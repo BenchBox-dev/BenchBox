@@ -37,7 +37,7 @@ user-facing messages because they bypass this channel's quiet policy.
 MCP and tooling callers can use `get_quiet_console()` or
 `silence_output()` to guard transitive stdout/stderr writes. Their actual
 stream and override boundaries are documented in the
-[utilities API](../reference/python-api/utilities.rst#runtime-toggles-and-output).
+[utilities API](../reference/python-api/utilities.md#runtime-toggles-and-output).
 
 ## TPC-DS package
 

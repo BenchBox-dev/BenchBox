@@ -194,6 +194,164 @@ GSPath('gs://bucket/data')
 
 Without it, `create_path_handler("s3://bucket/data")` raises `ImportError: cloudpathlib is required for cloud storage paths. uv pip install "benchbox[cloudstorage]"`.
 
+### Local Staging Path Wrappers
+
+#### `benchbox.utils.cloud_storage.DatabricksPath`
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath"></span>
+<span id="benchbox.utils.cloud_storage.DatabricksPath.__init__"></span>
+
+Associates a local file system path with a remote upload target stored in `dbfs_target`. Generators write to the local path, and the platform adapter uses the remote target.
+
+**Import:** `from benchbox.utils.cloud_storage import DatabricksPath` · **Extras:** none
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `local_path` | `str` or `Path` | required | The local path. A string is converted to `pathlib.Path`, and a `Path` is kept as given. |
+| `dbfs_target` | `str` | required | The `dbfs:/Volumes/...` URI that the platform adapter uploads to. |
+
+##### Returns
+
+A `DatabricksPath` object. Construction does not create directories and does not upload files. The caller that supplies `local_path` owns directory persistence and cleanup.
+
+`str(wrapper)` and `os.fspath(wrapper)` return the local path. Keep the wrapper when you pass the output directory to an adapter, because converting it to `Path` discards the remote target. The `/` operator returns a plain local `Path`, as do `joinpath()`, `parent` and `resolve()`.
+
+Two wrappers of this class compare equal when their local paths and remote targets match. Comparison with a `str` or `Path` uses only the local path, and hashing uses only the local path. The file system queries and changes below all act on the local path.
+
+**Attributes, methods and properties:**
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.dbfs_target"></span>
+`dbfs_target` (`str`) is the remote target supplied at construction, kept verbatim.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.exists"></span>
+`exists()` returns `bool`: whether the local path exists.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.mkdir"></span>
+`mkdir(parents=True, exist_ok=True)` creates the local directory and returns `None`. Both parent creation and acceptance of an existing directory default to `True`.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.is_dir"></span>
+`is_dir()` returns `bool`: whether the local path names a directory.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.is_file"></span>
+`is_file()` returns `bool`: whether the local path names a regular file.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.iterdir"></span>
+`iterdir()` returns an iterator over the immediate children as plain local `Path` objects.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.glob"></span>
+`glob(pattern: str)` returns an iterator over the matching local `Path` objects, using `pathlib` glob semantics.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.rglob"></span>
+`rglob(pattern: str)` returns an iterator over the matching local `Path` objects, searching recursively.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.name"></span>
+`name` is the final component of the local path, as a `str`.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.parent"></span>
+`parent` is the local parent as a plain `Path`. The returned object does not keep the remote target.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.parts"></span>
+`parts` is the local path components, as a `tuple`. It is a property.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.as_posix"></span>
+`as_posix()` returns the local path with forward slashes, as a `str`.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.suffix"></span>
+`suffix` is the suffix of the final local path component, as a `str`. It includes the leading dot when there is one.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.joinpath"></span>
+`joinpath(*other: str | Path)` joins local components and returns a plain `Path` without the remote target.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.stat"></span>
+`stat(*, follow_symlinks=True)` returns the local file metadata as an `os.stat_result`. It follows symbolic links unless `follow_symlinks=False`.
+
+<span id="benchbox.utils.cloud_storage.DatabricksPath.resolve"></span>
+`resolve(strict=False)` resolves the local path to an absolute plain `Path`. With `strict=False` missing components are allowed. The returned `Path` does not keep the remote target.
+
+##### Raises
+
+Nothing it raises itself.
+
+#### `benchbox.utils.cloud_storage.CloudStagingPath`
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath"></span>
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.__init__"></span>
+
+Associates a local file system path with a remote upload target stored in `cloud_target`. Generators write to the local path, and the platform adapter uses the remote target.
+
+**Import:** `from benchbox.utils.cloud_storage import CloudStagingPath` · **Extras:** none
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `local_path` | `str` or `Path` | required | The local path. A string is converted to `pathlib.Path`, and a `Path` is kept as given. |
+| `cloud_target` | `str` | required | The remote URI or stage reference that the platform adapter uploads to. |
+
+##### Returns
+
+A `CloudStagingPath` object. Construction does not create directories and does not upload files. The caller that supplies `local_path` owns directory persistence and cleanup.
+
+`str(wrapper)` and `os.fspath(wrapper)` return the local path. Keep the wrapper when you pass the output directory to an adapter, because converting it to `Path` discards the remote target. The `/` operator returns a plain local `Path`, as do `joinpath()`, `parent` and `resolve()`.
+
+Two wrappers of this class compare equal when their local paths and remote targets match. Comparison with a `str` or `Path` uses only the local path, and hashing uses only the local path. The file system queries and changes below all act on the local path.
+
+**Attributes, methods and properties:**
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.cloud_target"></span>
+`cloud_target` (`str`) is the remote target supplied at construction, kept verbatim.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.exists"></span>
+`exists()` returns `bool`: whether the local path exists.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.mkdir"></span>
+`mkdir(parents=True, exist_ok=True)` creates the local directory and returns `None`. Both parent creation and acceptance of an existing directory default to `True`.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.is_dir"></span>
+`is_dir()` returns `bool`: whether the local path names a directory.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.is_file"></span>
+`is_file()` returns `bool`: whether the local path names a regular file.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.iterdir"></span>
+`iterdir()` returns an iterator over the immediate children as plain local `Path` objects.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.glob"></span>
+`glob(pattern: str)` returns an iterator over the matching local `Path` objects, using `pathlib` glob semantics.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.rglob"></span>
+`rglob(pattern: str)` returns an iterator over the matching local `Path` objects, searching recursively.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.name"></span>
+`name` is the final component of the local path, as a `str`.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.parent"></span>
+`parent` is the local parent as a plain `Path`. The returned object does not keep the remote target.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.parts"></span>
+`parts` is the local path components, as a `tuple`. It is a property.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.as_posix"></span>
+`as_posix()` returns the local path with forward slashes, as a `str`.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.suffix"></span>
+`suffix` is the suffix of the final local path component, as a `str`. It includes the leading dot when there is one.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.joinpath"></span>
+`joinpath(*other: str | Path)` joins local components and returns a plain `Path` without the remote target.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.stat"></span>
+`stat(*, follow_symlinks=True)` returns the local file metadata as an `os.stat_result`. It follows symbolic links unless `follow_symlinks=False`.
+
+<span id="benchbox.utils.cloud_storage.CloudStagingPath.resolve"></span>
+`resolve(strict=False)` resolves the local path to an absolute plain `Path`. With `strict=False` missing components are allowed. The returned `Path` does not keep the remote target.
+
+##### Raises
+
+Nothing it raises itself.
+
 ### Credential Validation
 
 #### `benchbox.utils.cloud_storage.validate_cloud_credentials`
@@ -614,6 +772,274 @@ Without `cloudpathlib`:
 ❌ Install cloud storage support:
    uv add benchbox --extra cloudstorage
 ```
+
+### Provider Classification and Output Preservation
+
+#### `benchbox.utils.cloud_storage.is_snowflake_stage_path`
+
+<span id="benchbox.utils.cloud_storage.is_snowflake_stage_path"></span>
+
+Tells whether a path is a Snowflake stage reference.
+
+**Import:** `from benchbox.utils.cloud_storage import is_snowflake_stage_path` · **Extras:** none
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `path` | `str` or `Path` | required | The path or stage reference to classify. |
+
+##### Returns
+
+`bool`: `True` for a leading `@` followed by a user stage (`@~`), a table stage (`@%table`), a named stage or a stage name with up to three qualifying parts, optionally followed by a slash and a subpath. Identifiers are unquoted or double quoted, and a doubled quote escapes a quote inside a quoted identifier. A slash inside a quoted stage identifier belongs to that identifier.
+
+`PurePath` inputs have backslashes normalized to slashes. Strings keep their spelling. An `@` inside a cloud URI does not make it a stage.
+
+##### Raises
+
+Nothing it raises itself.
+
+#### `benchbox.utils.cloud_storage.snowflake_stage_mode_error`
+
+<span id="benchbox.utils.cloud_storage.snowflake_stage_mode_error"></span>
+
+Returns an error message when a Snowflake stage reference cannot be used with the chosen table mode.
+
+**Import:** `from benchbox.utils.cloud_storage import snowflake_stage_mode_error` · **Extras:** none
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `path` | `str` or `Path` | required | The path to check. |
+| `table_mode` | `str` | `"native"` | The Snowflake table mode. It is keyword-only. |
+
+##### Returns
+
+`str | None`: `None` for an input that is not a stage. For a stage, the external mode (matched without regard to letter case) returns an explanatory message, because `CREATE STAGE URL` requires a cloud URI. Every other mode accepts only user stages and rejects named and table stages, because native loads upload to each table's own stage instead of reusing `staging_root`.
+
+The function returns the message as a string. It does not raise and does not validate credentials.
+
+##### Raises
+
+Nothing it raises itself.
+
+#### `benchbox.utils.cloud_storage.is_adls_path`
+
+<span id="benchbox.utils.cloud_storage.is_adls_path"></span>
+
+Tells whether a path uses an Azure Data Lake Storage Gen2 scheme.
+
+**Import:** `from benchbox.utils.cloud_storage import is_adls_path` · **Extras:** none
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `path` | `str` or `Path` | required | The path to classify. |
+
+##### Returns
+
+`bool`: `True` for the `abfss` and `abfs` schemes. These URIs carry the storage account in the authority, so converting them to `az` would lose the account. `create_path_handler` instead stages them locally and keeps the original target.
+
+##### Raises
+
+Nothing it raises itself.
+
+#### `benchbox.utils.cloud_storage.is_databricks_path`
+
+<span id="benchbox.utils.cloud_storage.is_databricks_path"></span>
+
+Tells whether a path uses the `dbfs` scheme.
+
+**Import:** `from benchbox.utils.cloud_storage import is_databricks_path` · **Extras:** none
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `path` | `str` or `Path` | required | The path to classify. |
+
+##### Returns
+
+`bool`: `True` for the `dbfs` URI scheme. The function does not check the Unity Catalog Volume path shape. `create_path_handler` requires the literal `dbfs:/Volumes/` prefix.
+
+##### Raises
+
+Nothing it raises itself.
+
+#### `benchbox.utils.cloud_storage.cloud_provider_family`
+
+<span id="benchbox.utils.cloud_storage.cloud_provider_family"></span>
+
+Returns the provider family of a cloud path.
+
+**Import:** `from benchbox.utils.cloud_storage import cloud_provider_family` · **Extras:** none
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `path` | `str` or `Path` | required | The path to classify. |
+
+##### Returns
+
+`str | None`: `aws` for `s3`, `gcp` for `gs` and `gcs`, `azure` for `az`, `azure`, `abfss` and `abfs`, and `databricks` for `dbfs`. It returns `None` for local paths, unknown schemes and Snowflake stages without a scheme. Provider gating uses these families instead of separate alias lists.
+
+##### Raises
+
+Nothing it raises itself.
+
+#### `benchbox.utils.cloud_storage.CloudScheme`
+
+<span id="benchbox.utils.cloud_storage.CloudScheme"></span>
+<span id="benchbox.utils.cloud_storage.CloudScheme.__init__"></span>
+
+An immutable named tuple that describes one supported URI scheme.
+
+**Import:** `from benchbox.utils.cloud_storage import CloudScheme` · **Extras:** none
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `canonical` | `str` | required | The spelling that `cloudpathlib` registers, or the retained spelling for a staged family. |
+| `aliases` | `tuple[str, ...]` | required | The accepted alternative spellings. |
+| `family` | `str` | required | The provider family, used by platform gates. |
+| `env_vars` | `tuple[str, ...]` | required | The credential environment variables that `validate_cloud_credentials` checks. |
+| `stages_locally` | `bool` | `False` | When `True`, the scheme uses generic local staging instead of `cloudpathlib`. `dbfs` leaves this `False` and uses the separate `DatabricksPath` branch. |
+
+##### Returns
+
+A `CloudScheme` tuple.
+
+One shared scheme table drives recognition, alias normalization, provider families and credential checks, so adding a spelling cannot skip one of those checks. The non-staged aliases `gcs` and `azure` are rewritten to `gs` and `az`. `abfs` keeps its account-bearing URI instead of being rewritten to a `cloudpathlib` `az` path.
+
+##### Raises
+
+Nothing it raises itself.
+
+#### `benchbox.utils.cloud_storage.normalize_output_dir`
+
+<span id="benchbox.utils.cloud_storage.normalize_output_dir"></span>
+
+Normalizes a benchmark output directory without losing a staging wrapper.
+
+**Import:** `from benchbox.utils.cloud_storage import normalize_output_dir` · **Extras:** `cloudstorage`, needed only for `s3`, `gs`, `gcs`, `az` and `azure` paths
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `path` | `str`, `Path` or `None` | required | The output directory to normalize. |
+
+##### Returns
+
+`Path | CloudPath | DatabricksPath | CloudStagingPath | None`: `None` and existing local `Path`, `DatabricksPath` and `CloudStagingPath` objects are returned as the same object. Any other value goes to `create_path_handler`, including its `cloudpathlib` support and errors.
+
+Benchmark output-directory assignments must keep staging wrappers. Passing one through `Path` would keep only the local cache and discard the remote upload target.
+
+##### Raises
+
+Whatever `create_path_handler` raises: `ImportError` for an ordinary cloud path without `cloudpathlib`, and `ValueError` for a malformed cloud path or a `dbfs:` path outside `dbfs:/Volumes/`.
+
+### Remote File Operations
+
+#### `benchbox.utils.cloud_storage.RemoteFileSystemAdapter`
+
+<span id="benchbox.utils.cloud_storage.RemoteFileSystemAdapter"></span>
+
+A protocol for validation-time remote file operations. Inputs are opaque absolute remote paths that include their scheme. Implementations own the remote access.
+
+**Import:** `from benchbox.utils.cloud_storage import RemoteFileSystemAdapter` · **Extras:** none
+
+##### Parameters
+
+None. This is a protocol, not a constructor.
+
+##### Returns
+
+An object that provides these methods:
+
+<span id="benchbox.utils.cloud_storage.RemoteFileSystemAdapter.file_exists"></span>
+`file_exists(remote_path: str)` returns `bool`: whether the remote file exists.
+
+<span id="benchbox.utils.cloud_storage.RemoteFileSystemAdapter.read_file"></span>
+`read_file(remote_path: str)` returns the file contents as `bytes`.
+
+<span id="benchbox.utils.cloud_storage.RemoteFileSystemAdapter.write_file"></span>
+`write_file(remote_path: str, content: bytes)` writes the bytes to the remote file and returns `None`.
+
+<span id="benchbox.utils.cloud_storage.RemoteFileSystemAdapter.list_files"></span>
+`list_files(remote_path: str, pattern: str = "*")` returns a `list[str]` of the matching paths under the remote location.
+
+##### Raises
+
+Nothing it raises itself. Each implementation defines its own errors.
+
+#### `benchbox.utils.cloud_storage.DatabricksVolumeAdapter`
+
+<span id="benchbox.utils.cloud_storage.DatabricksVolumeAdapter"></span>
+<span id="benchbox.utils.cloud_storage.DatabricksVolumeAdapter.__init__"></span>
+
+Implements `RemoteFileSystemAdapter` through the Databricks Files API.
+
+**Import:** `from benchbox.utils.cloud_storage import DatabricksVolumeAdapter` · **Extras:** `databricks`, which provides `databricks-sdk`
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `workspace_client` | `Any \| None` | `None` | A Databricks workspace client to use. When it is `None`, the adapter builds one. |
+| `host` | `str \| None` | `None` | The workspace host. It is keyword-only. A nonempty host gets an `https://` prefix before it is passed to `WorkspaceClient`. `None` leaves this setting to the SDK configuration. |
+| `token` | `str \| None` | `None` | The access token passed to `WorkspaceClient`. It is keyword-only. `None` leaves this setting to the SDK configuration. |
+
+##### Returns
+
+A `DatabricksVolumeAdapter`. Construction imports `databricks.sdk` lazily, even when `workspace_client` is supplied.
+
+The `dbfs:` marker is removed before each Files API call. These operations can make real remote requests.
+
+<span id="benchbox.utils.cloud_storage.DatabricksVolumeAdapter.file_exists"></span>
+`file_exists(remote_path)` returns `False` when the provider reports an error.
+
+<span id="benchbox.utils.cloud_storage.DatabricksVolumeAdapter.read_file"></span>
+`read_file(remote_path)` accepts either the downloaded bytes or a stream with `read()`, and returns `bytes`.
+
+<span id="benchbox.utils.cloud_storage.DatabricksVolumeAdapter.write_file"></span>
+`write_file(remote_path, content)` uploads the bytes in a `BytesIO` with `overwrite=True`.
+
+<span id="benchbox.utils.cloud_storage.DatabricksVolumeAdapter.list_files"></span>
+`list_files(remote_path, pattern="*")` takes the `path` attribute of each returned object, then `file_path`, then its string form. It matches the final slash-separated component against `pattern` with `fnmatch`. Dictionary entries get no special key lookup. A listing error returns an empty list.
+
+##### Raises
+
+- **`ImportError`:** the Databricks SDK cannot be imported, or its import fails.
+- **`RuntimeError`:** `read_file` or `write_file` fails. The original exception is the cause.
+
+#### `benchbox.utils.cloud_storage.get_remote_fs_adapter`
+
+<span id="benchbox.utils.cloud_storage.get_remote_fs_adapter"></span>
+
+Returns a remote file system adapter for a remote path.
+
+**Import:** `from benchbox.utils.cloud_storage import get_remote_fs_adapter` · **Extras:** `databricks`, which provides `databricks-sdk`
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `remote_path` | `str` | required | The remote path. Only `dbfs` paths are supported. |
+
+##### Returns
+
+A `DatabricksVolumeAdapter`, built from a `WorkspaceClient` that is constructed lazily from the SDK environment configuration. The function does not check the Unity Catalog Volume prefix, and it adds no placeholder support for other providers.
+
+##### Raises
+
+- **`ImportError`:** the Databricks SDK is not installed.
+- **`RuntimeError`:** any other initialization failure. The message gives credential guidance.
+- **`ValueError`:** the path is for a provider other than `dbfs`.
 
 ## Usage Examples
 

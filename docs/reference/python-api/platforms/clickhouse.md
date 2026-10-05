@@ -246,6 +246,93 @@ These were run in local mode for this page. Server-mode behaviour of the same me
 <span id="benchbox.platforms.clickhouse.ClickHouseAdapter.get_tuning_introspector"></span>
 **`get_tuning_introspector()`**: Returns a `ClickHouseTuningIntrospector` (from `benchbox.platforms.clickhouse.introspection`), which reads the `sorting_key` and `partition_key` of `system.tables` to confirm that the tuning clauses recorded for a run were applied.
 
+#### Diagnostics
+
+These methods come from `ClickHouseDiagnosticsMixin`. Both `ClickHouseAdapter.<name>` and `ClickHouseDiagnosticsMixin.<name>` resolve to the same method.
+
+<span id="benchbox.platforms.clickhouse.diagnostics.ClickHouseDiagnosticsMixin.check_server_database_exists"></span>
+**`check_server_database_exists(**connection_config) -> bool`**: Tells whether the database exists. In local mode it returns whether the path from `get_database_path` exists on disk, and `False` when there is no path. In server mode it connects with an administrative client and looks for the database name in `SHOW DATABASES`. The `database` key of `connection_config` overrides the adapter's database. Any failure returns `False`.
+
+<span id="benchbox.platforms.clickhouse.diagnostics.ClickHouseDiagnosticsMixin.drop_database"></span>
+**`drop_database(**connection_config) -> None`**: Drops the database on a ClickHouse server with `DROP DATABASE IF EXISTS`. In local mode it does nothing. The `database` key of `connection_config` overrides the adapter's database. A failure raises `RuntimeError` (`Failed to drop ClickHouse database: ...`).
+
+<span id="benchbox.platforms.clickhouse.ClickHouseAdapter.get_table_info"></span>
+<span id="benchbox.platforms.clickhouse.diagnostics.ClickHouseDiagnosticsMixin.get_table_info"></span>
+**`get_table_info(connection, table_name: str) -> dict[str, Any]`**: Returns detailed information about a table in the current database: `columns` (a list of `(name, type)` pairs in column order), `row_count`, `bytes_on_disk` and `compressed_size`. The last three come from `system.parts`. A failure does not raise: the result is `{'error': <message>}`.
+
+<span id="benchbox.platforms.clickhouse.ClickHouseAdapter.optimize_table"></span>
+<span id="benchbox.platforms.clickhouse.diagnostics.ClickHouseDiagnosticsMixin.optimize_table"></span>
+**`optimize_table(connection, table_name: str) -> None`**: Runs `OPTIMIZE TABLE <table_name> FINAL` to merge the table's parts for better query performance. A failure is logged as a warning and does not raise.
+
+#### Metadata and command-line options
+
+These methods come from `ClickHouseMetadataMixin`.
+
+<span id="benchbox.platforms.clickhouse.metadata.ClickHouseMetadataMixin.add_cli_arguments"></span>
+**`add_cli_arguments(parser) -> None`** (static method): Adds the ClickHouse option group to an `argparse` parser: `--data-path` (default `/tmp/benchbox_ch_local`, the path for local-mode data) and `--deployment-mode` (default `local`, `server` or `local`).
+
+<span id="benchbox.platforms.clickhouse.metadata.ClickHouseMetadataMixin.get_database_path"></span>
+**`get_database_path(**connection_config) -> str | None`**: Returns the database path for local-mode persistence, or `None`. In server mode it always returns `None`. In local mode it uses the first of these that is set:
+
+1. `connection_config["database_path"]`, if given and not `None`. A `.duckdb` suffix is replaced with `.chdb`, and `.chdb` is appended to any other name that does not already end with it.
+2. The adapter's `database_path`, which `from_config` sets.
+3. `None`. `check_server_database_exists` then returns `False`.
+
+<span id="benchbox.platforms.clickhouse.metadata.ClickHouseMetadataMixin.get_target_dialect"></span>
+**`get_target_dialect() -> str`**: Returns the target SQL dialect, `"clickhouse"`.
+
+#### Delta Lake reads
+
+These methods come from `ClickHouseWorkloadMixin`. They use the probes and resolver in `benchbox.platforms.clickhouse.delta_lake`.
+
+<span id="benchbox.platforms.clickhouse.workload.ClickHouseWorkloadMixin.delta_native_registration"></span>
+**`delta_native_registration(connection) -> bool`**: Probes whether the server registers native Delta Lake reads. It runs the `system.table_functions` and `system.table_engines` probes and applies `has_native_delta_registration`. It returns `True` when the server registers both the `deltaLake` function and the `DeltaLake` engine. The `connection` must expose `execute()`. Nothing is cached: the probe is two light system queries, so callers that decide per statement see the current server state.
+
+<span id="benchbox.platforms.clickhouse.workload.ClickHouseWorkloadMixin.delta_reader_for"></span>
+**`delta_reader_for(connection, location: str) -> DeltaReader`**: Selects the native or snapshot read path for a Delta table. It probes the server once, then calls `resolve_delta_reader` in `benchbox.platforms.clickhouse.delta_lake` with two verdicts: the base-integration verdict, and the verdict for the `deltaLakeLocal` function. Both are needed because a server can register the base integration without the local alias. `location` is the bucket URL or file system path of the Delta table, and the result is the chosen `DeltaReader`. It raises `ValueError` when the location is empty, blank or unrecognized, or when it has no executable read path (a remote location on a server without native reads).
+
+#### Tuning
+
+These methods come from `ClickHouseTuningMixin`.
+
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.get_effective_tuning_configuration"></span>
+**`get_effective_tuning_configuration() -> UnifiedTuningConfiguration | None`**: Returns the tuning configuration with ClickHouse's requirements applied. ClickHouse requires primary keys even when tuning is off, so primary keys are always enabled. When there is no configured tuning, the result has foreign keys disabled.
+
+<span id="benchbox.platforms.clickhouse.ClickHouseAdapter.validate_session_cache_control"></span>
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.validate_session_cache_control"></span>
+**`validate_session_cache_control(connection) -> dict[str, Any]`**: Checks that the session-level cache control settings were applied. It reads `use_query_cache`, `enable_writes_to_query_cache` and `enable_reads_from_query_cache` from `system.settings` and expects each to be `0` when `disable_result_cache` is on and `1` otherwise. The result has these keys:
+
+- **`validated`:** `True` when all three settings have the expected value.
+- **`cache_disabled`:** `True` when validation passed and the cache is disabled.
+- **`settings`:** the settings as read, as a dict of strings.
+- **`warnings`:** a list of validation warnings.
+- **`errors`:** a list of validation errors.
+
+It raises `ConfigurationError` if validation fails and `strict_validation` is `True`.
+
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.supports_tuning_type"></span>
+**`supports_tuning_type(tuning_type) -> bool`**: Tells whether ClickHouse supports a tuning type. The supported types are partitioning, sorting, clustering and distribution.
+
+<span id="benchbox.platforms.clickhouse.ClickHouseAdapter.apply_table_tunings"></span>
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.apply_table_tunings"></span>
+**`apply_table_tunings(table_tuning, connection) -> None`**: Applies ClickHouse-specific table tunings from a `TableTuning` object. ClickHouse handles each tuning type differently:
+
+- **Partitioning:** defined with `PARTITION BY` in `CREATE TABLE`.
+- **Sorting:** defined with `ORDER BY` in `CREATE TABLE`.
+- **Clustering:** achieved through `ORDER BY` and `OPTIMIZE` operations.
+- **Distribution:** handled through distributed engine settings.
+
+It raises `ValueError` if the tuning configuration is invalid for ClickHouse.
+
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.apply_unified_tuning"></span>
+**`apply_unified_tuning(unified_config: UnifiedTuningConfiguration, connection) -> None`**: Applies a unified tuning configuration to ClickHouse.
+
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.apply_platform_optimizations"></span>
+**`apply_platform_optimizations(platform_config: PlatformOptimizationConfiguration, connection) -> None`**: An intentional no-op for ClickHouse today. `PlatformOptimizationConfiguration` models only Databricks and BigQuery style options (z-ordering, liquid clustering, auto-optimize, bloom filters, materialized views), and none of them apply to ClickHouse. ClickHouse session settings (memory, threads, join algorithm, cache control) are applied separately by `configure_for_benchmark`, which reads the adapter's own attributes.
+
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.apply_constraint_configuration"></span>
+**`apply_constraint_configuration(primary_key_config: PrimaryKeyConfiguration, foreign_key_config: ForeignKeyConfiguration, connection) -> None`**: Logs an informational message for each enabled primary-key and foreign-key setting. It runs no SQL and does not use `connection`. The table-creation hooks handle any constraint DDL the platform supports.
+
 ## Configuration Examples
 
 ### Server Mode - Local Development

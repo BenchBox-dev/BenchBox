@@ -762,6 +762,70 @@ print(round(time.time() - start))
 2
 ```
 
+### CPU Identity Detection
+
+#### `benchbox.utils.environment.is_cpu_architecture_token`
+
+<span id="benchbox.utils.environment.is_cpu_architecture_token"></span>
+
+Tells whether a string is only an architecture label rather than a CPU model. Use it to reject architecture labels that stand in for CPU models. It does not identify arbitrary processor brands.
+
+**Import:** `from benchbox.utils.environment import is_cpu_architecture_token` · **Extras:** none
+
+```python
+def is_cpu_architecture_token(value: str, machine: str) -> bool: ...
+```
+
+{#is-cpu-architecture-token-parameters}
+
+##### Parameters
+
+| Name | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `value` | `str` | required | The candidate CPU model string. It is stripped and lowercased before the comparison. |
+| `machine` | `str` | required | The current machine architecture, such as `x86_64` or `arm64`. |
+
+{#is-cpu-architecture-token-returns}
+
+##### Returns
+
+`bool`: `True` when the cleaned value is empty, equals the machine architecture, equals that architecture followed by `CPU`, equals `unknown cpu`, or is a recognized architecture token. Otherwise `False`.
+
+#### `benchbox.utils.environment.detect_cpu_info`
+
+<span id="benchbox.utils.environment.detect_cpu_info"></span>
+
+Returns the CPU model and vendor of the current host. Either value can be unavailable.
+
+**Import:** `from benchbox.utils.environment import detect_cpu_info` · **Extras:** none
+
+```python
+def detect_cpu_info() -> tuple[str | None, str | None]: ...
+```
+
+{#detect-cpu-info-parameters}
+
+##### Parameters
+
+None.
+
+{#detect-cpu-info-returns}
+
+##### Returns
+
+`tuple[str | None, str | None]`: the CPU model and the CPU vendor. Each is `None` when it cannot be determined.
+
+The probe depends on the platform:
+
+- **Darwin:** reads the `sysctl` CPU brand string. The subprocess has a two-second timeout.
+- **Linux:** reads `/proc/cpuinfo`, and uses known ARM part mappings when no model string is present.
+- **Windows:** reads the first `Win32_Processor` through PowerShell CIM. The subprocess has a two-second timeout.
+- **Other platforms:** returns `(None, None)`.
+
+Probe errors return unavailable values. A detected architecture label is discarded as a model, and an available vendor is kept.
+
+The probes request processor identity, not host names or machine identifiers. `get_system_info()` separately includes a host name, so callers who publish host information still need the anonymization rules in {doc}`/development/result-execution-environment`.
+
 ### Usage Examples
 
 #### Benchmark Environment Documentation

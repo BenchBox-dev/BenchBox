@@ -282,6 +282,343 @@ PASSED
 
 The class that holds it, `ExecutionPhases`, and its attributes are not part of the public contract and may change. See [Not part of the public contract](#not-part-of-the-public-contract). For setup timings that are part of the contract, read `data_loading_time` and `schema_creation_time`.
 
+### Nested execution phase records
+
+All records below are mutable dataclasses except `ThroughputOutstandingWork`, which describes a dictionary. Required fields have no constructor default; a nullable required field must still be supplied. List factories create independent containers. Producers supply timestamp strings and status values; these dataclasses do not enforce a timestamp format or status enum.
+
+#### `benchbox.core.results.models.TableGenerationStats`
+
+<span id="benchbox.core.results.models.TableGenerationStats"></span>
+
+One table's generated row count, data size in bytes, output file path, and generation time in milliseconds. Optional failure fields retain attempted row and byte counts and producer-supplied error details.
+
+**Import:** `from benchbox.core.results.models import TableGenerationStats` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `generation_time_ms` | `int` | required |
+| `status` | `str` | required |
+| `rows_generated` | `int` | required |
+| `data_size_bytes` | `int` | required |
+| `file_path` | `str` | required |
+| `error_type` | `str \| None` | `None` |
+| `error_message` | `str \| None` | `None` |
+| `rows_attempted` | `int \| None` | `None` |
+| `bytes_attempted` | `int \| None` | `None` |
+| `error_timestamp` | `str \| None` | `None` |
+
+#### `benchbox.core.results.models.DataGenerationPhase`
+
+<span id="benchbox.core.results.models.DataGenerationPhase"></span>
+
+Generation duration in milliseconds, table and row counts, and total data size in bytes. `per_table_stats` maps table names to generation records.
+
+**Import:** `from benchbox.core.results.models import DataGenerationPhase` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `duration_ms` | `int` | required |
+| `status` | `str` | required |
+| `tables_generated` | `int` | required |
+| `total_rows_generated` | `int` | required |
+| `total_data_size_bytes` | `int` | required |
+| `per_table_stats` | `dict[str, TableGenerationStats]` | required |
+
+#### `benchbox.core.results.models.TableCreationStats`
+
+<span id="benchbox.core.results.models.TableCreationStats"></span>
+
+One table's creation duration in milliseconds, applied constraint count, created index count, and optional producer-supplied failure details.
+
+**Import:** `from benchbox.core.results.models import TableCreationStats` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `creation_time_ms` | `int` | required |
+| `status` | `str` | required |
+| `constraints_applied` | `int` | required |
+| `indexes_created` | `int` | required |
+| `error_type` | `str \| None` | `None` |
+| `error_message` | `str \| None` | `None` |
+| `error_timestamp` | `str \| None` | `None` |
+
+#### `benchbox.core.results.models.SchemaCreationPhase`
+
+<span id="benchbox.core.results.models.SchemaCreationPhase"></span>
+
+Schema-creation duration in milliseconds and table, constraint, and index counts. `per_table_creation` maps table names to creation records.
+
+**Import:** `from benchbox.core.results.models import SchemaCreationPhase` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `duration_ms` | `int` | required |
+| `status` | `str` | required |
+| `tables_created` | `int` | required |
+| `constraints_applied` | `int` | required |
+| `indexes_created` | `int` | required |
+| `per_table_creation` | `dict[str, TableCreationStats]` | required |
+
+#### `benchbox.core.results.models.TableLoadingStats`
+
+<span id="benchbox.core.results.models.TableLoadingStats"></span>
+
+One table's reported row count and loading duration in milliseconds. Optional failure fields retain processed and successful row counts and producer-supplied error details.
+
+**Import:** `from benchbox.core.results.models import TableLoadingStats` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `rows` | `int` | required |
+| `load_time_ms` | `int` | required |
+| `status` | `str` | required |
+| `error_type` | `str \| None` | `None` |
+| `error_message` | `str \| None` | `None` |
+| `rows_processed` | `int \| None` | `None` |
+| `rows_successful` | `int \| None` | `None` |
+| `error_timestamp` | `str \| None` | `None` |
+
+#### `benchbox.core.results.models.DataLoadingPhase`
+
+<span id="benchbox.core.results.models.DataLoadingPhase"></span>
+
+Loading duration in milliseconds and loaded row and table counts. `per_table_stats` maps table names to loading records.
+
+**Import:** `from benchbox.core.results.models import DataLoadingPhase` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `duration_ms` | `int` | required |
+| `status` | `str` | required |
+| `total_rows_loaded` | `int` | required |
+| `tables_loaded` | `int` | required |
+| `per_table_stats` | `dict[str, TableLoadingStats]` | required |
+
+#### `benchbox.core.results.models.ValidationPhase`
+
+<span id="benchbox.core.results.models.ValidationPhase"></span>
+
+Setup validation duration in milliseconds, outcome text for row counts, schema and integrity checks, and optional additional validation details.
+
+**Import:** `from benchbox.core.results.models import ValidationPhase` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `duration_ms` | `int` | required |
+| `row_count_validation` | `str` | required |
+| `schema_validation` | `str` | required |
+| `data_integrity_checks` | `str` | required |
+| `validation_details` | `dict[str, Any] \| None` | `None` |
+
+#### `benchbox.core.results.models.StatisticsGatheringPhase`
+
+<span id="benchbox.core.results.models.StatisticsGatheringPhase"></span>
+
+Optimizer-statistics duration in milliseconds. `stats_mode` is `explicit` for a measured ANALYZE build; `auto-on-load` and `unsupported` record a duration of 0.
+
+**Import:** `from benchbox.core.results.models import StatisticsGatheringPhase` · **Extras:** none
+
+`stats_lifecycle` is `reset` when statistics were invalidated before the build, `unsupported` when a requested reset was unavailable, or `persist` for an explicit warm-statistics choice. None means that the control was unused. `per_table_ms` provides an opt-in per-table ANALYZE breakdown in milliseconds. Whole-database hooks, auto-on-load, and unsupported modes leave it None. Serialization omits it when None or empty.
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `duration_ms` | `int` | required |
+| `status` | `str` | required |
+| `stats_mode` | `str` | required |
+| `tables_analyzed` | `int` | `0` |
+| `error_message` | `str \| None` | `None` |
+| `stats_lifecycle` | `str \| None` | `None` |
+| `per_table_ms` | `dict[str, int] \| None` | `None` |
+
+#### `benchbox.core.results.models.SetupPhase`
+
+<span id="benchbox.core.results.models.SetupPhase"></span>
+
+Optional stages grouped under `ExecutionPhases.setup`. A missing stage is represented by None.
+
+**Import:** `from benchbox.core.results.models import SetupPhase` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `data_generation` | `DataGenerationPhase \| None` | `None` |
+| `schema_creation` | `SchemaCreationPhase \| None` | `None` |
+| `data_loading` | `DataLoadingPhase \| None` | `None` |
+| `validation` | `ValidationPhase \| None` | `None` |
+| `statistics_gathering` | `StatisticsGatheringPhase \| None` | `None` |
+
+#### `benchbox.core.results.models.PowerTestPhase`
+
+<span id="benchbox.core.results.models.PowerTestPhase"></span>
+
+Power-test timestamps, duration in milliseconds, and query records. `geometric_mean_time` uses seconds. `power_at_size` is the power metric supplied by the benchmark result producer.
+
+**Import:** `from benchbox.core.results.models import PowerTestPhase` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `start_time` | `str` | required |
+| `end_time` | `str` | required |
+| `duration_ms` | `int` | required |
+| `query_executions` | `list[QueryExecution]` | required |
+| `geometric_mean_time` | `float` | required |
+| `power_at_size` | `float` | required |
+
+#### `benchbox.core.results.models.ThroughputStream`
+
+<span id="benchbox.core.results.models.ThroughputStream"></span>
+
+One throughput stream's identifier, timestamps, duration in milliseconds, query records, and success or failure outcome.
+
+**Import:** `from benchbox.core.results.models import ThroughputStream` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `stream_id` | `int` | required |
+| `start_time` | `str` | required |
+| `end_time` | `str` | required |
+| `duration_ms` | `int` | required |
+| `query_executions` | `list[QueryExecution]` | required |
+| `success` | `bool` | `True` |
+| `error_message` | `str \| None` | `None` |
+
+#### `benchbox.core.results.models.ThroughputOutstandingWork`
+
+<span id="benchbox.core.results.models.ThroughputOutstandingWork"></span>
+
+Dictionary shape for workers remaining after phase completion. Both keys are required: `stream_ids` identifies the workers, and `cleanup_state` records their producer-reported cleanup state.
+
+**Import:** `from benchbox.core.results.models import ThroughputOutstandingWork` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `stream_ids` | `list[int]` | required key |
+| `cleanup_state` | `str` | required key |
+
+#### `benchbox.core.results.models.ThroughputTestPhase`
+
+<span id="benchbox.core.results.models.ThroughputTestPhase"></span>
+
+Throughput timestamps, duration in milliseconds, configured stream count, stream records and executed-query count. `throughput_at_size` is a required argument that may be None when no metric is available. `errors` contains phase error messages; `outstanding_work` retains optional evidence about workers remaining after phase completion.
+
+**Import:** `from benchbox.core.results.models import ThroughputTestPhase` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `start_time` | `str` | required |
+| `end_time` | `str` | required |
+| `duration_ms` | `int` | required |
+| `num_streams` | `int` | required |
+| `streams` | `list[ThroughputStream]` | required |
+| `total_queries_executed` | `int` | required |
+| `throughput_at_size` | `float \| None` | required |
+| `success` | `bool` | `True` |
+| `errors` | `list[str]` | fresh list |
+| `outstanding_work` | `ThroughputOutstandingWork \| None` | `None` |
+
+#### `benchbox.core.results.models.MaintenanceOperation`
+
+<span id="benchbox.core.results.models.MaintenanceOperation"></span>
+
+One maintenance operation's identifier, type, affected table, duration in milliseconds, affected-row count and outcome.
+
+**Import:** `from benchbox.core.results.models import MaintenanceOperation` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `operation` | `str` | required |
+| `operation_type` | `str` | required |
+| `table` | `str` | required |
+| `execution_time_ms` | `int` | required |
+| `rows_affected` | `int` | required |
+| `status` | `str` | required |
+| `error_message` | `str \| None` | `None` |
+
+#### `benchbox.core.results.models.MaintenanceTestPhase`
+
+<span id="benchbox.core.results.models.MaintenanceTestPhase"></span>
+
+Maintenance timestamps, duration in milliseconds, operation records and query execution records.
+
+**Import:** `from benchbox.core.results.models import MaintenanceTestPhase` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `start_time` | `str` | required |
+| `end_time` | `str` | required |
+| `duration_ms` | `int` | required |
+| `maintenance_operations` | `list[MaintenanceOperation]` | required |
+| `query_executions` | `list[QueryExecution]` | required |
+
+#### `benchbox.core.results.models.MigrationTableStats`
+
+<span id="benchbox.core.results.models.MigrationTableStats"></span>
+
+One table's migration duration in milliseconds and storage sizes before and after migration, with their change, in bytes.
+
+**Import:** `from benchbox.core.results.models import MigrationTableStats` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `duration_ms` | `int` | required |
+| `status` | `str` | required |
+| `storage_before_bytes` | `int` | required |
+| `storage_after_bytes` | `int` | required |
+| `storage_delta_bytes` | `int` | required |
+| `error_message` | `str \| None` | `None` |
+
+#### `benchbox.core.results.models.MigrationPhase`
+
+<span id="benchbox.core.results.models.MigrationPhase"></span>
+
+pg_mooncake heap-to-columnstore migration duration in milliseconds, migrated and failed table counts, and aggregate storage sizes and change in bytes. `per_table_stats` maps table names to migration records.
+
+**Import:** `from benchbox.core.results.models import MigrationPhase` · **Extras:** none
+
+##### Fields
+
+| Field | Type | Default |
+| --- | --- | --- |
+| `duration_ms` | `int` | required |
+| `status` | `str` | required |
+| `tables_migrated` | `int` | required |
+| `tables_failed` | `int` | required |
+| `storage_before_bytes` | `int` | required |
+| `storage_after_bytes` | `int` | required |
+| `storage_delta_bytes` | `int` | required |
+| `per_table_stats` | `dict[str, MigrationTableStats]` | required |
+
 ## Working with Results
 
 ### Loading Results
@@ -834,6 +1171,1240 @@ tpch_sf1_duckdb_baseline.json
 2. **Track over time** to detect gradual degradation
 3. **Set alert thresholds** (e.g., 15% regression)
 4. **Investigate outliers** before dismissing as noise
+
+## Cost Calculation and Result Enrichment
+
+These APIs estimate costs from packaged prices and resource metadata. Query and phase totals do not certify invoices or infrastructure idle costs. See {doc}`../../development/adr/adr-billing-unit-tb-tib-contract` for billing units.
+
+### validate_resource_usage
+
+#### `benchbox.core.cost.calculator.validate_resource_usage`
+
+<span id="benchbox.core.cost.calculator.validate_resource_usage"></span>
+
+```python
+def validate_resource_usage(
+    platform: str,
+    resource_usage: dict[str, Any],
+) -> tuple[bool, list[str]]: ...
+```
+
+Lowercase the platform and check key presence against `cost_specs.yaml`. Required keys and at-least-one groups must be present. Values are not checked for type or sign. Unexpected keys produce warnings without invalidating the input. Unknown platforms return `True` with a no-schema warning. The input is not changed.
+
+**Import:** `from benchbox.core.cost.calculator import validate_resource_usage` · **Extras:** none
+
+### CostCalculator
+
+#### `benchbox.core.cost.calculator.CostCalculator`
+
+<span id="benchbox.core.cost.calculator.CostCalculator"></span>
+
+Construct without arguments. Cloud calculation keys are `snowflake`, `bigquery`, `redshift`, `databricks`, `databricks-df`, `athena`, `synapse`, `fabric_dw` and `firebolt`. Lookups lowercase names but do not resolve display aliases; other keys can be local or unsupported.
+
+**Import:** `from benchbox.core.cost.calculator import CostCalculator` · **Extras:** none
+
+##### `benchbox.core.cost.calculator.CostCalculator.is_local_platform`
+
+<span id="benchbox.core.cost.calculator.CostCalculator.is_local_platform"></span>
+
+```python
+def is_local_platform(platform: str) -> bool: ...
+```
+
+Test the local/self-hosted platform set. Zero cloud compute cost does not measure hardware, storage or operating costs.
+
+##### `benchbox.core.cost.calculator.CostCalculator.calculate_query_cost`
+
+<span id="benchbox.core.cost.calculator.CostCalculator.calculate_query_cost"></span>
+
+```python
+def calculate_query_cost(
+    platform: str,
+    resource_usage: dict[str, Any],
+    platform_config: dict[str, Any],
+    validate: bool = True,
+) -> QueryCost | None: ...
+```
+
+Return an estimate in packaged `CURRENCY`. Validation logs warnings but does not prevent calculation when invalid. Local platforms return zero. Unsupported platforms and exceptions inside a platform calculator return `None` after logging; earlier input/schema errors can propagate. Missing query costs are not evidence of free execution.
+
+Fallback pricing can produce an estimate marked by `pricing_details["price_unavailable"]`. Normalized publication rejects that estimate. Snowflake uses metered warehouse `credits_used` when present; `credits_used_cloud_services` is not warehouse billing. Otherwise runtime and warehouse size can support an estimate. Runtime preference is numeric `execution_time_ms`, `execution_time_seconds`, then `total_elapsed_time_ms`; millisecond values are divided by 1,000. Booleans are not runtime measurements. Estimates exclude idle periods and multicluster scaling and can overcount concurrent warehouse use.
+
+Byte-priced tables declare `tebibyte` (`1024**4` bytes) or `terabyte` (`10**12` bytes). Retain that distinction when providing byte counts; unit labels alone are insufficient.
+
+`benchbox/core/cost/cost_specs.yaml` defines presence-validation schemas. The calculators consume these inputs; defaults below apply to missing configuration keys and support estimates, not observed deployment proof:
+
+- Snowflake uses `edition="standard"`, `cloud="aws"` and `region="us-east-1"`. Runtime estimation uses a truthy per-query `warehouse_size` before configuration `warehouse_size`.
+- BigQuery uses truthy `bytes_billed` before `bytes_processed` and `location="us"`. List-rate estimation starts at byte zero; it does not model the monthly free tier.
+- Redshift needs `execution_time_seconds` and uses `node_type="dc2.large"`, `node_count=1` and `region="us-east-1"`. It estimates runtime-based query cost, excluding cluster idle time; total cluster spend needs full runtime.
+- Databricks uses metered `dbu_consumed` when non-`None`; otherwise `execution_time_seconds` and `cluster_size_dbu_per_hour` are both needed. Defaults are `cloud="aws"`, `tier="premium"` and `workload_type="all_purpose"`. This is DBU cost only and excludes underlying cloud compute charges.
+- Athena needs `data_scanned_bytes` and uses `region="us-east-1"`; legacy adapter `cost_usd` is ignored.
+- Synapse lowercases `mode` and treats missing/falsy mode as `"serverless"`. That mode needs `bytes_processed`; all other mode values take the dedicated branch using `execution_time_seconds` and `dwu_level="dw100c"`. Both branches use `region="eastus"`. Dedicated pricing is per selected pool-hour, not multiplied by DWUs.
+- Fabric uses non-`None` `cu_seconds`; otherwise it needs `execution_time_seconds` and resolves CU count from `sku="f64"`. It uses `region="eastus"` and converts CU-seconds to CU-hours.
+- Firebolt uses non-`None` `fbu_consumed`; otherwise it needs `execution_time_seconds` and estimates consumption from hourly rate for `node_type="m"` and `node_count=1`. With metered FBUs, missing node type is recorded as `"unknown"` instead.
+
+##### `benchbox.core.cost.calculator.CostCalculator.calculate_phase_cost`
+
+<span id="benchbox.core.cost.calculator.CostCalculator.calculate_phase_cost"></span>
+
+```python
+def calculate_phase_cost(phase_name: str, query_costs: list[QueryCost]) -> PhaseCost: ...
+```
+
+Sum compute costs, including concurrent queries. This is summed spend, not cost per hour of phase wall time. `None` placeholders are omitted from totals and stored costs; query count remains the input list length. Empty input produces zero and no individual costs. Duration and stream count are not inferred. Callers must use packaged currency consistently; no conversion or matching-currency validation is performed.
+
+##### `benchbox.core.cost.calculator.CostCalculator.calculate_benchmark_cost`
+
+<span id="benchbox.core.cost.calculator.CostCalculator.calculate_benchmark_cost"></span>
+
+```python
+def calculate_benchmark_cost(
+    phase_costs: list[PhaseCost],
+    platform_details: dict[str, Any] | None = None,
+) -> BenchmarkCost: ...
+```
+
+Delegate to `BenchmarkCost.from_phase_costs` using packaged `CURRENCY`. Phase amounts must use that currency. Storage is not automatically added to the compute total.
+
+##### `benchbox.core.cost.calculator.CostCalculator.calculate_normalized_benchmark_cost`
+
+<span id="benchbox.core.cost.calculator.CostCalculator.calculate_normalized_benchmark_cost"></span>
+
+```python
+def calculate_normalized_benchmark_cost(
+    platform: str,
+    benchmark_cost: BenchmarkCost,
+    platform_config: dict[str, Any],
+) -> tuple[NormalizedCost, list[str]]: ...
+```
+
+Return a normalized record and availability warnings. Local platforms return explicit zero with `not_applicable_local` and no warnings. Cloud normalization needs computed phases, billing unit, cloud/region and applicable warehouse, cluster or node sizing. Defaulted metadata, fallback price markers, missing pricing provenance or pricing older than 90 days make the amount unavailable. Concurrent Snowflake phases containing runtime-estimated credits are also unavailable.
+
+Success converts the existing compute total through `Decimal(str(total_cost))` without recalculating queries. Scope is `compute_only`. Warnings yield `normalized_cost_usd=None` while preserving deployment and model provenance.
+
+### validate_platform_config
+
+#### `benchbox.core.cost.integration.validate_platform_config`
+
+<span id="benchbox.core.cost.integration.validate_platform_config"></span>
+
+```python
+def validate_platform_config(
+    platform: str,
+    config: dict[str, Any],
+) -> tuple[bool, list[str]]: ...
+```
+
+Check packaged requirements after lowercasing the platform. Missing or `None` values warn. Dedicated Synapse additionally needs `dwu_level`; Databricks needs `workload_type` or `warehouse_type`. Unknown platforms return `True` without warnings. This checks presence, not types or price coverage, and does not change configuration.
+
+**Import:** `from benchbox.core.cost.integration import validate_platform_config` · **Extras:** none
+
+### canonical_cost_platform_key
+
+#### `benchbox.core.cost.integration.canonical_cost_platform_key`
+
+<span id="benchbox.core.cost.integration.canonical_cost_platform_key"></span>
+
+```python
+def canonical_cost_platform_key(results: BenchmarkResults) -> str: ...
+```
+
+Resolve `platform_type`, `platform_name`, `name`, then `platform`. For each key, inspect `platform_info`, its `configuration`, then that mapping's nested `configuration`. Fall back to `results.platform`; return an empty string when absent. Strip/lowercase tokens, remove display mode suffixes and normalize spaces/underscores before registry aliases. Canonical `fabric_dw` and `clickhouse_cloud` retain underscores.
+
+**Import:** `from benchbox.core.cost.integration import canonical_cost_platform_key` · **Extras:** none
+
+### add_cost_estimation_to_results
+
+#### `benchbox.core.cost.integration.add_cost_estimation_to_results`
+
+<span id="benchbox.core.cost.integration.add_cost_estimation_to_results"></span>
+
+```python
+def add_cost_estimation_to_results(
+    results: BenchmarkResults,
+    platform_config: dict[str, Any] | None = None,
+) -> BenchmarkResults: ...
+```
+
+Enrich and return the same object. Without platform identity it is unchanged. Otherwise calculate available query costs, phase/compute totals, optional storage estimates, warnings and `cost_summary["normalized_cost"]`. Query dictionaries receive `cost`; objects with that attribute receive its value. Fallback-priced query amounts are stored as `None`.
+
+**Import:** `from benchbox.core.cost.integration import add_cost_estimation_to_results` · **Extras:** none
+
+Explicit configuration overrides are used directly. Otherwise extract normalized facets and legacy metadata. Observed compute sizing may support publication; requested, inferred or defaulted values support estimates while marking normalized cost unavailable. Missing sizing fields merge across representations while retaining field provenance. Databricks configured `cluster_size` is not observed warehouse size. Override callers remain responsible for truthful metadata and `_defaulted_fields`; overrides are not independently authenticated.
+
+Validation logs warnings and continues. Positive loaded-data size adds a separate storage estimate for at least one hour, without changing compute total or normalized scope. Exceptions inside enrichment are logged and return the same object; prior mutations are not rolled back. Identity resolution precedes this handler, so errors there can propagate.
+
+## Cost Records and Availability
+
+The records in `benchbox.core.cost.models` carry estimates and availability metadata. Creating a query, phase or benchmark cost record does not validate currency consistency or nonnegative amounts. Normalized costs enforce the availability rules below.
+
+### DeploymentMetadata
+
+#### `benchbox.core.cost.models.DeploymentMetadata`
+
+<span id="benchbox.core.cost.models.DeploymentMetadata"></span>
+
+Frozen deployment context. Every field defaults to `None`: `cloud_provider: str | None`, `cloud_region: str | None`, `instance_type: str | None`, `warehouse_size: str | None`, `node_count: int | None`, `cluster_size: str | None`, `storage_format: str | None` and `storage_tier: str | None`. The class stores supplied values without resolving deployment defaults.
+
+**Import:** `from benchbox.core.cost.models import DeploymentMetadata` · **Extras:** none
+
+##### `benchbox.core.cost.models.DeploymentMetadata.to_dict`
+
+<span id="benchbox.core.cost.models.DeploymentMetadata.to_dict"></span>
+
+```python
+def to_dict() -> dict[str, str | int | None]: ...
+```
+
+Return all eight named fields, including those whose values are `None`.
+
+### NormalizedCost
+
+#### `benchbox.core.cost.models.NormalizedCost`
+
+<span id="benchbox.core.cost.models.NormalizedCost"></span>
+
+Frozen cost with required fields `normalized_cost_usd: Decimal | None`, `cost_model_version: str`, `cost_model_source: str`, `cost_scope: CostScope`, `cost_status: CostStatus`, `billing_unit: str` and `pricing_region: str`. The optional `deployment: DeploymentMetadata` gets a new empty context per instance. `CostScope` names `"compute_only"` and `"compute_plus_storage"`; `CostStatus` names `"normalized"`, `"not_applicable_local"` and `"unavailable"`. These Literal annotations are not runtime enum checks.
+
+**Import:** `from benchbox.core.cost.models import NormalizedCost` · **Extras:** none
+
+Non-`None` amounts are converted through `Decimal(str(value))`. Construction rejects a negative amount, a normalized status without an amount, a local-not-applicable status without explicit zero, and an unavailable status carrying any amount. Local zero is not comparable to normalized cloud spend.
+
+##### `benchbox.core.cost.models.NormalizedCost.cost_usd`
+
+<span id="benchbox.core.cost.models.NormalizedCost.cost_usd"></span>
+
+**Type:** `Decimal | None`
+
+Deprecated compatibility alias. Return the amount only when status is `"normalized"` and scope is `"compute_only"`; otherwise return `None`, including for storage-inclusive costs.
+
+##### `benchbox.core.cost.models.NormalizedCost.to_dict`
+
+<span id="benchbox.core.cost.models.NormalizedCost.to_dict"></span>
+
+```python
+def to_dict() -> dict[str, Any]: ...
+```
+
+Return every named field plus `cost_usd`. Both amount fields serialize as decimal strings or `None`; deployment serializes using `to_dict`. Decimal precision is retained rather than converted to a binary float.
+
+### QueryCost
+
+#### `benchbox.core.cost.models.QueryCost`
+
+<span id="benchbox.core.cost.models.QueryCost"></span>
+
+```python
+class QueryCost:
+    def __init__(
+        self,
+        compute_cost: float,
+        currency: str = "USD",
+        pricing_details: dict[str, Any] = ...,
+    ) -> None: ...
+```
+
+Store the compute amount in `currency` and platform pricing context. `pricing_details` defaults to a new empty dictionary per instance.
+
+**Import:** `from benchbox.core.cost.models import QueryCost` · **Extras:** none
+
+##### `benchbox.core.cost.models.QueryCost.to_dict`
+
+<span id="benchbox.core.cost.models.QueryCost.to_dict"></span>
+
+```python
+def to_dict() -> dict[str, Any]: ...
+```
+
+Return `compute_cost`, `currency` and `pricing_details`. The pricing dictionary is reused, not deep-copied.
+
+### PhaseCost
+
+#### `benchbox.core.cost.models.PhaseCost`
+
+<span id="benchbox.core.cost.models.PhaseCost"></span>
+
+```python
+class PhaseCost:
+    def __init__(
+        self,
+        phase_name: str,
+        total_cost: float,
+        query_count: int,
+        currency: str = "USD",
+        query_costs: list[QueryCost] | None = None,
+        wall_clock_duration_seconds: float | None = None,
+        concurrent_streams: int | None = None,
+    ) -> None: ...
+```
+
+Store a phase total, query count and optional individual costs. The duration is in seconds; concurrent streams is a count. Supplying query costs does not recompute or check the supplied total.
+
+**Import:** `from benchbox.core.cost.models import PhaseCost` · **Extras:** none
+
+##### `benchbox.core.cost.models.PhaseCost.to_dict`
+
+<span id="benchbox.core.cost.models.PhaseCost.to_dict"></span>
+
+```python
+def to_dict() -> dict[str, Any]: ...
+```
+
+Always return `phase_name`, `total_cost`, `query_count` and `currency`. Include each optional field only when non-`None`. Serialize query costs recursively. When duration is positive, also include `effective_cost_per_hour = total_cost / (duration / 3600)`. Zero or negative duration is retained without that derived field.
+
+### BenchmarkCost
+
+#### `benchbox.core.cost.models.BenchmarkCost`
+
+<span id="benchbox.core.cost.models.BenchmarkCost"></span>
+
+```python
+class BenchmarkCost:
+    def __init__(
+        self,
+        total_cost: float,
+        currency: str = "USD",
+        phase_costs: list[PhaseCost] = ...,
+        platform_details: dict[str, Any] = ...,
+        cost_model: str | None = None,
+        warnings: list[str] = ...,
+        storage_cost: float | None = None,
+    ) -> None: ...
+```
+
+Store a run total, phase breakdown and pricing context. The list and dictionary defaults create new containers per instance. `storage_cost` is optional; setting it does not automatically change `total_cost`. `cost_model` and `warnings` carry calculation limitations without themselves enforcing publication availability.
+
+**Import:** `from benchbox.core.cost.models import BenchmarkCost` · **Extras:** none
+
+##### `benchbox.core.cost.models.BenchmarkCost.to_dict`
+
+<span id="benchbox.core.cost.models.BenchmarkCost.to_dict"></span>
+
+```python
+def to_dict() -> dict[str, Any]: ...
+```
+
+Always return `total_cost`, `currency`, recursively serialized `phase_costs` and `platform_details`. Include `cost_model` and `warnings` only when truthy; include `storage_cost` whenever it is non-`None`, including zero. Platform details and warnings are not deep-copied.
+
+##### `benchbox.core.cost.models.BenchmarkCost.from_phase_costs`
+
+<span id="benchbox.core.cost.models.BenchmarkCost.from_phase_costs"></span>
+
+```python
+@classmethod
+def from_phase_costs(
+    phase_costs: list[PhaseCost],
+    platform_details: dict[str, Any] | None = None,
+    currency: str = "USD",
+) -> BenchmarkCost: ...
+```
+
+Sum phase totals and retain the supplied phase list. A truthy platform details dictionary is reused; absent or empty input produces a new empty dictionary. This method does not validate matching phase currencies or add storage cost. Callers must supply phases whose currencies all match the requested `currency`; this precondition is not checked.
+
+### normalized_cost_allows_direct_total
+
+#### `benchbox.core.cost.models.normalized_cost_allows_direct_total`
+
+<span id="benchbox.core.cost.models.normalized_cost_allows_direct_total"></span>
+
+```python
+def normalized_cost_allows_direct_total(
+    normalized_cost: Mapping[str, Any] | None,
+) -> bool: ...
+```
+
+Allow `None` for legacy results with no normalized block. Otherwise require a mapping whose status is `"normalized"` or `"not_applicable_local"` and whose `normalized_cost_usd` is non-`None`. This predicate checks availability, not numeric validity or comparability.
+
+**Import:** `from benchbox.core.cost.models import normalized_cost_allows_direct_total` · **Extras:** none
+
+### cost_status_of
+
+#### `benchbox.core.cost.models.cost_status_of`
+
+<span id="benchbox.core.cost.models.cost_status_of"></span>
+
+```python
+def cost_status_of(cost_summary: Mapping[str, Any] | None) -> str | None: ...
+```
+
+Return the string status from the nested `normalized_cost` mapping, or `None` when either mapping or the string status is absent. Unknown string values are returned unchanged.
+
+**Import:** `from benchbox.core.cost.models import cost_status_of` · **Extras:** none
+
+### published_total_cost
+
+#### `benchbox.core.cost.models.published_total_cost`
+
+<span id="benchbox.core.cost.models.published_total_cost"></span>
+
+```python
+def published_total_cost(cost_summary: Mapping[str, Any] | None) -> float | None: ...
+```
+
+Return `None` when the summary is not a mapping or its normalized block rejects a direct total. Otherwise return `cost_summary.get("total_cost")` unchanged, including for legacy summaries. This helper does not convert or validate the stored numeric value.
+
+**Import:** `from benchbox.core.cost.models import published_total_cost` · **Extras:** none
+
+### unavailable_cost_warning
+
+#### `benchbox.core.cost.models.unavailable_cost_warning`
+
+<span id="benchbox.core.cost.models.unavailable_cost_warning"></span>
+
+```python
+def unavailable_cost_warning(warnings: list[str] | tuple[str, ...] | None) -> str | None: ...
+```
+
+Return the first string beginning with the exact, case-sensitive prefix `"normalized cost unavailable"`, or `None`. Non-string entries are ignored. TCO and optimizer consumers use this marker to reject unavailable object-level estimates.
+
+**Import:** `from benchbox.core.cost.models import unavailable_cost_warning` · **Extras:** none
+
+## Storage Cost Estimates
+
+### estimate_storage_cost
+
+#### `benchbox.core.cost.storage.estimate_storage_cost`
+
+<span id="benchbox.core.cost.storage.estimate_storage_cost"></span>
+
+```python
+def estimate_storage_cost(
+    platform: str,
+    total_bytes: int,
+    storage_duration_hours: float,
+    region: str = "us-east-1",
+) -> dict[str, Any]: ...
+```
+
+Estimate USD storage spend using the packaged storage price table. Platform lookup lowercases the name. Region lookup strips and lowercases the region before mapping it to a pricing tier. Missing platform prices use `23.00`; a known platform with a missing tier uses its US tier, then `23.00`. Those fallbacks are estimates and carry no availability status.
+
+**Import:** `from benchbox.core.cost.storage import estimate_storage_cost` · **Extras:** none
+
+The formula is `(total_bytes / 1024**4) * price_per_tb_month * (storage_duration_hours / 730)`. `storage_tb` therefore uses a binary tebibyte divisor despite the TB label. Negative inputs are not rejected. Compression, replication, retention features, snapshots and backups are not separately modeled.
+
+##### Returns
+
+`storage_cost` in USD, `storage_tb`, `price_per_tb_month`, `duration_hours` and the platform's packaged `note` or a default estimate note. This calculation does not modify a benchmark cost record.
+
+## Cloud Scan Price Resolution
+
+These functions resolve the per-terabyte scanned-data rates used in cost estimates. Prices come from the packaged pricing tables, so callers should use the returned value rather than assume a fixed rate. Both return a `PriceResolution` with `value`, `table`, `resolved_key`, `fallback_used`, `unit` and `reason`.
+
+For both functions, region inputs are stripped and lowercased before lookup. `resolved_key` is a one-element tuple containing the selected region, including the default region on fallback. `unit` records the table's declared billing unit, or `None` when unspecified. A fallback supplies a human-readable `reason`; listed hits have `reason=None`. Callers must inspect `fallback_used` to distinguish a listed price from a default estimate.
+
+### resolve_athena_price_per_tb
+
+#### `benchbox.core.cost.pricing.resolve_athena_price_per_tb`
+
+<span id="benchbox.core.cost.pricing.resolve_athena_price_per_tb"></span>
+
+```python
+def resolve_athena_price_per_tb(region: str = "") -> PriceResolution: ...
+```
+
+Resolve the Athena scanned-data rate for an AWS region, using the `athena_price_per_tb` table. A listed region returns its own rate. An omitted or unlisted region returns the `us-east-1` rate and sets `fallback_used=True`.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_athena_price_per_tb` · **Extras:** none
+
+### resolve_synapse_serverless_price_per_tb
+
+#### `benchbox.core.cost.pricing.resolve_synapse_serverless_price_per_tb`
+
+<span id="benchbox.core.cost.pricing.resolve_synapse_serverless_price_per_tb"></span>
+
+```python
+def resolve_synapse_serverless_price_per_tb(region: str = "") -> PriceResolution: ...
+```
+
+Resolve the Azure Synapse Serverless SQL Pool scanned-data rate for an Azure region, using the `synapse_serverless_price_per_tb` table. A listed region returns its own rate. An omitted or unlisted region returns the `eastus` rate and sets `fallback_used=True`.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_synapse_serverless_price_per_tb` · **Extras:** none
+
+## Price and Quantity Resolution
+
+Pricing lookups use packaged tables rather than live vendor catalogs. Every price and billing-quantity resolver returns `PriceResolution`; consumers must inspect fallback status before publishing amounts. A selected bucket is a table policy, not independent proof of a location's current vendor rate.
+
+The packaged compute estimates exclude enterprise/reserved/commitment discounts, storage and network/data-transfer charges. In `pricing_data.yaml`, each price table must carry provenance keys `source`, `retrieved`, `upstream_published`, `method` and `verified_regions`; the latter is a list. Each byte-priced table must also declare its billing unit. These schema requirements preserve provenance and divisor checks, not price certification.
+
+### PriceResolution
+
+#### `benchbox.core.cost.pricing.PriceResolution`
+
+<span id="benchbox.core.cost.pricing.PriceResolution"></span>
+
+```python
+class PriceResolution:
+    def __init__(
+        self,
+        value: float | int | None,
+        table: str,
+        resolved_key: tuple[str, ...],
+        fallback_used: bool,
+        unit: str | None = None,
+        reason: str | None = None,
+    ) -> None: ...
+```
+
+Frozen lookup record for both prices and quantities. `value` can be absent; `resolved_key` is a resolver-supplied lookup identity. Some fallbacks retain requested normalized labels rather than an existing table cell. Inspect `fallback_used`, `reason` and `table` together; the key alone does not prove a stored cell supplied the amount. Scalar tables use an empty tuple. A designed priced bucket such as a table's `other` tier need not be marked fallback; a guessed default is marked. `reason` explains fallback and `unit` records an applicable billing unit. Construction does not validate these relationships.
+
+**Import:** `from benchbox.core.cost.pricing import PriceResolution` · **Extras:** none
+
+### get_table_provenance
+
+#### `benchbox.core.cost.pricing.get_table_provenance`
+
+<span id="benchbox.core.cost.pricing.get_table_provenance"></span>
+
+```python
+def get_table_provenance(table: str) -> dict[str, Any] | None: ...
+```
+
+Return a shallow copy of dictionary provenance for the exact table name, or `None` when absent. Nested values are not deep-copied.
+
+**Import:** `from benchbox.core.cost.pricing import get_table_provenance` · **Extras:** none
+
+### get_table_unit
+
+#### `benchbox.core.cost.pricing.get_table_unit`
+
+<span id="benchbox.core.cost.pricing.get_table_unit"></span>
+
+```python
+def get_table_unit(table: str) -> str | None: ...
+```
+
+Return a table's declared string unit or `None`. Byte units distinguish `tebibyte` from `terabyte`; absence does not infer either divisor.
+
+**Import:** `from benchbox.core.cost.pricing import get_table_unit` · **Extras:** none
+
+### resolve_snowflake_credit_price
+
+#### `benchbox.core.cost.pricing.resolve_snowflake_credit_price`
+
+<span id="benchbox.core.cost.pricing.resolve_snowflake_credit_price"></span>
+
+```python
+def resolve_snowflake_credit_price(
+    edition: str,
+    cloud: str,
+    region: str,
+) -> PriceResolution: ...
+```
+
+Resolve `snowflake_credit_prices` by normalized edition/cloud and mapped region tier. Edition accepts hyphens/spaces as underscores. Missing cells use standard/aws/us pricing and mark fallback; if that cell is absent the implementation estimate is `2.00`. A designed `other` tier is not fallback merely because the region mapped there.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_snowflake_credit_price` · **Extras:** none
+
+### resolve_bigquery_price_per_tb
+
+#### `benchbox.core.cost.pricing.resolve_bigquery_price_per_tb`
+
+<span id="benchbox.core.cost.pricing.resolve_bigquery_price_per_tb"></span>
+
+```python
+def resolve_bigquery_price_per_tb(location: str) -> PriceResolution: ...
+```
+
+Strip/lowercase the location. Multi-region labels, captured exact locations and recognized continental branches resolve to packaged cells. An exact non-`other` cell takes precedence over continental branches. The unmatched `other` bucket is a guessed rate and marks fallback. The table's declared unit accompanies the result; despite this function's name, the packaged BigQuery byte divisor is a tebibyte.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_bigquery_price_per_tb` · **Extras:** none
+
+### resolve_redshift_node_price
+
+#### `benchbox.core.cost.pricing.resolve_redshift_node_price`
+
+<span id="benchbox.core.cost.pricing.resolve_redshift_node_price"></span>
+
+```python
+def resolve_redshift_node_price(node_type: str, region: str) -> PriceResolution: ...
+```
+
+Strip/lowercase inputs and resolve `redshift_node_prices`. A known node with no exact region uses its `other` bucket without marking fallback. An unknown node returns the packaged implementation's default node-hour estimate `1.00` with fallback marked. These results estimate USD per node-hour.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_redshift_node_price` · **Extras:** none
+
+### resolve_databricks_dbu_price
+
+#### `benchbox.core.cost.pricing.resolve_databricks_dbu_price`
+
+<span id="benchbox.core.cost.pricing.resolve_databricks_dbu_price"></span>
+
+```python
+def resolve_databricks_dbu_price(
+    cloud: str,
+    tier: str,
+    workload_type: str,
+) -> PriceResolution: ...
+```
+
+Normalize inputs and resolve `databricks_dbu_prices`. Workload hyphens and spaces become underscores; `serverless_sql` maps to `sql_serverless` and `sql_compute` to `sql_pro`. Missing cells use aws/premium/all_purpose with fallback marked; if that default cell is absent the implementation estimate is `0.55`. The result is a DBU price, not a warehouse size rate.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_databricks_dbu_price` · **Extras:** none
+
+### resolve_databricks_warehouse_dbu_per_hour
+
+#### `benchbox.core.cost.pricing.resolve_databricks_warehouse_dbu_per_hour`
+
+<span id="benchbox.core.cost.pricing.resolve_databricks_warehouse_dbu_per_hour"></span>
+
+```python
+def resolve_databricks_warehouse_dbu_per_hour(warehouse_size: str) -> PriceResolution: ...
+```
+
+Strip and case-match warehouse labels. Return quantity unit `DBU/hour`; unknown sizes use a conservative `2.0` estimate and mark fallback so the amount cannot support normalized publication.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_databricks_warehouse_dbu_per_hour` · **Extras:** none
+
+### resolve_snowflake_warehouse_credits_per_hour
+
+#### `benchbox.core.cost.pricing.resolve_snowflake_warehouse_credits_per_hour`
+
+<span id="benchbox.core.cost.pricing.resolve_snowflake_warehouse_credits_per_hour"></span>
+
+```python
+def resolve_snowflake_warehouse_credits_per_hour(warehouse_size: str) -> PriceResolution: ...
+```
+
+Normalize case and size-label separators. Return quantity unit `credits/hour`; unknown labels use the Medium `4.0` estimate with fallback marked. The selected size spelling is retained in known keys.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_snowflake_warehouse_credits_per_hour` · **Extras:** none
+
+### resolve_synapse_dedicated_price
+
+#### `benchbox.core.cost.pricing.resolve_synapse_dedicated_price`
+
+<span id="benchbox.core.cost.pricing.resolve_synapse_dedicated_price"></span>
+
+```python
+def resolve_synapse_dedicated_price(dwu_level: str, region: str) -> PriceResolution: ...
+```
+
+Strip/lowercase the DWU level and map the region tier. A known level with no tier cell uses its US cell and marks fallback; an unknown level uses DW100c US pricing with fallback marked. Missing US default cells use the implementation estimate `1.20`. The amount is the hourly price for the selected pool level, not a price to multiply by the DWU count.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_synapse_dedicated_price` · **Extras:** none
+
+### resolve_fabric_cu_price
+
+#### `benchbox.core.cost.pricing.resolve_fabric_cu_price`
+
+<span id="benchbox.core.cost.pricing.resolve_fabric_cu_price"></span>
+
+```python
+def resolve_fabric_cu_price(region: str) -> PriceResolution: ...
+```
+
+Map the region to a packaged capacity-unit hourly price. A designed `other` tier is returned without fallback marking, including when used after no direct tier cell exists.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_fabric_cu_price` · **Extras:** none
+
+### resolve_fabric_sku_cu_count
+
+#### `benchbox.core.cost.pricing.resolve_fabric_sku_cu_count`
+
+<span id="benchbox.core.cost.pricing.resolve_fabric_sku_cu_count"></span>
+
+```python
+def resolve_fabric_sku_cu_count(sku: str) -> PriceResolution: ...
+```
+
+Strip/lowercase a SKU and return quantity unit `CU`. Unknown SKUs use the F2 quantity `2` with fallback marked. This is a quantity, not a price.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_fabric_sku_cu_count` · **Extras:** none
+
+### resolve_firebolt_fbu_rate
+
+#### `benchbox.core.cost.pricing.resolve_firebolt_fbu_rate`
+
+<span id="benchbox.core.cost.pricing.resolve_firebolt_fbu_rate"></span>
+
+```python
+def resolve_firebolt_fbu_rate(node_type: str) -> PriceResolution: ...
+```
+
+Strip/lowercase the node label and return quantity unit `FBU/hour`. Unknown nodes use the packaged M rate and mark fallback.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_firebolt_fbu_rate` · **Extras:** none
+
+### resolve_firebolt_fbu_price
+
+#### `benchbox.core.cost.pricing.resolve_firebolt_fbu_price`
+
+<span id="benchbox.core.cost.pricing.resolve_firebolt_fbu_price"></span>
+
+```python
+def resolve_firebolt_fbu_price() -> PriceResolution: ...
+```
+
+Return the packaged scalar `firebolt_fbu_price` with an empty resolved key and no fallback. Its presence does not establish provenance freshness.
+
+**Import:** `from benchbox.core.cost.pricing import resolve_firebolt_fbu_price` · **Extras:** none
+
+### get_pricing_age_days
+
+#### `benchbox.core.cost.pricing.get_pricing_age_days`
+
+<span id="benchbox.core.cost.pricing.get_pricing_age_days"></span>
+
+```python
+def get_pricing_age_days(table: str | None = None) -> int | None: ...
+```
+
+For a table, parse its provenance retrieval date and return calendar days since that date, using local `date.today()`. Missing, unknown or malformed dates return `None`. Without a table use the file-level validation date; absence also returns `None`. Future dates yield negative ages.
+
+**Import:** `from benchbox.core.cost.pricing import get_pricing_age_days` · **Extras:** none
+
+### is_pricing_stale
+
+#### `benchbox.core.cost.pricing.is_pricing_stale`
+
+<span id="benchbox.core.cost.pricing.is_pricing_stale"></span>
+
+```python
+def is_pricing_stale(threshold_days: int = 90) -> bool: ...
+```
+
+Test whether the file-level age is strictly greater than the threshold. Unknown file-level age returns `False`; callers needing publication assurance must check each relevant table's provenance separately.
+
+**Import:** `from benchbox.core.cost.pricing import is_pricing_stale` · **Extras:** none
+
+## Cost Projections
+
+These projections extrapolate supplied costs. They do not forecast vendor prices, validate invoices or automatically include idle infrastructure costs. Rates are fractions: `0.1` growth means 10%, and `0.2` discount means 20%.
+
+### GrowthModel
+
+#### `benchbox.core.cost.tco.GrowthModel`
+
+<span id="benchbox.core.cost.tco.GrowthModel"></span>
+
+Enum members `NONE="none"`, `LINEAR="linear"` and `COMPOUND="compound"` select flat, additive or compounded usage growth.
+
+**Import:** `from benchbox.core.cost.tco import GrowthModel` · **Extras:** none
+
+### DiscountType
+
+#### `benchbox.core.cost.tco.DiscountType`
+
+<span id="benchbox.core.cost.tco.DiscountType"></span>
+
+Enum members `NONE="none"`, `RESERVED="reserved"`, `COMMITTED_USE="committed_use"`, `ENTERPRISE="enterprise"` and `VOLUME="volume"` label the discount configuration.
+
+**Import:** `from benchbox.core.cost.tco import DiscountType` · **Extras:** none
+
+### GrowthConfig
+
+#### `benchbox.core.cost.tco.GrowthConfig`
+
+<span id="benchbox.core.cost.tco.GrowthConfig"></span>
+
+```python
+class GrowthConfig:
+    def __init__(
+        self,
+        model: GrowthModel = GrowthModel.NONE,
+        annual_rate: float = 0.0,
+        data_growth_rate: float | None = None,
+    ) -> None: ...
+```
+
+Store rates without range validation. The separate data rate is metadata; the calculator's cost multiplier uses `annual_rate`.
+
+**Import:** `from benchbox.core.cost.tco import GrowthConfig` · **Extras:** none
+
+##### `benchbox.core.cost.tco.GrowthConfig.get_data_growth_rate`
+
+<span id="benchbox.core.cost.tco.GrowthConfig.get_data_growth_rate"></span>
+
+```python
+def get_data_growth_rate() -> float: ...
+```
+
+Return the separate data rate or `annual_rate` when it is `None`.
+
+##### `benchbox.core.cost.tco.GrowthConfig.calculate_multiplier`
+
+<span id="benchbox.core.cost.tco.GrowthConfig.calculate_multiplier"></span>
+
+```python
+def calculate_multiplier(year: int) -> float: ...
+```
+
+Year numbers are one-based. The first year, earlier values and no-growth mode return one. Later linear growth is additive and compound growth multiplicative from the first-year base. Unknown model values return one.
+
+### DiscountConfig
+
+#### `benchbox.core.cost.tco.DiscountConfig`
+
+<span id="benchbox.core.cost.tco.DiscountConfig"></span>
+
+```python
+class DiscountConfig:
+    def __init__(
+        self,
+        discount_type: DiscountType = DiscountType.NONE,
+        discount_percent: float = 0.0,
+        commitment_years: int = 1,
+        effective_start_year: int = 1,
+    ) -> None: ...
+```
+
+Store the discount fraction and commitment metadata without range checks. `commitment_years` does not limit the years receiving a discount.
+
+**Import:** `from benchbox.core.cost.tco import DiscountConfig` · **Extras:** none
+
+##### `benchbox.core.cost.tco.DiscountConfig.get_discount_multiplier`
+
+<span id="benchbox.core.cost.tco.DiscountConfig.get_discount_multiplier"></span>
+
+```python
+def get_discount_multiplier(year: int) -> float: ...
+```
+
+Return one for no discount or before its start year; otherwise return `1 - discount_percent`. The discount persists in later years.
+
+### BudgetThreshold
+
+#### `benchbox.core.cost.tco.BudgetThreshold`
+
+<span id="benchbox.core.cost.tco.BudgetThreshold"></span>
+
+```python
+class BudgetThreshold:
+    def __init__(self, name: str, amount: float, period: str = "annual") -> None: ...
+```
+
+Amount uses the projected currency. Period labels are `monthly`, `annual` and `total`; construction does not validate them.
+
+**Import:** `from benchbox.core.cost.tco import BudgetThreshold` · **Extras:** none
+
+##### `benchbox.core.cost.tco.BudgetThreshold.is_exceeded`
+
+<span id="benchbox.core.cost.tco.BudgetThreshold.is_exceeded"></span>
+
+```python
+def is_exceeded(cost: float, period: str) -> bool: ...
+```
+
+Compare strictly greater than the threshold. Convert only monthly to annual or annual to monthly when labels differ; other mismatches are compared without conversion.
+
+### BudgetAlert
+
+#### `benchbox.core.cost.tco.BudgetAlert`
+
+<span id="benchbox.core.cost.tco.BudgetAlert"></span>
+
+```python
+class BudgetAlert:
+    def __init__(
+        self,
+        threshold: BudgetThreshold,
+        actual_cost: float,
+        year: int,
+        period: str,
+        message: str,
+    ) -> None: ...
+```
+
+Store the triggered threshold, projected amount, one-based year, period and message. The amount is a projection, despite the `actual_cost` name.
+
+**Import:** `from benchbox.core.cost.tco import BudgetAlert` · **Extras:** none
+
+### YearlyProjection
+
+#### `benchbox.core.cost.tco.YearlyProjection`
+
+<span id="benchbox.core.cost.tco.YearlyProjection"></span>
+
+```python
+class YearlyProjection:
+    def __init__(
+        self,
+        year: int,
+        calendar_year: int,
+        base_cost: float,
+        growth_multiplier: float,
+        discount_multiplier: float,
+        projected_cost: float,
+        cumulative_cost: float,
+        monthly_cost: float,
+    ) -> None: ...
+```
+
+Store one-based and calendar years, monetary amounts and applied multipliers.
+
+**Import:** `from benchbox.core.cost.tco import YearlyProjection` · **Extras:** none
+
+##### `benchbox.core.cost.tco.YearlyProjection.to_dict`
+
+<span id="benchbox.core.cost.tco.YearlyProjection.to_dict"></span>
+
+```python
+def to_dict() -> dict[str, Any]: ...
+```
+
+Return all fields; round amounts to two decimals and multipliers to four.
+
+### TCOProjection
+
+#### `benchbox.core.cost.tco.TCOProjection`
+
+<span id="benchbox.core.cost.tco.TCOProjection"></span>
+
+```python
+class TCOProjection:
+    def __init__(
+        self,
+        platform: str,
+        base_annual_cost: float,
+        currency: str = "USD",
+        projection_years: int = 5,
+        start_year: int = ...,
+        growth_config: GrowthConfig = ...,
+        discount_config: DiscountConfig = ...,
+        yearly_projections: list[YearlyProjection] = ...,
+        total_tco: float = 0.0,
+        average_annual_cost: float = 0.0,
+        budget_alerts: list[BudgetAlert] = ...,
+        metadata: dict[str, Any] = ...,
+    ) -> None: ...
+```
+
+Default start year is the local current year. Configurations and containers get new defaults per instance. Construction does not derive totals.
+
+**Import:** `from benchbox.core.cost.tco import TCOProjection` · **Extras:** none
+
+##### `benchbox.core.cost.tco.TCOProjection.to_dict`
+
+<span id="benchbox.core.cost.tco.TCOProjection.to_dict"></span>
+
+```python
+def to_dict() -> dict[str, Any]: ...
+```
+
+Serialize projections and enum values, round monetary summary fields to two decimals and retain metadata by reference. Discount serialization omits `effective_start_year`. Alert serialization uses threshold name and amount and omits the alert/threshold period; it is not a lossless reconstruction of every constructor field.
+
+### TCOCalculator
+
+#### `benchbox.core.cost.tco.TCOCalculator`
+
+<span id="benchbox.core.cost.tco.TCOCalculator"></span>
+
+Construct without arguments and with no budget thresholds.
+
+**Import:** `from benchbox.core.cost.tco import TCOCalculator` · **Extras:** none
+
+##### `benchbox.core.cost.tco.TCOCalculator.add_budget_threshold`
+
+<span id="benchbox.core.cost.tco.TCOCalculator.add_budget_threshold"></span>
+
+```python
+def add_budget_threshold(threshold: BudgetThreshold) -> None: ...
+```
+
+Append and retain the supplied threshold; repeated additions are allowed.
+
+##### `benchbox.core.cost.tco.TCOCalculator.clear_budget_thresholds`
+
+<span id="benchbox.core.cost.tco.TCOCalculator.clear_budget_thresholds"></span>
+
+```python
+def clear_budget_thresholds() -> None: ...
+```
+
+Remove every registered threshold.
+
+##### `benchbox.core.cost.tco.TCOCalculator.calculate_tco`
+
+<span id="benchbox.core.cost.tco.TCOCalculator.calculate_tco"></span>
+
+```python
+def calculate_tco(
+    benchmark_cost: BenchmarkCost,
+    annual_runs: int = 1,
+    projection_years: int = 5,
+    growth_config: GrowthConfig | None = None,
+    discount_config: DiscountConfig | None = None,
+    platform: str | None = None,
+    start_year: int | None = None,
+) -> TCOProjection: ...
+```
+
+Multiply per-run cost by annual runs and apply configured yearly growth and discounts. Preserve benchmark currency. Absent platform uses `platform_details["platform"]` or `"unknown"`; absent or zero start year uses the local current year. Costs and rates are not range-checked. Supply a positive integer horizon: zero raises `ZeroDivisionError`. Horizons are not restricted to the example values one, three and five.
+
+Each registered non-total threshold yields at most one alert, at its first exceeded year; total thresholds check the complete projected sum. A warning beginning `"normalized cost unavailable"` rejects the input with `ValueError`. This gate checks the object warning marker, not a separate normalized result block. No cost regeneration occurs.
+
+##### `benchbox.core.cost.tco.TCOCalculator.calculate_tco_from_annual_cost`
+
+<span id="benchbox.core.cost.tco.TCOCalculator.calculate_tco_from_annual_cost"></span>
+
+```python
+def calculate_tco_from_annual_cost(
+    annual_cost: float,
+    platform: str,
+    projection_years: int = 5,
+    growth_config: GrowthConfig | None = None,
+    discount_config: DiscountConfig | None = None,
+    currency: str = "USD",
+    start_year: int | None = None,
+) -> TCOProjection: ...
+```
+
+Wrap the supplied annual amount as a benchmark cost and calculate with one annual run. Other projection and alert rules remain the same.
+
+##### `benchbox.core.cost.tco.TCOCalculator.compare_platforms`
+
+<span id="benchbox.core.cost.tco.TCOCalculator.compare_platforms"></span>
+
+```python
+def compare_platforms(projections: list[TCOProjection]) -> dict[str, Any]: ...
+```
+
+Return an error dictionary for empty input; otherwise rank ascending TCO and report savings against the largest total. Monetary values round to two decimals, savings percentages to one. Zero/negative largest totals produce zero savings percentages. Currency and horizon come from the cheapest projection without checking all inputs agree; callers must supply comparable currencies and horizons. No input ordering is changed.
+
+### create_standard_tco_scenarios
+
+#### `benchbox.core.cost.tco.create_standard_tco_scenarios`
+
+<span id="benchbox.core.cost.tco.create_standard_tco_scenarios"></span>
+
+```python
+def create_standard_tco_scenarios(
+    benchmark_cost: BenchmarkCost,
+    annual_runs: int = 12,
+) -> dict[str, TCOProjection]: ...
+```
+
+Return three five-year scenarios: conservative has no growth/discount; moderate has 10% compound growth and 15% reserved discount with three-year commitment metadata; aggressive has 25% compound growth and no discount. These are fixed assumptions, not recommendations or predicted vendor rates.
+
+**Import:** `from benchbox.core.cost.tco import create_standard_tco_scenarios` · **Extras:** none
+
+## Optimization Records and Analysis
+
+Optimization estimates are rule outputs, not guaranteed savings. Recommendations can overlap; the reported sum does not deduplicate competing changes.
+
+### OptimizationCategory
+
+#### `benchbox.core.cost.optimizer.OptimizationCategory`
+
+<span id="benchbox.core.cost.optimizer.OptimizationCategory"></span>
+
+Members `PLATFORM_TIER="platform_tier"`, `REGION="region"`, `RESOURCE_SIZING="resource_sizing"`, `PRICING_MODEL="pricing_model"`, `QUERY="query"` and `DATA_MANAGEMENT="data_management"` label opportunities.
+
+**Import:** `from benchbox.core.cost.optimizer import OptimizationCategory` · **Extras:** none
+
+### ConfidenceLevel
+
+#### `benchbox.core.cost.optimizer.ConfidenceLevel`
+
+<span id="benchbox.core.cost.optimizer.ConfidenceLevel"></span>
+
+`HIGH="high"` labels pricing-based estimates, `MEDIUM="medium"` typical patterns and `LOW="low"` rough estimates. These are labels, not statistical confidence intervals or independent price certification.
+
+**Import:** `from benchbox.core.cost.optimizer import ConfidenceLevel` · **Extras:** none
+
+### ImplementationEffort
+
+#### `benchbox.core.cost.optimizer.ImplementationEffort`
+
+<span id="benchbox.core.cost.optimizer.ImplementationEffort"></span>
+
+`TRIVIAL="trivial"`, `LOW="low"`, `MEDIUM="medium"` and `HIGH="high"` label rough minutes, hours, days and weeks of effort.
+
+**Import:** `from benchbox.core.cost.optimizer import ImplementationEffort` · **Extras:** none
+
+### SavingsEstimate
+
+#### `benchbox.core.cost.optimizer.SavingsEstimate`
+
+<span id="benchbox.core.cost.optimizer.SavingsEstimate"></span>
+
+```python
+class SavingsEstimate:
+    def __init__(
+        self,
+        amount: float,
+        currency: str = "USD",
+        period: str = "annual",
+        confidence: ConfidenceLevel = ConfidenceLevel.MEDIUM,
+        range_low: float | None = None,
+        range_high: float | None = None,
+        percentage: float | None = None,
+    ) -> None: ...
+```
+
+Store estimated savings per period and optional monetary range/percentage. Construction does not validate ranges or convert currencies.
+
+**Import:** `from benchbox.core.cost.optimizer import SavingsEstimate` · **Extras:** none
+
+##### `benchbox.core.cost.optimizer.SavingsEstimate.to_dict`
+
+<span id="benchbox.core.cost.optimizer.SavingsEstimate.to_dict"></span>
+
+```python
+def to_dict() -> dict[str, Any]: ...
+```
+
+Include amount, currency, period and confidence value. Include optional fields only when non-`None`; round amounts/ranges to two decimals and percentage to one.
+
+### ImplementationGuide
+
+#### `benchbox.core.cost.optimizer.ImplementationGuide`
+
+<span id="benchbox.core.cost.optimizer.ImplementationGuide"></span>
+
+```python
+class ImplementationGuide:
+    def __init__(
+        self,
+        steps: list[str],
+        prerequisites: list[str] = ...,
+        risks: list[str] = ...,
+        rollback: str | None = None,
+        estimated_time: str | None = None,
+    ) -> None: ...
+```
+
+Store actions, requirements, risks and optional rollback/time guidance. Default prerequisite and risk lists are new per instance.
+
+**Import:** `from benchbox.core.cost.optimizer import ImplementationGuide` · **Extras:** none
+
+##### `benchbox.core.cost.optimizer.ImplementationGuide.to_dict`
+
+<span id="benchbox.core.cost.optimizer.ImplementationGuide.to_dict"></span>
+
+```python
+def to_dict() -> dict[str, Any]: ...
+```
+
+Always include steps; include other fields only when truthy. Lists are reused, not deep-copied.
+
+### Recommendation
+
+#### `benchbox.core.cost.optimizer.Recommendation`
+
+<span id="benchbox.core.cost.optimizer.Recommendation"></span>
+
+```python
+class Recommendation:
+    def __init__(
+        self,
+        id: str,
+        title: str,
+        description: str,
+        category: OptimizationCategory,
+        savings: SavingsEstimate,
+        effort: ImplementationEffort,
+        guide: ImplementationGuide,
+        priority: int = 50,
+        platform: str | None = None,
+        current_config: dict[str, Any] | None = None,
+        recommended_config: dict[str, Any] | None = None,
+        metadata: dict[str, Any] = ...,
+    ) -> None: ...
+```
+
+Store a recommendation and configurations. Higher priority sorts first; the nominal 1–100 score is not clamped. IDs are not checked for uniqueness.
+
+**Import:** `from benchbox.core.cost.optimizer import Recommendation` · **Extras:** none
+
+##### `benchbox.core.cost.optimizer.Recommendation.to_dict`
+
+<span id="benchbox.core.cost.optimizer.Recommendation.to_dict"></span>
+
+```python
+def to_dict() -> dict[str, Any]: ...
+```
+
+Serialize enum values, savings and guide. Optional platform/configuration and metadata fields appear only when truthy; configuration dictionaries and metadata are reused rather than deep-copied.
+
+### OptimizationReport
+
+#### `benchbox.core.cost.optimizer.OptimizationReport`
+
+<span id="benchbox.core.cost.optimizer.OptimizationReport"></span>
+
+```python
+class OptimizationReport:
+    def __init__(
+        self,
+        recommendations: list[Recommendation] = ...,
+        total_potential_savings: float = 0.0,
+        currency: str = "USD",
+        platform: str | None = None,
+        analysis_date: str = ...,
+        benchmark_cost: BenchmarkCost | None = None,
+        metadata: dict[str, Any] = ...,
+    ) -> None: ...
+```
+
+New containers are created per instance. Default analysis date is a local, timezone-naive ISO timestamp. Direct construction does not sort or sum.
+
+**Import:** `from benchbox.core.cost.optimizer import OptimizationReport` · **Extras:** none
+
+##### `benchbox.core.cost.optimizer.OptimizationReport.to_dict`
+
+<span id="benchbox.core.cost.optimizer.OptimizationReport.to_dict"></span>
+
+```python
+def to_dict() -> dict[str, Any]: ...
+```
+
+Serialize recommendations and count, round total savings to two decimals and include currency, platform, date and metadata. The original benchmark cost is omitted; metadata is reused.
+
+##### `benchbox.core.cost.optimizer.OptimizationReport.get_by_category`
+
+<span id="benchbox.core.cost.optimizer.OptimizationReport.get_by_category"></span>
+
+```python
+def get_by_category(category: OptimizationCategory) -> list[Recommendation]: ...
+```
+
+Return matching recommendations in existing order.
+
+##### `benchbox.core.cost.optimizer.OptimizationReport.get_quick_wins`
+
+<span id="benchbox.core.cost.optimizer.OptimizationReport.get_quick_wins"></span>
+
+```python
+def get_quick_wins(
+    max_effort: ImplementationEffort = ImplementationEffort.LOW,
+) -> list[Recommendation]: ...
+```
+
+Include effort levels through the supplied maximum and sort descending by savings amount. Invalid effort values raise `ValueError`.
+
+### CostOptimizer
+
+#### `benchbox.core.cost.optimizer.CostOptimizer`
+
+<span id="benchbox.core.cost.optimizer.CostOptimizer"></span>
+
+Construct without arguments and register the built-in rules.
+
+**Import:** `from benchbox.core.cost.optimizer import CostOptimizer` · **Extras:** none
+
+##### `benchbox.core.cost.optimizer.CostOptimizer.analyze`
+
+<span id="benchbox.core.cost.optimizer.CostOptimizer.analyze"></span>
+
+```python
+def analyze(
+    benchmark_cost: BenchmarkCost,
+    platform_config: dict[str, Any] | None = None,
+    annual_runs: int = 12,
+) -> OptimizationReport: ...
+```
+
+`annual_runs` is expected benchmark executions per year; yearly estimates scale the supplied single-run cost by this count. Resolve `platform_config["platform"]`, then `benchmark_cost.platform_details["platform"]`, then `"unknown"`. Supply actual deployment settings: built-in rules read these fields with rule-specific missing-key defaults:
+
+- Snowflake edition changes read `edition` (`""`), `cloud` (`"aws"`) and `region` (`"us-east-1"`); only enterprise/business-critical editions qualify. Region changes read `region` (`""`), `cloud` (`"aws"`) and `edition` (`"standard"`).
+- Databricks tier changes read `tier` (`""`), `cloud` (`"aws"`) and `workload_type` (`"sql_warehouse"`); only enterprise/premium tiers qualify. Workload changes read `workload_type` (`""`), `cloud` (`"aws"`) and `tier` (`"premium"`); only `"all_purpose"` qualifies.
+- BigQuery region changes read `location` (`""`). Data-scan estimation instead defaults `location` to `"us"`. The latter reads bytes from `benchmark_cost.platform_details["pricing_details"]` under `"total_bytes_processed"`; missing/zero bytes are estimated from total cost and resolved price using `1024**4` bytes per billing TB.
+- Redshift region changes read `region` (`""`), `node_type` (`"dc2.large"`) and `node_count` (1). Node migration reads `node_type` (`""`), `region` (`"us-east-1"`) and `node_count` (1); only `ds2`-prefixed types qualify.
+
+Evaluate built-in rules. Sort recommendations by descending priority and sum their savings amounts without currency conversion or overlap adjustment. Preserve report currency from the benchmark; individual savings records retain their own currency labels.
+
+An unavailable-cost warning suppresses every rule and returns no recommendations. Fallback/absent pricing suppresses affected rules; `metadata["suppressed_rules"]` records rule and reason. Other rule exceptions are skipped without a suppression entry. Metadata also records annual runs, rules evaluated and recommendations generated. No platform configuration or benchmark cost is changed.
 
 <span id="not-part-of-public-contract"></span>
 
