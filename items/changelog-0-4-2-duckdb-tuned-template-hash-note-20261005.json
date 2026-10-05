@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The 0.4.2 notes warn about the DuckDB tuned-template hash change and the cached database rename."
+  ],
+  "context": "Source: PR #2677 close-out. The matching text exists in the PR #2677 branch history (CHANGELOG commit before the rebase) and in the tuning W2 ledger notes.",
+  "description": "## Problem\nPR #2636 (merged before the 0.4.2 cut) changed the shipped DuckDB tuned templates: partitioning and CHECK constraints were removed. As a result DuckDB tuned results recorded earlier carry a different `requested_config_hash`, and the cached tuned database name changes (for example `tpch_sf1_custom_pk_fk_uniq_check_part_sort` becomes `tpch_sf1_custom_pk_fk_uniq_sort`), so an existing tuned DuckDB database is rebuilt on the next run. PR #2636's CHANGELOG bullet was lost when develop rewrote the 0.4.2 section; the released 0.4.2 notes mention only that DuckDB tuned runs no longer report false index mismatches. Users comparing hashes or relying on cached tuned databases get no warning.\n\n## Change\nAdd a \"Before you upgrade\" bullet to the 0.4.2 section (or the release notes the owner publishes) covering the hash change and the database rename. 0.4.2 PyPI publication is handed to the owner (dlv2-52-release-rehearsal-and-first-release), so coordinate the wording there.\n\n## Guardrails\n- Do not edit older released sections beyond this addition; keep the changelog tag guard test green.",
+  "links": [
+    "CHANGELOG.md",
+    "tests/unit/release/test_changelog_tag_guard.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-05T15:25:30Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "5f8e7d7c28054af3a5b1a575a98647e4",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    }
+  ]
+}
