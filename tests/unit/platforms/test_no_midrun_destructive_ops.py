@@ -797,10 +797,7 @@ SPECS: dict[str, Spec] = {
         config={**AWS, "workgroup": "spark-wg"}, patches={"_wait_for_session_ready": lambda *a, **k: None}
     ),
     "bigquery": Spec(config={"project_id": "bench-project", "dataset_id": CATALOG_NAME}),
-    "clickhouse-cloud": Spec(
-        no_positive_control="check_server_database_exists builds a native-protocol admin client from "
-        "attributes the cloud adapter never sets, fails with AttributeError, and reports no database",
-    ),
+    "clickhouse-cloud": Spec(),
     "databend": Spec(scripted={r"SHOW DATABASES": [ValuesRow((CATALOG_NAME,))]}),
     "databricks": DATABRICKS,
     "databricks-df": DATABRICKS,
