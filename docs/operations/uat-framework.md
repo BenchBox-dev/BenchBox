@@ -675,8 +675,8 @@ reads downloaded records (nested artifact directories are fine) and prints
 the median of the latest N matching the runner class, defaulting to the
 current machine's class. The floor must never compare across classes.
 
-Status: observe-only, and the per-class median is computed but not yet used
-by the nightly assert. The assert still reads the explicit
+Status: observe-only. The per-class median is available through the manual
+`rolling-median` command, but the nightly neither computes nor uses it yet. The assert still reads the explicit
 `THROUGHPUT_FLOOR_MEDIAN` repository variable when it is set; while it is
 unset the assert only reports each observed value (`::notice::`). That
 variable is a fixed absolute number and must not be set for a mixed runner
