@@ -20,19 +20,19 @@ def _input(
     labels: tuple[str, ...] = (),
     *,
     brief_mode: str = "inline",
-    enable_agy: bool = False,
+    enable: tuple[str, ...] = ("muse",),
     blocked: dict[str, datetime] | None = None,
-    max_attempts: int | None = None,
+    max_attempts: int = 5,
 ) -> SelectionInput:
-    chain = policy.chain(tier)
-    if enable_agy:
-        chain = [replace(reviewer, enabled=True) if reviewer.name == "agy" else reviewer for reviewer in chain]
+    chain = [
+        replace(reviewer, enabled=True) if reviewer.name in enable else reviewer for reviewer in policy.chain(tier)
+    ]
     return SelectionInput(
         chain=chain,
         diversity_exempt=frozenset(policy.tiers[tier].diversity_exempt),
         excluded_families=excluded_families(labels, policy),
         brief_mode=brief_mode,
-        max_attempts=max_attempts or policy.max_attempts,
+        max_attempts=max_attempts,
         now=NOW,
         pool_blocked_until=blocked or {},
     )
@@ -71,7 +71,7 @@ def test_low_medium_for_a_codex_author_falls_back_to_sonnet(policy: Policy) -> N
 
 
 def test_medium_high_falls_back_to_low_medium_reviewers_in_order(policy: Policy) -> None:
-    order = _walk(_input(policy, "medium-high", ("author-family:muse",), enable_agy=True), {})
+    order = _walk(_input(policy, "medium-high", ("author-family:muse",), enable=("muse", "agy")), {})
     assert order == ["sonnet", "sol", "luna", "agy"]
 
 
@@ -130,9 +130,11 @@ def test_clean_verdict_passes_without_another_reviewer(policy: Policy) -> None:
 
 
 def test_brief_over_cap_leaves_only_hard_read_only_reviewers(policy: Policy) -> None:
-    order = _walk(_input(policy, "low-medium", ("author-family:codex",), brief_mode="file-list", enable_agy=True), {})
+    order = _walk(
+        _input(policy, "low-medium", ("author-family:codex",), brief_mode="file-list", enable=("muse", "agy")), {}
+    )
     assert order == ["muse", "sonnet"]
-    with_inline = _walk(_input(policy, "low-medium", ("author-family:codex",), enable_agy=True), {})
+    with_inline = _walk(_input(policy, "low-medium", ("author-family:codex",), enable=("muse", "agy")), {})
     assert with_inline == ["muse", "agy", "sonnet"]
 
 
@@ -163,3 +165,32 @@ def test_pool_resets_carry_quota_reset_times(policy: Policy) -> None:
         selection_input, [Attempt(1, "opus", selection.ABSENT, "quota", "", reset), _absent(2, "sol")]
     )
     assert resets == {"claude": reset}
+
+
+@pytest.mark.parametrize("tier", ["low-medium", "medium-high", "very-high"])
+@pytest.mark.parametrize("label", [(), ("author-family:codex",), ("author-family:muse",), ("author-family:agy",)])
+def test_every_enabled_chain_is_fully_reachable(policy: Policy, tier: str, label: tuple[str, ...]) -> None:
+    excluded = excluded_families(label, policy)
+    exempt = set(policy.tiers[tier].diversity_exempt)
+    expected = [
+        reviewer.name
+        for reviewer in policy.chain(tier)
+        if reviewer.enabled and (reviewer.family not in excluded or reviewer.name in exempt)
+    ]
+    selection_input = SelectionInput(
+        chain=policy.chain(tier),
+        diversity_exempt=frozenset(exempt),
+        excluded_families=excluded,
+        brief_mode="inline",
+        max_attempts=policy.max_attempts,
+        now=NOW,
+    )
+    assert _walk(selection_input, {}) == expected
+    attempts = [_absent(index + 1, name) for index, name in enumerate(expected)]
+    step = next_step(selection_input, attempts)
+    assert step.kind == selection.PENDING
+    assert not any("no attempt slot left" in reason for reason in step.reasons)
+
+
+def test_policy_slots_cover_the_longest_enabled_chain(policy: Policy) -> None:
+    assert policy.max_attempts == policy.longest_enabled_chain()

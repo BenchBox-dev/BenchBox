@@ -73,13 +73,20 @@ it logs the result and succeeds.
 
 - agy is disabled in the policy and has no job, because its CI authentication
   and quota output are not calibrated and its usage is exhausted.
-- The quota and authentication messages of claude, codex and muse are not
+- The quota and authentication messages of claude and codex are not
   calibrated. Until they are, those failures are recorded as errors, which
   still never pass; the pattern tables in `absence.py` take the calibrated
   messages.
 - codex and agy have no turn-cap flag, so their timeout is the only bound.
-- The muse installer is unpinned and may need an interactive sign-in to
-  download; a failed install is recorded as an absence.
+- muse is disabled in the policy and has no job. Meta's only documented
+  installer, `https://dev.meta.ai/install.sh`, has no version or published
+  checksum: it fetches an unversioned launcher, and the launcher downloads the
+  channel's latest binary each time it runs, so nothing can be pinned. Until
+  Meta publishes a versioned, checksummed release, low–medium changes from a
+  Claude author go to `gpt-6-luna`, then `gpt-6.1-sol`.
+- The policy's `max_attempts`, and so the number of reviewer slots in the
+  workflow, must cover the longest chain of enabled reviewers; enabling muse
+  or agy needs more slots and a job for that harness.
 - Retry state is read only from artifacts of this workflow's runs whose commit
   is on `develop`, so a pull request's own workflow cannot forge it. That a
   `pull_request_target` run records the base commit as its head SHA is

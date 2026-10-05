@@ -19,7 +19,6 @@ POLICY = load_policy(REPO_ROOT / ".github" / "oracle-reviewers.yml")
 HARNESS_SECRETS = {
     "claude": {"CLAUDE_CODE_OAUTH_TOKEN"},
     "codex": {"OPENAI_API_KEY"},
-    "muse": {"META_API_KEY"},
 }
 APP_SECRETS = {"ORACLE_APP_ID", "ORACLE_APP_PRIVATE_KEY"}
 SHA_PIN = re.compile(r"^[\w.-]+/[\w.-]+@[0-9a-f]{40}$")
@@ -159,11 +158,11 @@ def test_reviewer_slots_cover_the_policy_and_run_sequentially() -> None:
         assert job["if"] == f"${{{{ !cancelled() && needs.select-{slot}.outputs.harness == '{_harness(name)}' }}}}"
 
 
-def test_every_harness_in_the_policy_except_disabled_agy_has_a_job() -> None:
+def test_only_enabled_harnesses_have_jobs() -> None:
     enabled = {reviewer.harness for reviewer in POLICY.reviewers.values() if reviewer.enabled}
     assert enabled == set(HARNESS_SECRETS)
-    assert not POLICY.reviewers["agy"].enabled
-    assert not any(_harness(name) == "agy" for name in _attempt_jobs())
+    assert not POLICY.reviewers["agy"].enabled and not POLICY.reviewers["muse"].enabled
+    assert not any(_harness(name) in ("agy", "muse") for name in _attempt_jobs())
 
 
 def test_each_reviewer_job_loads_only_its_own_secret() -> None:
@@ -212,7 +211,8 @@ def test_cli_installs_come_from_official_sources_with_pins() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     assert "npm install --global @anthropic-ai/claude-code@2.1.289" in text
     assert "npm install --global @openai/codex@0.160.0" in text
-    assert "https://dev.meta.ai/install.sh" in text
+    assert "dev.meta.ai" not in text and "META_API_KEY" not in text
+    assert "curl " not in text
     assert "printenv OPENAI_API_KEY | codex login --with-api-key" in text
     assert "--dangerously" not in text and "--yolo" not in text
 

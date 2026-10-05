@@ -111,6 +111,9 @@ class Policy:
     def chain(self, tier: str) -> list[Reviewer]:
         return [self.reviewers[name] for name in self.tiers[tier].order]
 
+    def longest_enabled_chain(self) -> int:
+        return max(sum(1 for reviewer in self.chain(tier) if reviewer.enabled) for tier in self.tiers)
+
 
 def _require(condition: bool, message: str) -> None:
     if not condition:
@@ -222,7 +225,10 @@ def parse_policy(data: Mapping[str, Any]) -> Policy:
     _require(bool(policy.status_context), "status_context is required")
     _require(policy.findings_delivery in DELIVERIES, f"findings_delivery must be one of {DELIVERIES}")
     _require(0 < policy.brief_max_bytes <= 120_000, "brief_max_bytes must fit in one command-line argument")
-    _require(policy.max_attempts > 0, "max_attempts must be positive")
+    _require(
+        policy.max_attempts >= policy.longest_enabled_chain(),
+        f"max_attempts must cover the longest enabled chain ({policy.longest_enabled_chain()})",
+    )
     _require(policy.default_author_family in policy.families, "default_author_family must be a reviewer family")
     _require(policy.retry.daily_budget > 0 and policy.retry.backoff_start_minutes > 0, "retry rules must be positive")
     _require(
