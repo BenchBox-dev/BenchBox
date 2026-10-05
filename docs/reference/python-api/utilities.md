@@ -1018,7 +1018,7 @@ def is_valid_sql_identifier(identifier: str, *, max_length: int) -> bool: ...
 
 The function does not reject reserved words, does not quote a name and does not infer an engine-specific length cap. Because `$` also matches the position before a final newline, do not treat the pattern as a full-string validation guarantee.
 
-BenchBox callers currently use caps of 63 for PostgreSQL, TimescaleDB, pg_duckdb, pg_mooncake and CedarDB; 127 for QuestDB; and 128 for Spark, LakeSail, Velox and the Hive metastore. These are project caller settings, not a universal statement about those engines.
+BenchBox callers currently use caps of 63 for PostgreSQL, TimescaleDB, pg_duckdb, pg_mooncake and CedarDB; 127 for QuestDB; and 128 for Spark, LakeSail, Velox, the Hive metastore and the MySQL-wire family (Doris and SingleStore). These are project caller settings, not a universal statement about those engines.
 
 ##### Raises
 

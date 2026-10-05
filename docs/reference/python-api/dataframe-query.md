@@ -266,10 +266,16 @@ Recognizes a callable defined directly on the instance or its class, or an alrea
 <span id="benchbox.core.dataframe.query_resolution.get_dataframe_queries_for_benchmark"></span>
 
 ```python
-def get_dataframe_queries_for_benchmark(benchmark_config: Any, benchmark_instance: Any | None, stream_id: int | None = None) -> list[Any]: ...
+def get_dataframe_queries_for_benchmark(
+    benchmark_config: Any,
+    benchmark_instance: Any | None,
+    stream_id: int | None = None,
+    *,
+    bind_parameters: bool = True,
+) -> list[Any]: ...
 ```
 
-Normalizes the configuration's benchmark name. A missing `stream_id` uses its configured value, defaulting to zero. TPC-H, TPC-DS and ClickBench use their named resolvers before an instance hook is considered. Other benchmarks accept an explicit provider's list unchanged, or its `get_all_queries()` result. Unsupported containers log a warning and fall back to the registry.
+Normalizes the configuration's benchmark name. A missing `stream_id` uses its configured value, defaulting to zero. TPC-H, TPC-DS and ClickBench use their named resolvers before an instance hook is considered. `bind_parameters` is passed to the TPC-DS resolver, which binds the power-stream parameters unless it is false. Other benchmarks accept an explicit provider's list unchanged, or its `get_all_queries()` result. Unsupported containers log a warning and fall back to the registry.
 
 **Import:** `from benchbox.core.dataframe.query_resolution import get_dataframe_queries_for_benchmark` · **Extras:** none
 
@@ -293,8 +299,8 @@ The stream-specific helpers preserve these ordering boundaries:
 
 - `get_tpch_dataframe_queries(stream_id)` selects the permutation matrix row modulo its length, logs missing query IDs and omits those entries.
 - `resolve_tpcds_query_manager(instance)` checks the instance, then its `_impl` wrapper. Without a manager, `get_tpcds_legacy_queries(ids, stream_id)` warns and generates legacy ordering using seed `42 + stream_id`.
-- `get_tpcds_dataframe_queries(config, instance, stream_id)` gathers numeric base IDs, creates one standard stream over query range 1 through 99 with that seed, and resolves variants. `tpcds_dataframe_variant_fallback` defaults to true and is interpreted with `bool`.
-- `resolve_tpcds_stream_queries(queries, allow_variant_fallback)` logs and skips missing base queries, resolves variant IDs with lower, upper and capitalized suffix spellings, and retains stream order. With fallback enabled, a missing variant uses a dataclass copy of the base implementation with the variant ID; this does not certify SQL parity. With fallback disabled, missing variants raise `RuntimeError` after collection.
+- `get_tpcds_dataframe_queries(config, instance, stream_id, *, bind_parameters=True)` gathers numeric base IDs, creates one standard stream over query range 1 through 99 with that seed, and resolves variants. The `tpcds_dataframe_variant_fallback` option defaults to false and is interpreted with `bool`. Unless `bind_parameters` is false, the resolved queries are then bound to the power-stream parameters for that stream.
+- `resolve_tpcds_stream_queries(queries, allow_variant_fallback)` logs and skips missing base queries, resolves variant IDs with lower, upper and capitalized suffix spellings, and retains stream order. For the first-statement variant of a multi-part query, it always runs the base implementation under the variant ID, whatever the fallback setting. With fallback enabled, a missing variant uses a dataclass copy of the base implementation with the variant ID; this does not certify SQL parity. With fallback disabled, missing variants raise `RuntimeError` after collection.
 - `get_clickbench_dataframe_queries(config, instance, stream_id)` returns the registry's sorted list. Its configuration, instance and stream arguments do not alter the order.
 
 ## DataFrame Row-count Evidence

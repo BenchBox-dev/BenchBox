@@ -315,14 +315,14 @@ It raises `ConfigurationError` if validation fails and `strict_validation` is `T
 
 <span id="benchbox.platforms.clickhouse.ClickHouseAdapter.apply_table_tunings"></span>
 <span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.apply_table_tunings"></span>
-**`apply_table_tunings(table_tuning, connection) -> None`**: Applies ClickHouse-specific table tunings from a `TableTuning` object. ClickHouse handles each tuning type differently:
+**`apply_table_tunings(table_tuning, connection) -> None`**: Applies ClickHouse-specific table tunings from a `TableTuning` object to an existing table. It does nothing when the object has no tunings. Each tuning type is handled differently:
 
-- **Partitioning:** defined with `PARTITION BY` in `CREATE TABLE`.
-- **Sorting:** defined with `ORDER BY` in `CREATE TABLE`.
-- **Clustering:** achieved through `ORDER BY` and `OPTIMIZE` operations.
-- **Distribution:** handled through distributed engine settings.
+- **Sorting:** runs `optimize_table`, which issues `OPTIMIZE TABLE ... FINAL`.
+- **Clustering:** runs `OPTIMIZE TABLE ... FINAL` directly.
+- **Partitioning:** only logged, because partitioning is fixed when the table is created.
+- **Distribution:** only logged, because it is handled by engine settings.
 
-It raises `ValueError` if the tuning configuration is invalid for ClickHouse.
+If the tuning interface cannot be imported, it logs a warning and skips the tunings. Any other error is raised as `ValueError`.
 
 <span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.apply_unified_tuning"></span>
 **`apply_unified_tuning(unified_config: UnifiedTuningConfiguration, connection) -> None`**: Applies a unified tuning configuration to ClickHouse.
