@@ -196,6 +196,10 @@ The comparison still evaluates the exact-head approval slots.
   intentional visual change. The owner sets the four slot variables for that
   PR's head and merge group, since setting them needs repository
   administration. The run ids are recorded in this section when it merges.
+- **Cutover rehearsal (PR #2685, 2026-10-05).** The approval slot was
+  rehearsed on the cutover head with the variables set: CI run 37364773750,
+  `Public-site visual regression` job 112016617380, SUCCESS. The slot
+  variables were cleared afterwards.
 
 ### Site inventory: decided
 
