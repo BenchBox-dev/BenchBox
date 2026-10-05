@@ -21823,7 +21823,12 @@
       "title": "Stop false tuning claims in the console and the Results Explorer"
     },
     "tuning-template-and-resolution-coherence-20261001": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-06T14:28:06Z",
+        "generation": "9dcfaa07ccb547fcb748522bc6b19780",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329"
+      },
       "needs": [
         "tuning-gate-dataframe-tuned-resolution-20261001",
         "clickhouse-pk-prefix-sort-key-20261001",
@@ -21831,7 +21836,7 @@
         "clickhouse-optimize-post-load-20261001"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Ship a ClickHouse tuned template, fix fallback messaging, add SQL `tuning validate`, apply the DataFrame resolution decision"
     },
     "tuning-template-packaging-20260716": {
