@@ -225,22 +225,24 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
         List of paths in search order (first match wins)
     """
     paths = []
+    raw_platform = platform.lower()
     template_platform = _template_platform_key(platform)
+    platform_dirs = [raw_platform] if raw_platform == template_platform else [raw_platform, template_platform]
+    template_name = f"{benchmark.lower()}_tuned.yaml"
 
     # 1. Environment variable override path (highest priority)
     env_path = os.environ.get("BENCHBOX_TUNING_PATH")
     if env_path:
-        env_template = Path(env_path) / f"{template_platform}" / f"{benchmark.lower()}_tuned.yaml"
-        paths.append(env_template)
+        paths.extend(Path(env_path) / directory / template_name for directory in platform_dirs)
 
     # 2. Project-relative path (standard location)
-    primary = Path(f"examples/tunings/{template_platform}/{benchmark.lower()}_tuned.yaml")
-    paths.append(primary)
+    paths.extend(Path(f"examples/tunings/{directory}/{template_name}") for directory in platform_dirs)
 
     # 3. Current working directory fallback
-    cwd_template = Path(f"{template_platform}/{benchmark.lower()}_tuned.yaml")
-    if cwd_template != primary:  # Avoid duplicate if cwd is project root
-        paths.append(cwd_template)
+    for directory in platform_dirs:
+        cwd_template = Path(f"{directory}/{template_name}")
+        if cwd_template not in paths:
+            paths.append(cwd_template)
 
     # 4. Packaged resource (last resort; see docstring above)
     paths.append(packaged_template_path(template_platform, benchmark))
@@ -453,7 +455,7 @@ def _resolve_tuned(
         # cwd/env-relative auto-discovered template apart from the packaged
         # fallback for provenance purposes (must_preserve: packaged-template
         # provenance is recorded distinctly from AUTO_DISCOVERED).
-        packaged_candidate = packaged_template_path(platform, benchmark)
+        packaged_candidate = packaged_template_path(_template_platform_key(platform), benchmark)
 
         for path in search_paths:
             if path.exists():

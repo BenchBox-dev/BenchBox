@@ -237,3 +237,51 @@ class TestFallbackTextComesFromRegistry:
         resolution = _resolve(platform, None, config_manager)
 
         assert resolution.info_messages[-1] == f"Tuning: using {expected}"
+
+
+class TestClickHouseTemplateDirectories:
+    @pytest.mark.parametrize("platform", ["clickhouse", "clickhouse-local", "clickhouse-server", "clickhouse-cloud"])
+    def test_every_variant_searches_the_shared_clickhouse_directory(self, platform):
+        from benchbox.cli.tuning_resolver import get_tuning_template_paths
+
+        paths = [str(path) for path in get_tuning_template_paths(platform, "tpch")]
+
+        assert "examples/tunings/clickhouse/tpch_tuned.yaml" in paths
+
+    def test_a_variant_specific_directory_is_searched_first(self, monkeypatch, tmp_path):
+        from benchbox.cli.tuning_resolver import get_tuning_template_paths
+
+        monkeypatch.setenv("BENCHBOX_TUNING_PATH", str(tmp_path))
+
+        paths = get_tuning_template_paths("clickhouse-cloud", "tpch")
+
+        assert paths.index(tmp_path / "clickhouse-cloud" / "tpch_tuned.yaml") < paths.index(
+            tmp_path / "clickhouse" / "tpch_tuned.yaml"
+        )
+        assert paths.index(tmp_path / "clickhouse" / "tpch_tuned.yaml") < paths.index(
+            Path("examples/tunings/clickhouse-cloud/tpch_tuned.yaml")
+        )
+
+    def test_a_variant_specific_override_wins_over_the_curated_template(self, config_manager, monkeypatch, tmp_path):
+        from benchbox.cli.tuning_resolver import TuningSource
+
+        override = tmp_path / "clickhouse-cloud" / "tpch_tuned.yaml"
+        override.parent.mkdir()
+        override.write_text("primary_keys:\n  enabled: false\n")
+        monkeypatch.chdir(REPO_ROOT)
+        monkeypatch.setenv("BENCHBOX_TUNING_PATH", str(tmp_path))
+
+        resolution = _resolve("clickhouse-cloud", "tpch", config_manager)
+
+        assert resolution.config_file == override.resolve()
+        assert resolution.source == TuningSource.AUTO_DISCOVERED
+
+    @pytest.mark.parametrize("platform", ["clickhouse", "clickhouse-local", "clickhouse-cloud"])
+    def test_the_packaged_template_is_recorded_as_packaged_for_every_variant(self, platform, config_manager, empty_cwd):
+        from benchbox.cli.tuning_resolver import TuningSource
+
+        resolution = _resolve(platform, "tpch", config_manager)
+
+        assert resolution.source == TuningSource.PACKAGED_RESOURCE
+        assert resolution.config_file.name == "tpch_tuned.yaml"
+        assert resolution.config_file.parent.name == "clickhouse"

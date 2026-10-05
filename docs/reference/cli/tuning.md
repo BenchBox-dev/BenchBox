@@ -35,10 +35,16 @@ Resolution happens in this order (see `benchbox/cli/tuning_resolver.py:resolve_t
          itself (`benchbox/core/tuning/packaged_templates.py`) - last resort,
          only reached when none of tiers 1-3 exist. Only a subset of
          platform/benchmark pairs ship a packaged template today (the
-         `duckdb`, `databricks`, and `snowflake` templates that follow the
-         `<benchmark>_tuned.yaml` naming convention); see
+         `duckdb`, `databricks`, `snowflake`, and `clickhouse` templates that
+         follow the `<benchmark>_tuned.yaml` naming convention); see
          `benchbox/core/tuning/templates/README.md` for the exact list and
          how it's kept in sync with `examples/tunings/`.
+      The ClickHouse deployment variants (`clickhouse-local`,
+      `clickhouse-server`, `clickhouse-cloud`, and `chdb`) share one template
+      directory, `clickhouse`. In tiers 1-3, a directory named for the exact
+      variant (for example `clickhouse-cloud/`) is searched before the shared
+      `clickhouse/` directory, so a variant-specific template overrides the
+      curated one.
       5. **DataFrame platforms only**: the curated profile
          `examples/tunings/dataframe/<platform>_optimized.yaml` (cwd-relative),
          searched after every per-benchmark tier above. `polars`, `pandas`
