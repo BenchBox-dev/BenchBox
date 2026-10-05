@@ -7,6 +7,7 @@ import logging
 import shutil
 from pathlib import Path
 
+from benchbox.utils.datagen_manifest import require_manifest_files
 from benchbox.utils.file_format import COMPRESSION_EXTENSIONS, detect_compression, strip_compression_suffix
 from benchbox.utils.printing import emit
 from benchbox.utils.scale_factor import format_scale_factor
@@ -378,13 +379,9 @@ class FileArtifactMixin:
                     }
                 )
 
-        # A manifest naming no tables, or only tables without files, would be
-        # reused by later runs and load nothing, so generation fails instead of
-        # recording it.
-        if not any(manifest["tables"].values()):
-            raise RuntimeError(
-                f"TPC-DS data generation produced no table files in {output_dir}; refusing to write a manifest that lists no tables"
-            )
+        require_manifest_files(
+            sum(len(entries) for entries in manifest["tables"].values()), label="TPC-DS", output_dir=output_dir
+        )
 
         out = output_dir / "_datagen_manifest.json"
 
