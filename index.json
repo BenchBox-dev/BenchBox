@@ -2932,6 +2932,13 @@
       "status": "done",
       "title": "Fix ClickHouse QueryTransformer stripping leading zeros from decimal literals (tpchavoc Q6)"
     },
+    "clickhouse-tuned-tpcds-answer-parity-and-nullable-keys-20261005": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "ClickHouse tuned TPC-DS: prove tuned answers match untuned, and decide how Nullable key columns are rendered"
+    },
     "clickhouse-tuning-ledger-soundness-1275-followups-20260724": {
       "claim": null,
       "needs": [],

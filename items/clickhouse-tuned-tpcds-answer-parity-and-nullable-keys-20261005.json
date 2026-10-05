@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A recorded tuned-vs-untuned answer comparison for the TPC-DS query set on ClickHouse local, with any difference explained or fixed.",
+    "A decided and tested behaviour for a tuned key column that is nullable in the schema."
+  ],
+  "context": "Source: PR #2677 independent review (finding 6, consider) and close-out. Fixed in the template only; the underlying rendering rule and the answer-parity check remain open.",
+  "description": "## Problem\nBenchBox renders ClickHouse sort-key, partition and primary-key columns as non-Nullable (`_resolve_key_columns` in benchbox/platforms/clickhouse/workload.py). When such a column is declared nullable in the schema, the CSV load turns NULLs into 0 (untuned DDL has `Nullable(INTEGER)`, tuned DDL has `INTEGER`). The curated TPC-DS template now avoids the problem by sorting only on NOT NULL columns (item key and ticket/order number), but custom user configs and any future template that sorts on a nullable column (for example `*_date_sk`) silently change the data. No test or run compared TPC-DS query answers between tuned and untuned ClickHouse, so tuned-vs-untuned answer parity is unproven for any template.\n\n## Change\n- Add a check (nightly or integration) that runs the TPC-DS query set at a small scale factor on ClickHouse local untuned and tuned (curated template) and compares answers.\n- Decide the rule for nullable key columns: reject with an actionable validator message, keep them Nullable and set `allow_nullable_key = 1`, or warn. Implement it and test with a sort key on a nullable column.\n\n## Guardrails\n- Untuned ClickHouse DDL stays byte-identical (snapshot test).\n- Never relax a comparison to pass; document any expected difference.",
+  "links": [
+    "benchbox/platforms/clickhouse/workload.py",
+    "examples/tunings/clickhouse/tpcds_tuned.yaml"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-05T15:24:07Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "1161065644fc428487d3649c4c139df2",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    }
+  ]
+}
