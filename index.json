@@ -16056,6 +16056,13 @@
       "status": "done",
       "title": "Cut releases from an exact origin/develop head in a linked worktree"
     },
+    "release-cut-single-pass-agent-curation": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Let release-cut take a curated changelog in one pass so a moving develop cannot abort it"
+    },
     "release-finalize-merged-pr-tag-recovery": {
       "claim": null,
       "needs": [],

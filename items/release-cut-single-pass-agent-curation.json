@@ -1,0 +1,27 @@
+{
+  "acceptance": [
+    "A non-interactive release-cut can finish in one invocation with a curated section supplied from a file, and the --check-curation gate still runs on that text.",
+    "No option skips or weakens the curation gate or the exact-origin/develop start check.",
+    "docs/operations/release-guide.md describes the non-interactive flow.",
+    "Tests cover the curated-input path and its refusal of raw generated text."
+  ],
+  "context": "Found during the v0.4.2 release (2026-10-04/05). Evidence: cut attempts at 670af9029, 48be0235a and ba304dc2e aborted with 'fetched origin/develop advanced from ... preserve the cut and its curated files'; the fourth attempt at 8ed0c64e1 succeeded only because develop stayed quiet. Related: dlv2-53-retire-legacy-release-path.",
+  "description": "`make release-cut` opens $EDITOR for changelog curation only when stdin is a terminal. A non-interactive cut (an agent, or CI) therefore needs two passes: the first writes the raw generated section and stops at the curation gate, and the second resumes after someone curates the file. The resume refuses to continue when fetched origin/develop has moved past the cut's starting commit (scripts/release_cut_start.sh), so the cut must be aborted and restarted. During the v0.4.2 release, develop merged a PR every 5-20 minutes and the first pass took about 5 minutes; three of the first four agent attempts aborted this way. A pty-plus-EDITOR workaround was refused as a gate bypass, correctly. Add a supported way to supply curated text in the same pass, for example a CHANGELOG_SECTION=<path> input that the curation gate still checks, or make the resume compare against the recorded start commit rather than the live develop head when only curated files changed. Coordinate with dlv2-53, which may retire this path.",
+  "links": [
+    "Makefile",
+    "scripts/release_cut_start.sh",
+    "scripts/generate_changelog_entry.py",
+    "docs/operations/release-guide.md",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2648"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a9333dba047ba14211d4b4b2",
+      "at": "2026-10-05T15:25:03Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f3918863c53a4198bf2966bbd7dd1155",
+      "session_id": "3c335988ab31486690b06c7fec8a522d"
+    }
+  ]
+}
