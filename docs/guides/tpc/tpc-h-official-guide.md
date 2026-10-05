@@ -5,7 +5,7 @@
 ```{tags} advanced, guide, tpc-h, validation
 ```
 
-This guide provides systematic documentation for the TPC-H official benchmark implementation in BenchBox, including Power@Size and Throughput@Size. BenchBox does not export the composite QphH@Size; see [QphH@Size (not exported)](#qphhsize-not-exported).
+This guide provides systematic documentation for the TPC-H official benchmark implementation in BenchBox, including Power@Size and Throughput@Size. BenchBox does not export the composite QphH@Size; see [QphH@Size (not exported)](#qphh-size-not-exported).
 
 ## Overview
 
@@ -338,7 +338,7 @@ Incorrect: generate → load → maintenance → power → throughput  ❌ (powe
 
 ## Power@Size and Throughput@Size Calculation
 
-BenchBox does not calculate QphH@Size (see [QphH@Size (not exported)](#qphhsize-not-exported)). It calculates the two component metrics.
+BenchBox does not calculate QphH@Size (see [QphH@Size (not exported)](#qphh-size-not-exported)). It calculates the two component metrics.
 
 ### Component Calculations
 

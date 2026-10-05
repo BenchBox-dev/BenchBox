@@ -5,7 +5,7 @@
 ```{tags} advanced, guide, tpc-ds, validation
 ```
 
-This guide provides systematic documentation for the TPC-DS official benchmark implementation in BenchBox, including Power@Size and Throughput@Size. BenchBox does not export the composite QphDS@Size; see [QphDS@Size (not exported)](#qphdssize-not-exported).
+This guide provides systematic documentation for the TPC-DS official benchmark implementation in BenchBox, including Power@Size and Throughput@Size. BenchBox does not export the composite QphDS@Size; see [QphDS@Size (not exported)](#qphds-size-not-exported).
 
 ## Overview
 
@@ -443,7 +443,7 @@ for query_result in maintenance_result.query_results:
 
 ### Official TPC-DS Metrics
 
-The implementation calculates Power@Size and Throughput@Size. It does not calculate the composite QphDS@Size (see [QphDS@Size (not exported)](#qphdssize-not-exported)):
+The implementation calculates Power@Size and Throughput@Size. It does not calculate the composite QphDS@Size (see [QphDS@Size (not exported)](#qphds-size-not-exported)):
 
 ```python
 # Access calculated metrics
