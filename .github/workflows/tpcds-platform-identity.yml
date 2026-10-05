@@ -8,8 +8,8 @@ name: TPC-DS Platform Identity
 # another can be traced to the data or the parameters. The parameters are also recorded at SF 100,
 # where dsqgen needs no data and draws such as the Q46 city list are not degenerate.
 #
-# Linux and macOS must agree. Windows runs as an advisory cell: its manifest and comparison never fail
-# the workflow. The other bundled binaries (darwin-x86_64, linux-arm64, windows-arm64) are not run.
+# Linux and macOS cells (x86_64 and arm64) must agree. Windows cells (x86_64 and arm64) are advisory:
+# their manifests and comparison never fail the workflow. Every bundled binary runs on a native runner.
 #
 # Not a required check: it runs on a schedule, on demand, and on pull requests that touch the bundled
 # TPC-DS binaries, the code that selects and runs them, or this check.
@@ -43,11 +43,11 @@ jobs:
     name: TPC-DS manifest (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
+    continue-on-error: ${{ startsWith(matrix.os, 'windows') }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel, windows-latest, windows-11-arm]
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0

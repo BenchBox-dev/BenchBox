@@ -472,3 +472,30 @@ def check_tpc_status():
             needs_compile = compiler.needs_compilation(binary)
             print(f"{binary}: available={available}, needs_compile={needs_compile}")
 ```
+
+## Source tree build outputs
+
+The TPC-H auto-compilation path writes `Makefile.auto` and the object files into
+`_sources/tpc-h/dbgen/`. The Makefile depends on the host platform, so it is
+generated on each build and not tracked. Neither it nor the `.o` files, `dbgen`
+or `qgen` are tracked; `.gitignore` lists them. A tracked object file can be
+newer than its source after a checkout and be linked into a fresh build.
+`tests/unit/core/tpch/test_tpch_dbgen_framing.py` fails if one is tracked again.
+The tracked build configuration is `makefile.suite`; the same test checks that it
+and the generated Makefile both define `-DEOL_HANDLING`.
+
+## Bundled binary checks
+
+Two hosted workflows run the bundled binaries on native runners.
+
+- `tpch-dbgen-intel-macos.yml` runs the bundled `darwin-x86_64` `dbgen` on an
+  Intel macOS runner at scale factor 0.01 and compares the supplier and customer
+  output hashes with the canonical values in
+  `tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py`.
+- `tpcds-platform-identity.yml` generates TPC-DS data and `dsqgen` parameters at
+  scale factor 0.01 on every bundled platform (linux-x86_64, linux-arm64,
+  darwin-arm64, darwin-x86_64, windows-x86_64, windows-arm64) and compares the
+  manifests. The Linux and macOS cells must agree. The Windows cells are
+  advisory.
+
+Owner decision (2026-10-04): the Windows cell stays advisory.
