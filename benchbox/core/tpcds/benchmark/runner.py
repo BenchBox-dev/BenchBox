@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection as _DatabaseConnection
 from benchbox.core.results.metrics import TPCMetricsCalculator
+from benchbox.core.throughput.result import throughput_stream_ids
 from benchbox.core.validation import (
     DatabaseValidationEngine,
     DataValidationEngine,
@@ -1444,7 +1445,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                     dialect,
                     logger,
                 )
-                for i in range(num_streams)
+                for i in throughput_stream_ids(num_streams)
             ]
             for future in concurrent.futures.as_completed(futures):
                 try:

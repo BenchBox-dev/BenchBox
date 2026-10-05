@@ -1638,6 +1638,38 @@ class TestThroughputPhaseCreation:
         assert result.streams[0].query_executions[0].run_type == "measurement"
         assert result.streams[0].query_executions[1].run_type == "measurement"
 
+    def test_create_throughput_phase_records_the_stream_numbering_basis(self):
+        adapter = MockPlatformAdapter()
+        stream = Mock()
+        stream.stream_id = 1
+        stream.start_time = "2025-01-01T10:00:00"
+        stream.end_time = "2025-01-01T10:01:00"
+        stream.duration = 60.0
+        stream.query_results = [{"query_id": "Q1", "execution_time_seconds": 1.0, "success": True}]
+        stream.queries_executed = 1
+        stream.queries_successful = 1
+        stream.queries_failed = 0
+        stream.success = True
+        stream.error = None
+        numbering = {"basis": "tpc_spec_throughput_streams_1_to_s", "first_stream_id": 1}
+
+        throughput_result = Mock()
+        throughput_result.stream_results = [stream]
+        throughput_result.total_time = 60.0
+        throughput_result.start_time = "2025-01-01T10:00:00"
+        throughput_result.end_time = "2025-01-01T10:01:00"
+        throughput_result.config = Mock(num_streams=1)
+        throughput_result.throughput_at_size = 720.0
+        throughput_result.streams_executed = 1
+        throughput_result.streams_successful = 1
+        throughput_result.errors = []
+        throughput_result.stream_numbering = numbering
+
+        result = adapter._create_throughput_phase(throughput_result)
+
+        assert result.stream_numbering == numbering
+        assert result.streams[0].stream_id == 1
+
     def test_create_throughput_phase_infers_warmup_run_type(self):
         """Throughput query executions infer warmup run_type from iteration metadata."""
         adapter = MockPlatformAdapter()
@@ -2717,7 +2749,7 @@ class TestTPCHAndTPCDSExecutionHelpers:
         first_kwargs = mock_power_test_cls.call_args_list[0].kwargs
         second_kwargs = mock_power_test_cls.call_args_list[1].kwargs
         assert first_kwargs["stream_id"] == 0
-        assert second_kwargs["stream_id"] == 1
+        assert second_kwargs["stream_id"] == 0
         assert first_kwargs["query_subset"] == ["1", "2"]
         assert second_kwargs["dialect"] == "mock_dialect"
         assert results[0]["run_type"] == "warmup"
@@ -2802,9 +2834,9 @@ class TestTPCHAndTPCDSExecutionHelpers:
         class FakeTPCHPowerTest:
             def __init__(self, **kwargs):
                 self.kwargs = kwargs
-                # Force a policy that differs from stream_id to prove the adapter
+                # Force a policy that differs between runs to prove the adapter
                 # consumes resolved config.validation rather than re-deriving it.
-                self.config = SimpleNamespace(validation=kwargs["stream_id"] == 1)
+                self.config = SimpleNamespace(validation=len(power_results) == 1)
 
             def run(self):
                 observed_flags.append((self.kwargs["stream_id"], self.kwargs["connection"]._validate_row_count))
@@ -2813,7 +2845,7 @@ class TestTPCHAndTPCDSExecutionHelpers:
         with patch("benchbox.core.tpch.power_test.TPCHPowerTest", FakeTPCHPowerTest):
             adapter._execute_tpch_power_test(benchmark, connection, run_config)
 
-        assert observed_flags == [(0, False), (1, True)]
+        assert observed_flags == [(0, False), (0, True)]
 
     @patch("benchbox.platforms.base.execution.quiet_console")
     @patch("benchbox.core.expected_results.tpcds_results.set_config_validation_mode")

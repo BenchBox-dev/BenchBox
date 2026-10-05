@@ -170,6 +170,35 @@ def test_throughput_outstanding_work_survives_schema_round_trip_without_query_ro
     assert reloaded["phases"]["throughput_test"] == payload["phases"]["throughput_test"]
 
 
+def test_throughput_stream_numbering_survives_schema_round_trip() -> None:
+    numbering = {"basis": "tpc_spec_throughput_streams_1_to_s", "first_stream_id": 1}
+    result = _result_with_queries([])
+    result.execution_phases = ExecutionPhases(
+        setup=SetupPhase(),
+        throughput_test=ThroughputTestPhase(
+            start_time="2026-02-12T00:00:00",
+            end_time="2026-02-12T00:00:01",
+            duration_ms=1000,
+            num_streams=2,
+            streams=[
+                ThroughputStream(1, "start", "end", 500, [], success=True),
+                ThroughputStream(2, "start", "end", 500, [], success=True),
+            ],
+            total_queries_executed=0,
+            throughput_at_size=None,
+            success=True,
+            stream_numbering=numbering,
+        ),
+    )
+
+    payload = build_result_payload(result)
+
+    assert payload["phases"]["throughput_test"]["stream_numbering"] == numbering
+    assert [stream["stream_id"] for stream in payload["phases"]["throughput_test"]["stream_results"]] == [1, 2]
+    reloaded = build_result_payload(reconstruct_benchmark_results(payload))
+    assert reloaded["phases"]["throughput_test"] == payload["phases"]["throughput_test"]
+
+
 def test_build_result_payload_rejects_conflicting_duration_aliases() -> None:
     result = _result_with_queries(
         [

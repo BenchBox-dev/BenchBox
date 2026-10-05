@@ -1082,6 +1082,8 @@ def _throughput_phase_payload(throughput: Any) -> dict[str, Any]:
             "stream_ids": list(throughput.outstanding_work["stream_ids"]),
             "cleanup_state": throughput.outstanding_work["cleanup_state"],
         }
+    if throughput.stream_numbering is not None:
+        payload["stream_numbering"] = dict(throughput.stream_numbering)
     return payload
 
 

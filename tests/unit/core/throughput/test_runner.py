@@ -180,7 +180,7 @@ class TestStreamRunnerExecute:
         StreamRunner.execute(stream_fn, config, result, logger)
 
         assert result.streams_executed == 1
-        stream_fn.assert_called_once_with(0, config.base_seed, config)
+        stream_fn.assert_called_once_with(1, config.base_seed + 1, config)
 
     def test_verbose_logging_does_not_affect_aggregation(self) -> None:
         config = _FakeConfig(num_streams=1, verbose=True)
@@ -453,7 +453,7 @@ class TestStreamRunnerCooperativeCancellation:
 
         cancel_events = getattr(config, "_stream_cancel_events", None)
         assert cancel_events is not None and len(cancel_events) == 1
-        assert cancel_events[0].is_set()
+        assert cancel_events[1].is_set()
         assert "cooperative cancellation has been signalled" in result.errors[0]
 
     def test_stale_cancel_events_reset_when_reusing_config_with_cancel_disabled(self) -> None:
@@ -481,7 +481,7 @@ class TestStreamRunnerCooperativeCancellation:
         StreamRunner.execute(slow_stream_fn, config, result1, logger)
 
         stale_cancel_events = getattr(config, "_stream_cancel_events", None)
-        assert stale_cancel_events is not None and stale_cancel_events[0].is_set()
+        assert stale_cancel_events is not None and stale_cancel_events[1].is_set()
 
         # Reuse the SAME config object; cooperative cancel now disabled and
         # no timeout pressure. A fresh dict must replace the stale one.
@@ -599,8 +599,8 @@ class TestStreamRunnerNonBlockingShutdown:
 
         cancel_events = getattr(config, "_stream_cancel_events", None)
         assert cancel_events is not None
-        assert isinstance(cancel_events[0], threading.Event)
-        assert cancel_events[0].is_set()
+        assert isinstance(cancel_events[1], threading.Event)
+        assert cancel_events[1].is_set()
 
     def test_cooperative_cancel_disabled_by_default_never_cancels(self) -> None:
         """Composition with #1106: cancel_on_timeout defaults False, so no
@@ -672,7 +672,7 @@ class TestStreamRunnerNonBlockingShutdown:
         started = threading.Event()
 
         def stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
-            if stream_id == 0:
+            if stream_id == 1:
                 time.sleep(self.HANG_SLEEP)  # occupies the sole worker past the timeout
             else:
                 started.set()  # only reachable if stream 1 was ever dispatched

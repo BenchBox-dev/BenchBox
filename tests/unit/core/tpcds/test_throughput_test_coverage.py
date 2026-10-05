@@ -215,15 +215,15 @@ def test_build_stream_queries_uses_run_num_streams_and_base_seed_not_stream_id(m
 
     config = TPCDSThroughputTestConfig(num_streams=4, base_seed=100, enable_preflight=False)
 
-    throughput._build_stream_queries(stream_id=0, seed=100, config=config)
-    throughput._build_stream_queries(stream_id=3, seed=103, config=config)
+    throughput._build_stream_queries(stream_id=1, seed=101, config=config)
+    throughput._build_stream_queries(stream_id=4, seed=104, config=config)
 
     assert len(captured_kwargs) == 2
     # Both calls -- regardless of stream_id -- must resolve to the SAME
     # num_streams/base_seed (the run's config), not stream_id-dependent
     # values like the retired `stream_id + 1` / `seed + stream_id` formula.
     for kwargs in captured_kwargs:
-        assert kwargs["num_streams"] == config.num_streams == 4
+        assert kwargs["num_streams"] == config.num_streams + 1 == 5
         assert kwargs["base_seed"] == config.base_seed == 100
 
 
@@ -249,8 +249,9 @@ def test_pregenerate_stream_queries_routes_through_dsqgen_streams(monkeypatch):
     def _fake_generate_dsqgen_streams(*, num_streams, scale_factor, seed):
         calls.append({"num_streams": num_streams, "scale_factor": scale_factor, "seed": seed})
         return {
-            0: [DummyStreamQueryWithSql(query_id=1, sql="select 1;")],
-            1: [DummyStreamQueryWithSql(query_id=2, sql="select 2;")],
+            0: [DummyStreamQueryWithSql(query_id=9, sql="select 9;")],
+            1: [DummyStreamQueryWithSql(query_id=1, sql="select 1;")],
+            2: [DummyStreamQueryWithSql(query_id=2, sql="select 2;")],
         }
 
     monkeypatch.setattr(
@@ -262,10 +263,11 @@ def test_pregenerate_stream_queries_routes_through_dsqgen_streams(monkeypatch):
     result = throughput._pregenerate_stream_queries(config)
 
     assert len(calls) == 1
-    assert calls[0] == {"num_streams": 2, "scale_factor": 3.0, "seed": 7}
+    assert calls[0] == {"num_streams": 3, "scale_factor": 3.0, "seed": 7}
 
-    assert result[0][0][1] == "TRANSLATED::select 1;"
-    assert result[1][0][1] == "TRANSLATED::select 2;"
+    assert sorted(result) == [1, 2]
+    assert result[1][0][1] == "TRANSLATED::select 1;"
+    assert result[2][0][1] == "TRANSLATED::select 2;"
 
 
 def test_pregenerate_stream_queries_resolves_translation_from_wrapper_impl(monkeypatch):
@@ -282,12 +284,12 @@ def test_pregenerate_stream_queries_resolves_translation_from_wrapper_impl(monke
     )
     monkeypatch.setattr(
         "benchbox.core.tpcds.streams.generate_dsqgen_streams",
-        lambda **_kwargs: {0: [DummyStreamQueryWithSql(query_id=7, sql="select 7;")]},
+        lambda **_kwargs: {1: [DummyStreamQueryWithSql(query_id=7, sql="select 7;")]},
     )
 
     result = throughput._pregenerate_stream_queries(TPCDSThroughputTestConfig(num_streams=1, enable_preflight=True))
 
-    assert result[0][0][1] == "O::T::select 7;"
+    assert result[1][0][1] == "O::T::select 7;"
     assert calls == [("translate", "select 7;"), ("override", 7)]
 
 

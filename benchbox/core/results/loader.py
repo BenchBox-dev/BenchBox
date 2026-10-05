@@ -870,6 +870,7 @@ def _reconstruct_execution_phases(phases_section: dict[str, Any]) -> ExecutionPh
             for stream in throughput_data.get("stream_results", [])
         ]
         outstanding_work = throughput_data.get("outstanding_work")
+        stream_numbering = throughput_data.get("stream_numbering")
         throughput = ThroughputTestPhase(
             start_time="",
             end_time="",
@@ -888,6 +889,7 @@ def _reconstruct_execution_phases(phases_section: dict[str, Any]) -> ExecutionPh
                 if isinstance(outstanding_work, dict)
                 else None
             ),
+            stream_numbering=dict(stream_numbering) if isinstance(stream_numbering, dict) else None,
         )
 
     # Only return ExecutionPhases if we have at least one reconstructable phase.
