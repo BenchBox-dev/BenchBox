@@ -196,6 +196,11 @@ def test_a_parity_only_failure_keeps_the_printed_comparison_strict():
     assert printed_classification("2", "mismatch", [_item("strict", None)]) == {"state": "unclassified"}
 
 
+def test_a_matching_file_does_not_hide_an_error_on_another_file():
+    error = {"file": "1.ans", "null_order": "unspecified", "status": "error"}
+    assert printed_classification("1", "error", [error, _item("strict", "strict")]) == {"state": "unclassified"}
+
+
 def test_a_null_order_variant_file_never_classifies_a_statement_by_itself():
     variant = classification.NULL_ORDER_VARIANT
     only_variant = [

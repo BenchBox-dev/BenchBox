@@ -212,9 +212,12 @@ def _malformed(entry: KnownDifference, files: list[dict[str, Any]]) -> bool:
 
 
 def printed_classification(query: str, status: str, files: list[dict[str, Any]]) -> dict[str, Any]:
-    if status == "match" or any(
-        all(item.get(f"{side}_to_printed", {}).get("status") == "match" for side in ("sql", "dataframe"))
-        for item in files
+    if status == "match" or (
+        not any(item.get("status") == "error" for item in files)
+        and any(
+            all(item.get(f"{side}_to_printed", {}).get("status") == "match" for side in ("sql", "dataframe"))
+            for item in files
+        )
     ):
         return {"state": "strict"}
     entry = KNOWN.get(query)
