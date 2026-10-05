@@ -1,34 +1,4 @@
 #!/usr/bin/env python3
-"""Decide whether a ci.yml run needs the heavy test tier.
-
-The heavy tier (medium-test, correctness-gate, plan-capture-gate,
-tpch-binary-framing, and the postgres/datafusion/clickhouse integration
-samples) runs only when needed:
-
-    heavy-needed = needs-code-ci
-                   AND (event is merge_group
-                        OR soundness paths touched
-                        OR packaging-needed)
-
-Soundness uses the UNION of the base-ref copy and the PR (working tree)
-copy of the soundness policy: a PR that rewrites the predicate or manifest
-must not silently narrow what counts as a soundness path. Each snapshot
-contains its wrapper, helper, and manifest from the same revision and runs
-in an isolated stdlib-only interpreter. Historical standalone predicates
-remain supported.
-
-Fail-closed: any lookup error, missing input, ambiguous match, or
-classification failure reports ``heavy-needed=true`` so the tier runs.
-The process still exits 0 (the safe direction is encoded in the output,
-not the exit code) unless invoked with ``--check``, where true maps to
-exit 0, false maps to exit 1, and a lookup error maps to exit 0.
-
-The event gate lives HERE, not in a workflow ``if:``: downstream jobs
-read this lookup's outputs on every event, and references to a skipped
-job's outputs do not evaluate reliably. Non-code-routed trees report
-``heavy-needed=false`` without any further lookup.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -40,8 +10,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-PREDICATE_REPO_PATH = "_project/scripts/auto_merge_soundness_paths.py"
-POLICY_PATHS = (PREDICATE_REPO_PATH, "_project/scripts/soundness_paths.py", ".github/soundness-paths.txt")
+PREDICATE_REPO_PATH = "_project/scripts/soundness_paths.py"
+POLICY_PATHS = (PREDICATE_REPO_PATH, ".github/soundness-paths.txt")
 MERGE_GROUP_EVENT = "merge_group"
 
 
@@ -51,7 +21,7 @@ class HeavyTierError(RuntimeError):
 
 def _load_predicate_copy(name: str, sources: dict[str, str], paths: list[str]) -> bool:
     """Evaluate one complete policy snapshot in an isolated interpreter."""
-    if set(sources) not in ({PREDICATE_REPO_PATH}, set(POLICY_PATHS)):
+    if set(sources) != set(POLICY_PATHS):
         raise HeavyTierError(f"predicate copy {name!r} has an invalid file set")
     if any("\n" in path or "\r" in path for path in paths):
         raise HeavyTierError("changed paths contain ambiguous line separators")
@@ -66,7 +36,7 @@ def _load_predicate_copy(name: str, sources: dict[str, str], paths: list[str]) -
                 [sys.executable, "-I", "-S", str(root / PREDICATE_REPO_PATH), "--stdin", "--format", "github-output"],
                 input="\n".join(paths),
                 cwd=root,
-                env={**os.environ, "SOUNDNESS_PATH_MANIFEST": str(root / POLICY_PATHS[2])},
+                env={**os.environ, "SOUNDNESS_PATH_MANIFEST": str(root / POLICY_PATHS[1])},
                 capture_output=True,
                 text=True,
                 timeout=15,
@@ -106,8 +76,6 @@ def _read_base_copy(base_ref: str, repo_root: Path) -> dict[str, str]:
             text=True,
             stderr=subprocess.DEVNULL,
         ).split("\0")
-        # Old standalone predicates legitimately lack a helper and manifest.
-        # Read errors never count as absence; ls-tree must have succeeded.
         return {
             path: subprocess.check_output(
                 ["git", "--no-replace-objects", "-C", str(repo_root), "show", f"{commit}:{path}"],
