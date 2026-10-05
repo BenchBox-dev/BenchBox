@@ -601,9 +601,9 @@ class DuckDBAdapter(PlatformAdapter):
         when the recorded ``CREATE INDEX`` statements are confirmed present in
         the catalog (see ``benchbox.platforms.duckdb_introspection``).
         """
-        from benchbox.platforms.duckdb_introspection import DuckDBTuningIntrospector
+        from benchbox.platforms.base import tuning_trust
 
-        return DuckDBTuningIntrospector()
+        return tuning_trust.duckdb_tuning_introspector()
 
     @staticmethod
     def add_cli_arguments(parser) -> None:

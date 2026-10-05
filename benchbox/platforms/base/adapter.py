@@ -394,9 +394,10 @@ class PlatformAdapter(
         database catalog, letting an ``applied_unverified`` run be upgraded to
         ``applied_verified`` -- but only when every catalog-backed tuning
         statement is corroborated (see
-        ``benchbox.core.tuning.introspection``). Platforms with a structured
-        catalog (DuckDB, ClickHouse) override this; the base returns None, so a
-        platform without an introspector keeps the honest ledger-derived status.
+        ``benchbox.core.tuning.introspection``). The admitted set is exactly
+        DuckDB, ClickHouse, and Snowflake (see the ADR-001 verification-reach
+        addendum); those platforms override this, and the base returns None, so
+        a platform without an introspector keeps the honest ledger-derived status.
         """
         return None
 
@@ -1006,10 +1007,7 @@ class PlatformAdapter(
             # session SETs at line ~827 run later and are folded in before the
             # success result is built). tuning_metadata_saved is a separate
             # persistence note, fully decoupled from this status.
-            tuning_validation_status = self._applied_tuning_ledger.overall_status(
-                tuning_enabled=self.tuning_enabled,
-                has_config=bool(effective_tuning_config),
-            )
+            tuning_validation_status = tuning_trust.apply_phase_status(self, bool(effective_tuning_config))
 
             if self._check_validation_failure(validation_phase):
                 # Data validation failed before session SETs ran, so the ledger

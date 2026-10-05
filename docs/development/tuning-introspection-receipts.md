@@ -49,26 +49,47 @@ to use the entry verdicts directly.
 
 ## Where the trust code lives
 
-The adapter-side corroboration, drift-check routing, layout-operation fold, and
-ledger read-back live in `benchbox/platforms/base/tuning_trust.py`.
+The adapter-side corroboration, drift-check routing, layout-operation fold,
+apply-phase status, introspector selection, and ledger read-back live in
+`benchbox/platforms/base/tuning_trust.py`.
 `PlatformAdapter._corroborate_applied_ledger`,
 `_attach_applied_ledger_payload`, `_build_drift_check_payload`, and
 `_fold_layout_operations_into_ledger` remain as one-line delegates, so callers
-and subclasses keep their existing entry points. `applied_verified` is still
-emitted only by `corroborate_applied_ledger`, whose behavior is unchanged: it
-returns the status untouched unless the derived status is `applied_unverified`,
-and any introspector or corroboration error leaves the status as it was and
-logs at debug level.
+and subclasses keep their existing entry points. `run_enhanced_benchmark`
+derives its apply-phase status and reads the ledger back through that module
+too, including the validation-failure path, which attaches the payload via
+the same delegate. The DuckDB, ClickHouse, and Snowflake
+`get_tuning_introspector` overrides are one-line delegates to that module's
+per-platform factories -- the admitted verdict-producing set stays exactly
+those three platforms (see the ADR-001 verification-reach addendum), and no
+new introspector is constructed. The DataFrame ledger status derivation and
+result attach live in `benchbox/platforms/dataframe/tuning_trust.py`, with
+`TuningConfigurableMixin` keeping one-line delegates. `applied_verified` is
+still emitted only by `corroborate_applied_ledger`, whose behavior is
+unchanged: it returns the status untouched unless the derived status is
+`applied_unverified`, and any introspector or corroboration error leaves the
+status as it was and logs at debug level.
 
 These files are soundness-manifest paths (`.github/soundness-paths.txt`), so a
 change to any of them needs the external soundness review before it is armed:
 `benchbox/platforms/base/tuning_trust.py`,
 `benchbox/core/tuning/introspection.py`, `applied_ledger.py`,
 `capability_registry.py`, `metadata.py`,
-`benchbox/platforms/*_introspection.py`, and
-`benchbox/platforms/clickhouse/introspection.py`. The manifest cannot name a
-region of a file, which is why the logic sits in its own module instead of
-making all of `adapter.py` a soundness path.
+`benchbox/platforms/*_introspection.py`,
+`benchbox/platforms/clickhouse/introspection.py`, and
+`benchbox/platforms/dataframe/tuning_trust.py`. The manifest cannot name a
+region of a file, which is why the logic sits in its own modules instead of
+making all of `adapter.py` (or the DataFrame mixins) a soundness path.
+
+What is *not* gated: the adapter files themselves (`adapter.py`,
+`duckdb.py`, `clickhouse/adapter.py`, `snowflake.py`, the DataFrame mixins)
+stay outside the manifest. Their trust-relevant methods are one-line
+delegates pinned by tests -- a change that routes around the gated module
+fails the suite -- but the manifest alone does not flag edits there, so those
+pins are load-bearing. Likewise the `benchbox/platforms/*_introspection.py`
+glob uses `fnmatch` semantics, where `*` crosses `/`: it also matches nested
+`benchbox/platforms/<sub>/*_introspection.py` files, not just the top-level
+modules.
 
 ## Statement classes (per phase x mechanism)
 

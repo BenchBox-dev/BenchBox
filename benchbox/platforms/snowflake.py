@@ -1922,9 +1922,9 @@ class SnowflakeAdapter(PlatformAdapter):
         in a recording connection), so this supplies the catalog side that lets
         them be corroborated instead of classified ``unverifiable``.
         """
-        from benchbox.platforms.snowflake_introspection import SnowflakeTuningIntrospector
+        from benchbox.platforms.base import tuning_trust
 
-        return SnowflakeTuningIntrospector(schema=self.schema)
+        return tuning_trust.snowflake_tuning_introspector(self.schema)
 
     def close_connection(self, connection: Any) -> None:
         """Close Snowflake connection."""
