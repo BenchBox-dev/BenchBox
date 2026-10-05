@@ -19,7 +19,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from benchbox.core.loaded_tables import require_loaded_tables
+from benchbox.core.loaded_tables import is_data_loading_skipped, require_loaded_tables
 from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
 from benchbox.core.throughput.containment import await_quiescence
@@ -1463,7 +1463,7 @@ class PlatformAdapter(
             else:
                 quiet_console.print("✅ Tuning metadata saved")
 
-        if getattr(type(benchmark), "SKIP_DATA_LOADING", False):
+        if is_data_loading_skipped(benchmark):
             quiet_console.print("Benchmark uses schema only; skipping data loading")
             # Some adapters only materialize catalog objects inside load_data()
             # (e.g. DataFusion creates empty tables from the recorded schema),
