@@ -298,6 +298,7 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             "max_threads",
             "disable_result_cache",
             "compression",
+            "optimize_after_load",
         ]:
             if key in config and config[key] is not None:
                 adapter_config[key] = config[key]

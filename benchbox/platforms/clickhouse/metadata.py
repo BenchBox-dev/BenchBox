@@ -81,6 +81,7 @@ class ClickHouseMetadataMixin:
             "tuning_source_file",
             "verbose_enabled",
             "very_verbose",
+            "optimize_after_load",
         ]:
             if key in config:
                 adapter_config[key] = config[key]

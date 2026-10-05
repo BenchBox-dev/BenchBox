@@ -307,3 +307,31 @@ class TestClickHouseOptionIsDeclared:
             PlatformHookRegistry.parse_options(platform, [("optimize_after_load", "true")])["optimize_after_load"]
             is True
         )
+
+
+class TestClickHouseOptionReachesTheAdapter:
+    @pytest.mark.parametrize("adapter_name", ["ClickHouseLocalAdapter", "ClickHouseServerAdapter"])
+    def test_from_config_carries_optimize_after_load(self, adapter_name):
+        import importlib
+
+        module = importlib.import_module(
+            "benchbox.platforms.clickhouse_local" if "Local" in adapter_name else "benchbox.platforms.clickhouse_server"
+        )
+        adapter_cls = getattr(module, adapter_name)
+        with patch("benchbox.platforms.clickhouse.adapter.check_platform_dependencies", return_value=(True, [])):
+            enabled = adapter_cls.from_config({"benchmark": "tpch", "scale_factor": 0.01, "optimize_after_load": True})
+            default = adapter_cls.from_config({"benchmark": "tpch", "scale_factor": 0.01})
+
+        assert enabled._optimize_after_load_enabled() is True
+        assert default._optimize_after_load_enabled() is False
+
+    def test_cloud_from_config_carries_optimize_after_load(self):
+        from benchbox.platforms.clickhouse_cloud import ClickHouseCloudAdapter
+
+        with patch("benchbox.platforms.clickhouse.adapter.check_platform_dependencies", return_value=(True, [])):
+            base = {"host": "h", "password": "p"}
+            enabled = ClickHouseCloudAdapter.from_config({**base, "optimize_after_load": True})
+            default = ClickHouseCloudAdapter.from_config(base)
+
+        assert enabled._optimize_after_load_enabled() is True
+        assert default._optimize_after_load_enabled() is False
