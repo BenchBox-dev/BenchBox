@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Tests pin both behaviours, including the unusual-DDL cases.",
+    "Untuned ClickHouse DDL snapshot unchanged."
+  ],
+  "context": "Source: PR #2677 subagent review (Consider/Nit). Not exercised by any current benchmark schema.",
+  "description": "## Problem (review findings left open in PR #2677)\n- `_has_tuned_sort_key` (benchbox/platforms/clickhouse/tuning.py) decides from the effective configuration whether a tuned sort key exists, but does not check `tuning_enabled`. A configuration with sorting present while tuning is off could still change how primary keys are forced on in the effective config.\n- `_strip_primary_key_constraints` (benchbox/platforms/clickhouse/workload.py) removes PRIMARY KEY constraints from generated CREATE TABLE text with a scanner. It is covered for the generated DDL shapes, but its behaviour on unusual DDL (quoted identifiers, inline column-level PRIMARY KEY, comments, nested type commas) is untested, so a user-supplied or future schema could be mangled silently.\n\n## Change\n- Gate `_has_tuned_sort_key` on `tuning_enabled` and add a test.\n- Add edge-case tests for `_strip_primary_key_constraints`; fix or reject inputs it cannot handle safely.\n\n## Guardrails\n- Untuned ClickHouse DDL stays byte-identical (snapshot test).",
+  "links": [
+    "benchbox/platforms/clickhouse/tuning.py",
+    "benchbox/platforms/clickhouse/workload.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-05T15:25:09Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "60d37385b794421599c71e1653d86e4a",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    }
+  ]
+}
