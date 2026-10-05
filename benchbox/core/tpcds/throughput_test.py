@@ -25,6 +25,10 @@ from benchbox.core.plan_capture_phase import (
 )
 from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
 from benchbox.core.throughput.runner import StreamRunner
+from benchbox.core.validation.query_validation import (
+    clear_reference_seed_context,
+    set_reference_seed_context,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
@@ -51,24 +55,6 @@ class TPCDSThroughputTestConfig:
     queries_per_stream: Optional[int] = None  # Default: execute all queries
     # Enable preflight validation (validates query generation before execution)
     enable_preflight: bool = True
-    # Legacy per-stream reporting threshold retained for configuration
-    # compatibility. Product scoring is stricter: StreamRunner emits
-    # Throughput@Size only when every requested stream and query succeeds.
-    #
-    # Spec citation: NOT derived from a TPC-DS "acceptable failure rate"
-    # clause -- no such partial-success allowance exists in the TPC-DS
-    # specification v4.0.0. A compliant/audited run requires every stream and
-    # query to complete successfully (mirroring TPC-H specification 5.1.1.6's
-    # "A failed run is defined as a run that did not complete successfully
-    # due to unforeseen system failures"). 0.70 is a BenchBox-internal
-    # tolerance for treating a run as "usable" for iterative development/CI
-    # despite some stream/query failures; it is NOT an official TPC-DS
-    # compliance gate, and results below 100% success are not eligible for
-    # TPC-DS-compliant/audited reporting regardless of this setting.
-    #
-    # The threshold still drives _finalize_stream_success() so historical
-    # per-stream status remains visible, but it cannot make a partial run
-    # scoreable at the shared metric boundary.
     min_success_rate: float = 0.70
 
 
@@ -517,17 +503,20 @@ class TPCDSThroughputTest:
     ) -> tuple[dict[str, Any] | None, int]:
         if hasattr(connection, "set_query_context"):
             connection.set_query_context(query_display_id, stream_id=stream_id)
-        cursor = connection.execute(query_text)
-        # _count_cursor_rows() reads the adapter-reported count directly (when
-        # available) instead of materializing the result set via fetchall() -
-        # see PlatformAdapterCursor.row_count() in connection_wrappers.py.
-        # Previously this called cursor.fetchall() and discarded the return
-        # value entirely, so TPC-DS result_count was hardcoded to 0 below
-        # regardless of the true result size.
+        set_reference_seed_context(False)
+        try:
+            cursor = connection.execute(query_text)
+        finally:
+            clear_reference_seed_context()
+        platform_result = getattr(cursor, "platform_result", None)
+        if isinstance(platform_result, dict) and platform_result.get("status") == "FAILED":
+            raise RuntimeError(
+                platform_result.get("error", platform_result.get("row_count_validation_error", "Query failed"))
+            )
         row_count = _count_cursor_rows(cursor)
         if hasattr(connection, "commit"):
             connection.commit()
-        return getattr(cursor, "platform_result", None), row_count
+        return platform_result, row_count
 
     def _execute_single_query(
         self,
@@ -625,16 +614,13 @@ class TPCDSThroughputTest:
                 self.logger.info(f"Stream {stream_id} completed: no queries executed")
             return
 
-        # Preserve the configurable per-stream reporting threshold. The shared
-        # metric boundary independently requires every query and stream to
-        # succeed before the run can produce a score.
         success_rate = stream_result.queries_successful / stream_result.queries_executed
-        stream_result.success = success_rate >= config.min_success_rate
+        stream_result.success = stream_result.queries_failed == 0
         if config.verbose:
             self.logger.info(
                 f"Stream {stream_id} completed: "
                 f"{stream_result.queries_successful}/{stream_result.queries_executed} successful "
-                f"(success rate: {success_rate:.2%}, threshold: {config.min_success_rate:.2%})"
+                f"(success rate: {success_rate:.2%})"
             )
 
     def _close_stream_connection(self, connection, stream_id: int, config: TPCDSThroughputTestConfig) -> None:
