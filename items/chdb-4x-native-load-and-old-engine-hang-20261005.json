@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "chDB loads on macOS 27 in a documented way, or the unsupported combination is documented and enforced with a clear message.",
+    "Whether the 3.6.0 hang and timestamp error occur on 4.x is recorded."
+  ],
+  "context": "Source: PR #2677 close-out. Related: dlv2-10-chdb-cwd-guard (done), tuning-liveness-e2e-gates-20261001 (needs a working chDB for the ClickHouse cell).",
+  "description": "## Problem\nOn this macOS (Darwin 27, arm64) the pinned chDB 4.1.6 native library cannot be loaded (\"chdb-core engine not found\"), so the chDB-dependent ClickHouse local tests are skipped (tests/unit/platforms/test_clickhouse_adapter.py: embedded mode, real DDL, and others) and real-CLI ClickHouse runs cannot use the pinned engine. The W2 end-to-end runs used chDB 3.6.0 from a scratch `PYTHONPATH` target instead. With that older engine two oddities appeared: a non-fatal metadata timestamp error, and an occasional silent hang at \"Saving tuning metadata…\". Neither is confirmed to occur on 4.x.\n\n## Change\n- Find out why chDB 4.1.6 (chdb-core) fails to load on macOS 27 (wheel tags, dylib deps, code signing) and either fix the install path, document the constraint, or pin a version that loads.\n- Check whether the metadata timestamp error and the \"Saving tuning metadata…\" hang reproduce on a loading 4.x engine; file or fix them.\n- Make the skip reason actionable so a skipped chDB test is visible in the lane summary.\n\n## Guardrails\n- Do not remove tests to avoid the skip.",
+  "links": [
+    "tests/unit/platforms/test_clickhouse_adapter.py",
+    "pyproject.toml"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-05T15:24:39Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "514d8628a5d144f6bf8c764900ccefcc",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    }
+  ]
+}

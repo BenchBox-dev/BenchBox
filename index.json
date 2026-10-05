@@ -2264,6 +2264,13 @@
       "status": "open",
       "title": "Tinybird dual-path spike: ClickHouse-interface query plus Data Source ingest"
     },
+    "chdb-4x-native-load-and-old-engine-hang-20261005": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Pinned chDB 4.1.6 does not load on macOS 27; ClickHouse local e2e tests are skipped there"
+    },
     "check-scope-reports-ok-when-no-scope-rules-exist": {
       "claim": null,
       "needs": [],
