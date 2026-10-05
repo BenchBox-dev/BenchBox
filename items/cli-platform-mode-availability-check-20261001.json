@@ -2,7 +2,7 @@
   "acceptance": [
     "CLI test: --platform clickhouse:local passes the availability check when chdb is installed; the install hint names a valid extra."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Incidental finding I2 from the re-review.\n\nRESERVED (2026-10-04): in flight in the tuning-rework batch session (workstream W1). Implemented and published as PR #2630, branch fix/cli-platform-mode-availability-check. Do not claim or implement; workstream W2 must not take this item. Finish it after #2630 merges.",
+  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Incidental finding I2 from the re-review.\n\nResumption notes (2026-10-04): shipped in PR #2630 (merged). resolve_platform_selector in benchbox/cli/platform.py maps <platform>:<deployment> to the platform used for the availability check, the install hint and the benchmark compatibility gate (the gate previously let a selector bypass a registry block); unknown deployments error with the available list, including under --dry-run. Install hints for timescaledb, pg-duckdb, pg-mooncake, paradedb, citus and cedardb now name the real postgresql extra. ':local' is accepted wherever PlatformRegistry.supports_deployment_mode accepts it; whether cloud-only platforms should accept it is filed as platforms-without-deployment-modes-accept-local-decision-20261004. benchbox/cli/commands/run.py crossed its size limit (allowlist re-baselined; see run-py-module-size-allowlist-growth-20261004).",
   "description": "## Problem (reproduced)\n`benchbox run --platform clickhouse:local` is documented in `benchbox run --help`. It fails with \"Platform 'clickhouse:local' is not available (missing dependencies)\" because `is_platform_available(\"clickhouse:local\")` returns False while `clickhouse` and `clickhouse-local` return True (`benchbox/cli/commands/run.py:1106`). The install hint `uv sync --extra clickhouse:local` is not a valid extra.\n\n## Change\n- Resolve `platform:mode` to the canonical platform before the availability check and the install hint.\n- Check the other documented `platform:mode` forms, e.g. `firebolt:core`.\n\n## Guardrails (must preserve)\n- Unknown modes still error clearly.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     "benchbox/cli/commands/run.py",
@@ -32,6 +32,14 @@
       "generation": "270fbf62738848deabf10490279636aa",
       "op": "take",
       "op_id": "2265accc6bb346f3a6bb766f66dfa939",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-05T00:13:42Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "c9c707fbbbc54268a23297c62bb2a726",
       "session_id": "040d67d8304f4a3581f98a3300e36001"
     }
   ]
