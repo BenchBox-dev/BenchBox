@@ -307,7 +307,7 @@ class PlatformAdapter(
         self._client_link_metadata = None
         self._link_probe_timed_out = False
         self._post_measurement_contained = False
-        self._contained_throughput_result: Any = None
+        self._contained_throughput_result = None
         if self.dry_run_mode:
             self.captured_sql = []
             self.query_counter = 0

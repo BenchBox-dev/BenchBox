@@ -191,17 +191,15 @@ def resolve_stream_connection_capability(adapter: Any) -> tuple[StreamConnection
     from benchbox.platforms.base.adapter import PlatformAdapter
 
     cls = adapter if isinstance(adapter, type) else type(adapter)
-    for entry in PLATFORM_MANIFEST:
-        spec = entry.adapter
-        if (
-            spec is not None
-            and spec.class_name == cls.__name__
-            and (cls.__module__ == spec.module or cls.__module__.startswith(f"{spec.module}."))
-        ):
-            return StreamConnectionCapability(spec.stream_connection_capability), True
+    manifest_entries = [entry.adapter for entry in PLATFORM_MANIFEST if entry.adapter is not None]
     for klass in cls.__mro__:
         if klass is PlatformAdapter:
             break
+        for spec in manifest_entries:
+            if spec.class_name == klass.__name__ and (
+                klass.__module__ == spec.module or klass.__module__.startswith(f"{spec.module}.")
+            ):
+                return StreamConnectionCapability(spec.stream_connection_capability), True
         if "stream_connection_capability" in klass.__dict__:
             value = klass.__dict__["stream_connection_capability"]
             if not isinstance(value, StreamConnectionCapability):
