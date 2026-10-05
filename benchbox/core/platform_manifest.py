@@ -405,7 +405,7 @@ _PLATFORM_MANIFEST_JSON = """[
       "module": "benchbox.platforms.sqlite",
       "class_name": "SQLiteAdapter",
       "registration_order": 11,
-      "stream_connection_capability": "shared_cursor"
+      "stream_connection_capability": "independent_connection"
     },
     "display_name": "SQLite",
     "description": "Row-based OLTP database • Single-node • File-based",
