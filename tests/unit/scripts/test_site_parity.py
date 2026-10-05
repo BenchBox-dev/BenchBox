@@ -277,16 +277,10 @@ def test_committed_policy_files_carry_reasons_and_only_the_signed_approvals() ->
     everything = rules + redirects + added + entries + losses
     assert redirects and added and all(entry["reason"].strip() for entry in everything)
     assert {entry["owner_approval"] for entry in everything} <= {"pending", "approved"}
-    approved = {entry.get("id") or entry.get("path") for entry in everything if entry["owner_approval"] == "approved"}
-    assert approved == {
-        "/_static/",
-        "/docs/_static/",
-        "/docs/_sphinx_design_static/",
-        "/docs/.buildinfo",
-        "/docs/searchindex.js",
-        "sphinx-page-sources",
-        "sphinx-doctrees",
-    }
+    sphinx_assets = site_parity.removal_entries([site_parity.DESIGN_DIR / "expected-removals-sphinx-assets.json"])
+    signed = rules + redirects + losses + sphinx_assets
+    assert {entry["owner_approval"] for entry in signed} == {"approved"}
+    assert {entry["owner_approval"] for entry in added} == {"pending"}
 
 
 CANONICAL_RULES = [

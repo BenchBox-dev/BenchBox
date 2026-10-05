@@ -293,7 +293,7 @@ async function headerScript(route) {
   out.grewClosed = await expanded();
   await page.locator(".site-header__link", { hasText: "Blog" }).focus();
   await page.setViewportSize({ width: 390, height: 900 });
-  await page.waitForTimeout(200);
+  await page.waitForFunction(() => document.activeElement?.hasAttribute("data-site-header-toggle"), null, { timeout: 5000 }).catch(() => null);
   out.shrinkFocusOnToggle = await page.evaluate(() => document.activeElement?.hasAttribute("data-site-header-toggle"));
   await page.setViewportSize({ width: 1280, height: 900 });
   const radio = (name) => page.getByRole("radio", { name });

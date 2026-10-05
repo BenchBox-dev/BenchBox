@@ -78,23 +78,23 @@ docs edits made since the baseline and affect both renderers.
 
 ## Decisions for the owner
 
-- Approve each redirect page in `redirect-pages.json`: the not-found
-  fallback and the retired `/docs/genindex.html`, `/docs/search.html` and
-  `/docs/blog.html`.
-- Approved on 2026-10-04: the Sphinx build files in
-  `expected-removals-sphinx-assets.json` (`/_static/`, `/docs/_static/`,
-  `/docs/_sphinx_design_static/`, `/docs/.buildinfo`, `/docs/searchindex.js`)
-  and the `sphinx-page-sources` and `sphinx-doctrees` rules in
-  `allowed-differences.json`.
-- Approve the old landing page assets in
-  `expected-removals-sphinx-assets.json`: `/style.css`, `/script.js` and
-  `/shared/`.
-- Approve the two module index labels that the objects inventory omits, in
-  `allowed-inventory-losses.json`.
-- Approve the differences added beyond the earlier allowlist: the docs index
-  title, the Footnotes heading, the headings on four generated index pages,
-  the added canonical and description metadata, and the placeholder content of
-  the redirect pages.
+Approved by the owner on 2026-10-04 and recorded as `approved` in the policy
+files:
+
+- every redirect page in `redirect-pages.json`: the not-found fallback and the
+  retired `/docs/genindex.html`, `/docs/search.html` and `/docs/blog.html`;
+- every entry in `expected-removals-sphinx-assets.json`: the Sphinx and Furo
+  assets under `/_static/`, `/docs/_static/` and `/docs/_sphinx_design_static/`,
+  `/docs/.buildinfo`, `/docs/searchindex.js` and the old landing page assets
+  `/style.css`, `/script.js` and `/shared/`;
+- the two module index labels in `allowed-inventory-losses.json`;
+- every rule in `allowed-differences.json`, including the docs index title,
+  the Footnotes heading, the headings on generated index pages, the added
+  canonical and description metadata and the redirect page placeholders.
+
+Still pending: the new paths in `added-paths.json` (sitemap, robots, favicon,
+`/_astro/`, `/pagefind/`, `/_images/` and `/blog.html`) and the
+`expected-removals-*.json` files that carry no approval field.
 
 ## Approval
 
