@@ -1417,6 +1417,12 @@ class PlatformAdapter(
             if callable(validate_fn):
                 validate_fn()
 
+            if self.tuning_enabled and effective_tuning_config and not self.ensure_tuned_run_marker(connection):
+                raise RuntimeError(
+                    "Failed to write the tuned-run marker; refusing to proceed with a tuned run "
+                    "rather than leave a database with no notuning-reuse refusal evidence"
+                )
+
             schema_time = 0.0
             schema_creation_phase = self._create_enhanced_schema_creation_phase(benchmark, connection, 0.0)
             schema_creation_phase.status = "SKIPPED"
@@ -1450,6 +1456,11 @@ class PlatformAdapter(
         tuning_metadata_saved = False
         if self.tuning_enabled and effective_tuning_config:
             quiet_console.print("Applying unified tuning configuration...")
+            if not self.ensure_tuned_run_marker(connection):
+                raise RuntimeError(
+                    "Failed to write the tuned-run marker; refusing to apply tuning "
+                    "rather than leave a database with no notuning-reuse refusal evidence"
+                )
             apply_ledger = self._applied_tuning_ledger or AppliedTuningLedger()
             ledger_before_apply = apply_ledger.snapshot()
             self.apply_unified_tuning(effective_tuning_config, connection)
