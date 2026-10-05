@@ -27,16 +27,16 @@
  {
   "path": "/style.css",
   "reason": "the old landing page stylesheet is bundled into the Astro landing page, which ships hashed assets under /_astro/",
-  "owner_approval": "pending"
+  "owner_approval": "approved"
  },
  {
   "path": "/script.js",
   "reason": "the old landing page script is bundled into the Astro landing page, which ships hashed assets under /_astro/",
-  "owner_approval": "pending"
+  "owner_approval": "approved"
  },
  {
   "path": "/shared/",
   "reason": "the shared header, shell and token files were loaded by the old landing page and the Sphinx theme; the Astro build imports them at build time and bundles them under /_astro/",
-  "owner_approval": "pending"
+  "owner_approval": "approved"
  }
 ]
