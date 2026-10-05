@@ -19386,17 +19386,12 @@
       "title": "Extend SQLGlot repro harness to cover wrapper call shapes (cross-dialect probes)"
     },
     "sqlite-throughput-dialect-and-stream-isolation": {
-      "claim": {
-        "expires_at": "2026-10-06T22:39:27Z",
-        "generation": "0175bf84fcab45dd8a3495c35085337c",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
-      },
+      "claim": null,
       "needs": [
         "tpch-throughput-dialect-translation"
       ],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "SQLite throughput runs fail: untranslated INTERVAL syntax and shared-cursor errors across streams"
     },
     "sqlite-tpcds-fails-every-query-cursor-passed-as-connection": {
