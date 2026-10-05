@@ -97,8 +97,6 @@ def _run_tpch_throughput(
 @pytest.mark.parametrize(
     ("requested", "expected"),
     [
-        # Below the TPC throughput minimum: floored to 2 (must_preserve /
-        # official TPC-H 2-stream minimum -- see _resolve_requested_stream_count).
         (1, 2),
         (4, 4),
         (8, 8),
@@ -132,12 +130,15 @@ def test_throughput_stream_count_tpcds_matches_requested(tmp_path):
             "scale_factor": 0.01,
             "concurrent_streams": 2,
             "validation_mode": "skip",
+            "query_subset": ["1", "3"],
         }
         results = adapter._execute_queries_by_type(bench, conn, run_config)
         result = adapter._last_throughput_test_result
 
         assert result.streams_executed == 2
         assert sorted({r.get("stream_id") for r in results}) == [0, 1]
+        assert {str(r.get("query_id")) for r in results} == {"1", "3"}
+        assert len(results) == 4
     finally:
         conn.close()
 
@@ -218,11 +219,12 @@ def test_throughput_stream_count_default_preserved_via_real_pipeline_shape(tmp_p
     assert result.streams_executed == 2
 
 
-def test_throughput_stream_count_low_request_floored_to_two(tmp_path):
-    """Pin the floor itself: an explicit request of 1 stream still floors to 2."""
-    result, _results = _run_tpch_throughput(tmp_path, concurrent_streams=1)
+def test_throughput_stream_count_explicit_single_stream_is_rejected(tmp_path):
+    result, results = _run_tpch_throughput(tmp_path, num_streams=1)
 
-    assert result.streams_executed == 2
+    assert result is None
+    assert results[0]["query_id"] == "throughput_test_error"
+    assert "at least 2" in results[0]["error"]
 
 
 def test_throughput_stream_count_legacy_num_streams_key_still_wins(tmp_path):

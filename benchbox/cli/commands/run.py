@@ -2756,7 +2756,7 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "--streams",
     "--concurrency",
     "concurrency",
-    type=click.IntRange(min=1),
+    type=click.IntRange(min=2),
     default=None,
     hidden=True,
     help="Concurrent streams for throughput (canonical; --concurrency accepted as alias for run-official forwarding)",

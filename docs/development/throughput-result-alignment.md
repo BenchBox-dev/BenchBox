@@ -203,6 +203,23 @@ unaffected.
 
 ---
 
+## Throughput Run Options
+
+The TPC-H and TPC-DS throughput drivers in `benchbox/platforms/base/execution.py`
+build their config from the run config through one helper, so both families
+honor the same options:
+
+- `validation_mode`: `disabled`/`skip` turns row-count validation off for TPC-H
+  streams (TPC-DS already carried the mode on its stream connections).
+- `query_subset`: each stream runs its own permutation filtered to the subset;
+  unknown query ids fail the run with a clear error.
+- `stream_timeout_seconds` (0 disables the deadline) and `cancel_on_timeout`:
+  carried from `RunConfig`, which reads them from `BenchmarkConfig.options`.
+- Stream counts: `num_streams`/`streams` below 2 are rejected. A
+  `concurrent_streams` of 1 is the schema default and means "no count
+  requested", so it still runs the 2-stream default; `run --streams` and
+  `run-official --streams` reject 0 and 1 where the request is explicit.
+
 ## Non-Blocking Executor Shutdown (`throughput-executor-nonblocking-shutdown`, 2026-07)
 
 `throughput-timeout-leak-and-success-gates` (above) fixed timeout
