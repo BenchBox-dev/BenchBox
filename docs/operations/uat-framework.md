@@ -607,10 +607,12 @@ count end to end via the production CLI (`run-official --streams 3`):
   cannot finish TPC-H SF1 Q17 and Q20 inside the cell, and a 64 MB
   `/dev/shm` breaks Q4 and Q21. On a ubuntu runner CedarDB passed 66 of
   66 queries and 3 of 3 streams in 80 seconds, so the cell timeout is 600
-  seconds. The cell is quarantined (`continue-on-error` on its sweep and
-  assert steps, GitHub issue #2571) until it has three green nightly
-  runs, and the job uploads logs and results so a failure can be
-  diagnosed.
+  seconds. The cell uses the DuckDB cell's seed, 20260709: some seeds
+  (for example 20260711) give TPC-H Q13 41 result rows where validation
+  expects 42, on DuckDB and CedarDB alike. The cell is quarantined
+  (`continue-on-error` on its sweep and assert steps, GitHub issue #2571)
+  until it has three green nightly runs, and the job uploads logs and
+  results so a failure can be diagnosed.
 
 The DuckDB cell gates on the sweep exit code plus an independent assert
 step (`python -m tests.uat.throughput assert`, run under `if: !cancelled()`

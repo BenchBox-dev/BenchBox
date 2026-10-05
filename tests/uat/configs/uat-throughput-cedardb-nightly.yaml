@@ -23,9 +23,12 @@
 # benchbox/platforms/base/execution.py), so the cell checks that the requested
 # count was honored rather than that the floor happened to match.
 #
-# `seed: 20260709` is the seed the ubuntu runner measurement used; seed
-# 20260711 failed TPC-H Q13 row-count validation on CedarDB (42 rows expected,
-# 41 returned) in a local run and has not been investigated.
+# `seed: 20260709` matches the DuckDB cell's seed. TPC-H Q13's row count
+# depends on its WORD1/WORD2 parameters (41 or 42 groups at SF1), and
+# validation of that query under non-reference seeds is being made
+# range-aware. Seed 20260711 yields 41 rows for Q13 in stream 1 and fails the
+# fixed 42-row check on DuckDB and CedarDB alike, so it is an expectation
+# difference, not an engine difference.
 #
 # `per_cell_timeout_s`/`early_stop_after_s` are 600 s. The measured ubuntu
 # runner cell took 80 s: datagen about 35 s, load 44 s, throughput phase 2.6 s,
