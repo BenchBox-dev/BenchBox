@@ -477,6 +477,7 @@ class TestDriversMixin:
                 scale_factor=scale_factor,
                 num_streams=num_streams,
                 verbose=verbose,
+                dialect=self.get_target_dialect(),
             )
 
             seed = run_config.get("seed")
