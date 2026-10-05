@@ -26,6 +26,7 @@ from __future__ import annotations
 import collections
 import datetime as _dt
 import json
+import math
 import pathlib
 import re
 import sys
@@ -43,6 +44,20 @@ NON_CLEAN_VALIDATION_STATUSES = frozenset(
 NON_CLEAN_TRANSLATION_STATUSES = frozenset({"fallback", "failed"})
 UNOFFICIAL_COMPLIANCE_CLASSES = frozenset({"unofficial_nonstandard", "unofficial_subscale"})
 PHASE_ALIASES = {"standard": "power"}
+EXECUTION_RUN_TYPES = frozenset({"measurement", "warmup"})
+PASS_STATUSES = frozenset({"SUCCESS", "PASS", "pass", "success"})
+KNOWN_LOGICAL_QUERY_COUNTS = {
+    "tpch": 22,
+    "tpch_skew": 22,
+    "tpchavoc": 22,
+    "tpcds": 99,
+    "ssb": 13,
+    "star_schema": 13,
+    "clickbench": 43,
+}
+CANONICAL_TUNING_MODES = frozenset({"tuned", "tuned-fallback", "notuning", "auto", "custom"})
+APPLIED_TUNING_STATUSES = frozenset({"applied_unverified", "applied_verified"})
+POWER_SCORE_BENCHMARKS = frozenset({"tpch", "tpcds"})
 UTC = _dt.timezone.utc
 DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 TIMESTAMP_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$")
@@ -196,14 +211,187 @@ def bundle_validation_status(payload: dict) -> str | None:
     return status
 
 
-def bundle_rankable(payload: dict) -> bool:
-    benchmark = payload.get("benchmark")
-    compliance = benchmark.get("compliance_class") if isinstance(benchmark, dict) else None
+def _mapping(value: object) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def _query_timings(payload: dict) -> list[tuple[str, float, bool, str | None]]:
+    rows = payload.get("queries")
+    timings = []
+    for row in rows if isinstance(rows, list) else []:
+        data = _mapping(row)
+        run_type = data.get("run_type")
+        run_type = None if run_type is None else str(run_type)
+        if run_type is not None and run_type not in EXECUTION_RUN_TYPES:
+            continue
+        raw = data.get("ms")
+        if raw is None:
+            raw = data.get("execution_time_ms") or 0.0
+        try:
+            duration = float(raw)
+        except (TypeError, ValueError):
+            duration = 0.0
+        status = "fail" if "status" in data and data["status"] is None else data.get("status", "pass")
+        query_id = str(data.get("id") or data.get("query_id", ""))
+        timings.append((query_id, duration, status in PASS_STATUSES, run_type))
+    return timings
+
+
+def _display_timings(payload: dict) -> list[tuple[str, float | None, int]]:
+    grouped: dict[str, list[tuple[float, bool, str | None]]] = {}
+    for query_id, duration, passed, run_type in _query_timings(payload):
+        grouped.setdefault(query_id, []).append((duration, passed, run_type))
+    result = []
+    for query_id, rows in grouped.items():
+        passing = [(duration, run_type) for duration, passed, run_type in rows if passed]
+        measurement = [duration for duration, run_type in passing if run_type == "measurement"]
+        legacy = [duration for duration, run_type in passing if run_type is None]
+        candidates = sorted(measurement or legacy)
+        if not candidates:
+            result.append((query_id, None, 0))
+            continue
+        middle = len(candidates) // 2
+        if len(candidates) % 2:
+            median = candidates[middle]
+        else:
+            median = (candidates[middle - 1] + candidates[middle]) / 2.0
+        result.append((query_id, median, len(candidates)))
+    return result
+
+
+def _summary_query_total(payload: dict) -> int:
+    try:
+        return int(_mapping(_mapping(payload.get("summary")).get("queries")).get("total") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _logical_query_count(payload: dict, display: list[tuple[str, float | None, int]]) -> int:
+    best = None
+    rows = payload.get("queries")
+    for row in rows if isinstance(rows, list) else []:
+        skip = _mapping(_mapping(row).get("dataframe_skip_summary"))
+        executed = _int_or_none(skip.get("executed_total"))
+        skipped = _int_or_none(skip.get("skipped_total"))
+        if executed is None or skipped is None:
+            continue
+        total = executed + skipped
+        if total > 0 and (best is None or total > best):
+            best = total
+    if best is not None:
+        return best
+    raw = _summary_query_total(payload)
+    observed = len({query_id for query_id, _, _ in display if query_id})
+    if observed <= 0:
+        return raw
+    if raw <= observed:
+        return raw or observed
+    known = KNOWN_LOGICAL_QUERY_COUNTS.get(str(_mapping(payload.get("benchmark")).get("id", "unknown")))
+    if known and observed <= known and raw % known == 0:
+        return known
+    if raw % observed == 0 and any(samples > 1 for _, _, samples in display):
+        return observed
+    return raw
+
+
+def _valid_timing(value: float | None) -> bool:
+    return value is not None and math.isfinite(float(value)) and float(value) > 0
+
+
+def _timing_exclusion(display: list[tuple[str, float | None, int]], logical: int) -> str | None:
+    valid = zero = missing = 0
+    for _, value, _ in display:
+        if _valid_timing(value):
+            valid += 1
+        elif value is not None and math.isfinite(float(value)) and float(value) == 0:
+            zero += 1
+        else:
+            missing += 1
+    missing += max(logical - len({query_id for query_id, _, _ in display}), 0)
+    if valid <= 0:
+        if logical <= 0:
+            return "no_queries"
+        if zero > 0 and missing == 0:
+            return "zero_timings_only"
+        if missing > 0 and zero == 0:
+            return "missing_timings"
+        return "no_valid_display_timing"
+    if valid < 2:
+        return "insufficient_valid_queries"
+    if logical > 0 and valid * 2 < logical:
+        return "insufficient_query_coverage"
+    return None
+
+
+def _tuning_mode(payload: dict) -> str | None:
+    for section in ("config", "execution"):
+        mode = _mapping(payload.get(section)).get("tuning_mode")
+        if mode and str(mode) in CANONICAL_TUNING_MODES:
+            return str(mode)
+    return None
+
+
+def _tuning_applied(payload: dict) -> bool:
+    if _tuning_mode(payload) != "custom":
+        return True
+    status = _mapping(_mapping(payload.get("platform")).get("tuning")).get("validation_status")
+    return bool(status) and str(status) in APPLIED_TUNING_STATUSES
+
+
+def _power_score(payload: dict) -> float | None:
+    metrics = _mapping(_mapping(payload.get("summary")).get("tpc_metrics"))
+    for key in ("power_at_size", "qphh_at_size", "qphds_at_size"):
+        value = metrics.get(key)
+        if value is not None:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def _primary_metric_reason(payload: dict, display: list[tuple[str, float | None, int]]) -> str | None:
+    benchmark_id = str(_mapping(payload.get("benchmark")).get("id", "unknown"))
+    if benchmark_id in POWER_SCORE_BENCHMARKS:
+        value = _power_score(payload)
+    else:
+        values = [value for _, value, _ in display if value is not None and value > 0]
+        value = math.exp(sum(math.log(item) for item in values) / len(values)) if values else None
+    if value is None:
+        return "missing_primary_metric"
+    if not math.isfinite(float(value)) or float(value) <= 0:
+        return "non_positive_primary_metric"
+    return None
+
+
+def exclusion_reason(payload: dict) -> str | None:
+    benchmark = _mapping(payload.get("benchmark"))
+    compliance = benchmark.get("compliance_class")
     if compliance is not None and str(compliance) in UNOFFICIAL_COMPLIANCE_CLASSES:
-        return False
+        return "unofficial_compliance"
     if failed_query_count(payload):
-        return False
-    return bundle_validation_status(payload) not in NON_CLEAN_VALIDATION_STATUSES
+        return "failed_queries"
+    if bundle_validation_status(payload) in NON_CLEAN_VALIDATION_STATUSES:
+        return "validation_not_clean"
+    if not _tuning_applied(payload):
+        return "tuning_not_applied"
+    display = _display_timings(payload)
+    timing = _timing_exclusion(display, _logical_query_count(payload, display))
+    if timing is not None:
+        return timing
+    return _primary_metric_reason(payload, display)
+
+
+def bundle_rankable(payload: dict) -> bool:
+    return exclusion_reason(payload) is None
+
+
+def cohort_phase_suffix(payload: dict) -> str:
+    phase = bundle_phase(payload)
+    if phase == "power":
+        return ""
+    streams = _stream_count(payload) if phase == "throughput" else None
+    return f"#{phase}" if streams is None else f"#{phase}#{streams}streams"
 
 
 def _cohort_key(payload: dict) -> CohortKey:
@@ -212,13 +400,7 @@ def _cohort_key(payload: dict) -> CohortKey:
         scale_factor = str(payload["benchmark"].get("scale_factor", ""))
     except Exception as exc:  # noqa: BLE001
         raise CorpusReadError(f"ERROR missing cohort fields: {exc}") from exc
-    phase = bundle_phase(payload)
-    if phase != "power":
-        scale_factor = f"{scale_factor}#{phase}"
-        streams = _stream_count(payload) if phase == "throughput" else None
-        if streams is not None:
-            scale_factor = f"{scale_factor}#{streams}streams"
-    return (benchmark_id, scale_factor)
+    return (benchmark_id, f"{scale_factor}{cohort_phase_suffix(payload)}")
 
 
 def _comparison_identity(bundle: pathlib.Path, payload: dict) -> str:
@@ -312,10 +494,6 @@ def _stats_from_dates(dates: list[_dt.date], *, as_of: _dt.date) -> RecencyStats
 def cohort_platforms(bundles: list[pathlib.Path]) -> dict[CohortKey, set[str]]:
     """Map a cohort to distinct platform/version comparison identities.
 
-    Cohorts are keyed by benchmark, scale and measured phase, and only bundles
-    the explorer can rank contribute an identity. A cohort whose bundles are all
-    unrankable stays in the map with no identities so the depth gate reports it.
-
     An explicitly segregated version-over-version corpus legitimately repeats
     one platform name. Only bundles under ``duckdb-version-matrix/`` therefore
     include a reported version in their identity. Ordinary cohorts retain the
@@ -402,11 +580,7 @@ def format_recency_report(
 
 
 def shallow_cohorts(cohorts: dict[CohortKey, set[str]]) -> dict[CohortKey, set[str]]:
-    """Cohorts with some rankable identities but fewer than the required number.
-
-    A cohort with no rankable identity publishes no ranking, so it is reported
-    by ``unranked_cohorts`` instead of failing the gate.
-    """
+    """Cohorts with fewer than the required number of platforms."""
     return {key: platforms for key, platforms in cohorts.items() if 0 < len(platforms) < MINIMUM_PLATFORMS_PER_COHORT}
 
 
