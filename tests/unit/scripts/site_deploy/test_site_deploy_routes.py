@@ -58,8 +58,8 @@ def test_committed_manifest_declares_the_decided_routes() -> None:
     manifest = routes.load_manifest(MANIFEST)
     by_path = {route.path: (route.ref, route.builder) for route in manifest.routes}
     assert by_path == {
-        "/": ("release", "landing"),
-        "/docs/": ("release", "docs"),
+        "/": ("trunk", "landing"),
+        "/docs/": ("trunk", "docs"),
         "/docs/dev/": ("trunk", "docs"),
         "/blog/": ("trunk", "blog"),
         "/results/": ("trunk", "explorer"),
@@ -98,7 +98,7 @@ def test_manifest_validation_rejects_malformed_input(mutate, message: str) -> No
 def test_routes_mode_mounts_each_route_from_its_own_ref(tmp_path: Path) -> None:
     release = _checkout(tmp_path / "release", "release", explorer=False)
     trunk = _checkout(tmp_path / "trunk", "trunk", explorer=True)
-    release_sha = _git_init(release)
+    _git_init(release)
     trunk_sha = _git_init(trunk)
     site = tmp_path / "site-build"
     receipt_path = tmp_path / "receipt.json"
@@ -121,11 +121,11 @@ def test_routes_mode_mounts_each_route_from_its_own_ref(tmp_path: Path) -> None:
     )
 
     assert exit_code == 0
-    assert _read(site, "index.html") == "release landing"
+    assert _read(site, "index.html") == "trunk landing"
     assert _read(site, "prompts/docs/nested.txt") == "landing asset in a docs folder"
-    assert _read(site, "docs/index.html") == "release docs"
-    assert _read(site, "docs/guide/index.html") == "release guide"
-    assert _read(site, "docs/_static/theme.css") == "release css"
+    assert _read(site, "docs/index.html") == "trunk docs"
+    assert _read(site, "docs/guide/index.html") == "trunk guide"
+    assert _read(site, "docs/_static/theme.css") == "trunk css"
     assert _read(site, "docs/dev/index.html") == "trunk docs"
     assert _read(site, "docs/dev/_static/theme.css") == "trunk css"
     assert _read(site, "blog/post.html") == "trunk blog"
@@ -140,13 +140,13 @@ def test_routes_mode_mounts_each_route_from_its_own_ref(tmp_path: Path) -> None:
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     sources = {route["path"]: route["source_sha"] for route in receipt["routes"]}
     assert sources == {
-        "/": release_sha,
-        "/docs/": release_sha,
+        "/": trunk_sha,
+        "/docs/": trunk_sha,
         "/docs/dev/": trunk_sha,
         "/blog/": trunk_sha,
         "/results/": trunk_sha,
     }
-    assert receipt["refs"]["release"]["kind"] == "release-tag"
+    assert receipt["refs"]["trunk"] == {"kind": "trunk", "source_sha": trunk_sha}
     assert len(receipt["tree_sha256"]) == 64
     lanes = {route["path"]: route["lane_sha256"] for route in receipt["routes"]}
     explorer_digest, _, _ = compute_tree_digest(site / "results")
@@ -160,7 +160,7 @@ def test_routes_mode_mounts_each_route_from_its_own_ref(tmp_path: Path) -> None:
     assert len(owners) == receipt["total_files"]
 
 
-def test_assets_of_the_release_build_never_claim_root_static_paths(tmp_path: Path) -> None:
+def test_route_build_statics_never_claim_root_static_paths(tmp_path: Path) -> None:
     release = _checkout(tmp_path / "release", "release", explorer=False)
     trunk = _checkout(tmp_path / "trunk", "trunk", explorer=True)
     manifest = routes.load_manifest(MANIFEST)
@@ -176,9 +176,9 @@ def test_assets_of_the_release_build_never_claim_root_static_paths(tmp_path: Pat
     assert static_owners == {"/blog/:_static", "/blog/:_images"}
 
 
-def test_path_collision_between_release_and_trunk_docs_is_refused(tmp_path: Path) -> None:
-    release = _checkout(tmp_path / "release", "release", explorer=False, extra_docs=("dev/index.html",))
-    trunk = _checkout(tmp_path / "trunk", "trunk", explorer=True)
+def test_path_collision_between_stable_and_dev_docs_is_refused(tmp_path: Path) -> None:
+    release = _checkout(tmp_path / "release", "release", explorer=False)
+    trunk = _checkout(tmp_path / "trunk", "trunk", explorer=True, extra_docs=("dev/index.html",))
     with pytest.raises(PathOwnershipError, match="docs/dev/index.html"):
         routes.assemble_routes(
             manifest=routes.load_manifest(MANIFEST),
@@ -190,22 +190,32 @@ def test_path_collision_between_release_and_trunk_docs_is_refused(tmp_path: Path
         )
 
 
-def test_ref_roots_must_match_manifest_refs(tmp_path: Path) -> None:
+def test_ref_roots_must_cover_manifest_refs(tmp_path: Path) -> None:
+    release = _checkout(tmp_path / "release", "release", explorer=False)
     trunk = _checkout(tmp_path / "trunk", "trunk", explorer=True)
     with pytest.raises(routes.RouteManifestError, match="do not match"):
         routes.assemble_routes(
             manifest=routes.load_manifest(MANIFEST),
-            ref_roots={"trunk": trunk},
+            ref_roots={"release": release},
             site_dir=tmp_path / "out",
             work_dir=tmp_path / "work",
             stage_builder=assemble_public_site,
         )
+    summary = routes.assemble_routes(
+        manifest=routes.load_manifest(MANIFEST),
+        ref_roots={"release": release, "trunk": trunk},
+        site_dir=tmp_path / "out",
+        work_dir=tmp_path / "work",
+        stage_builder=assemble_public_site,
+        resolve_sha=lambda root: root.name,
+    )
+    assert {route["path"] for route in summary["routes"]} == {"/", "/docs/", "/docs/dev/", "/blog/", "/results/"}
 
 
-def test_release_without_landing_fails_closed_for_the_landing_route(tmp_path: Path) -> None:
+def test_trunk_without_landing_fails_closed_for_the_landing_route(tmp_path: Path) -> None:
     release = _checkout(tmp_path / "release", "release", explorer=False)
     trunk = _checkout(tmp_path / "trunk", "trunk", explorer=True)
-    shutil.rmtree(release / "landing")
+    shutil.rmtree(trunk / "landing")
     with pytest.raises(routes.RouteManifestError, match="needs landing"):
         routes.assemble_routes(
             manifest=routes.load_manifest(MANIFEST),
@@ -254,10 +264,10 @@ def test_routes_mode_rejects_single_ref_flags(tmp_path: Path, flag: list[str]) -
 @pytest.mark.parametrize(
     ("path", "expected"),
     [
-        ("/", "release"),
-        ("/index.html", "release"),
-        ("/docs/index.html", "release"),
-        ("/docs", "release"),
+        ("/", "trunk"),
+        ("/index.html", "trunk"),
+        ("/docs/index.html", "trunk"),
+        ("/docs", "trunk"),
         ("/docs/dev/index.html", "trunk"),
         ("/docs/dev/x.html#frag", "trunk"),
         ("/blog/post/", "trunk"),
@@ -266,7 +276,7 @@ def test_routes_mode_rejects_single_ref_flags(tmp_path: Path, flag: list[str]) -
         ("/_images/a.png", "trunk"),
         ("/404.html", "trunk"),
         ("/CNAME", "trunk"),
-        ("/usage/x.html", "release"),
+        ("/usage/x.html", "trunk"),
     ],
 )
 def test_ownership_is_derived_from_the_manifest(path: str, expected: str) -> None:

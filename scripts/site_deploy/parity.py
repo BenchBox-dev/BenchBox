@@ -12,10 +12,10 @@ SITE_INVENTORY = Path(__file__).resolve().parents[1] / "site_inventory.py"
 ROUTE_PREFIXES = ("/docs/dev/", "/docs/", "/blog/", "/results/", "/")
 EXPLANATIONS = {
     "/docs/dev/": "new route: trunk documentation mounted beside the release documentation",
-    "/docs/": "release documentation now built from the latest release tag instead of the single deployed ref",
+    "/docs/": "trunk documentation served at the stable path instead of the single deployed ref",
     "/blog/": "blog and its shared assets come from the trunk candidate",
     "/results/": "Explorer UI and DuckDB snapshot come from the trunk candidate",
-    "/": "landing page now built from the latest release tag",
+    "/": "landing page now built from the trunk candidate",
 }
 
 

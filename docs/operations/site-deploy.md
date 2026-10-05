@@ -13,9 +13,11 @@ dispatched. Re-dispatch the one you want after the newer run finishes.
 
 ## Routes
 
-`deploy/routes.yml` is the route manifest. `/` and `/docs/` come from the newest
-`v<major>.<minor>.<patch>` tag; `/docs/dev/`, `/blog/` and `/results/` (Explorer
-UI plus DuckDB snapshot) come from the trunk candidate. `/_static` and
+`deploy/routes.yml` is the route manifest. `/`, `/docs/`, `/docs/dev/`,
+`/blog/` and `/results/` (Explorer UI plus DuckDB snapshot) come from the
+trunk candidate. The `release` ref stays declared because the renderer
+selection reads the newest `v<major>.<minor>.<patch>` tag's
+readiness. `/_static` and
 `/_images` belong to the blog route because blog pages reference them with
 root-relative paths; docs pages use their own `_static`, so the two Sphinx
 builds never collide. The assembler refuses any path claimed twice. The corpus
@@ -26,15 +28,15 @@ SHA in a receipt is the git tree hash of `results-data/` at the trunk SHA.
 One renderer builds every route of an artifact. `deploy/routes.yml` names the
 policy:
 
-- `renderer: sphinx`, the committed value, holds every route on Sphinx whatever
-  the release tag contains.
-- `renderer: auto` selects the renderer from the tree of the newest release
-  tag's commit, never from the working tree. It selects Astro when that tree
-  contains every one of `website/package.json`, `website/package-lock.json`,
-  `website/astro.config.ts`, `website/src/converter/cli.ts`,
-  `website/src/pages/index.astro`, `website/src/pages/404.astro`,
-  `website/src/pages/blog.astro`, at least one file under each of
-  `website/src/pages/docs/`, `website/src/pages/blog/` and
+- `renderer: sphinx` holds every route on Sphinx whatever the release tag
+  contains. It is the rollback policy.
+- `renderer: auto`, the committed value, selects the renderer from the tree of
+  the newest release tag's commit, never from the working tree. It selects Astro
+  when that tree contains every one of `website/package.json`,
+  `website/package-lock.json`, `website/astro.config.ts`,
+  `website/src/converter/cli.ts`, `website/src/pages/index.astro`,
+  `website/src/pages/404.astro`, `website/src/pages/blog.astro`, at least one
+  file under each of `website/src/pages/docs/`, `website/src/pages/blog/` and
   `website/src/pages/prompts/`, a `site-build:` target in
   `make/documentation.mk`, and no `.rst` file under `docs/` (every page has been
   migrated to MyST). This is what "the release tag contains `website/` and all
@@ -42,8 +44,9 @@ policy:
 
 No policy forces Astro. `scripts/site_deploy/renderer.py` holds the list, and the
 resolve step writes the selection and its reasons to `resolved.json`.
-`test_the_committed_policy_selects_sphinx_for_any_release_tag` shows that the
-committed policy keeps Sphinx even for a ready tag, and
+`test_the_committed_policy_selects_astro_only_for_a_ready_release_tag` shows
+that the committed policy keeps Sphinx for a tag that is not ready and selects
+Astro for a ready one, and
 `test_auto_selects_astro_only_from_a_ready_release_tag` covers `auto` on
 synthetic release trees.
 
@@ -61,16 +64,16 @@ Restore trunk's readiness or set `renderer: sphinx`.
 
 ### Cutover
 
-1. Cut a release from a tree that meets the list above. With the committed
-   `sphinx` policy this deploys as Sphinx, like any other release. That deploy
-   is a precondition, not a formality: the first Astro deploy compares against
-   the deployed generation's artifact, so a receipted Sphinx generation must be
-   live before the switch. Without one, the pre-deploy visual comparison fails
-   (`no receipted production generation to compare the candidate with; deploy
-   and receipt a Sphinx generation before switching deploy/routes.yml to
-   renderer: auto`) and the Astro deploy cannot publish. Confirm the newest
-   `github-pages` deployment has a receipt before step 3. Trunk must also still
-   meet the list at the commit that will be deployed.
+1. Cut a release from a tree that meets the list above. Under `renderer: sphinx`
+   this deploys as Sphinx, like any other release. That deploy is a
+   precondition, not a formality: the first Astro deploy compares against the
+   deployed generation's artifact, so a receipted Sphinx generation must be live
+   before the switch. Without one, the pre-deploy visual comparison fails (`no
+   receipted production generation to compare the candidate with; deploy and
+   receipt a Sphinx generation before switching deploy/routes.yml to renderer:
+   auto`) and the Astro deploy cannot publish. Confirm the newest `github-pages`
+   deployment has a receipt before step 3. Trunk must also still meet the list
+   at the commit that will be deployed.
 2. Record the parity sign-off for that release (URL compatibility report and
    reviewed visual changes) in the cutover pull request.
 3. The owner's cutover pull request changes `renderer: sphinx` to
@@ -83,12 +86,12 @@ Restore trunk's readiness or set `renderer: sphinx`.
 
 ### Astro layout
 
-With Astro, both refs run `make site-build`, which needs the ref's own
-`results-explorer/dist`. `/` (with `/prompts/`, `/pagefind/` and the sitemap)
-and `/docs/`, including the API reference, come from the release tag's
-`website/dist`; `/docs/dev/`, `/blog/` and `/_images/` (the blog's images) from
-trunk's; `/results/` is trunk's Explorer build and snapshot, and the root
-`404.html`, `CNAME` and `.nojekyll` come from trunk. Each docs and blog route
+With Astro, the trunk ref runs `make site-build`, which needs the ref's own
+`results-explorer/dist`. `/` (with `/prompts/`, `/pagefind/` and the sitemap),
+`/docs/` including the API reference, `/docs/dev/`, `/blog/` and `/_images/`
+(the blog's images) come from trunk's `website/dist`; `/results/` is trunk's
+Explorer build and snapshot, and the root `404.html`, `CNAME` and `.nojekyll`
+come from trunk. Each docs and blog route
 mounts the content-hashed assets of its own build under `/_astro/`: a file both
 builds produce byte for byte is kept once, and the same path with different
 bytes fails the assembly.
@@ -350,8 +353,8 @@ receipt, probe, and assert the tree digest equals A. The `site-deploy-preview-<r
 artifact holds `preview-drill.json`, `parity.json` (route and byte differences against
 the single-ref assembly), `production-parity.json` (informational comparison with the
 live site), the drill receipts, and `gates.json`. Differences from the single-ref
-assembly are expected only where a route changes source: `/docs/` now follows the
-release tag, `/docs/dev/` is new, and `/` follows the tag.
+assembly are expected only where a route changes source: `/docs/dev/` is new,
+and `/results/` carries the trunk Explorer build and snapshot.
 
 ## Local rehearsal
 
