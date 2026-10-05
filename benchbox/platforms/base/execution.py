@@ -814,6 +814,7 @@ class TestDriversMixin:
         # post-measurement operation that could touch it.  The remaining worker
         # futures stay attached to the result for deferred cleanup.
         self._post_measurement_contained = True
+        self._contained_throughput_result = result
         return False
 
     def _dispatch_queries_by_type(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:

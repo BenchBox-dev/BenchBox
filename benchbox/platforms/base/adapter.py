@@ -288,6 +288,7 @@ class PlatformAdapter(
         self._client_link_metadata: dict[str, Any] | None = None
         self._link_probe_timed_out = False
         self._post_measurement_contained = False
+        self._contained_throughput_result = None
 
     def _reset_run_scoped_state(self) -> None:
         """Reset mutable state that belongs to one benchmark execution."""
@@ -303,6 +304,7 @@ class PlatformAdapter(
         self._client_link_metadata = None
         self._link_probe_timed_out = False
         self._post_measurement_contained = False
+        self._contained_throughput_result = None
         if self.dry_run_mode:
             self.captured_sql = []
             self.query_counter = 0
@@ -1246,10 +1248,7 @@ class PlatformAdapter(
         """Close or defer the run connection according to containment state."""
         connection = self.connection
         if self._post_measurement_contained:
-            self._defer_connection_close_until_quiescent(
-                connection,
-                getattr(self, "_last_throughput_test_result", None),
-            )
+            self._defer_connection_close_until_quiescent(connection, self._contained_throughput_result)
         else:
             self.close_connection(connection)
         self.connection = None
