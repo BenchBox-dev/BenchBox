@@ -51,7 +51,7 @@ def validate_stream_count(streams: int | None, phases: str | None = None) -> Non
 
     if "throughput" in phase_set and streams is None:
         raise ValueError("--streams is required for throughput test")
-    if streams is not None and streams < 2:
+    if streams is not None and streams < 2 and "throughput" in phase_set:
         raise ValueError(f"--streams must be >= 2 (TPC throughput minimum); got: {streams}")
 
 
@@ -187,6 +187,7 @@ def resolve_run_config(
         warm_up_iterations=max(0, warmups),
         power_fail_fast=fail_fast,
         stream_timeout_seconds=options.get("stream_timeout_seconds"),
+        stream_timeout_source=options.get("stream_timeout_source"),
         cancel_on_timeout=bool(options.get("cancel_on_timeout", False)),
         client_region=getattr(config, "client_region", None) or options.get("client_region"),
         client_cloud=getattr(config, "client_cloud", None) or options.get("client_cloud"),

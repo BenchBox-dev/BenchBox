@@ -265,14 +265,14 @@ An `ExecutionConfigHelper` with the provider in `config_manager`. Its methods re
 | Method | Returns |
 | --- | --- |
 | `get_power_run_settings()` | A `PowerRunSettings` dataclass with `iterations` (default 4), `warm_up_iterations` (0), `timeout_per_iteration_minutes` (60), `fail_fast` (`False`) and `collect_metrics` (`True`). |
-| `get_concurrent_queries_settings()` | A `ConcurrentQueriesSettings` dataclass with `enabled` (`False`), `max_concurrent` (2), `query_timeout_seconds` (300), `stream_timeout_seconds` (3600), `retry_failed_queries` (`True`) and `max_retries` (3). |
-| `update_power_run_settings(settings)` and `update_concurrent_queries_settings(settings)` | `None`. Write every field of the settings object to the provider. |
+| `get_concurrent_queries_settings()` | A `ConcurrentQueriesSettings` dataclass with `enabled` (`False`), `max_concurrent` (2), `query_timeout_seconds` (300), `stream_timeout_seconds` (`None`, not set), `retry_failed_queries` (`True`), `max_retries` (3) and `cancel_on_timeout` (`False`). |
+| `update_power_run_settings(settings)` and `update_concurrent_queries_settings(settings)` | `None`. Write every field of the settings object to the provider, except a `stream_timeout_seconds` of `None`, which is left unwritten so the benchmark default applies. |
 | `enable_power_run_iterations(iterations: int = 3, warm_up_iterations: int = 1)` | `None`. Sets the two counts. |
 | `enable_concurrent_queries(max_concurrent: int = 2)` | `None`. Sets `enabled` to `True` and `max_concurrent`. |
 | `disable_concurrent_queries()` | `None`. Sets `enabled` to `False`. |
-| `optimize_for_system(cpu_cores: int, memory_gb: float)` | `None`. Sets `max_concurrent` to `cpu_cores // 4`, at least 2 and at most 8. Below 8 GB it sets the iteration timeout to 120 minutes and the query and stream timeouts to 600 and 7200 seconds; above 16 GB, to 45 minutes, 180 and 1800 seconds. From 8 to 16 GB the timeouts stay as they are. |
+| `optimize_for_system(cpu_cores: int, memory_gb: float)` | `None`. Sets `max_concurrent` to `cpu_cores // 4`, at least 2 and at most 8. Below 8 GB it sets the iteration timeout to 120 minutes and the query timeout to 600 seconds; above 16 GB, to 45 minutes and 180 seconds. From 8 to 16 GB the timeouts stay as they are. It never writes a stream timeout. |
 | `create_performance_profile(profile_name: str)` | `dict` with `name`, `power_run` and `concurrent_queries`, without changing any setting. The profiles are `quick`, `standard`, `thorough` and `stress`, see below. |
-| `apply_performance_profile(profile_name: str)` | `None`. Writes the profile's settings to the provider. |
+| `apply_performance_profile(profile_name: str)` | `None`. Writes the profile's settings to the provider. Profiles do not set a stream timeout. |
 | `get_execution_summary()` | `dict` with `power_run` (`enabled`, `total_iterations`, `estimated_duration_minutes`, `settings`), `concurrent_queries` (`enabled`, `max_streams`, `estimated_stream_duration_minutes`, `settings`) and `general` (`max_workers`, `memory_limit_gb`, `parallel_queries`). |
 | `save_config()` and `validate_execution_config()` | Call `save_config()` and `validate_config()` on the provider and return what `validate_config()` returns. |
 

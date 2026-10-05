@@ -545,3 +545,106 @@ class TestConfigFileStreamOptions:
         manager = ConfigManager(config_path=tmp_path / "missing.yaml")
 
         assert _stream_timeout_config_entries(SimpleNamespace(config=manager)) == {}
+
+
+class TestStreamTimeoutReporting:
+    def _printed(self, run_config, runner):
+        driver = _Driver()
+        console = Mock()
+        with patch("benchbox.platforms.base.execution.quiet_console", console):
+            runner(driver, run_config)
+        return " ".join(str(call.args[0]) for call in console.print.call_args_list)
+
+    def _tpch(self, driver, run_config):
+        _run_tpch(driver, **run_config)
+
+    def _tpcds(self, driver, run_config):
+        with patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest.run", side_effect=RuntimeError("stop")):
+            driver._execute_tpcds_throughput_test(Mock(), Mock(), {"scale_factor": 1.0, "num_streams": 2, **run_config})
+
+    def test_benchmark_defaults_are_reported_per_benchmark(self):
+        assert "Stream timeout: 3600s (benchmark default)" in self._printed({}, self._tpch)
+        assert "Stream timeout: 7200s (benchmark default)" in self._printed({}, self._tpcds)
+
+    def test_config_file_value_is_reported_with_its_source(self):
+        printed = self._printed({"stream_timeout_seconds": 1800, "stream_timeout_source": "config file"}, self._tpch)
+
+        assert "Stream timeout: 1800s (config file)" in printed
+
+    def test_run_option_is_reported_as_a_run_option(self):
+        assert "Stream timeout: 90s (run option)" in self._printed({"stream_timeout_seconds": 90}, self._tpcds)
+
+    def test_zero_is_reported_as_no_timeout(self):
+        assert "Stream timeout: no timeout (run option)" in self._printed({"stream_timeout_seconds": 0}, self._tpch)
+
+    def test_config_file_source_travels_from_the_cli_into_the_run_config(self, tmp_path):
+        from benchbox.cli.commands.run import _stream_timeout_config_entries
+        from benchbox.core.config import BenchmarkConfig
+        from benchbox.core.run_service import resolve_run_config
+        from benchbox.utils.verbosity import VerbositySettings
+
+        manager = TestConfigFileStreamOptions()._config_manager(
+            tmp_path, "execution:\n  concurrent_queries:\n    stream_timeout_seconds: 1800\n"
+        )
+        config = BenchmarkConfig(
+            name="tpch",
+            display_name="TPC-H",
+            scale_factor=1.0,
+            options=_stream_timeout_config_entries(SimpleNamespace(config=manager)),
+        )
+
+        run_config = resolve_run_config(config, database_path=tmp_path / "db", verbosity=VerbositySettings())
+
+        assert run_config.stream_timeout_seconds == 1800
+        assert run_config.stream_timeout_source == "config file"
+
+
+class TestConfigFileValidationAndCompatibility:
+    def test_zero_stream_timeout_is_a_valid_config_value(self, tmp_path):
+        from benchbox.cli.config import ConfigManager
+
+        path = tmp_path / "benchbox.yaml"
+        path.write_text("execution:\n  concurrent_queries:\n    stream_timeout_seconds: 0\n")
+
+        assert ConfigManager(config_path=path).validate_config() is True
+
+    def test_negative_stream_timeout_is_still_invalid(self, tmp_path):
+        from benchbox.cli.config import ConfigManager
+
+        path = tmp_path / "benchbox.yaml"
+        path.write_text("execution:\n  concurrent_queries:\n    stream_timeout_seconds: -5\n")
+
+        assert ConfigManager(config_path=path).validate_config() is False
+
+    def test_official_run_minimum_applies_only_when_throughput_runs(self):
+        from benchbox.core.run_service import validate_stream_count
+
+        validate_stream_count(1, "power")
+        validate_stream_count(0, "load,power")
+        with pytest.raises(ValueError, match="must be >= 2"):
+            validate_stream_count(1, "power,throughput")
+
+    def test_legacy_saved_single_stream_is_noted_when_treated_as_unset(self):
+        from benchbox.cli.run_resolution import RunRequest, merge_quick_restart_request
+
+        current = RunRequest(
+            platform="duckdb",
+            benchmark="tpch",
+            scale=1.0,
+            phases=("load", "power"),
+            queries=None,
+            tuning="tuned",
+            table_mode="native",
+            output=None,
+            mode=None,
+            seed=None,
+            compression_enabled=False,
+            compression_type="zstd",
+            compression_level=None,
+        )
+        saved = {"database": "duckdb", "benchmark": "tpch", "scale": 1.0, "concurrency": 1}
+
+        merged = merge_quick_restart_request(current, saved, explicit_fields=frozenset())
+
+        assert merged.concurrency is None
+        assert "saved run recorded 1 stream, the former default; treated as not set" in merged.compatibility_notes

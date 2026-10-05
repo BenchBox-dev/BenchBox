@@ -29,6 +29,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   An enabled primary key that is not a prefix of the tuned sort key now fails
   before any table is created, with a message that says to put the key columns
   first or disable `primary_keys`.
+- **A saved stream timeout now applies to throughput runs.**
+  `execution.concurrent_queries.stream_timeout_seconds` used to be read by
+  nothing; it now sets the timeout of every TPC-H and TPC-DS throughput stream
+  (0 disables it), and `cancel_on_timeout` next to it stops a timed-out stream
+  before its next query. Config files written by `ExecutionConfigHelper`
+  (`apply_performance_profile`, `optimize_for_system`, or any settings update)
+  or by an earlier default often hold 1800, 3600, 7200 or 10800. A TPC-DS
+  stream that runs longer than a saved value now times out and the run
+  reports no Throughput@Size, where before it ran for the 7200 s default.
+  Check `execution.concurrent_queries.stream_timeout_seconds` in your config
+  file and remove it to keep each benchmark's default (3600 s for TPC-H, 7200 s
+  for TPC-DS). The helper no longer writes a stream timeout unless you set one,
+  and each throughput run prints the effective timeout and where it came from.
+- **A stream count of 1 is no longer raised to 2.** `BenchmarkConfig.concurrency`
+  and `RunConfig.concurrent_streams` default to `None`, which runs the
+  2-stream default. An explicit count below 2 is rejected when the run
+  includes throughput. Saved runs that recorded 1 replay as not set.
 
 ### Added
 

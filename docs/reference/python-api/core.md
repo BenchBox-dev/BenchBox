@@ -25,7 +25,7 @@ All parameters are keyword-only. Positional arguments raise `TypeError`.
 | `display_name` | `str` | required | The human-readable name, such as `"TPC-H"`. |
 | `scale_factor` | `float` | `0.01` | Data size multiplier. Must be greater than 0 and at most 100000. |
 | `queries` | `list[str]` or `None` | `None` | Query identifiers to run. `None` runs the benchmark's full query set. |
-| `concurrency` | `int` | `1` | Concurrency level. Must be at least 1. |
+| `concurrency` | `int` or `None` | `None` | Number of concurrent throughput streams. `None` means not set and runs the default of 2 streams. Must be at least 1, and at least 2 when the run includes the throughput phase. |
 | `capture_plans` | `bool` | `False` | Add `query_plan`, `plan_fingerprint` and `plan_capture_time_ms` to each query result when the lifecycle runs. |
 | `analyze_plans` | `bool` or `None` | `None` | Plan-capture detail. `None` leaves the choice to the platform adapter. |
 | `strict_plan_capture` | `bool` | `False` | Strict plan-capture mode. |
@@ -47,7 +47,7 @@ A `BenchmarkConfig` instance. Fields can be changed after creation, and assignme
 
 ### Raises
 
-`pydantic.ValidationError` (a subclass of `ValueError`) when a value fails validation. A missing `name` or `display_name`, a `scale_factor` of 0 or less or above 100000, a `concurrency` below 1, a `compression_type` or `test_execution_type` outside the lists above, and a `compression_level` outside 1 to 22 each raise it. The message names the field, for example `concurrency must be at least 1, got: 0`.
+`pydantic.ValidationError` (a subclass of `ValueError`) when a value fails validation. A missing `name` or `display_name`, a `scale_factor` of 0 or less or above 100000, a `concurrency` below 1, a `concurrency` of 1 with `test_execution_type` `throughput` (or `combined` that includes throughput), a `compression_type` or `test_execution_type` outside the lists above, and a `compression_level` outside 1 to 22 each raise it. The message names the field, for example `concurrency must be at least 1, got: 0`.
 
 ### Example
 
@@ -57,7 +57,7 @@ from pydantic import ValidationError
 from benchbox.core.config import BenchmarkConfig
 
 benchmark = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.1, queries=["1", "6"])
-print(benchmark.scale_factor, benchmark.concurrency, benchmark.test_execution_type)
+print(benchmark.scale_factor, benchmark.test_execution_type)
 
 try:
     BenchmarkConfig(name="tpch", display_name="TPC-H", concurrency=0)
@@ -69,7 +69,7 @@ print(BenchmarkConfig(name="tpch", display_name="TPC-H", unknown_field=1).model_
 Output on 0.4.1:
 
 ```text
-0.1 1 standard
+0.1 standard
 Value error, concurrency must be at least 1, got: 0
 None
 ```

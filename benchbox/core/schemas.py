@@ -184,6 +184,7 @@ class RunConfig(BaseModel):
     warm_up_iterations: int = GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS  # Default: 1 warmup iteration
     power_fail_fast: bool = False
     stream_timeout_seconds: Optional[int] = None
+    stream_timeout_source: Optional[str] = None
     cancel_on_timeout: bool = False
 
     # Client-link locality disclosure

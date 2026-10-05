@@ -65,9 +65,10 @@ class ConcurrentQueriesSettings:
     enabled: bool
     max_concurrent: int
     query_timeout_seconds: int
-    stream_timeout_seconds: int
+    stream_timeout_seconds: Optional[int]
     retry_failed_queries: bool
     max_retries: int
+    cancel_on_timeout: bool = False
 
     @classmethod
     def from_config_manager(cls, config_manager: Any) -> "ConcurrentQueriesSettings":
@@ -76,9 +77,10 @@ class ConcurrentQueriesSettings:
             enabled=config_manager.get("execution.concurrent_queries.enabled", False),
             max_concurrent=config_manager.get("execution.concurrent_queries.max_concurrent", 2),
             query_timeout_seconds=config_manager.get("execution.concurrent_queries.query_timeout_seconds", 300),
-            stream_timeout_seconds=config_manager.get("execution.concurrent_queries.stream_timeout_seconds", 3600),
+            stream_timeout_seconds=config_manager.get("execution.concurrent_queries.stream_timeout_seconds"),
             retry_failed_queries=config_manager.get("execution.concurrent_queries.retry_failed_queries", True),
             max_retries=config_manager.get("execution.concurrent_queries.max_retries", 3),
+            cancel_on_timeout=bool(config_manager.get("execution.concurrent_queries.cancel_on_timeout", False)),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -90,6 +92,7 @@ class ConcurrentQueriesSettings:
             "stream_timeout_seconds": self.stream_timeout_seconds,
             "retry_failed_queries": self.retry_failed_queries,
             "max_retries": self.max_retries,
+            "cancel_on_timeout": self.cancel_on_timeout,
         }
 
     def apply_to_config_manager(self, config_manager: Any) -> None:
@@ -100,15 +103,17 @@ class ConcurrentQueriesSettings:
             "execution.concurrent_queries.query_timeout_seconds",
             self.query_timeout_seconds,
         )
-        config_manager.set(
-            "execution.concurrent_queries.stream_timeout_seconds",
-            self.stream_timeout_seconds,
-        )
+        if self.stream_timeout_seconds is not None:
+            config_manager.set(
+                "execution.concurrent_queries.stream_timeout_seconds",
+                self.stream_timeout_seconds,
+            )
         config_manager.set(
             "execution.concurrent_queries.retry_failed_queries",
             self.retry_failed_queries,
         )
         config_manager.set("execution.concurrent_queries.max_retries", self.max_retries)
+        config_manager.set("execution.concurrent_queries.cancel_on_timeout", self.cancel_on_timeout)
 
 
 class ExecutionConfigHelper:
@@ -182,10 +187,8 @@ class ExecutionConfigHelper:
         # Adjust timeouts based on available resources
         if memory_gb < 8:
             concurrent_settings.query_timeout_seconds = 600
-            concurrent_settings.stream_timeout_seconds = 7200
         elif memory_gb > 16:
             concurrent_settings.query_timeout_seconds = 180
-            concurrent_settings.stream_timeout_seconds = 1800
 
         self.update_power_run_settings(power_settings)
         self.update_concurrent_queries_settings(concurrent_settings)
@@ -212,7 +215,7 @@ class ExecutionConfigHelper:
                     enabled=False,
                     max_concurrent=2,
                     query_timeout_seconds=180,
-                    stream_timeout_seconds=1800,
+                    stream_timeout_seconds=None,
                     retry_failed_queries=False,
                     max_retries=1,
                 ),
@@ -229,7 +232,7 @@ class ExecutionConfigHelper:
                     enabled=True,
                     max_concurrent=2,
                     query_timeout_seconds=300,
-                    stream_timeout_seconds=3600,
+                    stream_timeout_seconds=None,
                     retry_failed_queries=True,
                     max_retries=3,
                 ),
@@ -246,7 +249,7 @@ class ExecutionConfigHelper:
                     enabled=True,
                     max_concurrent=4,
                     query_timeout_seconds=600,
-                    stream_timeout_seconds=7200,
+                    stream_timeout_seconds=None,
                     retry_failed_queries=True,
                     max_retries=5,
                 ),
@@ -263,7 +266,7 @@ class ExecutionConfigHelper:
                     enabled=True,
                     max_concurrent=8,
                     query_timeout_seconds=900,
-                    stream_timeout_seconds=10800,
+                    stream_timeout_seconds=None,
                     retry_failed_queries=True,
                     max_retries=10,
                 ),
@@ -318,7 +321,7 @@ class ExecutionConfigHelper:
             "concurrent_queries": {
                 "enabled": concurrent_settings.enabled,
                 "max_streams": concurrent_settings.max_concurrent,
-                "estimated_stream_duration_minutes": concurrent_settings.stream_timeout_seconds / 60,
+                "estimated_stream_duration_minutes": (concurrent_settings.stream_timeout_seconds or 3600) / 60,
                 "settings": concurrent_settings.to_dict(),
             },
             "general": {
@@ -356,7 +359,6 @@ def create_sample_execution_config(output_path: Union[str, Path]) -> None:
                 "enabled": True,
                 "max_concurrent": 2,
                 "query_timeout_seconds": 300,
-                "stream_timeout_seconds": 3600,
                 "retry_failed_queries": True,
                 "max_retries": 3,
                 "_description": "Concurrent query configuration for throughput testing",

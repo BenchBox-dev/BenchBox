@@ -103,6 +103,15 @@ def _format_throughput_metric(result: Any) -> str:
     return f"Throughput@Size = {result.throughput_at_size:.2f}"
 
 
+def _describe_stream_timeout(cfg: Any, run_config: dict) -> str:
+    timeout = "no timeout" if cfg.stream_timeout == 0 else f"{cfg.stream_timeout}s"
+    if run_config.get("stream_timeout_seconds") is None:
+        source = "benchmark default"
+    else:
+        source = run_config.get("stream_timeout_source") or "run option"
+    return f"Stream timeout: {timeout} ({source})"
+
+
 def _throughput_config_options(run_config: dict) -> dict[str, Any]:
     options: dict[str, Any] = {
         "verbose": run_config.get("verbose", False),
@@ -347,6 +356,7 @@ class TestDriversMixin:
                 num_streams=num_streams,
                 **_throughput_config_options(run_config),
             )
+            console.print(f"[dim]{_describe_stream_timeout(cfg, run_config)}[/dim]")
             throughput_test_result = throughput_test.run(config=cfg)
 
             _finalize_throughput_metrics(throughput_test_result, num_streams, cfg.query_subset)
@@ -479,6 +489,7 @@ class TestDriversMixin:
                 num_streams=num_streams,
                 **_throughput_config_options(run_config),
             )
+            console.print(f"[dim]{_describe_stream_timeout(cfg, run_config)}[/dim]")
             throughput_test_result = throughput_test.run(config=cfg)
 
             _finalize_throughput_metrics(throughput_test_result, num_streams, cfg.query_subset)
@@ -1721,7 +1732,8 @@ class TestDriversMixin:
             benchmark: Benchmark instance with maintenance functions and data
             **kwargs: Configuration options for the maintenance test including:
                 - maintenance_operations: List of operations to perform (default: all)
-                - concurrent_streams: Number of concurrent query streams (default: 1)
+                - concurrent_streams: Number of concurrent query streams (int or None, default: None;
+                  minimum 2 when throughput runs)
                 - batch_size: Size of maintenance operation batches (default: platform-specific)
                 - validation: Whether to validate results (default: True)
 

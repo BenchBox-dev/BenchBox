@@ -37,7 +37,6 @@ def _make_config_manager(overrides: dict | None = None):
         "execution.concurrent_queries.enabled": False,
         "execution.concurrent_queries.max_concurrent": 2,
         "execution.concurrent_queries.query_timeout_seconds": 300,
-        "execution.concurrent_queries.stream_timeout_seconds": 3600,
         "execution.concurrent_queries.retry_failed_queries": True,
         "execution.concurrent_queries.max_retries": 3,
         "execution.max_workers": 4,
@@ -54,6 +53,12 @@ def _make_config_manager(overrides: dict | None = None):
     cm.save_config.return_value = None
     cm.validate_config.return_value = True
     return cm
+
+
+def _stream_timeout_writes(cm):
+    return [
+        call for call in cm.set.call_args_list if call.args[0] == "execution.concurrent_queries.stream_timeout_seconds"
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -112,7 +117,8 @@ class TestConcurrentQueriesSettings:
         assert s.enabled is False
         assert s.max_concurrent == 2
         assert s.query_timeout_seconds == 300
-        assert s.stream_timeout_seconds == 3600
+        assert s.stream_timeout_seconds is None
+        assert s.cancel_on_timeout is False
         assert s.retry_failed_queries is True
         assert s.max_retries == 3
 
@@ -141,7 +147,8 @@ class TestConcurrentQueriesSettings:
             max_retries=5,
         )
         s.apply_to_config_manager(cm)
-        assert cm.set.call_count == 6
+        assert cm.set.call_count == 7
+        cm.set.assert_any_call("execution.concurrent_queries.stream_timeout_seconds", 7200)
         cm.set.assert_any_call("execution.concurrent_queries.enabled", True)
         cm.set.assert_any_call("execution.concurrent_queries.max_concurrent", 4)
 
@@ -221,7 +228,7 @@ class TestExecutionConfigHelper:
         # Low memory: longer timeouts
         cm.set.assert_any_call("execution.power_run.timeout_per_iteration_minutes", 120)
         cm.set.assert_any_call("execution.concurrent_queries.query_timeout_seconds", 600)
-        cm.set.assert_any_call("execution.concurrent_queries.stream_timeout_seconds", 7200)
+        assert not _stream_timeout_writes(cm)
 
     def test_optimize_for_system_high_memory(self):
         cm = _make_config_manager()
@@ -357,3 +364,65 @@ class TestCreateSampleExecutionConfig:
         from pathlib import Path
 
         assert Path(output).exists()
+
+
+class TestStreamTimeoutIsOnlyWrittenWhenSet:
+    def test_unset_timeout_is_not_written(self):
+        cm = _make_config_manager()
+        settings = ConcurrentQueriesSettings.from_config_manager(cm)
+
+        settings.apply_to_config_manager(cm)
+
+        assert settings.stream_timeout_seconds is None
+        assert not _stream_timeout_writes(cm)
+
+    def test_explicit_timeout_survives_a_round_trip(self):
+        cm = _make_config_manager({"execution.concurrent_queries.stream_timeout_seconds": 5400})
+
+        settings = ConcurrentQueriesSettings.from_config_manager(cm)
+        settings.apply_to_config_manager(cm)
+
+        assert settings.stream_timeout_seconds == 5400
+        assert [call.args[1] for call in _stream_timeout_writes(cm)] == [5400]
+
+    @pytest.mark.parametrize("profile", ["quick", "standard", "thorough", "stress"])
+    def test_profiles_never_write_a_stream_timeout(self, profile):
+        cm = _make_config_manager()
+        helper = ExecutionConfigHelper(config_manager=cm)
+
+        assert helper.create_performance_profile(profile)["concurrent_queries"]["stream_timeout_seconds"] is None
+        helper.apply_performance_profile(profile)
+
+        assert not _stream_timeout_writes(cm)
+
+    @pytest.mark.parametrize("memory_gb", [4.0, 12.0, 64.0])
+    def test_system_optimization_never_writes_a_stream_timeout(self, memory_gb):
+        cm = _make_config_manager()
+
+        ExecutionConfigHelper(config_manager=cm).optimize_for_system(cpu_cores=8, memory_gb=memory_gb)
+
+        assert not _stream_timeout_writes(cm)
+
+    def test_unrelated_helper_calls_do_not_write_a_stream_timeout(self):
+        cm = _make_config_manager()
+        helper = ExecutionConfigHelper(config_manager=cm)
+
+        helper.disable_concurrent_queries()
+        helper.enable_concurrent_queries(max_concurrent=4)
+
+        assert not _stream_timeout_writes(cm)
+
+    def test_cancel_on_timeout_round_trips(self):
+        cm = _make_config_manager({"execution.concurrent_queries.cancel_on_timeout": True})
+
+        settings = ConcurrentQueriesSettings.from_config_manager(cm)
+        settings.apply_to_config_manager(cm)
+
+        assert settings.cancel_on_timeout is True
+        cm.set.assert_any_call("execution.concurrent_queries.cancel_on_timeout", True)
+        assert settings.to_dict()["cancel_on_timeout"] is True
+
+    def test_execution_summary_estimates_streams_without_a_configured_timeout(self):
+        summary = ExecutionConfigHelper(config_manager=_make_config_manager()).get_execution_summary()
+
+        assert summary["concurrent_queries"]["estimated_stream_duration_minutes"] == 60

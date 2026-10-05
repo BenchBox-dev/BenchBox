@@ -372,6 +372,8 @@ def _replay_compatibility_notes(
         for field, saved_field, note in assumed_defaults
         if field not in explicit_fields and saved_field not in saved
     )
+    if "concurrency" not in explicit_fields and saved.get("concurrency") == 1:
+        notes.append("saved run recorded 1 stream, the former default; treated as not set")
     if "seed" not in explicit_fields and saved.get("seed") is None:
         notes.append("saved run did not record a seed")
     if "compression" not in explicit_fields and compression_enabled and "compression_type" not in saved:

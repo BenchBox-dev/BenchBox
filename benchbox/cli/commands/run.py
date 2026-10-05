@@ -1116,6 +1116,7 @@ def _stream_timeout_config_entries(s: types.SimpleNamespace) -> dict[str, Any]:
     stream_timeout = config.get("execution.concurrent_queries.stream_timeout_seconds")
     if stream_timeout is not None:
         entries["stream_timeout_seconds"] = int(stream_timeout)
+        entries["stream_timeout_source"] = "config file"
     if config.get("execution.concurrent_queries.cancel_on_timeout", False):
         entries["cancel_on_timeout"] = True
     return entries
