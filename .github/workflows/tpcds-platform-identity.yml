@@ -50,7 +50,7 @@ jobs:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel, windows-latest, windows-11-arm]
         include:
           - os: windows-11-arm
-            uv_args: --no-dev
+            uv_args: --no-dev --no-install-package pyarrow --no-install-package pandas
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
