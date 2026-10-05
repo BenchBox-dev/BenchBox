@@ -19999,10 +19999,15 @@
       "title": "Throughput explorer smoke sweep can pass without checking anything and accepts dropped streams"
     },
     "throughput-floor-baseline-retention-per-runner": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-06T22:34:25Z",
+        "generation": "7ad96c2ffe624874a8c868fb575860bd",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Retain nightly Throughput@Size per run and runner class so the floor can use a rolling median"
     },
     "throughput-floor-numeric-threshold-from-baseline": {
