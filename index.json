@@ -7000,6 +7000,13 @@
       "status": "dropped",
       "title": "Dispatch Seed Corpus to prove it actually runs green"
     },
+    "dispose-unowned-v0-4-2-release-scope-worktree": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Find the owner of the v0-4-2-release-scope worktree and dispose of it"
+    },
     "distinct-database-naming-based-on-configuration-characteristics": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The owner confirms the worktree's purpose or that it is obsolete.",
+    "Any needed work is moved to a tracked branch; otherwise the worktree and its local branch are removed."
+  ],
+  "context": "Recorded by the v0.4.2 release handoff refresh on 2026-10-04 and left untouched since.",
+  "description": ".claude/worktrees/v0-4-2-release-scope-829b64 sits inside the primary clone on branch claude/v0-4-2-release-scope-829b64 at 0a5b88a35, with no remote branch. Its owner is unknown, so the v0.4.2 release sessions left it alone. v0.4.2 has shipped, so its scope work is likely obsolete. Confirm with the owner whether anything in it is still needed, then keep it or remove it with make worktree-remove.",
+  "links": [
+    "~/.benchbox/handoffs/2026-10-03-v0.4.2-release-handoff.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a9333dba047ba14211d4b4b2",
+      "at": "2026-10-05T15:28:11Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d58d901dbad440db837b0deaff864250",
+      "session_id": "3c335988ab31486690b06c7fec8a522d"
+    }
+  ]
+}
