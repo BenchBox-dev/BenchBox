@@ -283,7 +283,8 @@ def assemble_routes(
     if renderer not in RENDERERS:
         raise RouteManifestError(f"unknown renderer {renderer!r}; expected one of {RENDERERS}")
     wanted = manifest.ref_names()
-    if set(ref_roots) != wanted:
+    missing = sorted(wanted - set(ref_roots))
+    if missing:
         raise RouteManifestError(f"ref roots {sorted(ref_roots)} do not match manifest refs {sorted(wanted)}")
     if work_dir.exists():
         shutil.rmtree(work_dir)

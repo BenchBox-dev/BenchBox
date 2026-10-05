@@ -13,9 +13,11 @@ dispatched. Re-dispatch the one you want after the newer run finishes.
 
 ## Routes
 
-`deploy/routes.yml` is the route manifest. `/` and `/docs/` come from the newest
-`v<major>.<minor>.<patch>` tag; `/docs/dev/`, `/blog/` and `/results/` (Explorer
-UI plus DuckDB snapshot) come from the trunk candidate. `/_static` and
+`deploy/routes.yml` is the route manifest. `/`, `/docs/`, `/docs/dev/`,
+`/blog/` and `/results/` (Explorer UI plus DuckDB snapshot) come from the
+trunk candidate. The `release` ref stays declared because the renderer
+selection reads the newest `v<major>.<minor>.<patch>` tag's
+readiness. `/_static` and
 `/_images` belong to the blog route because blog pages reference them with
 root-relative paths; docs pages use their own `_static`, so the two Sphinx
 builds never collide. The assembler refuses any path claimed twice. The corpus
@@ -84,12 +86,12 @@ Restore trunk's readiness or set `renderer: sphinx`.
 
 ### Astro layout
 
-With Astro, both refs run `make site-build`, which needs the ref's own
-`results-explorer/dist`. `/` (with `/prompts/`, `/pagefind/` and the sitemap)
-and `/docs/`, including the API reference, come from the release tag's
-`website/dist`; `/docs/dev/`, `/blog/` and `/_images/` (the blog's images) from
-trunk's; `/results/` is trunk's Explorer build and snapshot, and the root
-`404.html`, `CNAME` and `.nojekyll` come from trunk. Each docs and blog route
+With Astro, the trunk ref runs `make site-build`, which needs the ref's own
+`results-explorer/dist`. `/` (with `/prompts/`, `/pagefind/` and the sitemap),
+`/docs/` including the API reference, `/docs/dev/`, `/blog/` and `/_images/`
+(the blog's images) come from trunk's `website/dist`; `/results/` is trunk's
+Explorer build and snapshot, and the root `404.html`, `CNAME` and `.nojekyll`
+come from trunk. Each docs and blog route
 mounts the content-hashed assets of its own build under `/_astro/`: a file both
 builds produce byte for byte is kept once, and the same path with different
 bytes fails the assembly.
@@ -351,8 +353,8 @@ receipt, probe, and assert the tree digest equals A. The `site-deploy-preview-<r
 artifact holds `preview-drill.json`, `parity.json` (route and byte differences against
 the single-ref assembly), `production-parity.json` (informational comparison with the
 live site), the drill receipts, and `gates.json`. Differences from the single-ref
-assembly are expected only where a route changes source: `/docs/` now follows the
-release tag, `/docs/dev/` is new, and `/` follows the tag.
+assembly are expected only where a route changes source: `/docs/dev/` is new,
+and `/results/` carries the trunk Explorer build and snapshot.
 
 ## Local rehearsal
 

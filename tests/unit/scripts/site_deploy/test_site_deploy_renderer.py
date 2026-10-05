@@ -252,7 +252,7 @@ def _assemble_astro(tmp_path: Path, release: Path, trunk: Path) -> dict[str, Any
     )
 
 
-def test_astro_assembly_takes_stable_routes_from_the_release_and_dev_routes_from_trunk(tmp_path: Path) -> None:
+def test_astro_assembly_takes_stable_and_dev_routes_from_trunk(tmp_path: Path) -> None:
     release = _astro_checkout(tmp_path / "release", "release")
     trunk = _astro_checkout(tmp_path / "trunk", "trunk")
     summary = _assemble_astro(tmp_path, release, trunk)
@@ -261,25 +261,24 @@ def test_astro_assembly_takes_stable_routes_from_the_release_and_dev_routes_from
     def read(name: str) -> str:
         return (site / name).read_text(encoding="utf-8")
 
-    assert "release" in read("index.html")
-    assert "release" in read("prompts/index.html")
-    assert "release" in read("docs/index.html")
-    assert "release" in read("docs/api.html")
+    assert "trunk" in read("index.html")
+    assert "trunk" in read("prompts/index.html")
+    assert "trunk" in read("docs/index.html")
+    assert "trunk" in read("docs/api.html")
     assert "trunk" in read("docs/dev/index.html")
     assert "trunk" in read("blog/post.html")
     assert "trunk" in read("404.html")
     assert read("results/index.html") == "trunk explorer"
-    assert read("_astro/site.release.css") == "release css"
     assert read("_astro/site.trunk.css") == "trunk css"
-    assert read("pagefind/index.json") == "release"
+    assert read("pagefind/index.json") == "trunk"
     assert summary["renderer"] == renderer.ASTRO
     assert {route["renderer"] for route in summary["routes"]} == {renderer.ASTRO}
     owners = summary["file_owners"]
     assert owners["_astro/shared.js"] == "/:."
-    assert owners["_astro/site.trunk.css"] == "/docs/dev/:_astro"
+    assert owners["_astro/site.trunk.css"] == "/:."
     assert owners["_images/logo.svg"] == "/blog/:_images"
     assert read("_images/logo.svg") == "trunk logo"
-    assert routes.owner_ref(routes.load_manifest(MANIFEST), "/docs/api.html", renderer.ASTRO) == "release"
+    assert routes.owner_ref(routes.load_manifest(MANIFEST), "/docs/api.html", renderer.ASTRO) == "trunk"
 
 
 def test_trunk_docs_mounted_at_docs_dev_link_to_trunk_pages(tmp_path: Path) -> None:
@@ -315,7 +314,7 @@ def test_astro_docs_dev_carries_its_own_assets_without_the_blog_route(tmp_path: 
         resolve_sha=lambda root: root.name,
         renderer=renderer.ASTRO,
     )
-    assert summary["file_owners"]["_astro/site.trunk.css"] == "/docs/dev/:_astro"
+    assert summary["file_owners"]["_astro/site.trunk.css"] == "/:."
 
 
 def test_astro_explorer_without_a_snapshot_is_refused(tmp_path: Path) -> None:
@@ -359,8 +358,24 @@ def test_astro_explorer_pins_the_ui_and_the_snapshot_separately(tmp_path: Path) 
 def test_astro_assembly_refuses_shared_assets_whose_bytes_differ(tmp_path: Path) -> None:
     release = _astro_checkout(tmp_path / "release", "release", shared="one")
     trunk = _astro_checkout(tmp_path / "trunk", "trunk", shared="two")
+    data = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
+    data["routes"] = [
+        {"path": "/", "ref": "release", "builder": "landing"},
+        {"path": "/docs/", "ref": "trunk", "builder": "docs"},
+        {"path": "/docs/dev/", "ref": "trunk", "builder": "docs"},
+        {"path": "/blog/", "ref": "trunk", "builder": "blog"},
+        {"path": "/results/", "ref": "trunk", "builder": "explorer"},
+    ]
     with pytest.raises(routes.RouteManifestError, match="different bytes at shared path _astro/shared.js"):
-        _assemble_astro(tmp_path, release, trunk)
+        routes.assemble_routes(
+            manifest=routes.parse_manifest(data),
+            ref_roots={"release": release, "trunk": trunk},
+            site_dir=tmp_path / "out",
+            work_dir=tmp_path / "work",
+            stage_builder=assemble_astro_stage,
+            resolve_sha=lambda root: root.name,
+            renderer=renderer.ASTRO,
+        )
 
 
 def test_astro_assembly_refuses_a_stage_that_is_not_an_astro_build(tmp_path: Path) -> None:
@@ -413,6 +428,14 @@ def test_sphinx_assembly_refuses_a_ref_whose_build_carries_astro_output(tmp_path
 def test_assembly_refuses_and_removes_a_mixed_artifact_from_per_ref_builders(tmp_path: Path) -> None:
     release = _sphinx_checkout(tmp_path / "release", "release")
     trunk = _astro_checkout(tmp_path / "trunk", "trunk")
+    data = yaml.safe_load(MANIFEST.read_text(encoding="utf-8"))
+    data["routes"] = [
+        {"path": "/", "ref": "release", "builder": "landing"},
+        {"path": "/docs/", "ref": "trunk", "builder": "docs"},
+        {"path": "/docs/dev/", "ref": "trunk", "builder": "docs"},
+        {"path": "/blog/", "ref": "trunk", "builder": "blog"},
+        {"path": "/results/", "ref": "trunk", "builder": "explorer"},
+    ]
 
     def per_ref(*, repo_root: Path, site_dir: Path, prose_only: bool) -> None:
         if repo_root == trunk:
@@ -423,7 +446,7 @@ def test_assembly_refuses_and_removes_a_mixed_artifact_from_per_ref_builders(tmp
     for selected in renderer.RENDERERS:
         with pytest.raises(routes.RouteManifestError, match="did not produce an astro build|carries astro output"):
             routes.assemble_routes(
-                manifest=routes.load_manifest(MANIFEST),
+                manifest=routes.parse_manifest(data),
                 ref_roots={"release": release, "trunk": trunk},
                 site_dir=tmp_path / "out",
                 work_dir=tmp_path / "work",
@@ -841,9 +864,11 @@ def test_link_ownership_follows_the_lane_that_supplied_the_file(tmp_path: Path) 
     summary = _assemble_astro(tmp_path, release, trunk)
     manifest = routes.load_manifest(MANIFEST)
     owners = summary["file_owners"]
+    assert "_astro/site.release.css" not in owners
     assert routes.owner_ref(manifest, "/_astro/site.trunk.css", renderer.ASTRO, owners) == "trunk"
-    assert routes.owner_ref(manifest, "/_astro/site.release.css", renderer.ASTRO, owners) == "release"
-    assert routes.owner_ref(manifest, "/_astro/shared.js#x", renderer.ASTRO, owners) == "release"
+    assert routes.owner_ref(manifest, "/_astro/shared.js#x", renderer.ASTRO, owners) == "trunk"
+    assert routes.owner_ref(manifest, "/_astro/site.trunk.css", renderer.ASTRO) == "trunk"
     assert routes.is_trunk_owned(manifest, "/_astro/site.trunk.css", renderer.ASTRO, owners)
     assert routes.owner_ref(manifest, "/404.html", renderer.ASTRO, owners) == "trunk"
     assert routes.owner_ref(manifest, "/docs/dev/", renderer.ASTRO, owners) == "trunk"
+    assert routes.owner_ref(manifest, "/", renderer.ASTRO, owners) == "trunk"

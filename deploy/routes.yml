@@ -7,10 +7,10 @@ refs:
     kind: trunk
 routes:
   - path: /
-    ref: release
+    ref: trunk
     builder: landing
   - path: /docs/
-    ref: release
+    ref: trunk
     builder: docs
   - path: /docs/dev/
     ref: trunk
