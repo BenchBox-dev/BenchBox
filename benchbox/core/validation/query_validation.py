@@ -39,6 +39,9 @@ _PARAMETER_SENSITIVE_QUERY_IDS_BY_BENCHMARK: dict[str, frozenset[str]] = {
 }
 
 
+_NON_REFERENCE_SEED_EXCLUDED_BENCHMARKS: frozenset[str] = frozenset({"tpcds"})
+
+
 def get_parameter_sensitive_query_ids(benchmark_type: str) -> frozenset[str]:
     """Return the parameter-sensitive query-id set for a benchmark, if any.
 
@@ -245,6 +248,20 @@ class QueryValidator:
         # Normalize query_id for lookups in expected results
         # Benchmarks may use int keys but expected results use string keys
         query_id_normalized = self._normalize_query_id(benchmark_type, query_id)
+
+        if get_reference_seed_context() is False and benchmark_type.lower() in _NON_REFERENCE_SEED_EXCLUDED_BENCHMARKS:
+            return ValidationResult(
+                is_valid=True,
+                query_id=query_id_str,
+                expected_row_count=None,
+                actual_row_count=actual_row_count,
+                validation_mode=ValidationMode.SKIP,
+                warning_message=(
+                    f"Query '{query_id}' ran with stream-seeded parameters that differ from the "
+                    f"'{benchmark_type}' answer-set parameters. Row-count validation excluded. "
+                    f"Actual rows returned: {actual_row_count}"
+                ),
+            )
 
         # Get expected result from registry with the classified load outcome.
         # A provider failure or timeout is never reported as a normal skip.

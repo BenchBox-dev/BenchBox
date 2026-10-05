@@ -402,10 +402,7 @@ class TestThroughputTest:
 class TestSuccessGateConfigurable:
     """Cover the legacy per-stream threshold and strict run-level gate."""
 
-    def test_finalize_stream_success_uses_configurable_gate(self, tpcds_benchmark):
-        """3/5 = 60% queries successful: fails against the default 70% gate,
-        passes against a lowered 50% gate -- proving the per-stream gate
-        (previously a second, separate hard-coded 0.7) now reads config."""
+    def test_finalize_stream_success_ignores_legacy_threshold_when_a_query_failed(self, tpcds_benchmark):
         test = TPCDSThroughputTest(benchmark=tpcds_benchmark)
 
         def _make_result(min_success_rate: float) -> TPCDSThroughputStreamResult:
@@ -423,7 +420,7 @@ class TestSuccessGateConfigurable:
             return stream_result
 
         assert _make_result(0.70).success is False
-        assert _make_result(0.50).success is True
+        assert _make_result(0.50).success is False
 
     def test_run_partial_stream_is_fatal_despite_legacy_success_threshold(self, tpcds_benchmark):
         """A lowered reporting threshold cannot make a partial run scoreable."""
