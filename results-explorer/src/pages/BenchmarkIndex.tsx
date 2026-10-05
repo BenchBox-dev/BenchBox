@@ -412,10 +412,6 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
   // Load the BenchmarkSummary from DuckDB whenever (sf, phase) changes.
   useEffect(() => {
-    // Guard: don't request until phases have resolved for the current SF.
-    // Without this guard, effectivePhase falls back to the stale phaseFilter
-    // default ("power") even when only "standard" rows exist, triggering a
-    // needless empty-cohort fetch.
     if (!results || phases.length === 0) return;
     let cancelled = false;
     setSelectedIds(new Set());

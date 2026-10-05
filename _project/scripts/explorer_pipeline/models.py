@@ -57,6 +57,9 @@ def canonical_benchmark_slug(raw: str) -> str:
     return CANONICAL_BENCHMARK_ALIASES.get(normalized, normalized)
 
 
+_PHASE_ALIASES = {"standard": "power"}
+
+
 def canonical_phase(raw: str | None) -> str:
     """Return an explicit phase identity without guessing missing provenance.
 
@@ -64,7 +67,9 @@ def canonical_phase(raw: str | None) -> str:
     power test. Keeping it in its own cohort prevents accidental aggregation.
     """
     normalized = (raw or "").strip().lower()
-    return normalized if normalized else "unknown"
+    if not normalized:
+        return "unknown"
+    return _PHASE_ALIASES.get(normalized, normalized)
 
 
 # Provenance suffixes appended to platform.name that are NOT part of the

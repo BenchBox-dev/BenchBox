@@ -246,6 +246,19 @@ describe("local result import", () => {
     expect(preview.detail.cost_usd).toBeNull();
   });
 
+  it("infers the phase from executed phases and ignores NOT_RUN or empty blocks", async () => {
+    const infer = async (phases: Record<string, unknown>) => {
+      const value = bundle({ benchmark: { id: "tpch", name: "TPC-H", scale_factor: 1 }, phases });
+      return (await parseLocalResultText(JSON.stringify(value))).detail.test_type;
+    };
+
+    await expect(
+      infer({ power_test: { status: "NOT_RUN" }, throughput_test: { status: "COMPLETED" } }),
+    ).resolves.toBe("throughput");
+    await expect(infer({ power_test: {}, throughput_test: { status: "COMPLETED" } })).resolves.toBe("throughput");
+    await expect(infer({ power_test: { status: "NOT_RUN" }, throughput_test: { status: "NOT_RUN" } })).resolves.toBeNull();
+  });
+
   it.each(["2.0", "2.1", "2.2"])("accepts supported schema %s", async (version) => {
     await expect(parseLocalResultText(JSON.stringify(bundle({ version })))).resolves.toBeTruthy();
   });

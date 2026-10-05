@@ -10,7 +10,7 @@
 
 import { queryRows } from "@/db";
 import type { BuiltQuery } from "@/lib/queryFilters";
-import type { FacetWhereClause } from "@/lib/facetModel";
+import { canonicalPhaseSql, type FacetWhereClause } from "@/lib/facetModel";
 import { canonicalBenchmarkSlug } from "@/lib/displayLabels";
 import type {
   BenchmarkSummary,
@@ -1254,7 +1254,7 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " COALESCE(si.short_id, '') AS short_id," +
     " r.benchmark," +
     " r.scale_factor," +
-    " CASE WHEN br.phase IS NOT NULL THEN br.phase WHEN r.test_type IS NOT NULL THEN lower(r.test_type) ELSE 'unknown' END AS phase," +
+    ` CASE WHEN br.phase IS NOT NULL THEN br.phase ELSE ${canonicalPhaseSql("r.test_type")} END AS phase,` +
     " r.platform," +
     " r.platform_id," +
     " r.driver_version," +

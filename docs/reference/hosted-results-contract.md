@@ -324,7 +324,7 @@ side-by-side in the explore compare view.
 |---|---|
 | `canonical_benchmark` | Must be identical across all results. `star_schema` is the legacy raw alias for canonical `ssb`; raw `benchmark` remains available for audit. |
 | `scale_factor` | Must be identical across all results in the cohort (e.g., `1.0`) |
-| `canonical_phase` | Must be identical for ranking identity. It is normalized raw `test_type`, or explicit `unknown` when provenance is absent. |
+| `canonical_phase` | Must be identical for ranking identity. It is normalized raw `test_type` (lowercased, with `standard` folded into `power`), or explicit `unknown` when provenance is absent. |
 
 These fields form the ranking cohort key. Raw submitted benchmark and phase
 values are never rewritten; the derived identity is generated centrally by the
