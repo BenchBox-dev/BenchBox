@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "tests/uat/test_tuning_coverage.py fails when the TSV and the generated matrix differ in either direction.",
+    "Docstrings describe the family-directory lookup."
+  ],
+  "context": "Source: PR #2677 independent review nits, left unaddressed to keep the PR scoped.",
+  "description": "## Problem\n`static_matrix_drift` in benchbox/core/tuning/coverage.py reports only cells whose status got worse, so a TSV that says `waived` where a template now exists passes. That is how the ClickHouse rows went stale while PR #2677 added templates, and the stale rows were found only by a reviewer. Also: the module docstring (lines 3-5) and `template_path_for` (line ~101) still describe a single `examples/tunings/{platform}/` lookup although `classify_template` now also checks the family directory; and the new `TEMPLATE_PLATFORM_KEYS` in benchbox/core/tuning/packaged_templates.py repeats four entries of `capability_registry.PLATFORM_ALIASES` without saying why it must stay separate (that map also sends spark to databricks, which is wrong for template lookup).\n\n## Change\n- Make the checked-in matrix test assert exact equality with the generated rows (with a clear regeneration command in the failure message), or flag upgrades as drift too.\n- Update the docstrings and add a one-line comment on `TEMPLATE_PLATFORM_KEYS`.\n\n## Guardrails\n- Intentional waivers stay possible and visible.",
+  "links": [
+    "benchbox/core/tuning/coverage.py",
+    "benchbox/core/tuning/packaged_templates.py",
+    "tests/uat/test_tuning_coverage.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-05T15:24:53Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d0d0db5b00dc4698989794198d71514c",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    }
+  ]
+}
