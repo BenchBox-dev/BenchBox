@@ -84,6 +84,31 @@ Whether these two defaults should be coupled is an open question, recorded under
 For how the container rung is selected and admitted, see
 [the UAT framework doc](../operations/uat-framework.md).
 
+## Tuned Runs
+
+`--tuning tuned` applies a curated template for TPC-H, SSB and TPC-DS:
+MergeTree sort keys, plus monthly partitions on the TPC-H `LINEITEM` and
+`ORDERS` tables. The same templates serve the local, server and cloud platforms
+(`examples/tunings/clickhouse/`, packaged with BenchBox). For other
+benchmarks there is no curated template, so `--tuning tuned` resolves to the
+fallback. ClickHouse's "OLAP session pack" session settings apply to tuned runs
+either way.
+
+```bash
+benchbox run --platform clickhouse-server --benchmark tpch --tuning tuned
+```
+
+The templates disable every constraint, so a table the template sorts has no
+`PRIMARY KEY` clause and its sort key is the index. A table the template does
+not tune keeps the schema's primary key and derives its `ORDER BY` from it. If you supply a template that enables
+`primary_keys`, its columns must be a prefix of the tuned sort key, or the run
+fails before any table is created.
+
+`OPTIMIZE TABLE ... FINAL` is off by default. To run it on each table after it
+loads, set `--platform-option optimize_after_load=true`. It runs on tuned runs
+only. Its time is reported as `phases.post_load_maintenance` and is not
+counted in data-loading time.
+
 ## Docker Integration Testing
 
 ClickHouse server Docker tests use the existing Compose stack:

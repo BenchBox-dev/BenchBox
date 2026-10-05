@@ -76,6 +76,9 @@ Databricks data-skipping documentation
 | Snowflake | locality candidates | clustering keys where useful |
 | Snowflake | distribution candidates | unsupported; no user-managed distribution key |
 
+The checked-in ClickHouse templates (`examples/tunings/clickhouse/`) are not
+rendered from this profile, and the validator below does not check them.
+
 Platforms without a meaningful physical mechanism must return a structured
 unsupported or waived decision. They must not be reported as fully mapped.
 
@@ -145,8 +148,9 @@ Databricks selected every listed column. Explicit
 `z_ordering_enabled: false` with empty `z_ordering_columns` is permitted for
 schema completeness (as in `examples/tunings/databricks/tpch_liquid_tuned.yaml`).
 
-Do not compare a fully mapped tuned template to a basic-constraints fallback as
-if both are equivalent. The fallback means BenchBox could not find a
+Do not compare a fully mapped tuned template to a fallback (for example basic
+constraints, or ClickHouse's "OLAP session pack") as if both are equivalent.
+The fallback means BenchBox could not find a
 benchmark-specific tuned template for that platform/benchmark cell; result
 consumers should treat that as a coverage gap unless the cell has an explicit
 waiver.

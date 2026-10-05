@@ -213,16 +213,22 @@ results = adapter.run_benchmark(benchmark)
 
 ### Delta Lake Optimizations
 
-BenchBox applies Delta optimizations with `--tuning tuned`. The statements optimize the file layout, apply liquid
-clustering, and vacuum old versions:
+BenchBox applies Delta optimizations with `--tuning tuned`. The statements optimize the file layout and apply liquid
+clustering:
 
 ```sql
 OPTIMIZE lineitem ZORDER BY (l_shipdate);
 
 ALTER TABLE lineitem CLUSTER BY (l_shipdate, l_orderkey);
-
-VACUUM lineitem RETAIN 0 HOURS;
 ```
+
+Clustering is set before the data loads. After a tuned table loads, BenchBox
+also executes `OPTIMIZE <table>` and `ANALYZE TABLE <table> COMPUTE STATISTICS`
+on Delta tables, unless `enable_delta_optimization` is `false`. The time is
+reported as `phases.post_load_maintenance` and is not counted in data-loading
+time. Tables the tuning does not cover, and untuned runs, still get a plain
+`OPTIMIZE` after load while `enable_delta_optimization` is on, and that time
+counts as load time. BenchBox does not run `VACUUM` as part of tuning.
 
 The resolved strategy is recorded per run in the result bundle at
 `platform.config.databricks_clustering_strategy` (`"z_order"`,

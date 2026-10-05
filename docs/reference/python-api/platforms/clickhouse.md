@@ -104,6 +104,7 @@ Both modes:
 | `max_threads` | `int` | `8` in server mode, `4` in local mode | ClickHouse `max_threads`. |
 | `disable_result_cache` | `bool` | `True` | Turns the query cache off for accurate timing. |
 | `strict_validation` | `bool` | `True` | Raise `ConfigurationError` if the cache-control settings cannot be confirmed. |
+| `optimize_after_load` | `bool` | `False` | Run `OPTIMIZE TABLE ... FINAL` on each table after it loads. Only when `tuning_enabled` is true. The time is reported as `phases.post_load_maintenance`, not as load time. |
 
 Server mode:
 
@@ -183,7 +184,7 @@ insert_block_size must be a positive integer other than 1000
 - The default mode is local, not server. In local mode `data_path` does not select persistent storage; `database_path` does.
 - Local mode keeps one chDB session per process. After a connection has opened one storage path (or memory), opening a different path in the same process fails with `EmbeddedServer already initialized with path ...`.
 - The `clickhouse:local`, `clickhouse:server` and `clickhouse:cloud` platform selectors are deprecated in favour of the platforms `clickhouse-local`, `clickhouse-server` and `clickhouse-cloud`.
-- `from_config` reads only `deployment_mode` (or `mode`/`embedded`), `data_path` (default `/tmp/benchbox_ch_local`), `database_path`, `host`, `port`, `username`, `user`, `password`, `secure`, `compression` and the tuning and verbosity keys. It drops `max_memory_usage`, `max_execution_time`, `max_threads`, `database` and `force`. In local mode it also builds `database_path` as `benchmark_runs/databases/<benchmark>_sf<token>/<benchmark>_sf<token>_notuning_noconstraints.chdb` from `benchmark` and `scale_factor`.
+- `from_config` reads only `deployment_mode` (or `mode`/`embedded`), `data_path` (default `/tmp/benchbox_ch_local`), `database_path`, `host`, `port`, `username`, `user`, `password`, `secure`, `compression`, `optimize_after_load` and the tuning and verbosity keys. It drops `max_memory_usage`, `max_execution_time`, `max_threads`, `database` and `force`. In local mode it also builds `database_path` as `benchmark_runs/databases/<benchmark>_sf<token>/<benchmark>_sf<token>_notuning_noconstraints.chdb` from `benchmark` and `scale_factor`.
 
 ### Constructor Parameters
 
