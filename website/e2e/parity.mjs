@@ -42,7 +42,7 @@ async function open(route, theme, stripRefresh = false) {
   await page
     .waitForFunction(() => [...document.querySelectorAll(".expressive-code pre")].every((pre) => pre.scrollWidth <= pre.clientWidth || pre.hasAttribute("tabindex")), null, { timeout: 10000 })
     .catch(() => null);
-  await page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => null))));
+  await page.evaluate(() => Promise.race([Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => null))), new Promise((resolve) => setTimeout(resolve, 5000))]));
   return { page, context, response };
 }
 

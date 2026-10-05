@@ -60,6 +60,7 @@ for (const [name, route] of Object.entries(pages)) {
       const key = `${name} ${size} ${theme}`;
       const { page, context } = await open(width, route, theme);
       await openNav(page);
+      await page.evaluate(() => Promise.race([Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => null))), new Promise((resolve) => setTimeout(resolve, 5000))]));
       const result = await new AxeBuilder({ page }).analyze();
       const blocking = result.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
       report.axe[key] = {
