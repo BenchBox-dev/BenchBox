@@ -43,6 +43,18 @@ check here is necessarily after the fact — a workflow that reads posted
 comments and flags the footer, which detects rather than prevents. That is a
 real option, but it should not be described as prevention.
 
+## Where the harness setting must live
+
+Claude Code's `attribution` setting (`commit`, `pr`, `sessionUrl`) controls the
+commit trailer, the `Generated with [Claude Code]` pull request line, and the
+session link. A maintainer's `~/.claude/settings.json` only reaches sessions on
+that machine. Cloud sessions on claude.ai/code clone the repository into a
+fresh sandbox, so they see neither the user settings nor the local
+`commit-msg` hook. The setting is therefore also committed in the project
+`.claude/settings.json`, which every session reads. The comment footer comes
+from the cloud harness's own instructions and may not follow this setting; the
+`AGENTS.md` rule still covers it.
+
 ## The trade-off accepted
 
 Suppressing the footer removes the only standing signal that separates an
