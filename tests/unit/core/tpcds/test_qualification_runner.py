@@ -208,7 +208,7 @@ def test_frozen_official_pack_maps_all_103_statements_with_both_null_order_files
     assert all(answer["sha256"] and answer["file"] for answers in inventory.values() for answer in answers)
 
 
-def test_scheduled_lane_is_advisory_private_bounded_and_preserves_failure_artifacts():
+def test_scheduled_lane_fails_on_gate_failures_stays_private_and_preserves_failure_artifacts():
     root = Path(__file__).resolve().parents[4]
     workflow = yaml.safe_load((root / ".github/workflows/tpcds-official-qualification.yml").read_text(encoding="utf-8"))
     triggers = workflow.get("on", workflow.get(True))
@@ -217,14 +217,16 @@ def test_scheduled_lane_is_advisory_private_bounded_and_preserves_failure_artifa
     job = workflow["jobs"]["qualification-report"]
     assert job["timeout-minutes"] == 25
     report = next(step for step in job["steps"] if step.get("id") == "report")
-    assert report["continue-on-error"] is True
+    assert "continue-on-error" not in report
     assert "--overall-seconds 1200" in report["run"] and "--query-seconds 120" in report["run"]
     assert "|| true" not in report["run"]
     uploads = [step for step in job["steps"] if "upload-artifact@" in step.get("uses", "")]
     assert len(uploads) == 1 and uploads[0]["if"] == "always()"
     assert "*.jsonl" in uploads[0]["with"]["path"]
     assert "cache" not in uploads[0]["with"]["path"]
-    assert "REPORT_OUTCOME" in job["steps"][-2]["env"]
+    summary_step = job["steps"][-2]
+    assert summary_step["if"] == "always()" and "REPORT_OUTCOME" in summary_step["env"]
+    assert "benchbox.core.tpcds.qualification.summary" in summary_step["run"]
 
 
 def _appendix_fixture():

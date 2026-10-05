@@ -38,20 +38,17 @@ jobs:
           uv run --with pypdf==6.0.0 -- python scripts/audit_tpcds_qualification.py --pdf _sources/tpc-ds/specification/specification_4.0.0.pdf --parameters benchbox/core/tpcds/dataframe_queries/qualification_values.json --output "${{ runner.temp }}/tpcds-qualification/parameter-audit.json"
       - name: Compare SF1 qualification values
         id: report
-        continue-on-error: true
         run: >-
           uv run -- python -m benchbox.core.tpcds.qualification.runner
           --output-dir "${{ runner.temp }}/tpcds-qualification"
           --query-seconds 120 --overall-seconds 1200
-      - name: Summarize qualification diagnostics
+      - name: Summarize qualification results
         if: always()
         env:
           REPORT_OUTCOME: ${{ steps.report.outcome }}
         run: |
-          echo "TPC-DS SF1 qualification diagnostic outcome: ${REPORT_OUTCOME}. Strict printed-answer mismatches and execution failures remain in the artifacts; this advisory report does not certify TPC compliance." >> "$GITHUB_STEP_SUMMARY"
-          if [ -f "${{ runner.temp }}/tpcds-qualification/summary.jsonl" ]; then
-            cat "${{ runner.temp }}/tpcds-qualification/summary.jsonl" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          echo "TPC-DS SF1 qualification outcome: ${REPORT_OUTCOME}. The job fails on a DataFrame-to-SQL divergence, an unclassified printed-answer mismatch or error, or an empty result for a statement that is empty at SF 0.01. Classified differences are listed in docs/development/tpcds-dataframe-parity.md; strict results stay in the artifacts. This report does not certify TPC compliance." >> "$GITHUB_STEP_SUMMARY"
+          uv run -- python -m benchbox.core.tpcds.qualification.summary "${{ runner.temp }}/tpcds-qualification" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload qualification evidence
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
