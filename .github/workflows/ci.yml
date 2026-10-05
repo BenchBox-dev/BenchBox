@@ -4,8 +4,11 @@ name: CI
 # docs, landing, and tooling. The classifier maps changed paths to units
 # (.github/ci-units.yml); an untouched unit reports success immediately, and a
 # touched unit must succeed in every job it required (a skipped required job
-# fails the unit). There is deliberately no branch filter on pull_request, so a
-# change opened against any base gets CI instead of an empty check list.
+# fails the unit). pull_request filters out only the release base, so a change
+# opened against any other base gets CI instead of an empty check list. A
+# release PR carries the curated release tree, which lacks the development
+# files these lanes read; validate-release-pr.yml (validate-base) and test.yml
+# (release-required-result) validate it.
 
 env:
   BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
@@ -13,6 +16,7 @@ env:
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited, ready_for_review, converted_to_draft]
+    branches-ignore: [release]
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
