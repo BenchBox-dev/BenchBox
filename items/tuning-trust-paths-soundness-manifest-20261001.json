@@ -4,7 +4,7 @@
     "`uv run -- python -c \"import sys; sys.path.insert(0,'_project/scripts'); from soundness_paths import is_soundness_path as s; assert all(s(p) for p in ['benchbox/core/tuning/introspection.py','benchbox/core/tuning/applied_ledger.py','benchbox/core/tuning/capability_registry.py','benchbox/core/tuning/metadata.py','benchbox/platforms/duckdb_introspection.py','benchbox/platforms/snowflake_introspection.py','benchbox/platforms/clickhouse/introspection.py','benchbox/platforms/base/tuning_trust.py'])\"` exits 0.",
     "PR body contains a `Soundness review:` section from codex, muse or agy, with all Critical/Required findings resolved."
   ],
-  "context": "Source: tuning remediation plan rev2 (2026-10-01; adversarial re-review of develop d39166ea plus independent plan review). Plan task P0.4 (finding A1.14; plan review F8). Every later item that touches these paths carries the soundness guardrail.",
+  "context": "Resumption notes (2026-10-04): shipped in PR #2638 (merged 2026-10-05T00:17Z): the four methods and the ledger read-back moved into benchbox/platforms/base/tuning_trust.py (AST-identical bodies, adapter.py keeps one-line delegates, checked by an independent review); .github/soundness-paths.txt lists tuning_trust.py, core/tuning introspection.py, applied_ledger.py, capability_registry.py, metadata.py, clickhouse/introspection.py and the glob benchbox/platforms/*_introspection.py; docs/development/tuning-introspection-receipts.md documents it. Remaining gaps (filed as tuning-trust-surface-outside-soundness-manifest-20261004): get_tuning_introspector overrides, apply-phase status, failure-path attach and the DataFrame ledger status/attach are still outside the manifest; nothing pins the read-back call site; the glob also matches subdirectories while the pin test does not.",
   "description": "## Problem\nThe trust-critical tuning files are **not** listed in `.github/soundness-paths.txt` (kinds `file|glob|prefix|regex`, read by `_project/scripts/soundness_paths.py`). Only `benchbox/platforms/base/result_capture.py` is. Unlisted files:\n- `benchbox/core/tuning/introspection.py`;\n- `applied_ledger.py`;\n- `capability_registry.py`;\n- `metadata.py`;\n- `platforms/*_introspection.py`;\n- `platforms/clickhouse/introspection.py`;\n- the corroboration code in `platforms/base/adapter.py`.\n\nChanges to verification logic can therefore auto-merge without the external soundness review AGENTS.md requires.\n\n## Change\n1. **Preparatory refactor, no behavior change:** move `_corroborate_applied_ledger`, `_fold_layout_operations_into_ledger`, `_attach_applied_ledger_payload`, `_build_drift_check_payload` and the ledger read-back from `platforms/base/adapter.py` into a new module `benchbox/platforms/base/tuning_trust.py`. A manifest \"region\" is not expressible (plan review F8), and listing all of `adapter.py` would put most adapter PRs under soundness review.\n2. Add manifest entries for:\n   - `benchbox/core/tuning/introspection.py`, `applied_ledger.py`, `capability_registry.py` and `metadata.py`;\n   - glob `benchbox/platforms/*_introspection.py`;\n   - `benchbox/platforms/clickhouse/introspection.py`;\n   - `benchbox/platforms/base/tuning_trust.py`.\n\n## Guardrails (must preserve)\n- The refactor is behavior-identical. The existing tuning unit and integration suites pass unchanged.\n- This PR edits a manifest path itself, so it needs its own external `Soundness review:`.\n\n## Do not\n- Do not list all of `adapter.py`. That makes nearly every adapter PR soundness-gated; extract instead.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`.\n- Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit user approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop d39166ea.",
   "links": [
     ".github/soundness-paths.txt",
@@ -46,6 +46,14 @@
       "generation": "b3b9c8b505b947889a18b8827ac4ddd3",
       "op": "take",
       "op_id": "6c03e02251af4e689bdcdce002b36571",
+      "session_id": "040d67d8304f4a3581f98a3300e36001"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56",
+      "at": "2026-10-05T00:18:36Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "ecae70e7ac6f4758b7e493927c6c8b93",
       "session_id": "040d67d8304f4a3581f98a3300e36001"
     }
   ]
