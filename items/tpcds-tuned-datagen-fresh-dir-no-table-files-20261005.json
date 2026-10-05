@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A documented root cause and a fix, or a documented decision that it is environmental, with the reproduction steps.",
+    "A regression test or a gate that fails if tuned TPC-DS datagen from an empty output directory produces no tables."
+  ],
+  "context": "Source: PR #2677 close-out, scratchpad logs chc-tpcds-gen.log and chc-tpcds2.log from the W2 session. Related: bound-datagen-sync-and-investigate-io-stall, datagen-empty-manifest-vacuous-validation-20261001 (done).",
+  "description": "## Problem (observed, root cause unknown)\nDuring W2 PR C end-to-end runs, `benchbox run --platform clickhouse-local --benchmark tpcds --scale 0.01 --tuning tuned --phases generate,load,power` into a fresh `BENCHBOX_OUTPUT_DIR` failed in data generation with a message ending \"refusing to write a manifest that lists no tables\" (scan-v1 manifest, \"produced no table files\"). Generating once with `--tuning notuning --phases generate,load` into the same output directory first made the tuned run work. It happened more than once on macOS (Darwin 27, arm64) and was never reproduced in isolation or root-caused. The fail-loud behaviour is correct (datagen-empty-manifest-vacuous-validation-20261001); the cause of the empty generation is not understood.\n\n## Change\n- Reproduce with a clean output directory and capture the datagen log (the dsdgen invocation, working directory, and files produced).\n- Find out whether it depends on tuning mode, the output directory being empty, the compression step or tool (zstd), or macOS specifics.\n- Fix the cause, add a regression test, and keep the fail-loud check.\n\n## Guardrails\n- Do not weaken the empty-manifest validation.",
+  "links": [
+    "benchbox/core/tpcds",
+    "benchbox/core/runner/runner.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-05T15:24:19Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "7aa68aa01c1545f982ba27e93adcbe39",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    }
+  ]
+}
