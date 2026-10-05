@@ -199,6 +199,72 @@ def test_throughput_stream_numbering_survives_schema_round_trip() -> None:
     assert reloaded["phases"]["throughput_test"] == payload["phases"]["throughput_test"]
 
 
+def _combined_rows(throughput_streams: int) -> list[dict[str, Any]]:
+    power = [
+        {
+            "query_id": str(query),
+            "status": "SUCCESS",
+            "execution_time_seconds": 0.5,
+            "rows_returned": 1,
+            "iteration": iteration,
+            "stream_id": 0,
+            "run_type": "measurement",
+            "test_type": "power",
+        }
+        for iteration in (1, 2)
+        for query in (1, 2)
+    ]
+    throughput = [
+        {
+            "query_id": str(query),
+            "status": "SUCCESS",
+            "execution_time_seconds": 1.0,
+            "rows_returned": 1,
+            "iteration": 1,
+            "stream_id": stream,
+            "run_type": "measurement",
+            "test_type": "throughput",
+        }
+        for stream in range(1, throughput_streams + 1)
+        for query in (1, 2)
+    ]
+    return power + throughput
+
+
+def test_combined_run_counts_only_throughput_streams() -> None:
+    payload = build_result_payload(_result_with_queries(_combined_rows(4)))
+
+    assert payload["run"]["streams"] == 4
+
+
+def test_power_only_run_reports_one_stream() -> None:
+    rows = [row for row in _combined_rows(2) if row["test_type"] == "power"]
+
+    assert build_result_payload(_result_with_queries(rows))["run"]["streams"] == 1
+
+
+def test_throughput_only_run_counts_every_stream() -> None:
+    rows = [row for row in _combined_rows(3) if row["test_type"] == "throughput"]
+
+    assert build_result_payload(_result_with_queries(rows))["run"]["streams"] == 3
+
+
+def test_combined_run_qphh_reports_the_throughput_stream_count() -> None:
+    from benchbox.core.results.metrics import TPCMetricsCalculator
+
+    payload = build_result_payload(_result_with_queries(_combined_rows(4)))
+    power_data = {"benchmark": {"scale_factor": 1.0}, "summary": {"tpc_metrics": {"power_at_size": 10.0}}}
+    throughput_data = {
+        "benchmark": {"scale_factor": 1.0},
+        "run": payload["run"],
+        "summary": {"tpc_metrics": {"throughput_at_size": 5.0}},
+    }
+
+    result = TPCMetricsCalculator.compute_qphh_result(power_data, throughput_data, scale_factor=1.0)
+
+    assert result["num_streams"] == 4
+
+
 def test_build_result_payload_rejects_conflicting_duration_aliases() -> None:
     result = _result_with_queries(
         [

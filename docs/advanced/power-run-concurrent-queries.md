@@ -25,14 +25,13 @@ These features are essential for:
 
 ### What are Power Run Iterations?
 
-Power Run Iterations execute the same benchmark test multiple times with **different query orderings per iteration**, providing statistical analysis of performance consistency. This approach:
+Power Run Iterations execute the same benchmark test multiple times, providing statistical analysis of performance consistency. This approach:
 
 - **Eliminates outliers** from single-run measurements
 - **Provides confidence intervals** for benchmark results
 - **Detects performance variance** and consistency issues
 - **Enables statistical comparison** between configurations
-- **Follows TPC specifications** with proper stream permutations (each iteration uses different stream_id)
-- **Tests different query interaction patterns** to stress query optimizers
+- **Follows TPC specifications**: every warm-up and measured iteration runs stream 00, with the same query ordering and substitution parameters
 
 ### Key Benefits
 
@@ -459,35 +458,34 @@ BenchBox ensures compliance with official TPC specifications for query ordering 
 
 ### Power Run Compliance
 
-Each power run iteration uses a **different stream permutation** to ensure varied query interaction patterns:
+Every power run iteration, warm-up and measured, runs stream 00 of the TPC specification: the same query permutation and the same substitution parameters, so iterations are repeats of one workload and can be compared directly. Row-count validation applies to every measured iteration under the default validation mode.
 
 ```python
-# Iteration 0: Uses TPC-H stream 0 permutation [14, 2, 9, 20, 6, 17, 18, 8, 21, 13, 3, 22, 16, 4, 11, 15, 1, 10, 19, 5, 7, 12]
-# Iteration 1: Uses TPC-H stream 1 permutation [21, 3, 18, 5, 11, 7, 6, 20, 17, 12, 16, 15, 13, 10, 2, 8, 14, 19, 9, 22, 1, 4]
-# Iteration 2: Uses TPC-H stream 2 permutation [6, 17, 14, 16, 19, 10, 9, 2, 15, 8, 5, 22, 12, 7, 13, 18, 1, 4, 20, 3, 11, 21]
+# Every iteration: TPC-H stream 0 permutation [14, 2, 9, 20, 6, 17, 18, 8, 21, 13, 3, 22, 16, 4, 11, 15, 1, 10, 19, 5, 7, 12]
 
 config = PowerRunSettings()
-config.iterations = 5  # Each iteration uses different stream (0, 1, 2, 3, 4)
+config.iterations = 5  # Five repeats of stream 0
 ```
 
-### Concurrent Query Compliance
+### Throughput Compliance
 
-Each concurrent stream uses a **different permutation** as mandated by TPC specifications:
+Throughput streams are numbered 1 to S, as in the TPC specifications. Stream 0 is the power stream, so no throughput stream repeats the power ordering, and each throughput stream uses its own permutation and parameters:
 
 ```python
-# Stream 0: TPC-H permutation[0] or TPC-DS stream 0 permutation
-# Stream 1: TPC-H permutation[1] or TPC-DS stream 1 permutation
-# Stream 2: TPC-H permutation[2] or TPC-DS stream 2 permutation
+# Stream 1: TPC-H permutation[1] or TPC-DS dsqgen stream 1
+# Stream 2: TPC-H permutation[2] or TPC-DS dsqgen stream 2
+# Stream S: TPC-H permutation[S] or TPC-DS dsqgen stream S
 
-config = ConcurrentQueriesSettings()
-config.max_concurrent = 4  # Each stream gets different permutation (0, 1, 2, 3)
+# A 4-stream throughput test runs streams 1, 2, 3 and 4.
 ```
+
+Results record this under `phases.throughput_test.stream_numbering`.
 
 ### Why TPC Compliance Matters
 
 1. **Valid Comparisons**: Results comparable to official TPC publications
-2. **Optimizer Testing**: Different orderings stress different optimization paths
-3. **Statistical Validity**: Varied patterns provide meaningful performance statistics
+2. **Optimizer Testing**: Each throughput stream uses a different ordering, which stresses different optimization paths
+3. **Statistical Validity**: Repeated stream 00 iterations measure variance on one fixed workload
 4. **Research Validity**: Academic research can rely on specification-compliant results
 
 ### Verification

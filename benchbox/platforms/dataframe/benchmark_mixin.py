@@ -1243,7 +1243,7 @@ class BenchmarkExecutionMixin:
 
         console.print(f"\n[yellow]Running {warmup_iterations} warmup iteration(s)...[/yellow]")
         for warmup_iter in range(warmup_iterations):
-            warmup_stream_id = warmup_iter
+            warmup_stream_id = self._power_iteration_stream_id(benchmark_config, warmup_iter)
             warmup_queries = self._filter_queries(
                 self._get_queries_for_benchmark(benchmark_config, benchmark_instance, stream_id=warmup_stream_id),
                 skip_query_ids,
@@ -1268,6 +1268,12 @@ class BenchmarkExecutionMixin:
                     result["stream_id"] = warmup_stream_id
                     result["run_type"] = "warmup"
                     query_results.append(result)
+
+    @staticmethod
+    def _power_iteration_stream_id(benchmark_config: BenchmarkConfig, default_stream_id: int) -> int:
+        if normalize_benchmark_id(benchmark_config.name) != "tpch":
+            return default_stream_id
+        return int(getattr(benchmark_config, "stream_id", 0) or 0)
 
     @staticmethod
     def _stream_parameter_scope(benchmark_config: BenchmarkConfig, stream_id: int) -> AbstractContextManager[None]:
@@ -1311,7 +1317,7 @@ class BenchmarkExecutionMixin:
         )
 
         for iteration in range(measurement_iterations):
-            measurement_stream_id = warmup_iterations + iteration
+            measurement_stream_id = self._power_iteration_stream_id(benchmark_config, warmup_iterations + iteration)
             measurement_queries = self._filter_queries(
                 self._get_queries_for_benchmark(benchmark_config, benchmark_instance, stream_id=measurement_stream_id),
                 skip_query_ids,

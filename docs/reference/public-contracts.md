@@ -328,8 +328,10 @@ Allowed differences:
   SQL Throughput uses `base_seed + 1001 * stream_id + query_position`, with
   a default base seed of 42 and positions starting at zero in each stream's
   permutation. TPC-H and TPC-DS SQL Throughput streams are numbered 1 to S,
-  as in the specifications; stream 0 is the Power stream and no Throughput
-  stream repeats it. The throughput phase records this basis under
+  as in the specifications; stream 0 is the Power stream. With up to 40
+  throughput streams none repeats it. With more, the TPC-H permutation wraps
+  and stream 41 repeats the power ordering; the stream count is not capped.
+  The throughput phase records this basis under
   `phases.throughput_test.stream_numbering`. Combined SQL lists the requested phases separately; refresh
   functions do not use qgen parameters. Unsupported harnesses that fall back
   to Standard SQL record the default parameters.
