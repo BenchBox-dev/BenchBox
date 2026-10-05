@@ -287,6 +287,7 @@ class PlatformAdapter(
         self._post_load_maintenance_seconds: float = 0.0
         self._post_load_maintenance_tables: list[str] = []
         self._post_load_maintenance_by_table: dict[str, float] = {}
+        self._post_load_maintenance_errors: int = 0
         self._reset_plan_capture_stats()
         self._client_link_metadata: dict[str, Any] | None = None
         self._link_probe_timed_out = False
@@ -305,6 +306,7 @@ class PlatformAdapter(
         self._post_load_maintenance_seconds = 0.0
         self._post_load_maintenance_tables = []
         self._post_load_maintenance_by_table = {}
+        self._post_load_maintenance_errors = 0
         self._reset_plan_capture_stats()
         self._client_link_metadata = None
         self._link_probe_timed_out = False

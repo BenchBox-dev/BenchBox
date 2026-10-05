@@ -3503,16 +3503,18 @@ class DatabricksAdapter(PlatformAdapter):
 
         return " ".join(clauses)
 
-    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> bool:
         table_tuning = self.table_tuning_for(effective_config, table_name)
         if table_tuning is None or not table_tuning.has_any_tuning() or not self.enable_delta_optimization:
-            return
+            return False
         physical_table = self.resolve_physical_table(table_name)
         cursor = connection.cursor()
         try:
             cursor.execute(f"DESCRIBE EXTENDED {physical_table}")
-            if any("DELTA" in str(row).upper() for row in cursor.fetchall()):
-                self._apply_delta_optimize(cursor, physical_table, phase="post_load")
+            if not any("DELTA" in str(row).upper() for row in cursor.fetchall()):
+                return False
+            self._apply_delta_optimize(cursor, physical_table, phase="post_load")
+            return True
         finally:
             cursor.close()
 

@@ -2612,10 +2612,10 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         return " ".join(clauses)
 
-    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> bool:
         table_tuning = self.table_tuning_for(effective_config, table_name)
         if table_tuning is None or not table_tuning.has_any_tuning():
-            return
+            return False
         physical_table = self.resolve_physical_table(table_name, connection)
         cursor = connection.cursor()
         try:
@@ -2628,6 +2628,7 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             self.logger.warning(f"Failed to perform maintenance operations on {physical_table}: {e}")
         finally:
             cursor.close()
+        return True
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         """Apply tuning configurations to a Redshift table.

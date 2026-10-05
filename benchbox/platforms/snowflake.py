@@ -1993,11 +1993,11 @@ class SnowflakeAdapter(PlatformAdapter):
             self._resume_recluster_tables = pending
         return pending
 
-    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> bool:
         physical_table = self.resolve_physical_table(table_name, connection)
         pending = self._pending_resume_recluster()
         if physical_table not in pending:
-            return
+            return False
         pending.discard(physical_table)
         cursor = connection.cursor()
         try:
@@ -2007,6 +2007,7 @@ class SnowflakeAdapter(PlatformAdapter):
             self.logger.debug(f"Could not enable automatic clustering for {physical_table}: {e}")
         finally:
             cursor.close()
+        return True
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         """Apply tuning configurations to a Snowflake table.

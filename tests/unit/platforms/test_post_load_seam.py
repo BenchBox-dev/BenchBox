@@ -62,9 +62,11 @@ class _Adapter(PlatformAdapter):
     def execute_query(self, connection: Any, query: str, query_id: str, **kwargs: Any) -> dict[str, Any]:
         return {"query_id": query_id, "status": "SUCCESS", "execution_time_seconds": 0.0, "rows_returned": 0}
 
-    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
-        if self._hook is not None:
-            self._hook(table_name, effective_config, connection)
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> bool:
+        if self._hook is None:
+            return False
+        self._hook(table_name, effective_config, connection)
+        return True
 
 
 class _Connection:
@@ -85,7 +87,7 @@ class TestPostLoadRunner:
     def test_default_hook_does_nothing(self):
         connection = _Connection()
 
-        assert TuningHooksMixin.apply_post_load_tunings(object(), "lineitem", CONFIG, connection) is None
+        assert TuningHooksMixin.apply_post_load_tunings(object(), "lineitem", CONFIG, connection) is False
         assert connection.statements == []
 
     def test_statements_are_recorded_in_the_post_load_phase(self):
@@ -127,6 +129,33 @@ class TestPostLoadRunner:
         adapter.run_post_load_tunings("lineitem", CONFIG, _Connection())
 
         assert adapter.get_post_load_maintenance_metadata()["applied_tables"] == ["lineitem"]
+
+    def test_a_hook_that_performs_nothing_leaves_no_phase_and_no_metadata(self):
+        adapter = _Adapter()
+
+        adapter.run_post_load_tunings("lineitem", CONFIG, _Connection())
+
+        assert adapter.build_post_load_maintenance_phase() is None
+        assert adapter.get_post_load_maintenance_metadata() == {"total_apply_seconds": 0.0, "applied_tables": []}
+
+    def test_the_phase_reports_success_after_clean_hooks(self):
+        adapter = _Adapter(lambda *args: None)
+
+        adapter.run_post_load_tunings("lineitem", CONFIG, _Connection())
+
+        phase = adapter.build_post_load_maintenance_phase()
+        assert (phase.status, phase.tables_processed) == ("SUCCESS", 1)
+
+    def test_the_phase_reports_failure_when_a_hook_raised(self):
+        def hook(table, config, connection):
+            raise RuntimeError("boom")
+
+        adapter = _Adapter(hook)
+
+        adapter.run_post_load_tunings("lineitem", CONFIG, _Connection())
+
+        phase = adapter.build_post_load_maintenance_phase()
+        assert (phase.status, phase.tables_processed) == ("FAILED", 1)
 
     def test_no_effective_configuration_skips_the_hook(self):
         calls = []

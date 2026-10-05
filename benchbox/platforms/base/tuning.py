@@ -92,8 +92,8 @@ class TuningHooksMixin:
                 return table_tuning
         return None
 
-    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
-        return None
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> bool:
+        return False
 
     def run_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
         if effective_config is None or getattr(self, "dry_run_mode", False):
@@ -104,24 +104,28 @@ class TuningHooksMixin:
         ledger = getattr(self, "_applied_tuning_ledger", None)
         record = ledger is not None and self.post_load_connection_recording
         target = recording_connection(connection, ledger, PHASE_POST_LOAD) if record else connection
+        performed = False
         start = mono_time()
         try:
-            self.apply_post_load_tunings(table_name, effective_config, target)
+            performed = bool(self.apply_post_load_tunings(table_name, effective_config, target))
         except Exception as exc:
+            performed = True
+            self._post_load_maintenance_errors = getattr(self, "_post_load_maintenance_errors", 0) + 1
             self.logger.warning(f"Post-load tuning failed for {table_name}: {exc}")
         finally:
-            elapsed = elapsed_seconds(start)
-            self._post_load_maintenance_seconds = getattr(self, "_post_load_maintenance_seconds", 0.0) + elapsed
-            tables = getattr(self, "_post_load_maintenance_tables", None)
-            if tables is None:
-                tables = []
-                self._post_load_maintenance_tables = tables
-            tables.append(table_name)
-            by_table = getattr(self, "_post_load_maintenance_by_table", None)
-            if by_table is None:
-                by_table = {}
-                self._post_load_maintenance_by_table = by_table
-            by_table[table_name.lower()] = by_table.get(table_name.lower(), 0.0) + elapsed
+            if performed:
+                elapsed = elapsed_seconds(start)
+                self._post_load_maintenance_seconds = getattr(self, "_post_load_maintenance_seconds", 0.0) + elapsed
+                tables = getattr(self, "_post_load_maintenance_tables", None)
+                if tables is None:
+                    tables = []
+                    self._post_load_maintenance_tables = tables
+                tables.append(table_name)
+                by_table = getattr(self, "_post_load_maintenance_by_table", None)
+                if by_table is None:
+                    by_table = {}
+                    self._post_load_maintenance_by_table = by_table
+                by_table[table_name.lower()] = by_table.get(table_name.lower(), 0.0) + elapsed
 
     def exclude_post_load_maintenance(self, loading_time: float, per_table_timings: Any) -> tuple[float, Any]:
         by_table = getattr(self, "_post_load_maintenance_by_table", None) or {}
@@ -140,6 +144,7 @@ class TuningHooksMixin:
             return None
         return PostLoadMaintenancePhase(
             duration_ms=int(getattr(self, "_post_load_maintenance_seconds", 0.0) * 1000),
+            status="FAILED" if getattr(self, "_post_load_maintenance_errors", 0) else "SUCCESS",
             tables_processed=len(tables),
         )
 
