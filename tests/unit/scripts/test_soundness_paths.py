@@ -50,6 +50,14 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "benchbox/core/expected_results/registry.py",
         "benchbox/core/expected_results/reference_digests/tpch_value_digests_sf1.json",
         "benchbox/platforms/base/result_capture.py",
+        "benchbox/platforms/base/tuning_trust.py",
+        "benchbox/core/tuning/introspection.py",
+        "benchbox/core/tuning/applied_ledger.py",
+        "benchbox/core/tuning/capability_registry.py",
+        "benchbox/core/tuning/metadata.py",
+        "benchbox/platforms/duckdb_introspection.py",
+        "benchbox/platforms/snowflake_introspection.py",
+        "benchbox/platforms/clickhouse/introspection.py",
         "benchbox/sql_compat/resolver.py",
         "benchbox/sql_compat/decision.py",
         "benchbox/sql_compat/rules/_registration.py",
@@ -131,6 +139,15 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         "benchbox/sql_compat/registry.py",
         "benchbox/sql_compat/actions.py",
         "benchbox/platforms/base/result_capture_helpers.py",
+        "benchbox/platforms/base/adapter.py",
+        "benchbox/platforms/duckdb.py",
+        "benchbox/platforms/base/tuning_trust_helpers.py",
+        "benchbox/core/tuning/coverage.py",
+        "benchbox/core/tuning/modes.py",
+        "benchbox/core/tuning/introspection.py.bak",
+        "benchbox/core/tuning/metadata_helpers.py",
+        "benchbox/platforms/duckdb_introspection_notes.md",
+        "benchbox/platforms/clickhouse/adapter.py",
         "benchbox/core/results/exporter.py",
         "benchbox/core/results/schema.py",
         "benchbox/core/results/anonymization.py.bak",
@@ -159,6 +176,36 @@ def test_soundness_files_glob_duality_stays_pinned() -> None:
     assert soundness.OVERRIDE_FILES_GLOB in soundness.SOUNDNESS_FILES
     assert soundness.is_soundness_path("results-data/bundles/tpch/duckdb/sf1.override.json") is True
     assert soundness.is_soundness_path("results-data/bundles/x.override.json.bak") is False
+
+
+TUNING_TRUST_FILES = (
+    "benchbox/platforms/base/tuning_trust.py",
+    "benchbox/core/tuning/introspection.py",
+    "benchbox/core/tuning/applied_ledger.py",
+    "benchbox/core/tuning/capability_registry.py",
+    "benchbox/core/tuning/metadata.py",
+    "benchbox/platforms/clickhouse/introspection.py",
+)
+TUNING_TRUST_GLOB = "benchbox/platforms/*_introspection.py"
+
+
+def test_tuning_trust_paths_are_pinned_in_manifest() -> None:
+    manifest = (ROOT / ".github" / "soundness-paths.txt").read_text(encoding="utf-8").splitlines()
+    for path in TUNING_TRUST_FILES:
+        assert f"file\t{path}" in manifest
+        assert (ROOT / path).is_file(), f"{path} no longer exists; update the soundness manifest"
+        assert soundness.is_soundness_path(path) is True
+    assert f"glob\t{TUNING_TRUST_GLOB}" in manifest
+    introspection_modules = sorted((ROOT / "benchbox" / "platforms").glob("*_introspection.py"))
+    assert introspection_modules, "the platform introspection glob matches no module"
+    for module in introspection_modules:
+        assert soundness.is_soundness_path(module.relative_to(ROOT).as_posix()) is True
+
+
+def test_any_soundness_path_recognises_tuning_trust_paths() -> None:
+    assert soundness.any_soundness_path(["docs/index.md", *TUNING_TRUST_FILES[:1]]) is True
+    assert soundness.any_soundness_path(["benchbox/platforms/duckdb_introspection.py"]) is True
+    assert soundness.any_soundness_path(["benchbox/platforms/base/adapter.py", "benchbox/platforms/duckdb.py"]) is False
 
 
 def test_make_pr_open_uses_shared_predicate_and_skips_auto_merge() -> None:
