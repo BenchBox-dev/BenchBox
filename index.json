@@ -21871,6 +21871,13 @@
       "status": "open",
       "title": "Tuning trust code that still sits outside the soundness manifest, and a test gap on the extracted read-back"
     },
+    "tuning-validate-datafusion-sql-files-20261005": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "`tuning validate --platform datafusion` cannot validate a SQL tuning file, and a DataFusion DataFrame profile could leak into SQL mode"
+    },
     "tuning-verification-footprint-duckdb-clickhouse-20260722": {
       "claim": null,
       "needs": [],

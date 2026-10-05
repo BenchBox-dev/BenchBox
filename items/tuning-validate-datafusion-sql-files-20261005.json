@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "A SQL DataFusion tuning file validates through the CLI, and the DataFrame path is unchanged.",
+    "A test proves a DataFusion SQL run never resolves a DataFrame profile."
+  ],
+  "context": "Source: PR #2677 close-out. Two reviewer notes (nit level) left unaddressed on purpose to keep the PR scoped.",
+  "description": "## Problem\n- `benchbox tuning validate <file> --platform datafusion` always validates the file as a DataFrame configuration, because SQL `datafusion` shares the DataFrame template entries. A SQL DataFusion tuning file therefore cannot be validated.\n- `_dataframe_profile_path` in benchbox/cli/tuning_resolver.py would hand a DataFrame profile to a SQL-mode DataFusion run if `examples/tunings/dataframe/datafusion_optimized.yaml` is ever added.\n\n## Change\n- Decide the validate-mode selection for platforms that exist in both SQL and DataFrame modes (explicit flag or inferring from the file contents) and implement it with tests.\n- Make the profile resolution mode-aware so a DataFrame profile is only chosen for a DataFrame run; add a test that would fail if a datafusion profile file appeared.\n- Document the rule in docs/reference/cli/tuning.md.\n\n## Guardrails\n- Existing DataFrame validate behaviour for polars, pandas and cuDF is unchanged.",
+  "links": [
+    "benchbox/cli/commands/tuning_group.py",
+    "benchbox/cli/tuning_resolver.py",
+    "docs/reference/cli/tuning.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:5325140a2a39263d2a755329",
+      "at": "2026-10-05T15:23:53Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "e8ff127f343e4ff48d98372f66ecc67d",
+      "session_id": "796d606672604f3d869b9c79926d482c"
+    }
+  ]
+}
