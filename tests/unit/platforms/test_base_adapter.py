@@ -3246,6 +3246,7 @@ class TestTPCHAndTPCDSExecutionHelpers:
                 "status": "FAILED",
                 "rows_returned": 0,
                 "test_type": "maintenance",
+                "error": "Unknown error",
             },
         ]
 

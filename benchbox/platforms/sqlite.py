@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     )
 
 from .base import DriverIsolationCapability, PlatformAdapter, StreamConnectionCapability
+from .base.connection_wrappers import _make_stream_cursor
 
 try:
     import sqlite3
@@ -407,15 +408,19 @@ class SQLiteAdapter(PlatformAdapter):
         "shared by independent stream connections. Use a database_path on disk."
     )
 
-    def ensure_stream_sessions_supported(self) -> None:
-        database_path = str(self.get_database_path() or "")
-        if database_path in {"", ":memory:"} or database_path.startswith("file::memory:"):
+    def ensure_stream_sessions_supported(self, connection: Any = None) -> None:
+        if connection is not None:
+            in_memory = not self._main_database_file(connection)
+        else:
+            database_path = str(self.get_database_path() or "")
+            in_memory = database_path in {"", ":memory:"} or database_path.startswith("file::memory:")
+        if in_memory:
             raise RuntimeError(self._IN_MEMORY_REQUIRES_FILE_MESSAGE)
 
     def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
         database_file = self._main_database_file(connection)
         if not database_file:
-            raise RuntimeError(self._IN_MEMORY_REQUIRES_FILE_MESSAGE)
+            return _make_stream_cursor(connection)
         stream_connection = self._open_connection(database_file)
         try:
             if benchmark_type is not None:

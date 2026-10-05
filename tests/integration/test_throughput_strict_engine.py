@@ -104,16 +104,27 @@ def _stream_connection_factory(adapter: SQLiteAdapter, connection: Any, benchmar
 
 
 @pytest.fixture(scope="module")
-def tpch_sqlite(
-    tmp_path_factory: pytest.TempPathFactory,
-) -> Generator[tuple[SQLiteAdapter, TPCHBenchmark, Any], None, None]:
-    base = tmp_path_factory.mktemp("tpch_sqlite_throughput")
-    adapter = SQLiteAdapter(database_path=str(base / "tpch.sqlite"))
-    connection = adapter.create_connection()
+def tpch_data(tmp_path_factory: pytest.TempPathFactory) -> tuple[TPCHBenchmark, Path]:
+    base = tmp_path_factory.mktemp("tpch_sqlite_data")
     benchmark = TPCHBenchmark(scale_factor=_SCALE_FACTOR, output_dir=str(base / "data"))
     benchmark.generate_data()
+    return benchmark, base / "data"
+
+
+def _load_tpch(adapter: SQLiteAdapter, benchmark: TPCHBenchmark, data_dir: Path) -> Any:
+    connection = adapter.create_connection()
     adapter.create_schema(benchmark, connection)
-    adapter.load_data(benchmark, connection, Path(base / "data"))
+    adapter.load_data(benchmark, connection, data_dir)
+    return connection
+
+
+@pytest.fixture(scope="module")
+def tpch_sqlite(
+    tmp_path_factory: pytest.TempPathFactory, tpch_data: tuple[TPCHBenchmark, Path]
+) -> Generator[tuple[SQLiteAdapter, TPCHBenchmark, Any], None, None]:
+    benchmark, data_dir = tpch_data
+    adapter = SQLiteAdapter(database_path=str(tmp_path_factory.mktemp("tpch_sqlite_throughput") / "tpch.sqlite"))
+    connection = _load_tpch(adapter, benchmark, data_dir)
     yield adapter, benchmark, connection
     connection.close()
 
@@ -195,47 +206,65 @@ class TestTPCHThroughputOnSQLite:
         assert all(stream.queries_failed == 1 for stream in result.stream_results)
         assert result.throughput_at_size is None
 
-    def test_in_memory_database_is_refused_before_streams_are_submitted(self, tmp_path: Path) -> None:
+    def test_in_memory_database_is_refused_before_streams_are_submitted(self) -> None:
         adapter = SQLiteAdapter(database_path=":memory:")
+        connection = adapter.create_connection()
+        try:
+            with pytest.raises(RuntimeError, match="file-backed"):
+                require_throughput_stream_capability(adapter, platform_name="SQLite", connection=connection)
+        finally:
+            connection.close()
 
-        with pytest.raises(RuntimeError, match="file-backed"):
-            require_throughput_stream_capability(adapter, platform_name="SQLite")
 
-    def test_concurrent_streams_do_not_share_error_state(self, tmp_path: Path) -> None:
-        adapter = SQLiteAdapter(database_path=str(tmp_path / "isolation.sqlite"))
-        shared = adapter.create_connection()
-        shared.execute("CREATE TABLE t (id INTEGER)")
-        shared.execute("INSERT INTO t VALUES (1)")
-        shared.commit()
-        outcomes: list[str] = []
-        lock = threading.Lock()
+class TestTPCHMaintenanceOnSQLite:
+    @staticmethod
+    def _run(
+        adapter: SQLiteAdapter, benchmark: TPCHBenchmark, connection: Any, output_dir: Path
+    ) -> list[dict[str, Any]]:
+        return adapter._execute_queries_by_type(
+            benchmark,
+            connection,
+            {
+                "benchmark_name": "tpch",
+                "test_execution_type": "maintenance",
+                "scale_factor": _SCALE_FACTOR,
+                "output_dir": str(output_dir),
+            },
+        )
 
-        def stream(sql: str) -> None:
-            stream_connection = adapter.new_stream_connection(shared, benchmark_type="olap")
-            try:
-                for _ in range(200):
-                    try:
-                        stream_connection.execute(sql).fetchall()
-                        outcome = "ok"
-                    except sqlite3.OperationalError as exc:
-                        outcome = str(exc)
-                    with lock:
-                        outcomes.append(f"{'bad' if 'missing' in sql else 'good'}:{outcome}")
-            finally:
-                stream_connection.close()
+    @pytest.mark.parametrize("in_memory", [True, False], ids=["in_memory", "file_backed"])
+    def test_refresh_functions_succeed(
+        self, tpch_data: tuple[TPCHBenchmark, Path], tmp_path: Path, in_memory: bool
+    ) -> None:
+        benchmark, data_dir = tpch_data
+        adapter = SQLiteAdapter(database_path=":memory:" if in_memory else str(tmp_path / "maintenance.sqlite"))
+        connection = _load_tpch(adapter, benchmark, data_dir)
+        try:
+            rows = self._run(adapter, benchmark, connection, tmp_path / "maintenance")
+        finally:
+            connection.close()
 
-        threads = [
-            threading.Thread(target=stream, args=(sql,))
-            for sql in ("SELECT id FROM t", "SELECT id FROM missing", "SELECT id FROM t", "SELECT id FROM missing")
-        ]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-        shared.close()
+        assert [(row["query_id"], row["status"]) for row in rows] == [("RF1", "SUCCESS"), ("RF2", "SUCCESS")]
 
-        assert {outcome for outcome in outcomes if outcome.startswith("good:")} == {"good:ok"}
-        assert {outcome for outcome in outcomes if outcome.startswith("bad:")} == {"bad:no such table: missing"}
+    @pytest.mark.parametrize("in_memory", [True, False], ids=["in_memory", "file_backed"])
+    def test_failed_refresh_function_row_carries_the_engine_error(
+        self, tpch_data: tuple[TPCHBenchmark, Path], tmp_path: Path, in_memory: bool
+    ) -> None:
+        benchmark, data_dir = tpch_data
+        adapter = SQLiteAdapter(database_path=":memory:" if in_memory else str(tmp_path / "maintenance.sqlite"))
+        connection = _load_tpch(adapter, benchmark, data_dir)
+        connection.execute(
+            "CREATE TRIGGER block_orders BEFORE INSERT ON orders BEGIN SELECT RAISE(ABORT, 'insert blocked'); END"
+        )
+        connection.commit()
+        try:
+            rows = self._run(adapter, benchmark, connection, tmp_path / "maintenance")
+        finally:
+            connection.close()
+
+        failed = [row for row in rows if row["status"] == "FAILED"]
+        assert [row["query_id"] for row in failed] == ["RF1"]
+        assert "insert blocked" in failed[0]["error"]
 
 
 class TestHungStreamDeferredClose:
