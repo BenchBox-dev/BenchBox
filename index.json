@@ -20720,10 +20720,15 @@
       "title": "Exercise the darwin-x86_64, linux-arm64 and windows-arm64 TPC-DS binaries in the identity check"
     },
     "tpcds-identity-windows-required": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-06T19:13:19Z",
+        "generation": "9ad6abcd2bd545adb1d6d659370f7d6f",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Decide whether the Windows TPC-DS identity comparison becomes a failing check"
     },
     "tpcds-informational-key-audit-redshift-snowflake-databricks-20261004": {
