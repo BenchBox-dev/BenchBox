@@ -29,8 +29,18 @@ from types import ModuleType
 
 import pytest
 
-from _project.scripts.explorer_pipeline.models import canonical_phase, ranking_exclusion_reason
+from _project.scripts.explorer_pipeline import transformer as explorer_transformer
+from _project.scripts.explorer_pipeline.models import (
+    _PHASE_ALIASES,
+    APPLIED_TUNING_STATUSES,
+    RANKING_METRIC_BY_FAMILY,
+    UNOFFICIAL_COMPLIANCE_CLASSES,
+    canonical_phase,
+    ranking_exclusion_reason,
+)
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
+from benchbox.core.results.status import NON_CLEAN_TRANSLATION_STATUSES, NON_CLEAN_VALIDATION_STATUSES
+from benchbox.core.tuning.modes import MODES
 from tests.unit.scripts.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
@@ -895,3 +905,20 @@ def test_every_committed_bundle_declares_a_phase() -> None:
     ]
 
     assert not undeclared
+
+
+def test_copied_constants_match_their_explorer_sources() -> None:
+    validator = _load_validator()
+
+    assert {
+        name for name, config in RANKING_METRIC_BY_FAMILY.items() if config.primary_metric == "power_score"
+    } == validator.POWER_SCORE_BENCHMARKS
+    assert set(MODES) == validator.CANONICAL_TUNING_MODES
+    assert set(APPLIED_TUNING_STATUSES) == validator.APPLIED_TUNING_STATUSES
+    assert validator.KNOWN_LOGICAL_QUERY_COUNTS == explorer_transformer._KNOWN_LOGICAL_QUERY_COUNTS
+    assert validator.PASS_STATUSES == explorer_transformer._PASS_STATUSES
+    assert validator.EXECUTION_RUN_TYPES == explorer_transformer._ALLOWED_EXECUTION_RUN_TYPES
+    assert validator.NON_CLEAN_VALIDATION_STATUSES == NON_CLEAN_VALIDATION_STATUSES
+    assert validator.NON_CLEAN_TRANSLATION_STATUSES == NON_CLEAN_TRANSLATION_STATUSES
+    assert validator.UNOFFICIAL_COMPLIANCE_CLASSES == UNOFFICIAL_COMPLIANCE_CLASSES
+    assert validator.PHASE_ALIASES == _PHASE_ALIASES

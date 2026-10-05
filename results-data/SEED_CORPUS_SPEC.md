@@ -30,9 +30,29 @@ declared type it is the executed phase in `phases` (a phase recorded as `NOT_RUN
 did not run), and without either it is its own `unknown` cohort. Other declared
 phases such as `combined` stay separate cohorts.
 
-Only bundles the Explorer can rank contribute an identity: no failed queries, a
-clean validation status (a `passed` status with failed queries or a translation
-fallback does not count), and a compliance class that is not `unofficial_*`.
+Only bundles the Explorer can rank contribute an identity. `exclusion_reason` in
+`results-data/validate_corpus.py` is the source of truth; it mirrors the Explorer's
+`ranking_exclusion_reason`, and a bundle counts only when it returns no reason. It applies
+these conditions, in order:
+
+1. The compliance class is not `unofficial_nonstandard` or `unofficial_subscale`.
+2. No measurement query failed.
+3. The validation status is clean. A `passed` or missing status with failed queries is
+   `partial`, and one with a failed or fallback SQL translation is `uncertain`.
+4. A `custom` tuning mode has applied tuning evidence (`applied_unverified` or
+   `applied_verified`).
+5. The timing and coverage contract holds: at least two queries with a valid positive
+   display timing, covering at least half of the logical queries.
+6. The benchmark's primary metric is present, finite and positive. TPC-H and TPC-DS rank on
+   `power_score` (from `power_at_size`, `qphh_at_size` or `qphds_at_size`); other
+   benchmarks rank on the geometric mean of display timings.
+
+Trust label and visibility come from where a bundle is published, not from its content,
+so the validator does not check them.
+
+TPC-H and TPC-DS throughput cohorts cannot be ranked today, because the Explorer ranks those
+benchmarks on `power_score` and throughput bundles do not carry one. Such cohorts are
+reported as `UNRANKED`.
 
 The depth gate applies to cohorts that publish a ranking:
 
@@ -134,9 +154,10 @@ admission behavior.
 
 ### Execution phases
 
-All seed-corpus runs use `--phases generate,load,power`. Throughput and
-maintenance are excluded to keep CI runtime bounded and to standardize the
-comparison surface on single-stream power timings.
+Scheduled seed-corpus runs use `--phases generate,load,power`. Throughput and
+maintenance are excluded from those runs to keep CI runtime bounded and to standardize
+the comparison surface on single-stream power timings. Throughput bundles can still be
+committed; they form their own cohorts as described under the depth requirement.
 
 ## Storage Layout
 
