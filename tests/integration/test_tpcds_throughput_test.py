@@ -399,9 +399,7 @@ class TestThroughputTest:
         assert result.config.scale_factor == throughput_test_config.scale_factor
 
 
-class TestSuccessGateConfigurable:
-    """Cover the legacy per-stream threshold and strict run-level gate."""
-
+class TestStreamSuccessRequiresNoFailedQuery:
     def test_finalize_stream_success_ignores_legacy_threshold_when_a_query_failed(self, tpcds_benchmark):
         test = TPCDSThroughputTest(benchmark=tpcds_benchmark)
 
