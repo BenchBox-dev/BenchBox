@@ -3,9 +3,8 @@
 Status: approved
 Approval: approved
 
-This record is the cutover gate for the Astro site. The cutover may not start
-until the owner reviews the URL compatibility report below and replaces both
-pending lines above with an approval. Nothing here is approved yet.
+This record is the cutover gate for the Astro site. The owner reviewed the URL
+compatibility report below and set both pending lines above to approved.
 
 ## How the report is produced
 
@@ -121,4 +120,4 @@ different SHA, voids the approval.
 
 - Cutover base SHA: 172276a3216c6d76b15ec90ab7b9f2bc2d303c63
 - Re-run result: PASS (site-parity, CI run 37360524148, job 111933957845)
-- Re-run approval: approved
+- Re-run approval: approved (joeharris76, 2026-10-05)
