@@ -80,11 +80,10 @@ a PR's mergeability — both only alert.
 
 - **Soundness-drain daily digest**
   (`_project/scripts/soundness_drain_report.py`, scheduled via a daily
-  workflow) — for PRs that correctly never get auto-merge because they
-  touch a soundness-critical path (or have the owner as a requested
-  reviewer): flags ones parked more than 24h since their required lane
-  went green, so they don't sit forgotten accumulating conflicts while
-  waiting on the owner's manual review and merge.
+  workflow) — for PRs that touch a soundness-critical path (or have the
+  owner as a requested reviewer): flags ones parked more than 24h since
+  their required lane went green, so they don't sit forgotten accumulating
+  conflicts while waiting on the review that `oracle-review` requires.
 - **Green-unmerged nightly sweep**
   (`_project/scripts/green_unmerged_sweep.py`,
   `.github/workflows/nightly.yml`) — alerts only on **true stranding**:
