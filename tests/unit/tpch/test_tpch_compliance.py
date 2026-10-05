@@ -159,9 +159,9 @@ class TestTPCHCompliance:
         stream_1_queries = []
 
         def capture_queries_stream_0(query_id, **kwargs):
-            if kwargs.get("stream_id") == 0:
+            if kwargs["params"]["stream_id"] == 0:
                 stream_0_queries.append(query_id)
-            elif kwargs.get("stream_id") == 1:
+            elif kwargs["params"]["stream_id"] == 1:
                 stream_1_queries.append(query_id)
             return f"SELECT {query_id}"
 

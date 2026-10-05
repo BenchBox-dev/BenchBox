@@ -110,6 +110,7 @@ class TPCHThroughputTest:
         scale_factor: float = 1.0,
         num_streams: int = 2,
         verbose: bool = False,
+        dialect: Optional[str] = None,
     ) -> None:
         """Initialize TPC-H Throughput Test.
 
@@ -119,9 +120,11 @@ class TPCHThroughputTest:
             scale_factor: Scale factor for the benchmark
             num_streams: Number of concurrent streams
             verbose: Enable verbose logging
+            dialect: Target SQL dialect used to translate every stream query
         """
         self.benchmark = benchmark
         self.connection_factory = connection_factory
+        self.target_dialect = dialect
         self.config = TPCHThroughputTestConfig(scale_factor=scale_factor, num_streams=num_streams, verbose=verbose)
 
         self.logger = logging.getLogger(__name__)
@@ -255,14 +258,7 @@ class TPCHThroughputTest:
             for position, query_id in enumerate(query_permutation):
                 stream_seed = _derive_query_seed(seed, stream_id, position)
                 try:
-                    sql_list.append(
-                        self.benchmark.get_query(
-                            query_id,
-                            seed=stream_seed,
-                            stream_id=stream_id,
-                            scale_factor=config.scale_factor,
-                        )
-                    )
+                    sql_list.append(self._get_stream_query(query_id, stream_seed, stream_id, config.scale_factor))
                 except Exception as exc:  # noqa: BLE001 - deferred to per-query fault isolation
                     sql_list.append(exc)
             return stream_id, sql_list
@@ -279,6 +275,17 @@ class TPCHThroughputTest:
                 stream_queries[stream_id] = sql_list
 
         return stream_queries
+
+    def _get_stream_query(self, query_id: int, stream_seed: int, stream_id: int, scale_factor: float) -> str:
+        from benchbox.core.tpch.streams import TPCHStreams
+
+        return self.benchmark.get_query(
+            query_id,
+            seed=stream_seed,
+            params={"stream_id": stream_id % len(TPCHStreams.PERMUTATION_MATRIX)},
+            scale_factor=scale_factor,
+            dialect=self.target_dialect,
+        )
 
     def _resolve_query_text(
         self,
@@ -304,12 +311,7 @@ class TPCHThroughputTest:
         # Fall back to inline generation (_execute_stream called directly,
         # bypassing run()'s pre-generation pass).
         stream_seed = _derive_query_seed(seed, stream_id, position)
-        return self.benchmark.get_query(
-            query_id,
-            seed=stream_seed,
-            stream_id=stream_id,
-            scale_factor=config.scale_factor,
-        )
+        return self._get_stream_query(query_id, stream_seed, stream_id, config.scale_factor)
 
     def _resolve_cancel_event(self, config: TPCHThroughputTestConfig, stream_id: int) -> Optional[threading.Event]:
         """Return this stream's cooperative-cancel event, if any.
