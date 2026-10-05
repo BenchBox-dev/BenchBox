@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Before you upgrade
+
+- **Tuning maintenance runs after the load.** ClickHouse `OPTIMIZE TABLE ...
+  FINAL`, Redshift `ANALYZE` and `VACUUM`, Databricks Delta `OPTIMIZE` and
+  `ANALYZE`, and Snowflake `RESUME RECLUSTER` ran before any data was loaded,
+  on empty tables. They now run after each table loads. ClickHouse `OPTIMIZE`
+  is off unless you set the `optimize_after_load` platform option to `true`.
+  Redshift keeps its existing isolated `VACUUM` and `ANALYZE` pass over every
+  loaded table, so the tuning step adds an `ANALYZE` only when `auto_analyze`
+  is off. Databricks does not repeat its load-time `OPTIMIZE` on a table the
+  tuning step already optimized. A load-only run (`--phases generate,load`)
+  does not run Redshift's isolated pass, so it no longer vacuums tuned tables;
+  the next benchmark run does.
+  Data-loading time, in total and per table, excludes this maintenance; its
+  time is reported as `phases.post_load_maintenance`.
+- **ClickHouse primary keys and tuned sort keys.** With a tuned sort key,
+  `primary_keys.enabled: false` now takes effect and emits no `PRIMARY KEY`
+  clause. Before, it was ignored and a date-first sort key such as
+  `(O_ORDERDATE, O_ORDERKEY)` stopped schema creation with a ClickHouse error.
+  An enabled primary key that is not a prefix of the tuned sort key now fails
+  before any table is created, with a message that says to put the key columns
+  first or disable `primary_keys`.
+
+### Added
+
+- **Curated ClickHouse tuning templates.** TPC-H, SSB, and TPC-DS ship tuned
+  templates for ClickHouse, so `--tuning tuned` there applies sort keys and
+  partitions instead of falling back to session settings.
+- **DataFrame tuned profiles.** `--tuning tuned` on Polars, pandas, and cuDF
+  now resolves the curated `examples/tunings/dataframe/<platform>_optimized.yaml`
+  profile and records mode `tuned`. Platforms without a profile, such as Dask,
+  still resolve to `tuned-fallback`.
+- **`benchbox tuning validate` accepts SQL tuning files.** For example,
+  `benchbox tuning validate examples/tunings/duckdb/tpch_tuned.yaml --platform
+  duckdb` checks the file against the platform's capabilities.
+- **Applied ledger `satisfied` list.** When a platform realizes a requested
+  sort through `ORDER BY` in `CREATE TABLE`, as ClickHouse and StarRocks do,
+  the ledger records it as satisfied by that statement instead of dropped.
+  Sorts that no executed statement realized are still dropped. This lets
+  ClickHouse tuned runs reach `applied_verified`.
+
+### Changed
+
+- **The `--tuning tuned` fallback names what each platform applies.** The
+  message said "using basic constraints" everywhere. It now says "engine
+  runtime defaults (streaming)" for Polars and "OLAP session pack" for
+  ClickHouse, for example.
+
 ## [0.4.2] - 2026-10-05
 
 ### Before you upgrade
