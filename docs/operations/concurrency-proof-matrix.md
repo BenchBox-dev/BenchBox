@@ -26,12 +26,12 @@ evidence named below.
 | Cancellation or lease loss never proves database work stopped | durable attempt to admission capacity | cancellation plus expired lease while the executor remains blocked | `tests/integration/mcp/test_durable_jobs.py` |
 | Unknown work retains capacity until a durable quiescence attestation | recovery and retention to replacement claim | retention expiry before and after worker quiescence | `tests/unit/mcp/test_durable_jobs.py`, `tests/integration/mcp/test_durable_jobs.py` |
 | Durable global and per-principal running caps hold across concurrent processes | claim transaction to shared SQLite state | two spawned processes claiming at a cap of one, globally and for one principal | `tests/integration/mcp/test_durable_jobs.py` (`test_multiprocess_claims_respect_global_running_limit`, `test_multiprocess_claims_respect_per_principal_running_limit`) |
-| Durable queue bounds hold across repository handles | submit and retry transactions to shared SQLite state | global and per-principal queue limits through separate handles in one process; not proven across processes | `tests/unit/mcp/test_durable_jobs.py` |
+| Durable queue bounds hold across repository handles | submit and retry transactions to shared SQLite state | global and per-principal queue limits, each through separate repository handles in one process; not proven across processes | `tests/unit/mcp/test_durable_jobs.py` |
 | A durable job stores and exposes a shared outcome derived from its result | result payload to job row and status tool | failed queries, failed phases, failed validation, no result, rejected request, quarantined outstanding work | `tests/unit/mcp/test_durable_jobs.py` (`test_job_stores_and_exposes_shared_outcome_derived_from_result`, `test_public_outcome_reports_non_terminal_and_quarantined_states`, `test_recovered_published_artifact_keeps_its_derived_outcome`) |
 | Outstanding throughput work is detected from the real result export shape and from the result object when both exports fail | result export to job worker | `phases.throughput_test.outstanding_work` payload; exporter and payload builder both failing | `tests/unit/mcp/test_run_response_outstanding_work.py` |
-| Leaked throughput work releases its capacity only when its futures finish | stream runner futures to worker attestation to claim admission | blocked stream future released after the job was quarantined; no observable handles | `tests/unit/mcp/test_durable_jobs.py` (`test_leaked_throughput_work_attests_quiescence_when_its_futures_finish`, `test_leaked_work_without_observable_handles_stays_quarantined`) |
+| Leaked throughput work releases its capacity only when its futures finish | stream runner futures to worker attestation to claim admission | blocked stream future released after the job was quarantined; no observable handles | `tests/unit/mcp/test_durable_jobs.py` (`test_leaked_throughput_work_attests_quiescence_when_its_futures_finish`, `test_leaked_work_without_observable_handles_stays_quarantined`, `test_leaked_work_quarantines_even_when_the_executor_raises_or_the_response_hides_it`, `test_quiescence_attestation_is_retried_and_logged_when_the_store_fails`) |
 | Recovery never deletes the staging directory of a fenced attempt that may still write | recovery fence to staging directory | expired lease with a live writer; purge before and after quiescence | `tests/unit/mcp/test_durable_jobs.py` (`test_recovery_leaves_fenced_attempt_staging_until_quiescence_and_purge`) |
-| The load-testing executor bounds its waits and times durations on the monotonic clock | stream futures to run result | stream blocked past the drain bound; query over its timeout; wall clock stepping backwards | `tests/unit/core/load_testing/test_executor.py` (`TestExecutorBoundedWaitsAndClocks`) |
+| The load-testing executor bounds its waits, stops abandoned streams between queries, reports them as outstanding, and times durations and latencies on the monotonic clock | stream futures to run result | stream blocked past the drain bound; query over its timeout; wall clock stepping backwards; non-positive timeout | `tests/unit/core/load_testing/test_executor.py` (`TestExecutorBoundedWaitsAndClocks`, `TestExecutorLatencyAndAbandonedStreams`) |
 | Fairness and per-principal FIFO do not depend on wall-clock order | durable enqueue and service sequences to claim selection | wall-clock rollback between submissions and claims | `tests/unit/mcp/test_durable_jobs.py` |
 | Capacity reporting does not expose another tenant's job identity | durable capacity state to MCP caller | two authenticated principals with quarantined work | `tests/integration/mcp/test_durable_jobs.py` |
 
@@ -74,17 +74,21 @@ operator response, or a production database adapter.
 ## Known fail-closed boundary
 
 An unknown attempt consumes durable capacity until its displaced worker attests
-quiescence. Two cases never attest, and BenchBox does not release the fence
+quiescence. Three cases never attest, and BenchBox does not release the fence
 merely because retention time elapsed:
 
 - The worker process dies after losing its lease and before it can attest.
+- The worker process restarts or exits while leaked futures are still running.
+  The attesting thread dies with the process and nothing else observes the
+  futures.
 - The job returned a result that reports outstanding throughput work and the
   worker holds no futures for it, for example a custom executor that does not
   go through `StreamRunner`.
 
-A worker that did observe the leaked futures attests from a background thread
-once they all finish, then removes the attempt's staging directory. Until
-then each such job holds one running slot for its principal and one global
+A worker that did observe the leaked futures, on a normal return or after the
+executor raised, attests from a background thread once they all finish, then
+removes the attempt's staging directory. Attestation is retried with backoff
+and failures are logged. Until then each such job holds one running slot for its principal and one global
 slot. No operator release path exists. A future one must obtain explicit
 termination evidence before it can release capacity; until then, manual
 resubmission is unsafe.
@@ -92,3 +96,17 @@ resubmission is unsafe.
 Staging directories of fenced attempts are not deleted at recovery. The
 displaced worker removes its own directory when it finishes, and the
 retention purge removes any leftover once the job is terminal.
+
+## Load-testing executor limit
+
+An abandoned load-testing stream stops only between queries. A query that never
+returns keeps its worker thread alive, and the standard library joins pool
+threads at interpreter exit, so a hung query can still delay process exit. The
+run result lists such streams in `outstanding_stream_ids` with
+`cleanup_state` set to `outstanding`.
+
+## Job outcome for rows written before the outcome field
+
+Job rows written before the `outcome` column existed have no stored outcome.
+For a completed row with a retained artifact the status tool derives the
+outcome from that artifact. Rows without an artifact report a null outcome.
