@@ -14158,10 +14158,15 @@
       "title": "Build Shared Infrastructure for Benchmarking PostgreSQL Extensions"
     },
     "postgres-throughput-uat-cell-unquarantine": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-06T22:35:14Z",
+        "generation": "7a718fde0a1443819c3f6bd37db82a32",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Postgres throughput UAT cell fails every night and is quarantined; capture logs, bound queries, restore gating"
     },
     "postgresql-code-quality-fixes": {
