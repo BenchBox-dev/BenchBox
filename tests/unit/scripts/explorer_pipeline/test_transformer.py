@@ -1224,7 +1224,6 @@ class TestExtendedManifestFields:
         assert entry.test_type is None
 
     def test_not_run_phase_block_does_not_infer_test_type(self, tmp_path: Path) -> None:
-        """A phase recorded as NOT_RUN is no evidence the phase ran."""
         data = copy.deepcopy(MINIMAL_BUNDLE)
         del data["benchmark"]["test_type"]
         data["phases"] = {

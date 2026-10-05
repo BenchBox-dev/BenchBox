@@ -65,7 +65,6 @@ def canonical_phase(raw: str | None) -> str:
 
     A missing test type is legacy/unknown evidence, not proof that a run is a
     power test. Keeping it in its own cohort prevents accidental aggregation.
-    ``standard`` is the single-stream power-like phase and shares its cohort.
     """
     normalized = (raw or "").strip().lower()
     if not normalized:

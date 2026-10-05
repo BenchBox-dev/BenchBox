@@ -307,7 +307,7 @@ export function canonicalBenchmarkSlug(raw: string): string {
   return normalized === "star_schema" ? "ssb" : normalized;
 }
 
-/** Stable phase identity; missing provenance is explicit and never guessed. `standard` is power. */
+/** Stable phase identity; missing provenance is explicit and never guessed. */
 export function canonicalPhase(raw: string | null | undefined): string {
   const normalized = (raw ?? "").trim().toLowerCase();
   if (!normalized) return "unknown";

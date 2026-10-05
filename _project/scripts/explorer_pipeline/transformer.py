@@ -814,9 +814,9 @@ def _test_type(bundle: BundleDocument) -> str | None:
     """Extract test type (power/throughput) from schema-v2 bundle."""
     if bundle.benchmark.test_type:
         return bundle.benchmark.test_type
-    # A present-but-empty phase block, or one marked NOT_RUN, carries no
-    # evidence the phase ran; truthiness on the unset-excluded dump matches
-    # the historical raw-mapping check.
+    # A present-but-empty phase block carries no evidence the phase ran;
+    # truthiness on the unset-excluded dump matches the historical
+    # raw-mapping check.
     if _phase_executed(bundle.phases.get("power_test")):
         return "power"
     if _phase_executed(bundle.phases.get("throughput_test")):

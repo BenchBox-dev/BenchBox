@@ -480,16 +480,21 @@ function addCanonicalBenchmarkClause(values: readonly string[], clauses: string[
 }
 
 /**
- * SQL mirror of `canonicalPhase()`: trim + lowercase, `standard` folded into
- * `power`, and null/blank folded into the `unknown` token. `matchesFacetKey` canonicalizes `test_type` in
+ * SQL mirror of `canonicalPhase()`: trim + lowercase, with null/blank folded
+ * into the `unknown` token. `matchesFacetKey` canonicalizes `test_type` in
  * memory, so a raw `test_type IN (?)` predicate here would silently disagree -
  * selecting the exposed `unknown` cohort would match no null-phase row, and a
  * `POWER`/`power` casing difference would drop rows the matcher accepts,
  * leaving the leaderboard empty or inconsistent with its own facet counts.
  */
-const CANONICAL_PHASE_SQL =
-  "CASE WHEN trim(lower(coalesce(test_type, ''))) = '' THEN 'unknown' " +
-  "WHEN trim(lower(test_type)) = 'standard' THEN 'power' ELSE trim(lower(test_type)) END";
+export function canonicalPhaseSql(column: string): string {
+  return (
+    `CASE WHEN trim(lower(coalesce(${column}, ''))) = '' THEN 'unknown' ` +
+    `WHEN trim(lower(${column})) = 'standard' THEN 'power' ELSE trim(lower(${column})) END`
+  );
+}
+
+const CANONICAL_PHASE_SQL = canonicalPhaseSql("test_type");
 
 function addCanonicalPhaseClause(values: readonly string[], clauses: string[], params: unknown[]) {
   if (values.length === 0) return;

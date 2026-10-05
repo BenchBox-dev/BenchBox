@@ -1316,9 +1316,6 @@ describe("BenchmarkIndex", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Phase guard: when only "throughput" phase is available, the page must
-  // request the "throughput" cohort (not the stale phaseFilter="power" default).
-  // -----------------------------------------------------------------------
 
   it("loads throughput-phase cohort when only throughput is available for the SF", async () => {
     const throughputRows = RESULT_ROWS.map((r) => ({ ...r, test_type: "throughput" }));
@@ -1332,8 +1329,6 @@ describe("BenchmarkIndex", () => {
       expect(new URL(window.location.href).searchParams.get("phase")).toBe("throughput"),
     );
 
-    // Verify the last benchmark_rankings call targets "throughput" (any earlier
-    // call may still use the default phase filter before results resolve).
     const rankingCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
       String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
     );

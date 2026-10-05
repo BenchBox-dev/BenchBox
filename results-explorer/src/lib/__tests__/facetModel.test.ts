@@ -7,6 +7,7 @@ import {
   FACET_URL_KEYS,
   FACET_URL_SERDES,
   HARDWARE_FACET_KEYS,
+  canonicalPhaseSql,
   facetsToWhereClause,
   normalizeFacetState,
   readFacetParam,
@@ -251,6 +252,10 @@ describe("facetsToWhereClause", () => {
       keys: ["phase"],
     });
     expect(rowMatches).toBe(true);
+  });
+
+  it("renders the canonical phase expression for any column", () => {
+    expect(canonicalPhaseSql("r.test_type")).toContain("trim(lower(r.test_type)) = 'standard' THEN 'power'");
   });
 
   it("folds the standard phase into power on both the SQL and in-memory sides", () => {
