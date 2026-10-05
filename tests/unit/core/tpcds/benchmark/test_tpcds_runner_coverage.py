@@ -278,64 +278,18 @@ def _routed_driver_result(**overrides):
     return SimpleNamespace(**values)
 
 
-def test_run_throughput_test_routes_to_supported_driver_with_deprecation(tpcds_benchmark, monkeypatch):
-    routed = Mock(return_value=_routed_driver_result())
-    monkeypatch.setattr("benchbox.core.tpcds.benchmark.runner.run_factory_throughput", routed)
+def _adapter(result=None):
+    adapter = Mock()
+    adapter._run_routed_throughput.return_value = result or _routed_driver_result()
+    return adapter
 
-    def factory():
-        return _Conn()
+
+def test_run_throughput_test_routes_through_the_adapter_with_deprecation(tpcds_benchmark):
+    adapter = _adapter()
+    connection = object()
+    factory = Mock()
 
     with pytest.warns(DeprecationWarning, match="TPCDSBenchmark.run_throughput_test is deprecated"):
-        result = tpcds_benchmark.run_throughput_test(factory, num_streams=2, base_seed=7, dialect="duckdb")
-
-    routed.assert_called_once()
-    assert routed.call_args.args == ("tpcds", tpcds_benchmark, factory)
-    assert routed.call_args.kwargs["scale_factor"] == tpcds_benchmark.scale_factor
-    assert routed.call_args.kwargs["num_streams"] == 2
-    assert routed.call_args.kwargs["base_seed"] == 7
-    assert routed.call_args.kwargs["dialect"] == "duckdb"
-    assert result.success is True
-    assert result.streams_executed == 2
-    assert result.streams_successful == 2
-    assert result.throughput_at_size == 50.0
-    assert result.total_duration == 2.5
-    assert result.stream_results[0]["queries_executed"] == 99
-    assert result.error is None
-
-
-def test_run_throughput_test_withholds_metric_when_a_stream_fails(tpcds_benchmark, monkeypatch):
-    failed = _routed_driver_result(
-        success=False, throughput_at_size=None, streams_successful=1, errors=["Stream 1 failed: boom"]
-    )
-    monkeypatch.setattr("benchbox.core.tpcds.benchmark.runner.run_factory_throughput", Mock(return_value=failed))
-
-    with pytest.warns(DeprecationWarning):
-        result = tpcds_benchmark.run_throughput_test(lambda: _Conn(), num_streams=2)
-
-    assert result.success is False
-    assert result.throughput_at_size is None
-    assert result.error == "Stream 1 failed: boom"
-
-
-def test_run_throughput_test_refuses_fewer_than_two_streams(tpcds_benchmark, monkeypatch):
-    routed = Mock()
-    monkeypatch.setattr("benchbox.core.tpcds.benchmark.runner.run_factory_throughput", routed)
-
-    with pytest.raises(ValueError, match="at least 2"):
-        tpcds_benchmark.run_throughput_test(lambda: _Conn(), num_streams=1)
-
-    routed.assert_not_called()
-
-
-def test_run_throughput_test_with_adapter_uses_the_adapter_gate_and_sessions(tpcds_benchmark, monkeypatch):
-    factory = Mock()
-    factory_route = Mock()
-    monkeypatch.setattr("benchbox.core.tpcds.benchmark.runner.run_factory_throughput", factory_route)
-    adapter = Mock()
-    adapter._run_routed_throughput.return_value = _routed_driver_result()
-    connection = object()
-
-    with pytest.warns(DeprecationWarning):
         result = tpcds_benchmark.run_throughput_test(
             factory, num_streams=3, base_seed=9, stream_timeout=120, adapter=adapter, connection=connection
         )
@@ -347,14 +301,80 @@ def test_run_throughput_test_with_adapter_uses_the_adapter_gate_and_sessions(tpc
     assert args[2]["num_streams"] == 3
     assert args[2]["seed"] == 9
     assert args[2]["stream_timeout_seconds"] == 120
+    assert "validation_mode" not in args[2]
     factory.assert_not_called()
-    factory_route.assert_not_called()
     assert result.success is True
+    assert result.streams_executed == 2
+    assert result.streams_successful == 2
+    assert result.throughput_at_size == 50.0
+    assert result.total_duration == 2.5
+    assert result.stream_results[0]["queries_executed"] == 99
+    assert result.error is None
+
+
+def test_run_throughput_test_forwards_disabled_validation(tpcds_benchmark):
+    adapter = _adapter()
+
+    with pytest.warns(DeprecationWarning):
+        tpcds_benchmark.run_throughput_test(
+            Mock(), num_streams=2, enable_validation=False, adapter=adapter, connection=object()
+        )
+
+    assert adapter._run_routed_throughput.call_args.args[2]["validation_mode"] == "disabled"
+
+
+def test_run_throughput_test_warns_about_options_that_no_longer_apply(tpcds_benchmark):
+    with pytest.warns(DeprecationWarning), pytest.warns(UserWarning, match="query_timeout, max_retries, output_dir"):
+        tpcds_benchmark.run_throughput_test(
+            Mock(),
+            num_streams=2,
+            query_timeout=10,
+            max_retries=0,
+            output_dir="out",
+            adapter=_adapter(),
+            connection=object(),
+        )
+
+
+def test_run_throughput_test_withholds_metric_when_a_stream_fails(tpcds_benchmark):
+    failed = _routed_driver_result(
+        success=False, throughput_at_size=None, streams_successful=1, errors=["Stream 1 failed: boom"]
+    )
+
+    with pytest.warns(DeprecationWarning):
+        result = tpcds_benchmark.run_throughput_test(
+            Mock(), num_streams=2, adapter=_adapter(failed), connection=object()
+        )
+
+    assert result.success is False
+    assert result.throughput_at_size is None
+    assert result.error == "Stream 1 failed: boom"
+
+
+def test_run_throughput_test_refuses_fewer_than_two_streams(tpcds_benchmark):
+    adapter = _adapter()
+
+    with pytest.raises(ValueError, match="at least 2"):
+        tpcds_benchmark.run_throughput_test(Mock(), num_streams=1, adapter=adapter, connection=object())
+
+    adapter._run_routed_throughput.assert_not_called()
+
+
+def test_run_throughput_test_without_an_adapter_fails_closed(tpcds_benchmark):
+    factory = Mock()
+
+    with (
+        pytest.warns(DeprecationWarning),
+        pytest.raises(TypeError, match=r"adapter=.*benchbox run --phases throughput"),
+    ):
+        tpcds_benchmark.run_throughput_test(factory, num_streams=2)
+
+    factory.assert_not_called()
 
 
 def test_run_throughput_test_with_adapter_requires_a_connection(tpcds_benchmark):
     with pytest.warns(DeprecationWarning), pytest.raises(ValueError, match="connection is required"):
-        tpcds_benchmark.run_throughput_test(lambda: _Conn(), num_streams=2, adapter=Mock())
+        tpcds_benchmark.run_throughput_test(Mock(), num_streams=2, adapter=_adapter())
 
 
 def test_adapter_gate_refusal_propagates_without_a_metric(tpcds_benchmark):
@@ -362,7 +382,7 @@ def test_adapter_gate_refusal_propagates_without_a_metric(tpcds_benchmark):
     adapter._run_routed_throughput.side_effect = RuntimeError("stream_connection_capability=UNSUPPORTED")
 
     with pytest.warns(DeprecationWarning), pytest.raises(RuntimeError, match="UNSUPPORTED"):
-        tpcds_benchmark.run_throughput_test(lambda: _Conn(), num_streams=2, adapter=adapter, connection=object())
+        tpcds_benchmark.run_throughput_test(Mock(), num_streams=2, adapter=adapter, connection=object())
 
 
 def test_run_power_test_withholds_power_at_size_when_any_query_fails(tpcds_benchmark, monkeypatch):
@@ -382,9 +402,23 @@ def test_official_run_hands_its_dialect_to_the_throughput_phase(tpcds_benchmark,
     monkeypatch.setattr(tpcds_benchmark, "run_power_test", lambda **kwargs: {"total_time": 1.0, "power_at_size": 1.0})
     monkeypatch.setattr(tpcds_benchmark, "run_throughput_test", routed)
 
-    tpcds_benchmark.run_official_benchmark(object(), maintenance_test=False, dialect="duckdb")
+    adapter = object()
+    connection = object()
+    tpcds_benchmark.run_official_benchmark(connection, maintenance_test=False, dialect="duckdb", adapter=adapter)
 
     assert routed.call_args.kwargs["dialect"] == "duckdb"
+    assert routed.call_args.kwargs["adapter"] is adapter
+    assert routed.call_args.kwargs["connection"] is connection
+
+
+def test_official_run_without_an_adapter_fails_closed_before_any_phase(tpcds_benchmark, monkeypatch):
+    power = Mock()
+    monkeypatch.setattr(tpcds_benchmark, "run_power_test", power)
+
+    with pytest.raises(TypeError, match=r"adapter=.*benchbox run --phases throughput"):
+        tpcds_benchmark.run_official_benchmark(object(), num_streams=2)
+
+    power.assert_not_called()
 
 
 def test_official_run_withholds_phase_metrics_for_failed_phases(tpcds_benchmark, monkeypatch):
@@ -397,12 +431,12 @@ def test_official_run_withholds_phase_metrics_for_failed_phases(tpcds_benchmark,
         lambda **kwargs: SimpleNamespace(throughput_at_size=None, success=False),
     )
 
-    result = tpcds_benchmark.run_official_benchmark(object(), maintenance_test=False)
+    result = tpcds_benchmark.run_official_benchmark(object(), maintenance_test=False, adapter=object())
 
     assert result["success"] is False
     assert result["power_at_size"] == 0.0
     assert result["throughput_at_size"] == 0.0
-    assert result["qphds_at_size"] == 0.0
+    assert "qphds_at_size" not in result
     assert any("Power@Size withheld" in error for error in result["errors"])
     assert any("Throughput@Size withheld" in error for error in result["errors"])
 
@@ -417,74 +451,6 @@ def _flaky_factory(failures):
         return _Conn()
 
     return factory
-
-
-def test_run_throughput_test_withholds_metric_when_a_stream_fails(tpcds_benchmark, monkeypatch):
-    monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
-
-    result = tpcds_benchmark.run_throughput_test(
-        connection_factory=_flaky_factory(1), num_streams=2, query_timeout=1, stream_timeout=10, max_retries=0
-    )
-
-    assert result.success is False
-    assert result.streams_successful == 1
-    assert result.throughput_at_size is None
-
-
-def test_run_throughput_test_withholds_metric_when_a_query_fails(tpcds_benchmark, monkeypatch):
-    monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
-
-    result = tpcds_benchmark.run_throughput_test(
-        connection_factory=lambda: _Conn(fail_on="SELECT 42"),
-        num_streams=1,
-        query_timeout=1,
-        stream_timeout=10,
-        max_retries=0,
-    )
-
-    assert result.success is False
-    assert result.throughput_at_size is None
-
-
-def test_run_throughput_test_window_excludes_connection_setup(tpcds_benchmark, monkeypatch):
-    import time
-
-    monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
-
-    def slow_factory():
-        time.sleep(0.3)
-        return _Conn()
-
-    result = tpcds_benchmark.run_throughput_test(
-        connection_factory=slow_factory, num_streams=1, query_timeout=1, stream_timeout=10, max_retries=0
-    )
-
-    assert result.success is True
-    assert result.total_duration < 0.15
-    assert result.stream_results[0]["duration"] < 0.15
-
-
-def test_run_official_benchmark_does_not_copy_a_withheld_throughput(tpcds_benchmark, monkeypatch):
-    monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
-    monkeypatch.setattr(tpcds_benchmark, "run_power_test", lambda **kwargs: {"total_time": 1.0, "power_at_size": 16.0})
-
-    result = tpcds_benchmark.run_official_benchmark(
-        connection=_Conn(), num_streams=2, maintenance_test=False, power_test=True, throughput_test=True
-    )
-    assert result["throughput_at_size"] > 0
-
-    monkeypatch.setattr(
-        tpcds_benchmark,
-        "run_throughput_test",
-        lambda **kwargs: SimpleNamespace(throughput_at_size=None, success=False),
-    )
-    result = tpcds_benchmark.run_official_benchmark(
-        connection=_Conn(), num_streams=2, maintenance_test=False, power_test=True, throughput_test=True
-    )
-
-    assert result["throughput_at_size"] == 0.0
-    assert result["success"] is False
-    assert any("withheld" in error for error in result["errors"])
 
 
 def test_run_power_test_collects_query_error(tpcds_benchmark, monkeypatch):
@@ -558,7 +524,7 @@ def test_run_official_benchmark_aggregates(tpcds_benchmark, monkeypatch):
         lambda **kwargs: SimpleNamespace(successful_operations=1, total_operations=1),
     )
 
-    result = tpcds_benchmark.run_official_benchmark(connection=_Conn(), num_streams=1)
+    result = tpcds_benchmark.run_official_benchmark(connection=_Conn(), num_streams=1, adapter=object())
     assert result["success"] is True
     assert result["power_at_size"] == 16.0
     assert result["throughput_at_size"] == 9.0

@@ -64,28 +64,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2-stream default. An explicit count below 2 is rejected when the run
   includes throughput. Saved runs that recorded 1 replay as not set.
 - **Legacy throughput APIs now run the supported drivers and are deprecated.**
-  `PlatformAdapter.run_throughput_test`, `TPCDSBenchmark.run_throughput_test`
-  and `TPCHOfficialBenchmark.run_official_benchmark` emit a
-  `DeprecationWarning` and run the same throughput drivers as `benchbox run`:
-  the dsqgen-based TPC-DS driver (per-stream seeds and permutations, no more
-  shuffled stream order) and the TPC-H driver. The adapter entry point refuses
-  platforms that cannot serve concurrent streams, opens one session per stream
-  and takes the shared connection as `connection`; a `connection_factory`
-  argument is rejected. All three refuse fewer than 2 streams, and none
-  reports Throughput@Size when a stream failed (`throughput_at_size` is
-  `None`). `TPCDSBenchmark.run_throughput_test` accepts `adapter=` and
-  `connection=` to use the adapter's gate and sessions; `query_timeout`,
-  `max_retries`, `enable_validation` and `output_dir` no longer have any
-  effect. Power@Size from `TPCDSBenchmark.run_power_test` is withheld when a
-  query fails.
+  `PlatformAdapter.run_throughput_test`, `TPCDSBenchmark.run_throughput_test`,
+  `TPCDSBenchmark.run_official_benchmark` and
+  `TPCHOfficialBenchmark.run_official_benchmark` emit a `DeprecationWarning`
+  and run the same throughput drivers as `benchbox run`: the dsqgen-based
+  TPC-DS driver (per-stream seeds and permutations, no more shuffled stream
+  order) and the TPC-H driver. The adapter entry point refuses platforms that
+  cannot serve concurrent streams, opens one session per stream and takes the
+  shared connection as `connection`; a `connection_factory` argument is
+  rejected. The other three now require `adapter=` and raise `TypeError`
+  without it, because a bare connection factory cannot be checked for safe
+  concurrent sessions; `TPCDSBenchmark.run_throughput_test` also needs
+  `connection=`. All of them refuse fewer than 2 streams, and none reports
+  Throughput@Size when a stream failed (`throughput_at_size` is `None`).
+  `query_timeout`, `max_retries` and `output_dir` on
+  `TPCDSBenchmark.run_throughput_test` no longer have any effect and warn when
+  you change them. Power@Size from `TPCDSBenchmark.run_power_test` is withheld
+  when a query fails.
 - **`TPCDSOfficialBenchmark` and `TPCHOfficialBenchmark` work end to end.**
   `TPCDSOfficialBenchmark` used scale factor 1 for the power and throughput
   tests whatever scale you configured; it now uses the configured scale, and
-  it publishes no Power@Size or QphDS@Size unless every power query succeeded.
+  it publishes no Power@Size unless every power query succeeded.
   `TPCHOfficialBenchmark` ran methods that `TPCHBenchmark` doesn't have and
   `TPCH.run_official_benchmark` failed with a `TypeError`; both now run the
-  TPC-H power, throughput and maintenance tests and compute QphH only from
-  complete phases.
+  TPC-H power, throughput and maintenance tests and report each metric only
+  from a complete phase.
 
 ### Added
 

@@ -82,7 +82,7 @@ class TestPowerPhaseOutcome:
 
         assert result.success is False
         assert result.power_at_size == 0.0
-        assert result.qphds_at_size == 0.0
+        assert not hasattr(result, "qphds_at_size")
         assert any("Power@Size withheld" in error for error in result.errors)
 
     def test_complete_power_phase_publishes_the_metric(self, tmp_path, phases):
@@ -91,7 +91,7 @@ class TestPowerPhaseOutcome:
         result = official.run_official_benchmark(lambda: Mock())
 
         assert result.power_at_size == 100.0
-        assert result.qphds_at_size == pytest.approx(80.0)
+        assert not hasattr(result, "qphds_at_size")
         assert result.errors == []
 
 

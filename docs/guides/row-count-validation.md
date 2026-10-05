@@ -255,7 +255,8 @@ The validation system is thread-safe for concurrent query execution:
 # Safe to run throughput tests with concurrent queries
 results = adapter.run_throughput_test(
     benchmark=benchmark,
-    num_streams=4  # 4 concurrent query streams
+    connection=connection,  # shared connection; each stream gets its own session
+    num_streams=4,  # 4 concurrent query streams
 )
 # Each stream can validate concurrently without conflicts
 ```

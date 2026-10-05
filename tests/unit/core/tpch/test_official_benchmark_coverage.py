@@ -53,24 +53,27 @@ def phases(monkeypatch):
     monkeypatch.setattr(f"{module}.TPCHBenchmark", FakeBenchmark)
     power = Mock()
     power.return_value.run.return_value = _power()
-    throughput = Mock(return_value=_throughput())
+    adapter = Mock()
+    adapter._run_routed_throughput.return_value = _throughput()
+    throughput = adapter._run_routed_throughput
     maintenance = Mock()
     maintenance.return_value.run_maintenance_test.return_value = _maintenance()
     monkeypatch.setattr(f"{module}.TPCHPowerTest", power)
-    monkeypatch.setattr(f"{module}.run_factory_throughput", throughput)
     monkeypatch.setattr(f"{module}.TPCHMaintenanceTest", maintenance)
-    return SimpleNamespace(power=power, throughput=throughput, maintenance=maintenance)
+    return SimpleNamespace(power=power, throughput=throughput, maintenance=maintenance, adapter=adapter)
 
 
-def _run(benchmark, **kwargs):
+def _run(benchmark, phases, **kwargs):
     with pytest.warns(DeprecationWarning, match="TPCHOfficialBenchmark.run_official_benchmark is deprecated"):
-        return benchmark.run_official_benchmark(connection_factory=FakeConnection, **kwargs)
+        return benchmark.run_official_benchmark(
+            connection_factory=FakeConnection, **{"adapter": phases.adapter, **kwargs}
+        )
 
 
 def test_run_official_benchmark_success(phases, tmp_path):
     benchmark = TPCHOfficialBenchmark(scale_factor=1.0, output_dir=tmp_path, verbose=False)
 
-    result = _run(benchmark)
+    result = _run(benchmark, phases)
 
     assert result.success is True
     assert result.power_at_size == 100.0
@@ -82,11 +85,11 @@ def test_run_official_benchmark_success(phases, tmp_path):
 def test_scale_factor_reaches_every_phase(phases, tmp_path):
     benchmark = TPCHOfficialBenchmark(scale_factor=0.5, output_dir=tmp_path, num_streams=3)
 
-    _run(benchmark)
+    _run(benchmark, phases)
 
     assert phases.power.call_args.kwargs["scale_factor"] == 0.5
-    assert phases.throughput.call_args.kwargs["scale_factor"] == 0.5
-    assert phases.throughput.call_args.kwargs["num_streams"] == 3
+    assert phases.throughput.call_args.args[2]["scale_factor"] == 0.5
+    assert phases.throughput.call_args.args[2]["num_streams"] == 3
     assert phases.maintenance.call_args.kwargs["scale_factor"] == 0.5
 
 
@@ -94,10 +97,10 @@ def test_seed_reaches_power_and_throughput(phases, tmp_path):
     config = TPCHOfficialBenchmarkConfig(scale_factor=0.01, seed=7, output_dir=tmp_path)
     benchmark = TPCHOfficialBenchmark(scale_factor=0.01, output_dir=tmp_path)
 
-    _run(benchmark, config=config)
+    _run(benchmark, phases, config=config)
 
     assert phases.power.call_args.kwargs["seed"] == 7
-    assert phases.throughput.call_args.kwargs["base_seed"] == 7
+    assert phases.throughput.call_args.args[2]["seed"] == 7
 
 
 def test_run_official_benchmark_collects_phase_errors(phases, tmp_path):
@@ -106,7 +109,7 @@ def test_run_official_benchmark_collects_phase_errors(phases, tmp_path):
     phases.maintenance.return_value.run_maintenance_test.side_effect = RuntimeError("maintenance fail")
     benchmark = TPCHOfficialBenchmark(scale_factor=1.0, output_dir=tmp_path, verbose=False)
 
-    result = _run(benchmark)
+    result = _run(benchmark, phases)
 
     assert result.success is False
     assert len(result.errors) == 3
@@ -126,7 +129,7 @@ def test_failed_or_partial_power_phase_publishes_no_metric(phases, tmp_path, pow
     phases.power.return_value.run.return_value = power
     benchmark = TPCHOfficialBenchmark(scale_factor=1.0, output_dir=tmp_path)
 
-    result = _run(benchmark)
+    result = _run(benchmark, phases)
 
     assert result.success is False
     assert result.power_at_size == 0.0
@@ -138,7 +141,7 @@ def test_failed_throughput_phase_publishes_no_metric(phases, tmp_path):
     phases.throughput.return_value = _throughput(success=False)
     benchmark = TPCHOfficialBenchmark(scale_factor=1.0, output_dir=tmp_path)
 
-    result = _run(benchmark)
+    result = _run(benchmark, phases)
 
     assert result.success is False
     assert result.throughput_at_size == 0.0
@@ -149,7 +152,7 @@ def test_failed_throughput_phase_publishes_no_metric(phases, tmp_path):
 def test_one_stream_is_refused_before_the_throughput_driver_runs(phases, tmp_path):
     benchmark = TPCHOfficialBenchmark(scale_factor=1.0, output_dir=tmp_path, num_streams=1)
 
-    result = _run(benchmark)
+    result = _run(benchmark, phases)
 
     phases.throughput.assert_not_called()
     assert result.success is False
@@ -160,7 +163,7 @@ def test_failed_maintenance_marks_the_run_failed(phases, tmp_path):
     phases.maintenance.return_value.run_maintenance_test.return_value = _maintenance(success=False)
     benchmark = TPCHOfficialBenchmark(scale_factor=1.0, output_dir=tmp_path)
 
-    result = _run(benchmark)
+    result = _run(benchmark, phases)
 
     assert result.success is False
     assert any("Maintenance Test failed" in err for err in result.errors)
@@ -170,28 +173,68 @@ def test_maintenance_is_refused_while_throughput_work_is_outstanding(phases, tmp
     phases.throughput.return_value = _throughput(success=False, outstanding=[1])
     benchmark = TPCHOfficialBenchmark(scale_factor=1.0, output_dir=tmp_path)
 
-    result = _run(benchmark)
+    result = _run(benchmark, phases)
 
     phases.maintenance.assert_not_called()
     assert any("Maintenance Test refused" in err for err in result.errors)
 
 
-def test_adapter_route_runs_throughput_through_the_adapter_gate(phases, tmp_path):
+def test_adapter_route_runs_throughput_with_the_factory_connection_as_the_shared_connection(phases, tmp_path):
     adapter = Mock()
     adapter._run_routed_throughput.return_value = _throughput(80.0)
-    connection = FakeConnection()
+    connection = Mock()
     benchmark = TPCHOfficialBenchmark(scale_factor=0.01, output_dir=tmp_path)
 
     with pytest.warns(DeprecationWarning):
         result = benchmark.run_official_benchmark(lambda: connection, adapter=adapter)
 
-    phases.throughput.assert_not_called()
     adapter._run_routed_throughput.assert_called_once()
     args = adapter._run_routed_throughput.call_args.args
     assert args[1] is connection
     assert args[2]["scale_factor"] == 0.01
     assert args[2]["num_streams"] == 2
     assert result.throughput_at_size == 80.0
+
+
+def test_power_and_shared_connections_are_closed(phases, tmp_path):
+    connections = []
+
+    def factory():
+        connection = Mock()
+        connections.append(connection)
+        return connection
+
+    benchmark = TPCHOfficialBenchmark(scale_factor=0.01, output_dir=tmp_path)
+
+    with pytest.warns(DeprecationWarning):
+        benchmark.run_official_benchmark(factory, adapter=phases.adapter)
+
+    assert len(connections) >= 2
+    assert connections[0].close.called
+    assert connections[1].close.called
+
+
+def test_missing_adapter_fails_closed_before_any_phase(phases, tmp_path):
+    benchmark = TPCHOfficialBenchmark(scale_factor=0.01, output_dir=tmp_path)
+
+    with (
+        pytest.warns(DeprecationWarning),
+        pytest.raises(TypeError, match=r"adapter=.*benchbox run --phases throughput"),
+    ):
+        benchmark.run_official_benchmark(FakeConnection)
+
+    phases.power.assert_not_called()
+
+
+def test_missing_adapter_is_allowed_when_throughput_is_disabled(phases, tmp_path):
+    benchmark = TPCHOfficialBenchmark(scale_factor=0.01, output_dir=tmp_path)
+    config = TPCHOfficialBenchmarkConfig(scale_factor=0.01, throughput_test_enabled=False, output_dir=tmp_path)
+
+    with pytest.warns(DeprecationWarning):
+        result = benchmark.run_official_benchmark(FakeConnection, config)
+
+    assert result.power_at_size == 100.0
+    phases.throughput.assert_not_called()
 
 
 def test_adapter_gate_refusal_withholds_the_throughput_metric(phases, tmp_path):
@@ -267,5 +310,6 @@ def test_generate_audit_trail_writes_file(monkeypatch, tmp_path):
     assert path.exists()
     content = path.read_text()
     assert "TPC-H Official Benchmark Audit Trail" in content
+    assert "Throughput@Size" in content
     assert "QphH" not in content
     assert "Power@Size: 10.00" in content

@@ -334,6 +334,8 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
     cfg = TPCDSOfficialBenchmarkConfig(scale_factor=1.0, num_streams=2, output_dir=tmp_path)
     official = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
     assert not hasattr(official, "qphds_at_size")
+    assert official.power_at_size == 100.0
+    assert official.throughput_at_size == 64.0
     assert ob.validate_compliance(official) is True
     audit = ob.generate_audit_trail(official)
     assert audit.exists()

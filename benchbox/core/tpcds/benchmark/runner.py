@@ -4,6 +4,7 @@ import dataclasses
 import logging
 import re
 import time
+import warnings
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -15,8 +16,8 @@ if TYPE_CHECKING:
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection as _DatabaseConnection
 from benchbox.core.throughput.entrypoints import (
+    require_adapter,
     require_stream_minimum,
-    run_factory_throughput,
     warn_legacy_throughput_api,
 )
 from benchbox.core.validation import (
@@ -24,7 +25,6 @@ from benchbox.core.validation import (
     DataValidationEngine,
     ValidationResult,
 )
-from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.file_format import get_delimiter_for_file
 from benchbox.utils.printing import emit
 from benchbox.utils.sql_parsing import find_matching_parenthesis
@@ -43,23 +43,12 @@ from .results import (
 
 
 def _execute_single_stream(stream_id: int, stream_file: Path) -> dict[str, Any]:
-    """Execute a single TPC-DS stream file and return result metrics.
-
-    Raises:
-        NotImplementedError: Always. This function never executed SQL against
-            a database -- it only counted ``-- Query`` comment lines in
-            ``stream_file`` and reported every query as successful, regardless
-            of the file's actual contents or any database connection. Use
-            :meth:`TPCDSBenchmark.run_throughput_test` for the production,
-            spec-compliant TPC-DS Throughput Test, which executes real
-            concurrent query streams against a real connection.
-    """
     raise NotImplementedError(
         f"_execute_single_stream (stream {stream_id}, {stream_file}) does not "
         "execute SQL. It previously faked success by counting '-- Query' "
         "comment lines in the stream file without running anything against a "
-        "database. Use TPCDSBenchmark.run_throughput_test() for real TPC-DS "
-        "Throughput Test execution."
+        "database. Use `benchbox run --phases throughput` (TPCDSThroughputTest) "
+        "for real TPC-DS throughput execution."
     )
 
 
@@ -997,32 +986,12 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         concurrent: bool = True,
         dialect: str = "standard",
     ) -> dict[str, Any]:
-        """Run TPC-DS streams against a database.
-
-        Args:
-            connection: Database connection object
-            stream_files: Optional list of stream files to run
-            concurrent: Whether to run streams concurrently or sequentially
-            dialect: SQL dialect (standard, postgres, mysql, etc.)
-
-        Raises:
-            NotImplementedError: Always. This method never executed real SQL
-                against ``connection`` -- both its "concurrent" branch (via
-                ``ConcurrentQueryExecutor``, since removed; see
-                adr-concurrency-public-api-reconciliation) and its
-                sequential branch bottomed out in ``_execute_single_stream``,
-                which only counted ``-- Query`` comment lines in each stream
-                file and reported every stream as successful. Use
-                :meth:`run_throughput_test` for the production, spec-compliant
-                TPC-DS Throughput Test, which executes real concurrent query
-                streams against a real connection.
-        """
         raise NotImplementedError(
             "TPCDSBenchmark.run_streams does not execute SQL against "
             "`connection`. It previously faked success by counting "
             "'-- Query' comment lines in stream files without running "
-            "anything. Use TPCDSBenchmark.run_throughput_test() for the "
-            "production, spec-compliant TPC-DS Throughput Test."
+            "anything. Use `benchbox run --phases throughput` "
+            "(TPCDSThroughputTest) for TPC-DS throughput runs."
         )
 
     def _load_data(self, connection: _DatabaseConnection) -> None:
@@ -1216,6 +1185,9 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         Raises:
             ValueError: If benchmark configuration is invalid
         """
+        if throughput_test:
+            require_adapter("TPCDSBenchmark.run_official_benchmark", adapter)
+
         logger = logging.getLogger(__name__)
         if self.verbose:
             logger.setLevel(logging.INFO)
@@ -1244,7 +1216,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         def connection_factory() -> Any:
             """Factory function to create database connections."""
-            return connection.cursor() if hasattr(connection, "cursor") else connection
+            return connection
 
         try:
             # Phase 1: Power Test
@@ -1405,6 +1377,24 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             raise ValueError(f"max_retries must be non-negative, got {max_retries}")
         require_stream_minimum(num_streams, "num_streams")
         warn_legacy_throughput_api("TPCDSBenchmark.run_throughput_test", "tpcds")
+        require_adapter("TPCDSBenchmark.run_throughput_test", adapter)
+        if connection is None:
+            raise ValueError("connection is required when adapter is given")
+        ignored = [
+            name
+            for name, differs in (
+                ("query_timeout", query_timeout != 300),
+                ("max_retries", max_retries != 3),
+                ("output_dir", output_dir is not None),
+            )
+            if differs
+        ]
+        if ignored:
+            warnings.warn(
+                f"{', '.join(ignored)} no longer has any effect on TPCDSBenchmark.run_throughput_test.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         config = ThroughputTestConfig(
             num_streams=num_streams,
@@ -1417,31 +1407,17 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             output_dir=Path(output_dir) if output_dir else None,
         )
         test_start_time = time.time()
-        if adapter is not None:
-            if connection is None:
-                raise ValueError("connection is required when adapter is given")
-            routed = adapter._run_routed_throughput(
-                self,
-                connection,
-                {
-                    "num_streams": num_streams,
-                    "seed": base_seed,
-                    "stream_timeout_seconds": stream_timeout,
-                    "verbose": self.verbose,
-                },
-            )
-        else:
-            routed = run_factory_throughput(
-                "tpcds",
-                self,
-                connection_factory,
-                scale_factor=self.scale_factor,
-                num_streams=num_streams,
-                base_seed=base_seed,
-                stream_timeout=stream_timeout,
-                verbose=self.verbose,
-                dialect=dialect,
-            )
+        routed = adapter._run_routed_throughput(
+            self,
+            connection,
+            {
+                "num_streams": num_streams,
+                "seed": base_seed,
+                "stream_timeout_seconds": stream_timeout,
+                "verbose": self.verbose,
+                **({} if enable_validation else {"validation_mode": "disabled"}),
+            },
+        )
         return ThroughputTestResult(
             config=config,
             start_time=test_start_time,

@@ -29,6 +29,7 @@ Generic query pipeline helpers (`_execute_power_test`,
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import signal
 from datetime import datetime
 from pathlib import Path
@@ -1682,7 +1683,13 @@ class TestDriversMixin:
         connection = options.pop("connection", None)
         if connection is None:
             raise ValueError("TPC benchmarks require a connection object for throughput tests")
-        return dict(vars(self._run_routed_throughput(benchmark, connection, options)))
+        result = self._run_routed_throughput(benchmark, connection, options)
+        return {
+            **vars(result),
+            "total_duration": result.total_time,
+            "stream_results": [dataclasses.asdict(stream) for stream in result.stream_results],
+            "error": "; ".join(result.errors) or None,
+        }
 
     def _run_routed_throughput(self, benchmark, connection: Any, options: dict[str, Any]) -> Any:
         if options.get("connection_factory") is not None:

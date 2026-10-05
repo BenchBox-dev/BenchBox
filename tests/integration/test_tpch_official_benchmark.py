@@ -2,7 +2,6 @@
 
 These tests verify the complete TPC-H benchmark workflow including:
 - Official benchmark execution
-- QphH@Size metric calculation
 - All three test phases (Power, Throughput, Maintenance)
 - Report generation and validation
 - Compliance checking
@@ -49,13 +48,14 @@ def phases(monkeypatch):
     module = "benchbox.core.tpch.official_benchmark"
     power = Mock()
     power.return_value.run.return_value = _power(100.0)
-    throughput = Mock(return_value=_throughput(200.0))
+    adapter = Mock()
+    adapter._run_routed_throughput.return_value = _throughput(200.0)
+    throughput = adapter._run_routed_throughput
     maintenance = Mock()
     maintenance.return_value.run_maintenance_test.return_value = Mock(success=True, errors=[])
     monkeypatch.setattr(f"{module}.TPCHPowerTest", power)
-    monkeypatch.setattr(f"{module}.run_factory_throughput", throughput)
     monkeypatch.setattr(f"{module}.TPCHMaintenanceTest", maintenance)
-    return SimpleNamespace(power=power, throughput=throughput, maintenance=maintenance)
+    return SimpleNamespace(power=power, throughput=throughput, maintenance=maintenance, adapter=adapter)
 
 
 @pytest.mark.filterwarnings("ignore:TPCHOfficialBenchmark.run_official_benchmark is deprecated:DeprecationWarning")
@@ -150,7 +150,7 @@ class TestTPCHOfficialBenchmark:
         """Test basic official benchmark execution."""
 
         # Run benchmark
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory)
+        result = benchmark_instance.run_official_benchmark(mock_connection_factory, adapter=phases.adapter)
 
         # Verify results
         assert isinstance(result, TPCHOfficialBenchmarkResult)
@@ -166,7 +166,7 @@ class TestTPCHOfficialBenchmark:
         self, benchmark_instance, mock_connection_factory, phases
     ):
         with pytest.warns(DeprecationWarning, match="TPC-H throughput driver"):
-            benchmark_instance.run_official_benchmark(mock_connection_factory)
+            benchmark_instance.run_official_benchmark(mock_connection_factory, adapter=phases.adapter)
 
     def test_run_official_benchmark_with_custom_config(self, benchmark_instance, mock_connection_factory, phases):
         """Test official benchmark with custom configuration."""
@@ -181,7 +181,9 @@ class TestTPCHOfficialBenchmark:
 
         phases.power.return_value.run.return_value = _power(150.0)
 
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory, config=custom_config)
+        result = benchmark_instance.run_official_benchmark(
+            mock_connection_factory, config=custom_config, adapter=phases.adapter
+        )
 
         assert result.success is True
         assert result.power_at_size == 150.0
@@ -257,6 +259,7 @@ class TestTPCHOfficialBenchmark:
             assert "TPC-H Official Benchmark Audit Trail" in content
             assert "Scale Factor: 0.01" in content
             assert "Number of Streams: 2" in content
+            assert "Throughput@Size:" in content
             assert "QphH" not in content
         finally:
             # Clean up the temp file
@@ -295,14 +298,17 @@ class TestTPCHOfficialBenchmark:
         assert "Power Test failed" in result.errors[0]
         assert "Database connection failed" in result.errors[0]
 
-    def test_component_metrics_pass_through_without_composite(self, benchmark_instance, mock_connection_factory, phases):
-        """Power@Size and Throughput@Size are reported as-is and no composite is derived."""
+    def test_phase_metrics_are_reported_and_no_combined_metric_is_computed(
+        self, benchmark_instance, mock_connection_factory, phases
+    ):
         for power, throughput in [(100.0, 400.0), (360.0, 480.0), (1000.0, 1000.0)]:
             phases.power.return_value.run.return_value = _power(power)
             phases.throughput.return_value = _throughput(throughput)
 
             config = TPCHOfficialBenchmarkConfig(maintenance_test_enabled=False)
-            result = benchmark_instance.run_official_benchmark(mock_connection_factory, config=config)
+            result = benchmark_instance.run_official_benchmark(
+                mock_connection_factory, config=config, adapter=phases.adapter
+            )
 
             assert result.power_at_size == power
             assert result.throughput_at_size == throughput
@@ -313,7 +319,9 @@ class TestTPCHOfficialBenchmark:
         phases.throughput.side_effect = Exception("Throughput failed")
 
         config = TPCHOfficialBenchmarkConfig(maintenance_test_enabled=False)
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory, config=config)
+        result = benchmark_instance.run_official_benchmark(
+            mock_connection_factory, config=config, adapter=phases.adapter
+        )
 
         # Should still return a result, but marked as failed
         assert result.success is False
@@ -327,7 +335,9 @@ class TestTPCHOfficialBenchmark:
         """Test that timing metrics are properly recorded."""
 
         config = TPCHOfficialBenchmarkConfig(maintenance_test_enabled=False)
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory, config=config)
+        result = benchmark_instance.run_official_benchmark(
+            mock_connection_factory, config=config, adapter=phases.adapter
+        )
 
         assert result.start_time is not None
         assert result.end_time is not None
@@ -340,7 +350,7 @@ class TestTPCHOfficialBenchmark:
         phases.power.return_value.run.return_value = _power(500.0)
         phases.throughput.return_value = _throughput(800.0)
 
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory)
+        result = benchmark_instance.run_official_benchmark(mock_connection_factory, adapter=phases.adapter)
 
         assert phases.power.return_value.run.called
         assert phases.throughput.called
@@ -352,11 +362,12 @@ class TestTPCHOfficialBenchmark:
         assert not hasattr(result, "qphh_at_size")
 
     def test_zero_metric_handling(self, benchmark_instance, mock_connection_factory, phases):
-        """Test handling when metrics are zero (cannot calculate QphH@Size)."""
         phases.power.return_value.run.return_value = _power(0.0)
 
         config = TPCHOfficialBenchmarkConfig(throughput_test_enabled=False, maintenance_test_enabled=False)
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory, config=config)
+        result = benchmark_instance.run_official_benchmark(
+            mock_connection_factory, config=config, adapter=phases.adapter
+        )
 
         assert result.power_at_size == 0.0
         assert result.throughput_at_size == 0.0

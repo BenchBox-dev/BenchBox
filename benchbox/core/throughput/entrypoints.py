@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable
 from typing import Any
 
 from benchbox.core.schemas import MIN_THROUGHPUT_STREAMS
-from benchbox.core.throughput.result import ThroughputResult, throughput_result_succeeded
+from benchbox.core.throughput.result import throughput_result_succeeded
 
 SUPPORTED_THROUGHPUT_DRIVERS = {
     "tpch": "the TPC-H throughput driver that `benchbox run` uses (TPCHThroughputTest)",
@@ -42,54 +41,11 @@ def warn_legacy_throughput_api(api: str, benchmark_type: str | None = None, *, s
     )
 
 
-def run_factory_throughput(
-    benchmark_type: str,
-    benchmark: Any,
-    connection_factory: Callable[[], Any],
-    *,
-    scale_factor: float,
-    num_streams: int,
-    base_seed: int | None = None,
-    stream_timeout: int | None = None,
-    query_subset: list[str] | None = None,
-    verbose: bool = False,
-    dialect: str | None = None,
-) -> ThroughputResult:
-    require_stream_minimum(num_streams, "num_streams")
-    options: dict[str, Any] = {"verbose": verbose}
-    if base_seed is not None:
-        options["base_seed"] = int(base_seed)
-    if stream_timeout is not None:
-        options["stream_timeout"] = int(stream_timeout)
-    if query_subset:
-        options["query_subset"] = [str(query_id) for query_id in query_subset]
-
-    if benchmark_type == "tpcds":
-        from benchbox.core.tpcds.throughput_test import TPCDSThroughputTest, TPCDSThroughputTestConfig
-
-        config = TPCDSThroughputTestConfig(scale_factor=scale_factor, num_streams=num_streams, **options)
-        driver = TPCDSThroughputTest(
-            benchmark=benchmark,
-            connection_factory=connection_factory,
-            scale_factor=scale_factor,
-            num_streams=num_streams,
-            verbose=verbose,
-            dialect=dialect,
+def require_adapter(api: str, adapter: Any) -> Any:
+    if adapter is None:
+        raise TypeError(
+            f"{api} needs adapter=<platform adapter> so the platform's stream capability gate and per-stream "
+            "sessions apply; without it every stream would share the caller's connection. "
+            "Pass adapter=, or run `benchbox run --phases throughput`."
         )
-    elif benchmark_type == "tpch":
-        from benchbox.core.tpch.throughput_test import TPCHThroughputTest, TPCHThroughputTestConfig
-
-        config = TPCHThroughputTestConfig(scale_factor=scale_factor, num_streams=num_streams, **options)
-        driver = TPCHThroughputTest(
-            benchmark=benchmark,
-            connection_factory=connection_factory,
-            scale_factor=scale_factor,
-            num_streams=num_streams,
-            verbose=verbose,
-        )
-    else:
-        raise ValueError(f"No supported throughput driver for benchmark type '{benchmark_type}'")
-
-    result = driver.run(config=config)
-    finalize_throughput_metrics(result, num_streams, config.query_subset)
-    return result
+    return adapter

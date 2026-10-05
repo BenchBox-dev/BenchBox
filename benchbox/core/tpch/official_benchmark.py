@@ -12,6 +12,7 @@ This implementation is based on the TPC-H specification.
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import contextlib
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -19,8 +20,8 @@ from typing import Any, Callable, Optional, Union
 
 from benchbox.core.throughput.containment import check_phase_boundary
 from benchbox.core.throughput.entrypoints import (
+    require_adapter,
     require_stream_minimum,
-    run_factory_throughput,
     warn_legacy_throughput_api,
 )
 from benchbox.core.tpc_patterns import generate_official_benchmark_audit_trail
@@ -66,6 +67,13 @@ class TPCHOfficialBenchmarkResult:
     errors: list[str]
     compliance_validated: bool = False
     audit_trail_saved: bool = False
+
+
+def _close_quietly(connection: Any) -> None:
+    close = getattr(connection, "close", None)
+    if callable(close):
+        with contextlib.suppress(Exception):
+            close()
 
 
 class TPCHOfficialBenchmark:
@@ -130,6 +138,8 @@ class TPCHOfficialBenchmark:
             config = self.config
 
         warn_legacy_throughput_api("TPCHOfficialBenchmark.run_official_benchmark", "tpch")
+        if config.throughput_test_enabled:
+            require_adapter("TPCHOfficialBenchmark.run_official_benchmark", adapter)
         benchmark_start = mono_time()
 
         result = TPCHOfficialBenchmarkResult(
@@ -150,13 +160,16 @@ class TPCHOfficialBenchmark:
             if config.power_test_enabled:
                 try:
                     connection = connection_factory()
-                    power_result = TPCHPowerTest(
-                        benchmark=self.benchmark,
-                        connection=connection,
-                        scale_factor=config.scale_factor,
-                        seed=config.seed,
-                        verbose=config.verbose,
-                    ).run()
+                    try:
+                        power_result = TPCHPowerTest(
+                            benchmark=self.benchmark,
+                            connection=connection,
+                            scale_factor=config.scale_factor,
+                            seed=config.seed,
+                            verbose=config.verbose,
+                        ).run()
+                    finally:
+                        _close_quietly(connection)
                     result.power_test_result = power_result
                     if power_result.success and power_result.queries_successful == power_result.queries_executed > 0:
                         result.power_at_size = power_result.power_at_size
@@ -171,10 +184,11 @@ class TPCHOfficialBenchmark:
             if config.throughput_test_enabled:
                 try:
                     require_stream_minimum(config.num_streams, "num_streams")
-                    if adapter is not None:
+                    shared_connection = connection_factory()
+                    try:
                         throughput_result = adapter._run_routed_throughput(
                             self.benchmark,
-                            connection_factory(),
+                            shared_connection,
                             {
                                 "num_streams": config.num_streams,
                                 "scale_factor": config.scale_factor,
@@ -182,16 +196,8 @@ class TPCHOfficialBenchmark:
                                 **({"seed": config.seed} if config.seed is not None else {}),
                             },
                         )
-                    else:
-                        throughput_result = run_factory_throughput(
-                            "tpch",
-                            self.benchmark,
-                            connection_factory,
-                            scale_factor=config.scale_factor,
-                            num_streams=config.num_streams,
-                            base_seed=config.seed,
-                            verbose=config.verbose,
-                        )
+                    finally:
+                        _close_quietly(shared_connection)
                     result.throughput_test_result = throughput_result
                     if throughput_result.success and throughput_result.throughput_at_size:
                         result.throughput_at_size = throughput_result.throughput_at_size

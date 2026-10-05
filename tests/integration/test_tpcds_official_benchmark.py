@@ -256,6 +256,7 @@ class TestTPCDSOfficialBenchmark:
             assert "TPC-DS Official Benchmark Audit Trail" in content
             assert "Scale Factor: 1.0" in content
             assert "Number of Streams: 4" in content
+            assert "Throughput@Size:" in content
             assert "QphDS" not in content
         finally:
             # Clean up the temp file

@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from benchbox.core.throughput.result import ThroughputResult
 from benchbox.platforms.base.connection_wrappers import StreamConnectionCapability
 from benchbox.platforms.base.execution import TestDriversMixin
 
@@ -92,6 +93,9 @@ class TestRoutesThroughTheSupportedDriver:
         assert result["streams_successful"] == 2
         assert result["throughput_at_size"] is not None
         assert len(driver.calls) == 44
+        assert result["total_duration"] == result["total_time"]
+        assert isinstance(result["stream_results"][0], dict)
+        assert result["error"] is None
 
     def test_stream_count_alias_is_honoured(self):
         driver = _Driver()
@@ -132,7 +136,14 @@ class TestRoutesThroughTheSupportedDriver:
 
         def fake_tpcds(benchmark, connection, run_config):
             seen.update(run_config)
-            driver._last_throughput_test_result = Mock(throughput_at_size=5.0, success=True)
+            driver._last_throughput_test_result = ThroughputResult(
+                start_time="s",
+                end_time="e",
+                total_time=1.0,
+                throughput_at_size=5.0,
+                streams_executed=2,
+                streams_successful=2,
+            )
             return []
 
         with patch.object(driver, "_execute_tpcds_throughput_test", fake_tpcds), pytest.warns(DeprecationWarning):
