@@ -13,6 +13,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import concurrent.futures
+import contextvars
 import logging
 import threading
 from dataclasses import dataclass, field
@@ -200,9 +201,7 @@ class TPCHThroughputTest:
                 self.logger.info(f"Successful streams: {result.streams_successful}/{config.num_streams}")
                 if config.num_streams > 0:
                     success_rate = result.streams_successful / config.num_streams
-                    self.logger.info(
-                        f"Stream success rate: {success_rate:.2%} (threshold: {config.min_success_rate:.2%})"
-                    )
+                    self.logger.info(f"Stream success rate: {success_rate:.2%}")
                 self.logger.info(f"Throughput@Size: {result.throughput_at_size:.2f}")
                 self.logger.info(f"Query throughput: {result.query_throughput:.2f} queries/sec")
 
@@ -269,7 +268,10 @@ class TPCHThroughputTest:
 
         max_workers = max(1, config.max_workers or config.num_streams)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(_generate_one_stream, sid) for sid in range(config.num_streams)]
+            futures = [
+                executor.submit(contextvars.copy_context().run, _generate_one_stream, sid)
+                for sid in range(config.num_streams)
+            ]
             for future in concurrent.futures.as_completed(futures):
                 stream_id, sql_list = future.result()
                 stream_queries[stream_id] = sql_list

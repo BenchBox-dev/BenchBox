@@ -28,6 +28,7 @@ from benchbox.core.validation.query_validation import (
 )
 from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection, require_throughput_stream_capability
 from benchbox.platforms.sqlite import SQLiteAdapter
+from benchbox.utils.dialect_utils import SQLTranslationError, sql_translation_context
 
 pytestmark = [
     pytest.mark.unit,
@@ -114,6 +115,48 @@ class TestTPCHThroughputDialect:
         config = TPCHThroughputTestConfig(scale_factor=0.01, num_streams=1, base_seed=_SEED)
 
         assert test._pregenerate_stream_queries(config) != untranslated._pregenerate_stream_queries(config)
+
+
+class TestTPCHPregenerationTranslationContext:
+    def test_pregeneration_records_one_outcome_per_stream_query(self) -> None:
+        benchmark = TPCHBenchmark(scale_factor=0.01)
+        test = TPCHThroughputTest(benchmark=benchmark, connection_factory=lambda: None, num_streams=3, dialect="sqlite")
+        config = TPCHThroughputTestConfig(scale_factor=0.01, num_streams=3, base_seed=_SEED)
+
+        with sql_translation_context(strict=False) as outcomes:
+            test._pregenerate_stream_queries(config)
+
+        assert len(outcomes) == 3 * 22
+        assert {outcome.status for outcome in outcomes} == {"success"}
+
+    def test_strict_translation_fails_the_query_when_pregeneration_falls_back(self) -> None:
+        benchmark = TPCHBenchmark(scale_factor=0.01)
+        test = TPCHThroughputTest(
+            benchmark=benchmark, connection_factory=lambda: None, num_streams=2, dialect="no_such_dialect"
+        )
+        config = TPCHThroughputTestConfig(scale_factor=0.01, num_streams=2, base_seed=_SEED)
+
+        with sql_translation_context(strict=True) as outcomes:
+            streams = test._pregenerate_stream_queries(config)
+
+        assert len(outcomes) == 2 * 22
+        assert {outcome.status for outcome in outcomes} == {"failed"}
+        assert all(isinstance(entry, SQLTranslationError) for sql_list in streams.values() for entry in sql_list)
+        with pytest.raises(SQLTranslationError):
+            test._resolve_query_text(streams[0], 0, 0, _SEED, 1, config)
+
+    def test_non_strict_translation_falls_back_and_records_the_fallback(self) -> None:
+        benchmark = TPCHBenchmark(scale_factor=0.01)
+        test = TPCHThroughputTest(
+            benchmark=benchmark, connection_factory=lambda: None, num_streams=1, dialect="no_such_dialect"
+        )
+        config = TPCHThroughputTestConfig(scale_factor=0.01, num_streams=1, base_seed=_SEED)
+
+        with sql_translation_context(strict=False) as outcomes:
+            streams = test._pregenerate_stream_queries(config)
+
+        assert {outcome.status for outcome in outcomes} == {"fallback"}
+        assert all(isinstance(entry, str) for entry in streams[0])
 
 
 class TestTPCDSStreamSeedValidationPolicy:
@@ -295,3 +338,36 @@ class TestStreamSeedOverrideWarning:
             QueryValidator().validate_query_result("tpcds", "1", 5, scale_factor=1.0, stream_id=0)
 
         assert [record for record in caplog.records if record.levelno == logging.WARNING] == []
+
+    def test_each_throughput_run_resets_the_once_only_record(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        monkeypatch.setenv("BENCHBOX_QUERY_VALIDATION_MODE", "exact")
+        monkeypatch.setattr(
+            "benchbox.core.tpcds.streams.generate_dsqgen_streams",
+            lambda **_kwargs: {0: [StreamQuery(stream_id=0, position=0, query_id=1, sql="SELECT 1")]},
+        )
+
+        class _Benchmark:
+            def translate_query_text(self, query: str, source_dialect: str, target_dialect: str) -> str:
+                return query
+
+        def run_once() -> None:
+            connection = sqlite3.connect(":memory:", check_same_thread=False)
+
+            def factory() -> PlatformAdapterConnection:
+                wrapper = PlatformAdapterConnection(connection, SQLiteAdapter(database_path=":memory:"))
+                wrapper.benchmark_type = "tpcds"
+                wrapper.scale_factor = 1.0
+                return wrapper
+
+            test = TPCDSThroughputTest(
+                benchmark=_Benchmark(), connection_factory=factory, scale_factor=1.0, num_streams=1, dialect="sqlite"
+            )
+            test.run(TPCDSThroughputTestConfig(scale_factor=1.0, num_streams=1, base_seed=7))
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.core.validation.query_validation"):
+            run_once()
+            run_once()
+
+        assert len([record for record in caplog.records if "stream-seeded" in record.getMessage()]) == 2
