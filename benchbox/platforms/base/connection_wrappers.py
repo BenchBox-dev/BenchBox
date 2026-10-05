@@ -267,6 +267,9 @@ def require_throughput_stream_capability(adapter: Any, *, platform_name: str) ->
                 "override would fail on the first stream; fix the adapter (not the runner) by "
                 "overriding new_stream_connection() per the StreamConnectionCapability contract."
             )
+    ensure_supported = getattr(adapter, "ensure_stream_sessions_supported", None)
+    if callable(ensure_supported):
+        ensure_supported()
     return capability
 
 

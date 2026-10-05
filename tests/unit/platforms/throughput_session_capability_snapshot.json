@@ -361,7 +361,7 @@
   },
   "sqlite": {
     "adapter": "benchbox.platforms.sqlite.SQLiteAdapter",
-    "capability": "shared_cursor",
+    "capability": "independent_connection",
     "declaration_site": "benchbox.core.platform_manifest",
     "declared": true,
     "gate": "pass",
