@@ -478,3 +478,15 @@ def test_required_throughput_stream_count_reaches_the_browser_smoke_environment(
     assert result.exit_code() == 0
     assert seen_env
     assert all(env["E2E_REQUIRE_THROUGHPUT_STREAMS"] == "3" for env in seen_env)
+
+
+def test_bundle_execution_streams_parse_through_float_and_require_whole_numbers():
+    queries = [
+        {"stream": "2.0"},
+        {"stream": 1},
+        {"stream": "1.5"},
+        {"stream": "x"},
+        {"stream": None},
+        {"stream": 7, "run_type": "other"},
+    ]
+    assert explorer_smoke._bundle_execution_streams(queries) == {1, 2}

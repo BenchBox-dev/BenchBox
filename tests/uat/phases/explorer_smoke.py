@@ -334,9 +334,11 @@ def _bundle_execution_streams(queries: object) -> set[int]:
         if not isinstance(query, dict) or query.get("run_type") not in (None, "measurement", "warmup"):
             continue
         try:
-            streams.add(int(str(query.get("stream")).strip()))
+            stream = float(str(query.get("stream")).strip())
         except ValueError:
             continue
+        if stream.is_integer():
+            streams.add(int(stream))
     return streams
 
 

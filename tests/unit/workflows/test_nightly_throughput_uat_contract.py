@@ -103,8 +103,10 @@ def test_upload_steps_come_after_every_sweep_and_assert_step() -> None:
         assert next(index for index, name in enumerate(names) if name.startswith(prefix)) < upload_index
 
 
-def test_baseline_record_is_uploaded_with_long_retention() -> None:
+def test_baseline_record_is_uploaded_only_after_a_successful_duckdb_sweep() -> None:
     step = _step("Upload Throughput@Size baseline record")
+    assert _step("Run DuckDB throughput UAT cell")["id"] == "duckdb-sweep"
+    assert _condition(step) == "${{!cancelled()&&steps.duckdb-sweep.outcome=='success'}}"
     assert step["uses"].startswith(UPLOAD_ARTIFACT_PIN)
     assert step["with"]["path"].startswith("~/Developer/benchmark_runs/throughput-baseline")
     assert step["with"]["retention-days"] == 90
@@ -114,12 +116,27 @@ def test_baseline_record_is_uploaded_with_long_retention() -> None:
 def test_failure_signal_is_a_separate_status_independent_of_other_jobs() -> None:
     job = _jobs()["throughput-uat-signal"]
     assert job["needs"] == "throughput-uat"
-    assert "".join(str(job["if"]).split()) == "${{!cancelled()}}"
+    assert "".join(str(job["if"]).split()) == "${{always()}}"
     assert job["permissions"] == {"statuses": "write"}
     assert "continue-on-error" not in job
     run = "\n".join(str(step.get("run", "")) for step in job["steps"])
     assert 'context="nightly/throughput-uat"' in run
     assert "needs.throughput-uat.result" in yaml.safe_dump(job)
+
+
+def test_only_a_successful_job_publishes_a_success_status() -> None:
+    run = "\n".join(str(step.get("run", "")) for step in _jobs()["throughput-uat-signal"]["steps"])
+    assert run.count("state=success") == 1
+    assert "success) state=success ;;" in run
+    assert "cancelled) state=error ;;" in run
+    assert "*) state=failure ;;" in run
+
+
+def test_status_description_reports_the_quarantined_postgres_sweep_outcome() -> None:
+    assert _jobs()["throughput-uat"]["outputs"] == {"postgres_sweep_outcome": "${{ steps.postgres-sweep.outcome }}"}
+    assert _step("Run Postgres throughput UAT cell")["id"] == "postgres-sweep"
+    run = "\n".join(str(step.get("run", "")) for step in _jobs()["throughput-uat-signal"]["steps"])
+    assert "POSTGRES_SWEEP_OUTCOME" in run
 
 
 def test_postgres_cell_bounds_statements_so_one_query_cannot_consume_the_cell() -> None:

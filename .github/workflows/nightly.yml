@@ -977,6 +977,8 @@ jobs:
     # ~25 min headroom for checkout, deps, integration tests, Docker
     # startup/cleanup, and both assert steps.
     timeout-minutes: 80
+    outputs:
+      postgres_sweep_outcome: ${{ steps.postgres-sweep.outcome }}
     env:
       # Throughput@Size floor activation: repository configuration variables
       # flow into the DuckDB assert step below. Unset vars evaluate to empty,
@@ -1005,6 +1007,7 @@ jobs:
           uv run -- python -m pytest tests/integration -k "throughput and duckdb" -m integration --tb=short -v
 
       - name: Run DuckDB throughput UAT cell (TPC-H SF1, run-official --streams 3)
+        id: duckdb-sweep
         # Gated on the sweep's own exit code: the config's
         # `validator_clean_rate_floor: 1.0` plus the strict report exit
         # policy fail this step on any non-clean cell. The TPC-H
@@ -1019,6 +1022,7 @@ jobs:
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
 
       - name: "Run Postgres throughput UAT cell (TPC-H SF1, run-official --streams 3) (quarantine #2571)"
+        id: postgres-sweep
         # w4: the same stream-count contract on a client/server engine. Unlike
         # DuckDB's SHARED_CURSOR fast path, PostgreSQL opts into
         # INDEPENDENT_CONNECTION (a fresh connection per stream), so this cell
@@ -1058,7 +1062,7 @@ jobs:
           retention-days: 14
 
       - name: Upload Throughput@Size baseline record
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.duckdb-sweep.outcome == 'success' }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: throughput-baseline-duckdb-tpch-sf1-${{ github.run_id }}-${{ github.run_attempt }}
@@ -1069,7 +1073,7 @@ jobs:
   throughput-uat-signal:
     name: throughput-uat-signal
     needs: throughput-uat
-    if: ${{ !cancelled() }}
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -1079,16 +1083,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           THROUGHPUT_UAT_RESULT: ${{ needs.throughput-uat.result }}
+          POSTGRES_SWEEP_OUTCOME: ${{ needs.throughput-uat.outputs.postgres_sweep_outcome }}
         run: |
-          if [ "${THROUGHPUT_UAT_RESULT}" = "success" ]; then
-            state=success
-          else
-            state=failure
-          fi
+          case "${THROUGHPUT_UAT_RESULT}" in
+            success) state=success ;;
+            cancelled) state=error ;;
+            *) state=failure ;;
+          esac
           gh api "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="${state}" \
             -f context="nightly/throughput-uat" \
-            -f description="throughput-uat ${THROUGHPUT_UAT_RESULT}" \
+            -f description="throughput-uat ${THROUGHPUT_UAT_RESULT}; postgres cell (quarantined) ${POSTGRES_SWEEP_OUTCOME:-not run}" \
             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
   pyspark-tests:

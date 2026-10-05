@@ -422,24 +422,26 @@ def _write_cells(logs_dir: Path, rows: list[dict]) -> Path:
     return cells
 
 
-def _cell_row(result_path: Path | None, *, platform: str = "duckdb", scale: float = 1.0) -> dict:
+def _cell_row(
+    result_path: Path | None, *, platform: str = "duckdb", scale: float = 1.0, status: str = "passed"
+) -> dict:
     return {
         "platform": platform,
         "benchmark": "tpch",
         "scale": scale,
-        "status": "passed",
+        "status": status,
         "result_path": str(result_path) if result_path else None,
     }
 
 
-def _setup_cell(tmp_path: Path, payload: dict | str | None = None) -> str:
+def _setup_cell(tmp_path: Path, payload: dict | str | None = None, *, status: str = "passed") -> str:
     result_path = tmp_path / "results" / "tpch_sf1_duckdb_sql_x.json"
     result_path.parent.mkdir(parents=True)
     if isinstance(payload, str):
         result_path.write_text(payload, encoding="utf-8")
     else:
         result_path.write_text(json.dumps(payload if payload is not None else _good_result()), encoding="utf-8")
-    _write_cells(tmp_path / "logs" / "uat_throughput_duckdb_nightly_20261004", [_cell_row(result_path)])
+    _write_cells(tmp_path / "logs" / "uat_throughput_duckdb_nightly_20261004", [_cell_row(result_path, status=status)])
     return str(tmp_path / "logs" / "uat_throughput_duckdb_nightly_*" / "cells.jsonl")
 
 
@@ -627,3 +629,13 @@ def test_cli_assert_floor_observe_only_without_median(tmp_path: Path, monkeypatc
     assert main(_assert_argv(glob_pattern, "--evaluate-floor")) == 0
 
     assert "observe-only" in capsys.readouterr().out
+
+
+def test_cli_assert_records_no_baseline_when_the_sweep_cell_did_not_pass(tmp_path: Path, capsys):
+    glob_pattern = _setup_cell(tmp_path, status="failed")
+    out_dir = tmp_path / "baseline"
+
+    assert main(_assert_argv(glob_pattern, "--baseline-out", str(out_dir))) == 0
+
+    assert not out_dir.exists()
+    assert load_cell_result(glob_pattern, platform="duckdb", benchmark="tpch", scale=1).passed is False

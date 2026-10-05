@@ -661,26 +661,28 @@ floor failure never masks or replaces a wiring failure.
 Retention. Every green DuckDB run writes
 `throughput-baseline-duckdb-tpch-sf1-<run_id>-<attempt>.json` and uploads it
 as the artifact of the same name (90 days, the GitHub maximum). The record
-holds `throughput_at_size`, `throughput_duration_ms`, `cpu_model`,
-`cpu_count`, `runner_class` (CPU model slug plus vCPU count), runner OS and
-image, `run_id`, `run_attempt`, `commit_sha` and `recorded_at`. A run that
-fails any check writes no record, so the retained set is green runs only.
-Artifacts expire; a longer history needs a copy outside GitHub run data.
+holds `throughput_at_size`, `streams`, `cpu_model`, `cpu_count`,
+`runner_class` (CPU model slug plus vCPU count), `run_id`, `run_attempt` and
+`recorded_at`. Green means all of: the sweep step succeeded, the sweep's
+`cells.jsonl` row has `status: passed`, and the assert checks passed. The
+upload step runs only when the DuckDB sweep step's outcome is `success`, and
+the assert writes no record for a cell that did not pass. Artifacts expire; a
+longer history needs a copy outside GitHub run data.
 
-Median. `python -m tests.uat.throughput_baseline rolling-median --baseline-dir DIR
---platform duckdb --benchmark tpch --scale 1 [--runner-class C] [--window N]
-[--min-samples K]` reads downloaded records (nested artifact directories are
-fine) and prints the median of the latest N matching the runner class,
-defaulting to the current machine's class. The floor must never compare
-across classes.
+Median. `python -m tests.uat.throughput rolling-median --baseline-dir DIR
+--platform duckdb --benchmark tpch --scale 1 [--runner-class C] [--window N]`
+reads downloaded records (nested artifact directories are fine) and prints
+the median of the latest N matching the runner class, defaulting to the
+current machine's class. The floor must never compare across classes.
 
-Status: observe-only. The nightly assert still reads the explicit
+Status: observe-only, and the per-class median is computed but not yet used
+by the nightly assert. The assert still reads the explicit
 `THROUGHPUT_FLOOR_MEDIAN` repository variable when it is set; while it is
 unset the assert only reports each observed value (`::notice::`). That
 variable is a fixed absolute number and must not be set for a mixed runner
 fleet. Feeding the per-class median into the assert (download the retained
-artifacts, then compute the median) and fixing X and N are the remaining
-steps before the floor gates; they need baselines to accumulate first.
+artifacts, then compute the median) and fixing X and N belong to the later
+floor-activation change; they need baselines to accumulate first.
 
 Window length decision. The ten annotated nightlies from 2026-09-25 to
 2026-10-04 (73583, 74389, 74835, 75285, 75789, 79385, 92632, 96272, 97537,
