@@ -33,6 +33,13 @@ class QueryExecution:
     error: str | None = None
     rows_returned: int | None = None
     queue_wait_time: float = 0.0  # Time waiting in queue before execution
+    duration_seconds: float | None = None
+
+    @property
+    def latency_seconds(self) -> float:
+        if self.duration_seconds is not None:
+            return self.duration_seconds
+        return self.end_time - self.start_time
 
 
 @dataclass
@@ -113,6 +120,10 @@ class ConcurrentLoadConfig:
     track_queue_times: bool = True
     """Whether to track time queries spend waiting in queue."""
 
+    def __post_init__(self) -> None:
+        if not self.query_timeout_seconds > 0:
+            raise ValueError("query_timeout_seconds must be greater than zero")
+
 
 @dataclass
 class ConcurrentLoadResult:
@@ -146,6 +157,9 @@ class ConcurrentLoadResult:
     pattern_name: str = ""
     max_concurrency_reached: int = 0
 
+    outstanding_stream_ids: list[int] = field(default_factory=list)
+    cleanup_state: str = "complete"
+
     @property
     def success_rate(self) -> float:
         """Overall query success rate as a percentage."""
@@ -165,7 +179,7 @@ class ConcurrentLoadResult:
         latencies = []
         for stream in self.streams:
             for execution in stream.query_executions:
-                latencies.append(execution.end_time - execution.start_time)
+                latencies.append(execution.latency_seconds)
 
         if not latencies:
             return 0.0
@@ -198,6 +212,8 @@ class ConcurrentLoadExecutor:
         self._queue: deque[tuple[int, float]] = deque()  # (stream_id, enqueue_time)
         self._resource_samples: list[dict[str, float]] = []
         self._stop_monitoring = threading.Event()
+        self._stream_stops: dict[int, threading.Event] = {}
+        self._abandoned: dict[int, Future] = {}
 
     def run(self) -> ConcurrentLoadResult:
         """Execute the concurrent load test.
@@ -244,6 +260,7 @@ class ConcurrentLoadExecutor:
 
         # Calculate queue metrics
         queue_metrics = self._calculate_queue_metrics()
+        outstanding_stream_ids = sorted(stream_id for stream_id, future in self._abandoned.items() if not future.done())
 
         # Calculate resource metrics
         resource_metrics = self._calculate_resource_metrics()
@@ -263,6 +280,8 @@ class ConcurrentLoadExecutor:
             resource_metrics=resource_metrics,
             pattern_name=pattern.__class__.__name__,
             max_concurrency_reached=self._max_concurrency_reached,
+            outstanding_stream_ids=outstanding_stream_ids,
+            cleanup_state="outstanding" if outstanding_stream_ids else "complete",
         )
 
         logger.info(
@@ -364,6 +383,7 @@ class ConcurrentLoadExecutor:
                                 if self._config.track_queue_times:
                                     self._queue.append((stream_id, enqueue_time))
 
+                            self._stream_stops[stream_id] = threading.Event()
                             future = executor.submit(self._execute_stream, stream_id, enqueue_time, role)
                             futures[future] = (stream_id, role)
 
@@ -390,6 +410,8 @@ class ConcurrentLoadExecutor:
     def _record_stream_future(self, future: Future, stream_id: int, role: str, *, abandoned: bool = False) -> None:
         try:
             if abandoned:
+                self._stream_stops[stream_id].set()
+                self._abandoned[stream_id] = future
                 raise TimeoutError(
                     f"Stream {stream_id} did not finish within {self._stream_wait_seconds():g}s; worker abandoned"
                 )
@@ -454,6 +476,7 @@ class ConcurrentLoadExecutor:
         stream_start = mono_time()
         queue_wait = stream_start - enqueue_time if enqueue_time > 0 else 0
         query_factory = self._query_factory_for(role)
+        stop = self._stream_stops.setdefault(stream_id, threading.Event())
 
         # Remove from queue by identity: ThreadPoolExecutor does not start
         # streams in enqueue order, so head-of-queue removal strands entries.
@@ -470,6 +493,8 @@ class ConcurrentLoadExecutor:
 
             try:
                 for i in range(self._config.queries_per_stream):
+                    if stop.is_set():
+                        break
                     query_id, sql = query_factory(i)
                     query_start = time.time()
                     query_mono = mono_time()
@@ -477,7 +502,8 @@ class ConcurrentLoadExecutor:
                     try:
                         success, rows, error = self._config.execute_query(connection, sql)
                         query_end = time.time()
-                        if success and elapsed_seconds(query_mono) > self._config.query_timeout_seconds:
+                        query_seconds = elapsed_seconds(query_mono)
+                        if success and query_seconds > self._config.query_timeout_seconds:
                             success = False
                             error = f"Query exceeded the {self._config.query_timeout_seconds:g}s timeout"
 
@@ -492,6 +518,7 @@ class ConcurrentLoadExecutor:
                                 stream_id=stream_id,
                                 start_time=query_start,
                                 end_time=query_end,
+                                duration_seconds=query_seconds,
                                 success=success,
                                 error=error,
                                 rows_returned=rows,
@@ -501,6 +528,7 @@ class ConcurrentLoadExecutor:
 
                     except Exception as e:
                         query_end = time.time()
+                        query_seconds = elapsed_seconds(query_mono)
                         queries_failed += 1
                         executions.append(
                             QueryExecution(
@@ -508,6 +536,7 @@ class ConcurrentLoadExecutor:
                                 stream_id=stream_id,
                                 start_time=query_start,
                                 end_time=query_end,
+                                duration_seconds=query_seconds,
                                 success=False,
                                 error=str(e),
                                 queue_wait_time=queue_wait if i == 0 else 0,
