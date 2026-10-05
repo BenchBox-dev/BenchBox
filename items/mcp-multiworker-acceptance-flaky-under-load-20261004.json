@@ -2,7 +2,7 @@
   "acceptance": [
     "Either a reproduction and a fix with a test, or a recorded failed reproduction (N runs under load) and the item closed as not reproducible."
   ],
-  "context": "Source: local full-suite run during PR #2625 verification (2026-10-04). Related existing flake items: flaky-bigquery-credential-defaults-confirm-prompt.",
+  "context": "Source: local full-suite run during PR #2625 verification (2026-10-04). Related existing flake items: flaky-bigquery-credential-defaults-confirm-prompt. Reproduction (2026-10-05, worktree BenchBox.wt-mcp-flake @2dcdf3a5a): 30/30 measured runs of test_remote_contract_survives_alternating_workers passed under artificial load (CPU spinners + parallel pytest sessions, load avg 17-55; lock never bypassed) plus 24/24 load-session passes; source untouched. Full per-iteration log: /tmp/item17-runs.log; report: /tmp/pr-item17-body.md. No timing bound showed pressure (wait_for ~2s/transition, executor timeout=5 held with margin). Outcome: failed-reproduction per D14; finish with this record, no code change.",
   "description": "## Problem (one observation; weak evidence)\nDuring a full `pytest -m fast` run on a developer machine that was running several other test sessions, `tests/integration/mcp/test_multiworker_acceptance.py::test_remote_contract_survives_alternating_workers` failed. It passed when run alone immediately afterwards (29 s), and the same suite later passed. It has not been seen failing in CI. The cause is unknown (timing, port or worker reuse under load are guesses).\n\n## Change\nReproduce under artificial load (parallel runs); if it reproduces, find the timing assumption and fix or bound it; if it does not, close with the reproduction attempt recorded.\n\n## Guardrails (must preserve)\n- The test keeps its alternating-worker coverage.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
   "links": [
     "tests/integration/mcp/test_multiworker_acceptance.py"
@@ -15,6 +15,14 @@
       "op": "create",
       "op_id": "81abab43721d48a48d24995d87b24649",
       "session_id": "040d67d8304f4a3581f98a3300e36001"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680",
+      "at": "2026-10-05T21:17:11Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "94ff4164292a4d89abc634ae8fa06ec8",
+      "session_id": "886444b9f5294b15856d1f4489297eb4"
     }
   ]
 }
