@@ -31,38 +31,45 @@ def _throughput(value=64.0):
 def phases():
     with (
         patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as power,
-        patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest") as throughput,
         patch("benchbox.core.tpcds.maintenance_test.TPCDSMaintenanceTest") as maintenance,
     ):
         power.return_value.run.return_value = _power()
-        throughput.return_value.run.return_value = _throughput()
+        adapter = Mock()
+        adapter._run_routed_throughput.return_value = _throughput()
         maintenance.return_value.run.return_value = {"success": True}
-        yield SimpleNamespace(power=power, throughput=throughput, maintenance=maintenance)
+        yield SimpleNamespace(
+            power=power, throughput=adapter._run_routed_throughput, maintenance=maintenance, adapter=adapter
+        )
 
 
 def _official(tmp_path, scale_factor=0.01):
     return TPCDSOfficialBenchmark(scale_factor=scale_factor, output_dir=tmp_path, verbose=False)
 
 
+def _run(official, phases, factory=None, **kwargs):
+    with pytest.warns(DeprecationWarning, match="TPCDSOfficialBenchmark.run_official_benchmark is deprecated"):
+        return official.run_official_benchmark(factory or (lambda: Mock()), adapter=phases.adapter, **kwargs)
+
+
 class TestScaleFactor:
     def test_power_and_throughput_receive_the_configured_scale_factor(self, tmp_path, phases):
         official = _official(tmp_path, scale_factor=0.01)
 
-        result = official.run_official_benchmark(lambda: Mock())
+        result = _run(official, phases)
 
         assert phases.power.call_args.kwargs["scale_factor"] == 0.01
-        assert phases.throughput.call_args.kwargs["scale_factor"] == 0.01
+        assert phases.throughput.call_args.args[2]["scale_factor"] == 0.01
         assert result.success is True
 
     def test_explicit_config_scale_factor_wins(self, tmp_path, phases):
         official = _official(tmp_path, scale_factor=1.0)
         config = TPCDSOfficialBenchmarkConfig(scale_factor=10.0, num_streams=3, output_dir=tmp_path)
 
-        official.run_official_benchmark(lambda: Mock(), config=config)
+        _run(official, phases, config=config)
 
         assert phases.power.call_args.kwargs["scale_factor"] == 10.0
-        assert phases.throughput.call_args.kwargs["scale_factor"] == 10.0
-        assert phases.throughput.call_args.kwargs["num_streams"] == 3
+        assert phases.throughput.call_args.args[2]["scale_factor"] == 10.0
+        assert phases.throughput.call_args.args[2]["num_streams"] == 3
 
 
 class TestPowerPhaseOutcome:
@@ -78,7 +85,7 @@ class TestPowerPhaseOutcome:
         phases.power.return_value.run.return_value = power
         official = _official(tmp_path)
 
-        result = official.run_official_benchmark(lambda: Mock())
+        result = _run(official, phases)
 
         assert result.success is False
         assert result.power_at_size == 0.0
@@ -88,7 +95,7 @@ class TestPowerPhaseOutcome:
     def test_complete_power_phase_publishes_the_metric(self, tmp_path, phases):
         official = _official(tmp_path)
 
-        result = official.run_official_benchmark(lambda: Mock())
+        result = _run(official, phases)
 
         assert result.power_at_size == 100.0
         assert not hasattr(result, "qphds_at_size")
@@ -100,9 +107,55 @@ class TestStreamMinimum:
         official = _official(tmp_path)
         config = TPCDSOfficialBenchmarkConfig(scale_factor=0.01, num_streams=1, output_dir=tmp_path)
 
-        result = official.run_official_benchmark(lambda: Mock(), config=config)
+        result = _run(official, phases, config=config)
 
         phases.throughput.assert_not_called()
         assert result.success is False
         assert result.throughput_at_size == 0.0
         assert any("at least 2" in error for error in result.errors)
+
+
+class TestAdapterGate:
+    def test_missing_adapter_fails_closed_before_any_phase(self, tmp_path, phases):
+        official = _official(tmp_path)
+
+        with (
+            pytest.warns(DeprecationWarning),
+            pytest.raises(TypeError, match=r"adapter=.*benchbox run --phases throughput"),
+        ):
+            official.run_official_benchmark(lambda: Mock())
+
+        phases.power.assert_not_called()
+
+    def test_missing_adapter_is_allowed_when_throughput_is_disabled(self, tmp_path, phases):
+        official = _official(tmp_path)
+        config = TPCDSOfficialBenchmarkConfig(
+            scale_factor=0.01, throughput_test_enabled=False, maintenance_test_enabled=False, output_dir=tmp_path
+        )
+
+        with pytest.warns(DeprecationWarning):
+            result = official.run_official_benchmark(lambda: Mock(), config)
+
+        assert result.power_at_size == 100.0
+
+    def test_gate_refusal_withholds_the_throughput_metric(self, tmp_path, phases):
+        phases.throughput.side_effect = RuntimeError("stream_connection_capability=UNSUPPORTED")
+
+        result = _run(_official(tmp_path), phases)
+
+        assert result.success is False
+        assert result.throughput_at_size == 0.0
+        assert any("UNSUPPORTED" in error for error in result.errors)
+
+    def test_shared_connection_is_passed_to_the_adapter_and_closed(self, tmp_path, phases):
+        connections = []
+
+        def factory():
+            connection = Mock()
+            connections.append(connection)
+            return connection
+
+        _run(_official(tmp_path), phases, factory)
+
+        assert phases.throughput.call_args.args[1] in connections
+        assert phases.throughput.call_args.args[1].close.called

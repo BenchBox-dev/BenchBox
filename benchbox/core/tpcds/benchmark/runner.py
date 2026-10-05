@@ -1214,10 +1214,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "errors": [],
         }
 
-        def connection_factory() -> Any:
-            """Factory function to create database connections."""
-            return connection
-
         try:
             # Phase 1: Power Test
             if power_test:
@@ -1225,9 +1221,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
             # Phase 2: Throughput Test
             if throughput_test:
-                self._run_throughput_phase(
-                    connection_factory, num_streams, logger, result, adapter, connection, dialect
-                )
+                self._run_throughput_phase(num_streams, logger, result, adapter, connection, dialect)
 
             # Phase 3: Maintenance Test
             if maintenance_test:
@@ -1276,7 +1270,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     def _run_throughput_phase(
         self,
-        connection_factory: Any,
         num_streams: int,
         logger: logging.Logger,
         result: dict[str, Any],
@@ -1289,7 +1282,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             logger.info("Running Throughput Test...")
         try:
             throughput_result = self.run_throughput_test(
-                connection_factory=connection_factory,
                 num_streams=num_streams,
                 dialect=dialect,
                 adapter=adapter,
@@ -1354,7 +1346,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     def run_throughput_test(
         self,
-        connection_factory,
+        connection_factory=None,
         num_streams: int = 2,
         query_timeout: int = 300,
         stream_timeout: int = 3600,
@@ -1378,6 +1370,13 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         require_stream_minimum(num_streams, "num_streams")
         warn_legacy_throughput_api("TPCDSBenchmark.run_throughput_test", "tpcds")
         require_adapter("TPCDSBenchmark.run_throughput_test", adapter)
+        if connection_factory is not None:
+            warnings.warn(
+                "connection_factory is ignored by TPCDSBenchmark.run_throughput_test; "
+                "per-stream sessions come from adapter.",
+                UserWarning,
+                stacklevel=2,
+            )
         if connection is None:
             raise ValueError("connection is required when adapter is given")
         ignored = [

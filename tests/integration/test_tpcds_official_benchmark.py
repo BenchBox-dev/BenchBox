@@ -135,7 +135,6 @@ class TestTPCDSOfficialBenchmark:
         # Mock the internal components that would be used
         with (
             patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as mock_power_test,
-            patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest") as mock_throughput_test,
             patch("benchbox.core.tpcds.maintenance_test.TPCDSMaintenanceTest") as mock_maintenance_test,
         ):
             # Setup mocks
@@ -143,16 +142,16 @@ class TestTPCDSOfficialBenchmark:
             mock_power_instance.run.return_value = {"power_at_size": 100.0}
             mock_power_test.return_value = mock_power_instance
 
-            mock_throughput_instance = Mock()
-            mock_throughput_instance.run.return_value = {"throughput_at_size": 200.0}
-            mock_throughput_test.return_value = mock_throughput_instance
+            adapter = Mock()
+            adapter._run_routed_throughput.return_value = Mock(success=True, throughput_at_size=200.0)
 
             mock_maintenance_instance = Mock()
             mock_maintenance_instance.run.return_value = {"success": True}
             mock_maintenance_test.return_value = mock_maintenance_instance
 
             # Run benchmark
-            result = benchmark_instance.run_official_benchmark(mock_connection_factory)
+            with pytest.warns(DeprecationWarning):
+                result = benchmark_instance.run_official_benchmark(mock_connection_factory, adapter=adapter)
 
             # Verify results
             assert isinstance(result, TPCDSOfficialBenchmarkResult)

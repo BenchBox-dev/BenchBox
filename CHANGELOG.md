@@ -65,14 +65,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   includes throughput. Saved runs that recorded 1 replay as not set.
 - **Legacy throughput APIs now run the supported drivers and are deprecated.**
   `PlatformAdapter.run_throughput_test`, `TPCDSBenchmark.run_throughput_test`,
-  `TPCDSBenchmark.run_official_benchmark` and
+  `TPCDSBenchmark.run_official_benchmark`,
+  `TPCDSOfficialBenchmark.run_official_benchmark` and
   `TPCHOfficialBenchmark.run_official_benchmark` emit a `DeprecationWarning`
   and run the same throughput drivers as `benchbox run`: the dsqgen-based
   TPC-DS driver (per-stream seeds and permutations, no more shuffled stream
   order) and the TPC-H driver. The adapter entry point refuses platforms that
   cannot serve concurrent streams, opens one session per stream and takes the
   shared connection as `connection`; a `connection_factory` argument is
-  rejected. The other three now require `adapter=` and raise `TypeError`
+  rejected. The other four now require `adapter=` and raise `TypeError`
   without it, because a bare connection factory cannot be checked for safe
   concurrent sessions; `TPCDSBenchmark.run_throughput_test` also needs
   `connection=`. All of them refuse fewer than 2 streams, and none reports

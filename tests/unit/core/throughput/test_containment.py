@@ -231,13 +231,14 @@ class TestOfficialBenchmarkContainment:
         benchmark = self._official(tmp_path)
         with (
             patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as mock_power,
-            patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest") as mock_throughput,
             patch("benchbox.core.tpcds.maintenance_test.TPCDSMaintenanceTest") as mock_maintenance,
         ):
             mock_power.return_value.run.return_value = {"power_at_size": 100.0}
-            mock_throughput.return_value.run.return_value = self._outstanding_throughput_result()
+            adapter = Mock()
+            adapter._run_routed_throughput.return_value = self._outstanding_throughput_result()
 
-            result = benchmark.run_official_benchmark(lambda: Mock())
+            with pytest.warns(DeprecationWarning):
+                result = benchmark.run_official_benchmark(lambda: Mock(), adapter=adapter)
 
         mock_maintenance.assert_not_called()
         assert result.success is False
@@ -253,14 +254,15 @@ class TestOfficialBenchmarkContainment:
         failed.cleanup_state = "complete"
         with (
             patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as mock_power,
-            patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest") as mock_throughput,
             patch("benchbox.core.tpcds.maintenance_test.TPCDSMaintenanceTest") as mock_maintenance,
         ):
             mock_power.return_value.run.return_value = {"power_at_size": 100.0}
-            mock_throughput.return_value.run.return_value = failed
+            adapter = Mock()
+            adapter._run_routed_throughput.return_value = failed
             mock_maintenance.return_value.run.return_value = {"success": True}
 
-            result = benchmark.run_official_benchmark(lambda: Mock())
+            with pytest.warns(DeprecationWarning):
+                result = benchmark.run_official_benchmark(lambda: Mock(), adapter=adapter)
 
         mock_maintenance.assert_called_once()
         assert result.success is False
@@ -273,14 +275,15 @@ class TestOfficialBenchmarkContainment:
         healthy.throughput_at_size = 200.0
         with (
             patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as mock_power,
-            patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest") as mock_throughput,
             patch("benchbox.core.tpcds.maintenance_test.TPCDSMaintenanceTest") as mock_maintenance,
         ):
             mock_power.return_value.run.return_value = {"power_at_size": 100.0}
-            mock_throughput.return_value.run.return_value = healthy
+            adapter = Mock()
+            adapter._run_routed_throughput.return_value = healthy
             mock_maintenance.return_value.run.return_value = {"success": True}
 
-            result = benchmark.run_official_benchmark(lambda: Mock())
+            with pytest.warns(DeprecationWarning):
+                result = benchmark.run_official_benchmark(lambda: Mock(), adapter=adapter)
 
         assert result.success is True
         assert result.throughput_at_size == 200.0

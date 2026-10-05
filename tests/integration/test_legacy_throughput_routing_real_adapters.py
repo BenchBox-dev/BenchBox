@@ -7,6 +7,7 @@ import pytest
 
 from benchbox import TPCDS, TPCH
 from benchbox.core.tpcds.benchmark import TPCDSBenchmark
+from benchbox.core.tpcds.official_benchmark import TPCDSOfficialBenchmark, TPCDSOfficialBenchmarkConfig
 from benchbox.core.tpch.official_benchmark import TPCHOfficialBenchmark, TPCHOfficialBenchmarkConfig
 from benchbox.platforms.base.connection_wrappers import (
     StreamConnectionCapability,
@@ -120,6 +121,52 @@ class TestTPCHOfficialBenchmark:
         assert ran.success is True, ran.errors
 
 
+class TestTPCDSOfficialBenchmark:
+    def _config(self, directory):
+        return TPCDSOfficialBenchmarkConfig(
+            scale_factor=SCALE_FACTOR,
+            num_streams=2,
+            power_test_enabled=False,
+            maintenance_test_enabled=False,
+            output_dir=directory,
+        )
+
+    def _official(self, directory):
+        return TPCDSOfficialBenchmark(scale_factor=SCALE_FACTOR, output_dir=directory, dialect="duckdb")
+
+    def test_supported_adapter_runs_throughput_and_warns(self, tpcds_database, tmp_path):
+        adapter, _connection, path = tpcds_database
+
+        with pytest.warns(DeprecationWarning, match="TPCDSOfficialBenchmark.run_official_benchmark is deprecated"):
+            result = self._official(tmp_path).run_official_benchmark(
+                lambda: duckdb.connect(str(path)), self._config(tmp_path), adapter=adapter
+            )
+
+        assert result.success is True, result.errors
+        assert result.throughput_at_size > 0
+        assert result.throughput_test_result.config.scale_factor == SCALE_FACTOR
+        assert result.qphds_at_size == 0.0
+
+    def test_unsupported_adapter_is_refused_and_publishes_no_metric(
+        self, tpcds_database, unsupported_adapter, tmp_path
+    ):
+        _adapter, _connection, path = tpcds_database
+
+        result = self._official(tmp_path).run_official_benchmark(
+            lambda: duckdb.connect(str(path)), self._config(tmp_path), adapter=unsupported_adapter
+        )
+
+        assert result.success is False
+        assert result.throughput_at_size == 0.0
+        assert any("UNSUPPORTED" in error for error in result.errors)
+
+    def test_missing_adapter_is_refused(self, tpcds_database, tmp_path):
+        _adapter, _connection, path = tpcds_database
+
+        with pytest.raises(TypeError, match=r"adapter=.*benchbox run --phases throughput"):
+            self._official(tmp_path).run_official_benchmark(lambda: duckdb.connect(str(path)), self._config(tmp_path))
+
+
 class TestTPCDSBenchmarkThroughput:
     def _benchmark(self, directory):
         return TPCDSBenchmark(scale_factor=SCALE_FACTOR, output_dir=directory)
@@ -129,19 +176,31 @@ class TestTPCDSBenchmarkThroughput:
 
         with pytest.warns(DeprecationWarning, match="TPCDSBenchmark.run_throughput_test is deprecated"):
             result = self._benchmark(tmp_path).run_throughput_test(
-                lambda: None, num_streams=2, base_seed=7, adapter=adapter, connection=connection
+                num_streams=2, base_seed=7, adapter=adapter, connection=connection
             )
 
         assert result.success is True, result.error
         assert result.streams_successful == 2
         assert result.throughput_at_size > 0
 
+    def test_connection_factory_is_optional_and_warns_when_given(self, tpcds_database, tmp_path):
+        adapter, connection, _path = tpcds_database
+        benchmark = self._benchmark(tmp_path)
+
+        with pytest.warns(UserWarning, match="connection_factory is ignored"):
+            benchmark.run_throughput_test(lambda: None, num_streams=2, adapter=adapter, connection=connection)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            result = benchmark.run_throughput_test(num_streams=2, adapter=adapter, connection=connection)
+
+        assert result.success is True, result.error
+
     def test_unsupported_adapter_is_refused(self, tpcds_database, unsupported_adapter, tmp_path):
         _adapter, connection, _path = tpcds_database
 
         with pytest.raises(RuntimeError, match="UNSUPPORTED"):
             self._benchmark(tmp_path).run_throughput_test(
-                lambda: None, num_streams=2, adapter=unsupported_adapter, connection=connection
+                num_streams=2, adapter=unsupported_adapter, connection=connection
             )
 
     def test_missing_adapter_is_refused(self, tpcds_database, tmp_path):

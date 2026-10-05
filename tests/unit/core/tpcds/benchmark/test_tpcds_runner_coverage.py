@@ -613,9 +613,7 @@ def test_run_throughput_phase_records_errors(tpcds_benchmark, monkeypatch):
     monkeypatch.setattr(tpcds_benchmark, "run_throughput_test", Mock(side_effect=RuntimeError("throughput boom")))
     result = {"errors": [], "success": True, "throughput_at_size": 0.0}
 
-    tpcds_benchmark._run_throughput_phase(
-        connection_factory=lambda: object(), num_streams=2, logger=Mock(), result=result
-    )
+    tpcds_benchmark._run_throughput_phase(num_streams=2, logger=Mock(), result=result)
 
     assert result["success"] is False
     assert result["errors"] == ["Throughput Test failed: throughput boom"]

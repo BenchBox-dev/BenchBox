@@ -310,12 +310,9 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
         def run(self):
             return {"power_at_size": 100.0}
 
-    class _ThroughputPhase:
-        def __init__(self, **kwargs):
-            pass
-
-        def run(self):
-            return {"throughput_at_size": 64.0}
+    adapter = SimpleNamespace(
+        _run_routed_throughput=lambda *args, **kwargs: SimpleNamespace(success=True, throughput_at_size=64.0)
+    )
 
     class _MaintPhase:
         def __init__(self, **kwargs):
@@ -325,14 +322,13 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
             return {"ok": True}
 
     fake_power_mod = types.SimpleNamespace(TPCDSPowerTest=_PowerPhase)
-    fake_tp_mod = types.SimpleNamespace(TPCDSThroughputTest=_ThroughputPhase)
     fake_m_mod = types.SimpleNamespace(TPCDSMaintenanceTest=_MaintPhase)
     monkeypatch.setitem(__import__("sys").modules, "benchbox.core.tpcds.power_test", fake_power_mod)
-    monkeypatch.setitem(__import__("sys").modules, "benchbox.core.tpcds.throughput_test", fake_tp_mod)
     monkeypatch.setitem(__import__("sys").modules, "benchbox.core.tpcds.maintenance_test", fake_m_mod)
 
     cfg = TPCDSOfficialBenchmarkConfig(scale_factor=1.0, num_streams=2, output_dir=tmp_path)
-    official = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
+    with pytest.warns(DeprecationWarning):
+        official = ob.run_official_benchmark(connection_factory=_Conn, config=cfg, adapter=adapter)
     assert not hasattr(official, "qphds_at_size")
     assert official.power_at_size == 100.0
     assert official.throughput_at_size == 64.0
@@ -340,27 +336,15 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
     audit = ob.generate_audit_trail(official)
     assert audit.exists()
 
-    class _FailedDictThroughputPhase:
-        def __init__(self, **kwargs):
-            pass
-
-        def run(self):
-            return {"success": False, "throughput_at_size": 64.0}
-
-    fake_tp_mod.TPCDSThroughputTest = _FailedDictThroughputPhase
-    failed_dict = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
+    adapter._run_routed_throughput = lambda *args, **kwargs: {"success": False, "throughput_at_size": 64.0}
+    with pytest.warns(DeprecationWarning):
+        failed_dict = ob.run_official_benchmark(connection_factory=_Conn, config=cfg, adapter=adapter)
     assert failed_dict.success is False
     assert failed_dict.throughput_at_size == 0.0
 
-    class _FailedObjectThroughputPhase:
-        def __init__(self, **kwargs):
-            pass
-
-        def run(self):
-            return SimpleNamespace(success=False, throughput_at_size=64.0)
-
-    fake_tp_mod.TPCDSThroughputTest = _FailedObjectThroughputPhase
-    failed_object = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
+    adapter._run_routed_throughput = lambda *args, **kwargs: SimpleNamespace(success=False, throughput_at_size=64.0)
+    with pytest.warns(DeprecationWarning):
+        failed_object = ob.run_official_benchmark(connection_factory=_Conn, config=cfg, adapter=adapter)
     assert failed_object.success is False
     assert failed_object.throughput_at_size == 0.0
 
