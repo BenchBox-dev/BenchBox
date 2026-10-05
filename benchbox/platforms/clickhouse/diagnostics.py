@@ -130,13 +130,15 @@ class ClickHouseDiagnosticsMixin:
         except Exception as e:
             return {"error": str(e)}
 
-    def optimize_table(self, connection: Any, table_name: str) -> None:
-        """Optimize table for better query performance."""
+    def optimize_table(self, connection: Any, table_name: str) -> bool:
+        """Optimize table for better query performance; return False if the engine refused."""
         try:
             connection.execute(f"OPTIMIZE TABLE {table_name} FINAL")
             self.logger.info(f"Optimized table {table_name}")
         except Exception as e:
             self.logger.warning(f"Failed to optimize table {table_name}: {e}")
+            return False
+        return True
 
 
 __all__ = ["ClickHouseDiagnosticsMixin"]

@@ -328,6 +328,99 @@ class TestDatabricksPostLoad:
         cursor.execute.assert_not_called()
 
 
+class TestDatabricksLoadPathOptimizesOnce:
+    def _load(self, adapter, *, tuned: bool):
+        from tests.unit.platforms.csv_dialect_test_helpers import resolver_data_source
+
+        config = UnifiedTuningConfiguration()
+        if tuned:
+            config.table_tunings["LINEITEM"] = _table_tuning()
+        adapter.catalog = "main"
+        adapter.schema = "bench"
+        adapter.get_effective_tuning_configuration = Mock(return_value=config)
+        cursor = Mock()
+        cursor.fetchone.return_value = (10,)
+        cursor.fetchall.return_value = [("Provider", "delta")]
+        connection = Mock()
+        connection.cursor.return_value = cursor
+        file_path = Path("lineitem.csv")
+        adapter._load_single_table(
+            cursor=cursor,
+            connection=connection,
+            benchmark=None,
+            table_name="lineitem",
+            file_path=file_path,
+            stage_root="dbfs:/Volumes/main/bench",
+            existing_tables={"lineitem"},
+            data_source=resolver_data_source(
+                "lineitem", file_path, {"csv_delimiter": ",", "csv_has_header": False, "csv_null_marker": ""}
+            ),
+        )
+        return [str(call.args[0]) for call in cursor.execute.call_args_list]
+
+    def test_a_tuned_table_is_optimized_once_after_load(self, databricks_adapter):
+        executed = self._load(databricks_adapter, tuned=True)
+
+        assert [sql for sql in executed if sql.upper().startswith("OPTIMIZE")] == ["OPTIMIZE lineitem"]
+        assert [op["mechanism"] for op in databricks_adapter._applied_layout_operations] == ["optimize", "analyze"]
+
+    def test_the_skip_marker_does_not_outlive_the_load(self, databricks_adapter):
+        self._load(databricks_adapter, tuned=True)
+        executed = self._load(databricks_adapter, tuned=False)
+
+        assert [sql for sql in executed if sql.upper().startswith("OPTIMIZE")] != []
+
+    def test_an_untuned_table_keeps_the_load_time_optimize(self, databricks_adapter):
+        executed = self._load(databricks_adapter, tuned=False)
+
+        assert [sql for sql in executed if sql.upper().startswith("OPTIMIZE")] == ["OPTIMIZE LINEITEM"]
+
+
+class TestCaughtMaintenanceErrorsFailThePhase:
+    def test_databricks_optimize_error(self, databricks_adapter):
+        connection, cursor = _databricks_connection()
+
+        def fail_optimize(statement, *args, **kwargs):
+            if str(statement).startswith("OPTIMIZE"):
+                raise RuntimeError("optimize refused")
+
+        cursor.execute.side_effect = fail_optimize
+        config = UnifiedTuningConfiguration()
+        config.table_tunings["LINEITEM"] = _table_tuning()
+
+        databricks_adapter.run_post_load_tunings("LINEITEM", config, connection)
+
+        assert databricks_adapter.build_post_load_maintenance_phase().status == "FAILED"
+
+    def test_clickhouse_optimize_error(self):
+        from benchbox.platforms.clickhouse_local import ClickHouseLocalAdapter
+
+        with patch("benchbox.platforms.clickhouse.adapter.check_platform_dependencies", return_value=(True, [])):
+            adapter = ClickHouseLocalAdapter.from_config({"optimize_after_load": True})
+        adapter.tuning_enabled = True
+
+        class Refusing(_Connection):
+            def execute(self, statement: str, *args, **kwargs):
+                if statement.startswith("OPTIMIZE"):
+                    raise RuntimeError("engine refused OPTIMIZE")
+                return super().execute(statement, *args, **kwargs)
+
+        adapter.run_post_load_tunings("lineitem", CONFIG, Refusing())
+
+        phase = adapter.build_post_load_maintenance_phase()
+        assert phase.status == "FAILED"
+        assert phase.tables_processed == 1
+
+    def test_the_phase_stays_successful_when_every_statement_works(self, databricks_adapter):
+        connection, _ = _databricks_connection()
+        config = UnifiedTuningConfiguration()
+        config.table_tunings["LINEITEM"] = _table_tuning()
+
+        databricks_adapter.run_post_load_tunings("LINEITEM", config, connection)
+
+        assert databricks_adapter.build_post_load_maintenance_phase().status == "SUCCESS"
+
+
 class TestClickHouseOptionIsDeclared:
     @pytest.mark.parametrize("platform", ["clickhouse-local", "clickhouse-server", "clickhouse-cloud"])
     def test_optimize_after_load_defaults_off_and_can_be_enabled(self, platform):

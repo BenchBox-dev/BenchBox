@@ -95,6 +95,10 @@ class TuningHooksMixin:
     def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> bool:
         return False
 
+    def note_post_load_maintenance_failure(self) -> None:
+        """Mark the maintenance phase FAILED for a statement a hook caught and logged."""
+        self._post_load_maintenance_errors = getattr(self, "_post_load_maintenance_errors", 0) + 1
+
     def run_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> None:
         if effective_config is None or getattr(self, "dry_run_mode", False):
             return
@@ -110,7 +114,7 @@ class TuningHooksMixin:
             performed = bool(self.apply_post_load_tunings(table_name, effective_config, target))
         except Exception as exc:
             performed = True
-            self._post_load_maintenance_errors = getattr(self, "_post_load_maintenance_errors", 0) + 1
+            self.note_post_load_maintenance_failure()
             self.logger.warning(f"Post-load tuning failed for {table_name}: {exc}")
         finally:
             if performed:

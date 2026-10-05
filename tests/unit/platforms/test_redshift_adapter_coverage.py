@@ -3207,18 +3207,22 @@ class TestApplyTableTunings:
         assert not any("ANALYZE" in sql or "VACUUM" in sql for sql in executed_sqls)
 
         mock_cursor.execute.reset_mock()
-        adapter.apply_post_load_tunings(
-            mock_table_tuning.table_name,
-            SimpleNamespace(table_tunings={mock_table_tuning.table_name: mock_table_tuning}),
-            mock_conn,
-        )
+        config = SimpleNamespace(table_tunings={mock_table_tuning.table_name: mock_table_tuning})
 
+        # auto_vacuum/auto_analyze are on: the isolated pass in configure_for_benchmark owns
+        # maintenance, so the hook must not repeat it on the benchmark connection.
+        assert adapter.apply_post_load_tunings(mock_table_tuning.table_name, config, mock_conn) is False
+        assert mock_cursor.execute.call_args_list == []
+
+        # With auto_analyze off nothing else analyzes the table; VACUUM stays with the isolated pass.
+        adapter.auto_analyze = False
+        assert adapter.apply_post_load_tunings(mock_table_tuning.table_name, config, mock_conn) is True
         post_load_sqls = [str(c.args[0]) for c in mock_cursor.execute.call_args_list]
         assert any("ANALYZE" in sql for sql in post_load_sqls)
-        assert any("VACUUM" in sql for sql in post_load_sqls)
+        assert not any("VACUUM" in sql for sql in post_load_sqls)
 
     def test_table_not_found_logs_warning(self):
-        adapter = _make_adapter(auto_vacuum=False)
+        adapter = _make_adapter(auto_vacuum=False, auto_analyze=False)
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor

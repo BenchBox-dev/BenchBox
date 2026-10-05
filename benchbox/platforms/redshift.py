@@ -2616,16 +2616,19 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         table_tuning = self.table_tuning_for(effective_config, table_name)
         if table_tuning is None or not table_tuning.has_any_tuning():
             return False
+        # configure_for_benchmark vacuums and analyzes every loaded table on an isolated
+        # connection when auto_vacuum/auto_analyze are on. Only cover what that pass skips,
+        # so a tuned table is not maintained twice on the benchmark connection.
+        if self.auto_analyze:
+            return False
         physical_table = self.resolve_physical_table(table_name, connection)
         cursor = connection.cursor()
         try:
             cursor.execute(f"ANALYZE {physical_table}")
             self.logger.info(f"Analyzed table statistics for {physical_table}")
-            if self.auto_vacuum:
-                cursor.execute(f"VACUUM {physical_table}")
-                self.logger.info(f"Vacuumed table {physical_table}")
         except Exception as e:
-            self.logger.warning(f"Failed to perform maintenance operations on {physical_table}: {e}")
+            self.logger.warning(f"Failed to analyze {physical_table}: {e}")
+            self.note_post_load_maintenance_failure()
         finally:
             cursor.close()
         return True

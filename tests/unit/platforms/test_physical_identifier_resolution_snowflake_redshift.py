@@ -155,10 +155,15 @@ class TestRedshiftPhysicalIdentifiers:
         statements = connection.recorder.statements
         assert any("tablename = 'lineitem'" in statement for statement in statements)
         assert "ANALYZE lineitem" not in statements
-        redshift_adapter.apply_post_load_tunings(
-            "LINEITEM", SimpleNamespace(table_tunings={"LINEITEM": tuning}), connection
-        )
+        config = SimpleNamespace(table_tunings={"LINEITEM": tuning})
+        # The isolated vacuum/analyze pass in configure_for_benchmark covers the default case.
+        assert redshift_adapter.auto_analyze is True
+        assert redshift_adapter.apply_post_load_tunings("LINEITEM", config, connection) is False
+        assert "ANALYZE lineitem" not in connection.recorder.statements
+        redshift_adapter.auto_analyze = False
+        assert redshift_adapter.apply_post_load_tunings("LINEITEM", config, connection) is True
         assert "ANALYZE lineitem" in connection.recorder.statements
+        assert not any(statement.startswith("VACUUM") for statement in connection.recorder.statements)
 
     def test_existing_keys_compare_against_physical_column_names(self, redshift_adapter, caplog):
         row = ("public", "lineitem", "KEY", "l_orderkey", "l_orderkey", "l_linenumber", None, None)
