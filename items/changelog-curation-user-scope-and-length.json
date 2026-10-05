@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "The release guide has a short curation standard covering audience, grouping, length, plain language, BREAKING: labels and the date.",
+    "The curation gate's limits reflect that standard, with tests.",
+    "The 0.4.3 cut carries develop's rewritten 0.4.2 section onto the release branch; verify it at that cut."
+  ],
+  "context": "Found during the v0.4.2 release (2026-10-05). The owner chose not to retag. Section sizes: 0.4.2 tagged 53 bullets/255 lines; 0.4.1 16/61; 0.4.0 14/99; 0.3.1 13/50; rewrite 21/92.",
+  "description": "The curated 0.4.2 section that shipped in the tagged release had 53 bullets over 255 lines, much of it contributor-level detail, against 13-16 grouped bullets in 0.3.1 through 0.4.1. The curation gate accepted it because it only rejects raw commit subjects and sections over 60 bullets. The owner found it inconsistent with earlier entries; a 21-bullet rewrite for users replaced the GitHub Release notes and develop's CHANGELOG (#2669), but the CHANGELOG.md inside the v0.4.2 tag and on the release branch keeps the long text until 0.4.3. Write curation guidance into the release guide: include only changes users notice, group by theme, write in plain language (ISO 24495-1), match earlier entries' structure and length, use BREAKING: in Before you upgrade, and date the section with the publication date. Consider lowering the gate's bullet ceiling or adding a line-count check.",
+  "links": [
+    "docs/operations/release-guide.md",
+    "scripts/generate_changelog_entry.py",
+    "CHANGELOG.md",
+    "https://github.com/BenchBox-dev/BenchBox/pull/2669",
+    "https://github.com/BenchBox-dev/BenchBox/releases/tag/v0.4.2"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a9333dba047ba14211d4b4b2",
+      "at": "2026-10-05T15:26:05Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "bc1ade230f4c42b69ab3a51c965f6e26",
+      "session_id": "3c335988ab31486690b06c7fec8a522d"
+    }
+  ]
+}

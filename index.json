@@ -2271,6 +2271,13 @@
       "status": "open",
       "title": "0.4.2 release notes omit the DuckDB tuned-template config-hash and database-name change"
     },
+    "changelog-curation-user-scope-and-length": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Keep release notes user-focused and in line with earlier entries"
+    },
     "chdb-4x-native-load-and-old-engine-hang-20261005": {
       "claim": null,
       "needs": [],
