@@ -164,4 +164,4 @@ def test_enhanced_phase_error_text_is_carried_into_the_pipeline_result(tmp_path)
     assert results["success"] is False
     assert results["phases"]["enhanced_data_processing"]["error"] == "no input files"
     assert results["phases"]["incremental_loading"]["error"] == "load broke"
-    assert results["phases"]["enhanced_scd_processing"]["error"] is None
+    assert "error" not in results["phases"]["enhanced_scd_processing"]

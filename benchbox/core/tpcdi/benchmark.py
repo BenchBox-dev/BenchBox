@@ -2399,8 +2399,8 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "finwire_records": phase1_results.get("finwire_records", 0),
                 "customer_mgmt_records": phase1_results.get("customer_mgmt_records", 0),
                 "success": phase1_results.get("success", False),
-                "error": phase1_results.get("error") or phase1_results.get("errors") or None,
             }
+            self._attach_phase_error(pipeline_results["phases"]["enhanced_data_processing"], phase1_results)
 
             # Phase 2: Enhanced SCD Type 2 Processing
             emit("Phase 2: Enhanced SCD Type 2 processing...")
@@ -2414,8 +2414,8 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "scd_records_processed": phase2_results.get("records_processed", 0),
                 "change_records_detected": phase2_results.get("changes_detected", 0),
                 "success": phase2_results.get("success", False),
-                "error": phase2_results.get("error") or phase2_results.get("errors") or None,
             }
+            self._attach_phase_error(pipeline_results["phases"]["enhanced_scd_processing"], phase2_results)
 
             # Phase 3: Incremental Data Loading
             emit("Phase 3: Incremental data loading...")
@@ -2429,8 +2429,8 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 "incremental_batches": phase3_results.get("batches_loaded", 0),
                 "records_loaded": phase3_results.get("records_loaded", 0),
                 "success": phase3_results.get("success", False),
-                "error": phase3_results.get("error") or phase3_results.get("errors") or None,
             }
+            self._attach_phase_error(pipeline_results["phases"]["incremental_loading"], phase3_results)
 
             # Phase 4: Data Quality Monitoring (if enabled)
             if enable_data_quality_monitoring:
@@ -2514,6 +2514,12 @@ class TPCDIBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             # Don't raise - return the error details for debugging
 
         return pipeline_results
+
+    @staticmethod
+    def _attach_phase_error(phase_entry: dict[str, Any], phase_results: dict[str, Any]) -> None:
+        error = phase_results.get("error") or phase_results.get("errors")
+        if error:
+            phase_entry["error"] = error
 
     def _run_enhanced_data_processing(self) -> dict[str, Any]:
         """Run enhanced data processing with FinWire and Customer Management processors."""
