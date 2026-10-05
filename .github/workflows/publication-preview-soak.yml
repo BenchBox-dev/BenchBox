@@ -1,6 +1,6 @@
 # G2 dual-publication soak prober (same-site preview path).
 #
-# Cron (every 30 min) probes the preview generation deployed by
+# Manual dispatch probes the preview generation deployed by
 # publication-preview-deploy.yml plus root stability, and uploads each
 # observation as a dated, append-only artifact. Nothing here writes Pages.
 #
@@ -21,8 +21,6 @@
 name: Publication Preview Soak (G2)
 
 "on":
-  schedule:
-    - cron: "*/30 * * * *"
   workflow_dispatch:
     inputs:
       generation:

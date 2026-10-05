@@ -156,13 +156,10 @@ def test_soak_never_writes_pages() -> None:
         assert perms.get("pages") != "write"
 
 
-def test_soak_is_cron_plus_dispatch() -> None:
+def test_soak_is_dispatch_only() -> None:
     data = _load(SOAK_PATH)
     on = _triggers(data)
-    assert "schedule" in on, "soak must probe on a schedule without human action"
-    crons = [entry.get("cron", "") for entry in on["schedule"]]
-    assert any("30" in c for c in crons), f"expected a 30min cadence, got {crons}"
-    assert "workflow_dispatch" in on
+    assert set(on) == {"workflow_dispatch"}
 
 
 def test_soak_verdict_discipline() -> None:

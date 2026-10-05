@@ -227,8 +227,8 @@ reads more protection into a green badge than is there:
 
 The static Explorer at `benchbox.dev/results/` publishes through the independent publication
 transaction from `develop` (candidate build plus `github-pages`-approved promotion in
-`publication-deployer-soak-and-retirement.md`). The legacy `docs.yml` release-to-Pages deploy
-remains in the tree but is skipped while a recent independent publication owns Pages.
+`publication-deployer-soak-and-retirement.md`). Production Pages is now deployed by
+`.github/workflows/site-deploy.yml`; `docs.yml` no longer deploys.
 `published-results` is **not** the Explorer's build source — it is the
 corpus-archive branch that contributor PRs target and that mirrors develop's
 `results-data/`.
@@ -239,10 +239,8 @@ corpus-archive branch that contributor PRs target and that mirrors develop's
 > The `docs.yml` build still gates Explorer steps on
 > `hashFiles('results-explorer/package.json')`, but a release that includes the
 > application now fails closed when the corpus, helper set, or generated
-> snapshot is missing. The legacy `docs.yml` deploy job runs only after a protected push to
-> `release`, and the `github-pages` environment must permit `release` for that fallback path.
-> Normal production writes use the transaction writer, whose `github-pages` approval is granted
-> on a dispatch from `develop`.
+> snapshot is missing. Production Pages is deployed by
+> `.github/workflows/site-deploy.yml`.
 >
 > This is a curated preview, not a broad leaderboard or full-cohort claim.
 > Completion evidence must pin the release SHA, artifact digest, deployment
