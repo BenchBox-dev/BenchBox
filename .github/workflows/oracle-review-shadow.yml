@@ -313,9 +313,84 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  attempt-1-muse:
+    name: attempt 1 (muse ${{ needs.select-1.outputs.reviewer }})
+    needs: [plan, select-1]
+    if: ${{ !cancelled() && needs.select-1.outputs.harness == 'muse' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: oracle
+    concurrency:
+      group: oracle-review-shadow-credential-muse
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the trusted develop copy
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+          sparse-checkout: |
+            .github/oracle-reviewers.yml
+            .github/soundness-paths.txt
+            _project/scripts/oracle_reviewers
+            _project/scripts/soundness_paths.py
+          sparse-checkout-cone-mode: false
+
+      - name: Check out the pull request head for reading only
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.plan.outputs.head_sha }}
+          path: workspace
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download the plan
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: oracle-review-shadow-plan
+          path: ${{ runner.temp }}/oracle-plan
+
+      - name: Install muse
+        continue-on-error: true
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
+          sh "$RUNNER_TEMP/muse-install.sh"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run the reviewer
+        working-directory: trusted
+        env:
+          META_API_KEY: ${{ secrets.META_API_KEY }}
+          REVIEWER: ${{ needs.select-1.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli review --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 1 --reviewer "$REVIEWER" --harness muse
+          --workspace "$GITHUB_WORKSPACE/workspace" --scratch "$RUNNER_TEMP/oracle-scratch"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Record an absence if the reviewer did not finish
+        if: always()
+        working-directory: trusted
+        env:
+          REVIEWER: ${{ needs.select-1.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli ensure-attempt --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 1 --reviewer "$REVIEWER"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Upload the attempt
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: oracle-review-shadow-attempt-1
+          path: ${{ runner.temp }}/oracle-attempt/attempt-1.json
+          if-no-files-found: error
+          retention-days: 7
+
   select-2:
     name: select 2
-    needs: [plan, select-1, attempt-1-claude, attempt-1-codex]
+    needs: [plan, select-1, attempt-1-claude, attempt-1-codex, attempt-1-muse]
     if: ${{ !cancelled() && needs.plan.outputs.decision == 'review' && needs.select-1.outputs.reviewer != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -519,9 +594,84 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  attempt-2-muse:
+    name: attempt 2 (muse ${{ needs.select-2.outputs.reviewer }})
+    needs: [plan, select-2]
+    if: ${{ !cancelled() && needs.select-2.outputs.harness == 'muse' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: oracle
+    concurrency:
+      group: oracle-review-shadow-credential-muse
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the trusted develop copy
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+          sparse-checkout: |
+            .github/oracle-reviewers.yml
+            .github/soundness-paths.txt
+            _project/scripts/oracle_reviewers
+            _project/scripts/soundness_paths.py
+          sparse-checkout-cone-mode: false
+
+      - name: Check out the pull request head for reading only
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.plan.outputs.head_sha }}
+          path: workspace
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download the plan
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: oracle-review-shadow-plan
+          path: ${{ runner.temp }}/oracle-plan
+
+      - name: Install muse
+        continue-on-error: true
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
+          sh "$RUNNER_TEMP/muse-install.sh"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run the reviewer
+        working-directory: trusted
+        env:
+          META_API_KEY: ${{ secrets.META_API_KEY }}
+          REVIEWER: ${{ needs.select-2.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli review --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 2 --reviewer "$REVIEWER" --harness muse
+          --workspace "$GITHUB_WORKSPACE/workspace" --scratch "$RUNNER_TEMP/oracle-scratch"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Record an absence if the reviewer did not finish
+        if: always()
+        working-directory: trusted
+        env:
+          REVIEWER: ${{ needs.select-2.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli ensure-attempt --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 2 --reviewer "$REVIEWER"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Upload the attempt
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: oracle-review-shadow-attempt-2
+          path: ${{ runner.temp }}/oracle-attempt/attempt-2.json
+          if-no-files-found: error
+          retention-days: 7
+
   select-3:
     name: select 3
-    needs: [plan, select-2, attempt-2-claude, attempt-2-codex]
+    needs: [plan, select-2, attempt-2-claude, attempt-2-codex, attempt-2-muse]
     if: ${{ !cancelled() && needs.plan.outputs.decision == 'review' && needs.select-2.outputs.reviewer != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -725,6 +875,362 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  attempt-3-muse:
+    name: attempt 3 (muse ${{ needs.select-3.outputs.reviewer }})
+    needs: [plan, select-3]
+    if: ${{ !cancelled() && needs.select-3.outputs.harness == 'muse' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: oracle
+    concurrency:
+      group: oracle-review-shadow-credential-muse
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the trusted develop copy
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+          sparse-checkout: |
+            .github/oracle-reviewers.yml
+            .github/soundness-paths.txt
+            _project/scripts/oracle_reviewers
+            _project/scripts/soundness_paths.py
+          sparse-checkout-cone-mode: false
+
+      - name: Check out the pull request head for reading only
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.plan.outputs.head_sha }}
+          path: workspace
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download the plan
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: oracle-review-shadow-plan
+          path: ${{ runner.temp }}/oracle-plan
+
+      - name: Install muse
+        continue-on-error: true
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
+          sh "$RUNNER_TEMP/muse-install.sh"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run the reviewer
+        working-directory: trusted
+        env:
+          META_API_KEY: ${{ secrets.META_API_KEY }}
+          REVIEWER: ${{ needs.select-3.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli review --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 3 --reviewer "$REVIEWER" --harness muse
+          --workspace "$GITHUB_WORKSPACE/workspace" --scratch "$RUNNER_TEMP/oracle-scratch"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Record an absence if the reviewer did not finish
+        if: always()
+        working-directory: trusted
+        env:
+          REVIEWER: ${{ needs.select-3.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli ensure-attempt --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 3 --reviewer "$REVIEWER"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Upload the attempt
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: oracle-review-shadow-attempt-3
+          path: ${{ runner.temp }}/oracle-attempt/attempt-3.json
+          if-no-files-found: error
+          retention-days: 7
+
+  select-4:
+    name: select 4
+    needs: [plan, select-3, attempt-3-claude, attempt-3-codex, attempt-3-muse]
+    if: ${{ !cancelled() && needs.plan.outputs.decision == 'review' && needs.select-3.outputs.reviewer != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      reviewer: ${{ steps.select.outputs.reviewer }}
+      harness: ${{ steps.select.outputs.harness }}
+    steps:
+      - name: Check out the trusted develop copy
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            .github/oracle-reviewers.yml
+            .github/soundness-paths.txt
+            _project/scripts/oracle_reviewers
+            _project/scripts/soundness_paths.py
+          sparse-checkout-cone-mode: false
+
+      - name: Download the plan
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: oracle-review-shadow-plan
+          path: ${{ runner.temp }}/oracle-plan
+
+      - name: Download this run's attempts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          pattern: oracle-review-shadow-attempt-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/oracle-attempts
+
+      - name: Select the reviewer for attempt 4
+        id: select
+        run: python3 -m _project.scripts.oracle_reviewers.cli select --plan "$RUNNER_TEMP/oracle-plan/plan.json" --attempts-dir "$RUNNER_TEMP/oracle-attempts" --slot 4
+
+  attempt-4-claude:
+    name: attempt 4 (claude ${{ needs.select-4.outputs.reviewer }})
+    needs: [plan, select-4]
+    if: ${{ !cancelled() && needs.select-4.outputs.harness == 'claude' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: oracle
+    concurrency:
+      group: oracle-review-shadow-credential-claude
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the trusted develop copy
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+          sparse-checkout: |
+            .github/oracle-reviewers.yml
+            .github/soundness-paths.txt
+            _project/scripts/oracle_reviewers
+            _project/scripts/soundness_paths.py
+          sparse-checkout-cone-mode: false
+
+      - name: Check out the pull request head for reading only
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.plan.outputs.head_sha }}
+          path: workspace
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download the plan
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: oracle-review-shadow-plan
+          path: ${{ runner.temp }}/oracle-plan
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install Claude Code
+        continue-on-error: true
+        run: npm install --global @anthropic-ai/claude-code@2.1.289
+
+      - name: Run the reviewer
+        working-directory: trusted
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          REVIEWER: ${{ needs.select-4.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli review --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 4 --reviewer "$REVIEWER" --harness claude
+          --workspace "$GITHUB_WORKSPACE/workspace" --scratch "$RUNNER_TEMP/oracle-scratch"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Record an absence if the reviewer did not finish
+        if: always()
+        working-directory: trusted
+        env:
+          REVIEWER: ${{ needs.select-4.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli ensure-attempt --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 4 --reviewer "$REVIEWER"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Upload the attempt
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: oracle-review-shadow-attempt-4
+          path: ${{ runner.temp }}/oracle-attempt/attempt-4.json
+          if-no-files-found: error
+          retention-days: 7
+
+  attempt-4-codex:
+    name: attempt 4 (codex ${{ needs.select-4.outputs.reviewer }})
+    needs: [plan, select-4]
+    if: ${{ !cancelled() && needs.select-4.outputs.harness == 'codex' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: oracle
+    concurrency:
+      group: oracle-review-shadow-credential-codex
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the trusted develop copy
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+          sparse-checkout: |
+            .github/oracle-reviewers.yml
+            .github/soundness-paths.txt
+            _project/scripts/oracle_reviewers
+            _project/scripts/soundness_paths.py
+          sparse-checkout-cone-mode: false
+
+      - name: Check out the pull request head for reading only
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.plan.outputs.head_sha }}
+          path: workspace
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download the plan
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: oracle-review-shadow-plan
+          path: ${{ runner.temp }}/oracle-plan
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Install Codex
+        continue-on-error: true
+        run: npm install --global @openai/codex@0.160.0
+
+      - name: Log in to Codex with the API key
+        continue-on-error: true
+        env:
+          CODEX_HOME: ${{ runner.temp }}/codex-home
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          mkdir -p "$CODEX_HOME"
+          printenv OPENAI_API_KEY | codex login --with-api-key
+
+      - name: Run the reviewer
+        working-directory: trusted
+        env:
+          CODEX_HOME: ${{ runner.temp }}/codex-home
+          REVIEWER: ${{ needs.select-4.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli review --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 4 --reviewer "$REVIEWER" --harness codex
+          --workspace "$GITHUB_WORKSPACE/workspace" --scratch "$RUNNER_TEMP/oracle-scratch"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Record an absence if the reviewer did not finish
+        if: always()
+        working-directory: trusted
+        env:
+          REVIEWER: ${{ needs.select-4.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli ensure-attempt --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 4 --reviewer "$REVIEWER"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Upload the attempt
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: oracle-review-shadow-attempt-4
+          path: ${{ runner.temp }}/oracle-attempt/attempt-4.json
+          if-no-files-found: error
+          retention-days: 7
+
+  attempt-4-muse:
+    name: attempt 4 (muse ${{ needs.select-4.outputs.reviewer }})
+    needs: [plan, select-4]
+    if: ${{ !cancelled() && needs.select-4.outputs.harness == 'muse' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: oracle
+    concurrency:
+      group: oracle-review-shadow-credential-muse
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the trusted develop copy
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+          sparse-checkout: |
+            .github/oracle-reviewers.yml
+            .github/soundness-paths.txt
+            _project/scripts/oracle_reviewers
+            _project/scripts/soundness_paths.py
+          sparse-checkout-cone-mode: false
+
+      - name: Check out the pull request head for reading only
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ needs.plan.outputs.head_sha }}
+          path: workspace
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download the plan
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: oracle-review-shadow-plan
+          path: ${{ runner.temp }}/oracle-plan
+
+      - name: Install muse
+        continue-on-error: true
+        run: |
+          curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
+          sh "$RUNNER_TEMP/muse-install.sh"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run the reviewer
+        working-directory: trusted
+        env:
+          META_API_KEY: ${{ secrets.META_API_KEY }}
+          REVIEWER: ${{ needs.select-4.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli review --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 4 --reviewer "$REVIEWER" --harness muse
+          --workspace "$GITHUB_WORKSPACE/workspace" --scratch "$RUNNER_TEMP/oracle-scratch"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Record an absence if the reviewer did not finish
+        if: always()
+        working-directory: trusted
+        env:
+          REVIEWER: ${{ needs.select-4.outputs.reviewer }}
+        run: >-
+          python3 -m _project.scripts.oracle_reviewers.cli ensure-attempt --plan "$RUNNER_TEMP/oracle-plan/plan.json" --slot 4 --reviewer "$REVIEWER"
+          --out-dir "$RUNNER_TEMP/oracle-attempt"
+
+      - name: Upload the attempt
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: oracle-review-shadow-attempt-4
+          path: ${{ runner.temp }}/oracle-attempt/attempt-4.json
+          if-no-files-found: error
+          retention-days: 7
+
   post:
     name: post
     needs:
@@ -732,12 +1238,19 @@ jobs:
       - select-1
       - select-2
       - select-3
+      - select-4
       - attempt-1-claude
       - attempt-1-codex
+      - attempt-1-muse
       - attempt-2-claude
       - attempt-2-codex
+      - attempt-2-muse
       - attempt-3-claude
       - attempt-3-codex
+      - attempt-3-muse
+      - attempt-4-claude
+      - attempt-4-codex
+      - attempt-4-muse
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.post == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10

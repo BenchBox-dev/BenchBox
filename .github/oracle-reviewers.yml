@@ -3,7 +3,7 @@ mode: shadow
 status_context: oracle-review-shadow
 findings_delivery: comment
 brief_max_bytes: 100000
-max_attempts: 3
+max_attempts: 4
 author_label_prefix: "author-family:"
 default_author_family: claude
 tier_labels:
@@ -70,8 +70,7 @@ reviewers:
     timeout_minutes: 25
     turn_cap: 80
     allowed_tiers: [low-medium, medium-high]
-    enabled: false
-    disabled_reason: no versioned or checksummed installer exists; dev.meta.ai/install.sh fetches an unversioned launcher that downloads the channel's latest binary at run time
+    enabled: true
   agy:
     harness: agy
     family: agy

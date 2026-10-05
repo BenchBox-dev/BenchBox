@@ -60,22 +60,21 @@ def test_agy_is_disabled_until_calibrated(policy: Policy) -> None:
     assert "calibrated" in agy.disabled_reason
 
 
-def test_muse_is_disabled_without_a_pinnable_installer(policy: Policy) -> None:
-    muse = policy.reviewers["muse"]
-    assert muse.enabled is False
-    assert "no versioned or checksummed installer" in muse.disabled_reason
+def test_muse_is_enabled_first_in_low_medium(policy: Policy) -> None:
+    assert policy.reviewers["muse"].enabled is True
+    assert policy.tiers["low-medium"].order[0] == "muse"
     enabled = {name for name, reviewer in policy.reviewers.items() if reviewer.enabled}
-    assert enabled == {"opus", "sonnet", "sol", "luna"}
+    assert enabled == {"opus", "sonnet", "sol", "luna", "muse"}
 
 
 def test_max_attempts_must_cover_the_longest_enabled_chain() -> None:
     raw = _raw()
-    raw["max_attempts"] = 2
-    with pytest.raises(PolicyError, match="longest enabled chain"):
-        parse_policy(raw)
-    raw["reviewers"]["muse"].update(enabled=True)
     raw["max_attempts"] = 3
     with pytest.raises(PolicyError, match=r"longest enabled chain \(4\)"):
+        parse_policy(raw)
+    raw["reviewers"]["agy"].update(enabled=True)
+    raw["max_attempts"] = 4
+    with pytest.raises(PolicyError, match=r"longest enabled chain \(5\)"):
         parse_policy(raw)
 
 

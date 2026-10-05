@@ -25,9 +25,12 @@ record is `_project/decisions/oracle-review-v2-shadow-2026-10-05.md`.
    - `CLAUDE_CODE_OAUTH_TOKEN`, from `claude setup-token`, used only by the
      claude jobs;
    - `OPENAI_API_KEY`, used only by the codex jobs through
-     `codex login --with-api-key`.
+     `codex login --with-api-key`;
+   - `META_API_KEY`, used only by the muse jobs. muse is installed unpinned from
+     `https://dev.meta.ai/install.sh`, so a compromised download would run with
+     this key; the owner accepted that risk on 2026-10-05.
 
-   muse and agy are disabled and have no jobs, so they need no secret yet.
+   agy is disabled and has no job, so it needs no secret yet.
 4. Remove `CLAUDE_CODE_OAUTH_TOKEN` from the repository secrets, because
    same-repository pull request workflows can read those.
 
@@ -88,8 +91,7 @@ These checks must pass before the cut-over that makes the context required.
   branch cannot.
 - **P3:** each reviewer authenticates in CI. A reviewer that cannot is set to
   `enabled: false` with a `disabled_reason`. agy stays disabled until it
-  passes, and muse until Meta publishes a versioned, checksummed installer.
-  Enabling either needs a workflow job and enough reviewer slots.
+  passes; enabling it needs an agy job and a fifth reviewer slot.
 - **P4:** capture each reviewer's quota, authentication and outage output from
   real runs. The attempt artifact's `diagnostic` field holds one redacted line
   of the output, at most 300 characters, with credentials and long tokens
