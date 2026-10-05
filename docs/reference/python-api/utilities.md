@@ -273,7 +273,7 @@ An `ExecutionConfigHelper` with the provider in `config_manager`. Its methods re
 | `optimize_for_system(cpu_cores: int, memory_gb: float)` | `None`. Sets `max_concurrent` to `cpu_cores // 4`, at least 2 and at most 8. Below 8 GB it sets the iteration timeout to 120 minutes and the query timeout to 600 seconds; above 16 GB, to 45 minutes and 180 seconds. From 8 to 16 GB the timeouts stay as they are. It never writes a stream timeout. |
 | `create_performance_profile(profile_name: str)` | `dict` with `name`, `power_run` and `concurrent_queries`, without changing any setting. The profiles are `quick`, `standard`, `thorough` and `stress`, see below. |
 | `apply_performance_profile(profile_name: str)` | `None`. Writes the profile's settings to the provider. Profiles do not set a stream timeout. |
-| `get_execution_summary()` | `dict` with `power_run` (`enabled`, `total_iterations`, `estimated_duration_minutes`, `settings`), `concurrent_queries` (`enabled`, `max_streams`, `estimated_stream_duration_minutes`, `settings`) and `general` (`max_workers`, `memory_limit_gb`, `parallel_queries`). |
+| `get_execution_summary()` | `dict` with `power_run` (`enabled`, `total_iterations`, `estimated_duration_minutes`, `settings`), `concurrent_queries` (`enabled`, `max_streams`, `estimated_stream_duration_minutes`, which is `None` when no stream timeout is set or it is 0, and `settings`) and `general` (`max_workers`, `memory_limit_gb`, `parallel_queries`). |
 | `save_config()` and `validate_execution_config()` | Call `save_config()` and `validate_config()` on the provider and return what `validate_config()` returns. |
 
 Performance profiles:

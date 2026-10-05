@@ -422,7 +422,9 @@ class TestStreamTimeoutIsOnlyWrittenWhenSet:
         cm.set.assert_any_call("execution.concurrent_queries.cancel_on_timeout", True)
         assert settings.to_dict()["cancel_on_timeout"] is True
 
-    def test_execution_summary_estimates_streams_without_a_configured_timeout(self):
-        summary = ExecutionConfigHelper(config_manager=_make_config_manager()).get_execution_summary()
+    @pytest.mark.parametrize(("timeout", "expected"), [(None, None), (0, None), (5400, 90)])
+    def test_execution_summary_estimates_streams_only_from_a_configured_timeout(self, timeout, expected):
+        overrides = {} if timeout is None else {"execution.concurrent_queries.stream_timeout_seconds": timeout}
+        summary = ExecutionConfigHelper(config_manager=_make_config_manager(overrides)).get_execution_summary()
 
-        assert summary["concurrent_queries"]["estimated_stream_duration_minutes"] == 60
+        assert summary["concurrent_queries"]["estimated_stream_duration_minutes"] == expected

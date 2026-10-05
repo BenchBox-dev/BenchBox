@@ -321,7 +321,11 @@ class ExecutionConfigHelper:
             "concurrent_queries": {
                 "enabled": concurrent_settings.enabled,
                 "max_streams": concurrent_settings.max_concurrent,
-                "estimated_stream_duration_minutes": (concurrent_settings.stream_timeout_seconds or 3600) / 60,
+                "estimated_stream_duration_minutes": (
+                    concurrent_settings.stream_timeout_seconds / 60
+                    if concurrent_settings.stream_timeout_seconds
+                    else None
+                ),
                 "settings": concurrent_settings.to_dict(),
             },
             "general": {

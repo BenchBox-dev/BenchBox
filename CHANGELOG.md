@@ -29,6 +29,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   An enabled primary key that is not a prefix of the tuned sort key now fails
   before any table is created, with a message that says to put the key columns
   first or disable `primary_keys`.
+- **Spark, LakeSail and Velox per-query times no longer include `clearCache()`.**
+  With `disable_cache` on (the default), these adapters cleared the session
+  cache inside each query's timer. They now clear it before the timer starts,
+  so recorded query times can drop compared with earlier runs. On a shared
+  session another stream's clear can still overlap a timed query during
+  throughput and stays inside the throughput total time. Don't compare their
+  per-query times recorded before this change with results after it.
+- **A throughput run limited to a query subset reports no Throughput@Size.**
+  Subset runs follow filtered parameter positions and are not TPC-compliant.
+  The run still succeeds and reports query throughput.
+- **Throughput now honors `validation_mode` and `--queries`.** TPC-H
+  throughput ignored `validation_mode`, so `--validation-mode disabled` still
+  failed streams on a row-count mismatch. Neither TPC-H nor TPC-DS throughput
+  read the query subset, so `--queries 1,6 --phases power,throughput` ran the
+  subset in the power phase and every query in the throughput phase. Both now
+  follow the options, and each stream runs its own permutation filtered to the
+  subset.
 - **A saved stream timeout now applies to throughput runs.**
   `execution.concurrent_queries.stream_timeout_seconds` used to be read by
   nothing; it now sets the timeout of every TPC-H and TPC-DS throughput stream
