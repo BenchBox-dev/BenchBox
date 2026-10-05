@@ -499,12 +499,11 @@ def benchbox_run_official_argv(
 ) -> list[str]:
     """Build the `uv run -- benchbox run-official ...` argv for a throughput cell.
 
-    `run-official` (unlike `run`) has a `--streams` option that reaches
-    `BenchmarkConfig.concurrency` via `_forward_requested_streams`
-    (`benchbox/cli/commands/run_official.py`) -- the only CLI surface that
+    `run-official` (unlike `run`) has a `--streams` option that
+    `benchbox/cli/commands/run_official.py` passes to `run` as `concurrency`,
+    which reaches `BenchmarkConfig.concurrency` -- the only CLI surface that
     can request N>1 concurrent throughput streams today; see
-    `tests.uat.throughput` and the `throughput-stream-count-wiring-defect`
-    TODO's `deferred` note. `run-official` requires a TPC-compliant scale
+    `tests.uat.throughput`. `run-official` requires a TPC-compliant scale
     factor (`tests.uat.throughput.TPC_ALLOWED_SCALE_FACTORS`). UAT uses
     `--quiet` by default so the deprecated command reuses the same final
     bare-path stdout contract as `benchbox run`; callers can disable it for
