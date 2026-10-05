@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "The site-parity report shows 0 stale allowances on develop.",
+    "A decision is recorded on whether stale allowances fail the gate, and the gate or its docs match it."
+  ],
+  "context": "Seen in the site-parity job for #2669 (2026-10-05): 'summary: 0 missing path, 0 missing fragment, ... 36 stale allow'. The gate failure in that run was a separate docs-header focus bug, fixed in #2675.",
+  "description": "The site-parity report lists 36 \"stale allowance\" entries: links recorded as allowed breakage (missing paths on the blog index, missing fragments in several ADR, examples and API-reference pages) that are no longer broken. Stale entries hide nothing today, but they would silently re-allow those links if they broke again. Remove them from the allowed-differences inventory and decide whether a stale allowance should fail the gate instead of only being reported.",
+  "links": [
+    "make/documentation.mk",
+    "_project/design/site-inventory/allowed-differences.json",
+    "https://github.com/BenchBox-dev/BenchBox/actions/runs/37309045020/job/111759921790"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a9333dba047ba14211d4b4b2",
+      "at": "2026-10-05T15:27:57Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "31d3c680e2db496990ace5db21eed9cd",
+      "session_id": "3c335988ab31486690b06c7fec8a522d"
+    }
+  ]
+}

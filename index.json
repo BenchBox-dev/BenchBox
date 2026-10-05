@@ -18807,6 +18807,13 @@
       "status": "open",
       "title": "Add SiriusDB (GPU-Native SQL Engine) Platform Adapter"
     },
+    "site-parity-prune-stale-allowances": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Prune the 36 site-parity allowances for broken links that now resolve"
+    },
     "skill-integrity-ci-lane-live-validation": {
       "claim": null,
       "needs": [
