@@ -27,6 +27,7 @@ from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamRe
 from benchbox.core.throughput.runner import StreamRunner
 from benchbox.core.validation.query_validation import (
     clear_reference_seed_context,
+    reset_stream_seed_override_warnings,
     set_reference_seed_context,
 )
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -227,6 +228,7 @@ class TPCDSThroughputTest:
         # (falls back to inline per-query generation in _execute_single_query)
         # when enable_preflight=False, matching today's behavior for callers
         # that explicitly opt out of upfront validation/generation.
+        reset_stream_seed_override_warnings()
         self._pregenerated_queries = None
         if config.enable_preflight:
             self._pregenerated_queries = self._pregenerate_stream_queries(config)

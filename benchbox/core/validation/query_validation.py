@@ -44,6 +44,11 @@ _stream_seed_override_warned: set[str] = set()
 _stream_seed_override_lock = threading.Lock()
 
 
+def reset_stream_seed_override_warnings() -> None:
+    with _stream_seed_override_lock:
+        _stream_seed_override_warned.clear()
+
+
 def _warn_stream_seed_override_once(benchmark_type: str, requested_mode: ValidationMode | None) -> None:
     if requested_mode is None or requested_mode is ValidationMode.SKIP:
         return
