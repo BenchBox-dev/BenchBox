@@ -62,16 +62,16 @@ Restore trunk's readiness or set `renderer: sphinx`.
 
 ### Cutover
 
-1. Cut a release from a tree that meets the list above. With the committed
-   `sphinx` policy this deploys as Sphinx, like any other release. That deploy
-   is a precondition, not a formality: the first Astro deploy compares against
-   the deployed generation's artifact, so a receipted Sphinx generation must be
-   live before the switch. Without one, the pre-deploy visual comparison fails
-   (`no receipted production generation to compare the candidate with; deploy
-   and receipt a Sphinx generation before switching deploy/routes.yml to
-   renderer: auto`) and the Astro deploy cannot publish. Confirm the newest
-   `github-pages` deployment has a receipt before step 3. Trunk must also still
-   meet the list at the commit that will be deployed.
+1. Cut a release from a tree that meets the list above. Under `renderer: sphinx`
+   this deploys as Sphinx, like any other release. That deploy is a
+   precondition, not a formality: the first Astro deploy compares against the
+   deployed generation's artifact, so a receipted Sphinx generation must be live
+   before the switch. Without one, the pre-deploy visual comparison fails (`no
+   receipted production generation to compare the candidate with; deploy and
+   receipt a Sphinx generation before switching deploy/routes.yml to renderer:
+   auto`) and the Astro deploy cannot publish. Confirm the newest `github-pages`
+   deployment has a receipt before step 3. Trunk must also still meet the list
+   at the commit that will be deployed.
 2. Record the parity sign-off for that release (URL compatibility report and
    reviewed visual changes) in the cutover pull request.
 3. The owner's cutover pull request changes `renderer: sphinx` to
