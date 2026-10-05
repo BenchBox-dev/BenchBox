@@ -638,6 +638,23 @@ def test_resolve_records_the_renderer_and_when_the_visual_guard_runs(
     lines = outputs.read_text(encoding="utf-8").splitlines()
     assert f"renderer={expected}" in lines
     assert f"visual_required={'true' if visual else 'false'}" in lines
+    assert resolved["release_in_use"] is False
+    assert "release_in_use=false" in lines
+
+
+def test_resolve_reports_the_release_ref_in_use_while_a_route_names_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    api = FakeGitHub()
+    api.record_deployment(10, make_receipt(run_id=1, trunk=SHA_A), "2026-01-01T00:00:01Z")
+    _use(monkeypatch, api, ready=True)
+    repo = _auto_repo(tmp_path)
+    data = yaml.safe_load((repo / "deploy" / "routes.yml").read_text(encoding="utf-8"))
+    data["routes"][0]["ref"] = "release"
+    (repo / "deploy" / "routes.yml").write_text(yaml.safe_dump(data), encoding="utf-8")
+    code, resolved = _resolve(tmp_path, "--mode", "deploy", repo_dir=repo)
+    assert code == 0
+    assert resolved["release_in_use"] is True
 
 
 def test_resolve_with_the_committed_manifest_selects_astro_for_a_ready_release(

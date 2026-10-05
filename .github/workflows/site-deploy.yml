@@ -57,6 +57,7 @@ jobs:
       release_sha: ${{ steps.resolve.outputs.release_sha }}
       renderer: ${{ steps.resolve.outputs.renderer }}
       visual_required: ${{ steps.resolve.outputs.visual_required }}
+      release_in_use: ${{ steps.resolve.outputs.release_in_use }}
       resolved_artifact: site-deploy-resolved-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Require develop for production modes
@@ -187,7 +188,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Build release documentation
-        if: inputs.mode != 'rollback' && needs.resolve.outputs.renderer == 'sphinx'
+        if: inputs.mode != 'rollback' && needs.resolve.outputs.renderer == 'sphinx' && needs.resolve.outputs.release_in_use == 'true'
         working-directory: release
         run: |
           uv sync --group dev
@@ -219,7 +220,7 @@ jobs:
           (cd results-explorer && npm run build)
 
       - name: Build the release site with Astro
-        if: inputs.mode != 'rollback' && needs.resolve.outputs.renderer == 'astro'
+        if: inputs.mode != 'rollback' && needs.resolve.outputs.renderer == 'astro' && needs.resolve.outputs.release_in_use == 'true'
         working-directory: release
         run: |
           set -euo pipefail
