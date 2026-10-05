@@ -75,6 +75,7 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 1.0 \
 | `max_execution_time` | - | - | Query timeout (seconds) |
 | `disable_result_cache` | - | `true` | Disable result cache for benchmarking |
 | `compression` | - | `true` | Enable network compression |
+| `optimize_after_load` | - | `false` | Run `OPTIMIZE TABLE ... FINAL` on each table after it loads, on tuned runs only |
 | `driver_version` | - | (latest) | Pin the clickhouse-connect package version (e.g. `0.10.0`) |
 | `driver_auto_install` | - | false | Auto-install the requested driver version via uv if missing |
 
@@ -127,6 +128,31 @@ benchbox run --platform clickhouse-cloud --benchmark tpcds --scale 100 \
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 10 \
     --platform-option max_execution_time=300
 ```
+
+### Tuned Runs
+
+`--tuning tuned` applies a curated template for TPC-H, SSB and TPC-DS:
+MergeTree sort keys, plus monthly partitions on the TPC-H `LINEITEM` and
+`ORDERS` tables. The same templates serve the local, server and cloud platforms
+(`examples/tunings/clickhouse/`, packaged with BenchBox). For other
+benchmarks there is no curated template, so `--tuning tuned` resolves to the
+fallback. ClickHouse's "OLAP session pack" session settings apply to tuned runs
+either way.
+
+```bash
+benchbox run --platform clickhouse-cloud --benchmark tpch --tuning tuned
+```
+
+The templates disable every constraint, so a table the template sorts has no
+`PRIMARY KEY` clause and its sort key is the index. A table the template does
+not tune keeps the schema's primary key and derives its `ORDER BY` from it. If you supply a template that enables
+`primary_keys`, its columns must be a prefix of the tuned sort key, or the run
+fails before any table is created.
+
+`OPTIMIZE TABLE ... FINAL` is off by default. To run it on each table after it
+loads, set `--platform-option optimize_after_load=true`. It runs on tuned runs
+only. Its time is reported as `phases.post_load_maintenance` and is not
+counted in data-loading time.
 
 ### Dry Run (Preview)
 
