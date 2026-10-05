@@ -304,7 +304,7 @@ class TestDriversMixin:
             # or INDEPENDENT_CONNECTION without an override) - see
             # require_throughput_stream_capability. This runs before the
             # factory below is ever called, so no stream work starts.
-            require_throughput_stream_capability(self, platform_name=self.platform_name)
+            require_throughput_stream_capability(self, platform_name=self.platform_name, connection=connection)
             # Benchmark tuning vocabulary for per-stream session parity
             # (equivalence dimension 4); defaults to "olap" like the tuning
             # phase's configure_for_benchmark call.
@@ -458,7 +458,7 @@ class TestDriversMixin:
 
             # Fail closed before stream submission - see the require call in
             # _execute_tpcds_throughput_test above for the capability contract.
-            require_throughput_stream_capability(self, platform_name=self.platform_name)
+            require_throughput_stream_capability(self, platform_name=self.platform_name, connection=connection)
             benchmark_type = run_config.get("benchmark_type", "olap")
 
             # See new_stream_connection() docstring / connection_factory comment
@@ -721,6 +721,7 @@ class TestDriversMixin:
                         "status": "SUCCESS" if op.success else "FAILED",
                         "rows_returned": op.rows_affected,
                         "test_type": "maintenance",
+                        **({} if op.success else {"error": getattr(op, "error", None) or "Unknown error"}),
                     }
                 )
 

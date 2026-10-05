@@ -214,7 +214,9 @@ def resolve_stream_connection_capability(adapter: Any) -> tuple[StreamConnection
     return StreamConnectionCapability.SHARED_CURSOR, False
 
 
-def require_throughput_stream_capability(adapter: Any, *, platform_name: str) -> StreamConnectionCapability:
+def require_throughput_stream_capability(
+    adapter: Any, *, platform_name: str, connection: Any = None
+) -> StreamConnectionCapability:
     """Fail closed before stream submission when the session model is unsafe.
 
     Called by the production throughput entry points
@@ -269,7 +271,7 @@ def require_throughput_stream_capability(adapter: Any, *, platform_name: str) ->
             )
     ensure_supported = getattr(adapter, "ensure_stream_sessions_supported", None)
     if callable(ensure_supported):
-        ensure_supported()
+        ensure_supported(connection)
     return capability
 
 

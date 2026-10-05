@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -20,11 +21,12 @@ from benchbox.core.tpch.streams import TPCHStreams
 from benchbox.core.tpch.throughput_test import TPCHThroughputTest, TPCHThroughputTestConfig
 from benchbox.core.validation.query_validation import (
     QueryValidator,
+    _stream_seed_override_warned,
     clear_reference_seed_context,
     set_reference_seed_context,
     set_validation_mode_context,
 )
-from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
+from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection, require_throughput_stream_capability
 from benchbox.platforms.sqlite import SQLiteAdapter
 
 pytestmark = [
@@ -235,13 +237,61 @@ class TestSQLiteStreamConnections:
             second.close()
             shared.close()
 
-    def test_in_memory_database_cannot_serve_independent_streams(self) -> None:
+    def test_in_memory_database_is_refused_for_throughput_and_shared_for_single_stream_use(self) -> None:
         adapter = SQLiteAdapter(database_path=":memory:")
         shared = adapter.create_connection()
+        shared.execute("CREATE TABLE t (id INTEGER)")
+        shared.execute("INSERT INTO t VALUES (1)")
         try:
             with pytest.raises(RuntimeError, match="file-backed"):
-                adapter.new_stream_connection(shared, benchmark_type="olap")
+                adapter.ensure_stream_sessions_supported(shared)
             with pytest.raises(RuntimeError, match="file-backed"):
-                adapter.ensure_stream_sessions_supported()
+                require_throughput_stream_capability(adapter, platform_name="SQLite", connection=shared)
+            handle = adapter.new_stream_connection(shared, benchmark_type="olap")
+            assert handle is not shared
+            assert handle.execute("SELECT id FROM t").fetchall() == [(1,)]
+            handle.close()
+            assert shared.execute("SELECT id FROM t").fetchall() == [(1,)]
         finally:
             shared.close()
+
+    def test_support_check_follows_the_live_connection_not_the_configured_path(self, tmp_path: Path) -> None:
+        adapter = SQLiteAdapter()
+        connection = adapter.create_connection(database_path=str(tmp_path / "live.sqlite"))
+        try:
+            adapter.ensure_stream_sessions_supported(connection)
+            require_throughput_stream_capability(adapter, platform_name="SQLite", connection=connection)
+        finally:
+            connection.close()
+
+
+class TestStreamSeedOverrideWarning:
+    @pytest.fixture(autouse=True)
+    def _reset(self) -> Any:
+        _stream_seed_override_warned.clear()
+        set_reference_seed_context(False)
+        yield
+        clear_reference_seed_context()
+        set_validation_mode_context(None)
+        _stream_seed_override_warned.clear()
+
+    @pytest.mark.parametrize("mode", [ValidationMode.EXACT, ValidationMode.LOOSE])
+    def test_requested_mode_override_is_warned_once(
+        self, mode: ValidationMode, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        set_validation_mode_context(mode)
+
+        with caplog.at_level(logging.WARNING, logger="benchbox.core.validation.query_validation"):
+            for query_id in ("1", "2", "3"):
+                QueryValidator().validate_query_result("tpcds", query_id, 5, scale_factor=1.0, stream_id=0)
+
+        warnings = [record for record in caplog.records if record.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        assert mode.value in warnings[0].getMessage()
+        assert "stream-seeded" in warnings[0].getMessage()
+
+    def test_default_skip_mode_does_not_warn(self, caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.WARNING, logger="benchbox.core.validation.query_validation"):
+            QueryValidator().validate_query_result("tpcds", "1", 5, scale_factor=1.0, stream_id=0)
+
+        assert [record for record in caplog.records if record.levelno == logging.WARNING] == []

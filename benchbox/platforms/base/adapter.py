@@ -741,7 +741,7 @@ class PlatformAdapter(
         if connection and hasattr(connection, "close"):
             connection.close()
 
-    def ensure_stream_sessions_supported(self) -> None:
+    def ensure_stream_sessions_supported(self, connection: Any = None) -> None:
         return None
 
     def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
