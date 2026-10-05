@@ -104,7 +104,6 @@
 }
 
 .site-header__cta {
-  min-height: 2.5rem;
   padding: 0 1.1rem;
   background: var(--accent-secondary);
   color: var(--on-accent);
