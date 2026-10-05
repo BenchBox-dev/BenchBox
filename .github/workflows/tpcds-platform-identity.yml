@@ -50,7 +50,8 @@ jobs:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel, windows-latest, windows-11-arm]
         include:
           - os: windows-11-arm
-            uv_args: --no-dev --no-install-package pyarrow --no-install-package pandas
+            uv_sync_args: --no-dev --no-install-package pyarrow --no-install-package pandas
+            uv_run_args: --no-sync
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -64,10 +65,10 @@ jobs:
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
       - name: Install dependencies
-        run: uv sync ${{ matrix.uv_args }}
+        run: uv sync ${{ matrix.uv_sync_args }}
 
       - name: Build the manifest
-        run: uv run ${{ matrix.uv_args }} -- python scripts/tpcds_platform_identity.py manifest --out "manifest-${{ runner.os }}-${{ runner.arch }}.json"
+        run: uv run ${{ matrix.uv_run_args }} -- python scripts/tpcds_platform_identity.py manifest --out "manifest-${{ runner.os }}-${{ runner.arch }}.json"
 
       - name: Upload the manifest
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
