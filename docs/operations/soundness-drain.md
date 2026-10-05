@@ -56,7 +56,7 @@ hold:
   a missing run is fail-closed, not an absent requirement.
 - **(b) awaiting the owner** — auto-merge is currently OFF, **and** either
   the diff touches a soundness-critical path (reused via
-  `any_soundness_path` imported from `auto_merge_soundness_paths.py` —
+  `any_soundness_path` imported from `soundness_paths.py` —
   never re-derived or edited), or the owner (`joeharris76`) is a requested
   reviewer.
 - **(c) parked > 24h** — more than 24 hours of park time (see below).

@@ -174,6 +174,7 @@ def _assemble_from_routes(args: argparse.Namespace) -> int:
         assemble_routes,
         load_manifest,
         release_ref,
+        trunk_ref,
         write_assembly_receipt,
     )
 
@@ -188,7 +189,14 @@ def _assemble_from_routes(args: argparse.Namespace) -> int:
         release = ref_roots.get(release_ref(manifest))
         if release is None:
             raise RouteManifestError(f"no --ref-root for the release ref {release_ref(manifest)}")
-        selection = renderer_module.select_for_commit(manifest.renderer_policy, release, "HEAD")
+        trunk = ref_roots.get(trunk_ref(manifest))
+        if trunk is None:
+            raise RouteManifestError(f"no --ref-root for the trunk ref {trunk_ref(manifest)}")
+        selection = renderer_module.require_trunk_ready(
+            renderer_module.select_for_commit(manifest.renderer_policy, release, "HEAD"),
+            lambda: renderer_module.readiness_at(trunk, "HEAD"),
+            f"ref root {trunk}",
+        )
         if args.renderer is not None and args.renderer != selection.renderer:
             raise RouteManifestError(
                 f"--renderer {args.renderer} differs from the release selection {selection.renderer}: {selection.reason}"

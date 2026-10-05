@@ -4,8 +4,7 @@ Durable judgment rules for triaging open PRs against `develop` — the parts
 of PR triage that are stable enough to write down once, rather than
 rediscovered per-session. These are rules, not a walkthrough: they assume
 familiarity with the dev-loop (`AGENTS.md`) and the auto-merge machinery
-(`.github/workflows/auto-merge-on-open.yml`,
-`_project/scripts/auto_merge_soundness_paths.py`).
+(`scripts/pr_arm.py`, `_project/scripts/soundness_paths.py`).
 
 ## Always confirm against the current head SHA
 
@@ -81,11 +80,10 @@ a PR's mergeability — both only alert.
 
 - **Soundness-drain daily digest**
   (`_project/scripts/soundness_drain_report.py`, scheduled via a daily
-  workflow) — for PRs that correctly never get auto-merge because they
-  touch a soundness-critical path (or have the owner as a requested
-  reviewer): flags ones parked more than 24h since their required lane
-  went green, so they don't sit forgotten accumulating conflicts while
-  waiting on the owner's manual review and merge.
+  workflow) — for PRs that touch a soundness-critical path (or have the
+  owner as a requested reviewer): flags ones parked more than 24h since
+  their required lane went green, so they don't sit forgotten accumulating
+  conflicts while waiting on the review that `oracle-review` requires.
 - **Green-unmerged nightly sweep**
   (`_project/scripts/green_unmerged_sweep.py`,
   `.github/workflows/nightly.yml`) — alerts only on **true stranding**:
@@ -114,11 +112,14 @@ a PR's mergeability — both only alert.
     and the evidence file declares `delivery_mode` (`batch` evidence must
     include the complete batch binding)
 
-  `auto-merge-on-open.yml` is revoke-only
-  and never arms (its draft→ready arm point never fired once and was deleted
-  — see `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`,
-  D2). The Makefile paths refuse while the PR carries the `no-auto-merge`
-  label. The workflow revokes on that label, not on soundness paths; the
+  No workflow arms auto-merge: a draft→ready arm point never fired once and
+  was deleted (see
+  `_project/decisions/auto-merge-policy-consolidation-2026-08-06.md`, D2).
+  The Makefile paths refuse while the PR carries the `no-auto-merge` label or
+  is a draft. Nothing disarms a PR that is already armed when the label is
+  added later: to hold an armed PR, disable auto-merge
+  (`gh pr merge <n> --disable-auto`) or withdraw it with
+  `make pr-landing-withdraw PR=<n> HEAD=<sha>`, then add the label. The
   evidence transaction also refuses for soundness paths.
   Soundness-path PRs require `oracle-review` on the current head and resolved
   threads. After any push or refresh, rerun CI and obtain the connector's
@@ -168,20 +169,20 @@ a PR's mergeability — both only alert.
   final, arm via `make pr-arm` (or `READY=1`); if work continues, leave
   auto-merge off (or apply a durable hold — see below).
 
-  A green revocation-workflow run is also not proof of the PR's `auto_merge`
-  field either way — the sweep re-reads the PR field (and the timeline)
-  rather than trusting the workflow conclusion.
+  A workflow conclusion is also not proof of the PR's `auto_merge` field
+  either way — the sweep re-reads the PR field (and the timeline).
 
 ## Durable auto-merge holds
 
 `gh pr merge --disable-auto` alone is **not** a durable product signal: a later
-intentional arm path could still enable auto-merge. Both re-arming layers
-honour these durable holds (and neither re-arms on push or nightly `--apply`):
+intentional arm path could still enable auto-merge. The arm paths and the
+sweep honour these durable holds (and nothing re-arms on push or nightly
+`--apply`):
 
 | Hold | Who honours it | Effect |
 | --- | --- | --- |
-| **Draft** | `auto-merge-on-open.yml` (job skip), green-unmerged sweep | Not ready; no arm, not stranded |
-| **Label `no-auto-merge`** | `make pr-arm-auto-merge` / `pr-ready` (refuse to arm), `auto-merge-on-open.yml` (disable on apply/`labeled`), green-unmerged sweep | Non-draft intentional hold; revoke any enabled auto-merge; not stranded |
+| **Draft** | `make pr-arm` / `pr-ready` (refuse to arm), green-unmerged sweep | Not ready; no arm, not stranded |
+| **Label `no-auto-merge`** | `make pr-arm-auto-merge` / `pr-arm` / `pr-ready` (refuse to arm), green-unmerged sweep | Non-draft intentional hold; blocks arming only; not stranded |
 | **Never armed** | green-unmerged sweep (timeline arm-intent classifier) | Green + auto-merge OFF with no prior arm events is normal after the post-#1592 policy; not stranded |
 
 Use draft while the branch is incomplete. Use `no-auto-merge` when the PR
@@ -189,9 +190,10 @@ should stay non-draft (CI/review as ready) but must not auto-merge — for
 example waiting on another PR, or after an explicit disable that must survive
 a later re-arm attempt. Remove the label before arming with `make pr-ready`
 (which refuses to arm while the label is present, and fails closed when the
-label list cannot be read). The hold guarantee is **eventual, not atomic**: a
-label applied after the arm path's check but before the arm lands is caught
-by the workflow's `labeled`-trigger revoke within one run, not instantly.
+label list cannot be read). The label is checked only when arming. It does
+not disarm a PR that is already armed: disable auto-merge
+(`gh pr merge <n> --disable-auto`) or run
+`make pr-landing-withdraw PR=<n> HEAD=<sha>` first, then add the label.
 
 Both sweeps upsert a single marker-tagged tracking issue while their
 respective queue is non-empty, and patch it to the empty state exactly
