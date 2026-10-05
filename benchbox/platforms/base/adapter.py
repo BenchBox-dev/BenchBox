@@ -292,7 +292,7 @@ class PlatformAdapter(
         self._client_link_metadata: dict[str, Any] | None = None
         self._link_probe_timed_out = False
         self._post_measurement_contained = False
-        self._contained_throughput_result = None
+        self._contained_throughput_result: Any = None
 
     def _reset_run_scoped_state(self) -> None:
         """Reset mutable state that belongs to one benchmark execution."""
@@ -312,7 +312,7 @@ class PlatformAdapter(
         self._client_link_metadata = None
         self._link_probe_timed_out = False
         self._post_measurement_contained = False
-        self._contained_throughput_result = None
+        self._contained_throughput_result: Any = None
         if self.dry_run_mode:
             self.captured_sql = []
             self.query_counter = 0

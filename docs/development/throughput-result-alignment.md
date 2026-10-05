@@ -247,6 +247,28 @@ cancel — it is a no-op compared to the old `shutdown(wait=True)`. Only the
 hung-stream shutdown path changes; default timeout behavior for healthy
 runs is unaffected.
 
+### Interpreter exit (`DaemonStreamExecutor`)
+
+`ThreadPoolExecutor` registers an interpreter-exit hook that joins every
+worker thread, even after `shutdown(wait=False)`. A stream stuck in a
+database call therefore kept the process alive at exit until the call
+returned: a probe with two hung streams and a 1 s timeout returned from
+`execute()` after 1 s but took about 9 s to exit, against 0.85 s with
+healthy streams.
+
+`StreamRunner.execute()` now runs streams on `DaemonStreamExecutor`
+(`benchbox/core/throughput/executor.py`). Its workers are daemon threads and
+it hands out standard `Future` objects, so `await_quiescence()` and the
+phase-boundary gate are unchanged, while an abandoned stream can no longer
+block process exit.
+
+Settlement at the deadline is also race-free. Each unfinished future goes
+through one atomic `cancel()`: success proves the stream never started (it is
+listed in `cancelled_stream_ids` and not counted in `streams_executed`);
+failure means the stream is finished (recorded normally) or still running
+(listed in `outstanding_stream_ids`). If submission itself fails, the same
+settlement runs before the original error propagates.
+
 ### Zombie connection ownership
 
 A leaked stream's database connection is owned and opened by that
