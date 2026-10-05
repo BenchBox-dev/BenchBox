@@ -21,11 +21,18 @@ a matching `<benchmark>_notuning.yaml`):
   cloud-template platform today because its clustering renders post-load via
   `ALTER TABLE ... CLUSTER BY`, while BigQuery and Redshift layouts stay
   preview-only in the current adapters)
+- `clickhouse/` - `tpch`, `tpcds`, `ssb`. One directory serves every
+  ClickHouse platform: `clickhouse-local`, `clickhouse-server`,
+  `clickhouse-cloud` and `chdb`. TPC-H, SSB and TPC-DS set a MergeTree sort
+  key per fact table; TPC-H also partitions `LINEITEM` and `ORDERS` by month.
+  All constraints are disabled, because the sort key is ClickHouse's primary
+  index
 
 DataFrame platforms live under `dataframe/` with a flat
 `<platform>_<profile>.yaml` naming (e.g. `polars_optimized.yaml`,
-`dask_memory_constrained.yaml`, `cudf_default.yaml`). These are **not**
-auto-discovered (see below) - pass the path to `--tuning` explicitly.
+`dask_memory_constrained.yaml`, `cudf_default.yaml`). Only the
+`<platform>_optimized.yaml` files for `polars`, `pandas` and `cudf` are found
+by `--tuning tuned` (see below). Pass any other file to `--tuning` by path.
 
 ## Using with the CLI
 
@@ -44,9 +51,11 @@ benchbox run --platform duckdb --benchmark tpch --tuning notuning
 benchbox run --platform duckdb --benchmark tpch \
   --tuning examples/tunings/duckdb/tpch_tuned.yaml
 
-# DataFrame platform - these files must be referenced explicitly
+# DataFrame platform - `tuned` resolves dataframe/polars_optimized.yaml;
+# any other profile must be referenced by path
+benchbox run --platform polars --benchmark tpch --mode dataframe --tuning tuned
 benchbox run --platform polars --benchmark tpch --mode dataframe \
-  --tuning examples/tunings/dataframe/polars_optimized.yaml
+  --tuning examples/tunings/dataframe/polars_streaming.yaml
 ```
 
 `examples/unified_runner.py` is a lighter-weight alternative to the `benchbox`
@@ -75,14 +84,28 @@ relevant to these templates is:
 3. `examples/tunings/<platform>/<benchmark>_tuned.yaml`, resolved relative to
    the current working directory.
 4. `<platform>/<benchmark>_tuned.yaml`, also resolved relative to cwd.
-5. If none of the above exist, the run falls back to a basic, untuned
-   configuration and prints a warning (an interactive terminal is also
-   offered the tuning wizard).
+5. A copy packaged with the installed `benchbox` (see
+   `benchbox/core/tuning/templates/README.md`).
+6. DataFrame platforms only: `examples/tunings/dataframe/<platform>_optimized.yaml`
+   (cwd-relative), for `polars`, `pandas` and `cudf`. The run is recorded as
+   mode `tuned`.
+7. If none of the above exist, the run falls back to the platform's default
+   configuration and prints a warning that names what the fallback applies
+   (for example "OLAP session pack" on ClickHouse or "engine runtime defaults
+   (streaming)" on Polars). An interactive terminal is also offered the tuning
+   wizard. A DataFrame platform with no `_optimized.yaml`, such as Dask, is
+   recorded as mode `tuned-fallback`, not `tuned`.
 
-Step 3 is **cwd-relative**, so `--tuning tuned` only auto-discovers the
-templates in this directory when `benchbox` is run from a checkout of this
+For the ClickHouse platforms, a directory named for the exact platform (for
+example `clickhouse-cloud/`) is searched before the shared `clickhouse/`
+directory in steps 2 to 4, so it can override the curated template.
+
+Steps 3, 4 and 6 are **cwd-relative**, so `--tuning tuned` only auto-discovers
+the templates in this directory when `benchbox` is run from a checkout of this
 repository (or another directory that contains its own `examples/tunings/`).
-If BenchBox is installed as a package and run elsewhere, set
+If BenchBox is installed as a package and run elsewhere, step 5 still finds
+the packaged templates, which cover DuckDB, Databricks, Snowflake and
+ClickHouse but not the DataFrame profiles. To use your own templates, set
 `BENCHBOX_TUNING_PATH` to a directory with the same
 `<platform>/<benchmark>_tuned.yaml` layout - see the next section.
 
@@ -126,6 +149,9 @@ benchbox tuning list --platform duckdb --benchmark tpch
 
 # Show what --tuning would actually resolve to (including which file, if any)
 benchbox tuning show tuned --platform duckdb --benchmark tpch
+
+# Check a SQL tuning file against a platform's capabilities
+benchbox tuning validate examples/tunings/clickhouse/tpch_tuned.yaml --platform clickhouse-local
 ```
 
 ## Configuration structure
@@ -182,9 +208,32 @@ basic-constraints fallback as equivalent tuned runs.
 ## Tuned vs No-Tuning Configurations
 
 ### Tuned Configurations
-- Enable all appropriate constraints (primary keys, foreign keys, unique constraints, check constraints)
+- Enable the constraints that suit the platform (primary keys, foreign keys, unique constraints, check constraints). The ClickHouse templates disable all of them
 - Include table-level optimizations (partitioning on date columns, sorting on key columns)
 - Enable platform-specific features (Databricks: Z-ordering/Liquid Clustering, auto-optimize, bloom filters)
+
+### Maintenance after the load
+
+Some platforms run maintenance on each table after it loads, on tuned runs
+only:
+
+- ClickHouse `OPTIMIZE TABLE ... FINAL`, only when you set the
+  `optimize_after_load` platform option to `true` (off by default).
+- Redshift `ANALYZE` and `VACUUM`.
+- Databricks Delta `OPTIMIZE` and `ANALYZE`.
+- Snowflake `RESUME RECLUSTER`.
+
+This time is not part of data-loading time. Results report it as
+`phases.post_load_maintenance`.
+
+### ClickHouse sort keys and primary keys
+
+The ClickHouse tuned templates set `primary_keys.enabled: false`, which is
+honored: no `PRIMARY KEY` clause is emitted and the sort key alone defines the
+index. If you enable `primary_keys` in your own file, its columns must be a
+prefix of the table's tuned sort key. Otherwise the run fails before any table
+is created. Put the key columns first in the sort key, or disable
+`primary_keys`.
 
 ### No-Tuning Configurations
 - Disable all constraints for fastest data loading

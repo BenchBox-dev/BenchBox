@@ -215,10 +215,13 @@ OPTIMIZE lineitem ZORDER BY (l_shipdate);
 
 -- Clustering (liquid clustering)
 ALTER TABLE lineitem CLUSTER BY (l_shipdate, l_orderkey);
-
--- Vacuum old versions
-VACUUM lineitem RETAIN 0 HOURS;
 ```
+
+Clustering is set before the data loads. After each table loads, a tuned run
+also executes `OPTIMIZE <table>` and `ANALYZE TABLE <table> COMPUTE STATISTICS`
+on Delta tables, unless `enable_delta_optimization` is `false`. The time is
+reported as `phases.post_load_maintenance` and is not counted in data-loading
+time. BenchBox does not run `VACUUM` as part of tuning.
 
 The resolved strategy is recorded per run in the result bundle at
 `platform.config.databricks_clustering_strategy` (`"z_order"`,

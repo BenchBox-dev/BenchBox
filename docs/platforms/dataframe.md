@@ -390,9 +390,18 @@ BenchBox provides a comprehensive tuning system for DataFrame platforms that all
 # Use auto-detected optimal settings based on your system
 benchbox run --platform polars-df --benchmark tpch --scale 1 --tuning auto
 
+# Use the curated profile shipped for the platform
+benchbox run --platform polars-df --benchmark tpch --tuning tuned
+
 # Use a custom tuning configuration file
 benchbox run --platform polars-df --benchmark tpch --tuning ./my_tuning.yaml
 ```
+
+`--tuning tuned` loads `examples/tunings/dataframe/<platform>_optimized.yaml`
+for Polars, pandas and cuDF, relative to the current directory, and records
+the run as mode `tuned`. Dask and DataFusion ship no such file, so `tuned` falls
+back to the platform's defaults, prints a warning that names what the fallback
+applies ("engine runtime defaults"), and records mode `tuned-fallback`.
 
 ### CLI Commands
 

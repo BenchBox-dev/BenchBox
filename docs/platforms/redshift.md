@@ -211,6 +211,10 @@ CREATE TABLE nation (...)
 DISTSTYLE ALL;
 ```
 
+After each table loads, a tuned run executes `ANALYZE <table>` and, unless
+`auto_vacuum` is `false`, `VACUUM <table>`. The time is reported as
+`phases.post_load_maintenance` and is not counted in data-loading time.
+
 ### Sort Keys
 
 ```sql

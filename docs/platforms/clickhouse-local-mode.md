@@ -238,6 +238,29 @@ benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
 top -p $(pgrep -f benchbox)
 ```
 
+### Tuned Runs
+
+`--tuning tuned` applies a curated template for TPC-H, SSB and TPC-DS:
+MergeTree sort keys, plus monthly partitions on the TPC-H `LINEITEM` and
+`ORDERS` tables. The same templates serve the local, server and cloud platforms
+(`examples/tunings/clickhouse/`, packaged with BenchBox). For other
+benchmarks, `--tuning tuned` falls back to the "OLAP session pack" session
+settings.
+
+```bash
+benchbox run --platform clickhouse-local --benchmark tpch --tuning tuned
+```
+
+The templates disable every constraint, so no `PRIMARY KEY` clause is emitted
+and the sort key is the index. If you supply a template that enables
+`primary_keys`, its columns must be a prefix of the tuned sort key, or the run
+fails before any table is created.
+
+`OPTIMIZE TABLE ... FINAL` is off by default. To run it on each table after it
+loads, set `--platform-option optimize_after_load=true`. It runs on tuned runs
+only. Its time is reported as `phases.post_load_maintenance` and is not
+counted in data-loading time.
+
 ### Integration with Other Tools
 
 ```bash

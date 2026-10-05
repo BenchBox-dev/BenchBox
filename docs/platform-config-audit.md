@@ -80,7 +80,7 @@ behavior and are standard practice for OLAP workloads with long-running queries.
   `benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases power --non-interactive`.
 - Databricks - Delta auto_optimize/auto_compact, ANALYZE TABLE post-tuning, and forced Delta rewrite
   of CREATE TABLE (`benchbox/platforms/databricks/adapter.py:61-95,1422-1458,1730-1738`). When
-  `enable_delta_optimization=True` (default), runs OPTIMIZE and ANALYZE TABLE after tuning. Impact if
+  `enable_delta_optimization=True` (default), runs OPTIMIZE and ANALYZE TABLE after each table loads, on tuned runs, and reports the time as `phases.post_load_maintenance`. Impact if
   removed: fewer automatic OPTIMIZE/compaction costs; tables may stay in source format; query planner
   has less statistics. Disable via `enable_delta_optimization=False` in config. Tests to confirm:
   Databricks integration suite (if available) or manual smoke load/query of TPCH SF0.01 with and
