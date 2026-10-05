@@ -752,17 +752,19 @@ class TuningMetadataManager:
         persistence is diagnostic, not required for the run to proceed).
 
         The fail-closed tuned-run marker rides along in the section-marker
-        rows, so every successful save carries it. When the column save fails,
-        its full-table clear may already have removed the pre-apply marker, so
-        rewrite the marker best-effort (never affecting the non-fatal return)
-        to keep a physically tuned database refusing notuning reuse.
+        rows, so every successful save carries it. The column save starts with
+        a full-table clear that removes the pre-apply marker, so whenever the
+        section-marker batch fails -- or the column save itself fails -- rewrite
+        the marker best-effort (never affecting the non-fatal return) to keep
+        a physically tuned database refusing notuning reuse.
         """
         try:
             if not isinstance(unified_config, UnifiedTuningConfiguration):
                 raise TypeError("Expected UnifiedTuningConfiguration")
             saved = self.save_tunings(self._as_benchmark_tunings(unified_config))
             if saved:
-                self._save_section_markers(unified_config)
+                if not self._save_section_markers(unified_config):
+                    self.write_tuned_run_marker()
             else:
                 self.write_tuned_run_marker()
             return saved

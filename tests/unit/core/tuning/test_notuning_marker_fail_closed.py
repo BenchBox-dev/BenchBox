@@ -219,6 +219,42 @@ def test_constraints_only_config_refused_when_section_markers_swallowed(tmp_path
     assert any(REFUSAL in error for error in result.errors)
 
 
+def test_committed_clear_plus_failed_section_markers_rewrites_marker(tmp_path, monkeypatch):
+    """A durable wipe plus failed markers still leaves refusal evidence.
+
+    On SQLite the column-save clear runs uncommitted on the shared connection
+    and rolls back, so the pre-apply marker is never really at risk there.
+    Commit the clear explicitly to emulate a durable engine, then fail the
+    section-marker batch: without a rewrite the marker is gone and notuning
+    reuse is allowed.
+    """
+    db = _db_path(tmp_path)
+    config = UnifiedTuningConfiguration()  # constraints on, no table tunings
+    tuned = _tuned_adapter(db, config)
+    conn = tuned.create_connection()
+    try:
+        assert tuned.ensure_tuned_run_marker(conn) is True
+        manager = TuningMetadataManager(tuned, connection=conn)
+        assert manager.has_tuned_run_marker() is True
+        assert manager.clear_tunings() is True
+        conn.commit()
+        assert manager.has_tuned_run_marker() is False
+
+        def _fail_section_markers(self, unified_config):
+            self.marker_save_failed = True
+            return False
+
+        monkeypatch.setattr(TuningMetadataManager, "_save_section_markers", _fail_section_markers)
+        assert tuned.save_tuning_metadata(conn) is True
+        assert manager.has_tuned_run_marker() is True
+    finally:
+        tuned.close_connection(conn)
+
+    plain = _notuning_adapter(db)
+    result = plain._validate_database_tunings(database_path=db)
+    assert any(REFUSAL in error for error in result.errors)
+
+
 def test_sorted_ingestion_only_config_infers_tuned_and_refuses_reuse(tmp_path):
     """A sorted-ingestion-only wizard config counts as tuned, never baseline."""
     config = _sorted_ingestion_only_config()
