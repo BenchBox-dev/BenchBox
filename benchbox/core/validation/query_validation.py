@@ -40,6 +40,24 @@ _PARAMETER_SENSITIVE_QUERY_IDS_BY_BENCHMARK: dict[str, frozenset[str]] = {
 
 
 _NON_REFERENCE_SEED_EXCLUDED_BENCHMARKS: frozenset[str] = frozenset({"tpcds"})
+_stream_seed_override_warned: set[str] = set()
+_stream_seed_override_lock = threading.Lock()
+
+
+def _warn_stream_seed_override_once(benchmark_type: str, requested_mode: ValidationMode | None) -> None:
+    if requested_mode is None or requested_mode is ValidationMode.SKIP:
+        return
+    key = f"{benchmark_type.lower()}:{requested_mode.value}"
+    with _stream_seed_override_lock:
+        if key in _stream_seed_override_warned:
+            return
+        _stream_seed_override_warned.add(key)
+    logger.warning(
+        "Row-count validation mode '%s' was requested for '%s', but queries run with stream-seeded parameters "
+        "that differ from the answer-set parameters, so answer-set row counts are not checked for them.",
+        requested_mode.value,
+        benchmark_type,
+    )
 
 
 def get_parameter_sensitive_query_ids(benchmark_type: str) -> frozenset[str]:
@@ -250,6 +268,7 @@ class QueryValidator:
         query_id_normalized = self._normalize_query_id(benchmark_type, query_id)
 
         if get_reference_seed_context() is False and benchmark_type.lower() in _NON_REFERENCE_SEED_EXCLUDED_BENCHMARKS:
+            _warn_stream_seed_override_once(benchmark_type, self._resolve_tpcds_run_mode(benchmark_type))
             return ValidationResult(
                 is_valid=True,
                 query_id=query_id_str,

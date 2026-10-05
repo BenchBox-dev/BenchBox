@@ -245,7 +245,7 @@ class TPCDSThroughputTest:
             if config.verbose:
                 self.logger.info(f"Throughput Test completed in {result.total_time:.3f}s")
                 self.logger.info(f"Successful streams: {result.streams_successful}/{config.num_streams}")
-                self.logger.info(f"Stream success rate: {success_rate:.2%} (threshold: {config.min_success_rate:.2%})")
+                self.logger.info(f"Stream success rate: {success_rate:.2%}")
                 self.logger.info(f"Throughput@Size: {result.throughput_at_size:.2f}")
                 self.logger.info(f"Query throughput: {result.query_throughput:.2f} queries/sec")
 
