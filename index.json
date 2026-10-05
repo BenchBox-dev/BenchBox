@@ -2717,15 +2717,10 @@
       "title": "✅ CLI Platform Adapter Management Feature"
     },
     "cli-platform-mode-availability-check-20261001": {
-      "claim": {
-        "expires_at": "2026-10-06T00:13:27Z",
-        "generation": "270fbf62738848deabf10490279636aa",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:e9b35f24f609aefba0449c56"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Fix --platform <name>:<mode> availability check (clickhouse:local reported as missing dependencies)"
     },
     "cli-test-coverage-enhancement-to-80": {
