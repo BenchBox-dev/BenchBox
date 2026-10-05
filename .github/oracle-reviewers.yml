@@ -1,0 +1,132 @@
+version: 1
+mode: shadow
+status_context: oracle-review-shadow
+findings_delivery: comment
+brief_max_bytes: 100000
+max_attempts: 4
+author_label_prefix: "author-family:"
+default_author_family: claude
+tier_labels:
+  "oracle-tier:low-medium": low-medium
+  "oracle-tier:medium-high": medium-high
+  "oracle-tier:very-high": very-high
+retry:
+  daily_budget: 6
+  backoff_start_minutes: 60
+  sweep_max_dispatches: 5
+pools: [claude, codex, muse, agy]
+reviewers:
+  opus:
+    harness: claude
+    family: claude
+    pool: claude
+    model: claude-opus-5-5
+    effort: medium
+    read_only: hard
+    timeout_minutes: 30
+    turn_cap: 60
+    allowed_tiers: [very-high]
+    enabled: true
+  sonnet:
+    harness: claude
+    family: claude
+    pool: claude
+    model: claude-sonnet-5-5
+    effort: medium
+    read_only: hard
+    timeout_minutes: 25
+    turn_cap: 60
+    allowed_tiers: [low-medium, medium-high]
+    enabled: true
+  sol:
+    harness: codex
+    family: codex
+    pool: codex
+    model: gpt-6.1-sol
+    effort: medium
+    read_only: hard
+    timeout_minutes: 25
+    turn_cap: null
+    allowed_tiers: [low-medium, medium-high, very-high]
+    enabled: true
+  luna:
+    harness: codex
+    family: codex
+    pool: codex
+    model: gpt-6-luna
+    effort: high
+    read_only: hard
+    timeout_minutes: 25
+    turn_cap: null
+    allowed_tiers: [low-medium, medium-high]
+    enabled: true
+  muse:
+    harness: muse
+    family: muse
+    pool: muse
+    model: muse-spark-1.3
+    effort: medium
+    read_only: hard
+    timeout_minutes: 25
+    turn_cap: 80
+    allowed_tiers: [low-medium, medium-high]
+    enabled: true
+  agy:
+    harness: agy
+    family: agy
+    pool: agy
+    model: gemini-3.8-flash-medium
+    effort: medium
+    read_only: soft
+    timeout_minutes: 20
+    turn_cap: null
+    allowed_tiers: [low-medium, medium-high]
+    enabled: false
+    disabled_reason: CI authentication and quota output are not yet calibrated, and the workflow has no agy job
+tiers:
+  low-medium:
+    blocking: [Critical, High]
+    order: [muse, agy, luna, sonnet, sol]
+    diversity_exempt: []
+  medium-high:
+    blocking: [Critical, High]
+    order: [sonnet, sol, luna, muse, agy]
+    diversity_exempt: []
+  very-high:
+    blocking: [Critical, High, Medium]
+    order: [opus, sol]
+    diversity_exempt: [opus]
+classifier:
+  area_depth: 3
+  small_max_lines: 150
+  large_min_lines: 800
+  large_min_areas: 3
+  gate_paths:
+    - .github/oracle-reviewers.yml
+    - .github/soundness-paths.txt
+    - .github/workflows/oracle-review.yml
+    - .github/workflows/oracle-review-shadow.yml
+    - .github/workflows/soundness-merge-digest.yml
+    - _project/scripts/oracle_review_check.py
+    - _project/scripts/oracle_reviewers/*
+    - _project/scripts/soundness_paths.py
+    - _project/scripts/soundness_merge_digest.py
+    - _project/scripts/check_soundness_review.py
+    - _project/scripts/ruleset_review_enforcement.py
+    - scripts/ruleset_drift_check.py
+  logic_paths:
+    - benchbox/core/equivalence/*
+    - benchbox/core/expected_results/*
+    - benchbox/core/results/*
+    - "*validation*"
+    - "*equivalence*"
+    - "*comparator*"
+    - "*result_capture*"
+    - "*result_digest*"
+  data_paths:
+    - _sources/tpc-h/dbgen/answers/*
+    - _sources/tpc-ds/answer_sets/*
+    - results-data/bundles/*.override.json
+    - _project/joinorder/*.json
+    - _project/design/site-inventory/*
+    - "*_specs.yaml"
