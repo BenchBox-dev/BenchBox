@@ -63,7 +63,6 @@ jobs:
             expected_arch: x64
           - os: windows-11-arm
             expected_arch: arm64
-          - os: windows-11-arm
             uv_sync_args: --no-dev --no-install-package pyarrow --no-install-package pandas
             uv_run_args: --no-sync
     steps:
@@ -82,6 +81,7 @@ jobs:
         run: uv sync ${{ matrix.uv_sync_args }}
 
       - name: Require the expected architecture
+        shell: bash
         run: |
           uv run ${{ matrix.uv_run_args }} -- python - <<'PY'
           import platform
