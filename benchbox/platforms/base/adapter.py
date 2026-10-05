@@ -24,18 +24,14 @@ from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
 from benchbox.core.throughput.containment import await_quiescence
 from benchbox.core.tuning.applied_ledger import (
-    APPLIED_UNVERIFIED,
-    APPLIED_VERIFIED,
-    EXECUTED,
     PHASE_DDL,
-    PHASE_POST_LOAD,
     PHASE_SESSION,
-    STATEMENT_FAILED,
     AppliedTuningLedger,
     is_schema_tuning_statement,
     recording_connection,
 )
-from benchbox.core.tuning.introspection import Introspector, corroborate
+from benchbox.core.tuning.introspection import Introspector
+from benchbox.platforms.base import tuning_trust
 from benchbox.platforms.base.client_region import discover_client_region
 from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.base.connection_wrappers import (
@@ -1147,44 +1143,14 @@ class PlatformAdapter(
             # end-to-end: capture must never break an otherwise-successful run, so
             # any derive/serialize failure degrades the companion to None and the
             # status falls back to the apply-phase value computed above.
-            final_tuning_status = tuning_validation_status
-            applied_ledger_payload = None
-            applied_ledger_hash = None
-            applied_receipt_payload = None
-            try:
-                final_tuning_status = self._applied_tuning_ledger.overall_status(
-                    tuning_enabled=self.tuning_enabled,
-                    has_config=bool(effective_tuning_config),
-                )
-                # Post-load introspection receipt (tuning-introspection-receipts):
-                # corroborate the ledger against the live catalog (connection is
-                # still open here) and upgrade applied_unverified ->
-                # applied_verified ONLY when every catalog-backed tuning statement
-                # is corroborated. applied_verified is emitted HERE and *only* via
-                # corroboration -- overall_status never returns it. Bounded +
-                # fully guarded (see _corroborate_applied_ledger): any
-                # introspection error leaves the honest applied_unverified status
-                # and records why in the receipt. A no-op unless the derived
-                # status is applied_unverified (see _corroborate_applied_ledger).
-                final_tuning_status, applied_receipt_payload = self._corroborate_applied_ledger(
-                    connection, final_tuning_status
-                )
-                # Carry the companion when something was captured (executed
-                # statements or dropped intents) OR a reused-DB drift check was
-                # computed -- a reused DB re-applies no tuning DDL so its ledger
-                # is empty, but its drift_check must still reach the bundle
-                # (ADR-001 addendum). A non-tuned run with no session SETs and no
-                # drift remains a no-op (no .applied.json).
-                drift_check_payload = self._build_drift_check_payload()
-                if not self._applied_tuning_ledger.is_empty() or drift_check_payload is not None:
-                    applied_ledger_payload = self._applied_tuning_ledger.to_payload(
-                        status=final_tuning_status,
-                        receipt=applied_receipt_payload,
-                        drift_check=drift_check_payload,
-                    )
-                    applied_ledger_hash = self._applied_tuning_ledger.applied_ledger_hash()
-            except Exception as exc:  # capture must never break a successful run
-                self.logger.debug("applied-ledger read-back degraded: %s", exc)
+            (
+                final_tuning_status,
+                applied_ledger_payload,
+                applied_ledger_hash,
+                applied_receipt_payload,
+            ) = tuning_trust.read_back_applied_ledger(
+                self, connection, tuning_validation_status, bool(effective_tuning_config)
+            )
 
             return benchmark.create_enhanced_benchmark_result(
                 platform=self.platform_name,
@@ -1406,115 +1372,16 @@ class PlatformAdapter(
         return metadata
 
     def _corroborate_applied_ledger(self, connection: Any, status: str) -> tuple[str, dict[str, Any] | None]:
-        """Corroborate the applied ledger against the live catalog.
-
-        Returns ``(status, receipt_payload)``. When this platform exposes a
-        tuning introspector (``get_tuning_introspector``), runs bounded catalog
-        reads, corroborates, and upgrades ``applied_unverified`` ->
-        ``applied_verified`` iff every catalog-backed tuning statement is
-        corroborated (``benchbox.core.tuning.introspection.corroborate``).
-
-        Must-preserve invariants: introspection NEVER breaks or materially slows
-        a run (the introspector is bounded and returns an errored state rather
-        than raising; this method is additionally wrapped), and
-        ``applied_verified`` is claimable ONLY via corroboration here -- on any
-        introspector, no-introspector, or corroboration miss, ``status`` is
-        returned unchanged (staying ``applied_unverified``) and the receipt (when
-        one was produced) records why.
-        """
-        # applied_verified is reachable ONLY from applied_unverified via
-        # corroboration; every other status (noop/failed/not_applicable) is left
-        # exactly as the ledger derived it.
-        if status != APPLIED_UNVERIFIED:
-            return status, None
-        introspector = None
-        try:
-            introspector = self.get_tuning_introspector()
-        except Exception as exc:  # pragma: no cover - defensive
-            self.logger.debug("tuning introspector lookup degraded: %s", exc)
-        if introspector is None:
-            return status, None
-        try:
-            state = introspector.introspect(connection, self._applied_tuning_ledger)
-            receipt = corroborate(self._applied_tuning_ledger, state)
-            if receipt.corroborated:
-                status = APPLIED_VERIFIED
-            return status, receipt.to_payload()
-        except Exception as exc:  # introspection must never break a run
-            self.logger.debug("applied-ledger corroboration degraded: %s", exc)
-            return status, None
+        return tuning_trust.corroborate_applied_ledger(self, connection, status)
 
     def _attach_applied_ledger_payload(self, result: Any, status: str) -> None:
-        """Attach the applied-tuning ledger payload + hash onto a built result.
-
-        Used on the validation-failure path, where the result is built by
-        ``_create_failed_benchmark_result`` (defined in the CODEOWNERS-locked
-        ``result_capture.py``): the ledger companion is attached adapter-side
-        rather than by threading extra parameters through that method. Capture
-        never breaks a run - failures degrade to a debug log.
-        """
-        ledger = getattr(self, "_applied_tuning_ledger", None)
-        if ledger is None or result is None:
-            return
-        drift_check_payload = self._build_drift_check_payload()
-        if ledger.is_empty() and drift_check_payload is None:
-            return
-        try:
-            result.applied_tuning_ledger = ledger.to_payload(status=status, drift_check=drift_check_payload)
-            result.applied_ledger_hash = ledger.applied_ledger_hash()
-        except Exception as exc:  # capture must never break a run
-            self.logger.debug("applied-ledger attach degraded: %s", exc)
+        tuning_trust.attach_applied_ledger_payload(self, result, status)
 
     def _build_drift_check_payload(self) -> dict[str, Any] | None:
-        """Build the ``.applied.json`` companion ``drift_check`` section.
-
-        Routes the rerun drift-validation result (the
-        ``MetadataValidationResult`` from ``_validate_database_tunings``, stashed
-        on ``self._drift_validation_result`` during connection-time reuse
-        validation) into the bundle per the ADR-001 addendum (drift-validation
-        bundle routing).
-        Scoped to reused tuned databases -- a fresh DB just persisted its
-        metadata, so nothing could have drifted, and an untuned run has no
-        expected tuning to compare. Guarded: ``None`` when not a reused tuned
-        run or nothing was captured; never raises.
-        """
-        try:
-            if not (self.tuning_enabled and getattr(self, "database_was_reused", False)):
-                return None
-            result = getattr(self, "_drift_validation_result", None)
-            if result is None:
-                return None
-            return result.to_payload()
-        except Exception as exc:  # capture must never break a run
-            self.logger.debug("drift-check payload build degraded: %s", exc)
-            return None
+        return tuning_trust.build_drift_check_payload(self)
 
     def _fold_layout_operations_into_ledger(self) -> None:
-        """Fold platform-recorded post-load layout ops into the applied ledger.
-
-        Some platforms (Databricks) accumulate post-load layout statements
-        (OPTIMIZE / ZORDER) on ``self._applied_layout_operations`` rather than
-        executing them through the wrapped tuning connection. Fold each into the
-        ledger as a PHASE_POST_LOAD statement so they show up in the companion.
-        Generic + guarded: a no-op when the attribute is absent or empty.
-        """
-        ledger = getattr(self, "_applied_tuning_ledger", None)
-        layout_ops = getattr(self, "_applied_layout_operations", None)
-        if ledger is None or not layout_ops:
-            return
-        for op in layout_ops:
-            try:
-                op_status = EXECUTED if op.get("status") == "applied" else STATEMENT_FAILED
-                ledger.record(
-                    op.get("statement", ""),
-                    op.get("phase") or PHASE_POST_LOAD,
-                    status=op_status,
-                    mechanism=op.get("mechanism"),
-                    table=op.get("table"),
-                    error=op.get("error_message"),
-                )
-            except Exception as exc:  # capture must never break a run
-                self.logger.debug("applied-ledger layout fold degraded: %s", exc)
+        tuning_trust.fold_layout_operations_into_ledger(self)
 
     def _setup_fresh_database_phases(self, benchmark, connection: Any, effective_tuning_config) -> tuple:
         """Run fresh-database setup while capturing schema-phase tuning DDL.
