@@ -2,7 +2,7 @@
   "acceptance": [
     "The docs link check reports zero unexplained broken links on develop."
   ],
-  "context": "Source: W2 docs sweep (branch s9-tuning-docs-sweep) report. Re-measure before working.",
+  "context": "Source: W2 docs sweep (branch s9-tuning-docs-sweep) report. Re-measure before working.\n\nCloseout 2026-10-06 (re-validation, read-only): PR #2717 MERGED to develop at 762a0da40dd2573440078472d449402fb318787e (mergedAt 2026-10-06T09:14:16Z, head fix/docs-internal-links). Evidence: gh pr view state MERGED; statusCheckRollup clean (only oracle-review-shadow null, non-required); git show confirms ABlog-generated blog catalog pages accepted as intentional in docs/linkcheck_ignore.txt with builder rationale plus policy test tests/unit/docs/test_linkcheck_ignore_policy.py. Original worker session 5709cef75a584579a236033476a263ba (finish 2026-10-06T09:22:56Z); ladder not re-run in this validation.",
   "description": "## Problem\nThe docs-sweep subagent in the W2 session reported about 37 broken internal documentation links that already exist on develop (not introduced by the tuning work). The count is from one run on an older base and has not been re-measured.\n\n## Change\n- Run the repository's docs link check on current develop and record the exact list.\n- Fix or remove each broken link; if some are intentional, mark them as accepted in the checker's policy.\n\n## Guardrails\n- Do not disable the link check to make it pass.",
   "links": [
     "docs",
@@ -34,6 +34,14 @@
       "op": "finish",
       "op_id": "a9b8cedca380444bac7aafe5699b9272",
       "session_id": "5709cef75a584579a236033476a263ba"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:f3947ef8d62ddbe70b6706e6",
+      "at": "2026-10-06T15:49:53Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "f0e41aae0d8f4ad0a10821038ffc9cb9",
+      "session_id": "6a33af84e93c469ebdeae2d73e412c6f"
     }
   ]
 }
