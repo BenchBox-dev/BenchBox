@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "Script passes and is wired into CI, or is removed with its soundness-path entry"
+  ],
+  "description": "It fails on develop (two phrases missing from docs/operations/independent-publication-contract.md) and is not run by CI. It also requires the unpublished independent-publication ADR in the published ADR index. It is a soundness path.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:20:44Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2ba949df9ffc40f7a7a0740445b1c64f",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}

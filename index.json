@@ -9494,6 +9494,13 @@
       "status": "done",
       "title": "Fix ASCII visualization regressions in summary box, histogram semantics, box labels, and heatmap readability"
     },
+    "fix-check-decision-records": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Repair scripts/check_decision_records.py or retire it"
+    },
     "fix-chromium-result-detail-sort-flake": {
       "claim": null,
       "needs": [],
