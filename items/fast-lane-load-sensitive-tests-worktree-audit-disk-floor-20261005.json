@@ -3,7 +3,7 @@
     "The worktree audit test finishes within a few seconds regardless of worktree count.",
     "The disk-floor test passes and fails based on injected values, not the host's free space."
   ],
-  "context": "Source: W2 PR B and PR C fast-lane runs on a shared macOS workstation. Related: dlv2-12-hermeticity-leak-detector.",
+  "context": "Source: W2 PR B and PR C fast-lane runs on a shared macOS workstation. Related: dlv2-12-hermeticity-leak-detector.\n\nCloseout 2026-10-06 (re-validation, read-only): PR #2718 MERGED to develop at 7b7b2d091e6e59273acf0c2b23a189d0ecee48aa (mergedAt 2026-10-06T10:01:25Z, head fix/fast-lane-hermeticity). Evidence: gh pr view state MERGED; statusCheckRollup clean (only oracle-review-shadow null, non-required); git show confirms fixture-repository worktree audit (init_repo/add_worktree, monkeypatch.chdir) and autouse isolate_free_space_reading fixture with injected reader in tests/uat/conftest.py. Original worker session 5709cef75a584579a236033476a263ba (finish 2026-10-06T10:03:22Z); ladder not re-run in this validation.",
   "description": "## Problem\nTwo tests failed in full local `make test-fast` runs during W2 and passed when run alone, which costs reruns and hides real failures:\n- tests/integration/worktree/test_worktree_audit.py::test_make_worktree_audit_json_output hit the 120 s pytest-timeout when the machine was loaded; alone the file takes about 76 s, so it has little headroom, and the time grows with the number of worktrees on the machine.\n- A UAT disk-floor test failed when free disk space was low (it passed alone after about 1 GB of scratch files was removed). A test that fails because of the host's free space is not hermetic.\n\n## Change\n- Make the worktree-audit test independent of the host's worktree count (fixture repository or a bounded fake) so it runs in a few seconds.\n- Make the disk-floor test hermetic (inject the free-space value) while keeping a real check where the floor is meant to protect runs.\n\n## Guardrails\n- Keep both behaviours covered; never raise a timeout to hide the cost.",
   "links": [
     "tests/integration/worktree/test_worktree_audit.py",
@@ -35,6 +35,14 @@
       "op": "finish",
       "op_id": "0271e53a291f498d8dc3791803bc0a17",
       "session_id": "5709cef75a584579a236033476a263ba"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:f3947ef8d62ddbe70b6706e6",
+      "at": "2026-10-06T15:49:07Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "7bc723dedeae4262bb8c424eb9dc1471",
+      "session_id": "6a33af84e93c469ebdeae2d73e412c6f"
     }
   ]
 }
