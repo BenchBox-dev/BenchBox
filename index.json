@@ -7593,7 +7593,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "blocked",
+      "status": "open",
       "title": "Audit metric/scope truthfulness across all historical DONE items and add a recurrence guard"
     },
     "drop-chdb-core-from-core-dependencies": {

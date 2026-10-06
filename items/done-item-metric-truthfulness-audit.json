@@ -127,5 +127,15 @@
         "wid": "w3"
       }
     ]
-  }
+  },
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:26acbcff276b4a051a0b6cee",
+      "at": "2026-10-06T19:21:50Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "68f7e253e43b49788eea4b72387110fc",
+      "session_id": "ccd5a4124a5a4b2ab886fc474bb7d83c"
+    }
+  ]
 }
