@@ -3,7 +3,7 @@
     "Hosted pandas step time measured over three runs with at least 10 s headroom under the budget, without dropping statements",
     "The change is measured before and after on hosted runners"
   ],
-  "context": "Timings recorded on PR #2612. A two-shard split was tried and made each shard slower (39 s and 30 s) because setup repeats per step.",
+  "context": "Timings recorded on PR #2612. A two-shard split was tried and made each shard slower (39 s and 30 s) because setup repeats per step. Closeout: delivered by PR #2661 (merge ebeb49067) — pandas CSV date columns parsed in one vectorized ISO 8601 pass (per-value pd.to_datetime was ~20 s of the 42 s step); hosted before/after timings recorded in the PR body with headroom under the 45 s budget, all 103 statements still compared. Trunk green on final batch head dda8c787d (11/11 jobs).",
   "description": "On hosted Ubuntu runners the pandas TPC-DS gate step took 26, 42 and 41 s against the 45 s per-step budget; the Polars and DataFusion step took 14-18 s. About 10 s of each step is data generation, 99 dsqgen binding calls and SQL rendering, repeated in every step, and pandas loading plus comparison dominates the rest. Runner variance can push the pandas step over budget.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "generation": "1b70bf17c3ae42bebc71c9561e4675be",
       "op": "take",
       "op_id": "520ecafdce9042a3821177afb5bf171a",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T14:09:25Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "98d5e0db40b0483e8ec1a9720c2fd6b2",
       "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
     }
   ]
