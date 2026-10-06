@@ -121,6 +121,15 @@
       "op": "update",
       "op_id": "1e6fdffaacdb4882977076eea16fe54a",
       "session_id": "478589c5678249f8b1396af48cc8f140"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:26acbcff276b4a051a0b6cee",
+      "at": "2026-10-06T19:20:23Z",
+      "client": "tbh",
+      "generation": "12b9fbfe75a14708abaeffaa70648666",
+      "op": "take",
+      "op_id": "e69d41691d854ac883e8747a2fc82312",
+      "session_id": "ccd5a4124a5a4b2ab886fc474bb7d83c"
     }
   ]
 }
