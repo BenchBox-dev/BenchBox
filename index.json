@@ -7537,6 +7537,13 @@
       "status": "done",
       "title": "Fix tests README pytest config paths"
     },
+    "docs-timescaledb-example-host-label": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Replace the possibly real project label in the TimescaleDB example host"
+    },
     "document-cli-comprehensively": {
       "claim": null,
       "needs": [],

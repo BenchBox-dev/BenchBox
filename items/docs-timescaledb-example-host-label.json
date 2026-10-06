@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "No real-looking project label remains in docs, examples or code",
+    "Owner confirmed whether the label was real"
+  ],
+  "description": "The TigerData/Timescale example hostname in docs/platforms/timescaledb.md (two places), docs/platforms/deployment-modes.md, examples/getting_started/cloud/tigerdata_tpch.py and benchbox/platforms/timescaledb.py uses a label that may be a real project ID. Confirm with the owner, then replace with <service-id>.<project-id>.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:15:19Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "6385974f58e94cf680e957fb79eea093",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}
