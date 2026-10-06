@@ -2290,6 +2290,13 @@
       "status": "active",
       "title": "Keep release notes user-focused and in line with earlier entries"
     },
+    "chdb-4x-engine-load-verification-20261006": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "chDB 4.x timestamp/hang fix never verified by loading the 4.x engine"
+    },
     "chdb-4x-native-load-and-old-engine-hang-20261005": {
       "claim": null,
       "needs": [],
