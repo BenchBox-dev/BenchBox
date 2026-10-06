@@ -171,6 +171,12 @@ class TuningMetadataManager:
     _TUNING_TYPE_CONSTRAINTS_HASH = "constraints_hash"
     _TUNING_TYPE_PLATFORM_OPT_HASH = "platform_optimizations_hash"
     _TUNING_TYPE_TABLE_ATTRIBUTES_HASH = "table_attributes_hash"
+    # Fail-closed run-kind marker: written by a tuned run *before* any physical
+    # tuning is applied, so a tuned database is recognizable even when the
+    # full tuning metadata was never saved (failed save, crash between apply
+    # and save). A notuning run refuses any database carrying this marker.
+    _TUNING_TYPE_RUN_KIND = "run_kind"
+    _TUNED_RUN_VALUE = "tuned"
 
     # Bumped whenever the *shape* of what gets hashed into the section-marker
     # rows changes (e.g. a new field folded into the constraints payload).
@@ -394,13 +400,78 @@ class TuningMetadataManager:
                 return False
 
             platform = self._platform_key()
-            records = self._build_section_marker_records(unified_config, platform, datetime.now())
+            created_at = datetime.now()
+            records = self._build_section_marker_records(unified_config, platform, created_at)
+            # The fail-closed tuned-run marker rides in the same batch, so
+            # every successful save carries refusal evidence for notuning
+            # reuse -- including constraints-only configs that persist no
+            # column-tuning rows.
+            records.append(self._build_run_kind_record(created_at))
             self._batch_insert_records(records)
             self.marker_save_failed = False
             return True
         except Exception as e:
             self.marker_save_failed = True
             self.logger.warning(f"Failed to save tuning section markers (non-fatal): {e}")
+            return False
+
+    def write_tuned_run_marker(self) -> bool:
+        """Write the fail-closed tuned-run marker row.
+
+        Called by a tuned run *before* any physical tuning is applied: the
+        marker reuses the existing metadata-table row shape under the section
+        sentinel table, so no DDL change or migration is needed and older
+        readers still load without error (they skip the sentinel table).
+        Appends (never deletes): a repeated write leaves a duplicate
+        sentinel row, which is harmless -- the probe is existential and
+        sentinel rows are excluded from summaries and rebuilds.
+
+        Returns:
+            True when the marker row is persisted, False otherwise (never
+            raises -- callers fail the tuned run themselves on False).
+        """
+        try:
+            if not self.create_metadata_table():
+                return False
+            self._batch_insert_records([self._build_run_kind_record(datetime.now())])
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to write tuned-run marker: {e}")
+            return False
+
+    def _build_run_kind_record(self, created_at: datetime) -> "TuningMetadata":
+        """Build the fail-closed tuned-run marker row (existing row shape)."""
+        return TuningMetadata(
+            table_name=self._SECTION_MARKER_TABLE,
+            tuning_type=self._TUNING_TYPE_RUN_KIND,
+            column_name="run_kind",
+            column_order=0,
+            configuration_hash=self._TUNED_RUN_VALUE,
+            created_at=created_at,
+            platform=self._platform_key(),
+        )
+
+    def has_tuned_run_marker(self) -> bool:
+        """Return True when the database carries a tuned-run marker row.
+
+        Never raises: a missing metadata table means no marker (False), and
+        any other read failure also reports False -- genuine unreadability is
+        already surfaced by the load path (`last_load_error`), so this stays
+        a pure existence probe for the notuning reuse refusal.
+        """
+        try:
+            if not self._table_exists_check():
+                return False
+            query_sql = (
+                "SELECT 1 FROM "
+                f"{self._metadata_table_name} "
+                f"WHERE table_name = '{self._SECTION_MARKER_TABLE}' "
+                f"AND tuning_type = '{self._TUNING_TYPE_RUN_KIND}' "
+                "LIMIT 1"
+            )
+            with self._managed_connection() as conn:
+                return self._fetch_one(conn, query_sql) is not None
+        except Exception:
             return False
 
     def _load_section_markers(self) -> dict[str, str]:
@@ -679,13 +750,23 @@ class TuningMetadataManager:
         A section-marker save failure is logged and swallowed -- it must
         never turn an otherwise-successful save into a failure (metadata
         persistence is diagnostic, not required for the run to proceed).
+
+        The fail-closed tuned-run marker rides along in the section-marker
+        rows, so every successful save carries it. The column save starts with
+        a full-table clear that removes the pre-apply marker, so whenever the
+        section-marker batch fails -- or the column save itself fails -- rewrite
+        the marker best-effort (never affecting the non-fatal return) to keep
+        a physically tuned database refusing notuning reuse.
         """
         try:
             if not isinstance(unified_config, UnifiedTuningConfiguration):
                 raise TypeError("Expected UnifiedTuningConfiguration")
             saved = self.save_tunings(self._as_benchmark_tunings(unified_config))
             if saved:
-                self._save_section_markers(unified_config)
+                if not self._save_section_markers(unified_config):
+                    self.write_tuned_run_marker()
+            else:
+                self.write_tuned_run_marker()
             return saved
         except Exception as e:
             self.logger.error(f"Failed to save unified tunings: {e}")

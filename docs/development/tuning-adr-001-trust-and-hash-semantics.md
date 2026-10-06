@@ -498,3 +498,7 @@ truncation is measured before filtering.
 - `_project/TODO/main/planning/tuning-applied-ledger-and-validation-status-20260712.yaml`
 - `_project/TODO/main/planning/tuning-bundle-provenance-and-config-export-20260712.yaml`
 - `_project/TODO/main/planning/tuning-mode-vocabulary-and-facet-implementation-20260712.yaml`
+
+## Addendum (2026-10-05): fail-closed tuned-run marker
+
+Decision: every tuned run writes a run-kind marker row (existing `benchbox_tuning_metadata` row shape, no DDL change) before applying any physical tuning and fails instead of tuning when the marker cannot be written, so a notuning run refuses any database carrying the marker even when full tuning metadata was never saved; baselines still write nothing.

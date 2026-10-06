@@ -32,8 +32,18 @@ def infer_runtime_tuning_mode(
 
     Callers that need to preserve the original ``--tuning`` source or file path
     should keep that metadata separately and opt into this collapse explicitly.
+
+    A config that tunes without the usual keys still counts as tuned: sorted
+    ingestion applies physical layout work outside ``get_enabled_tuning_types``
+    (which only covers constraints, platform-optimization flags, and
+    table-layout slots), so a sorted-ingestion-only config must not collapse
+    to ``notuning`` -- otherwise a physically reordered database would reuse
+    as a baseline.
     """
     if unified_config is None or not unified_config.get_enabled_tuning_types():
+        platform_optimizations = getattr(unified_config, "platform_optimizations", None)
+        if getattr(platform_optimizations, "sorted_ingestion_mode", "off") not in (None, "off"):
+            return True, "tuned"
         return False, "notuning"
     return True, "tuned"
 

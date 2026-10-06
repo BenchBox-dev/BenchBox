@@ -38,6 +38,9 @@ def postgres_adapter(monkeypatch):
     stub = Mock()
     stub.__version__ = "3.1.0"
     monkeypatch.setattr(postgresql_module, "psycopg", stub)
+    # Fresh-setup tests stub the connection, so the fail-closed marker write
+    # needs the fake manager; marker-specific tests override this patch.
+    monkeypatch.setattr("benchbox.core.tuning.metadata.TuningMetadataManager", FakeMetadataManager)
     config = UnifiedTuningConfiguration()
     adapter = PostgreSQLAdapter(tuning_enabled=True, unified_tuning_configuration=config)
     adapter._applied_tuning_ledger = AppliedTuningLedger()
@@ -59,6 +62,9 @@ class FakeMetadataManager:
 
     def __init__(self, adapter, **_kwargs):
         pass
+
+    def write_tuned_run_marker(self):
+        return True
 
     def save_unified_tunings(self, config):
         return True
