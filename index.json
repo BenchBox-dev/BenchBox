@@ -11640,6 +11640,15 @@
       "status": "open",
       "title": "Run and publish first live corpus on Fabric DW and Lakehouse (TPC-H SF 0.1/1/10)"
     },
+    "live-cloud-corpus-redshift-expansion-20261006": {
+      "claim": null,
+      "needs": [
+        "live-cloud-corpus-redshift-tpch-first-20261006"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Expand Redshift Serverless corpus to remaining suites (industry, TPC-DS/DI, academic, real-world, variants, primitives)"
+    },
     "live-cloud-corpus-redshift-tpch-first-20261006": {
       "claim": null,
       "needs": [

@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Industry suites (ClickBench, CoffeeShop, H2ODB) completed notuning",
+    "TPC-DS and TPC-DI completed notuning",
+    "Academic suites (SSB, AMPLab, JoinOrder) completed notuning",
+    "NYC Taxi at SF 0.1, 1.0, 10.0 and Flight Data at SF 0.1, 1.0 completed; Flight Data SF 10 follows the source policy (real contiguous months or a recorded no-publish decision, never synthetic backfill)",
+    "TPC variants (Skew, Havoc, Data Vault at SF 0.1, 1.0, 10.0; DS-OBT at SF 1.0) completed with Havoc query counts reconciled against the 220 loaded variations",
+    "Primitives at their supported scales (read 0.01/0.1; write and transaction 0.01/0.1/1.0; metadata 1.0), TSBS DevOps, and Vector Search where a variant exists completed; skips limited to documented platform gaps",
+    "100% query pass on every bundle; all bundles pass scripts/validate_submission.py with 0 errors and carry result_source=internal",
+    "Capacity disclosure (trial versus paid, RPU base, region) recorded per bundle",
+    "Cells stay inside 6h per cell and the recorded spend discipline; anything outside needs approval stating command, maximum runtime, log path, and stop condition"
+  ],
+  "context": "Deferred follow-up to live-cloud-corpus-redshift-tpch-first-20261006. Mirrors the Snowflake/BigQuery/Databricks suite items (industry, tpcds-tpcdi, academic, real-world, variants, primitives-timeseries-ai). Tuned runs deferred until tuning-portable-metadata-store-20261001 lands.",
+  "description": "Expand the Redshift Serverless corpus beyond TPC-H to the remaining suites, notuning on current develop: industry, TPC-DS/DI, academic, real-world, TPC variants and experimental, primitives plus time-series and vector search where variants exist. Settles Redshift to parity with the published three-platform corpus.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:d4c6ceae0de4d166359ede4c",
+      "at": "2026-10-06T19:13:58Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "92839c1df2d640419c805fcf45847b43",
+      "session_id": "508606d004364578b5da477b03baf36a"
+    }
+  ]
+}
