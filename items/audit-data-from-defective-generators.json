@@ -3,6 +3,7 @@
     "Bundles in results-data and published corpora are checked for generator platform (macOS TPC-H, Windows TPC-DS) and date",
     "Affected bundles are regenerated, labelled or withdrawn; cached datasets keyed by the old binaries are invalidated"
   ],
+  "context": "Closeout: owner decision D4 applied. Audit found 140 of 395 published bundles are macOS TPC-H-family runs possibly from the defective dbgen (53 direct / 52 presumed / 35 unresolved; per-bundle table ~/Developer/audit-defective-generators-bundles.csv); no Windows TPC-DS data affected. Cache invalidation by PR #2705 (merge 4e258f415) — manifests record generator binary hash, unstamped/defective caches regenerate; validator plus explorer ranking exclusion for known_defects with tests (independent review found one Required defect in the vote logic, fixed with regression test, re-reviewed APPROVE with stand-in marker). Labelling by PR #2708 (merge dda8c787d) — all 140 sidecars carry known_defects (exact CSV match verified), audit report included, independently reviewed APPROVE with marker. Paid cloud reruns (61 bundles) listed as follow-ups in the report. All required checks green on both PRs. Trunk green on final batch head dda8c787d (11/11 jobs).",
   "description": "Two generator defects fixed this cycle produced wrong data: TPC-H data generated with the packaged darwin-arm64 or darwin-x86_64 dbgen before #2622 has non-canonical supplier and customer addresses (affects Q2, Q10, Q15, Q20 values), and TPC-DS data generated on Windows before #2623 was generated at scale factor 1 regardless of the requested scale, with trailing separators. Any published result bundle, cached dataset or reference artifact built that way is wrong.",
   "sessions": [
     {
@@ -20,6 +21,14 @@
       "generation": "d9a61f894d5742a88b10a00ac971497d",
       "op": "take",
       "op_id": "078351a8e3fe4a6ba1648c304cedcd46",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T14:16:23Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "12a57e19f7424b48b8e1a21157266905",
       "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
     }
   ]
