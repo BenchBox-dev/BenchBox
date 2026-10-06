@@ -20706,10 +20706,15 @@
       "title": "Cut the TPC-DS cross-surface gate's setup time so the pandas step keeps budget headroom"
     },
     "tpcds-gate-vacuous-statement-coverage": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T14:11:29Z",
+        "generation": "c762d6b712b04226956c3392575e604f",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Give the 26 always-empty TPC-DS statements nonempty coverage in a blocking lane"
     },
     "tpcds-identity-unexercised-binaries": {
