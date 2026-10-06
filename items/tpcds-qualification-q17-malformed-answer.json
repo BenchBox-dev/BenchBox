@@ -2,7 +2,7 @@
   "acceptance": [
     "A documented decision: either a bounded, evidence-backed parser rule that recovers the 15 columns without altering answer bytes, or a recorded permanent exception with its rationale in the runner's classification"
   ],
-  "context": "Shape evidence: /tmp/dfparity-official-q17-shape-evidence.json (copy under ~/.jcode/scratch/dfparity-handoff/evidence/stop-20261003T2017Z/).",
+  "context": "Shape evidence: /tmp/dfparity-official-q17-shape-evidence.json (copy under ~/.jcode/scratch/dfparity-handoff/evidence/stop-20261003T2017Z/). Closeout: owner decision D2 applied — permanent exception recorded in the runner classification with shape evidence and rationale, no parser special case, by PR #2688 (merge 840bdf192). DataFrame-to-SQL parity still checks Q17. Trunk green on final batch head dda8c787d (11/11 jobs).",
   "description": "The pinned official 17.ans has a merged header/separator field and a wrapped continuation row, so the parser yields 14 columns where SQL returns 15. The runner records an answer error for Q17 on every engine while keeping DataFrame-to-SQL parity. Q17 therefore never contributes printed-answer evidence. Oracle values must not be invented.",
   "sessions": [
     {
@@ -20,6 +20,14 @@
       "generation": "ae38bd27bf3a4b079adab9ba467ad25d",
       "op": "take",
       "op_id": "a893bf84ff714ceb8ef94c5cc9d0ce74",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T14:10:37Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "4228c8dc35e24e5aa81cacadc3ddc7f7",
       "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
     }
   ]
