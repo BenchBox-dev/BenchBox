@@ -3,7 +3,7 @@
     "Tests pin both behaviours, including the unusual-DDL cases.",
     "Untuned ClickHouse DDL snapshot unchanged."
   ],
-  "context": "Source: PR #2677 subagent review (Consider/Nit). Not exercised by any current benchmark schema.",
+  "context": "Source: PR #2677 subagent review (Consider/Nit). Not exercised by any current benchmark schema.\n\nCloseout 2026-10-06 (re-validation, read-only): PR #2715 MERGED to develop at b9b39f5c89aebdee13c408c26d09121393c88137 (mergedAt 2026-10-06T07:37:16Z, head fix/clickhouse-sortkey-hardening). Evidence: gh pr view state MERGED; statusCheckRollup clean (only oracle-review-shadow null, non-required); git show confirms _has_tuned_sort_key gated on tuning_enabled in benchbox/platforms/clickhouse/tuning.py plus edge-case tests for _strip_primary_key_constraints (tests/unit/platforms/test_clickhouse_pk_strip.py, test_clickhouse_primary_keys_enabled.py). Original worker session 5709cef75a584579a236033476a263ba (finish 2026-10-06T07:42:07Z); ladder not re-run in this validation.",
   "description": "## Problem (review findings left open in PR #2677)\n- `_has_tuned_sort_key` (benchbox/platforms/clickhouse/tuning.py) decides from the effective configuration whether a tuned sort key exists, but does not check `tuning_enabled`. A configuration with sorting present while tuning is off could still change how primary keys are forced on in the effective config.\n- `_strip_primary_key_constraints` (benchbox/platforms/clickhouse/workload.py) removes PRIMARY KEY constraints from generated CREATE TABLE text with a scanner. It is covered for the generated DDL shapes, but its behaviour on unusual DDL (quoted identifiers, inline column-level PRIMARY KEY, comments, nested type commas) is untested, so a user-supplied or future schema could be mangled silently.\n\n## Change\n- Gate `_has_tuned_sort_key` on `tuning_enabled` and add a test.\n- Add edge-case tests for `_strip_primary_key_constraints`; fix or reject inputs it cannot handle safely.\n\n## Guardrails\n- Untuned ClickHouse DDL stays byte-identical (snapshot test).",
   "links": [
     "benchbox/platforms/clickhouse/tuning.py",
@@ -35,6 +35,14 @@
       "op": "finish",
       "op_id": "075b966ba3c04275b7870f2f4da5bbe9",
       "session_id": "5709cef75a584579a236033476a263ba"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:f3947ef8d62ddbe70b6706e6",
+      "at": "2026-10-06T15:48:50Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "9f4cc1542e594e9285a1dd33887a1fa9",
+      "session_id": "6a33af84e93c469ebdeae2d73e412c6f"
     }
   ]
 }
