@@ -96,7 +96,6 @@ api
 development/getting-started
 development/architecture-design
 development/platform-development
-development/comment-cleanup-scope
 design/architecture.md
 testing/index.md
 ```
