@@ -5333,10 +5333,15 @@
       "title": "Remediate the cross-surface equivalence oracle: fix the bugs it found-and-dismissed, make it deterministic, order-aware, non-vacuous, and honest"
     },
     "cross-surface-order-check-unverified-terms": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T14:08:16Z",
+        "generation": "fc23edd3736a4ee981377522181c5e3f",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Report and narrow the ORDER BY shapes the cross-surface comparator still compares without order"
     },
     "csv-html-tuning-exports-bypass-anonymization": {
