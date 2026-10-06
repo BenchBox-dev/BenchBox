@@ -742,12 +742,20 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     def drop_database(self, **connection_config) -> None:
         """Drop database in Firebolt.
 
-        Note: Firebolt Core creates databases implicitly.
+        Note: Firebolt Core creates databases implicitly and offers no DROP DATABASE.
         Cloud mode supports explicit DROP DATABASE.
         """
         database = connection_config.get("database", self.database)
 
         if self.deployment_mode == "core":
+            self.fail_closed_on_force_recreate(
+                platform_label="Firebolt (Core)",
+                database=database,
+                manual_hint=(
+                    "Core creates databases implicitly and offers no DROP DATABASE: drop the "
+                    "benchmark tables manually, or remove the Core data directory and restart Core"
+                ),
+            )
             self.log_verbose(f"Firebolt Core: database {database} will be recreated implicitly")
             return
 

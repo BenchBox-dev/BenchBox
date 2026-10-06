@@ -817,13 +817,9 @@ SPECS: dict[str, Spec] = {
     "fabric_dw": Spec(
         config=FABRIC, connection_sites=("test_connection", "check_server_database_exists", "get_platform_info")
     ),
-    "firebolt": Spec(
-        no_positive_control="Firebolt Core recreates databases implicitly, so drop_database only logs",
-    ),
+    "firebolt": Spec(),
     "glue": Spec(config={**AWS, "job_role": ROLE_ARN}),
-    "influxdb": Spec(
-        no_positive_control="InfluxDB reports no file path and no server database, so force_recreate only warns",
-    ),
+    "influxdb": Spec(),
     "motherduck": Spec(config={"token": "tok"}, connection_sites=("execute_query", "test_connection")),
     "polars": Spec(config={"working_dir": "{world}/db/dir_db"}),
     "pyspark": Spec(
@@ -844,10 +840,7 @@ SPECS: dict[str, Spec] = {
         },
         patches={"_ensure_session": lambda *a, **k: 1},
     ),
-    "velox": Spec(
-        config={"gluten_jar_path": "{world}/db/bench.db"},
-        no_positive_control="the adapter defines no database existence check",
-    ),
+    "velox": Spec(config={"gluten_jar_path": "{world}/db/bench.db"}),
 }
 
 VARIANTS: dict[str, dict[str, Spec]] = {
@@ -934,11 +927,22 @@ NO_FIRST_CONNECTION_CHECK: dict[str, str] = {
     "warehouse is created in the Fabric portal, so there is no database to drop on connect and "
     "check_server_database_exists only tests that a connection opens. Tables are dropped and re-created in "
     "create_schema, which the re-create allowance covers",
-    "motherduck": "create_connection opens md:<database> and never calls handle_existing_database, and the adapter "
-    "does not read force_recreate; the database lives in the MotherDuck service",
+    "motherduck": "create_connection opens md:<database> and never calls handle_existing_database; "
+    "a requested --force-recreate fails closed in create_connection with a manual-drop error instead of "
+    "silently reusing the database, which lives in the MotherDuck service",
     "snowpark-connect": "create_connection only opens a Snowpark session and never calls handle_existing_database; "
-    "force_recreate is forwarded to the base class but nothing acts on it, and create_schema only issues "
-    "CREATE DATABASE and CREATE SCHEMA IF NOT EXISTS",
+    "a requested --force-recreate fails closed in create_connection with a manual-drop error instead of being "
+    "silently ignored, and create_schema only issues CREATE DATABASE and CREATE SCHEMA IF NOT EXISTS",
+}
+FORCE_RECREATE_FAIL_CLOSED: dict[str, str] = {
+    # Case id -> error fragment expected when force_recreate=True. These adapters have no docs-supported
+    # automatic drop, so they fail closed with a manual-drop error instead of silently reusing the database.
+    # The firebolt-cloud variant is absent: Cloud mode issues a real DROP DATABASE.
+    "velox": "Velox does not support --force-recreate",
+    "influxdb": "InfluxDB does not support --force-recreate",
+    "firebolt": "Firebolt (Core) does not support --force-recreate",
+    "snowpark-connect": "Snowpark Connect does not support --force-recreate",
+    "motherduck": "MotherDuck does not support --force-recreate",
 }
 FAKE_POLL = "the fake service never reports the remote job or session as finished, so the polling loop raises"
 INCOMPLETE_STAGES: dict[str, tuple[frozenset[str], str]] = {
@@ -1281,6 +1285,12 @@ def run_case(case: Case, world: Path, ledger: Ledger) -> tuple[Any, Outcome]:
 
 @pytest.mark.parametrize("case", CASE_PARAMS)
 def test_no_destructive_ops_after_first_connection_decision(case, world, ledger):
+    fail_closed = FORCE_RECREATE_FAIL_CLOSED.get(case.id)
+    if fail_closed is not None:
+        with pytest.raises(RuntimeError, match=re.escape(fail_closed)):
+            run_case(case, world, ledger)
+        assert not ledger.violations(), describe(ledger.violations())
+        return
     _, outcome = run_case(case, world, ledger)
 
     assert not ledger.violations(), describe(ledger.violations())
@@ -1292,6 +1302,11 @@ def test_no_destructive_ops_after_first_connection_decision(case, world, ledger)
 
 @pytest.mark.parametrize("case", CASE_PARAMS)
 def test_force_recreate_still_acts_at_the_first_connection(case, world, ledger):
+    fail_closed = FORCE_RECREATE_FAIL_CLOSED.get(case.id)
+    if fail_closed is not None:
+        with pytest.raises(RuntimeError, match=re.escape(fail_closed)):
+            run_case(case, world, ledger)
+        return
     adapter, outcome = run_case(case, world, ledger)
 
     if not outcome.decision_calls or getattr(adapter, "skip_database_management", False):
@@ -1306,6 +1321,11 @@ def test_force_recreate_still_acts_at_the_first_connection(case, world, ledger):
 
 @pytest.mark.parametrize("case", CASE_PARAMS)
 def test_case_is_not_silently_vacuous(case, world, ledger):
+    fail_closed = FORCE_RECREATE_FAIL_CLOSED.get(case.id)
+    if fail_closed is not None:
+        with pytest.raises(RuntimeError, match=re.escape(fail_closed)):
+            run_case(case, world, ledger)
+        return
     _, outcome = run_case(case, world, ledger)
     reach = reach_of(outcome, ledger)
 
@@ -1357,6 +1377,7 @@ def test_exemptions_name_registered_adapters():
 
     for table in (NO_FIRST_CONNECTION_CHECK, INCOMPLETE_STAGES, NO_SQL_OBSERVED):
         assert set(table) <= registered
+    assert set(FORCE_RECREATE_FAIL_CLOSED) <= {case.id for case in CASES}
     assert all(stages <= REQUIRED_STAGES for stages, _ in INCOMPLETE_STAGES.values())
 
 

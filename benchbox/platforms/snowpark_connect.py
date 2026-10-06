@@ -256,7 +256,15 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
 
         Raises:
             ConfigurationError: If connection fails.
+            RuntimeError: If ``force_recreate`` is set: the adapter accepts the flag but has no
+                docs-supported automatic drop, so it fails closed instead of silently reusing
+                the database.
         """
+        self.fail_closed_on_force_recreate(
+            platform_label="Snowpark Connect",
+            database=kwargs.get("database", self.database),
+            manual_hint="Drop the database manually (for example `DROP DATABASE <name>` in Snowflake)",
+        )
         try:
             if self._session is not None:
                 # Check if session is still valid
