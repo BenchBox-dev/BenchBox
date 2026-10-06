@@ -1,0 +1,11 @@
+{
+  "bundle_file": "datavault_sf01_datafusion_sql_20260825_174216_497e5dd1.json",
+  "bundle_hash": "b8ac5ca886fcc63df6c6f956a9494e91aa1c4cabfb79db3bd1722f2ab73b5c8d",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}
