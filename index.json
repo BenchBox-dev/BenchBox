@@ -20853,15 +20853,10 @@
       "title": "Implement the TPC-DS QphDS@Size spec metric (two throughput tests, two maintenance runs, load time)"
     },
     "tpcds-qualification-actionable-signal": {
-      "claim": {
-        "expires_at": "2026-10-07T14:10:54Z",
-        "generation": "17b83a2e007a4b32a4bacde4c603680f",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Make the weekly TPC-DS SF1 qualification report flag only new printed-answer mismatches"
     },
     "tpcds-qualification-q17-malformed-answer": {
