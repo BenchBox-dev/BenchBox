@@ -20739,15 +20739,10 @@
       "title": "Audit whether Redshift, Snowflake and Databricks planners exploit the TPC-DS informational keys (needs live-cloud approval)"
     },
     "tpcds-maintenance-delete-limit-syntax-error-swallowed-20261004": {
-      "claim": {
-        "expires_at": "2026-10-07T06:18:48Z",
-        "generation": "914b3c3fa0854d4fbac8b8d33c134a2c",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "open",
       "title": "TPC-DS maintenance DELETE ... LIMIT is a syntax error on DuckDB, is swallowed as a warning, and the operation still reports success"
     },
     "tpcds-obt-benchmark-implementation": {
