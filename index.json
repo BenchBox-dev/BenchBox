@@ -2008,15 +2008,10 @@
       "title": "Publish per-test durations from every release-canary shard"
     },
     "canary-impact-02-selector": {
-      "claim": {
-        "expires_at": "2026-10-07T19:19:28Z",
-        "generation": "5cc3bf9efa8942e6b4e6262e63434d8a",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:26acbcff276b4a051a0b6cee"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "open",
       "title": "Build a fail-safe selector that maps changed paths to the release-canary tests they can affect"
     },
     "canary-impact-03-replay-and-go-decision": {
