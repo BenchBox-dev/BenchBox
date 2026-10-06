@@ -104,7 +104,7 @@ test-pytest:
 # Speed-based testing
 .PHONY: test-fast
 test-fast:
-	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120
+	BENCHBOX_TEST_TIER=t1 uv run -- python -m pytest -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short -rs --timeout=120
 
 .PHONY: test-unlock
 test-unlock:
