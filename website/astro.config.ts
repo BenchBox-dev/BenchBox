@@ -105,8 +105,9 @@ export default defineConfig({
       ],
       components: {
         Header: "./src/components/starlight/Header.astro",
-        PageTitle: "./src/components/starlight/PageTitle.astro",
         Footer: "./src/components/starlight/Footer.astro",
+        Sidebar: "./src/components/starlight/Sidebar.astro",
+        TwoColumnContent: "./src/components/starlight/TwoColumnContent.astro",
         ThemeProvider: "./src/components/starlight/ThemeProvider.astro",
         ThemeSelect: "./src/components/starlight/Empty.astro",
       },

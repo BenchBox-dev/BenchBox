@@ -97,10 +97,17 @@
 }
 
 .site-header__link[aria-current="page"] {
-  text-decoration: underline;
-  text-decoration-color: currentColor;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 0.35rem;
+  background: var(--pill-bg);
+  color: var(--pill-fg);
+  font-weight: 600;
+}
+
+.site-header__tools {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  order: 3;
+  margin-left: auto;
 }
 
 .site-header__cta {
@@ -269,6 +276,11 @@
 @media (max-width: 56.25rem) {
   .site-header__toggle {
       display: inline-flex;
+      order: 3;
+    }
+
+  .site-header__tools {
+      order: 2;
     }
 
   .site-header__logo {

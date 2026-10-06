@@ -36,6 +36,7 @@ const { title, description, searchable = false, type = "website", robots } = Ast
   <body class="shell">
     <a class="skip-link" href="#main">Skip to content</a>
     <SiteHeader />
+    <slot name="context" />
     <main id="main" data-pagefind-body={searchable ? "" : undefined}>
       <slot />
     </main>

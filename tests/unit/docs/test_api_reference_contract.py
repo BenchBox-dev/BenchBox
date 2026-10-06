@@ -66,6 +66,7 @@ def test_documented_starlight_overrides_match_the_astro_config() -> None:
         "ThemeProvider",
         "ThemeSelect",
         "Sidebar",
+        "TwoColumnContent",
         "Search",
         "SocialIcons",
         "Hero",
