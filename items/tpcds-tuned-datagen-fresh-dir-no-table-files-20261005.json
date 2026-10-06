@@ -3,7 +3,7 @@
     "A documented root cause and a fix, or a documented decision that it is environmental, with the reproduction steps.",
     "A regression test or a gate that fails if tuned TPC-DS datagen from an empty output directory produces no tables."
   ],
-  "context": "Source: PR #2677 close-out, scratchpad logs chc-tpcds-gen.log and chc-tpcds2.log from the W2 session. Related: bound-datagen-sync-and-investigate-io-stall, datagen-empty-manifest-vacuous-validation-20261001 (done).",
+  "context": "Source: PR #2677 close-out, scratchpad logs chc-tpcds-gen.log and chc-tpcds2.log from the W2 session. Related: bound-datagen-sync-and-investigate-io-stall, datagen-empty-manifest-vacuous-validation-20261001 (done).\n\nCloseout 2026-10-06 (re-validation, read-only): PR #2706 MERGED to develop at b680d20710be655f24df87413d1f3a57397c5a34 (mergedAt 2026-10-06T05:40:56Z, head fix/tpcds-datagen-fresh-dir). Evidence: gh pr view state MERGED; statusCheckRollup clean (only oracle-review-shadow null, non-required); git show confirms fix in benchbox/core/tpcds/generator/manager.py (generate tuned sort inputs from compressed output) plus regression tests test_generate_local_tuned_with_compression_from_empty_dir and test_generate_local_tuned_reuse_applies_sorting. Original worker session 5709cef75a584579a236033476a263ba (finish 2026-10-06T06:02:15Z); ladder not re-run in this validation.",
   "description": "## Problem (observed, root cause unknown)\nDuring W2 PR C end-to-end runs, `benchbox run --platform clickhouse-local --benchmark tpcds --scale 0.01 --tuning tuned --phases generate,load,power` into a fresh `BENCHBOX_OUTPUT_DIR` failed in data generation with a message ending \"refusing to write a manifest that lists no tables\" (scan-v1 manifest, \"produced no table files\"). Generating once with `--tuning notuning --phases generate,load` into the same output directory first made the tuned run work. It happened more than once on macOS (Darwin 27, arm64) and was never reproduced in isolation or root-caused. The fail-loud behaviour is correct (datagen-empty-manifest-vacuous-validation-20261001); the cause of the empty generation is not understood.\n\n## Change\n- Reproduce with a clean output directory and capture the datagen log (the dsdgen invocation, working directory, and files produced).\n- Find out whether it depends on tuning mode, the output directory being empty, the compression step or tool (zstd), or macOS specifics.\n- Fix the cause, add a regression test, and keep the fail-loud check.\n\n## Guardrails\n- Do not weaken the empty-manifest validation.",
   "links": [
     "benchbox/core/tpcds",
@@ -35,6 +35,14 @@
       "op": "finish",
       "op_id": "138afb54488646aaa789cd5b261f66f6",
       "session_id": "5709cef75a584579a236033476a263ba"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:f3947ef8d62ddbe70b6706e6",
+      "at": "2026-10-06T15:47:26Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "72e4a3701c80472393f3484130389409",
+      "session_id": "6a33af84e93c469ebdeae2d73e412c6f"
     }
   ]
 }
