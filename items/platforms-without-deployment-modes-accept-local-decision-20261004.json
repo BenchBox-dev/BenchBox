@@ -44,6 +44,15 @@
       "op": "release",
       "op_id": "0ac5c98acaf14d2789c5893ac0da8c4f",
       "session_id": "886444b9f5294b15856d1f4489297eb4"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680",
+      "at": "2026-10-06T04:52:18Z",
+      "client": "tbh",
+      "generation": "9890068f572b475f8e0566ac0d809397",
+      "op": "take",
+      "op_id": "57029ddb0cf742799f7210fadc74b180",
+      "session_id": "886444b9f5294b15856d1f4489297eb4"
     }
   ]
 }
