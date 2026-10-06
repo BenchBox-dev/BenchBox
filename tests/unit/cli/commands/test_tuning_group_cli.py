@@ -350,6 +350,45 @@ class TestTuningValidateSql:
         assert "Configuration file is empty" in output
 
 
+class TestTuningValidateMode:
+    def test_sql_datafusion_file_validates_with_mode_sql(self, tmp_path):
+        target = tmp_path / "datafusion_tuned.yaml"
+        target.write_text("table_tunings: {}\n")
+
+        result, output = _run_validate([str(target), "--platform", "datafusion", "--mode", "sql"])
+
+        assert result.exit_code == 0, output
+        assert "Enabled tuning types: 4" in output
+
+    def test_dataframe_file_rejected_with_mode_sql(self):
+        template = REPO_ROOT / "examples/tunings/dataframe/polars_optimized.yaml"
+
+        result, output = _run_validate([str(template), "--platform", "datafusion", "--mode", "sql"])
+
+        assert result.exit_code != 0
+        assert "DataFrame tuning file" in output
+
+    def test_auto_datafusion_validates_dataframe_file(self, tmp_path):
+        from benchbox.core.dataframe.tuning import get_smart_defaults, save_dataframe_tuning
+
+        target = tmp_path / "datafusion_df.yaml"
+        save_dataframe_tuning(get_smart_defaults("datafusion"), target, platform="datafusion")
+
+        result, output = _run_validate([str(target), "--platform", "datafusion"])
+
+        assert result.exit_code == 0, output
+        assert "Configuration is valid for datafusion" in output
+
+    def test_dataframe_mode_rejected_for_sql_platform(self, tmp_path):
+        target = tmp_path / "tuned.yaml"
+        target.write_text("table_tunings: {}\n")
+
+        result, output = _run_validate([str(target), "--platform", "duckdb", "--mode", "dataframe"])
+
+        assert result.exit_code != 0
+        assert "does not support DataFrame mode" in output
+
+
 class TestTuningDefaults:
     def test_defaults_exits_zero(self):
         from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration

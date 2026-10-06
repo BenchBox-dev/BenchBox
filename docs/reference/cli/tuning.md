@@ -173,9 +173,18 @@ benchbox tuning init --platform dask --output ./configs/dask_tuning.yaml
   non-zero. A DataFrame tuning file passed with a SQL platform is rejected.
   An unknown platform name exits with code 2 and lists the accepted names.
 
+`--mode [sql|dataframe|auto]` (default: auto) selects the file kind for
+platforms with both modes (`datafusion`); auto detects it from the platform.
+A SQL DataFusion tuning file is validated with `--mode sql`. The same rule
+holds at run time: SQL-mode runs never resolve a DataFrame profile
+(`examples/tunings/dataframe/*_optimized.yaml`) during template discovery,
+and a DataFrame tuning file passed to a SQL-mode run is refused with an
+actionable error instead of loading as an empty configuration.
+
 ```bash
 benchbox tuning validate polars_tuning.yaml --platform polars
 benchbox tuning validate examples/tunings/duckdb/tpch_tuned.yaml --platform duckdb
+benchbox tuning validate datafusion_tuned.yaml --platform datafusion --mode sql
 ```
 
 ### Show Smart Defaults

@@ -39,6 +39,54 @@ if TYPE_CHECKING:
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
+UNIFIED_TUNING_KEYS = frozenset(
+    {
+        "primary_keys",
+        "foreign_keys",
+        "unique_constraints",
+        "check_constraints",
+        "platform_optimizations",
+        "table_tunings",
+    }
+)
+
+DATAFRAME_TUNING_KEYS = frozenset(
+    {
+        "execution",
+        "memory",
+        "data_types",
+        "parallelism",
+        "io",
+        "gpu",
+    }
+)
+
+
+def is_dataframe_tuning_file(path_or_data: Path | str | dict) -> bool:
+    """Report whether a tuning file holds a DataFrame tuning configuration.
+
+    A DataFrame tuning file parsed as a SQL unified tuning file yields an
+    empty configuration with no error, so SQL-mode callers use this to
+    refuse such files with an actionable message instead of silently
+    running untuned.
+    """
+    if isinstance(path_or_data, (Path, str)):
+        from benchbox.core.config_utils import load_config_file
+
+        try:
+            data = load_config_file(Path(path_or_data))
+        except Exception:
+            return False
+    else:
+        data = path_or_data
+    if not isinstance(data, dict):
+        return False
+    metadata = data.get("_metadata")
+    if isinstance(metadata, dict) and metadata.get("format") == "dataframe_tuning":
+        return True
+    keys = set(data) - {"_metadata"}
+    return bool(keys & DATAFRAME_TUNING_KEYS) and not (keys & UNIFIED_TUNING_KEYS)
+
 
 def promote_tuning_provenance(
     database_config: DatabaseConfig | None,
@@ -185,7 +233,7 @@ def _dataframe_profile_path(platform: str) -> Path | None:
     return Path(f"examples/tunings/dataframe/{base}_optimized.yaml")
 
 
-def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
+def get_tuning_template_paths(platform: str, benchmark: str, *, mode: str | None = None) -> list[Path]:
     """Get all paths that will be searched for tuning templates.
 
     Search order (highest priority first):
@@ -202,7 +250,9 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
     5. DataFrame platforms only: the curated profile
        examples/tunings/dataframe/{platform}_optimized.yaml, searched after
        every per-benchmark tier. A DataFrame platform with no such file
-       continues to the tuned-fallback resolution.
+       continues to the tuned-fallback resolution. This tier is skipped for
+       SQL-mode runs: a DataFrame profile is never a SQL tuning file, so a
+       SQL run must never adopt it.
 
     The BENCHBOX_TUNING_PATH can be set to a custom directory containing
     platform-specific tuning templates following the same structure:
@@ -211,6 +261,8 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
     Args:
         platform: Platform name (e.g., 'duckdb', 'snowflake')
         benchmark: Benchmark name (e.g., 'tpch', 'tpcds')
+        mode: Execution mode ('sql', 'dataframe', or None when unknown).
+            The DataFrame profile tier is skipped for SQL-mode runs.
 
     Returns:
         List of paths in search order (first match wins)
@@ -238,9 +290,10 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
     # 4. Packaged resource (last resort; see docstring above)
     paths.append(packaged_template_path(template_platform, benchmark))
 
-    dataframe_profile = _dataframe_profile_path(platform)
-    if dataframe_profile is not None:
-        paths.append(dataframe_profile)
+    if mode != "sql":
+        dataframe_profile = _dataframe_profile_path(platform)
+        if dataframe_profile is not None:
+            paths.append(dataframe_profile)
 
     return paths
 
@@ -312,6 +365,7 @@ def resolve_tuning(
     logger: Logger | None = None,
     quiet: bool = False,
     non_interactive: bool = False,
+    mode: str | None = None,
 ) -> TuningResolution:
     """Resolve tuning configuration with full transparency.
 
@@ -327,6 +381,8 @@ def resolve_tuning(
         logger: Optional logger for debug output
         quiet: Suppress informational output
         non_interactive: Disable interactive prompts
+        mode: Execution mode ('sql', 'dataframe', or None when unknown).
+            SQL-mode runs never auto-discover a DataFrame profile.
 
     Returns:
         TuningResolution with full metadata about the resolution
@@ -347,7 +403,7 @@ def resolve_tuning(
 
     # === Case 3: tuned - auto-discovery or fallback ===
     if tuning_lower == "tuned":
-        return _resolve_tuned(platform, benchmark, config_manager, logger)
+        return _resolve_tuned(platform, benchmark, config_manager, logger, mode=mode)
 
     # === Case 4: Explicit file path ===
     tuning_path = Path(tuning_arg)
@@ -413,6 +469,8 @@ def _resolve_tuned(
     benchmark: str | None,
     config_manager: ConfigManager,
     logger: Logger | None,
+    *,
+    mode: str | None = None,
 ) -> TuningResolution:
     """Resolve tuned mode with auto-discovery or fallback."""
     resolution = TuningResolution(
@@ -438,7 +496,7 @@ def _resolve_tuned(
             resolution.warnings.append(f"Default tuning config '{default_config}' from benchbox.yaml not found")
 
     if platform and benchmark:
-        search_paths = get_tuning_template_paths(platform, benchmark)
+        search_paths = get_tuning_template_paths(platform, benchmark, mode=mode)
         resolution.searched_paths = search_paths
 
         # The packaged tier is always the last candidate in search_paths (see
