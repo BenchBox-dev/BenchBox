@@ -15791,6 +15791,13 @@
       "status": "done",
       "title": "Convert Read Primitives' 17 bare-string known-divergence waivers to detail-bounded ClassifiedDivergence"
     },
+    "real-world-suites-scale-text-reconciliation-20261006": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Reconcile FlightData scale text in the real-world suites item (SF 0.1/1.0 vs SF 1/5)"
+    },
     "rebuild-tpcds-binaries": {
       "claim": null,
       "needs": [

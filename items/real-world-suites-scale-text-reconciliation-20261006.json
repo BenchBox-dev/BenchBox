@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "The item text states one FlightData scale list for closeout, with no contradictory SF set between description, acceptance, and context",
+    "The campaign per-cell table reference is unambiguous about which cells count"
+  ],
+  "context": "Found during 2026-10-06 adversarial review of the cloud corpus plan: context cites an SF 1 and SF 5 interim policy while acceptance requires SF 0.1 and 1.0. Related: flightdata-source-status-and-alternatives (open) owns the SF 10 source decision.",
+  "description": "Reconcile the FlightData scale-factor text in live-cloud-benchmark-real-world-suites: its context cites an interim campaign policy of SF 1 and SF 5 with SF 10 held, while its acceptance requires SF 0.1 and 1.0 plus conditional SF 10. State which scales close the item and which belong to the campaign table only. No live runs in this item.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:d4c6ceae0de4d166359ede4c",
+      "at": "2026-10-06T18:55:31Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "38afd2b567654ca8882f667fdfd2e332",
+      "session_id": "508606d004364578b5da477b03baf36a"
+    }
+  ]
+}
