@@ -170,7 +170,7 @@ site-parity-diff: site-parity-inventory
 	@rm -f "$(SITE_PARITY_DIR)/published-diff.txt"
 	@status=0; \
 	uv run -- python scripts/site_inventory.py diff --baseline "$(SITE_PARITY_DIR)/inventory-sphinx" --candidate "$(SITE_PARITY_DIR)/inventory-astro" $(SITE_PARITY_REMOVALS) --allowed-differences "$(SITE_PARITY_DESIGN)/allowed-differences.json" || status=1; \
-	uv run -- python scripts/site_inventory.py check --inventory "$(SITE_PARITY_DIR)/inventory-astro" --known-broken "$(SITE_INVENTORY_KNOWN_BROKEN)" || status=1; \
+	uv run -- python scripts/site_inventory.py check --inventory "$(SITE_PARITY_DIR)/inventory-astro" --known-broken "$(SITE_INVENTORY_KNOWN_BROKEN)" --fail-on-stale || status=1; \
 	echo "site_inventory diff against the published baseline (informational)"; \
 	uv run -- python scripts/site_inventory.py diff --baseline "$(SITE_INVENTORY_BASELINE)" --candidate "$(SITE_PARITY_DIR)/inventory-astro" $(SITE_PARITY_REMOVALS) --allowed-differences "$(SITE_PARITY_DESIGN)/allowed-differences.json" > "$(SITE_PARITY_DIR)/published-diff.txt" || true; \
 	tail -n 1 "$(SITE_PARITY_DIR)/published-diff.txt"; \
