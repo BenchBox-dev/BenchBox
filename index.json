@@ -2813,10 +2813,15 @@
       "title": "ClickHouse Cloud Deployment Mode"
     },
     "clickhouse-cloud-existence-probe-attribute-error-20261004": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T04:20:41Z",
+        "generation": "f90a79f1b1a94ef683c4366eb2961511",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "ClickHouse Cloud: the existing-database probe raises AttributeError, so force_recreate is never exercised there"
     },
     "clickhouse-coffeeshop-dialect-overrides": {
