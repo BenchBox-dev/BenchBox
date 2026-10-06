@@ -7530,6 +7530,13 @@
       "status": "done",
       "title": "Clarify Phase path and compat check wording"
     },
+    "docs-reference-contract-pages-decision": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Decide whether public-contracts and hosted-results-contract stay published"
+    },
     "docs-rewrite-architecture-and-structure": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "Decision recorded and applied in both renderers (Astro converter and Sphinx)"
+  ],
+  "description": "docs/reference/public-contracts.md and docs/reference/hosted-results-contract.md were trimmed of internal material but still mix a public contract with maintainer governance or rollout planning. Keep, split into a short public page plus an internal page, or unpublish.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:17:53Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f24b9181b1564351a7ad34f2b331e38a",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}
