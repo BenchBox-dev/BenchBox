@@ -20735,7 +20735,7 @@
       "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "blocked",
       "title": "Audit whether Redshift, Snowflake and Databricks planners exploit the TPC-DS informational keys (needs live-cloud approval)"
     },
     "tpcds-maintenance-delete-limit-syntax-error-swallowed-20261004": {
