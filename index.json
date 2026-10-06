@@ -20860,15 +20860,10 @@
       "title": "Make the weekly TPC-DS SF1 qualification report flag only new printed-answer mismatches"
     },
     "tpcds-qualification-q17-malformed-answer": {
-      "claim": {
-        "expires_at": "2026-10-07T14:10:21Z",
-        "generation": "ae38bd27bf3a4b079adab9ba467ad25d",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Decide how the TPC-DS qualification runner handles the malformed official Q17 answer file"
     },
     "tpcds-qualification-q85-q93-returns-data": {
