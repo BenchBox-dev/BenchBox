@@ -19744,15 +19744,10 @@
       "title": "Stop manufacturing zero durations in throughput result capture"
     },
     "stream-capability-single-source-of-truth": {
-      "claim": {
-        "expires_at": "2026-10-07T19:25:01Z",
-        "generation": "cf4e5ed52eb44ab99bab674fee9ce910",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Stream connection capability is declared twice (class attribute vs manifest) and maintenance skips the gate"
     },
     "streamline-pytest-run-profiles": {
