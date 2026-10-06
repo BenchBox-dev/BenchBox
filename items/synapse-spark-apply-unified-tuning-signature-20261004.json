@@ -3,7 +3,7 @@
     "Test: every registered adapter's `apply_unified_tuning` accepts the arguments the base setup phase passes.",
     "Synapse Spark with tuning enabled gets past the apply step against a fake service."
   ],
-  "context": "Source: PR #2632 contract-test author report (2026-10-04). File path of the Synapse Spark adapter is a best guess; confirm with `grep -rn \"class SynapseSparkAdapter\" benchbox`.",
+  "context": "Implemented: Synapse apply_unified_tuning aligned to (unified_config, connection); other cloud Spark adapters audited (no same drift); tuning-arity conformance test added; synapse exemption removed from contract test. PR #2694 (head 823865915f2b) reviewed clean, attested, armed; state=MERGED at 2026-10-06T04:27:45Z, merge commit d6065a9198ee. Verified: synapse coverage + arity/contract suites green, ruff clean, pr-preflight green.",
   "description": "## Problem (observed by the contract-test author; reproduced against fakes, not a real Synapse workspace)\n`SynapseSparkAdapter.apply_unified_tuning(unified_config)` takes one argument. The base setup phase calls `apply_unified_tuning(config, connection)`. With tuning enabled the call raises `TypeError`.\n\n## Change\n- Align the signature with the base method (`unified_config, connection`) and check the other cloud Spark adapters (EMR Serverless, Dataproc Serverless, Fabric Spark, Athena Spark, Glue, Quanton) for the same drift.\n- Add a signature-conformance test over every adapter's `apply_unified_tuning` against the base method.\n\n## Guardrails (must preserve)\n- No live cloud runs without explicit approval stating the command, maximum runtime, log path and stop condition.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
   "links": [
     "benchbox/platforms/azure/synapse_spark.py",
@@ -25,6 +25,14 @@
       "generation": "173b2acdcd144192b50757bc2ae78388",
       "op": "take",
       "op_id": "7c5e6577c5f04720b6616248bef3e200",
+      "session_id": "886444b9f5294b15856d1f4489297eb4"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680",
+      "at": "2026-10-06T04:30:08Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "e8a61a4254784ed09aaa0e551d30f5aa",
       "session_id": "886444b9f5294b15856d1f4489297eb4"
     }
   ]
