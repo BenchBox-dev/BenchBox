@@ -21005,15 +21005,10 @@
       "title": "TPC-DS PySpark Compatibility - Add missing UnifiedExpr methods and context functions"
     },
     "tpcds-qphds-nonspec-formula": {
-      "claim": {
-        "expires_at": "2026-10-07T19:22:33Z",
-        "generation": "db18116a62c3406bb21fa387b7c61944",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Stop exporting non-spec QphDS@Size as official and count 99 queries per stream"
     },
     "tpcds-qphds-spec-metric-implementation": {
