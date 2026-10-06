@@ -17980,10 +17980,15 @@
       "title": "Consolidate run-official into run --official flag"
     },
     "run-py-module-size-allowlist-growth-20261004": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T07:47:24Z",
+        "generation": "80c06f9ad6a74f9a96c3bb0aa7218fb3",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "benchbox/cli/commands/run.py keeps growing: extract platform and selector resolution so the size allowlist stops being re-baselined"
     },
     "run-service-all-exports-private-names": {
