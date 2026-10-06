@@ -100,6 +100,11 @@ PHASE_DDL = "ddl"
 PHASE_POST_LOAD = "post_load"
 PHASE_SESSION = "session"
 
+# Satisfied-intent marker for a requested state that already held in the
+# catalog, so no statement executed to realize it. Not an index into
+# ``statements`` -- there is no realizing statement to point at.
+SATISFIED_BY_PREEXISTING_STATE = -1
+
 # Read-only statement prefixes the recorder must NOT log: adapters run readbacks
 # through the same wrapped connection (e.g. ClickHouse's
 # validate_session_cache_control issues `SELECT ... FROM system.settings` to

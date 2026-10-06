@@ -287,8 +287,16 @@ def test_missing_tuning_metadata_on_an_empty_database_is_not_an_error(tmp_path, 
     adapter, errors = handle_existing(tmp_path, outcome, caplog)
 
     assert not any(NO_TUNING_METADATA_ERROR in message for message in errors)
-    assert any("Missing tables" in message for message in errors)
+    assert not any("Missing tables" in message for message in errors)
     adapter._remove_database.assert_called_once()
+
+
+def test_missing_tables_on_a_populated_database_is_still_an_error(tmp_path, caplog):
+    outcome = validation_outcome(["Missing tables: ORDERS"], database_empty=False)
+
+    _adapter, errors = handle_existing(tmp_path, outcome, caplog)
+
+    assert any("Missing tables" in message for message in errors)
 
 
 def test_missing_tuning_metadata_on_a_populated_database_is_still_an_error(tmp_path, caplog):

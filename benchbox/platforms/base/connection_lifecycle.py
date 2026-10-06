@@ -302,7 +302,12 @@ class ConnectionLifecycleMixin:
 
             fresh_database_issue = f"Tuning: {NO_TUNING_METADATA_ERROR}"
             for issue in validation_result.issues:
-                if issue == fresh_database_issue and validation_result.database_empty:
+                if getattr(validation_result, "database_empty", False) and (
+                    issue == fresh_database_issue or issue.startswith("Missing tables:")
+                ):
+                    # A database holding none of the benchmark's tables is
+                    # recreated either way; reporting the expected absence as
+                    # an error misleads, so it stays in verbose output only.
                     self.log_verbose(issue)
                 else:
                     self.logger.error(f"❌ {issue}")
