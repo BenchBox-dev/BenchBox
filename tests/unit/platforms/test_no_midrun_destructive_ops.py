@@ -826,10 +826,7 @@ SPECS: dict[str, Spec] = {
     ),
     "motherduck": Spec(config={"token": "tok"}, connection_sites=("execute_query", "test_connection")),
     "polars": Spec(config={"working_dir": "{world}/db/dir_db"}),
-    "pyspark": Spec(
-        no_positive_control="create_connection runs the existing-database check before the Spark session exists, "
-        "so check_server_database_exists reports no database",
-    ),
+    "pyspark": Spec(),
     "quanton": Spec(config={**AWS, "api_key": "key"}),
     "snowflake": Spec(config={"account": "acct"}),
     "snowpark-connect": Spec(config={"account": "acct", "user": "user"}),
@@ -1301,6 +1298,30 @@ def test_force_recreate_still_acts_at_the_first_connection(case, world, ledger):
         assert not acted, f"exemption is stale, the adapter now acts: {describe(acted)}"
     else:
         assert acted, "force_recreate did not remove anything at the first connection"
+
+
+def test_pyspark_force_recreate_drops_existing_database_only_once(world, ledger):
+    """PySpark decides reuse/recreate against the live session catalog, once per run."""
+    case = next(case for case in CASES if case.key == "pyspark" and not case.variant)
+    adapter = make_adapter(case, world, ledger, force_recreate=True)
+    outcome = Outcome()
+    create_connection = instrument(adapter, ledger, outcome)
+
+    adapter._reset_run_scoped_state()
+    first = create_connection()
+    drops = [
+        event for event in ledger.in_phase("decision", destructive=True) if "DROP DATABASE" in event.target.upper()
+    ]
+    assert drops, "force_recreate did not drop the existing database at the first connection:\n" + describe(
+        ledger.events
+    )
+
+    second = create_connection()
+    adapter.close_connection(first)
+    adapter.close_connection(second)
+
+    assert outcome.decision_calls == 1, f"existing-database decision ran {outcome.decision_calls} times"
+    assert not ledger.violations(), describe(ledger.violations())
 
 
 @pytest.mark.parametrize("case", CASE_PARAMS)
