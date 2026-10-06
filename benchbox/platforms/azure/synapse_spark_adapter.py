@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import argparse
@@ -491,10 +487,11 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
 
     def apply_unified_tuning(
         self,
-        config: UnifiedTuningConfiguration,
+        unified_config: UnifiedTuningConfiguration,
+        connection: Any,
     ) -> None:
-        if hasattr(config, "platform_optimization"):
-            self.apply_platform_tuning(config.platform_optimization)
+        if hasattr(unified_config, "platform_optimization"):
+            self.apply_platform_tuning(unified_config.platform_optimization)
 
     @classmethod
     def add_cli_arguments(cls, parser: Any) -> None:

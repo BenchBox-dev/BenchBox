@@ -84,7 +84,7 @@ export function PowerBar({ summary }: Props) {
                 fill={color}
                 rx={2}
               >
-                <title>{`${row.fullLabel}: ${valueText} QphH`}</title>
+                <title>{`${row.fullLabel}: ${valueText} Power@Size`}</title>
               </rect>
               <text
                 x={layout.labelAbove ? w : layout.plotX + barW + 6}
@@ -133,7 +133,7 @@ export function PowerBar({ summary }: Props) {
             text-anchor="middle"
             style={{ fontSize: "10px", fill: "var(--bb-chart-label-muted)" }}
           >
-            Power@Size (QphH) - higher is better
+            Power@Size - higher is better
           </text>
         </g>
       </svg>

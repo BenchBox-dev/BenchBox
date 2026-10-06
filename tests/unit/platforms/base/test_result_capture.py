@@ -241,7 +241,7 @@ def test_throughput_sql_metadata_matches_the_production_generation_convention(se
     throughput._pregenerate_stream_queries(config)
     base_seed = config.base_seed
     for stream in range(2):
-        emitted = [call["seed"] for call in calls if call["stream_id"] == stream]
+        emitted = [call["seed"] for call in calls if call["params"]["stream_id"] == stream]
         assert emitted == [base_seed + 1001 * stream + position for position in range(22)]
     metadata, _, _ = _MetadataHost()._build_execution_metadata(
         {"benchmark_name": "tpch", "seed": seed, "test_execution_type": "throughput"}

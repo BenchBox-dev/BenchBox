@@ -7,7 +7,7 @@ from benchbox.cli.shared import console
     "calculate-qphh",
     hidden=True,
     deprecated=True,
-    help=("Calculate TPC-H QphH@Size. Deprecated; use `benchbox metrics qphh`."),
+    help=("Calculate Power@Size and Throughput@Size. Deprecated; use `benchbox metrics qphh`."),
 )
 @click.option("--power-results", type=click.Path(exists=True), required=True, help="Path to power results JSON")
 @click.option(

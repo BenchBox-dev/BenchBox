@@ -156,6 +156,32 @@ class TestPandasDataLoading:
         assert not pd.api.types.is_datetime64_any_dtype(df["d_date_sk"])
         assert pd.api.types.is_datetime64_any_dtype(df["EventTime"])
 
+    def test_read_csv_date_columns_keep_missing_values_as_null(self, tmp_path):
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "items.dat"
+        csv_path.write_text("1|1998-01-02|\n2||2001-05-06\n")
+
+        df = adapter.read_csv(
+            csv_path,
+            delimiter="|",
+            header=None,
+            names=["i_id", "i_rec_start_date", "i_rec_end_date"],
+            null_marker="",
+        )
+
+        assert df["i_rec_start_date"].tolist() == [date(1998, 1, 2), pd.NA]
+        assert df["i_rec_end_date"].tolist() == [pd.NA, date(2001, 5, 6)]
+        assert str(df["i_rec_start_date"].dtype) == "date32[day][pyarrow]"
+
+    def test_read_csv_date_columns_fall_back_for_non_iso_text(self, tmp_path):
+        adapter = PandasDataFrameAdapter()
+        csv_path = tmp_path / "events.dat"
+        csv_path.write_text("1|Jan 2 1998\n2|1999-03-04\n")
+
+        df = adapter.read_csv(csv_path, delimiter="|", header=None, names=["id", "event_date"], null_marker="")
+
+        assert df["event_date"].tolist() == [date(1998, 1, 2), date(1999, 3, 4)]
+
     def test_read_csv_type_aware_date_parsing_by_declared_type(self, tmp_path):
         adapter = PandasDataFrameAdapter()
         csv_path = tmp_path / "hits.csv"

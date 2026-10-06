@@ -1,5 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
 from __future__ import annotations
 
 import json
@@ -331,6 +329,7 @@ def test_generate_local_with_data_organization(tmp_gen, tmp_path):
     )
 
     fake_paths = {"customer": [tmp_path / "customer.dat"]}
+    tmp_gen.should_use_compression = MagicMock(return_value=False)
     tmp_gen.validator = MagicMock()
     tmp_gen.validator.should_regenerate_data.return_value = (True, None)
     tmp_gen._log_regeneration_reason = MagicMock()
@@ -435,3 +434,64 @@ def test_init_with_valid_data_organization_env_var(tmp_path, monkeypatch):
         assert gen is not None
     except Exception:
         pass
+
+
+@pytest.fixture
+def tmp_tuned_gen(tmp_gen, tmp_path):
+    from benchbox.core.data_organization.config import DataOrganizationConfig, SortColumn
+    from benchbox.utils.compression import CompressionManager
+
+    tmp_gen.compress_data = True
+    tmp_gen.compression_type = "zstd"
+    tmp_gen.compression_level = None
+    tmp_gen.compression_manager = CompressionManager()
+    tmp_gen._data_organization_config = DataOrganizationConfig(table_configs={"item": [SortColumn(name="i_item_sk")]})
+    tmp_gen.dsdgen_available = True
+    tmp_gen.output_dir = tmp_path
+    return tmp_gen
+
+
+def _write_compressed_tbl(path, rows):
+    import zstandard as zstd
+
+    with zstd.open(path, "wb") as f:
+        f.write(("\n".join(rows) + "\n").encode())
+
+
+def _item_tbl_rows(gen):
+    width = len(gen._build_schema_registry()["item"]["columns"])
+    return ["|".join(f"v{i}" for i in range(width)) for _ in range(3)]
+
+
+def test_generate_local_tuned_with_compression_from_empty_dir(tmp_tuned_gen, tmp_path, monkeypatch):
+    rows = _item_tbl_rows(tmp_tuned_gen)
+
+    def fake_dsdgen(output_dir):
+        _write_compressed_tbl(output_dir / "item.dat.zst", rows)
+        _write_compressed_tbl(output_dir / "customer.dat.zst", ["a|b"])
+
+    monkeypatch.setattr(tmp_tuned_gen, "_run_dsdgen_native", fake_dsdgen)
+    monkeypatch.setattr(tmp_tuned_gen.validator, "should_regenerate_data", lambda target_dir, force: (True, None))
+
+    result = tmp_tuned_gen._generate_local()
+
+    assert set(result) == {"item", "customer"}
+    assert result["item"][0].suffix == ".parquet"
+    assert result["item"][0].exists()
+    assert result["customer"][0].suffix == ".zst"
+    manifest = json.loads((tmp_path / "_datagen_manifest.json").read_text())
+    assert manifest["tables"]["item"][0]["path"].endswith(".parquet")
+    assert manifest["tables"]["customer"][0]["path"].endswith(".zst")
+
+
+def test_generate_local_tuned_reuse_applies_sorting(tmp_tuned_gen, tmp_path, monkeypatch):
+    _write_compressed_tbl(tmp_path / "item.dat.zst", _item_tbl_rows(tmp_tuned_gen))
+    _write_compressed_tbl(tmp_path / "customer.dat.zst", ["a|b"])
+    monkeypatch.setattr(tmp_tuned_gen.validator, "should_regenerate_data", lambda target_dir, force: (False, None))
+
+    result = tmp_tuned_gen._generate_local()
+
+    assert result["item"][0].suffix == ".parquet"
+    assert (tmp_path / "item.parquet").exists()
+    manifest = json.loads((tmp_path / "_datagen_manifest.json").read_text())
+    assert manifest["tables"]["item"][0]["path"].endswith(".parquet")

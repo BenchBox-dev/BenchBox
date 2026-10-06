@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import bz2
@@ -21,7 +17,7 @@ from benchbox.core.tpch.generator import TPCHDataGenerator
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler, is_cloud_path
 from benchbox.utils.compression_mixin import CompressionMixin
-from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
+from benchbox.utils.datagen_manifest import DataGenerationManifest, require_manifest_files, resolve_compression_metadata
 from benchbox.utils.file_format import detect_compression
 from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
@@ -201,6 +197,7 @@ class PrimitivesDataGeneratorBase(CompressionMixin, CloudStorageGeneratorMixin, 
             seed=getattr(self.tpch_generator, "seed", None),
         )
 
+        file_count = 0
         for table_name, file_path in table_paths.items():
             if table_name in ["orders_stage", "orders"]:
                 expected_rows = self._get_tpch_row_count("orders")
@@ -225,9 +222,12 @@ class PrimitivesDataGeneratorBase(CompressionMixin, CloudStorageGeneratorMixin, 
                 for i, chunk_file in enumerate(file_path):
                     rc = rows_per_chunk + (remainder if i == chunk_count - 1 else 0)
                     manifest.add_entry(table_name, chunk_file, row_count=rc)
+                file_count += chunk_count
             else:
                 manifest.add_entry(table_name, file_path, row_count=expected_rows)
+                file_count += 1
 
+        require_manifest_files(file_count, label=self._display_name, output_dir=self.output_dir)
         manifest.write()
         self.log_verbose(f"Wrote manifest with {len(table_paths)} tables")
 

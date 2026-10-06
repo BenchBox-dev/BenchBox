@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import logging
@@ -72,11 +68,11 @@ class InfluxDBSetupMixin:
             self.logger.warning(f"Error closing connection: {e}")
 
     def handle_existing_database(self, **connection_config) -> None:
-        if getattr(self, "force_recreate", False):
-            self.logger.warning(
-                "InfluxDB does not support database recreation via SQL. "
-                "Database must be managed via InfluxDB UI or API."
-            )
+        self.fail_closed_on_force_recreate(
+            platform_label="InfluxDB",
+            database=connection_config.get("database", getattr(self, "database", None)),
+            manual_hint="Delete the database manually via the InfluxDB UI, CLI, or management API",
+        )
         base_handler = getattr(super(), "handle_existing_database", None)
         if base_handler is not None:
             base_handler(**connection_config)

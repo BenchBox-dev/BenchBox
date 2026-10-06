@@ -23,6 +23,7 @@ from benchbox.core.power_harnesses import (
 )
 from benchbox.core.results.builder import benchmark_family, normalize_benchmark_id
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT, QUERY_RUN_TYPE_WARMUP
+from benchbox.core.schemas import MIN_THROUGHPUT_STREAMS
 from benchbox.core.throughput.containment import await_quiescence, check_phase_boundary
 from benchbox.core.throughput.result import throughput_result_succeeded
 from benchbox.core.tpch.platform_power import _power_query_result, _power_test_error_result
@@ -39,14 +40,67 @@ from benchbox.utils.printing import quiet_console
 __all__ = ["TestDriversMixin", "_power_query_result", "_power_test_error_result"]
 
 
-def _resolve_requested_stream_count(run_config: dict, default: int = 2) -> int:
-    resolved = default
-    for key in ("num_streams", "streams", "concurrent_streams"):
+def _require_stream_minimum(count: int, source: str) -> int:
+    if count < MIN_THROUGHPUT_STREAMS:
+        raise ValueError(
+            f"Throughput requires at least {MIN_THROUGHPUT_STREAMS} concurrent streams (TPC minimum); "
+            f"got {count} from '{source}'."
+        )
+    return count
+
+
+def _resolve_requested_stream_count(run_config: dict, default: int = MIN_THROUGHPUT_STREAMS) -> int:
+    for key in ("num_streams", "streams"):
         value = run_config.get(key)
         if value is not None:
-            resolved = int(value)
-            break
-    return max(resolved, 2)
+            return _require_stream_minimum(int(value), key)
+    value = run_config.get("concurrent_streams")
+    if value is None:
+        return default
+    return _require_stream_minimum(int(value), "concurrent_streams")
+
+
+def _finalize_throughput_metrics(result: Any, num_streams: int, query_subset: list[str] | None) -> None:
+    result.success = throughput_result_succeeded(result, num_streams)
+    if not result.success:
+        result.throughput_at_size = None
+        result.query_throughput = 0.0
+    elif query_subset:
+        result.throughput_at_size = None
+
+
+def _format_throughput_metric(result: Any) -> str:
+    if result.throughput_at_size is None:
+        return "Throughput@Size not reported (query_subset runs are not TPC-compliant)"
+    return f"Throughput@Size = {result.throughput_at_size:.2f}"
+
+
+def _describe_stream_timeout(cfg: Any, run_config: dict) -> str:
+    timeout = "no timeout" if cfg.stream_timeout == 0 else f"{cfg.stream_timeout}s"
+    if run_config.get("stream_timeout_seconds") is None:
+        source = "benchmark default"
+    else:
+        source = run_config.get("stream_timeout_source") or "run option"
+    return f"Stream timeout: {timeout} ({source})"
+
+
+def _throughput_config_options(run_config: dict) -> dict[str, Any]:
+    options: dict[str, Any] = {
+        "verbose": run_config.get("verbose", False),
+        "cancel_on_timeout": bool(run_config.get("cancel_on_timeout", False)),
+    }
+    timeout = run_config.get("stream_timeout_seconds")
+    if timeout is not None:
+        if int(timeout) < 0:
+            raise ValueError(f"stream_timeout_seconds must be >= 0 (0 disables the timeout); got {timeout}")
+        options["stream_timeout"] = int(timeout)
+    query_subset = run_config.get("query_subset")
+    if query_subset:
+        options["query_subset"] = [str(query_id) for query_id in query_subset]
+    seed = run_config.get("seed")
+    if seed is not None:
+        options["base_seed"] = int(seed)
+    return options
 
 
 class _CapturedPlan(NamedTuple):
@@ -154,7 +208,7 @@ class TestDriversMixin:
 
     def _execute_tpcds_throughput_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
         from benchbox.core.expected_results.tpcds_results import parse_validation_mode, set_config_validation_mode
-        from benchbox.core.tpcds.throughput_test import TPCDSThroughputTest
+        from benchbox.core.tpcds.throughput_test import TPCDSThroughputTest, TPCDSThroughputTestConfig
 
         console = quiet_console
 
@@ -171,7 +225,7 @@ class TestDriversMixin:
                 f"[green]Running TPC-DS Throughput Test (Scale Factor: {scale_factor}, Streams: {num_streams})[/green]"
             )
 
-            require_throughput_stream_capability(self, platform_name=self.platform_name)
+            require_throughput_stream_capability(self, platform_name=self.platform_name, connection=connection)
             benchmark_type = run_config.get("benchmark_type", "olap")
 
             def connection_factory():
@@ -194,26 +248,15 @@ class TestDriversMixin:
                 dialect=self.get_target_dialect(),
             )
 
-            seed = run_config.get("seed")
-            if seed is not None:
-                from benchbox.core.tpcds.throughput_test import (
-                    TPCDSThroughputTestConfig,
-                )
+            cfg = TPCDSThroughputTestConfig(
+                scale_factor=scale_factor,
+                num_streams=num_streams,
+                **_throughput_config_options(run_config),
+            )
+            console.print(f"[dim]{_describe_stream_timeout(cfg, run_config)}[/dim]")
+            throughput_test_result = throughput_test.run(config=cfg)
 
-                cfg = TPCDSThroughputTestConfig(
-                    scale_factor=scale_factor,
-                    num_streams=num_streams,
-                    base_seed=int(seed),
-                    verbose=verbose,
-                )
-                throughput_test_result = throughput_test.run(config=cfg)
-            else:
-                throughput_test_result = throughput_test.run()
-
-            throughput_test_result.success = throughput_result_succeeded(throughput_test_result, num_streams)
-            if not throughput_test_result.success:
-                throughput_test_result.throughput_at_size = None
-                throughput_test_result.query_throughput = 0.0
+            _finalize_throughput_metrics(throughput_test_result, num_streams, cfg.query_subset)
 
             if self.very_verbose:
                 with contextlib.suppress(Exception):
@@ -234,7 +277,7 @@ class TestDriversMixin:
 
             if throughput_test_result.success:
                 console.print(
-                    f"[green]✅ TPC-DS Throughput Test completed: Throughput@Size = {throughput_test_result.throughput_at_size:.2f}[/green]"
+                    f"[green]✅ TPC-DS Throughput Test completed: {_format_throughput_metric(throughput_test_result)}[/green]"
                 )
                 console.print(
                     f"  Streams executed: {throughput_test_result.streams_executed}, Successful: {throughput_test_result.streams_successful}"
@@ -285,6 +328,8 @@ class TestDriversMixin:
             ]
 
     def _execute_tpch_throughput_test(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:
+        from benchbox.core.expected_results.models import ValidationMode
+        from benchbox.core.expected_results.tpcds_results import parse_validation_mode
         from benchbox.core.tpch.throughput_test import (
             TPCHThroughputTest,
             TPCHThroughputTestConfig,
@@ -301,12 +346,15 @@ class TestDriversMixin:
                 f"[green]Running TPC-H Throughput Test (Scale Factor: {scale_factor}, Streams: {num_streams})[/green]"
             )
 
-            require_throughput_stream_capability(self, platform_name=self.platform_name)
+            require_throughput_stream_capability(self, platform_name=self.platform_name, connection=connection)
             benchmark_type = run_config.get("benchmark_type", "olap")
+
+            validate_row_counts = parse_validation_mode(run_config.get("validation_mode")) is not ValidationMode.SKIP
 
             def connection_factory():
                 stream_connection = open_stream_connection(self, connection, benchmark_type)
                 conn_wrapper = PlatformAdapterConnection(stream_connection, self)
+                conn_wrapper._validate_row_count = validate_row_counts
                 conn_wrapper.benchmark_type = "tpch"
                 conn_wrapper.scale_factor = scale_factor
                 return conn_wrapper
@@ -317,29 +365,23 @@ class TestDriversMixin:
                 scale_factor=scale_factor,
                 num_streams=num_streams,
                 verbose=verbose,
+                dialect=self.get_target_dialect(),
             )
 
-            seed = run_config.get("seed")
-            if seed is not None:
-                cfg = TPCHThroughputTestConfig(
-                    scale_factor=scale_factor,
-                    num_streams=num_streams,
-                    base_seed=int(seed),
-                    verbose=verbose,
-                )
-                throughput_test_result = throughput_test.run(config=cfg)
-            else:
-                throughput_test_result = throughput_test.run()
+            cfg = TPCHThroughputTestConfig(
+                scale_factor=scale_factor,
+                num_streams=num_streams,
+                **_throughput_config_options(run_config),
+            )
+            console.print(f"[dim]{_describe_stream_timeout(cfg, run_config)}[/dim]")
+            throughput_test_result = throughput_test.run(config=cfg)
 
-            throughput_test_result.success = throughput_result_succeeded(throughput_test_result, num_streams)
-            if not throughput_test_result.success:
-                throughput_test_result.throughput_at_size = None
-                throughput_test_result.query_throughput = 0.0
+            _finalize_throughput_metrics(throughput_test_result, num_streams, cfg.query_subset)
             self._last_throughput_test_result = throughput_test_result
 
             if throughput_test_result.success:
                 console.print(
-                    f"[green]✅ TPC-H Throughput Test completed: Throughput@Size = {throughput_test_result.throughput_at_size:.2f}[/green]"
+                    f"[green]✅ TPC-H Throughput Test completed: {_format_throughput_metric(throughput_test_result)}[/green]"
                 )
                 console.print(
                     f"  Streams executed: {throughput_test_result.streams_executed}, Successful: {throughput_test_result.streams_successful}"
@@ -397,8 +439,10 @@ class TestDriversMixin:
 
             console.print(f"[green]Running TPC-DS Maintenance Test (Scale Factor: {scale_factor})[/green]")
 
+            benchmark_type = run_config.get("benchmark_type", "olap")
+
             def connection_factory():
-                stream_connection = self.new_stream_connection(connection)
+                stream_connection = open_stream_connection(self, connection, benchmark_type)
                 conn_wrapper = PlatformAdapterConnection(stream_connection, self)
                 conn_wrapper.benchmark_type = "tpcds"
                 conn_wrapper.scale_factor = scale_factor
@@ -480,8 +524,10 @@ class TestDriversMixin:
 
             console.print(f"[green]Running TPC-H Maintenance Test (Scale Factor: {scale_factor})[/green]")
 
+            benchmark_type = run_config.get("benchmark_type", "olap")
+
             def connection_factory():
-                stream_connection = self.new_stream_connection(connection)
+                stream_connection = open_stream_connection(self, connection, benchmark_type)
                 conn_wrapper = PlatformAdapterConnection(stream_connection, self, maintenance_mode=True)
                 conn_wrapper.benchmark_type = "tpch"
                 conn_wrapper.scale_factor = scale_factor
@@ -524,6 +570,7 @@ class TestDriversMixin:
                         "status": "SUCCESS" if op.success else "FAILED",
                         "rows_returned": op.rows_affected,
                         "test_type": "maintenance",
+                        **({} if op.success else {"error": getattr(op, "error", None) or "Unknown error"}),
                     }
                 )
 
@@ -589,6 +636,7 @@ class TestDriversMixin:
             return True
 
         self._post_measurement_contained = True
+        self._contained_throughput_result = result
         return False
 
     def _dispatch_queries_by_type(self, benchmark, connection: Any, run_config: dict) -> list[dict[str, Any]]:

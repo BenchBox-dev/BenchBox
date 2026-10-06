@@ -60,8 +60,8 @@ try:
     CURRENT_SCHEMA_VERSION: int = _READ_MODEL_VERSION
     CONTRACT_VERSION: str = _CONTRACT_VERSION
 except ImportError:
-    SUPPORTED_SCHEMA_VERSIONS: tuple[int, ...] = (11,)
-    CURRENT_SCHEMA_VERSION: int = 11
+    SUPPORTED_SCHEMA_VERSIONS: tuple[int, ...] = (12,)
+    CURRENT_SCHEMA_VERSION: int = 12
     CONTRACT_VERSION: str = "6"
 
 _TYPE_ALIASES: dict[str, str] = {
@@ -310,10 +310,13 @@ TABLE_COLUMNS_V11: dict[str, dict[str, str]] = {
     },
 }
 
+TABLE_COLUMNS_V12: dict[str, dict[str, str]] = {**TABLE_COLUMNS_V11}
+
 SCHEMA_REGISTRY: dict[int, dict[str, dict[str, str]]] = {
     9: TABLE_COLUMNS_V9,
     10: TABLE_COLUMNS_V10,
     11: TABLE_COLUMNS_V11,
+    12: TABLE_COLUMNS_V12,
 }
 
 REQUIRED_INDEXES_V9: list[tuple[str, str, list[str]]] = [
@@ -335,6 +338,8 @@ REQUIRED_VIEWS_V10: list[str] = list(REQUIRED_VIEWS_V9)
 
 REQUIRED_VIEWS_V11: list[str] = list(REQUIRED_VIEWS_V10)
 
+REQUIRED_VIEWS_V12: list[str] = list(REQUIRED_VIEWS_V11)
+
 REQUIRED_VIEW_COLUMNS_V11: dict[str, list[str]] = {
     "result_detail_metrics": [
         "override_rules",
@@ -354,6 +359,8 @@ def get_table_columns_for_version(version: int) -> dict[str, dict[str, str]]:
 def get_views_for_version(version: int) -> list[str]:
     if version not in SUPPORTED_SCHEMA_VERSIONS:
         raise ValueError(f"Unsupported schema version: {version}")
+    if version >= 12:
+        return list(REQUIRED_VIEWS_V12)
     if version >= 11:
         return list(REQUIRED_VIEWS_V11)
     return list(REQUIRED_VIEWS_V10)

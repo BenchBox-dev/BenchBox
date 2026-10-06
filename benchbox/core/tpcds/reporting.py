@@ -1,10 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-# This implementation is based on the TPC-DS specification.
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 import csv
 import json
 from dataclasses import asdict
@@ -75,19 +68,14 @@ class TPCDSReportGenerator:
             f.write("-" * 25 + "\n")
 
             if result.power_at_size:
-                f.write(f"Power@Size: {result.power_at_size:.2f} QphDS@Size\n")
+                f.write(f"Power@Size: {result.power_at_size:.2f}\n")
             else:
                 f.write("Power@Size: Not calculated\n")
 
             if result.throughput_at_size:
-                f.write(f"Throughput@Size: {result.throughput_at_size:.2f} QphDS@Size\n")
+                f.write(f"Throughput@Size: {result.throughput_at_size:.2f}\n")
             else:
                 f.write("Throughput@Size: Not calculated\n")
-
-            if result.qphds_at_size:
-                f.write(f"QphDS@Size: {result.qphds_at_size:.2f} (FINAL METRIC)\n")
-            else:
-                f.write("QphDS@Size: Not calculated\n")
 
             f.write("\n")
 
@@ -160,20 +148,15 @@ class TPCDSReportGenerator:
             if result.power_test and result.power_at_size:
                 f.write("Power@Size Calculation:\n")
                 f.write(f"  Formula: 3600 × {result.scale_factor} / {result.power_test.total_time:.2f}\n")
-                f.write(f"  Result: {result.power_at_size:.2f} QphDS@Size\n\n")
+                f.write(f"  Result: {result.power_at_size:.2f}\n\n")
 
             if result.throughput_test and result.throughput_at_size:
                 num_streams = result.num_streams
                 f.write("Throughput@Size Calculation:\n")
                 f.write(
-                    f"  Formula: {num_streams} × 3600 × {result.scale_factor} / {result.throughput_test.total_time:.2f}\n"
+                    f"  Formula: 99 × {num_streams} × 3600 × {result.scale_factor} / {result.throughput_test.total_time:.2f}\n"
                 )
-                f.write(f"  Result: {result.throughput_at_size:.2f} QphDS@Size\n\n")
-
-            if result.qphds_at_size:
-                f.write("QphDS@Size Calculation:\n")
-                f.write(f"  Formula: sqrt({result.power_at_size:.2f} × {result.throughput_at_size:.2f})\n")
-                f.write(f"  Result: {result.qphds_at_size:.2f} QphDS@Size\n\n")
+                f.write(f"  Result: {result.throughput_at_size:.2f}\n\n")
 
         return report_path
 
@@ -325,7 +308,6 @@ class TPCDSReportGenerator:
                     "Multi-stream execution in Throughput Test",
                     result.throughput_test and result.num_streams > 1,
                 ),
-                ("QphDS@Size calculated", result.qphds_at_size is not None),
                 ("No query failures", self._check_no_failures(result)),
                 ("Proper parameter generation", True),
                 (
@@ -369,9 +351,6 @@ class TPCDSReportGenerator:
             f.write("-" * 18 + "\n")
             f.write(f"Scale Factor: {result.scale_factor}\n")
             f.write(f"Total Execution Time: {result.total_benchmark_time:.2f} seconds\n")
-            f.write(
-                f"QphDS@Size: {result.qphds_at_size:.2f}\n" if result.qphds_at_size else "QphDS@Size: Not calculated\n"
-            )
             f.write("\n")
 
             for phase_name, phase_result in [
@@ -437,9 +416,8 @@ class TPCDSReportGenerator:
 
     <div class="metric">
         <h2>Official TPC-DS Metrics</h2>
-        <p><strong>Power@Size:</strong> {result.power_at_size:.2f} QphDS@Size</p>
-        <p><strong>Throughput@Size:</strong> {result.throughput_at_size:.2f} QphDS@Size</p>
-        <p><strong>QphDS@Size:</strong> <span style="font-size: 1.2em; color: blue;">{result.qphds_at_size:.2f}</span></p>
+        <p><strong>Power@Size:</strong> {result.power_at_size:.2f}</p>
+        <p><strong>Throughput@Size:</strong> {result.throughput_at_size:.2f}</p>
     </div>
 """
 
@@ -492,9 +470,6 @@ class TPCDSReportGenerator:
             success_rate = self._calculate_success_rate(result.throughput_test)
             if success_rate < 95:
                 recommendations.append("Investigate query failures in throughput test")
-
-        if result.qphds_at_size and result.qphds_at_size < 100:
-            recommendations.append("Consider system tuning to improve QphDS@Size metric")
 
         if not recommendations:
             recommendations.append("No specific recommendations - benchmark completed successfully")

@@ -28,6 +28,7 @@ from benchbox.utils.datagen_manifest import (
     DataGenerationManifest,
     get_table_files,
     load_manifest,
+    require_manifest_files,
     resolve_compression_metadata,
 )
 from benchbox.utils.file_format import COMPRESSION_EXTENSIONS, detect_data_format
@@ -1160,6 +1161,7 @@ class TPCHDataGenerator(CompressionMixin, CloudStorageGeneratorMixin, VerbosityM
                 row_count=self._manifest_row_count(first_file_path, expected_rows_total),
             )
 
+        require_manifest_files(manifest.file_counts()[1], label="TPC-H", output_dir=output_dir)
         manifest.write()
 
     def _manifest_row_count(self, file_path: Path, fallback: int) -> int:

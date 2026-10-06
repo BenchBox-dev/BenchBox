@@ -18,6 +18,9 @@ def infer_runtime_tuning_mode(
     unified_config: UnifiedTuningConfiguration | None,
 ) -> tuple[bool, Literal["tuned", "notuning"]]:
     if unified_config is None or not unified_config.get_enabled_tuning_types():
+        platform_optimizations = getattr(unified_config, "platform_optimizations", None)
+        if getattr(platform_optimizations, "sorted_ingestion_mode", "off") not in (None, "off"):
+            return True, "tuned"
         return False, "notuning"
     return True, "tuned"
 
@@ -53,7 +56,7 @@ def resolve_dataframe_tuning_config(
     if tuning_config_file_path:
         try:
             df_config = load_dataframe_tuning(tuning_config_file_path)
-        except Exception as e:  # pragma: no cover
+        except Exception as e:
             if logger:
                 logger.error(f"Failed to load DataFrame tuning configuration: {e}", exc_info=True)
             raise ValueError(f"Failed to load DataFrame tuning configuration: {e}") from e

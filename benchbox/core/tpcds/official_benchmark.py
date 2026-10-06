@@ -1,11 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-# This implementation is based on the TPC-DS specification.
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
-import math
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -45,7 +37,6 @@ class TPCDSOfficialBenchmarkResult:
     maintenance_test_result: Optional[dict[str, Any]]
     power_at_size: float
     throughput_at_size: float
-    qphds_at_size: float
     success: bool
     errors: list[str]
     compliance_validated: bool = False
@@ -114,7 +105,6 @@ class TPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphds_at_size=0.0,
             success=True,
             errors=[],
         )
@@ -196,9 +186,6 @@ class TPCDSOfficialBenchmark:
                         result.errors.append(f"Maintenance Test failed: {e}")
                         result.success = False
 
-            if result.power_at_size > 0 and result.throughput_at_size > 0:
-                result.qphds_at_size = math.sqrt(result.power_at_size * result.throughput_at_size)
-
             result.total_time = elapsed_seconds(benchmark_start)
             result.end_time = datetime.now().isoformat()
 
@@ -218,9 +205,6 @@ class TPCDSOfficialBenchmark:
         if result.power_at_size <= 0 or result.throughput_at_size <= 0:
             return False
 
-        if result.qphds_at_size <= 0:
-            return False
-
         return True
 
     def generate_audit_trail(
@@ -232,7 +216,5 @@ class TPCDSOfficialBenchmark:
             result=result,
             benchmark_title="TPC-DS",
             benchmark_slug="tpcds",
-            qph_label="QphDS@Size",
-            qph_attr="qphds_at_size",
             output_file=output_file,
         )

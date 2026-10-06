@@ -39,7 +39,5 @@ generate_official_benchmark_audit_trail(
     result=official_result,
     benchmark_title="TPC-H",
     benchmark_slug="tpch",
-    qph_label="QphH@Size",
-    qph_attr="qphh_at_size",
 )
 ```

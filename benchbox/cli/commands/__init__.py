@@ -74,7 +74,7 @@ COMMAND_SPECS: tuple[CommandSpec, ...] = (
         "calculate-qphh",
         "benchbox.cli.commands.calculate_qphh",
         "calculate_qphh",
-        "Calculate TPC-H QphH metric.",
+        "Calculate Power@Size and Throughput@Size.",
         True,
         True,
     ),

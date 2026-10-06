@@ -416,8 +416,12 @@ class TestDeploymentCapabilities:
     def test_supports_deployment_mode_false(self):
         assert PlatformRegistry.supports_deployment_mode("duckdb", "managed") is False
 
-    def test_supports_deployment_mode_unknown_platform_defaults_local(self):
-        assert PlatformRegistry.supports_deployment_mode("sqlite", "local") is True
+    @pytest.mark.parametrize("platform", ["snowflake", "databricks", "polars", "sqlite"])
+    def test_platforms_without_deployment_modes_accept_only_local(self, platform: str):
+        assert PlatformRegistry.get_available_deployment_modes(platform) == []
+        assert PlatformRegistry.supports_deployment_mode(platform, "local") is True
+        assert PlatformRegistry.supports_deployment_mode(platform, "cloud") is False
+        assert PlatformRegistry.supports_deployment_mode(platform, "managed") is False
 
     def test_requires_cloud_storage_for_deployment_motherduck(self):
         assert PlatformRegistry.requires_cloud_storage_for_deployment("motherduck") is False

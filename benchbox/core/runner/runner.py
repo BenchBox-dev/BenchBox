@@ -779,6 +779,9 @@ def _build_run_config_from_options(
         iterations=max(1, iterations),
         warm_up_iterations=max(0, warmups),
         power_fail_fast=bool(options.get("power_fail_fast", False)),
+        stream_timeout_seconds=options.get("stream_timeout_seconds"),
+        stream_timeout_source=options.get("stream_timeout_source"),
+        cancel_on_timeout=bool(options.get("cancel_on_timeout", False)),
         capture_plans=benchmark_config.capture_plans,
         show_query_plans=(
             bool(database_options.get("show_query_plans")) if "show_query_plans" in database_options else None

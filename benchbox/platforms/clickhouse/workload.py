@@ -172,6 +172,9 @@ class ClickHouseWorkloadMixin:
         )
         if nullable_columns:
             key_columns = self._resolve_key_columns(statement, tuning_clauses, nullable_columns)
+            tuned_nullable_keys = self._tuned_nullable_key_columns(tuning_clauses, nullable_columns)
+            if tuned_nullable_keys:
+                raise ValueError(self._nullable_key_error(statement, tuned_nullable_keys))
             statement = self._apply_nullable_column_types(statement, nullable_columns - key_columns)
 
         tuned_sort_key_applies = tuned_order_by_applies and tuning_clauses is not None and bool(tuning_clauses.sort_by)
@@ -309,31 +312,48 @@ class ClickHouseWorkloadMixin:
         return nullable_by_table
 
     def _resolve_key_columns(self, statement: str, tuning_clauses: Any, nullable_columns: set[str]) -> set[str]:
+        key_columns = {name.lower() for name in self._extract_primary_key_columns(statement)}
+        key_columns.update(self._tuned_nullable_key_columns(tuning_clauses, nullable_columns))
+        return key_columns
+
+    _TUNED_KEY_ROLES: tuple[tuple[str, str], ...] = (
+        ("partition_by", "PARTITION BY"),
+        ("sort_by", "ORDER BY"),
+        ("order_by", "ORDER BY"),
+        ("cluster_by", "CLUSTER BY"),
+        ("primary_key", "PRIMARY KEY"),
+    )
+
+    def _tuned_nullable_key_columns(self, tuning_clauses: Any, nullable_columns: set[str]) -> dict[str, list[str]]:
         import re
 
-        key_columns = {name.lower() for name in self._extract_primary_key_columns(statement)}
+        matched: dict[str, list[str]] = {}
         if tuning_clauses is None:
-            return key_columns
-
-        key_expressions = [
-            value
-            for value in (
-                tuning_clauses.partition_by,
-                tuning_clauses.sort_by,
-                tuning_clauses.order_by,
-                tuning_clauses.cluster_by,
-                tuning_clauses.primary_key,
-            )
-            if value
-        ]
+            return matched
+        expressions = [(role, getattr(tuning_clauses, attribute, None)) for attribute, role in self._TUNED_KEY_ROLES]
         for column_name in nullable_columns:
             identifier = re.compile(
                 rf"(?<![A-Za-z0-9_]){re.escape(column_name)}(?![A-Za-z0-9_])",
                 re.IGNORECASE,
             )
-            if any(identifier.search(expression) for expression in key_expressions):
-                key_columns.add(column_name)
-        return key_columns
+            roles = sorted({role for role, expression in expressions if expression and identifier.search(expression)})
+            if roles:
+                matched[column_name] = roles
+        return matched
+
+    @staticmethod
+    def _nullable_key_error(statement: str, tuned_nullable_keys: dict[str, list[str]]) -> str:
+        import re
+
+        match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)", statement, re.IGNORECASE)
+        table = match.group(1) if match else "<unknown table>"
+        columns = ", ".join(f"{name} ({'/'.join(roles)})" for name, roles in sorted(tuned_nullable_keys.items()))
+        return (
+            f"tuned key columns of table {table!r} are nullable in the source schema: {columns}; "
+            "BenchBox renders key columns non-Nullable, which would load their NULLs as 0 and "
+            "silently change query answers. Use NOT NULL key columns (as in the curated ClickHouse "
+            "TPC-DS template) or declare the columns non-nullable."
+        )
 
     @classmethod
     def _apply_nullable_column_types(cls, statement: str, nullable_columns: set[str]) -> str:
@@ -391,8 +411,16 @@ class ClickHouseWorkloadMixin:
                         index += 2
                         continue
                     quote = None
-            elif char in {"'", '"'}:
+            elif char in {"'", '"', "`"}:
                 quote = char
+            elif char == "-" and body[index + 1 : index + 2] == "-":
+                end = body.find("\n", index)
+                index = len(body) if end == -1 else end
+                continue
+            elif char == "/" and body[index + 1 : index + 2] == "*":
+                end = body.find("*/", index + 2)
+                index = len(body) if end == -1 else end + 2
+                continue
             elif char in "([":
                 depth += 1
             elif char in ")]":
@@ -403,6 +431,62 @@ class ClickHouseWorkloadMixin:
             index += 1
         spans.append((start, len(body)))
         return spans
+
+    @staticmethod
+    def _blank_quoted_and_commented(text: str) -> str:
+        chars = list(text)
+        index = 0
+        quote: str | None = None
+        while index < len(chars):
+            char = chars[index]
+            if quote is not None:
+                if chars[index] != "\n":
+                    chars[index] = " "
+                if char == quote:
+                    if index + 1 < len(chars) and chars[index + 1] == quote:
+                        if chars[index + 1] != "\n":
+                            chars[index + 1] = " "
+                        index += 2
+                        continue
+                    quote = None
+            elif char in {"'", '"', "`"}:
+                chars[index] = " "
+                quote = char
+            elif char == "-" and index + 1 < len(chars) and chars[index + 1] == "-":
+                while index < len(chars) and chars[index] != "\n":
+                    chars[index] = " "
+                    index += 1
+                continue
+            elif char == "/" and index + 1 < len(chars) and chars[index + 1] == "*":
+                chars[index] = " "
+                chars[index + 1] = " "
+                index += 2
+                while index < len(chars):
+                    if chars[index] == "*" and index + 1 < len(chars) and chars[index + 1] == "/":
+                        chars[index] = " "
+                        chars[index + 1] = " "
+                        index += 2
+                        break
+                    if chars[index] != "\n":
+                        chars[index] = " "
+                    index += 1
+                continue
+            index += 1
+        return "".join(chars)
+
+    @staticmethod
+    def _strip_inline_primary_key(segment: str) -> str:
+        import re
+
+        while True:
+            probe = ClickHouseWorkloadMixin._blank_quoted_and_commented(segment)
+            match = re.search(r"PRIMARY\s+KEY\b", probe, flags=re.IGNORECASE)
+            if match is None:
+                return segment
+            start = match.start()
+            while start > 0 and segment[start - 1].isspace():
+                start -= 1
+            segment = segment[:start] + segment[match.end() :]
 
     @staticmethod
     def _column_type_end(segment: str, type_start: int) -> int:
@@ -440,22 +524,25 @@ class ClickHouseWorkloadMixin:
     def _strip_primary_key_constraints(cls, statement: str) -> str:
         import re
 
-        create_match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+[A-Za-z_]\w*\s*\(", statement, re.IGNORECASE)
+        table_name = r'(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[A-Za-z_]\w*)'
+        create_match = re.search(rf"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+{table_name}\s*\(", statement, re.IGNORECASE)
         if create_match is None:
             return statement
         open_index = statement.find("(", create_match.start())
         close_index = find_matching_parenthesis(statement, open_index)
         body = statement[open_index + 1 : close_index]
 
+        table_constraint = re.compile(r"^\s*(?:CONSTRAINT\s+[\s\S]+?\s+)?PRIMARY\s+KEY\s*\(", re.IGNORECASE)
         kept_segments: list[str] = []
         dropped_last_segment = False
         spans = cls._top_level_column_spans(body)
         for position, (start, end) in enumerate(spans):
             segment = body[start:end]
-            if re.match(r"^\s*PRIMARY\s+KEY\s*\(", segment, re.IGNORECASE):
+            probe = cls._blank_quoted_and_commented(segment)
+            if table_constraint.match(probe):
                 dropped_last_segment = position == len(spans) - 1
                 continue
-            kept_segments.append(re.sub(r"\s+PRIMARY\s+KEY\b", "", segment, flags=re.IGNORECASE))
+            kept_segments.append(cls._strip_inline_primary_key(segment))
 
         rebuilt = ",".join(kept_segments)
         if dropped_last_segment:

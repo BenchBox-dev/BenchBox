@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 import logging
 from typing import Any, Optional
 
@@ -21,7 +17,7 @@ from benchbox.core.benchmark_registry import (
     validate_scale_factor as core_validate_scale_factor,
 )
 from benchbox.core.constants import VALID_PHASES
-from benchbox.core.schemas import BenchmarkConfig
+from benchbox.core.schemas import MIN_THROUGHPUT_STREAMS, BenchmarkConfig
 from benchbox.utils.printing import quiet_console
 from benchbox.utils.verbosity import VerbositySettings
 
@@ -544,20 +540,26 @@ class BenchmarkManager:
 
         return scale_factor
 
-    def _prompt_concurrency(self, benchmark_info: dict[str, Any], system_profile: dict[str, Any]) -> int:
+    def _prompt_concurrency(self, benchmark_info: dict[str, Any], system_profile: dict[str, Any]) -> int | None:
         if not benchmark_info.get("supports_streams", False):
-            return 1
+            return None
 
-        recommended_concurrency = min(2, max(1, system_profile.get("cpu_cores", 2) // 2))
+        recommended_concurrency = max(
+            MIN_THROUGHPUT_STREAMS, min(MIN_THROUGHPUT_STREAMS, system_profile.get("cpu_cores", 2) // 2)
+        )
         console.print("\n[bold cyan]Concurrency Options[/bold cyan]")
         console.print(
             f"• [green]Recommended streams: {recommended_concurrency}[/green] (based on {system_profile.get('cpu_cores', 'unknown')} CPU cores)"
         )
 
         if not Confirm.ask("Enable concurrent execution?", default=False):
-            return 1
+            return None
 
-        concurrency = IntPrompt.ask("Number of concurrent streams", default=recommended_concurrency)
+        while True:
+            concurrency = IntPrompt.ask("Number of concurrent streams", default=recommended_concurrency)
+            if concurrency >= MIN_THROUGHPUT_STREAMS:
+                break
+            console.print(f"[red]Concurrent streams must be at least {MIN_THROUGHPUT_STREAMS} (TPC minimum).[/red]")
 
         if concurrency > system_profile.get("cpu_cores", 4):
             console.print(
@@ -588,7 +590,7 @@ class BenchmarkManager:
         benchmark_id: str,
         benchmark_info: dict[str, Any],
         scale_factor: float,
-        concurrency: int,
+        concurrency: int | None,
         queries: Optional[list[str]],
         compress_data: bool,
         compression_type: str,
@@ -604,7 +606,7 @@ class BenchmarkManager:
         table.add_row("Scale Factor:", str(scale_factor))
         table.add_row("Complexity:", benchmark_info["complexity"])
 
-        if concurrency > 1:
+        if concurrency is not None:
             table.add_row("Concurrency:", f"{concurrency} streams")
 
         if queries:

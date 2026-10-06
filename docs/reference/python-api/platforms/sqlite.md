@@ -245,7 +245,7 @@ The values are stored as attributes of the same name (`SQLiteAdapter().force_rec
 **`driver_isolation_capability`** (class attribute): `DriverIsolationCapability.NOT_APPLICABLE` (from `benchbox.platforms.base`): SQLite is part of the Python standard library, so there is no driver version to isolate.
 
 <span id="benchbox.platforms.sqlite.SQLiteAdapter.stream_connection_capability"></span>
-**`stream_connection_capability`** (class attribute): `StreamConnectionCapability.SHARED_CURSOR` (from `benchbox.platforms.base`): concurrent throughput streams use cursors of the one connection instead of opening more connections.
+**`stream_connection_capability`** (read-only attribute): `StreamConnectionCapability.SHARED_CURSOR` (from `benchbox.platforms.base`), declared in the platform manifest rather than on the class: concurrent throughput streams use cursors of the one connection instead of opening more connections.
 
 ## Configuration Examples
 

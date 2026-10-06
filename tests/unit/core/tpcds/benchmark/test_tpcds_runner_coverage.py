@@ -277,6 +277,86 @@ def test_run_throughput_test_success(tpcds_benchmark, monkeypatch):
     )
 
 
+def _flaky_factory(failures):
+    calls = {"n": 0}
+
+    def factory():
+        calls["n"] += 1
+        if calls["n"] <= failures:
+            raise RuntimeError("connect failed")
+        return _Conn()
+
+    return factory
+
+
+def test_run_throughput_test_withholds_metric_when_a_stream_fails(tpcds_benchmark, monkeypatch):
+    monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
+
+    result = tpcds_benchmark.run_throughput_test(
+        connection_factory=_flaky_factory(1), num_streams=2, query_timeout=1, stream_timeout=10, max_retries=0
+    )
+
+    assert result.success is False
+    assert result.streams_successful == 1
+    assert result.throughput_at_size is None
+
+
+def test_run_throughput_test_withholds_metric_when_a_query_fails(tpcds_benchmark, monkeypatch):
+    monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
+
+    result = tpcds_benchmark.run_throughput_test(
+        connection_factory=lambda: _Conn(fail_on="SELECT 42"),
+        num_streams=1,
+        query_timeout=1,
+        stream_timeout=10,
+        max_retries=0,
+    )
+
+    assert result.success is False
+    assert result.throughput_at_size is None
+
+
+def test_run_throughput_test_window_excludes_connection_setup(tpcds_benchmark, monkeypatch):
+    import time
+
+    monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
+
+    def slow_factory():
+        time.sleep(0.3)
+        return _Conn()
+
+    result = tpcds_benchmark.run_throughput_test(
+        connection_factory=slow_factory, num_streams=1, query_timeout=1, stream_timeout=10, max_retries=0
+    )
+
+    assert result.success is True
+    assert result.total_duration < 0.15
+    assert result.stream_results[0]["duration"] < 0.15
+
+
+def test_run_official_benchmark_does_not_copy_a_withheld_throughput(tpcds_benchmark, monkeypatch):
+    monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
+    monkeypatch.setattr(tpcds_benchmark, "run_power_test", lambda **kwargs: {"total_time": 1.0, "power_at_size": 16.0})
+
+    result = tpcds_benchmark.run_official_benchmark(
+        connection=_Conn(), num_streams=2, maintenance_test=False, power_test=True, throughput_test=True
+    )
+    assert result["throughput_at_size"] > 0
+
+    monkeypatch.setattr(
+        tpcds_benchmark,
+        "run_throughput_test",
+        lambda **kwargs: SimpleNamespace(throughput_at_size=None, success=False),
+    )
+    result = tpcds_benchmark.run_official_benchmark(
+        connection=_Conn(), num_streams=2, maintenance_test=False, power_test=True, throughput_test=True
+    )
+
+    assert result["throughput_at_size"] == 0.0
+    assert result["success"] is False
+    assert any("withheld" in error for error in result["errors"])
+
+
 def test_run_power_test_collects_query_error(tpcds_benchmark, monkeypatch):
     monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
 
@@ -352,7 +432,7 @@ def test_run_official_benchmark_aggregates(tpcds_benchmark, monkeypatch):
     assert result["success"] is True
     assert result["power_at_size"] == 16.0
     assert result["throughput_at_size"] == 9.0
-    assert result["qphds_at_size"] == pytest.approx(12.0)
+    assert "qphds_at_size" not in result
 
 
 def test_load_table_data_trims_padding_and_null_conversion(tpcds_benchmark, tmp_path):
@@ -461,7 +541,6 @@ def test_finalize_benchmark_result_populates_timing_fields(tpcds_benchmark):
         "end_time": None,
         "power_at_size": 1.0,
         "throughput_at_size": 2.0,
-        "qphds_at_size": 1.414,
         "success": True,
         "errors": [],
     }

@@ -344,3 +344,122 @@ def test_external_corpus_contract_ignores_tuning_sidecars(tmp_path: Path):
     assert contract["bundles"] == 1
     assert contract["checked_bundles"] == 1
     assert contract["benchmarks"] == ["tpch"]
+
+
+def write_throughput_bundle(
+    bundles_dir: Path, *, streams: tuple[int, ...], name: str = "tpch-duckdb-sf1-throughput.json"
+) -> Path:
+    bundles_dir.mkdir(parents=True, exist_ok=True)
+    path = bundles_dir / name
+    path.write_text(
+        json.dumps(
+            {
+                "run": {"id": "abc12345"},
+                "benchmark": {"id": "tpch", "name": "TPC-H", "scale_factor": 1.0, "test_type": "throughput"},
+                "platform": {"name": "DuckDB"},
+                "queries": [
+                    {"id": str(query), "stream": stream, "status": "SUCCESS", "run_type": "measurement"}
+                    for stream in streams
+                    for query in range(1, 4)
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def run_required(tmp_path: Path, bundles_dir: Path, *, streams: int | None = 3, runner=None):
+    return explorer_smoke.run_explorer_smoke(
+        bundles_dir=bundles_dir,
+        output_dir=tmp_path / "out",
+        log_dir=tmp_path / "logs",
+        require_throughput_streams=streams,
+        runner=runner or Mock(side_effect=AssertionError("no subprocess on the minimal path")),
+    )
+
+
+@pytest.mark.parametrize(
+    ("explorer_present", "has_node", "reason"),
+    [(True, False, "node not on PATH"), (False, True, "explorer assets absent")],
+)
+def test_required_throughput_smoke_fails_instead_of_skipping(tmp_path: Path, explorer_present, has_node, reason):
+    bundles_dir = tmp_path / "b"
+    write_throughput_bundle(bundles_dir, streams=(0, 1, 2))
+    with (
+        patch.object(explorer_smoke, "explorer_present", return_value=explorer_present),
+        patch.object(explorer_smoke, "has_node", return_value=has_node),
+    ):
+        result = run_required(tmp_path, bundles_dir)
+    assert result.aborted is True
+    assert result.exit_code() == 2
+    assert reason in (result.abort_reason or "")
+
+
+def test_unrequired_smoke_still_skips_without_node(tmp_path: Path):
+    bundles_dir = tmp_path / "b"
+    write_throughput_bundle(bundles_dir, streams=(0, 1, 2))
+    with (
+        patch.object(explorer_smoke, "explorer_present", return_value=True),
+        patch.object(explorer_smoke, "has_node", return_value=False),
+    ):
+        result = run_required(tmp_path, bundles_dir, streams=None)
+    assert result.skipped is True
+    assert result.exit_code() == 0
+
+
+def test_required_throughput_smoke_rejects_corpus_without_throughput_bundle(tmp_path: Path):
+    bundles_dir = tmp_path / "b"
+    write_bundle(bundles_dir)
+    with (
+        patch.object(explorer_smoke, "explorer_present", return_value=False),
+        patch.object(explorer_smoke, "has_node", return_value=False),
+    ):
+        result = run_required(tmp_path, bundles_dir)
+    assert result.aborted is True
+    assert "no throughput bundle" in (result.abort_reason or "")
+
+
+@pytest.mark.parametrize("streams", [(0, 1), (0, 1, 2, 3)])
+def test_required_throughput_smoke_rejects_wrong_stream_count(tmp_path: Path, streams):
+    bundles_dir = tmp_path / "b"
+    write_throughput_bundle(bundles_dir, streams=streams)
+    with (
+        patch.object(explorer_smoke, "explorer_present", return_value=False),
+        patch.object(explorer_smoke, "has_node", return_value=False),
+    ):
+        result = run_required(tmp_path, bundles_dir)
+    assert result.aborted is True
+    assert f"has {len(streams)} distinct streams, expected exactly 3" in (result.abort_reason or "")
+
+
+def test_required_throughput_stream_count_reaches_the_browser_smoke_environment(tmp_path: Path):
+    bundles_dir = tmp_path / "b"
+    write_throughput_bundle(bundles_dir, streams=(0, 1, 2))
+    seen_env: list[dict[str, str]] = []
+
+    def runner(argv, **kwargs):
+        if kwargs.get("env"):
+            seen_env.append(kwargs["env"])
+        return Mock(returncode=0)
+
+    with (
+        patch.object(explorer_smoke, "explorer_present", return_value=True),
+        patch.object(explorer_smoke, "has_node", return_value=True),
+    ):
+        result = run_required(tmp_path, bundles_dir, runner=runner)
+    assert result.exit_code() == 0
+    assert seen_env
+    assert all(env["E2E_REQUIRE_THROUGHPUT_STREAMS"] == "3" for env in seen_env)
+
+
+def test_bundle_execution_streams_parse_through_float_and_require_whole_numbers():
+    queries = [
+        {"stream": "2.0"},
+        {"stream": 1},
+        {"stream": "1.5"},
+        {"stream": "x"},
+        {"stream": None},
+        {"stream": 7, "run_type": "other"},
+    ]
+    assert explorer_smoke._bundle_execution_streams(queries) == {1, 2}

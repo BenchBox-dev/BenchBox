@@ -149,6 +149,8 @@ class TPCDSDataGenerator(
                 emit(f"✅ Valid TPC-DS data found for scale factor {self.scale_factor}")
                 self.validator.print_validation_report(validation_result, verbose=False)
                 emit("   Skipping data generation")
+            if self._data_organization_config is not None:
+                return self._apply_organization_to_existing(target_dir)
             return self._gather_existing_table_files(target_dir)
 
         self._log_regeneration_reason(validation_result)
@@ -161,16 +163,14 @@ class TPCDSDataGenerator(
         if sample_dir is not None:
             result = self._generate_from_sample(sample_dir, target_dir)
             if result is not None:
+                if self._data_organization_config is not None:
+                    return self._apply_organization_to_existing(target_dir)
                 return result
 
         self._run_dsdgen_native(target_dir)
 
         if self._data_organization_config is not None:
-            raw_table_paths = self._gather_existing_table_files(target_dir, use_compression=False)
-            table_paths = raw_table_paths
-            table_paths = self._apply_data_organization(target_dir, table_paths)
-            self._write_manifest(target_dir, table_paths)
-            return table_paths
+            return self._apply_organization_to_existing(target_dir)
 
         self._compress_raw_dat_files(target_dir)
 
@@ -182,6 +182,45 @@ class TPCDSDataGenerator(
 
         self._write_manifest(target_dir, table_paths)
 
+        return table_paths
+
+    def _tables_with_organization(self) -> set[str]:
+        config = self._data_organization_config
+        organized = set()
+        for table_name in self._known_table_names():
+            if (
+                config.get_sort_columns_for_table(table_name)
+                or config.get_partition_columns_for_table(table_name)
+                or config.get_cluster_columns_for_table(table_name)
+            ):
+                organized.add(table_name)
+        return organized
+
+    def _ensure_raw_sort_inputs(self, target_dir: Path, tables: set[str]) -> None:
+        if not tables or not self.should_use_compression():
+            return
+        raw_paths = self._gather_existing_table_files(target_dir, use_compression=False)
+        if all(raw_paths.get(table) for table in tables):
+            return
+        compressed_paths = self._gather_existing_table_files(target_dir, use_compression=True)
+        compressor = self.get_compressor()
+        for table in sorted(tables):
+            if raw_paths.get(table):
+                continue
+            for source in compressed_paths.get(table, []):
+                compressor.decompress_file(source)
+
+    def _apply_organization_to_existing(self, target_dir: Path) -> dict[str, list[Path]]:
+        organized_tables = self._tables_with_organization()
+        self._ensure_raw_sort_inputs(target_dir, organized_tables)
+        raw_table_paths = self._gather_existing_table_files(target_dir, use_compression=False)
+        table_paths = self._apply_data_organization(target_dir, raw_table_paths)
+        if self.should_use_compression():
+            compressed_paths = self._gather_existing_table_files(target_dir, use_compression=True)
+            for table, files in compressed_paths.items():
+                if table not in organized_tables:
+                    table_paths[table] = files
+        self._write_manifest(target_dir, table_paths)
         return table_paths
 
     def _apply_data_organization(

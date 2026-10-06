@@ -43,7 +43,6 @@ def _git(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> str:
 
 
 def init_repo(path: Path) -> Path:
-
     path.mkdir(parents=True, exist_ok=True)
     _git(["init", "-q"], path)
     _git(["config", "user.email", "test@example.com"], path)
@@ -273,7 +272,12 @@ def test_fixture_squash_source_tip_not_ancestor(tmp_path: Path):
     assert cls.item_classification == "finish candidate"
 
 
-def test_make_worktree_audit_json_output(capsys: pytest.CaptureFixture):
+def test_make_worktree_audit_json_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+):
+    repo = init_repo(tmp_path / "repo")
+    wt = add_worktree(repo, "fix/feature-json", tmp_path / "wt_json")
+    monkeypatch.chdir(repo)
 
     code = audit_mod.main(["--format", "json"])
     assert code == 0
@@ -285,6 +289,8 @@ def test_make_worktree_audit_json_output(capsys: pytest.CaptureFixture):
     assert "report_authority" in data
     assert data["report_authority"]["is_deletion_authority"] is False
     assert "snapshot_path" in data
+    paths = [Path(w["worktree"]["path"]).resolve() for w in data["worktrees"]]
+    assert paths == [wt.resolve()]
 
 
 def test_fixture_primary_clone(tmp_path: Path):
@@ -401,10 +407,8 @@ def test_fixture_gone_upstream_no_pr_evidence(tmp_path: Path):
 
 
 def test_fixture_missing_directory(tmp_path: Path):
-
     repo = init_repo(tmp_path / "repo")
     wt = add_worktree(repo, "fix/feature-missing", tmp_path / "wt_missing")
-
     import shutil
 
     shutil.rmtree(wt)
@@ -426,7 +430,6 @@ def test_fixture_missing_directory(tmp_path: Path):
 
 
 def test_fixture_unregistered_path(tmp_path: Path):
-
     repo = init_repo(tmp_path / "repo")
     unregistered_dir = tmp_path / "unregistered_dir"
     unregistered_dir.mkdir()
@@ -455,7 +458,6 @@ def test_fixture_unregistered_path(tmp_path: Path):
 
 
 def test_fixture_prunable_worktree(tmp_path: Path):
-
     repo = init_repo(tmp_path / "repo")
     wt = audit_mod.WorktreeInfo(
         path=str(tmp_path / "prunable_wt"),
@@ -484,7 +486,6 @@ def test_fixture_prunable_worktree(tmp_path: Path):
 
 
 def test_fixture_gone_upstream_unmerged_pr(tmp_path: Path):
-
     repo = init_repo(tmp_path / "repo")
     add_worktree(repo, "fix/feature-closed-unmerged", tmp_path / "wt_closed")
 
@@ -516,7 +517,6 @@ def test_fixture_gone_upstream_unmerged_pr(tmp_path: Path):
 
 
 def test_fixture_wrong_base_pr(tmp_path: Path):
-
     repo = init_repo(tmp_path / "repo")
     wt = add_worktree(repo, "fix/feature-wrong-base", tmp_path / "wt_wrong_base")
     (wt / "change.txt").write_text("change\n", encoding="utf-8")
@@ -553,7 +553,6 @@ def test_fixture_wrong_base_pr(tmp_path: Path):
 
 
 def test_fixture_old_but_active_worktree(tmp_path: Path):
-
     repo = init_repo(tmp_path / "repo")
     wt = add_worktree(repo, "fix/feature-old", tmp_path / "wt_old")
     (wt / "old.txt").write_text("old work\n", encoding="utf-8")
@@ -583,7 +582,6 @@ def test_fixture_old_but_active_worktree(tmp_path: Path):
 
 
 def test_fixture_incomplete_collection_error(tmp_path: Path):
-
     repo = init_repo(tmp_path / "repo")
     add_worktree(repo, "fix/feature-api-err", tmp_path / "wt_api_err")
 

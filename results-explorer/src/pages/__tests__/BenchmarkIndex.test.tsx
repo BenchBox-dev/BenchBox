@@ -1184,26 +1184,26 @@ describe("BenchmarkIndex", () => {
     await expectNoAxeViolations(container);
   });
 
-  it("loads standard-phase cohort when only standard is available for the SF", async () => {
-    const standardRows = RESULT_ROWS.map((r) => ({ ...r, test_type: "standard" }));
-    const standardRankings = RANKING_ROWS.map((r) => ({ ...r, phase: "standard" }));
-    const standardCells = CELL_ROWS.map((c) => ({ ...c, phase: "standard" }));
-    vi.mocked(queryRows).mockImplementation(defaultImpl(standardRows, standardRankings, standardCells));
+  it("loads throughput-phase cohort when only throughput is available for the SF", async () => {
+    const throughputRows = RESULT_ROWS.map((r) => ({ ...r, test_type: "throughput" }));
+    const throughputRankings = RANKING_ROWS.map((r) => ({ ...r, phase: "throughput" }));
+    const throughputCells = CELL_ROWS.map((c) => ({ ...c, phase: "throughput" }));
+    vi.mocked(queryRows).mockImplementation(defaultImpl(throughputRows, throughputRankings, throughputCells));
 
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
     await waitFor(() =>
-      expect(new URL(window.location.href).searchParams.get("phase")).toBe("standard"),
+      expect(new URL(window.location.href).searchParams.get("phase")).toBe("throughput"),
     );
 
     const rankingCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
       String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
     );
-    expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "standard"]);
+    expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "throughput"]);
   });
 
   it("coerces an unavailable phase URL value to the rendered cohort phase", async () => {
-    window.history.replaceState(null, "", "/results/tpch/?sf=0.1&phase=standard");
+    window.history.replaceState(null, "", "/results/tpch/?sf=0.1&phase=throughput");
 
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
@@ -1239,8 +1239,8 @@ describe("BenchmarkIndex", () => {
       ...RESULT_ROWS,
       {
         ...RESULT_ROWS[0],
-        result_id: "standard-r1",
-        test_type: "standard",
+        result_id: "throughput-r1",
+        test_type: "throughput",
         platform: "ClickHouse",
         platform_id: "clickhouse",
       },

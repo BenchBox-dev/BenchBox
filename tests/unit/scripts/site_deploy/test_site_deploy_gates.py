@@ -247,9 +247,26 @@ def _deployed_with_baseline(links: list[list[str]] | None, tag: str = "v0.4.1") 
 RELEASE_BROKEN = ["/docs/old.html", "/docs/gone.html", "missing path"]
 
 
+def _release_routes_manifest(tmp_path: Path) -> Path:
+    manifest = tmp_path / "release-routes.yml"
+    manifest.write_text(
+        "version: 1\nrefs:\n  release:\n    kind: release-tag\n  trunk:\n    kind: trunk\n"
+        "routes:\n  - path: /\n    ref: release\n    builder: landing\n"
+        "  - path: /docs/\n    ref: release\n    builder: docs\n"
+        "  - path: /docs/dev/\n    ref: trunk\n    builder: docs\n"
+        "  - path: /blog/\n    ref: trunk\n    builder: blog\n"
+        "  - path: /results/\n    ref: trunk\n    builder: explorer\n"
+        "root_files:\n  ref: trunk\n  files: [CNAME, .nojekyll, 404.html]\n",
+        encoding="utf-8",
+    )
+    return manifest
+
+
 def test_link_gate_tolerates_release_breakage_up_to_the_recorded_baseline(tmp_path: Path) -> None:
+    manifest = _release_routes_manifest(tmp_path)
     result = g.link_gate(
-        _inputs(tmp_path, deployed=_deployed_with_baseline([RELEASE_BROKEN])), _link_runner([RELEASE_BROKEN])
+        _inputs(tmp_path, deployed=_deployed_with_baseline([RELEASE_BROKEN]), routes_manifest=manifest),
+        _link_runner([RELEASE_BROKEN]),
     )
     assert result["status"] == g.PASS
     assert "release tag v0.4.1" in result["detail"]
@@ -258,7 +275,11 @@ def test_link_gate_tolerates_release_breakage_up_to_the_recorded_baseline(tmp_pa
 
 def test_link_gate_fails_when_a_newer_release_tag_adds_broken_links(tmp_path: Path) -> None:
     listing = [RELEASE_BROKEN, ["/docs/x.html", "/docs/y.html", "missing path"]]
-    result = g.link_gate(_inputs(tmp_path, deployed=_deployed_with_baseline([RELEASE_BROKEN])), _link_runner(listing))
+    manifest = _release_routes_manifest(tmp_path)
+    result = g.link_gate(
+        _inputs(tmp_path, deployed=_deployed_with_baseline([RELEASE_BROKEN]), routes_manifest=manifest),
+        _link_runner(listing),
+    )
     assert result["status"] == g.FAIL
     assert "outside the last deployed receipt baseline of 1" in result["detail"]
 
@@ -273,19 +294,23 @@ def test_link_gate_fails_when_fixed_links_are_swapped_for_new_ones(tmp_path: Pat
 def test_link_gate_passes_a_pure_reduction_and_records_the_smaller_set(tmp_path: Path) -> None:
     other = ["/docs/x.html", "/docs/y.html", "missing path"]
     deployed = _deployed_with_baseline([RELEASE_BROKEN, other])
-    result = g.link_gate(_inputs(tmp_path, deployed=deployed), _link_runner([other]))
+    manifest = _release_routes_manifest(tmp_path)
+    result = g.link_gate(_inputs(tmp_path, deployed=deployed, routes_manifest=manifest), _link_runner([other]))
     assert result["status"] == g.PASS
     assert result["link_baseline"]["links"] == [other]
 
 
 def test_link_gate_ignores_a_baseline_recorded_for_another_tag(tmp_path: Path) -> None:
-    inputs = _inputs(tmp_path, deployed=_deployed_with_baseline([RELEASE_BROKEN], tag="v0.4.0"))
+    manifest = _release_routes_manifest(tmp_path)
+    inputs = _inputs(
+        tmp_path, deployed=_deployed_with_baseline([RELEASE_BROKEN], tag="v0.4.0"), routes_manifest=manifest
+    )
     result = g.link_gate(inputs, _link_runner([RELEASE_BROKEN]))
     assert result["status"] == g.FAIL
     assert "outside the allowance file baseline of 0" in result["detail"]
 
 
-def test_link_gate_without_a_receipt_pins_release_breakage_to_the_allowance_file(tmp_path: Path) -> None:
+def test_link_gate_without_a_receipt_pins_trunk_breakage_to_the_allowance_file(tmp_path: Path) -> None:
     inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None)
     allowance = inputs.repo_root / "_project" / "design" / "site-inventory" / "known-broken-links.json"
     allowance.parent.mkdir(parents=True)
@@ -302,19 +327,21 @@ def _write_tag_allowance(inputs: g.GateInputs, tag: str, entries: list[list[str]
 
 
 def test_link_gate_adds_the_tag_allowance_file_only_without_a_receipt_baseline(tmp_path: Path) -> None:
-    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None)
+    manifest = _release_routes_manifest(tmp_path)
+    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None, routes_manifest=manifest)
     _write_tag_allowance(inputs, "v0.4.1", [RELEASE_BROKEN])
     result = g.link_gate(inputs, _link_runner([RELEASE_BROKEN]))
     assert result["status"] == g.PASS
     assert result["link_baseline"]["links"] == [RELEASE_BROKEN]
     receipt = _deployed_with_baseline([])
-    result = g.link_gate(_inputs(tmp_path, deployed=receipt), _link_runner([RELEASE_BROKEN]))
+    result = g.link_gate(_inputs(tmp_path, deployed=receipt, routes_manifest=manifest), _link_runner([RELEASE_BROKEN]))
     assert result["status"] == g.FAIL
     assert "last deployed receipt baseline of 0" in result["detail"]
 
 
 def test_link_gate_ignores_the_allowance_file_of_another_tag(tmp_path: Path) -> None:
-    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None, release_tag="v0.4.2")
+    manifest = _release_routes_manifest(tmp_path)
+    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None, release_tag="v0.4.2", routes_manifest=manifest)
     _write_tag_allowance(inputs, "v0.4.1", [RELEASE_BROKEN])
     result = g.link_gate(inputs, _link_runner([RELEASE_BROKEN]))
     assert result["status"] == g.FAIL
@@ -322,7 +349,8 @@ def test_link_gate_ignores_the_allowance_file_of_another_tag(tmp_path: Path) -> 
 
 
 def test_link_gate_fails_an_entry_outside_the_develop_and_tag_allowances(tmp_path: Path) -> None:
-    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None)
+    manifest = _release_routes_manifest(tmp_path)
+    inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None, routes_manifest=manifest)
     _write_tag_allowance(inputs, "v0.4.1", [RELEASE_BROKEN])
     stray = ["/docs/x.html", "/docs/y.html", "missing path"]
     result = g.link_gate(inputs, _link_runner([RELEASE_BROKEN, stray]))
@@ -350,18 +378,17 @@ def test_link_gate_passes_real_inventory_output_with_stale_allowances(tmp_path: 
     stale = ["/docs/old.html", "/docs/fixed.html", "missing path"]
     allowance = inputs.repo_root / "_project" / "design" / "site-inventory" / "known-broken-links.json"
     allowance.parent.mkdir(parents=True)
-    allowance.write_text(json.dumps([stale]), encoding="utf-8")
-    _write_tag_allowance(inputs, "v0.4.1", [RELEASE_BROKEN])
+    allowance.write_text(json.dumps([stale, RELEASE_BROKEN]), encoding="utf-8")
     result = g.link_gate(inputs, g.run_subprocess)
     assert result["status"] == g.PASS, result["detail"]
-    assert result["link_baseline"]["links"] == [RELEASE_BROKEN]
+    assert result["link_baseline"]["links"] == []
 
 
 def test_link_gate_fails_new_breakage_whose_source_is_a_trunk_route(tmp_path: Path) -> None:
     runner = _link_runner([RELEASE_BROKEN, ["/blog/p.html", "/x.html", "missing path"]])
     result = g.link_gate(_inputs(tmp_path, deployed=_deployed_with_baseline([RELEASE_BROKEN])), runner)
     assert result["status"] == g.FAIL
-    assert "/blog/p.html" in result["detail"]
+    assert "/docs/old.html" in result["detail"]
 
 
 @pytest.mark.parametrize(

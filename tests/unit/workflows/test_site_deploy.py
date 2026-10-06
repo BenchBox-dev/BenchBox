@@ -246,6 +246,13 @@ def test_resolve_exposes_the_renderer_and_whether_the_visual_comparison_runs() -
     outputs = _jobs()["resolve"]["outputs"]
     assert outputs["renderer"] == "${{ steps.resolve.outputs.renderer }}"
     assert outputs["visual_required"] == "${{ steps.resolve.outputs.visual_required }}"
+    assert outputs["release_in_use"] == "${{ steps.resolve.outputs.release_in_use }}"
+
+
+def test_release_build_steps_run_only_while_a_route_uses_the_release_ref() -> None:
+    for name in ("Build release documentation", "Build the release site with Astro"):
+        assert "needs.resolve.outputs.release_in_use == 'true'" in _step("build", name)["if"], name
+    assert "release_in_use" not in _step("build", "Build the trunk site with Astro")["if"]
 
 
 def test_each_renderer_builds_only_its_own_site() -> None:
@@ -339,7 +346,7 @@ def test_plain_python_jobs_can_import_the_cli_without_third_party_packages() -> 
     assert result.returncode == 0, result.stderr
 
 
-def test_visual_comparison_covers_exactly_the_release_sourced_capture_routes() -> None:
+def test_visual_comparison_covers_the_trunk_served_landing_and_getting_started() -> None:
     from scripts.site_deploy import routes
     from scripts.site_deploy.renderer import RENDERERS
 
@@ -347,14 +354,12 @@ def test_visual_comparison_covers_exactly_the_release_sourced_capture_routes() -
     captured = dict(re.findall(r'slug:\s*"([^"]+)",\s*path:\s*"([^"]+)"', spec))
     assert len(captured) >= 6
     selected = _jobs()["visual"]["env"]["PUBLIC_SITE_VISUAL_ROUTES"].split(",")
+    assert sorted(selected) == ["getting-started", "landing"]
     manifest = routes.load_manifest(ROOT / "deploy" / "routes.yml")
     for renderer in RENDERERS:
-        release_owned = sorted(
-            slug
-            for slug, path in captured.items()
-            if manifest.refs[routes.owner_ref(manifest, path, renderer)] == "release-tag"
-        )
-        assert sorted(selected) == release_owned, renderer
+        assert all(
+            manifest.refs[routes.owner_ref(manifest, path, renderer)] == "trunk" for path in captured.values()
+        ), renderer
     assert "PUBLIC_SITE_VISUAL_ROUTES" in spec
 
 

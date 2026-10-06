@@ -1528,8 +1528,7 @@ def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
         {alias: (source, func) for alias, source, func in spec["aggs"]},
         dropna=False,
     )
-    for column in spec["group_by"]:
-        result[column] = result[column].astype(object).where(~result[column].isna(), None)
+    result = _none_for_null(result, list(spec["group_by"]))
     post_filter = spec.get("post_filter")
     if post_filter is not None:
         result = result[_joined_agg_pandas_condition(result, params, post_filter)]
@@ -1977,10 +1976,7 @@ def q46_pandas_impl(ctx: DataFrameContext) -> Any:
     outer = outer[(outer["ca_city"] != outer["bought_city"]) & outer["ca_city"].notna() & outer["bought_city"].notna()]
     cols = ["c_last_name", "c_first_name", "ca_city", "bought_city", "ss_ticket_number", "amt", "profit"]
     result = outer[cols].sort_values(cols).head(100)
-    for column in result.columns:
-        if result[column].dtype == object:
-            result[column] = result[column].where(result[column].notna(), None)
-    return result
+    return _none_for_null(result, [column for column in result.columns if result[column].dtype == object])
 
 
 def q68_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2059,10 +2055,7 @@ def q68_pandas_impl(ctx: DataFrameContext) -> Any:
         "list_price",
     ]
     result = outer[cols].sort_values(["c_last_name", "ss_ticket_number"]).head(100)
-    for column in result.columns:
-        if result[column].dtype == object:
-            result[column] = result[column].where(result[column].notna(), None)
-    return result
+    return _none_for_null(result, [column for column in result.columns if result[column].dtype == object])
 
 
 def q79_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2147,10 +2140,7 @@ def q79_pandas_impl(ctx: DataFrameContext) -> Any:
     outer["s_city"] = outer["s_city"].astype(str).str[:30]
     cols = ["c_last_name", "c_first_name", "s_city", "ss_ticket_number", "amt", "profit"]
     result = outer[cols].sort_values(["c_last_name", "c_first_name", "s_city", "profit"]).head(100)
-    for column in result.columns:
-        if result[column].dtype == object:
-            result[column] = result[column].where(result[column].notna(), None)
-    return result
+    return _none_for_null(result, [column for column in result.columns if result[column].dtype == object])
 
 
 _Q50_STORE_COLS = [
@@ -3224,8 +3214,7 @@ def q34_pandas_impl(ctx: DataFrameContext) -> Any:
     ticket_filtered = ticket_agg[(ticket_agg["cnt"] >= 15) & (ticket_agg["cnt"] <= 20)]
 
     result = ticket_filtered.merge(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-    for column in ("c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag"):
-        result[column] = result[column].astype(object).where(~result[column].isna(), None)
+    result = _none_for_null(result, ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag"])
 
     result = result[["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number", "cnt"]]
     return _sort_null_largest_pandas(
@@ -4581,13 +4570,9 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
         ["d_week_seq1", "sun_ratio", "mon_ratio", "tue_ratio", "wed_ratio", "thu_ratio", "fri_ratio", "sat_ratio"]
     ]
     result = result.sort_values("d_week_seq1")
-    import pandas as _pd
-
-    for column in ["sun_ratio", "mon_ratio", "tue_ratio", "wed_ratio", "thu_ratio", "fri_ratio", "sat_ratio"]:
-        result[column] = _pd.Series(
-            [None if value != value else value for value in result[column].tolist()], dtype=object
-        )
-    return result
+    return _none_for_null(
+        result, ["sun_ratio", "mon_ratio", "tue_ratio", "wed_ratio", "thu_ratio", "fri_ratio", "sat_ratio"]
+    )
 
 
 _Q31_ORDER_COLUMNS = (
@@ -6431,11 +6416,10 @@ def q35_pandas_impl(ctx: DataFrameContext) -> Any:
         "aggthree3": ("cd_dep_college_count", aggthree),
     }
     result = base.groupby(group_cols, as_index=False, dropna=False).agg(**agg_spec)
-    result["ca_state"] = result["ca_state"].astype(object).where(result["ca_state"].notna(), None)
     result["cnt2"] = result["cnt1"]
     result["cnt3"] = result["cnt1"]
     result = _none_for_null(
-        result, [f"agg{position}{number}" for position in ("one", "two", "three") for number in "123"]
+        result, ["ca_state", *(f"agg{position}{number}" for position in ("one", "two", "three") for number in "123")]
     )
     return (
         result[
@@ -6970,17 +6954,9 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
         "catalog_sales_quantitystdev",
         "catalog_sales_quantitycov",
     ]
-    import pandas as _pd
 
     result = result[out_cols].sort_values(["i_item_id", "i_item_desc", "s_state"]).head(100)
-    for column in result.columns:
-        if result[column].dtype == object:
-            result[column] = result[column].where(result[column].notna(), None)
-        elif result[column].dtype == float:
-            values = result[column].tolist()
-            if any(value != value for value in values):
-                result[column] = _pd.Series([None if value != value else value for value in values], dtype=object)
-    return result
+    return _none_for_null(result, [column for column in result.columns if result[column].dtype in (object, float)])
 
 
 def q18_expression_impl(ctx: DataFrameContext) -> Any:

@@ -746,3 +746,18 @@ def test_throughput_explorer_smoke_config_covers_throughput_phase():
     assert "package" in cfg.phases
     assert "explorer_smoke" in cfg.phases
     assert "{time}" in cfg.output.logs_dir_template
+
+
+def test_throughput_explorer_smoke_config_fails_closed_on_the_requested_stream_count():
+    from tests.uat.config import load_config
+
+    cfg = load_config(_CORPUS_CONFIGS_ROOT / "uat-throughput-explorer-smoke.yaml")
+    assert cfg.explorer_smoke.require_throughput_streams == cfg.execute.streams == 3
+
+
+def test_explorer_smoke_require_throughput_streams_defaults_to_unset_and_rejects_one():
+    assert config.validate_config({"name": "x"}).explorer_smoke.require_throughput_streams is None
+    with pytest.raises(config.ConfigError, match="at least 2"):
+        config.validate_config({"name": "x", "explorer_smoke": {"require_throughput_streams": 1}})
+    with pytest.raises(config.ConfigError, match="require_throughput_streams"):
+        config.validate_config({"name": "x", "explorer_smoke": {"require_throughput_streams": "many"}})

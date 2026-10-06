@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fnmatch
 import importlib.util
 import sys
 from pathlib import Path
@@ -185,6 +186,7 @@ TUNING_TRUST_FILES = (
     "benchbox/core/tuning/capability_registry.py",
     "benchbox/core/tuning/metadata.py",
     "benchbox/platforms/clickhouse/introspection.py",
+    "benchbox/platforms/dataframe/tuning_trust.py",
 )
 TUNING_TRUST_GLOB = "benchbox/platforms/*_introspection.py"
 
@@ -196,10 +198,26 @@ def test_tuning_trust_paths_are_pinned_in_manifest() -> None:
         assert (ROOT / path).is_file(), f"{path} no longer exists; update the soundness manifest"
         assert soundness.is_soundness_path(path) is True
     assert f"glob\t{TUNING_TRUST_GLOB}" in manifest
-    introspection_modules = sorted((ROOT / "benchbox" / "platforms").glob("*_introspection.py"))
+    # Enumerate with the same matcher as the real rule (``fnmatchcase``, where
+    # ``*`` crosses ``/``). ``Path.glob("*_introspection.py")`` only sees the
+    # top level and would miss nested ``benchbox/platforms/<sub>/*_introspection.py``
+    # modules that the manifest glob still matches.
+    candidates = sorted((ROOT / "benchbox" / "platforms").rglob("*.py"))
+    introspection_modules = [
+        module for module in candidates if fnmatch.fnmatchcase(module.relative_to(ROOT).as_posix(), TUNING_TRUST_GLOB)
+    ]
     assert introspection_modules, "the platform introspection glob matches no module"
     for module in introspection_modules:
         assert soundness.is_soundness_path(module.relative_to(ROOT).as_posix()) is True
+
+
+def test_tuning_trust_glob_covers_nested_introspection_modules() -> None:
+    """The manifest glob's ``*`` crosses ``/``; the pin must agree below the top level."""
+    nested = "benchbox/platforms/clickhouse/custom_introspection.py"
+    assert fnmatch.fnmatchcase(nested, TUNING_TRUST_GLOB) is True
+    assert soundness.is_soundness_path(nested) is True
+    top_level = {path.name for path in (ROOT / "benchbox" / "platforms").glob("*_introspection.py")}
+    assert "custom_introspection.py" not in top_level
 
 
 def test_any_soundness_path_recognises_tuning_trust_paths() -> None:

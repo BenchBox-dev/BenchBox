@@ -406,12 +406,11 @@ benchbox run-official {tpch|tpcds} [OPTIONS]
   TPC-allowed values: 1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000)
 - `--phases TEXT` (required): Comma-separated test phases
 - `--streams INTEGER`: Number of concurrent streams for the `throughput`
-  phase. **Required** when `--phases` includes `throughput`; must be a
-  non-negative integer. Sets `BenchmarkConfig.concurrency` (the same field
-  `run`'s throughput driver reads internally), so `run-official ... --streams 4`
-  is equivalent to running with 4 concurrent throughput streams.
-  The throughput driver floors the resolved stream count at the TPC minimum
-  of **2**, so `--streams 0` and `--streams 1` both run 2 streams.
+  phase. **Required** when `--phases` includes `throughput`; must be at least
+  **2** (the TPC minimum), and `--streams 0` or `--streams 1` is rejected.
+  Sets `BenchmarkConfig.concurrency` (the same field `run`'s throughput driver
+  reads internally), so `run-official ... --streams 4` is equivalent to
+  running with 4 concurrent throughput streams.
 - `--seed INTEGER`: Random seed for reproducible official runs (a warning is
   printed if omitted)
 - `--output PATH`: Output directory

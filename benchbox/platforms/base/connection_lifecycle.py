@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import logging
 import sys
 from contextlib import contextmanager
@@ -89,7 +90,18 @@ class ConnectionLifecycleMixin:
     def get_connection_from_pool(self) -> Any:
         if self.connection_pool:
             return self.connection_pool.get_connection()
-        return self.create_connection(**self.platform_config)
+        return self._create_unpooled_connection()
+
+    def _create_unpooled_connection(self) -> Any:
+        try:
+            parameters = inspect.signature(self.create_connection).parameters
+        except (TypeError, ValueError):
+            return self.create_connection(**self.platform_config)
+        if any(param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values()):
+            return self.create_connection(**self.platform_config)
+        if "connection_config" in parameters:
+            return self.create_connection(connection_config=dict(self.platform_config))
+        return self.create_connection()
 
     def get_database_path(self, **connection_config) -> str | None:
         return None
@@ -184,7 +196,9 @@ class ConnectionLifecycleMixin:
 
             fresh_database_issue = f"Tuning: {NO_TUNING_METADATA_ERROR}"
             for issue in validation_result.issues:
-                if issue == fresh_database_issue and validation_result.database_empty:
+                if getattr(validation_result, "database_empty", False) and (
+                    issue == fresh_database_issue or issue.startswith("Missing tables:")
+                ):
                     self.log_verbose(issue)
                 else:
                     self.logger.error(f"❌ {issue}")
@@ -233,6 +247,19 @@ class ConnectionLifecycleMixin:
 
     def reset_database_in_place(self, **connection_config) -> bool:
         return False
+
+    def fail_closed_on_force_recreate(self, *, platform_label: str, database: str | None, manual_hint: str) -> None:
+        if not getattr(self, "force_recreate", False):
+            return
+        if getattr(self, "dry_run", False) or getattr(self, "dry_run_mode", False):
+            self.log_verbose(f"--force-recreate has no automatic drop on {platform_label} (dry run: nothing to drop)")
+            return
+        name = database or "default"
+        raise RuntimeError(
+            f"{platform_label} does not support --force-recreate: BenchBox cannot drop "
+            f"database '{name}' automatically. {manual_hint} "
+            "Re-run without --force-recreate once the database has been removed."
+        )
 
     def drop_database(self, **connection_config) -> None:
         raise NotImplementedError("drop_database not implemented for this platform")

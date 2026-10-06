@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from benchbox.core.loaded_tables import is_data_loading_skipped
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.file_format import DATA_FORMAT_EXTENSIONS, detect_compression, strip_compression_suffix
 
@@ -165,7 +166,7 @@ class SparkDataLoadMixin:
             data_source = resolver.resolve(benchmark, Path(data_dir))
 
             if not data_source or not data_source.tables:
-                if getattr(type(benchmark), "SKIP_DATA_LOADING", False):
+                if is_data_loading_skipped(benchmark):
                     self.logger.info("Benchmark is schema-only; skipping Spark data load")
                     return table_stats, elapsed_seconds(start_time), per_table_timings
                 raise ValueError(
@@ -357,14 +358,18 @@ class SparkQueryExecutionMixin:
             self.capture_sql(query, "query", None)
             return self._build_dry_run_result(query_id)
 
-        start_time = mono_time()
-
         spark = connection
 
-        try:
-            if self.disable_cache and self._catalog_clear_cache_supported:
+        if self.disable_cache and self._catalog_clear_cache_supported:
+            clear_start = mono_time()
+            try:
                 spark.catalog.clearCache()
+            except Exception as e:
+                return self._build_query_failure_result(query_id, clear_start, e)
 
+        start_time = mono_time()
+
+        try:
             result_df = spark.sql(query)
             result = result_df.collect()
 

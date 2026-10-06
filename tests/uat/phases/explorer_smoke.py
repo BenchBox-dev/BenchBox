@@ -95,12 +95,15 @@ def run_explorer_smoke(
     build_extra_args: tuple[str, ...] = (),
     playwright_browsers: tuple[str, ...] = ("chromium",),
     playwright_fixture_dir: Path | None = None,
+    require_throughput_streams: int | None = None,
     runner=subprocess.run,
 ) -> ExplorerSmokeResult:
     log_dir.mkdir(parents=True, exist_ok=True)
 
     resolved_bundles_dir = _resolve_bundles_dir(bundles_dir)
-    contract = _validate_external_corpus(bundles_dir=resolved_bundles_dir)
+    contract = _validate_external_corpus(
+        bundles_dir=resolved_bundles_dir, require_throughput_streams=require_throughput_streams
+    )
     (log_dir / "explorer_corpus_contract.json").write_text(
         json.dumps(contract, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -119,7 +122,24 @@ def run_explorer_smoke(
             abort_reason="Explorer smoke corpus contract failed:\n  - " + "\n  - ".join(corpus_errors[:20]),
         )
 
+    skip_reason = None
     if not explorer_present():
+        skip_reason = _explorer_absent_reason()
+    elif not has_node():
+        skip_reason = "node not on PATH"
+    if skip_reason is not None:
+        if require_throughput_streams is not None:
+            return ExplorerSmokeResult(
+                phase="explorer_smoke",
+                build_returncode=0,
+                smoke_returncode=0,
+                build_log=None,
+                smoke_log=None,
+                skipped=True,
+                skip_reason=skip_reason,
+                aborted=True,
+                abort_reason=f"Explorer smoke required throughput coverage but could not run: {skip_reason}",
+            )
         return ExplorerSmokeResult(
             phase="explorer_smoke",
             build_returncode=0,
@@ -127,17 +147,7 @@ def run_explorer_smoke(
             build_log=None,
             smoke_log=None,
             skipped=True,
-            skip_reason=_explorer_absent_reason(),
-        )
-    if not has_node():
-        return ExplorerSmokeResult(
-            phase="explorer_smoke",
-            build_returncode=0,
-            smoke_returncode=0,
-            build_log=None,
-            smoke_log=None,
-            skipped=True,
-            skip_reason="node not on PATH",
+            skip_reason=skip_reason,
         )
 
     build_log = log_dir / "explorer_build.log"
@@ -166,6 +176,7 @@ def run_explorer_smoke(
         data_dir=output_dir,
         fixture_dir=fixture_dir,
         playwright_browsers=playwright_browsers,
+        require_throughput_streams=require_throughput_streams,
         runner=runner,
     )
     return ExplorerSmokeResult(
@@ -231,11 +242,15 @@ def _run_browser_smoke(
     data_dir: Path,
     fixture_dir: Path,
     playwright_browsers: tuple[str, ...],
+    require_throughput_streams: int | None = None,
     runner,
 ) -> int:
     env = os.environ.copy()
     env["BENCHBOX_DATA_DIR"] = str(data_dir)
     env["E2E_FIXTURE_DIR"] = str(_absolute_path(fixture_dir))
+    env.pop("E2E_REQUIRE_THROUGHPUT_STREAMS", None)
+    if require_throughput_streams is not None:
+        env["E2E_REQUIRE_THROUGHPUT_STREAMS"] = str(require_throughput_streams)
     env.setdefault("E2E_PORT", str(_find_free_local_port()))
     commands = (
         ["npm", "ci"],
@@ -258,7 +273,33 @@ def _absolute_path(path: Path) -> Path:
     return Path.cwd() / expanded
 
 
-def _validate_external_corpus(*, bundles_dir: Path) -> dict[str, object]:
+def _bundle_execution_streams(queries: object) -> set[int]:
+    streams: set[int] = set()
+    if not isinstance(queries, list):
+        return streams
+    for query in queries:
+        if not isinstance(query, dict) or query.get("run_type") not in (None, "measurement", "warmup"):
+            continue
+        try:
+            stream = float(str(query.get("stream")).strip())
+        except ValueError:
+            continue
+        if stream.is_integer():
+            streams.add(int(stream))
+    return streams
+
+
+def _throughput_stream_errors(throughput_streams: dict[str, int], required: int) -> list[str]:
+    if not throughput_streams:
+        return [f"Explorer smoke corpus has no throughput bundle but {required} throughput streams are required"]
+    return [
+        f"{name}: throughput bundle has {count} distinct streams, expected exactly {required}"
+        for name, count in sorted(throughput_streams.items())
+        if count != required
+    ]
+
+
+def _validate_external_corpus(*, bundles_dir: Path, require_throughput_streams: int | None = None) -> dict[str, object]:
     bundle_files = sorted(
         path
         for path in bundles_dir.rglob("*.json")
@@ -276,6 +317,7 @@ def _validate_external_corpus(*, bundles_dir: Path) -> dict[str, object]:
 
     benchmarks: set[str] = set()
     platforms: set[str] = set()
+    throughput_streams: dict[str, int] = {}
     query_count = 0
     checked = 0
     errors: list[str] = []
@@ -308,6 +350,11 @@ def _validate_external_corpus(*, bundles_dir: Path) -> dict[str, object]:
         queries = bundle.get("queries") if isinstance(bundle, dict) else None
         if isinstance(queries, list):
             query_count += len(queries)
+        if isinstance(benchmark, dict) and benchmark.get("test_type") == "throughput":
+            throughput_streams[path.name] = len(_bundle_execution_streams(queries))
+
+    if require_throughput_streams is not None:
+        errors.extend(_throughput_stream_errors(throughput_streams, require_throughput_streams))
 
     return {
         "bundles": len(bundle_files),

@@ -26,7 +26,7 @@ from ..utils.dependencies import (
     get_dependency_error_message,
 )
 from ..utils.file_format import get_data_extension
-from .base import DriverIsolationCapability, PlatformAdapter, PsycopgConnectionMixin, StreamConnectionCapability
+from .base import DriverIsolationCapability, PlatformAdapter, PsycopgConnectionMixin
 from .base.data_loading import (
     CsvDialect,
     DataSourceResolver,
@@ -82,7 +82,6 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     _max_identifier_length = 127
-    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     @property
     def platform_name(self) -> str:

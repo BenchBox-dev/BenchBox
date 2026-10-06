@@ -9,6 +9,8 @@ from typing import Any, Callable, Protocol
 from benchbox.core.results.metrics import TPCMetricsCalculator
 from benchbox.utils.clock import elapsed_seconds
 
+from .containment import record_outstanding_result
+from .executor import DaemonStreamExecutor
 from .result import (
     ThroughputResult,
     ThroughputStreamResult,
@@ -27,36 +29,6 @@ class _RunnerConfig(Protocol):
 
 
 class StreamRunner:
-    @staticmethod
-    def _finalize_tentatively_cancelled(
-        result: ThroughputResult,
-        tentatively_cancelled: list[tuple[concurrent.futures.Future[ThroughputStreamResult], int]],
-        record_completed: Callable[[concurrent.futures.Future[ThroughputStreamResult], int], None],
-        leaked_error: Callable[[int], str],
-        logger: logging.Logger,
-    ) -> dict[int, concurrent.futures.Future[ThroughputStreamResult]]:
-        still_owned: dict[int, concurrent.futures.Future[ThroughputStreamResult]] = {}
-        for queued_future, queued_stream_id in tentatively_cancelled:
-            if queued_future.cancelled():
-                result.streams_executed += 1
-                result.cancelled_stream_ids.append(queued_stream_id)
-                result.outstanding_notes.append(
-                    f"Stream {queued_stream_id} cancelled before dispatch; it never executed."
-                )
-            elif queued_future.done():
-                record_completed(queued_future, queued_stream_id)
-            else:
-                result.streams_executed += 1
-                result.outstanding_stream_ids.append(queued_stream_id)
-                still_owned[queued_stream_id] = queued_future
-                error_msg = leaked_error(queued_stream_id)
-                result.errors.append(error_msg)
-                result.outstanding_notes.append(
-                    f"Stream {queued_stream_id} started after the deadline; worker still running."
-                )
-                logger.warning(error_msg)
-        return still_owned
-
     @staticmethod
     def execute(
         stream_fn: Callable[[int, int, Any], ThroughputStreamResult],
@@ -77,149 +49,136 @@ class StreamRunner:
             )
 
         cooperative_cancel = bool(getattr(config, "cancel_on_timeout", False))
-        cancel_events: dict[int, threading.Event] = {}
+        cancel_events: dict[int, threading.Event] = (
+            {stream_id: threading.Event() for stream_id in range(config.num_streams)} if cooperative_cancel else {}
+        )
+        config._stream_cancel_events = cancel_events
 
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
-        try:
-            future_to_stream_id: dict[concurrent.futures.Future[ThroughputStreamResult], int] = {}
+        future_to_stream_id: dict[concurrent.futures.Future[ThroughputStreamResult], int] = {}
+        pending: set[concurrent.futures.Future[ThroughputStreamResult]] = set()
+        outstanding_futures: dict[int, concurrent.futures.Future[ThroughputStreamResult]] = {}
 
-            if cooperative_cancel:
-                cancel_events = {stream_id: threading.Event() for stream_id in range(config.num_streams)}
-                config._stream_cancel_events = cancel_events
-            else:
-                config._stream_cancel_events = {}
+        def _record_completed_future(
+            completed_future: concurrent.futures.Future[ThroughputStreamResult], completed_stream_id: int
+        ) -> None:
+            try:
+                stream_result = completed_future.result()
+                result.stream_results.append(stream_result)
+                result.streams_executed += 1
 
-            for stream_id in range(config.num_streams):
-                future = executor.submit(
-                    stream_fn,
-                    stream_id,
-                    config.base_seed + stream_id,
-                    config,
-                )
-                future_to_stream_id[future] = stream_id
-
-            def _record_completed_future(
-                completed_future: concurrent.futures.Future[ThroughputStreamResult], completed_stream_id: int
-            ) -> None:
-                try:
-                    stream_result = completed_future.result()
-                    result.stream_results.append(stream_result)
-                    result.streams_executed += 1
-
-                    if throughput_stream_succeeded(stream_result):
-                        result.streams_successful += 1
-                    else:
-                        stream_result.success = False
-                        if not stream_result.error:
-                            query_errors = [
-                                str(query.get("error"))
-                                for query in stream_result.query_results
-                                if not query.get("success", True) and query.get("error")
-                            ]
-                            stream_result.error = "; ".join(query_errors) or (
-                                f"{stream_result.queries_successful}/{stream_result.queries_executed} queries succeeded"
-                            )
-                        result.errors.append(f"Stream {stream_result.stream_id} failed: {stream_result.error}")
-
-                    if config.verbose:
-                        logger.info(
-                            f"Stream {stream_result.stream_id}: "
-                            f"{stream_result.queries_successful}/{stream_result.queries_executed} successful"
+                if throughput_stream_succeeded(stream_result):
+                    result.streams_successful += 1
+                else:
+                    stream_result.success = False
+                    if not stream_result.error:
+                        query_errors = [
+                            str(query.get("error"))
+                            for query in stream_result.query_results
+                            if not query.get("success", True) and query.get("error")
+                        ]
+                        stream_result.error = "; ".join(query_errors) or (
+                            f"{stream_result.queries_successful}/{stream_result.queries_executed} queries succeeded"
                         )
+                    result.errors.append(f"Stream {stream_result.stream_id} failed: {stream_result.error}")
 
-                except Exception as e:
-                    result.streams_executed += 1
-                    result.errors.append(f"Stream {completed_stream_id} execution failed: {e}")
-                    if config.verbose:
-                        logger.error(f"Stream {completed_stream_id} execution failed: {e}")
-
-            pending = set(future_to_stream_id.keys())
-
-            outstanding_futures: dict[int, concurrent.futures.Future[ThroughputStreamResult]] = {}
-            tentatively_cancelled: list[tuple[concurrent.futures.Future[ThroughputStreamResult], int]] = []
-
-            def _leaked_error(timed_out_stream_id: int) -> str:
-                return (
-                    f"Stream {timed_out_stream_id} timed out after {timeout}s and has not completed. "
-                    "Python cannot forcibly cancel a running thread, so this stream's worker "
-                    "may still be executing queries and holding its database connection in "
-                    "the background (leaked)"
-                    + (
-                        "; cooperative cancellation has been signalled and the stream should stop before its next query"
-                        if cooperative_cancel
-                        else ""
+                if config.verbose:
+                    logger.info(
+                        f"Stream {stream_result.stream_id}: "
+                        f"{stream_result.queries_successful}/{stream_result.queries_executed} successful"
                     )
-                    + "."
-                )
+
+            except Exception as e:
+                result.streams_executed += 1
+                result.errors.append(f"Stream {completed_stream_id} execution failed: {e}")
+                if config.verbose:
+                    logger.error(f"Stream {completed_stream_id} execution failed: {e}")
+
+        def _settle_pending(reason: str) -> None:
+            for future in sorted(pending, key=future_to_stream_id.__getitem__):
+                stream_id = future_to_stream_id[future]
+                pending.discard(future)
+
+                if cooperative_cancel:
+                    cancel_events[stream_id].set()
+
+                if future.cancel():
+                    result.cancelled_stream_ids.append(stream_id)
+                    result.outstanding_notes.append(f"Stream {stream_id} cancelled before dispatch; it never executed.")
+                    cancelled_msg = (
+                        f"Stream {stream_id} {reason} without starting: it was still queued behind "
+                        "running streams and is cancelled before dispatch so it never executes."
+                    )
+                    result.errors.append(cancelled_msg)
+                    logger.warning(cancelled_msg)
+                elif future.done():
+                    _record_completed_future(future, stream_id)
+                else:
+                    result.streams_executed += 1
+                    result.outstanding_stream_ids.append(stream_id)
+                    outstanding_futures[stream_id] = future
+                    error_msg = (
+                        f"Stream {stream_id} {reason} and has not completed. "
+                        "Python cannot forcibly cancel a running thread, so this stream's worker "
+                        "may still be executing queries and holding its database connection in "
+                        "the background (leaked)"
+                        + (
+                            "; cooperative cancellation has been signalled and the stream should "
+                            "stop before its next query"
+                            if cooperative_cancel
+                            else ""
+                        )
+                        + "."
+                    )
+                    result.errors.append(error_msg)
+                    result.outstanding_notes.append(
+                        f"Stream {stream_id} worker still running when it was settled"
+                        + (
+                            "; cooperative cancellation signalled"
+                            if cooperative_cancel
+                            else "; no cooperative cancellation (cancel_on_timeout=False)"
+                        )
+                        + "."
+                    )
+                    logger.warning(error_msg)
+
+        executor = DaemonStreamExecutor(max_workers=max_workers)
+        try:
+            for stream_id in range(config.num_streams):
+                future = executor.submit(stream_fn, stream_id, config.base_seed + stream_id, config)
+                future_to_stream_id[future] = stream_id
+                pending.add(future)
 
             try:
                 for future in concurrent.futures.as_completed(pending, timeout=timeout):
-                    stream_id = future_to_stream_id[future]
                     pending.discard(future)
-                    _record_completed_future(future, stream_id)
-
+                    _record_completed_future(future, future_to_stream_id[future])
             except concurrent.futures.TimeoutError:
-                for future in list(pending):
-                    stream_id = future_to_stream_id[future]
-
-                    if future.done():
-                        pending.discard(future)
-                        _record_completed_future(future, stream_id)
-                        continue
-
-                    if cooperative_cancel:
-                        cancel_events[stream_id].set()
-
-                    if future.running():
-                        result.streams_executed += 1
-                        result.outstanding_stream_ids.append(stream_id)
-                        outstanding_futures[stream_id] = future
-                        error_msg = _leaked_error(stream_id)
-                        result.errors.append(error_msg)
-                        result.outstanding_notes.append(
-                            f"Stream {stream_id} worker still running at timeout"
-                            + (
-                                "; cooperative cancellation signalled"
-                                if cooperative_cancel
-                                else "; no cooperative cancellation (cancel_on_timeout=False)"
-                            )
-                            + "."
-                        )
-                        logger.warning(error_msg)
-                    else:
-                        tentatively_cancelled.append((future, stream_id))
-                        queued_msg = (
-                            f"Stream {stream_id} timed out after {timeout}s without starting: "
-                            f"it was still queued behind running streams and is cancelled "
-                            f"before dispatch so it never executes."
-                        )
-                        result.errors.append(queued_msg)
-                        logger.warning(queued_msg)
-                    pending.discard(future)
+                _settle_pending(f"timed out after {timeout}s")
+        except BaseException:
+            _settle_pending("was abandoned after the runner failed")
+            raise
         finally:
             executor.shutdown(wait=False, cancel_futures=True)
-
-            outstanding_futures.update(
-                StreamRunner._finalize_tentatively_cancelled(
-                    result, tentatively_cancelled, _record_completed_future, _leaked_error, logger
-                )
-            )
-
             result._outstanding_futures = outstanding_futures
             result.cleanup_state = "outstanding" if result.outstanding_stream_ids else "complete"
+            if result.outstanding_stream_ids:
+                record_outstanding_result(result)
 
     @staticmethod
     def compute_metrics(
         result: ThroughputResult,
         config: _RunnerConfig,
         start_time: float,
+        queries_per_stream: int | None = None,
     ) -> bool:
         result.end_time = datetime.now().isoformat()
 
         if result.stream_results:
-            first_stream_start = min(sr.start_time for sr in result.stream_results)
-            last_stream_end = max(sr.end_time for sr in result.stream_results)
-            total_time = last_stream_end - first_stream_start
+            first_stream = min(result.stream_results, key=lambda sr: sr.start_time)
+            last_stream = max(result.stream_results, key=lambda sr: sr.end_time)
+            total_time = last_stream.end_time - first_stream.start_time
+            result.start_time = first_stream.start_wall_time or result.start_time
+            result.end_time = last_stream.end_wall_time or result.end_time
         else:
             total_time = elapsed_seconds(start_time)
 
@@ -231,13 +190,14 @@ class StreamRunner:
             result.success = False
             return False
 
-        total_queries = sum(sr.queries_executed for sr in result.stream_results)
+        executed_queries = sum(sr.queries_executed for sr in result.stream_results)
+        scored_queries = executed_queries if queries_per_stream is None else queries_per_stream * config.num_streams
         result.throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
-            total_queries=total_queries,
+            total_queries=scored_queries,
             total_time_seconds=total_time,
             scale_factor=config.scale_factor,
             num_streams=config.num_streams,
         )
-        result.query_throughput = total_queries / total_time
+        result.query_throughput = executed_queries / total_time
         result.success = result.throughput_at_size > 0
         return result.success

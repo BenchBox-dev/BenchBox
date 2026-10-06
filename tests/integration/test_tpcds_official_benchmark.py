@@ -1,10 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-# This implementation is based on the TPC-DS specification.
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -47,7 +40,6 @@ class TestTPCDSOfficialBenchmark:
         return factory
 
     def test_official_benchmark_initialization(self, temp_dir):
-
         benchmark = TPCDSOfficialBenchmark(scale_factor=1.0, output_dir=temp_dir, verbose=True, num_streams=2)
 
         assert benchmark.config.scale_factor == 1.0
@@ -58,7 +50,6 @@ class TestTPCDSOfficialBenchmark:
         assert temp_dir.exists()
 
     def test_benchmark_result_initialization(self):
-
         config = TPCDSOfficialBenchmarkConfig(scale_factor=1.0)
         result = TPCDSOfficialBenchmarkResult(
             config=config,
@@ -70,7 +61,6 @@ class TestTPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphds_at_size=0.0,
             success=True,
             errors=[],
         )
@@ -83,7 +73,6 @@ class TestTPCDSOfficialBenchmark:
         assert result.errors == []
 
     def test_query_result_initialization(self):
-
         result = QueryResult(
             query_id=1,
             execution_time=1.5,
@@ -95,7 +84,6 @@ class TestTPCDSOfficialBenchmark:
         assert result.success is True
 
     def test_config_initialization(self):
-
         config = TPCDSOfficialBenchmarkConfig(
             scale_factor=2.0,
             num_streams=8,
@@ -117,7 +105,6 @@ class TestTPCDSOfficialBenchmark:
         assert config.verbose is True
 
     def test_run_official_benchmark_basic(self, benchmark_instance, mock_connection_factory):
-
         with (
             patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as mock_power_test,
             patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest") as mock_throughput_test,
@@ -144,7 +131,6 @@ class TestTPCDSOfficialBenchmark:
             assert result.total_time > 0
 
     def test_run_official_benchmark_with_custom_config(self, benchmark_instance, mock_connection_factory):
-
         custom_config = TPCDSOfficialBenchmarkConfig(
             scale_factor=1.0,
             num_streams=2,
@@ -164,10 +150,9 @@ class TestTPCDSOfficialBenchmark:
             assert result.success is True
             assert result.power_at_size == 150.0
             assert result.throughput_at_size == 0.0
-            assert result.qphds_at_size == 0.0
+            assert not hasattr(result, "qphds_at_size")
 
     def test_validate_compliance(self, benchmark_instance):
-
         valid_result = TPCDSOfficialBenchmarkResult(
             config=TPCDSOfficialBenchmarkConfig(),
             start_time="2023-01-01T00:00:00",
@@ -178,7 +163,6 @@ class TestTPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=100.0,
             throughput_at_size=200.0,
-            qphds_at_size=141.42,
             success=True,
             errors=[],
         )
@@ -195,7 +179,6 @@ class TestTPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphds_at_size=0.0,
             success=False,
             errors=["Test error"],
         )
@@ -203,7 +186,6 @@ class TestTPCDSOfficialBenchmark:
         assert benchmark_instance.validate_compliance(invalid_result) is False
 
     def test_generate_audit_trail(self, benchmark_instance, temp_dir):
-
         result = TPCDSOfficialBenchmarkResult(
             config=TPCDSOfficialBenchmarkConfig(scale_factor=1.0, num_streams=4),
             start_time="2023-01-01T00:00:00",
@@ -214,7 +196,6 @@ class TestTPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=500.0,
             throughput_at_size=800.0,
-            qphds_at_size=632.46,
             success=True,
             errors=[],
         )
@@ -238,13 +219,12 @@ class TestTPCDSOfficialBenchmark:
             assert "TPC-DS Official Benchmark Audit Trail" in content
             assert "Scale Factor: 1.0" in content
             assert "Number of Streams: 4" in content
-            assert "QphDS@Size: 632.46" in content
+            assert "QphDS" not in content
         finally:
             if audit_file.exists():
                 os.unlink(audit_file)
 
     def test_integration_with_base_benchmark(self, temp_dir):
-
         base_benchmark = TPCDSBenchmark(scale_factor=1.0, output_dir=temp_dir, verbose=False)
 
         assert hasattr(base_benchmark, "run_official_benchmark")
@@ -269,7 +249,6 @@ class TestTPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphds_at_size=0.0,
             success=True,
             errors=[],
         )
@@ -287,7 +266,6 @@ class TestTPCDSOfficialBenchmark:
         assert "Database connection failed" in result.errors[0]
 
     def test_query_result_attributes(self):
-
         result = QueryResult(query_id=5, execution_time=2.5, success=True)
 
         assert result.query_id == 5
@@ -295,7 +273,6 @@ class TestTPCDSOfficialBenchmark:
         assert result.success is True
 
     def test_benchmark_phases_enum(self):
-
         assert BenchmarkPhase.POWER == "power"
         assert BenchmarkPhase.THROUGHPUT == "throughput"
         assert BenchmarkPhase.MAINTENANCE == "maintenance"
@@ -304,7 +281,6 @@ class TestTPCDSOfficialBenchmark:
 @pytest.mark.integration
 class TestTPCDSIntegration:
     def test_integration_with_query_manager(self):
-
         from benchbox.core.tpcds.queries import TPCDSQueryManager
 
         query_manager = TPCDSQueryManager()
@@ -312,7 +288,6 @@ class TestTPCDSIntegration:
         assert hasattr(query_manager, "available")
 
     def test_integration_with_stream_manager(self):
-
         from benchbox.core.tpcds.queries import TPCDSQueryManager
         from benchbox.core.tpcds.streams import TPCDSStreamManager
 
@@ -323,7 +298,6 @@ class TestTPCDSIntegration:
         assert stream_manager.query_manager is query_manager
 
     def test_integration_with_base_benchmark(self):
-
         from benchbox.core.tpcds.benchmark import TPCDSBenchmark
 
         benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)

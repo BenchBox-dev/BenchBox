@@ -141,6 +141,11 @@ class MotherDuckAdapter(PlatformAdapter):
         return resolve_dialect_for_query_translation("motherduck")
 
     def create_connection(self, connection_config: Optional[dict[str, Any]] = None):
+        self.fail_closed_on_force_recreate(
+            platform_label="MotherDuck",
+            database=self.database,
+            manual_hint="Delete the database manually via the MotherDuck UI",
+        )
         if self.connection is not None:
             return self.connection
 

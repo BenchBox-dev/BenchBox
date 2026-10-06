@@ -228,6 +228,7 @@ def reconstruct_benchmark_results(
         tuning_config_hash=tuning["tuning_config_hash"],
         tuning_source=tuning["tuning_source"],
         tuning_validation_status=tuning["tuning_validation_status"],
+        tuning_legacy_source=tuning["tuning_legacy_source"],
         applied_tuning_ledger=_extract_applied_ledger(platform_section, applied_data),
         applied_ledger_hash=_extract_applied_ledger_hash(platform_section, applied_data),
         query_plans_captured=plans_captured,
@@ -331,12 +332,16 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
     tuning_config_hash = None
     tuning_source = None
     tuning_validation_status = None
+    tuning_legacy_source = None
 
     tuning_summary = platform_section.get("tuning", {})
     if tuning_summary:
         tuning_config_hash = tuning_summary.get("requested_config_hash") or tuning_summary.get("hash")
         tuning_source = tuning_summary.get("tuning_source")
         tuning_validation_status = tuning_summary.get("validation_status")
+        legacy_source = tuning_summary.get("source")
+        if legacy_source in ("yaml", "auto"):
+            tuning_legacy_source = legacy_source
         tuning_source_file = tuning_summary.get("source_file") or (
             "yaml" if tuning_summary.get("source") == "yaml" else None
         )
@@ -364,6 +369,7 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
         "tuning_config_hash": tuning_config_hash,
         "tuning_source": tuning_source,
         "tuning_validation_status": tuning_validation_status,
+        "tuning_legacy_source": tuning_legacy_source,
     }
 
 

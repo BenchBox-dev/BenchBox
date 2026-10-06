@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -339,6 +335,17 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
             "To start one via Docker: cd docker/velox && docker compose up -d velox-connect\n"
             f"Then retry after the server is listening on {host}:{port}."
         )
+
+    def handle_existing_database(self, **connection_config) -> None:
+        self.fail_closed_on_force_recreate(
+            platform_label="Velox",
+            database=connection_config.get("database", self.database),
+            manual_hint=(
+                "Drop the database manually (for example `DROP DATABASE <name> CASCADE` "
+                "in Spark SQL against the warehouse, or remove its warehouse directory)"
+            ),
+        )
+        super().handle_existing_database(**connection_config)
 
     def create_connection(self, **connection_config) -> Any:
         self.log_operation_start("Velox SparkSession")

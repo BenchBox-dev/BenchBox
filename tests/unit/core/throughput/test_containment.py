@@ -116,7 +116,7 @@ class TestOutstandingOwnershipState:
         finally:
             release.set()
 
-        assert result.streams_executed == 2
+        assert result.streams_executed == 1
         assert len(result.errors) == 2
         assert result.outstanding_stream_ids == [0]
         assert result.cancelled_stream_ids == [1]

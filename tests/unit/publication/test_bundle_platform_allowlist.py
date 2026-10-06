@@ -27,6 +27,11 @@ class TestBundlePlatformAllowlist:
         assert vr.errors == []
         assert vr.warnings == []
 
+    def test_cedardb_bundle_section_validates_clean(self):
+        vr = _validate_platform_name("CedarDB")
+        assert vr.errors == []
+        assert vr.warnings == []
+
     def test_genuinely_unknown_platform_still_warns(self):
         vr = _validate_platform_name("Not A Real Platform")
         assert vr.errors == []

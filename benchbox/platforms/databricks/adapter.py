@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import json
@@ -2342,10 +2338,6 @@ class DatabricksAdapter(PlatformAdapter):
     def _make_power_connection_adapter(self, connection: Any, benchmark_id: str, scale_factor: float) -> Any:
         self._initialize_query_session(connection)
         return super()._make_power_connection_adapter(connection, benchmark_id, scale_factor)
-
-    def _execute_tpch_throughput_test(self, benchmark: Any, connection: Any, run_config: dict) -> list[dict[str, Any]]:
-        self._initialize_query_session(connection)
-        return super()._execute_tpch_throughput_test(benchmark, connection, run_config)
 
     def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
         stream = super().new_stream_connection(connection, benchmark_type=benchmark_type)

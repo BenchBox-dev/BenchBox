@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import hashlib
@@ -32,6 +28,47 @@ if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+
+UNIFIED_TUNING_KEYS = frozenset(
+    {
+        "primary_keys",
+        "foreign_keys",
+        "unique_constraints",
+        "check_constraints",
+        "platform_optimizations",
+        "table_tunings",
+    }
+)
+
+DATAFRAME_TUNING_KEYS = frozenset(
+    {
+        "execution",
+        "memory",
+        "data_types",
+        "parallelism",
+        "io",
+        "gpu",
+    }
+)
+
+
+def is_dataframe_tuning_file(path_or_data: Path | str | dict) -> bool:
+    if isinstance(path_or_data, (Path, str)):
+        from benchbox.core.config_utils import load_config_file
+
+        try:
+            data = load_config_file(Path(path_or_data))
+        except Exception:
+            return False
+    else:
+        data = path_or_data
+    if not isinstance(data, dict):
+        return False
+    metadata = data.get("_metadata")
+    if isinstance(metadata, dict) and metadata.get("format") == "dataframe_tuning":
+        return True
+    keys = set(data) - {"_metadata"}
+    return bool(keys & DATAFRAME_TUNING_KEYS) and not (keys & UNIFIED_TUNING_KEYS)
 
 
 def promote_tuning_provenance(
@@ -122,7 +159,7 @@ def _dataframe_profile_path(platform: str) -> Path | None:
     return Path(f"examples/tunings/dataframe/{base}_optimized.yaml")
 
 
-def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
+def get_tuning_template_paths(platform: str, benchmark: str, *, mode: str | None = None) -> list[Path]:
     paths = []
     raw_platform = platform.lower()
     template_platform = template_platform_key(platform)
@@ -142,9 +179,10 @@ def get_tuning_template_paths(platform: str, benchmark: str) -> list[Path]:
 
     paths.append(packaged_template_path(template_platform, benchmark))
 
-    dataframe_profile = _dataframe_profile_path(platform)
-    if dataframe_profile is not None:
-        paths.append(dataframe_profile)
+    if mode != "sql":
+        dataframe_profile = _dataframe_profile_path(platform)
+        if dataframe_profile is not None:
+            paths.append(dataframe_profile)
 
     return paths
 
@@ -196,6 +234,7 @@ def resolve_tuning(
     logger: Logger | None = None,
     quiet: bool = False,
     non_interactive: bool = False,
+    mode: str | None = None,
 ) -> TuningResolution:
     tuning_lower = tuning_arg.lower()
 
@@ -206,7 +245,7 @@ def resolve_tuning(
         return _resolve_auto(logger)
 
     if tuning_lower == "tuned":
-        return _resolve_tuned(platform, benchmark, config_manager, logger)
+        return _resolve_tuned(platform, benchmark, config_manager, logger, mode=mode)
 
     tuning_path = Path(tuning_arg)
     if tuning_path.exists():
@@ -259,6 +298,8 @@ def _resolve_tuned(
     benchmark: str | None,
     config_manager: ConfigManager,
     logger: Logger | None,
+    *,
+    mode: str | None = None,
 ) -> TuningResolution:
     resolution = TuningResolution(
         mode=TuningMode.TUNED,
@@ -282,7 +323,7 @@ def _resolve_tuned(
             resolution.warnings.append(f"Default tuning config '{default_config}' from benchbox.yaml not found")
 
     if platform and benchmark:
-        search_paths = get_tuning_template_paths(platform, benchmark)
+        search_paths = get_tuning_template_paths(platform, benchmark, mode=mode)
         resolution.searched_paths = search_paths
 
         packaged_candidate = packaged_template_path(template_platform_key(platform), benchmark)

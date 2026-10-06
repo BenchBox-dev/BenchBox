@@ -854,7 +854,9 @@ jobs:
 
   throughput-uat:
     runs-on: ubuntu-latest
-    timeout-minutes: 80
+    timeout-minutes: 60
+    outputs:
+      cedardb_sweep_outcome: ${{ steps.cedardb-sweep.outcome }}
     env:
       THROUGHPUT_FLOOR_MEDIAN: ${{ vars.THROUGHPUT_FLOOR_MEDIAN }}
       THROUGHPUT_FLOOR_MAX_DROP_FRACTION: ${{ vars.THROUGHPUT_FLOOR_MAX_DROP_FRACTION }}
@@ -878,119 +880,79 @@ jobs:
         run: |
           uv run -- python -m pytest tests/integration -k "throughput and duckdb" -m integration --tb=short -v
 
-      - name: Capture throughput UAT start timestamp
-        run: |
-          echo "THROUGHPUT_UAT_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S)" >> "$GITHUB_ENV"
-
       - name: Run DuckDB throughput UAT cell (TPC-H SF1, run-official --streams 3)
+        id: duckdb-sweep
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
 
-      - name: "Run Postgres throughput UAT cell (TPC-H SF1, run-official --streams 3) (quarantine #2571)"
+      - name: "Run CedarDB throughput UAT cell (TPC-H SF1, run-official --streams 3) (quarantine #2571)"
+        id: cedardb-sweep
         continue-on-error: true
         run: |
-          make uat-sweep CONFIG=tests/uat/configs/uat-throughput-postgresql-nightly.yaml
+          make uat-sweep CONFIG=tests/uat/configs/uat-throughput-cedardb-nightly.yaml
 
       - name: Assert the requested stream count reached the driver and every stream succeeded
         if: ${{ !cancelled() }}
         run: |
-          uv run -- python -c "
-          import datetime, os, sys
-          from datetime import timezone
-          from pathlib import Path
-          from tests.uat.throughput import (
-              validate_stream_count,
-              validate_stream_success,
-          )
-          started_after = datetime.datetime.strptime(
-              os.environ['THROUGHPUT_UAT_STARTED_AT'], '%Y-%m-%dT%H:%M:%S'
-          ).replace(tzinfo=timezone.utc)
-          results_dir = Path.home() / 'Developer' / 'benchmark_runs' / 'results'
-          candidates = [
-              p for p in results_dir.glob('tpch_sf1_duckdb_*.json')
-              if not p.name.endswith('.applied.json')
-              and not p.name.endswith('.plans.json')
-              and p.stat().st_mtime >= (started_after.timestamp() - 5)
-          ]
-          result_path = max(candidates, key=lambda p: (p.stat().st_mtime, p.name)) if candidates else None
-          if result_path is None:
-              print('::error::No throughput UAT result JSON found for duckdb/tpch')
-              sys.exit(1)
-          import json
-          result_json = json.loads(result_path.read_text(encoding='utf-8'))
-          ok, reason = validate_stream_count(result_json, requested_streams=3)
-          if not ok:
-              print(f'::error::{reason}')
-              sys.exit(1)
-          ok, reason = validate_stream_success(result_json)
-          if not ok:
-              print(f'::error::{reason}')
-              sys.exit(1)
-          print(f'OK: stream count and per-stream success both verified ({result_path})')
-          tpc_metrics = (result_json.get('summary') or {}).get('tpc_metrics') or {}
-          observed = tpc_metrics.get('throughput_at_size')
-          print(f'::notice::Throughput@Size observed: {observed!r} (duckdb/tpch-sf1)')
-          import math
-          floor_median = os.environ.get('THROUGHPUT_FLOOR_MEDIAN')
-          floor_drop = os.environ.get('THROUGHPUT_FLOOR_MAX_DROP_FRACTION') or '0.2'
-          if floor_median:
-              try:
-                  median = float(floor_median)
-                  max_drop = float(floor_drop)
-                  assert math.isfinite(median) and median > 0
-                  assert math.isfinite(max_drop) and 0 < max_drop < 1
-                  assert isinstance(observed, (int, float)) and math.isfinite(observed) and observed > 0
-              except (ValueError, AssertionError):
-                  print('::error::Throughput@Size floor misconfigured or unobserved; refusing to gate')
-                  sys.exit(1)
-              floor = median * (1 - max_drop)
-              if observed < floor:
-                  print(f'::error::Throughput@Size regression: observed {observed:.2f} below floor {floor:.2f} (median {median:.2f}, max drop {max_drop:.0%})')
-                  sys.exit(1)
-              print(f'OK: Throughput@Size {observed:.2f} clears floor {floor:.2f}')
-          else:
-              print('::notice::No THROUGHPUT_FLOOR_MEDIAN configured; floor check in observe-only mode')
-          "
+          uv run -- python -m tests.uat.throughput assert \
+            --cells-glob "$HOME/Developer/benchmark_runs/logs/uat_throughput_duckdb_nightly_*/cells.jsonl" \
+            --platform duckdb --benchmark tpch --scale 1 --streams 3 \
+            --evaluate-floor \
+            --baseline-out "$HOME/Developer/benchmark_runs/throughput-baseline"
 
-      - name: "Assert the Postgres cell stream count and per-stream success (quarantine #2571)"
+      - name: "Assert the CedarDB cell stream count and per-stream success (quarantine #2571)"
         if: ${{ !cancelled() }}
         continue-on-error: true
         run: |
-          uv run -- python -c "
-          import datetime, os, sys
-          from datetime import timezone
-          from pathlib import Path
-          from tests.uat.throughput import (
-              validate_stream_count,
-              validate_stream_success,
-          )
+          uv run -- python -m tests.uat.throughput assert \
+            --cells-glob "$HOME/Developer/benchmark_runs/logs/uat_throughput_cedardb_nightly_*/cells.jsonl" \
+            --platform cedardb --benchmark tpch --scale 1 --streams 3
 
-          started_after = datetime.datetime.strptime(
-              os.environ['THROUGHPUT_UAT_STARTED_AT'], '%Y-%m-%dT%H:%M:%S'
-          ).replace(tzinfo=timezone.utc)
-          results_dir = Path.home() / 'Developer' / 'benchmark_runs' / 'results'
-          candidates = [
-              p for p in results_dir.glob('tpch_sf1_postgres*.json')
-              if not p.name.endswith('.applied.json')
-              and not p.name.endswith('.plans.json')
-              and p.stat().st_mtime >= (started_after.timestamp() - 5)
-          ]
-          result_path = max(candidates, key=lambda p: (p.stat().st_mtime, p.name)) if candidates else None
-          if result_path is None:
-              print('::error::No throughput UAT result JSON found for postgresql/tpch')
-              sys.exit(1)
-          import json
-          result_json = json.loads(result_path.read_text(encoding='utf-8'))
-          ok, reason = validate_stream_count(result_json, requested_streams=3)
-          if not ok:
-              print(f'::error::{reason}')
-              sys.exit(1)
-          ok, reason = validate_stream_success(result_json)
-          if not ok:
-              print(f'::error::{reason}')
-              sys.exit(1)
-          print(f'OK: postgres stream count and per-stream success both verified ({result_path})')
-          "
+      - name: Upload throughput UAT logs and results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: throughput-uat-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ~/Developer/benchmark_runs/logs/uat_throughput_*
+            ~/Developer/benchmark_runs/results/tpch_sf1_*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Throughput@Size baseline record
+        if: ${{ !cancelled() && steps.duckdb-sweep.outcome == 'success' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: throughput-baseline-duckdb-tpch-sf1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ~/Developer/benchmark_runs/throughput-baseline/
+          if-no-files-found: ignore
+          retention-days: 90
+
+  throughput-uat-signal:
+    name: throughput-uat-signal
+    needs: throughput-uat
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      statuses: write
+    steps:
+      - name: Publish the throughput-uat commit status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          THROUGHPUT_UAT_RESULT: ${{ needs.throughput-uat.result }}
+          CEDARDB_SWEEP_OUTCOME: ${{ needs.throughput-uat.outputs.cedardb_sweep_outcome }}
+        run: |
+          case "${THROUGHPUT_UAT_RESULT}" in
+            success) state=success ;;
+            cancelled) state=error ;;
+            *) state=failure ;;
+          esac
+          gh api "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="${state}" \
+            -f context="nightly/throughput-uat" \
+            -f description="throughput-uat ${THROUGHPUT_UAT_RESULT}; cedardb cell (quarantined) ${CEDARDB_SWEEP_OUTCOME:-not run}" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
   pyspark-tests:
     runs-on: ubuntu-latest

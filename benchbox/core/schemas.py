@@ -1,7 +1,4 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
+from collections.abc import Iterable
 from datetime import datetime
 from typing import Any, ClassVar, Literal, Optional
 
@@ -12,6 +9,28 @@ from benchbox.core.constants import (
     GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS,
 )
 from benchbox.utils.verbosity import VerbositySettings
+
+MIN_THROUGHPUT_STREAMS = 2
+ALL_COMBINED_PHASES = ("power", "throughput", "maintenance")
+
+
+def reject_single_stream_throughput(streams: Optional[int], phases: Iterable[str] | None) -> None:
+    if streams is None or streams >= MIN_THROUGHPUT_STREAMS:
+        return
+    if "throughput" not in {str(phase).strip().lower() for phase in phases or ()}:
+        return
+    raise ValueError(
+        f"Throughput requires at least {MIN_THROUGHPUT_STREAMS} concurrent streams (TPC minimum); got {streams}. "
+        "Omit the stream count to use the default of 2."
+    )
+
+
+def _throughput_phases(test_execution_type: str, options: dict[str, Any]) -> tuple[str, ...]:
+    if test_execution_type == "throughput":
+        return ("throughput",)
+    if test_execution_type == "combined":
+        return tuple(options.get("requested_phases") or ALL_COMBINED_PHASES)
+    return ()
 
 
 class QueryResult(BaseModel):
@@ -64,7 +83,7 @@ class RunConfig(BaseModel):
     benchmark: Optional[str] = None
     database_type: Optional[str] = None
     query_subset: Optional[list[str]] = None
-    concurrent_streams: int = 1
+    concurrent_streams: Optional[int] = None
     test_execution_type: str = "standard"
     scale_factor: float = 0.01
     seed: Optional[int] = None
@@ -99,6 +118,9 @@ class RunConfig(BaseModel):
     iterations: int = GENERIC_POWER_DEFAULT_MEASUREMENT_ITERATIONS
     warm_up_iterations: int = GENERIC_POWER_DEFAULT_WARMUP_ITERATIONS
     power_fail_fast: bool = False
+    stream_timeout_seconds: Optional[int] = None
+    stream_timeout_source: Optional[str] = None
+    cancel_on_timeout: bool = False
 
     client_region: str | None = None
     client_cloud: str | None = None
@@ -133,10 +155,17 @@ class RunConfig(BaseModel):
 
     @field_validator("concurrent_streams")
     @classmethod
-    def validate_concurrent_streams(cls, v: int) -> int:
-        if v < 1:
+    def validate_concurrent_streams(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v < 1:
             raise ValueError(f"concurrent_streams must be at least 1, got: {v}")
         return v
+
+    @model_validator(mode="after")
+    def reject_single_stream_throughput_request(self) -> "RunConfig":
+        reject_single_stream_throughput(
+            self.concurrent_streams, _throughput_phases(self.test_execution_type, self.options)
+        )
+        return self
 
     @field_validator("test_execution_type")
     @classmethod
@@ -202,7 +231,7 @@ class BenchmarkConfig(BaseModel):
     display_name: str
     scale_factor: float = 0.01
     queries: Optional[list[str]] = None
-    concurrency: int = 1
+    concurrency: Optional[int] = None
     capture_plans: bool = False
     analyze_plans: bool | None = None
     strict_plan_capture: bool = False
@@ -229,10 +258,15 @@ class BenchmarkConfig(BaseModel):
 
     @field_validator("concurrency")
     @classmethod
-    def validate_concurrency(cls, v: int) -> int:
-        if v < 1:
+    def validate_concurrency(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v < 1:
             raise ValueError(f"concurrency must be at least 1, got: {v}")
         return v
+
+    @model_validator(mode="after")
+    def reject_single_stream_throughput_request(self) -> "BenchmarkConfig":
+        reject_single_stream_throughput(self.concurrency, _throughput_phases(self.test_execution_type, self.options))
+        return self
 
     @field_validator("compression_type")
     @classmethod

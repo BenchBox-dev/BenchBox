@@ -108,6 +108,8 @@ Before classifying a query as legitimately empty at a gate scale:
 
 Keep classifications scoped to the scale and draw. Empty results are not monotonic in scale. A SQL-only search that finds a non-empty draw is a candidate for further testing; rerun every DataFrame backend under that exact binding before claiming parity. A one-row hit may still need a stronger fixture that distinguishes the operation being changed.
 
+The 26 statements that are empty at SF 0.01 (3, 4, 8, 10, 23a, 23b, 24a, 24b, 31, 32, 37, 39a, 39b, 41, 54, 58, 61, 64, 65, 73, 82, 85, 90, 91, 92, 93) are required to return rows in the SF 1 qualification lane, where each is compared between SQL and every DataFrame engine. The lane fails if one of them is empty or all NULL at SF 1. Their entries in `_TPCDS_LEGITIMATELY_EMPTY` stay as the cause of the SF 0.01 result.
+
 Classified empty matches never count as non-empty query coverage. Report registered queries, attempted comparisons, non-empty matches, empty matches, all-NULL matches, missing implementations, errors, and divergences separately.
 
 ## Adding or changing a query
@@ -181,4 +183,58 @@ the whole report to 20 minutes, each query to 120 seconds and each worker's
 resident memory to 6 GiB. Artifacts record all substitution values and hashes,
 source and dependency versions, binary and data hashes, chosen answer files,
 SQL text, column types, comparison failures and resource receipts. The weekly
-workflow is advisory and retains failures in artifacts and its job summary.
+workflow retains all results in artifacts and reports DataFrame-to-SQL parity
+and the printed-answer comparison separately in its job summary. The job fails
+only on a DataFrame-to-SQL divergence, an unclassified printed-answer mismatch
+or error, or an empty SQL result for one of the statements listed below as
+required nonempty.
+
+## Known differences from the official answer files
+
+The qualification runner compares SQL and each DataFrame engine against the
+official printed answers and reports the strict result. A strict mismatch is
+labeled when it matches a recorded difference in
+`benchbox/core/tpcds/qualification/classification.py`. A label is written beside
+the strict result and never changes its status. A mismatch is classified only if
+its statement has a record, the label is one of that record's classes, and the
+label's predicate holds for both SQL and the DataFrame engine on one official
+file. A different mismatch on a recorded statement is unclassified. No
+tolerance or answer file was changed to produce a label.
+
+| Class | Statements | Predicate |
+| --- | --- | --- |
+| `display_precision` | 7, 8, 9, 12, 13, 20, 22, 26, 27, 28, 31, 36, 49, 58, 59, 61, 63, 70, 83, 86, 90, 98 | Each differing numeric cell rounds, half up or half to even, to its printed text. |
+| `half_boundary_rounding` | 66, 77, 78 | A cell sits within 1e-12 relative of the rounding half point (an exact decimal half held as a binary value just below it); for Q78 the ratio equals the exact quotient of its own row rounded half up. |
+| `tied_order` | 77 | Rows tied on (channel, id) between a NULL id and the ROLLUP subtotal have no defined order; the tied rows are aligned to the official order before the cell rules apply. |
+| `float_detail` | 39a, 39b | The coefficient-of-variation columns differ from the printed value by less than 1e-8 relative; the validator tolerance is 1e-10. |
+| `char_padding` | 84 | The official value is the last name padded to CHAR(30) before the comma. |
+| `returns_difference` | 85, 93 | The result equals the recorded digest of the SF 1 rows generated with a 75-row reason table (below). |
+| `null_order_variant` | 66, 77, 93 | The NULLS_FIRST file orders NULL first; the reference sorts NULL last. Informational: it never classifies a statement. |
+| `malformed_official_answer` | 17 | Permanent exception (below). |
+
+### Q85 and Q93: reason table size
+
+BenchBox's distribution file `_sources/tpc-ds/tools/scaling.dst` sets the
+`reason` table to 75 rows at every scale; its only difference from
+tpcds-kit's file is that row. Specification 4.0.0 Table 3-2 gives 35 rows at
+SF 1, and the official answers match a 35-row table. dsdgen draws `wr_reason_sk`
+and `sr_reason_sk` modulo the row count, so the count changes those columns in
+every returns row. Generating with tpcds-kit and the reason row set to 75
+reproduces BenchBox's `web_returns`, `store_returns`, `web_sales`,
+`store_sales`, `web_page`, `customer_address`, `customer_demographics` and
+`date_dim` byte for byte. Setting it to 35 changes only the two reason key
+columns, and then the unchanged Q85 and Q93 SQL returns the official rows
+(`85.ans` and `93_NULLS_LAST.ans`). The statements are classified rather than
+fixed because correcting the table changes SF 1 returns data for every TPC-DS
+user and needs rebuilt binaries; when it is corrected, both statements match
+strictly and their records can be removed.
+
+### Q17: permanent exception
+
+The pinned `17.ans` has a merged header and separator field
+(`STORE_RETURNS_QUANTITYAV   STORE_RETURNS_QUANTITYSTDEV`) and a wrapped
+continuation row, so it parses to 14 columns where the SQL returns 15. The
+parser has no special case and the file is not reconstructed. The comparison to
+the file reports an error that is classified only while the file hash, the
+14-column parse, the 15-column SQL and the width error all hold.
+DataFrame-to-SQL parity still checks Q17 on every engine.

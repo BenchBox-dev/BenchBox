@@ -41,6 +41,7 @@ def test_run_official_accepts_and_forwards_platform_options(monkeypatch):
 
     assert result.exit_code == 0, result.output
     assert captured["platform"] == "postgresql"
+    assert captured["concurrency"] == 3
     assert captured["platform_option_pairs"] == (("username", "benchbox"), ("password", "benchbox"))
 
 

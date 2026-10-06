@@ -70,6 +70,10 @@ class ClickHouseDiagnosticsMixin:
 
             return db_name in databases
 
+        except AttributeError:
+            # A missing attribute is a programming error, not a missing
+            # database: surface it instead of reporting "no database".
+            raise
         except Exception:
             return False
 

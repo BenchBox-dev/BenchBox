@@ -388,6 +388,11 @@ class BenchmarkResults:
     applied_ledger_hash: str | None = None
     tuning_source_file: str | None = None
     tuning_source: str | None = None
+    # Pre-ADR-1 ``platform.tuning.source`` bridge value ("yaml"/"auto") preserved
+    # across a load -> re-export cycle when the bundle carries no richer tuning
+    # identity (no tuning_source, source_file, or hash). Never invented: None
+    # unless the loaded bundle stated it, and never a substitute for a hash.
+    tuning_legacy_source: str | None = None
     tuning_validation_status: str = "not_validated"
     tuning_metadata_saved: bool = False
     system_profile: dict[str, Any] | None = None

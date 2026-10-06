@@ -36,6 +36,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   An enabled primary key that is not a prefix of the tuned sort key now fails
   before any table is created, with a message that says to put the key columns
   first or disable `primary_keys`.
+- **Spark, LakeSail and Velox per-query times no longer include `clearCache()`.**
+  With `disable_cache` on (the default), these adapters cleared the session
+  cache inside each query's timer. They now clear it before the timer starts,
+  so recorded query times can drop compared with earlier runs. On a shared
+  session another stream's clear can still overlap a timed query during
+  throughput and stays inside the throughput total time. Don't compare their
+  per-query times recorded before this change with results after it.
+- **A throughput run limited to a query subset reports no Throughput@Size.**
+  Subset runs follow filtered parameter positions and are not TPC-compliant.
+  The run still succeeds and reports query throughput.
+- **Throughput now honors `validation_mode` and `--queries`.** TPC-H
+  throughput ignored `validation_mode`, so `--validation-mode disabled` still
+  failed streams on a row-count mismatch. Neither TPC-H nor TPC-DS throughput
+  read the query subset, so `--queries 1,6 --phases power,throughput` ran the
+  subset in the power phase and every query in the throughput phase. Both now
+  follow the options, and each stream runs its own permutation filtered to the
+  subset.
+- **A saved stream timeout now applies to throughput runs.**
+  `execution.concurrent_queries.stream_timeout_seconds` used to be read by
+  nothing; it now sets the timeout of every TPC-H and TPC-DS throughput stream
+  (0 disables it), and `cancel_on_timeout` next to it stops a timed-out stream
+  before its next query. Config files written by `ExecutionConfigHelper`
+  (`apply_performance_profile`, `optimize_for_system`, or any settings update)
+  or by an earlier default often hold 1800, 3600, 7200 or 10800. A TPC-DS
+  stream that runs longer than a saved value now times out and the run
+  reports no Throughput@Size, where before it ran for the 7200 s default.
+  Check `execution.concurrent_queries.stream_timeout_seconds` in your config
+  file and remove it to keep each benchmark's default (3600 s for TPC-H, 7200 s
+  for TPC-DS). The helper no longer writes a stream timeout unless you set one,
+  and each throughput run prints the effective timeout and where it came from.
+- **A stream count of 1 is no longer raised to 2.** `BenchmarkConfig.concurrency`
+  and `RunConfig.concurrent_streams` default to `None`, which runs the
+  2-stream default. An explicit count below 2 is rejected when the run
+  includes throughput. Saved runs that recorded 1 replay as not set.
 
 ### Added
 
@@ -93,6 +127,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A result in which every query was skipped no longer passes integrity
   certification. Nine incorrect TPC-H results from early BigQuery, Databricks
   and Snowflake runs are removed from Results Explorer.
+- **DuckDB tuned databases are rebuilt.** The shipped DuckDB tuned templates
+  no longer include partitioning or CHECK constraints, so a new tuned run
+  records a different `requested_config_hash` than earlier results and the
+  cached tuned database is rebuilt on the next run (for example
+  `tpch_sf1_custom_pk_fk_uniq_check_part_sort` becomes
+  `tpch_sf1_custom_pk_fk_uniq_sort`).
+- **Cached TPC-H and TPC-DS data regenerates once.** Dataset manifests now
+  record the SHA-256 of the bundled `dbgen` or `dsdgen` binary that wrote the
+  data. A cache that records no generator, or that a known-defective `dbgen`
+  wrote, is regenerated on the next run. This covers TPC-H data generated on
+  macOS by the earlier `dbgen`, which wrote non-canonical supplier and
+  customer addresses (Q2, Q10, Q15 and Q20 return different values), and
+  TPC-DS data generated on Windows before `dsdgen` options were passed
+  correctly, which was always scale factor 1. The TPC-H Skew, TPC-Havoc,
+  primitives and Data Vault datasets are built from `dbgen` and regenerate too.
 
 ### Added
 

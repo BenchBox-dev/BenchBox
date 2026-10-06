@@ -70,10 +70,21 @@ class TestSQLiteAdapter:
         )
         adapter._applied_tuning_ledger = AppliedTuningLedger()
         connection = adapter.create_connection()
-        benchmark = Mock()
+
+        class _SchemaOnlyBenchmark:
+            """Schema-only double: declares SKIP_DATA_LOADING at class level.
+
+            A bare Mock cannot declare this: instance attributes on a mock
+            are untrusted by is_data_loading_skipped by design, so this DDL
+            test (which stubs load_data out) must opt out explicitly.
+            """
+
+            SKIP_DATA_LOADING = True
+
+        benchmark = _SchemaOnlyBenchmark()
         benchmark.output_dir = tmp_path
-        benchmark.get_create_tables_sql.return_value = (
-            "CREATE TABLE baseline (id INTEGER);\nCREATE TABLE tuned (id INTEGER PRIMARY KEY);\n"
+        benchmark.get_create_tables_sql = Mock(
+            return_value=("CREATE TABLE baseline (id INTEGER);\nCREATE TABLE tuned (id INTEGER PRIMARY KEY);\n")
         )
         adapter.apply_unified_tuning = Mock()
         adapter.save_tuning_metadata = Mock(return_value=True)
@@ -88,8 +99,12 @@ class TestSQLiteAdapter:
         assert (
             adapter._applied_tuning_ledger.overall_status(tuning_enabled=True, has_config=True) == "applied_unverified"
         )
+        # The tuned fresh path writes the fail-closed run-kind marker before
+        # applying tuning, so the metadata table exists alongside the schema
+        # tables even though the metadata save itself is mocked out above.
         assert connection.execute("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").fetchall() == [
             ("baseline",),
+            ("benchbox_tuning_metadata",),
             ("tuned",),
         ]
 

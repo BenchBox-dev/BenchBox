@@ -351,9 +351,9 @@ def test_prompt_scale_retries_after_validation_failure(monkeypatch: pytest.Monke
     assert attempts["count"] == 2
 
 
-def test_prompt_concurrency_returns_one_when_streams_not_supported(manager: BenchmarkManager):
+def test_prompt_concurrency_returns_unset_when_streams_not_supported(manager: BenchmarkManager):
     concurrency = manager._prompt_concurrency(manager.benchmarks["clickbench"], {"cpu_cores": 8})
-    assert concurrency == 1
+    assert concurrency is None
 
 
 def test_prompt_concurrency_warns_when_user_exceeds_cpu_count(

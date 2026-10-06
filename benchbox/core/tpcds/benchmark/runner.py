@@ -18,6 +18,7 @@ from benchbox.core.validation import (
     DataValidationEngine,
     ValidationResult,
 )
+from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.file_format import get_delimiter_for_file
 from benchbox.utils.printing import emit
 from benchbox.utils.sql_parsing import find_matching_parenthesis
@@ -876,8 +877,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         dialect: str = "standard",
         output_dir: Optional[Union[str, Path]] = None,
     ) -> dict[str, Any]:
-        import math
-
         logger = logging.getLogger(__name__)
         if self.verbose:
             logger.setLevel(logging.INFO)
@@ -899,7 +898,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "maintenance_test_result": None,
             "power_at_size": 0.0,
             "throughput_at_size": 0.0,
-            "qphds_at_size": 0.0,
             "success": True,
             "errors": [],
         }
@@ -916,9 +914,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
             if maintenance_test:
                 self._run_maintenance_phase(connection, dialect, logger, result)
-
-            if result["power_at_size"] > 0 and result["throughput_at_size"] > 0:
-                result["qphds_at_size"] = math.sqrt(result["power_at_size"] * result["throughput_at_size"])
 
             self._finalize_benchmark_result(result, benchmark_start_time, logger)
             return result
@@ -965,7 +960,11 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         try:
             throughput_result = self.run_throughput_test(connection_factory=connection_factory, num_streams=num_streams)
             result["throughput_test_result"] = throughput_result
-            result["throughput_at_size"] = throughput_result.throughput_at_size
+            if throughput_result.throughput_at_size is None:
+                result["success"] = False
+                result["errors"].append("Throughput Test failed: Throughput@Size withheld because a stream failed")
+            else:
+                result["throughput_at_size"] = throughput_result.throughput_at_size
             if self.verbose:
                 logger.info(f"Throughput Test completed: Throughput@Size = {result['throughput_at_size']:.2f}")
         except Exception as e:
@@ -1011,7 +1010,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             logger.info(f"Total time: {result['total_time']:.3f} seconds")
             logger.info(f"Power@Size: {result['power_at_size']:.2f}")
             logger.info(f"Throughput@Size: {result['throughput_at_size']:.2f}")
-            logger.info(f"QphDS@Size: {result['qphds_at_size']:.2f}")
             logger.info(f"Success: {result['success']}")
             if result["errors"]:
                 logger.warning(f"Errors encountered: {len(result['errors'])}")
@@ -1063,7 +1061,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             logger.info(f"Starting TPC-DS Throughput Test ({num_streams} streams)")
 
         test_start_time = time.time()
-        _perf_start = time.perf_counter()
+        _perf_start = mono_time()
         stream_results = []
         successful_streams = 0
 
@@ -1095,10 +1093,21 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                         logger.error(f"Stream execution failed: {e}")
 
         test_end_time = time.time()
-        total_duration = time.perf_counter() - _perf_start
+        windows = [
+            (sr["monotonic_start"], sr["monotonic_end"])
+            for sr in stream_results
+            if sr.get("monotonic_start") is not None
+        ]
+        if windows:
+            total_duration = max(end for _, end in windows) - min(start for start, _ in windows)
+        else:
+            total_duration = elapsed_seconds(_perf_start)
 
-        throughput_at_size = 0.0
-        if total_duration > 0:
+        all_streams_succeeded = (
+            len(stream_results) == num_streams and successful_streams == num_streams and len(windows) == num_streams
+        )
+        throughput_at_size = None
+        if all_streams_succeeded and total_duration > 0:
             total_queries = sum(stream_result["queries_executed"] for stream_result in stream_results)
             throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
                 total_queries=total_queries,
@@ -1121,7 +1130,11 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         if self.verbose:
             logger.info(f"Throughput Test completed in {total_duration:.3f} seconds")
-            logger.info(f"Throughput@Size: {throughput_at_size:.2f}")
+            logger.info(
+                "Throughput@Size: withheld"
+                if throughput_at_size is None
+                else f"Throughput@Size: {throughput_at_size:.2f}"
+            )
             logger.info(f"Successful streams: {successful_streams}/{num_streams}")
 
         return result
@@ -1146,11 +1159,15 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "queries_successful": 0,
             "queries_failed": 0,
             "query_results": [],
+            "monotonic_start": None,
+            "monotonic_end": None,
             "success": False,
             "error": None,
         }
         try:
             connection = connection_factory()
+            stream_result["start_time"] = time.time()
+            stream_result["monotonic_start"] = mono_time()
             query_ids = list(range(1, 100))
             random.seed(base_seed + stream_id)
             random.shuffle(query_ids)
@@ -1173,7 +1190,11 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 logger.error(f"Stream {stream_id} failed: {e}")
         finally:
             stream_result["end_time"] = time.time()
-            stream_result["duration"] = stream_result["end_time"] - stream_result["start_time"]
+            if stream_result["monotonic_start"] is not None:
+                stream_result["monotonic_end"] = mono_time()
+                stream_result["duration"] = elapsed_seconds(
+                    stream_result["monotonic_start"], stream_result["monotonic_end"]
+                )
         return stream_result
 
     def _execute_throughput_query(
@@ -1185,7 +1206,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         dialect: str,
         logger,
     ) -> dict[str, Any]:
-        query_start = time.time()
+        query_start = mono_time()
         result: dict[str, Any] = {
             "query_id": query_id,
             "stream_id": stream_id,
@@ -1200,19 +1221,17 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             )
             connection.execute(query_text)
             rows = connection.fetchall()
-            query_end = time.time()
             result.update(
                 {
-                    "execution_time_seconds": query_end - query_start,
+                    "execution_time_seconds": elapsed_seconds(query_start),
                     "result_count": len(rows) if rows else 0,
                     "success": True,
                 }
             )
         except Exception as e:
-            query_end = time.time()
             result.update(
                 {
-                    "execution_time_seconds": query_end - query_start,
+                    "execution_time_seconds": elapsed_seconds(query_start),
                     "error": str(e),
                 }
             )

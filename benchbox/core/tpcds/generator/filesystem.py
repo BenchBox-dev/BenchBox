@@ -5,6 +5,7 @@ import logging
 import shutil
 from pathlib import Path
 
+from benchbox.utils.datagen_manifest import require_manifest_files
 from benchbox.utils.file_format import COMPRESSION_EXTENSIONS, detect_compression, strip_compression_suffix
 from benchbox.utils.printing import emit
 from benchbox.utils.scale_factor import format_scale_factor
@@ -271,7 +272,7 @@ class FileArtifactMixin:
                     elif compression == "zstd":
                         import zstandard as zstd
 
-                        with zstd.open(file_path, "rb") as f:
+                        with zstd.open(file_path, "rt") as f:
                             row_count = sum(1 for _ in f)
                     elif compression == "bzip2":
                         import bz2
@@ -286,7 +287,8 @@ class FileArtifactMixin:
                     else:
                         with open(file_path, "rb") as f:
                             row_count = sum(1 for _ in f)
-                except Exception:
+                except Exception as exc:
+                    logging.getLogger(__name__).debug("row counting failed for %s: %s", file_path, exc)
                     row_count = 0
 
                 manifest["tables"].setdefault(table, []).append(
@@ -297,10 +299,9 @@ class FileArtifactMixin:
                     }
                 )
 
-        if not any(manifest["tables"].values()):
-            raise RuntimeError(
-                f"TPC-DS data generation produced no table files in {output_dir}; refusing to write a manifest that lists no tables"
-            )
+        require_manifest_files(
+            sum(len(entries) for entries in manifest["tables"].values()), label="TPC-DS", output_dir=output_dir
+        )
 
         out = output_dir / "_datagen_manifest.json"
 

@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import hashlib
@@ -46,6 +42,8 @@ STATEMENT_FAILED = "failed"
 PHASE_DDL = "ddl"
 PHASE_POST_LOAD = "post_load"
 PHASE_SESSION = "session"
+
+SATISFIED_BY_PREEXISTING_STATE = -1
 
 _READBACK_PREFIXES = ("select", "show", "describe", "desc ", "explain", "values ")
 
@@ -97,14 +95,14 @@ def _split_sql_script(script: Any) -> list[str]:
         if pending and "".join(pending).strip():
             statements.append("".join(pending).strip())
         return statements
-    except Exception:  # pragma: no cover
+    except Exception:
         return [text]
 
 
 def _is_recordable_statement(statement: Any) -> bool:
     try:
         text = str(statement).lstrip().lstrip("(").lstrip().lower()
-    except Exception:  # pragma: no cover
+    except Exception:
         return True
     return not text.startswith(_READBACK_PREFIXES)
 
@@ -407,6 +405,6 @@ def recording_connection(
         return connection
     try:
         return RecordingConnection(connection, ledger, phase, statement_filter)
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         logger.debug("applied-ledger connection wrap degraded: %s", exc)
         return connection

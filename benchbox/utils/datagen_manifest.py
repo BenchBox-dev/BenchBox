@@ -29,6 +29,14 @@ def compute_entry_size(path: Path) -> int:
     return path.stat().st_size
 
 
+def require_manifest_files(file_count: int, *, label: str, output_dir: PathLike) -> None:
+    if file_count <= 0:
+        raise RuntimeError(
+            f"{label} data generation produced no table files in {output_dir}; "
+            "refusing to write a manifest that lists no tables"
+        )
+
+
 def _is_subpath(candidate: Path, parent: Path) -> bool:
     try:
         candidate.relative_to(parent)

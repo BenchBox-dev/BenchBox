@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import csv
@@ -165,7 +161,7 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         )
 
     def _write_manifest(self, table_paths: dict[str, Path]) -> None:
-        from benchbox.utils.datagen_manifest import DataGenerationManifest
+        from benchbox.utils.datagen_manifest import DataGenerationManifest, require_manifest_files
 
         identity = self.skew_config.datagen_identity()
         from benchbox.utils.datagen_version import compute_datagen_identity_hash
@@ -184,6 +180,7 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         for table_name, file_path in table_paths.items():
             base_rows = _TPCH_BASE_ROW_COUNTS.get(table_name, 0)
             manifest.add_entry(table_name, file_path, row_count=int(base_rows * self.scale_factor))
+        require_manifest_files(manifest.file_counts()[1], label="TPC-H Skew", output_dir=self.output_dir)
         manifest.write()
 
     def _collect_table_files(self) -> dict[str, Path]:

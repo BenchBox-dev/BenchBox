@@ -43,28 +43,6 @@ datafusion	nyctaxi	basic_constraints	waived	basic constraints are acceptable unt
 datafusion	flightdata	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
 datafusion	datavault	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
 datafusion	vector_search	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	tpch	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	tpcds	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	tpcds_obt	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	tpcdi	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	ssb	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	clickbench	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	h2odb	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	amplab	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	read_primitives	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	write_primitives	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	metadata_primitives	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	transaction_primitives	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	ai_primitives	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	joinorder	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	coffeeshop	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	tpchavoc	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	tpch_skew	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	tsbs_devops	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	nyctaxi	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	flightdata	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	datavault	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
-lakesail	vector_search	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
 clickhouse-local	tpch	tuned_template	done	benchmark-specific tuned template exists	examples/tunings/clickhouse/tpch_tuned.yaml
 clickhouse-local	tpcds	tuned_template	done	benchmark-specific tuned template exists	examples/tunings/clickhouse/tpcds_tuned.yaml
 clickhouse-local	tpcds_obt	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
@@ -87,6 +65,28 @@ clickhouse-local	nyctaxi	basic_constraints	waived	basic constraints are acceptab
 clickhouse-local	flightdata	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
 clickhouse-local	datavault	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
 clickhouse-local	vector_search	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	tpch	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	tpcds	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	tpcds_obt	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	tpcdi	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	ssb	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	clickbench	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	h2odb	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	amplab	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	read_primitives	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	write_primitives	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	metadata_primitives	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	transaction_primitives	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	ai_primitives	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	joinorder	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	coffeeshop	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	tpchavoc	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	tpch_skew	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	tsbs_devops	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	nyctaxi	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	flightdata	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	datavault	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
+lakesail	vector_search	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-
 clickhouse-server	tpch	tuned_template	done	benchmark-specific tuned template exists	examples/tunings/clickhouse/tpch_tuned.yaml
 clickhouse-server	tpcds	tuned_template	done	benchmark-specific tuned template exists	examples/tunings/clickhouse/tpcds_tuned.yaml
 clickhouse-server	tpcds_obt	basic_constraints	waived	basic constraints are acceptable until measured benefit justifies a template	-

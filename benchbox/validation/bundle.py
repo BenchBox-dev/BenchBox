@@ -38,7 +38,7 @@ PUBLIC_SUBMISSION_SCHEMA_POLICY, result_schema_version_value = _load_schema_poli
 
 try:
     from benchbox.core.results.provenance import FUNDING_SOURCES, RESULT_SOURCES
-except ImportError:  # pragma: no cover
+except ImportError:
     FUNDING_SOURCES = ("employer", "personal", "free-trial", "vendor-sponsored", "grant", "unspecified")
     RESULT_SOURCES = ("internal", "community", "vendor")
 
@@ -56,6 +56,13 @@ def _load_bundle_failed_query_count():
 bundle_failed_query_count = _load_bundle_failed_query_count()
 
 SUBMISSION_NOTES_MAX_LEN = 500
+
+KNOWN_DEFECT_IDS = frozenset(
+    {
+        "defective-macdbgen-addresses",
+        "defective-windows-dsdgen-scale",
+    }
+)
 
 APPLIED_RECEIPT_MAX_ENTRIES = 10_000
 APPLIED_COMPANION_MAX_BYTES = 8 * 1024 * 1024
@@ -320,6 +327,7 @@ KNOWN_PLATFORMS = {
     "athena",
     "firebolt",
     "postgresql",
+    "cedardb",
     "timescaledb",
     "pg-duckdb",
     "pg_duckdb",
@@ -1921,17 +1929,28 @@ def _validate_manifest_provenance(manifest: dict[str, Any], primary_path: Path, 
             vr.error(f"Manifest submission_notes exceeds {SUBMISSION_NOTES_MAX_LEN} characters ({len(notes)})")
 
     result_source = manifest.get("result_source")
-    if result_source is None:
-        return
-    if result_source not in RESULT_SOURCES:
-        vr.error(f"Invalid manifest result_source {result_source!r}: must be one of {sorted(RESULT_SOURCES)}")
-        return
-    if result_source == "vendor" and primary_path.parent.name != "vendor":
-        vr.error(
-            "Manifest result_source 'vendor' is only valid for bundles directly "
-            "under a maintainer-controlled results-data/bundles/vendor/ path; a "
-            "community submission cannot self-assert the vendor-supplied label."
-        )
+    if result_source is not None:
+        if result_source not in RESULT_SOURCES:
+            vr.error(f"Invalid manifest result_source {result_source!r}: must be one of {sorted(RESULT_SOURCES)}")
+        elif result_source == "vendor" and primary_path.parent.name != "vendor":
+            vr.error(
+                "Manifest result_source 'vendor' is only valid for bundles directly "
+                "under a maintainer-controlled results-data/bundles/vendor/ path; a "
+                "community submission cannot self-assert the vendor-supplied label."
+            )
+
+    known_defects = manifest.get("known_defects")
+    if known_defects is not None:
+        if (
+            not isinstance(known_defects, list)
+            or not known_defects
+            or any(not isinstance(item, str) for item in known_defects)
+        ):
+            vr.error("Manifest known_defects must be a non-empty list of defect id strings")
+        else:
+            for defect in known_defects:
+                if defect not in KNOWN_DEFECT_IDS:
+                    vr.error(f"Unknown manifest known_defects id {defect!r}: must be one of {sorted(KNOWN_DEFECT_IDS)}")
 
 
 def discover_bundles(path: Path) -> list[Path]:

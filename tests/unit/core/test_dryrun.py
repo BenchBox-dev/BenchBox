@@ -6,7 +6,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 import yaml
 
-from benchbox.core.dryrun import DryRunExecutor, preview_benchmark_run
+from benchbox.core.dryrun import DryRunExecutor, DryRunQueryExtractionError, preview_benchmark_run
+from benchbox.core.schemas import BenchmarkConfig
 
 pytestmark = [
     pytest.mark.unit,
@@ -774,3 +775,60 @@ class TestExtractUnifiedTuningPlatformOptimizations:
         unified_config = self._make_unified_config()
         result = self.executor._extract_unified_tuning(unified_config, None)
         assert "databricks_clustering_strategy" not in result["platform_optimizations"]
+
+
+class _SeedAwareStubBenchmark:
+    def __init__(self) -> None:
+        self.seen: list[tuple] = []
+
+    def get_queries(self):
+        return {"1": "SELECT 'qgen -d'", "2": "SELECT 'qgen -d'"}
+
+    def get_query(self, query_id, *, seed=None, scale_factor=1.0):
+        self.seen.append((query_id, seed, scale_factor))
+        return f"SELECT {query_id} seed={seed} sf={scale_factor}"
+
+
+class TestApplyTpchFamilySeed:
+    def setup_method(self):
+        self.executor = DryRunExecutor()
+
+    def _config(self, name="tpch", seed=4242):
+        return BenchmarkConfig(
+            name=name,
+            display_name=name,
+            scale_factor=0.01,
+            options={"seed": seed} if seed is not None else {},
+        )
+
+    def test_seeded_tpch_preview_renders_stream_zero_seed(self):
+        benchmark = _SeedAwareStubBenchmark()
+        result = self.executor._extract_standard_queries(benchmark, self._config(), None)
+        assert result == {"1": "SELECT 1 seed=4242 sf=0.01", "2": "SELECT 2 seed=4242 sf=0.01"}
+        assert benchmark.seen == [(1, 4242, 0.01), (2, 4242, 0.01)]
+
+    def test_unseeded_tpch_preview_keeps_defaults(self):
+        benchmark = _SeedAwareStubBenchmark()
+        result = self.executor._extract_standard_queries(benchmark, self._config(seed=None), None)
+        assert result == {"1": "SELECT 'qgen -d'", "2": "SELECT 'qgen -d'"}
+        assert benchmark.seen == []
+
+    def test_seeded_non_tpch_preview_unchanged(self):
+        benchmark = _SeedAwareStubBenchmark()
+        result = self.executor._extract_standard_queries(benchmark, self._config(name="tpcds"), None)
+        assert result == {"1": "SELECT 'qgen -d'", "2": "SELECT 'qgen -d'"}
+        assert benchmark.seen == []
+
+    def test_seeded_preview_through_adapter_path(self):
+        benchmark = _SeedAwareStubBenchmark()
+        adapter = MagicMock()
+        adapter._get_dialect_queries.return_value = {1: "SELECT 'qgen -d'"}
+        adapter._filter_queries.side_effect = lambda queries, *args: queries
+        result = self.executor._extract_standard_queries(benchmark, self._config(), adapter)
+        assert result == {"1": "SELECT 1 seed=4242 sf=0.01"}
+
+    def test_seeded_render_failure_raises(self):
+        benchmark = _SeedAwareStubBenchmark()
+        benchmark.get_query = MagicMock(side_effect=RuntimeError("qgen missing"))
+        with pytest.raises(DryRunQueryExtractionError, match="seeded query rendering failed"):
+            self.executor._extract_standard_queries(benchmark, self._config(), None)

@@ -468,31 +468,95 @@ class DryRunExecutor:
             except Exception as exc:
                 raise DryRunQueryExtractionError(f"Dry-run query extraction failed: {exc}") from exc
             if queries and isinstance(next(iter(queries.keys())), int):
-                return {str(k): v for k, v in queries.items()}
-            return queries
+                return self._seed_tpch_family_preview(
+                    benchmark, benchmark_config, platform_adapter, {str(k): v for k, v in queries.items()}
+                )
+            return self._seed_tpch_family_preview(benchmark, benchmark_config, platform_adapter, queries)
 
         if hasattr(benchmark, "get_queries"):
             queries = benchmark.get_queries()
             if queries:
                 if queries and isinstance(next(iter(queries.keys())), int):
-                    return {str(k): v for k, v in queries.items()}
-                return queries
+                    return self._seed_tpch_family_preview(
+                        benchmark, benchmark_config, platform_adapter, {str(k): v for k, v in queries.items()}
+                    )
+                return self._seed_tpch_family_preview(benchmark, benchmark_config, platform_adapter, queries)
 
         if hasattr(benchmark, "get_all_queries"):
             queries = benchmark.get_all_queries()
             if queries:
                 if isinstance(next(iter(queries.keys())), int):
-                    return {str(k): v for k, v in queries.items()}
-                return queries
+                    return self._seed_tpch_family_preview(
+                        benchmark, benchmark_config, platform_adapter, {str(k): v for k, v in queries.items()}
+                    )
+                return self._seed_tpch_family_preview(benchmark, benchmark_config, platform_adapter, queries)
 
         if hasattr(benchmark, "query_manager") and hasattr(benchmark.query_manager, "get_all_queries"):
             queries = benchmark.query_manager.get_all_queries()
             if queries:
                 if isinstance(next(iter(queries.keys())), int):
-                    return {str(k): v for k, v in queries.items()}
-                return queries
+                    return self._seed_tpch_family_preview(
+                        benchmark, benchmark_config, platform_adapter, {str(k): v for k, v in queries.items()}
+                    )
+                return self._seed_tpch_family_preview(benchmark, benchmark_config, platform_adapter, queries)
 
         return {}
+
+    def _seed_tpch_family_preview(
+        self,
+        benchmark,
+        benchmark_config: BenchmarkConfig | None,
+        platform_adapter,
+        queries: dict[str, str],
+    ) -> dict[str, str]:
+        from benchbox.core.results.builder import benchmark_family
+
+        if not queries or benchmark_config is None or not hasattr(benchmark, "get_query"):
+            return queries
+        benchmark_id = normalize_benchmark_id(benchmark_config.name)
+        if benchmark_family(benchmark_id) != "tpch":
+            return queries
+        options = benchmark_config.options if isinstance(benchmark_config.options, dict) else {}
+        seed = options.get("seed")
+        if seed is None:
+            return queries
+
+        from benchbox.core.tpch.benchmark import power_stream_seed
+
+        stream_seed = power_stream_seed(int(seed), 0)
+        scale_factor = getattr(benchmark_config, "scale_factor", 1.0) or 1.0
+        target = None
+        base = None
+        if platform_adapter is not None:
+            if hasattr(platform_adapter, "get_target_dialect"):
+                try:
+                    target = platform_adapter.get_target_dialect()
+                except Exception:
+                    target = None
+            if hasattr(platform_adapter, "get_tpc_base_dialect"):
+                try:
+                    base = platform_adapter.get_tpc_base_dialect(benchmark_family(benchmark_id))
+                except Exception:
+                    base = None
+
+        import inspect
+
+        parameters = inspect.signature(benchmark.get_query).parameters
+        render: dict[str, str] = {}
+        for key in queries:
+            query_id: Any = int(key) if str(key).isdigit() else key
+            kwargs: dict[str, Any] = {"seed": stream_seed, "scale_factor": scale_factor}
+            if "dialect" in parameters and target is not None:
+                kwargs["dialect"] = target
+            if "base_dialect" in parameters and base is not None:
+                kwargs["base_dialect"] = base
+            try:
+                render[key] = benchmark.get_query(query_id, **kwargs)
+            except Exception as exc:
+                raise DryRunQueryExtractionError(
+                    f"Dry-run seeded query rendering failed for query {key}: {exc}"
+                ) from exc
+        return render
 
     def _extract_tpch_maintenance_operations(self, benchmark, benchmark_config: BenchmarkConfig) -> dict[str, str]:
         try:

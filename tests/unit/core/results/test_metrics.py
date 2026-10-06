@@ -17,7 +17,6 @@ pytestmark = [
 
 class TestTPCMetricsCalculator:
     def test_calculate_power_at_size_basic(self) -> None:
-
         times = [1.0, 1.0, 1.0, 1.0]
         result = TPCMetricsCalculator.calculate_power_at_size(times, scale_factor=1.0)
         assert result == 3600.0
@@ -32,7 +31,6 @@ class TestTPCMetricsCalculator:
         assert result == 36.0
 
     def test_calculate_power_at_size_varied_times(self) -> None:
-
         times = [1.0, 2.0, 4.0, 8.0]
         result = TPCMetricsCalculator.calculate_power_at_size(times, scale_factor=1.0)
         expected_geom_mean = math.pow(64, 0.25)
@@ -46,7 +44,6 @@ class TestTPCMetricsCalculator:
     def test_calculate_power_at_size_with_zeros(self) -> None:
         times = [0.0, 1.0, 1.0, 0.0]
         result = TPCMetricsCalculator.calculate_power_at_size(times, scale_factor=1.0)
-
         assert result == 3600.0
 
     def test_calculate_power_at_size_all_zeros(self) -> None:
@@ -62,7 +59,6 @@ class TestTPCMetricsCalculator:
         assert result == pytest.approx((10.0 * 3600.0) / math.prod(times) ** (1 / len(times)))
 
     def test_calculate_throughput_at_size_basic(self) -> None:
-
         result = TPCMetricsCalculator.calculate_throughput_at_size(
             total_queries=100,
             total_time_seconds=100.0,
@@ -72,14 +68,12 @@ class TestTPCMetricsCalculator:
         assert result == 3600.0
 
     def test_calculate_throughput_at_size_with_streams(self) -> None:
-
         result = TPCMetricsCalculator.calculate_throughput_at_size(
             total_queries=100,
             total_time_seconds=100.0,
             scale_factor=1.0,
             num_streams=2,
         )
-
         assert result == 3600.0
 
     def test_calculate_throughput_at_size_zero_time(self) -> None:
@@ -109,40 +103,6 @@ class TestTPCMetricsCalculator:
         )
 
         assert result == pytest.approx((44 * 3600.0) / 22.0)
-
-    def test_calculate_qph_basic(self) -> None:
-
-        result = TPCMetricsCalculator.calculate_qph(
-            power_at_size=100.0,
-            throughput_at_size=100.0,
-        )
-        assert abs(result - 100.0) < 0.0001
-
-    def test_calculate_qph_different_values(self) -> None:
-
-        result = TPCMetricsCalculator.calculate_qph(
-            power_at_size=400.0,
-            throughput_at_size=100.0,
-        )
-        assert abs(result - 200.0) < 0.0001
-
-    def test_calculate_qph_matches_legacy_tpc_h_and_tpc_ds_composite_formula(self) -> None:
-        assert TPCMetricsCalculator.calculate_qph(1000.0, 4000.0) == pytest.approx(2000.0)
-        assert TPCMetricsCalculator.calculate_qph(900.0, 100.0) == pytest.approx(300.0)
-
-    def test_calculate_qph_zero_power(self) -> None:
-        result = TPCMetricsCalculator.calculate_qph(
-            power_at_size=0.0,
-            throughput_at_size=100.0,
-        )
-        assert result == 0.0
-
-    def test_calculate_qph_zero_throughput(self) -> None:
-        result = TPCMetricsCalculator.calculate_qph(
-            power_at_size=100.0,
-            throughput_at_size=0.0,
-        )
-        assert result == 0.0
 
     def test_calculate_geometric_mean_basic(self) -> None:
         times = [1.0, 1.0, 1.0, 1.0]
@@ -196,7 +156,6 @@ class TestTimingStatsCalculator:
         assert result["stdev_ms"] == 0.0
 
     def test_calculate_percentiles(self) -> None:
-
         times_ms = [float(i) for i in range(1, 101)]
         result = TimingStatsCalculator.calculate(times_ms)
 
@@ -219,3 +178,141 @@ class TestTimingStatsCalculator:
     def test_calculate_seconds_empty(self) -> None:
         result = TimingStatsCalculator.calculate_seconds([])
         assert result == {}
+
+
+def _power_file(iteration_times: dict[int, float], *, failed: int = 0, tpc_metrics: dict | None = None) -> dict:
+    rows = [
+        {"id": str(q), "iter": iteration, "ms": seconds * 1000, "run_type": "measurement", "status": "SUCCESS"}
+        for iteration, seconds in iteration_times.items()
+        for q in range(1, 23)
+    ]
+    summary: dict = {"queries": {"total": len(rows), "passed": len(rows), "failed": failed}}
+    if tpc_metrics is not None:
+        summary["tpc_metrics"] = tpc_metrics
+    return {
+        "benchmark": {"id": "tpch", "name": "TPC-H"},
+        "environment": {"scale_factor": 1.0},
+        "summary": summary,
+        "queries": rows,
+    }
+
+
+def _throughput_file(
+    *,
+    benchmark_id: str = "tpch",
+    name: str = "TPC-H",
+    streams: int = 2,
+    duration_ms: int = 3_600_000,
+    summed_query_ms: int = 7_200_000,
+    phase_status: str = "COMPLETED",
+    failed: int = 0,
+    tpc_metrics: dict | None = None,
+) -> dict:
+    summary: dict = {
+        "queries": {"total": 44, "passed": 44 - failed, "failed": failed},
+        "timing": {"total_ms": summed_query_ms},
+    }
+    if tpc_metrics is not None:
+        summary["tpc_metrics"] = tpc_metrics
+    return {
+        "benchmark": {"id": benchmark_id, "name": name},
+        "environment": {"scale_factor": 1.0},
+        "run": {"streams": streams},
+        "summary": summary,
+        "phases": {"throughput_test": {"status": phase_status, "duration_ms": duration_ms}},
+    }
+
+
+class TestDeriveFromResultFiles:
+    def test_suppressed_metrics_are_refused(self) -> None:
+        suppressed = {"suppressed": True, "reason": "compliance_class=unofficial_subscale"}
+        with pytest.raises(ValueError, match="suppressed"):
+            TPCMetricsCalculator.compute_qphh_result(
+                _power_file({1: 1.0}), _throughput_file(tpc_metrics=suppressed), scale_factor=1.0
+            )
+        with pytest.raises(ValueError, match="suppressed"):
+            TPCMetricsCalculator.compute_qphh_result(
+                _power_file({1: 1.0}, tpc_metrics=suppressed), _throughput_file(), scale_factor=1.0
+            )
+
+    @pytest.mark.parametrize("which", ["power", "throughput"])
+    def test_failed_queries_are_refused(self, which: str) -> None:
+        power = _power_file({1: 1.0}, failed=5 if which == "power" else 0)
+        throughput = _throughput_file(failed=5 if which == "throughput" else 0)
+        with pytest.raises(ValueError, match="failed queries"):
+            TPCMetricsCalculator.compute_qphh_result(power, throughput, scale_factor=1.0)
+
+    def test_failed_throughput_phase_without_failed_rows_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="failed throughput phase"):
+            TPCMetricsCalculator.compute_qphh_result(
+                _power_file({1: 1.0}), _throughput_file(phase_status="FAILED"), scale_factor=1.0
+            )
+
+    def test_throughput_uses_phase_wall_duration_not_summed_query_time(self) -> None:
+        result = TPCMetricsCalculator.compute_qphh_result(
+            _power_file({1: 1.0}), _throughput_file(duration_ms=3_600_000, summed_query_ms=7_200_000), scale_factor=1.0
+        )
+
+        assert result["throughput_test_time"] == pytest.approx(3600.0)
+        assert result["throughput_at_size"] == pytest.approx(22 * 2)
+
+    def test_tpcds_throughput_scores_99_queries_per_stream(self) -> None:
+        throughput = _throughput_file(benchmark_id="tpcds", name="TPC-DS", streams=3)
+        result = TPCMetricsCalculator.compute_qphh_result(_power_file({1: 1.0}), throughput, scale_factor=1.0)
+
+        assert result["throughput_at_size"] == pytest.approx(99 * 3)
+        assert result["benchmark"] == "TPC-DS"
+
+    def test_power_uses_only_the_final_iteration(self) -> None:
+        result = TPCMetricsCalculator.compute_qphh_result(
+            _power_file({1: 100.0, 2: 10.0, 3: 1.0}), _throughput_file(), scale_factor=1.0
+        )
+
+        assert result["power_at_size"] == pytest.approx(3600.0)
+        assert result["power_test_time"] == pytest.approx(22.0)
+
+    @pytest.mark.parametrize("compliance_class", ["unofficial_subscale", "unofficial_nonstandard"])
+    def test_unofficial_bundles_without_a_suppressed_marker_are_refused(self, compliance_class: str) -> None:
+        legacy = _throughput_file()
+        legacy["benchmark"]["compliance_class"] = compliance_class
+        with pytest.raises(ValueError, match=compliance_class):
+            TPCMetricsCalculator.compute_qphh_result(_power_file({1: 1.0}), legacy, scale_factor=1.0)
+        legacy_power = _power_file({1: 1.0})
+        legacy_power["benchmark"]["compliance_class"] = compliance_class
+        with pytest.raises(ValueError, match=compliance_class):
+            TPCMetricsCalculator.compute_qphh_result(legacy_power, _throughput_file(), scale_factor=1.0)
+
+    def test_official_bundles_are_accepted(self) -> None:
+        power = _power_file({1: 1.0})
+        power["benchmark"]["compliance_class"] = "official"
+
+        result = TPCMetricsCalculator.compute_qphh_result(power, _throughput_file(), scale_factor=1.0)
+
+        assert result["power_at_size"] == pytest.approx(3600.0)
+
+    def test_result_has_no_composite_metric(self) -> None:
+        result = TPCMetricsCalculator.compute_qphh_result(_power_file({1: 1.0}), _throughput_file(), scale_factor=1.0)
+
+        assert not any("qph" in key for key in result)
+
+
+def test_scale_factor_is_detected_from_the_benchmark_block() -> None:
+    power = _power_file({1: 1.0})
+    throughput = _throughput_file()
+    for data in (power, throughput):
+        data.pop("environment")
+        data["benchmark"]["scale_factor"] = 1.0
+
+    result = TPCMetricsCalculator.compute_qphh_result(power, throughput)
+
+    assert result["scale_factor"] == 1.0
+
+
+def test_stream_count_comes_from_the_throughput_phase_not_distinct_row_streams() -> None:
+    throughput = _throughput_file(streams=4)
+    throughput["phases"]["throughput_test"]["stream_results"] = [{"stream_id": 0}, {"stream_id": 1}]
+
+    result = TPCMetricsCalculator.compute_qphh_result(_power_file({1: 1.0}), throughput, scale_factor=1.0)
+
+    assert result["num_streams"] == 2
+    assert result["throughput_at_size"] == pytest.approx(22 * 2)

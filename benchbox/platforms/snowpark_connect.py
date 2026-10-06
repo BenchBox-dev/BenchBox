@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import logging
@@ -148,6 +144,11 @@ class SnowparkConnectAdapter(SparkTuningMixin, PlatformAdapter):
         }
 
     def create_connection(self, **kwargs: Any) -> Any:
+        self.fail_closed_on_force_recreate(
+            platform_label="Snowpark Connect",
+            database=kwargs.get("database", self.database),
+            manual_hint="Drop the database manually (for example `DROP DATABASE <name>` in Snowflake)",
+        )
         try:
             if self._session is not None:
                 try:

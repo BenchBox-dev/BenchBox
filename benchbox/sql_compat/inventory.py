@@ -664,9 +664,15 @@ def write_jsonl(entries: list[InventoryEntry], output: Path) -> None:
 def _validate_mandatory_sites(entries: list[InventoryEntry]) -> list[str]:
     errors: list[str] = []
 
-    gate_sites = [e for e in entries if e.kind == "benchmark_gate" and "run.py" in e.file]
+    gate_sites = [
+        e
+        for e in entries
+        if e.kind == "benchmark_gate" and ("run.py" in e.file or "run_platform_resolution.py" in e.file)
+    ]
     if not gate_sites:
-        errors.append("MISSING: benchmark_gate site in cli/commands/run.py not detected")
+        errors.append(
+            "MISSING: benchmark_gate site in cli/commands/run.py or cli/run_platform_resolution.py not detected"
+        )
 
     variants_sites = [e for e in entries if e.suggested_phase == "query_source" and "vector_search" in e.file]
     if not variants_sites:

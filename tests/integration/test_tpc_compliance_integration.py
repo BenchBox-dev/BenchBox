@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -18,37 +14,19 @@ pytestmark = [
 ]
 
 
-def _calculate_composite_qph(
-    *,
-    scale_factor: float,
-    power_time: float,
-    throughput_time: float,
-    num_streams: int,
-) -> float:
-    if power_time <= 0 or throughput_time <= 0 or num_streams <= 0:
-        return 0.0
-
-    power_at_size = (3600.0 * scale_factor) / power_time
-    throughput_at_size = (num_streams * 3600.0 * scale_factor) / throughput_time
-    return TPCMetricsCalculator.calculate_qph(power_at_size, throughput_at_size)
-
-
 class TestTPCHCompliance:
     def setup_method(self) -> None:
-
         self.temp_dir = tempfile.mkdtemp()
         self.connection_string = "sqlite:///:memory:"
         self.dialect = "sqlite"
 
     def test_tpch_benchmark_initialization(self) -> None:
-
         benchmark = TPCHBenchmark(scale_factor=1.0, output_dir=self.temp_dir)
 
         assert benchmark.scale_factor == 1.0
         assert benchmark.output_dir == Path(self.temp_dir)
 
     def test_tpch_power_test_integration(self) -> None:
-
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [("result1",), ("result2",)]
@@ -143,38 +121,20 @@ class TestTPCHCompliance:
             assert result.rf1_operations > 0
             assert result.rf2_operations > 0
 
-    def test_tpch_qphh_size_calculation(self) -> None:
-
-        power_time = 360.0
-        throughput_time = 720.0
-        num_streams = 2
-
-        qphh_size = _calculate_composite_qph(
-            scale_factor=1.0,
-            power_time=power_time,
-            throughput_time=throughput_time,
-            num_streams=num_streams,
-        )
-
-        assert abs(qphh_size - 10.0) < 0.0001
-
 
 class TestTPCDSCompliance:
     def setup_method(self) -> None:
-
         self.temp_dir = tempfile.mkdtemp()
         self.connection_string = "sqlite:///:memory:"
         self.dialect = "sqlite"
 
     def test_tpcds_benchmark_initialization(self) -> None:
-
         benchmark = TPCDSBenchmark(scale_factor=1.0, output_dir=self.temp_dir)
 
         assert benchmark.scale_factor == 1.0
         assert benchmark.output_dir == Path(self.temp_dir)
 
     def test_tpcds_power_test_integration(self) -> None:
-
         benchmark = TPCDSBenchmark(scale_factor=1.0, output_dir=self.temp_dir)
 
         with (
@@ -182,7 +142,6 @@ class TestTPCDSCompliance:
             patch.object(benchmark, "get_queries") as mock_get_queries,
         ):
             mock_get_query.return_value = "SELECT 1"
-
             mock_get_queries.return_value = {str(i): f"SELECT {i}" for i in range(1, 11)}
 
             from benchbox.core.tpcds.power_test import TPCDSPowerTest
@@ -190,7 +149,6 @@ class TestTPCDSCompliance:
             def mock_connection_factory():
                 mock_conn = Mock()
                 mock_cursor = Mock()
-
                 mock_results = [("result1",), ("result2",), ("result3",)]
                 mock_cursor.fetchall.return_value = mock_results
                 mock_conn.execute.return_value = mock_cursor
@@ -211,7 +169,6 @@ class TestTPCDSCompliance:
 
             assert result.scale_factor == 1.0
             assert result.power_at_size > 0
-
             assert len(result.query_results) == 10
 
     def test_tpcds_throughput_test_integration(self) -> None:
@@ -273,25 +230,9 @@ class TestTPCDSCompliance:
             assert result.test_duration == 60.0
             assert result.overall_throughput == 100.0
 
-    def test_tpcds_qphds_size_calculation(self) -> None:
-
-        power_time = 600.0
-        throughput_time = 1200.0
-        num_streams = 3
-
-        qphds_size = _calculate_composite_qph(
-            scale_factor=1.0,
-            power_time=power_time,
-            throughput_time=throughput_time,
-            num_streams=num_streams,
-        )
-
-        assert abs(qphds_size - 7.35) < 0.01
-
 
 class TestTPCBenchmarkFlows:
     def setup_method(self) -> None:
-
         self.temp_dir = tempfile.mkdtemp()
         self.connection_string = "sqlite:///:memory:"
         self.dialect = "sqlite"
@@ -346,43 +287,15 @@ class TestTPCBenchmarkFlows:
             )
             maintenance_result = maintenance_test.run_maintenance_test(rf1_interval=0.0, rf2_interval=0.0)
 
-            qphh_size = _calculate_composite_qph(
-                scale_factor=1.0,
-                power_time=power_result.total_time,
-                throughput_time=throughput_result.total_time,
-                num_streams=2,
-            )
-
             assert power_result.power_at_size > 0
             assert throughput_result.throughput_at_size > 0
             assert maintenance_result.total_time > 0
-            assert qphh_size > 0
 
     def test_tpc_metrics_validation(self) -> None:
-
-        qphh_size = _calculate_composite_qph(
-            scale_factor=1.0,
-            power_time=0.0,
-            throughput_time=100.0,
-            num_streams=2,
-        )
-        assert qphh_size == 0.0
-
-        qphh_size = _calculate_composite_qph(
-            scale_factor=1.0,
-            power_time=-50.0,
-            throughput_time=100.0,
-            num_streams=2,
-        )
-        assert qphh_size == 0.0
-
-        qphh_size = _calculate_composite_qph(
-            scale_factor=1.0,
-            power_time=100.0,
-            throughput_time=100.0,
-            num_streams=0,
-        )
-        assert qphh_size == 0.0
+        assert TPCMetricsCalculator.calculate_power_at_size([], scale_factor=1.0) == 0.0
+        assert TPCMetricsCalculator.calculate_power_at_size([-50.0], scale_factor=1.0) == 0.0
+        assert TPCMetricsCalculator.calculate_throughput_at_size(44, 0.0, 1.0, 2) == 0.0
+        assert TPCMetricsCalculator.calculate_throughput_at_size(44, 100.0, 1.0, 0) == 0.0
 
 
 if __name__ == "__main__":

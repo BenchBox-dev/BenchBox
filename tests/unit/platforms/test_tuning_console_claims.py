@@ -38,6 +38,9 @@ def postgres_adapter(monkeypatch):
     stub = Mock()
     stub.__version__ = "3.1.0"
     monkeypatch.setattr(postgresql_module, "psycopg", stub)
+    # Fresh-setup tests stub the connection, so the fail-closed marker write
+    # needs the fake manager; marker-specific tests override this patch.
+    monkeypatch.setattr("benchbox.core.tuning.metadata.TuningMetadataManager", FakeMetadataManager)
     config = UnifiedTuningConfiguration()
     adapter = PostgreSQLAdapter(tuning_enabled=True, unified_tuning_configuration=config)
     adapter._applied_tuning_ledger = AppliedTuningLedger()
@@ -59,6 +62,9 @@ class FakeMetadataManager:
 
     def __init__(self, adapter, **_kwargs):
         pass
+
+    def write_tuned_run_marker(self):
+        return True
 
     def save_unified_tunings(self, config):
         return True
@@ -287,8 +293,16 @@ def test_missing_tuning_metadata_on_an_empty_database_is_not_an_error(tmp_path, 
     adapter, errors = handle_existing(tmp_path, outcome, caplog)
 
     assert not any(NO_TUNING_METADATA_ERROR in message for message in errors)
-    assert any("Missing tables" in message for message in errors)
+    assert not any("Missing tables" in message for message in errors)
     adapter._remove_database.assert_called_once()
+
+
+def test_missing_tables_on_a_populated_database_is_still_an_error(tmp_path, caplog):
+    outcome = validation_outcome(["Missing tables: ORDERS"], database_empty=False)
+
+    _adapter, errors = handle_existing(tmp_path, outcome, caplog)
+
+    assert any("Missing tables" in message for message in errors)
 
 
 def test_missing_tuning_metadata_on_a_populated_database_is_still_an_error(tmp_path, caplog):

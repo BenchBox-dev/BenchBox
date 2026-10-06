@@ -47,11 +47,12 @@ def empty_cwd(tmp_path, monkeypatch):
     return tmp_path
 
 
-def _resolve(platform, bench_name, config_manager):
+def _resolve(platform, bench_name, config_manager, mode=None):
     return resolve_tuning(
         tuning_arg="tuned",
         platform=platform,
         benchmark=bench_name,
+        mode=mode,
         config_manager=config_manager,
         console=MagicMock(spec=Console),
     )
@@ -285,3 +286,54 @@ class TestClickHouseTemplateDirectories:
         assert resolution.source == TuningSource.PACKAGED_RESOURCE
         assert resolution.config_file.name == "tpch_tuned.yaml"
         assert resolution.config_file.parent.name == "clickhouse"
+
+
+def _write_datafusion_profile(root: Path) -> Path:
+    profile_dir = root / "examples" / "tunings" / "dataframe"
+    profile_dir.mkdir(parents=True)
+    profile = profile_dir / "datafusion_optimized.yaml"
+    profile.write_text("execution:\n  streaming_mode: false\n")
+    return profile
+
+
+class TestSqlModeSkipsDataFrameProfile:
+    def test_sql_search_paths_exclude_the_profile(self, empty_cwd):
+        _write_datafusion_profile(empty_cwd)
+
+        sql_paths = [p.as_posix() for p in get_tuning_template_paths("datafusion", "tpch", mode="sql")]
+
+        assert not any("dataframe" in part for path in sql_paths for part in Path(path).parts)
+
+    @pytest.mark.parametrize("mode", ["dataframe", None])
+    def test_dataframe_and_unknown_modes_keep_the_profile(self, empty_cwd, mode):
+        _write_datafusion_profile(empty_cwd)
+
+        paths = [p.as_posix() for p in get_tuning_template_paths("datafusion", "tpch", mode=mode)]
+
+        assert paths[-1] == "examples/tunings/dataframe/datafusion_optimized.yaml"
+
+    def test_sql_tuned_run_never_resolves_the_profile(self, empty_cwd, config_manager):
+        from benchbox.cli.tuning_resolver import TuningSource
+
+        _write_datafusion_profile(empty_cwd)
+
+        resolution = _resolve("datafusion", "tpch", config_manager, mode="sql")
+
+        assert resolution.searched_paths is not None
+        assert not any("dataframe" in p.parts for p in resolution.searched_paths)
+        if resolution.config_file is not None:
+            assert "dataframe" not in resolution.config_file.parts
+        assert resolution.source is TuningSource.FALLBACK
+
+    def test_dataframe_tuned_run_still_resolves_the_profile(self, empty_cwd, config_manager):
+        from benchbox.cli.tuning_resolver import TuningSource
+
+        profile = _write_datafusion_profile(empty_cwd)
+
+        resolution = _resolve("datafusion", "tpch", config_manager, mode="dataframe")
+
+        assert resolution.config_file == profile.resolve()
+        assert resolution.source is TuningSource.AUTO_DISCOVERED
+
+    def test_repo_ships_no_datafusion_profile(self):
+        assert not (REPO_ROOT / "examples/tunings/dataframe/datafusion_optimized.yaml").exists()

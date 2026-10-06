@@ -56,6 +56,15 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/platform_defaults.py",
     "benchbox/cli/platform.py",
     "benchbox/cli/run_resolution.py",
+    # run-py-extraction: helpers moved verbatim out of run.py into this new
+    # module. No @click decorator, option, or command signature lives here;
+    # the surface snapshot stays empty so the guard below still holds.
+    "benchbox/cli/run_platform_resolution.py",
+    # throughput-stream-count-unset: the saved-run store and its summary label
+    # accept an unset stream count (None) instead of assuming 1, so a saved
+    # run no longer records a count the user never chose. Plain functions with
+    # no click decorator; no command, option, or argument changed.
+    "benchbox/cli/preferences.py",
     "benchbox/cli/commands/benchmarks.py",
     "benchbox/cli/commands/config.py",
     "benchbox/cli/commands/download_answers.py",
@@ -69,7 +78,6 @@ ALLOWED_INTERNAL_CLI_FILES = {
     "benchbox/cli/common_types.py",
     "benchbox/cli/output.py",
     "benchbox/cli/platform_checks.py",
-    "benchbox/cli/preferences.py",
     "benchbox/cli/presentation/__init__.py",
     "benchbox/cli/presentation/system.py",
     "benchbox/cli/progress.py",

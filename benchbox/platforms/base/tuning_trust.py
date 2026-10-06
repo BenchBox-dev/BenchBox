@@ -85,10 +85,52 @@ def fold_layout_operations_into_ledger(adapter: PlatformAdapter) -> None:
             adapter.logger.debug("applied-ledger layout fold degraded: %s", exc)
 
 
+def apply_phase_status(adapter: PlatformAdapter, has_config: bool) -> str:
+    """Derive the honest apply-phase tuning status from the execution ledger.
+
+    This is the status the run carries when corroboration cannot run (no
+    introspector, degraded read-back) or when validation fails before the
+    read-back. Moved here from ``PlatformAdapter.run_enhanced_benchmark`` so
+    the status-deciding call lives in this gated module; the behavior is
+    unchanged.
+    """
+    return adapter._applied_tuning_ledger.overall_status(
+        tuning_enabled=adapter.tuning_enabled,
+        has_config=has_config,
+    )
+
+
+def duckdb_tuning_introspector() -> Any:
+    """Build the DuckDB catalog introspector (``duckdb_indexes()`` reads).
+
+    The admitted verdict-producing set is exactly DuckDB, ClickHouse, and
+    Snowflake (``docs/development/tuning-adr-001-trust-and-hash-semantics.md``
+    addendum "verification reach beyond DuckDB and ClickHouse"); no new
+    introspector is constructed here.
+    """
+    from benchbox.platforms.duckdb_introspection import DuckDBTuningIntrospector
+
+    return DuckDBTuningIntrospector()
+
+
+def clickhouse_tuning_introspector() -> Any:
+    """Build the ClickHouse catalog introspector (``system.tables`` reads)."""
+    from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
+
+    return ClickHouseTuningIntrospector()
+
+
+def snowflake_tuning_introspector(schema: str | None) -> Any:
+    """Build the Snowflake catalog introspector (clustering-key reads)."""
+    from benchbox.platforms.snowflake_introspection import SnowflakeTuningIntrospector
+
+    return SnowflakeTuningIntrospector(schema=schema)
+
+
 def read_back_applied_ledger(
-    adapter: PlatformAdapter, connection: Any, apply_phase_status: str, has_config: bool
+    adapter: PlatformAdapter, connection: Any, apply_status: str, has_config: bool
 ) -> tuple[str, dict[str, Any] | None, str | None, dict[str, Any] | None]:
-    final_tuning_status = apply_phase_status
+    final_tuning_status = apply_status
     applied_ledger_payload = None
     applied_ledger_hash = None
     applied_receipt_payload = None

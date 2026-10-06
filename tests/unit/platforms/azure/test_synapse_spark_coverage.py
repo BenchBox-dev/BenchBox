@@ -63,7 +63,10 @@ def test_apply_unified_tuning_calls_platform_tuning_when_present() -> None:
     adapter = _adapter()
     adapter.apply_platform_tuning = MagicMock()
 
-    adapter.apply_unified_tuning(SimpleNamespace(platform_optimization={"spark.sql.shuffle.partitions": "4"}))
+    adapter.apply_unified_tuning(
+        SimpleNamespace(platform_optimization={"spark.sql.shuffle.partitions": "4"}),
+        None,
+    )
 
     call_args = adapter.apply_platform_tuning.call_args
     assert call_args is not None, "apply_platform_tuning should have been called"

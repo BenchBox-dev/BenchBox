@@ -136,7 +136,6 @@ def _fake_tpcds_result() -> Any:
         maintenance_test=maintenance,
         power_at_size=100.0,
         throughput_at_size=80.0,
-        qphds_at_size=89.44,
         validation_results={"overall_valid": False, "issues": ["issue"]},
     )
 
@@ -145,7 +144,6 @@ def _fake_tpch_result() -> Any:
     power_query_times = {i: 1.0 + (i / 100.0) for i in range(1, 23)}
     return SimpleNamespace(
         success=True,
-        qphh_at_size=123.4,
         scale_factor=1.0,
         total_benchmark_time=50.0,
         power_test=SimpleNamespace(success=True, total_time=20.0, power_at_size=140.0, query_times=power_query_times),
@@ -160,6 +158,7 @@ def test_tpc_reporting_modules_generate_all_outputs(tmp_path: Path):
     for path in tpcds_reports.values():
         assert path.exists()
         assert path.stat().st_size > 0
+        assert "QphDS" not in path.read_text(encoding="utf-8")
 
     tpch_result = _fake_tpch_result()
     tpch_reporter = TPCHReportGenerator(output_dir=tmp_path)
@@ -168,6 +167,8 @@ def test_tpc_reporting_modules_generate_all_outputs(tmp_path: Path):
     csv_file = tpch_reporter.generate_performance_csv(tpch_result)
     comparison = tpch_reporter.generate_comparison_report(tpch_result, tpch_result)
     assert detailed.exists() and cert.exists() and csv_file.exists() and comparison.exists()
+    for path in (detailed, cert, csv_file, comparison):
+        assert "QphH" not in path.read_text(encoding="utf-8")
 
     cmp_obj = tpch_reporter.compare_results(tpch_result, tpch_result)
     assert cmp_obj.significant_change is False
@@ -326,7 +327,7 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
 
     cfg = TPCDSOfficialBenchmarkConfig(scale_factor=1.0, num_streams=2, output_dir=tmp_path)
     official = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
-    assert official.qphds_at_size > 0
+    assert not hasattr(official, "qphds_at_size")
     assert ob.validate_compliance(official) is True
     audit = ob.generate_audit_trail(official)
     assert audit.exists()
@@ -342,7 +343,6 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
     failed_dict = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
     assert failed_dict.success is False
     assert failed_dict.throughput_at_size == 0.0
-    assert failed_dict.qphds_at_size == 0.0
 
     class _FailedObjectThroughputPhase:
         def __init__(self, **kwargs):
@@ -355,7 +355,6 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
     failed_object = ob.run_official_benchmark(connection_factory=_Conn, config=cfg)
     assert failed_object.success is False
     assert failed_object.throughput_at_size == 0.0
-    assert failed_object.qphds_at_size == 0.0
 
     bad = TPCDSOfficialBenchmarkResult(
         config=cfg,
@@ -367,7 +366,6 @@ def test_tpcds_power_and_official_benchmark_helpers(monkeypatch: pytest.MonkeyPa
         maintenance_test_result=None,
         power_at_size=0.0,
         throughput_at_size=0.0,
-        qphds_at_size=0.0,
         success=False,
         errors=[],
     )

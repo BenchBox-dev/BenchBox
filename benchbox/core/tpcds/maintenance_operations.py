@@ -376,7 +376,10 @@ class MaintenanceOperations:
         sales_table: str,
         returns_table: str,
         sales_select_columns: str,
+        sales_key_columns: tuple[str, str],
+        sales_quantity_column: str,
         returns_columns: str,
+        returns_key_columns: tuple[str, str],
         num_returns_columns: int,
         row_generator: Callable[[tuple], tuple],
     ) -> int:
@@ -384,9 +387,18 @@ class MaintenanceOperations:
 
         placeholder = self._get_parameter_placeholder(connection)
 
+        sales_item, sales_number = sales_key_columns
+        returns_item, returns_number = returns_key_columns
         query_sql = f"""
         SELECT {sales_select_columns}
         FROM {sales_table}
+        WHERE {sales_quantity_column} IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1
+            FROM {returns_table}
+            WHERE {returns_table}.{returns_item} = {sales_table}.{sales_item}
+              AND {returns_table}.{returns_number} = {sales_table}.{sales_number}
+          )
         ORDER BY RANDOM()
         LIMIT {placeholder}
         """
@@ -399,8 +411,14 @@ class MaintenanceOperations:
             raise
 
         if not sales_records:
-            self.logger.warning(f"No {sales_table.lower()} records found to generate returns from")
+            self.logger.warning(f"No {sales_table.lower()} records without a return found to generate returns from")
             return 0
+
+        if len(sales_records) < estimated_rows:
+            self.logger.warning(
+                f"Only {len(sales_records)} {sales_table.lower()} records without a return available "
+                f"for {estimated_rows} requested {returns_table.lower()} rows"
+            )
 
         rows_to_insert = []
         for sale in sales_records:
@@ -419,11 +437,14 @@ class MaintenanceOperations:
             returns_table="STORE_RETURNS",
             sales_select_columns="""SS_TICKET_NUMBER, SS_ITEM_SK, SS_CUSTOMER_SK, SS_CDEMO_SK,
                SS_HDEMO_SK, SS_ADDR_SK, SS_STORE_SK, SS_QUANTITY""",
+            sales_key_columns=("SS_ITEM_SK", "SS_TICKET_NUMBER"),
+            sales_quantity_column="SS_QUANTITY",
             returns_columns="""SR_RETURNED_DATE_SK, SR_RETURN_TIME_SK, SR_ITEM_SK, SR_CUSTOMER_SK,
             SR_CDEMO_SK, SR_HDEMO_SK, SR_ADDR_SK, SR_STORE_SK, SR_REASON_SK,
             SR_TICKET_NUMBER, SR_RETURN_QUANTITY, SR_RETURN_AMT, SR_RETURN_TAX,
             SR_RETURN_AMT_INC_TAX, SR_FEE, SR_RETURN_SHIP_COST, SR_REFUNDED_CASH,
             SR_REVERSED_CHARGE, SR_STORE_CREDIT, SR_NET_LOSS""",
+            returns_key_columns=("SR_ITEM_SK", "SR_TICKET_NUMBER"),
             num_returns_columns=20,
             row_generator=self._generate_store_returns_from_sale,
         )
@@ -437,6 +458,8 @@ class MaintenanceOperations:
             sales_select_columns="""CS_ORDER_NUMBER, CS_ITEM_SK, CS_BILL_CUSTOMER_SK, CS_BILL_CDEMO_SK,
                CS_BILL_HDEMO_SK, CS_BILL_ADDR_SK, CS_CALL_CENTER_SK, CS_CATALOG_PAGE_SK,
                CS_SHIP_MODE_SK, CS_WAREHOUSE_SK, CS_QUANTITY""",
+            sales_key_columns=("CS_ITEM_SK", "CS_ORDER_NUMBER"),
+            sales_quantity_column="CS_QUANTITY",
             returns_columns="""CR_RETURNED_DATE_SK, CR_RETURNED_TIME_SK, CR_ITEM_SK, CR_REFUNDED_CUSTOMER_SK,
             CR_REFUNDED_CDEMO_SK, CR_REFUNDED_HDEMO_SK, CR_REFUNDED_ADDR_SK,
             CR_RETURNING_CUSTOMER_SK, CR_RETURNING_CDEMO_SK, CR_RETURNING_HDEMO_SK,
@@ -445,6 +468,7 @@ class MaintenanceOperations:
             CR_RETURN_QUANTITY, CR_RETURN_AMOUNT, CR_RETURN_TAX, CR_RETURN_AMT_INC_TAX,
             CR_FEE, CR_RETURN_SHIP_COST, CR_REFUNDED_CASH, CR_REVERSED_CHARGE,
             CR_STORE_CREDIT, CR_NET_LOSS""",
+            returns_key_columns=("CR_ITEM_SK", "CR_ORDER_NUMBER"),
             num_returns_columns=27,
             row_generator=self._generate_catalog_returns_from_sale,
         )
@@ -457,6 +481,8 @@ class MaintenanceOperations:
             returns_table="WEB_RETURNS",
             sales_select_columns="""WS_ORDER_NUMBER, WS_ITEM_SK, WS_BILL_CUSTOMER_SK, WS_BILL_CDEMO_SK,
                WS_BILL_HDEMO_SK, WS_BILL_ADDR_SK, WS_WEB_PAGE_SK, WS_QUANTITY""",
+            sales_key_columns=("WS_ITEM_SK", "WS_ORDER_NUMBER"),
+            sales_quantity_column="WS_QUANTITY",
             returns_columns="""WR_RETURNED_DATE_SK, WR_RETURNED_TIME_SK, WR_ITEM_SK, WR_REFUNDED_CUSTOMER_SK,
             WR_REFUNDED_CDEMO_SK, WR_REFUNDED_HDEMO_SK, WR_REFUNDED_ADDR_SK,
             WR_RETURNING_CUSTOMER_SK, WR_RETURNING_CDEMO_SK, WR_RETURNING_HDEMO_SK,
@@ -464,6 +490,7 @@ class MaintenanceOperations:
             WR_RETURN_QUANTITY, WR_RETURN_AMT, WR_RETURN_TAX, WR_RETURN_AMT_INC_TAX,
             WR_FEE, WR_RETURN_SHIP_COST, WR_REFUNDED_CASH, WR_REVERSED_CHARGE,
             WR_ACCOUNT_CREDIT, WR_NET_LOSS""",
+            returns_key_columns=("WR_ITEM_SK", "WR_ORDER_NUMBER"),
             num_returns_columns=24,
             row_generator=self._generate_web_returns_from_sale,
         )
@@ -553,53 +580,102 @@ class MaintenanceOperations:
 
         return rows_updated
 
+    def _get_delete_rowid_column(self, connection: Any) -> Optional[str]:
+        dialect = f"{type(connection).__module__}.{type(connection).__name__}".lower()
+
+        if "sqlite" in dialect or "duckdb" in dialect:
+            return "rowid"
+        elif "psycopg" in dialect or "postgres" in dialect:
+            return "ctid"
+        return None
+
+    @staticmethod
+    def _count_table_rows(connection: Any, table_name: str) -> int:
+        cursor = connection.execute(f"SELECT COUNT(*) FROM {table_name}")
+        row = cursor.fetchone()
+        return int(row[0]) if row and row[0] is not None else 0
+
+    @staticmethod
+    def _reported_deleted_rows(cursor: Any) -> int:
+        rowcount = getattr(cursor, "rowcount", -1)
+        if type(rowcount) is int and rowcount >= 0:
+            return rowcount
+        return -1
+
+    def _execute_limited_delete(
+        self,
+        connection: Any,
+        table_name: str,
+        date_column: str,
+        cutoff_date_sk: int,
+        limit: int,
+    ) -> int:
+        limit = max(0, int(limit))
+        placeholder = self._get_parameter_placeholder(connection)
+        rowid_column = self._get_delete_rowid_column(connection)
+
+        if rowid_column is not None:
+            delete_sql = (
+                f"DELETE FROM {table_name} WHERE {rowid_column} IN "
+                f"(SELECT {rowid_column} FROM {table_name} "
+                f"WHERE {date_column} < {placeholder} LIMIT {placeholder})"
+            )
+            params: tuple = (cutoff_date_sk, limit)
+        else:
+            delete_sql = f"DELETE FROM {table_name} WHERE {date_column} < {placeholder} LIMIT {limit}"
+            params = (cutoff_date_sk,)
+
+        try:
+            total_before = self._count_table_rows(connection, table_name)
+            cursor = connection.execute(delete_sql, params)
+            deleted = self._reported_deleted_rows(cursor)
+            if deleted < 0:
+                deleted = max(0, total_before - self._count_table_rows(connection, table_name))
+        except Exception as e:
+            raise MaintenanceError(f"Delete from {table_name} failed: {e}") from e
+        return deleted
+
+    def _delete_from_tables(
+        self, connection: Any, specs: list[tuple[str, str]], cutoff_date_sk: int, per_table_limit: int
+    ) -> int:
+        total_deleted = 0
+        for table_name, date_column in specs:
+            total_deleted += self._execute_limited_delete(
+                connection, table_name, date_column, cutoff_date_sk, per_table_limit
+            )
+        return total_deleted
+
     def _delete_old_sales(self, connection: Any, estimated_rows: int) -> int:
         self.logger.info(f"Deleting approximately {estimated_rows} rows from sales tables")
 
         cutoff_date_sk = 2450815
 
-        delete_queries = [
-            f"DELETE FROM STORE_SALES WHERE SS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-            f"DELETE FROM CATALOG_SALES WHERE CS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-            f"DELETE FROM WEB_SALES WHERE WS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-        ]
-
-        total_deleted = 0
-        for query in delete_queries:
-            try:
-                result = connection.execute(query)
-                if hasattr(result, "rowcount"):
-                    total_deleted += result.rowcount
-                else:
-                    total_deleted += estimated_rows // 3
-            except Exception as e:
-                self.logger.warning(f"Delete query failed: {e}")
-
-        return total_deleted
+        return self._delete_from_tables(
+            connection,
+            [
+                ("STORE_SALES", "SS_SOLD_DATE_SK"),
+                ("CATALOG_SALES", "CS_SOLD_DATE_SK"),
+                ("WEB_SALES", "WS_SOLD_DATE_SK"),
+            ],
+            cutoff_date_sk,
+            estimated_rows // 3,
+        )
 
     def _delete_old_returns(self, connection: Any, estimated_rows: int) -> int:
         self.logger.info(f"Deleting approximately {estimated_rows} rows from returns tables")
 
         cutoff_date_sk = 2450815
 
-        delete_queries = [
-            f"DELETE FROM STORE_RETURNS WHERE SR_RETURNED_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-            f"DELETE FROM CATALOG_RETURNS WHERE CR_RETURNED_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-            f"DELETE FROM WEB_RETURNS WHERE WR_RETURNED_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-        ]
-
-        total_deleted = 0
-        for query in delete_queries:
-            try:
-                result = connection.execute(query)
-                if hasattr(result, "rowcount"):
-                    total_deleted += result.rowcount
-                else:
-                    total_deleted += estimated_rows // 3
-            except Exception as e:
-                self.logger.warning(f"Delete query failed: {e}")
-
-        return total_deleted
+        return self._delete_from_tables(
+            connection,
+            [
+                ("STORE_RETURNS", "SR_RETURNED_DATE_SK"),
+                ("CATALOG_RETURNS", "CR_RETURNED_DATE_SK"),
+                ("WEB_RETURNS", "WR_RETURNED_DATE_SK"),
+            ],
+            cutoff_date_sk,
+            estimated_rows // 3,
+        )
 
     def _bulk_load_sales(self, connection: Any, estimated_rows: int) -> int:
         self.logger.info(f"Bulk loading {estimated_rows} rows into sales tables")

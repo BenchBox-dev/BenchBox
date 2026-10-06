@@ -81,6 +81,26 @@ benchbox run --platform starburst --benchmark tpch --scale 0.1
 | **BigQuery** | `bigquery` | - | GCP serverless warehouse |
 | **Redshift** | `redshift` | - | AWS data warehouse |
 
+### Platforms Without Deployment Modes (`:local` Suffix)
+
+Platforms that declare no deployment modes — including cloud-only platforms
+such as Snowflake and Databricks, as well as embedded engines such as Polars
+and SQLite — accept only the `:local` suffix. The suffix is a no-op alias for
+the bare platform name, kept so the CLI selector resolver, the adapter
+factory, and `PlatformRegistry.supports_deployment_mode` agree. Any other
+suffix is rejected with a "Remove the ':…' suffix" error.
+
+```bash
+benchbox run --platform snowflake:local --benchmark tpch --scale 1.0  # same as --platform snowflake
+benchbox run --platform databricks:local --benchmark tpch --scale 1.0  # same as --platform databricks
+```
+
+```{note}
+The `:local` suffix on a platform without deployment modes names the
+platform's implicit (and only) deployment — it does not mean local
+execution. A `snowflake:local` run still executes against Snowflake Cloud.
+```
+
 ### Configuration Inheritance
 
 Some platforms inherit SQL dialect and configuration from parent platforms:

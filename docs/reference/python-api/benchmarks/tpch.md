@@ -289,7 +289,7 @@ TPCHPowerTestResult True 22 22
 
 <span id="benchbox.tpch.TPCH.run_official_benchmark"></span>
 
-`run_official_benchmark(connection_factory, config=None)` is meant to run the power, throughput and maintenance tests and compute QphH. On 0.4.1 it raises `TypeError: scale_factor must be a number, got TPCH` for every argument.
+`run_official_benchmark(connection_factory, config=None)` is meant to run the power, throughput and maintenance tests and report Power@Size and Throughput@Size. On 0.4.1 it raises `TypeError: scale_factor must be a number, got TPCH` for every argument.
 
 `TPCH` has no `run_throughput_test` method on 0.4.1.
 

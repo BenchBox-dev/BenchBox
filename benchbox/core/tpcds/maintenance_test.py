@@ -1,10 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-# This implementation is based on the TPC-DS specification.
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 import logging
 import time
 from dataclasses import dataclass, field
@@ -587,23 +580,27 @@ class TPCDSMaintenanceTest:
         statements.append(
             f"-- TPC-DS Maintenance: Delete {num_rows} old store sales records\n"
             f"-- Same logic as MaintenanceOperations._delete_old_sales()\n"
-            f"DELETE FROM STORE_SALES WHERE SS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {num_rows // 3}"
+            f"DELETE FROM STORE_SALES WHERE rowid IN (SELECT rowid FROM STORE_SALES "
+            f"WHERE SS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {placeholder})"
         )
 
         statements.append(
             f"-- TPC-DS Maintenance: Delete {num_rows} old catalog sales records\n"
-            f"DELETE FROM CATALOG_SALES WHERE CS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {num_rows // 3}"
+            f"DELETE FROM CATALOG_SALES WHERE rowid IN (SELECT rowid FROM CATALOG_SALES "
+            f"WHERE CS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {placeholder})"
         )
 
         statements.append(
             f"-- TPC-DS Maintenance: Delete {num_rows} old web sales records\n"
-            f"DELETE FROM WEB_SALES WHERE WS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {num_rows // 3}"
+            f"DELETE FROM WEB_SALES WHERE rowid IN (SELECT rowid FROM WEB_SALES "
+            f"WHERE WS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {placeholder})"
         )
 
         statements.append(
             f"-- TPC-DS Maintenance: Delete {num_rows // 2} old store returns\n"
             f"-- Same logic as MaintenanceOperations._delete_old_returns()\n"
-            f"DELETE FROM STORE_RETURNS WHERE SR_RETURNED_DATE_SK < {cutoff_date_sk} LIMIT {num_rows // 3}"
+            f"DELETE FROM STORE_RETURNS WHERE rowid IN (SELECT rowid FROM STORE_RETURNS "
+            f"WHERE SR_RETURNED_DATE_SK < {cutoff_date_sk} LIMIT {placeholder})"
         )
 
         return statements

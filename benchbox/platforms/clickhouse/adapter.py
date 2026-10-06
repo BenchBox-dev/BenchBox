@@ -99,9 +99,9 @@ class ClickHouseAdapter(
         return ClickHouseQueryPlanParser()
 
     def get_tuning_introspector(self):
-        from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
+        from benchbox.platforms.base import tuning_trust
 
-        return ClickHouseTuningIntrospector()
+        return tuning_trust.clickhouse_tuning_introspector()
 
 
 __all__ = ["ClickHouseAdapter"]

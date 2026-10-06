@@ -450,8 +450,14 @@ function addCanonicalBenchmarkClause(values: readonly string[], clauses: string[
   params.push(...canonicalValues);
 }
 
-const CANONICAL_PHASE_SQL =
-  "CASE WHEN trim(lower(coalesce(test_type, ''))) = '' THEN 'unknown' ELSE trim(lower(test_type)) END";
+export function canonicalPhaseSql(column: string): string {
+  return (
+    `CASE WHEN trim(lower(coalesce(${column}, ''))) = '' THEN 'unknown' ` +
+    `WHEN trim(lower(${column})) = 'standard' THEN 'power' ELSE trim(lower(${column})) END`
+  );
+}
+
+const CANONICAL_PHASE_SQL = canonicalPhaseSql("test_type");
 
 function addCanonicalPhaseClause(values: readonly string[], clauses: string[], params: unknown[]) {
   if (values.length === 0) return;

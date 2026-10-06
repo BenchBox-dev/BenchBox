@@ -41,9 +41,14 @@ def canonical_benchmark_slug(raw: str) -> str:
     return CANONICAL_BENCHMARK_ALIASES.get(normalized, normalized)
 
 
+_PHASE_ALIASES = {"standard": "power"}
+
+
 def canonical_phase(raw: str | None) -> str:
     normalized = (raw or "").strip().lower()
-    return normalized if normalized else "unknown"
+    if not normalized:
+        return "unknown"
+    return _PHASE_ALIASES.get(normalized, normalized)
 
 
 _PROVENANCE_SUFFIX_RE = re.compile(
@@ -360,6 +365,9 @@ class DetailResult(BaseModel):
     @field_serializer("environment")
     def _serialize_environment(self, env: ExplorerEnvironment) -> dict[str, Any]:
         return env.model_dump(mode="json", exclude_unset=True)
+
+
+KNOWN_DEFECT_RANKING_EXCLUSION = "known_defective_data"
 
 
 def is_ranking_eligible(entry: ManifestEntry) -> bool:

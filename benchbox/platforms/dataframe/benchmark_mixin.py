@@ -175,8 +175,10 @@ class DataLoadingError(RuntimeError):
 
 
 def _describe_query_parameters(benchmark_config: Any) -> str | None:
+    from benchbox.core.tpch.dataframe_queries import TPCH_FAMILY_DATAFRAME_IDS
+
     benchmark_id = normalize_benchmark_id(benchmark_config.name)
-    if benchmark_id == "tpch":
+    if benchmark_id in TPCH_FAMILY_DATAFRAME_IDS:
         from benchbox.core.tpch.benchmark import describe_query_parameters
 
         seed = (getattr(benchmark_config, "options", {}) or {}).get("seed")
@@ -1012,9 +1014,10 @@ class BenchmarkExecutionMixin:
 
     @staticmethod
     def _stream_parameter_scope(benchmark_config: BenchmarkConfig, stream_id: int) -> AbstractContextManager[None]:
-        if normalize_benchmark_id(benchmark_config.name) != "tpch":
+        from benchbox.core.tpch.dataframe_queries import TPCH_FAMILY_DATAFRAME_IDS, seeded_parameter_overrides
+
+        if normalize_benchmark_id(benchmark_config.name) not in TPCH_FAMILY_DATAFRAME_IDS:
             return nullcontext()
-        from benchbox.core.tpch.dataframe_queries import seeded_parameter_overrides
 
         seed = (getattr(benchmark_config, "options", {}) or {}).get("seed")
         scale_factor = getattr(benchmark_config, "scale_factor", 1.0)

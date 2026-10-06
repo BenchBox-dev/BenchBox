@@ -110,6 +110,8 @@ class TuningMetadataManager:
     _TUNING_TYPE_CONSTRAINTS_HASH = "constraints_hash"
     _TUNING_TYPE_PLATFORM_OPT_HASH = "platform_optimizations_hash"
     _TUNING_TYPE_TABLE_ATTRIBUTES_HASH = "table_attributes_hash"
+    _TUNING_TYPE_RUN_KIND = "run_kind"
+    _TUNED_RUN_VALUE = "tuned"
 
     _METADATA_SCHEMA_VERSION = 3
 
@@ -273,13 +275,52 @@ class TuningMetadataManager:
                 return False
 
             platform = self._platform_key()
-            records = self._build_section_marker_records(unified_config, platform, datetime.now())
+            created_at = datetime.now()
+            records = self._build_section_marker_records(unified_config, platform, created_at)
+            records.append(self._build_run_kind_record(created_at))
             self._batch_insert_records(records)
             self.marker_save_failed = False
             return True
         except Exception as e:
             self.marker_save_failed = True
             self.logger.warning(f"Failed to save tuning section markers (non-fatal): {e}")
+            return False
+
+    def write_tuned_run_marker(self) -> bool:
+        try:
+            if not self.create_metadata_table():
+                return False
+            self._batch_insert_records([self._build_run_kind_record(datetime.now())])
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to write tuned-run marker: {e}")
+            return False
+
+    def _build_run_kind_record(self, created_at: datetime) -> "TuningMetadata":
+        return TuningMetadata(
+            table_name=self._SECTION_MARKER_TABLE,
+            tuning_type=self._TUNING_TYPE_RUN_KIND,
+            column_name="run_kind",
+            column_order=0,
+            configuration_hash=self._TUNED_RUN_VALUE,
+            created_at=created_at,
+            platform=self._platform_key(),
+        )
+
+    def has_tuned_run_marker(self) -> bool:
+        try:
+            if not self._table_exists_check():
+                return False
+            query_sql = (
+                "SELECT 1 FROM "
+                f"{self._metadata_table_name} "
+                f"WHERE table_name = '{self._SECTION_MARKER_TABLE}' "
+                f"AND tuning_type = '{self._TUNING_TYPE_RUN_KIND}' "
+                "LIMIT 1"
+            )
+            with self._managed_connection() as conn:
+                return self._fetch_one(conn, query_sql) is not None
+        except Exception:
             return False
 
     def _load_section_markers(self) -> dict[str, str]:
@@ -498,7 +539,10 @@ class TuningMetadataManager:
                 raise TypeError("Expected UnifiedTuningConfiguration")
             saved = self.save_tunings(self._as_benchmark_tunings(unified_config))
             if saved:
-                self._save_section_markers(unified_config)
+                if not self._save_section_markers(unified_config):
+                    self.write_tuned_run_marker()
+            else:
+                self.write_tuned_run_marker()
             return saved
         except Exception as e:
             self.logger.error(f"Failed to save unified tunings: {e}")

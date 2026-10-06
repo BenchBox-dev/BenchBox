@@ -77,6 +77,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `nightly.yml` | product-safety | Scheduled validation; replaced by nightly T3; Windows legs, scheduled-workflow liveness and the Postgres throughput cell are non-blocking; ruleset drift runs as advisory |
 | `nightly-v2.yml` | product-safety | Nightly T3: platform matrix, docker engines, cross-browser, extension, install, drift, external documentation links |
 | `oracle-review.yml` | product-safety | Result-affecting changes need the Codex connector's review, whose identity is the only unforgeable review signal, or a stand-in approval comment from an attester account when the connector cannot review; that account is also the one local automation uses, so the stand-in records who vouched, not that a human read it |
+| `oracle-review-shadow.yml` | product-safety | Shadow run of the self-hosted soundness review: reviewers chosen by tier and availability, each with only its own credential, and a non-required `oracle-review-shadow` status posted by the owner's App |
 | `perf-smoke.yml` | product-safety | Performance smoke |
 | `pricing-data-drift-check.yml` | product-safety | Pricing data integrity |
 | `publication-canaries.yml` | product-safety | Publication canary protection |
@@ -102,8 +103,9 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `validate-release-pr.yml` | product-safety | Release PR base validation |
 | `validate-submission.yml` | product-safety | Submission validation |
 | `validate-submission-comment.yml` | product-safety | Submission validation comment |
-| `tpcds-official-qualification.yml` | product-safety | Weekly advisory SF 1 TPC-DS qualification diagnostic |
+| `tpcds-official-qualification.yml` | product-safety | Weekly SF 1 TPC-DS qualification; fails on DataFrame-to-SQL divergence or an unclassified printed-answer difference |
 | `tpcds-platform-identity.yml` | product-safety | Bundled TPC-DS generators agree across platforms (data checksums and dsqgen parameters) |
+| `tpch-dbgen-intel-macos.yml` | product-safety | Bundled darwin-x86_64 TPC-H dbgen is executed on an Intel macOS runner and emits the canonical supplier and customer rows |
 
 ### `tests/unit/workflows/`
 
@@ -115,6 +117,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_docker_integration_workflow.py` | product-safety | Container integration |
 | `test_nightly_t3_workflow.py` | product-safety | Nightly T3 domain coverage |
 | `test_oracle_review_workflow.py` | product-safety | The required check name, triggers, read-only token and script invocation of the connector-review check |
+| `test_oracle_review_shadow_workflow.py` | product-safety | Shadow review triggers, guards, per-job secret scoping, sequential reviewer slots and App-only posting |
 | `test_t2_partition_workflow.py` | product-safety | Complete medium selection, correctness gate conservation, and binary framing placement |
 | `test_public_site_visual_workflow.py` | product-safety | Visual acceptance |
 | `test_trunk_workflow.py` | product-safety | Develop-push triggers, retained pending runs and read-only test permissions |
@@ -201,6 +204,18 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_migrate_clickhouse_labels.py` | product-safety |
 | `test_mirror_partial_validation_policy.py` | pure-process |
 | `test_oracle_review_check.py` | product-safety | Connector review or stand-in approval decision for soundness-path changes |
+| `oracle_reviewers/test_absence.py` | product-safety |
+| `oracle_reviewers/test_attempts.py` | product-safety |
+| `oracle_reviewers/test_brief.py` | product-safety |
+| `oracle_reviewers/test_classifier.py` | product-safety |
+| `oracle_reviewers/test_cli_plan.py` | product-safety |
+| `oracle_reviewers/test_commands.py` | product-safety |
+| `oracle_reviewers/test_github.py` | product-safety |
+| `oracle_reviewers/test_policy.py` | product-safety |
+| `oracle_reviewers/test_retry.py` | product-safety |
+| `oracle_reviewers/test_runner.py` | product-safety |
+| `oracle_reviewers/test_selection.py` | product-safety |
+| `oracle_reviewers/test_verdict.py` | product-safety |
 | `test_path_filter_decision.py` | tooling |
 | `test_preflight_targets.py` | pure-process |
 | `test_phase2_metrics.py` | pure-process |
@@ -357,6 +372,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `fast_lane_ceiling_check.py` | pure-process | Fast-lane marker and path guards; retires with the fast lane |
 | `soundness_paths.py` | product-safety | Soundness path manifest |
 | `oracle_review_check.py` | product-safety | Connector review or stand-in approval check for soundness-path changes; the attester account is the one local automation also uses |
+| `oracle_reviewers/cli.py` | product-safety | Shadow review entry point; its package holds the classifier, reviewer selection, absence classification and verdict validation |
 | `ruleset_review_enforcement.py` | product-safety | Ruleset review enforcement |
 | `soundness_drain_report.py` | pure-process | Drain digest mechanics |
 | `soundness_merge_digest.py` | product-safety | Post-merge soundness review digest |

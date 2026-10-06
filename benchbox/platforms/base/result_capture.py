@@ -1177,8 +1177,8 @@ class ResultCaptureMixin:
         persisted_order = 0
 
         for stream_result in getattr(throughput_result, "stream_results", []) or []:
-            start_iso = self._format_timestamp(stream_result.start_time)
-            end_iso = self._format_timestamp(stream_result.end_time)
+            start_iso = self._format_timestamp(getattr(stream_result, "start_wall_time", ""))
+            end_iso = self._format_timestamp(getattr(stream_result, "end_wall_time", ""))
 
             duration_seconds = float(getattr(stream_result, "duration", 0.0) or 0.0)
             if (

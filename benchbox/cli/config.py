@@ -52,7 +52,7 @@ _CONFIG_VALIDATION_RULES: list[tuple[str, int, Any, str]] = [
     (
         "execution.concurrent_queries.stream_timeout_seconds",
         3600,
-        lambda v: v > 0,
+        lambda v: v >= 0,
         "Invalid concurrent stream timeout value",
     ),
     ("execution.concurrent_queries.max_retries", 3, lambda v: v >= 0, "Invalid max retries value"),
@@ -225,7 +225,7 @@ class ConfigManager:
                     "enabled": False,
                     "max_concurrent": 2,
                     "query_timeout_seconds": 300,
-                    "stream_timeout_seconds": 3600,
+                    "cancel_on_timeout": False,
                     "retry_failed_queries": True,
                     "max_retries": 3,
                 },

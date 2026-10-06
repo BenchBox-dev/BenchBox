@@ -170,6 +170,19 @@ def read_tuning_coverage_tsv(path: Path) -> list[TuningCoverageRow]:
     return rows
 
 
+def coverage_differences(
+    recorded_rows: Iterable[TuningCoverageRow],
+    current_rows: Iterable[TuningCoverageRow],
+) -> list[str]:
+    recorded = {row.key: row.to_dict() for row in recorded_rows}
+    current = {row.key: row.to_dict() for row in current_rows}
+    return sorted(
+        f"{platform}/{benchmark}"
+        for (platform, benchmark) in set(recorded) | set(current)
+        if recorded.get((platform, benchmark)) != current.get((platform, benchmark))
+    )
+
+
 def static_matrix_drift(
     recorded_rows: Iterable[TuningCoverageRow],
     current_rows: Iterable[TuningCoverageRow],

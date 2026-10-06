@@ -438,6 +438,7 @@ postgresql|username|PostgreSQL username|{'default': 'postgres'}
 postgresql|password|PostgreSQL password|{}
 postgresql|schema|PostgreSQL schema name|{'default': 'public'}
 postgresql|work_mem|PostgreSQL work_mem setting for queries|{'default': '256MB'}
+postgresql|statement_timeout|PostgreSQL per-statement timeout in milliseconds (0 disables)|{'parser': 'int'}
 postgresql|enable_timescale|Enable TimescaleDB extensions if available|{'default': 'false'}
 timescaledb|host|TimescaleDB server hostname|{'default': 'localhost'}
 timescaledb|port|TimescaleDB server port|{'parser': 'int', 'default': 5432}

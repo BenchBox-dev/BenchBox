@@ -254,9 +254,18 @@ so `develop` no longer trails PyPI.
 
 The fast guard
 `tests/unit/release/test_changelog_tag_guard.py::test_repo_release_accounting_matches_*`
-pins the published version as its own literal. No tooling updates that literal:
-rename the test to the new version by hand at each cut (or extend
-`scripts/update_version.py`, which currently has no reference to it). It stays
+pins the published version as its own literal. Keep that literal at the version
+PyPI currently serves: on the release branch it stays at the previous release,
+and it moves to the new version only in the develop version-sync PR after
+publication (renaming the test, for example from `..._matches_v041_...` to
+`..._matches_v042_...`, as #2669 did). The same timing applies to the
+CHANGELOG `[Unreleased]` compare link: on the release branch it still starts at
+the previous release's tag, and it moves to the new tag in the version-sync PR.
+Moving either at cut time fails the required test job, because
+`check_release_accounting` validates what PyPI serves, not what the release
+branch is about to publish. No tooling updates the literal today; automating
+that move means extending `scripts/update_version.py`, which currently has no
+reference to it. It stays
 a literal rather than reading
 `pyproject.toml`, because that is exactly what the accounting check validates;
 deriving it from the checked source would let a sync to an unpublished version

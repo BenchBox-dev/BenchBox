@@ -549,6 +549,9 @@ DRIVER_ROOTS = frozenset(
         "dask",
         "cudf",
         "rmm",
+        "fsspec",
+        "gcsfs",
+        "s3fs",
     }
 )
 OPTIONAL_IMPORT_NAMES = frozenset(
@@ -797,10 +800,7 @@ SPECS: dict[str, Spec] = {
         config={**AWS, "workgroup": "spark-wg"}, patches={"_wait_for_session_ready": lambda *a, **k: None}
     ),
     "bigquery": Spec(config={"project_id": "bench-project", "dataset_id": CATALOG_NAME}),
-    "clickhouse-cloud": Spec(
-        no_positive_control="check_server_database_exists builds a native-protocol admin client from "
-        "attributes the cloud adapter never sets, fails with AttributeError, and reports no database",
-    ),
+    "clickhouse-cloud": Spec(),
     "databend": Spec(scripted={r"SHOW DATABASES": [ValuesRow((CATALOG_NAME,))]}),
     "databricks": DATABRICKS,
     "databricks-df": DATABRICKS,
@@ -820,21 +820,20 @@ SPECS: dict[str, Spec] = {
     "fabric_dw": Spec(
         config=FABRIC, connection_sites=("test_connection", "check_server_database_exists", "get_platform_info")
     ),
-    "firebolt": Spec(
-        no_positive_control="Firebolt Core recreates databases implicitly, so drop_database only logs",
-    ),
+    "firebolt": Spec(),
     "glue": Spec(config={**AWS, "job_role": ROLE_ARN}),
-    "influxdb": Spec(
-        no_positive_control="InfluxDB reports no file path and no server database, so force_recreate only warns",
-    ),
+    "influxdb": Spec(),
     "motherduck": Spec(config={"token": "tok"}, connection_sites=("execute_query", "test_connection")),
     "polars": Spec(config={"working_dir": "{world}/db/dir_db"}),
-    "pyspark": Spec(
-        no_positive_control="create_connection runs the existing-database check before the Spark session exists, "
-        "so check_server_database_exists reports no database",
-    ),
+    "pyspark": Spec(),
     "quanton": Spec(config={**AWS, "api_key": "key"}),
-    "snowflake": Spec(config={"account": "acct"}),
+    "snowflake": Spec(
+        config={"account": "acct"},
+        # The decision drops the database when validation fails, so the fake catalog must
+        # report no tables afterwards: otherwise create_schema skips the CREATE TABLE its
+        # load-time TRUNCATE allowance depends on.
+        scripted={r"SHOW TABLES LIKE": []},
+    ),
     "snowpark-connect": Spec(config={"account": "acct", "user": "user"}),
     "starrocks": Spec(connection_sites=("get_connection",)),
     "synapse": Spec(config={"server": "ws.sql.azuresynapse.net"}),
@@ -847,10 +846,7 @@ SPECS: dict[str, Spec] = {
         },
         patches={"_ensure_session": lambda *a, **k: 1},
     ),
-    "velox": Spec(
-        config={"gluten_jar_path": "{world}/db/bench.db"},
-        no_positive_control="the adapter defines no database existence check",
-    ),
+    "velox": Spec(config={"gluten_jar_path": "{world}/db/bench.db"}),
 }
 
 VARIANTS: dict[str, dict[str, Spec]] = {
@@ -937,20 +933,36 @@ NO_FIRST_CONNECTION_CHECK: dict[str, str] = {
     "warehouse is created in the Fabric portal, so there is no database to drop on connect and "
     "check_server_database_exists only tests that a connection opens. Tables are dropped and re-created in "
     "create_schema, which the re-create allowance covers",
-    "motherduck": "create_connection opens md:<database> and never calls handle_existing_database, and the adapter "
-    "does not read force_recreate; the database lives in the MotherDuck service",
+    "motherduck": "create_connection opens md:<database> and never calls handle_existing_database; "
+    "a requested --force-recreate fails closed in create_connection with a manual-drop error instead of "
+    "silently reusing the database, which lives in the MotherDuck service",
     "snowpark-connect": "create_connection only opens a Snowpark session and never calls handle_existing_database; "
-    "force_recreate is forwarded to the base class but nothing acts on it, and create_schema only issues "
-    "CREATE DATABASE and CREATE SCHEMA IF NOT EXISTS",
+    "a requested --force-recreate fails closed in create_connection with a manual-drop error instead of being "
+    "silently ignored, and create_schema only issues CREATE DATABASE and CREATE SCHEMA IF NOT EXISTS",
+}
+FORCE_RECREATE_FAIL_CLOSED: dict[str, str] = {
+    # Case id -> error fragment expected when force_recreate=True. These adapters have no docs-supported
+    # automatic drop, so they fail closed with a manual-drop error instead of silently reusing the database.
+    # The firebolt-cloud variant is absent: Cloud mode issues a real DROP DATABASE.
+    "velox": "Velox does not support --force-recreate",
+    "influxdb": "InfluxDB does not support --force-recreate",
+    "firebolt": "Firebolt (Core) does not support --force-recreate",
+    "snowpark-connect": "Snowpark Connect does not support --force-recreate",
+    "motherduck": "MotherDuck does not support --force-recreate",
+}
+DEFAULT_MODE_REFUSALS: dict[str, str] = {
+    # Case id -> error fragment expected when force_recreate=False. The postgres-catalog variant
+    # refuses to reuse a populated catalog that carries no BenchBox run identity instead of
+    # running against tables another run wrote.
+    "ducklake-postgres_catalog": "no BenchBox run identity",
 }
 FAKE_POLL = "the fake service never reports the remote job or session as finished, so the polling loop raises"
 INCOMPLETE_STAGES: dict[str, tuple[frozenset[str], str]] = {
     "athena-spark": (frozenset({"load_data"}), f"load_data: {FAKE_POLL}"),
     "fabric-spark": (frozenset({"load_data"}), f"load_data: {FAKE_POLL}"),
     "synapse-spark": (
-        frozenset({"create_schema", "apply_unified_tuning", "load_data"}),
-        f"create_schema and load_data: {FAKE_POLL}; apply_unified_tuning takes one argument but the setup phase "
-        "passes two, which is a defect in the adapter",
+        frozenset({"create_schema", "load_data"}),
+        f"create_schema and load_data: {FAKE_POLL}",
     ),
     "fabric-lakehouse": (
         frozenset({"create_schema", "load_data"}),
@@ -1186,6 +1198,11 @@ def instrument(adapter: Any, ledger: Ledger, outcome: Outcome) -> Callable[..., 
     original_handle = adapter.handle_existing_database
     depth = 0
 
+    # functools.wraps keeps signature introspection truthful through this
+    # closure: product code dispatches on create_connection's declared
+    # signature, and without __wrapped__ every adapter would look like
+    # (*args, **kwargs). Recorded calls and ledger behaviour are unchanged.
+    @functools.wraps(original_create)
     def create_connection(*args: Any, **kwargs: Any) -> Any:
         nonlocal depth
         depth += 1
@@ -1277,13 +1294,19 @@ def describe(events: list[Event]) -> str:
     return "\n".join(str(event) for event in events)
 
 
-def run_case(case: Case, world: Path, ledger: Ledger) -> tuple[Any, Outcome]:
-    adapter = make_adapter(case, world, ledger, force_recreate=True)
+def run_case(case: Case, world: Path, ledger: Ledger, *, force_recreate: bool = True) -> tuple[Any, Outcome]:
+    adapter = make_adapter(case, world, ledger, force_recreate=force_recreate)
     return adapter, drive_lifecycle(adapter, make_benchmark(world), ledger)
 
 
 @pytest.mark.parametrize("case", CASE_PARAMS)
 def test_no_destructive_ops_after_first_connection_decision(case, world, ledger):
+    fail_closed = FORCE_RECREATE_FAIL_CLOSED.get(case.id)
+    if fail_closed is not None:
+        with pytest.raises(RuntimeError, match=re.escape(fail_closed)):
+            run_case(case, world, ledger)
+        assert not ledger.violations(), describe(ledger.violations())
+        return
     _, outcome = run_case(case, world, ledger)
 
     assert not ledger.violations(), describe(ledger.violations())
@@ -1294,7 +1317,41 @@ def test_no_destructive_ops_after_first_connection_decision(case, world, ledger)
 
 
 @pytest.mark.parametrize("case", CASE_PARAMS)
+def test_no_destructive_ops_in_default_reuse_mode(case, world, ledger):
+    """The default reuse-or-recreate mode decides once, then stays clean mid-run.
+
+    The contract used to drive only ``force_recreate=True``. The default mode instead
+    validates the existing database for compatibility and recreates it only when
+    validation fails, so this runs the same lifecycle with ``force_recreate=False``
+    and applies the same post-decision assertions, including that every adapter that
+    can reach the existing-database check does reach it.
+    """
+    refusal = DEFAULT_MODE_REFUSALS.get(case.id)
+    if refusal is not None:
+        with pytest.raises(RuntimeError, match=re.escape(refusal)):
+            run_case(case, world, ledger, force_recreate=False)
+        assert not ledger.violations(), describe(ledger.violations())
+        return
+    _, outcome = run_case(case, world, ledger, force_recreate=False)
+
+    assert not ledger.violations(), describe(ledger.violations())
+    assert "save_tuning_metadata" not in outcome.stage_errors, outcome.stage_errors
+    assert not outcome.connections.get("save_tuning_metadata"), "tuning metadata opened its own connection"
+    for site in case.spec.connection_sites:
+        assert outcome.connections.get(site, 0) >= 1, f"{site} did not open a mid-run connection"
+    assert bool(outcome.decision_calls) == (case.key not in NO_FIRST_CONNECTION_CHECK), (
+        f"existing-database check reached: {bool(outcome.decision_calls)}; "
+        f"exemption: {NO_FIRST_CONNECTION_CHECK.get(case.key, 'none')}"
+    )
+
+
+@pytest.mark.parametrize("case", CASE_PARAMS)
 def test_force_recreate_still_acts_at_the_first_connection(case, world, ledger):
+    fail_closed = FORCE_RECREATE_FAIL_CLOSED.get(case.id)
+    if fail_closed is not None:
+        with pytest.raises(RuntimeError, match=re.escape(fail_closed)):
+            run_case(case, world, ledger)
+        return
     adapter, outcome = run_case(case, world, ledger)
 
     if not outcome.decision_calls or getattr(adapter, "skip_database_management", False):
@@ -1307,8 +1364,37 @@ def test_force_recreate_still_acts_at_the_first_connection(case, world, ledger):
         assert acted, "force_recreate did not remove anything at the first connection"
 
 
+def test_pyspark_force_recreate_drops_existing_database_only_once(world, ledger):
+    """PySpark decides reuse/recreate against the live session catalog, once per run."""
+    case = next(case for case in CASES if case.key == "pyspark" and not case.variant)
+    adapter = make_adapter(case, world, ledger, force_recreate=True)
+    outcome = Outcome()
+    create_connection = instrument(adapter, ledger, outcome)
+
+    adapter._reset_run_scoped_state()
+    first = create_connection()
+    drops = [
+        event for event in ledger.in_phase("decision", destructive=True) if "DROP DATABASE" in event.target.upper()
+    ]
+    assert drops, "force_recreate did not drop the existing database at the first connection:\n" + describe(
+        ledger.events
+    )
+
+    second = create_connection()
+    adapter.close_connection(first)
+    adapter.close_connection(second)
+
+    assert outcome.decision_calls == 1, f"existing-database decision ran {outcome.decision_calls} times"
+    assert not ledger.violations(), describe(ledger.violations())
+
+
 @pytest.mark.parametrize("case", CASE_PARAMS)
 def test_case_is_not_silently_vacuous(case, world, ledger):
+    fail_closed = FORCE_RECREATE_FAIL_CLOSED.get(case.id)
+    if fail_closed is not None:
+        with pytest.raises(RuntimeError, match=re.escape(fail_closed)):
+            run_case(case, world, ledger)
+        return
     _, outcome = run_case(case, world, ledger)
     reach = reach_of(outcome, ledger)
 
@@ -1360,6 +1446,8 @@ def test_exemptions_name_registered_adapters():
 
     for table in (NO_FIRST_CONNECTION_CHECK, INCOMPLETE_STAGES, NO_SQL_OBSERVED):
         assert set(table) <= registered
+    assert set(FORCE_RECREATE_FAIL_CLOSED) <= {case.id for case in CASES}
+    assert set(DEFAULT_MODE_REFUSALS) <= {case.id for case in CASES}
     assert all(stages <= REQUIRED_STAGES for stages, _ in INCOMPLETE_STAGES.values())
 
 
@@ -1382,6 +1470,38 @@ def test_spec_coverage_rejects_stale_misspelled_and_missing_entries():
         "gamma is registered but has no spec and is not a default-spec adapter",
         "required adapter is not registered: delta",
     ]
+
+
+# The once-per-run guard `_existing_db_decided` is set BEFORE the decision body runs, in
+# the shared lifecycle (connection_lifecycle.handle_existing_database) as well as DuckLake's
+# overrides (the local-catalog check and the post-ATTACH postgres `_resolve_postgres_catalog_reuse`,
+# which marks the decision before `_existing_lake_tables` / `_verify_run_identity` run). This is
+# deliberate: a decision that raises part-way is still marked as made, so a later connection never
+# retries it destructively. test_harness_flags_a_repeated_decision pins the guard itself (clearing
+# it must produce violations); the test below pins the ordering (a failed decision must not run
+# again).
+def test_failed_decision_is_not_retried(world, ledger, monkeypatch):
+    case = next(case for case in CASES if case.key == "sqlite" and not case.variant)
+    adapter = make_adapter(case, world, ledger, force_recreate=True)
+    adapter._reset_run_scoped_state()
+    calls = 0
+
+    def flaky_check(**kwargs: Any) -> bool:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("probe failure inside the decision")
+        return False
+
+    monkeypatch.setattr(adapter, "check_database_exists", flaky_check)
+    with pytest.raises(RuntimeError, match="probe failure inside the decision"):
+        adapter.create_connection()
+    assert adapter._existing_db_decided is True
+
+    second = adapter.create_connection()
+    adapter.close_connection(second)
+
+    assert calls == 1, "the failed first-connection decision ran again on a later connection"
 
 
 @pytest.mark.parametrize("name", ["sqlite", "postgresql", "clickhouse-server", "duckdb"])
@@ -1538,6 +1658,22 @@ def test_ledger_flags_destructive_driver_calls(call, tmp_path):
     probe.record_call(call, ("target",), {})
 
     assert probe.violations()
+
+
+@pytest.mark.parametrize("library", ["fsspec", "gcsfs", "s3fs"])
+def test_filesystem_library_removals_are_observed(library, ledger):
+    """Removals through fsspec/s3fs/gcsfs are observed because the harness fakes those libraries.
+
+    They are listed in DRIVER_ROOTS, so an adapter that deletes a staging prefix through one of
+    them records a destructive driver call instead of performing an unobserved real deletion.
+    """
+    module = importlib.import_module(library)
+    assert isinstance(module, FakeModule), f"{library} was not faked by the harness"
+    ledger.phase = "post"
+    ledger.stage = "second_connection"
+    module.fs.rm("s3://bench-bucket/benchbox/staging/part-0")
+
+    assert ledger.violations(), f"a {library} removal was not observed"
 
 
 @pytest.mark.parametrize("call", ["client.deleted", "frame.dropna", "text.removeprefix", "client.get_table"])

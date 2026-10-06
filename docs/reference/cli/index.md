@@ -35,7 +35,7 @@ BenchBox provides the following commands:
 | `compare`              | Compare benchmark results for regression detection | [results](results.md#compare)             |
 | `visualize`            | Generate ASCII charts from benchmark results       | [visualize](visualize.md)                 |
 | `report`               | Historical analysis, rankings, and regressions     | [report](report.md)                       |
-| `metrics`              | Calculate TPC performance metrics (QphH)           | [metrics](metrics.md)                     |
+| `metrics`              | Calculate TPC Power@Size and Throughput@Size      | [metrics](metrics.md)                     |
 | `aggregate`            | Aggregate results into CSV performance trends      | [aggregate](aggregate.md)                 |
 | `datagen`              | Generate benchmark data without running queries    | [datagen](datagen.md)                     |
 | `setup`                | Interactive cloud platform credential setup        | [setup](setup.md)                         |

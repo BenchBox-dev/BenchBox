@@ -185,7 +185,7 @@ class TestBenchmarkConfig:
         assert config.display_name == "TPC-H"
         assert config.scale_factor == 0.01
         assert config.queries is None
-        assert config.concurrency == 1
+        assert config.concurrency is None
         assert config.options == {}
 
     def test_benchmark_config_with_custom_values(self):

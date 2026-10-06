@@ -582,3 +582,58 @@ class TestRunBenchmarkCarriesLedger:
         assert result.tuning_validation_status == NOT_APPLICABLE
         assert result.applied_tuning_ledger is None
         assert result.applied_ledger_hash is None
+
+
+# ---------------------------------------------------------------------------
+# Gated-module delegation pins
+# ---------------------------------------------------------------------------
+class TestLedgerTrustDelegation:
+    """The mixin entry points must route through the gated module.
+
+    ``benchbox/platforms/dataframe/tuning_trust.py`` is a soundness-manifest
+    path; the mixin methods below are one-line delegates. Computing the status
+    or attach inline (ignoring the gated functions) leaves the patched
+    sentinels unobserved, so these fail if the mixin stops delegating.
+    """
+
+    def _stub(self):
+        from benchbox.platforms.dataframe.tuning_mixin import TuningConfigurableMixin
+
+        class _Stub(TuningConfigurableMixin):
+            @property
+            def platform_name(self) -> str:
+                return "stub"
+
+            @property
+            def family(self) -> str:
+                return "stub"
+
+        stub = object.__new__(_Stub)
+        stub._applied_tuning_ledger = SimpleNamespace(
+            statements=[],
+            overall_status=lambda tuning_enabled, has_config: "stub-status",
+        )
+        stub._tuning_config = SimpleNamespace(is_default=lambda: True)
+        return stub
+
+    def test_derive_status_delegates_to_gated_module(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from benchbox.platforms.dataframe import tuning_trust
+
+        sentinel = object()
+        monkeypatch.setattr(tuning_trust, "derive_applied_tuning_status", lambda ledger, config: sentinel)
+        stub = self._stub()
+        assert stub._derive_applied_tuning_status() is sentinel
+
+    def test_write_ledger_delegates_to_gated_module(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from benchbox.platforms.dataframe import tuning_trust
+
+        calls: list = []
+        monkeypatch.setattr(
+            tuning_trust,
+            "write_applied_tuning_ledger",
+            lambda ledger, config, builder: calls.append((ledger, config, builder)),
+        )
+        stub = self._stub()
+        builder = SimpleNamespace()
+        stub._write_applied_tuning_ledger(builder)
+        assert calls == [(stub._applied_tuning_ledger, stub._tuning_config, builder)]

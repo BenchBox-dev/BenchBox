@@ -22,6 +22,58 @@ cohorts count platform names, preserving the historical three-platform floor. Bu
 the explicitly segregated `duckdb-version-matrix/` corpus count platform plus version;
 repeated runs of one platform/version do not pad that matrix.
 
+A cohort is one benchmark, scale factor and measured phase. Power timings and
+throughput timings are never mixed, and a throughput cohort is further split by
+stream count. The phase is the bundle's declared `benchmark.test_type`, lowercased,
+with `standard` folded into `power` (the Explorer applies the same rule). Without a
+declared type it is the executed phase in `phases` (a phase recorded as `NOT_RUN`
+did not run), and without either it is its own `unknown` cohort. Other declared
+phases such as `combined` stay separate cohorts.
+
+Only bundles the Explorer can rank contribute an identity. `exclusion_reason` in
+`results-data/validate_corpus.py` is the source of truth; it mirrors the Explorer's
+`ranking_exclusion_reason`, and a bundle counts only when it returns no reason. It applies
+these conditions, in order:
+
+1. The compliance class is not `unofficial_nonstandard` or `unofficial_subscale`.
+2. No measurement query failed.
+3. The validation status is clean. A `passed` or missing status with failed queries is
+   `partial`, and one with a failed or fallback SQL translation is `uncertain`.
+4. A `custom` tuning mode has applied tuning evidence (`applied_unverified` or
+   `applied_verified`).
+5. The timing and coverage contract holds: at least two queries with a valid positive
+   display timing, covering at least half of the logical queries.
+6. The benchmark's primary metric is present, finite and positive. TPC-H and TPC-DS rank on
+   `power_score` (from `power_at_size` only; `qphh_at_size`/`qphds_at_size` are
+   non-spec exports the driver no longer validates); other
+   benchmarks rank on the geometric mean of display timings.
+
+Trust label and visibility come from where a bundle is published, not from its content,
+so the validator does not check them.
+
+TPC-H and TPC-DS throughput cohorts cannot be ranked today, because the Explorer ranks those
+benchmarks on `power_score` and throughput bundles do not carry one. Such cohorts are
+reported as `UNRANKED`.
+
+The depth gate applies to cohorts that publish a ranking:
+
+| Rankable identities | Result |
+|---------------------|--------|
+| 3 or more | passes |
+| 1 or 2 | fails |
+| 0 | reported as `UNRANKED` in the validator output; passes |
+
+A cohort with no rankable bundle publishes no ranking, so there is nothing to
+read against and nothing for the gate to protect. This is how a cohort made up
+only of `unofficial_subscale` runs (for example TPC-DS at SF0.1 on cloud
+warehouses) stays in the corpus without blocking it.
+
+Distinct identities are distinct platform names. The validator does not merge engines
+that share a backend (Spark SQL and PySpark, DuckDB and DuckDB-based services), so
+reviewers must not rely on them to reach the floor.
+`results-data/validate_corpus.py` is the authority; `corpus-inventory.json` lists
+platform and version for every cohort and is not an admission count.
+
 ## Generation Contract
 
 | Item | Value |
@@ -103,9 +155,10 @@ admission behavior.
 
 ### Execution phases
 
-All seed-corpus runs use `--phases generate,load,power`. Throughput and
-maintenance are excluded to keep CI runtime bounded and to standardize the
-comparison surface on single-stream power timings.
+Scheduled seed-corpus runs use `--phases generate,load,power`. Throughput and
+maintenance are excluded from those runs to keep CI runtime bounded and to standardize
+the comparison surface on single-stream power timings. Throughput bundles can still be
+committed; they form their own cohorts as described under the depth requirement.
 
 ## Storage Layout
 

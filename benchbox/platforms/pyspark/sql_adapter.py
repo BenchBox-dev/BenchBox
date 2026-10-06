@@ -28,8 +28,6 @@ class PySparkSQLAdapter(SparkAdapter):
     def create_connection(self, **connection_config: Any) -> Any:
         self.log_operation_start("PySpark SQL session")
 
-        self.handle_existing_database(**connection_config)
-
         extra_configs = self._get_spark_conf()
 
         try:
@@ -46,6 +44,8 @@ class PySparkSQLAdapter(SparkAdapter):
             self._session_claimed = True
             self._spark_session = spark
 
+            self.handle_existing_database(**connection_config)
+
             target_database = connection_config.get("database", self.database)
 
             if not self.database_was_reused:
@@ -60,7 +60,7 @@ class PySparkSQLAdapter(SparkAdapter):
             )
 
             return spark
-        except Exception as exc:  # pragma: no cover
+        except Exception as exc:
             logger.error("Failed to create PySpark SQL session: %s", exc)
             raise
 

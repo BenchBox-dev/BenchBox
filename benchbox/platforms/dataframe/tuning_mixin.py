@@ -135,29 +135,18 @@ class TuningConfigurableMixin(ABC):
             logger.debug("dataframe write-layout ledger fold degraded: %s", exc)
 
     def _derive_applied_tuning_status(self) -> str | None:
-        ledger = getattr(self, "_applied_tuning_ledger", None)
-        if ledger is None:
-            return None
-        config = getattr(self, "_tuning_config", None)
-        has_config = bool(ledger.statements) or (config is not None and not config.is_default())
-        return ledger.overall_status(tuning_enabled=has_config, has_config=has_config)
+        from benchbox.platforms.dataframe import tuning_trust
+
+        return tuning_trust.derive_applied_tuning_status(
+            getattr(self, "_applied_tuning_ledger", None),
+            getattr(self, "_tuning_config", None),
+        )
 
     def _write_applied_tuning_ledger(self, builder: Any) -> None:
-        ledger = getattr(self, "_applied_tuning_ledger", None)
-        if ledger is None:
-            return
-        try:
-            status = self._derive_applied_tuning_status()
-            if status is None:
-                return
-            payload = ledger.to_payload(status=status) if not ledger.is_empty() else None
-            config = getattr(self, "_tuning_config", None)
-            tunings_applied = config.to_dict() if config is not None else None
-            builder.set_tuning_info(
-                tunings_applied=tunings_applied or None,
-                validation_status=status,
-                applied_tuning_ledger=payload,
-                applied_ledger_hash=ledger.applied_ledger_hash(),
-            )
-        except Exception as exc:
-            logger.debug("dataframe applied-ledger wiring degraded: %s", exc)
+        from benchbox.platforms.dataframe import tuning_trust
+
+        tuning_trust.write_applied_tuning_ledger(
+            getattr(self, "_applied_tuning_ledger", None),
+            getattr(self, "_tuning_config", None),
+            builder,
+        )

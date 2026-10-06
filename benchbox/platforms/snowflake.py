@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import hashlib
@@ -1570,9 +1566,9 @@ class SnowflakeAdapter(PlatformAdapter):
             cursor.close()
 
     def get_tuning_introspector(self):
-        from benchbox.platforms.snowflake_introspection import SnowflakeTuningIntrospector
+        from benchbox.platforms.base import tuning_trust
 
-        return SnowflakeTuningIntrospector(schema=self.schema)
+        return tuning_trust.snowflake_tuning_introspector(self.schema)
 
     def close_connection(self, connection: Any) -> None:
         try:
@@ -1705,7 +1701,13 @@ class SnowflakeAdapter(PlatformAdapter):
                     self.logger.info(f"Table {table_name} already has desired clustering key: {current_clustering}")
                     ledger = getattr(self, "_applied_tuning_ledger", None)
                     if ledger is not None:
-                        ledger.record_dropped(cluster_sql, "already present in Snowflake catalog; ALTER skipped")
+                        from benchbox.core.tuning.applied_ledger import SATISFIED_BY_PREEXISTING_STATE
+
+                        ledger.record_satisfied(
+                            cluster_sql,
+                            SATISFIED_BY_PREEXISTING_STATE,
+                            "already present in Snowflake catalog; ALTER skipped",
+                        )
 
                     if len(clustering_columns) <= 4 and not automatic_clustering_on:
                         self._pending_resume_recluster().add(table_name)

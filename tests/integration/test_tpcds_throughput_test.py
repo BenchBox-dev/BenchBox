@@ -355,8 +355,8 @@ class TestThroughputTest:
         assert result.config.scale_factor == throughput_test_config.scale_factor
 
 
-class TestSuccessGateConfigurable:
-    def test_finalize_stream_success_uses_configurable_gate(self, tpcds_benchmark):
+class TestStreamSuccessRequiresNoFailedQuery:
+    def test_finalize_stream_success_ignores_legacy_threshold_when_a_query_failed(self, tpcds_benchmark):
         test = TPCDSThroughputTest(benchmark=tpcds_benchmark)
 
         def _make_result(min_success_rate: float) -> TPCDSThroughputStreamResult:
@@ -374,7 +374,7 @@ class TestSuccessGateConfigurable:
             return stream_result
 
         assert _make_result(0.70).success is False
-        assert _make_result(0.50).success is True
+        assert _make_result(0.50).success is False
 
     def test_run_partial_stream_is_fatal_despite_legacy_success_threshold(self, tpcds_benchmark):
         connections: list[Mock] = []

@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import argparse
@@ -30,7 +26,7 @@ from ._spark_helpers import (
     spark_aqe_conf_entries,
     validate_spark_identifier,
 )
-from .base import DriverIsolationCapability, PlatformAdapter, StreamConnectionCapability
+from .base import DriverIsolationCapability, PlatformAdapter
 from .base.config_utils import make_registered_platform_config_builder
 from .base.spark_execution_mixin import SparkDataLoadMixin, SparkQueryExecutionMixin
 from .base.spark_logging import suppress_window_exec_warning
@@ -162,7 +158,6 @@ class SparkAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
-    stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
 
     def __init__(self, **config):
         super().__init__(**config)

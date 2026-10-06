@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 import pytest
 
 from benchbox.core.expected_results.models import ValidationMode
@@ -40,7 +36,6 @@ class TestQueryValidator:
         assert result.validation_mode == ValidationMode.EXACT
 
     def test_validate_tpch_query_mismatch(self):
-
         validator = QueryValidator()
         result = validator.validate_query_result(
             benchmark_type="tpch",
@@ -55,7 +50,6 @@ class TestQueryValidator:
         assert result.error_message is not None
 
     def test_validate_unknown_benchmark(self):
-
         validator = QueryValidator()
         result = validator.validate_query_result(
             benchmark_type="unknown_benchmark",
@@ -68,7 +62,6 @@ class TestQueryValidator:
         assert result.warning_message is not None
 
     def test_validate_unknown_query(self):
-
         validator = QueryValidator()
         result = validator.validate_query_result(
             benchmark_type="tpch",
@@ -283,7 +276,7 @@ class TestParameterSensitiveValidation:
         assert not result.is_valid
         assert result.validation_mode == ValidationMode.EXACT
 
-    def test_tpcds_query_unaffected_by_reference_seed_context(self):
+    def test_tpcds_non_reference_seed_context_excludes_row_count_validation(self):
         set_reference_seed_context(False)
         validator = QueryValidator()
         result = validator.validate_query_result(
@@ -294,4 +287,4 @@ class TestParameterSensitiveValidation:
         )
         assert result.is_valid
         assert result.validation_mode == ValidationMode.SKIP
-        assert "SKIP" in result.warning_message or "skip" in result.warning_message
+        assert "excluded" in result.warning_message

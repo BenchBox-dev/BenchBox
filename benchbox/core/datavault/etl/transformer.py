@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -316,7 +312,11 @@ class DataVaultETLTransformer(CompressionMixin):
         output_format: str,
         load_timestamp: datetime,
     ) -> None:
-        from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
+        from benchbox.utils.datagen_manifest import (
+            DataGenerationManifest,
+            require_manifest_files,
+            resolve_compression_metadata,
+        )
 
         manifest = DataGenerationManifest(
             output_dir=output_dir,
@@ -348,6 +348,7 @@ class DataVaultETLTransformer(CompressionMixin):
                 metadata=dialect_metadata,
             )
 
+        require_manifest_files(manifest.file_counts()[1], label="Data Vault", output_dir=output_dir)
         manifest.write()
 
     def _get_hub_sql(self, table_name: str, load_dts: str) -> str:

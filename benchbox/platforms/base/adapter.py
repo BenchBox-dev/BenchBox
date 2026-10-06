@@ -1,11 +1,6 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import logging
-import math
 import threading
 import uuid
 from abc import ABC, abstractmethod
@@ -13,7 +8,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from benchbox.core.loaded_tables import require_loaded_tables
+from benchbox.core.loaded_tables import is_data_loading_skipped, require_loaded_tables
 from benchbox.core.results.query_plan_models import DEFAULT_PLAN_MAX_DEPTH
 from benchbox.core.results.schema import compute_plan_capture_stats
 from benchbox.core.throughput.containment import await_quiescence
@@ -95,6 +90,12 @@ def exclude_probe_wall_time(total_seconds: float, probe_seconds: float) -> float
     return max(0.0, total_seconds - probe_seconds)
 
 
+class _ManifestStreamCapability:
+    def __get__(self, instance: Any, owner: type) -> StreamConnectionCapability:
+        capability, _declared = resolve_stream_connection_capability(owner if instance is None else type(instance))
+        return capability
+
+
 class PlatformAdapter(
     ConnectionLifecycleMixin,
     DialectTranslationMixin,
@@ -109,7 +110,7 @@ class PlatformAdapter(
     ABC,
 ):
     driver_isolation_capability: DriverIsolationCapability = DriverIsolationCapability.NOT_APPLICABLE
-    stream_connection_capability: StreamConnectionCapability = StreamConnectionCapability.SHARED_CURSOR
+    stream_connection_capability = _ManifestStreamCapability()
     default_service_port: int | None = None
     supports_external_tables: bool = False
     plan_capture_phase_eligible: bool = True
@@ -183,6 +184,7 @@ class PlatformAdapter(
         self._client_link_metadata: dict[str, Any] | None = None
         self._link_probe_timed_out = False
         self._post_measurement_contained = False
+        self._contained_throughput_result: Any = None
 
     def _reset_run_scoped_state(self) -> None:
         self.database_was_reused = False
@@ -201,6 +203,7 @@ class PlatformAdapter(
         self._client_link_metadata = None
         self._link_probe_timed_out = False
         self._post_measurement_contained = False
+        self._contained_throughput_result = None
         if self.dry_run_mode:
             self.captured_sql = []
             self.query_counter = 0
@@ -208,11 +211,13 @@ class PlatformAdapter(
     @staticmethod
     @abstractmethod
     def add_cli_arguments(parser) -> None:
+
         pass
 
     @classmethod
     @abstractmethod
     def from_config(cls, config: dict[str, Any]):
+
         pass
 
     @property
@@ -260,14 +265,17 @@ class PlatformAdapter(
 
     @abstractmethod
     def create_connection(self, **connection_config) -> Any:
+
         pass
 
     @abstractmethod
     def create_schema(self, benchmark, connection: Any) -> float:
+
         pass
 
     @abstractmethod
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
+
         pass
 
     @abstractmethod
@@ -277,12 +285,14 @@ class PlatformAdapter(
         foreign_key_config: ForeignKeyConfiguration,
         connection: Any,
     ) -> None:
+
         pass
 
     @abstractmethod
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
+
         pass
 
     def materialize_schema_only_tables(self, benchmark, connection: Any) -> dict[str, int]:
@@ -300,6 +310,7 @@ class PlatformAdapter(
 
     @abstractmethod
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
+
         pass
 
     def gather_statistics(self, connection: Any, table_names: list[str]) -> tuple[str, int]:
@@ -404,11 +415,15 @@ class PlatformAdapter(
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
+
         pass
 
     def close_connection(self, connection: Any) -> None:
         if connection and hasattr(connection, "close"):
             connection.close()
+
+    def ensure_stream_sessions_supported(self, connection: Any = None) -> None:
+        return None
 
     def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
         del benchmark_type
@@ -547,10 +562,7 @@ class PlatformAdapter(
                     _dropped.reason,
                 )
 
-            tuning_validation_status = self._applied_tuning_ledger.overall_status(
-                tuning_enabled=self.tuning_enabled,
-                has_config=bool(effective_tuning_config),
-            )
+            tuning_validation_status = tuning_trust.apply_phase_status(self, bool(effective_tuning_config))
 
             if self._check_validation_failure(validation_phase):
                 failed_result = self._create_failed_benchmark_result(
@@ -644,10 +656,6 @@ class PlatformAdapter(
             power_at_size = power_test_phase.power_at_size if power_test_phase else None
             throughput_at_size = throughput_test_phase.throughput_at_size if throughput_test_phase else None
 
-            qph_at_size = None
-            if power_at_size and power_at_size > 0 and throughput_at_size and throughput_at_size > 0:
-                qph_at_size = math.sqrt(power_at_size * throughput_at_size)
-
             eet = run_config.get("_effective_execution_type")
             execution_type = eet if eet is not None else run_config.get("test_execution_type", "standard")
 
@@ -700,7 +708,6 @@ class PlatformAdapter(
                 validation_details=validation_phase.validation_details,
                 power_at_size=power_at_size,
                 throughput_at_size=throughput_at_size,
-                qph_at_size=qph_at_size,
                 test_execution_type=execution_type,
             )
 
@@ -757,10 +764,7 @@ class PlatformAdapter(
     def _close_run_connection(self) -> None:
         connection = self.connection
         if self._post_measurement_contained:
-            self._defer_connection_close_until_quiescent(
-                connection,
-                getattr(self, "_last_throughput_test_result", None),
-            )
+            self._defer_connection_close_until_quiescent(connection, self._contained_throughput_result)
         else:
             self.close_connection(connection)
         self.connection = None
@@ -880,6 +884,12 @@ class PlatformAdapter(
             if callable(validate_fn):
                 validate_fn()
 
+            if self.tuning_enabled and effective_tuning_config and not self.ensure_tuned_run_marker(connection):
+                raise RuntimeError(
+                    "Failed to write the tuned-run marker; refusing to proceed with a tuned run "
+                    "rather than leave a database with no notuning-reuse refusal evidence"
+                )
+
             schema_time = 0.0
             schema_creation_phase = self._create_enhanced_schema_creation_phase(benchmark, connection, 0.0)
             schema_creation_phase.status = "SKIPPED"
@@ -913,6 +923,11 @@ class PlatformAdapter(
         tuning_metadata_saved = False
         if self.tuning_enabled and effective_tuning_config:
             quiet_console.print("Applying unified tuning configuration...")
+            if not self.ensure_tuned_run_marker(connection):
+                raise RuntimeError(
+                    "Failed to write the tuned-run marker; refusing to apply tuning "
+                    "rather than leave a database with no notuning-reuse refusal evidence"
+                )
             apply_ledger = self._applied_tuning_ledger or AppliedTuningLedger()
             ledger_before_apply = apply_ledger.snapshot()
             self.apply_unified_tuning(effective_tuning_config, connection)
@@ -929,7 +944,7 @@ class PlatformAdapter(
             else:
                 quiet_console.print("✅ Tuning metadata saved")
 
-        if getattr(type(benchmark), "SKIP_DATA_LOADING", False):
+        if is_data_loading_skipped(benchmark):
             quiet_console.print("Benchmark uses schema only; skipping data loading")
             schema_only_stats = self.materialize_schema_only_tables(benchmark, connection)
             data_loading_phase = self._create_enhanced_data_loading_phase(schema_only_stats, 0.0, {})

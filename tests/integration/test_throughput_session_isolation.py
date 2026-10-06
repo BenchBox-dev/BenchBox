@@ -256,10 +256,10 @@ class TestPostgreSQLIndependentConnectionIsolatesSessions:
             shared_connection.close()
 
 
-class TestSQLiteSharedCursorConcurrentUse:
-    def test_concurrent_read_streams_share_safely_and_close_cleanly(self, tmp_path) -> None:
-        adapter = SQLiteAdapter(database_path=str(tmp_path / "shared.db"))
-        assert adapter.stream_connection_capability is StreamConnectionCapability.SHARED_CURSOR
+class TestSQLiteIndependentStreamConnections:
+    def test_concurrent_read_streams_run_in_isolated_sessions_and_close_cleanly(self, tmp_path) -> None:
+        adapter = SQLiteAdapter(database_path=str(tmp_path / "streams.db"))
+        assert adapter.stream_connection_capability is StreamConnectionCapability.INDEPENDENT_CONNECTION
 
         shared_connection = adapter.create_connection()
         try:
@@ -268,13 +268,13 @@ class TestSQLiteSharedCursorConcurrentUse:
                 setup.execute("CREATE TABLE probe (value INTEGER)")
                 for value in range(10):
                     setup.execute(f"INSERT INTO probe VALUES ({value})")
+                setup.commit()
             finally:
                 setup.close()
 
             barrier = threading.Barrier(2)
             errors: dict[str, BaseException] = {}
             counts: dict[str, list[int]] = {}
-            execute_lock = threading.Lock()
 
             def run(name: str) -> None:
                 try:
@@ -283,8 +283,7 @@ class TestSQLiteSharedCursorConcurrentUse:
                         barrier.wait(timeout=30)
                         row_counts = []
                         for _ in range(5):
-                            with execute_lock:
-                                row = wrapper.execute("SELECT COUNT(*) FROM probe").fetchone()
+                            row = wrapper.execute("SELECT COUNT(*) FROM probe").fetchone()
                             row_counts.append(row[0])
                         counts[name] = row_counts
                     finally:
@@ -298,14 +297,14 @@ class TestSQLiteSharedCursorConcurrentUse:
             for thread in threads:
                 thread.join(timeout=60)
 
-            assert not errors, f"concurrent shared-cursor read streams raised: {errors}"
-            assert counts == {"a": [10] * 5, "b": [10] * 5}, f"shared-cursor streams mismeasured: {counts}"
+            assert not errors, f"concurrent independent read streams raised: {errors}"
+            assert counts == {"a": [10] * 5, "b": [10] * 5}, f"independent streams mismeasured: {counts}"
             assert shared_connection.execute("SELECT COUNT(*) FROM probe").fetchone()[0] == 10
         finally:
             shared_connection.close()
 
-    def test_identical_concurrent_reads_never_share_a_prepared_statement(self, tmp_path) -> None:
-        adapter = SQLiteAdapter(database_path=str(tmp_path / "shared.db"))
+    def test_identical_concurrent_reads_never_see_another_streams_state(self, tmp_path) -> None:
+        adapter = SQLiteAdapter(database_path=str(tmp_path / "streams.db"))
         shared_connection = adapter.create_connection()
         try:
             setup = _stream_wrapper(adapter, shared_connection)
@@ -313,6 +312,7 @@ class TestSQLiteSharedCursorConcurrentUse:
                 setup.execute("CREATE TABLE probe (value INTEGER)")
                 for value in range(10):
                     setup.execute(f"INSERT INTO probe VALUES ({value})")
+                setup.commit()
             finally:
                 setup.close()
 
@@ -342,10 +342,10 @@ class TestSQLiteSharedCursorConcurrentUse:
                 thread.start()
             for thread in threads:
                 thread.join(timeout=120)
-            assert not any(thread.is_alive() for thread in threads), "shared-cursor read streams hung"
+            assert not any(thread.is_alive() for thread in threads), "independent read streams hung"
 
-            assert not errors, f"concurrent shared-cursor read streams raised: {errors}"
-            assert not wrong, f"{len(wrong)} shared-cursor reads saw another stream's statement state: {wrong[:3]}"
+            assert not errors, f"concurrent independent read streams raised: {errors}"
+            assert not wrong, f"{len(wrong)} independent reads saw another stream's state: {wrong[:3]}"
         finally:
             shared_connection.close()
 

@@ -103,6 +103,7 @@ tests/uat/
 ├── cells_io.py                    # cells.jsonl + accounting-sidecar codec
 ├── gate_summary.py                # uat_gate_summary.json evidence artifact (make uat-gate-check)
 ├── throughput.py                  # multi-stream throughput/concurrent cell support
+├── throughput_baseline.py         # per-runner-class Throughput@Size baselines and rolling median
 ├── ladder.py                      # scale-ladder + early-stop logic
 ├── phases/
 │   ├── __init__.py
@@ -141,6 +142,7 @@ tests/uat/
 | `cells_io.py` | `cells.jsonl` + accounting-sidecar read/write codec; single schema shared by `orchestrator.py` and `_cli.py` | — |
 | `gate_summary.py` | Writes/reads the versioned `uat_gate_summary.json` per-sweep evidence artifact; powers `make uat-gate-check` cross-stage aggregation | — |
 | `throughput.py` | Multi-stream throughput/concurrent cell support via `benchbox run-official --streams`; TPC-compliant scale-factor gate | — |
+| `throughput_baseline.py` | Per-run Throughput@Size baseline records keyed by runner class, and their rolling median; shares the `throughput` bucket ceiling with `throughput.py` | — |
 | `ladder.py` | Per-(platform, benchmark) rung order; wall-clock and exit-code early-stop; pruning bookkeeping | 100 |
 | `preflight_budget.py` | Disk free-space floor budgeting and cell-key accounting | — |
 | `phases/__init__.py` | UAT phase package marker and phase contract documentation string | — |

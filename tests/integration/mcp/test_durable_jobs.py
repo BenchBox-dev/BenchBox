@@ -372,6 +372,32 @@ def test_multiprocess_claims_respect_global_running_limit(tmp_path: Path) -> Non
     assert sorted(outcomes.get(timeout=10) for _ in processes) == [False, True]
 
 
+def _spawn_per_principal_claim(db_path: str, worker_id: str, outcome: multiprocessing.Queue) -> None:
+    from benchbox.mcp.jobs import DurableJobRepository
+    from benchbox.mcp.security import JobLimits
+
+    repository = DurableJobRepository(Path(db_path), JobLimits(max_running=8, max_running_per_principal=1))
+    outcome.put(repository.claim(worker_id) is not None)
+
+
+def test_multiprocess_claims_respect_per_principal_running_limit(tmp_path: Path) -> None:
+    repository = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits(max_running=8, max_running_per_principal=1))
+    repository.submit("tenant-a", _request())
+    repository.submit("tenant-a", _request())
+    context = multiprocessing.get_context("spawn")
+    outcomes: multiprocessing.Queue = context.Queue()
+    processes = [
+        context.Process(target=_spawn_per_principal_claim, args=(str(tmp_path / "state.sqlite3"), worker, outcomes))
+        for worker in ("proc-a", "proc-b")
+    ]
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(timeout=60)
+        assert process.exitcode == 0
+    assert sorted(outcomes.get(timeout=10) for _ in processes) == [False, True]
+
+
 def test_fairness_state_is_shared_across_worker_handles(tmp_path: Path) -> None:
     first = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())
     second = DurableJobRepository(tmp_path / "state.sqlite3", JobLimits())

@@ -1,6 +1,6 @@
 # ADR: Concurrency Outcome and Resource-Ownership Contract
 
-**Status**: Accepted
+**Status**: Accepted; superseded in part (see [Superseded in part](#superseded-in-part))
 **Date**: 2026-09-19
 **Scope**: `concurrency-outcome-and-ownership-contract` (prerequisite for the 10-item concurrency batch)
 
@@ -97,6 +97,25 @@ follow-up batch items own their surfaces:
   outstanding-work containment, deterministic TPC-DI generation, adapter session capability,
   enhanced-parallel support decision, public-API semantic reconciliation, MCP ownership fencing,
   durable admission/fairness, and the final proof matrix.
+
+## Superseded in part
+
+Two statements in this ADR describe code that no longer exists:
+
+- The `benchbox/utils/execution_manager.py` rows in the Context table and in section 2 say
+  `PowerRunExecutor` and `ConcurrentQueryExecutor` remain quarantined and that removal must
+  preserve their public surface. `adr-concurrency-public-api-reconciliation.md` supersedes that
+  statement: both classes were removed without a compatibility shim, and `StreamRunner` is the
+  only concurrent-stream executor.
+- The `etl/parallel_batch_processor.py` and `ParallelBatchProcessor` rows in the Context table
+  and in section 2 describe a scheduler that was removed by
+  `adr-tpcdi-enhanced-parallel-support-decision.md`. The canonical TPC-DI parallel path is
+  `TPCDIBenchmark._transform_source_data_parallel`, and it raises `TPCDITransformationError`
+  naming every failed file, the same outcome as the sequential path.
+
+The outcome vocabulary, ownership rules, and containment rules above remain in force. The MCP row
+in section 2 is satisfied by the durable job `outcome` field described in
+`docs/operations/concurrency-proof-matrix.md`.
 
 ## Consequences
 

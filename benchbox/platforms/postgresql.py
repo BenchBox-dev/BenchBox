@@ -33,7 +33,6 @@ from .base.config_utils import (
     POSTGRES_FAMILY_PLATFORM_FIELDS,
     make_platform_config_builder,
 )
-from .base.connection_wrappers import StreamConnectionCapability
 from .base.data_loading import (
     CsvDialect,
     DataSourceResolver,
@@ -263,7 +262,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     plan_capture_phase_eligible = True
     default_service_port = 5432
-    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     @property
     def platform_name(self) -> str:
@@ -1044,7 +1042,7 @@ _build_postgresql_config = make_platform_config_builder(
     __name__,
     "PostgreSQL",
     "psycopg",
-    POSTGRES_FAMILY_PLATFORM_FIELDS + ("enable_timescale",),
+    POSTGRES_FAMILY_PLATFORM_FIELDS + ("enable_timescale", "statement_timeout"),
     base_options={"schema": "public"},
-    field_defaults={**POSTGRES_FAMILY_BASE_OPTIONS, "enable_timescale": False},
+    field_defaults={**POSTGRES_FAMILY_BASE_OPTIONS, "enable_timescale": False, "statement_timeout": 0},
 )

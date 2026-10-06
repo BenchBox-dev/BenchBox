@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import logging
@@ -21,7 +17,7 @@ from benchbox.core.errors import PlanCaptureError
 from benchbox.utils.cloud_storage import get_cloud_path_info, is_cloud_path
 from benchbox.utils.printing import emit
 
-from .base import DriverIsolationCapability, PlatformAdapter, StreamConnectionCapability
+from .base import DriverIsolationCapability, PlatformAdapter
 from .base.ddl_helpers import strip_foreign_keys
 
 if TYPE_CHECKING:
@@ -472,7 +468,6 @@ class DuckDBAdapter(PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.SUPPORTED
     supports_external_tables = True
     plan_capture_phase_eligible = True
-    stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
     physical_identifier_case = "lower"
     index_ddl_unsupported_reason: str | None = None
     _catalog_lookup_active: bool = False
@@ -523,9 +518,9 @@ class DuckDBAdapter(PlatformAdapter):
         return found if found is not None else super().resolve_physical_column(table_name, logical_column, connection)
 
     def get_tuning_introspector(self):
-        from benchbox.platforms.duckdb_introspection import DuckDBTuningIntrospector
+        from benchbox.platforms.base import tuning_trust
 
-        return DuckDBTuningIntrospector()
+        return tuning_trust.duckdb_tuning_introspector()
 
     @staticmethod
     def add_cli_arguments(parser) -> None:

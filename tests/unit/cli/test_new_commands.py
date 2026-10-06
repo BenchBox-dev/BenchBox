@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 import json
 import sys
 import sys as _sys
@@ -29,7 +25,6 @@ pytestmark = [
 
 class TestDatagenCommand:
     def test_datagen_command_exists(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -37,7 +32,6 @@ class TestDatagenCommand:
         assert "datagen" in result.output
 
     def test_datagen_help(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["datagen", "--help"])
 
@@ -49,7 +43,6 @@ class TestDatagenCommand:
         assert "--seed" in result.output
 
     def test_datagen_requires_benchmark_and_scale(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["datagen"])
 
@@ -59,7 +52,6 @@ class TestDatagenCommand:
 
 class TestAggregateCommand:
     def test_aggregate_command_exists(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -67,7 +59,6 @@ class TestAggregateCommand:
         assert "aggregate" in result.output
 
     def test_aggregate_help(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["aggregate", "--help"])
 
@@ -79,7 +70,6 @@ class TestAggregateCommand:
         assert "--platform" in result.output
 
     def test_aggregate_requires_input_and_output(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["aggregate"])
 
@@ -87,7 +77,6 @@ class TestAggregateCommand:
         assert "Missing option" in result.output or "required" in result.output.lower()
 
     def test_aggregate_with_empty_directory(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -99,7 +88,6 @@ class TestAggregateCommand:
             assert "No JSON result files found" in result.output
 
     def test_aggregate_success(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -138,7 +126,6 @@ class TestAggregateCommand:
 
 class TestShellCommand:
     def test_shell_command_exists(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -146,7 +133,6 @@ class TestShellCommand:
         assert "shell" in result.output
 
     def test_shell_help(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["shell", "--help"])
 
@@ -161,7 +147,6 @@ class TestShellCommand:
         assert "--output" in result.output
 
     def test_shell_no_databases_found(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -171,7 +156,6 @@ class TestShellCommand:
             assert "No databases found" in result.output
 
     def test_shell_list_flag(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -186,7 +170,6 @@ class TestShellCommand:
             assert "tpch" in result.output.lower() or "Available" in result.output
 
     def test_shell_direct_database_path(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -199,7 +182,6 @@ class TestShellCommand:
                 mock_launch.assert_called_once()
 
     def test_shell_platform_autodetect(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -212,7 +194,6 @@ class TestShellCommand:
                 mock_launch.assert_called_once()
 
     def test_shell_sqlite_autodetect(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -225,7 +206,6 @@ class TestShellCommand:
                 mock_launch.assert_called_once()
 
     def test_shell_unsupported_platform_explicit(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -238,7 +218,6 @@ class TestShellCommand:
             assert "not supported" in result.output.lower()
 
     def test_shell_benchmark_filter(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -256,7 +235,6 @@ class TestShellCommand:
             assert result.exit_code == 0
 
     def test_shell_scale_filter(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -274,7 +252,6 @@ class TestShellCommand:
             assert result.exit_code == 0
 
     def test_shell_discovers_databases_in_multiple_locations(self):
-
         from benchbox.cli.config import DirectoryManager
 
         runner = CliRunner()
@@ -298,7 +275,6 @@ class TestShellCommand:
 
 class TestMetricsCommand:
     def test_metrics_command_exists(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -306,7 +282,6 @@ class TestMetricsCommand:
         assert "metrics" in result.output
 
     def test_metrics_help(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["metrics", "--help"])
 
@@ -315,7 +290,6 @@ class TestMetricsCommand:
         assert "qphh" in result.output
 
     def test_metrics_qphh_help(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["metrics", "qphh", "--help"])
 
@@ -326,7 +300,6 @@ class TestMetricsCommand:
         assert "--scale-factor" in result.output
 
     def test_metrics_qphh_requires_both_results(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["metrics", "qphh"])
 
@@ -334,7 +307,6 @@ class TestMetricsCommand:
         assert "Missing option" in result.output or "required" in result.output.lower()
 
     def test_metrics_qphh_success(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -366,12 +338,53 @@ class TestMetricsCommand:
             )
 
             assert result.exit_code == 0
-            assert "QphH@Size" in result.output
+            assert "Power@Size" in result.output
+            assert "Throughput@Size" in result.output
+            assert "QphH@Size:" not in result.output
+
+    @pytest.mark.parametrize(
+        ("power_summary", "throughput_summary", "expected"),
+        [
+            ({"tpc_metrics": {"suppressed": True, "reason": "compliance_class=unofficial_subscale"}}, {}, "suppressed"),
+            ({}, {"queries": {"total": 44, "passed": 39, "failed": 5}}, "failed queries"),
+        ],
+    )
+    def test_metrics_qphh_refuses_suppressed_or_failed_results(self, power_summary, throughput_summary, expected):
+        runner = CliRunner()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            power_file = Path(tmpdir) / "power.json"
+            throughput_file = Path(tmpdir) / "throughput.json"
+            power_file.write_text(
+                json.dumps(
+                    {
+                        "environment": {"scale_factor": 1.0},
+                        "summary": {"tpc_metrics": {"power_at_size": 36.0}, **power_summary},
+                    }
+                )
+            )
+            throughput_file.write_text(
+                json.dumps(
+                    {
+                        "environment": {"scale_factor": 1.0},
+                        "run": {"streams": 2},
+                        "summary": {"tpc_metrics": {"throughput_at_size": 36.0}, **throughput_summary},
+                    }
+                )
+            )
+
+            result = runner.invoke(
+                cli,
+                ["metrics", "qphh", "--power-results", str(power_file), "--throughput-results", str(throughput_file)],
+            )
+
+            assert result.exit_code != 0
+            assert expected in result.output
+            assert "Throughput@Size:" not in result.output
 
 
 class TestCalculateQphhCommand:
     def test_calculate_qphh_hidden_from_help(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -379,18 +392,16 @@ class TestCalculateQphhCommand:
         assert "calculate-qphh" not in result.output
 
     def test_calculate_qphh_help(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["calculate-qphh", "--help"])
 
         assert result.exit_code == 0
-        assert "QphH" in result.output
+        assert "Power@Size" in result.output
         assert "--power-results" in result.output
         assert "--throughput-results" in result.output
         assert "--scale-factor" in result.output
 
     def test_calculate_qphh_requires_both_results(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["calculate-qphh"])
 
@@ -398,7 +409,6 @@ class TestCalculateQphhCommand:
         assert "Missing option" in result.output or "required" in result.output.lower()
 
     def test_calculate_qphh_shows_deprecation_warning(self):
-
         runner = CliRunner()
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -431,12 +441,12 @@ class TestCalculateQphhCommand:
 
             assert result.exit_code == 0
             assert "deprecated" in result.output.lower() or "DeprecationWarning" in result.output
-            assert "QphH@Size" in result.output
+            assert "Power@Size" in result.output
+            assert "QphH@Size:" not in result.output
 
 
 class TestRunOfficialFlag:
     def test_run_official_flag_in_help(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["run", "--help"])
 
@@ -445,7 +455,6 @@ class TestRunOfficialFlag:
         assert "TPC-compliant" in result.output
 
     def test_run_official_invalid_scale_factor(self):
-
         runner = CliRunner()
         result = runner.invoke(
             cli,
@@ -456,7 +465,6 @@ class TestRunOfficialFlag:
         assert "not TPC-compliant" in result.output
 
     def test_run_official_warns_on_missing_seed(self):
-
         runner = CliRunner()
 
         result = runner.invoke(
@@ -482,7 +490,6 @@ class TestRunOfficialFlag:
 
 class TestRunOfficialCommand:
     def test_run_official_hidden_from_help(self):
-
         runner = CliRunner()
         result = runner.invoke(cli, ["--help"])
 
@@ -502,7 +509,6 @@ class TestRunOfficialCommand:
         assert "--quiet" in result.output
 
     def test_run_official_shows_deprecation_warning(self):
-
         runner = CliRunner()
         result = runner.invoke(
             cli, ["run-official", "tpch", "--platform", "duckdb", "--scale", "0.5", "--phases", "power"]
@@ -511,7 +517,6 @@ class TestRunOfficialCommand:
         assert "deprecated" in result.output.lower() or "DeprecationWarning" in result.output
 
     def test_run_official_invalid_scale_factor(self):
-
         runner = CliRunner()
         result = runner.invoke(
             cli, ["run-official", "tpch", "--platform", "duckdb", "--scale", "0.5", "--phases", "power"]

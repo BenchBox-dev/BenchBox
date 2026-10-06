@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
+import importlib.util
 import json
 import sys
 from collections import Counter, defaultdict
@@ -45,6 +47,20 @@ VENDOR_SUBTREE_COMPONENT = "vendor"
 def _normalize_funding(value: object) -> str:
     token = str(value).strip().lower() if value is not None else ""
     return token if token in FUNDING_SOURCES else DEFAULT_FUNDING
+
+
+@functools.cache
+def _load_corpus_validator():
+    path = CHECKOUT_ROOT / "results-data" / "validate_corpus.py"
+    spec = importlib.util.spec_from_file_location("validate_corpus", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _cohort_phase_suffix(bundle_path: Path) -> str:
+    payload = json.loads(bundle_path.read_text(encoding="utf-8"))
+    return _load_corpus_validator().cohort_phase_suffix(payload)
 
 
 def discover_bundles(bundles_dir: Path) -> list[Path]:
@@ -194,7 +210,7 @@ def generate_inventory(bundles_dir: Path) -> dict:
     cohorts: dict[str, list[str]] = {}
     cohort_members: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
     for entry in entries:
-        key = (entry["benchmark"], str(entry["scale_factor"]))
+        key = (entry["benchmark"], str(entry["scale_factor"]) + _cohort_phase_suffix(bundles_dir / entry["file"]))
         identity = entry["platform"]
         if entry["platform_version"] != "unknown":
             identity = f"{identity} v{entry['platform_version']}"

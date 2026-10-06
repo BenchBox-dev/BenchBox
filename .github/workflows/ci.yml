@@ -1972,6 +1972,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -1996,6 +2002,7 @@ jobs:
         run: python scripts/release_canary_sharding.py verify-medium --artifacts t2-evidence --checked-sha "${{ github.sha }}"
 
       - name: Aggregate core result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2014,7 +2021,28 @@ jobs:
             --expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' || needs.ci-paths.outputs.framing-needed == 'true' }} \
             --expect datafusion-integration=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect package-smoke=${{ needs.ci-paths.outputs.packaging-needed == 'true' }} \
-            --expect dependency-audit=${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
+            --expect dependency-audit=${{ needs.ci-paths.outputs.packaging-needed == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   explorer:
     name: explorer
@@ -2022,6 +2050,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -2032,6 +2066,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate explorer result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2044,7 +2079,28 @@ jobs:
             --expect explorer-vitest=${{ needs.ci-paths.outputs.explorer-vitest-needed == 'true' }} \
             --expect parity-check=${{ needs.ci-paths.outputs.viz-needed == 'true' }} \
             --expect explorer-e2e=${{ needs.ci-paths.outputs.unit-explorer == 'true' }} \
-            --expect visual-inputs=${{ true }}
+            --expect visual-inputs=${{ true }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   results-data:
     name: results-data
@@ -2052,6 +2108,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -2062,6 +2124,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate results-data result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2070,7 +2133,28 @@ jobs:
             --unit results-data \
             --needs "$NEEDS_JSON" \
             --always ci-paths \
-            --expect results-data-check=${{ needs.ci-paths.outputs.unit-results-data == 'true' }}
+            --expect results-data-check=${{ needs.ci-paths.outputs.unit-results-data == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   docs:
     name: docs
@@ -2078,6 +2162,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -2088,6 +2178,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate docs result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2099,7 +2190,28 @@ jobs:
             --expect visual-inputs=${{ true }} \
             --expect docs-build=${{ needs.visual-inputs.outputs.changed == 'true' }} \
             --expect example-validation=${{ needs.visual-inputs.outputs.changed == 'true' }} \
-            --expect spellcheck=${{ needs.visual-inputs.outputs.changed == 'true' }}
+            --expect spellcheck=${{ needs.visual-inputs.outputs.changed == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   landing:
     name: landing
@@ -2107,6 +2219,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -2117,6 +2235,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate landing result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2127,7 +2246,28 @@ jobs:
             --always ci-paths \
             --expect site-theme-tokens=${{ needs.ci-paths.outputs.site-theme-needed == 'true' }} \
             --expect visual-inputs=${{ true }} \
-            --expect site-build=${{ needs.ci-paths.outputs.site-needed == 'true' }}
+            --expect site-build=${{ needs.ci-paths.outputs.site-needed == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   tooling:
     name: tooling
@@ -2135,6 +2275,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -2145,6 +2291,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate tooling result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2157,4 +2304,19 @@ jobs:
             --expect base-guard=${{ github.event_name == 'pull_request' }} \
             --expect content-guard=${{ needs.ci-paths.outputs.content-guard-needed == 'true' }} \
             --expect skill-integrity=${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }} \
-            --expect audit-sha=${{ needs.ci-paths.outputs.audit-paths-changed == 'true' }}
+            --expect audit-sha=${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90

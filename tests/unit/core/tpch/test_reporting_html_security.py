@@ -19,7 +19,6 @@ UNTRUSTED_WARNING = '"><script>alert("warning")</script>'
 
 def _benchmark_result(query_id: str = UNTRUSTED_QUERY_ID):
     return SimpleNamespace(
-        qphh_at_size=10.0,
         scale_factor=1.0,
         power_test=SimpleNamespace(
             power_at_size=10.0,
@@ -38,15 +37,12 @@ def _benchmark_result(query_id: str = UNTRUSTED_QUERY_ID):
 
 def _metrics() -> PerformanceMetrics:
     return PerformanceMetrics(
-        qphh_at_size=10.0,
         power_at_size=10.0,
         throughput_at_size=10.0,
         total_execution_time=1.0,
         average_query_time=1.0,
         median_query_time=1.0,
         query_time_std_dev=0.0,
-        throughput_efficiency=1.0,
-        power_efficiency=1.0,
         scale_factor=1.0,
     )
 
@@ -77,8 +73,8 @@ def test_detailed_report_escapes_title_query_id_issues_and_warnings(tmp_path):
 def test_comparison_report_escapes_title(tmp_path):
     generator = TPCHReportGenerator(tmp_path)
     comparison = ComparisonResult(
-        baseline_qphh=10.0,
-        current_qphh=11.0,
+        baseline_power_at_size=10.0,
+        current_power_at_size=11.0,
         performance_change=1.0,
         relative_change=0.1,
         significant_change=False,

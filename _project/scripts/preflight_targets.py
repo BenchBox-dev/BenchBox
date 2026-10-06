@@ -39,6 +39,11 @@ def _test_index(repo: Path) -> dict[str, list[str]]:
     return index
 
 
+EXTRA_TEST_MAP: dict[str, list[str]] = {
+    "tests/integration/platforms/common.py": ["tests/integration/test_ducklake_integration.py"],
+}
+
+
 def map_tests(repo: Path, paths: list[str]) -> list[str]:
     index = _test_index(repo)
     selected: set[str] = set()
@@ -52,6 +57,7 @@ def map_tests(repo: Path, paths: list[str]) -> list[str]:
             module = PurePosixPath(path).stem
             if module != "__init__":
                 selected.update(index.get(f"test_{module}.py", ()))
+        selected.update(EXTRA_TEST_MAP.get(path, ()))
     return sorted(selected)
 
 

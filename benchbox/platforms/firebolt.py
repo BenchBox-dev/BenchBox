@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import logging
@@ -626,6 +622,14 @@ class FireboltAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         database = connection_config.get("database", self.database)
 
         if self.deployment_mode == "core":
+            self.fail_closed_on_force_recreate(
+                platform_label="Firebolt (Core)",
+                database=database,
+                manual_hint=(
+                    "Core creates databases implicitly and offers no DROP DATABASE: drop the "
+                    "benchmark tables manually, or remove the Core data directory and restart Core"
+                ),
+            )
             self.log_verbose(f"Firebolt Core: database {database} will be recreated implicitly")
             return
 

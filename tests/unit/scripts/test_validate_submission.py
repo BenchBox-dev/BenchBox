@@ -76,6 +76,35 @@ class TestManifestProvenance:
         vr = self._run({"result_source": "vendor"}, subdir="bundles/vendor")
         assert vr.ok
 
+    def test_absent_known_defects_ok(self):
+        assert self._run({}).ok
+
+    def test_valid_known_defects_ok(self):
+        assert self._run({"known_defects": ["defective-macdbgen-addresses"]}).ok
+
+    def test_multiple_known_defects_ok(self):
+        assert self._run({"known_defects": ["defective-macdbgen-addresses", "defective-windows-dsdgen-scale"]}).ok
+
+    def test_unknown_known_defect_rejected(self):
+        vr = self._run({"known_defects": ["defective-everything"]})
+        assert not vr.ok
+        assert any("known_defects" in e for e in vr.errors)
+
+    def test_non_list_known_defects_rejected(self):
+        vr = self._run({"known_defects": "defective-macdbgen-addresses"})
+        assert not vr.ok
+        assert any("known_defects" in e for e in vr.errors)
+
+    def test_empty_known_defects_rejected(self):
+        vr = self._run({"known_defects": []})
+        assert not vr.ok
+        assert any("known_defects" in e for e in vr.errors)
+
+    def test_non_string_known_defect_member_rejected(self):
+        vr = self._run({"known_defects": ["defective-macdbgen-addresses", 7]})
+        assert not vr.ok
+        assert any("known_defects" in e for e in vr.errors)
+
 
 def _minimal_bundle() -> dict:
     return {

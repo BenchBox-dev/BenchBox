@@ -18,6 +18,21 @@ from pathlib import Path
 from typing import Any
 
 from benchbox.core.expected_results.loader import TpcdsAnswerBlock, parse_tpcds_answer_values
+from benchbox.core.tpcds.qualification.classification import (
+    CHAR_PADDING,
+    DISPLAY_PRECISION,
+    FLOAT_DETAIL,
+    HALF_BOUNDARY_ROUNDING,
+    KNOWN,
+    MALFORMED_OFFICIAL_ANSWER,
+    NULL_ORDER_VARIANT,
+    RETURNS_DIFFERENCE,
+    TIED_ORDER,
+    KnownDifference,
+    gate,
+    printed_classification,
+    rows_digest,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 _INPUTS = Path(__file__).with_name("inputs.json")
@@ -193,6 +208,173 @@ def _display_cell(value: Any, text: str | None, sql_type: str, null_tokens: list
     if printed in {actual.quantize(step, ROUND_HALF_UP), actual.quantize(step, ROUND_HALF_EVEN)}:
         return convert_cell(text, sql_type, null_tokens)
     return value
+
+
+_HALF_BOUNDARY_RELATIVE = Decimal("1e-12")
+_FLOAT_DETAIL_RELATIVE = Decimal("1e-8")
+_CHAR_PADDING_WIDTH = 30
+
+
+def _printed_step(text: str) -> tuple[Decimal, Decimal] | None:
+    try:
+        printed = Decimal(text)
+    except InvalidOperation:
+        return None
+    exponent = printed.as_tuple().exponent
+    if not printed.is_finite() or not isinstance(exponent, int):
+        return None
+    return printed, Decimal(1).scaleb(exponent)
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float, Decimal)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _half_boundary_cell(value: Any, text: str | None, sql_type: str, null_tokens: list[str]) -> Any:
+    if (
+        text is None
+        or text in null_tokens
+        or not _is_number(value)
+        or not sql_type.upper().startswith(("DECIMAL(", "DOUBLE"))
+    ):
+        return value
+    parsed = _printed_step(text)
+    if parsed is None:
+        return value
+    printed, step = parsed
+    actual = Decimal(str(value))
+    if abs(abs(actual - printed) - step / 2) <= _HALF_BOUNDARY_RELATIVE * max(abs(actual), Decimal(1)):
+        return convert_cell(text, sql_type, null_tokens)
+    return value
+
+
+def _float_detail_cell(value: Any, text: str | None, sql_type: str, null_tokens: list[str]) -> Any:
+    if text is None or text in null_tokens or not _is_number(value) or not sql_type.upper().startswith("DOUBLE"):
+        return value
+    parsed = _printed_step(text)
+    if parsed is None or parsed[0] == 0:
+        return value
+    printed = parsed[0]
+    if abs(Decimal(str(value)) - printed) <= _FLOAT_DETAIL_RELATIVE * abs(printed):
+        return convert_cell(text, sql_type, null_tokens)
+    return value
+
+
+def _char_padding_cell(value: Any, text: str | None) -> Any:
+    if not isinstance(value, str) or text is None or ", " not in value:
+        return value
+    last, first = value.split(", ", 1)
+    if text.rstrip() == f"{last.ljust(_CHAR_PADDING_WIDTH)}, {first}".rstrip():
+        return text
+    return value
+
+
+def _half_up_ratio_cell(row: tuple[Any, ...], text: str | None, ratio: tuple[int, int, int, int]) -> Any:
+    target, numerator, denominator, places = ratio
+    if text is None or not (_is_number(row[numerator]) and _is_number(row[denominator])) or not row[denominator]:
+        return row[target]
+    exact = (Decimal(str(row[numerator])) / Decimal(str(row[denominator]))).quantize(
+        Decimal(1).scaleb(-places), ROUND_HALF_UP
+    )
+    parsed = _printed_step(text)
+    if parsed is not None and parsed[0] == exact:
+        return float(exact)
+    return row[target]
+
+
+def _tie_distance(actual: tuple[Any, ...], expected: tuple[Any, ...], key: tuple[int, ...]) -> float:
+    total = 0.0
+    for index, (left, right) in enumerate(zip(actual, expected, strict=True)):
+        if index in key:
+            continue
+        if _is_number(left) and _is_number(right):
+            total += abs(float(left) - float(right)) / (1 + abs(float(right)))
+        elif left != right:
+            total += 1.0
+    return total
+
+
+def _align_tied_runs(
+    rows: list[tuple[Any, ...]], expected: list[tuple[Any, ...]], key: tuple[int, ...]
+) -> list[tuple[Any, ...]]:
+    aligned = list(rows)
+    start = 0
+    while start < len(expected):
+        end = start + 1
+        while end < len(expected) and all(expected[end][i] == expected[start][i] for i in key):
+            end += 1
+        if end - start > 1 and all(rows[p][i] == expected[start][i] for p in range(start, end) for i in key):
+            pool = list(range(start, end))
+            for target in range(start, end):
+                best = min(pool, key=lambda p: _tie_distance(rows[p], expected[target], key))
+                pool.remove(best)
+                aligned[target] = rows[best]
+        start = end
+    return aligned
+
+
+def classified_rows(
+    rows: list[tuple[Any, ...]],
+    expected: list[tuple[Any, ...]],
+    answer: dict[str, Any],
+    sql_types: list[str],
+    entry: KnownDifference,
+    classes: tuple[str, ...],
+) -> list[tuple[Any, ...]]:
+    if len(rows) != len(answer["rows"]):
+        return rows
+    if TIED_ORDER in classes:
+        rows = _align_tied_runs(rows, expected, entry.tie_key)
+    null_tokens = answer["null_tokens"]
+    result = []
+    for row, printed in zip(rows, answer["rows"], strict=True):
+        cells = []
+        for index, (value, text, kind) in enumerate(zip(row, printed, sql_types, strict=True)):
+            replaced = value
+            if DISPLAY_PRECISION in classes:
+                replaced = _display_cell(replaced, text, kind, null_tokens)
+            if replaced is value and index in entry.columns:
+                if HALF_BOUNDARY_ROUNDING in classes:
+                    replaced = _half_boundary_cell(replaced, text, kind, null_tokens)
+                if FLOAT_DETAIL in classes and replaced is value:
+                    replaced = _float_detail_cell(replaced, text, kind, null_tokens)
+                if CHAR_PADDING in classes and replaced is value:
+                    replaced = _char_padding_cell(replaced, text)
+            if replaced is value and HALF_BOUNDARY_ROUNDING in classes and entry.ratio and index == entry.ratio[0]:
+                replaced = _half_up_ratio_cell(row, text, entry.ratio)
+            cells.append(replaced)
+        result.append(tuple(cells))
+    return result
+
+
+def side_classification(
+    entry: KnownDifference | None,
+    item: dict[str, Any],
+    side: str,
+    rows: list[tuple[Any, ...]],
+    expected: list[tuple[Any, ...]],
+    answer: dict[str, Any],
+    sql_types: list[str],
+    query: str,
+    sql: str,
+    columns: list[tuple[str, str]],
+) -> dict[str, str] | None:
+    if entry is None or item[f"{side}_to_printed"]["status"] == "match":
+        return None
+    if entry.result_digest is not None and answer["null_order"] != "first" and rows_digest(rows) == entry.result_digest:
+        return {"class": RETURNS_DIFFERENCE}
+    if item[f"{side}_to_printed_display"]["status"] == "match" and DISPLAY_PRECISION in entry.classes:
+        return {"class": DISPLAY_PRECISION}
+    for count in range(1, len(entry.classes) + 1):
+        classes = entry.classes[:count]
+        if RETURNS_DIFFERENCE in classes or MALFORMED_OFFICIAL_ANSWER in classes:
+            break
+        transformed = classified_rows(rows, expected, answer, sql_types, entry, classes)
+        if compare_rows(expected, transformed, query, sql, columns)["status"] == "match":
+            return {"class": classes[-1]}
+    if answer["file"] in entry.variant_files and answer["null_order"] == "first":
+        return {"class": NULL_ORDER_VARIANT}
+    return None
 
 
 def compare_rows(
@@ -384,6 +566,7 @@ def worker(job: Path, engine: str, events: Path, data_dir: Path) -> int:
                 parity = compare_rows(reference, candidate, query, sql, columns)
                 comparisons = []
                 answer_error = False
+                entry = KNOWN.get(query)
                 for answer in prepared["answers"][query]:
                     try:
                         expected = convert_rows(answer, types)
@@ -396,6 +579,8 @@ def worker(job: Path, engine: str, events: Path, data_dir: Path) -> int:
                                 "null_order": answer["null_order"],
                                 "status": "error",
                                 "detail": str(exc),
+                                "official_columns": len(answer["columns"]),
+                                "sql_columns": len(types),
                             }
                         )
                         continue
@@ -411,6 +596,11 @@ def worker(job: Path, engine: str, events: Path, data_dir: Path) -> int:
                             item[f"{side}_to_printed_display"] = compare_rows(
                                 expected, display_rounded(rows, answer, types), query, sql, columns
                             )
+                            label = side_classification(
+                                entry, item, side, rows, expected, answer, types, query, sql, columns
+                            )
+                            if label is not None:
+                                item[f"{side}_classification"] = label
                     comparisons.append(item)
                 matched = (
                     not answer_error
@@ -421,7 +611,11 @@ def worker(job: Path, engine: str, events: Path, data_dir: Path) -> int:
                         for item in comparisons
                     )
                 )
-                failed |= not matched
+                status = "error" if answer_error else "match" if matched else "mismatch"
+                classification = printed_classification(query, status, comparisons)
+                nonempty = any(value is not None for row in reference for value in row)
+                verdict = gate(query, status, parity, classification, nonempty)
+                failed |= verdict["status"] == "fail"
                 emit(
                     events,
                     {
@@ -436,7 +630,10 @@ def worker(job: Path, engine: str, events: Path, data_dir: Path) -> int:
                         "elapsed_seconds": elapsed_seconds(started),
                         "dataframe_to_sql": parity,
                         "official_files": comparisons,
-                        "status": "error" if answer_error else "match" if matched else "mismatch",
+                        "status": status,
+                        "sql_nonempty": nonempty,
+                        "printed_classification": classification,
+                        "gate": verdict,
                     },
                 )
             except Exception as exc:
@@ -450,6 +647,7 @@ def worker(job: Path, engine: str, events: Path, data_dir: Path) -> int:
                         "status": "error",
                         "detail": str(exc),
                         "elapsed_seconds": elapsed_seconds(started),
+                        "gate": {"status": "fail", "failures": ["execution_error"]},
                     },
                 )
     finally:

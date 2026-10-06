@@ -187,16 +187,20 @@ execution:
     max_concurrent: 4
     query_timeout_seconds: 600
     stream_timeout_seconds: 7200
+    cancel_on_timeout: true
     retry_failed_queries: true
     max_retries: 5
 ```
 
-- `enabled`: enable concurrent execution.
-- `max_concurrent`: the maximum number of concurrent streams. The default is 2.
-- `query_timeout_seconds`: the timeout for an individual query. The default is 300.
-- `stream_timeout_seconds`: the timeout for a whole stream. The default is 3600.
-- `retry_failed_queries`: retry failed queries. The default is true.
-- `max_retries`: the maximum number of retry attempts. The default is 3.
+Defaults: `enabled` false, `max_concurrent` 2, `query_timeout_seconds` 300,
+`stream_timeout_seconds` unset (3600 for TPC-H, 7200 for TPC-DS),
+`cancel_on_timeout` false, `retry_failed_queries` true, `max_retries` 3.
+
+`stream_timeout_seconds` and `cancel_on_timeout` apply to the `throughput`
+phase of `benchbox run`: a value in the config file reaches every TPC-H and
+TPC-DS throughput stream. Leave `stream_timeout_seconds` out to keep the
+per-benchmark default. The other `concurrent_queries` settings are read by the
+`ExecutionConfigHelper` API only; `benchbox run` does not use them.
 
 ### Usage Examples
 

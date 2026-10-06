@@ -375,18 +375,22 @@ queries above, so don't compare those queries one for one with newer results.
 
 ## Official TPC-DS Metrics
 
-BenchBox computes the TPC-DS composite metric family when the `power`, `throughput`,
-and `maintenance` phases run successfully. Values are surfaced in the executive
-summary (`Power@Size`, `Throughput@Size`, `QphDS@Size`) and in the JSON results.
+BenchBox exports Power\@Size and Throughput\@Size when the `power` and `throughput`
+phases run successfully. Values are surfaced in the JSON results.
 
-| Metric               | Meaning                                                       | Source                                                    |
-| -------------------- | ------------------------------------------------------------- | --------------------------------------------------------- |
-| **Power\@Size**      | Single-stream power test throughput at the given scale factor | `power_at_size` - computed from the 99-query power stream |
-| **Throughput\@Size** | Multi-stream throughput at the given scale factor             | `throughput_at_size` - computed across parallel streams   |
-| **QphDS\@Size**      | Final composite metric: `sqrt(Power@Size × Throughput@Size)`  | `qphds_at_size` - the headline figure                     |
+| Metric               | Meaning                                                                             | Source                                                    |
+| -------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **Power\@Size**      | Single-stream power test throughput at the given scale factor                       | `power_at_size` - computed from the 99-query power stream |
+| **Throughput\@Size** | Multi-stream throughput at the given scale factor, scored with `Q = 99 × S` queries | `throughput_at_size` - computed across parallel streams   |
 
-Implementation: `benchbox/core/tpcds/reporting.py` (surfacing) and
-`benchbox/core/tpcds/power_test.py` / `TPCMetricsCalculator` (computation).
+BenchBox does not export QphDS\@Size. The specification formula is
+`SF × Q / (T_PT × T_TT × T_DM × T_LD)^(1/4)` with `Q = 99 × S`, and it needs
+the data maintenance and load times. The geometric mean of Power\@Size and
+Throughput\@Size that BenchBox previously exported under this name is not
+that metric. Implementing the specification formula is tracked as follow-up
+work.
+
+Implementation: `benchbox/core/tpcds/power_test.py` / `TPCMetricsCalculator` (computation).
 
 ### Throughput Permutation
 

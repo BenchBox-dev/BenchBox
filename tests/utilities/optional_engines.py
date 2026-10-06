@@ -26,6 +26,20 @@ def chdb_skip_reason() -> str | None:
             return "chDB not installed"
         return f"chDB is installed but a dependency is missing: {_first_line(exc)}"
     except (ImportError, OSError) as exc:
+        # Match against the full exception text, not the truncated first
+        # line: long venv paths can push the LINKEDIT verdict past the
+        # _MAX_REASON_CHARS cutoff and hide the diagnosis.
+        if "mis-aligned LINKEDIT" in str(exc):
+            # The OS loader rejects the published chdb wheel build (observed
+            # on macOS 27 for both the pinned chdb 4.1.6 and 4.4.0 with
+            # chdb-core 26.9.0). Name the cause and the remedies
+            # instead of echoing the local venv path from the dlopen error.
+            return (
+                "chDB is installed but its native library cannot be loaded: "
+                "this macOS release's loader rejects the published chdb wheel "
+                "build (mis-aligned LINKEDIT string pool); run these tests on "
+                "Linux CI or use a ClickHouse server backend on this host"
+            )
         return f"chDB is installed but its native library cannot be loaded: {_first_line(exc)}"
 
     if not hasattr(module, "connect"):

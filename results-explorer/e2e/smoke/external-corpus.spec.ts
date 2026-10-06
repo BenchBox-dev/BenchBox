@@ -69,7 +69,12 @@ test.describe("External corpus smoke", () => {
 
   test("@uat-external-corpus renders throughput phase and stream data from mounted bundle", async ({ page }) => {
     const maybeSeed = discoverThroughputSeed();
-    test.skip(maybeSeed === null, "mounted corpus has no throughput bundle");
+    const requiredStreams = requiredThroughputStreams();
+    if (requiredStreams !== null) {
+      expect(maybeSeed, "mounted corpus has no throughput bundle").not.toBeNull();
+    } else {
+      test.skip(maybeSeed === null, "mounted corpus has no throughput bundle");
+    }
     const seed: CorpusRouteSeed = maybeSeed as CorpusRouteSeed;
 
     await page.goto(`/results/r/${seed.resultId}`);
@@ -83,7 +88,11 @@ test.describe("External corpus smoke", () => {
     const receipt = page.locator("#run-receipt");
     await expect(receipt.getByText("throughput", { exact: true }).first()).toBeVisible();
 
-    expect(seed.streamValues.length).toBeGreaterThanOrEqual(2);
+    if (requiredStreams !== null) {
+      expect(seed.streamValues).toHaveLength(requiredStreams);
+    } else {
+      expect(seed.streamValues.length).toBeGreaterThanOrEqual(2);
+    }
     await expect(page.getByText(`Individual samples (${seed.executionRows})`)).toBeVisible();
     await page.getByText(`Individual samples (${seed.executionRows})`).click();
     for (const stream of seed.streamValues.slice(0, 2)) {
@@ -130,6 +139,16 @@ function discoverExternalCorpusSeed(): CorpusRouteSeed {
   }
   if (!first) throw new Error(`external corpus has no routable benchmark/platform bundles: ${bundlesDir}`);
   return first;
+}
+
+function requiredThroughputStreams(): number | null {
+  const raw = process.env.E2E_REQUIRE_THROUGHPUT_STREAMS;
+  if (raw === undefined || raw === "") return null;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 2) {
+    throw new Error(`E2E_REQUIRE_THROUGHPUT_STREAMS must be an integer >= 2, got ${JSON.stringify(raw)}`);
+  }
+  return value;
 }
 
 function discoverThroughputSeed(): CorpusRouteSeed | null {

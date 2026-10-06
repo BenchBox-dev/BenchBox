@@ -1,13 +1,9 @@
-import contextlib
-import functools
 import sys
-from collections.abc import Iterator
 
 import click
 
 from benchbox.cli.commands.run import PlatformOptionParamType, run
 from benchbox.cli.composite_params import ValidationConfig
-from benchbox.cli.orchestrator import BenchmarkOrchestrator
 from benchbox.cli.shared import console
 from benchbox.core.run_service import (
     TPC_ALLOWED_SCALE_FACTORS,
@@ -16,33 +12,7 @@ from benchbox.core.run_service import (
 )
 
 
-@contextlib.contextmanager
-def _forward_requested_streams(streams: int | None) -> Iterator[None]:
-    if not streams:
-        yield
-        return
-
-    original = BenchmarkOrchestrator.execute_benchmark
-
-    @functools.wraps(original)
-    def _patched(self, *args, **kwargs):
-        config = args[0] if args else kwargs["config"]
-        config.concurrency = streams
-        return original(self, *args, **kwargs)
-
-    BenchmarkOrchestrator.execute_benchmark = _patched
-    try:
-        yield
-    finally:
-        BenchmarkOrchestrator.execute_benchmark = original
-
-
-@click.command(
-    "run-official",
-    hidden=True,
-    deprecated=True,
-    help=("Run TPC-compliant official benchmark tests. Deprecated; use `benchbox run --official`."),
-)
+@click.command("run-official", hidden=True, deprecated=True)
 @click.argument("benchmark", type=click.Choice(["tpch", "tpcds"], case_sensitive=False))
 @click.option("--platform", type=str, required=True, help="Platform to run on")
 @click.option("--scale", type=float, required=True, help="TPC scale factor")

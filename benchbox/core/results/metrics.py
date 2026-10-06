@@ -1,7 +1,3 @@
-# Copyright 2026 Joe Harris / BenchBox Project
-
-# Licensed under the MIT License. See LICENSE file in the project root for details.
-
 from __future__ import annotations
 
 import math
@@ -12,6 +8,11 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 NAMED_METRICS = ("geometric_mean", "p50", "p95", "p99", "total_time", "mean")
+
+NON_POWER_TEST_TYPES = frozenset({"throughput", "maintenance"})
+UNOFFICIAL_COMPLIANCE_CLASSES = frozenset({"unofficial_subscale", "unofficial_nonstandard"})
+TPC_QUERIES_PER_STREAM = {"tpch": 22, "tpcds": 99}
+_TPC_BENCHMARK_LABELS = {"tpch": "TPC-H", "tpcds": "TPC-DS"}
 
 
 def percentile_ms(times_ms: Sequence[float], p: float) -> float:
@@ -90,13 +91,6 @@ class TPCMetricsCalculator:
         return (total_queries * scale_factor * 3600) / total_time_seconds
 
     @staticmethod
-    def calculate_qph(power_at_size: float, throughput_at_size: float) -> float:
-        if power_at_size <= 0 or throughput_at_size <= 0:
-            return 0.0
-
-        return statistics.geometric_mean([power_at_size, throughput_at_size])
-
-    @staticmethod
     def calculate_geometric_mean(times: Sequence[float]) -> float:
         return geometric_mean_ms(times)
 
@@ -108,8 +102,12 @@ class TPCMetricsCalculator:
     ) -> float:
         if scale_factor is not None:
             return scale_factor
-        sf_power = power_data.get("environment", {}).get("scale_factor")
-        sf_throughput = throughput_data.get("environment", {}).get("scale_factor")
+        sf_power = power_data.get("environment", {}).get("scale_factor") or power_data.get("benchmark", {}).get(
+            "scale_factor"
+        )
+        sf_throughput = throughput_data.get("environment", {}).get("scale_factor") or throughput_data.get(
+            "benchmark", {}
+        ).get("scale_factor")
         if sf_power and sf_throughput:
             if sf_power != sf_throughput:
                 raise ValueError(f"Scale factor mismatch: power={sf_power}, throughput={sf_throughput}")
@@ -117,47 +115,72 @@ class TPCMetricsCalculator:
         raise ValueError("Could not auto-detect scale factor. Please specify --scale-factor")
 
     @staticmethod
+    def metrics_refusal_reason(data: dict, label: str) -> str | None:
+        summary = data.get("summary", {})
+        tpc_metrics = summary.get("tpc_metrics") or {}
+        if tpc_metrics.get("suppressed"):
+            return f"{label} results have suppressed TPC metrics ({tpc_metrics.get('reason', 'suppressed')})"
+        compliance_class = (data.get("benchmark") or {}).get("compliance_class")
+        if compliance_class in UNOFFICIAL_COMPLIANCE_CLASSES:
+            return f"{label} results are {compliance_class} and carry no official TPC metrics"
+        failed = (summary.get("queries") or {}).get("failed") or 0
+        if failed:
+            return f"{label} results contain {failed} failed queries"
+        throughput_phase = (data.get("phases") or {}).get("throughput_test") or {}
+        if throughput_phase.get("status") == "FAILED":
+            return f"{label} results have a failed throughput phase"
+        return None
+
+    @staticmethod
     def derive_tpc_metrics(
         power_data: dict,
         throughput_data: dict,
         scale_factor: float,
     ) -> tuple[float | None, float | None, float | None, float | None]:
+        for label, data in (("Power", power_data), ("Throughput", throughput_data)):
+            reason = TPCMetricsCalculator.metrics_refusal_reason(data, label)
+            if reason:
+                raise ValueError(reason)
+
         power_metrics = power_data.get("summary", {}).get("tpc_metrics", {})
         throughput_metrics = throughput_data.get("summary", {}).get("tpc_metrics", {})
-
-        power_time_ms = power_data.get("summary", {}).get("timing", {}).get("total_ms")
-        throughput_time_ms = throughput_data.get("summary", {}).get("timing", {}).get("total_ms")
-        power_time = (power_time_ms / 1000.0) if power_time_ms else None
-        throughput_time = (throughput_time_ms / 1000.0) if throughput_time_ms else None
-
         power_at_size = power_metrics.get("power_at_size")
         throughput_at_size = throughput_metrics.get("throughput_at_size")
 
-        compliance_class = power_data.get("benchmark", {}).get("compliance_class")
-        is_subscale = compliance_class == "unofficial_subscale"
+        power_times = TPCMetricsCalculator._final_power_iteration_times(power_data)
+        power_time = sum(power_times) if power_times else None
+        if power_at_size is None and power_times:
+            power_at_size = TPCMetricsCalculator.calculate_power_at_size(power_times, scale_factor)
 
-        if power_at_size is None or throughput_at_size is None:
-            if power_at_size is None and not is_subscale:
-                power_query_times = [
-                    q["ms"] / 1000.0
-                    for q in power_data.get("queries", [])
-                    if q.get("run_type") == "measurement" and q.get("status") == "SUCCESS"
-                ]
-                if power_query_times:
-                    power_at_size = TPCMetricsCalculator.calculate_power_at_size(power_query_times, scale_factor)
-            if throughput_at_size is None and not is_subscale:
-                t_summary = throughput_data.get("summary", {}).get("queries", {})
-                total_queries = t_summary.get("total")
-                t_time_ms = throughput_data.get("summary", {}).get("timing", {}).get("total_ms")
-                if total_queries and t_time_ms:
-                    num_streams = throughput_data.get("run", {}).get("streams", 1)
-                    throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
-                        total_queries,
-                        t_time_ms / 1000.0,
-                        scale_factor,
-                        num_streams,
-                    )
+        phase = (throughput_data.get("phases") or {}).get("throughput_test") or {}
+        duration_ms = phase.get("duration_ms")
+        throughput_time = duration_ms / 1000.0 if duration_ms else None
+        if throughput_at_size is None and throughput_time and phase.get("status") == "COMPLETED":
+            num_streams = len(phase.get("stream_results") or []) or throughput_data.get("run", {}).get("streams") or 1
+            per_stream = TPC_QUERIES_PER_STREAM.get(throughput_data.get("benchmark", {}).get("id"))
+            if per_stream:
+                throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
+                    per_stream * num_streams,
+                    throughput_time,
+                    scale_factor,
+                    num_streams,
+                )
         return power_at_size, throughput_at_size, power_time, throughput_time
+
+    @staticmethod
+    def _final_power_iteration_times(power_data: dict) -> list[float]:
+        rows = [
+            q
+            for q in power_data.get("queries", [])
+            if q.get("run_type") == "measurement"
+            and q.get("status") == "SUCCESS"
+            and q.get("test_type") not in NON_POWER_TEST_TYPES
+            and q.get("ms")
+        ]
+        if not rows:
+            return []
+        final_iteration = max(q.get("iter") or 0 for q in rows)
+        return [q["ms"] / 1000.0 for q in rows if (q.get("iter") or 0) == final_iteration]
 
     @staticmethod
     def compute_qphh_result(
@@ -171,19 +194,21 @@ class TPCMetricsCalculator:
         )
         if power_at_size is None or throughput_at_size is None:
             raise ValueError("Could not derive Power@Size or Throughput@Size from result data")
-        num_streams = throughput_data.get("run", {}).get("streams") or throughput_data.get("environment", {}).get(
-            "num_streams", 1
+        throughput_phase = (throughput_data.get("phases") or {}).get("throughput_test") or {}
+        num_streams = (
+            len(throughput_phase.get("stream_results") or [])
+            or throughput_data.get("run", {}).get("streams")
+            or throughput_data.get("environment", {}).get("num_streams", 1)
         )
-        qphh_at_size = TPCMetricsCalculator.calculate_qph(power_at_size, throughput_at_size)
+        benchmark = throughput_data.get("benchmark", {})
         return {
-            "benchmark": "TPC-H",
+            "benchmark": benchmark.get("name") or _TPC_BENCHMARK_LABELS.get(benchmark.get("id"), "TPC"),
             "scale_factor": sf,
             "num_streams": num_streams,
             "power_test_time": power_time,
             "throughput_test_time": throughput_time,
             "power_at_size": power_at_size,
             "throughput_at_size": throughput_at_size,
-            "qphh_at_size": qphh_at_size,
         }
 
 

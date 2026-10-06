@@ -43,6 +43,8 @@ class ThroughputStreamResult:
     query_results: list[dict[str, Any]] = field(default_factory=list)
     success: bool = True
     error: Optional[str] = None
+    start_wall_time: str = ""
+    end_wall_time: str = ""
 
 
 @dataclass

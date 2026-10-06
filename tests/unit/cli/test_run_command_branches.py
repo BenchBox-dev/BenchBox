@@ -14,6 +14,8 @@ from benchbox.cli.run_resolution import ResolvedRunPlan, RunRequest
 
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
+__import__("benchbox.cli.run_platform_resolution")
+_platform_module = _sys.modules["benchbox.cli.run_platform_resolution"]
 
 pytestmark = [
     pytest.mark.unit,
@@ -810,7 +812,7 @@ class TestRunCommandBranchCoverage:
     def test_platform_option_parse_error_logs_and_exits(self):
         from benchbox.cli.commands.run import PlatformOptionError, run
 
-        with patch.object(_run_module.PlatformHookRegistry, "parse_options") as parse_options:
+        with patch.object(_platform_module.PlatformHookRegistry, "parse_options") as parse_options:
             parse_options.side_effect = PlatformOptionError("invalid option")
             result = self.runner.invoke(
                 run,
@@ -978,7 +980,7 @@ class TestPlatformDeploymentSelectorAvailability:
         s.ctx.exit.side_effect = SystemExit
         printed = MagicMock()
         with (
-            patch.object(_run_module, "console", printed),
+            patch.object(_platform_module, "console", printed),
             patch(
                 "benchbox.core.platform_registry.PlatformRegistry.get_platform_availability",
                 return_value=available,
@@ -1114,6 +1116,6 @@ class TestPlatformDeploymentSelectorAvailability:
     def test_benchmark_gate_applies_to_the_resolved_platform(self, platform_key: str):
         s = SimpleNamespace(platform_key=platform_key, benchmark="metadata_primitives", logger=None, ctx=MagicMock())
         printed = MagicMock()
-        with patch.object(_run_module, "console", printed):
+        with patch.object(_platform_module, "console", printed):
             _run_module._check_benchmark_platform_compatibility(s)
         s.ctx.exit.assert_called_once_with(1)

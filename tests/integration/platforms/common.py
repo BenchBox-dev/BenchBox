@@ -165,8 +165,8 @@ def install_databricks_stub(monkeypatch, *, catalog: str = "main", schema: str =
     try:
         import benchbox.platforms.databricks.adapter as adapter_module
 
-        adapter_module.databricks_sql = sql_module
-        adapter_module.DatabricksConnection = _DatabricksConnection
+        monkeypatch.setattr(adapter_module, "databricks_sql", sql_module)
+        monkeypatch.setattr(adapter_module, "DatabricksConnection", _DatabricksConnection, raising=False)
     except ImportError:  # pragma: no cover
         pass
 
@@ -510,9 +510,9 @@ def install_redshift_stubs(
     try:
         import benchbox.platforms.redshift as adapter_module
 
-        adapter_module.redshift_connector = redshift_module
-        adapter_module.psycopg = psycopg_module
-        adapter_module.boto3 = boto3_module
+        monkeypatch.setattr(adapter_module, "redshift_connector", redshift_module)
+        monkeypatch.setattr(adapter_module, "psycopg", psycopg_module)
+        monkeypatch.setattr(adapter_module, "boto3", boto3_module)
     except ImportError:  # pragma: no cover
         pass
 
@@ -601,9 +601,9 @@ def install_snowflake_stub(monkeypatch) -> SnowflakeStubState:
     try:
         import benchbox.platforms.snowflake as adapter_module
 
-        adapter_module.snowflake = root_module
-        adapter_module.DictCursor = None
-        adapter_module.SnowflakeError = errors_module.Error
+        monkeypatch.setattr(adapter_module, "snowflake", root_module)
+        monkeypatch.setattr(adapter_module, "DictCursor", None)
+        monkeypatch.setattr(adapter_module, "SnowflakeError", errors_module.Error, raising=False)
     except ImportError:  # pragma: no cover
         pass
 
@@ -781,9 +781,9 @@ def install_athena_stubs(
     try:
         import benchbox.platforms.athena as adapter_module
 
-        adapter_module.boto3 = boto3_module
-        adapter_module.athena_connect = athena_connect
-        adapter_module.AthenaCursor = _AthenaCursor
+        monkeypatch.setattr(adapter_module, "boto3", boto3_module)
+        monkeypatch.setattr(adapter_module, "athena_connect", athena_connect)
+        monkeypatch.setattr(adapter_module, "AthenaCursor", _AthenaCursor, raising=False)
     except ImportError:  # pragma: no cover
         pass
 
@@ -998,8 +998,8 @@ def install_trino_stub(
     try:
         import benchbox.platforms.trino as adapter_module
 
-        adapter_module.trino = trino_module
-        adapter_module.BasicAuthentication = BasicAuthentication
+        monkeypatch.setattr(adapter_module, "trino", trino_module)
+        monkeypatch.setattr(adapter_module, "BasicAuthentication", BasicAuthentication)
     except ImportError:  # pragma: no cover
         pass
 
@@ -1101,8 +1101,8 @@ def install_presto_stub(
     try:
         import benchbox.platforms.presto as adapter_module
 
-        adapter_module.prestodb = prestodb_module
-        adapter_module.PrestoBasicAuthentication = PrestoBasicAuthentication
+        monkeypatch.setattr(adapter_module, "prestodb", prestodb_module)
+        monkeypatch.setattr(adapter_module, "PrestoBasicAuthentication", PrestoBasicAuthentication)
     except ImportError:  # pragma: no cover
         pass
 
@@ -1204,7 +1204,7 @@ def install_postgresql_stub(
     try:
         import benchbox.platforms.postgresql as adapter_module
 
-        adapter_module.psycopg = psycopg_module
+        monkeypatch.setattr(adapter_module, "psycopg", psycopg_module)
     except ImportError:  # pragma: no cover
         pass
 
@@ -2118,8 +2118,8 @@ def install_doris_stub(
     try:
         import benchbox.platforms.doris as adapter_module
 
-        adapter_module.pymysql = pymysql_module
-        adapter_module._requests = None
+        monkeypatch.setattr(adapter_module, "pymysql", pymysql_module)
+        monkeypatch.setattr(adapter_module, "_requests", None)
     except ImportError:  # pragma: no cover
         pass
 

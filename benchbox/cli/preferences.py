@@ -49,7 +49,7 @@ def save_last_run_config(
     scale: float,
     tuning_mode: str,
     phases: Optional[list[str]] = None,
-    concurrency: int = 1,
+    concurrency: Optional[int] = None,
     compress_data: bool = True,
     compression_type: str = "zstd",
     compression_level: Optional[int] = None,
@@ -203,8 +203,8 @@ def format_last_run_summary(config: dict[str, Any]) -> str:
     if table_mode != "native":
         parts.append(f"tables: {table_mode}")
 
-    concurrency = config.get("concurrency", 1)
-    if concurrency > 1:
+    concurrency = config.get("concurrency")
+    if concurrency is not None and concurrency > 1:
         parts.append(f"{concurrency} streams")
 
     iterations = config.get("iterations")
@@ -226,7 +226,7 @@ def save_favorite_config(
     scale: float,
     tuning_mode: str,
     phases: Optional[list[str]] = None,
-    concurrency: int = 1,
+    concurrency: Optional[int] = None,
     description: Optional[str] = None,
 ) -> None:
     favorites_path = get_preferences_dir() / "favorites.yaml"

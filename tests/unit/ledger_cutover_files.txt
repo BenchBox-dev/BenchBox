@@ -18,6 +18,18 @@ tests/unit/scripts/explorer_pipeline/test_read_model_contract.py
 tests/unit/scripts/explorer_pipeline/test_result_id_contract.py
 tests/unit/scripts/explorer_pipeline/test_transformer.py
 tests/unit/scripts/explorer_pipeline/test_visible_metrics_registry.py
+tests/unit/scripts/oracle_reviewers/test_absence.py
+tests/unit/scripts/oracle_reviewers/test_attempts.py
+tests/unit/scripts/oracle_reviewers/test_brief.py
+tests/unit/scripts/oracle_reviewers/test_classifier.py
+tests/unit/scripts/oracle_reviewers/test_cli_plan.py
+tests/unit/scripts/oracle_reviewers/test_commands.py
+tests/unit/scripts/oracle_reviewers/test_github.py
+tests/unit/scripts/oracle_reviewers/test_policy.py
+tests/unit/scripts/oracle_reviewers/test_retry.py
+tests/unit/scripts/oracle_reviewers/test_runner.py
+tests/unit/scripts/oracle_reviewers/test_selection.py
+tests/unit/scripts/oracle_reviewers/test_verdict.py
 tests/unit/scripts/publication/test_acquire_canary_evidence.py
 tests/unit/scripts/publication/test_artifacts.py
 tests/unit/scripts/publication/test_assembler.py
@@ -161,6 +173,7 @@ tests/unit/workflows/test_corpus_event_bridge.py
 tests/unit/workflows/test_corpus_trust_boundary.py
 tests/unit/workflows/test_docker_integration_workflow.py
 tests/unit/workflows/test_nightly_t3_workflow.py
+tests/unit/workflows/test_oracle_review_shadow_workflow.py
 tests/unit/workflows/test_oracle_review_workflow.py
 tests/unit/workflows/test_public_site_visual_workflow.py
 tests/unit/workflows/test_publication_canaries.py

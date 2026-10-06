@@ -423,7 +423,7 @@ def test_interactive_execution_type_derived_from_phases(tmp_path: Path):
         display_name="TPC-H",
         scale_factor=0.01,
         queries=None,
-        concurrency=1,
+        concurrency=None,
         options={},
     )
     bench_manager = Mock()
