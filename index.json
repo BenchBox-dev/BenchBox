@@ -2265,15 +2265,10 @@
       "title": "Tinybird dual-path spike: ClickHouse-interface query plus Data Source ingest"
     },
     "changelog-0-4-2-duckdb-tuned-template-hash-note-20261005": {
-      "claim": {
-        "expires_at": "2026-10-06T18:57:54Z",
-        "generation": "5db2691c8caf48ffb6b5ff4c6ed32385",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:64399a12525eb713b4a9ab65"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "0.4.2 release notes omit the DuckDB tuned-template config-hash and database-name change"
     },
     "changelog-curation-user-scope-and-length": {
