@@ -138,6 +138,21 @@ def test_chdb_native_load_failure_is_reported_as_unusable(monkeypatch: pytest.Mo
     assert "/x/chdb" not in reason
 
 
+def test_chdb_linkedit_diagnosis_survives_long_venv_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A long install path must not truncate away the LINKEDIT diagnosis.
+
+    The reason text is capped at _MAX_REASON_CHARS, so matching the capped
+    first line misses the verdict when the path alone exceeds the cap.
+    """
+    long_path = "/x/" + "y" * 300 + "/chdb/_chdb.abi3.so"
+    error = ImportError(f"dlopen({long_path}, 0x0002): tried: '{long_path}' (mis-aligned LINKEDIT string pool)")
+    _patch_import_chdb(monkeypatch, error)
+    reason = optional_engines.chdb_skip_reason()
+    assert reason is not None
+    assert "mis-aligned LINKEDIT string pool" in reason
+    assert "Linux CI" in reason
+
+
 def test_chdb_os_error_from_the_loader_is_unusable(monkeypatch: pytest.MonkeyPatch) -> None:
     _patch_import_chdb(monkeypatch, OSError("cannot open shared object file"))
     assert "native library cannot be loaded" in (optional_engines.chdb_skip_reason() or "")
