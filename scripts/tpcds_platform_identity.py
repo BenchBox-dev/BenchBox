@@ -65,6 +65,29 @@ def table_entry(path: Path) -> dict[str, Any]:
     return {"rows": data.count(b"\n"), "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
 
 
+_BUNDLE_ROOT = Path(__file__).resolve().parents[1] / "benchbox" / "_binaries"
+
+
+def _bundle_platform() -> str:
+    machine = platform.machine().lower()
+    if machine in {"x86_64", "amd64"}:
+        arch = "x86_64"
+    elif machine in {"arm64", "aarch64"}:
+        arch = "arm64"
+    else:
+        arch = machine
+    return f"{platform.system().lower()}-{arch}"
+
+
+def pinned_bundle_hashes() -> dict[str, str]:
+    from benchbox.utils.binary_manifest import read_binary_manifest
+
+    files = read_binary_manifest((_BUNDLE_ROOT / "SHA256MANIFEST.json").read_bytes())
+    directory = f"tpc-ds/{_bundle_platform()}"
+    suffix = ".exe" if platform.system() == "Windows" else ""
+    return {name: files[f"{directory}/{name}{suffix}"] for name in ("dsqgen", "dsdgen")}
+
+
 def generate_tables(scale_factor: float, output_dir: Path) -> dict[str, dict[str, Any]]:
     from benchbox.core.tpcds.benchmark import TPCDSBenchmark
 
@@ -217,6 +240,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         args.out.write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n", encoding="utf-8")
         print(f"wrote {args.out}: {len(manifest['tables'])} tables, {len(manifest['queries'])} queries")
+        try:
+            pinned = pinned_bundle_hashes()
+        except (OSError, ValueError, KeyError) as exc:
+            print(f"could not verify the bundled binaries: {exc}")
+            return 1
+        mismatched = sorted(name for name, digest in pinned.items() if manifest["binaries"].get(name) != digest)
+        if mismatched:
+            print(f"manifest was not produced by the bundled binaries: {', '.join(mismatched)}")
+            return 1
         return 0
 
     manifests = _load(args.manifests)

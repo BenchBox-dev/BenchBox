@@ -105,6 +105,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `validate-submission-comment.yml` | product-safety | Submission validation comment |
 | `tpcds-official-qualification.yml` | product-safety | Weekly advisory SF 1 TPC-DS qualification diagnostic |
 | `tpcds-platform-identity.yml` | product-safety | Bundled TPC-DS generators agree across platforms (data checksums and dsqgen parameters) |
+| `tpch-dbgen-intel-macos.yml` | product-safety | Bundled darwin-x86_64 TPC-H dbgen is executed on an Intel macOS runner and emits the canonical supplier and customer rows |
 
 ### `tests/unit/workflows/`
 
