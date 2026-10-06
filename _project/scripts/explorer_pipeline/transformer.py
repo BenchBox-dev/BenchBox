@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from _project.scripts.explorer_pipeline.models import (
+    KNOWN_DEFECT_RANKING_EXCLUSION,
     BasisAvailability,
     BundleContainerBlock,
     BundleDocument,
@@ -698,6 +699,20 @@ def _override_display(bundle_path: Path) -> dict[str, Any]:
         "override_approver": payload.get("approver") if isinstance(payload.get("approver"), str) else None,
         "override_expires": payload.get("expires") if isinstance(payload.get("expires"), str) else None,
     }
+
+
+def _sidecar_known_defects(bundle_path: Path) -> list[str]:
+    manifest_path = bundle_path.parent / f"{bundle_path.stem}.manifest.json"
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(payload, dict):
+        return []
+    recorded = payload.get("known_defects")
+    if not isinstance(recorded, list):
+        return []
+    return [item for item in recorded if isinstance(item, str) and item]
 
 
 def _applied_receipt(bundle_path: Path, bundle: BundleDocument | None = None) -> str | None:
@@ -1585,7 +1600,10 @@ class BundleTransformer:
             compliance_class=_compliance_class(bundle),
             basis_availability=_compute_basis_availability(timings),
         )
-        return entry.model_copy(update={"ranking_exclusion_reason": ranking_exclusion_reason(entry)})
+        reason = ranking_exclusion_reason(entry)
+        if _sidecar_known_defects(bundle_path):
+            reason = KNOWN_DEFECT_RANKING_EXCLUSION
+        return entry.model_copy(update={"ranking_exclusion_reason": reason})
 
     def to_detail_result(
         self,
@@ -1694,7 +1712,10 @@ class BundleTransformer:
             validation_status=detail.validation_status,
             failed_query_count=detail.failed_query_count,
         )
-        return detail.model_copy(update={"ranking_exclusion_reason": ranking_exclusion_reason(manifest_peer)})
+        reason = ranking_exclusion_reason(manifest_peer)
+        if _sidecar_known_defects(bundle_path):
+            reason = KNOWN_DEFECT_RANKING_EXCLUSION
+        return detail.model_copy(update={"ranking_exclusion_reason": reason})
 
 
 __all__ = ["BundleTransformer"]

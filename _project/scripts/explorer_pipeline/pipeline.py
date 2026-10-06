@@ -467,7 +467,7 @@ def _build_benchmark_summaries(
         # shown as evidence without suppressing valid peer rankings.
         query_set_counts: dict[frozenset[str], int] = {}
         for entry, detail in pairs:
-            if ranking_exclusion_reason(entry) is None:
+            if entry.ranking_exclusion_reason is None and ranking_exclusion_reason(entry) is None:
                 query_set = frozenset(dt.query_id for dt in detail.display_timings)
                 query_set_counts[query_set] = query_set_counts.get(query_set, 0) + 1
         canonical_query_set: frozenset[str] | None = None
