@@ -3,6 +3,7 @@
     "Build artifacts are untracked or generated outside the source tree",
     "The tracked build configuration matches what the compile path uses, and a test or guard keeps them in sync"
   ],
+  "context": "Closeout: delivered by PR #2657 (merge 67406da2f) — dbgen build outputs untracked (stale .o files and generated Makefile.auto removed from the source tree) with a guard test keeping the tracked build configuration in sync with benchbox/utils/tpc_compilation.py; gitignore-lint waiver comments in place. Independently reviewed APPROVE on exact head with stand-in marker, all required checks green. Trunk green on final batch head dda8c787d (11/11 jobs).",
   "description": "_sources/tpc-h/dbgen/ tracks stale Windows .o files and a Makefile.auto that no longer matches what benchbox/utils/tpc_compilation.py generates. The runtime auto-compile fallback rewrites both in place, so running it dirties the working tree and can mask which build configuration produced a binary.",
   "sessions": [
     {
@@ -20,6 +21,14 @@
       "generation": "81493b2c5d864b19b144f7769f40883d",
       "op": "take",
       "op_id": "89f832208bc646bda40cfadd8c73908a",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T14:14:53Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "39da4cc0e2974a2586d01865f1d9f746",
       "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
     }
   ]
