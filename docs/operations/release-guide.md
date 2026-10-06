@@ -131,9 +131,27 @@ must not be bypassed with an undocumented local change.
    subjects (trailing `(#NNNN)`), the manual-edit placeholder, and more than
    60 bullets. Curation is always required — the draft is the raw
    `origin/release..HEAD` delta, hundreds of commits whenever `release` lags
-   `develop`. Headless runs stop here: hand-curate the section, then re-run
-   `make release-cut` (see "Resuming or aborting a cut" below).
+   `develop`. A headless run without curated text stops here: hand-curate the
+   section, then re-run `make release-cut` (see "Resuming or aborting a cut"
+   below). That resume is refused once `origin/develop` moves past the cut's
+   starting commit, which a busy `develop` does within minutes.
    `RELEASE_ALLOW_RAW_CHANGELOG=1` accepts the raw draft deliberately.
+
+   **Non-interactive cuts (agents, CI).** Write the curated section first and
+   pass it in, so the cut finishes in one invocation:
+
+   ```bash
+   make release-cut VERSION=X.Y.Z CHANGELOG_SECTION=/tmp/benchbox-X.Y.Z-section.md
+   ```
+
+   The file holds the section body only: the `###` groups and their bullets,
+   without the `## [X.Y.Z] - date` header, which the cut adds. Keep it outside
+   the worktree, because an untracked file there blocks `release-cut-abort`.
+   The text replaces any `[X.Y.Z]` section an earlier pass left, and goes below
+   `[Unreleased]`, which the cut leaves unchanged. The
+   `--check-curation` gate checks it like any other section, so raw commit
+   subjects are still refused, and the exact-`origin/develop` start check still
+   runs first.
 4. Curates the release branch — `git rm`'s the dev-only and deferred
    release paths while retaining the curated Results Explorer publication
    inputs: `results-data/`, `results-explorer/`,

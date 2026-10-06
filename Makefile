@@ -1266,7 +1266,8 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 #   1. Verify a clean linked worktree at origin/develop and create v$(VERSION).
 #   2. On v$(VERSION): bump version sources (scripts/update_version.py).
 #   3. On v$(VERSION): generate CHANGELOG.md entry from the origin/release patch delta.
-#   4. $EDITOR opens CHANGELOG.md for hand-curation when interactive.
+#   4. $EDITOR opens CHANGELOG.md for hand-curation when interactive, unless
+#      CHANGELOG_SECTION=<path> supplies the curated section body.
 #   5. Gate on the changelog curation check (--check-curation).
 #   6. Curate: git rm dev-only/deferred paths (per A3 in single-repo-migration.md).
 #   7. Commit "Release v$(VERSION)" (bump + changelog + curation in one squash-friendly commit).
@@ -1281,7 +1282,11 @@ RELEASE_REQUIRED_CONTEXTS := validate-base release-required-result
 # same values, and an existing CHANGELOG.md section is left untouched. The
 # v0.3.1 cut died at step 3 twice and left exactly that half-applied state.
 # `make release-cut-abort VERSION=X.Y.Z` discards it instead.
-# Usage: make release-cut VERSION=X.Y.Z
+# A non-interactive cut (an agent or CI) passes CHANGELOG_SECTION=<path>, a file
+# outside the worktree holding the curated section body, so the cut finishes in
+# one pass instead of stopping for curation while origin/develop moves on. The
+# curation gate still checks that text.
+# Usage: make release-cut VERSION=X.Y.Z [CHANGELOG_SECTION=/path/to/section.md]
 .PHONY: release-cut
 release-cut: .release-cut-tree-required
 	@test -n "$(VERSION)" || (echo "Usage: make release-cut VERSION=X.Y.Z" && exit 1)
@@ -1291,19 +1296,22 @@ release-cut: .release-cut-tree-required
 	@# pre-commit uv-lock hook has nothing to regenerate mid-commit (v0.3.1
 	@# aborted because the tracked lock was stale and the hook rewrote it).
 	uv lock
-	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/release
+	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/release $(if $(CHANGELOG_SECTION),--section-file "$(CHANGELOG_SECTION)")
 	@# The generated section is raw commit subjects across the whole
 	@# origin/release..HEAD delta (release lags develop by many releases), so it always
 	@# needs hand-curation. Open $$EDITOR when there is a terminal to open it in;
 	@# either way the --check-curation gate below decides, on the section's own
 	@# text, whether curation actually happened. The old gate tested only whether
 	@# EDITOR was set and stdin was a TTY, which `EDITOR=true` defeated.
-	@if [ -n "$$EDITOR" ] && [ -t 0 ]; then \
+	@if [ -n "$(CHANGELOG_SECTION)" ]; then \
+		echo "==> CHANGELOG.md [$(VERSION)] section written from $(CHANGELOG_SECTION)"; \
+	elif [ -n "$$EDITOR" ] && [ -t 0 ]; then \
 		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
 		$$EDITOR CHANGELOG.md; \
 	else \
 		echo "==> Non-interactive: CHANGELOG.md holds the raw generated draft."; \
 		echo "    Hand-curate the [$(VERSION)] section, then re-run: make release-cut VERSION=$(VERSION)"; \
+		echo "    Or pass the curated section body in one pass: CHANGELOG_SECTION=<path>"; \
 	fi
 	uv run -- python scripts/generate_changelog_entry.py --check-curation --version $(VERSION)
 	@# Curation FIRST so dev-only paths are never staged. Order matters: git rm

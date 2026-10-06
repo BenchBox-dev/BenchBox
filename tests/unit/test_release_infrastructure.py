@@ -736,6 +736,21 @@ class TestReleaseInfrastructure:
         rm_idx = recipe.index("git rm")
         assert gen_idx < check_idx < rm_idx, "curation check must gate between changelog draft and `git rm`"
 
+    def test_release_cut_takes_a_curated_section_in_one_pass_without_skipping_gates(self):
+        """A non-interactive cut supplies curated text up front instead of resuming later.
+
+        Resume refuses once origin/develop moves, so a two-pass agent cut aborted
+        three times in four during v0.4.2. CHANGELOG_SECTION writes the curated
+        body during the first pass; the start check and the curation gate still run.
+        """
+        recipe = _make_target_recipe("release-cut")
+
+        assert '$(if $(CHANGELOG_SECTION),--section-file "$(CHANGELOG_SECTION)")' in recipe
+        assert recipe.index('sh scripts/release_cut_start.sh "$(VERSION)"') < recipe.index("--section-file")
+        assert recipe.index("--section-file") < recipe.index("--check-curation --version $(VERSION)")
+        assert 'if [ -n "$(CHANGELOG_SECTION)" ]' in recipe
+        assert recipe.count("CHANGELOG_SECTION") == 5, "CHANGELOG_SECTION must not gate anything else"
+
     def test_release_cut_is_resumable_and_has_an_abort_target(self):
         """An interrupted cut must be resumable or discardable, not a manual cleanup.
 
