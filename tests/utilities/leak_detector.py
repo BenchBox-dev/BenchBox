@@ -11,6 +11,9 @@ REGISTERED_GLOBALS: tuple[tuple[str, str, Any], ...] = (
     ("benchbox.utils.printing", "_QUIET", False),
     ("benchbox.utils.config_interface", "_config_provider", None),
 )
+LIBRARY_IMPORT_ENV: tuple[tuple[str, str, str], ...] = (
+    ("ARROW_DEFAULT_MEMORY_POOL", "system", "snowflake.connector.options"),
+)
 _BASELINE_KEY = pytest.StashKey[dict[str, Any]]()
 _LEAK_KEY = pytest.StashKey[list[str]]()
 
@@ -48,6 +51,9 @@ def detect_and_restore(baseline: dict[str, Any]) -> list[str]:
 
     env = dict(os.environ)
     old = baseline["env"]
+    for key, value, module in LIBRARY_IMPORT_ENV:
+        if key not in old and env.get(key) == value and module in sys.modules:
+            old[key] = value
     for key in sorted(set(old) | set(env)):
         if (key in old) != (key in env) or old.get(key) != env.get(key):
             problems.append(f"env[{key}]")
