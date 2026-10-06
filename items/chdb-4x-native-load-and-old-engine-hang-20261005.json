@@ -3,7 +3,7 @@
     "chDB loads on macOS 27 in a documented way, or the unsupported combination is documented and enforced with a clear message.",
     "Whether the 3.6.0 hang and timestamp error occur on 4.x is recorded."
   ],
-  "context": "Source: PR #2677 close-out. Related: dlv2-10-chdb-cwd-guard (done), tuning-liveness-e2e-gates-20261001 (needs a working chDB for the ClickHouse cell).",
+  "context": "Source: PR #2677 close-out. Related: dlv2-10-chdb-cwd-guard (done), tuning-liveness-e2e-gates-20261001 (needs a working chDB for the ClickHouse cell).\n\nCloseout 2026-10-06 (re-validation, read-only): PR #2719 MERGED to develop at 15c7f8a190314013bee3cd7974bf6438dbf29e43 (mergedAt 2026-10-06T10:36:31Z, head fix/chdb-macos-load). Evidence: gh pr view state MERGED; statusCheckRollup clean; git show confirms documented macOS 27 loader constraint (pinned chdb 4.1.6 and 4.4.0 rejected) and actionable skip reasons naming remedies (Linux CI, server backend) in tests/utilities/optional_engines.py plus helper tests. Original worker session 5709cef75a584579a236033476a263ba (finish 2026-10-06T11:00:53Z); ladder not re-run in this validation.",
   "description": "## Problem\nOn this macOS (Darwin 27, arm64) the pinned chDB 4.1.6 native library cannot be loaded (\"chdb-core engine not found\"), so the chDB-dependent ClickHouse local tests are skipped (tests/unit/platforms/test_clickhouse_adapter.py: embedded mode, real DDL, and others) and real-CLI ClickHouse runs cannot use the pinned engine. The W2 end-to-end runs used chDB 3.6.0 from a scratch `PYTHONPATH` target instead. With that older engine two oddities appeared: a non-fatal metadata timestamp error, and an occasional silent hang at \"Saving tuning metadata…\". Neither is confirmed to occur on 4.x.\n\n## Change\n- Find out why chDB 4.1.6 (chdb-core) fails to load on macOS 27 (wheel tags, dylib deps, code signing) and either fix the install path, document the constraint, or pin a version that loads.\n- Check whether the metadata timestamp error and the \"Saving tuning metadata…\" hang reproduce on a loading 4.x engine; file or fix them.\n- Make the skip reason actionable so a skipped chDB test is visible in the lane summary.\n\n## Guardrails\n- Do not remove tests to avoid the skip.",
   "links": [
     "tests/unit/platforms/test_clickhouse_adapter.py",
@@ -35,6 +35,14 @@
       "op": "finish",
       "op_id": "a89f3913c19b4332b3eb1055ef6b27a2",
       "session_id": "5709cef75a584579a236033476a263ba"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:f3947ef8d62ddbe70b6706e6",
+      "at": "2026-10-06T15:48:27Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "c9c5827444fc4cfe827bf091832ef7e8",
+      "session_id": "6a33af84e93c469ebdeae2d73e412c6f"
     }
   ]
 }
