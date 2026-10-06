@@ -2284,15 +2284,10 @@
       "title": "Keep release notes user-focused and in line with earlier entries"
     },
     "chdb-4x-native-load-and-old-engine-hang-20261005": {
-      "claim": {
-        "expires_at": "2026-10-07T10:03:41Z",
-        "generation": "84abb9ea15cb44c0bfc81f2490fc7432",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:d90c17f1dbc58577e72c0803"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Pinned chDB 4.1.6 does not load on macOS 27; ClickHouse local e2e tests are skipped there"
     },
     "check-scope-reports-ok-when-no-scope-rules-exist": {
