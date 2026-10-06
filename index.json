@@ -11948,15 +11948,10 @@
       "title": "Add live MCP integration coverage for rendered prompts"
     },
     "mcp-multiworker-acceptance-flaky-under-load-20261004": {
-      "claim": {
-        "expires_at": "2026-10-07T08:41:54Z",
-        "generation": "3d287368d91c49138118b20c7b852be9",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Possible flake: tests/integration/mcp/test_multiworker_acceptance.py::test_remote_contract_survives_alternating_workers failed once under load"
     },
     "mcp-option-contract-matrix-enforcement": {
