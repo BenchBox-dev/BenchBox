@@ -4,7 +4,7 @@
     "e2e: `benchbox run --platform duckdb --benchmark tpcds --scale 0.01 --tuning notuning --phases generate,load,power --queries 3 --non-interactive` exits 0 with all 25 tables non-empty, with default compression and with `--compression none`.",
     "A generation that cannot produce all chunks fails with an error naming the cause, not an empty manifest."
   ],
-  "context": "Source: found by an agent reproducing the TPC-DS maintenance regression (PR #2643, 2026-10-04). Related: datagen-empty-manifest-vacuous-validation-20261001 (done; PR #2625, follow-ups #2637 and the all-generators guard).",
+  "context": "Root cause: manifest fallback iterated zstd files in binary mode (UnsupportedOperation swallowed, row_count 0). Fix reads zstd in text mode; default compression unchanged; guards kept. PR #2692 (head 3242e3eb2904) reviewed clean (root cause reproduced empirically), attested, armed; state=MERGED at 2026-10-06T04:23:03Z, merge commit 242698123c35. Verified: new tests revert-proven, e2e both compressions identical row totals, ruff clean, pr-preflight green.",
   "description": "## Problem (reproduced once, by an agent on macOS arm64; not re-run by a second person)\n`benchbox run --platform duckdb --benchmark tpcds --scale 0.01 --phases generate,load` with the default compression wrote only chunk 1 of the 10 data files, recorded a `_datagen_manifest.json` that lists no tables, and loaded zero rows. With `--compression none` the same command works. This is the most likely origin of the stale zero-table manifest behind the vacuous-validation incident (`datagen-empty-manifest-vacuous-validation-20261001`, whose guards now make the run fail loudly instead of passing). The run still cannot complete with default compression.\n\n## Change\n- Find why generation stops after the first chunk under default compression (start in `benchbox/core/tpcds/generator/` streaming, compression and manifest-writing code; the zstd path counts rows and swallows exceptions at `filesystem.py` `_write_manifest`).\n- Fix generation so every chunk is written and recorded, or fail generation with an actionable error.\n- Keep the zero-table and zero-row guards from the datagen item.\n\n## Guardrails (must preserve)\n- Uncompressed generation and the `--compression` options keep working.\n- Do not weaken the zero-table manifest checks.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
   "links": [
     "benchbox/core/tpcds/generator/filesystem.py",
@@ -27,6 +27,14 @@
       "generation": "13287293d95b4ea59f88130bd02c334d",
       "op": "take",
       "op_id": "344ec199c51249b88da92f91d90199ad",
+      "session_id": "886444b9f5294b15856d1f4489297eb4"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680",
+      "at": "2026-10-06T04:25:33Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "c39b1aa2bbbd4f968b404701e4e1a634",
       "session_id": "886444b9f5294b15856d1f4489297eb4"
     }
   ]
