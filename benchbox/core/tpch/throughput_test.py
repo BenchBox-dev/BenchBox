@@ -25,6 +25,7 @@ from benchbox.core.plan_capture_phase import (
 )
 from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
 from benchbox.core.throughput.runner import StreamRunner
+from benchbox.core.tpch.power_test import _parse_tpch_query_id
 from benchbox.core.validation.query_validation import (
     clear_reference_seed_context,
     set_reference_seed_context,
@@ -50,6 +51,7 @@ class TPCHThroughputTestConfig:
     # never hard-kills anything -- see benchbox/core/throughput/runner.py's
     # module docstring ("Timed-out streams") for the full design.
     cancel_on_timeout: bool = False
+    query_subset: Optional[list[str]] = None
     # Legacy reporting threshold retained for configuration compatibility.
     # Product scoring is stricter: StreamRunner emits Throughput@Size only
     # when every requested stream completes successfully.
@@ -62,6 +64,19 @@ TPCHThroughputStreamResult = ThroughputStreamResult
 
 def _derive_query_seed(seed: int, stream_id: int, position: int) -> int:
     return seed + stream_id * 1000 + position
+
+
+def _stream_permutation(stream_id: int, query_subset: Optional[list[str]]) -> list[int]:
+    from benchbox.core.tpch.streams import TPCHStreams
+
+    permutation = list(TPCHStreams.PERMUTATION_MATRIX[stream_id % len(TPCHStreams.PERMUTATION_MATRIX)])
+    if not isinstance(query_subset, (list, tuple)) or not query_subset:
+        return permutation
+    wanted = {_parse_tpch_query_id(query_id) for query_id in query_subset}
+    unknown = sorted(wanted - set(permutation))
+    if unknown:
+        raise ValueError(f"Invalid TPC-H query ids in query_subset: {unknown} (expected 1-22)")
+    return [query_id for query_id in permutation if query_id in wanted]
 
 
 def _count_cursor_rows(cursor: Any) -> int:
@@ -248,11 +263,10 @@ class TPCHThroughputTest:
         single bad query still only fails that one query during execution,
         matching today's per-query fault isolation in ``_execute_stream``.
         """
-        from benchbox.core.tpch.streams import TPCHStreams
 
         def _generate_one_stream(stream_id: int) -> tuple[int, list[Any]]:
             seed = config.base_seed + stream_id
-            query_permutation = TPCHStreams.PERMUTATION_MATRIX[stream_id % len(TPCHStreams.PERMUTATION_MATRIX)]
+            query_permutation = _stream_permutation(stream_id, config.query_subset)
             sql_list: list[Any] = []
             for position, query_id in enumerate(query_permutation):
                 stream_seed = _derive_query_seed(seed, stream_id, position)
@@ -422,11 +436,7 @@ class TPCHThroughputTest:
             # Create connection for this stream
             connection = self.connection_factory()
 
-            # Execute all 22 TPC-H queries in proper TPC-H permutation order for this stream
-            from benchbox.core.tpch.streams import TPCHStreams
-
-            # Use stream-specific permutation from TPC-H specification
-            query_permutation = TPCHStreams.PERMUTATION_MATRIX[stream_id % len(TPCHStreams.PERMUTATION_MATRIX)]
+            query_permutation = _stream_permutation(stream_id, config.query_subset)
 
             if config.verbose:
                 self.logger.info(f"Stream {stream_id} using TPC-H permutation: {query_permutation}")
@@ -594,5 +604,8 @@ class TPCHThroughputTest:
         if result.errors or result.throughput_at_size is None or result.throughput_at_size <= 0:
             return False
 
-        # Ensure all streams executed all 22 queries
-        return all(stream_result.queries_executed == 22 for stream_result in result.stream_results)
+        return all(
+            stream_result.queries_executed
+            == len(_stream_permutation(stream_result.stream_id, result.config.query_subset))
+            for stream_result in result.stream_results
+        )

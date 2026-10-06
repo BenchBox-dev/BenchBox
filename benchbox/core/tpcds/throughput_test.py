@@ -51,6 +51,7 @@ class TPCDSThroughputTestConfig:
     # never hard-kills anything -- see benchbox/core/throughput/runner.py's
     # module docstring ("Timed-out streams") for the full design.
     cancel_on_timeout: bool = False
+    query_subset: Optional[list[str]] = None
     # Number of queries to execute per stream (None = all queries, ~99 for TPC-DS)
     # NOTE: Per TPC-DS spec, full query set should be executed. Use subset only for testing.
     queries_per_stream: Optional[int] = None  # Default: execute all queries
@@ -61,6 +62,29 @@ class TPCDSThroughputTestConfig:
 
 # Backward-compatibility alias - ThroughputStreamResult is the canonical type.
 TPCDSThroughputStreamResult = ThroughputStreamResult
+
+
+def _query_token(value: Any) -> str:
+    token = str(value).strip().lower()
+    return token[1:] if token.startswith("q") else token
+
+
+def _apply_query_subset(stream_queries: list[Any], query_subset: Optional[list[str]]) -> list[Any]:
+    if not isinstance(query_subset, (list, tuple)) or not query_subset:
+        return stream_queries
+    wanted = {_query_token(query_id) for query_id in query_subset}
+    selected = [
+        stream_query
+        for stream_query in stream_queries
+        if str(stream_query.query_id) in wanted or f"{stream_query.query_id}{stream_query.variant or ''}" in wanted
+    ]
+    available = {str(stream_query.query_id) for stream_query in stream_queries} | {
+        f"{stream_query.query_id}{stream_query.variant or ''}" for stream_query in stream_queries
+    }
+    unknown = sorted(wanted - available)
+    if unknown:
+        raise ValueError(f"Invalid TPC-DS query ids in query_subset: {unknown}")
+    return selected
 
 
 def _count_cursor_rows(cursor: Any) -> int:
@@ -350,7 +374,7 @@ class TPCDSThroughputTest:
         failures: list[str] = []
 
         for stream_id in range(config.num_streams):
-            query_subset = all_streams.get(stream_id, [])
+            query_subset = _apply_query_subset(all_streams.get(stream_id, []), config.query_subset)
             if config.queries_per_stream is not None:
                 query_subset = query_subset[: min(config.queries_per_stream, len(query_subset))]
 
@@ -456,7 +480,7 @@ class TPCDSThroughputTest:
         )
 
         streams = stream_manager.generate_streams()
-        all_queries = streams.get(stream_id, [])
+        all_queries = _apply_query_subset(streams.get(stream_id, []), config.query_subset)
 
         if config.queries_per_stream is not None:
             subset = all_queries[: min(config.queries_per_stream, len(all_queries))]

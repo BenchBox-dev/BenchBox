@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 from typing import Any, Callable
 
-from benchbox.platforms.base.connection_wrappers import StreamConnectionCapability
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.sql_identifier import is_valid_sql_identifier
 
@@ -125,14 +124,6 @@ class MySqlWireConnectionWrapper:
 
 class MySqlWireLifecycleMixin:
     """Common database, schema, query-plan, and health plumbing."""
-
-    # MySQL-wire connections are per-connection sessions (server-side state
-    # such as ``@@session`` variables lives on the connection) and neither
-    # pymysql nor the SingleStore driver supports concurrent statement
-    # execution across cursors of one connection, so every throughput stream
-    # gets its own connection (Doris, SingleStore). See
-    # ``StreamConnectionCapability`` equivalence dimensions.
-    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     database_identifier_max_length = 128
     connection_operation_name = "MySQL-wire connection"
