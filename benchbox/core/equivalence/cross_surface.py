@@ -390,7 +390,34 @@ def _projection_column(projection: Any) -> Any | None:
     return inner if isinstance(inner, exp.Column) and not isinstance(inner.this, exp.Star) else None
 
 
-def _resolve_output_column(column: Any, names: Sequence[str], projections: Sequence[Any] | None) -> int | None:
+def _lone_source_qualifier(tree: Any) -> str | None:
+    """Return the only relation an ORDER BY qualifier may name, if exactly one exists.
+
+    A qualified ORDER BY column may only be read from an unqualified projection
+    when the query draws from a single source and the qualifier names that
+    source (by table name or alias). With joins, an unqualified projection can
+    resolve to a different input than the qualifier names (for example the
+    merged column of a JOIN ... USING), so the binding stays unverifiable.
+    """
+    from sqlglot import exp
+
+    from_node = tree.args.get("from")
+    if from_node is None:
+        from_node = tree.args.get("from_")
+    if from_node is None or tree.args.get("joins"):
+        return None
+    source = from_node.this
+    if source is None:
+        return None
+    if isinstance(source, exp.Table):
+        return source.alias_or_name.lower() or None
+    alias = source.args.get("alias")
+    return alias.alias_or_name.lower() if alias is not None else None
+
+
+def _resolve_output_column(
+    column: Any, names: Sequence[str], projections: Sequence[Any] | None, lone_qualifier: str | None
+) -> int | None:
     name = column.name.lower()
     if not column.table:
         matches = [index for index, output in enumerate(names) if output == name]
@@ -401,16 +428,22 @@ def _resolve_output_column(column: Any, names: Sequence[str], projections: Seque
     candidates = []
     for index, projection in enumerate(projections):
         source = _projection_column(projection)
-        if (
-            source is not None
-            and source.name.lower() == name
-            and (not source.table or source.table.lower() == qualifier)
-        ):
-            candidates.append(index)
+        if source is None or source.name.lower() != name:
+            continue
+        if source.table:
+            if source.table.lower() != qualifier:
+                continue
+        elif lone_qualifier != qualifier:
+            # An unqualified projection does not establish which relation
+            # supplies a qualified ORDER BY column.
+            continue
+        candidates.append(index)
     return candidates[0] if len(candidates) == 1 else None
 
 
-def _rewrite_order_term(target: Any, names: Sequence[str], projections: Sequence[Any] | None) -> Any:
+def _rewrite_order_term(
+    target: Any, names: Sequence[str], projections: Sequence[Any] | None, lone_qualifier: str | None
+) -> Any:
     from sqlglot import exp
 
     if isinstance(target, exp.Literal) and target.is_int:
@@ -423,7 +456,7 @@ def _rewrite_order_term(target: Any, names: Sequence[str], projections: Sequence
     if not target.find(exp.Column):
         return "an ORDER BY term has no column reference"
     for column in list(target.find_all(exp.Column)):
-        position = _resolve_output_column(column, names, projections)
+        position = _resolve_output_column(column, names, projections, lone_qualifier)
         if position is None:
             return f"ORDER BY column {column.sql(dialect='duckdb')} is not a unique output column"
         replacement = exp.column(f"__c{position}")
@@ -449,6 +482,10 @@ def _derived_order_plan(sql: str, describe: Callable[[], Sequence[tuple[str, str
     order = tree.args.get("order") if isinstance(tree, exp.Select) else None
     if order is None:
         return _DerivedOrderPlan()
+    if any(projection.find(exp.Collate) is not None for projection in tree.expressions):
+        # The check table carries declared types but not output collations, so
+        # it would validate against different sorting semantics.
+        return _unverifiable("an output column specifies a collation the order check cannot reproduce")
     try:
         columns = tuple(describe())
     except Exception:  # noqa: BLE001 - an undescribable query is reported as unverifiable
@@ -457,6 +494,7 @@ def _derived_order_plan(sql: str, describe: Callable[[], Sequence[tuple[str, str
         return _unverifiable("the output columns cannot be described")
     names = [name.lower() for name, _ in columns]
     projections = tree.expressions if not any(_is_star_projection(item) for item in tree.expressions) else None
+    lone_qualifier = _lone_source_qualifier(tree)
 
     entries = []
     for ordered in order.expressions:
@@ -471,7 +509,7 @@ def _derived_order_plan(sql: str, describe: Callable[[], Sequence[tuple[str, str
     terms = []
     for index, (target, ordered, resolved) in enumerate(entries):
         if not resolved:
-            rewritten = _rewrite_order_term(target, names, projections)
+            rewritten = _rewrite_order_term(target, names, projections, lone_qualifier)
             if isinstance(rewritten, str):
                 return _unverifiable(rewritten)
             target = rewritten
