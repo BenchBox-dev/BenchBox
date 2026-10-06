@@ -13059,6 +13059,13 @@
       "status": "blocked",
       "title": "Negative --wait test (a healthcheck that never passes)"
     },
+    "new-platform-tpch-smoke-20261006": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Smoke TPC-H SF 0.01 notuning on Athena SQL, Redshift, and Fabric DW"
+    },
     "next-package-release-decision-and-publication": {
       "claim": null,
       "needs": [

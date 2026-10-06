@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "One passing TPC-H SF 0.01 notuning smoke bundle per platform that is set up, or a recorded blocker stating why it cannot run",
+    "Trial clocks (Fabric 60d, Redshift 90d) started only when ready to run densely",
+    "No full campaign launched from this item"
+  ],
+  "context": "Found during 2026-10-06 platform-priority review: no run-and-publish items exist for Athena SQL, Redshift, or Fabric DW, and none has ever run live end to end from this machine. Redshift reachability is owned by approx-survey-remaining-legs; Athena probe by athena-sql-live-credential-probe-20261006; Fabric needs workspace, capacity, and Entra setup by the operator.",
+  "description": "Run one TPC-H SF 0.01 notuning smoke per new platform that is set up (Athena SQL, Redshift once reachable, Fabric DW) inside the campaign limits (6h per cell, BigQuery-style spend discipline); anything outside needs approval stating command, maximum runtime, log path, and stop condition. 100% query pass, validate_submission.py 0 errors, result_source=internal.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:d4c6ceae0de4d166359ede4c",
+      "at": "2026-10-06T18:56:03Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "97853c7793c042ad95cfd8fd7ef6fb51",
+      "session_id": "508606d004364578b5da477b03baf36a"
+    }
+  ]
+}
