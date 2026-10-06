@@ -1603,8 +1603,7 @@ def _joined_agg_pandas_impl(ctx: DataFrameContext, spec: dict[str, Any]) -> Any:
         {alias: (source, func) for alias, source, func in spec["aggs"]},
         dropna=False,
     )
-    for column in spec["group_by"]:
-        result[column] = result[column].astype(object).where(~result[column].isna(), None)
+    result = _none_for_null(result, list(spec["group_by"]))
     post_filter = spec.get("post_filter")
     if post_filter is not None:
         result = result[_joined_agg_pandas_condition(result, params, post_filter)]
@@ -2117,10 +2116,7 @@ def q46_pandas_impl(ctx: DataFrameContext) -> Any:
     result = outer[cols].sort_values(cols).head(100)
     # A NULL merged through pandas object columns arrives as float NaN, which
     # the strict comparator distinguishes from SQL NULL: map NaN back to None.
-    for column in result.columns:
-        if result[column].dtype == object:
-            result[column] = result[column].where(result[column].notna(), None)
-    return result
+    return _none_for_null(result, [column for column in result.columns if result[column].dtype == object])
 
 
 def q68_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2214,10 +2210,7 @@ def q68_pandas_impl(ctx: DataFrameContext) -> Any:
     result = outer[cols].sort_values(["c_last_name", "ss_ticket_number"]).head(100)
     # A NULL merged through pandas object columns arrives as float NaN, which
     # the strict comparator distinguishes from SQL NULL: map NaN back to None.
-    for column in result.columns:
-        if result[column].dtype == object:
-            result[column] = result[column].where(result[column].notna(), None)
-    return result
+    return _none_for_null(result, [column for column in result.columns if result[column].dtype == object])
 
 
 def q79_expression_impl(ctx: DataFrameContext) -> Any:
@@ -2317,10 +2310,7 @@ def q79_pandas_impl(ctx: DataFrameContext) -> Any:
     outer["s_city"] = outer["s_city"].astype(str).str[:30]
     cols = ["c_last_name", "c_first_name", "s_city", "ss_ticket_number", "amt", "profit"]
     result = outer[cols].sort_values(["c_last_name", "c_first_name", "s_city", "profit"]).head(100)
-    for column in result.columns:
-        if result[column].dtype == object:
-            result[column] = result[column].where(result[column].notna(), None)
-    return result
+    return _none_for_null(result, [column for column in result.columns if result[column].dtype == object])
 
 
 _Q50_STORE_COLS = [
@@ -3609,8 +3599,7 @@ def q34_pandas_impl(ctx: DataFrameContext) -> Any:
 
     # Join with customer
     result = ticket_filtered.merge(customer, left_on="ss_customer_sk", right_on="c_customer_sk")
-    for column in ("c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag"):
-        result[column] = result[column].astype(object).where(~result[column].isna(), None)
+    result = _none_for_null(result, ["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag"])
 
     # Select and sort
     result = result[["c_last_name", "c_first_name", "c_salutation", "c_preferred_cust_flag", "ss_ticket_number", "cnt"]]
@@ -5228,13 +5217,9 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
     result = result.sort_values("d_week_seq1")
     # SQL NULL ratios arrive as NaN: map back to None in object columns so
     # NULLs compare equal (assigning None into float64 would coerce to NaN).
-    import pandas as _pd
-
-    for column in ["sun_ratio", "mon_ratio", "tue_ratio", "wed_ratio", "thu_ratio", "fri_ratio", "sat_ratio"]:
-        result[column] = _pd.Series(
-            [None if value != value else value for value in result[column].tolist()], dtype=object
-        )
-    return result
+    return _none_for_null(
+        result, ["sun_ratio", "mon_ratio", "tue_ratio", "wed_ratio", "thu_ratio", "fri_ratio", "sat_ratio"]
+    )
 
 
 # =============================================================================
@@ -7274,12 +7259,11 @@ def q35_pandas_impl(ctx: DataFrameContext) -> Any:
         "aggthree3": ("cd_dep_college_count", aggthree),
     }
     result = base.groupby(group_cols, as_index=False, dropna=False).agg(**agg_spec)
-    result["ca_state"] = result["ca_state"].astype(object).where(result["ca_state"].notna(), None)
     result["cnt2"] = result["cnt1"]
     result["cnt3"] = result["cnt1"]
     # stddev_samp of a one-row group is NULL in SQL and NaN in pandas.
     result = _none_for_null(
-        result, [f"agg{position}{number}" for position in ("one", "two", "three") for number in "123"]
+        result, ["ca_state", *(f"agg{position}{number}" for position in ("one", "two", "three") for number in "123")]
     )
     return (
         result[
@@ -7920,17 +7904,8 @@ def q17_pandas_impl(ctx: DataFrameContext) -> Any:
     # SQL STDDEV_SAMP over a single row is NULL; pandas yields NaN. Map NaN
     # back to None in object columns so NULLs compare equal (assigning None
     # into float64 would coerce back to NaN).
-    import pandas as _pd
-
     result = result[out_cols].sort_values(["i_item_id", "i_item_desc", "s_state"]).head(100)
-    for column in result.columns:
-        if result[column].dtype == object:
-            result[column] = result[column].where(result[column].notna(), None)
-        elif result[column].dtype == float:
-            values = result[column].tolist()
-            if any(value != value for value in values):
-                result[column] = _pd.Series([None if value != value else value for value in values], dtype=object)
-    return result
+    return _none_for_null(result, [column for column in result.columns if result[column].dtype in (object, float)])
 
 
 # =============================================================================
