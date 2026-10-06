@@ -23,6 +23,7 @@ from benchbox.cli.tuning_resolver import (
     display_tuning_list,
     display_tuning_resolution,
     get_tuning_template_paths,
+    is_dataframe_tuning_file,
     list_available_tuning_templates,
     resolve_template_reference,
     resolve_tuning,
@@ -1111,3 +1112,34 @@ class TestPackagedTemplateShippingInputs:
         for templates in by_platform.values():
             for template in templates:
                 assert template.suffix == ".yaml"
+
+
+class TestIsDataframeTuningFile:
+    def test_shipped_dataframe_profile_detected(self):
+        profile = Path(__file__).resolve().parents[3] / "examples/tunings/dataframe/polars_optimized.yaml"
+        assert is_dataframe_tuning_file(profile)
+
+    def test_shipped_sql_template_not_detected(self):
+        template = Path(__file__).resolve().parents[3] / "examples/tunings/duckdb/tpch_tuned.yaml"
+        assert not is_dataframe_tuning_file(template)
+
+    def test_marker_free_dataframe_sections_detected(self, tmp_path):
+        candidate = tmp_path / "candidate.yaml"
+        candidate.write_text("execution:\n  streaming_mode: false\n")
+        assert is_dataframe_tuning_file(candidate)
+
+    def test_unified_sections_not_detected(self, tmp_path):
+        candidate = tmp_path / "candidate.yaml"
+        candidate.write_text("table_tunings: {}\n")
+        assert not is_dataframe_tuning_file(candidate)
+
+    def test_empty_and_missing_files_not_detected(self, tmp_path):
+        empty = tmp_path / "empty.yaml"
+        empty.write_text("")
+        assert not is_dataframe_tuning_file(empty)
+        assert not is_dataframe_tuning_file(tmp_path / "absent.yaml")
+
+    def test_non_mapping_not_detected(self, tmp_path):
+        candidate = tmp_path / "candidate.yaml"
+        candidate.write_text("- just\n- a\n- list\n")
+        assert not is_dataframe_tuning_file(candidate)
