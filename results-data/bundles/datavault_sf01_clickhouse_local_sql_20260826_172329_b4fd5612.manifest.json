@@ -1,0 +1,11 @@
+{
+  "bundle_file": "datavault_sf01_clickhouse_local_sql_20260826_172329_b4fd5612.json",
+  "bundle_hash": "14bd9a74c372b8475bad2e630f5e12ea9a8761bf0f500a53f934ad751b3b603f",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}

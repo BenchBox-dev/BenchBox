@@ -1,0 +1,11 @@
+{
+  "bundle_file": "tpchavoc_sf1_duckdb_sql_20260826_163310_7d7aeb6f.json",
+  "bundle_hash": "ec4eb69756aef8dd7fc8434c1ba341c4fed1aa702bd0c81ae73ec1a8ce8478b5",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}

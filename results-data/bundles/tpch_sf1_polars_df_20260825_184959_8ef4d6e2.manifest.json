@@ -1,0 +1,11 @@
+{
+  "bundle_file": "tpch_sf1_polars_df_20260825_184959_8ef4d6e2.json",
+  "bundle_hash": "fba87dcfa681e550927593ff9ca9cc26a4d33c710fbb67d5fe7e044106e09b75",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}
