@@ -90,7 +90,7 @@ tpch
 
 ##### Compatibility
 
-`benchbox.read_primitives.ReadPrimitives` is the same class. The class attribute `DATA_SOURCE_BENCHMARK` is `None` on the wrapper; `get_data_source_benchmark()` returns `"tpch"`. The old claim of "109 queries in 26 categories" does not hold for 0.4.1.
+`benchbox.read_primitives.ReadPrimitives` is the same class. The class attribute `DATA_SOURCE_BENCHMARK` is `None` on the wrapper; `get_data_source_benchmark()` returns `"tpch"`.
 
 ### Constructor
 

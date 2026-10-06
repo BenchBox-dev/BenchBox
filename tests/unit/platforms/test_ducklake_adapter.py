@@ -1564,8 +1564,8 @@ class TestDuckLakeGcsAzureBackends:
 class TestDuckLakeResultMetadataRecordsBacking:
     """Exported results must say which DuckLake deployment produced them.
 
-    ADR decision w12 makes remote-backed DuckLake results publishable and
-    ranking-eligible ON CONDITION that the backing is recorded - a
+    The DuckLake maturity ADR makes remote-backed DuckLake results publishable
+    and ranking-eligible ON CONDITION that the backing is recorded - a
     DuckLake-on-S3 number partly measures object-store latency and must never
     be silently ranked against DuckLake-on-local-disk as the same system.
     """
@@ -1646,8 +1646,8 @@ class TestDuckLakeRegistration:
     def test_support_status_is_beta(self):
         # Promoted from experimental on 2026-07-30 once every criterion in
         # docs/development/adr/adr-ducklake-maturity-and-publishability.md
-        # (decision w11) was met - including TPC-H SF=1 validated on all four
-        # deployment modes. Do not relax this to experimental to make a change
+        # (experimental to beta exit criterion) was met - including TPC-H SF=1
+        # validated on all four deployment modes. Do not relax this to experimental to make a change
         # pass; the ADR records what promotion required.
         assert PlatformRegistry.get_platform_support_status("ducklake") == "beta"
 

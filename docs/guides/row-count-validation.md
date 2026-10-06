@@ -525,8 +525,7 @@ Planned improvements to row count validation:
 5. **Differential Validation**: Compare results across platforms
 6. **Configuration Options**: Toggle validation on/off per query or benchmark
 
-> **Note**: On-demand answer file download for wheel installs (item 7 from the
-> original list) has been implemented. See the
+> **Note**: Wheel installs can download answer files on demand. See the
 > [Installation and Answer File Availability](#installation-and-answer-file-availability)
 > section above.
 
@@ -536,8 +535,3 @@ Planned improvements to row count validation:
 - TPC-DS Specification: https://www.tpc.org/tpcds/
 - BenchBox Architecture: docs/design/architecture.md
 - Issue Tracking: Report validation bugs on GitHub
-
----
-
-*Generated as part of Phase D: Testing & Documentation*
-*Implementation Phases A-C: Bug fixes, security, robustness*

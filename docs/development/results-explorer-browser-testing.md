@@ -3,10 +3,12 @@
 **Audience:** Contributors changing `results-explorer/` who need to know what
 browser coverage exists, how to run it, and how to add tests.
 
-This note is the operational counterpart to
-`docs/development/browser-test-architecture.md`. The architecture
-note records *why* the suite is shaped the way it is; this note records *what
-to run, when to run it, and what to do when it fails*.
+The suite follows four design choices. It tests the built app (`dist/`), not
+the dev server. Each run generates its own fixture corpus and leaves the
+curated public corpus untouched. Chromium runs the full suite and blocks;
+Firefox and WebKit run the `@smoke` subset. Failure paths are injected with
+Playwright routing, offline mode and permissions, never with a test seam in
+production code.
 
 ## What's covered by automation
 
@@ -27,7 +29,7 @@ Routes and behaviours with at least one browser-functional test:
 | Compare | ✅ (deep link, share URL, sticky-bar flow) | ✅ (benchmark mismatch, scale mismatch, unknown id) |
 | Query workbench | ✅ (sort, column toggle, starter query, CSV + JSON download) | ✅ (read-only write surfaces error) |
 | NotFound | ✅ (unknown `/results/...` path renders the 404 card) | - |
-| DuckDB-WASM attach | ✅ (cold load, `waitForDataLoaded`) | ✅ (RG-2 range-read capability via test server) |
+| DuckDB-WASM attach | ✅ (cold load, `waitForDataLoaded`) | ✅ (range-read byte budget via test server) |
 
 ## Running the suite locally
 
@@ -104,8 +106,8 @@ rather than re-encoding fixture/build/test sequencing in the workflow.
   target user-visible error states (a visible heading or message), not just
   thrown exceptions or console output.
 - Put server/runtime contract checks that are not user failure paths
-  under `results-explorer/e2e/capability/` (e.g. the RG-2 range-read
-  gate in `capability/range-read-budget.spec.ts`).
+  under `results-explorer/e2e/capability/` (e.g. the range-read byte
+  budget gate in `capability/range-read-budget.spec.ts`).
 - If a test depends on fixture data that does not yet exist, add a variant
   to `results-explorer/scripts/generate-browser-fixtures.mjs` - do not
   mutate the curated public corpus.

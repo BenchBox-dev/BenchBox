@@ -707,7 +707,7 @@ Write Primitives provides DataFrame support for write operations on DataFrame pl
 | --- | --- | --- | --- | --- | --- | --- |
 | Polars (`polars-df`) | yes | yes | yes | yes | yes | Compressions: zstd, snappy, gzip, lz4; partitioning supported |
 | Pandas (`pandas-df`) | no | no | no | no | yes | Compressions: snappy, gzip, brotli |
-| PySpark (`pyspark-df`) | no | no | no | no | yes | Also supports aggregate persist and merge; Delta Lake table support was not tested |
+| PySpark (`pyspark-df`) | no | no | no | no | yes | Also supports aggregate persist and merge |
 | DataFusion, Dask, cuDF | no | no | no | no | yes | Bulk load only |
 
 ### DataFrameWriteOperationsManager
@@ -812,4 +812,4 @@ class DataFrameWriteCapabilities:
 
 ### Future Expansion
 
-The operation catalog is YAML-driven, so more operations can be added to it. The 0.4.1 catalog already holds 112 operations; the transaction operations from the original plan are in the transaction primitives benchmark.
+The operation catalog is YAML-driven, so more operations can be added to it. The catalog holds 112 operations. Transaction operations are in the transaction primitives benchmark.

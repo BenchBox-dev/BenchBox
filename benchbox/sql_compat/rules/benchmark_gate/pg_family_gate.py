@@ -120,12 +120,11 @@ _register_pg_mooncake_gate(
     benchmark="tpcds",
     rule_suffix="moonlink_scan_plan_gaps",
     reason=(
-        "pg_mooncake loads and row-count validates TPC-DS SF 0.01, "
-        "but the power run ends PARTIAL with 21 failed query executions. Failed query ids "
-        "11, 23a, 23b, 4, 74, and 95 all fail during PGDuckDB plan creation because "
-        "`mooncake_scan` is not registered; query 90 fails in the same plan path on PostgreSQL-style "
-        "numeric casts. pg-duckdb and TimescaleDB clear the same benchmark, so this is a Mooncake "
-        "query-planning capability gap rather than a benchmark loader issue."
+        "pg_mooncake loads TPC-DS data, but several queries cannot be planned. Queries "
+        "4, 11, 23a, 23b, 74, and 95 fail during PGDuckDB plan creation because "
+        "`mooncake_scan` is not registered, and query 90 fails in the same plan path on "
+        "PostgreSQL-style numeric casts. pg-duckdb and TimescaleDB run the same benchmark, so "
+        "this is a Mooncake query-planning gap rather than a benchmark loader issue."
     ),
 )
 

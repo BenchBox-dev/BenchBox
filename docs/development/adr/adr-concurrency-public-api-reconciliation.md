@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted. Implements `concurrency-public-api-semantic-reconciliation`.
+Accepted.
 
 ## Date
 
@@ -10,11 +10,11 @@ Accepted. Implements `concurrency-public-api-semantic-reconciliation`.
 
 ## Context
 
-`concurrency-executor-consolidation` quarantined `PowerRunExecutor` and
+An earlier executor consolidation quarantined `PowerRunExecutor` and
 `ConcurrentQueryExecutor` (`benchbox/utils/execution_manager.py`): nothing
 in `benchbox` calls either class, after the only two routings turned out
 to terminate in a non-executing stub. The classes survived only through
-the `benchbox.utils` re-export. This item reassesses them by behavior
+the `benchbox.utils` re-export. This decision reassesses them by behavior
 against the canonical paths.
 
 ### Inventory
@@ -77,7 +77,7 @@ corrected in the same change. `ExecutionConfigHelper`
 - **Deprecate with a removal version.** Rejected over removal because the
   quarantine already served as the deprecation notice and no production
   path can import these names; a shim cycle would prolong the ambiguity
-  this item closes.
+  this decision closes.
 
 ## Consequences
 

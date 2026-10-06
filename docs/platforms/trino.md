@@ -164,7 +164,7 @@ remote Trino cluster via `--platform-option host=<host> --platform-option port=<
 ```bash
 # Run with Hive Metastore
 benchbox run --platform trino --benchmark tpch --scale 10.0 \
-  --platform-option host=trino.production.com \
+  --platform-option host=trino.example.com \
   --platform-option catalog=hive \
   --platform-option staging_root=s3://data-lake/staging/
 ```

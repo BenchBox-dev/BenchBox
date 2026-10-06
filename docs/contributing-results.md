@@ -253,10 +253,6 @@ automatically:
 uv run -- pre-commit install
 ```
 
-If this clone installed hooks before BenchBox added its pre-push timing-policy
-stage, re-run the same command from the primary clone so the pre-push hook is
-installed too.
-
 ## Questions?
 
 Start a [discussion](https://github.com/BenchBox-dev/BenchBox/discussions) if you need help with a submission or want to report a correction.

@@ -37,7 +37,7 @@ The three candidate shapes were:
 
 ## Consequences
 
-- BenchBox MCP continues to publish only `suggest_charts` and `generate_chart` (result-aware) until a separate, explicitly approved follow-on item changes the surface. No `benchbox.mcp` code, visualization registry, or `textcharts/` directory changes are made in this decision.
+- BenchBox MCP continues to publish only `suggest_charts` and `generate_chart` (result-aware) until a later decision changes the surface. No `benchbox.mcp` code, visualization registry, or `textcharts/` directory changes are made in this decision.
 - Documentation (`docs/reference/mcp.md`, `docs/reference/public-contracts.md`) records the separate-client posture and the rejected bundle/proxy alternatives.
 - If demand for bundled or proxied textcharts emerges, the follow-on implementation must provide: (1) a namespaced tool prefix, (2) tenant and workspace isolation tests, (3) raw input bounds and SVG sanitization, (4) pinned version and license audit, (5) sessionless HTTP compatibility verification, and (6) a rollback plan that does not require a BenchBox core release.
 

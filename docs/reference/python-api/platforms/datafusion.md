@@ -163,7 +163,7 @@ The values are stored as attributes of the same name (`DataFusionAdapter().force
 **`get_target_dialect() -> str`**: Returns `'datafusion'`, the SQL dialect BenchBox translates queries into.
 
 <span id="benchbox.platforms.datafusion.DataFusionAdapter.get_platform_info"></span>
-**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict`: `platform_type` (`'datafusion'`), `platform_name`, `connection_mode` (`'in-memory'`), `configuration` (`working_dir`, `memory_limit`, `target_partitions`, `data_format`, `temp_dir`, `batch_size`, `result_cache_enabled` which is `False`), `client_library_version`, `platform_version` and `driver_version_actual` (all three are the installed `datafusion` version, `54.0.0` for the run on this page). The `connection` argument is accepted and not used.
+**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict`: `platform_type` (`'datafusion'`), `platform_name`, `connection_mode` (`'in-memory'`), `configuration` (`working_dir`, `memory_limit`, `target_partitions`, `data_format`, `temp_dir`, `batch_size`, `result_cache_enabled` which is `False`), `client_library_version`, `platform_version` and `driver_version_actual` (all three are the installed `datafusion` version). The `connection` argument is accepted and not used.
 
 #### Connection and schema
 

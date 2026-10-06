@@ -80,8 +80,8 @@ This proposal extends existing BenchBox mechanisms rather than replacing them:
   contracts.
 - `benchbox/core/expected_results/` supplies expected-result and digest mechanisms that can support score
   admission, but the new suite needs more than one exact-equality oracle.
-- `docs/development/benchbox-results-platform-strategy.md` defines comparable result cohorts and deliberately
-  avoids a weighted cross-context composite. The new scores are a new, explicitly versioned product
+- The Results Explorer groups results into comparable cohorts and deliberately avoids a weighted
+  cross-context composite. The new scores are a new, explicitly versioned product
   surface; they do not reinterpret the Explorer's existing meta-leaderboard.
 - `docs/development/adr/adr-client-link-locality-disclosure.md` requires client cloud and region disclosure
   plus a post-run statement-overhead probe. Score evidence inherits that contract. The score does not
@@ -487,37 +487,6 @@ Publication is mechanically gated. A ranked bundle must identify a frozen method
 reference-vector ID, and the exact frozen manifest hash. Development and pilot bundles remain provisional
 and unranked; CI and ingestion reject any bundle whose identities do not match the qualified set.
 
-## Review findings incorporated
-
-Adversarial reviews changed the proposal in these material ways:
-
-- benchmark-count weighting was replaced with capability and lineage blocks;
-- experimental benchmarks became first-class candidates with stronger admission gates;
-- a portable no-skip query core was rejected as the only score because it discards advanced SQL coverage;
-- fixed canonical datasets and scalable synthetic datasets were separated into versioned size vectors;
-- concurrency became an explicit measured dimension, with a ladder and published curve rather than one
-  asserted constant;
-- advanced windows, applied analytics, complex types, approximate accuracy, temporal behavior, and
-  non-vacuity fixtures were added to the qualification contract;
-- JOB and full TPC-Havoc were removed from the default throughput mix while remaining important Power or
-  diagnostic workloads;
-- a fully geometric hierarchy replaced mixed arithmetic/geometric aggregation;
-- the M4/16 GB example became a reference candidate subject to resource and variance qualification.
-
-Two challenges were rejected. First, experimental workloads are not excluded merely because they are
-experimental; their purpose is directly relevant and admission evidence addresses their maturity. Second,
-all benchmarks do not receive equal top-level weight, because TPC-H, TPC-Havoc, and TPC-H Skew share data
-and query ancestry and would otherwise dominate independent evidence.
-
-Cost, energy, tenancy, and data freshness do not become hidden score dimensions. Cost and energy may be
-published as diagnostics; isolation and quota policy belong to execution qualification; and fixed datasets
-are deliberately immutable for reproducibility rather than freshness claims. Cross-engine null, NaN,
-timestamp, collation, and complex-value semantics belong to the oracle contract. Hardware-unit continuity
-and shared-host resource accounting belong to reference qualification and topology evidence. The Explorer
-must show blocks and evidence next to the headline, but that is not a reason to remove the two headline
-metrics. Holdout and sensitivity gates test whether those headlines add stable information before
-publication.
-
 ## Alternatives rejected
 
 ### One universal numeric scale factor
@@ -531,10 +500,22 @@ vectors are more honest.
 Rejected because throughput changes materially with session count and saturation. `C` is part of the score
 name and immutable cohort identity.
 
+### Assert one concurrency constant
+
+Rejected because no single session count represents every platform and profile. Qualification measures a
+concurrency ladder and the public result keeps the curve.
+
 ### Weight every benchmark or query equally
 
-Rejected because correlated suites and large variant catalogs would dominate by enumeration. Capability
-and lineage weights preserve diversity without rewarding duplication.
+Rejected because correlated suites and large variant catalogs would dominate by enumeration. TPC-H,
+TPC-Havoc, and TPC-H Skew share data and query ancestry and would otherwise outweigh independent evidence.
+Capability and lineage weights preserve diversity without rewarding duplication.
+
+### Exclude experimental benchmarks
+
+Rejected because their purpose, covering syntax, function, skew, and physical-model diversity, is directly
+relevant to the score. They are first-class candidates with stronger admission gates, and admission
+evidence addresses their maturity.
 
 ### Score only queries supported by every platform
 
@@ -547,6 +528,11 @@ created to cover. Named Core and Full profiles make support explicit.
 Rejected because some workloads model optimizer robustness or exhaustive syntax variation rather than a
 realistic concurrent session. Throughput membership follows modeled concurrent use, as Geekbench 7 limits
 multi-core membership to workloads whose applications are meaningfully multi-threaded.
+
+### Mix arithmetic and geometric aggregation
+
+Rejected because an arithmetic step lets one exceptional block dominate the composite and loses ratio-scale
+properties. The hierarchy is geometric at every level.
 
 ### Use paired-query robustness penalties in the headline
 
@@ -563,6 +549,20 @@ correctness, and variance evidence must determine whether it qualifies.
 
 Rejected because rank aggregation does not preserve a “twice the score means twice the performance”
 interpretation, and existing cohorts do not carry the scored manifest and correctness contract.
+
+### Fold cost, energy, tenancy, or freshness into the score
+
+Rejected because each would become a hidden score dimension. Cost and energy may be published as
+diagnostics; isolation and quota policy belong to execution qualification; and fixed datasets are
+deliberately immutable for reproducibility rather than freshness claims. Cross-engine null, NaN, timestamp,
+collation, and complex-value semantics belong to the oracle contract. Hardware-unit continuity and
+shared-host resource accounting belong to reference qualification and topology evidence.
+
+### Publish only block scores, without headlines
+
+Rejected because the two headline metrics are the summary users need. The Explorer must show blocks and
+evidence next to the headline, and holdout and sensitivity gates test whether the headlines add stable
+information before publication.
 
 ## Consequences
 

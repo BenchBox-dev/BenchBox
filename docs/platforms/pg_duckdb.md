@@ -58,16 +58,13 @@ benchbox run --platform pg-duckdb:motherduck --benchmark tpch --scale 1.0
 ## Data Lake Support Status
 
 Parquet loads work through the inherited PostgreSQL path: the Parquet file
-is streamed client-side via pyarrow into `COPY`, exactly like `postgresql`
-(which is why `pg_duckdb` is registered for Parquet at the same
-`EXTENSION` level). The embedded DuckDB engine is not used for file reads.
+is streamed client-side via pyarrow into `COPY`, exactly like `postgresql`.
+The embedded DuckDB engine is not used for file reads.
 Native loads stay tbl-first like `postgresql`.
 
-BenchBox has no Delta Lake or Iceberg read path for pg_duckdb, so
-neither format is registered in
-`benchbox/platforms/base/format_capabilities.py` - an explicit `--format
-delta` request fails fast with a platform-named error instead of a late
-load failure.
+BenchBox has no Delta Lake or Iceberg read path for pg_duckdb. An explicit
+`--format delta` request fails immediately with an error that names the
+platform.
 
 Cloud reads need credentials at query time, never in code or committed
 config. MotherDuck mode remains the supported cloud variant (token via the

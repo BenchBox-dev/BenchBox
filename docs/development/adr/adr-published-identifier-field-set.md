@@ -38,8 +38,8 @@ the nine pseudonymised field names are consumed by nothing:
 | `database_name` | – | yes | – |
 | `endpoint` | yes | yes | yes |
 
-The read model has no machine or host column. The stated motivation for the
-idempotence fix in #1512 — "pseudonym stability is what lets the Explorer
+The read model has no machine or host column. The stated motivation for making
+anonymization idempotent — "pseudonym stability is what lets the Explorer
 correlate results from the same machine" — describes a capability that is not
 implemented. Nothing correlates by machine today.
 
@@ -96,7 +96,7 @@ the right default for an operator who will publish other people's submissions.
 |---|---|---|
 | Keep empty default salt | Residual oracle on retained fields; fixed point and current corpus bytes unchanged | **Chosen for OSS default** |
 | Mint a baked-in non-empty default salt | Salt is public in git, so the oracle remains; only obscures the empty-string case | **Rejected** |
-| One-time rehash of retained fields under a new salt | Breaks the #1512 publication fixed point; rotates `result_id` again; history still holds the old tokens; without a *secret* salt the oracle returns | **Rejected** |
+| One-time rehash of retained fields under a new salt | Breaks the publication fixed point; rotates `result_id` again; history still holds the old tokens; without a *secret* salt the oracle returns | **Rejected** |
 | Require a non-empty operator-configured salt before public export | Closes the oracle for deployments that set it; needs a secret outside the repo | **Recommended for community-facing operators** (documented; not a hard fail of the OSS default path in this ADR) |
 
 Rationale:
@@ -107,8 +107,8 @@ Rationale:
 2. **The publication fixed point stays.** Already-public-shaped
    `endpoint_` / `database_` / `path_` tokens continue to pass through. A
    one-time rehash would not remove retained history tokens on
-   `published-results` and would force another free-only-once `result_id`
-   rotation after #1578.
+   `published-results` and would force another `result_id` rotation, which
+   is a compatibility event now that result routes are public.
 3. **The unread-field drop already removed the highest-risk empty-salt
    surfaces** (`machine_id`, home-directory paths, `engine_host`, …). What
    remains is low-entropy product material (database names, local endpoints)
@@ -147,28 +147,27 @@ bundles are the product.
 
 ## Consequences
 
-- Every bundle's bytes change, so **every `result_id` changes**. That is free
-  exactly once, while no Explorer is deployed and `published-results` records
-  no `result_id`. It is not free later. See
-  `public-result-id-permanence-and-documented-format`.
-- This supersedes the re-derivation in progress in #1537, which re-derives to a
-  single anonymization pass but keeps the field set. Doing both as one
-  re-derivation avoids rotating every id twice.
+- Every bundle's bytes change, so **every `result_id` changes**. The rotation
+  happened before result routes were publicly served, so it needed no redirect.
+  Any later rotation of a public id is a compatibility event; see
+  [ADR: `public_result_id` permanence attaches at publication](adr-public-result-id-permanence.md).
+- The field-set drop and the move to a single anonymization pass share one
+  re-derivation, so every id rotates once rather than twice.
 - `find_public_path_leaks` stays, but is no longer sufficient on its own. A
   recovery gate that attempts dictionary confirmation against the corpus is
   required alongside it.
 - Retained `published-results` history keeps the superseded values reachable.
-  That decision was recorded in `adr-published-results-history-retention.md`
-  before reversibility was known, and was re-examined separately.
+  The history-retention policy was set before reversibility was known and is
+  decided separately.
 - Retained-field salt decision (2026-08-05): empty OSS default; residual
   confirmation oracle documented; operator-configured non-empty salt recommended
-  for community-facing publishes; publication fixed point from #1512 preserved.
+  for community-facing publishes; publication fixed point preserved.
 - Residual local-path keys (2026-08-05): additional pure-FS compact keys dropped
   at the public boundary; remote-ish path/host keys remain hashed; no corpus
   re-derive when tip bundles lack those keys.
 
 ## What this does not change
 
-`[COMMIT-IDENTITY-001]`, trust labels, and provenance are untouched. Pseudonym
+Trust labels and provenance are untouched. Pseudonym
 identity was never a provenance signal and must not become one — a submitter
 can choose a pseudonym-shaped value and have it pass through by design.

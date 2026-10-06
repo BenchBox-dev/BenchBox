@@ -179,7 +179,7 @@ The values are stored as attributes of the same name (`SQLiteAdapter().force_rec
 **`get_target_dialect() -> str`**: Returns `'sqlite'`, the SQL dialect BenchBox translates queries into.
 
 <span id="benchbox.platforms.sqlite.SQLiteAdapter.get_platform_info"></span>
-**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict`: `platform_type` (`'sqlite'`), `platform_name`, `connection_mode` (`'memory'` for `:memory:`, else `'file'`), `configuration` (`database_path`, `timeout`, `check_same_thread`), `client_library_version` (`'builtin'`) and `platform_version` (the SQLite library version of the Python build, `3.45.1` for the run on this page). The `connection` argument is accepted and not used.
+**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict`: `platform_type` (`'sqlite'`), `platform_name`, `connection_mode` (`'memory'` for `:memory:`, else `'file'`), `configuration` (`database_path`, `timeout`, `check_same_thread`), `client_library_version` (`'builtin'`) and `platform_version` (the SQLite library version of the Python build). The `connection` argument is accepted and not used.
 
 #### Connection and schema
 

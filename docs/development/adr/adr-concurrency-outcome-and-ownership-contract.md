@@ -2,7 +2,7 @@
 
 **Status**: Accepted; superseded in part (see [Superseded in part](#superseded-in-part))
 **Date**: 2026-09-19
-**Scope**: `concurrency-outcome-and-ownership-contract` (prerequisite for the 10-item concurrency batch)
+**Scope**: outcome vocabulary and resource ownership for every concurrent execution path
 
 ## Context
 
@@ -21,7 +21,7 @@ BenchBox has several concurrent execution paths with narrower, disagreeing statu
 
 Adopt one shared outcome vocabulary where the semantics are real, plus explicit adapters
 where a surface is narrower. No second orchestration framework is introduced; existing narrow
-state machines are extended by the owning follow-up items.
+state machines are extended to carry it.
 
 ### 1. Shared outcome vocabulary
 
@@ -82,21 +82,20 @@ a numeric sentinel (e.g., `0.0`) must never read as a valid measurement.
 
 No implementation may claim universal cancellation, exactly-once execution, or production
 readiness unless this contract and its proving tests establish that property. In particular,
-external MCP production acceptance stays operator-owned under
-`docs/operations/mcp-production-readiness.md`; local durable-job hardening does not certify it.
+external MCP production acceptance remains a separate operator decision; local durable-job
+hardening does not certify it.
 
 ## Reconciliation
 
 This ADR constrains but does not supersede: the throughput runner's bounded-timeout design, the
 canonical TPC-DI ETL path, the expected-results registry cache, the execution-manager utilities,
-the durable-job lease design, or completed work (`concurrency-executor-consolidation`,
-`universal-validation-mode-system-architectural-refactor`, TPC-DI phase-3 items). The ten
-follow-up batch items own their surfaces:
+the durable-job lease design, the earlier executor consolidation, or the validation-mode
+system. Each surface applies the contract to its own scope:
 
-- truthful TPC-DI parallel outcomes, expected-results single-flight/run policy, throughput
+- truthful TPC-DI parallel outcomes, expected-results single-flight and run policy, throughput
   outstanding-work containment, deterministic TPC-DI generation, adapter session capability,
-  enhanced-parallel support decision, public-API semantic reconciliation, MCP ownership fencing,
-  durable admission/fairness, and the final proof matrix.
+  the enhanced-parallel support decision, public-API semantic reconciliation, MCP ownership
+  fencing, durable admission and fairness, and a proof matrix that verifies the invariants.
 
 ## Superseded in part
 
@@ -119,7 +118,7 @@ in section 2 is satisfied by the durable job `outcome` field described in
 
 ## Consequences
 
-- Follow-up items extend existing state machines with the outcomes, owners, and containment
-  rules above instead of inventing parallel ones.
-- The proof-matrix item verifies each invariant at the lowest layer capable of falsifying it;
+- Existing state machines gain the outcomes, owners, and containment rules above instead of
+  parallel ones being invented.
+- The proof matrix verifies each invariant at the lowest layer capable of falsifying it;
   mock-based success cannot certify real cancellation or session equivalence.

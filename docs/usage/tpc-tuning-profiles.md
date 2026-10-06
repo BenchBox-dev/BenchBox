@@ -27,7 +27,7 @@ Each candidate records:
 
 Statuses:
 
-- `existing_baseline`: already present before the recovered TPC tuning audit
+- `existing_baseline`: part of the original checked-in tuning baseline
 - `accepted`: added from query-template evidence
 - `dropped_low_evidence`: intentionally excluded unless future evidence changes
 
@@ -38,7 +38,7 @@ checked-in template.
 
 Logical parity does not require identical physical features.
 
-Databricks guidance rechecked on 2026-05-26:
+Databricks guidance:
 
 - Liquid Clustering replaces table partitioning and ZORDER for Delta layout,
   is GA for Delta Lake on Databricks Runtime 15.2 and above, and is recommended

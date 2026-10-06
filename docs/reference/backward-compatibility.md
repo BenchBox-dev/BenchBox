@@ -2,7 +2,7 @@
 
 # Backward Compatibility Registry
 
-This document is the canonical process and registry for tracking backward-compatibility surfaces in BenchBox.
+This page lists the backward-compatibility surfaces BenchBox keeps, and the ones it has removed.
 
 ## Release Stage Policy
 
@@ -25,11 +25,11 @@ development stage.
 
 - Alpha:
   - Prioritize canonical API cleanup over compatibility.
-  - Breaking changes are allowed with direct migration in the same PR.
+  - Breaking changes are allowed with a direct migration.
   - Shims should be short-lived and removed quickly.
 - Beta:
   - Minimize breaking public API changes.
-  - New shims require explicit owner, target removal version, and migration path.
+  - New shims require a target removal version and a migration path.
   - Deprecation windows should span at least one beta cycle.
 - GA (1.x):
   - Preserve public API compatibility by default.
@@ -49,51 +49,19 @@ A code element belongs in this registry if it keeps old behavior working, includ
 - Legacy schema or format handling
 - Compatibility fallbacks for prior API or result shapes
 
-## Registry Process
-
-- Every new compatibility shim must add or update a row in this registry in the same PR.
-- Every removal must delete or update the corresponding row in the same PR.
-- Every row must include:
-  - `Location`
-  - `Compatibility Marker`
-  - `Status` (`active`, `deprecate`, `remove`)
-  - `Target Removal`
-  - `Rationale`
-  - `Owner`
-
 ## Lifecycle States
 
 - `active`: currently retained for compatibility.
 - `deprecate`: retained temporarily and scheduled for removal.
 - `remove`: approved for removal in the next compatible breaking window.
 
-## Update Procedure
-
-1. Run scan:
-
-```bash
-rg -n "backward compatibility|Backward compatibility|legacy compatibility|for backward compatibility|Legacy|backward-compatible|Backward-compatible" benchbox
-```
-
-2. Reconcile scan output with registry entries.
-3. Add missing rows for newly introduced shims.
-4. Remove or update rows for shims removed in the PR.
-5. Validate:
-
-```bash
-make ci-lint
-make ci-test
-```
-
 ## Current Inventory
 
-Maintain live rows below. Do not leave compatibility changes untracked.
-
-| Location | Compatibility Marker | Status | Target Removal | Rationale | Owner |
-| --- | --- | --- | --- | --- | --- |
-| `benchbox/base.py` | `BaseBenchmark.create_enhanced_benchmark_result()` continues accepting legacy kwargs (`table_statistics`, `data_loading_time`, `phases`, `execution_metadata`) while delegating to shared result factory | active | Beta compatibility review | Preserve stable result-shape behavior for adapters and wrapper benchmarks while runtime internals are unified | core-runtime |
-| `benchbox/core/base_benchmark.py` | Deprecated internal base class retained after `datavault` and `tpcds_obt` migrated to `benchbox.base.BaseBenchmark`; no remaining production implementation imports it | deprecate | Deletion-only compatibility item after the beta review window and any remaining internal imports are migrated | Keep the old internal import path observable until its explicit removal gate; it is not a public extension path for new benchmark families | core-runtime |
-| `benchbox/cli/benchmark_hooks.py`, `benchbox/cli/platform_hooks.py` | Thin re-export shims for the benchmark/platform CLI-option hook registries relocated to `benchbox.core.hooks.benchmark_hooks` / `benchbox.core.hooks.platform_hooks` (fixes a `core`/`platforms` -> `cli` layering inversion) | active | Beta compatibility review; these paths are internal-only (not listed in `public-contracts.md`), so the shim is a courtesy rather than a guaranteed compatibility window | Avoid breaking any internal or external caller still importing the old `benchbox.cli.*` path while `benchbox.core`/`benchbox.platforms` are updated to import the registries directly | core-runtime |
+| Location | Compatibility Marker | Status | Target Removal | Rationale |
+| --- | --- | --- | --- | --- |
+| `benchbox/base.py` | `BaseBenchmark.create_enhanced_benchmark_result()` continues accepting legacy kwargs (`table_statistics`, `data_loading_time`, `phases`, `execution_metadata`) while delegating to shared result factory | active | Beta compatibility review | Preserve stable result-shape behavior for adapters and wrapper benchmarks while runtime internals are unified |
+| `benchbox/core/base_benchmark.py` | Deprecated internal base class retained after `datavault` and `tpcds_obt` migrated to `benchbox.base.BaseBenchmark`; no remaining production implementation imports it | deprecate | Deletion-only compatibility item after the beta review window and any remaining internal imports are migrated | Keep the old internal import path observable until its explicit removal gate; it is not a public extension path for new benchmark families |
+| `benchbox/cli/benchmark_hooks.py`, `benchbox/cli/platform_hooks.py` | Thin re-export shims for the benchmark/platform CLI-option hook registries relocated to `benchbox.core.hooks.benchmark_hooks` / `benchbox.core.hooks.platform_hooks` (fixes a `core`/`platforms` -> `cli` layering inversion) | active | Beta compatibility review; these paths are internal-only (not listed in `public-contracts.md`), so the shim is a courtesy rather than a guaranteed compatibility window | Avoid breaking any internal or external caller still importing the old `benchbox.cli.*` path while `benchbox.core`/`benchbox.platforms` are updated to import the registries directly |
 
 ## Removed Compatibility Surfaces
 

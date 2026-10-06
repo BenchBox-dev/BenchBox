@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted, 2026-07-12. Decided by Joe.
+Accepted, 2026-07-12. Decided by the project maintainer.
 
 ## Date
 
@@ -10,9 +10,7 @@ Accepted, 2026-07-12. Decided by Joe.
 
 ## Context
 
-This is the decision gate for TODO `tuning-adr-baseline-definition-and-renderer-20260712`,
-drawn from the 2026-07-12 tuning-system deep review (evidence pinned to commit
-`acfb8992`; findings C5, R2, R3).
+This decision follows a 2026-07-12 review of the tuning system.
 
 ### `notuning` is not a baseline today
 
@@ -78,10 +76,10 @@ the adapter method directly.
 
 ### Linked open question
 
-The blocked TODO `databricks-liquid-clustering-tuning-review-20260526` has
-two open questions (DBR-compatibility hard-error vs. warning; manual-mode
-`liquid_clustering_columns` over 4 keys) that are instances of the same
-policy axis this ADR settles: when does an engine-specific tuning constraint
+Databricks liquid clustering raised two open questions (whether a DBR
+incompatibility is a hard error or a warning; whether manual-mode
+`liquid_clustering_columns` over 4 keys fails) that are instances of the
+same policy axis this ADR settles: when does an engine-specific tuning constraint
 block a run outright, versus warn and proceed? See Consequences.
 
 ## Decision
@@ -99,8 +97,7 @@ block a run outright, versus warn and proceed? See Consequences.
    is never mistaken for an applied tuning. Session-level `SET` statements
    are recorded in the bundle in every mode, not only when tuning is
    enabled. This settles the warn-vs-fail direction for the
-   `databricks-liquid-clustering-tuning-review-20260526` open questions:
-   compatibility checks warn first; a run is blocked only for explicit,
+   Databricks liquid-clustering questions: compatibility checks warn first; a run is blocked only for explicit,
    named unsafe combinations, not by default.
 
 2. **Single renderer.** `core/tuning/generators/*` becomes the single
@@ -115,23 +112,19 @@ block a run outright, versus warn and proceed? See Consequences.
 
 ## Consequences
 
-- `tuning-renderer-consolidation-and-baseline-policy-20260712` implements
-  decision 2 (and the labeling/recording half of decision 1): one capability
-  registry, per-platform migration to the generators with before/after DDL
-  snapshot tests, and deletion of dead renderers such as
+- Decision 2 and the labeling half of decision 1 are implemented through
+  one capability registry, per-platform migration to the generators with
+  before/after DDL snapshot tests, and deletion of dead renderers such as
   `ClickHouse.generate_tuning_clause`.
-- `tuning-applied-ledger-and-validation-status-20260712` implements the
-  recording half of decision 1: session-level `SET` statements (ClickHouse
-  OLAP pack, StarRocks query settings) get bundle ledger entries in every
-  mode, and `validation_status` stops certifying only that a metadata-table
-  `INSERT` succeeded.
-- `databricks-liquid-clustering-tuning-review-20260526` (blocked, w3's open
-  question on DBR-compatibility hard-error vs. warning) is unblocked on this
-  axis: warn-first, block only for explicit unsafe runtimes. Its second open
-  question (hard-fail for explicit `>4` manual `liquid_clustering_columns`)
-  already matches this ADR's "block only explicit unsafe combinations"
-  direction and stands unchanged. Annotated directly on the TODO via
-  `resolved_with`.
+- The recording half of decision 1 is implemented by the applied-statement
+  ledger: session-level `SET` statements (ClickHouse OLAP pack, StarRocks
+  query settings) get bundle ledger entries in every mode, and
+  `validation_status` stops certifying only that a metadata-table `INSERT`
+  succeeded.
+- For Databricks liquid clustering, DBR compatibility checks warn first and
+  block only explicit unsafe runtimes. A hard failure for an explicit `>4`
+  manual `liquid_clustering_columns` already matches this ADR's "block only
+  explicit unsafe combinations" direction and stands unchanged.
 - The ClickHouse OLAP session pack and any similar per-platform pack must be
   re-homed (tuned path or harness-defaults block) as part of the renderer
   consolidation work, not left in place with a comment.
@@ -196,7 +189,7 @@ anonymized.**
   non-anonymized exports stays on for local files.
 - The change is limited to exporter defaults and CLI wiring. The anonymizer
   (`benchbox/core/results/anonymization.py` and `anonymization_specs.yaml`) is
-  owner-reviewed and is not edited by this decision.
+  not changed by this decision.
 
 Rejected options: a `--no-anonymize` flag, which leaves the unhelpful default in
 place for everyone who does not find it; and keeping the default while printing

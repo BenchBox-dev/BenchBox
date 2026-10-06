@@ -11,11 +11,15 @@ Complete reference for the BenchBox MCP (Model Context Protocol) server, includi
 
 ### Prerequisites
 
-Install BenchBox with MCP dependencies:
+Install BenchBox with the MCP extra:
 
 ```bash
-uv sync --extra mcp
+uv pip install "benchbox[mcp]"
+# or
+python -m pip install "benchbox[mcp]"
 ```
+
+In a source checkout, run `uv sync --extra mcp` instead.
 
 The MCP extra includes DuckDB because `duckdb` is the advertised local
 execution platform in the MCP surface. Other platforms keep their separate
@@ -24,11 +28,14 @@ optional extras.
 ### Starting the Server
 
 ```bash
-# Via Python module
-uv run python -m benchbox.mcp
-
-# Via entry point (if installed globally)
+# Via the installed entry point
 benchbox-mcp
+
+# Via the Python module
+python -m benchbox.mcp
+
+# From a source checkout
+uv run benchbox-mcp
 
 # With explicit MCP path overrides
 benchbox-mcp --results-dir /tmp/benchbox-results --charts-dir /tmp/benchbox-charts
@@ -63,10 +70,8 @@ not a production-readiness claim.
 
 BenchBox uses the Python MCP SDK 2.x `MCPServer` API and reports its own
 `benchbox` server name and BenchBox package version during initialization.
-The v2 migration preserves the public stdio contract: 12 tools, 4 static
-resources, 2 resource templates, and 7 prompts. Tool names, input schemas,
-annotations, resource URIs, prompt schemas, and handler behavior are unchanged;
-only Python-side SDK model attributes use the v2 snake-case names.
+The stdio server exposes 12 tools, 4 static resources, 2 resource templates,
+and 7 prompts.
 
 An authenticated remote server adds four durable job tools. They use shared
 storage and return immediately, so sessionless requests may reach different
@@ -87,7 +92,7 @@ To verify the server works, you can test it interactively:
 
 ```bash
 # Start server and send a test request
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | uv run python -m benchbox.mcp
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | benchbox-mcp
 ```
 
 This should return a JSON response listing all available tools.
@@ -169,10 +174,10 @@ benchbox-mcp --transport streamable-http --host ::1
 Tools are executable actions that can be invoked by AI assistants. BenchBox MCP
 is a **beta-public scoped surface over the shared BenchBox engine**: all
 benchmark business logic lives in `benchbox.core` below both CLI and MCP, and
-each surface exposes a deliberately scoped subset of it. Surface asymmetry is
-deliberate and ledgered, never a parity backlog. MCP must not import
-`benchbox.cli` command internals. See
-[ADR: One Engine, Scoped Surfaces](../development/adr/adr-one-engine-scoped-surfaces.md).
+each surface exposes a chosen subset of it. Surface asymmetry is deliberate and
+ledgered, never a parity backlog. The CLI controls that MCP does not expose,
+and the reason for each, are listed in the omission tables below the
+`run_benchmark` behavior notes.
 
 MCP run results are exported through `ResultExporter` as normal result JSON
 bundles and include `execution_context.entry_point = "mcp"` when the result
@@ -242,25 +247,14 @@ modes remain available because they do not hold the request for execution.
 - `dry_run=true` uses the core dry-run executor and returns the plan/resources
   preview the MCP subset can model; it currently reports the default
   load/power plan rather than applying the `phases` parameter.
-- `mode=data_only` generates benchmark data without running queries. This is a
-  deliberate, ratified asymmetry rather than a ledgered omission, and it runs
-  the other way from the rest of the ledger: MCP accepts a value here that
-  `benchbox run --mode` does not. `sql` and `dataframe` are platform
-  *capabilities*, validated against
-  `benchbox.core.constants.RUN_MODES`; `data_only` is an *execution type*
-  (`benchbox.core.constants.EXECUTION_TYPES`), meaning "run no queries at all".
-  The CLI derives that execution type from `--phases generate`, so it has no
-  reason to name it on `--mode`. MCP's phase surface is a single string with no
-  interactive selection behind it, so it names the execution type directly.
-  `datagen` and `generate` remain accepted spellings of `data_only`. Both
-  synchronous requests and durable workers route this execution through the
-  shared core run service; MCP owns only the structured response envelope and
-  tenant-scoped artifact path.
+- `mode=data_only` generates benchmark data without running queries. MCP
+  accepts this value but `benchbox run --mode` does not: on the CLI, use
+  `--phases generate` for the same result. `sql` and `dataframe` select how
+  queries run; `data_only` means "run no queries at all". `datagen` and
+  `generate` are accepted spellings of `data_only`.
 - `phases` is validated against
   `benchbox.core.constants.VALID_PHASES` at admission, on both `run_benchmark`
-  and `start_benchmark`. An unknown phase is rejected with the valid list;
-  previously it was accepted and then silently dropped, so a typo like
-  `load,lodad` ran only the load phase without reporting anything.
+  and `start_benchmark`. An unknown phase is rejected with the valid list.
 - `phases` applies to normal execution and maps to the benchmark execution type
   used by `BaseBenchmark.run_with_platform()`.
 - `platform_options` is normalized and validated before any adapter is built.
@@ -271,10 +265,9 @@ modes remain available because they do not hold the request for execution.
   filesystem paths, unbounded values, and driver auto-install/version controls
   fail closed. Authenticated durable jobs persist only this normalized object,
   so retries and worker restarts cannot reintroduce raw request mappings.
-- Velox `deployment` is not exposed over MCP. Local execution is the only deployment MCP can fully describe; `remote` would require an operator-approved endpoint (`sc://`) and additional packaging/runtime controls that are not part of the MCP allow-list. Both `remote` and `docker` are rejected at admission, so a request can never redirect execution to an endpoint it did not name via a server-owned profile. `docker` is rejected: the `docker/velox/` tree is packaging infrastructure for local development, not a deployment mode with its own lifecycle, endpoint, isolation, and cleanup contract. See the omission ledger below.
+- Velox `deployment` is not exposed over MCP. Local execution is the only deployment MCP can fully describe; `remote` would require an operator-approved endpoint (`sc://`) and additional packaging/runtime controls that are not part of the MCP allow-list. Both `remote` and `docker` are rejected at admission, so a request can never redirect execution to an endpoint it did not name via a server-owned profile. `docker` is rejected: the `docker/velox/` tree is packaging infrastructure for local development, not a deployment mode with its own lifecycle, endpoint, isolation, and cleanup contract. See the `benchbox run` flag table below.
 - DuckDB `threads` is the public option name and maps to the adapter's
-  `thread_limit`, which becomes a `SET threads` statement on the connection. The
-  public name is unchanged; only the internal mapping is documented here.
+  `thread_limit`, which becomes a `SET threads` statement on the connection.
 - Databricks clustering options are translated into effective tuning before the
   adapter is built. `databricks_clustering_strategy` and
   `liquid_clustering_columns` become a `PlatformOptimizationConfiguration` that
@@ -313,28 +306,26 @@ modes remain available because they do not hold the request for execution.
 
 **Scoped-surface omission ledger**
 
-These `benchbox run` controls are not MCP parameters. Each entry carries exactly
-one ratified tier reason, defined in
-[ADR: One Engine, Scoped Surfaces](../development/adr/adr-one-engine-scoped-surfaces.md):
+Some CLI commands and `benchbox run` controls are not available over MCP. The
+tables below list each one with one of three reasons:
 
-- **security-scoped** — permanent. Admitting the control would let a request
-  name credentials, endpoints, filesystem or cloud destinations, or unbounded
-  resources, or would trigger destructive or publishing side effects. Parity
-  never applies to these. A bounded, typed, server-validated allow-list entry is
-  a new narrow control, not a promotion of the CLI flag.
-- **interaction-scoped** — permanent. The control governs terminal interaction
-  or presentation and has no meaning in a structured request/response protocol.
-- **not-yet-demanded** — provisional. Nothing about security or interaction
-  blocks it; no MCP client has demanded it. Promotion is demand-driven.
+- **security-scoped** — will not be added. The control could name credentials,
+  endpoints, filesystem or cloud destinations, or unbounded resources, or could
+  trigger destructive or publishing side effects. Where MCP needs a safe part of
+  such a control, it offers a separate bounded, server-validated parameter.
+- **interaction-scoped** — will not be added. The control governs terminal
+  interaction or presentation and has no meaning in a structured
+  request/response protocol.
+- **not-yet-demanded** — may be added later. Nothing about security or
+  interaction blocks it; no MCP client has needed it yet.
 
 An omission that is absent from this ledger is a defect, not a decision.
 
 ### Per-Tool CLI↔MCP Mapping Ledger
 
-Every local MCP tool names its CLI counterpart(s) or `none`. Every CLI command
-family absent from MCP carries exactly one ratified tier tag. Together the two
-tables below cover all 12 local tools and every CLI command family with no MCP
-tool.
+The first table maps each of the 12 local MCP tools to its CLI counterparts, or
+`none`. The second lists the CLI command families that have no MCP tool, with
+the reason.
 
 **MCP tool → CLI mapping (12 local tools)**
 
@@ -344,7 +335,7 @@ tool.
 | `get_benchmark_info` | discovery | `benchbox benchmarks list` | Single-benchmark metadata, query counts, and scale constraints. CLI `list` is the registry read path; MCP returns enriched per-ID detail via `get_benchmark_info`. |
 | `system_profile` | discovery | `benchbox profile` | Host, CPU, memory, and package facts. |
 | `check_dependencies` | discovery | `benchbox check-deps [platform]` | Dependency availability and install guidance. |
-| `run_benchmark` | execution | `benchbox run` | Scoped subset of `benchbox run`; omission details are in the run-surface ledger below. |
+| `run_benchmark` | execution | `benchbox run` | Scoped subset of `benchbox run`; omitted flags are listed in the `benchbox run` flag table below. |
 | `get_query_details` | execution aid | `none` | MCP-only convenience: CLI users read query SQL from the benchmark source tree; MCP returns it structured per platform/mode. |
 | `get_results` | results | `benchbox results`, `benchbox export` | Lists, reads, and exports result bundles; MCP inline-reads while CLI renders to stdout/files and supports cloud export. |
 | `analyze_results` | analytics | `benchbox compare`, `benchbox report`, `benchbox aggregate` | Comparison, regression, trend, and aggregation over result bundles. |
@@ -372,9 +363,8 @@ tool.
 
 ### Scoped-Surface Omission Ledger — `benchbox run` Flags
 
-The section below ledgers every `benchbox run` flag not exposed as an
-`run_benchmark` parameter. The tier taxonomy is shared with the per-tool ledger
-above.
+These `benchbox run` flags are not `run_benchmark` parameters. The reasons use
+the same three categories as above.
 
 | CLI surface | MCP status | Tier | Reason |
 |---|---|---|---|
@@ -466,7 +456,7 @@ planning.
 
 Public benchmark query details include registry `support_status` in
 `benchmark_info`. Internal/repo-only benchmark details remain addressable by
-explicit ID where previously supported, but do not expose support-status claims.
+explicit ID, but do not expose support-status claims.
 See the [Benchmark Visibility Policy](public-contracts.md#benchmark-visibility-policy)
 for the full surface-by-surface matrix.
 

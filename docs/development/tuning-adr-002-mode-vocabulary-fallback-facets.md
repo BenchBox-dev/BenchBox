@@ -1,12 +1,10 @@
 # ADR-002: Tuning Mode Vocabulary, Fallback Labeling, and Facet Semantics
 
-**Status**: Accepted (2026-07-12, decided by Joe)
-**Decision gate**: `_project/DONE/main/active/tuning-adr-mode-vocabulary-fallback-facets-20260712.yaml`
-**Source review**: tuning-system deep review 2026-07-12 (`claude/tuning-system-review-7mzapy`), findings C4-C6, evidence pinned to commit `acfb8992`
+**Status**: Accepted (2026-07-12, decided by the project maintainer)
 
 ## Context
 
-Three related gaps surfaced in the 2026-07-12 tuning-system review:
+Three related gaps surfaced in a 2026-07-12 review of the tuning system:
 
 1. **Silent fallback mislabeling.** When `--tuning tuned` is requested but no platform/benchmark
    template can be found, `benchbox/cli/tuning_resolver.py:295-307` falls back to a bare
@@ -77,25 +75,22 @@ Three related gaps surfaced in the 2026-07-12 tuning-system review:
 
 ## Consequences
 
-- `tuning-mode-vocabulary-and-facet-implementation-20260712` implements the vocabulary pin,
-  fallback labeling, `wizard` source provenance, and the shared vocabulary artifact across
-  `benchbox/cli/tuning_resolver.py`, `benchbox/cli/tuning.py`, `benchbox/cli/commands/run.py`,
-  and `benchbox/core/schemas.py`.
-- `tuning-explorer-ingest-mode-extraction-20260712` updates explorer ingest and
-  `facetMatching.ts`/`TuningBadge.tsx` to consume the shared vocabulary, drop the invented
-  `"untuned"` default in favor of an explicit "not recorded" state, and add the
+- The vocabulary pin, fallback labeling, `wizard` source provenance, and the shared vocabulary
+  artifact apply across `benchbox/cli/tuning_resolver.py`, `benchbox/cli/tuning.py`,
+  `benchbox/cli/commands/run.py`, and `benchbox/core/schemas.py`.
+- Explorer ingest and `facetMatching.ts`/`TuningBadge.tsx` consume the shared vocabulary, drop
+  the invented `"untuned"` default in favor of an explicit "not recorded" state, and add the
   `physical_rendering_id` secondary facet.
-- `tuning-soundness-test-coverage-20260712` adds cross-language test coverage asserting Python
-  and TypeScript agree on the pinned vocabulary and that the `--official` refusal for
-  `tuned-fallback` is enforced.
+- Cross-language tests assert that Python and TypeScript agree on the pinned vocabulary and that
+  the `--official` refusal for `tuned-fallback` is enforced.
 - Existing bundles with `tuning_mode: tuned` produced via the fallback path, or with raw file
   paths as `tuning_mode`, are not silently reclassified retroactively; ingest treats
   unrecognized values as "not recorded" rather than guessing which bucket they belong in.
 
 ## Rejected options
 
-- **Keep the `tuned` label for fallback runs.** Rejected: it is the root cause of finding C4 —
-  fallback runs facet-match curated-template runs with no signal that a materially different
+- **Keep the `tuned` label for fallback runs.** Rejected: it is the root cause of the mislabeling in
+  Context item 1 — fallback runs facet-match curated-template runs with no signal that a materially different
   (unoptimized) configuration was used, which silently corrupts head-to-head comparisons.
 - **Strict mechanism-based facet matching** (fold physical mechanism sets directly into the
   `tuning_mode` facet match, so platforms with different mechanism counts never match even when

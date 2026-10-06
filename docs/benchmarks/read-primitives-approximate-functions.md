@@ -52,11 +52,7 @@ sqlglot leaves the SQL non-functional.
 | DataFusion | `approx_percentile_cont(x, 0.5)`                             | YAML variant     |
 | Redshift   | `APPROXIMATE PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY x)` | YAML variant     |
 
-Redshift's `APPROXIMATE PERCENTILE_DISC` syntax is rejected by
-sqlglot's redshift parser, so the variant is hand-written rather than
-sqlglot-rewritten and the static linter has an explicit allowlist for
-its `variant_parse_error`. Runtime execution sends the SQL as-is to
-the Redshift adapter, so the parse-time gap doesn't block actual runs.
+The Redshift variant is hand-written and sent to Redshift as-is.
 Note: the per-node GROUP BY result-set cap applies; for grouping
 columns with cardinality near or above the cap, fall back to exact
 `PERCENTILE_CONT`.
@@ -148,8 +144,8 @@ fallbacks rather than hand-rolled approximations.
 
 ## Single-query scope
 
-These queries exercise only the **aggregate latency** path — i.e., the
-boring half of the modern approximate-analytics announcement. They run
+These queries exercise only the **aggregate latency** path: one-shot
+approximate aggregates. They run
 in isolation against TPC-H tables with no shared state.
 
 The differentiated capability — building sketches in one query,

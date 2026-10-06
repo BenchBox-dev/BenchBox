@@ -7,7 +7,7 @@ Python API reference for the NYC Taxi benchmark.
 
 NYC Taxi models trip records from the New York City Taxi and Limousine Commission (TLC). By default it has a `trips` fact table, a `taxi_zones` dimension table and 25 analytical queries on Yellow Taxi data. Green Taxi and high-volume for-hire vehicle (HVFHV, Uber and Lyft) data and 14 more queries can be added.
 
-Network access matters for this benchmark. `generate_data()` tries to download each month of real TLC data and generates synthetic rows for any month it cannot download, logging `Download failed: ..., using synthetic data` for each. The runs on this page had no access to the TLC site, so every example output below comes from synthetic data. Row counts and query results from a run with network access will differ.
+Network access matters for this benchmark. `generate_data()` tries to download each month of real TLC data and generates synthetic rows for any month it cannot download, logging `Download failed: ..., using synthetic data` for each. The example outputs below come from synthetic data. Row counts and query results from downloaded data differ.
 
 ## `benchbox.NYCTaxi`
 

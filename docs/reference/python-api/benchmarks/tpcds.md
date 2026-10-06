@@ -296,13 +296,13 @@ Raises `ValueError` for a negative id or an id of 100 or more.
 
 <span id="benchbox.tpcds.TPCDS.queries"></span>
 
-`queries` returns the internal query manager (a `TPCDSQueryManager`). Its methods are not part of the contract; the old example calling `get_query_info(1)` on it raises `AttributeError`. Use `get_query()`, `get_queries()` and `get_available_queries()`.
+`queries` returns the internal query manager (a `TPCDSQueryManager`). Its methods are not part of the contract. Use `get_query()`, `get_queries()` and `get_available_queries()`.
 
 ### generator
 
 <span id="benchbox.tpcds.TPCDS.generator"></span>
 
-`generator` returns the internal data generator (a `TPCDSDataGenerator`). Its methods are not part of the contract; the old example calling `get_table_info("store_sales")` on it raises `AttributeError`. Use `generate_data()` and `get_schema()`.
+`generator` returns the internal data generator (a `TPCDSDataGenerator`). Its methods are not part of the contract. Use `generate_data()` and `get_schema()`.
 
 ### Inherited members
 

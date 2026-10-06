@@ -23,18 +23,18 @@ its cgroup ceiling, but the engine's measured peak was substantially lower.
 Exploratory Apple Container runs then measured the following complete TPC-H SF1
 load-plus-power outcomes:
 
-| nominal cgroup request | outcome | evidence |
-|---:|---|---|
-| 5 GiB | failed three power queries; no cgroup/OOM event | `tpch_sf1_clickhouse_server_sql_20260823_085737_dafb9272.json` |
-| 5.25 GiB | 66/66 queries passed; exact eight-table rows | `tpch_sf1_clickhouse_server_sql_20260823_090633_3e841a03.json` |
-| 5.5 GiB | 66/66 queries passed | `tpch_sf1_clickhouse_server_sql_20260823_090340_dec290a6.json` |
-| 6 GiB | 66/66 queries passed | `tpch_sf1_clickhouse_server_sql_20260823_090049_c8fcd4aa.json` |
-| 8 GiB | 66/66 queries passed | `tpch_sf1_clickhouse_server_sql_20260823_085324_045ac0bf.json` |
+| nominal cgroup request | outcome |
+|---:|---|
+| 5 GiB | failed three power queries; no cgroup/OOM event |
+| 5.25 GiB | 66/66 queries passed; exact eight-table rows |
+| 5.5 GiB | 66/66 queries passed |
+| 6 GiB | 66/66 queries passed |
+| 8 GiB | 66/66 queries passed |
 
 The 5.25 GiB TPC-H run had zero cgroup/OOM events and passed the result
 validator, including exact SF1 row counts. TPC-DS SF1 at the same 5.25 GiB
 request loaded 19,557,376 rows without a cgroup/OOM event and reached a
-measured engine peak of about 3.11 GB (`tpcds_sf1_clickhouse_server_sql_20260823_093153_449b1f7e.json`). Its power phase completed but contained query failures; those are separate TPC-DS compatibility/correctness evidence, not a memory-limit failure. The TPC-DS result must not be represented as a clean benchmark pass until those query failures are resolved.
+measured engine peak of about 3.11 GB. Its power phase completed but contained query failures; those are separate TPC-DS compatibility/correctness evidence, not a memory-limit failure. The TPC-DS result must not be represented as a clean benchmark pass until those query failures are resolved.
 
 No default host reserve is assumed. The calibration established the
 5.25 GiB runtime request, but did not validate an additional host margin; the
@@ -97,14 +97,7 @@ for server-mode certification.
   ClickHouse insert counters exist. Once the first complete sample is present,
   any later required-telemetry gap invalidates the trace.
 
-## Evidence and follow-up
-
-The Apple Container cgroup probe and full-run console captures are retained in
-`/tmp/clickhouse-host-overhead-rungs-20260822.log`,
-`/tmp/clickhouse-host-overhead-8g-repeats-20260822.log`, and the corresponding
-`/tmp/clickhouse-candidate8-*` logs from the calibration session. The durable
-result JSON files are under `<repo>/benchmark_runs/results/` as named
-above.
+## Requirements that follow
 
 The trace collector must remain fail-closed for missing telemetry after the
 startup warm-up boundary. TPC-DS power-query failures require a separate

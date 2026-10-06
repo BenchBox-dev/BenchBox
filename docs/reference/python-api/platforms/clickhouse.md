@@ -230,7 +230,7 @@ These results are for local mode. In server mode the same methods connect to the
 **`__init__(**config)`**: Creates the adapter from keyword arguments. See Parameters above. It stores the settings for the chosen mode and opens no connection.
 
 <span id="benchbox.platforms.clickhouse.ClickHouseAdapter.KNOWN_INCOMPATIBLE_QUERIES"></span>
-**`KNOWN_INCOMPATIBLE_QUERIES`** (class attribute): `{'tpcds': [14, 30, 81]}`: TPC-DS query numbers that have failed on some ClickHouse versions even after BenchBox's query rewrites (query 14 needs an alias for `INTERSECT DISTINCT`; queries 30 and 81 hit `Code: 48`, query-plan cloning for aggregation steps). The attribute is data only and nothing in the adapter skips these queries. In the run behind this page, with chDB 4.4.0, all three executed with status `SUCCESS` at scale factor 0.01, so the list describes older engine versions.
+**`KNOWN_INCOMPATIBLE_QUERIES`** (class attribute): `{'tpcds': [14, 30, 81]}`: TPC-DS query numbers that have failed on some ClickHouse versions even after BenchBox's query rewrites (query 14 needs an alias for `INTERSECT DISTINCT`; queries 30 and 81 hit `Code: 48`, query-plan cloning for aggregation steps). The attribute is data only and nothing in the adapter skips these queries. With chDB 4.4.0, all three run with status `SUCCESS` at scale factor 0.01, so the list describes older engine versions.
 
 <span id="benchbox.platforms.clickhouse.ClickHouseAdapter.driver_isolation_capability"></span>
 **`driver_isolation_capability`** (class attribute): `DriverIsolationCapability.NOT_FEASIBLE` (from `benchbox.platforms.base`): a requested ClickHouse driver version cannot be run in an isolated runtime.

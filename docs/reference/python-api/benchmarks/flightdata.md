@@ -7,7 +7,7 @@ Python API reference for the FlightData benchmark.
 
 FlightData models US domestic flight on-time performance (the Bureau of Transportation Statistics "On-Time Performance" data). It has a `flights` fact table, two small reference tables (`airlines` and `airports`) and 20 analytical queries in five categories.
 
-Network access matters for this benchmark. `generate_data()` tries to download each month of real data from the Bureau of Transportation Statistics and generates synthetic rows for any month it cannot download. The runs on this page had no access to that site, so every example output below comes from synthetic data. Row counts and query results from a run with network access will differ.
+Network access matters for this benchmark. `generate_data()` tries to download each month of real data from the Bureau of Transportation Statistics and generates synthetic rows for any month it cannot download. The example outputs below come from synthetic data. Row counts and query results from downloaded data differ.
 
 ## `benchbox.FlightData`
 

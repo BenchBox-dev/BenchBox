@@ -57,9 +57,7 @@ session settings on each connection.
 | `send_receive_timeout` | `300` | Driver socket timeout in seconds |
 | `compression` | `false` | Disabled by default (`clickhouse-cityhash` compatibility on Python 3.13+) |
 
-`insert_block_size` rejects `1000` and any non-positive value. That guard is
-deliberate: the loader streams natively and must never fall back to a
-1,000-row application batch.
+`insert_block_size` rejects `1000` and any non-positive value.
 
 `clickhouse-cloud` sets `max_memory_usage` and `max_threads` to `0` so the
 managed service handles sizing.
@@ -95,14 +93,6 @@ fails before any table is created.
 loads, set `--platform-option optimize_after_load=true`. It runs on tuned runs
 only. Its time is reported as `phases.post_load_maintenance` and is not
 counted in data-loading time.
-
-## Docker Integration Testing
-
-ClickHouse server Docker tests use the existing Compose stack:
-
-```bash
-make test-docker-clickhouse
-```
 
 ## Comparison with Other ClickHouse Platforms
 

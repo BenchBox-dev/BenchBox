@@ -2,7 +2,6 @@
 
 **Status**: Accepted
 **Date**: 2026-04-20
-**Workstream**: `build-sql-compat-phase-aware-pipeline` (complete); `centralize-ddl-translation-phase` (complete)
 
 The shipped subsystem lives at [`benchbox/sql_compat/`](../../../benchbox/sql_compat/). Generated
 references regenerated from the registry by `scripts/generate_compat_docs.py`:
@@ -52,7 +51,7 @@ Migration lands behind a `BENCHBOX_COMPAT_REGISTRY` feature flag with a dual-run
   separate future ADR. The decision engine must work behind the existing managers without requiring
   storage migration.
 - sqlglot version upgrade or replacement
-- New platform or benchmark additions within this workstream
+- New platform or benchmark additions as part of this change
 - Result schema or visualization changes
 - Polars/Pandas compatibility beyond DataFrame pipeline-head skip/variant actions
 
@@ -62,17 +61,16 @@ Migration lands behind a `BENCHBOX_COMPAT_REGISTRY` feature flag with a dual-run
 
 ### Derivation Protocol
 
-The phase list below is **provisional**. The `w2` inventory tool will walk the codebase and classify
-every dialect-branching decision point. Before any implementation slice begins, the inventory output
-(`_project/compat/inventory.jsonl`) is reviewed and these phases are amended if the inventory
-surfaces decision shapes that do not fit the provisional taxonomy. The ADR is updated and the
-amended phase list is frozen before `w5` (engine scaffold) begins.
+The phase list below started as provisional. The inventory tool
+(`benchbox/sql_compat/inventory.py`) walks the codebase and classifies every dialect-branching
+decision point. The inventory output was reviewed against the provisional taxonomy, and the phase
+list was frozen before the engine was scaffolded.
 
 Acceptance criteria for freezing: the inventory must successfully classify at minimum:
 - The `benchmark_gate` site at `cli/commands/run.py:804`
 - The `QUERY_VARIANTS` / version-gated site at `core/vector_search/queries.py`
 
-### Provisional Phase List
+### Phase List
 
 | Phase | When it runs | Applicable actions |
 |-------|-------------|-------------------|
@@ -86,7 +84,7 @@ Acceptance criteria for freezing: the inventory must successfully classify at mi
 | `dataframe_filter` | Per-query skip decision at DataFrame execution time | `skip_query`, `native` |
 
 **Session policy is an action, not a phase.** `set_session_policy` is emitted by a rule in
-`query_adapter` phase. It is not promoted to its own phase unless the `w2` inventory demonstrates a
+`query_adapter` phase. It is not promoted to its own phase unless the inventory demonstrates a
 case where session-policy decisions must fire independently of query-adapter decisions.
 
 **`post_translate` is an action within `query_compile`**, not a separate phase. Post-processors
@@ -133,7 +131,7 @@ class CompatibilityContext:
     platform_version: str | None  # e.g. "3.2.1"; None if not known
     benchmark: str          # e.g. "h2odb", "write_primitives"
     query_id: str | None    # e.g. "Q9"; None for non-query phases
-    phase: Phase            # one of the provisional Phase enum values
+    phase: Phase            # one of the Phase enum values
     mode: Literal["sql", "dataframe"]
     dialect: str | None     # sqlglot dialect string; None for non-SQL paths
 ```
@@ -353,13 +351,13 @@ The lint rule (`scripts/compat_lint.py`) fires when: a dialect-branch (`if diale
 the containing callable is not `@compat_local`-decorated (with a matching `kind`) AND has no
 registered rule for the detected platform × phase combination.
 
-The linter runs in **error mode** (exit 1) permanently, as of the completion of `w15`.
+The linter runs in **error mode** (exit 1) permanently.
 
 ---
 
 ## Baseline Schema v1
 
-The baseline artifact (`_project/compat/baseline.v1.jsonl`) records the pre-migration behavior of
+The baseline artifact (`baseline.v1.jsonl`, written by `benchbox/sql_compat/baseline_tool.py`) records the pre-migration behavior of
 every (platform, benchmark, query_id, phase) tuple that has a compatibility decision. It is the
 parity baseline for dual-run shadow-mode divergence review.
 
@@ -396,7 +394,7 @@ When the baseline schema changes:
 2. Create `baseline.v{N+1}.jsonl` with the new shape
 3. Update `baseline_tool.py` to emit the new version
 4. Update the dual-run harness to consume the new version
-5. No old-version file is deleted until the dual-run harness is removed in `w16`
+5. No old-version file is deleted while the dual-run harness exists (it has since been removed)
 
 ### Refresh Protocol
 
@@ -428,8 +426,7 @@ CLI run command
 ```
 
 The `caps.unsupported_benchmarks` field on `PlatformCapability` becomes a view computed from
-registry `benchmark_gate` rules (implemented in `w16`). Until then, `w9` wires the CLI preflight
-to consult the registry for PK-requiring benchmarks.
+registry `benchmark_gate` rules.
 
 ## SQL Pipeline Head
 
@@ -455,8 +452,8 @@ query-execution phases only (`query_source`, `query_compile`, `query_adapter`,
 Actions that apply at the SQL pipeline head: `skip_query`, `select_variant`, `set_session_policy`,
 `rewrite_query`, `post_translate`.
 
-The existing `get_platform_skip_queries()` function becomes a thin facade over the registry
-(kept for backwards compatibility until `w16`).
+The existing `get_platform_skip_queries()` function becomes a thin facade over the registry,
+kept for backwards compatibility.
 
 ---
 
@@ -467,8 +464,8 @@ registry but consults it with `mode="dataframe"` in the context. Only `skip_quer
 `select_variant` actions apply; `rewrite_query`, `set_session_policy`, and `post_translate` do not
 apply to DataFrame paths (Polars/Pandas retain existing code paths).
 
-The existing `get_df_platform_skip_queries()` function becomes a thin facade over the registry
-(kept for backwards compatibility until `w16`).
+The existing `get_df_platform_skip_queries()` function becomes a thin facade over the registry,
+kept for backwards compatibility.
 
 ---
 
@@ -548,19 +545,19 @@ runner enforces this by not retaining a reference to the resolver.
 
 ## Dual-Run Harness (deleted - registry is authoritative)
 
-The dual-run harness (`benchbox/sql_compat/harness.py`) was deleted in parent w16 after zero
+The dual-run harness (`benchbox/sql_compat/harness.py`) was deleted at cutover after zero
 divergence was confirmed across all registered rules. Feature flag `BENCHBOX_COMPAT_REGISTRY` is
 also removed. The registry is now the sole source of truth.
 
 The harness operated in three modes; preserved below for historical reference only:
 
-Feature flag: `BENCHBOX_COMPAT_REGISTRY={off|shadow|on}` (default: `off` until `w5`; `shadow` after
-`w6`; `on` after `w16`).
+Feature flag: `BENCHBOX_COMPAT_REGISTRY={off|shadow|on}`. The default moved from `off` to `shadow`
+once the harness existed, and to `on` at cutover.
 
 | Mode | Behavior |
 |------|---------|
 | `off` | Legacy path only. Registry not consulted. |
-| `shadow` | Both legacy and registry paths run. Legacy decision is acted on. Registry decision is logged. Divergences written to `_project/compat/divergence.log`. |
+| `shadow` | Both legacy and registry paths run. Legacy decision is acted on. Registry decision is logged. Divergences written to a local divergence log. |
 | `on` | Registry is authoritative. Legacy path disabled. |
 
 ### Divergence Log Shape
@@ -581,31 +578,30 @@ The `rule_id` prefix must always match the `phase` field - both reflect the
 `CompatibilityContext.phase` used when the resolver was called. A null `rule_id` is valid when the
 registry has no matching rule (registry outcome = "no_decision").
 
-Cut-over to `on` mode is gated on divergence reaching **zero** for each slice's rule_ids across a
-full shadow-mode pass before that slice is merged.
+Cut-over to `on` mode is gated on divergence reaching **zero** for each migrated site's rule_ids across a
+full shadow-mode pass before that site's migration is merged.
 
 ---
 
-## Migration Plan (work unit sequence)
+## Migration Sequence
 
-See TODO item `build-sql-compat-phase-aware-pipeline` for full work unit breakdown. High-level:
-
-1. **w1** (this ADR) → **w2** (inventory + freeze phase taxonomy) → **w3** (baseline snapshot)
-2. **w4** (parallel with w3): `@compat_local` decorator + warn-only linter
-3. **w5**: Scaffold `benchbox/sql_compat/` package (no rules yet)
-4. **w6**: Dual-run harness + feature flag
-5. **Slices w7-w15**: Migrate each decision site behind the harness; merge only after zero divergence
-6. **w16**: Cutover - registry authoritative, harness deleted, feature flag removed
-7. **w17-w18**: Doc generator + capability matrix
+1. Record this decision, run the inventory and freeze the phase taxonomy, then take the baseline
+   snapshot.
+2. In parallel with the baseline: add the `@compat_local` decorator and a warn-only linter.
+3. Scaffold the `benchbox/sql_compat/` package with no rules.
+4. Add the dual-run harness and feature flag.
+5. Migrate each decision site behind the harness; merge each only after zero divergence.
+6. Cut over: the registry becomes authoritative, and the harness and feature flag are deleted.
+7. Add the doc generator and capability matrix.
 
 ---
 
-## DDL Centralization Follow-On (`centralize-ddl-translation-phase`)
+## DDL Centralization
 
 This section documents the DDL centralization scope, resolves the Fabric Warehouse open question,
-and provides the migration inventory for the `centralize-ddl-translation-phase` follow-on work.
+and records the adapter migration inventory.
 
-### What Is Done (centralize-ddl-translation-phase complete)
+### Outcome
 
 - Phase enum frozen: `schema_emit`, `ddl_optimize` cover all DDL ownership. No `ddl_compile` phase
   was added.
@@ -614,20 +610,20 @@ and provides the migration inventory for the `centralize-ddl-translation-phase` 
 - All 13 adapter platforms have `ddl_optimize` rules registered (see
   `benchbox/sql_compat/rules/ddl_optimize/`). The adapter's own `_optimize_table_definition()`
   method is the rule implementation; the registry entry serves governance and lint purposes.
-- `schema_emit` rules for nyctaxi and tsbs_devops landed in parent w15.
-- `platform_transform_fn` callback removed from `base/data_loading.py` (w17); Databricks now
+- `schema_emit` rules cover nyctaxi and tsbs_devops.
+- `platform_transform_fn` callback removed from `base/data_loading.py`; Databricks now
   applies `_convert_to_delta_table` in a pre-pass loop before calling `_execute_schema_statements`.
 - `transaction_primitives` StarRocks PK rule added (`schema_emit.starrocks.transaction_primitives.pk_lock_table_unsupported`); StarRocks and Doris were absent from the legacy tuple - now documented as registry rules.
 - `write_primitives/_supports_primary_keys()` legacy hardcoded platform set removed; fallback is
   now `return True` (no rule → supported), consistent with `transaction_primitives`.
 - compat_lint runs in permanent error mode (exit 1 on any unregistered dialect branch in `benchbox/core/`); currently 0 violations.
 
-### Adapter Migration Inventory (complete)
+### Adapter Migration Inventory
 
 All 13 adapter platforms have `ddl_optimize` rules registered. Rule files in
-`benchbox/sql_compat/rules/ddl_optimize/`. Note: StarRocks was the reference
-implementation established in the parent w16 pipeline - it is included here for
-completeness but was not one of the 12 adapters newly migrated in this workstream.
+`benchbox/sql_compat/rules/ddl_optimize/`. StarRocks was the reference implementation
+established during the original pipeline cutover; the other 12 adapters were migrated as part of
+DDL centralization.
 
 | Adapter | File(s) | Hook | DDL concern |
 |---------|---------|------|-------------|
@@ -649,8 +645,8 @@ Fabric Warehouse is **not** in this list - see resolution below.
 
 **Presto/Trino invocation note**: These adapters do not call `_optimize_table_definition` directly
 in their schema loop. They pass it as `optimize_table_definition=self._optimize_table_definition`
-to a standalone `execute_schema_statements()` helper. The shadow harness call will go inside that
-helper rather than in the per-adapter schema creation method.
+to a standalone `execute_schema_statements()` helper, so the registry call sits inside that helper
+rather than in the per-adapter schema creation method.
 
 ### Fabric Warehouse Decision: Operational, Not a DDL Compat Rule
 
@@ -672,7 +668,7 @@ This is **operational context injection**, not a DDL compatibility rewrite:
 
 **Decision**: Fabric Warehouse's `_optimize_table_definition` is NOT migrated to a `ddl_optimize`
 registry rule. It remains adapter-local operational logic. No `RewriteDDLPayload` extension is
-needed. `w14` of `centralize-ddl-translation-phase` documents this conclusion and closes.
+needed.
 
 ### Config-Dependent Transforms (Databricks, Spark, Velox)
 
@@ -685,15 +681,14 @@ For shadow-harness purposes this is acceptable: the `harness_resolve()` call ver
 registry knows a DDL rewrite is required for this platform, not that the transformer output matches.
 The transformer itself (`transformer_id` lookup) is not invoked during shadow mode. Full
 transformer parity (verifying the rule's transformer produces identical output to the legacy hook)
-is deferred to the ON-mode cutover in parent w16.
+was deferred to the cutover to `on` mode.
 
-### Sequencing and the `platform_transform_fn` Callback (complete)
+### The `platform_transform_fn` Callback
 
-- **w2-w14** (adapter rule registration): all adapters have `ddl_optimize` registry rules. w14
-  closed as documentation (Fabric Warehouse excluded from migration - see above).
-- **`platform_transform_fn` removal** (`benchbox/platforms/base/data_loading.py`): completed in
-  `centralize-ddl-translation-phase` w17. The parameter is removed; Databricks applies
-  `_convert_to_delta_table` in a statements pre-pass before calling `_execute_schema_statements`.
+- All adapters except Fabric Warehouse have `ddl_optimize` registry rules (see above).
+- `platform_transform_fn` is removed from `benchbox/platforms/base/data_loading.py`. Databricks
+  applies `_convert_to_delta_table` in a statements pre-pass before calling
+  `_execute_schema_statements`.
 
 ---
 
@@ -705,26 +700,24 @@ is deferred to the ON-mode cutover in parent w16.
   all first-class fields.
 - Silent-failure modes (StarRocks PK first-N-columns) are expressed structurally, not as comments.
 - New platform/benchmark additions acquire compatibility rules in one place.
-- Generated capability matrix (w18) documents platform support levels for users.
-- Linter in error mode after w15 prevents future drift.
+- Generated capability matrix documents platform support levels for users.
+- Linter in error mode prevents future drift.
 
 ### Negative / Risks
 
-- Large surface area: 18 work units across ~15 files. Mitigated by feature flag + dual-run harness.
-- Snapshot sign-off for Slice A (translation entrypoint unification) requires per-adapter diff
+- Large surface area: about 15 files. Mitigated by feature flag + dual-run harness.
+- Snapshot sign-off for translation entrypoint unification requires per-adapter diff
   review; cannot be auto-approved.
-- The inventory tool (w2) may surface additional decision sites not listed in `files_affected`,
-  expanding scope. New sites must be explicitly triaged before adding to the workstream.
+- The inventory tool may surface additional decision sites not listed in the Context table,
+  expanding scope. New sites must be explicitly triaged before they are migrated.
 
 ---
 
 ## Addendum: Taxonomy Refinement (2026-04-26)
 
-Workstream: `refine-sql-compat-skip-semantics` (follow-up to this ADR).
-
 ### Context
 
-After `build-sql-compat-phase-aware-pipeline` shipped (w17/w18, 2026-04-26), a review of the
+After the pipeline and its generated docs shipped (2026-04-26), a review of the
 eight skip/block/degrade rows in `docs/compat/skip-reference.md` surfaced five problems: two naming
 gaps that bias readers toward wrong interpretations, one overloaded enum value, one doc-structure
 gap, and one silent-corruption window the pipeline was designed to close but had not fully closed.
@@ -735,9 +728,8 @@ gap, and one silent-corruption window the pipeline was designed to close but had
 
 Every BenchBox platform that can host `write_primitives` or `transaction_primitives` MUST have a
 registered PK-capability rule in `benchbox/sql_compat/rules/schema_emit/`. The rule MUST classify
-into one of the four buckets defined below. After `refine-sql-compat-skip-semantics` w5 lands, the
-`legacy_bypass` fallback tuples in `core/write_primitives/benchmark.py` and
-`core/transaction_primitives/benchmark.py` are deleted. No platform may rely on the fallback path.
+into one of the four buckets defined below. The `legacy_bypass` fallback tuples in
+`core/write_primitives/benchmark.py` and `core/transaction_primitives/benchmark.py` are deleted. No platform may rely on the fallback path.
 
 A parity test in `tests/unit/sql_compat/test_pk_coverage_parity.py` enforces this invariant:
 every platform in the write_primitives-supported set must resolve to a non-None PK rule.
@@ -787,8 +779,7 @@ Approved prefixes:
 | `"Workload runs; <auxiliary DDL> is suppressed."` | `SKIPPED_DDL_FRAGMENT` rules |
 | `"Workload runs; <semantic gap> is not enforced."` | `INFORMATIONAL` rules |
 
-The lint check is warn-only in `refine-sql-compat-skip-semantics`. Promotion to error mode is a
-separate follow-up after all existing rules comply.
+The lint check is warn-only. It moves to error mode once all existing rules comply.
 
 #### (f) Doc Restructure Plan for skip-reference.md
 

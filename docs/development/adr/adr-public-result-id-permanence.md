@@ -3,8 +3,8 @@
 - Status: Accepted
 - Date: 2026-08-05
 - Supersedes the informal format and collision rules previously stated in
-  `docs/reference/hosted-results-contract.md` §1.1 (and the Result Identity
-  line in `docs/development/benchbox-results-platform-strategy.md`).
+  `docs/reference/hosted-results-contract.md` §1.1 and in the earlier results
+  platform strategy.
 - Constrains: explorer publication pipeline, hosted results contract,
   and any future alias/redirect surface for public result URLs.
 
@@ -52,11 +52,17 @@ Because the id is content-addressed over published bytes:
 - two distinct published payloads that collide on the 32-bit `sha8` prefix
   are a hard failure (`DuplicateResultIdError`), not a silent `-{n}` rename.
 
-The current public Explorer serves result detail URLs, so the earlier pre-deploy
-assumption is stale. Link permanence attached when those routes first became publicly
-available to consumers. The A0 observed-site baseline is the preservation floor for the
-currently served corpus; future attested live receipts provide stronger, generation-specific
-proof without postponing compatibility for URLs that are already public.
+The public Results Explorer serves result detail URLs. Link permanence attached when those
+routes first became publicly available to consumers. Two kinds of evidence identify which
+ids are public:
+
+- The **A0 observed baseline** is a snapshot, taken on 2026-08-31 before publication
+  control changed, of the repository, build, deployment, and live-site state, including
+  the result ids the public site served. It is the preservation floor for that corpus.
+- An **attested live receipt** is a record, produced after each promotion, that observes
+  the deployed site and proves which artifact and corpus generation are publicly served.
+  Receipts provide generation-specific proof without postponing compatibility for URLs
+  that are already public.
 
 The remaining operational question is which ids belong to each later receipt-backed
 generation. The A0 observed baseline already protects the currently served ids. The
@@ -147,7 +153,7 @@ or workflow state alone never proves public availability.
 | Permanence attaches at local run / commit of private capture | Private bytes and paths are not the public artifact; hashing them would fingerprint non-public content and diverge from downloadable bundles |
 | Keep format without `sha8` and resolve collisions with `-{n}` | Diverges from implemented mint; sequential suffixes are not content-addressed and break deterministic re-derivation |
 | Freeze ids independently of content (assign once, never recompute) | Loses verifiability ("anyone holding the published bundle can recompute the id") and forces a registry service before the static corpus needs one |
-| Ship alias/redirect tables before the first deploy | No external links existed at that decision point; the A0 observed baseline now protects the routes that subsequently became public |
+| Ship alias/redirect tables before the first public deployment | No external links existed at that decision point; the A0 observed baseline now protects the routes that subsequently became public |
 
 ## Consequences
 
@@ -159,9 +165,8 @@ or workflow state alone never proves public availability.
   baseline IDs already require aliases or tombstones for any rotation. Later attested live
   receipts extend that protected set generation by generation; they do not postpone the
   compatibility obligation until receipt infrastructure exists.
-- Strategy doc identity table remains non-authoritative relative to this
-  ADR and the hosted contract (out of scope for the immediate contract fix;
-  update when that doc is next edited for identity).
+- Any other identity table, including the earlier results platform strategy,
+  is non-authoritative relative to this ADR and the hosted contract.
 
 ## Prior art
 
@@ -172,4 +177,4 @@ or workflow state alone never proves public availability.
 | `tests/unit/scripts/explorer_pipeline/test_result_id_contract.py` | Pins hash-of-published-bytes | Keep |
 | `tests/unit/scripts/explorer_pipeline/test_transformer.py` (`TestResultIdFromBundle`) | Pins format including 8-hex suffix | Keep |
 | `docs/reference/hosted-results-contract.md` §1.1 | Public contract (was wrong) | Correct |
-| `docs/development/adr/adr-published-identifier-field-set.md` | What fields enter published bytes | Orthogonal; field-set changes still rotate ids pre-deploy |
+| `docs/development/adr/adr-published-identifier-field-set.md` | What fields enter published bytes | Orthogonal; field-set changes rotate ids and, for already-public ids, are a compatibility event |

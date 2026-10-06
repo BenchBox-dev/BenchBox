@@ -237,7 +237,7 @@ from benchbox.platforms.databricks import DatabricksAdapter
 adapter = DatabricksAdapter(
     server_hostname="dbc-12345678-abcd.cloud.databricks.com",
     http_path="/sql/1.0/warehouses/abcd1234efgh5678",
-    access_token="dapi1234567890abcdef",
+    access_token="<token>",
     catalog="hive_metastore",
     schema="default"
 )

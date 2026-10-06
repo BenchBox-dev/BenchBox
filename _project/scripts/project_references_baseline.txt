@@ -28,11 +28,8 @@ docs/development/adr/adr-explorer-cli-surface.md::_project/DONE/main/active/expl
 docs/development/adr/adr-published-results-slim-corpus-branch.md::_project/DONE/main/published-results-slim-down-and-corpus-mirror.yaml
 docs/development/benchbox-results-platform-strategy.md::_project/_archive/specs/cli/config.md
 docs/development/browser-test-architecture.md::_project/_archive/handoffs/handoff-results-publishing-phase2.md
-docs/development/tuning-adr-001-trust-and-hash-semantics.md::_project/TODO/main/planning/tuning-applied-ledger-and-validation-status-20260712.yaml
-docs/development/tuning-adr-001-trust-and-hash-semantics.md::_project/TODO/main/planning/tuning-bundle-provenance-and-config-export-20260712.yaml
-docs/development/tuning-adr-001-trust-and-hash-semantics.md::_project/TODO/main/planning/tuning-mode-vocabulary-and-facet-implementation-20260712.yaml
-docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md::_project/DONE/main/active/tuning-adr-mode-vocabulary-fallback-facets-20260712.yaml
 docs/operations/release-guide.md::_project/TODO/main/active/release-recovery-v0-3-1.yaml
+docs/operations/uat-release-campaign.md::_project/release-evidence/uat-gate-summary.json
 make/monolith-baseline.json::_project/cross-surface-baseline-autodetect/summary.json
 results-explorer/src/lib/starterQueries.ts::_project/TODO/.../explorer-canonical-browser-duckdb-read-model.yaml
 scripts/phase2_metrics.py::_project/handoffs/review.md

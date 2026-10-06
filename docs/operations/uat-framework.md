@@ -18,7 +18,7 @@ The developer guide for hacking on the framework itself is
 | Smoke a single cell | `make uat-cell PLATFORM=duckdb BENCHMARK=tpch SCALE=0.01` |
 | Stress preset (one scale, no validate/package/explorer) | `make uat-stress` |
 | Stress, single platform / benchmark | `make uat-stress PLATFORM=duckdb BENCHMARK=tpch` |
-| Full sweep from a config | `make uat-sweep CONFIG=tests/uat/configs/uat-tuned-followup-20260505.yaml` |
+| Full sweep from a config | `make uat-sweep CONFIG=tests/uat/configs/uat-enabled-platforms-full.yaml` |
 | Validate a directory of bundles | `make uat-validate RESULTS_DIR=<dir> OUTPUT_TSV=<path>` |
 | Package staged bundles via terminal-state YAML | `make uat-package CONFIG=<path> SUBMISSIONS_DIR=<path> RESULTS="r1.json r2.json"` |
 | Explorer build + Playwright smoke | `make uat-explorer-smoke BUNDLES_DIR=<path> OUTPUT_DIR=<path> LOG_DIR=<path>` |
@@ -29,12 +29,12 @@ The developer guide for hacking on the framework itself is
 ## Output artefacts
 
 By default every BenchBox runtime artefact lands under the shared
-`benchmark_runs/` root alongside the checkout — `~/Developer/benchmark_runs/`
-for a clone at `~/Developer/BenchBox`, and the same root for every sibling
+`benchmark_runs/` root next to the checkout — `<checkout-parent>/benchmark_runs/`
+for a clone at `<checkout-parent>/BenchBox`, and the same root for every sibling
 linked worktree:
 
 ```
-~/Developer/benchmark_runs/
+<checkout-parent>/benchmark_runs/
 ├── datagen/                       # generated source data; preserved across runs
 ├── databases/                     # loaded DBs; pruned at safe reuse boundaries
 ├── results/                       # per-cell result JSON files
@@ -52,7 +52,7 @@ Two ways to change the root, in precedence order: an explicit
 `output.submissions_dir_template`) in the config always wins. The
 `release-gate-*` configs leave those keys unset, so setting
 `BENCHBOX_OUTPUT_DIR` before a stage overrides the
-`~/Developer/benchmark_runs` base for runs, logs, and local-stage submissions;
+`<checkout-parent>/benchmark_runs` base for runs, logs, and local-stage submissions;
 this also matches bare `make uat-cell` (which has always read the env var).
 A config with an explicit template ignores `BENCHBOX_OUTPUT_DIR` for that
 path — no silent root switching for a configured sweep.
@@ -91,7 +91,7 @@ but never delete or move artifacts.
   # external root configured):
   make uat-artifact-hygiene
   # Or target an explicit root / raise the byte budget:
-  make uat-artifact-hygiene OUTPUT=~/Developer/benchmark_runs THRESHOLD_BYTES=0
+  make uat-artifact-hygiene OUTPUT=<checkout-parent>/benchmark_runs THRESHOLD_BYTES=0
   ```
 
 ### Compact audit commands
@@ -294,28 +294,25 @@ everything else for manual review, per the recovery command's normal
 
 ### Mocker validation status
 
-Apple silicon + macOS 26, LOCAL DEV ONLY -- never CI (CI runs `test-docker-*`
-on ubuntu with real docker). Validated on mocker: `questdb` + `postgresql`
-lifecycle parity and end-to-end `test-docker-questdb` (load + query).
+Mocker is for local development on Apple silicon with macOS 26 only, never
+CI (CI runs `test-docker-*` on Ubuntu with Docker). The `questdb` and
+`postgresql` lifecycles and the end-to-end `test-docker-questdb` target
+(load and query) work under mocker.
 
-NOT validated: multi-service stacks. `docker/databend/docker-compose.yml`
-declares three services (`minio`, `minio-setup`, `databend`); databend stays
-healthy on docker, but its `minio` service has been observed to exit under
-mocker. The compose files have changed since that observation and the
-failure has not been re-measured against them. Set the resolver override
-`BENCHBOX_CONTAINER_CLI=docker` for UAT's own compose lifecycle
-(`resolve_container_cli()`, above -- this is the path a macOS operator
-actually takes; on macOS it otherwise resolves to mocker when present).
-`CONTAINER_ENGINE=docker` is a different knob: it only feeds
-`make test-docker-*`'s `$(COMPOSE)` and is already the
-default there, so setting it is a no-op for that path. This databend/minio
-failure is specific to its dependency on a separate MinIO container for
-S3-compatible storage -- it is not evidence that mocker cannot run
+Multi-service stacks are not validated. `docker/databend/docker-compose.yml`
+declares three services (`minio`, `minio-setup`, `databend`). Databend stays
+healthy on Docker, but its `minio` service has exited under mocker, and that
+has not been rechecked against the current compose files. For databend, set
+`BENCHBOX_CONTAINER_CLI=docker` so UAT's own compose lifecycle
+(`resolve_container_cli()`, above) uses Docker; on macOS it otherwise
+resolves to mocker when present. `CONTAINER_ENGINE=docker` is a different
+knob: it only feeds `make test-docker-*`'s `$(COMPOSE)` and is already the
+default there. The databend failure comes from its separate MinIO container
+for S3-compatible storage; it is not evidence that mocker cannot run
 multi-service compose stacks in general. `docker/doris/docker-compose.yml`
-and `docker/starrocks/docker-compose.yml` each declare exactly one service
-(the official all-in-one FE+BE image); databend's separate-MinIO failure
-mode does not apply to them structurally, but they are not separately
-validated under mocker.
+and `docker/starrocks/docker-compose.yml` each declare one service (the
+official all-in-one FE+BE image), so databend's failure mode does not apply
+to them, but they are not separately validated under mocker.
 
 `tests/uat/test_docker_assets.py` pins these compose files' service *names*
 (not just counts) so this guidance cannot silently drift out of sync.
@@ -419,9 +416,9 @@ Disk budget estimate: 12.34 GiB peak (10.50 GiB steady; cells=141; unknown=4)
 Disk budget coverage: PARTIAL -- this estimate is a LOWER BOUND, not a certification that the sweep fits. Measured rows cover 0 of 21 platform(s); 137 of 141 largest-scale cell(s) have any row and 0 of 141 have a measured loaded-database footprint. Unmeasured platform(s): cedardb, clickhouse-local, clickhouse-server, databend, datafusion, doris, +15 more
 Disk budget verdict: no shortfall detected against a lower-bound requirement of 12.34 GiB; real demand may be higher (see coverage above)
 Free space: tmp                     18.63 GiB (required >= 12.34 GiB) /tmp
-Free space: output                 240.12 GiB (required >= 12.34 GiB) ~/Developer/benchmark_runs
-Free space: benchmark-data         240.12 GiB (required >= 12.34 GiB) ~/Developer/benchmark_runs/datagen
-Free space: docker-data            240.12 GiB (required >= 12.34 GiB) ~/Developer/benchmark_runs
+Free space: output                 240.12 GiB (required >= 12.34 GiB) <checkout-parent>/benchmark_runs
+Free space: benchmark-data         240.12 GiB (required >= 12.34 GiB) <checkout-parent>/benchmark_runs/datagen
+Free space: docker-data            240.12 GiB (required >= 12.34 GiB) <checkout-parent>/benchmark_runs
 ```
 
 The estimate comes from `tests/uat/data/disk_budget_table.tsv`, an
@@ -639,11 +636,12 @@ the median of the latest N matching the runner class, defaulting to the
 current machine's class. The floor must never compare across classes.
 
 Status: observe-only. The per-class median is available through the manual
-`rolling-median` command, but the nightly neither computes nor uses it yet. The assert still reads the explicit
-`THROUGHPUT_FLOOR_MEDIAN` repository variable when it is set; while it is
-unset the assert only reports each observed value (`::notice::`). That
-variable is a fixed absolute number and must not be set for a mixed runner
-fleet, because the floor must never compare across runner classes.
+`rolling-median` command; the nightly does not compute it. With
+`--evaluate-floor`, the assert applies a floor only when the
+`THROUGHPUT_FLOOR_MEDIAN` environment variable is set; otherwise it reports
+each observed value (`::notice::`). That value is a fixed
+absolute number, so it does not suit a mixed runner fleet: the floor must never
+compare across runner classes.
 
 ## Compatibility Pruning
 
@@ -669,114 +667,15 @@ treated as a pass or a compatibility exclusion.
 When enabled, the release-gate runtime-envelope switch applies measured,
 platform-specific cell exclusions in the same compatibility-pruning stream.
 When disabled, those cells remain enumerable for ordinary diagnostic runs. It
-does not change the benchmark registry's declared scale ladder. For v0.4.0,
-the native release campaign uses the measured 16 GiB host-class
-envelope. A larger host does not silently widen this comparable matrix; use it
-for a diagnostic certification run, then remove an exclusion in a reviewed
-change only after that evidence is recorded.
+does not change the benchmark registry's declared scale ladder. The native
+release campaign uses a measured 16 GiB host-class envelope. A larger host
+does not silently widen this comparable matrix; use it for a diagnostic
+certification run, then remove an exclusion in a reviewed change only after
+that evidence is recorded.
 
-As of 2026-08-25, DataFusion `datavault` and SQLite `tpcds` and `tpcds_obt`
-are excluded from the 1200-second native release-gate cell.
-
-For DataFusion DataVault, the clean Stage 1 sweep passed SF0.01 and SF0.1, but
-the SF1 process was killed while running query 18 after 145.9 seconds. A later fix
-corrected the DataFusion spill-pool construction; a clean post-fix replay
-confirmed that a 12 GiB fair spill pool was active, but the host still killed
-query 18. This is the largest pool the 16 GiB release-host envelope can admit.
-Because compatibility rules are platform/benchmark scoped, the release gate
-prunes the full scale ladder under
-`uat.compat.datafusion.datavault.release_gate_runtime_envelope`; ordinary
-diagnostic sweeps still enumerate every scale.
-
-| Probe | Source commit | Result | Artifact SHA-256 |
-| --- | --- | --- | --- |
-| Stage 1 native UAT | `1d86c31845e1293d2e6bf8adeeab6da2ce4e433a` | SF0.01 and SF0.1 passed; SF1 query 18 was killed | `cells.jsonl`: `b82e3cd019515bd4be57e0f53cf45a9ff2546819599bf0844da8fdbfe5b44cce` |
-| Post-fix SF1 replay | `f27fa6363517616e3573dd385ab75734207bb0a2` | 12 GiB fair spill pool applied; process killed | `1558c7ee5cd5d9561bc8e76b1d2ccceb527a4fa5f7e6950805aef8ea5de997f7` |
-
-Replay the focused SF1 cell from a clean worktree at
-`f27fa6363517616e3573dd385ab75734207bb0a2`:
-
-```bash
-BENCHBOX_OUTPUT_DIR="$HOME/Developer/benchmark_runs" \
-  uv run --no-sync -- benchbox run --platform datafusion \
-  --benchmark datavault --scale 1.0 --queries 18 --iterations 1 -vv \
-  --non-interactive --phases power \
-  --output "$HOME/Developer/benchmark_runs/datagen"
-```
-
-For canonical TPC-DS, the native UAT sweep timed out at about 1200 seconds at
-each requested scale: 0.01, 0.1, and 1.0. A bounded SF0.01 replay processed
-queries 2 through 12; successful queries completed in at most 0.60 seconds and
-query 5 failed immediately on unsupported `ROLLUP`, then query 13 ran for more
-than 300 seconds without completing. A second bounded replay processed queries
-14 through 47 quickly apart from immediate SQL-compatibility failures, then
-query 48 also ran for more than 300 seconds without completing. The generated
-SQLite stream also contains eleven queries that require unsupported `ROLLUP`
-semantics, four of which additionally require `GROUPING`. The release gate
-therefore prunes the complete platform/benchmark scale ladder under
-`uat.compat.sqlite.tpcds.release_gate_runtime_envelope`; diagnostic sweeps still
-enumerate and run it. The timeout evidence is provisional: a separate known
-SQLite TPC-DS adapter issue causes immediate cursor/connection failures, not a
-300s timeout, so it does not settle this runtime envelope.
-
-The durable evidence record is SHA-bound below. The UAT output root was
-`~/Developer/benchmark_runs`; its run logs are in the `logs/`
-subdirectory. The bounded-probe logs were temporary local files, so their
-digests and replay commands are recorded here rather than treating `/tmp` as
-durable storage.
-
-| Probe | Source commit | Result | Artifact SHA-256 |
-| --- | --- | --- | --- |
-| Stage 1 native UAT | `1d86c31845e1293d2e6bf8adeeab6da2ce4e433a` | SQLite TPC-DS SF0.01, SF0.1, and SF1 each timed out after 1200.2s | `cells.jsonl`: `b82e3cd019515bd4be57e0f53cf45a9ff2546819599bf0844da8fdbfe5b44cce` |
-| Q2-Q25 bounded replay | `20a2dc36b21607a7d1242bc5c456c4011a3df30d` | Q13 still running at 300s cutoff | `40116787be6d5e493f1f20478b467d65b25ff4dfd797fdf02c52aab2f54141e7` |
-| Q14-Q50 bounded replay | `20a2dc36b21607a7d1242bc5c456c4011a3df30d` | Q48 still running at 300s cutoff | `638854cb5367739e0935f7743550be123fe8d0db124fbeec17ae95c685953fae` |
-
-Run the release-gate reproduction in a clean linked worktree at
-`1d86c31845e1293d2e6bf8adeeab6da2ce4e433a`:
-
-```bash
-BENCHBOX_OUTPUT_DIR="$HOME/Developer/benchmark_runs" \
-  make uat-sweep CONFIG=tests/uat/configs/release-gate-01-native-dataframe.yaml
-```
-
-Run the bounded query reproductions in a clean linked worktree at
-`20a2dc36b21607a7d1242bc5c456c4011a3df30d`. They use the same output
-root, scale, one iteration, and five-minute alarm:
-
-```bash
-BENCHBOX_OUTPUT_DIR="$HOME/Developer/benchmark_runs" \
-  /usr/bin/time -l perl -e 'alarm shift; exec @ARGV' 300 \
-  uv run --no-sync -- benchbox run --platform sqlite --benchmark tpcds \
-  --scale 0.01 \
-  --queries 2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25 \
-  --iterations 1 -vv --non-interactive --phases power \
-  --output "$HOME/Developer/benchmark_runs/datagen"
-
-BENCHBOX_OUTPUT_DIR="$HOME/Developer/benchmark_runs" \
-  /usr/bin/time -l perl -e 'alarm shift; exec @ARGV' 300 \
-  uv run --no-sync -- benchbox run --platform sqlite --benchmark tpcds \
-  --scale 0.01 \
-  --queries 14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50 \
-  --iterations 1 -vv --non-interactive \
-  --phases power --output "$HOME/Developer/benchmark_runs/datagen"
-```
-
-For TPC-DS OBT, the canonical SF1 artifact contains 5,041,336 rows and 518
-columns. A bounded native probe through `ParquetFileHandler` inserted 1,325,000
-rows in 304.9 seconds, with 4,345 rows/s overall and 2,350 rows/s in the final
-25,000-row interval. A projection from the final 625,000 rows is 1,391 seconds
-for loading alone. The table has no indexes, primary keys, or foreign keys;
-the observed limit is SQLite parameter binding and single-transaction WAL
-growth, with external readers seeing no rows until the loader commits. The
-probe and original killed-run evidence were captured outside the repository
-under `BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs` and `/tmp`.
-
-This exclusion is represented by
-`uat.compat.sqlite.tpcds_obt.release_gate_runtime_envelope`. It prunes the
-requested `0.01`, `0.1`, and `1.0` ladder entries before the existing TPC-DS OBT
-minimum-scale fallback can substitute `1.0`; it is not a blanket skip or a
-timeout increase. A future atomic SQLite bulk-loader optimization must replace
-the rule only after a bounded native measurement fits the same contract.
+Each exclusion is listed in `tests/uat/compatibility.py` under its
+`uat.compat.<platform>.<benchmark>.release_gate_runtime_envelope` rule ID,
+with its reason.
 
 ## Config lifecycle (three classes)
 
@@ -1110,7 +1009,7 @@ and query gates can be considered complete.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Preflight aborts on disk | `<5 GiB free at ~/Developer/benchmark_runs` | free space, or override `preflight.free_space_min_gib` |
+| Preflight aborts on disk | `<5 GiB free at <checkout-parent>/benchmark_runs` | free space, or override `preflight.free_space_min_gib` |
 | Mid-sweep execute aborts on disk | free space fell below `preflight.free_space_min_gib` after a platform | inspect `uat_lifecycle.log`; increase space or reduce the matrix before resuming |
 | Preflight prints `Disk budget coverage: PARTIAL` and passes | the inventory does not measure every gated cell (for example, rows without a measured loaded-database footprint) -- see "The disk budget is a lower bound" | expected, not an error: the estimate is a floor, so keep headroom beyond the printed requirement and watch the mid-sweep free-space floor. Do not silence it by guessing values into `disk_budget_table.tsv` |
 | Sweep passes preflight then exhausts disk mid-run | real demand exceeded the lower-bound estimate -- most likely the unmeasured loaded-database term | inspect `uat_lifecycle.log` for the last platform reached; narrow the matrix or scale ladder, and record the observed footprints into `disk_budget_table.tsv` with `peak_database_gib_status = measured` |

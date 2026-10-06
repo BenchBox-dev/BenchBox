@@ -19,7 +19,7 @@ BenchBox provides cloud storage integration through a minimal abstraction layer 
 - **Platform Integration**: Staging wrappers for Databricks volumes, ADLS Gen2 and Snowflake stages
 - **Error Handling**: Error messages that name the missing environment variables or package
 
-The example outputs on this page come from runs without network access or credentials, so they show what each function does offline.
+The example outputs on this page show what each function does without network access or credentials.
 
 ## Quick Start
 
@@ -523,7 +523,7 @@ True False
 
 - **Pass a handler, not a URI string:** a string such as `"s3://bucket/data"` reaches `local_generate_func` as a string, so a function that builds `Path(output_dir)` writes into a local directory with that name. Convert URIs with `create_path_handler` first, as the example does for `abfss://`.
 - **Staging wrappers:** for `dbfs:`, `abfss:` and Snowflake stage targets the generation function writes to the local staging directory. Uploading from there to the remote target is not done by this mixin.
-- **Removed method:** <span id="generate_with_cloud_upload"></span>earlier versions of this page listed `_generate_with_cloud_upload`. It does not exist in 0.4.1.
+- **No upload method:** <span id="generate_with_cloud_upload"></span>the mixin has no `_generate_with_cloud_upload` method.
 
 ### Usage Guide Formatting
 

@@ -5,7 +5,7 @@
 ```{tags} contributor, advanced
 ```
 
-This document describes planned platform and benchmark additions for BenchBox. Items are organized by priority and implementation phase. For detailed specifications, see the corresponding TODO items in `_project/TODO/`.
+This document describes planned platform and benchmark additions for BenchBox. Items are organized by priority and implementation phase.
 
 > **Note**: This roadmap reflects current planning. Timelines are not committed, and scope may evolve with community feedback and sponsorship opportunities.
 

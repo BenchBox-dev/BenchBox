@@ -37,7 +37,7 @@ from benchbox.platforms.databricks import DatabricksAdapter
 adapter = DatabricksAdapter(
     server_hostname="dbc-12345678-abcd.cloud.databricks.com",
     http_path="/sql/1.0/warehouses/abcd1234efgh5678",
-    access_token="dapi1234567890abcdef",
+    access_token="<token>",
     catalog="main",
     schema="benchbox"
 )
@@ -243,7 +243,7 @@ The values are stored as attributes of the same name (`DatabricksAdapter(server_
 **`configure_for_benchmark(connection: Any, benchmark_type: str) -> None`**: Sets session options and returns `None`. With `disable_result_cache` true (the default) it runs `SET use_cached_result = false`; a failure is logged and not raised. The `benchmark_type` is not used. Custom Spark settings in an attribute `spark_configs`, if you set one, are applied with `SET`.
 
 <span id="benchbox.platforms.databricks.DatabricksAdapter.create_schema"></span>
-**`create_schema(benchmark, connection: Any) -> float`**: Creates the schema (and the catalog first when `create_catalog` is true), selects them, and runs the benchmark's `CREATE TABLE` statements, returning the elapsed time in seconds (`float`). Each statement becomes `CREATE OR REPLACE TABLE ... USING DELTA` (`USING HUDI` with record-key properties when `table_format` is `hudi`). With `delta_auto_optimize` true the table gets the properties `delta.autoOptimize.optimizeWrite` and `delta.autoOptimize.autoCompact` set to `true`; with it false the statement ends in an empty `TBLPROPERTIES ()`, which was not run against a warehouse. Raises `RuntimeError` when the benchmark produces no schema SQL.
+**`create_schema(benchmark, connection: Any) -> float`**: Creates the schema (and the catalog first when `create_catalog` is true), selects them, and runs the benchmark's `CREATE TABLE` statements, returning the elapsed time in seconds (`float`). Each statement becomes `CREATE OR REPLACE TABLE ... USING DELTA` (`USING HUDI` with record-key properties when `table_format` is `hudi`). With `delta_auto_optimize` true the table gets the properties `delta.autoOptimize.optimizeWrite` and `delta.autoOptimize.autoCompact` set to `true`; with it false the statement ends in an empty `TBLPROPERTIES ()`. Raises `RuntimeError` when the benchmark produces no schema SQL.
 
 #### Loading data into tables
 
@@ -321,7 +321,7 @@ The values are stored as attributes of the same name (`DatabricksAdapter(server_
 ```bash
 # Set Databricks credentials
 export DATABRICKS_HOST="https://dbc-12345678-abcd.cloud.databricks.com"
-export DATABRICKS_TOKEN="dapi1234567890abcdef"
+export DATABRICKS_TOKEN="<token>"
 export DATABRICKS_WAREHOUSE_ID="abcd1234efgh5678"
 ```
 
@@ -390,7 +390,7 @@ adapter = DatabricksAdapter(
 # User Settings → Developer → Access Tokens → Generate New Token
 
 # Use in environment
-export DATABRICKS_TOKEN="dapi1234567890abcdef"
+export DATABRICKS_TOKEN="<token>"
 ```
 
 ### Databricks CLI Configuration
