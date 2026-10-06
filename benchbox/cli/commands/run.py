@@ -76,6 +76,7 @@ from benchbox.cli.tuning_resolver import (
     TuningResolution,
     TuningSource,
     display_tuning_resolution,
+    is_dataframe_tuning_file,
     promote_tuning_provenance,
     resolve_template_reference,
     resolve_tuning,
@@ -839,6 +840,7 @@ def _resolve_tuning(s: types.SimpleNamespace, *, non_interactive_override: bool 
             logger=s.logger,
             quiet=bool(s.quiet),
             non_interactive=s.non_interactive if non_interactive_override is None else non_interactive_override,
+            mode=getattr(s, "resolved_mode", None),
         )
     except ValueError as e:
         console.print(f"[red]❌ {e}[/red]")
@@ -872,6 +874,15 @@ def _load_unified_tuning_config(s: types.SimpleNamespace, *, non_interactive_ove
 
     tuning_resolution = s.tuning_resolution
     if tuning_resolution.config_file:
+        if getattr(s, "resolved_mode", None) == "sql" and is_dataframe_tuning_file(tuning_resolution.config_file):
+            console.print(
+                f"[red]❌ Tuning file {tuning_resolution.config_file} is a DataFrame tuning "
+                "configuration, but this is a SQL-mode run; it would load as an empty "
+                "configuration. Use a SQL tuning file "
+                f"([cyan]benchbox tuning init --platform {s.platform} --mode sql[/cyan]) "
+                "or run with [cyan]--mode dataframe[/cyan].[/red]"
+            )
+            s.ctx.exit(1)
         try:
             s.loaded_unified_config = s.config.load_unified_tuning_config(tuning_resolution.config_file, s.platform)
             if s.logger:

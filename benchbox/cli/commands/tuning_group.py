@@ -22,6 +22,7 @@ from benchbox.cli.shared import console
 from benchbox.cli.tuning_resolver import (
     display_tuning_list,
     display_tuning_show,
+    is_dataframe_tuning_file,
     resolve_tuning,
 )
 from benchbox.core.config_utils import load_config_file
@@ -243,19 +244,27 @@ def _create_profile_config(platform: str, profile: str) -> DataFrameTuningConfig
     required=True,
     help="Target platform: a DataFrame platform or a SQL platform in the tuning capability registry",
 )
-def validate_config(config_file: str, platform: str) -> None:
+@click.option(
+    "--mode",
+    type=click.Choice(["sql", "dataframe", "auto"], case_sensitive=False),
+    default="auto",
+    help="Tuning mode: sql, dataframe, or auto (detect from platform)",
+)
+def validate_config(config_file: str, platform: str, mode: str) -> None:
     """Validate a tuning configuration file.
 
     Checks the configuration for errors and warnings specific to the target platform.
     DataFrame platforms (datafusion, polars, pandas, dask, cudf) validate a DataFrame
     tuning file. Any other platform validates a SQL tuning file against the platform
-    capability registry.
+    capability registry. Platforms with both modes (datafusion) select the mode with
+    --mode; auto detects it from the platform.
 
     \b
     Examples:
       benchbox tuning validate polars_tuning.yaml --platform polars
       benchbox tuning validate my_config.yaml --platform dask
       benchbox tuning validate examples/tunings/duckdb/tpch_tuned.yaml --platform duckdb
+      benchbox tuning validate datafusion_tuned.yaml --platform datafusion --mode sql
     """
     platform_name = platform.lower()
     if (
@@ -268,6 +277,9 @@ def validate_config(config_file: str, platform: str) -> None:
             param_hint="--platform",
         )
 
+    if mode == "auto":
+        mode = "dataframe" if platform_name in DATAFRAME_PLATFORMS else "sql"
+
     console.print(
         Panel.fit(
             Text("Validating Tuning Configuration", style="bold cyan"),
@@ -275,7 +287,11 @@ def validate_config(config_file: str, platform: str) -> None:
         )
     )
 
-    if platform_name in DATAFRAME_PLATFORMS:
+    if mode == "dataframe":
+        if platform_name not in DATAFRAME_PLATFORMS:
+            console.print(f"[red]Platform '{platform}' does not support DataFrame mode[/red]")
+            console.print(f"[yellow]DataFrame platforms: {', '.join(sorted(DATAFRAME_PLATFORMS))}[/yellow]")
+            raise click.Abort()
         _validate_dataframe_config(config_file, platform_name)
     else:
         _validate_sql_config(config_file, platform_name)
@@ -318,8 +334,7 @@ def _validate_sql_config(config_file: str, platform: str) -> None:
         data = load_config_file(config_file)
         if not data:
             raise ValueError("Configuration file is empty")
-        metadata = data.get("_metadata")
-        if isinstance(metadata, dict) and metadata.get("format") == "dataframe_tuning":
+        if is_dataframe_tuning_file(data):
             raise ValueError(
                 f"'{config_file}' is a DataFrame tuning file; validate it with a DataFrame platform "
                 f"({', '.join(sorted(DATAFRAME_PLATFORMS))})"
