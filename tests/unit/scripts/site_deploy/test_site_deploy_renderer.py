@@ -317,6 +317,23 @@ def test_astro_docs_dev_carries_its_own_assets_without_the_blog_route(tmp_path: 
     assert summary["file_owners"]["_astro/site.trunk.css"] == "/:."
 
 
+def test_astro_assembly_ignores_a_release_root_without_build_output(tmp_path: Path) -> None:
+    trunk = _astro_checkout(tmp_path / "trunk", "trunk")
+    release = tmp_path / "release"
+    release.mkdir()
+    summary = routes.assemble_routes(
+        manifest=routes.load_manifest(MANIFEST),
+        ref_roots={"release": release, "trunk": trunk},
+        site_dir=tmp_path / "out",
+        work_dir=tmp_path / "work",
+        stage_builder=assemble_astro_stage,
+        resolve_sha=lambda root: root.name,
+        renderer=renderer.ASTRO,
+    )
+    assert "trunk" in (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
+    assert {route["ref"] for route in summary["routes"]} == {"trunk"}
+
+
 def test_astro_explorer_without_a_snapshot_is_refused(tmp_path: Path) -> None:
     release = _astro_checkout(tmp_path / "release", "release")
     trunk = _astro_checkout(tmp_path / "trunk", "trunk")
@@ -638,6 +655,27 @@ def test_resolve_records_the_renderer_and_when_the_visual_guard_runs(
     lines = outputs.read_text(encoding="utf-8").splitlines()
     assert f"renderer={expected}" in lines
     assert f"visual_required={'true' if visual else 'false'}" in lines
+    assert resolved["release_in_use"] is False
+    assert "release_in_use=false" in lines
+
+
+@pytest.mark.parametrize("route", ["route", "root_files"])
+def test_resolve_reports_the_release_ref_in_use_while_a_route_names_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, route: str
+) -> None:
+    api = FakeGitHub()
+    api.record_deployment(10, make_receipt(run_id=1, trunk=SHA_A), "2026-01-01T00:00:01Z")
+    _use(monkeypatch, api, ready=True)
+    repo = _auto_repo(tmp_path)
+    data = yaml.safe_load((repo / "deploy" / "routes.yml").read_text(encoding="utf-8"))
+    if route == "route":
+        data["routes"][0]["ref"] = "release"
+    else:
+        data["root_files"]["ref"] = "release"
+    (repo / "deploy" / "routes.yml").write_text(yaml.safe_dump(data), encoding="utf-8")
+    code, resolved = _resolve(tmp_path, "--mode", "deploy", repo_dir=repo)
+    assert code == 0
+    assert resolved["release_in_use"] is True
 
 
 def test_resolve_with_the_committed_manifest_selects_astro_for_a_ready_release(

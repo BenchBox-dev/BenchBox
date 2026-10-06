@@ -246,6 +246,13 @@ def test_resolve_exposes_the_renderer_and_whether_the_visual_comparison_runs() -
     outputs = _jobs()["resolve"]["outputs"]
     assert outputs["renderer"] == "${{ steps.resolve.outputs.renderer }}"
     assert outputs["visual_required"] == "${{ steps.resolve.outputs.visual_required }}"
+    assert outputs["release_in_use"] == "${{ steps.resolve.outputs.release_in_use }}"
+
+
+def test_release_build_steps_run_only_while_a_route_uses_the_release_ref() -> None:
+    for name in ("Build release documentation", "Build the release site with Astro"):
+        assert "needs.resolve.outputs.release_in_use == 'true'" in _step("build", name)["if"], name
+    assert "release_in_use" not in _step("build", "Build the trunk site with Astro")["if"]
 
 
 def test_each_renderer_builds_only_its_own_site() -> None:

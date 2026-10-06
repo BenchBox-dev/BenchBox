@@ -276,6 +276,13 @@ def command_resolve(args: argparse.Namespace) -> int:
     selected = outcome["selection"]["renderer"]
     deployed_renderer = deployed.renderer if deployed else None
     visual_required = args.mode != "rollback" and visual_comparison_required(deployed, selected, outcome["release_sha"])
+    from scripts.site_deploy import routes as routes_module
+
+    release_manifest = routes_module.load_manifest(args.repo_dir / ROUTES_MANIFEST)
+    release_name = routes_module.release_ref(release_manifest)
+    release_in_use = release_manifest.root_files_ref == release_name or any(
+        route.ref == release_name for route in release_manifest.routes
+    )
     resolved = {
         "schema": RESOLVED_SCHEMA,
         "mode": args.mode,
@@ -297,6 +304,7 @@ def command_resolve(args: argparse.Namespace) -> int:
         "renderer_selection": outcome["selection"],
         "deployed_renderer": deployed_renderer,
         "visual_required": visual_required,
+        "release_in_use": release_in_use,
     }
     _write_json(args.output, resolved)
     _github_output(
@@ -307,6 +315,7 @@ def command_resolve(args: argparse.Namespace) -> int:
             "release_sha": resolved["release_sha"],
             "renderer": selected,
             "visual_required": "true" if visual_required else "false",
+            "release_in_use": "true" if release_in_use else "false",
         }
     )
     print(f"{decision.action}: {decision.reason}")
