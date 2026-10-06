@@ -20692,10 +20692,15 @@
       "title": "Correct TPC-DS composite primary keys and pin every benchmark's PK sets with a conformance test"
     },
     "tpcds-default-compression-generate-writes-one-chunk-20261004": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T04:25:12Z",
+        "generation": "13287293d95b4ea59f88130bd02c334d",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "TPC-DS generate with default compression writes only chunk 1 of 10, records an empty manifest, and loads zero rows"
     },
     "tpcds-gate-setup-time": {
