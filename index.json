@@ -2001,15 +2001,10 @@
       "title": "Get one green release canary run on develop before v0.4.1"
     },
     "canary-impact-01-junit-durations": {
-      "claim": {
-        "expires_at": "2026-10-07T19:18:04Z",
-        "generation": "b5d0fc2c1a7b4f52a54dd19b42e451c5",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:26acbcff276b4a051a0b6cee"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Publish per-test durations from every release-canary shard"
     },
     "canary-impact-02-selector": {
