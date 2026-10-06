@@ -20254,10 +20254,15 @@
       "title": "Propagate per-stream success into exported throughput results; make dead streams fatal outside the UAT lane"
     },
     "throughput-stream-timing-window-and-timestamps": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T19:21:02Z",
+        "generation": "ce62f2fb5a314a77941d7ff0068cec82",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Throughput stream timing includes connection setup, and per-stream timestamps export as 1970 dates"
     },
     "throughput-strict-engine-integration-tests": {
