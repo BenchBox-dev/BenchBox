@@ -4,7 +4,7 @@
     "The workflow summary reports DataFrame-to-SQL parity separately and fails or highlights only unclassified printed mismatches",
     "A regression test shows a new mismatch is reported while classified ones are not"
   ],
-  "context": "Runner: benchbox/core/tpcds/qualification/runner.py (display-rounding label already exists). Workflow: .github/workflows/tpcds-official-qualification.yml. Classification evidence: ~/.jcode/scratch/dfparity-handoff/evidence/resume-20261003/sf1-94a6ab351-printed-classification.md.",
+  "context": "Runner: benchbox/core/tpcds/qualification/runner.py (display-rounding label already exists). Workflow: .github/workflows/tpcds-official-qualification.yml. Classification evidence: ~/.jcode/scratch/dfparity-handoff/evidence/resume-20261003/sf1-94a6ab351-printed-classification.md. Closeout: delivered by PR #2688 (merge 840bdf192) — 31 known differences classified with statement/file/class/predicate/evidence, strict comparison untouched, parity reported separately, lane fails only on unclassified mismatches; regression test proves a new mismatch is reported while classified ones pass. Independently reviewed APPROVE with stand-in marker, all required checks green. Trunk green on final batch head dda8c787d (11/11 jobs).",
   "description": "Every SF1 qualification run reports failure because of mismatches that are already classified: display precision (22 statements), NULL-order file variants (Q66, Q77, Q93), CHAR(30) padding (Q84), half-boundary binary rounding (Q66, Q77, Q78), floating detail beyond 1e-10 (Q39a/b), the malformed Q17 file and the Q85/Q93 returns difference. Because the advisory job is always red, a new mismatch or a DataFrame-to-SQL regression would not stand out.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "generation": "17b83a2e007a4b32a4bacde4c603680f",
       "op": "take",
       "op_id": "66297b093b124f14bb6a6e9eca083319",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T14:11:11Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "b5c34dd6504844df85bfb20630d6eec5",
       "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
     }
   ]
