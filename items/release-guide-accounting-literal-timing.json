@@ -4,7 +4,7 @@
     "The .claude/skills/benchbox release reference agrees with the guide.",
     "Optional: a sync command updates the literal and the compare links, with a test."
   ],
-  "context": "Found during the v0.4.2 release. With the footer moved to v0.4.2 the guard failed ('[Unreleased] comparison does not start at v0.4.1'); with the literal renamed to 0.4.2 it failed ('published PyPI version 0.4.2 has no visible git tag v0.4.2'). With both left at 0.4.1 on the release branch, all 23 guard tests passed. The guide line is around 'rename the test to the new version by hand at each cut'.",
+  "context": "Found during the v0.4.2 release. With the footer moved to v0.4.2 the guard failed ('[Unreleased] comparison does not start at v0.4.1'); with the literal renamed to 0.4.2 it failed ('published PyPI version 0.4.2 has no visible git tag v0.4.2'). With both left at 0.4.1 on the release branch, all 23 guard tests passed. The guide line is around 'rename the test to the new version by hand at each cut'.\n\nCloseout 2026-10-06: PR #2703 merged to develop at ba01f8e91 (mergedAt 2026-10-06T01:44:41Z). Guide now says to keep the accounting literal and the [Unreleased] compare link at the published version on the release branch and move both in the develop version-sync PR. Evidence: 23 tag-guard tests pass; required develop contexts green on merged head (core, docs, landing, explorer, results-data, tooling, oracle-review); five-axis review clean. Skill-reference agreement: .claude/skills/benchbox/references/release.md states the guide wins on conflicts and mentions neither the literal nor the compare link, so nothing contradicts the corrected guide; no generated-mirror edit needed (mirrors are regenerated via make skill-sync, never hand-edited). Optional sync tooling declined: automating the literal/compare move in update_version.py needs version-source design (PyPI-published vs target) and a wrong automation breaks the release gate; the guide fix is the load-bearing part.",
   "description": "docs/operations/release-guide.md says to rename the release-accounting test literal (tests/unit/release/test_changelog_tag_guard.py::test_repo_release_accounting_matches_*) to the new version \"at each cut\", and the v0.4.2 handoff said to update the CHANGELOG footer links at cut time. Both are wrong for the release branch. check_release_accounting validates the version PyPI currently serves, so on the release PR the literal must stay at the published version and the [Unreleased] compare link must still start at that version's tag. Moving either at cut time fails the required test job. Both belong in the develop version-sync PR after publication, which is how #2669 did it. Fix the guide and the BenchBox release skill reference, and consider having update_version.py or a sync target move both so no one edits them by hand.",
   "links": [
     "docs/operations/release-guide.md",
@@ -28,6 +28,14 @@
       "generation": "ebc665bcf80d454cbb2944d7f407f546",
       "op": "take",
       "op_id": "ad8709434d90492c89e828ce825d6cb3",
+      "session_id": "a12b8d1162704af386c2b2c304357592"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:64399a12525eb713b4a9ab65",
+      "at": "2026-10-06T03:14:16Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "fd1a8b20b3984b1a87e472be4627ff77",
       "session_id": "a12b8d1162704af386c2b2c304357592"
     }
   ]
