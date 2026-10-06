@@ -2,6 +2,7 @@
   "acceptance": [
     "After several consecutive clean scheduled runs, an owner decision to make the Windows comparison fail the workflow (or keep it advisory with a recorded reason)"
   ],
+  "context": "Closeout: owner decision D3 applied — Windows identity cell stays advisory, recorded in docs/development/tpc-compilation-guide.md and the PR body. Delivered by PR #2657 (merge 67406da2f), independently reviewed APPROVE on exact head with stand-in marker, all required checks green. Trunk green on final batch head dda8c787d (11/11 jobs).",
   "description": "The Windows cell of .github/workflows/tpcds-platform-identity.yml is advisory. It found a real defect (dsdgen ignored \"-\" options on Windows and generated SF 1 instead of 0.01, fixed in #2623); after the fix it reports 0 differences. As long as it is advisory, a Windows regression only appears in the job log.",
   "sessions": [
     {
@@ -46,6 +47,14 @@
       "generation": "6817c2293bf9464a87c29d7831a66556",
       "op": "take",
       "op_id": "08846cd516074ad9bf10681998dd0918",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T14:07:56Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "f588386d4fc340d0b9301f613ec70d00",
       "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
     }
   ]
