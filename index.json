@@ -11645,6 +11645,15 @@
       "status": "open",
       "title": "Run and publish first live corpus on Athena SQL (TPC-H SF 0.1/1/10)"
     },
+    "live-cloud-corpus-clickhouse-cloud-expansion-20261006": {
+      "claim": null,
+      "needs": [
+        "live-cloud-corpus-clickhouse-cloud-tpch-first-20261006"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Expand ClickHouse Cloud corpus to remaining suites (industry, TPC-DS/DI, academic, real-world, variants, primitives)"
+    },
     "live-cloud-corpus-clickhouse-cloud-tpch-first-20261006": {
       "claim": null,
       "needs": [
