@@ -9028,6 +9028,13 @@
       "status": "done",
       "title": "Explorer: selection-oriented facets and coverage signals for large public corpus"
     },
+    "explorer-site-small-defects": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Fix the missing Explorer favicon, the drafts page in the sitemap, and a flaky pipeline test"
+    },
     "explorer-surface-trust-tiers-as-badges": {
       "claim": null,
       "needs": [

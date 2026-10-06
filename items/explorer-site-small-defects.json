@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Favicon served",
+    "Drafts page out of the sitemap",
+    "Test stable under xdist"
+  ],
+  "description": "results-explorer/index.html links /results/favicon.svg, which is not built. /blog/drafts.html is in the sitemap and would list future-dated posts. tests/unit/scripts/explorer_pipeline/test_pipeline.py::TestExplorerPipelineRun::test_does_not_emit_manifest_json failed under a parallel run and passed alone.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:25:05Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "008b082348e546faabc02c8ead610710",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}
