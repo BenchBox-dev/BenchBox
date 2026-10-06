@@ -20699,15 +20699,10 @@
       "title": "TPC-DS generate with default compression writes only chunk 1 of 10, records an empty manifest, and loads zero rows"
     },
     "tpcds-gate-setup-time": {
-      "claim": {
-        "expires_at": "2026-10-07T14:09:10Z",
-        "generation": "1b70bf17c3ae42bebc71c9561e4675be",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Cut the TPC-DS cross-surface gate's setup time so the pandas step keeps budget headroom"
     },
     "tpcds-gate-vacuous-statement-coverage": {
