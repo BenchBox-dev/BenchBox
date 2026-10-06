@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Root volume has sustained free headroom (owner-defined threshold, e.g. >5%)",
+    "todo-db reads/writes no longer fail with ENOSPC",
+    "Event log degradation alert clears"
+  ],
+  "context": "On 2026-10-06 the host root volume hit 100% capacity (115Mi free on a 926Gi disk; ~/Developer/benchmark_runs alone 298G). todo-db list_items failed with ENOSPC and the session event log reported degradation. Tracker access recovered later without agent action, so pressure is intermittent. Do not delete benchmark_runs or other owner data without explicit owner approval of exact paths.",
+  "description": "Investigate what is filling the disk (benchmark run retention? logs? caches?), set a retention/pruning policy with owner approval, and add monitoring or a guard so tooling (tracker, event log, CI artifacts) degrades loudly before writes start failing.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:d90c17f1dbc58577e72c0803",
+      "at": "2026-10-06T19:08:31Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "e37c19dde0e74c70879d8c3bbee1ec87",
+      "session_id": "5709cef75a584579a236033476a263ba"
+    }
+  ]
+}
