@@ -21,6 +21,7 @@ from benchbox.core.tuning.coverage import (
     _coverage_spec,
     build_tuning_coverage_rows,
     classify_template,
+    coverage_differences,
     parse_runtime_tuning_logs,
     read_tuning_coverage_tsv,
     runtime_mismatches,
@@ -60,10 +61,63 @@ def test_tuning_coverage_matrix_is_checked_in_and_has_decisions():
     assert any(row.status == BASIC_CONSTRAINTS and row.decision == DECISION_AUTHOR for row in rows)
 
 
-def test_checked_in_tuning_coverage_has_no_static_drift():
+def test_checked_in_tuning_coverage_matches_generated_rows():
     recorded = read_tuning_coverage_tsv(MATRIX_PATH)
     current = build_tuning_coverage_rows(_uat_platforms(), _uat_benchmarks())
-    assert static_matrix_drift(recorded, current) == []
+    differing = coverage_differences(recorded, current)
+    assert not differing, (
+        f"checked-in tuning coverage matrix differs in {len(differing)} rows "
+        f"({', '.join(differing[:20])}): run "
+        "`uv run -- python scripts/generate_tuning_coverage.py` to regenerate "
+        "tests/uat/data/tuning_coverage.tsv, then review the diff"
+    )
+
+
+def _row(platform, benchmark, status, decision, reason="reason"):
+    return TuningCoverageRow(
+        platform=platform,
+        benchmark=benchmark,
+        status=status,
+        decision=decision,
+        reason=reason,
+    )
+
+
+def test_coverage_differences_flags_an_upgrade_as_drift():
+    recorded = [_row("duckdb", "tpch", BASIC_CONSTRAINTS, DECISION_WAIVED)]
+    current = [
+        TuningCoverageRow(
+            platform="duckdb",
+            benchmark="tpch",
+            status=TUNED_TEMPLATE,
+            decision=DECISION_DONE,
+            reason="benchmark-specific tuned template exists",
+            template_path="examples/tunings/duckdb/tpch_tuned.yaml",
+        )
+    ]
+
+    assert coverage_differences(recorded, current) == ["duckdb/tpch"]
+
+
+def test_coverage_differences_flags_a_downgrade_as_drift():
+    recorded = [_row("duckdb", "tpch", TUNED_TEMPLATE, DECISION_DONE)]
+    current = [_row("duckdb", "tpch", BASIC_CONSTRAINTS, DECISION_WAIVED)]
+
+    assert coverage_differences(recorded, current) == ["duckdb/tpch"]
+
+
+def test_coverage_differences_flags_a_changed_decision_only():
+    recorded = [_row("duckdb", "tpch", BASIC_CONSTRAINTS, DECISION_WAIVED)]
+    current = [_row("duckdb", "tpch", BASIC_CONSTRAINTS, DECISION_AUTHOR)]
+
+    assert coverage_differences(recorded, current) == ["duckdb/tpch"]
+
+
+def test_coverage_differences_is_empty_for_identical_rows():
+    recorded = [_row("duckdb", "tpch", TUNED_TEMPLATE, DECISION_DONE)]
+    current = [_row("duckdb", "tpch", TUNED_TEMPLATE, DECISION_DONE)]
+
+    assert coverage_differences(recorded, current) == []
 
 
 def test_static_matrix_drift_flags_new_current_rows_missing_from_matrix():
