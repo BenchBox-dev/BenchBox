@@ -16643,6 +16643,13 @@
       "status": "done",
       "title": "Replace Q16-Q22 result-replay variants with deeper hand-written structural rewrites"
     },
+    "repo-personal-identifiers-cleanup": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Replace personal identifiers in an incident record and the Explorer approver field"
+    },
     "reproduce-postgres-integration-needs-a-live-postgres-inside": {
       "claim": null,
       "needs": [],

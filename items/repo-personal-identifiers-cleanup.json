@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Decision recorded",
+    "Identifiers replaced if chosen"
+  ],
+  "description": "docs/operations/publication-g4-incident-response-2026-09-04.json (not served, but in the public repo) contains a personal email. The Results Explorer snapshot publishes the maintainer's GitHub handle as override_approver, sourced from results-data override files. Decide whether to use a role identifier.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:18:53Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d4040c3484be4712be6413516649f86c",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}
