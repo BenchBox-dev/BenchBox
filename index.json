@@ -1145,6 +1145,13 @@
       "status": "done",
       "title": "Amazon Athena for Apache Spark Platform"
     },
+    "athena-sql-live-credential-probe-20261006": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Probe Athena SQL credentials and reachability live before ranking it first"
+    },
     "audit-blog-posts-and-historical-release-summaries-for-outdat": {
       "claim": null,
       "needs": [],
