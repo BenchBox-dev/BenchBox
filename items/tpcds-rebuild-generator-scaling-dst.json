@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Rebuilt TPC-DS binaries generate the 35-row reason tables at SF1 per the TPC spec",
+    "BenchBox SQL reproduces the official Q85 and Q93 answers exactly from the rebuilt data",
+    "The weekly SF1 qualification run reports Q85/Q93 as printed-verified"
+  ],
+  "context": "Cause proven this session: bundled _sources/tpc-ds/tools/scaling.dst yields 75 reason-table rows at every scale while the TPC reference kit and spec give 35 at SF1; with 35 rows BenchBox SQL reproduces the official answers exactly (evidence ~/Developer/qual-q85-q93-evidence.md). Q85/Q93 currently classified with that evidence in the runner; rebuilding binaries and regenerating reference data needs an owner decision and is outside the closed dfparity batch.",
+  "description": "The bundled TPC-DS generator builds reason tables with 75 rows at every scale factor from _sources/tpc-ds/tools/scaling.dst, while the TPC reference kit expects 35 rows at SF1. Official Q85/Q93 answers therefore never match data generated with the bundled binaries, on any engine. Rebuilding dsdgen/dsqgen with a corrected scaling table and regenerating the reference datasets is a generator change that needs an owner decision.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T18:38:20Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "74759411232840068088cc884ea8f760",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    }
+  ]
+}
