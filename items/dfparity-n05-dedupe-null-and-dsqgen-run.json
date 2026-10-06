@@ -4,6 +4,7 @@
     "The SF 0.1 per-query probe on both families is unchanged for every cell",
     "Existing tests pass; Dask runs of the touched queries still work"
   ],
+  "context": "Closeout: delivered by PR #2689 (merge 73c88d73b) — inline NULL-to-None loops in benchbox/core/tpcds/dataframe_queries/queries.py replaced with the shared _none_for_null helper (lazy Dask frames pass through unchanged); SF 0.1 per-query probe unchanged for every cell; Dask runs verified; all required checks green. Trunk green on final batch head dda8c787d (11/11 jobs).",
   "description": "The dsqgen half of this item is done and merged: #2542 (42dd35db8) folded generate_with_parameters into the shared dsqgen runner (all 99 templates replay to identical SQL). What remains: several implementations in benchbox/core/tpcds/dataframe_queries/queries.py still convert NULL to None with inline loops that _none_for_null already covers (note _none_for_null now returns a lazy Dask frame unchanged). Replace them without changing behaviour. queries.py PR: queue it alone, after #2539 and #2541 have merged.",
   "sessions": [
     {
@@ -47,6 +48,14 @@
       "generation": "5aac09e3686c494798d8102e4e31977e",
       "op": "take",
       "op_id": "d76bf27acbff46fab040cb0b468f37e3",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T14:12:17Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "c42575de7d374230bd69d4151e3d8c11",
       "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
     }
   ]
