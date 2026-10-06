@@ -3,7 +3,7 @@
     "Seeded tpch_skew and tpchavoc DataFrame runs bind the same qgen parameters as the SQL run, with an equal-bindings test at two seeds",
     "Dry-run with --seed previews the seeded SQL"
   ],
-  "context": "Listed as follow-ups in tpch-df-seed-parity.",
+  "context": "Listed as follow-ups in tpch-df-seed-parity. Closeout: delivered by PR #2689 (merge 73c88d73b) — seeded tpch_skew and tpchavoc DataFrame runs bind the same qgen parameters as SQL (equal-bindings test at two seeds); dry-run with --seed previews the seeded SQL. All required checks green. Trunk green on final batch head dda8c787d (11/11 jobs).",
   "description": "TPC-H DataFrame runs now bind the parameters qgen draws for a seed (#2595, #2604), but tpch_skew and tpchavoc DataFrame runs still ignore --seed and bind qgen -d defaults, and `benchbox run --dry-run --seed` previews qgen -d SQL. A seeded run of these benchmarks compares SQL and DataFrame results for different parameters.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "generation": "a85e7c79f52a4bc3a09f122ad0b7ee7c",
       "op": "take",
       "op_id": "87e5bab46b5e413291956c06cbf8315e",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T14:12:48Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "1f9d497ac8414cebbeb9d66b47a7c586",
       "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
     }
   ]
