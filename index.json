@@ -7545,6 +7545,13 @@
       "status": "done",
       "title": "Rewrite architecture.md and structure.md to match current codebase"
     },
+    "docs-test-pinned-internal-jargon": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Remove internal jargon that tests pin on published reference pages"
+    },
     "docs-tests-readme-pytest-config": {
       "claim": null,
       "needs": [],

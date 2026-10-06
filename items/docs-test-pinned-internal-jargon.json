@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Text rewritten for users",
+    "Tests assert the new wording"
+  ],
+  "description": "Two ledger sentences in docs/reference/mcp.md (tests/unit/mcp/test_run_surface_contract.py), the A0 freeze sentence in docs/reference/hosted-results-contract.md (tests/unit/docs/test_publication_architecture.py and scripts/check_decision_records.py) and the api-docs lane sentence in docs/reference/api-reference.md (test_api_reference_contract.py) stay because tests assert them. Change the assertions, then the text.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:25:41Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "141c837d120a4dc5a3ab1ea53d5710d0",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}
