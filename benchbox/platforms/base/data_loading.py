@@ -28,6 +28,7 @@ from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any, Protocol
 
+from benchbox.core.loaded_tables import is_data_loading_skipped
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.file_format import (
     get_column_names_with_trailing,
@@ -2660,6 +2661,22 @@ def prepare_local_load_file(
                 tmp_path.unlink(missing_ok=True)
 
 
+def _tables_map_to_no_files(tables: Any) -> bool:
+    """True when every table maps to an empty file list.
+
+    Providers normalize ``benchmark.tables`` values to lists, so a table with
+    no files arrives as ``[]``. A source where *all* tables are file-less is
+    indistinguishable downstream from a table-less source (each table loads
+    zero rows), hence it fails closed in :meth:`DataLoader.load` the same
+    way. Partial sources (at least one table with files) proceed; per-table
+    misses still raise in the sharded/single-file loaders.
+    """
+    if not isinstance(tables, Mapping):
+        return False
+    values = list(tables.values())
+    return bool(values) and all(isinstance(value, (list, tuple)) and len(value) == 0 for value in values)
+
+
 class DataLoader:
     """Main orchestrator for data loading operations."""
 
@@ -2715,14 +2732,16 @@ class DataLoader:
 
         table_stats = {}
 
-        # Resolve data source. A missing source -- or a source naming zero
-        # tables, such as a stale empty datagen manifest -- fails the run for
+        # Resolve data source. A missing source -- a source naming zero tables,
+        # or a source whose every table maps to an empty file list (e.g. a
+        # stale manifest that still names tables) -- fails the run for
         # benchmarks that expect data instead of loading nothing and
         # validating vacuously. Benchmarks that legitimately skip data
         # loading keep the previous empty result.
         data_source = self.resolver.resolve(self.benchmark, self.data_dir)
-        if not data_source or not data_source.tables:
-            if getattr(self.benchmark, "SKIP_DATA_LOADING", False):
+        tables = data_source.tables if data_source else None
+        if not data_source or not tables or _tables_map_to_no_files(tables):
+            if is_data_loading_skipped(self.benchmark):
                 self.adapter.log_very_verbose("No data source found (data loading skipped)")
                 return table_stats, elapsed_seconds(start_time)
             raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")

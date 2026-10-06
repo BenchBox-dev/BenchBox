@@ -76,10 +76,21 @@ class TestSQLiteAdapter:
         )
         adapter._applied_tuning_ledger = AppliedTuningLedger()
         connection = adapter.create_connection()
-        benchmark = Mock()
+
+        class _SchemaOnlyBenchmark:
+            """Schema-only double: declares SKIP_DATA_LOADING at class level.
+
+            A bare Mock cannot declare this: instance attributes on a mock
+            are untrusted by is_data_loading_skipped by design, so this DDL
+            test (which stubs load_data out) must opt out explicitly.
+            """
+
+            SKIP_DATA_LOADING = True
+
+        benchmark = _SchemaOnlyBenchmark()
         benchmark.output_dir = tmp_path
-        benchmark.get_create_tables_sql.return_value = (
-            "CREATE TABLE baseline (id INTEGER);\nCREATE TABLE tuned (id INTEGER PRIMARY KEY);\n"
+        benchmark.get_create_tables_sql = Mock(
+            return_value=("CREATE TABLE baseline (id INTEGER);\nCREATE TABLE tuned (id INTEGER PRIMARY KEY);\n")
         )
         adapter.apply_unified_tuning = Mock()
         adapter.save_tuning_metadata = Mock(return_value=True)
