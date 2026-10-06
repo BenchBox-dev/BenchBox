@@ -14,5 +14,16 @@
     "scripts/heavy_tier_needed.py",
     "_project/scripts/report_slow_test_coverage.py",
     "tests/conftest.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:26acbcff276b4a051a0b6cee",
+      "at": "2026-10-06T19:19:28Z",
+      "client": "tbh",
+      "generation": "5cc3bf9efa8942e6b4e6262e63434d8a",
+      "op": "take",
+      "op_id": "9c7ce7193da446a9bec102fedf6873b5",
+      "session_id": "ccd5a4124a5a4b2ab886fc474bb7d83c"
+    }
   ]
 }
