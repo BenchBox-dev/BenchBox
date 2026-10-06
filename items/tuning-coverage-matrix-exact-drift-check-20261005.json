@@ -3,7 +3,7 @@
     "tests/uat/test_tuning_coverage.py fails when the TSV and the generated matrix differ in either direction.",
     "Docstrings describe the family-directory lookup."
   ],
-  "context": "Source: PR #2677 independent review nits, left unaddressed to keep the PR scoped.",
+  "context": "Source: PR #2677 independent review nits, left unaddressed to keep the PR scoped.\n\nCloseout 2026-10-06 (re-validation, read-only): PR #2716 MERGED to develop at 75b5a794bff5a6bac9400032aaedff5ff0d6cb74 (mergedAt 2026-10-06T08:18:50Z, head fix/coverage-matrix-drift). Evidence: gh pr view state MERGED; statusCheckRollup clean (only oracle-review-shadow null, non-required); git show confirms coverage_differences flags upgrades and downgrades as drift plus docstring/comment updates in benchbox/core/tuning/coverage.py and packaged_templates.py. Original worker session 5709cef75a584579a236033476a263ba (finish 2026-10-06T08:43:50Z); ladder not re-run in this validation.",
   "description": "## Problem\n`static_matrix_drift` in benchbox/core/tuning/coverage.py reports only cells whose status got worse, so a TSV that says `waived` where a template now exists passes. That is how the ClickHouse rows went stale while PR #2677 added templates, and the stale rows were found only by a reviewer. Also: the module docstring (lines 3-5) and `template_path_for` (line ~101) still describe a single `examples/tunings/{platform}/` lookup although `classify_template` now also checks the family directory; and the new `TEMPLATE_PLATFORM_KEYS` in benchbox/core/tuning/packaged_templates.py repeats four entries of `capability_registry.PLATFORM_ALIASES` without saying why it must stay separate (that map also sends spark to databricks, which is wrong for template lookup).\n\n## Change\n- Make the checked-in matrix test assert exact equality with the generated rows (with a clear regeneration command in the failure message), or flag upgrades as drift too.\n- Update the docstrings and add a one-line comment on `TEMPLATE_PLATFORM_KEYS`.\n\n## Guardrails\n- Intentional waivers stay possible and visible.",
   "links": [
     "benchbox/core/tuning/coverage.py",
@@ -36,6 +36,14 @@
       "op": "finish",
       "op_id": "8d4159d54e3946219e609f72067d4ba0",
       "session_id": "5709cef75a584579a236033476a263ba"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:f3947ef8d62ddbe70b6706e6",
+      "at": "2026-10-06T15:49:23Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "8ccc561dd3084a62a56643739a7ca34e",
+      "session_id": "6a33af84e93c469ebdeae2d73e412c6f"
     }
   ]
 }
