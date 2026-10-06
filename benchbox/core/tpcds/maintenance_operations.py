@@ -558,10 +558,7 @@ class MaintenanceOperations:
         )
 
     def _insert_store_returns(self, connection: Any, estimated_rows: int) -> int:
-        """Insert new store returns data that reference valid store sales.
-
-        Per TPC-DS spec, returns must reference parent sales transactions.
-        """
+        """Insert new store returns referencing valid store sales (see generic helper)."""
         return self._insert_returns_generic(
             connection,
             estimated_rows,
@@ -582,10 +579,7 @@ class MaintenanceOperations:
         )
 
     def _insert_catalog_returns(self, connection: Any, estimated_rows: int) -> int:
-        """Insert new catalog returns data that reference valid catalog sales.
-
-        Per TPC-DS spec, returns must reference parent sales transactions.
-        """
+        """Insert new catalog returns referencing valid catalog sales (see generic helper)."""
         return self._insert_returns_generic(
             connection,
             estimated_rows,
@@ -610,10 +604,7 @@ class MaintenanceOperations:
         )
 
     def _insert_web_returns(self, connection: Any, estimated_rows: int) -> int:
-        """Insert new web returns data that reference valid web sales.
-
-        Per TPC-DS spec, returns must reference parent sales transactions.
-        """
+        """Insert new web returns referencing valid web sales (see generic helper)."""
         return self._insert_returns_generic(
             connection,
             estimated_rows,
