@@ -18830,6 +18830,13 @@
       "status": "open",
       "title": "Add SiriusDB (GPU-Native SQL Engine) Platform Adapter"
     },
+    "site-parity-header-shrink-toggle": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Fix the site-parity header shrink-toggle mismatch between docs and results sites"
+    },
     "site-parity-prune-stale-allowances": {
       "claim": {
         "expires_at": "2026-10-07T18:16:37Z",
