@@ -43,6 +43,7 @@ file	benchbox/core/tuning/applied_ledger.py
 file	benchbox/core/tuning/capability_registry.py
 file	benchbox/core/tuning/metadata.py
 file	benchbox/platforms/clickhouse/introspection.py
+file	benchbox/platforms/dataframe/tuning_trust.py
 glob	benchbox/platforms/*_introspection.py
 file	benchbox/sql_compat/resolver.py
 file	benchbox/sql_compat/decision.py
