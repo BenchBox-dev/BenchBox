@@ -33,6 +33,20 @@ default matches.
 | `query_results` | `list[dict]` (default `[]`) | `list[dict]` (default `[]`) | **shared** |
 | `success` | `bool` (default `True`) | `bool` (default `True`) | **shared** |
 | `error` | `Optional[str]` (default `None`) | `Optional[str]` (default `None`) | **shared** |
+| `start_wall_time` | `str` (default `""`) | `str` (default `""`) | **shared** |
+| `end_wall_time` | `str` (default `""`) | `str` (default `""`) | **shared** |
+
+`start_time`, `end_time` and `duration` are monotonic readings used only for
+durations. `start_wall_time` and `end_wall_time` are ISO-8601 wall-clock
+event times and are the only stream timestamps exported to result bundles.
+
+**Timing window.** A stream's window starts after its connection is open and
+ends before the connection is closed, so connection setup (connect, session
+settings, benchmark configuration) and teardown are not part of Total Test
+Time. The TPC specifications measure the interval from the first query of
+the first stream to the completion of the last query of the last stream.
+After `compute_metrics()` the throughput phase `start_time`, `end_time` and
+`duration_ms` all describe that same interval.
 
 **Outcome:** `ThroughputStreamResult` in `core.throughput.result` replaces
 both. The existing names become aliases in their respective modules for

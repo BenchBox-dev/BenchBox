@@ -18,7 +18,7 @@ class ThroughputTestResult:
     streams_executed: int
     streams_successful: int
     stream_results: list[dict[str, Any]]
-    throughput_at_size: float
+    throughput_at_size: Optional[float]
     success: bool
     error: Optional[str] = None
 
@@ -75,7 +75,6 @@ class BenchmarkResult:
     maintenance_test: Optional[PhaseResult] = None
     power_at_size: float = 0.0
     throughput_at_size: float = 0.0
-    qphds_at_size: float = 0.0
     benchmark_start_time: Optional[datetime] = None
     benchmark_end_time: Optional[datetime] = None
     total_benchmark_time: float = 0.0

@@ -190,8 +190,10 @@ slowdowns), `import` (load results into database), `stats`, and `list`.
 
 ### `benchbox metrics qphh`
 
-Calculates the TPC-H QphH@Size composite metric from power and throughput
-test results. Auto-detects scale factor from result files.
+Calculates Power@Size and Throughput@Size from power and throughput test
+results. It does not compute the composite QphH@Size or QphDS@Size, and it
+refuses result files with suppressed metrics or failed queries.
+Auto-detects scale factor from result files.
 
 ### `benchbox aggregate`
 

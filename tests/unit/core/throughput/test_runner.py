@@ -224,6 +224,40 @@ class TestStreamRunnerComputeMetrics:
         assert result.query_throughput == pytest.approx(66 / 3600.0)
         assert result.end_time != ""
 
+    def test_phase_window_follows_first_stream_start_and_last_stream_end(self) -> None:
+        config = _FakeConfig(num_streams=2)
+        result = _make_result()
+        first = _make_stream_result(0, start_time=100.0, end_time=105.0)
+        first.start_wall_time = "2026-10-04T10:00:00"
+        first.end_wall_time = "2026-10-04T10:00:05"
+        last = _make_stream_result(1, start_time=101.0, end_time=110.0)
+        last.start_wall_time = "2026-10-04T10:00:01"
+        last.end_wall_time = "2026-10-04T10:00:10"
+        result.stream_results = [first, last]
+        result.streams_executed = 2
+        result.streams_successful = 2
+
+        StreamRunner.compute_metrics(result, config, start_time=0.0)
+
+        assert result.total_time == pytest.approx(10.0)
+        assert result.start_time == "2026-10-04T10:00:00"
+        assert result.end_time == "2026-10-04T10:00:10"
+
+    def test_scored_queries_per_stream_overrides_executed_statement_count(self) -> None:
+        config = _FakeConfig(num_streams=2, scale_factor=1.0)
+        result = _make_result()
+        result.stream_results = [
+            _make_stream_result(0, start_time=0.0, end_time=3600.0, queries_executed=103, queries_successful=103),
+            _make_stream_result(1, start_time=0.0, end_time=3600.0, queries_executed=103, queries_successful=103),
+        ]
+        result.streams_executed = 2
+        result.streams_successful = 2
+
+        StreamRunner.compute_metrics(result, config, start_time=0.0, queries_per_stream=99)
+
+        assert result.throughput_at_size == pytest.approx(198.0)
+        assert result.query_throughput == pytest.approx(206 / 3600.0)
+
     def test_zero_queries_yields_zero_query_throughput(self) -> None:
         config = _FakeConfig(num_streams=1, scale_factor=0.1)
         result = _make_result()

@@ -426,6 +426,7 @@ class TPCHThroughputTest:
             queries_executed=0,
             queries_successful=0,
             queries_failed=0,
+            start_wall_time=datetime.now().isoformat(),
         )
 
         connection = None
@@ -435,6 +436,8 @@ class TPCHThroughputTest:
 
             # Create connection for this stream
             connection = self.connection_factory()
+            stream_result.start_time = mono_time()
+            stream_result.start_wall_time = datetime.now().isoformat()
 
             query_permutation = _stream_permutation(stream_id, config.query_subset)
 
@@ -569,17 +572,16 @@ class TPCHThroughputTest:
                 self.logger.error(f"Stream {stream_id} failed: {e}")
 
         finally:
-            # Ensure connection is always closed, even on exception
+            stream_result.end_time = mono_time()
+            stream_result.end_wall_time = datetime.now().isoformat()
+            stream_result.duration = stream_result.end_time - stream_result.start_time
+
             if connection is not None:
                 try:
                     connection.close()
                 except Exception as close_error:
                     if config.verbose:
                         self.logger.warning(f"Failed to close connection for stream {stream_id}: {close_error}")
-
-            # Record end time and duration
-            stream_result.end_time = mono_time()
-            stream_result.duration = stream_result.end_time - stream_result.start_time
 
         return stream_result
 

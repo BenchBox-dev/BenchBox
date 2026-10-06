@@ -44,7 +44,8 @@ these conditions, in order:
 5. The timing and coverage contract holds: at least two queries with a valid positive
    display timing, covering at least half of the logical queries.
 6. The benchmark's primary metric is present, finite and positive. TPC-H and TPC-DS rank on
-   `power_score` (from `power_at_size`, `qphh_at_size` or `qphds_at_size`); other
+   `power_score` (from `power_at_size` only; `qphh_at_size`/`qphds_at_size` are
+   non-spec exports the driver no longer validates); other
    benchmarks rank on the geometric mean of display timings.
 
 Trust label and visibility come from where a bundle is published, not from its content,

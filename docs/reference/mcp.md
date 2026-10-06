@@ -388,7 +388,7 @@ tool.
 | `benchbox tuning` | not-yet-demanded | Tuning template discovery and validation; promotion would be the enum subset (`tuned`/`notuning`/`auto`), not YAML paths. |
 | `benchbox plan-history` | not-yet-demanded | Plan evolution history over multiple runs; bounded read, no client demand yet. |
 | `benchbox download-answers` | security-scoped | Fetches external TPC answer keys from a remote source; network fetch with no tenant budget. |
-| `benchbox metrics` | not-yet-demanded | QphH composite metric calculation; bounded, no MCP client has demanded it. |
+| `benchbox metrics` | not-yet-demanded | Power@Size and Throughput@Size calculation from result files; bounded, no MCP client has demanded it. |
 | `benchbox config` / `benchbox validate` (config file) | not-yet-demanded | Config-file syntax and completeness check; file-path input outside the MCP result-registry surface. |
 
 ### Scoped-Surface Omission Ledger — `benchbox run` Flags

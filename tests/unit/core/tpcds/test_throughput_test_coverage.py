@@ -74,6 +74,31 @@ def test_run_computes_metrics(monkeypatch):
     assert result.query_throughput == pytest.approx(0.5)
 
 
+def test_throughput_at_size_scores_99_queries_per_stream_not_executed_statements(monkeypatch):
+    benchmark = SimpleNamespace(get_query=lambda *_args, **_kwargs: "SELECT 1")
+    throughput = TPCDSThroughputTest(benchmark=benchmark, connection_factory=DummyConn, num_streams=2)
+
+    def fake_execute_stream(stream_id, seed, config):
+        return TPCDSThroughputStreamResult(
+            stream_id=stream_id,
+            start_time=0.0,
+            end_time=3600.0,
+            duration=3600.0,
+            queries_executed=103,
+            queries_successful=103,
+            queries_failed=0,
+            success=True,
+        )
+
+    monkeypatch.setattr(throughput, "_execute_stream", fake_execute_stream)
+
+    result = throughput.run(TPCDSThroughputTestConfig(scale_factor=1.0, num_streams=2, enable_preflight=False))
+
+    assert result.success is True
+    assert result.throughput_at_size == pytest.approx(99 * 2)
+    assert result.query_throughput == pytest.approx(206 / 3600.0)
+
+
 def test_run_without_preflight_clears_stale_pregenerated_queries(monkeypatch):
     benchmark = SimpleNamespace(get_query=lambda *_args, **_kwargs: "SELECT inline")
     throughput = TPCDSThroughputTest(benchmark=benchmark, connection_factory=DummyConn, num_streams=1)

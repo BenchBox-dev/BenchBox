@@ -1247,7 +1247,7 @@ def _warn_tpcds_subscale(s: types.SimpleNamespace) -> None:
             f"   Scale factor: [bold]{s.scale}[/bold] (< 1.0 - not TPC-DS compliant)\n"
             "   Results are for development use only and must not be published or\n"
             "   submitted as official TPC-DS results. Official TPC metrics\n"
-            "   (QphDS, power@size, throughput@size) will not be computed.\n"
+            "   (power@size, throughput@size) will not be computed.\n"
             "   See _sources/tpcds-subscale-contract.md for the data contract."
         )
 
@@ -1259,7 +1259,7 @@ def _warn_tpch_subscale(s: types.SimpleNamespace) -> None:
             f"   Scale factor: [bold]{s.scale}[/bold] (< 1.0 - not TPC-H compliant)\n"
             "   Results are for development use only and must not be published or\n"
             "   submitted as official TPC-H results. Official TPC metrics\n"
-            "   (QphH, power@size, throughput@size) will not be computed."
+            "   (power@size, throughput@size) will not be computed."
         )
 
 

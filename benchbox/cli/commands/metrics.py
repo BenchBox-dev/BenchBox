@@ -16,15 +16,15 @@ def metrics_group():
     """Calculate benchmark performance metrics.
 
     The metrics command group provides tools for calculating
-    official TPC performance metrics from benchmark results.
+    TPC Power@Size and Throughput@Size from benchmark results.
 
     Available subcommands:
 
     \b
-      qphh    Calculate TPC-H QphH@Size composite metric
+      qphh    Calculate Power@Size and Throughput@Size (no composite QphH)
 
     Examples:
-        # Calculate TPC-H QphH metric
+        # Calculate Power@Size and Throughput@Size
         benchbox metrics qphh \\
           --power-results power.json \\
           --throughput-results throughput.json
@@ -64,20 +64,19 @@ def metrics_group():
 )
 @click.pass_context
 def qphh(ctx, power_results, throughput_results, scale_factor, output_format, output_file):
-    """Calculate TPC-H QphH@Size composite metric.
+    """Calculate Power@Size and Throughput@Size from result files.
 
-    Calculate the official TPC-H QphH@Size (Queries per Hour) composite
-    metric from power test and throughput test results according to TPC-H
-    specification.
+    The composite QphH@Size / QphDS@Size is not computed: BenchBox does not
+    yet run the TPC-H refresh functions or the TPC-DS data maintenance
+    phases that the composite requires. The command refuses result files
+    with suppressed metrics, failed queries or a failed throughput phase.
 
-    Formula: QphH@Size = geometric_mean(Power@Size, Throughput@Size)
-    Where:
-        Power@Size = 3600 × SF / Power_Test_Time
-        Throughput@Size = Num_Streams × 3600 × SF / Throughput_Test_Time
+    Power@Size uses the final power iteration. Throughput@Size uses the
+    throughput phase wall-clock duration.
 
     \b
     Examples:
-        # Calculate QphH from test results
+        # Calculate metrics from test results
         benchbox metrics qphh \\
           --power-results results/power/results.json \\
           --throughput-results results/throughput/results.json
@@ -184,7 +183,7 @@ def _format_text_output(result: dict) -> str:
     lines = []
 
     lines.append("=" * 70)
-    lines.append("TPC-H QphH@Size CALCULATION")
+    lines.append(f"{result['benchmark']} POWER AND THROUGHPUT METRICS")
     lines.append("=" * 70)
     lines.append("")
     lines.append(f"Benchmark:        {result['benchmark']}")
@@ -206,18 +205,15 @@ def _format_text_output(result: dict) -> str:
         lines.append("Throughput Test:  n/a")
     lines.append("")
     lines.append("-" * 70)
-    lines.append("TPC-H METRICS")
+    lines.append(f"{result['benchmark']} METRICS")
     lines.append("-" * 70)
     lines.append(f"Power@Size:       {result['power_at_size']:,.2f}")
     lines.append(f"Throughput@Size:  {result['throughput_at_size']:,.2f}")
     lines.append("")
     lines.append("=" * 70)
-    lines.append(f"QphH@Size:        {result['qphh_at_size']:,.2f}")
-    lines.append("=" * 70)
-    lines.append("")
-    lines.append("Formula: QphH@Size = geometric_mean(Power@Size, Throughput@Size)")
-    lines.append("  Power@Size = 3600 × SF / Power_Test_Time")
-    lines.append("  Throughput@Size = Num_Streams × 3600 × SF / Throughput_Test_Time")
+    lines.append("Composite QphH/QphDS is not computed (refresh/maintenance phases are not run).")
+    lines.append("  Power@Size = 3600 × SF / geometric_mean(final power iteration query times)")
+    lines.append("  Throughput@Size = Queries × 3600 × SF / Throughput_Phase_Wall_Time")
     lines.append("")
 
     return "\n".join(lines)

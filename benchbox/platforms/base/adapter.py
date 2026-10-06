@@ -11,7 +11,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
-import math
 import threading
 import uuid
 from abc import ABC, abstractmethod
@@ -1129,10 +1128,6 @@ class PlatformAdapter(
             power_at_size = power_test_phase.power_at_size if power_test_phase else None
             throughput_at_size = throughput_test_phase.throughput_at_size if throughput_test_phase else None
 
-            qph_at_size = None
-            if power_at_size and power_at_size > 0 and throughput_at_size and throughput_at_size > 0:
-                qph_at_size = math.sqrt(power_at_size * throughput_at_size)
-
             eet = run_config.get("_effective_execution_type")
             execution_type = eet if eet is not None else run_config.get("test_execution_type", "standard")
 
@@ -1193,7 +1188,6 @@ class PlatformAdapter(
                 validation_details=validation_phase.validation_details,
                 power_at_size=power_at_size,
                 throughput_at_size=throughput_at_size,
-                qph_at_size=qph_at_size,
                 test_execution_type=execution_type,
             )
 

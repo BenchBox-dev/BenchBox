@@ -23,6 +23,7 @@ from benchbox.core.connection import DatabaseConnection
 from benchbox.core.plan_capture_phase import (
     propagate_query_execution_metadata,
 )
+from benchbox.core.results.metrics import TPC_QUERIES_PER_STREAM
 from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
 from benchbox.core.throughput.runner import StreamRunner
 from benchbox.core.validation.query_validation import (
@@ -85,6 +86,12 @@ def _apply_query_subset(stream_queries: list[Any], query_subset: Optional[list[s
     if unknown:
         raise ValueError(f"Invalid TPC-DS query ids in query_subset: {unknown}")
     return selected
+
+
+def _scored_queries_per_stream(config: TPCDSThroughputTestConfig) -> int:
+    if config.queries_per_stream is None:
+        return TPC_QUERIES_PER_STREAM["tpcds"]
+    return min(config.queries_per_stream, TPC_QUERIES_PER_STREAM["tpcds"])
 
 
 def _count_cursor_rows(cursor: Any) -> int:
@@ -264,7 +271,9 @@ class TPCDSThroughputTest:
             # A throughput metric is valid only when every requested stream
             # completed successfully. Partial success remains visible in the
             # result details but is never published as a scored measurement.
-            result.success = StreamRunner.compute_metrics(result, config, start_time)
+            result.success = StreamRunner.compute_metrics(
+                result, config, start_time, queries_per_stream=_scored_queries_per_stream(config)
+            )
 
             success_rate = result.streams_successful / max(config.num_streams, 1)
 
@@ -339,7 +348,7 @@ class TPCDSThroughputTest:
         (``benchbox.core.tpcds.streams.generate_dsqgen_streams``), which
         yields both the official per-stream query ORDERING and the official
         per-stream substitution PARAMETERS -- the TPC-DS compliance-relevant
-        inputs to QphDS. This is the throughput-test default and retires the
+        inputs to the throughput test. This is the throughput-test default and retires the
         home-grown ``TPCDSPermutationGenerator`` ordering / RNG-jitter
         parameter path for this (the timed, scored) path; that Python path
         remains available, unchanged, via ``_build_stream_queries`` for
@@ -671,6 +680,7 @@ class TPCDSThroughputTest:
             queries_executed=0,
             queries_successful=0,
             queries_failed=0,
+            start_wall_time=datetime.now().isoformat(),
         )
 
         connection = None
@@ -679,6 +689,8 @@ class TPCDSThroughputTest:
                 self.logger.info(f"Starting stream {stream_id} with seed {seed}")
 
             connection = self.connection_factory()
+            stream_result.start_time = mono_time()
+            stream_result.start_wall_time = datetime.now().isoformat()
 
             # When run() pre-generated this stream (the normal path with
             # enable_preflight=True), reuse its already-resolved ordering
@@ -740,9 +752,10 @@ class TPCDSThroughputTest:
             if config.verbose:
                 self.logger.error(f"Stream {stream_id} failed: {e}")
         finally:
-            self._close_stream_connection(connection, stream_id, config)
             stream_result.end_time = mono_time()
+            stream_result.end_wall_time = datetime.now().isoformat()
             stream_result.duration = stream_result.end_time - stream_result.start_time
+            self._close_stream_connection(connection, stream_id, config)
 
         return stream_result
 
