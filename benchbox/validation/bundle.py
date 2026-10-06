@@ -96,6 +96,13 @@ bundle_failed_query_count = _load_bundle_failed_query_count()
 # Max length for the optional free-text submission_notes manifest field.
 SUBMISSION_NOTES_MAX_LEN = 500
 
+KNOWN_DEFECT_IDS = frozenset(
+    {
+        "defective-macdbgen-addresses",
+        "defective-windows-dsdgen-scale",
+    }
+)
+
 # Applied tuning receipts are attacker-controlled submission companions. These
 # ceilings sit well above realistic runs while bounding validation and Explorer
 # ingestion work. Oversized submissions fail loudly; the Explorer pipeline has
@@ -2361,17 +2368,28 @@ def _validate_manifest_provenance(manifest: dict[str, Any], primary_path: Path, 
             vr.error(f"Manifest submission_notes exceeds {SUBMISSION_NOTES_MAX_LEN} characters ({len(notes)})")
 
     result_source = manifest.get("result_source")
-    if result_source is None:
-        return
-    if result_source not in RESULT_SOURCES:
-        vr.error(f"Invalid manifest result_source {result_source!r}: must be one of {sorted(RESULT_SOURCES)}")
-        return
-    if result_source == "vendor" and primary_path.parent.name != "vendor":
-        vr.error(
-            "Manifest result_source 'vendor' is only valid for bundles directly "
-            "under a maintainer-controlled results-data/bundles/vendor/ path; a "
-            "community submission cannot self-assert the vendor-supplied label."
-        )
+    if result_source is not None:
+        if result_source not in RESULT_SOURCES:
+            vr.error(f"Invalid manifest result_source {result_source!r}: must be one of {sorted(RESULT_SOURCES)}")
+        elif result_source == "vendor" and primary_path.parent.name != "vendor":
+            vr.error(
+                "Manifest result_source 'vendor' is only valid for bundles directly "
+                "under a maintainer-controlled results-data/bundles/vendor/ path; a "
+                "community submission cannot self-assert the vendor-supplied label."
+            )
+
+    known_defects = manifest.get("known_defects")
+    if known_defects is not None:
+        if (
+            not isinstance(known_defects, list)
+            or not known_defects
+            or any(not isinstance(item, str) for item in known_defects)
+        ):
+            vr.error("Manifest known_defects must be a non-empty list of defect id strings")
+        else:
+            for defect in known_defects:
+                if defect not in KNOWN_DEFECT_IDS:
+                    vr.error(f"Unknown manifest known_defects id {defect!r}: must be one of {sorted(KNOWN_DEFECT_IDS)}")
 
 
 # ---------------------------------------------------------------------------

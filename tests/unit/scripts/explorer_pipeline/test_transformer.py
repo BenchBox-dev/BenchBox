@@ -1587,3 +1587,70 @@ class TestClientLinkProducerShape:
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["platform"]["deployment"] = {"endpoint_class": "cloud_endpoint"}
         assert transformer_module._deployment_class_from_contract(transformer_module._parse_bundle(data)) == "cloud"
+
+
+class TestKnownDefectExclusion:
+    def _write_sidecar(self, bundle_file: Path, payload: object) -> None:
+        sidecar = bundle_file.parent / f"{bundle_file.stem}.manifest.json"
+        if isinstance(payload, str):
+            sidecar.write_text(payload, encoding="utf-8")
+        else:
+            sidecar.write_text(json.dumps(payload), encoding="utf-8")
+
+    def test_known_defects_exclude_manifest_entry(self, bundle_file: Path) -> None:
+        self._write_sidecar(bundle_file, {"known_defects": ["defective-macdbgen-addresses"]})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == "known_defective_data"
+
+    def test_known_defects_exclude_detail_result(self, bundle_file: Path) -> None:
+        self._write_sidecar(bundle_file, {"known_defects": ["defective-macdbgen-addresses"]})
+        transformer = BundleTransformer()
+        rid = transformer.result_id_from_bundle(bundle_file)
+        detail = transformer.to_detail_result(bundle_file, rid)
+
+        assert detail.ranking_exclusion_reason == "known_defective_data"
+
+    def test_unlisted_defect_id_still_excludes(self, bundle_file: Path) -> None:
+        self._write_sidecar(bundle_file, {"known_defects": ["future-defect"]})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == "known_defective_data"
+
+    def test_absent_sidecar_preserves_baseline(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, {"result_source": "internal"})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
+    def test_empty_known_defects_preserves_baseline(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, {"known_defects": []})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
+    def test_malformed_sidecar_preserves_baseline(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, "{not json")
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
+    def test_non_string_entries_are_ignored(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, {"known_defects": [123, None]})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
+    def test_known_defects_take_precedence_over_other_reasons(self, bundle_file: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["summary"]["queries"]["failed"] = 1
+        bundle_file.write_text(json.dumps(data), encoding="utf-8")
+        assert BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason == "failed_queries"
+        self._write_sidecar(bundle_file, {"known_defects": ["defective-macdbgen-addresses"]})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == "known_defective_data"

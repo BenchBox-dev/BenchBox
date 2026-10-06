@@ -557,6 +557,8 @@ class DetailResult(BaseModel):
 # Ranking eligibility helpers
 # ---------------------------------------------------------------------------
 
+KNOWN_DEFECT_RANKING_EXCLUSION = "known_defective_data"
+
 
 def is_ranking_eligible(entry: ManifestEntry) -> bool:
     """Return True if this entry may appear in ranked tables."""
