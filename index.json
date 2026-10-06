@@ -1340,7 +1340,7 @@
       "needs": [],
       "priority": "medium",
       "status": "open",
-      "title": "Automatically opening an issue/PR or paging an owner when a review_by date passes."
+      "title": "Automatically open an issue/PR or page an owner when a review_by date passes"
     },
     "aws-athena-platform-adapter": {
       "claim": null,
