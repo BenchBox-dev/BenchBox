@@ -77,7 +77,8 @@ class ClickHouseTuningMixin:
 
         base_config = super().get_effective_tuning_configuration()
         if base_config:
-            if not self._has_tuned_sort_key(base_config):
+            tuned_sort_key = getattr(self, "tuning_enabled", False) and self._has_tuned_sort_key(base_config)
+            if not tuned_sort_key:
                 base_config.primary_keys.enabled = True
             return base_config
 
