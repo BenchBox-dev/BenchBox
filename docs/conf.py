@@ -155,6 +155,7 @@ exclude_patterns = [
     ".DS_Store",
     "_project",
     "agent",
+    "internal",
     "development/task-management-design.md",
     "development/dependency-audit-raw.md",
     "development/duplication-inventory.csv",
@@ -229,6 +230,32 @@ exclude_patterns = [
     "reference/threat-model.md",
     "tpc-licensing-analysis.md",
 ]
+
+# Pages under these directories are published only when publish-allowlist.txt
+# lists them, so a new maintainer document stays off the site until someone
+# decides it is for users. website/src/converter/sources.ts reads the same list.
+PUBLISH_LIST_ROOTS = ("development", "operations")
+
+
+def _read_publish_list(docs_root: Path) -> set[str]:
+    path = docs_root / "publish-allowlist.txt"
+    if not path.exists():
+        return set()
+    lines = (line.strip() for line in path.read_text(encoding="utf-8").splitlines())
+    return {line for line in lines if line and not line.startswith("#")}
+
+
+def _unlisted_publish_list_pages(docs_root: Path) -> list[str]:
+    listed = _read_publish_list(docs_root)
+    pages = (
+        page.relative_to(docs_root).as_posix()
+        for root in PUBLISH_LIST_ROOTS
+        for page in (docs_root / root).rglob("*.md")
+    )
+    return sorted(page for page in pages if page not in listed)
+
+
+exclude_patterns += [page for page in _unlisted_publish_list_pages(DOCS_ROOT) if page not in exclude_patterns]
 
 language = "en"
 
