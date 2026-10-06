@@ -21990,12 +21990,17 @@
       "title": "Make the tuning trust-path files soundness-manifest paths (extract corroboration out of adapter.py first)"
     },
     "tuning-trust-surface-outside-soundness-manifest-20261004": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T04:53:05Z",
+        "generation": "65499873fc9a4231b113b9d699f51f4c",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
+      },
       "needs": [
         "tuning-trust-paths-soundness-manifest-20261001"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Tuning trust code that still sits outside the soundness manifest, and a test gap on the extracted read-back"
     },
     "tuning-validate-datafusion-sql-files-20261005": {
