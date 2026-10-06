@@ -129,7 +129,8 @@ must not be bypassed with an undocumented local change.
    attached, then gates on `generate_changelog_entry.py --check-curation`,
    which inspects the drafted section's text: it rejects verbatim commit
    subjects (trailing `(#NNNN)`), the manual-edit placeholder, and more than
-   60 bullets. Curation is always required — the draft is the raw
+   45 bullets or 160 lines (see "Curating release notes" below). Curation is
+   always required — the draft is the raw
    `origin/release..HEAD` delta, hundreds of commits whenever `release` lags
    `develop`. A headless run without curated text stops here: hand-curate the
    section, then re-run `make release-cut` (see "Resuming or aborting a cut"
@@ -175,6 +176,18 @@ must not be bypassed with an undocumented local change.
 7. Pushes and opens a PR against `release`.
 8. Sweeps prior `v*` branches on origin (option-c lifecycle: keep until
    superseded, then auto-delete on the next `release-cut`).
+
+### Curating release notes
+
+Write for users, not contributors: include only changes a user would notice,
+grouped by theme (`Before you upgrade`, `Added`, `Changed`, `Fixed`) and
+matching the structure and length of earlier entries. Use plain language. Mark
+behavior changes in `Before you upgrade` with `BREAKING:` and date the section
+with the publication date. The curation gate enforces the length half of this
+standard: at most 45 bullets and 160 lines, set from the largest hand-curated
+section shipped (0.2.1, 39 bullets over 139 lines). A longer draft means the
+curation is not done yet — group and cut further rather than working around
+the gate.
 
 ### Tests on the release tree
 
