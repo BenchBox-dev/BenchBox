@@ -55,6 +55,35 @@ def test_detect_and_restore_reports_and_restores(tmp_path) -> None:
         leak_detector.detect_and_restore(baseline)
 
 
+@pytest.mark.parametrize(
+    ("value", "module_loaded", "accepted"),
+    [
+        ("system", True, True),
+        ("system", False, False),
+        ("jemalloc", True, False),
+    ],
+)
+def test_library_import_env_is_accepted_only_as_declared(monkeypatch, value, module_loaded, accepted) -> None:
+    key, module = "BENCHBOX_LEAK_LIBRARY_PROBE", "benchbox_leak_probe_library"
+    monkeypatch.setattr(leak_detector, "LIBRARY_IMPORT_ENV", ((key, "system", module),))
+    monkeypatch.delenv(key, raising=False)
+    if module_loaded:
+        monkeypatch.setitem(sys.modules, module, object())
+    else:
+        monkeypatch.delitem(sys.modules, module, raising=False)
+
+    baseline = leak_detector.snapshot()
+    monkeypatch.setenv(key, value)
+    problems = leak_detector.detect_and_restore(baseline)
+
+    assert problems == ([] if accepted else [f"env[{key}]"])
+    assert (os.environ.get(key) == value) is accepted
+
+
+def test_snowflake_arrow_pool_is_the_declared_library_import_env() -> None:
+    assert ("ARROW_DEFAULT_MEMORY_POOL", "system", "snowflake.connector.options") in leak_detector.LIBRARY_IMPORT_ENV
+
+
 def test_provider_compared_by_identity_not_equality(monkeypatch) -> None:
     import benchbox.utils.config_interface as ci
 
