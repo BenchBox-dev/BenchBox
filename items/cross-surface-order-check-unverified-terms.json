@@ -5,7 +5,7 @@
     "DECIMAL sort keys keep exact precision in the key table",
     "Tests cover each shape, including a mis-ordered result that must fail"
   ],
-  "context": "Raised by the agy and muse adversarial reviews (2026-10-04). Evaluation errors now fail closed (#2621).",
+  "context": "Raised by the agy and muse adversarial reviews (2026-10-04). Evaluation errors now fail closed (#2621). Closeout: delivered by PR #2661 (merge ebeb49067) — ORDER BY ALL expansion, qualified-column resolution, DECIMAL-exact keys, per-benchmark verified/unordered/unverifiable counts; tests for each shape including mis-ordered failure. Shadow review Highs addressed by branch driver across three heads. Trunk green on final batch head dda8c787d (11/11 jobs).",
   "description": "The derived ORDER BY check in benchbox/core/equivalence/cross_surface.py (_derived_order_violation) falls back to the unordered comparison when the output has duplicate column names, a sort term uses a qualified column (t.x), a term has no column reference (DuckDB ORDER BY ALL), or a term references a non-projected column. DECIMAL keys are compared as DOUBLE, which can merge distinct keys above about 1e13. These fallbacks are silent: the gate report does not say which cells had their order verified.",
   "sessions": [
     {
@@ -23,6 +23,14 @@
       "generation": "fc23edd3736a4ee981377522181c5e3f",
       "op": "take",
       "op_id": "d94605290fa04ff4993b4a3cb9ffe0f2",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T14:08:30Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "971d433367964eef9e9f8e94e09c0b47",
       "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
     }
   ]
