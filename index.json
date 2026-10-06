@@ -11620,6 +11620,15 @@
       "status": "done",
       "title": "Run and publish live cloud benchmark results for TPC-DS and TPC-DI (BigQuery, Databricks, Snowflake)"
     },
+    "live-cloud-corpus-athena-expansion-20261006": {
+      "claim": null,
+      "needs": [
+        "live-cloud-corpus-athena-tpch-first-20261006"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Expand Athena SQL corpus to remaining suites (industry, TPC-DS/DI, academic, real-world, variants, primitives)"
+    },
     "live-cloud-corpus-athena-tpch-first-20261006": {
       "claim": null,
       "needs": [
