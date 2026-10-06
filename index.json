@@ -11151,6 +11151,13 @@
       "status": "done",
       "title": "service_account exports a raw IAM email verbatim in internal result metadata"
     },
+    "internal-labels-in-code-and-rules": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Remove work-item labels and dated UAT evidence from code strings users can see"
+    },
     "internal-result-metadata-exports-connection-usernames": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "No work-item labels or dated evidence in user-visible strings"
+  ],
+  "description": "benchbox/platforms/ducklake.py docstring cites decision w12; two tuning ADR test docstrings carry tracker slugs; scripts/compat_lint.py mentions W16; several SQL-compat rule payload reasons carry dated UAT evidence shown at runtime (lakesail, postgres, pg_duckdb, timescaledb, vector_search rules).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:24:43Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "3051a116fad64c9da356bbcd2d9b7c5d",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}
