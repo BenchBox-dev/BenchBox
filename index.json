@@ -2503,15 +2503,10 @@
       "title": "Compare soundness-flag against the merge commit's first parent, not the stale event base"
     },
     "ci-superseded-run-aggregates-and-oracle-review-script-version-20261004": {
-      "claim": {
-        "expires_at": "2026-10-07T07:10:30Z",
-        "generation": "aa68975f7d6643d9a35eaded06730bd1",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "CI: superseded runs leave red aggregate jobs, and oracle-review runs the PR's own script version"
     },
     "ci-visual-baseline-queue-follower-gap": {
