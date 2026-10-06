@@ -263,6 +263,11 @@ markers, and release curation against the specified base. It is a local
 equivalent, so the parity inventory records `release-check` rather than a
 hosted-only exception.
 
+The `code-test` step that runs changed tests on the curated release tree has a
+local equivalent:
+`uv run -- python scripts/release_curation_dry_run.py --changed-since origin/develop`.
+With no arguments it runs the full fast selection on that tree.
+
 ### Hosted-only guard inventory
 
 Bundled generator integrity has local equivalents. Run

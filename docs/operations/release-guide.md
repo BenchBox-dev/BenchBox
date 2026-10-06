@@ -158,6 +158,34 @@ must not be bypassed with an undocumented local change.
 8. Sweeps prior `v*` branches on origin (option-c lifecycle: keep until
    superseded, then auto-delete on the next `release-cut`).
 
+### Tests on the release tree
+
+The release PR's required test job runs the fast test selection on the curated
+tree. A test that reads a path removed in step 4 passes on develop but fails or
+errors there, and blocks `release-required-result`.
+`scripts/release_curation_dry_run.py` catches this early. It reads the
+`git rm` commands from the `release-cut:` recipe, so it removes exactly what a
+cut removes. It applies them in a scratch worktree of the committed `HEAD`, then
+runs pytest there. CI runs it on every pull request for the test modules the PR
+changes. Before a cut, run the full fast selection on the curated tree (about
+8 minutes locally):
+
+```bash
+uv run -- python scripts/release_curation_dry_run.py
+```
+
+To fix a failure, change the test, not the curation:
+
+- When one test reads a file that release-cut removes, skip that test when the
+  file is absent, for example
+  `@pytest.mark.skipif(not PATH.exists(), reason="_project scripts are not in this checkout (release tree)")`.
+- When every test in a module needs a removed file, put the same `skipif` in the
+  module's `pytestmark`. When the module imports a removed helper, use
+  `pytest.importorskip`.
+- Add the test file to the release-cut strip list only when the whole file tests
+  development-only tooling. The list is the `git rm` lines in the `release-cut:`
+  target and the leftover guard below them.
+
 ### Resuming or aborting a cut
 
 Steps 1-3 are idempotent, so an interrupted cut is resumed by re-running the
