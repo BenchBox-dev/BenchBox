@@ -13193,10 +13193,15 @@
       "title": "NotImplementedError Completions ✅ COMPLETED"
     },
     "notuning-reuses-tuned-database-without-metadata-20261004": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T06:27:33Z",
+        "generation": "b33a87840a0a4f63baf94cfff3178d43",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "A notuning run reuses a physically tuned database whose tuning metadata was never saved"
     },
     "nyc-taxi-benchmark-expansion": {
