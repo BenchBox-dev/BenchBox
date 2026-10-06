@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "TPC-H completed at SF 0.1, 1.0, 10.0 on Fabric DW and on the Lakehouse SQL endpoint, notuning (6 bundles, per-endpoint)",
+    "Every executed query succeeds (no FAILED)",
+    "Bundles produced on current develop including the result-cache receipt check and phase wall-clock bounds",
+    "All bundles pass scripts/validate_submission.py with 0 errors and carry result_source=internal",
+    "Capacity disclosure recorded per bundle: trial versus paid, F4 or F64, workspace",
+    "Cells stay inside 6h per cell; anything outside needs approval stating command, maximum runtime, log path, and stop condition",
+    "Held bundles cleared by rerun, not override"
+  ],
+  "context": "Mirrors first-live-cloud-benchmark-run-and-publish. First live end-to-end from this machine; smoke covered by new-platform-tpch-smoke-20261006. Operator owns workspace, capacity, and Entra setup plus credentials; the 60-day trial clock starts only when ready to run densely. DW and Lakehouse SQL endpoint are distinct adapters and get separate bundles. Tuned runs deferred until tuning-portable-metadata-store-20261001 lands.",
+  "description": "Run and publish the first live Fabric corpus: TPC-H at SF 0.1, 1.0, 10.0, notuning, on current develop, on both the Data Warehouse and the Lakehouse SQL endpoint. Record F4/F64 and trial status per bundle per trial-capacity-disclosure-bundles-20261006. No live runs outside campaign limits without explicit approval stating command, maximum runtime, log path, and stop condition.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:d4c6ceae0de4d166359ede4c",
+      "at": "2026-10-06T19:07:17Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "cb2c0629fca3493aaed2aa694fca38d3",
+      "session_id": "508606d004364578b5da477b03baf36a"
+    }
+  ]
+}
