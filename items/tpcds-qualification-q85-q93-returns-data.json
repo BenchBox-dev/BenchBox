@@ -3,7 +3,7 @@
     "The cause is demonstrated, e.g. by comparing generated returns reason_sk distributions with the reference data or by reproducing the official rows from the rendered SQL",
     "If it is a data difference, the qualification runner classifies Q85/Q93 with that evidence; if it is a query defect, it is fixed with a regression test"
   ],
-  "context": "Evidence: classification at ~/.jcode/scratch/dfparity-handoff/evidence/resume-20261003/sf1-94a6ab351-printed-classification.md; run output /Users/joe/Developer/benchmark_runs/dfparity-official-qualification-sf1-94a6ab351-20261003T2124Z. Raised by the agy and muse adversarial reviews (2026-10-04).",
+  "context": "Evidence: classification at ~/.jcode/scratch/dfparity-handoff/evidence/resume-20261003/sf1-94a6ab351-printed-classification.md; run output /Users/joe/Developer/benchmark_runs/dfparity-official-qualification-sf1-94a6ab351-20261003T2124Z. Raised by the agy and muse adversarial reviews (2026-10-04). Closeout: cause proven — bundled _sources/tpc-ds/tools/scaling.dst yields 75 reason-table rows at every scale vs 35 in the spec/reference kit at SF1; with 35 rows BenchBox SQL reproduces the official Q85/Q93 answers exactly (evidence ~/Developer/qual-q85-q93-evidence.md). Classified with evidence in the runner by PR #2688 (merge 840bdf192); generator rebuild itself is out-of-batch follow-up needing an owner decision. Trunk green on final batch head dda8c787d (11/11 jobs).",
   "description": "In the SF1 qualification run, Q85 and Q93 (NULLS_LAST file) differ from the official answer files while SQL and all three DataFrame engines agree. Q85: three aggregate triples (e.g. 76 / 464.36 / 8.62) match the official file exactly but under different reason labels, and three rows differ. The working hypothesis is that wr_reason_sk / sr_reason_sk in the generated returns tables differ from the reference data used for the answer files; it is not proven. If the cause is instead a template or substitution defect, DataFrame-to-SQL parity cannot detect it because both surfaces share it.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "generation": "b72a158458ee4a14b3a75177f2cb0753",
       "op": "take",
       "op_id": "2add9427cd14499bac834a0228a46951",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T14:10:00Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "30383a73c15b4427a8a5f26f50095032",
       "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
     }
   ]
