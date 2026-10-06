@@ -7258,7 +7258,7 @@
       ],
       "priority": "critical",
       "status": "open",
-      "title": "Rehearse the new release path on TestPyPI, then hand the 0.4.2 PyPI release to the owner"
+      "title": "Rehearse the new release path on TestPyPI, then hand the next PyPI release to the owner"
     },
     "dlv2-53-retire-legacy-release-path": {
       "claim": null,
