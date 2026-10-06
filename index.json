@@ -21047,10 +21047,15 @@
       "title": "Number throughput streams 1..S so stream 0 no longer repeats the power ordering"
     },
     "tpch-variant-dataframe-seed-binding": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T14:12:34Z",
+        "generation": "a85e7c79f52a4bc3a09f122ad0b7ee7c",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Bind --seed in TPC-H Skew and TPC-Havoc DataFrame runs, and make dry-run previews honor it"
     },
     "tpchavoc-1v7-array-rewrite": {
