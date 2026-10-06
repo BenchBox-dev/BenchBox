@@ -14927,10 +14927,15 @@
       "title": "PySpark DataFrame read-primitives map/fulltext/window/array expression gaps"
     },
     "pyspark-existing-database-check-runs-before-session-20261004": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T05:37:19Z",
+        "generation": "089f894c68c143a698c261c1b566e4c1",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "PySpark: the existing-database check runs before the Spark session exists, so it always reports no database and force_recreate is a no-op"
     },
     "pyspark-parquet-time-millis-false-cache-loader-compatibility": {
