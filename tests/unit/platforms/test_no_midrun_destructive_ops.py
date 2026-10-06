@@ -945,9 +945,8 @@ INCOMPLETE_STAGES: dict[str, tuple[frozenset[str], str]] = {
     "athena-spark": (frozenset({"load_data"}), f"load_data: {FAKE_POLL}"),
     "fabric-spark": (frozenset({"load_data"}), f"load_data: {FAKE_POLL}"),
     "synapse-spark": (
-        frozenset({"create_schema", "apply_unified_tuning", "load_data"}),
-        f"create_schema and load_data: {FAKE_POLL}; apply_unified_tuning takes one argument but the setup phase "
-        "passes two, which is a defect in the adapter",
+        frozenset({"create_schema", "load_data"}),
+        f"create_schema and load_data: {FAKE_POLL}",
     ),
     "fabric-lakehouse": (
         frozenset({"create_schema", "load_data"}),

@@ -693,15 +693,17 @@ class SynapseSparkAdapter(LivyStatementMixin, SparkTuningMixin, PlatformAdapter)
 
     def apply_unified_tuning(
         self,
-        config: UnifiedTuningConfiguration,
+        unified_config: UnifiedTuningConfiguration,
+        connection: Any,
     ) -> None:
         """Apply unified tuning configuration.
 
         Args:
-            config: Unified tuning configuration.
+            unified_config: Unified tuning configuration.
+            connection: Database connection (unused - Livy sessions are internal).
         """
-        if hasattr(config, "platform_optimization"):
-            self.apply_platform_tuning(config.platform_optimization)
+        if hasattr(unified_config, "platform_optimization"):
+            self.apply_platform_tuning(unified_config.platform_optimization)
 
     # apply_primary_keys, apply_foreign_keys, apply_platform_optimizations,
     # and apply_constraint_configuration are inherited from SparkTuningMixin
