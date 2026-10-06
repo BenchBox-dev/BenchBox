@@ -16159,10 +16159,15 @@
       "title": "Add full-suite canary and GitHub ruleset drift detection for release readiness"
     },
     "release-guide-accounting-literal-timing": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T01:24:45Z",
+        "generation": "ebc665bcf80d454cbb2944d7f407f546",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:64399a12525eb713b4a9ab65"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Correct the release guide on when to move the accounting literal and the changelog compare link"
     },
     "release-readiness-py310-utc-compat": {
