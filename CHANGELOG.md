@@ -86,6 +86,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A result in which every query was skipped no longer passes integrity
   certification. Nine incorrect TPC-H results from early BigQuery, Databricks
   and Snowflake runs are removed from Results Explorer.
+- **DuckDB tuned databases are rebuilt.** The shipped DuckDB tuned templates
+  no longer include partitioning or CHECK constraints, so a new tuned run
+  records a different `requested_config_hash` than earlier results and the
+  cached tuned database is rebuilt on the next run (for example
+  `tpch_sf1_custom_pk_fk_uniq_check_part_sort` becomes
+  `tpch_sf1_custom_pk_fk_uniq_sort`).
 
 ### Added
 
