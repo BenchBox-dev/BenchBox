@@ -108,10 +108,7 @@ comparisons — downstream exclusion is:
   outright; only the trusted mirror path can admit `partial` or `not_run`,
   and only through the explicit `--allow-partial-validation` flag.
 
-This was verified by tracing the code paths above. A rendered-Explorer
-check that these bundles do not surface in ranked or compared views on the
-live site is in progress separately; its result is not yet in and is not a
-premise of this ADR.
+This was verified by tracing the code paths above.
 
 ## Decision
 

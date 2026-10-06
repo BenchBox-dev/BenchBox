@@ -2,10 +2,6 @@
 
 # Public Contracts and Support Taxonomy
 
-**Created:** 2026-05-21
-**Originating TODO:** `architecture-contract-map-and-support-taxonomy`
-**Checked SHA:** `893768130f3b3aad249549f897538a172a0f8230`
-
 This document classifies BenchBox surfaces by compatibility tier and names the
 source of truth for each one. It is intentionally narrower than a full
 architecture guide: if a future PR changes a public, beta-public, generated,
@@ -31,7 +27,7 @@ the map is unchanged.
 | CLI commands and documented options | `beta-public` | cli-runtime | Documented commands and option meanings are supported for beta users; option breadth can change with docs/tests. | Release notes plus docs update; backward-compatible aliases when practical. | CLI unit tests, generated CLI reference checks, `make pr-preflight`. | `benchbox/cli/commands/`, `docs/reference/cli/` |
 | Top-level Python wrapper facades, for example `benchbox.TPCH(...)` | `beta-public` | benchmark-api | Wrapper imports and facade methods covered by `tests/unit/test_wrapper_facades_fast.py` remain supported. Current count: 21 exported top-level benchmark facades from 23 registry class-name mappings; `ai_primitives` and `joinorder_synthetic` are core-only. | Registry row in `docs/reference/backward-compatibility.md`, migration to canonical API, beta-cycle review. | `uv run -- python -m pytest tests/unit/test_wrapper_facades_fast.py -q`, benchmark API contract count test. | `benchbox/__init__.py`, top-level wrapper modules, wrapper facade tests |
 | `benchbox.base.BaseBenchmark` | `beta-public` | core-runtime | Public base for wrapper benchmarks and orchestration helpers; result helper compatibility is tracked. | Compatibility registry row when kwargs, result helpers, or method contracts change. | Runtime contract and wrapper tests. | `benchbox/base.py`, `docs/reference/backward-compatibility.md` |
-| `BaseBenchmark.run_with_platform` | `beta-public` | core-runtime | Standard programmatic execution hook for CLI-adjacent tools and MCP; callers pass an adapter and run options. | ADR or contract-map update before replacing it as the orchestration API. | MCP benchmark tests plus runtime contract tests. | `benchbox/base.py`, `_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml` |
+| `BaseBenchmark.run_with_platform` | `beta-public` | core-runtime | Standard programmatic execution hook for CLI-adjacent tools and MCP; callers pass an adapter and run options. | ADR or contract-map update before replacing it as the orchestration API. | MCP benchmark tests plus runtime contract tests. | `benchbox/base.py` |
 | `benchbox.core.benchmark_loader` | `internal` | benchmark-api | Registry-backed runtime loader for CLI/core orchestration. It is not a public Python API and should not be imported by external callers. | Promote only through a contract-map update and migration docs. | Loader/registry parity tests and benchmark API contract tests. | `benchbox/core/benchmark_loader.py`, `benchbox/core/benchmark_registry.py` |
 | `benchbox.core.run_service` | `internal` | core-runtime | The shared run engine below both CLI and MCP. `__all__` is the cross-surface import contract: names it lists may be imported by `benchbox.cli` and `benchbox.mcp`, and anything not listed is module-private. `internal` is the product tier — these names are not a supported external Python API, and "public" here means importable by the surfaces, not promised to end users. | Promote to a user-facing tier only through a contract-map update; renaming or dropping an exported name needs the surface call sites migrated in the same PR. | `TestTheExportedSurface` in `tests/unit/core/test_run_service.py` (both directions: no private name exported, no public definition unexported, no surface importing a private symbol), plus `uv run -- lint-imports`. | `benchbox/core/run_service.py`, `docs/development/adr/adr-one-engine-scoped-surfaces.md` |
 | `benchbox.core.base_benchmark.BaseBenchmark` | `deprecated` | core-runtime | Documented internal compatibility base with no remaining production implementation consumers; not an alias and not the extension path for new benchmarks. | Remove only through the deletion-only compatibility item after the registry target and remaining internal import checks are satisfied. | Backward-compatibility registry review, benchmark loader/runtime tests, benchmark API contract tests. | `benchbox/core/base_benchmark.py`, `docs/reference/backward-compatibility.md` |
@@ -48,7 +44,7 @@ The `textcharts-mcp` external visualization server is intentionally a separate-c
 | Visualization semantic chart IDs | `beta-public` | visualization | Result-aware chart IDs accepted by CLI, MCP, templates, ASCII runtime dispatch, and Results Explorer must derive from the semantic registry. Raw textcharts primitive IDs are a separate dependency namespace. | Same-PR registry, template, discovery, Explorer, and parity-fixture updates; deprecate IDs rather than silently removing them. | Visualization registry tests, exporter tests, Explorer registry parity tests, and parity-fixture drift checks. | `benchbox/core/visualization/chart_types.py`, `benchbox/core/visualization/ascii_runtime.py`, `benchbox/core/visualization/templates.py`, `results-explorer/src/lib/chartRegistry.ts`, `tests/parity/fixtures/chart_ids.json` |
 | `benchbox.core.visualization.render_ascii_chart` | `beta-public` | visualization | Compatibility data-first ASCII primitive renderer for callers that already have chart-specific data objects. It intentionally has narrower coverage than the result-aware semantic renderer and excludes `power_bar`, which needs normalized BenchBox result context. | Promote a missing semantic chart only when a data-first payload contract exists; otherwise keep the explicit result-aware-only error. | `tests/unit/core/visualization/test_visualization_exporters.py`, visualization registry parity tests. | `benchbox/core/visualization/exporters.py` |
 | Result JSON bundles | `beta-public` | results | Schema-versioned result bundles are product data consumed by CLI, submission validation, hosted results, explorer, and SQL/DataFrame comparisons. SQL and DataFrame bundles must preserve the cross-mode invariants below. | Schema policy and hosted-results contract update before changing accepted versions, field semantics, or cross-mode parity guarantees. | Result schema policy, loader, normalizer, submission, explorer, and exported SQL/DataFrame parity tests. | `benchbox/core/results/schema_policy.py`, `benchbox/core/results/schema.py`, `docs/reference/result-formats.md`, `docs/reference/hosted-results-contract.md`, `tests/unit/core/results/test_result_parity.py` |
-| Explorer read model and generated browser inputs | `generated` | results-explorer | Browser data stores are generated from accepted result bundles; generated outputs should be reproducible from source bundles and pipeline code. | Read-model version bump or pipeline contract update. | Explorer pipeline contract tests and browser release gates. | `_project/scripts/explorer_pipeline/`, results explorer generated data |
+| Explorer read model and generated browser inputs | `generated` | results-explorer | Browser data stores are generated from accepted result bundles; generated outputs should be reproducible from source bundles and pipeline code. | Read-model version bump or pipeline contract update. | Explorer pipeline contract tests and browser release gates. | Results Explorer pipeline scripts, results explorer generated data |
 | Public submission validator behavior | `beta-public` | hosted-results | PR-based public result submissions must receive deterministic validation errors and privacy/trust handling. | Hosted-results contract update and validator tests. | `validate-submission` workflow, submission validator tests. | `scripts/validate_submission.py`, `docs/contributing-results.md`, `docs/reference/hosted-results-contract.md` |
 | SQL compatibility rule catalog | `internal` | sql-compat | Hybrid governance catalog: every source-detected adapter CREATE TABLE rewrite must be runtime-dispatched by `BaseDdlOptimizer`, registered as `governance_only`, or explicitly exempted. | sql_compat README and contract-map update before changing the governance guarantee. | `make compat-docs-check`, `uv run -- python -m benchbox.sql_compat.inventory --check-ddl-drift`. | `benchbox/sql_compat/`, `benchbox/platforms/`, `docs/compat/` |
 | Generated compatibility docs | `generated` | sql-compat | Generated docs must match registry/rule metadata; hand edits are drift unless the section says it is editorial. | Regenerate from source metadata or update the generator. | `make compat-docs-check`. | `benchbox/sql_compat/`, generated docs under `docs/compat/` |
@@ -144,14 +140,13 @@ separate `surface`/removal decision.
 
 Benchmark API snapshot: **23** registry entries; **23** loader-resolved core families; **22** public discovery entries; **21** top-level Python benchmark facades; **15** lazy facades; **6** eager facades; **2** core-only benchmark IDs. Benchmark support status: **6** stable, **11** beta, **5** experimental, **1** repo-only, **0** deprecated, **0** document-only.
 
-Evidence snapshot updated by `benchmark-support-status-and-discovery-policy`:
+Source-derived counts, checked by `scripts/check_public_contract_drift.py`:
 
 | Source | Current evidence | Contract implication |
 |---|---|---|
 | `benchbox.core.benchmark_registry` | 23 benchmark metadata entries and 23 loader-resolved IDs; support status counts are stable=6, beta=11, experimental=5, repo_only=1, deprecated=0, document_only=0. | Benchmark count and support claims must derive from registry metadata or avoid exact counts. |
 | `benchbox.core.platform_registry.PlatformRegistry.get_all_platform_metadata()` | 52 platform metadata entries: 48 SQL-capable, 18 DataFrame-capable, 14 dual-mode. | README and platform docs must not carry unqualified hand-maintained platform counts. |
 | `benchbox.core.results.schema_policy` | Current result schema version: `2.2`; runtime/explorer accepted versions: `2.0`, `2.1`, `2.2`; public submission accepts numeric `2.x`. | Result schema version claims must update with the named consumer policy or defer to this policy module. |
-| `README.md` before this TODO | Landing-page bullets claimed 22 benchmarks, 42 SQL platforms, and 9 DataFrame platforms. | Exact counts were stale relative to registry metadata; README now links to this policy instead of being authoritative. |
 
 Authoritative count statements should come from the relevant registry metadata.
 Editorial lists may remain in narrative docs, but they must not claim to be
@@ -191,23 +186,6 @@ file. The currently gated durable surfaces are `landing/index.html`,
 `docs/reference/cli/utilities.md`, and `docs/usage/faq.md`; the README marker is
 gated separately by the platform-registry marker tests.
 
-## Drift Check Ownership
-
-Each public claim class has one owner and one preferred verification gate:
-
-| Claim class | Owner | Source of truth | Verification gate |
-|---|---|---|---|
-| Platform counts, platform support status, and optional import health | platform-runtime | `benchbox/core/platform_registry.py` | Platform registry tests and generated platform docs checks. |
-| Benchmark counts, benchmark wrapper/loader/discovery reachability, and benchmark support status | benchmark-api | `benchbox/core/benchmark_registry.py`, `benchbox/__init__.py`, `benchbox/core/benchmark_loader.py` | `tests/unit/core/test_benchmark_api_contract.py` plus focused MCP discovery checks. |
-| Result schema versions and consumer acceptance policy | results | `benchbox/core/results/schema_policy.py`, result docs | Result schema policy, loader, submission, explorer, and hosted-results contract tests. |
-| MCP run parameters and product-surface limits | mcp | `benchbox/mcp/`, `docs/reference/mcp.md` | `tests/unit/mcp/test_run_surface_contract.py` and focused MCP tool tests. |
-| SQL compatibility DDL rewrite governance | sql-compat | `benchbox/sql_compat/`, adapter DDL rewrite sites | `make compat-docs-check` and DDL drift inventory checks. |
-
-The contract map is the routing layer for these gates, not the sole source of
-every generated table. A PR that changes a claim class should update the owning
-source and its gate first, then update this map only when the public contract or
-ownership boundary changes.
-
 ## Visualization Chart Contract
 
 `benchbox/core/visualization/chart_types.py` is the semantic result-aware chart
@@ -240,7 +218,7 @@ tests; no client should infer one from the dependency alone.
 
 ## SQL Compatibility Governance Decision
 
-Decision from `sql-compat-governance-ddl-hardening`: `sql_compat` is a hybrid
+`sql_compat` is a hybrid
 governance catalog plus optional runtime dispatcher. `BaseDdlOptimizer` is the
 preferred dispatch path for ordered statement-to-statement DDL transforms, but
 adapters may keep local CREATE TABLE rewrite paths when the rewrite depends on
@@ -255,35 +233,17 @@ CREATE TABLE rewrite behavior. It does not mean every DDL rewrite flows through
 
 ## DataFrame Runner Lifecycle Decision
 
-Checked for `dataframe-runner-lifecycle-and-bundle-parity` at
-`8604d0a413f6c3d4bd7db211bb472c2370a932c3`.
-
 Production DataFrame execution is `run_benchmark_lifecycle()` ->
 `adapter.run_benchmark()` -> `BenchmarkExecutionMixin.run_benchmark()`.
-`benchbox/core/runner/dataframe_runner.py` (deprecated internal compatibility
-runner) has been deleted: the two surviving helpers,
-`dataframe_compliance_class` and `no_dataframe_queries_message`, moved to
-`benchbox/platforms/dataframe/benchmark_mixin.py` (their only production
-consumer). Its mode predicate lives in `benchbox.core.run_service` beside
-run-plan resolution. New lifecycle behavior belongs in
+The helpers `dataframe_compliance_class` and `no_dataframe_queries_message`
+live in `benchbox/platforms/dataframe/benchmark_mixin.py`, and the DataFrame
+mode predicate lives in `benchbox.core.run_service` beside run-plan
+resolution. New lifecycle behavior belongs in
 `benchbox/platforms/dataframe/benchmark_mixin.py`.
 
 Production behavior tests are the DataFrame mixin and adapter lifecycle tests,
 plus exported result parity in `tests/unit/core/results/test_result_parity.py`.
-The standalone-runner compatibility tests
-(`tests/unit/core/runner/test_dataframe_runner.py`,
-`tests/unit/core/runner/test_dataframe_runner_lifecycle.py`) were retired with
-the module; empty-resolution coverage moved to the mixin suite
-(`TestHandleNoQueries`).
-
-Evidence rechecked:
-
-| Evidence | Finding |
-|---|---|
-| `benchbox/core/runner/runner.py` | DataFrame adapter branches call `adapter.run_benchmark(..., phases=DataFramePhases, options=DataFrameRunOptions)` for execute and load-only paths. |
-| `benchbox/platforms/dataframe/benchmark_mixin.py` | The mixin owns production DataFrame result construction, phase status, query execution, skip summaries, plan-capture counters, and the two migrated helpers. |
-| `docs/design/architecture.md` | DataFrame architecture points at the adapter mixin path; the standalone runner is deleted. |
-| `tests/unit/core/results/test_result_parity.py` | Exported JSON bundle parity is enforced after writing through `ResultExporter`. |
+Empty-resolution coverage is in the mixin suite (`TestHandleNoQueries`).
 
 ## SQL/DataFrame Result Bundle Invariants
 
@@ -377,8 +337,7 @@ Current extension inventory:
 
 ## Translation and Validation Mode Policy
 
-Decision from `fail-open-policy-and-translation-strictness`: SQL translation is
-mode-aware. Interactive/local runs may fail open by returning source SQL with a
+SQL translation is mode-aware. Interactive/local runs may fail open by returning source SQL with a
 warning, but CI, publishing, compatibility governance, and any caller making a
 public correctness claim must use strict translation or treat fallback metadata
 as uncertainty.
@@ -417,33 +376,3 @@ records `reference_seed: null`, so both run qgen `-d` without a seed.
 Regenerate the snapshot on Linux with
 `make correctness-gate-digests-regen`; the snapshot detects regressions against
 DuckDB and is separate from the official answer files.
-
-## Evidence Snapshot
-
-This TODO revalidated the contract map against the following files before
-editing:
-
-| Evidence | Finding |
-|---|---|
-| `README.md:35-48` | Beta disclaimer exists; `benchbox.experimental` is explicitly outside the supported beta product surface; feature count bullets were hand-maintained. |
-| `docs/reference/backward-compatibility.md:24-84` | Compatibility registry tracks shims; wrapper cleanup notes preserve top-level wrappers while `benchbox.core.base_benchmark.BaseBenchmark` remains only as a deprecated module pending its deletion-only item. |
-| `tests/unit/test_wrapper_facades_fast.py:30-260` | Wrapper facades are tested public behavior, not accidental reachability. |
-| `_project/DONE/mcp-integration/active/refactor-mcp-use-public-api.yaml:25-47` | Completed decision moved MCP away from CLI internals and onto public benchmark/adapter APIs. |
-| `docs/design/future-state/index.md` | Future-state extraction proposals are evidence-gated; MCP API formalization remains a later contract item. |
-| `benchbox/base.py:476` | `run_with_platform` remains the programmatic execution hook used by orchestration tools. |
-| `benchbox/core/platform_registry.py:85-89` | Platform registry declares itself the metadata and adapter-registration source of truth. |
-| `benchbox/core/benchmark_registry.py:1-5` | Benchmark registry declares itself the shared benchmark metadata source for CLI and MCP. |
-
-## Benchmark API Evidence Snapshot
-
-Checked SHA: `1d454632ba73911bc4ff0cf0a3fb8ec22227a7a8`
-
-| Evidence | Finding |
-|---|---|
-| `benchbox/base.py` | Public `BaseBenchmark` remains the beta-public base for top-level wrappers and orchestration helpers; `run_with_platform()` remains the beta-public adapter execution hook. |
-| `benchbox/core/base_benchmark.py` | Deprecated internal compatibility base remains distinct and has no remaining production implementation consumers after the Data Vault and TPC-DS OBT migrations. |
-| `tests/unit/test_wrapper_facades_fast.py` | Wrapper methods are asserted behavior and should not be treated as accidental duplicate reachability. |
-| `benchbox/__init__.py` | Top-level package exposes 21 benchmark facades: 6 eager imports and 15 lazy `_BENCHMARK_REGISTRY` entries. |
-| `benchbox/core/benchmark_loader.py` | Loader is registry-backed and internal; it resolves 23 core benchmark families from `CORE_BENCHMARK_CLASS_NAMES`. |
-| `benchbox/core/benchmark_registry.py` | Registry has 23 benchmark metadata entries; public discovery hides only `joinorder_synthetic`, leaving 22 public entries. |
-| `docs/reference/backward-compatibility.md` | Compatibility row now records the legacy core base as a retained internal base with a migration target rather than a public extension path. |

@@ -60,7 +60,7 @@ infrastructure.
 
 ## Test Organization
 
-The suite contains **3576+ tests** organized into:
+The suite is organized into:
 - **Unit tests** (`tests/unit/`): Fast component tests with no external dependencies
 - **Integration tests** (`tests/integration/`): Database integration and component interaction
 - **E2E tests** (`tests/e2e/`): Complete CLI workflow validation (125+ tests)
@@ -205,15 +205,7 @@ Use this checklist when introducing or updating this lane:
 2. Confirm marker registration exists in both `pytest.ini` and `pyproject.toml`.
 3. Confirm marker-selected tests are collected and executable:
    `uv run -- python -m pytest --collect-only -q tests/integration/core/data_organization/test_presorted_generation.py -m "requires_table_formats"`
-4. Update GitHub branch protection rules manually so `integration-table-formats`
-   is a required status check for pull requests into `main`.
 
-## Test Status
+## Troubleshooting
 
-Current test suite status:
-- ✅ **CLI Exporter Tests**: 30/30 passing (`tests/unit/cli/test_cli_output.py`)
-- ✅ **Result Schema Tests**: `tests/unit/core/results/`
-- ✅ **Test Collection**: 3576 tests collected with 0 errors
-- ⚠️ **Full Suite**: Some tests skipped when optional dependencies unavailable
-
-For questions or issues, see the troubleshooting section in `docs/development/adding-new-platforms.md`.
+Some tests are skipped when optional dependencies are unavailable. For questions or issues, see the troubleshooting section in `docs/development/adding-new-platforms.md`.

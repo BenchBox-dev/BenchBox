@@ -164,7 +164,7 @@ Explorer views beyond those captures relies on the build, link, route and
 digest gates and on the parity sign-off recorded for the cutover release.
 
 Approval follows the exact-match rule of
-[the visual-change runbook](../development/results-explorer-browser-testing.md),
+[the visual-change runbook](public-site-visual-baseline.md),
 bound to what was compared. The job verifies both trees against their digests and
 writes `visual-binding.json` into the `site-deploy-visual-<run_id>-<attempt>`
 artifact, with the binding `<release_sha>+<candidate artifact sha256>+<baseline

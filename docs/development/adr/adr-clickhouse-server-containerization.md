@@ -103,7 +103,7 @@ The Apple Container cgroup probe and full-run console captures are retained in
 `/tmp/clickhouse-host-overhead-rungs-20260822.log`,
 `/tmp/clickhouse-host-overhead-8g-repeats-20260822.log`, and the corresponding
 `/tmp/clickhouse-candidate8-*` logs from the calibration session. The durable
-result JSON files are under `~/Developer/benchmark_runs/results/` as named
+result JSON files are under `<repo>/benchmark_runs/results/` as named
 above.
 
 The trace collector must remain fail-closed for missing telemetry after the

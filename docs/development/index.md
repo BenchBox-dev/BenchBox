@@ -6,8 +6,6 @@
 ```
 
 Documentation for contributors and developers working on BenchBox.
-Agent review, identity, and attribution protocol lives in unpublished
-`docs/agent/`, not in this handbook.
 
 ## Roadmap
 

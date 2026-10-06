@@ -63,20 +63,17 @@ is streamed client-side via pyarrow into `COPY`, exactly like `postgresql`
 `EXTENSION` level). The embedded DuckDB engine is not used for file reads.
 Native loads stay tbl-first like `postgresql`.
 
-BenchBox has no Delta Lake or Iceberg read path for pg_duckdb today, so
+BenchBox has no Delta Lake or Iceberg read path for pg_duckdb, so
 neither format is registered in
 `benchbox/platforms/base/format_capabilities.py` - an explicit `--format
 delta` request fails fast with a platform-named error instead of a late
-load failure. The embedded engine could read both via DuckDB extensions in
-the future; that needs adapter-side extension/secret setup first.
+load failure.
 
 Cloud reads need credentials at query time, never in code or committed
 config. MotherDuck mode remains the supported cloud variant (token via the
 `MOTHERDUCK_TOKEN` environment variable). Direct S3 Parquet reads
 additionally need object-storage credentials and Parquet file management,
-and live verification is still pending - that is tracked separately and
-requires explicit approval for live cloud tests before any S3 read path is
-claimed as supported.
+and are not verified as supported.
 
 ## Installation
 

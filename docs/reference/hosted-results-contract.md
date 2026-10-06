@@ -1,8 +1,6 @@
 # Hosted Results Contract and Governance Model
 
 **Created:** 2026-04-01
-**Originating TODO:** `define-hosted-results-contract-and-governance-model`
-**Authoritative foundation:** `docs/development/benchbox-results-platform-strategy.md`
 
 ## Overview
 

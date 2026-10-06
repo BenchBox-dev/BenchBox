@@ -36,9 +36,10 @@ below.
 *The runtime overhead test is currently skipped due to timing variability across
 systems. Memory thresholds are actively enforced.
 
-These baselines are defined in `tests/performance/test_library_overhead.py`. If
+These baselines are defined in BenchBox's own test suite
+(`tests/performance/test_library_overhead.py` in the source repository). If
 new functionality increases memory usage beyond the limits, the performance
-tests will fail and surface a regression alert.
+tests fail and report a regression.
 
 ---
 
@@ -345,7 +346,8 @@ runtime and memory overhead relative to direct adapter execution. The suite in
   additional peak memory compared to the direct adapter path. Memory is tracked
   via `tracemalloc`, ensuring regressions are caught automatically.
 
-Run the tests locally with:
+The tests are not part of the installed package. To run them, use a source
+checkout of the BenchBox repository:
 
 ```bash
 uv run -- python -m pytest tests/performance/test_library_overhead.py

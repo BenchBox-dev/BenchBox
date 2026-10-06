@@ -141,7 +141,7 @@ A `ClickHouseAdapter`. Construction opens no connection; call `create_connection
 - `ValueError`: the mode is not `local` or `server` (`Invalid ClickHouse deployment mode 'bogus'. Valid modes: local, server`); the mode is `cloud` (`ClickHouse Cloud is now a separate first-class platform.`, use the `clickhouse-cloud` platform); or `insert_block_size` is not an integer (`insert_block_size must be an integer`) or is not positive or equals 1000 (`insert_block_size must be a positive integer other than 1000`).
 - `ImportError`: local mode and `chdb` is not installed (`ClickHouse local mode requires chDB but it is not installed.`), or server mode and `clickhouse-driver` is not installed.
 
-Unreachable servers and wrong credentials are not detected here; they fail in `create_connection()`. That behaviour needs a live server and was taken from reading the code.
+Unreachable servers and wrong credentials are not detected here; they fail in `create_connection()`.
 
 #### Example
 
@@ -222,7 +222,7 @@ Only the members below are defined on `ClickHouseAdapter` itself. Its connection
 | `get_platform_info(connection=None)` | A `dict` with `platform_type`, `platform_name` (`'ClickHouse (Local)'` or `'ClickHouse (Server)'`), `connection_mode`, `configuration` and `client_library_version`. |
 | `from_config(config)` | A `ClickHouseAdapter`; see Compatibility above. |
 
-These were run in local mode for this page. Server-mode behaviour of the same methods (connecting, creating the database, `SHOW DATABASES`, `DROP DATABASE IF EXISTS`) needs a live server and was taken from reading the code.
+These results are for local mode. In server mode the same methods connect to the server and use `SHOW DATABASES` and `DROP DATABASE IF EXISTS` to check for and remove the database.
 
 #### Construction and class attributes
 

@@ -3,10 +3,9 @@
 - Status: Accepted
 - Date: 2026-08-05
 - Supersedes the informal format and collision rules previously stated in
-  `docs/reference/hosted-results-contract.md` §1.1 (and the Phase 1 line in
-  `docs/development/benchbox-results-platform-strategy.md` Result Identity).
-- Constrains: explorer publication pipeline
-  (`_project/scripts/explorer_pipeline/`), hosted results contract,
+  `docs/reference/hosted-results-contract.md` §1.1 (and the Result Identity
+  line in `docs/development/benchbox-results-platform-strategy.md`).
+- Constrains: explorer publication pipeline, hosted results contract,
   and any future alias/redirect surface for public result URLs.
 
 ## Context
@@ -22,8 +21,8 @@ and collisions resolved by appending `-{n}`. That is not what the pipeline
 mints.
 
 What is actually minted (see
-`BundleTransformer.result_id_from_bundle` in
-`_project/scripts/explorer_pipeline/transformer.py`):
+`BundleTransformer.result_id_from_bundle` in the explorer publication
+pipeline's `transformer.py`):
 
 ```text
 {benchmark}-{platform}-sf{scale_factor}-{yyyymmdd}-{sha8}
@@ -98,7 +97,7 @@ The authoritative format is:
 
 Example: `tpch-duckdb-sf1.0-20260315-a1b2c3d4`
 
-Collision handling in the publication pipeline (Phase 1 static corpus):
+Collision handling in the publication pipeline (static corpus):
 
 | Case | Behavior |
 |---|---|
@@ -106,10 +105,10 @@ Collision handling in the publication pipeline (Phase 1 static corpus):
 | Same `result_id`, differing published digest | Fail closed with `DuplicateResultIdError` |
 
 The older contract claim that the minting service appends `-{n}` is
-**rejected** for the Phase 1 pipeline. Content addressing already
+**rejected** for the static-corpus pipeline. Content addressing already
 separates distinct payloads in the common case; a 32-bit prefix collision
 is treated as a build error so evidence is not silently dropped or
-renamed under a non-content-addressed suffix. A Phase 3 concurrent mint
+renamed under a non-content-addressed suffix. A future concurrent mint
 service may need a different concurrency story, but it must not invent a
 format that diverges from this slug without a new ADR.
 
@@ -147,7 +146,7 @@ or workflow state alone never proves public availability.
 |---|---|
 | Permanence attaches at local run / commit of private capture | Private bytes and paths are not the public artifact; hashing them would fingerprint non-public content and diverge from downloadable bundles |
 | Keep format without `sha8` and resolve collisions with `-{n}` | Diverges from implemented mint; sequential suffixes are not content-addressed and break deterministic re-derivation |
-| Freeze ids independently of content (assign once, never recompute) | Loses verifiability ("anyone holding the published bundle can recompute the id") and forces a registry service before Phase 1 needs one |
+| Freeze ids independently of content (assign once, never recompute) | Loses verifiability ("anyone holding the published bundle can recompute the id") and forces a registry service before the static corpus needs one |
 | Ship alias/redirect tables before the first deploy | No external links existed at that decision point; the A0 observed baseline now protects the routes that subsequently became public |
 
 ## Consequences
@@ -155,7 +154,7 @@ or workflow state alone never proves public availability.
 - `docs/reference/hosted-results-contract.md` must describe the `sha8`
   format and fail-closed / skip-identical collision rules.
 - Explorer pipeline code remains the mint authority; docs follow code.
-- Content-addressed permanence is preserved (must-preserve for this TODO).
+- Content-addressed permanence is preserved.
 - The A0 observed baseline is the initial freeze line for external link stability. Existing
   baseline IDs already require aliases or tombstones for any rotation. Later attested live
   receipts extend that protected set generation by generation; they do not postpone the
@@ -168,17 +167,9 @@ or workflow state alone never proves public availability.
 
 | Path | Role | Decision |
 |---|---|---|
-| `_project/scripts/explorer_pipeline/transformer.py` (`result_id_from_bundle`, `_sha256_prefix`) | Mint implementation | Extend docs to match; no code change |
-| `_project/scripts/explorer_pipeline/pipeline.py` (id after `public_raw`, `DuplicateResultIdError`) | Publication boundary and collision policy | Keep; document |
+| Explorer pipeline `transformer.py` (`result_id_from_bundle`, `_sha256_prefix`) | Mint implementation | Extend docs to match; no code change |
+| Explorer pipeline `pipeline.py` (id after `public_raw`, `DuplicateResultIdError`) | Publication boundary and collision policy | Keep; document |
 | `tests/unit/scripts/explorer_pipeline/test_result_id_contract.py` | Pins hash-of-published-bytes | Keep |
 | `tests/unit/scripts/explorer_pipeline/test_transformer.py` (`TestResultIdFromBundle`) | Pins format including 8-hex suffix | Keep |
 | `docs/reference/hosted-results-contract.md` §1.1 | Public contract (was wrong) | Correct |
 | `docs/development/adr/adr-published-identifier-field-set.md` | What fields enter published bytes | Orthogonal; field-set changes still rotate ids pre-deploy |
-
-## Work units
-
-| Unit | Outcome |
-|---|---|
-| w0 | This ADR |
-| w1 | Contract format + collision text aligned with mint |
-| w2 | Post-live id rotation requires explicit compatibility handling (this section) |

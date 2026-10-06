@@ -12,19 +12,15 @@ The public anonymization boundary replaces machine-local strings with
 `<prefix>_<12 hex>` pseudonyms. Two facts about that scheme were established
 together and change the picture:
 
-**The pseudonyms are a confirmation oracle.** `machine_id_salt` defaults to
-`None`, so the digest is computed over an empty salt, and the algorithm is
-documented in `docs/reference/result-formats.md`. Anyone can hash a candidate
-value and match it against the corpus with certainty — no false positives, no
-rate limit, no server involved. A 1550-candidate dictionary sweep over the 1615
-pseudonym occurrences in `results-data/` confirmed two distinct tokens in about
-a second, and the double-hashed form of one of them is present on the public
-`published-results` branch. Double hashing provides no protection: the
-transform is deterministic and public, so an attacker simply applies it twice.
+**The pseudonyms did not prevent re-identification.** `machine_id_salt`
+defaults to empty and the hashing algorithm is documented in
+`docs/reference/result-formats.md`, so the published identifier fields allowed
+the original values to be re-identified. Hashing twice does not change this,
+because the second step is just as deterministic and public as the first.
 
 The existing gate cannot see this. `find_public_path_leaks` detects *plaintext*
-absolute paths, so it reports the corpus clean while the corpus is recoverable
-by dictionary. It measures the wrong property.
+absolute paths, so it reports the corpus clean even when its pseudonyms can be
+re-identified. It measures the wrong property.
 
 **Most of the protected fields have no reader.** An audit across the publication
 pipeline, the Explorer application, and the published contract found that six of
@@ -136,8 +132,7 @@ close the oracle for future captures. Rejected as the primary remedy for the
 *unread* fields because it does not close the oracle for the corpus already
 published, keeps paying a privacy cost for data no consumer reads, and — once
 the salt question is examined for retained fields — a baked-in salt is still
-public. A hashed `working_dir` has no analytical value; the reductio is
-`database_5d7b725135a6`, which decodes to the string `benchbox`.
+public. A hashed `working_dir` has no analytical value.
 
 **Accept the oracle and document it (for unread fields).** Defensible on the
 material exposed so far — a repository path and a database name are low
@@ -164,8 +159,7 @@ bundles are the product.
   required alongside it.
 - Retained `published-results` history keeps the superseded values reachable.
   That decision was recorded in `adr-published-results-history-retention.md`
-  before reversibility was known, and is re-examined separately under
-  `published-history-retention-premise-predates-oracle`.
+  before reversibility was known, and was re-examined separately.
 - Retained-field salt decision (2026-08-05): empty OSS default; residual
   confirmation oracle documented; operator-configured non-empty salt recommended
   for community-facing publishes; publication fixed point from #1512 preserved.

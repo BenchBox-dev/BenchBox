@@ -5,7 +5,7 @@
 
 Python API reference for the Metadata Primitives benchmark.
 
-Metadata Primitives times a database's catalog introspection: the `INFORMATION_SCHEMA` views and the platform's catalog commands. It generates no data. It runs 62 queries in ten categories against a connection you supply, and can create wide tables, view hierarchies, complex types, large catalogs, constraints and access-control grants to see how introspection scales. Every statement on this page was checked against the released 0.4.1 wheel with DuckDB, and the one side effect on other platforms was checked with a recording stand-in for the connection.
+Metadata Primitives times a database's catalog introspection: the `INFORMATION_SCHEMA` views and the platform's catalog commands. It generates no data. It runs 62 queries in ten categories against a connection you supply, and can create wide tables, view hierarchies, complex types, large catalogs, constraints and access-control grants to see how introspection scales.
 
 ## `benchbox.MetadataPrimitives`
 

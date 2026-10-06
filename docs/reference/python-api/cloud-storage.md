@@ -19,7 +19,7 @@ BenchBox provides cloud storage integration through a minimal abstraction layer 
 - **Platform Integration**: Staging wrappers for Databricks volumes, ADLS Gen2 and Snowflake stages
 - **Error Handling**: Error messages that name the missing environment variables or package
 
-The examples on this page were run without network access and without credentials. Functions that contact a cloud provider are described, but only their offline branches are run.
+The example outputs on this page come from runs without network access or credentials, so they show what each function does offline.
 
 ## Quick Start
 
@@ -43,7 +43,7 @@ adapter = DuckDBAdapter()
 results = adapter.run_benchmark(benchmark)
 ```
 
-This example needs the `cloudstorage` extra and credentials for the bucket, so it was not run.
+This example needs the `cloudstorage` extra and credentials for the bucket.
 
 ## Installation
 
@@ -620,7 +620,7 @@ Without `cloudpathlib`:
 
 ### Multi-Cloud Benchmark Execution
 
-Run benchmarks across multiple cloud providers. The benchmark steps need credentials for each provider and were not run. Without credentials, every provider is skipped and the loop prints the error from `validate_cloud_credentials`.
+Run benchmarks across multiple cloud providers. The benchmark steps need credentials for each provider. Without credentials, every provider is skipped and the loop prints the error from `validate_cloud_credentials`.
 
 ```python
 from benchbox.tpch import TPCH

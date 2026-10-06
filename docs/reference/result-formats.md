@@ -191,8 +191,8 @@ independently verified record of what physically applied (see
 | ------- | ------ | ------------- |
 | `tuning_source` | string | Raw `TuningSource` enum value: `explicit_file`, `auto_discovered`, `smart_defaults`, `baseline`, `wizard`, or `fallback`. |
 | `requested_config_hash` | string | Full 64-hex-char SHA-256 over the requested `UnifiedTuningConfiguration.to_dict()` (canonical JSON, sorted keys). Identifies the requested template regardless of platform or dict ordering. |
-| `validation_status` | string | ADR-1 honest execution-derived tuning verified-state: `not_applicable`, `noop`, `applied_unverified`, `applied_verified`, or `failed`. Unlike the requested-config fields (which describe intent), this reflects what the execution path *actually did*: `applied_unverified` means at least one tuning statement executed (self-attested), and `applied_verified` means it was additionally **corroborated by a post-load introspection receipt** against the live catalog (the per-statement receipt itself is recorded in `platform.tuning.applied.receipt`). When `platform.tuning.applied` is present, its `status` equals this field. Emitted for runs executed by this version: an untuned run reports `not_applicable`, as does a DataFrame run whose configuration is empty or all defaults; a run that requested tuning and applied nothing reports `noop`; a tuned run reports the status its execution path derived, or the applied ledger's status when none was, and omits the field when it has neither. Absent from bundles whose run never recorded it, and a re-export of such a bundle keeps it absent (apart from the `.applied.json` case described above). |
-| `tuning_policy_generation` | string | Explicit tuning-policy generation marker (ADR-3 seam), currently `"adr-003"`. Identifies which generation of the tuning policy this run was produced under, so tuned results from different generations can be flagged as not directly comparable. Sourced from the `TUNING_POLICY_GENERATION` constant (`benchbox/core/tuning/policy_generation.py`), **never** derived from `benchbox_version`. Bundles predating this field omit it; consumers treat that absence as the "pre-seam" generation. See `docs/development/tuning-adr-003-baseline-and-single-renderer.md`. |
+| `validation_status` | string | Execution-derived tuning verification state: `not_applicable`, `noop`, `applied_unverified`, `applied_verified`, or `failed`. Unlike the requested-config fields (which describe intent), this reflects what the execution path *actually did*: `applied_unverified` means at least one tuning statement executed (self-attested), and `applied_verified` means it was additionally **corroborated by a post-load introspection receipt** against the live catalog (the per-statement receipt itself is recorded in `platform.tuning.applied.receipt`). When `platform.tuning.applied` is present, its `status` equals this field. Emitted for runs executed by this version: an untuned run reports `not_applicable`, as does a DataFrame run whose configuration is empty or all defaults; a run that requested tuning and applied nothing reports `noop`; a tuned run reports the status its execution path derived, or the applied ledger's status when none was, and omits the field when it has neither. Absent from bundles whose run never recorded it, and a re-export of such a bundle keeps it absent (apart from the `.applied.json` case described above). |
+| `tuning_policy_generation` | string | Explicit tuning-policy generation marker, currently `"adr-003"`. Identifies which generation of the tuning policy this run was produced under, so tuned results from different generations can be flagged as not directly comparable. Sourced from the `TUNING_POLICY_GENERATION` constant (`benchbox/core/tuning/policy_generation.py`), **never** derived from `benchbox_version`. Bundles predating this field omit it; consumers treat that absence as the generation before the marker existed. See `docs/development/tuning-adr-003-baseline-and-single-renderer.md`. |
 | `counts.tables_tuned` | number | Number of tables with at least one table-level tuning (partitioning/clustering/distribution/sorting). |
 | `counts.tuning_types` | array | Sorted list of tuning categories actually active (constraint names, platform optimization flags, table-tuning clause types). |
 | `logical_profile` | object | Optional workload-profile coverage metadata (unrelated to the requested-config hash). |
@@ -334,7 +334,7 @@ Discloses the client execution location and connectivity characteristics relativ
 | `collection_error_class` | string \| null | Optional exception or error class name if locality discovery or overhead probing failed. |
 | `collection_error_message` | string \| null | Fixed-template diagnostic (`"<ErrorClass>: statement overhead probe failed"`). Raw error text is never published, so hostnames, IPs, and credentials cannot leak through this field. |
 
-The probe issues 1 warmup plus 5 `SELECT 1` statements on the live connection after the workload succeeds, bounded by a 5-second deadline. On billable warehouses (Snowflake, Athena, Redshift) these are metered statements; pass `--no-link-probe` to skip them. Probe wall time is excluded from the published run `total_duration`. The Explorer read model (v10) projects `min`/`median` only; `samples` stays bundle-level by design. A published Explorer snapshot must be rebuilt after the v10 upgrade to surface the new `client_*` columns; older snapshots show NULLs for them without failing.
+The probe issues 1 warmup plus 5 `SELECT 1` statements on the live connection after the workload succeeds, bounded by a 5-second deadline. On billable warehouses (Snowflake, Athena, Redshift) these are metered statements; pass `--no-link-probe` to skip them. Probe wall time is excluded from the published run `total_duration`. The Results Explorer shows `min`/`median` only; `samples` stays in the bundle.
 
 ###### Example: Observed Cloud VM Run
 
@@ -388,10 +388,8 @@ by table name.
 
 Absence of `load_ms` means "not measured" and is always accepted; an
 explicit `load_ms: 0` is a measured zero and stays distinguishable from a
-missing key. Seed-corpus coverage is partial (forward-only rollout), which is
-expected for an additive field. The Explorer read model does not project this
-block yet; it is bundle-level diagnostic data until a read-model decision
-lands.
+missing key. Older bundles may omit the block. The Results Explorer does not
+read it; it is bundle-level diagnostic data.
 
 #### Export Block
 
@@ -667,8 +665,7 @@ the documented algorithm can confirm candidate values against published
 `<kind>_<12 hex>` tokens. Unread identifier fields are omitted entirely (see
 `docs/development/adr/adr-published-identifier-field-set.md`). Retained fields
 (`endpoint`, `database_name`, `submission_path`) still publish pseudonyms, so
-the **residual oracle on those fields is accepted for the OSS default** and
-documented rather than denied.
+under the empty default those fields remain confirmable this way.
 
 A non-empty salt closes the oracle only if it is **not** shipped in the public
 tree. Operators who will publish community submissions must set
@@ -678,13 +675,11 @@ tokens are salted when they are minted. `ResultExporter(anonymize=True)`
 soft-reads `BENCHBOX_MACHINE_ID_SALT` when present; without it, public-shaped
 export still succeeds with the empty default (local/private use).
 
-`benchbox submit` hard-refuses when that salt env is unset/empty — a
-community-path gate so operators cannot forget to configure salt on the
-submission machine. That gate does **not** re-hash already-exported files:
-already-public-shaped tokens pass through under the publication fixed point,
-so setting salt only at submit time does not close the empty-salt oracle for
-bundles that were minted earlier without salt. A repository-baked "default
-salt" would still be public and is rejected.
+`benchbox submit` refuses to run when that salt env is unset or empty. It
+does **not** re-hash already-exported files: tokens that are already
+pseudonyms pass through unchanged, so setting salt only at submit time does
+not protect bundles that were exported earlier without salt. Do not use a salt
+committed to a public repository; it is not private.
 
 #### Salt rotation
 

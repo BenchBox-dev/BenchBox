@@ -10,27 +10,20 @@ For the **one-shot** approximate-aggregate path (HLL distinct, T-Digest /
 KLL single quantile, top-K), see
 [read_primitives approximate-aggregate functions](read-primitives-approximate-functions.md).
 
-## DuckDB community-extension status (2026-05-06)
+## DuckDB community-extension status
 
-Four ops below are currently **blocked on upstream extension stability**:
+Four ops below do not run on DuckDB with the current community
+`datasketches` extension:
 
 - `sketch_insert_theta_per_partition`
 - `sketch_insert_topk_per_shard`
 - `sketch_query_theta_union_merge`
 - `sketch_query_topk_combine`
 
-Extension version `2e38607` of the duckdb-community-extensions
-`datasketches` build dropped the `theta` and `frequent_items` families
-between PR #114 morning and the audit later that day. CPC, REQ, KLL,
-and HLL families still load. The four ops above remain in
-`benchbox/core/write_primitives/catalog/operations.yaml` per
-`scope_limit` on the source TODO; CI's
-`extension-smoke.yml` workflow reports this reviewed `2e38607` state as
-known drift and goes red for any new missing family, affected extension
-version, or non-missing-function error from a fresh install. See
-the DuckDB datasketches vendoring ADR
-(`docs/development/adr/adr-duckdb-datasketches-vendoring.md`)
-for the long-term path.
+Extension build `2e38607` dropped the `theta` and `frequent_items`
+families. The CPC, REQ, KLL and HLL families still load. The four ops
+stay in `benchbox/core/write_primitives/catalog/operations.yaml` so they
+run again once the extension restores those families.
 
 ## Operation lifecycle
 
@@ -75,76 +68,29 @@ DataSketches binary format is portable across Databricks / Snowflake /
 BigQuery / DuckDB-with-extension (all built on the same C++/Java/WASM
 DataSketches core). ClickHouse uses its own `-State`/`-Merge` combinator
 serialization, which is comparable algorithmically but **not**
-binary-compatible. ClickHouse-native variants are deferred to a follow-up
-to keep this benchmark scoped to the cross-engine portability story.
+binary-compatible.
 
-## Live cloud survey (2026-09-25)
+## Verified platform behaviour
 
-The 22 SQL sketch ops ran against Snowflake (account `ZY50805`,
-warehouse `COMPUTE_WH`) and Databricks (Serverless Starter warehouse)
-at SF=0.1 (600,572 LINEITEM rows) and SF=1.0 (6,001,215 rows), using
-each op's catalog `platform_overrides` SQL timed per statement. The
-sketch ops are currently unreachable via `benchbox run --queries`
-(`get_queries()` excludes category `sketch` from the SQL path), so
-the survey drove catalog SQL directly; wiring sketch selection into
-the CLI is a tracked follow-up.
+The SQL sketch ops have been run on Snowflake and Databricks. The
+results narrow the support matrix above:
 
-| Op | Snowflake SF=0.1 | Snowflake SF=1.0 | Databricks SF=0.1 | Databricks SF=1.0 |
-|----|------------------|------------------|-------------------|-------------------|
-| `sketch_ddl_create_persistent_table` | pass (502 ms) | pass (625 ms) | pass (1.8 s) | pass (2.1 s) |
-| `sketch_insert_theta_per_partition` | FAIL — unknown `DATASKETCHES_THETA_ACCUMULATE` | FAIL (same) | pass (insert 3.2 s) | pass (insert 10.3 s) |
-| `sketch_insert_kll_per_partition` | FAIL — unknown `DATASKETCHES_KLL_ACCUMULATE` | FAIL (same) | pass (insert 1.6 s) | pass (insert 2.2 s) |
-| `sketch_insert_topk_per_shard` | FAIL — `APPROX_TOP_K_ACCUMULATE` returns OBJECT, column is BINARY | FAIL (same) | FAIL — executed two-arg `approx_top_k_accumulate(l_shipmode, 10000)` (datatype mismatch); the catalog override is one-arg `approx_top_k_accumulate(l_shipmode)` and was not exercised — re-run pending | FAIL (same) |
-| ★ `sketch_query_theta_union_merge` | FAIL (theta accumulate unknown) | FAIL (same) | pass (merge 0.7 s at SF=0.1; 1.2 s at SF=1.0; merge fan-in unchanged — see note) | pass |
-| ★ `sketch_query_kll_quantiles_merge` | FAIL (KLL accumulate unknown) | FAIL (same) | pass (merge 0.5 s at SF=0.1; 0.6 s at SF=1.0; merge fan-in unchanged — see note) | pass |
-| ★ `sketch_query_topk_combine` | FAIL (accumulate type mismatch) | FAIL (same) | FAIL (same unexercised-override cause as insert; re-run pending) | FAIL (same) |
-| `sketch_drop_persistent_table` | pass (933 ms) | pass (750 ms) | pass (2.4 s) | pass (2.4 s) |
-| `sketch_cpc_*` (4 ops), `sketch_req_*` (4 ops), `sketch_*_lgk*` (2), `sketch_*_k100/k1000` (2), `sketch_*_lgmm*` (2) | SKIP — explicit `snowflake: null` override (unsupported; never executed) | SKIP (same) | SKIP — explicit `databricks: null` override (unsupported; never executed) | SKIP (same) |
+- **Databricks:** Theta and KLL persist, merge and requery work with
+  the native `theta_sketch_*` and `kll_sketch_*` functions. The Top-K
+  ops are not yet verified.
+- **Snowflake:** the Theta and KLL ops need the
+  `DATASKETCHES_THETA_ACCUMULATE` and `DATASKETCHES_KLL_ACCUMULATE`
+  functions, which are not available on every account. Treat Snowflake
+  Theta and KLL sketch persistence as unverified. The Top-K insert fails
+  because `APPROX_TOP_K_ACCUMULATE` returns `OBJECT` while the sketch
+  column is `BINARY`.
+- **Both:** the CPC, REQ and parameter-sweep ops carry explicit `null`
+  platform overrides, so the runner reports them as skipped and runs no
+  SQL.
+- Firebolt and Starburst/Trino have not been verified.
 
-Score: Snowflake 2/8 attempted, Databricks 6/8 attempted (identical at
-both scale factors). The remaining 14 CPC/REQ/sweep ops carry explicit
-`null` platform overrides and are skipped as unsupported before any SQL
-runs (null-override skip in `benchmark.py`); they are excluded from the
-scores rather than counted as failures.
-Raw per-statement timings: `$BENCHBOX_OUTPUT_DIR/logs/approx-survey-20260925-1136/{snowflake,databricks}-sketch-{sf01,sf1}.jsonl`.
-
-Unsurveyed platforms and the reason:
-
-| Platform | Reason |
-|----------|--------|
-| Firebolt | no credentials on survey host |
-| Starburst/Trino | no credentials on survey host |
-
-What this corrects in the matrix above:
-
-- Snowflake Theta/KLL rows assume `DATASKETCHES_*` functions exist.
-  On the surveyed account they do not — Snowflake's DataSketches
-  functions require an extension/account feature that is not enabled
-  here. Until the catalog gains a fallback or the docs scope the
-  requirement, treat Snowflake Theta/KLL sketch persistence as
-  **unverified**, not supported.
-- Databricks Theta and KLL persist + merge + requery all pass with
-  native `theta_sketch_*` / `kll_sketch_*` functions. Merge times were
-  0.7 s at SF=0.1 vs 1.2 s at SF=1.0 (Theta) and 0.5 s vs 0.6 s (KLL),
-  but Theta/KLL partition by `l_shipdate, l_returnflag`, so scaling
-  SF=0.1 to SF=1.0 grows rows within groups while the merge fan-in
-  (partition count) stays roughly fixed. These numbers do not
-  demonstrate sub-linear scaling with 10x merge input; a fan-in-varying
-  run (more persisted partitions) is needed before claiming the
-  O(1)-ish merge story.
-- Databricks Top-K: the reported two-arg
-  `approx_top_k_accumulate(l_shipmode, 10000)` failure did not execute
-  the catalog override (one-arg `approx_top_k_accumulate(l_shipmode)`),
-  so it cannot establish catalog drift. Re-run the exact override before
-  recording this as a catalog failure; do not fix the catalog based on
-  this run alone.
-- CPC/REQ/lgk/k100/lgmm ops carry explicit `null` overrides for both
-  Snowflake and Databricks, so the runner reports them as
-  skipped-unsupported and never executes SQL. They are out of scope for
-  this survey; extending overrides is a follow-up.
-- Firebolt and Starburst/Trino remain unsurveyed (no credentials on
-  the survey host). Their rows belong in the matrix above once the
-  remaining-legs follow-up runs them.
+The sketch ops cannot be selected with `benchbox run --queries`;
+`get_queries()` leaves the `sketch` category out of the SQL query path.
 
 ### Redshift HLL-only ceiling
 
@@ -290,15 +236,14 @@ empirically against DuckDB SF=0.01:
 
 | Op                                | Observation                              | Bounds            | Rationale                                       |
 |-----------------------------------|------------------------------------------|-------------------|--------------------------------------------------|
-| `sketch_query_theta_union_merge`  | 14836.89 (deterministic over 5 runs)     | [14500, 15500]    | True distinct = 15000; tightened after HLL logm=15 review |
+| `sketch_query_theta_union_merge`  | 14836.89 (deterministic over 5 runs)     | [14500, 15500]    | True distinct = 15000                           |
 | `sketch_query_kll_quantiles_merge`| 34027.29 – 34361.75 (5 runs)             | [30000, 40000]    | Generous to tolerate SF=0.1 drift; catches no-op |
 | `sketch_query_topk_combine`       | 7 (deterministic; lineitem has 7 modes)  | [6, 8]            | Lower bound catches loss; upper catches false-positive |
 
 Bounds are intentionally wide enough to never false-fail on a healthy
 sketch but tight enough to catch a regression to a no-op (sketch
 returning 0) or a wildly off estimate. Cloud engines may shift the
-ranges; tolerances will need re-tuning when first-class cloud coverage
-lands.
+ranges, so the bounds may need re-tuning for cloud runs.
 
 ## Storage-size methodology
 
@@ -353,14 +298,8 @@ Per-engine SQL is wired through `validation_query.platform_overrides`:
   do not interpret the absolute number as the storage cost a ClickHouse
   user actually pays.
 - Other engines (Databricks, Snowflake, BigQuery, Redshift, DataFusion,
-  SQLite, StarRocks): skipped via explicit `null` overrides because their
-  byte-length probes for sketch state aren't yet wired. Add them in
-  follow-up TODOs as cloud verification lands.
-
-Bounds span both engines so a single validation passes on whichever
-engine the op runs on. Per-engine tightening (separate
-`*_storage_size_<engine>` validations with engine-specific bounds) is a
-future option if drift detection needs to be tighter.
+  SQLite, StarRocks): skipped via explicit `null` overrides because
+  byte-length probes for their sketch state are not implemented.
 
 ## Try it locally on clickhouse-local
 
@@ -427,13 +366,11 @@ compare different algorithms (fixed-precision `uniqHLL12` versus
 `uniqExact`, `quantileBFloat16` versus `quantileExact`) rather than the
 swept parameter — results labeled as `lg_k`, `k`, or `lg_max_map_size`
 effects would actually measure algorithm changes. The sweep ops are
-therefore unsupported on ClickHouse (null platform override, the
-established skip). Remaining cloud engines stay deferred: each has
-different parameter knobs (Snowflake `APPROX_TOP_K` `counters` vs
-DataSketches `lg_max_map_size`, etc.); 6 families × remaining cloud
-engines is out of proportion with the analytical value. The DuckDB-only
-sweep demonstrates the tradeoff; cloud users tune at their end with
-vendor-specific knobs.
+therefore unsupported on ClickHouse (null platform override). Cloud
+engines are not covered either: each has different parameter knobs
+(Snowflake `APPROX_TOP_K` `counters` vs DataSketches `lg_max_map_size`,
+etc.). The DuckDB-only sweep demonstrates the tradeoff; on cloud engines,
+tune with the vendor-specific knobs.
 
 Use the SF=0.01 TPC-H catalog validations to check the KLL median and
 storage bounds. Results from synthetic integer sequences do not establish
@@ -442,29 +379,27 @@ operations and parameter sweeps; its operation overrides skip execution
 before either the sketch SQL or validation SQL reaches the engine.
 Check the parameterized casts and merge calls separately from the
 headline functions: their availability alone does not establish sweep
-compatibility. Theta and frequent-items variants remain subject to the
-recorded extension drift in
-`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`.
+compatibility. The Theta and frequent-items variants do not run on
+DuckDB while the community extension lacks those families (see
+[DuckDB community-extension status](#duckdb-community-extension-status)).
 
 ## Single-query scope: what this benchmark is **not**
 
 This benchmark measures **latency under approximate semantics**, not
 **approximation error magnitude**. Users who want to evaluate
 approximation-quality tradeoffs (paired exact/approximate queries with
-relative-error metrics) will need a separate benchmark — that's
-deliberately deferred (see TODO `deferred:` block).
+relative-error metrics) need a separate benchmark.
 
 Cross-engine sketch portability tests (write a sketch on engine A,
-query it on engine B) are also deferred — this needs two-engine
-orchestration that BenchBox does not have today.
+query it on engine B) are not supported; they need two-engine
+orchestration that BenchBox does not have.
 
-## Catalog extension points (architecture-fixes 2026-05-04)
+## Catalog extension points
 
-Two catalog extension points support engine-specific sketch work without
-abusing existing schemas. Both were added so cross-engine sketch follow-ups
-(ClickHouse-native `-State`/`-Merge`, PySpark DataFrame HLL, etc.) can land
-without forcing per-engine SQL into a single body or routing aggregate-state
-DataFrame ops through row-level mutation APIs.
+Two catalog extension points support engine-specific sketch work
+(ClickHouse-native `-State`/`-Merge`, PySpark DataFrame HLL, etc.)
+without forcing per-engine SQL into a single body or routing
+aggregate-state DataFrame ops through row-level mutation APIs.
 
 ### `validation_query.platform_overrides`
 
@@ -546,9 +481,7 @@ failure with a clear "use the SQL surface or skip this op" message.
 
 Cleanup of the persisted state directory is the consumer's responsibility
 today (the persist phase leaves a Parquet directory at `target_path`;
-remove it with `shutil.rmtree` after the merge phase). A dedicated
-`execute_aggregate_cleanup` helper may land later if symmetry becomes
-load-bearing — surface the request in a follow-up TODO if you need it.
+remove it with `shutil.rmtree` after the merge phase).
 
 ### PySpark sketch factory helpers
 
@@ -568,7 +501,7 @@ top-K factory; older runtimes should skip cleanly with a logged reason.
 The guard is conservative: it requires both the version gate (≥4.1) and
 the function symbol — distributions that backport the function to a
 3.5.x build will be rejected by the version check. If you hit that case,
-bypass the guard or open a TODO to add a backport-detection branch.
+bypass the guard.
 
 The factory unit tests are MagicMock-based and verify call patterns. The
 real-Spark CLI integration is wired through the catalog ops
@@ -578,10 +511,9 @@ declare an `aggregate_state` block that the dispatch fork in
 through `manager.execute_aggregate_persist` /
 `manager.execute_aggregate_merge` on the active platform's
 `DataFrameWriteOperationsManager` instead of through the DuckDB parity
-path. HLL is verified live on PySpark 4.1.1 at SF=0.01:
-`aggregate_value=14852` (true distinct l_orderkeys = 15000, 0.99% RSE,
-inside the `[14250, 15750]` bound). Top-K skips cleanly on the same
-runtime because the PySpark 4.1.1 client wheel does not expose
+path. On PySpark 4.1.1 at SF=0.01, HLL returns an estimate inside the
+`[14250, 15750]` bound (true distinct l_orderkeys = 15000). Top-K skips
+cleanly on the same runtime because the PySpark 4.1.1 client wheel does not expose
 `F.approx_top_k_accumulate` / `F.approx_top_k_combine` /
 `F.approx_top_k_estimate` in its Python `functions` namespace —
 `pyspark_supports_approx_top_k(spark)` returns `False` and the dispatch
@@ -617,12 +549,3 @@ merge_extract = make_pyspark_hll_merge_extract(spark, sketch_col="sketch")
 merge = manager.execute_aggregate_merge(target, merge_extract)
 distinct_estimate = merge.metrics["aggregate_value"]
 ```
-
-**CLI integration gap.** `benchbox run --platform pyspark --benchmark
-write_primitives --queries sketch_df_hll_persist_merge` does not yet
-dispatch through these factories — the catalog has no `sketch_df_*`
-entries and `_execute_dataframe_sql_parity_workload` always routes to
-embedded DuckDB. The factory helpers are usable today via direct manager
-calls (covered by `tests/unit/core/write_primitives/test_pyspark_sketch_factories.py`);
-wiring them into the benchmark CLI is tracked as a follow-up. See
-`_project/blind-spots/2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch.md`.

@@ -237,7 +237,7 @@ while row-wise loading produces many small ones.
 
 Treat a DuckLake-vs-other-engine gap accordingly, and do not read it as the
 best DuckLake can do. See
-[ADR: DuckLake Maturity, Publishability, Review Path, and Compaction Bias](../development/adr/adr-ducklake-maturity-and-publishability.md)
+[ADR: DuckLake Maturity, Publishability, and Compaction Bias](../development/adr/adr-ducklake-maturity-and-publishability.md)
 for why this is documented rather than instrumented.
 
 ## Lakehouse-Feature Benchmarks (Time Travel, Schema Evolution, Snapshots)

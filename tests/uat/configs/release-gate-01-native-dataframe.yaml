@@ -4,7 +4,7 @@
 #
 # Release-gate re-run — STAGE 1 of 3: native SQL + dataframe (native execution).
 #
-# Run order (see docs/operations/uat-framework.md "Release-gate re-run"):
+# Run order (see docs/operations/uat-release-campaign.md):
 #   1. release-gate-01-native-dataframe.yaml   <-- this file
 #   2. release-gate-02-docker-nonoltp.yaml
 #   3. release-gate-03-docker-oltp.yaml

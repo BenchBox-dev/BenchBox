@@ -1,13 +1,11 @@
-# ADR: DuckLake Maturity, Publishability, Review Path, and Compaction Bias
+# ADR: DuckLake Maturity, Publishability, and Compaction Bias
 
 ```{tags} platform, governance, results
 ```
 
 ## Status
 
-Accepted (2026-07-30). Resolves work units w11-w14 of the
-`ducklake-post-merge-review-followups` tracker item. Each decision below is
-independently reversible and states what evidence would reverse it.
+Accepted (2026-07-30). Each decision below is independently reversible and states what evidence would reverse it.
 
 **Updated 2026-07-30: DuckLake is now `beta`.** Every w11 criterion is met -
 criterion 3 was satisfied by TPC-H SF=1 runs on all four deployment modes, each
@@ -42,14 +40,12 @@ enough to publish as reproducibility characteristics.
 ## Context
 
 The DuckLake adapter shipped as `support_status: experimental` and its post-merge
-review raised four questions that the code changes in that review deliberately
+review raised questions that the code changes in that review deliberately
 did not answer, because they are policy rather than defects:
 
 - **w11** - what concretely moves DuckLake from `experimental` to `beta`?
 - **w12** - may results from a remote-backed DuckLake run (PostgreSQL catalog
   and/or S3 `DATA_PATH`) be published, and are they ranking-eligible?
-- **w13** - should platform adapters that produce publishable numbers be a
-  CODEOWNERS owner-review path?
 - **w14** - does the absence of DuckLake compaction/inlining bias cross-engine
   comparisons, and should that be instrumented or documented?
 
@@ -67,10 +63,10 @@ by *what infrastructure produced them*.
 DuckLake moves to `beta` when **all** of the following hold, and not before:
 
 1. The non-live classes of `tests/integration/test_ducklake_integration.py` run
-   in a lane on every PR. *(Met as of #1357.)*
+   in a lane on every PR. *(Met.)*
 2. Both live classes - PostgreSQL catalog and S3 `DATA_PATH` - have been run
    green against real infrastructure at least once per minor release, with the
-   run recorded on the tracker item. *(First met 2026-07-30: PostgreSQL 18.4 and
+   run recorded. *(First met 2026-07-30: PostgreSQL 18.4 and
    a real S3 bucket.)*
 3. A full TPC-H SF>=1 run completes on each of the four deployment modes with
    results validated by the standard correctness gate - not just the SF=0.01
@@ -120,35 +116,6 @@ decision should be revisited when scale runs exist.
 
 ---
 
-## Decision w13: no. Platform adapters do not become a CODEOWNERS path
-
-**Basis.** This one is decided by what CODEOWNERS currently *does* in this repo,
-which is not what the question assumes. Per `.github/CODEOWNERS` and
-`docs/operations/repo-admin-settings.md`, code-owner
-approval enforcement was **retired on 2026-07-18** - the sole owner authors every
-PR and GitHub forbids self-approval. The file's two live roles are:
-
-1. mirroring `SOUNDNESS_PREFIXES` in
-   `_project/scripts/soundness_paths.py`, which **withholds
-   auto-merge**; and
-2. routing review requests.
-
-So adding `benchbox/platforms/**` would not add a human review gate. It would
-withhold auto-merge from every platform PR - and the platform tree is the
-highest-churn area in the repo. That is a real cost for no review benefit.
-
-The soundness set is scoped to code that decides whether a result is *correct*
-(validators, equivalence, plan parsers, expected-results, `result_capture.py`).
-A platform adapter produces numbers but does not adjudicate them; the
-correctness gate does, and that gate is already owner-reviewed. The existing
-boundary is principled and DuckLake gives no reason to move it.
-
-**What would reverse this.** Reinstating enforced code-owner approval (a second
-maintainer joining) changes the premise entirely and this should be re-decided
-then.
-
----
-
 ## Decision w14: document the bias; do not instrument yet
 
 BenchBox never invokes DuckLake's compaction or inlining maintenance
@@ -185,11 +152,8 @@ layout in results metadata.
 - w11's criteria are met; DuckLake is now `beta`. Future demotion would require
   new evidence against the reversal conditions above.
 - w12 requires that catalog backend and storage location reach result metadata.
-  The registry already models these as independent axes (four deployment modes
-  as of the w10 fix), so the vocabulary exists; wiring it into result metadata
+  The registry already models these as independent axes (four deployment
+  modes), so the vocabulary exists; wiring it into result metadata
   and comparison grouping is follow-up work, not covered here.
-- w13 leaves `SOUNDNESS_PREFIXES` and CODEOWNERS unchanged - and they must stay
-  in lockstep, pinned by
-  `tests/unit/scripts/test_soundness_paths.py`.
 - w14 adds a caveat to the DuckLake platform guide. Any future published
   DuckLake comparison should link it.

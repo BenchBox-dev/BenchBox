@@ -4,7 +4,7 @@
 - [ADR: Extract ASCII Charting into `textcharts` Standalone Library](adr-textcharts-extraction.md)
 - [ADR: `sql_compat` Phase-Aware Compatibility Pipeline](adr-sql-compat-phase-aware-pipeline.md)
 - [ADR: SQLGlot Use and Non-Use](adr-sqlglot-use-and-non-use.md)
-- [ADR: DuckLake Maturity, Publishability, Review Path, and Compaction Bias](adr-ducklake-maturity-and-publishability.md)
+- [ADR: DuckLake Maturity, Publishability, and Compaction Bias](adr-ducklake-maturity-and-publishability.md)
 - [ADR: One Engine, Scoped Surfaces — CLI and MCP over a Shared Core](adr-one-engine-scoped-surfaces.md)
 - [ADR: Core Kernel and Runtime Composition Boundary](adr-runtime-composition-boundary.md)
 - [ADR: `public_result_id` permanence attaches at publication](adr-public-result-id-permanence.md)

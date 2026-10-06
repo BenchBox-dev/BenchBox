@@ -469,8 +469,9 @@ Single-node multi-threaded execution. Start a Sail server locally, then connect 
 # Install the Spark Connect-capable PySpark client
 uv add benchbox --extra lakesail
 
-# Start the local Docker-backed Sail server
-make uat-bring-up PLATFORM=lakesail
+# Install and start a local Sail server (separate terminal)
+uv add pysail
+python -m pysail spark server --port 50051
 
 # SQL benchmark
 benchbox run --platform lakesail --benchmark tpch --scale 1.0

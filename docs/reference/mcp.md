@@ -57,12 +57,7 @@ port forward, or reverse proxy. Non-loopback binding requires a complete
 `--security-config` policy. See [Remote MCP security and tenancy](../operations/mcp-remote-security.md)
 for its threat model, token-digest provisioning, scopes, tenant workspaces,
 shared admission store, and fail-closed proxy requirements. This capability is
-not a production-readiness claim. Shared, non-loopback endpoint publication and
-its operational acceptance matrix are explicitly
-deferred until post-release. That
-deferral does not block the local stdio/loopback MCP MVP: its release checks are
-limited to current DuckDB package/execution evidence and pinned protocol
-conformance.
+not a production-readiness claim.
 
 ### SDK Compatibility
 
@@ -78,27 +73,13 @@ storage and return immediately, so sessionless requests may reach different
 workers without losing ownership or lifecycle state.
 
 Streamable HTTP supports modern MCP `2026-07-28` as a sessionless protocol.
-The only production-supported legacy handshake is `2025-11-25`; earlier
-revisions are not covered by the acceptance matrix:
-each request can reach any server process and no `Mcp-Session-Id` is issued.
+The only supported legacy handshake is `2025-11-25`; earlier revisions are
+not supported. Each request can reach any server process and no `Mcp-Session-Id` is issued.
 The same endpoint retains the SDK's stateless compatibility path for supported
 handshake-era clients. Protocol discovery, version negotiation, headers, and
 DNS-rebinding checks are provided by the MCP SDK rather than reimplemented by
 BenchBox. Responses remain streaming-capable; JSON-only mode is intentionally
 disabled so progress and future request-scoped notifications remain possible.
-
-### MVP release checks
-
-The MCP MVP has two release checks, both currently recorded `PASS`:
-
-1. install the built BenchBox wheel with `[mcp]` in a clean environment and run
-   a real small DuckDB benchmark through local `run_benchmark`; and
-2. run `uv run -- python scripts/verify_mcp_conformance.py
-   --protocol-version 2026-07-28` with no unexpected failures or warnings.
-
-The external registry, TLS/identity edge, multi-host storage, OTLP, incident
-exercise, transcript, and named approval belong to deferred post-release
-shared-service publication.
 
 ### Testing Locally
 
@@ -140,7 +121,6 @@ The inspector provides a web UI to browse tools, test calls, and view responses.
 | `--port` | Streamable HTTP bind port (default `8000`) |
 | `--streamable-http-path` | Streamable HTTP endpoint path (default `/mcp`) |
 | `--security-config` | Remote-only JSON policy for SDK auth, tenancy, authorization, admission, and audit |
-| `--readiness-evidence` | Revision-bound evidence required for every non-loopback bind |
 
 **Environment variables**
 
@@ -150,9 +130,10 @@ The inspector provides a web UI to browse tools, test calls, and view responses.
 | `BENCHBOX_CHARTS_DIR` | `benchmark_runs/charts` | Charts root when `--charts-dir` is not provided |
 | `BENCHBOX_OUTPUT_DIR` | `benchmark_runs` | Base root used to derive results/charts when specific vars are unset |
 | `BENCHBOX_LOG_LEVEL` | `INFO` | Logging level when `--log-level` is not provided |
-| `BENCHBOX_BUILD_SHA` | none | Exact deployed revision matched by remote readiness evidence |
-| `BENCHBOX_MCP_READINESS_SHA256` | none | Out-of-band digest of the readiness evidence file |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | none | Shared OTLP/HTTP trace endpoint required for remote publication |
+
+A non-loopback bind also needs `--readiness-evidence` and its related
+environment variables. See
+[Remote MCP security and tenancy](../operations/mcp-remote-security.md).
 
 Discovery and list responses carry a public five-minute cache hint. Resource
 bodies, including recent results and system profiles, are always private and
@@ -344,8 +325,7 @@ one ratified tier reason, defined in
 - **interaction-scoped** — permanent. The control governs terminal interaction
   or presentation and has no meaning in a structured request/response protocol.
 - **not-yet-demanded** — provisional. Nothing about security or interaction
-  blocks it; no MCP client has demanded it. Promotion is demand-driven and is
-  recorded as a deferral on the `one-engine-parity-ledger` tracker item.
+  blocks it; no MCP client has demanded it. Promotion is demand-driven.
 
 An omission that is absent from this ledger is a defect, not a decision.
 
@@ -369,7 +349,7 @@ tool.
 | `get_results` | results | `benchbox results`, `benchbox export` | Lists, reads, and exports result bundles; MCP inline-reads while CLI renders to stdout/files and supports cloud export. |
 | `analyze_results` | analytics | `benchbox compare`, `benchbox report`, `benchbox aggregate` | Comparison, regression, trend, and aggregation over result bundles. |
 | `get_query_plan` | analytics | `benchbox show-plan`, `benchbox compare --include-plans` | Reads captured plans from a result bundle; CLI also renders live plans. |
-| `validate_results` | analytics | `_project/scripts/validate_results.py` | Result JSON integrity and believability checks (`benchbox validate` checks config YAML, not result bundles). |
+| `validate_results` | analytics | `validate_results.py` (source-checkout script) | Result JSON integrity and believability checks (`benchbox validate` checks config YAML, not result bundles). |
 | `suggest_charts` | visualization | `benchbox visualize` | Suggests semantic chart types for result files. |
 | `generate_chart` | visualization | `benchbox visualize` | Generates ASCII charts; MCP is inline-only by contract, CLI may write files. |
 
@@ -438,6 +418,7 @@ above.
 | `--client-cloud` | Omitted | not-yet-demanded | Attested client-cloud metadata is a bounded provenance field with no client demand yet. |
 
 The textcharts MCP server remains a separate-client integration, not a bundled or proxied part of `benchbox-mcp`. See `docs/design/textcharts-mcp-boundary.md` for the accepted separate textcharts configuration and the rejected bundle/proxy alternatives.
+
 ### Discovery Tools
 
 #### `list_available`

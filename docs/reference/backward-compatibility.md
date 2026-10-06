@@ -95,57 +95,14 @@ Maintain live rows below. Do not leave compatibility changes untracked.
 | `benchbox/core/base_benchmark.py` | Deprecated internal base class retained after `datavault` and `tpcds_obt` migrated to `benchbox.base.BaseBenchmark`; no remaining production implementation imports it | deprecate | Deletion-only compatibility item after the beta review window and any remaining internal imports are migrated | Keep the old internal import path observable until its explicit removal gate; it is not a public extension path for new benchmark families | core-runtime |
 | `benchbox/cli/benchmark_hooks.py`, `benchbox/cli/platform_hooks.py` | Thin re-export shims for the benchmark/platform CLI-option hook registries relocated to `benchbox.core.hooks.benchmark_hooks` / `benchbox.core.hooks.platform_hooks` (fixes a `core`/`platforms` -> `cli` layering inversion) | active | Beta compatibility review; these paths are internal-only (not listed in `public-contracts.md`), so the shim is a courtesy rather than a guaranteed compatibility window | Avoid breaking any internal or external caller still importing the old `benchbox.cli.*` path while `benchbox.core`/`benchbox.platforms` are updated to import the registries directly | core-runtime |
 
-## Runtime Harmonization Notes (2026-02-26)
+## Removed Compatibility Surfaces
 
-- Loader benchmark-set definitions are now registry-backed (`list_loader_benchmark_ids` + `get_core_benchmark_class_name`) to prevent loader/registry drift.
-- `transaction_primitives` is now part of the core loader-supported benchmark set; stale loader-only entries were removed.
-- Runtime contract coverage now runs against loader benchmark IDs sourced from the shared registry contract.
-- Cleanup boundary for this workstream:
-  - Keep top-level wrapper classes in `benchbox/*.py` as-is.
-- Keep `benchbox.core.base_benchmark.BaseBenchmark` only as a deprecated compatibility module until its deletion-only item is approved.
+These compatibility shims were removed during the alpha API cleanup. Use the
+canonical replacements:
 
-## Benchmark API Boundary Notes (2026-05-21)
-
-- Top-level wrapper facades remain beta-public. The current package exposes 21
-  top-level benchmark facades: 7 eager imports and 14 lazy registry entries.
-- `ai_primitives` and `joinorder_synthetic` remain core-only benchmark IDs.
-  `joinorder_synthetic` is also hidden from public discovery by registry
-  `surface: internal`.
-- `benchbox.core.benchmark_loader` is an internal loader, not an external Python
-  API. It resolves 23 core benchmark families from the shared benchmark
-  registry.
-- `benchbox.core.base_benchmark.BaseBenchmark` has no remaining production
-  implementation consumers after the Data Vault and TPC-DS OBT migrations. It
-  remains a deprecated compatibility module until its deletion-only item runs;
-  new benchmark work must use `benchbox.base.BaseBenchmark`.
-
-## Final Removal Report (2026-02-18)
-
-### Before/After Inventory Diff
-
-- Baseline at kickoff: 89 compatibility markers tracked (67 active, 22 deprecate).
-- Current active compatibility registry rows: 0.
-- Final status: all registry-tracked compatibility shims removed for alpha-stage API cleanup.
-
-### Final Removals In This Closing Wave
-
-- Removed platform alias export: `MicrosoftFabricAdapter` (canonical: `FabricWarehouseAdapter`).
-- Removed legacy data loading provider: `LegacyGetTablesSource` and `legacy_get_tables` source path.
-- Removed compatibility-only tests asserting `benchmark.get_tables()` loading path in SQLite adapter coverage.
-
-### Canonical Replacement Paths
-
-- Platform adapter naming:
-  - Use `FabricWarehouseAdapter` (and platform key `fabric-warehouse`) instead of alias names.
-- Data loading source contract:
-  - Use `benchmark.tables`, `benchmark._impl.tables`, or `_datagen_manifest.json` (v1/v2).
-  - Do not rely on `benchmark.get_tables()` compatibility fallback.
-
-### Verification Summary
-
-- Registry row scan (`rg -n '^\\| \\`benchbox/' docs/reference/backward-compatibility.md`): no active benchbox rows.
-- Compatibility alias/shim scan for final-wave removals:
-  - `MicrosoftFabricAdapter`: no matches.
-  - `LegacyGetTablesSource` / `legacy_get_tables`: no matches.
-- CI fast profile (`make ci-test`): passing.
-- CI lint (`make ci-lint`): still blocked by pre-existing global `ty` warning backlog outside this TODO's closing-wave diffs.
+- Platform adapter naming: use `FabricWarehouseAdapter` (and platform key
+  `fabric-warehouse`) instead of the removed `MicrosoftFabricAdapter` alias.
+- Data loading source contract: use `benchmark.tables`,
+  `benchmark._impl.tables`, or `_datagen_manifest.json` (v1/v2). The
+  `benchmark.get_tables()` loading fallback (`LegacyGetTablesSource`) was
+  removed.

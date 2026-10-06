@@ -36,7 +36,7 @@ behavior and are standard practice for OLAP workloads with long-running queries.
   satisfies engine requirements.
 - ClickHouse - base execution caps (`max_memory_usage`, `max_execution_time`, `max_threads`) and
   server memory ratio 0.8 (`benchbox/platforms/clickhouse/setup.py:16-61`): guardrails against OOM
-  on shared hosts, aligned with recent memory incident.
+  on shared hosts.
 - DataFusion - repartitioning/pruning/batch size, disk spill via `with_disk_manager_os()`, and memory pool
   (`benchbox/platforms/datafusion.py:213-248,232-237`): necessary for stable OLAP execution; disk spilling
   avoids outright failure under pressure. Note: disk manager is always enabled when RuntimeEnvBuilder
@@ -47,7 +47,7 @@ behavior and are standard practice for OLAP workloads with long-running queries.
   and `SET default_order = 'ASC'` (OLAP optimization).
 - Redshift - `enable_case_sensitive_identifier=OFF`, `datestyle='ISO, MDY'`, `extra_float_digits=0`
   (`benchbox/platforms/redshift.py:1299-1345`): keeps canonical identifier/locale behavior for
-  benchmarks; matches example justification.
+  benchmarks.
 - Redshift - search_path and autocommit (`benchbox/platforms/redshift.py:821-918`): ensures objects
   land in the intended schema and avoids transaction state surprises.
 - Snowflake - Standard warehouse/database/schema defaults and timezone/autocommit settings
