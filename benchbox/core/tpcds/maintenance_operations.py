@@ -723,6 +723,117 @@ class MaintenanceOperations:
 
         return rows_updated
 
+    def _get_delete_rowid_column(self, connection: Any) -> Optional[str]:
+        """Physical row-identity column used to scope a portable limited DELETE.
+
+        The sales and returns tables all have composite primary keys, so no
+        single key column can bound a portable ``DELETE ... LIMIT``. The
+        portable form is ``DELETE FROM t WHERE <rid> IN (SELECT <rid> FROM t
+        WHERE <pred> LIMIT n)`` with a per-dialect row-identity column:
+
+        - SQLite / DuckDB: ``rowid`` (verified; bare ``DELETE ... LIMIT`` is a
+          syntax error on both).
+        - PostgreSQL: ``ctid`` (bare ``DELETE ... LIMIT`` is a syntax error).
+        - MySQL and others (returns None): native ``DELETE ... LIMIT`` is valid
+          SQL there, so the native form is used.
+
+        Args:
+            connection: Database connection
+
+        Returns:
+            Row-identity column name, or None when the dialect supports native
+            ``DELETE ... LIMIT``.
+        """
+        dialect = f"{type(connection).__module__}.{type(connection).__name__}".lower()
+
+        if "sqlite" in dialect or "duckdb" in dialect:
+            return "rowid"
+        elif "psycopg" in dialect or "postgres" in dialect:
+            return "ctid"
+        return None
+
+    @staticmethod
+    def _count_table_rows(connection: Any, table_name: str) -> int:
+        """Return the current total row count of a table."""
+        cursor = connection.execute(f"SELECT COUNT(*) FROM {table_name}")
+        row = cursor.fetchone()
+        return int(row[0]) if row and row[0] is not None else 0
+
+    @staticmethod
+    def _reported_deleted_rows(cursor: Any) -> int:
+        """Rows deleted per the engine, or -1 when the engine reports none."""
+        rowcount = getattr(cursor, "rowcount", -1)
+        if type(rowcount) is int and rowcount >= 0:
+            return rowcount
+        return -1
+
+    def _execute_limited_delete(
+        self,
+        connection: Any,
+        table_name: str,
+        date_column: str,
+        cutoff_date_sk: int,
+        limit: int,
+    ) -> int:
+        """Delete up to ``limit`` rows older than ``cutoff_date_sk``.
+
+        Uses the portable key-subquery form (or native ``DELETE ... LIMIT``
+        where the dialect supports it). A failed statement raises
+        MaintenanceError so the operation reports failure instead of success
+        with an estimated count.
+
+        Args:
+            connection: Database connection
+            table_name: Target table name
+            date_column: Date-sk column the cutoff applies to
+            cutoff_date_sk: Rows with a smaller date-sk are deletion candidates
+            limit: Maximum rows to delete from this table
+
+        Returns:
+            Actual number of rows deleted, as reported by the engine or
+            measured by a before/after count. Never an estimate.
+
+        Raises:
+            MaintenanceError: If the delete statement fails.
+        """
+        limit = max(0, int(limit))
+        placeholder = self._get_parameter_placeholder(connection)
+        rowid_column = self._get_delete_rowid_column(connection)
+
+        if rowid_column is not None:
+            delete_sql = (
+                f"DELETE FROM {table_name} WHERE {rowid_column} IN "
+                f"(SELECT {rowid_column} FROM {table_name} "
+                f"WHERE {date_column} < {placeholder} LIMIT {placeholder})"
+            )
+            params: tuple = (cutoff_date_sk, limit)
+        else:
+            # Dialects with native DELETE ... LIMIT (e.g. MySQL). The limit is
+            # an internal int, safe to inline as a literal.
+            delete_sql = f"DELETE FROM {table_name} WHERE {date_column} < {placeholder} LIMIT {limit}"
+            params = (cutoff_date_sk,)
+
+        try:
+            total_before = self._count_table_rows(connection, table_name)
+            cursor = connection.execute(delete_sql, params)
+            deleted = self._reported_deleted_rows(cursor)
+            if deleted < 0:
+                deleted = max(0, total_before - self._count_table_rows(connection, table_name))
+        except Exception as e:
+            raise MaintenanceError(f"Delete from {table_name} failed: {e}") from e
+        return deleted
+
+    def _delete_from_tables(
+        self, connection: Any, specs: list[tuple[str, str]], cutoff_date_sk: int, per_table_limit: int
+    ) -> int:
+        """Run limited deletes over (table, date-column) specs; any failure aborts the operation."""
+        total_deleted = 0
+        for table_name, date_column in specs:
+            total_deleted += self._execute_limited_delete(
+                connection, table_name, date_column, cutoff_date_sk, per_table_limit
+            )
+        return total_deleted
+
     def _delete_old_sales(self, connection: Any, estimated_rows: int) -> int:
         """Delete old sales data."""
         self.logger.info(f"Deleting approximately {estimated_rows} rows from sales tables")
@@ -730,24 +841,16 @@ class MaintenanceOperations:
         # Delete old sales records (older than 3 years)
         cutoff_date_sk = 2450815  # Approximately 3 years ago
 
-        delete_queries = [
-            f"DELETE FROM STORE_SALES WHERE SS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-            f"DELETE FROM CATALOG_SALES WHERE CS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-            f"DELETE FROM WEB_SALES WHERE WS_SOLD_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-        ]
-
-        total_deleted = 0
-        for query in delete_queries:
-            try:
-                result = connection.execute(query)
-                if hasattr(result, "rowcount"):
-                    total_deleted += result.rowcount
-                else:
-                    total_deleted += estimated_rows // 3  # Estimate
-            except Exception as e:
-                self.logger.warning(f"Delete query failed: {e}")
-
-        return total_deleted
+        return self._delete_from_tables(
+            connection,
+            [
+                ("STORE_SALES", "SS_SOLD_DATE_SK"),
+                ("CATALOG_SALES", "CS_SOLD_DATE_SK"),
+                ("WEB_SALES", "WS_SOLD_DATE_SK"),
+            ],
+            cutoff_date_sk,
+            estimated_rows // 3,
+        )
 
     def _delete_old_returns(self, connection: Any, estimated_rows: int) -> int:
         """Delete old returns data."""
@@ -756,24 +859,16 @@ class MaintenanceOperations:
         # Delete old returns records (older than 3 years)
         cutoff_date_sk = 2450815  # Approximately 3 years ago
 
-        delete_queries = [
-            f"DELETE FROM STORE_RETURNS WHERE SR_RETURNED_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-            f"DELETE FROM CATALOG_RETURNS WHERE CR_RETURNED_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-            f"DELETE FROM WEB_RETURNS WHERE WR_RETURNED_DATE_SK < {cutoff_date_sk} LIMIT {estimated_rows // 3}",
-        ]
-
-        total_deleted = 0
-        for query in delete_queries:
-            try:
-                result = connection.execute(query)
-                if hasattr(result, "rowcount"):
-                    total_deleted += result.rowcount
-                else:
-                    total_deleted += estimated_rows // 3  # Estimate
-            except Exception as e:
-                self.logger.warning(f"Delete query failed: {e}")
-
-        return total_deleted
+        return self._delete_from_tables(
+            connection,
+            [
+                ("STORE_RETURNS", "SR_RETURNED_DATE_SK"),
+                ("CATALOG_RETURNS", "CR_RETURNED_DATE_SK"),
+                ("WEB_RETURNS", "WR_RETURNED_DATE_SK"),
+            ],
+            cutoff_date_sk,
+            estimated_rows // 3,
+        )
 
     def _bulk_load_sales(self, connection: Any, estimated_rows: int) -> int:
         """Bulk load sales data."""
