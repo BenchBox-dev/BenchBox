@@ -17,15 +17,22 @@ from __future__ import annotations
 
 import inspect
 from datetime import date
+from decimal import Decimal
 
 import pytest
 
 from benchbox.core.equivalence.cross_surface import (
+    ORDER_UNORDERED,
+    ORDER_UNVERIFIABLE,
+    ORDER_VERIFIED,
     ClassifiedDivergence,
     CrossSurfaceGate,
     _apply_baseline_update,
     _bump_trailing_limit,
+    _derived_order_plan,
+    _derived_order_violation,
     _final_key_tied_beyond_limit,
+    _order_report_lines,
     _report,
     count_executed_cells,
     find_cross_surface_divergences,
@@ -1626,15 +1633,11 @@ _HIERARCHY_COLUMNS = [("total", "DECIMAL(17,2)"), ("category", "VARCHAR"), ("lev
 
 
 def test_derived_order_accepts_rows_in_case_key_order():
-    from benchbox.core.equivalence.cross_surface import _derived_order_violation
-
     rows = [(90.0, None, 2, 1), (60.0, "Music", 1, 1), (30.0, "Books", 1, 2), (20.0, "Books", 0, 1), (5.0, None, 0, 1)]
     assert _derived_order_violation(_HIERARCHY_SQL, _HIERARCHY_COLUMNS, rows) is None
 
 
 def test_derived_order_rejects_subtotals_sorted_by_category():
-    from benchbox.core.equivalence.cross_surface import _derived_order_violation
-
     rows = [(90.0, None, 2, 1), (30.0, "Books", 1, 2), (60.0, "Music", 1, 1), (20.0, "Books", 0, 1)]
     violation = _derived_order_violation(_HIERARCHY_SQL, _HIERARCHY_COLUMNS, rows)
     assert violation is not None
@@ -1642,8 +1645,6 @@ def test_derived_order_rejects_subtotals_sorted_by_category():
 
 
 def test_derived_order_allows_any_order_within_ties():
-    from benchbox.core.equivalence.cross_surface import _derived_order_violation
-
     sql = "SELECT a, b FROM t ORDER BY a - b"
     columns = [("a", "DOUBLE"), ("b", "DOUBLE")]
     assert _derived_order_violation(sql, columns, [(3.0, 2.0), (2.0, 1.0), (5.0, 1.0)]) is None
@@ -1651,17 +1652,15 @@ def test_derived_order_allows_any_order_within_ties():
 
 
 def test_derived_order_is_not_checked_when_a_key_is_not_in_the_result():
-    from benchbox.core.equivalence.cross_surface import _derived_order_violation
-
     sql = "SELECT a FROM t ORDER BY hidden"
     assert _derived_order_violation(sql, [("a", "INTEGER")], [(2,), (1,)]) is None
+    assert _plan_kind(sql, [("a", "INTEGER")]) == ORDER_UNVERIFIABLE
     qualified = "SELECT b AS a FROM t ORDER BY t.a + 0"
     assert _derived_order_violation(qualified, [("a", "INTEGER")], [(2,), (1,)]) is None
+    assert _plan_kind(qualified, [("a", "INTEGER")]) == ORDER_UNVERIFIABLE
 
 
 def test_derived_order_fails_closed_when_the_sort_keys_cannot_be_evaluated():
-    from benchbox.core.equivalence.cross_surface import _derived_order_violation
-
     sql = "SELECT a FROM t ORDER BY a / 2"
     violation = _derived_order_violation(sql, [("a", "VARCHAR")], [("x",), ("y",)])
     assert violation is not None
@@ -1686,8 +1685,182 @@ def test_report_lists_vacuity_without_failing_for_an_unclassified_draw(capsys):
     assert _report([SurfaceDivergence("Q2", "pandas", "value mismatch")], **arguments) == 1
 
 
-def test_derived_order_is_not_checked_for_order_by_all():
-    from benchbox.core.equivalence.cross_surface import _derived_order_violation
+def _plan_kind(sql, columns):
+    return _derived_order_plan(sql, lambda: columns).status.kind
 
-    sql = "SELECT a, b FROM t ORDER BY ALL DESC"
-    assert _derived_order_violation(sql, [("a", "INTEGER"), ("b", "INTEGER")], [(1, 2), (3, 4)]) is None
+
+def test_order_by_all_is_checked_over_every_output_column():
+    columns = [("a", "INTEGER"), ("b", "INTEGER")]
+    ascending = "SELECT a, b FROM t ORDER BY ALL"
+    assert _plan_kind(ascending, columns) == ORDER_VERIFIED
+    assert _derived_order_violation(ascending, columns, [(1, 2), (1, 3), (3, 4)]) is None
+    assert _derived_order_violation(ascending, columns, [(1, 3), (1, 2), (3, 4)]) is not None
+    descending = "SELECT a, b FROM t ORDER BY ALL DESC"
+    assert _derived_order_violation(descending, columns, [(3, 4), (1, 3), (1, 2)]) is None
+    assert _derived_order_violation(descending, columns, [(1, 2), (3, 4)]) is not None
+
+
+def test_order_by_all_honors_null_placement():
+    columns = [("a", "INTEGER")]
+    sql = "SELECT a FROM t ORDER BY ALL NULLS FIRST"
+    assert _derived_order_violation(sql, columns, [(None,), (1,), (2,)]) is None
+    assert _derived_order_violation(sql, columns, [(1,), (2,), (None,)]) is not None
+
+
+def test_qualified_sort_columns_resolve_to_the_matching_output_column():
+    columns = [("a", "INTEGER"), ("b", "INTEGER")]
+    sql = "SELECT t.a, t.b FROM t ORDER BY t.b DESC"
+    assert _plan_kind(sql, columns) == ORDER_VERIFIED
+    assert _derived_order_violation(sql, columns, [(2, 9), (1, 5)]) is None
+    assert _derived_order_violation(sql, columns, [(1, 5), (2, 9)]) is not None
+    assert _derived_order_violation("SELECT a, b FROM t ORDER BY t.b", columns, [(2, 9), (1, 5)]) is not None
+
+
+def test_qualified_sort_column_uses_the_qualifier_to_pick_among_same_named_outputs():
+    columns = [("a", "INTEGER"), ("a", "INTEGER")]
+    sql = "SELECT x.a, y.a FROM x JOIN y ON x.k = y.k ORDER BY y.a"
+    assert _plan_kind(sql, columns) == ORDER_VERIFIED
+    assert _derived_order_violation(sql, columns, [(9, 1), (1, 2)]) is None
+    assert _derived_order_violation(sql, columns, [(1, 2), (9, 1)]) is not None
+
+
+def test_qualified_sort_column_that_is_not_an_output_stays_unverifiable():
+    columns = [("a", "INTEGER")]
+    assert _plan_kind("SELECT y AS a FROM t ORDER BY t.a", columns) == ORDER_UNVERIFIABLE
+    assert _plan_kind("SELECT u.a FROM t JOIN u ON t.k = u.k ORDER BY t.a", columns) == ORDER_UNVERIFIABLE
+    assert _plan_kind("SELECT * FROM t ORDER BY t.a", columns) == ORDER_UNVERIFIABLE
+
+
+def test_qualified_sort_column_needs_the_lone_source_to_match():
+    columns = [("b", "INTEGER")]
+    assert _plan_kind("SELECT b FROM t ORDER BY t.b", columns) == ORDER_VERIFIED
+    assert _plan_kind("SELECT b FROM t AS x ORDER BY x.b", columns) == ORDER_VERIFIED
+    assert _plan_kind("SELECT b FROM t ORDER BY u.b", columns) == ORDER_UNVERIFIABLE
+    assert _plan_kind("SELECT b FROM t, u ORDER BY t.b", columns) == ORDER_UNVERIFIABLE
+
+
+def test_join_using_qualified_order_by_stays_unverifiable():
+    # An unqualified projection does not establish which relation supplies a
+    # qualified ORDER BY column: with t.a={1,2} and u.a={2}, the merged USING
+    # column orders [(2,), (1,)] while u.a alone would order [(1,), (2,)].
+    columns = [("a", "INTEGER")]
+    sql = "SELECT a FROM t LEFT JOIN u USING(a) ORDER BY u.a + 0"
+    assert _plan_kind(sql, columns) == ORDER_UNVERIFIABLE
+    assert _derived_order_violation(sql, columns, [(2,), (1,)]) is None
+
+
+def test_collated_output_columns_stay_unverifiable():
+    # The check table carries declared types but not output collations, so it
+    # would validate NOCASE orderings against binary sorting semantics.
+    assert _plan_kind("SELECT a COLLATE NOCASE AS x FROM t ORDER BY ALL", [("x", "VARCHAR")]) == ORDER_UNVERIFIABLE
+    assert _plan_kind("SELECT a COLLATE NOCASE AS x FROM t ORDER BY x", [("x", "VARCHAR")]) == ORDER_UNVERIFIABLE
+    assert _plan_kind("SELECT a FROM t ORDER BY ALL", [("a", "VARCHAR")]) == ORDER_UNVERIFIABLE
+    assert _plan_kind("SELECT a FROM t ORDER BY ALL", [("a", "INTEGER")]) == ORDER_VERIFIED
+
+
+def test_duplicate_output_names_are_checked_by_position_and_refused_by_name():
+    columns = [("a", "INTEGER"), ("a", "INTEGER")]
+    by_position = "SELECT x.a, y.a FROM x, y ORDER BY 2"
+    assert _plan_kind(by_position, columns) == ORDER_VERIFIED
+    assert _derived_order_violation(by_position, columns, [(5, 1), (4, 2)]) is None
+    assert _derived_order_violation(by_position, columns, [(5, 2), (4, 1)]) is not None
+    assert _plan_kind("SELECT x.a, y.a FROM x, y ORDER BY a", columns) == ORDER_UNVERIFIABLE
+
+
+def test_decimal_sort_keys_keep_exact_precision():
+    columns = [("amount", "DECIMAL(38,2)")]
+    sql = "SELECT amount FROM t ORDER BY amount"
+    low, high = Decimal("123456789012345678.01"), Decimal("123456789012345678.02")
+    assert float(low) == float(high)
+    assert _derived_order_violation(sql, columns, [(low,), (high,)]) is None
+    assert _derived_order_violation(sql, columns, [(high,), (low,)]) is not None
+    expression = "SELECT amount FROM t ORDER BY amount + 0"
+    assert _derived_order_violation(expression, columns, [(high,), (low,)]) is not None
+
+
+def test_a_mis_ordered_derived_key_fails_the_gate_cell():
+    sql = "SELECT a, b FROM t ORDER BY a - b"
+    reference = [(5, 1), (3, 2)]
+    connection = _FakeConnection(
+        {
+            sql: reference,
+            f"DESCRIBE {sql}": [("a", "INTEGER", "YES", None, None, None), ("b", "BIGINT", "YES", None, None, None)],
+        }
+    )
+    statuses = {}
+
+    def divergences_for(candidate):
+        return find_cross_surface_divergences(
+            connection,
+            query_ids=["Q1"],
+            reference_sql=lambda _qid: sql,
+            dataframe_query=lambda _qid: _FakeQuery({"expression": lambda ctx: _FakeFrame(candidate)}),
+            contexts={"expression": object()},
+            validator=ResultValidator(),
+            backends=("expression",),
+            order_statuses=statuses,
+        )
+
+    assert divergences_for([(3, 2), (5, 1)]) == []
+    assert statuses[("Q1", "expression")].kind == ORDER_VERIFIED
+    failing = divergences_for([(5, 1), (3, 2)])
+    assert [d.key for d in failing] == ["Q1_expression"]
+    assert "breaks the ORDER BY" in failing[0].detail
+
+
+def test_cells_are_recorded_as_verified_unordered_or_unverifiable():
+    def statuses_for(sql, describe):
+        rows = [(1, 2)]
+        connection = _FakeConnection({sql: rows, f"DESCRIBE {sql}": describe})
+        statuses = {}
+        find_cross_surface_divergences(
+            connection,
+            query_ids=["Q1"],
+            reference_sql=lambda _qid: sql,
+            dataframe_query=lambda _qid: _FakeQuery({"expression": lambda ctx: _FakeFrame(rows)}),
+            contexts={"expression": object()},
+            validator=ResultValidator(),
+            backends=("expression",),
+            order_statuses=statuses,
+        )
+        return statuses[("Q1", "expression")]
+
+    describe = [("a", "INTEGER", "YES", None, None, None), ("b", "INTEGER", "YES", None, None, None)]
+    assert statuses_for("SELECT a, b FROM t ORDER BY a", describe).kind == ORDER_VERIFIED
+    assert statuses_for("SELECT a, b FROM t", describe).kind == ORDER_UNORDERED
+    assert statuses_for("SELECT a, b FROM t ORDER BY hidden", describe).kind == ORDER_UNVERIFIABLE
+
+
+def test_order_report_counts_verified_and_unordered_cells():
+    from benchbox.core.equivalence.cross_surface import OrderStatus
+
+    statuses = {
+        ("Q1", "pandas"): OrderStatus(ORDER_VERIFIED),
+        ("Q1", "expression"): OrderStatus(ORDER_VERIFIED),
+        ("Q2", "pandas"): OrderStatus(ORDER_UNORDERED, "no ORDER BY"),
+        ("Q3", "pandas"): OrderStatus(ORDER_UNVERIFIABLE, "ORDER BY column hidden is not a unique output column"),
+    }
+    lines = _order_report_lines(statuses)
+    assert lines[0] == (
+        "  returned order: 2 of 4 cells verified, 2 compared unordered (1 without ORDER BY, 1 with an ORDER BY "
+        "that cannot be checked)"
+    )
+    assert lines[1:] == ["    unverifiable ORDER BY, query Q3: ORDER BY column hidden is not a unique output column"]
+    assert _order_report_lines({}) == []
+
+
+def test_report_prints_the_order_summary(capsys):
+    from benchbox.core.equivalence.cross_surface import OrderStatus
+
+    assert (
+        _report(
+            [],
+            1,
+            {"expression": 1},
+            {},
+            benchmark="fake",
+            order_statuses={("Q1", "expression"): OrderStatus(ORDER_VERIFIED)},
+        )
+        == 0
+    )
+    assert "returned order: 1 of 1 cells verified, 0 compared unordered" in capsys.readouterr().out

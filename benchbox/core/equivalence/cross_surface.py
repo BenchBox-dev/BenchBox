@@ -90,6 +90,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -364,85 +365,199 @@ def _order_by_result_key(sql: str) -> list[int] | None:
     return resolved
 
 
-def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows: list[tuple[Any, ...]]) -> str | None:
-    """Check returned row order against an ``ORDER BY`` that :func:`_order_by_result_key` cannot map.
+@dataclass(frozen=True)
+class OrderStatus:
+    kind: str
+    reason: str = ""
 
-    ``columns`` holds the query's output ``(name, type)`` pairs. Each ``ORDER BY``
-    term is rewritten over those output columns and evaluated on ``rows`` in a
-    separate DuckDB connection, using the query's own directions and NULL order.
-    The rows are in order when sorting them by those keys leaves the key sequence
-    unchanged, so rows that tie on every key may appear in any order. Returns a
-    description of the first out-of-order row, or ``None`` when the order holds or
-    cannot be checked: no ``ORDER BY``, an unparseable query, duplicate output
-    names, or a term that references a qualified or missing column. An error
-    while evaluating the sort keys over the returned rows is reported as a
-    violation, so the check fails closed instead of passing unverified.
+
+ORDER_VERIFIED = "verified"
+ORDER_UNORDERED = "unordered"
+ORDER_UNVERIFIABLE = "unverifiable"
+
+
+@dataclass(frozen=True)
+class _DerivedOrderPlan:
+    terms: tuple[tuple[str, str], ...] = ()
+    columns: tuple[tuple[str, str], ...] = ()
+    status: OrderStatus = OrderStatus(ORDER_UNORDERED, "no ORDER BY")
+
+
+def _projection_column(projection: Any) -> Any | None:
+    from sqlglot import exp
+
+    inner = projection.this if isinstance(projection, exp.Alias) else projection
+    return inner if isinstance(inner, exp.Column) and not isinstance(inner.this, exp.Star) else None
+
+
+def _lone_source_qualifier(tree: Any) -> str | None:
+    """Return the only relation an ORDER BY qualifier may name, if exactly one exists.
+
+    A qualified ORDER BY column may only be read from an unqualified projection
+    when the query draws from a single source and the qualifier names that
+    source (by table name or alias). With joins, an unqualified projection can
+    resolve to a different input than the qualifier names (for example the
+    merged column of a JOIN ... USING), so the binding stays unverifiable.
     """
-    import duckdb
+    from sqlglot import exp
+
+    from_node = tree.args.get("from")
+    if from_node is None:
+        from_node = tree.args.get("from_")
+    if from_node is None or tree.args.get("joins"):
+        return None
+    source = from_node.this
+    if source is None:
+        return None
+    if isinstance(source, exp.Table):
+        return source.alias_or_name.lower() or None
+    alias = source.args.get("alias")
+    return alias.alias_or_name.lower() if alias is not None else None
+
+
+def _resolve_output_column(
+    column: Any, names: Sequence[str], projections: Sequence[Any] | None, lone_qualifier: str | None
+) -> int | None:
+    name = column.name.lower()
+    if not column.table:
+        matches = [index for index, output in enumerate(names) if output == name]
+        return matches[0] if len(matches) == 1 else None
+    if projections is None or len(projections) != len(names):
+        return None
+    qualifier = column.table.lower()
+    candidates = []
+    for index, projection in enumerate(projections):
+        source = _projection_column(projection)
+        if source is None or source.name.lower() != name:
+            continue
+        if source.table:
+            if source.table.lower() != qualifier:
+                continue
+        elif lone_qualifier != qualifier:
+            # An unqualified projection does not establish which relation
+            # supplies a qualified ORDER BY column.
+            continue
+        candidates.append(index)
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _rewrite_order_term(
+    target: Any, names: Sequence[str], projections: Sequence[Any] | None, lone_qualifier: str | None
+) -> Any:
+    from sqlglot import exp
+
+    if isinstance(target, exp.Literal) and target.is_int:
+        ordinal = int(target.name)
+        if not 1 <= ordinal <= len(names):
+            return f"ORDER BY position {ordinal} is out of range"
+        return exp.column(f"__c{ordinal - 1}")
+    if target.find(exp.Subquery, exp.Select):
+        return "an ORDER BY term contains a subquery"
+    if not target.find(exp.Column):
+        return "an ORDER BY term has no column reference"
+    for column in list(target.find_all(exp.Column)):
+        position = _resolve_output_column(column, names, projections, lone_qualifier)
+        if position is None:
+            return f"ORDER BY column {column.sql(dialect='duckdb')} is not a unique output column"
+        replacement = exp.column(f"__c{position}")
+        if column is target:
+            target = replacement
+        else:
+            column.replace(replacement)
+    return target
+
+
+def _unverifiable(reason: str) -> _DerivedOrderPlan:
+    return _DerivedOrderPlan(status=OrderStatus(ORDER_UNVERIFIABLE, reason))
+
+
+def _derived_order_plan(sql: str, describe: Callable[[], Sequence[tuple[str, str]]]) -> _DerivedOrderPlan:
     import sqlglot
     from sqlglot import exp
 
-    if len(rows) < 2:
-        return None
     try:
         tree = sqlglot.parse_one(sql, read="duckdb")
     except Exception:  # noqa: BLE001 - an unparseable query is just "not checkable"
-        return None
+        return _unverifiable("the query does not parse")
     order = tree.args.get("order") if isinstance(tree, exp.Select) else None
+    if order is None:
+        return _DerivedOrderPlan()
+    if any(projection.find(exp.Collate) is not None for projection in tree.expressions):
+        # The check table carries declared types but not output collations, so
+        # it would validate against different sorting semantics.
+        return _unverifiable("an output column specifies a collation the order check cannot reproduce")
+    try:
+        columns = tuple(describe())
+    except Exception:  # noqa: BLE001 - an undescribable query is reported as unverifiable
+        columns = ()
+    if not columns:
+        return _unverifiable("the output columns cannot be described")
     names = [name.lower() for name, _ in columns]
-    if order is None or len(set(names)) != len(names):
-        return None
-    positions = {name: index for index, name in enumerate(names)}
+    projections = tree.expressions if not any(_is_star_projection(item) for item in tree.expressions) else None
+    lone_qualifier = _lone_source_qualifier(tree)
+
+    entries = []
+    for ordered in order.expressions:
+        target = ordered.this
+        if isinstance(target, exp.Var) and target.name.upper() == "ALL" and len(order.expressions) == 1:
+            if "all" in names:
+                return _unverifiable("ORDER BY ALL with an output column named all")
+            if any(_is_text_type(declared) for _, declared in columns):
+                # The check table carries declared types but not the effective
+                # output collation (which DESCRIBE does not report), so it
+                # would validate text orderings against binary sorting.
+                return _unverifiable("ORDER BY ALL over a text column cannot reproduce the output collation")
+            entries.extend((exp.column(f"__c{index}"), ordered, True) for index in range(len(names)))
+        else:
+            entries.append((target.copy(), ordered, False))
 
     terms = []
-    for index, ordered in enumerate(order.expressions):
-        target = ordered.this.copy()
-        if isinstance(target, exp.Literal) and target.is_int:
-            ordinal = int(target.name)
-            if not 1 <= ordinal <= len(names):
-                return None
-            target = exp.column(f"__c{ordinal - 1}")
-        else:
-            references = list(target.find_all(exp.Column))
-            if not references:
-                # A term with no column reference, such as DuckDB's ORDER BY ALL,
-                # cannot be evaluated over the returned columns.
-                return None
-            for column in references:
-                # A qualified reference names an input column, which SQL resolves
-                # before output names, so it cannot be read from the result.
-                position = None if column.table else positions.get(column.name.lower())
-                if position is None:
-                    return None
-                replacement = exp.column(f"__c{position}")
-                if column is target:
-                    target = replacement
-                else:
-                    column.replace(replacement)
+    for index, (target, ordered, resolved) in enumerate(entries):
+        if not resolved:
+            rewritten = _rewrite_order_term(target, names, projections, lone_qualifier)
+            if isinstance(rewritten, str):
+                return _unverifiable(rewritten)
+            target = rewritten
         key = ordered.copy()
         key.set("this", exp.column(f"__k{index}"))
         terms.append((target.sql(dialect="duckdb"), key.sql(dialect="duckdb")))
+    return _DerivedOrderPlan(tuple(terms), columns, OrderStatus(ORDER_VERIFIED))
 
-    def column_type(declared: str) -> str:
-        return "DOUBLE" if declared.upper().startswith(("DECIMAL", "NUMERIC", "FLOAT", "REAL")) else declared
+
+def _key_column_type(declared: str) -> str:
+    return "DOUBLE" if declared.upper().startswith(("FLOAT", "REAL")) else declared
+
+
+def _is_text_type(declared: str) -> bool:
+    return declared.upper().startswith(("VARCHAR", "CHAR", "BPCHAR", "TEXT"))
+
+
+def _plan_order_violation(plan: _DerivedOrderPlan, rows: list[tuple[Any, ...]]) -> str | None:
+    import duckdb
+
+    columns = plan.columns
+    if plan.status.kind != ORDER_VERIFIED or len(rows) < 2:
+        return None
 
     def cell(value: Any) -> Any:
         return None if isinstance(value, float) and value != value else value
 
     connection = duckdb.connect()
     try:
-        definitions = ", ".join(f"__c{index} {column_type(declared)}" for index, (_, declared) in enumerate(columns))
+        definitions = ", ".join(
+            f"__c{index} {_key_column_type(declared)}" for index, (_, declared) in enumerate(columns)
+        )
         connection.execute(f"CREATE TABLE candidate (__pos BIGINT, {definitions})")
         placeholders = ", ".join("?" for _ in range(len(columns) + 1))
         connection.executemany(
             f"INSERT INTO candidate VALUES ({placeholders})",
             [(position, *(cell(value) for value in row)) for position, row in enumerate(rows)],
         )
-        keys = ", ".join(f"{expression} AS __k{index}" for index, (expression, _) in enumerate(terms))
+        keys = ", ".join(f"{expression} AS __k{index}" for index, (expression, _) in enumerate(plan.terms))
         keyed = f"SELECT __pos, {keys} FROM candidate"
         returned = connection.execute(f"SELECT * EXCLUDE (__pos) FROM ({keyed}) ORDER BY __pos").fetchall()
         required = connection.execute(
-            f"SELECT * EXCLUDE (__pos) FROM ({keyed}) ORDER BY {', '.join(key for _, key in terms)}, __pos"
+            f"SELECT * EXCLUDE (__pos) FROM ({keyed}) ORDER BY {', '.join(key for _, key in plan.terms)}, __pos"
         ).fetchall()
     except duckdb.Error as exc:
         return f"the ORDER BY check could not evaluate the sort keys over the returned rows: {exc}"
@@ -452,6 +567,10 @@ def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows:
         if actual != expected:
             return f"returned row {position} breaks the ORDER BY: sort key {actual}, expected {expected}"
     return None
+
+
+def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows: list[tuple[Any, ...]]) -> str | None:
+    return _plan_order_violation(_derived_order_plan(sql, lambda: columns), rows)
 
 
 def _resolve_order_term(
@@ -587,6 +706,7 @@ def find_cross_surface_divergences(
     backends: tuple[str, ...] = DATAFRAME_BACKENDS,
     reference_row_counts: dict[Any, int] | None = None,
     all_null_references: set[Any] | None = None,
+    order_statuses: dict[tuple[Any, str], OrderStatus] | None = None,
 ) -> list[SurfaceDivergence]:
     """Compare each query's DataFrame surface to its own SQL surface on DuckDB.
 
@@ -620,6 +740,11 @@ def find_cross_surface_divergences(
             are still recorded as 0 rows above, and :func:`_report` lists them
             separately so a physical zero-row result and an all-NULL aggregate
             row are never conflated.
+        order_statuses: Optional mutable mapping populated with
+            ``(query_id, backend) -> OrderStatus`` for each compared cell:
+            whether the returned row order was verified, or the cell was compared
+            unordered because the query has no ``ORDER BY`` or its ``ORDER BY``
+            cannot be checked from the returned columns.
 
     Returns:
         One :class:`SurfaceDivergence` per query/backend cell whose DataFrame
@@ -675,21 +800,15 @@ def find_cross_surface_divergences(
         # catches a real unique-final-key value bug. Every backend of a query shares
         # the SAME reference, so the extra LIMIT n+1 query runs once, not per backend.
         probe_result: bool | None = None  # None = not yet computed (memo sentinel)
-        output_columns: list[tuple[str, str]] | None = None
+        derived_plan: _DerivedOrderPlan | None = None
 
-        def derived_order_violation(candidate: list[tuple[Any, ...]]) -> str | None:
-            # An ORDER BY that does not map to result columns (a CASE or arithmetic
-            # key, or an outer SELECT *) is checked by evaluating it over the
-            # candidate's own rows; the shared reference supplies the column names.
-            nonlocal output_columns
-            if order_by is not None:
-                return None
-            if output_columns is None:
-                try:
-                    output_columns = [(row[0], row[1]) for row in connection.execute(f"DESCRIBE {sql}").fetchall()]
-                except Exception:  # noqa: BLE001 - an undescribable query keeps the unordered comparison
-                    output_columns = []
-            return _derived_order_violation(sql, output_columns, candidate) if output_columns else None
+        def order_plan() -> _DerivedOrderPlan:
+            nonlocal derived_plan
+            if derived_plan is None:
+                derived_plan = _derived_order_plan(
+                    sql, lambda: [(row[0], row[1]) for row in connection.execute(f"DESCRIBE {sql}").fetchall()]
+                )
+            return derived_plan
 
         def final_key_tied(reference: list[tuple[Any, ...]]) -> bool:
             nonlocal probe_result
@@ -721,6 +840,11 @@ def find_cross_surface_divergences(
                 order_by: list[int] | None = order_by,
             ) -> None:
                 candidate = materialize_rows(impl(contexts[backend]))
+                plan = None if order_by is not None else order_plan()
+                if order_statuses is not None:
+                    order_statuses[(query_id, backend)] = (
+                        plan.status if plan is not None else OrderStatus(ORDER_VERIFIED)
+                    )
                 validator.validate_results_exact(
                     reference,
                     candidate,
@@ -731,7 +855,7 @@ def find_cross_surface_divergences(
                     order_by=order_by,
                     final_key_tied_beyond_limit=final_key_tied(reference),
                 )
-                violation = derived_order_violation(candidate)
+                violation = _plan_order_violation(plan, candidate) if plan is not None else None
                 if violation is not None:
                     raise ValidationError(f"Q{query_id}: {violation}")
 
@@ -2167,6 +2291,7 @@ def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False, repeats: 
         connection = data.connection
         reference_row_counts: dict[Any, int] = {}
         all_null_references: set[Any] = set()
+        order_statuses: dict[tuple[Any, str], OrderStatus] = {}
         try:
             if gate.name == "tpcds":
                 from benchbox.core.equivalence.builders.tpcds import validate_tpcds_gate_data
@@ -2191,6 +2316,7 @@ def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False, repeats: 
                 backends=gate.backends,
                 reference_row_counts=reference_row_counts,
                 all_null_references=all_null_references,
+                order_statuses=order_statuses,
             )
             repeat_runs = [divergences]
             for _ in range(repeats - 1):
@@ -2243,6 +2369,7 @@ def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False, repeats: 
         vacuous_cells=vacuous_cells_total,
         all_null_references=all_null_references,
         enforce_vacuity=gate.vacuity_classified,
+        order_statuses=order_statuses,
     )
     if flaky:
         _report_flaky(gate.name, flaky, repeats, enforced=enforced)
@@ -2280,6 +2407,27 @@ def _emit_report_lines(lines: list[str]) -> None:
         output.print(line, markup=False, highlight=False, soft_wrap=True)
 
 
+def _order_report_lines(order_statuses: dict[tuple[Any, str], OrderStatus]) -> list[str]:
+    if not order_statuses:
+        return []
+    kinds = Counter(status.kind for status in order_statuses.values())
+    unordered = kinds[ORDER_UNORDERED] + kinds[ORDER_UNVERIFIABLE]
+    lines = [
+        f"  returned order: {kinds[ORDER_VERIFIED]} of {len(order_statuses)} cells verified, {unordered} compared "
+        f"unordered ({kinds[ORDER_UNORDERED]} without ORDER BY, {kinds[ORDER_UNVERIFIABLE]} with an ORDER BY "
+        "that cannot be checked)"
+    ]
+    reasons = sorted(
+        {
+            (str(query_id), status.reason)
+            for (query_id, _), status in order_statuses.items()
+            if status.kind == ORDER_UNVERIFIABLE
+        }
+    )
+    lines.extend(f"    unverifiable ORDER BY, query {query_id}: {reason}" for query_id, reason in reasons)
+    return lines
+
+
 def _report(
     divergences: list[SurfaceDivergence],
     total: int,
@@ -2293,6 +2441,7 @@ def _report(
     vacuous_cells: int | None = None,
     all_null_references: set[Any] | None = None,
     enforce_vacuity: bool = True,
+    order_statuses: dict[tuple[Any, str], OrderStatus] | None = None,
 ) -> int:
     """Print a categorized divergence report and return the gate exit code.
 
@@ -2391,6 +2540,7 @@ def _report(
                 "  vacuity is classified for the default parameter draw only; this draw lists it without failing: "
                 f"{vacuous}"
             )
+    lines.extend(_order_report_lines(order_statuses or {}))
     _emit_report_lines([*lines, ""])
 
     by_class: dict[str, list[SurfaceDivergence]] = {}
