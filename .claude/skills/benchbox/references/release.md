@@ -19,10 +19,11 @@ Verify, do not assume; each failure has a recovery path in the guide:
 
 1. The latest release-canary run is green, <48h old, and its tested
    `develop` SHA is an ancestor of the intended release head.
-2. The intended release head is the fetched `origin/develop` commit. Once the
-   linked-worktree guard is deployed, cut from a clean linked worktree at that
-   exact commit. Until then, treat the missing guard as a blocker for agent
-   cuts. The required release PR checks must pass on the exact PR head before
+2. The cut runs in a clean linked worktree whose HEAD is the freshly fetched
+   `origin/develop` commit. `release-cut` enforces this and refuses the primary
+   clone, a checkout ahead of or behind that commit, a dirty tree, and a
+   `vX.Y.Z` branch or tag that already exists locally or on origin.
+3. The required release PR checks pass on the exact PR head before
    finalization.
 
 The three-stage UAT campaign is advisory under the current runbook. Missing,
@@ -33,13 +34,20 @@ and rollout on the trusted release base.
 ## Hard rules
 
 - `VERSION` is explicit on every target invocation; never guess it.
-- Use BenchBox's linked-worktree flow once deployed; do not cut from its
-  primary clone.
+- Cut and finalize from a linked worktree; both targets refuse the primary
+  clone.
 - Never bypass or ask to bypass `validate-base`,
   `release-required-result`, or the `release-only` ruleset.
-- A failed or interrupted cut is **resumable**; prefer resume
-  (`git checkout vX.Y.Z && make release-cut VERSION=X.Y.Z`) over
-  `release-cut-abort`. Abort only to start over deliberately.
+- A failed or interrupted cut is **resumable in place**: re-run `make
+  release-cut VERSION=X.Y.Z` from the same worktree, still on `vX.Y.Z`. Resume
+  is refused once the branch carries its release commit, once it exists on
+  origin, or once fetched `origin/develop` has moved past the starting commit.
+  In that last case the branch and its curated files are left intact; preserve
+  the authored changelog text before deciding to start over.
+  `release-cut-abort` discards only an uncommitted cut and refuses untracked
+  files.
+- `release-finalize` is resumable after an interrupted merge, tag creation, or
+  tag push: re-run the same command. Never retag or force-push.
 - Let `release-cut` remove dev-only paths. Do not run `git rm` by hand on the
   release branch. Route classification gaps through
   `scripts/check_release_curation.py` as the guide directs.
