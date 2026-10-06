@@ -1,9 +1,6 @@
 # External URLs that are known to be flaky, rate-limited, or login-gated.
 # Keep this list focused and prune entries when upstream stability improves.
 
-# Local examples in docs (not reachable in CI)
-http://localhost(:\d+)?/.*
-
 # TPC pages are frequently unavailable to automated checks
 http://www\.tpc\.org/.*
 https://www\.tpc\.org/.*
@@ -13,11 +10,6 @@ https://buttondown\.com/.*
 
 # Login-protected or interactive portals
 https://app\.motherduck\.com/.*
-https://cloud2\.influxdata\.com/.*
-https://api\.onehouse\.ai/.*
-
-# Package index endpoint can reject crawler requests
-https://pypi\.nvidia\.com/.*
 
 # ISO standards pages may block automated requests
 https://www\.iso\.org/standard/.*
@@ -68,11 +60,6 @@ https://benchbox\.dev/results/compare\?ids=[0-9a-f]{8},[0-9a-f]{8}$
 # (HTTP 403 with cf-mitigated: challenge); the link remains visible in the
 # rendered documentation.
 https://browser\.geekbench\.com/.*
-
-# BTS TranStats /ontime/ path returns 404 upstream (redirects to the
-# ErrPage; verified 2026-09-28). The FlightData reference link remains
-# visible in the rendered docs; re-check or replace when BTS restores it.
-https://www\.transtats\.bts\.gov/ontime/.*
 
 # Geekbench's public blog pages reject automated CI requests with HTTP 403;
 # the methodology links remain useful and visible in the rendered docs.
