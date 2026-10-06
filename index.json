@@ -20252,10 +20252,15 @@
       "title": "Throughput ignores validation_mode, query_subset and stream timeout settings, and silently raises 0 or 1 streams to 2"
     },
     "throughput-runner-shutdown-and-accounting-edges": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T19:23:54Z",
+        "generation": "fa3d2a0c3a4040ac8a4d9a3ef8678495",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Throughput runner: hung stream may block process exit; early-failure and timeout accounting edge cases"
     },
     "throughput-stream-count-wiring-defect": {
