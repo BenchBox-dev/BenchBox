@@ -228,7 +228,11 @@ class ClickHouseSetupMixin:
         database = connection_config.get("database", self.database)
 
         try:
-            self._ensure_server_database_exists(database, **connection_config)
+            # `database` is also a key of connection_config whenever the caller
+            # forwards the platform config, so drop it here to avoid passing
+            # the same argument positionally and by keyword.
+            admin_kwargs = {key: value for key, value in connection_config.items() if key != "database"}
+            self._ensure_server_database_exists(database, **admin_kwargs)
             client = ClickHouseClient(
                 **params,
                 database=database,

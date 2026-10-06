@@ -1183,6 +1183,11 @@ def instrument(adapter: Any, ledger: Ledger, outcome: Outcome) -> Callable[..., 
     original_handle = adapter.handle_existing_database
     depth = 0
 
+    # functools.wraps keeps signature introspection truthful through this
+    # closure: product code dispatches on create_connection's declared
+    # signature, and without __wrapped__ every adapter would look like
+    # (*args, **kwargs). Recorded calls and ledger behaviour are unchanged.
+    @functools.wraps(original_create)
     def create_connection(*args: Any, **kwargs: Any) -> Any:
         nonlocal depth
         depth += 1
