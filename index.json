@@ -14093,15 +14093,10 @@
       "title": "benchbox platforms list is unreadable at 80 columns: every informative column truncates to an ellipsis"
     },
     "platforms-without-deployment-modes-accept-local-decision-20261004": {
-      "claim": {
-        "expires_at": "2026-10-06T21:07:04Z",
-        "generation": "ecf58056cd7849b49dafb4698eb670a0",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "open",
       "title": "Decision: should cloud-only platforms such as Snowflake and Databricks accept a ':local' selector suffix?"
     },
     "polars-platform-adapter": {
