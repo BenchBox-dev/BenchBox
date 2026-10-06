@@ -11654,6 +11654,15 @@
       "status": "open",
       "title": "Run and publish first live corpus on ClickHouse Cloud (TPC-H SF 0.1/1/10)"
     },
+    "live-cloud-corpus-fabric-expansion-20261006": {
+      "claim": null,
+      "needs": [
+        "live-cloud-corpus-fabric-tpch-first-20261006"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Expand Fabric DW and Lakehouse corpus to remaining suites (industry, TPC-DS/DI, academic, real-world, variants, primitives)"
+    },
     "live-cloud-corpus-fabric-tpch-first-20261006": {
       "claim": null,
       "needs": [
