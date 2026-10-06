@@ -11590,10 +11590,15 @@
       "title": "Single CSV dialect source plus pandas NULL group keys"
     },
     "loader-empty-source-and-skip-flag-consistency-20261004": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T06:18:21Z",
+        "generation": "55d77f90899b4053b1c29f2b2d9e9768",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Data loading: empty-file-list sources, REQUIRED_LOADED_TABLES = None, and SKIP_DATA_LOADING read inconsistently"
     },
     "loader-fresh-manifest-invisible": {
