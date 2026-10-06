@@ -502,6 +502,11 @@ def _derived_order_plan(sql: str, describe: Callable[[], Sequence[tuple[str, str
         if isinstance(target, exp.Var) and target.name.upper() == "ALL" and len(order.expressions) == 1:
             if "all" in names:
                 return _unverifiable("ORDER BY ALL with an output column named all")
+            if any(_is_text_type(declared) for _, declared in columns):
+                # The check table carries declared types but not the effective
+                # output collation (which DESCRIBE does not report), so it
+                # would validate text orderings against binary sorting.
+                return _unverifiable("ORDER BY ALL over a text column cannot reproduce the output collation")
             entries.extend((exp.column(f"__c{index}"), ordered, True) for index in range(len(names)))
         else:
             entries.append((target.copy(), ordered, False))
@@ -521,6 +526,10 @@ def _derived_order_plan(sql: str, describe: Callable[[], Sequence[tuple[str, str
 
 def _key_column_type(declared: str) -> str:
     return "DOUBLE" if declared.upper().startswith(("FLOAT", "REAL")) else declared
+
+
+def _is_text_type(declared: str) -> bool:
+    return declared.upper().startswith(("VARCHAR", "CHAR", "BPCHAR", "TEXT"))
 
 
 def _plan_order_violation(plan: _DerivedOrderPlan, rows: list[tuple[Any, ...]]) -> str | None:

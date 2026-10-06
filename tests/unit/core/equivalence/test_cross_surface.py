@@ -1754,7 +1754,8 @@ def test_collated_output_columns_stay_unverifiable():
     # would validate NOCASE orderings against binary sorting semantics.
     assert _plan_kind("SELECT a COLLATE NOCASE AS x FROM t ORDER BY ALL", [("x", "VARCHAR")]) == ORDER_UNVERIFIABLE
     assert _plan_kind("SELECT a COLLATE NOCASE AS x FROM t ORDER BY x", [("x", "VARCHAR")]) == ORDER_UNVERIFIABLE
-    assert _plan_kind("SELECT a FROM t ORDER BY ALL", [("a", "VARCHAR")]) == ORDER_VERIFIED
+    assert _plan_kind("SELECT a FROM t ORDER BY ALL", [("a", "VARCHAR")]) == ORDER_UNVERIFIABLE
+    assert _plan_kind("SELECT a FROM t ORDER BY ALL", [("a", "INTEGER")]) == ORDER_VERIFIED
 
 
 def test_duplicate_output_names_are_checked_by_position_and_refused_by_name():
