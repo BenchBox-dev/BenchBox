@@ -3,7 +3,7 @@
     "Unit test with a fake client: the Cloud probe returns the database's real existence, and `force_recreate` issues the drop at the first connection.",
     "The contract test case for clickhouse-cloud asserts force_recreate acts at the first connection (it currently does not reach the probe)."
   ],
-  "context": "Source: independent review and author report of PR #2632 (2026-10-04). Related: tuning-no-midrun-destructive-db-handling-20261001.",
+  "context": "Implemented: ClickHouse Cloud setup sets send_receive_timeout (default 300); AttributeError no longer swallowed into no-database; clickhouse-cloud exemption removed from mid-run contract test; new probe test file (7 tests). PR #2693 (head 4df27c68056d) reviewed clean, attested, armed; state=MERGED at 2026-10-06T04:18:16Z, merge commit 12cfcdac5873. Verified: probe + contract suites green, ruff clean, pr-preflight green.",
   "description": "## Problem (observed by a reviewer and the contract-test author reading code and running fakes; not run against a real ClickHouse Cloud service)\n`check_server_database_exists` calls `_create_admin_client`, which reads `self.send_receive_timeout`. The ClickHouse Cloud adapter never sets that attribute, so the call raises `AttributeError`, which is swallowed and reported as \"no database\". Consequences: `--force-recreate` never recreates anything on ClickHouse Cloud, and a real drop would fail for the same reason.\n\n## Change\n- Set (or default) the timeout on the Cloud adapter, or have `_create_admin_client` not depend on it.\n- Do not swallow `AttributeError` into \"no database\": surface a real error.\n- Add the Cloud case to the mid-run contract test with a driver fake that exercises the probe.\n\n## Guardrails (must preserve)\n- No live cloud runs without explicit approval stating the command, maximum runtime, log path and stop condition.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
   "links": [
     "benchbox/platforms/clickhouse/",
@@ -25,6 +25,14 @@
       "generation": "f90a79f1b1a94ef683c4366eb2961511",
       "op": "take",
       "op_id": "3f87b18622f0469893926cf125ad51ee",
+      "session_id": "886444b9f5294b15856d1f4489297eb4"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680",
+      "at": "2026-10-06T04:21:03Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "c6ae5077974d4f83a9cb40a9f12d8c7f",
       "session_id": "886444b9f5294b15856d1f4489297eb4"
     }
   ]
