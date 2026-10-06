@@ -12727,10 +12727,15 @@
       "title": "`benchbox metrics qphh` derives scores for suppressed or failed runs using summed query time"
     },
     "midrun-contract-test-coverage-gaps-20261004": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T07:46:28Z",
+        "generation": "4a64474bd8794565bae4cdeb9af9e0c0",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Mid-run contract test: modes and adapters it does not drive, and observation gaps"
     },
     "migrate-adapters-not-listed-in-this-todo-that-already-use-da": {
