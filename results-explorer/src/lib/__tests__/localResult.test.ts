@@ -54,6 +54,19 @@ function bundle(overrides: Record<string, unknown> = {}) {
 }
 
 describe("local result import", () => {
+  it("does not borrow a composite QphH or QphDS value as the power score", async () => {
+    const legacy = bundle({
+      summary: {
+        queries: { total: 44, passed: 44, failed: 0 },
+        validation: "passed",
+        tpc_metrics: { qphh_at_size: 777, qphds_at_size: 888 },
+      },
+    });
+    const preview = await parseLocalResultText(JSON.stringify(legacy), "legacy.json");
+
+    expect(preview.detail.power_score).toBeNull();
+  });
+
   it("matches the publication transform for the canonical browser fixture", async () => {
     const fixturePath = resolve(
       import.meta.dirname,

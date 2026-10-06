@@ -36,6 +36,7 @@ def _documented(symbol: dict[str, str], names: set[str]) -> bool:
     return bool(candidates & names)
 
 
+@pytest.mark.skipif(not SYMBOLS.exists(), reason="_project site inventory is not in this checkout (release tree)")
 def test_every_public_symbol_has_an_authored_heading_or_anchor() -> None:
     names = _authored_names()
     inventory = json.loads(SYMBOLS.read_text(encoding="utf-8"))
@@ -52,6 +53,9 @@ def test_api_docs_lane_output_path_matches_the_workflow() -> None:
     assert "Sphinx build" not in reference
 
 
+@pytest.mark.skipif(
+    not SPIKE_REPORT.exists(), reason="_project decision records are not in this checkout (release tree)"
+)
 def test_documented_starlight_overrides_match_the_astro_config() -> None:
     config = ASTRO_CONFIG.read_text(encoding="utf-8")
     block = re.search(r"components:\s*\{(.*?)\}", config, re.DOTALL)
@@ -66,6 +70,7 @@ def test_documented_starlight_overrides_match_the_astro_config() -> None:
         "ThemeProvider",
         "ThemeSelect",
         "Sidebar",
+        "TwoColumnContent",
         "Search",
         "SocialIcons",
         "Hero",

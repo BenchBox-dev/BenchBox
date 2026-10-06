@@ -19,6 +19,14 @@ REGISTERED_GLOBALS: tuple[tuple[str, str, Any], ...] = (
     ("benchbox.utils.printing", "_QUIET", False),
     ("benchbox.utils.config_interface", "_config_provider", None),
 )
+# Environment values a third-party library sets once, at import, for the rest of
+# the process. Each entry is (variable, value, setting module). The change is
+# accepted only when the variable was unset, now holds exactly that value, and
+# the named module is loaded, so any other write to the variable still fails.
+LIBRARY_IMPORT_ENV: tuple[tuple[str, str, str], ...] = (
+    # snowflake.connector.options sets this the first time it is imported.
+    ("ARROW_DEFAULT_MEMORY_POOL", "system", "snowflake.connector.options"),
+)
 _BASELINE_KEY = pytest.StashKey[dict[str, Any]]()
 _LEAK_KEY = pytest.StashKey[list[str]]()
 
@@ -65,6 +73,9 @@ def detect_and_restore(baseline: dict[str, Any]) -> list[str]:
 
     env = dict(os.environ)
     old = baseline["env"]
+    for key, value, module in LIBRARY_IMPORT_ENV:
+        if key not in old and env.get(key) == value and module in sys.modules:
+            old[key] = value
     for key in sorted(set(old) | set(env)):
         if (key in old) != (key in env) or old.get(key) != env.get(key):
             problems.append(f"env[{key}]")

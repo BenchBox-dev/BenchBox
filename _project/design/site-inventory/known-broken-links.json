@@ -1,30 +1,5 @@
 [
  [
-  "(site chrome)",
-  "/blog.html",
-  "missing path"
- ],
- [
-  "/blog/2026-01-22-welcome.html",
-  "/usage/cli-quick-start.html",
-  "missing path"
- ],
- [
-  "/blog/2026-02-15-why-we-deleted-plotly.html",
-  "/reference/mcp.html",
-  "missing path"
- ],
- [
-  "/blog/2026-02-15-why-we-deleted-plotly.html",
-  "/reference/result-formats.html",
-  "missing path"
- ],
- [
-  "/blog/2026-02-15-why-we-deleted-plotly.html",
-  "/visualization/overview.html",
-  "missing path"
- ],
- [
   "/blog/atom.xml",
   "/blog/blog/2026-03-10-extracting-textcharts.html",
   "missing path"
@@ -80,113 +55,8 @@
   "missing fragment"
  ],
  [
-  "/docs/blog.html",
-  "/docs/blog/2026-01-22-welcome.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-02-15-v0-1-2-release-summary.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-02-15-why-we-deleted-plotly.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-02-23-v0-1-3-release-summary.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-03-03-duckdb-tpch-extension-vs-benchbox.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-03-03-v0-1-4-release-summary.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-03-10-extracting-textcharts.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-03-10-v0-1-5-release-summary.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-04-01-v0-2-0-release-summary.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-04-26-scale-factor-harmonization.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-04-26-v0-2-1-release-summary.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-05-18-joinorder-imdb-2013-dataset.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-05-18-sketch-functions-databricks-response.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-05-18-v0-3-0-release-overview.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-08-31-v0-4-0-release-overview.html",
-  "missing path"
- ],
- [
-  "/docs/blog.html",
-  "/docs/blog/2026-09-15-results-explorer-introduction.html",
-  "missing path"
- ],
- [
   "/docs/contributing-results.html",
   "/docs/operations/results-phase-2-runbook.html#13-explorer-publish-path",
-  "missing fragment"
- ],
- [
-  "/docs/development/adr/adr-sql-compat-phase-aware-pipeline.html",
-  "/docs/development/adr/adr-sql-compat-phase-aware-pipeline.html#../../../benchbox/sql_compat/",
-  "missing fragment"
- ],
- [
-  "/docs/development/adr/adr-sqlglot-use-and-non-use.html",
-  "/docs/development/adr/adr-sqlglot-use-and-non-use.html#../../../benchbox/sql_compat/",
-  "missing fragment"
- ],
- [
-  "/docs/development/adr/adr-sqlglot-use-and-non-use.html",
-  "/docs/development/adr/adr-sqlglot-use-and-non-use.html#../../../benchbox/sql_compat/rules/ddl_optimize/",
-  "missing fragment"
- ],
- [
-  "/docs/development/adr/adr-sqlglot-use-and-non-use.html",
-  "/docs/development/adr/adr-sqlglot-use-and-non-use.html#../../../benchbox/sql_compat/rules/query_source/",
-  "missing fragment"
- ],
- [
-  "/docs/features/query-plan-analysis.html",
-  "/docs/features/query-plan-analysis.html#../platforms/",
   "missing fragment"
  ],
  [
@@ -197,11 +67,6 @@
  [
   "/docs/platforms/comparison-matrix.html",
   "/docs/platforms/comparison-matrix.html#hybrid-platforms-sql--dataframe",
-  "missing fragment"
- ],
- [
-  "/docs/reference/api-reference.html",
-  "/docs/reference/api-reference.html#python-api",
   "missing fragment"
  ],
  [
@@ -267,51 +132,6 @@
  [
   "/docs/tutorials/dataframe-quickstart.html",
   "/docs/platforms/dataframe.html#tuning-system",
-  "missing fragment"
- ],
- [
-  "/docs/usage/examples-directory.html",
-  "/docs/usage/examples-directory.html#../../examples/config/",
-  "missing fragment"
- ],
- [
-  "/docs/usage/examples-directory.html",
-  "/docs/usage/examples-directory.html#../../examples/features/",
-  "missing fragment"
- ],
- [
-  "/docs/usage/examples-directory.html",
-  "/docs/usage/examples-directory.html#../../examples/getting_started/",
-  "missing fragment"
- ],
- [
-  "/docs/usage/examples-directory.html",
-  "/docs/usage/examples-directory.html#../../examples/notebooks/",
-  "missing fragment"
- ],
- [
-  "/docs/usage/examples-directory.html",
-  "/docs/usage/examples-directory.html#../../examples/use_cases/",
-  "missing fragment"
- ],
- [
-  "/docs/usage/examples.html",
-  "/docs/usage/examples.html#../../examples/features/",
-  "missing fragment"
- ],
- [
-  "/docs/usage/examples.html",
-  "/docs/usage/examples.html#../../examples/getting_started/",
-  "missing fragment"
- ],
- [
-  "/docs/usage/examples.html",
-  "/docs/usage/examples.html#../../examples/getting_started/cloud/",
-  "missing fragment"
- ],
- [
-  "/docs/usage/examples.html",
-  "/docs/usage/examples.html#../../examples/tunings/",
   "missing fragment"
  ],
  [

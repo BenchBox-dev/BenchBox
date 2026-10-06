@@ -154,6 +154,11 @@ merge-gating workflows. Each such step must name a local equivalent or carry
 a written reason in the test's `MERGE_GATE_EXEMPTIONS` table, so a new check
 step cannot become a silent CI-only failure.
 
+The `code-test` step that runs changed tests on the curated release tree has a
+local equivalent:
+`uv run -- python scripts/release_curation_dry_run.py --changed-since origin/develop`.
+With no arguments it runs the full fast selection on that tree.
+
 Bundled generator integrity has local equivalents. Run
 `uv run -- python scripts/bundled_binary_manifest.py` to check the shipped
 source tree. After `uv build --out-dir /tmp/benchbox-dist`, run

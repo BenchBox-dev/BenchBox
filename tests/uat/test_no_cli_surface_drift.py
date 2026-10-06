@@ -143,6 +143,11 @@ ALLOWED_INTERNAL_CLI_FILES = {
     # module. No @click decorator, option, or command signature lives here;
     # the surface snapshot stays empty so the guard below still holds.
     "benchbox/cli/run_platform_resolution.py",
+    # throughput-stream-count-unset: the saved-run store and its summary label
+    # accept an unset stream count (None) instead of assuming 1, so a saved
+    # run no longer records a count the user never chose. Plain functions with
+    # no click decorator; no command, option, or argument changed.
+    "benchbox/cli/preferences.py",
     "benchbox/cli/commands/benchmarks.py",
     "benchbox/cli/commands/config.py",
     "benchbox/cli/commands/download_answers.py",

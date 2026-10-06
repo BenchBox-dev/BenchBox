@@ -101,6 +101,13 @@ const sectionLinks = [
   description="Run your own benchmarks and compare database performance. 22 benchmarks (TPC-H/DS/DI, ClickBench, SSB, AI/ML, more). 50 platforms (DuckDB, Snowflake, Databricks, Polars, Onehouse, StarRocks, Doris, more). CLI, Python library, or MCP for AI assistants."
 >
   <div class="landing">
+    <section class="ticker" aria-label="Benchmarks BenchBox runs">
+      <div class="ticker__track">
+        <ul class="ticker__list">{tickerItems.map((item) => <li>{item}</li>)}</ul>
+        <ul class="ticker__list" aria-hidden="true">{tickerItems.map((item) => <li>{item}</li>)}</ul>
+      </div>
+    </section>
+
     <section id="overview" class="hero">
       <div class="container hero__inner">
         <Logo class="hero__logo" label="BenchBox" />
@@ -122,9 +129,9 @@ const sectionLinks = [
               </a>
             </div>
             <div class="pills">
-              <a class="pill" href="https://github.com/BenchBox-dev/benchbox/releases" target="_blank" rel="noopener">v0.4.1</a>
-              <a class="pill" href="/docs/usage/installation.html">Python 3.11+</a>
-              <a class="pill" href="/docs/usage/installation.html#no-docker-required">No Docker Required</a>
+              <a class="soft-pill" href="https://github.com/BenchBox-dev/benchbox/releases" target="_blank" rel="noopener">v0.4.1</a>
+              <a class="soft-pill" href="/docs/usage/installation.html">Python 3.11+</a>
+              <a class="soft-pill" href="/docs/usage/installation.html#no-docker-required">No Docker Required</a>
             </div>
           </div>
           <div class="code-block">
@@ -135,13 +142,6 @@ const sectionLinks = [
             <CodeBlock id="hero-code" lang="bash" code={heroCode} />
           </div>
         </div>
-      </div>
-    </section>
-
-    <section class="ticker" aria-label="Benchmarks BenchBox runs">
-      <div class="ticker__track">
-        <ul class="ticker__list">{tickerItems.map((item) => <li>{item}</li>)}</ul>
-        <ul class="ticker__list" aria-hidden="true">{tickerItems.map((item) => <li>{item}</li>)}</ul>
       </div>
     </section>
 

@@ -151,9 +151,11 @@ describe("shell sources", () => {
     expect(read("src/components/SiteFooter.astro")).toContain("data-pagefind-ignore");
   });
 
-  it("keeps the theme control in the footer and out of the header", () => {
-    expect(read("src/components/SiteHeader.astro")).not.toContain("ThemeToggle");
-    expect(read("src/components/SiteFooter.astro")).toContain("<ThemeToggle />");
+  it("puts the theme control beside search in the header and out of the footer", () => {
+    const header = read("src/components/SiteHeader.astro");
+    expect(header.indexOf("<SearchBox />")).toBeLessThan(header.indexOf("<ThemeToggle />"));
+    expect(header.indexOf("<ThemeToggle />")).toBeGreaterThan(header.indexOf("</nav>"));
+    expect(read("src/components/SiteFooter.astro")).not.toContain("ThemeToggle");
   });
 
   it("keeps the nav toggle before the panel it controls", () => {

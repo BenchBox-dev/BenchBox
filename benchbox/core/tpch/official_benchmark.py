@@ -2,7 +2,7 @@
 
 This module provides the official TPC-H benchmark implementation that follows
 the TPC-H specification exactly, including all three test phases (Power Test,
-Throughput Test, and Maintenance Test) and the official QphH@Size calculation.
+Throughput Test, and Maintenance Test) with Power@Size and Throughput@Size.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -12,7 +12,6 @@ This implementation is based on the TPC-H specification.
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
-import math
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -55,7 +54,6 @@ class TPCHOfficialBenchmarkResult:
     maintenance_test_result: Optional[TPCHMaintenanceTestResult]
     power_at_size: float
     throughput_at_size: float
-    qphh_at_size: float
     success: bool
     errors: list[str]
     compliance_validated: bool = False
@@ -104,14 +102,15 @@ class TPCHOfficialBenchmark:
         """Run the complete TPC-H Official Benchmark.
 
         This method executes all three phases of the TPC-H benchmark according
-        to the official specification and calculates the QphH@Size metric.
+        to the official specification and reports Power@Size and Throughput@Size.
+        The composite QphH@Size is not computed because the refresh functions are not run.
 
         Args:
             connection_factory: Factory function to create database connections
             config: Optional benchmark configuration (uses default if not provided)
 
         Returns:
-            Complete benchmark results with QphH@Size metric
+            Complete benchmark results
 
         Raises:
             RuntimeError: If benchmark execution fails
@@ -132,7 +131,6 @@ class TPCHOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphh_at_size=0.0,
             success=True,
             errors=[],
         )
@@ -181,10 +179,6 @@ class TPCHOfficialBenchmark:
                     result.errors.append(f"Maintenance Test failed: {e}")
                     result.success = False
 
-            # Calculate QphH@Size (geometric mean)
-            if result.power_at_size > 0 and result.throughput_at_size > 0:
-                result.qphh_at_size = math.sqrt(result.power_at_size * result.throughput_at_size)
-
             result.total_time = elapsed_seconds(benchmark_start)
             result.end_time = datetime.now().isoformat()
 
@@ -213,9 +207,6 @@ class TPCHOfficialBenchmark:
         if result.power_at_size <= 0 or result.throughput_at_size <= 0:
             return False
 
-        if result.qphh_at_size <= 0:
-            return False
-
         # Additional specification compliance checks would go here
         return True
 
@@ -237,7 +228,5 @@ class TPCHOfficialBenchmark:
             result=result,
             benchmark_title="TPC-H",
             benchmark_slug="tpch",
-            qph_label="QphH@Size",
-            qph_attr="qphh_at_size",
             output_file=output_file,
         )

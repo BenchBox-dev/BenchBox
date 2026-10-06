@@ -33,6 +33,20 @@ default matches.
 | `query_results` | `list[dict]` (default `[]`) | `list[dict]` (default `[]`) | **shared** |
 | `success` | `bool` (default `True`) | `bool` (default `True`) | **shared** |
 | `error` | `Optional[str]` (default `None`) | `Optional[str]` (default `None`) | **shared** |
+| `start_wall_time` | `str` (default `""`) | `str` (default `""`) | **shared** |
+| `end_wall_time` | `str` (default `""`) | `str` (default `""`) | **shared** |
+
+`start_time`, `end_time` and `duration` are monotonic readings used only for
+durations. `start_wall_time` and `end_wall_time` are ISO-8601 wall-clock
+event times and are the only stream timestamps exported to result bundles.
+
+**Timing window.** A stream's window starts after its connection is open and
+ends before the connection is closed, so connection setup (connect, session
+settings, benchmark configuration) and teardown are not part of Total Test
+Time. The TPC specifications measure the interval from the first query of
+the first stream to the completion of the last query of the last stream.
+After `compute_metrics()` the throughput phase `start_time`, `end_time` and
+`duration_ms` all describe that same interval.
 
 **Outcome:** `ThroughputStreamResult` in `core.throughput.result` replaces
 both. The existing names become aliases in their respective modules for
@@ -203,6 +217,29 @@ unaffected.
 
 ---
 
+## Throughput Run Options
+
+The TPC-H and TPC-DS throughput drivers in `benchbox/platforms/base/execution.py`
+build their config from the run config through one helper, so both families
+honor the same options:
+
+- `validation_mode`: `disabled`/`skip` turns row-count validation off for TPC-H
+  streams (TPC-DS already carried the mode on its stream connections).
+- `query_subset`: each stream runs its own permutation filtered to the subset;
+  unknown query ids fail the run with a clear error. A subset run is not
+  TPC-compliant, so it reports no Throughput@Size (the run itself still
+  succeeds and reports query throughput).
+- `stream_timeout_seconds` (0 disables the deadline) and `cancel_on_timeout`:
+  carried from `RunConfig`, which reads them from `BenchmarkConfig.options`.
+  `benchbox run` fills both from `execution.concurrent_queries` in the config
+  file; an unset timeout keeps the benchmark default.
+- Stream counts: `BenchmarkConfig.concurrency` and `RunConfig.concurrent_streams`
+  default to `None` (not set), and an unset count runs the 2-stream default. An
+  explicit count below 2 is rejected whenever throughput will run: in the
+  config models, in `run --streams`, `run-official --streams`, the interactive
+  wizard, quick-restart replay, and the adapter driver. Saved runs that
+  recorded `1` (the former default) are read as not set.
+
 ## Non-Blocking Executor Shutdown (`throughput-executor-nonblocking-shutdown`, 2026-07)
 
 `throughput-timeout-leak-and-success-gates` (above) fixed timeout
@@ -246,6 +283,28 @@ the time the `as_completed()`/fallback loop finishes, so
 cancel — it is a no-op compared to the old `shutdown(wait=True)`. Only the
 hung-stream shutdown path changes; default timeout behavior for healthy
 runs is unaffected.
+
+### Interpreter exit (`DaemonStreamExecutor`)
+
+`ThreadPoolExecutor` registers an interpreter-exit hook that joins every
+worker thread, even after `shutdown(wait=False)`. A stream stuck in a
+database call therefore kept the process alive at exit until the call
+returned: a probe with two hung streams and a 1 s timeout returned from
+`execute()` after 1 s but took about 9 s to exit, against 0.85 s with
+healthy streams.
+
+`StreamRunner.execute()` now runs streams on `DaemonStreamExecutor`
+(`benchbox/core/throughput/executor.py`). Its workers are daemon threads and
+it hands out standard `Future` objects, so `await_quiescence()` and the
+phase-boundary gate are unchanged, while an abandoned stream can no longer
+block process exit.
+
+Settlement at the deadline is also race-free. Each unfinished future goes
+through one atomic `cancel()`: success proves the stream never started (it is
+listed in `cancelled_stream_ids` and not counted in `streams_executed`);
+failure means the stream is finished (recorded normally) or still running
+(listed in `outstanding_stream_ids`). If submission itself fails, the same
+settlement runs before the original error propagates.
 
 ### Zombie connection ownership
 

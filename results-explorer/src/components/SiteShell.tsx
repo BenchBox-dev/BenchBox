@@ -130,6 +130,9 @@ export function SiteHeader({ pathname, testId }: SiteHeaderProps) {
             </a>
           </nav>
         </div>
+        <div class="site-header__tools">
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );
@@ -160,7 +163,6 @@ export function SiteFooter({ pathname, children }: SiteFooterProps) {
             </a>
           ))}
         </nav>
-        <ThemeToggle />
       </div>
     </footer>
   );

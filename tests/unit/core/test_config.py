@@ -78,7 +78,7 @@ class TestBenchmarkConfig:
         assert config.name == "tpch"
         assert config.display_name == "TPC-H Benchmark"
         assert config.scale_factor == 0.01
-        assert config.concurrency == 1
+        assert config.concurrency is None
         assert config.compress_data is False
         assert config.test_execution_type == "standard"
         assert config.options == {}
@@ -161,7 +161,7 @@ class TestRunConfig:
         config = RunConfig()
 
         assert config.query_subset is None
-        assert config.concurrent_streams == 1
+        assert config.concurrent_streams is None
         assert config.test_execution_type == "standard"
         assert config.scale_factor == 0.01
         assert config.seed is None

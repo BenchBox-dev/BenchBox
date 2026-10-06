@@ -462,7 +462,7 @@ class DryRunDisplay:
         benchmark_config = result.benchmark_config
         table.add_row("Benchmark", "Name", str(benchmark_config.get("name", "N/A")))
         table.add_row("", "Scale Factor", str(benchmark_config.get("scale_factor", "N/A")))
-        table.add_row("", "Concurrency", str(benchmark_config.get("concurrency", 1)))
+        table.add_row("", "Concurrency", str(benchmark_config.get("concurrency") or "default"))
 
         database_config = result.database_config
         table.add_row("Database", "Type", str(database_config.get("type", "N/A")))

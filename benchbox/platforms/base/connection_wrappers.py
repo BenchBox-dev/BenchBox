@@ -191,17 +191,15 @@ def resolve_stream_connection_capability(adapter: Any) -> tuple[StreamConnection
     from benchbox.platforms.base.adapter import PlatformAdapter
 
     cls = adapter if isinstance(adapter, type) else type(adapter)
-    for entry in PLATFORM_MANIFEST:
-        spec = entry.adapter
-        if (
-            spec is not None
-            and spec.class_name == cls.__name__
-            and (cls.__module__ == spec.module or cls.__module__.startswith(f"{spec.module}."))
-        ):
-            return StreamConnectionCapability(spec.stream_connection_capability), True
+    manifest_entries = [entry.adapter for entry in PLATFORM_MANIFEST if entry.adapter is not None]
     for klass in cls.__mro__:
         if klass is PlatformAdapter:
             break
+        for spec in manifest_entries:
+            if spec.class_name == klass.__name__ and (
+                klass.__module__ == spec.module or klass.__module__.startswith(f"{spec.module}.")
+            ):
+                return StreamConnectionCapability(spec.stream_connection_capability), True
         if "stream_connection_capability" in klass.__dict__:
             value = klass.__dict__["stream_connection_capability"]
             if not isinstance(value, StreamConnectionCapability):
@@ -215,7 +213,7 @@ def resolve_stream_connection_capability(adapter: Any) -> tuple[StreamConnection
 
 
 def require_throughput_stream_capability(
-    adapter: Any, *, platform_name: str, connection: Any = None
+    adapter: Any, *, platform_name: str | None = None, connection: Any = None
 ) -> StreamConnectionCapability:
     """Fail closed before stream submission when the session model is unsafe.
 
@@ -241,12 +239,19 @@ def require_throughput_stream_capability(
     """
     from benchbox.platforms.base.adapter import PlatformAdapter
 
+    if platform_name is None:
+        adapter_name = getattr(adapter, "platform_name", None)
+        platform_name = (
+            adapter_name
+            if isinstance(adapter_name, str)
+            else getattr(adapter, "__name__", None) or type(adapter).__name__
+        )
     capability, declared = resolve_stream_connection_capability(adapter)
     if not declared:
         raise RuntimeError(
             f"Platform '{platform_name}' has no explicit stream_connection_capability declaration. "
-            "Throughput is refused before stream submission; declare SHARED_CURSOR only after "
-            "reviewing the driver's concurrent-session guarantees, or declare "
+            "Throughput is refused before stream submission; set SHARED_CURSOR in the platform manifest "
+            "only after reviewing the driver's concurrent-session guarantees, or set "
             "INDEPENDENT_CONNECTION/UNSUPPORTED as appropriate."
         )
     if capability is StreamConnectionCapability.UNSUPPORTED:
@@ -255,13 +260,14 @@ def require_throughput_stream_capability(
             "this engine cannot provide concurrent throughput streams with isolated sessions. "
             "Throughput is refused before stream submission instead of silently sharing one "
             "connection across streams. To support throughput, implement per-stream sessions via "
-            "PlatformAdapter.new_stream_connection() and declare INDEPENDENT_CONNECTION (see "
-            "StreamConnectionCapability equivalence dimensions); to keep throughput unavailable, "
-            "leave this declaration in place and run power/single-stream tests instead."
+            "PlatformAdapter.new_stream_connection() and set INDEPENDENT_CONNECTION in the platform "
+            "manifest (see StreamConnectionCapability equivalence dimensions); to keep throughput "
+            "unavailable, leave this declaration in place and run power/single-stream tests instead."
         )
     if capability is StreamConnectionCapability.INDEPENDENT_CONNECTION:
         # Unoverridden access resolves to the identical base function object.
-        if type(adapter).new_stream_connection is PlatformAdapter.new_stream_connection:
+        adapter_cls = adapter if isinstance(adapter, type) else type(adapter)
+        if adapter_cls.new_stream_connection is PlatformAdapter.new_stream_connection:
             raise RuntimeError(
                 f"Platform '{platform_name}' declares stream_connection_capability="
                 "INDEPENDENT_CONNECTION but does not override new_stream_connection() to open an "

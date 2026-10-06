@@ -26,12 +26,11 @@ from typing import TYPE_CHECKING, Any
 import yaml
 
 from benchbox.core.cost.models import normalized_cost_allows_direct_total
-from benchbox.core.results.builder import normalize_benchmark_id
 from benchbox.core.results.environment import (
     build_environment_payload,
     build_platform_metadata_payload,
 )
-from benchbox.core.results.metrics import percentile_ms
+from benchbox.core.results.metrics import UNOFFICIAL_COMPLIANCE_CLASSES, percentile_ms
 from benchbox.core.results.platform_options import sanitize_platform_options
 from benchbox.core.results.query_execution import (
     QueryExecutionContractError,
@@ -955,6 +954,17 @@ def _post_load_maintenance_phase_payload(setup: Any) -> dict[str, Any]:
     }
 
 
+_VALIDATION_SEVERITY = {"PASSED": 0, "PARTIAL": 1, "FAILED": 2}
+
+
+def _validation_phase_status(row_count_status: str | None, overall_status: str | None) -> str | None:
+    row_count = (row_count_status or "").upper()
+    overall = (overall_status or "").upper()
+    if row_count in _VALIDATION_SEVERITY and _VALIDATION_SEVERITY.get(overall, -1) > _VALIDATION_SEVERITY[row_count]:
+        return overall
+    return row_count_status
+
+
 def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
     phases: dict[str, Any] = {}
     standard = [
@@ -985,7 +995,7 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
             }
         if setup.validation:
             phases["validation"] = {
-                "status": setup.validation.row_count_validation,
+                "status": _validation_phase_status(setup.validation.row_count_validation, result.validation_status),
                 "duration_ms": setup.validation.duration_ms,
             }
         # Opt-in statistics phase (omit when not run). stats_mode records where
@@ -1661,8 +1671,7 @@ def _build_tpc_metrics(result: BenchmarkResults) -> dict[str, Any] | None:
     """Build TPC metrics block if available."""
     # Official TPC composite metrics are suppressed for unofficial compliance classes
     compliance_class = getattr(result, "compliance_class", None)
-    _unofficial_classes = {"unofficial_nonstandard", "unofficial_subscale"}
-    if compliance_class in _unofficial_classes:
+    if compliance_class in UNOFFICIAL_COMPLIANCE_CLASSES:
         return {"suppressed": True, "reason": f"compliance_class={compliance_class}"}
 
     metrics: dict[str, Any] = {}
@@ -1671,13 +1680,6 @@ def _build_tpc_metrics(result: BenchmarkResults) -> dict[str, Any] | None:
         metrics["power_at_size"] = result.power_at_size
     if result.throughput_at_size is not None:
         metrics["throughput_at_size"] = result.throughput_at_size
-    if result.qph_at_size is not None:
-        # Output with benchmark-specific key name based on benchmark_name
-        benchmark_id = normalize_benchmark_id(result.benchmark_name or "")
-        if benchmark_id == "tpcds":
-            metrics["qphds_at_size"] = result.qph_at_size
-        else:
-            metrics["qphh_at_size"] = result.qph_at_size
     # Note: geometric_mean_ms is in summary.timing (computed from query times),
     # not here. TPC metrics block contains only TPC-specific metrics.
 

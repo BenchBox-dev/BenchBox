@@ -90,7 +90,7 @@ Flexible container for benchmark-specific metrics:
   or other custom extras attached during result construction).
 - `performance_summary`: aggregated figures from platform adapters.
 - `performance_characteristics`: optional qualitative metrics.
-- `tpc`: standard TPC metrics such as `power_at_size`, `throughput_at_size`, `qphh_at_size`, and `geometric_mean_ms`.
+- `tpc`: standard TPC metrics such as `power_at_size`, `throughput_at_size`, and `geometric_mean_ms`. Exports no longer carry `qphh_at_size` or `qphds_at_size`; older bundles may still contain them and the loader still reads them.
 
 ## Export Block
 

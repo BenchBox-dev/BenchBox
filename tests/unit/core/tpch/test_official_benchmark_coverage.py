@@ -48,7 +48,7 @@ def test_run_official_benchmark_success(monkeypatch, tmp_path):
     assert result.success is True
     assert result.power_at_size == 100.0
     assert result.throughput_at_size == 64.0
-    assert result.qphh_at_size == pytest.approx(80.0)
+    assert not hasattr(result, "qphh_at_size")
 
 
 def test_run_official_benchmark_collects_phase_errors(monkeypatch, tmp_path):
@@ -84,7 +84,6 @@ def test_validate_compliance_checks():
         maintenance_test_result=None,
         power_at_size=10.0,
         throughput_at_size=20.0,
-        qphh_at_size=14.0,
         success=True,
         errors=[],
     )
@@ -111,7 +110,6 @@ def test_generate_audit_trail_writes_file(monkeypatch, tmp_path):
         maintenance_test_result=None,
         power_at_size=10.0,
         throughput_at_size=20.0,
-        qphh_at_size=14.1,
         success=True,
         errors=[],
     )
@@ -121,4 +119,5 @@ def test_generate_audit_trail_writes_file(monkeypatch, tmp_path):
     assert path.exists()
     content = path.read_text()
     assert "TPC-H Official Benchmark Audit Trail" in content
-    assert "QphH@Size" in content
+    assert "QphH" not in content
+    assert "Power@Size: 10.00" in content
