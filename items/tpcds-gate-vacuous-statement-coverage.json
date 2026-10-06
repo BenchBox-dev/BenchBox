@@ -30,6 +30,15 @@
       "op": "update",
       "op_id": "0fab1e2f85844906bcf7909d66b78785",
       "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T14:11:52Z",
+      "client": "tbh",
+      "generation": "c762d6b712b04226956c3392575e604f",
+      "op": "finish",
+      "op_id": "2950012d35164e33a11bf1dfd838d92f",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
     }
   ]
 }
