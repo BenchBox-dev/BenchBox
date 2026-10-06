@@ -21623,13 +21623,18 @@
       "title": "Post-load schema introspection receipts: upgrade applied_unverified to applied_verified"
     },
     "tuning-layout-op-skip-vs-fail-20261001": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T18:33:14Z",
+        "generation": "e6e8c41126ca40ea9023b5149eeb7b13",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:5ebb7e36c1d093f7e3b10f70"
+      },
       "needs": [
         "tuning-gate-ledger-outcome-vocabulary-20261001",
         "tuning-trust-paths-soundness-manifest-20261001"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Fold skipped layout ops as dropped intents (not failures) and enforce the ledger phase vocabulary"
     },
     "tuning-ledger-capture-non-dbapi-drivers-20261001": {
