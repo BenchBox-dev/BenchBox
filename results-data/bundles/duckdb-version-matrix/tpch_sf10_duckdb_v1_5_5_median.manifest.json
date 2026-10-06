@@ -5,5 +5,8 @@
   "funding": "unspecified",
   "manifest_version": "1.0",
   "result_source": "internal",
-  "submitted_by": "maintainer"
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
 }
