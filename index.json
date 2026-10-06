@@ -18811,11 +18811,9 @@
     },
     "site-parity-prune-stale-allowances": {
       "claim": null,
-      "needs": [
-        "astro-site-53-cutover"
-      ],
+      "needs": [],
       "priority": "low",
-      "status": "blocked",
+      "status": "open",
       "title": "Prune the 36 site-parity allowances for broken links that now resolve"
     },
     "skill-integrity-ci-lane-live-validation": {
