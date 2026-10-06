@@ -12852,15 +12852,10 @@
       "title": "Create metrics command group and consolidate calculate-qphh"
     },
     "metrics-qphh-cli-rederives-withheld-metrics": {
-      "claim": {
-        "expires_at": "2026-10-07T19:19:18Z",
-        "generation": "aa12b667a7ae4f9299ef714865eda161",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "`benchbox metrics qphh` derives scores for suppressed or failed runs using summed query time"
     },
     "midrun-contract-test-coverage-gaps-20261004": {
