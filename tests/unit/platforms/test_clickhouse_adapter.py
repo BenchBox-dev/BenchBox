@@ -454,7 +454,6 @@ class TestClickHouseAdapter:
         just a string BenchBox believes is valid.
         """
         from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
-        from benchbox.core.tpcds.schema.registry import get_tunings
         from benchbox.core.tuning.interface import TableTuning, TuningColumn
 
         adapter = ClickHouseAdapter(deployment_mode="local", strict_validation=False, data_path=str(tmp_path))
@@ -496,13 +495,29 @@ class TestClickHouseAdapter:
         count_rows = connection.execute("SELECT count(*) FROM lineitem").fetchall()
         assert count_rows[0][0] == 2
 
-        # Execute the complete tuned TPC-DS schema. This catches both key
-        # nullability and case drift: tuning templates use uppercase names,
-        # while the benchmark emits lowercase, case-sensitive ClickHouse DDL.
+        # Execute the complete TPC-DS schema with the curated ClickHouse
+        # template. This catches case drift: tuning templates use uppercase
+        # names, while the benchmark emits lowercase, case-sensitive
+        # ClickHouse DDL. The curated template sorts only on NOT NULL
+        # columns, so the nullable-key rule never trips here; the legacy
+        # registry tunings (which sort on nullable columns) are rejected by
+        # design -- see the pinned rejection set in
+        # tests/unit/platforms/test_clickhouse_nullable_keys.py.
+        import yaml
+
+        from benchbox.core.tuning.packaged_templates import packaged_template_path
+
         benchmark = TPCDSBenchmark(scale_factor=0.01, output_dir=tmp_path / "tpcds")
         nullable_by_table = adapter._get_nullable_columns_by_table(benchmark)
-        tpcds_tunings = get_tunings().table_tunings
+        template_path = packaged_template_path("clickhouse", "tpcds")
+        assert template_path.exists(), f"missing curated template: {template_path}"
+        payload = yaml.safe_load(template_path.read_text(encoding="utf-8")) or {}
+        tpcds_tunings = {
+            name: TableTuning.from_dict(entry) for name, entry in (payload.get("table_tunings") or {}).items()
+        }
+        assert tpcds_tunings, f"curated template carries no table tunings: {template_path}"
         created_tables: list[str] = []
+        tuned_tables: list[str] = []
         statements = [
             statement.strip()
             for statement in benchmark.get_create_tables_sql(dialect="duckdb").split(";")
@@ -521,10 +536,15 @@ class TestClickHouseAdapter:
             )
             for key_column in key_columns:
                 assert f"{key_column} Nullable(" not in rendered
+            if tuning_clauses is not None:
+                tuned_tables.append(table_name)
             connection.execute(rendered)
             created_tables.append(table_name)
 
         assert len([table for table in created_tables if table != "dbgen_version"]) == 24
+        assert len(tuned_tables) == len(tpcds_tunings), (
+            f"every curated template table must render tuned DDL, got tuned={sorted(tuned_tables)}"
+        )
 
     def test_get_database_path_server_mode(self):
         """Test database path generation in server mode returns None."""
@@ -677,13 +697,23 @@ class TestClickHouseAdapter:
                     sorting=[TuningColumn(name="event_id", type="INTEGER", order=1)],
                 )
             }
+            # Tuned keys on schema-nullable columns are rejected: rendering
+            # them non-Nullable would load their NULLs as 0 and silently
+            # change query answers.
+            with pytest.raises(ValueError, match="tuned key columns of table 'events'"):
+                adapter._optimize_table_definition(
+                    "CREATE TABLE events (event_id INTEGER, event_date DATE, payload VARCHAR(50))",
+                    tuned,
+                    nullable_columns={"event_id", "event_date", "payload"},
+                )
+            # The compliant shape (keys absent from the nullable set) still
+            # renders tuned keys with Nullable wrapping for the other columns.
             keyed = adapter._optimize_table_definition(
                 "CREATE TABLE events (event_id INTEGER, event_date DATE, payload VARCHAR(50))",
                 tuned,
-                nullable_columns={"event_id", "event_date", "payload"},
+                nullable_columns={"payload"},
             )
-            assert "event_id INTEGER" in keyed
-            assert "event_date DATE" in keyed
+            assert "ORDER BY (event_id)" in keyed
             assert "payload Nullable(VARCHAR(50))" in keyed
             assert "event_id Nullable" not in keyed
             assert "event_date Nullable" not in keyed

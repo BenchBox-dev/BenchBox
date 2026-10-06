@@ -277,6 +277,9 @@ class ClickHouseWorkloadMixin:
         )
         if nullable_columns:
             key_columns = self._resolve_key_columns(statement, tuning_clauses, nullable_columns)
+            tuned_nullable_keys = self._tuned_nullable_key_columns(tuning_clauses, nullable_columns)
+            if tuned_nullable_keys:
+                raise ValueError(self._nullable_key_error(statement, tuned_nullable_keys))
             statement = self._apply_nullable_column_types(statement, nullable_columns - key_columns)
 
         tuned_sort_key_applies = tuned_order_by_applies and tuning_clauses is not None and bool(tuning_clauses.sort_by)
@@ -461,31 +464,60 @@ class ClickHouseWorkloadMixin:
 
     def _resolve_key_columns(self, statement: str, tuning_clauses: Any, nullable_columns: set[str]) -> set[str]:
         """Return nullable candidates referenced by PK/partition/order keys."""
+        key_columns = {name.lower() for name in self._extract_primary_key_columns(statement)}
+        key_columns.update(self._tuned_nullable_key_columns(tuning_clauses, nullable_columns))
+        return key_columns
+
+    # Tuning-clause attribute -> key role named in the nullable-key error.
+    _TUNED_KEY_ROLES: tuple[tuple[str, str], ...] = (
+        ("partition_by", "PARTITION BY"),
+        ("sort_by", "ORDER BY"),
+        ("order_by", "ORDER BY"),
+        ("cluster_by", "CLUSTER BY"),
+        ("primary_key", "PRIMARY KEY"),
+    )
+
+    def _tuned_nullable_key_columns(self, tuning_clauses: Any, nullable_columns: set[str]) -> dict[str, list[str]]:
+        """Map schema-nullable columns used as tuned keys to their key roles.
+
+        Only clauses from the tuning configuration are considered: statement
+        inline keys keep their existing rendering so untuned DDL is untouched.
+        Returns an empty mapping when tuning does not apply.
+        """
         import re
 
-        key_columns = {name.lower() for name in self._extract_primary_key_columns(statement)}
+        matched: dict[str, list[str]] = {}
         if tuning_clauses is None:
-            return key_columns
-
-        key_expressions = [
-            value
-            for value in (
-                tuning_clauses.partition_by,
-                tuning_clauses.sort_by,
-                tuning_clauses.order_by,
-                tuning_clauses.cluster_by,
-                tuning_clauses.primary_key,
-            )
-            if value
-        ]
+            return matched
+        expressions = [(role, getattr(tuning_clauses, attribute, None)) for attribute, role in self._TUNED_KEY_ROLES]
         for column_name in nullable_columns:
             identifier = re.compile(
                 rf"(?<![A-Za-z0-9_]){re.escape(column_name)}(?![A-Za-z0-9_])",
                 re.IGNORECASE,
             )
-            if any(identifier.search(expression) for expression in key_expressions):
-                key_columns.add(column_name)
-        return key_columns
+            roles = sorted({role for role, expression in expressions if expression and identifier.search(expression)})
+            if roles:
+                matched[column_name] = roles
+        return matched
+
+    @staticmethod
+    def _nullable_key_error(statement: str, tuned_nullable_keys: dict[str, list[str]]) -> str:
+        """Build the actionable error for a tuned key on a nullable column.
+
+        Key columns render non-Nullable, so a NULL in the source data loads
+        as 0 and silently changes query answers. Reject loudly instead.
+        """
+        import re
+
+        match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)", statement, re.IGNORECASE)
+        table = match.group(1) if match else "<unknown table>"
+        columns = ", ".join(f"{name} ({'/'.join(roles)})" for name, roles in sorted(tuned_nullable_keys.items()))
+        return (
+            f"tuned key columns of table {table!r} are nullable in the source schema: {columns}; "
+            "BenchBox renders key columns non-Nullable, which would load their NULLs as 0 and "
+            "silently change query answers. Use NOT NULL key columns (as in the curated ClickHouse "
+            "TPC-DS template) or declare the columns non-nullable."
+        )
 
     @classmethod
     def _apply_nullable_column_types(cls, statement: str, nullable_columns: set[str]) -> str:
