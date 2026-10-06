@@ -4,7 +4,7 @@
     "Filesystem-library removals (fsspec, s3fs, gcsfs) are observable by the test.",
     "Each exemption and allowance in the test has a reason that is still true, or is removed."
   ],
-  "context": "Source: PR #2632 and its independent review (2026-10-04). Do after #2632 merges.",
+  "context": "Source: PR #2632 and its independent review (2026-10-04). Do after #2632 merges.\n\nResumption (2026-10-06, PR opened, not merged): branch fix/midrun-contract-coverage-gaps, PR #2714, head 06371e83d4a7b6af88275e2e765d47e2668918fb, worktree /Users/joe/Developer/BenchBox.wt-midrun-coverage. Test-only change to tests/unit/platforms/test_no_midrun_destructive_ops.py (+96/-3): default reuse-or-recreate drive for all cases, fsspec/s3fs/gcsfs faked roots + observability test, once-per-run flag-ordering doc + pin test, Snowflake SHOW TABLES LIKE scripting, DEFAULT_MODE_REFUSALS table (ducklake-postgres_catalog). Verification done: contract file 259 passed, full fast suite 35417 passed/26 skipped, ruff check/format clean, ty clean on the file, module-size thresholds pass, pr-preflight green, teeth (guard removal fails 62), revert-to-red shown for every new test and each allowance. Next owner steps: independent review, stand-in attestation, oracle-review rerun, arm, and finish after merge. Do not finish before merge.",
   "description": "## Problem (documented by the test's author and an independent reviewer, PR #2632)\nThe all-adapter contract test is real but incomplete:\n- it drives only the `force_recreate` mode, not the default reuse-or-recreate-on-incompatibility mode;\n- 12 adapters never reach the existing-database check (athena-spark, dataproc, dataproc-serverless, emr-serverless, fabric-spark, glue, quanton, synapse-spark, fabric-lakehouse, fabric_dw, motherduck, snowpark-connect) and exemptions are documented in the test; Polars was a harness fault, since fixed;\n- real `fsspec`/`s3fs`/`gcsfs` removals are not observed because those libraries are not faked;\n- run-owned rewrites are allowed by named allowances (BigQuery metadata `CREATE OR REPLACE TABLE`, Snowpark Connect and Snowflake load-time `TRUNCATE`, Athena staging drop, Fabric warehouse temp table);\n- DuckLake sets the once-per-run flag before `_existing_lake_tables` / `_verify_run_identity` run, so if either raises the decision is still marked as made (the base class behaves the same).\n\n## Change\nAdd the default reuse-or-recreate mode to the lifecycle the test drives; fake the filesystem libraries or assert on their calls; revisit each exemption and allowance and remove the ones that can now be exercised; decide the flag-ordering question for DuckLake and the base class.\n\n## Guardrails (must preserve)\n- The teeth checks: removing the once-per-run guard must still fail 30+ cases.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
   "links": [
     "tests/unit/platforms/test_no_midrun_destructive_ops.py",
@@ -26,6 +26,14 @@
       "generation": "4aa4ab78dc544194827239f0f38cdab3",
       "op": "take",
       "op_id": "c975d1541dad40c2a07c101ecd0dd9c8",
+      "session_id": "886444b9f5294b15856d1f4489297eb4"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680",
+      "at": "2026-10-06T07:04:52Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "e4e0712cb05a433eb4f537f8952094ab",
       "session_id": "886444b9f5294b15856d1f4489297eb4"
     }
   ]
