@@ -132,6 +132,10 @@ def test_chdb_native_load_failure_is_reported_as_unusable(monkeypatch: pytest.Mo
     assert "installed but its native library cannot be loaded" in reason
     assert "mis-aligned LINKEDIT string pool" in reason
     assert "more detail" not in reason
+    # The reason must name the remedies, not echo the local venv path.
+    assert "Linux CI" in reason
+    assert "server backend" in reason
+    assert "/x/chdb" not in reason
 
 
 def test_chdb_os_error_from_the_loader_is_unusable(monkeypatch: pytest.MonkeyPatch) -> None:
