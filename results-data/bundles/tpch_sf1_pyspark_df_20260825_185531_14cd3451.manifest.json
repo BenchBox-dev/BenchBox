@@ -1,0 +1,11 @@
+{
+  "bundle_file": "tpch_sf1_pyspark_df_20260825_185531_14cd3451.json",
+  "bundle_hash": "20c41f3495135e164e2df15039729790a6b5674b5a926c645695b7478ccd99eb",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}
