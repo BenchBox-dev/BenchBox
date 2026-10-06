@@ -6,7 +6,7 @@
     "Refreshes 2380/2384/2409 verified green",
     "Queue fully drained to zero open develop PRs (except intentional holds)"
   ],
-  "context": "Session 2026-09-26 PR-merge sweep. All 12 bot review threads on PRs 2404/2406/2407/2408 addressed, replied, and marked resolved. Real CI defects fixed (2400 duplicate-delta, 2382 ledger seed, 2406 compat-docs regen). Queue root cause established: ~27 PRs bulk-enrolled at 11:14-11:16 UTC against max 5 build slots; trimmed to 5 at ~15:57 UTC. Do not re-add ejected entries without fixing validation failures (2359 pattern). Freeze pushes to queued branches while draining. Worktree for fixes: /Users/joe/Developer/BenchBox.wt-pr-merge-sweep.",
+  "context": "Session 2026-09-26 PR-merge sweep. All 12 bot review threads on PRs 2404/2406/2407/2408 addressed, replied, and marked resolved. Real CI defects fixed (2400 duplicate-delta, 2382 ledger seed, 2406 compat-docs regen). Queue root cause established: ~27 PRs bulk-enrolled at 11:14-11:16 UTC against max 5 build slots; trimmed to 5 at ~15:57 UTC. Do not re-add ejected entries without fixing validation failures (2359 pattern). Freeze pushes to queued branches while draining. Worktree for fixes: /Users/joe/Developer/BenchBox.wt-pr-merge-sweep.\n\n2026-10-06 review note: bulk-enrollment backlog superseded — the merge queue itself was retired (#2582; merge-queue API now 404s) and 8 develop PRs remain open (2725, 2721, 2684, 2683, 2614, 2494, 2382, 2381). Left open deliberately: either re-scope this item to the residual PRs or finish it once they drain; acceptance as written (zero open develop PRs) is not met, so it was not closed.",
   "description": "Finish draining the develop merge queue after the 2026-09-26 bulk-enrollment backlog. Approve PR 2382 visual on final head de1f2fde2 via APPROVED_HEAD_SHA/APPROVAL_REASON repo vars, re-run docs, then clear vars after merge. Confirm the retrigger run resolved the bigquery test flake and wedged aggregator. Arm green fixed PRs and manually enqueue soundness ones after owner review. Re-add dequeued PRs as the head drains. Verify the 2380/2384/2409 refreshes.",
   "sessions": [
     {
@@ -34,6 +34,14 @@
       "op": "release",
       "op_id": "ce31e58fcae54eedacb0bbbf6b8c2b2b",
       "session_id": "ef41fa9156174ab5afbd28b6e4f0bdd3"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:26acbcff276b4a051a0b6cee",
+      "at": "2026-10-06T19:23:33Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "50cfab2ff0fd480993feb9cec2e8ed46",
+      "session_id": "ccd5a4124a5a4b2ab886fc474bb7d83c"
     }
   ]
 }
