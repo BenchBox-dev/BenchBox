@@ -544,7 +544,11 @@ class ClickHouseWorkloadMixin:
 
     @staticmethod
     def _top_level_column_spans(body: str) -> list[tuple[int, int]]:
-        """Return comma-delimited spans while respecting nested SQL syntax."""
+        """Return comma-delimited spans while respecting nested SQL syntax.
+
+        String literals, quoted identifiers, and `--`/`/* */` comments are
+        opaque: commas inside them never split a span.
+        """
         spans: list[tuple[int, int]] = []
         start = 0
         depth = 0
@@ -558,8 +562,16 @@ class ClickHouseWorkloadMixin:
                         index += 2
                         continue
                     quote = None
-            elif char in {"'", '"'}:
+            elif char in {"'", '"', "`"}:
                 quote = char
+            elif char == "-" and body[index + 1 : index + 2] == "-":
+                end = body.find("\n", index)
+                index = len(body) if end == -1 else end
+                continue
+            elif char == "/" and body[index + 1 : index + 2] == "*":
+                end = body.find("*/", index + 2)
+                index = len(body) if end == -1 else end + 2
+                continue
             elif char in "([":
                 depth += 1
             elif char in ")]":
@@ -570,6 +582,69 @@ class ClickHouseWorkloadMixin:
             index += 1
         spans.append((start, len(body)))
         return spans
+
+    @staticmethod
+    def _blank_quoted_and_commented(text: str) -> str:
+        """Blank string literals, quoted identifiers, and comments in place.
+
+        Returns a same-length string where every character inside quotes or
+        comments is a space, so keyword matching on the result only sees real
+        SQL code. Newlines are preserved to keep line structure stable.
+        """
+        chars = list(text)
+        index = 0
+        quote: str | None = None
+        while index < len(chars):
+            char = chars[index]
+            if quote is not None:
+                if chars[index] != "\n":
+                    chars[index] = " "
+                if char == quote:
+                    if index + 1 < len(chars) and chars[index + 1] == quote:
+                        if chars[index + 1] != "\n":
+                            chars[index + 1] = " "
+                        index += 2
+                        continue
+                    quote = None
+            elif char in {"'", '"', "`"}:
+                chars[index] = " "
+                quote = char
+            elif char == "-" and index + 1 < len(chars) and chars[index + 1] == "-":
+                while index < len(chars) and chars[index] != "\n":
+                    chars[index] = " "
+                    index += 1
+                continue
+            elif char == "/" and index + 1 < len(chars) and chars[index + 1] == "*":
+                chars[index] = " "
+                chars[index + 1] = " "
+                index += 2
+                while index < len(chars):
+                    if chars[index] == "*" and index + 1 < len(chars) and chars[index + 1] == "/":
+                        chars[index] = " "
+                        chars[index + 1] = " "
+                        index += 2
+                        break
+                    if chars[index] != "\n":
+                        chars[index] = " "
+                    index += 1
+                continue
+            index += 1
+        return "".join(chars)
+
+    @staticmethod
+    def _strip_inline_primary_key(segment: str) -> str:
+        """Remove an inline column-level PRIMARY KEY outside literals/comments."""
+        import re
+
+        while True:
+            probe = ClickHouseWorkloadMixin._blank_quoted_and_commented(segment)
+            match = re.search(r"PRIMARY\s+KEY\b", probe, flags=re.IGNORECASE)
+            if match is None:
+                return segment
+            start = match.start()
+            while start > 0 and segment[start - 1].isspace():
+                start -= 1
+            segment = segment[:start] + segment[match.end() :]
 
     @staticmethod
     def _column_type_end(segment: str, type_start: int) -> int:
@@ -608,22 +683,25 @@ class ClickHouseWorkloadMixin:
     def _strip_primary_key_constraints(cls, statement: str) -> str:
         import re
 
-        create_match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+[A-Za-z_]\w*\s*\(", statement, re.IGNORECASE)
+        table_name = r'(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[A-Za-z_]\w*)'
+        create_match = re.search(rf"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+{table_name}\s*\(", statement, re.IGNORECASE)
         if create_match is None:
             return statement
         open_index = statement.find("(", create_match.start())
         close_index = find_matching_parenthesis(statement, open_index)
         body = statement[open_index + 1 : close_index]
 
+        table_constraint = re.compile(r"^\s*(?:CONSTRAINT\s+[\s\S]+?\s+)?PRIMARY\s+KEY\s*\(", re.IGNORECASE)
         kept_segments: list[str] = []
         dropped_last_segment = False
         spans = cls._top_level_column_spans(body)
         for position, (start, end) in enumerate(spans):
             segment = body[start:end]
-            if re.match(r"^\s*PRIMARY\s+KEY\s*\(", segment, re.IGNORECASE):
+            probe = cls._blank_quoted_and_commented(segment)
+            if table_constraint.match(probe):
                 dropped_last_segment = position == len(spans) - 1
                 continue
-            kept_segments.append(re.sub(r"\s+PRIMARY\s+KEY\b", "", segment, flags=re.IGNORECASE))
+            kept_segments.append(cls._strip_inline_primary_key(segment))
 
         rebuilt = ",".join(kept_segments)
         if dropped_last_segment:

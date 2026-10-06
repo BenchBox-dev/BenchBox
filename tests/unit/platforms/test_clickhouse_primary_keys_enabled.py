@@ -57,11 +57,19 @@ def _orders(statements: list[str]) -> str:
 class TestEffectiveConfiguration:
     def test_an_explicit_disable_is_honored_when_a_sort_key_is_tuned(self, adapter):
         adapter.unified_tuning_configuration = _config(primary_keys_enabled=False)
+        adapter.tuning_enabled = True
 
         assert adapter.get_effective_tuning_configuration().primary_keys.enabled is False
 
+    def test_a_sort_key_is_ignored_when_tuning_is_disabled(self, adapter):
+        adapter.unified_tuning_configuration = _config(primary_keys_enabled=False)
+        adapter.tuning_enabled = False
+
+        assert adapter.get_effective_tuning_configuration().primary_keys.enabled is True
+
     def test_primary_keys_stay_forced_on_without_a_tuned_sort_key(self, adapter):
         adapter.unified_tuning_configuration = _config(primary_keys_enabled=False, sorted_tables=False)
+        adapter.tuning_enabled = True
 
         assert adapter.get_effective_tuning_configuration().primary_keys.enabled is True
 
