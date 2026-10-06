@@ -668,6 +668,13 @@
       "status": "done",
       "title": "Decide whether the public anonymizer belongs on the auto-merge soundness path"
     },
+    "answer-parity-macos-blind-spot-20261006": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Answer-parity test only runs where the engine loads; macOS has no parity signal"
+    },
     "apache-doris-olap-platform": {
       "claim": null,
       "needs": [],

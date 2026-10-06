@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Answer parity is verified on macOS runs or the gap is explicitly documented as accepted",
+    "A macOS-capable parity signal exists or the nightly-slow test matrix states the engine-load precondition"
+  ],
+  "context": "The answer-parity follow-up (merged as PR #2720) added a nightly-slow parity test with exact multiset comparison, but it only executes where the engine loads (CI Linux). Local macOS runs, where the engine does not load, get no parity signal, so regressions visible only on macOS paths would go undetected.",
+  "description": "Close the macOS parity blind spot: either make the parity test runnable where the engine loads on macOS, add a macOS-capable parity check (e.g. fake-driver or recorded-answer comparison), or document the engine-load precondition and its accepted risk in the test matrix.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:d90c17f1dbc58577e72c0803",
+      "at": "2026-10-06T19:09:34Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "e3d8e66e84ef43dfbfda04e4aa109b6c",
+      "session_id": "5709cef75a584579a236033476a263ba"
+    }
+  ]
+}
