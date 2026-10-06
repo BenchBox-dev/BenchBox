@@ -19029,6 +19029,13 @@
       "status": "open",
       "title": "Prune the 36 site-parity allowances for broken links that now resolve"
     },
+    "site-sphinx-fallback-exposure": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Keep internal files out of the site under the Sphinx fallback renderer"
+    },
     "skill-integrity-ci-lane-live-validation": {
       "claim": null,
       "needs": [

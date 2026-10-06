@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "Fallback output contains only user-facing assets"
+  ],
+  "description": "With renderer auto falling back to Sphinx, all of landing/ (a11y checklist, catalog.yaml, console.log stubs in script.js) and docs/_static (pygments_cobalt2.py, IMAGE_REQUIREMENTS.md) publish.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:26:00Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "d8ecab0854394c5687e3128283638383",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}
