@@ -7419,10 +7419,15 @@
       "title": "Documentation workflow fails on every develop push: three broken blog index links"
     },
     "docs-broken-internal-links-sweep-20261005": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T08:44:06Z",
+        "generation": "c041fdfac7c24586880cf1f88b63d753",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:d90c17f1dbc58577e72c0803"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Fix the pre-existing broken internal links reported by the docs link check (about 37 at last count)"
     },
     "docs-browser-duckdb-schema-column-drift-20260724": {
