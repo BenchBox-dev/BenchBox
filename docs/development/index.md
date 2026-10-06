@@ -24,7 +24,6 @@ Agent review, identity, and attribution protocol lives in unpublished
 
 - [Adding New Platforms](adding-new-platforms.md) - How to add support for new database platforms
 - [New Platform Acceptance Checklist](new-platform-acceptance-checklist.md) - Required registry, docs, tests, compatibility, and UAT gates
-- [PR base branch policy](pr-base-branch-policy.md) - Integration bases for ready PRs; narrow draft-only stacking
 - [Import Patterns](import-patterns.md) - Lazy loading and dependency management patterns
 - [TPC Compilation Guide](tpc-compilation-guide.md) - Compiling TPC benchmark tools
 

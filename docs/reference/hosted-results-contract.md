@@ -103,7 +103,7 @@ Submission processing, archive acceptance, presentation policy, and observed
 deployment are separate state dimensions. No single `published` flag determines
 whether a result is accepted, visible, ranking-eligible, or live. The normative
 authority is
-[`adr-independent-publication-authorities.md`](../development/adr/adr-independent-publication-authorities.md).
+`docs/development/adr/adr-independent-publication-authorities.md`.
 
 #### Status Definitions
 

@@ -59,7 +59,7 @@ for its threat model, token-digest provisioning, scopes, tenant workspaces,
 shared admission store, and fail-closed proxy requirements. This capability is
 not a production-readiness claim. Shared, non-loopback endpoint publication and
 its operational acceptance matrix are explicitly
-[deferred until post-release](../operations/mcp-production-readiness.md). That
+deferred until post-release. That
 deferral does not block the local stdio/loopback MCP MVP: its release checks are
 limited to current DuckDB package/execution evidence and pinned protocol
 conformance.
@@ -89,8 +89,7 @@ disabled so progress and future request-scoped notifications remain possible.
 
 ### MVP release checks
 
-The MCP MVP has two release checks, both currently recorded `PASS` in the
-[MCP evidence boundary](../operations/mcp-production-readiness-evidence.md):
+The MCP MVP has two release checks, both currently recorded `PASS`:
 
 1. install the built BenchBox wheel with `[mcp]` in a clean environment and run
    a real small DuckDB benchmark through local `run_benchmark`; and

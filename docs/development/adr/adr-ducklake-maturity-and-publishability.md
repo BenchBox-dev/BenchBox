@@ -124,7 +124,7 @@ decision should be revisited when scale runs exist.
 
 **Basis.** This one is decided by what CODEOWNERS currently *does* in this repo,
 which is not what the question assumes. Per `.github/CODEOWNERS` and
-[`repo-admin-settings.md`](../../operations/repo-admin-settings.md), code-owner
+`docs/operations/repo-admin-settings.md`, code-owner
 approval enforcement was **retired on 2026-07-18** - the sole owner authors every
 PR and GitHub forbids self-approval. The file's two live roles are:
 

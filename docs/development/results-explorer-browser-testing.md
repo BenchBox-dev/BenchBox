@@ -129,7 +129,7 @@ Several changes alter what the current site renders before the switch to Astro:
 - adopting shared design tokens.
 
 The comparison is advisory until the public site is in production
-([merge-queue governance](../operations/merge-queue-governance.md)).
+(`docs/operations/merge-queue-governance.md`).
 Until then, a changed capture does not block the merge, but it is still
 reviewed. The procedure has two phases.
 
@@ -209,8 +209,8 @@ merge queue, so there is no second slot.
 A site-deploy run whose release commit or renderer differs from the deployed
 one captures the release-sourced pages of the last production artifact and of
 the assembled candidate with the same spec and compares them before the deploy
-job may start (see
-[the site deploy runbook](../operations/site-deploy.md#visual-comparison-before-deploy)).
+job may start (see the site deploy runbook,
+`docs/operations/site-deploy.md`).
 The approval rule is the one above, in a separate pair of repository variables
 named in that runbook: the approved value must equal the binding of the release
 commit, the candidate artifact and the production baseline, and the reason must

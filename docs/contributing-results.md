@@ -164,14 +164,14 @@ complete Phase 2 archive. It does not automatically enter `develop` or the
 curated static Explorer snapshot.
 
 Maintainer-run refreshes are monthly via `.github/workflows/seed-corpus.yml`
-(see [`docs/operations/corpus-refresh.md`](operations/corpus-refresh.md)). That
+(see `docs/operations/corpus-refresh.md`). That
 path is not a substitute for community `benchbox submit` PRs.
 
 The Results Explorer is built from the exact `published-results` commit selected by
 the publication candidate. A candidate build does not publish by itself; the
 protected transaction writer deploys one validated bundle and records the public
 receipt. The Explorer remains a presentation surface, not a broad leaderboard
-claim. See [`docs/operations/results-phase-2-runbook.md`](operations/results-phase-2-runbook.md#13-explorer-publish-path) for the publication path and launch evidence.
+claim. See `docs/operations/results-phase-2-runbook.md` for the publication path and launch evidence.
 
 ## What Makes a Good Submission
 
@@ -271,4 +271,4 @@ installed too.
 
 Start a [discussion](https://github.com/BenchBox-dev/BenchBox/discussions) if you need help with a submission or want to report a correction.
 
-Maintainers: see [Phase 2 Results Operations Runbook](operations/results-phase-2-runbook.md).
+Maintainers: see `docs/operations/results-phase-2-runbook.md` in the repository.

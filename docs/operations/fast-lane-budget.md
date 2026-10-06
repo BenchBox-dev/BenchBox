@@ -119,7 +119,8 @@ macOS, and Windows, alongside the installed-wheel generator smoke.
 
 At maximum packaging coverage, the heavy payload uses twelve standard Linux
 runners, including the shared collector. This follows the approved sharding
-allowance in [the development-loop ADR](../development/adr/adr-dev-loop-v2.md).
+allowance in the development-loop ADR
+(`docs/development/adr/adr-dev-loop-v2.md`).
 Classifier, aggregate, fast-tier, and other merge-unit jobs are counted
 separately. Hosted shard timings must establish the queue wall-time budget;
 equal node counts alone do not prove balanced duration.

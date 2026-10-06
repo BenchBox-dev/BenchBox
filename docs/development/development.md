@@ -107,8 +107,8 @@ We welcome contributions! Please see the `CONTRIBUTING.md` file in the root of t
 
 Maintainers and AI agents use one disposable linked worktree per task. Create
 it for the branch, work there until the PR merges, then remove that exact
-clean registration. See [the disposable worktree guide](../operations/dev-loop-worktrees.md)
-for common commands and recovery scenarios. External contributors working
+clean registration. See the disposable worktree guide
+(`docs/operations/dev-loop-worktrees.md`) for common commands and recovery scenarios. External contributors working
 from a fork can use the same lifecycle.
 
 ## Pull Request Lifecycle
@@ -123,7 +123,7 @@ BenchBox enforces single-commit squash integration into `develop`. A pull reques
 
 ## Release Preparation Workflow
 
-See [the release guide](../operations/release-guide.md) for the full
+See the release guide (`docs/operations/release-guide.md`) for the full
 maintainer workflow (version-branch flow on a single repo with
 `develop` and `main`).
 

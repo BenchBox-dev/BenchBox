@@ -28,7 +28,8 @@ and HLL families still load. The four ops above remain in
 `extension-smoke.yml` workflow reports this reviewed `2e38607` state as
 known drift and goes red for any new missing family, affected extension
 version, or non-missing-function error from a fresh install. See
-[ADR: DuckDB datasketches vendoring vs HLL fallback](../development/adr/adr-duckdb-datasketches-vendoring.md)
+the DuckDB datasketches vendoring ADR
+(`docs/development/adr/adr-duckdb-datasketches-vendoring.md`)
 for the long-term path.
 
 ## Operation lifecycle
