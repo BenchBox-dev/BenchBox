@@ -62,13 +62,15 @@ _FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 # Curation gate. `_build_raw_changelog` emits verbatim commit subjects, which
 # keep their squash-merge PR suffix (e.g. "... (#1086)"); the Claude summary
 # and any hand-curated section do not. That suffix is the precise signal; the
-# bullet ceiling is a backstop for drafts written by other means.
+# bullet and line ceilings are backstops for drafts written by other means.
 #
-# The ceiling is set from evidence, not the prompt's 10-25 target: the largest
-# genuinely hand-curated section shipped so far is 0.2.1 at 39 bullets, while
-# the raw origin/release..HEAD delta at v0.3.1 was 231 conventional commits. 60
-# separates the two with room to spare.
-MAX_CURATED_BULLETS = 60
+# The ceilings are set from evidence: the largest genuinely hand-curated
+# section shipped so far is 0.2.1 at 39 bullets and 139 lines, while the
+# contributor-level 0.4.2 draft that reached the v0.4.2 tag ran 53 bullets
+# and 255 lines. 45 bullets and 160 lines keep every shipped section green
+# with room to spare and reject a draft of that size on both axes.
+MAX_CURATED_BULLETS = 45
+MAX_CURATED_LINES = 160
 RAW_PLACEHOLDER = "(no user-facing changes detected -- please edit manually)"
 _PR_SUFFIX_RE = re.compile(r"\(#\d+\)\s*$")
 _BULLET_RE = re.compile(r"^\s*- \S")
@@ -399,6 +401,9 @@ def check_changelog_curation(source: Path, version: str) -> tuple[bool, list[str
         )
     if len(bullets) > MAX_CURATED_BULLETS:
         problems.append(f"{len(bullets)} bullets exceeds the {MAX_CURATED_BULLETS}-bullet curated ceiling")
+    body_lines = len(body.splitlines())
+    if body_lines > MAX_CURATED_LINES:
+        problems.append(f"{body_lines} lines exceeds the {MAX_CURATED_LINES}-line curated ceiling")
     return (not problems), problems
 
 
@@ -885,8 +890,8 @@ def main() -> int:
         help=(
             "Check that the '## [VERSION]' section has been hand-curated (no raw commit "
             "subjects, no placeholder, at most "
-            f"{MAX_CURATED_BULLETS} bullets), then exit. Requires --version. "
-            "Override with RELEASE_ALLOW_RAW_CHANGELOG=1."
+            f"{MAX_CURATED_BULLETS} bullets and {MAX_CURATED_LINES} lines), then exit. "
+            "Requires --version. Override with RELEASE_ALLOW_RAW_CHANGELOG=1."
         ),
     )
     parser.add_argument(

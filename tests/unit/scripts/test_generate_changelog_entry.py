@@ -465,6 +465,33 @@ class TestChangelogCurationGuard:
         assert not ok
         assert any("ceiling" in p for p in problems)
 
+    def test_line_ceiling_is_enforced(self, tmp_path: Path) -> None:
+        lines = ["## [0.3.1] - 2026-07-09", "", "### Added", ""]
+        lines.append("- **One change.** A single curated bullet.")
+        lines.extend(f"filler line {i}" for i in range(generate_changelog_entry.MAX_CURATED_LINES))
+        self._write(tmp_path, "\n".join(lines) + "\n")
+        ok, problems = generate_changelog_entry.check_changelog_curation(tmp_path, "0.3.1")
+        assert not ok
+        assert any("ceiling" in p for p in problems)
+
+    def test_contributor_level_draft_is_rejected_without_raw_subjects(self, tmp_path: Path) -> None:
+        """The 0.4.2 tag carried 53 hand-written bullets over 255 lines.
+
+        No bullet was a verbatim commit subject, so only the ceilings catch it.
+        """
+        bullets = "\n".join(
+            f"- **Change number {i}.** User-visible improvement.\n"
+            f"  Further detail on change {i}.\n"
+            f"  Even more detail on change {i}.\n"
+            f"  Final detail on change {i}."
+            for i in range(53)
+        )
+        self._write(tmp_path, f"## [0.3.1] - 2026-07-09\n\n### Added\n\n{bullets}\n")
+        ok, problems = generate_changelog_entry.check_changelog_curation(tmp_path, "0.3.1")
+        assert not ok
+        assert any("53 bullets exceeds" in p for p in problems)
+        assert any("lines exceeds" in p for p in problems)
+
     def test_missing_section_is_rejected(self, tmp_path: Path) -> None:
         self._write(tmp_path, "## [0.3.0] - 2026-05-16\n\n### Added\n\n- **Thing** - does things.\n")
         ok, problems = generate_changelog_entry.check_changelog_curation(tmp_path, "0.3.1")
@@ -482,9 +509,10 @@ class TestChangelogCurationGuard:
         assert ok, problems
 
     def test_every_shipped_changelog_section_passes_the_guard(self) -> None:
-        """The ceiling is calibrated on real releases, not on the prompt's target.
+        """The ceilings are calibrated on real releases, not on the prompt's target.
 
-        0.2.1 shipped 39 hand-curated bullets; a tighter ceiling would reject it.
+        0.2.1 shipped 39 hand-curated bullets over 139 lines; tighter ceilings
+        would reject it.
         """
         repo_root = Path(__file__).resolve().parents[3]
         text = (repo_root / "CHANGELOG.md").read_text(encoding="utf-8")
