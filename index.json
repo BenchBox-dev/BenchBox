@@ -16522,6 +16522,13 @@
       "status": "done",
       "title": "Pull the deepest holistic-review regression reproducers into required develop-PR CI"
     },
+    "rerun-cloud-bundles-defective-dbgen": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Rerun the 61 cloud bundles built with the defective macOS dbgen"
+    },
     "residual-path-host-keys-empty-salt-drop-or-hash-policy": {
       "claim": null,
       "needs": [

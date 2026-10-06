@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Every affected cloud bundle is regenerated with the fixed generator or withdrawn from published rankings",
+    "No published ranking includes data from the defective macOS dbgen"
+  ],
+  "context": "Audit evidence: ~/Developer/audit-defective-generators-bundles.csv (53 direct, 52 presumed, 35 unresolved macOS TPC-H-family bundles); per-bundle table in results-data/DEFECTIVE_DATAGEN_AUDIT.md on develop. The 61 paid cloud bundles cannot be regenerated without spending on live warehouses — needs owner approval. Local-engine bundles were labelled with known_defects in #2708 and are excluded from rankings by #2705.",
+  "description": "61 published bundles ran on paid cloud warehouses with data from the defective macOS TPC-H dbgen (non-canonical supplier/customer addresses, fixed in #2622). They cannot be regenerated locally; rerunning them spends live-warehouse budget and needs owner approval. Until then they stay labelled and excluded from rankings.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T18:39:05Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "0b64b690414a43e8a70069491f718f87",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    }
+  ]
+}
