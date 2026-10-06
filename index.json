@@ -2973,10 +2973,15 @@
       "title": "Measure whether the curated ClickHouse templates and `optimize_after_load` actually help at realistic scale"
     },
     "clickhouse-tuned-tpcds-answer-parity-and-nullable-keys-20261005": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T11:01:14Z",
+        "generation": "d17c79f423344194abafcd61c262550f",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:d90c17f1dbc58577e72c0803"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "ClickHouse tuned TPC-DS: prove tuned answers match untuned, and decide how Nullable key columns are rendered"
     },
     "clickhouse-tuning-ledger-soundness-1275-followups-20260724": {
