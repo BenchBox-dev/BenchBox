@@ -20721,9 +20721,9 @@
     },
     "tpcds-identity-windows-required": {
       "claim": {
-        "expires_at": "2026-10-06T19:13:56Z",
-        "generation": "1bf2d59b529c44d3bbdb85d646c9e342",
-        "renewals": 0,
+        "expires_at": "2026-10-07T14:07:47Z",
+        "generation": "6817c2293bf9464a87c29d7831a66556",
+        "renewals": 1,
         "worker": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494"
       },
       "needs": [],
