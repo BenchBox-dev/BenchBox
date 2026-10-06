@@ -7426,6 +7426,13 @@
       "status": "done",
       "title": "Run the stop-the-world flip: swap required checks and merge the flip PR"
     },
+    "docs-accuracy-guides-tutorials": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Fix broken examples in user guides and tutorials"
+    },
     "docs-accuracy-platforms": {
       "claim": null,
       "needs": [],

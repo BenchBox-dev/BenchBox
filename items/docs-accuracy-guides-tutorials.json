@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "Examples run against the current package"
+  ],
+  "description": "Affected: TPC official guides, TPC-DI deployment/ETL guides, performance-optimization, dry-run, examples.md, tutorials (--output treated as a file), concepts/workflow and data-model, MCP integration tool names, parquet/vortex guides.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:23:27Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "18a57c11f9204d55bff4f24e7034c5fe",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}
