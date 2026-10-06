@@ -4053,15 +4053,10 @@
       "title": "Remove comments and docstrings from result models, policy and serialization"
     },
     "comment-cleanup-scope-policy": {
-      "claim": {
-        "expires_at": "2026-10-07T19:20:23Z",
-        "generation": "12b9fbfe75a14708abaeffaa70648666",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:26acbcff276b4a051a0b6cee"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "open",
       "title": "Define comment-removal scope, provenance, ownership and exception policy"
     },
     "comment-cleanup-security-credentials": {

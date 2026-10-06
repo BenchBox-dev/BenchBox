@@ -130,6 +130,15 @@
       "op": "take",
       "op_id": "e69d41691d854ac883e8747a2fc82312",
       "session_id": "ccd5a4124a5a4b2ab886fc474bb7d83c"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:26acbcff276b4a051a0b6cee",
+      "at": "2026-10-06T19:20:55Z",
+      "client": "tbh",
+      "generation": "12b9fbfe75a14708abaeffaa70648666",
+      "op": "release",
+      "op_id": "20b3088f2c8c4a7eae2fbdc2ed92de48",
+      "session_id": "ccd5a4124a5a4b2ab886fc474bb7d83c"
     }
   ]
 }
