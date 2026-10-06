@@ -3,7 +3,7 @@
     "A SQL DataFusion tuning file validates through the CLI, and the DataFrame path is unchanged.",
     "A test proves a DataFusion SQL run never resolves a DataFrame profile."
   ],
-  "context": "Source: PR #2677 close-out. Two reviewer notes (nit level) left unaddressed on purpose to keep the PR scoped.",
+  "context": "Source: PR #2677 close-out. Two reviewer notes (nit level) left unaddressed on purpose to keep the PR scoped.\n\nCloseout 2026-10-06 (re-validation, read-only): PR #2712 MERGED to develop at a1458ee66bfd6149f7fe4039a7450991eff428ca (mergedAt 2026-10-06T06:43:27Z, head fix/datafusion-validate-sql). Evidence: gh pr view state MERGED; statusCheckRollup clean (only oracle-review-shadow null, non-required); git show confirms mode-aware validate selection and profile resolution (benchbox/cli/tuning_resolver.py, benchbox/cli/commands/tuning_group.py) plus tests test_sql_search_paths_exclude_the_profile, test_sql_tuned_run_never_resolves_the_profile, test_repo_ships_no_datafusion_profile; docs rule in docs/reference/cli/tuning.md. Original worker session 5709cef75a584579a236033476a263ba (finish 2026-10-06T06:49:01Z); ladder not re-run in this validation.",
   "description": "## Problem\n- `benchbox tuning validate <file> --platform datafusion` always validates the file as a DataFrame configuration, because SQL `datafusion` shares the DataFrame template entries. A SQL DataFusion tuning file therefore cannot be validated.\n- `_dataframe_profile_path` in benchbox/cli/tuning_resolver.py would hand a DataFrame profile to a SQL-mode DataFusion run if `examples/tunings/dataframe/datafusion_optimized.yaml` is ever added.\n\n## Change\n- Decide the validate-mode selection for platforms that exist in both SQL and DataFrame modes (explicit flag or inferring from the file contents) and implement it with tests.\n- Make the profile resolution mode-aware so a DataFrame profile is only chosen for a DataFrame run; add a test that would fail if a datafusion profile file appeared.\n- Document the rule in docs/reference/cli/tuning.md.\n\n## Guardrails\n- Existing DataFrame validate behaviour for polars, pandas and cuDF is unchanged.",
   "links": [
     "benchbox/cli/commands/tuning_group.py",
@@ -36,6 +36,14 @@
       "op": "finish",
       "op_id": "de7cc41050fe432aad09046f6e50d1bf",
       "session_id": "5709cef75a584579a236033476a263ba"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:f3947ef8d62ddbe70b6706e6",
+      "at": "2026-10-06T15:47:54Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "a5668a348d7e4c978ddb45711a91ddbe",
+      "session_id": "6a33af84e93c469ebdeae2d73e412c6f"
     }
   ]
 }
