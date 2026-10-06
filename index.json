@@ -20927,10 +20927,15 @@
       "title": "Rebuild darwin-arm64 TPC-H qgen/dbgen with a lower MACOSX_DEPLOYMENT_TARGET (minos 26.0 breaks macOS <= 15)"
     },
     "tpch-darwin-x86-64-dbgen-verify": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T14:14:07Z",
+        "generation": "68ffd46da83d4245b4d11a241d3a3f70",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Verify the rebuilt darwin-x86_64 TPC-H dbgen generates canonical addresses"
     },
     "tpch-dataframe-unseeded-q11-scale-fraction": {
