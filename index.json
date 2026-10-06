@@ -8353,6 +8353,13 @@
       "status": "done",
       "title": "Explorer drill-down for the per-statement applied-tuning receipt (.applied.json)"
     },
+    "explorer-applied-receipt-malformed-payload": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Harden the explorer receipt reader against payloads missing the expected layer"
+    },
     "explorer-basis-browse-hardware-engine-facets": {
       "claim": null,
       "needs": [

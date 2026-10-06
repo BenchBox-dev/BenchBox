@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "_applied_receipt tolerates a payload missing the expected layer without raising KeyError",
+    "A regression test covers the missing-layer shape"
+  ],
+  "context": "Noted during the independent review of PR #2705 (which was approved): every current caller passes a payload with the expected layer (verified by search), so this is latent robustness debt, not a live defect. No behavior change required beyond defensive access.",
+  "description": "_project/scripts/explorer_pipeline/models.py _applied_receipt indexes the receipt payload with direct key access. All current callers supply the expected layer, but a malformed payload would raise KeyError instead of degrading to the baseline the surrounding code already implements for other malformed shapes.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:6a2e2ab8b91b7afc9d83d494",
+      "at": "2026-10-06T19:09:18Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "b53bc29ee11343fc82b5497d2ff13f0a",
+      "session_id": "1b12a2c1c7b14a05a649d008ac5701eb"
+    }
+  ]
+}
