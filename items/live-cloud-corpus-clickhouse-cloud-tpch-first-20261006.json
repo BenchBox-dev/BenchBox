@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "TPC-H completed at SF 0.1, 1.0, 10.0 on ClickHouse Cloud notuning (3 bundles)",
+    "Every executed query succeeds (no FAILED)",
+    "Bundles produced on current develop including the result-cache receipt check and phase wall-clock bounds",
+    "All bundles pass scripts/validate_submission.py with 0 errors and carry result_source=internal",
+    "force_recreate exercised against a live Cloud service with the probe fix in place",
+    "Capacity and account type disclosed per bundle",
+    "Cells stay inside 6h per cell; anything outside needs approval stating command, maximum runtime, log path, and stop condition"
+  ],
+  "context": "Mirrors first-live-cloud-benchmark-run-and-publish. Blocked on clickhouse-cloud-existence-probe-attribute-error-20261004 (existing-database check crashes, so force_recreate never works there) and on operator-supplied credentials, which approx-survey-remaining-legs records as missing. Metadata DDL gap owned by tuning-portable-metadata-store-20261001; tuned runs deferred until it lands.",
+  "description": "Run and publish the first live ClickHouse Cloud corpus: TPC-H at SF 0.1, 1.0, 10.0, notuning, on current develop, after the existence-probe fix. Record capacity and account type per bundle per trial-capacity-disclosure-bundles-20261006. No live runs outside campaign limits without explicit approval stating command, maximum runtime, log path, and stop condition.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:d4c6ceae0de4d166359ede4c",
+      "at": "2026-10-06T19:07:27Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "253acf21855f4e33868c7ce206d7f828",
+      "session_id": "508606d004364578b5da477b03baf36a"
+    }
+  ]
+}
