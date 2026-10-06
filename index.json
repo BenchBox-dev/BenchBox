@@ -21432,10 +21432,15 @@
       "title": "Corroboration hardening nits: string-literal clause matching, empty-columns trivial corroboration, ORDER BY substring recording guard, bare-name table matching"
     },
     "tuning-coverage-matrix-exact-drift-check-20261005": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T07:42:22Z",
+        "generation": "849c2a5bfc2e47f08689511c3a0a3985",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:d90c17f1dbc58577e72c0803"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Tuning coverage matrix drift check only flags downgrades; make it exact and fix stale docs"
     },
     "tuning-ctas-rewrite-safety-20261001": {
