@@ -280,7 +280,7 @@ class ConnectionLifecycleMixin:
 
             fresh_database_issue = f"Tuning: {NO_TUNING_METADATA_ERROR}"
             for issue in validation_result.issues:
-                if validation_result.database_empty and (
+                if getattr(validation_result, "database_empty", False) and (
                     issue == fresh_database_issue or issue.startswith("Missing tables:")
                 ):
                     # A database holding none of the benchmark's tables is
