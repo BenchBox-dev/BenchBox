@@ -19035,15 +19035,10 @@
       "title": "Fix the site-parity header shrink-toggle mismatch between docs and results sites"
     },
     "site-parity-prune-stale-allowances": {
-      "claim": {
-        "expires_at": "2026-10-07T19:54:30Z",
-        "generation": "8f294493da734c62b6fbf0415b66b543",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:e5df545f4c322057da39bca0"
-      },
+      "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "active",
+      "status": "done",
       "title": "Prune the 36 site-parity allowances for broken links that now resolve"
     },
     "site-sphinx-fallback-exposure": {
