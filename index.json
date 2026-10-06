@@ -20918,10 +20918,15 @@
       "title": "Use dsqgen -STREAMS for TPC-DS throughput instead of home-grown ordering and parameters"
     },
     "tpcds-tuned-datagen-fresh-dir-no-table-files-20261005": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T03:16:17Z",
+        "generation": "a1443fa87c6b4a3188bc232e80fb8ead",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:d90c17f1dbc58577e72c0803"
+      },
       "needs": [],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "TPC-DS tuned run fails datagen from a fresh output directory (\"produced no table files\", empty manifest)"
     },
     "tpch-darwin-arm64-deployment-target-rebuild-20260724": {
