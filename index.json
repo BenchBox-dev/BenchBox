@@ -4359,6 +4359,13 @@
       "status": "open",
       "title": "Remove comments and docstrings from Write primitives modules"
     },
+    "comment-policy-ratchet-wheel-upgrade": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Comment-policy staged ratchet blocks all commits after legitimate vendored-wheel upgrade"
+    },
     "commit-identity-canonical-skill-source-sync": {
       "claim": null,
       "needs": [],
