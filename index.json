@@ -18820,7 +18820,7 @@
         "astro-site-53-cutover"
       ],
       "priority": "low",
-      "status": "open",
+      "status": "blocked",
       "title": "Prune the 36 site-parity allowances for broken links that now resolve"
     },
     "skill-integrity-ci-lane-live-validation": {
