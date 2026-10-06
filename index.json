@@ -21319,15 +21319,10 @@
       "title": "Author-facing honesty quickfixes: dry-run preview lookup, misleading displays, CLI footguns"
     },
     "tuning-bundle-and-console-residue-20261004": {
-      "claim": {
-        "expires_at": "2026-10-07T06:00:10Z",
-        "generation": "cb53a79e8bc1431985380fd3b7085008",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Residual tuning-claim gaps: legacy bundle re-export, fresh-database error level, Snowflake drop label, receipt drill-down"
     },
     "tuning-bundle-provenance-and-config-export-20260712": {
