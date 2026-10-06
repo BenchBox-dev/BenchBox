@@ -1638,6 +1638,20 @@ class TestKnownDefectExclusion:
 
         assert entry.ranking_exclusion_reason == baseline
 
+    def test_non_dict_sidecar_preserves_baseline(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, [1, 2, 3])
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
+    def test_non_list_known_defects_preserves_baseline(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, {"known_defects": "defective-macdbgen-addresses"})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
     def test_non_string_entries_are_ignored(self, bundle_file: Path) -> None:
         baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
         self._write_sidecar(bundle_file, {"known_defects": [123, None]})
