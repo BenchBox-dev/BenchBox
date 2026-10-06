@@ -142,21 +142,21 @@ def test_astro_header_links_resolve_to_site_paths_in_contract_order() -> None:
     assert "activeOnSurface" in model
 
 
-def test_astro_header_has_no_theme_toggle_component() -> None:
+def test_astro_header_puts_the_theme_button_after_search_outside_the_nav() -> None:
     header = _read(ASTRO_HEADER)
+    nav = header[header.index("<nav") : header.index("</nav>")]
 
-    assert "ThemeToggle" not in header, "astro header must not render the theme control"
+    assert "ThemeToggle" not in nav, "the theme button must not sit inside the global nav"
     assert 'role="radiogroup"' not in header
-    assert "data-theme-toggle" not in header
-    assert "theme-toggle" not in header
+    assert header.index("<SearchBox />") < header.index("<ThemeToggle />")
+    assert 'class="site-header__tools"' in header
 
 
-def test_astro_footer_theme_button_cycles_the_shared_options() -> None:
+def test_astro_header_theme_button_cycles_the_shared_options() -> None:
     toggle = _read(ASTRO_THEME_TOGGLE)
     footer = _read(ASTRO_FOOTER)
 
-    assert "import ThemeToggle" in footer
-    assert "<ThemeToggle />" in footer, "astro footer must render the theme button"
+    assert "ThemeToggle" not in footer, "the theme button moved from the footer to the header"
     assert toggle.count("data-theme-toggle") >= 1
     assert "shellLabels.theme" in toggle
     assert "THEME_OPTIONS.map(" in toggle
@@ -165,12 +165,16 @@ def test_astro_footer_theme_button_cycles_the_shared_options() -> None:
     assert "data-pagefind-ignore" in footer
 
 
-def test_results_footer_theme_button_binds_the_shared_aria_label() -> None:
+def test_results_header_theme_button_binds_the_shared_aria_label() -> None:
     shell = _read(PREACT_SHELL)
     model = _read(SHELL_MODEL)
     contract = _read("results-explorer/src/components/headerContract.ts")
+    header = shell[shell.index("export function SiteHeader") : shell.index("export function SiteFooter")]
+    footer = shell[shell.index("export function SiteFooter") : shell.index("function Logo(")]
 
-    assert "data-theme-toggle" in shell, "results footer should expose the theme button"
+    assert "<ThemeToggle />" in header, "results header should expose the theme button"
+    assert "<ThemeToggle />" not in footer
+    assert "data-theme-toggle" in shell
     assert "shellLabels.theme" in shell, "results theme button missing accessible name binding"
     assert "nextThemeOption(choice)" in shell
     assert "THEME_ICON_SHAPES" in shell
