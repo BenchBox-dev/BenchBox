@@ -5,6 +5,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from benchbox.core.tuning.applied_ledger import (
+    EXECUTED,
+    FAILED,
+    NOOP,
+    PHASE_DDL,
+    PHASE_POST_LOAD,
+    AppliedTuningLedger,
+)
 from benchbox.platforms.base import tuning_trust
 from benchbox.platforms.base.adapter import PlatformAdapter
 from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
@@ -101,6 +109,110 @@ def _run_enhanced_benchmark_source() -> str:
     start = source.index("    def run_enhanced_benchmark(")
     end = source.index("\n    def ", start + 1)
     return source[start:end]
+
+
+def _fold_adapter(
+    applied_ops: list[dict] | None = None, skipped_ops: list[dict] | None = None
+) -> tuple[MagicMock, AppliedTuningLedger]:
+    adapter = MagicMock()
+    ledger = AppliedTuningLedger()
+    adapter._applied_tuning_ledger = ledger
+    adapter._applied_layout_operations = list(applied_ops or [])
+    adapter._skipped_layout_operations = list(skipped_ops or [])
+    return adapter, ledger
+
+
+def test_fold_records_applied_as_executed() -> None:
+    adapter, ledger = _fold_adapter(
+        [{"statement": "OPTIMIZE T", "phase": PHASE_POST_LOAD, "status": "applied", "mechanism": "optimize"}]
+    )
+    tuning_trust.fold_layout_operations_into_ledger(adapter)
+    assert [s.status for s in ledger.statements] == [EXECUTED]
+
+
+def test_fold_records_skipped_as_dropped_not_failed() -> None:
+    adapter, ledger = _fold_adapter(
+        [{"statement": "OPTIMIZE T", "phase": PHASE_POST_LOAD, "status": "skipped", "mechanism": "optimize"}]
+    )
+    tuning_trust.fold_layout_operations_into_ledger(adapter)
+    assert ledger.statements == []
+    assert len(ledger.dropped) == 1
+    assert ledger.dropped[0].reason.startswith("skipped:")
+
+
+def test_fold_records_skipped_with_error_as_failed() -> None:
+    adapter, ledger = _fold_adapter(
+        [
+            {
+                "statement": "OPTIMIZE T",
+                "phase": PHASE_POST_LOAD,
+                "status": "skipped",
+                "mechanism": "optimize",
+                "error_message": "boom",
+            }
+        ]
+    )
+    tuning_trust.fold_layout_operations_into_ledger(adapter)
+    assert ledger.dropped == []
+    assert [s.status for s in ledger.statements] == [FAILED]
+
+
+def test_fold_records_unknown_status_as_failed() -> None:
+    adapter, ledger = _fold_adapter(
+        [{"statement": "OPTIMIZE T", "phase": PHASE_POST_LOAD, "status": "weird", "mechanism": "optimize"}]
+    )
+    tuning_trust.fold_layout_operations_into_ledger(adapter)
+    assert [s.status for s in ledger.statements] == [FAILED]
+
+
+def test_fold_consumes_skipped_layout_operations_as_dropped() -> None:
+    adapter, ledger = _fold_adapter(
+        skipped_ops=[
+            {
+                "statement": "OPTIMIZE LINEITEM ZORDER BY (L_ORDERKEY)",
+                "phase": PHASE_DDL,
+                "status": "skipped",
+                "mechanism": "z_order",
+                "table": "LINEITEM",
+            }
+        ]
+    )
+    tuning_trust.fold_layout_operations_into_ledger(adapter)
+    assert ledger.statements == []
+    assert [d.intent for d in ledger.dropped] == ["OPTIMIZE LINEITEM ZORDER BY (L_ORDERKEY)"]
+
+
+def test_hudi_skips_yield_dropped_intents_and_non_failed_status() -> None:
+    adapter, ledger = _fold_adapter(
+        skipped_ops=[
+            {
+                "statement": "OPTIMIZE LINEITEM ZORDER BY (L_ORDERKEY)",
+                "phase": "ddl",
+                "status": "skipped",
+                "mechanism": "z_order",
+                "table": "LINEITEM",
+            },
+            {
+                "statement": "OPTIMIZE LINEITEM",
+                "phase": "ddl",
+                "status": "skipped",
+                "mechanism": "optimize",
+                "table": "LINEITEM",
+            },
+        ]
+    )
+    tuning_trust.fold_layout_operations_into_ledger(adapter)
+    assert len(ledger.dropped) == 2
+    assert ledger.overall_status(tuning_enabled=True, has_config=True) == NOOP
+
+
+def test_no_ledger_phase_literal_outside_closed_set() -> None:
+    stray: list[str] = []
+    for path in (ROOT / "benchbox").rglob("*.py"):
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if 'phase="pre_load"' in line or "phase='pre_load'" in line or 'phase="manual"' in line:
+                stray.append(f"{path.relative_to(ROOT)}:{lineno}")
+    assert stray == []
 
 
 def test_run_enhanced_benchmark_routes_trust_through_tuning_trust() -> None:
