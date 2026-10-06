@@ -13569,6 +13569,13 @@
       "status": "done",
       "title": "oracle map renders a staged gate's scale from the shared default and passes unknown provenance labels through"
     },
+    "oracle-review-codex-limit-fallback-20261006": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "oracle-review has no fallback when Codex connector hits usage limits"
+    },
     "oracle-review-quota-fallback": {
       "claim": null,
       "needs": [],

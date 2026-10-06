@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "A merge-blocking review path exists that does not depend on Codex connector availability",
+    "Documented in the review protocol which fallback applies and who can invoke it"
+  ],
+  "context": "On 2026-10-06 PR #2721 (portable metadata store) was blocked: the Codex connector posted a usage-limit notice instead of a review, and oracle-review accepts only its review or a stand-in attestation from a listed attester (joeharris76). The only unblock path required the owner personally. Observed during the tuning-followups batch.",
+  "description": "Decide and document a fallback when the Codex connector is at its usage limit: e.g. limit monitoring/alerting before it blocks merges, a second eligible reviewer, or widening stand-in attester rules. Goal is that no PR sits unmergeable waiting on an external quota reset.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:d90c17f1dbc58577e72c0803",
+      "at": "2026-10-06T19:08:52Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "28d1dc2e5eb14335a5f188c1e5590331",
+      "session_id": "5709cef75a584579a236033476a263ba"
+    }
+  ]
+}
