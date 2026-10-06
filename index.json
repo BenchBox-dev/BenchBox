@@ -7509,6 +7509,13 @@
       "status": "done",
       "title": "Standardize benchmark and platform naming across documentation"
     },
+    "docs-licensing-compliance-wording": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Settle TPC compliance and IMDb permission wording on published pages"
+    },
     "docs-linkcheck-fails-on-external-site-timeouts": {
       "claim": null,
       "needs": [],

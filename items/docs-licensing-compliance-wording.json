@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Owner-approved wording on each page",
+    "A recorded decision on the TPC downloads"
+  ],
+  "description": "benchmarks/join-order.md states the IMDb data is used with permission and gives a redistribution position; benchmarks/tpc-standards.md, tpch-skew.md, tpc-h.md, tpc-ds.md and tpc-ds-obt.md make compliance claims. The site also serves TPC-DS templates and TPC-H query files under /docs/_downloads/. Decide the approved wording and whether those downloads fit the TPC EULA.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:16:17Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "5e546aa7d9bd4c54894c8d33640b6956",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}
