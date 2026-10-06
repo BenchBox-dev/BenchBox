@@ -41,7 +41,6 @@ from .base.config_utils import (
     POSTGRES_FAMILY_PLATFORM_FIELDS,
     make_platform_config_builder,
 )
-from .base.connection_wrappers import StreamConnectionCapability
 from .base.data_loading import (
     CsvDialect,
     DataSourceResolver,
@@ -335,14 +334,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     plan_capture_phase_eligible = True
     default_service_port = 5432
-    # psycopg connections do not support true concurrent statement execution
-    # across cursors of one connection (server-side session state --
-    # transactions, SET, prepared statements -- lives on the connection, and
-    # concurrent cursor use serializes or raises). Each throughput/pool-test
-    # stream therefore gets its own independent connection/session; see
-    # new_stream_connection() below and
-    # benchbox/platforms/base/connection_wrappers.py:StreamConnectionCapability.
-    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     @property
     def platform_name(self) -> str:

@@ -45,27 +45,14 @@ def validate_tpc_scale_factor(scale: float) -> None:
 
 
 def validate_stream_count(streams: int | None, phases: str | None = None) -> None:
-    """Validate ``--streams`` for official runs.
-
-    Mirrors the CLI guardrails in ``run_official``:
-    - ``--streams`` is required when throughput is requested.
-    - Negative values are rejected.
-    - Explicit ``1`` is rejected (TPC minimum is 2; the driver floors 1→2
-      without an error, so callers must be told here).
-
-    Raises:
-        ValueError: On invalid stream count.
-    """
     phase_set: set[str] = set()
     if phases:
         phase_set = {p.strip().lower() for p in phases.split(",")}
 
     if "throughput" in phase_set and streams is None:
         raise ValueError("--streams is required for throughput test")
-    if streams is not None and streams < 0:
-        raise ValueError(f"--streams must be a non-negative integer, got: {streams}")
-    if streams == 1:
-        raise ValueError("--streams must be >= 2 (TPC throughput minimum); got: 1")
+    if streams is not None and streams < 2 and "throughput" in phase_set:
+        raise ValueError(f"--streams must be >= 2 (TPC throughput minimum); got: {streams}")
 
 
 _DATAFRAME_THROUGHPUT_UNSUPPORTED = (
@@ -88,6 +75,7 @@ from benchbox.core.runner.runner import (
     ValidationOptions,
     run_benchmark_lifecycle,
 )
+from benchbox.core.schemas import reject_single_stream_throughput
 from benchbox.utils.toggles import is_probe_requested
 
 if TYPE_CHECKING:
@@ -198,6 +186,9 @@ def resolve_run_config(
         iterations=max(1, iterations),
         warm_up_iterations=max(0, warmups),
         power_fail_fast=fail_fast,
+        stream_timeout_seconds=options.get("stream_timeout_seconds"),
+        stream_timeout_source=options.get("stream_timeout_source"),
+        cancel_on_timeout=bool(options.get("cancel_on_timeout", False)),
         client_region=getattr(config, "client_region", None) or options.get("client_region"),
         client_cloud=getattr(config, "client_cloud", None) or options.get("client_cloud"),
         # RunConfig.link_probe defaults True, so the toggle always resolves
@@ -341,6 +332,7 @@ def execute_run(
     load-phase warning, and the credential-setup retry all stay in the CLI,
     which is where the new contract puts them.
     """
+    reject_single_stream_throughput(getattr(config, "concurrency", None), phases_to_run)
     stamp_requested_phases(config, phases_to_run)
 
     phases = resolve_lifecycle_phases(phases_to_run)

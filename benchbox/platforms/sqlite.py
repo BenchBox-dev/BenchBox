@@ -27,7 +27,7 @@ if TYPE_CHECKING:
         UnifiedTuningConfiguration,
     )
 
-from .base import DriverIsolationCapability, PlatformAdapter, StreamConnectionCapability
+from .base import DriverIsolationCapability, PlatformAdapter
 from .base.connection_wrappers import _make_stream_cursor
 
 try:
@@ -198,7 +198,6 @@ class SQLiteAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.NOT_APPLICABLE
     plan_capture_phase_eligible = True
-    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     @property
     def platform_name(self) -> str:

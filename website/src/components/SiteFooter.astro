@@ -1,5 +1,4 @@
 ---
-import ThemeToggle from "./ThemeToggle.astro";
 import { SHELL_FOOTER_LEGAL, shellLabels, shellLinks } from "../lib/header-links.ts";
 
 interface Props {
@@ -27,6 +26,5 @@ const links = shellLinks(Astro.url.pathname);
         ))
       }
     </nav>
-    <ThemeToggle />
   </div>
 </Wrapper>

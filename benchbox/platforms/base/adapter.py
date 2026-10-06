@@ -11,7 +11,6 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import logging
-import math
 import threading
 import uuid
 from abc import ABC, abstractmethod
@@ -112,6 +111,12 @@ def exclude_probe_wall_time(total_seconds: float, probe_seconds: float) -> float
     return max(0.0, total_seconds - probe_seconds)
 
 
+class _ManifestStreamCapability:
+    def __get__(self, instance: Any, owner: type) -> StreamConnectionCapability:
+        capability, _declared = resolve_stream_connection_capability(owner if instance is None else type(instance))
+        return capability
+
+
 class PlatformAdapter(
     ConnectionLifecycleMixin,
     DialectTranslationMixin,
@@ -135,18 +140,7 @@ class PlatformAdapter(
     # Subclasses should override this class variable to declare their capability.
     # Default is NOT_APPLICABLE - adapters that support isolation must opt in.
     driver_isolation_capability: DriverIsolationCapability = DriverIsolationCapability.NOT_APPLICABLE
-    # Per-stream connection capability for concurrent throughput/pool-test streams
-    # (see StreamConnectionCapability docstring). Default is SHARED_CURSOR, which
-    # preserves today's behavior for every adapter that does not opt in: streams
-    # share one cursor per connection, correct for embedded engines like DuckDB.
-    # Server-style (client/server) adapters that need one independent connection
-    # per stream must set this to INDEPENDENT_CONNECTION *and* override
-    # new_stream_connection() below - declaring the capability alone is not
-    # enough, since the base new_stream_connection() raises for that value to
-    # fail fast instead of silently falling back to cursor sharing. Adapters
-    # that cannot serve concurrent streams at all declare UNSUPPORTED, which
-    # the throughput entry points refuse before stream submission.
-    stream_connection_capability: StreamConnectionCapability = StreamConnectionCapability.SHARED_CURSOR
+    stream_connection_capability = _ManifestStreamCapability()
     # Default in-container service port the adapter connects to in the reference
     # docker deployment (the container side of the compose `ports:` mapping).
     # UAT derives its reachability table from these declarations instead of
@@ -292,7 +286,7 @@ class PlatformAdapter(
         self._client_link_metadata: dict[str, Any] | None = None
         self._link_probe_timed_out = False
         self._post_measurement_contained = False
-        self._contained_throughput_result = None
+        self._contained_throughput_result: Any = None
 
     def _reset_run_scoped_state(self) -> None:
         """Reset mutable state that belongs to one benchmark execution."""
@@ -1134,10 +1128,6 @@ class PlatformAdapter(
             power_at_size = power_test_phase.power_at_size if power_test_phase else None
             throughput_at_size = throughput_test_phase.throughput_at_size if throughput_test_phase else None
 
-            qph_at_size = None
-            if power_at_size and power_at_size > 0 and throughput_at_size and throughput_at_size > 0:
-                qph_at_size = math.sqrt(power_at_size * throughput_at_size)
-
             eet = run_config.get("_effective_execution_type")
             execution_type = eet if eet is not None else run_config.get("test_execution_type", "standard")
 
@@ -1198,7 +1188,6 @@ class PlatformAdapter(
                 validation_details=validation_phase.validation_details,
                 power_at_size=power_at_size,
                 throughput_at_size=throughput_at_size,
-                qph_at_size=qph_at_size,
                 test_execution_type=execution_type,
             )
 

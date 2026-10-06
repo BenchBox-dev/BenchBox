@@ -85,7 +85,6 @@ class TestTPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphds_at_size=0.0,
             success=True,
             errors=[],
         )
@@ -183,7 +182,7 @@ class TestTPCDSOfficialBenchmark:
             assert result.success is True
             assert result.power_at_size == 150.0
             assert result.throughput_at_size == 0.0  # Not run
-            assert result.qphds_at_size == 0.0  # Cannot calculate without both
+            assert not hasattr(result, "qphds_at_size")
 
     def test_validate_compliance(self, benchmark_instance):
         """Test compliance validation."""
@@ -198,7 +197,6 @@ class TestTPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=100.0,
             throughput_at_size=200.0,
-            qphds_at_size=141.42,  # sqrt(100 * 200)
             success=True,
             errors=[],
         )
@@ -216,7 +214,6 @@ class TestTPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphds_at_size=0.0,
             success=False,
             errors=["Test error"],
         )
@@ -235,7 +232,6 @@ class TestTPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=500.0,
             throughput_at_size=800.0,
-            qphds_at_size=632.46,
             success=True,
             errors=[],
         )
@@ -260,7 +256,7 @@ class TestTPCDSOfficialBenchmark:
             assert "TPC-DS Official Benchmark Audit Trail" in content
             assert "Scale Factor: 1.0" in content
             assert "Number of Streams: 4" in content
-            assert "QphDS@Size: 632.46" in content
+            assert "QphDS" not in content
         finally:
             # Clean up the temp file
             if audit_file.exists():
@@ -300,7 +296,6 @@ class TestTPCDSOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphds_at_size=0.0,
             success=True,
             errors=[],
         )

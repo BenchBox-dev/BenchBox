@@ -131,11 +131,13 @@ Even with these costs the margin is large: 28 ms against 370 ms per page.
 
 ## Starlight overrides (D6)
 
-- **Overridden:** `Header` (shared shell header), `PageTitle`, `Footer`
-  (shared shell footer), `ThemeProvider` (the `benchbox:theme` script) and
-  `ThemeSelect` (empty; the header owns the toggle). Starlight's built-in
-  Pagefind and 404 route are off.
-- **Unchanged:** the sidebar, table of contents, mobile menu and page frame.
+- **Overridden:** `Header` (shared shell header plus the breadcrumb bar),
+  `Footer` (shared shell footer), `Sidebar` (Starlight's sidebar with the
+  page's heading list placed under the current page), `TwoColumnContent`
+  (one column, because the heading list lives in the sidebar),
+  `ThemeProvider` (the `benchbox:theme` script) and `ThemeSelect` (empty; the
+  header owns the toggle). Starlight's built-in Pagefind and 404 route are off.
+- **Unchanged:** the table of contents component, mobile menu and page frame.
 - **Friction:**
   - Starlight styles sit in CSS layers, so shell rules are scoped with
     `:where(.shell)`.

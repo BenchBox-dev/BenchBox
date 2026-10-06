@@ -10,7 +10,8 @@ interface Props {
 }
 
 const { post } = Astro.props;
-const { Content } = await render(post);
+const { Content, headings } = await render(post);
+const lede = /^\s*>\s*([^\n[\]*_`]+?)\s*\n(?!>)/.exec(post.body ?? "")?.[1];
 const isIndex = post.id === "blog/index";
 const entry = isIndex || post.data.blogpost !== true ? undefined : toPost(post);
 const posts = entry ? (await loadBlog()).published : [];
@@ -23,6 +24,8 @@ const link = (target: typeof previous) => (target ? { label: target.title, href:
   title={post.data.title}
   titleId={post.data.titleId}
   description={post.data.description}
+  subtitle={lede}
+  headings={headings}
   author={entry?.author ?? post.data.author}
   authorHref={entry && entry.author in AUTHORS ? authorPath(entry.author) : undefined}
   date={entry ? formatBlogDate(entry.date) : post.data.date}

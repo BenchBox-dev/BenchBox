@@ -205,23 +205,6 @@ def test_failed_session_cannot_be_hidden_by_later_success(adapter):
     assert adapter._cache_control_receipt["errors"]
 
 
-def test_throughput_setup_precedes_parent_harness_timer(adapter):
-    from benchbox.platforms.base.execution import TestDriversMixin
-
-    session = Session()
-
-    def timed_parent(self, benchmark, connection, run_config):
-        assert session.commands == ["SET use_cached_result = false", "SET use_cached_result"]
-        session.commands.clear()
-        stream = self.new_stream_connection(connection)
-        self.execute_query(stream, "SELECT 1", "q1")
-        assert session.commands == ["SELECT 1"]
-        return []
-
-    with patch.object(TestDriversMixin, "_execute_tpch_throughput_test", timed_parent):
-        assert adapter._execute_tpch_throughput_test(Mock(), session, {}) == []
-
-
 def test_unsupported_readback_shape_refuses_execution(adapter):
     cursor = Mock(spec=["execute", "fetchall", "fetchone"])
     cursor.fetchone.return_value = ("different_setting", "false")

@@ -15,6 +15,7 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 from benchbox.cli.composite_params import CompressionConfig
+from benchbox.core.schemas import reject_single_stream_throughput
 
 if TYPE_CHECKING:
     from benchbox.cli.tuning_resolver import TuningResolution
@@ -46,7 +47,7 @@ class RunRequest:
     compression_type: str
     compression_level: int | None
     iterations: int | None = None
-    concurrency: int = 1
+    concurrency: int | None = None
     non_replayable_options: tuple[str, ...] = ()
     exact_replay: bool = True
     compatibility_notes: tuple[str, ...] = ()
@@ -84,7 +85,7 @@ class ResolvedRunPlan:
     compression_type: str
     compression_level: int | None
     iterations: int | None
-    concurrency: int
+    concurrency: int | None
     seed: int | None
     non_replayable_options: tuple[str, ...]
 
@@ -158,15 +159,10 @@ def _saved_non_replayable_options(saved: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(sorted(set(raw)))
 
 
-def _live_concurrency(state: types.SimpleNamespace) -> int:
-    """Validate the live CLI concurrency exactly like the saved-path check.
-
-    Only an absent value defaults to the single-stream plan of 1; an
-    explicit zero or a non-integer is rejected rather than coerced.
-    """
+def _live_concurrency(state: types.SimpleNamespace) -> int | None:
     raw_concurrency = getattr(state, "concurrency", None)
     if raw_concurrency is None:
-        return 1
+        return None
     try:
         concurrency = int(raw_concurrency)
     except (TypeError, ValueError) as exc:
@@ -180,6 +176,8 @@ def current_run_request(state: types.SimpleNamespace) -> RunRequest:
     """Capture user intent without including fields derived by the resolver."""
     phases = state.phases if isinstance(state.phases, (list, tuple)) else str(state.phases).split(",")
     compression = getattr(state, "comp_config", None) or state.compression or CompressionConfig()
+    concurrency = _live_concurrency(state)
+    reject_single_stream_throughput(concurrency, phases)
     return RunRequest(
         platform=state.platform,
         benchmark=state.benchmark,
@@ -195,10 +193,7 @@ def current_run_request(state: types.SimpleNamespace) -> RunRequest:
         compression_type=compression.type,
         compression_level=compression.level,
         iterations=getattr(state, "iterations", None),
-        # Click leaves the hidden --concurrency option as None when callers
-        # use the normal CLI surface; only that absent value defaults to the
-        # single-stream plan - explicit values go through saved-path validation.
-        concurrency=_live_concurrency(state),
+        concurrency=concurrency,
         non_replayable_options=_active_non_replayable_options(state),
     )
 
@@ -295,16 +290,19 @@ def _saved_concurrency(
     current: RunRequest,
     saved: Mapping[str, Any],
     explicit_fields: frozenset[str],
-) -> int:
-    raw_concurrency = current.concurrency if "concurrency" in explicit_fields else saved.get("concurrency", 1)
+) -> int | None:
+    explicit = "concurrency" in explicit_fields
+    raw_concurrency = current.concurrency if explicit else saved.get("concurrency")
     if raw_concurrency is None:
-        raw_concurrency = 1
+        return None
     try:
         concurrency = int(raw_concurrency)
     except (TypeError, ValueError) as exc:
         raise ValueError("Saved quick-restart concurrency must be an integer") from exc
     if concurrency < 1:
         raise ValueError("Saved quick-restart concurrency must be at least one")
+    if concurrency == 1 and not explicit:
+        return None
     return concurrency
 
 
@@ -366,7 +364,7 @@ def _replay_compatibility_notes(
         ("queries", "queries", "saved run did not record a query subset; assumed all queries"),
         ("mode", "mode", "saved run did not record execution mode; used platform default"),
         ("compression", "compress_data", "saved run did not record compression enablement; assumed enabled"),
-        ("concurrency", "concurrency", "saved run did not record concurrency; assumed one"),
+        ("concurrency", "concurrency", "saved run did not record concurrency; used the default stream count"),
         ("iterations", "iterations", "saved run did not record power iterations; used the default"),
     )
     notes.extend(
@@ -374,6 +372,8 @@ def _replay_compatibility_notes(
         for field, saved_field, note in assumed_defaults
         if field not in explicit_fields and saved_field not in saved
     )
+    if "concurrency" not in explicit_fields and saved.get("concurrency") == 1:
+        notes.append("saved run recorded 1 stream, the former default; treated as not set")
     if "seed" not in explicit_fields and saved.get("seed") is None:
         notes.append("saved run did not record a seed")
     if "compression" not in explicit_fields and compression_enabled and "compression_type" not in saved:
@@ -447,6 +447,7 @@ def merge_quick_restart_request(
 
     compression_enabled, compression_type, compression_level = _saved_compression(current, saved, explicit_fields)
     concurrency = _saved_concurrency(current, saved, explicit_fields)
+    reject_single_stream_throughput(concurrency, phases)
 
     notes = _replay_compatibility_notes(current, saved, explicit_fields, compression_enabled=compression_enabled)
 

@@ -6,10 +6,15 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 UAT_DIR = REPO_ROOT / "tests" / "uat"
+LOC_TABLE = REPO_ROOT / "_project" / "scripts" / "uat_loc_table.py"
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.fast,
+    pytest.mark.skipif(not LOC_TABLE.exists(), reason="_project scripts are not in this checkout (release tree)"),
+]
 
 UNBUCKETED_LEGACY_MODULES = frozenset(
     {
@@ -22,9 +27,7 @@ UNBUCKETED_LEGACY_MODULES = frozenset(
 
 
 def _load_loc_table():
-    spec = importlib.util.spec_from_file_location(
-        "uat_loc_bucket_coverage_table", REPO_ROOT / "_project" / "scripts" / "uat_loc_table.py"
-    )
+    spec = importlib.util.spec_from_file_location("uat_loc_bucket_coverage_table", LOC_TABLE)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)

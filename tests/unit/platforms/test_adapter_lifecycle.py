@@ -260,3 +260,94 @@ def test_run_benchmark_leaves_analyze_plans_default_when_run_config_omits_it(tmp
     adapter.run_benchmark(benchmark, benchmark_name="tpch", capture_plans=True, analyze_plans=None)
 
     assert adapter.analyze_plans is False
+
+
+class _ThroughputLifecycleAdapter(_LifecycleAdapter):
+    def __init__(self, stream_fn: Any, *, stream_timeout: float, **config: Any) -> None:
+        super().__init__(**config)
+        self._stream_fn = stream_fn
+        self._stream_timeout = stream_timeout
+
+    def _dispatch_queries_by_type(self, benchmark: Any, connection: Any, run_config: dict) -> list[dict[str, Any]]:
+        import logging
+
+        from benchbox.core.throughput.runner import StreamRunner
+        from benchbox.core.tpch.throughput_test import TPCHThroughputTestConfig, TPCHThroughputTestResult
+
+        config = TPCHThroughputTestConfig(num_streams=2, stream_timeout=self._stream_timeout, max_workers=2)
+        result = TPCHThroughputTestResult(
+            config=config,
+            start_time="",
+            end_time="",
+            total_time=0.0,
+            throughput_at_size=0.0,
+            streams_executed=0,
+            streams_successful=0,
+        )
+        StreamRunner.execute(self._stream_fn, config, result, logging.getLogger("lifecycle-throughput"))
+        self._last_throughput_test_result = result
+        return []
+
+
+def _stream_result(stream_id: int):
+    from benchbox.core.throughput.result import ThroughputStreamResult
+
+    return ThroughputStreamResult(
+        stream_id=stream_id,
+        start_time=0.0,
+        end_time=1.0,
+        duration=1.0,
+        queries_executed=1,
+        queries_successful=1,
+        queries_failed=0,
+        success=True,
+    )
+
+
+def _wait_for(predicate: Any, timeout: float = 10.0) -> bool:
+    import time
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return predicate()
+
+
+def test_connection_stays_open_until_a_timed_out_stream_finishes(tmp_path: Path) -> None:
+    import threading
+
+    release = threading.Event()
+
+    def stream_fn(stream_id: int, seed: int, config: Any):
+        if stream_id == 1:
+            release.wait(timeout=30)
+        return _stream_result(stream_id)
+
+    adapter = _ThroughputLifecycleAdapter(stream_fn, stream_timeout=0.2, existing_databases=[False])
+    benchmark = _LifecycleBenchmark(tmp_path)
+
+    try:
+        adapter.run_benchmark(benchmark, benchmark_name="tpch", test_execution_type="throughput")
+
+        assert adapter._post_measurement_contained is True
+        assert adapter.closed_connections == 0
+        assert adapter.connection is None
+        release.set()
+        assert _wait_for(lambda: adapter.closed_connections == 1)
+    finally:
+        release.set()
+
+
+def test_connection_closes_synchronously_when_no_stream_times_out(tmp_path: Path) -> None:
+    def stream_fn(stream_id: int, seed: int, config: Any):
+        return _stream_result(stream_id)
+
+    adapter = _ThroughputLifecycleAdapter(stream_fn, stream_timeout=5, existing_databases=[False])
+    benchmark = _LifecycleBenchmark(tmp_path)
+
+    adapter.run_benchmark(benchmark, benchmark_name="tpch", test_execution_type="throughput")
+
+    assert adapter._post_measurement_contained is False
+    assert adapter.closed_connections == 1

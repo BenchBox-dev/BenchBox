@@ -16,7 +16,6 @@ which is what remains in the module and is covered below.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -43,7 +42,6 @@ class _FakeResult:
     total_time: float = 60.0
     power_at_size: float = 100.0
     throughput_at_size: float = 200.0
-    qphh_at_size: float = 150.0
     success: bool = True
     errors: list = field(default_factory=list)
 
@@ -59,8 +57,6 @@ class TestGenerateOfficialBenchmarkAuditTrail:
             result=result,
             benchmark_title="TPC-H",
             benchmark_slug="tpch",
-            qph_label="QphH@Size",
-            qph_attr="qphh_at_size",
         )
 
         assert output_path.exists()
@@ -73,7 +69,8 @@ class TestGenerateOfficialBenchmarkAuditTrail:
         assert "Number of Streams: 2" in content
         assert "Power@Size: 100.00" in content
         assert "Throughput@Size: 200.00" in content
-        assert "QphH@Size: 150.00" in content
+        assert "QphH" not in content
+        assert "QphDS" not in content
         assert "Success: True" in content
         assert "Errors:" not in content
 
@@ -86,8 +83,6 @@ class TestGenerateOfficialBenchmarkAuditTrail:
             result=result,
             benchmark_title="TPC-DS",
             benchmark_slug="tpcds",
-            qph_label="QphDS@Size",
-            qph_attr="qphh_at_size",
             output_file=explicit_path,
         )
 
@@ -103,8 +98,6 @@ class TestGenerateOfficialBenchmarkAuditTrail:
             result=result,
             benchmark_title="TPC-H",
             benchmark_slug="tpch",
-            qph_label="QphH@Size",
-            qph_attr="qphh_at_size",
         )
 
         content = output_path.read_text(encoding="utf-8")
@@ -121,33 +114,7 @@ class TestGenerateOfficialBenchmarkAuditTrail:
             result=result,
             benchmark_title="TPC-H",
             benchmark_slug="tpch",
-            qph_label="QphH@Size",
-            qph_attr="qphh_at_size",
         )
 
         assert output_path.parent == tmp_path / "benchmark_results"
         assert output_path.exists()
-
-    def test_qph_attr_is_resolved_dynamically(self, tmp_path):
-        """qph_attr selects the result attribute used for the QPH line."""
-        result = SimpleNamespace(
-            config=_FakeConfig(output_dir=tmp_path),
-            start_time="t0",
-            end_time="t1",
-            total_time=1.0,
-            power_at_size=1.0,
-            throughput_at_size=1.0,
-            custom_qph=42.5,
-            success=True,
-            errors=[],
-        )
-
-        output_path = generate_official_benchmark_audit_trail(
-            result=result,
-            benchmark_title="TPC-DS",
-            benchmark_slug="tpcds",
-            qph_label="QphDS@Size",
-            qph_attr="custom_qph",
-        )
-
-        assert "QphDS@Size: 42.50" in output_path.read_text(encoding="utf-8")
