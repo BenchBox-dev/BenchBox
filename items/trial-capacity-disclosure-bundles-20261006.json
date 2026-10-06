@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Published bundles record the exact capacity SKU (Fabric F4/F64, Redshift RPU base and region, Athena credit account type)",
+    "Trial-capacity numbers are labeled so they are never compared as production equivalents",
+    "Validator or submission docs enforce the field"
+  ],
+  "context": "Found during 2026-10-06 review of free-trial offers: Redshift $300/90d, AWS $200/6mo, and Fabric 60d F4-or-F64 trials would otherwise enter the corpus indistinguishable from paid capacity.",
+  "description": "Require capacity disclosure for any benchmark bundle produced on trial or credit capacity: record trial versus paid, the exact SKU, and the account type in bundle metadata and enforce it at submission time. Covers Fabric F4/F64, Redshift Serverless RPU base, and Athena shared-credit runs.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:d4c6ceae0de4d166359ede4c",
+      "at": "2026-10-06T18:55:52Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "60cdfe119f334360a602d994e29c8d55",
+      "session_id": "508606d004364578b5da477b03baf36a"
+    }
+  ]
+}

@@ -21288,6 +21288,13 @@
       "status": "done",
       "title": "Transactional staging reuse ignores provenance and silently benchmarks stale data"
     },
+    "trial-capacity-disclosure-bundles-20261006": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Require trial-capacity disclosure in published bundles (F4/F64, RPU, credit account)"
+    },
     "trim-viz-deps-plotly-only": {
       "claim": null,
       "needs": [],
