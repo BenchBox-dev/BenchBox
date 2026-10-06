@@ -16923,10 +16923,15 @@
       "title": "Result Output Schema v2.0 Complete Redesign"
     },
     "result-validation-phase-status-contradicts-summary": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T19:20:08Z",
+        "generation": "4e71d2238464437f9d21be6dc746ce04",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Result bundles record phases.validation PASSED while summary.validation is partial with failed queries"
     },
     "results-anonymize-tuning-constraint-identifiers": {
