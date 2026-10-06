@@ -2,6 +2,7 @@
 import { shellBrand, shellCta, shellLabels, shellLinks } from "../lib/header-links.ts";
 import Logo from "./Logo.astro";
 import SearchBox from "./SearchBox.astro";
+import ThemeToggle from "./ThemeToggle.astro";
 
 interface Props {
   wrapper?: "header" | "div";
@@ -44,7 +45,10 @@ const cta = shellCta();
         <a class="site-header__cta" href={cta.href}>{cta.label}</a>
       </nav>
     </div>
-    <SearchBox />
+    <div class="site-header__tools">
+      <SearchBox />
+      <ThemeToggle />
+    </div>
   </div>
 </Wrapper>
 
