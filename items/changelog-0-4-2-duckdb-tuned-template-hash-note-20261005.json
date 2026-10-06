@@ -2,7 +2,7 @@
   "acceptance": [
     "The 0.4.2 notes warn about the DuckDB tuned-template hash change and the cached database rename."
   ],
-  "context": "Source: PR #2677 close-out. The matching text exists in the PR #2677 branch history (CHANGELOG commit before the rebase) and in the tuning W2 ledger notes.",
+  "context": "Source: PR #2677 close-out. The matching text exists in the PR #2677 branch history (CHANGELOG commit before the rebase) and in the tuning W2 ledger notes.\n\nCloseout 2026-10-06: PR #2687 merged to develop at b34db00ff (mergedAt 2026-10-06T01:20:02Z). Added \"DuckDB tuned databases are rebuilt\" bullet to develop's [0.4.2] Before-you-upgrade section. Evidence: curation guard OK; 23 tag-guard tests pass; required develop contexts green on merged head (core, docs, landing, explorer, results-data, tooling, oracle-review); five-axis review no Critical/Required findings. GitHub Release v0.4.2 notes re-sync NOT done: owner did not approve the bullet text or the re-sync (answered \"None of the above\" 2026-10-05). Re-sync with generate_changelog_entry.py --sync-github-release-notes needs explicit owner approval of the final wording.",
   "description": "## Problem\nPR #2636 (merged before the 0.4.2 cut) changed the shipped DuckDB tuned templates: partitioning and CHECK constraints were removed. As a result DuckDB tuned results recorded earlier carry a different `requested_config_hash`, and the cached tuned database name changes (for example `tpch_sf1_custom_pk_fk_uniq_check_part_sort` becomes `tpch_sf1_custom_pk_fk_uniq_sort`), so an existing tuned DuckDB database is rebuilt on the next run. PR #2636's CHANGELOG bullet was lost when develop rewrote the 0.4.2 section; the released 0.4.2 notes mention only that DuckDB tuned runs no longer report false index mismatches. Users comparing hashes or relying on cached tuned databases get no warning.\n\n## Change\nAdd a \"Before you upgrade\" bullet to the 0.4.2 section (or the release notes the owner publishes) covering the hash change and the database rename. 0.4.2 PyPI publication is handed to the owner (dlv2-52-release-rehearsal-and-first-release), so coordinate the wording there.\n\n## Guardrails\n- Do not edit older released sections beyond this addition; keep the changelog tag guard test green.",
   "links": [
     "CHANGELOG.md",
@@ -24,6 +24,14 @@
       "generation": "5db2691c8caf48ffb6b5ff4c6ed32385",
       "op": "take",
       "op_id": "65c8002589fb412cad06e4860f761ee2",
+      "session_id": "a12b8d1162704af386c2b2c304357592"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:64399a12525eb713b4a9ab65",
+      "at": "2026-10-06T01:23:13Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "0e8fee48ea194ec1b0f41656f604ca45",
       "session_id": "a12b8d1162704af386c2b2c304357592"
     }
   ]
