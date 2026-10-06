@@ -338,6 +338,26 @@ class ConnectionLifecycleMixin:
         """
         return False
 
+    def fail_closed_on_force_recreate(self, *, platform_label: str, database: str | None, manual_hint: str) -> None:
+        """Refuse ``--force-recreate`` when the adapter cannot recreate the database.
+
+        Fail-closed guard for adapters without a docs-supported automatic drop path: on a real (non-dry)
+        run with ``force_recreate`` set, raise a clear error naming the platform and telling the user to
+        drop the database manually, instead of silently reusing it. No-op when ``force_recreate`` is unset
+        or the run is a dry run (which changes nothing and must stay plannable).
+        """
+        if not getattr(self, "force_recreate", False):
+            return
+        if getattr(self, "dry_run", False) or getattr(self, "dry_run_mode", False):
+            self.log_verbose(f"--force-recreate has no automatic drop on {platform_label} (dry run: nothing to drop)")
+            return
+        name = database or "default"
+        raise RuntimeError(
+            f"{platform_label} does not support --force-recreate: BenchBox cannot drop "
+            f"database '{name}' automatically. {manual_hint} "
+            "Re-run without --force-recreate once the database has been removed."
+        )
+
     def drop_database(self, **connection_config) -> None:
         """Drop/remove database on server (for server-based databases).
 

@@ -495,6 +495,22 @@ class VeloxAdapter(SparkLikeAdapterMixin, SparkDataLoadMixin, SparkQueryExecutio
     # Connection lifecycle
     # ------------------------------------------------------------------
 
+    def handle_existing_database(self, **connection_config) -> None:
+        """Fail closed on --force-recreate: Velox defines no existence probe or drop helper.
+
+        The shared lifecycle can neither detect the database nor drop it, so a requested recreate would
+        silently reuse it. Raise naming Velox with the manual-drop path instead of delegating.
+        """
+        self.fail_closed_on_force_recreate(
+            platform_label="Velox",
+            database=connection_config.get("database", self.database),
+            manual_hint=(
+                "Drop the database manually (for example `DROP DATABASE <name> CASCADE` "
+                "in Spark SQL against the warehouse, or remove its warehouse directory)"
+            ),
+        )
+        super().handle_existing_database(**connection_config)
+
     def create_connection(self, **connection_config) -> Any:
         """Create a Gluten-enabled SparkSession (local) or Spark-Connect session (remote)."""
         self.log_operation_start("Velox SparkSession")
