@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "TPC-H completed at SF 0.1, 1.0, 10.0 on Athena SQL notuning (3 bundles)",
+    "Every executed query succeeds (no FAILED)",
+    "Bundles produced on current develop including the result-cache receipt check and phase wall-clock bounds",
+    "All bundles pass scripts/validate_submission.py with 0 errors and carry result_source=internal",
+    "Per-bundle spend discipline recorded: TB scanned, S3 and Glue charges noted separately, credit account type disclosed",
+    "Cells stay inside 6h per cell; anything outside needs approval stating command, maximum runtime, log path, and stop condition",
+    "Held bundles cleared by rerun, not override"
+  ],
+  "context": "Mirrors first-live-cloud-benchmark-run-and-publish. Credential and reachability proof is owned by athena-sql-live-credential-probe-20261006 and the platform smoke in new-platform-tpch-smoke-20261006. Parquet conversion path already exists via athena-parquet-optimization. Tuned runs deferred until tuning-portable-metadata-store-20261001 lands (Athena needs Iceberg-with-location or an explicit unsupported declaration there).",
+  "description": "Run and publish the first live Athena SQL corpus: TPC-H at SF 0.1, 1.0, 10.0, notuning, on current develop, using the Parquet path. Record TB scanned and credit account type per bundle per trial-capacity-disclosure-bundles-20261006. No live runs outside campaign limits without explicit approval stating command, maximum runtime, log path, and stop condition.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:d4c6ceae0de4d166359ede4c",
+      "at": "2026-10-06T19:07:06Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "bc793eacdfd24ae2896a1d32709e8015",
+      "session_id": "508606d004364578b5da477b03baf36a"
+    }
+  ]
+}

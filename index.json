@@ -11585,6 +11585,15 @@
       "status": "done",
       "title": "Run and publish live cloud benchmark results for TPC-DS and TPC-DI (BigQuery, Databricks, Snowflake)"
     },
+    "live-cloud-corpus-athena-tpch-first-20261006": {
+      "claim": null,
+      "needs": [
+        "new-platform-tpch-smoke-20261006"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Run and publish first live corpus on Athena SQL (TPC-H SF 0.1/1/10)"
+    },
     "live-cloud-corpus-redshift-tpch-first-20261006": {
       "claim": null,
       "needs": [
