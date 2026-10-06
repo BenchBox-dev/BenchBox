@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "Exclusion lists shrink to root entries",
+    "All references resolve"
+  ],
+  "description": "About 60 excluded pages remain in docs/development/ and docs/operations/, listed one by one in both exclusion lists (website/src/converter/sources.ts and docs/conf.py). Move them to docs/internal/ and update path references in AGENTS.md, scripts, tests and _project.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:21:12Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ea816427edf7409b810a82701b1e439a",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}
