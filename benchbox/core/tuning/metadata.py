@@ -578,14 +578,56 @@ class TuningMetadataManager:
                 )
                 result.add_error("Table tuning column attributes drifted from persisted database metadata")
 
+    # Platforms whose engines accept plain `CREATE INDEX IF NOT EXISTS`.
+    # Every other platform gets table-only DDL: the index is purely a lookup
+    # optimization for a tiny internal table, so omitting it is always
+    # correct, while emitting it can fail the whole save (observed on
+    # DataFusion: "Unsupported logical plan: CreateIndex"). The Postgres
+    # family entries rely on IF NOT EXISTS support present since PG 9.5.
+    _INDEX_PLAIN_FORM_PLATFORMS = frozenset(
+        {
+            "duckdb",
+            "motherduck",
+            "sqlite",
+            "postgresql",
+            "timescaledb",
+            "pg_duckdb",
+            "paradedb",
+            "citus",
+            "cedardb",
+        }
+    )
+    # T-SQL engines have no IF NOT EXISTS index form; guard via sys.indexes.
+    _INDEX_TSQL_PLATFORMS = frozenset({"azure_synapse", "fabric_warehouse"})
+
+    def _metadata_unsupported_reason(self) -> Optional[str]:
+        """Return a clear message when this platform cannot host the store."""
+        if self._platform_key() == "athena":
+            return (
+                "Tuning metadata is not supported on Athena: the metadata table "
+                "needs an Iceberg table with an explicit warehouse LOCATION, which "
+                "BenchBox does not provision. Runs continue without persisted tuning "
+                "metadata (reuse and drift detection stay disabled)."
+            )
+        return None
+
     def create_metadata_table(self) -> bool:
         """Create the tunings metadata table if it doesn't exist.
+
+        Table creation and index creation are independent steps: an index
+        failure is loud but never marks the table creation failed, so reuse
+        and drift detection keep working wherever the table itself exists.
 
         Returns:
             True if table was created or already exists, False on error
         """
         if self._table_exists:
             return True
+
+        unsupported = self._metadata_unsupported_reason()
+        if unsupported is not None:
+            self.logger.error(unsupported)
+            return False
 
         try:
             # Platform-specific table creation SQL
@@ -597,18 +639,23 @@ class TuningMetadataManager:
             # supplied; otherwise a single guarded temporary connection.
             with self._managed_connection() as conn:
                 self._execute_sql(conn, create_sql)
-
-                # Create index for performance
-                index_sql = self._get_create_index_sql()
-                if index_sql:
-                    self._execute_sql(conn, index_sql)
-
-            self._table_exists = True
-            return True
-
         except Exception as e:
             self.logger.error(f"Failed to create metadata table: {e}")
             return False
+
+        self._table_exists = True
+
+        # Create index for performance where the dialect supports it. A
+        # failure here is loud but non-fatal: the table exists and the store
+        # works without the lookup optimization.
+        index_sql = self._get_create_index_sql()
+        if index_sql:
+            try:
+                with self._managed_connection() as conn:
+                    self._execute_sql(conn, index_sql)
+            except Exception as e:
+                self.logger.warning(f"Failed to create tuning metadata index (non-fatal): {e}")
+        return True
 
     def _get_create_table_sql(self) -> str:
         """Get platform-specific CREATE TABLE SQL."""
@@ -628,15 +675,27 @@ class TuningMetadataManager:
 
         # Platform-specific modifications
         if platform == "bigquery":
-            # BigQuery doesn't support IF NOT EXISTS, but we'll handle that in the adapter
-            return base_sql.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE")
+            # BigQuery types are STRING/INT64/TIMESTAMP. IF NOT EXISTS handling
+            # stays in the adapter, so keep the plain CREATE TABLE form.
+            bigquery_sql = base_sql.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE")
+            for narrow, broad in (
+                ("VARCHAR(255)", "STRING"),
+                ("VARCHAR(50)", "STRING"),
+                ("VARCHAR(64)", "STRING"),
+                ("INTEGER", "INT64"),
+                ("TIMESTAMP", "TIMESTAMP"),
+            ):
+                bigquery_sql = bigquery_sql.replace(narrow, broad)
+            return bigquery_sql
         elif platform == "snowflake":
             # Snowflake uses TIMESTAMP_NTZ for deterministic timestamps
             return base_sql.replace("TIMESTAMP", "TIMESTAMP_NTZ")
         elif platform == "redshift":
-            # Redshift prefers explicit column encoding
-            return base_sql + " ENCODE AUTO"
-        elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
+            # No suffix: a table-level ENCODE is not valid Redshift syntax,
+            # and Redshift automatically assigns column encoding when none is
+            # specified. The base DDL parses as-is.
+            return base_sql
+        elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server", "clickhouse-cloud"}:
             # ClickHouse uses specific engine and ordering. base_sql always ends
             # with the CREATE TABLE's closing ")", so appending here is enough -
             # str.replace(")", ...) would also rewrite every VARCHAR(N) column
@@ -647,21 +706,37 @@ class TuningMetadataManager:
             return base_sql
 
     def _get_create_index_sql(self) -> Optional[str]:
-        """Get platform-specific index creation SQL."""
+        """Get platform-specific index creation SQL, or None for table-only DDL."""
         platform = self._platform_key()
+        index_name = f"idx_{self._metadata_table_name}_lookup"
 
-        if platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
+        if platform in {"clickhouse", "clickhouse-local", "clickhouse-server", "clickhouse-cloud"}:
             # ClickHouse uses ORDER BY in table definition, no separate index needed
             return None
         elif platform == "bigquery":
             # BigQuery doesn't support explicit indexes
             return None
-        else:
+        elif platform in self._INDEX_PLAIN_FORM_PLATFORMS:
             # Create index for faster lookups
             return f"""
-            CREATE INDEX IF NOT EXISTS idx_{self._metadata_table_name}_lookup
+            CREATE INDEX IF NOT EXISTS {index_name}
             ON {self._metadata_table_name} (table_name, configuration_hash)
             """
+        elif platform in self._INDEX_TSQL_PLATFORMS:
+            # T-SQL has no IF NOT EXISTS index form; guard via sys.indexes.
+            return f"""
+            IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = '{index_name}'
+            AND object_id = OBJECT_ID('{self._metadata_table_name}'))
+            CREATE INDEX {index_name}
+            ON {self._metadata_table_name} (table_name, configuration_hash)
+            """
+        else:
+            # Table-only DDL: secondary indexes are unsupported or unverified
+            # on this engine (Snowflake standard tables, Delta, Redshift,
+            # Trino/Presto/Athena, Spark SQL, DataFusion, ...). Omitting the
+            # lookup optimization is always correct; emitting it can fail the
+            # whole save.
+            return None
 
     def save_tunings(self, benchmark_tunings: BenchmarkTunings) -> bool:
         """Save tuning configuration to metadata table.
