@@ -3,7 +3,7 @@
     "Decision recorded in the item context.",
     "If changed: tests pin the new behaviour for snowflake, databricks, polars and sqlite selectors."
   ],
-  "context": "Source: PR #2630 follow-up agent report (2026-10-04).",
+  "context": "Decision D2 implemented as docs + pin test only (no factory/registry change). PR #2690 open at head 4aac76fa76b57200f3ffd9f6d44e9058029ef16f, branch docs/local-selector-no-deployment-modes; independent review clean; owner attestation posted; CI rerun in flight. Claim released temporarily to finish item 11 whose PR #2696 merged first; re-take this item after #2690 merges.",
   "description": "## Problem (product decision; behaviour made consistent in PR #2630 without deciding it)\n`PlatformRegistry.supports_deployment_mode` returns True for `local` on every platform that declares no deployment modes (the dataclass defaults `default_deployment` to `\"local\"`, and a registry test pins it). The adapter factory therefore accepts `snowflake:local`, `databricks:local`, `polars:local` and `sqlite:local`, and PR #2630 made the CLI selector resolver agree. For cloud-only platforms that is a misleading selector.\n\n## Change (owner decision)\n- Keep the rule (document it), or\n- make a platform with no modes accept no suffix, which also rejects `polars:local` and `sqlite:local` and changes the factory and the registry test.\n\n## Guardrails (must preserve)\n- Documented selector forms in `benchbox run --help` keep working.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
   "links": [
     "benchbox/core/platform_registry.py",
@@ -26,6 +26,14 @@
       "generation": "ecf58056cd7849b49dafb4698eb670a0",
       "op": "take",
       "op_id": "434018ad16e140e697f914887575ac66",
+      "session_id": "886444b9f5294b15856d1f4489297eb4"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680",
+      "at": "2026-10-06T04:14:27Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "06f23aabd56a4200a3f1953cc2990cee",
       "session_id": "886444b9f5294b15856d1f4489297eb4"
     }
   ]
