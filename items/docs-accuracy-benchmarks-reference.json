@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "Pages match the catalog and the code"
+  ],
+  "description": "Query counts, nonexistent query IDs (coffeeshop, nyctaxi), invented constructor options, missing APIs (TPC-DI, TPC-Havoc), recursive-CTE claim for TPC-DS, schema-v1 page, results/compare contradictions, Python API index examples, result-formats example bugs.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:26:21Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "82bcaceda0944eea81920fdeac37e644",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}

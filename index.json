@@ -7426,6 +7426,13 @@
       "status": "done",
       "title": "Run the stop-the-world flip: swap required checks and merge the flip PR"
     },
+    "docs-accuracy-benchmarks-reference": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Fix stale counts, missing APIs and contradictions in benchmark and reference pages"
+    },
     "docs-accuracy-guides-tutorials": {
       "claim": null,
       "needs": [],
