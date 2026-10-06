@@ -62,15 +62,10 @@
       "title": "Schema-phase tuning DDL bypasses the ledger recorder (ClickHouse exports noop despite physical tuning)"
     },
     "adapters-ignoring-force-recreate-at-first-connection-20261004": {
-      "claim": {
-        "expires_at": "2026-10-07T05:45:53Z",
-        "generation": "5a345e9092da4f22bf9332b816f002c2",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Several adapters accept --force-recreate but never recreate: Velox, InfluxDB, Firebolt Core, Snowpark Connect, MotherDuck"
     },
     "add-a-ci-check-that-the-uat-charter-or-pointer-exists-on-the": {
