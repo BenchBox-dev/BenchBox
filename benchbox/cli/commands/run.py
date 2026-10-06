@@ -2887,7 +2887,13 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
 
 @click.command("run", cls=BenchBoxCommand)
 # === Core Options (Tier 1 - Always visible) ===
-@click.option("--platform", type=str, help="Platform with optional deployment mode (platform:mode).")
+@click.option(
+    "--platform",
+    type=str,
+    help="Platform with optional deployment mode (platform:mode). Platforms that declare no "
+    "deployment modes (e.g. snowflake, databricks, polars, sqlite) accept only the ':local' "
+    "suffix, which is equivalent to the bare name; any other suffix is rejected.",
+)
 @click.option(
     "--benchmark", type=str, help="Benchmark (tpch, tpcds, ssb, joinorder, clickbench); joinorder is IMDb SF=1."
 )
@@ -3248,6 +3254,11 @@ def run(
       benchbox run --platform clickhouse-cloud --benchmark tpch    # ClickHouse Cloud
       benchbox run --platform firebolt:core --benchmark tpch       # Firebolt Core (Docker)
       benchbox run --platform firebolt:cloud --benchmark tpch      # Firebolt Cloud
+
+    Platforms that declare no deployment modes (snowflake, databricks, polars,
+    sqlite, ...) accept only the ':local' suffix, which is equivalent to the
+    bare name (snowflake:local == snowflake) and does not mean local
+    execution. Any other suffix is rejected.
 
     Use --help-topic examples for more, --help-topic all for advanced options.
     """
