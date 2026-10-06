@@ -21137,10 +21137,15 @@
       "title": "TPC-H measured power iterations run stream 1..k permutations and skip row-count validation"
     },
     "tpch-qphh-missing-refresh-functions": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-07T19:21:43Z",
+        "generation": "b1b411991c844fea9b51adc477e63097",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Stop exporting TPC-H QphH@Size as official while refresh functions are missing"
     },
     "tpch-refresh-functions-in-power-and-throughput": {
