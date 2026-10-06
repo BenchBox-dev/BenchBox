@@ -4366,6 +4366,13 @@
       "status": "open",
       "title": "Comment-policy staged ratchet blocks all commits after legitimate vendored-wheel upgrade"
     },
+    "comment-policy-strict-scope-mismatch": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "comment-policy-strict can never pass: flags vendored, binary, and out-of-scope files"
+    },
     "commit-identity-canonical-skill-source-sync": {
       "claim": null,
       "needs": [],

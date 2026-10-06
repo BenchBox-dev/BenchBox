@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "make comment-policy-strict either passes on a clean tree or its documented scope matches the files it actually enforces"
+  ],
+  "context": "Observed while verifying the #2614 develop merge: scripts/check_comment_policy.py --mode strict reports 531 violations across 6882 files, including vendored _sources/tpc-ds/PATCHES.md, tracked binaries under benchbox/_binaries, .github/workflows files, and .gitignore. The enforced gates (run_comment_policy.py --native-tests in CI, --staged pre-commit) do not cover these paths, so strict-mode output is advisory noise that cannot go green. Either scope strict mode to enforced paths or document that it is informational.",
+  "description": "Check whether comment-policy-strict is meant to gate anything; if so, exclude vendored/binary/out-of-scope paths, else mark it informational so a red target does not confuse contributors.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:7f8e006c86fd5a1a15b08122",
+      "at": "2026-10-06T18:37:08Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "ea8ff93020fa48a0863dcd6f0f1aead4",
+      "session_id": "cae197c525fe4eac8de35a156719a321"
+    }
+  ]
+}
