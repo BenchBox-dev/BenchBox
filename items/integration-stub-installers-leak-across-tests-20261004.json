@@ -4,7 +4,7 @@
     "A check fails when a test leaves adapter-module attributes modified.",
     "Decision recorded on running a minimal integration subset before merge."
   ],
-  "context": "Source: PR #2632 CI failures and the agent that fixed them (2026-10-04). Related: dlv2-12-hermeticity-leak-detector (open); check for overlap before starting.",
+  "context": "Implemented: 8 installers converted to monkeypatch.setattr, integration-tier leak guard in conftest, 18 isolation tests, DuckLake suite mapped in preflight targets. PR #2696 (head 2d56ed4006a7) reviewed clean, attested, armed; state=MERGED at 2026-10-06T04:13:50Z, merge commit 7d96356992ed. Verified: isolation tests green, ruff clean, pr-preflight green.",
   "description": "## Problem (reproduced in a CI-like environment by an agent; one regression slipped past local fast runs)\n`tests/integration/platforms/common.py` has stub installers that set attributes on adapter modules directly and never restore them. The ClickHouse and LakeSail installers leaked across tests on shared xdist workers and broke a later contract test in CI; they now use `monkeypatch.setattr`. The Databricks, Redshift and other installers in the same file still assign directly. Separately, `pytest -m fast` skips `tests/integration`, so a real regression (the DuckLake force-recreate integration test) was only caught by CI.\n\n## Change\n- Convert the remaining installers to `monkeypatch.setattr` (or an equivalent that restores state).\n- Add a hermeticity check that fails when a test leaves adapter-module attributes changed.\n- Decide whether a small, fast subset of integration tests (such as the DuckLake lifecycle test) should run in the fast tier or in `make pr-preflight`.\n\n## Guardrails (must preserve)\n- Integration tests still skip cleanly without credentials or services.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow.\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`; then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`. Re-read every anchor before editing.",
   "links": [
     "tests/integration/platforms/common.py",
@@ -26,6 +26,14 @@
       "generation": "4b43efbc531a4a15b3c9bb4c5eea279b",
       "op": "take",
       "op_id": "ce89472666e747a499cd627f2e5d8aa9",
+      "session_id": "886444b9f5294b15856d1f4489297eb4"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:59955db67d7b9663fb4a4680",
+      "at": "2026-10-06T04:15:26Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "15c2ead957db453db92bef2f6bca5255",
       "session_id": "886444b9f5294b15856d1f4489297eb4"
     }
   ]
