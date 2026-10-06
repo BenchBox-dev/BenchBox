@@ -7426,6 +7426,13 @@
       "status": "done",
       "title": "Run the stop-the-world flip: swap required checks and merge the flip PR"
     },
+    "docs-accuracy-platforms": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Fix wrong install extras, options and stale claims in platform guides"
+    },
     "docs-blog-index-broken-html-links": {
       "claim": null,
       "needs": [],

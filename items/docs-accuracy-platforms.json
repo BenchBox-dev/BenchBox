@@ -1,0 +1,16 @@
+{
+  "acceptance": [
+    "Each platform page's commands and options match the code"
+  ],
+  "description": "A docs re-audit found nonexistent extras (athena-spark, glue, emr-serverless, dataproc, fabric-spark, quanton), invented flags (InfluxDB, DuckLake --driver-version), invented adapter kwargs (platform-selection-guide, quick-reference), psycopg2 vs psycopg 3, DuckDB/Polars described as base install, contradictory ClickHouse selector status, and similar.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:a0b2abcaa2aedd44f418b7e4",
+      "at": "2026-10-06T19:23:00Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "67fd6c7a82a84ceaaab242ed8cd905e4",
+      "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    }
+  ]
+}
