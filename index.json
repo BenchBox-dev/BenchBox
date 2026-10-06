@@ -2002,10 +2002,10 @@
     },
     "canary-impact-01-junit-durations": {
       "claim": {
-        "expires_at": "2026-09-25T19:10:32Z",
-        "generation": "09fb7234715c480382d0fd389502886d",
+        "expires_at": "2026-10-07T19:18:04Z",
+        "generation": "b5d0fc2c1a7b4f52a54dd19b42e451c5",
         "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:0456a4b07c5c2d5268d800b2"
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:26acbcff276b4a051a0b6cee"
       },
       "needs": [],
       "priority": "high",
