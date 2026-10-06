@@ -16956,15 +16956,10 @@
       "title": "Anonymize tuning constraint identifiers"
     },
     "results-builder-throughput-metric-ignores-phase-success": {
-      "claim": {
-        "expires_at": "2026-10-07T19:17:06Z",
-        "generation": "b1fda2ccbcc945b4976f30a0a2a97cb9",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Result builder re-derives Throughput@Size for failed throughput phases, undoing the driver's withholding"
     },
     "results-complete-execution-environment-capture": {
