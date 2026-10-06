@@ -39,6 +39,18 @@ def _test_index(repo: Path) -> dict[str, list[str]]:
     return index
 
 
+#: Explicit changed-file → test mapping for files the name-based rules miss.
+#: Minimal-integration-subset decision: changes to the shared platform stub
+#: installers (tests/integration/platforms/common.py) select the DuckLake
+#: integration suite. It passes-or-skips cleanly in the CI default environment
+#: (no credentials or services required) while still exercising a real
+#: integration path. Fast-tier membership is unchanged: the stub smoke tests
+#: covering common.py directly stay fast and keep mapping to themselves.
+EXTRA_TEST_MAP: dict[str, list[str]] = {
+    "tests/integration/platforms/common.py": ["tests/integration/test_ducklake_integration.py"],
+}
+
+
 def map_tests(repo: Path, paths: list[str]) -> list[str]:
     index = _test_index(repo)
     selected: set[str] = set()
@@ -52,6 +64,7 @@ def map_tests(repo: Path, paths: list[str]) -> list[str]:
             module = PurePosixPath(path).stem
             if module != "__init__":
                 selected.update(index.get(f"test_{module}.py", ()))
+        selected.update(EXTRA_TEST_MAP.get(path, ()))
     return sorted(selected)
 
 
