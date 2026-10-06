@@ -20155,15 +20155,10 @@
       "title": "Give the TPC-H SF1 throughput cohort three engine identities and make the depth gate phase-aware"
     },
     "throughput-deferred-connection-close-never-runs": {
-      "claim": {
-        "expires_at": "2026-10-07T19:23:14Z",
-        "generation": "713c803da2334a019ce46f87f2b2df9f",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:fc74f974789f7106912bfe69"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Run connection is closed under still-running timed-out throughput streams; deferred close never takes effect"
     },
     "throughput-executor-nonblocking-shutdown": {
