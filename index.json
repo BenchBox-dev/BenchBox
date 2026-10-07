@@ -19067,17 +19067,12 @@
       "title": "Reconcile open astro-site and dlv2-6x tracker items with the site-repo split"
     },
     "site-split-10-core-site-inputs": {
-      "claim": {
-        "expires_at": "2026-10-08T03:42:08Z",
-        "generation": "13a39c5e2ee849e6be3a743fd5268bd8",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc"
-      },
+      "claim": null,
       "needs": [
         "site-split-agy-plan-review"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "open",
       "title": "Make core produce and attest the versioned site-inputs bundle and dispatch it to the site repo"
     },
     "site-split-20-seed-site-repo": {
