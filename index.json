@@ -7271,10 +7271,10 @@
     },
     "dlv2-60-publication-integration": {
       "claim": {
-        "expires_at": "2026-10-04T18:09:59Z",
-        "generation": "3cf8bad1bdb44f12a35ccd07ba4e24c8",
+        "expires_at": "2026-10-08T12:04:40Z",
+        "generation": "59b7a971f1d44ee4a15e9b59c15ce779",
         "renewals": 0,
-        "worker": "mcp:claude-code:root@vm:2d8b6cf841688ad34e41a486"
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc"
       },
       "needs": [
         "dlv2-00-decisions-adr"

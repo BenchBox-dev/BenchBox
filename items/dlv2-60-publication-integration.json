@@ -101,6 +101,15 @@
       "op": "update",
       "op_id": "dcb87ef670024807bd73c58b74491c93",
       "session_id": "8bc6380f11ef418691917c994cf8845c"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T12:04:40Z",
+      "client": "tbh",
+      "generation": "59b7a971f1d44ee4a15e9b59c15ce779",
+      "op": "take",
+      "op_id": "4d9988e63ed6478a994ae1038ab44572",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
 }
