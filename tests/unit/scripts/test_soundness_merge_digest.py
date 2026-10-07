@@ -49,7 +49,6 @@ def evidence(**overrides):
         "author": "dev",
         "merged_at": MERGED_AT,
         "commits": (commit(OLD, BEFORE), commit(HEAD, PUSHED)),
-        "head_date": PUSHED,
     }
     fields.update(overrides)
     return digest.PullEvidence(**fields)
@@ -57,7 +56,7 @@ def evidence(**overrides):
 
 def refreshed(**overrides):
     commits = (commit(OLD, BEFORE), commit(HEAD, PUSHED), commit(REFRESH, AFTER, refresh=True))
-    return evidence(commits=commits, **{"head_date": AFTER, **overrides})
+    return evidence(commits=commits, **overrides)
 
 
 def test_connector_review_of_the_last_content_commit_is_a_signal():
@@ -174,7 +173,6 @@ def test_a_standin_approval_must_name_the_merged_head_after_a_refresh_merge():
 
 def test_a_standin_approval_is_not_timed_against_the_head_arrival():
     assert digest.review_signals(evidence(comments=(standin(HEAD, at=PUSHED),))) == ("stand-in",)
-    assert digest.review_signals(evidence(comments=(standin(HEAD),), head_date="")) == ("stand-in",)
 
 
 def test_a_standin_approval_posted_before_a_retarget_is_not_a_signal():
@@ -961,9 +959,9 @@ def test_a_standin_survives_the_head_moving_away_and_back(monkeypatch, approved_
     assert digest.review_signals(pull) == ("stand-in",)
 
 
-def test_a_failing_head_runs_fetch_fails_closed(monkeypatch):
+def test_the_digest_no_longer_reads_head_workflow_runs(monkeypatch):
     commits = [api_commit(OLD, BEFORE), api_commit(HEAD, "2026-10-02T09:30:00Z")]
-    with pytest.raises(digest.ReadError):
-        collected_pull(
-            monkeypatch, commits, HEAD, [], [rest_comment(HEAD, AFTER)], runs_error=digest.ReadError("runs failed")
-        )
+    pull = collected_pull(
+        monkeypatch, commits, HEAD, [], [rest_comment(HEAD, AFTER)], runs_error=digest.ReadError("runs failed")
+    )
+    assert digest.review_signals(pull) == ("stand-in",)
