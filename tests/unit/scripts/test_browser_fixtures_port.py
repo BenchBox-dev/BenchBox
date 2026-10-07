@@ -13,7 +13,7 @@ MJS_GEN = ROOT / "results-explorer/scripts/generate-browser-fixtures.mjs"
 MJS_VERIFY = ROOT / "results-explorer/scripts/verify-browser-fixtures.mjs"
 SOURCE_BUNDLES = ROOT / "results-explorer/test-fixtures/source"
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 def _run_c(script: str, *args: str) -> bytes:
