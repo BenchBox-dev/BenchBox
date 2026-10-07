@@ -62,23 +62,30 @@ jobs:
           DISPATCH_PARENT: ${{ inputs.parent_core_sha }}
           RUN_ID: ${{ github.event.workflow_run.id }}
           IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+          REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
         run: |
           CORE_SHA="$(git rev-parse HEAD)"
           echo "core_sha=${CORE_SHA}" >> "$GITHUB_OUTPUT"
-          BUNDLE_SHAS="$(gh run list --workflow site-inputs.yml --branch develop --status success --json headSha --limit 20 -q '.[].headSha')"
+          BUNDLED_SHAS="$(gh api "repos/${REPO}/actions/artifacts" --paginate -q '.artifacts[] | select(.name | startswith("site-inputs-")) | .name | ltrimstr("site-inputs-")')"
           if [ -n "$DISPATCH_PARENT" ]; then
             if ! git merge-base --is-ancestor "$DISPATCH_PARENT" "$CORE_SHA"; then
               echo "parent_core_sha ${DISPATCH_PARENT} is not an ancestor of ${CORE_SHA}" >&2
               exit 1
             fi
-            if ! printf '%s\n' "$BUNDLE_SHAS" | grep -qx "$DISPATCH_PARENT"; then
-              echo "no successful site-inputs run on parent ${DISPATCH_PARENT}" >&2
+            if ! printf '%s\n' "$BUNDLED_SHAS" | grep -qx "$DISPATCH_PARENT"; then
+              echo "no site-inputs bundle attested on parent ${DISPATCH_PARENT}" >&2
               exit 1
             fi
             echo "parent_sha=${DISPATCH_PARENT}" >> "$GITHUB_OUTPUT"
           else
-            PREV="$(printf '%s\n' "$BUNDLE_SHAS" | grep -vx "$CORE_SHA" | head -n 1)"
+            PREV=""
+            for CANDIDATE in $BUNDLED_SHAS; do
+              if [ "$CANDIDATE" != "$CORE_SHA" ] && git merge-base --is-ancestor "$CANDIDATE" "$CORE_SHA" 2>/dev/null; then
+                PREV="$CANDIDATE"
+                break
+              fi
+            done
             if [ -n "$PREV" ]; then
               echo "parent_sha=${PREV}" >> "$GITHUB_OUTPUT"
             else

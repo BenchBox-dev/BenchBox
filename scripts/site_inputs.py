@@ -67,12 +67,16 @@ ACCEPTED_CORPUS_REF = "origin/published-results"
 VALIDATOR_EXACT_PATHS = (
     "scripts/validate_submission.py",
     "scripts/publication/validator_parity.py",
+    "scripts/generate_corpus_inventory.py",
 )
-VALIDATOR_PREFIX = "benchbox/validation/"
+VALIDATOR_PREFIXES = (
+    "benchbox/validation/",
+    "benchbox/core/results/",
+)
 
 
 def is_validator_path(path: str) -> bool:
-    return path in VALIDATOR_EXACT_PATHS or path.startswith(VALIDATOR_PREFIX)
+    return path in VALIDATOR_EXACT_PATHS or path.startswith(VALIDATOR_PREFIXES)
 
 
 def validator_changed(parent_sha: str, core_sha: str) -> bool:
@@ -298,7 +302,7 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
                 "python",
                 "scripts/publication/check_corpus_bijection.py",
                 "--accepted-ref",
-                ACCEPTED_CORPUS_REF,
+                accepted_sha,
                 "--bundles-dir",
                 str(ROOT / "results-data/bundles"),
                 "--artifact",
@@ -468,6 +472,20 @@ def cmd_verify(out: Path) -> int:
     ]
     if drifted:
         print(f"attestation inputs drifted from manifest: {', '.join(drifted)}")
+        return 1
+    core_sha = manifest.get("core_sha")
+    parent_sha = manifest.get("parent_core_sha")
+    rebound = [
+        e["name"]
+        for e in attestations
+        if isinstance(e.get("compared"), dict)
+        and (
+            ("head" in e["compared"] and e["compared"]["head"] != core_sha)
+            or ("base" in e["compared"] and parent_sha is not None and e["compared"]["base"] != parent_sha)
+        )
+    ]
+    if rebound:
+        print(f"attestation range drifted from manifest: {', '.join(rebound)}")
         return 1
     print(
         f"verify OK: schema {SCHEMA}, {len(expected)} members, "

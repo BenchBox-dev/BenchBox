@@ -69,11 +69,11 @@ def _bundle(tmp_path: Path, schema: int = 1, attestations: str = "pass") -> Path
         {"name": "explorer_compat", "result": "pass", "inputs": {"snapshot": snapshot}},
         {"name": "snapshot_invariants", "result": "pass", "inputs": {"snapshot": snapshot}},
         {"name": "corpus_bijection", "result": "pass", "inputs": {"snapshot": snapshot}},
-        {"name": "validator_parity", "result": "skip"},
+        {"name": "validator_parity", "result": "skip", "compared": {"base": "def", "head": "abc"}},
     ]
     _write(out / "attestations.json", json.dumps(att) + "\n")
     digests = {name: site_inputs.member_digest(out / name) for name in members}
-    manifest = {"schema": schema, "core_sha": "abc", "members": digests}
+    manifest = {"schema": schema, "core_sha": "abc", "parent_core_sha": "def", "members": digests}
     _write(out / "manifest.json", json.dumps(manifest) + "\n")
     return out
 
@@ -156,10 +156,34 @@ def test_verify_rejects_empty_member_digest(tmp_path: Path) -> None:
     assert site_inputs.cmd_verify(out) == 1
 
 
+def test_verify_rejects_compared_head_mismatch(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, compared={"base": "def", "head": "0" * 40}) if e["name"] == "validator_parity" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_compared_base_mismatch(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, compared={"base": "0" * 40, "head": "abc"}) if e["name"] == "validator_parity" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
 def test_is_validator_path_matches_exact_and_prefix() -> None:
     assert site_inputs.is_validator_path("benchbox/validation/engines.py") is True
     assert site_inputs.is_validator_path("scripts/validate_submission.py") is True
     assert site_inputs.is_validator_path("scripts/publication/validator_parity.py") is True
+    assert site_inputs.is_validator_path("scripts/generate_corpus_inventory.py") is True
+    assert site_inputs.is_validator_path("benchbox/core/results/schema_policy.py") is True
+    assert site_inputs.is_validator_path("benchbox/core/results/provenance.py") is True
+    assert site_inputs.is_validator_path("benchbox/core/results/anonymization.py") is True
     assert site_inputs.is_validator_path("benchbox/core/validation/engines.py") is False
     assert site_inputs.is_validator_path("scripts/validate_submission_test.py") is False
 
