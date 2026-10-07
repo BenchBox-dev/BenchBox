@@ -2,6 +2,7 @@
   "acceptance": [
     "matrix-manifest.json in the output directory lists every planned run, with exit status, versions, effective engine, seed and round",
     "The dry-run count equalled the spec formula (output saved in the output directory)",
+    "The datagen manifests used by the run record the fixed dbgen binary stamp; if pvm-s2 data is reused, its hashes match those recorded in pvm-s2",
     "Any voided round has its cause and replacement seed recorded; no individual cell was rerun",
     "The pinned BenchBox commit, pyarrow version and data hashes are identical across all runs (checked by the runner)",
     "After the run, the environment polars version equals the lock version (command output recorded in context)",
@@ -15,6 +16,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "c0cae7dc6c564748944208f492aca87c",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-07T20:57:55Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "b39255c15f21475a9f8d57d48f613421",
       "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
     }
   ]
