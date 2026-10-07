@@ -9,6 +9,7 @@ from _project.scripts.oracle_reviewers.retry import (
     ALL_ABSENT,
     INTEGRITY,
     UNREPORTED,
+    Reviewed,
     State,
     decide_rerun,
     due_for_retry,
@@ -138,3 +139,34 @@ def test_pending_cause_round_trips_and_clears_on_decisive_results(policy: Policy
         pending_cause=INTEGRITY,
     )
     assert decided.pending_cause is None
+
+
+def test_reviewed_files_survive_pending_runs_and_are_replaced_by_decisive_ones() -> None:
+    first = Reviewed(OTHER, "medium-high", "failure", {"a.py": "1" * 40})
+    previous = State(7, OTHER, "failure", NOW, reviewed=first)
+    pending = next_state(
+        previous=previous,
+        pr=7,
+        head_sha=HEAD,
+        outcome="pending",
+        manual=False,
+        now=NOW,
+        pool_blocked_until={},
+        pending_cause=ALL_ABSENT,
+        reviewed=Reviewed(HEAD, "medium-high", "pending", {}),
+    )
+    assert pending.reviewed == first
+    second = Reviewed(HEAD, "medium-high", "success", {"a.py": "2" * 40})
+    decisive = next_state(
+        previous=pending,
+        pr=7,
+        head_sha=HEAD,
+        outcome="success",
+        manual=False,
+        now=NOW,
+        pool_blocked_until={},
+        reviewed=second,
+    )
+    assert decisive.reviewed == second
+    assert State.from_json(decisive.to_json()) == decisive
+    assert State.from_json({**decisive.to_json(), "reviewed": None}).reviewed is None

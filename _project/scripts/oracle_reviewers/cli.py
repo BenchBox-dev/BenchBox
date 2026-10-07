@@ -1,33 +1,39 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from . import attempts as attempt_files, github, report, retry, runner, selection
+from . import attempts as attempt_files, dedup, github, report, retry, runner, selection
 from .absence import ERROR, Absence
-from .brief import build_brief, write_private
+from .brief import BRIEF_TEMPLATE, build_brief, write_private
 from .classifier import ChangedFile, classify
-from .diff import commentable_lines
-from .policy import Policy, Reviewer, load_policy
+from .diff import commentable_lines, select_files
+from .policy import Policy, Reviewer, Tier, load_policy
 from .selection import SelectionInput
+from .verdict import VERDICT_SCHEMA
 
 PLAN_FILE = "plan.json"
 BRIEF_FILE = "brief.md"
 DIFF_FILE = "diff.patch"
 WORKFLOW_FILE = "oracle-review-shadow.yml"
+WORKFLOW_SOURCE = Path(".github/workflows") / WORKFLOW_FILE
 DEVELOP_REF = "refs/heads/develop"
 NEW_DIFF_ACTIONS = ("opened", "synchronize")
 REVIEW = "review"
 SUCCESS = "success"
 FORK = "fork"
 SKIP = "skip"
+CARRY = "carry"
+SCOPELESS_TIER = "very-high"
+PROSE_SUFFIXES = (".md", ".mdx", ".rst")
 
 
 def _now() -> datetime:
@@ -97,6 +103,10 @@ def _base_plan(policy: Policy, repo: str, pr: int, run_id: str) -> dict[str, Any
         "diversity_exempt": [],
         "excluded_families": [],
         "brief_mode": "oversize",
+        "scope": "full",
+        "reviewed_head": None,
+        "reviewed_files": {},
+        "open_findings": {},
         "max_attempts": policy.max_attempts,
         "pool_blocked_until": {},
         "manual": False,
@@ -104,9 +114,77 @@ def _base_plan(policy: Policy, repo: str, pr: int, run_id: str) -> dict[str, Any
     }
 
 
+IMPLEMENTATION_DIGEST = hashlib.sha256(
+    json.dumps(
+        {
+            path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(Path(__file__).parent.glob("*.py"))
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+).hexdigest()
+
+
+def _identities(repo: str, head_sha: str, files: list[ChangedFile]) -> dict[str, str]:
+    try:
+        tree = github.get_json(f"repos/{repo}/git/trees/{head_sha}?recursive=1")
+        modes = {} if tree.get("truncated") else {entry["path"]: entry["mode"] for entry in tree["tree"]}
+    except (github.GitHubError, KeyError, TypeError, ValueError):
+        modes = {}
+    return {
+        item.path: f"{'removed' if item.removed else modes.get(item.path, '')}:{item.sha}:{item.previous_path or ''}"
+        if item.sha and (item.removed or item.path in modes)
+        else ""
+        for item in files
+    }
+
+
+def _reusable(
+    reviewed: retry.Reviewed | None,
+    basis: str | None,
+    scoped: list[ChangedFile],
+    tier: Tier,
+    current: dict[str, str],
+) -> tuple[retry.Reviewed | None, list[ChangedFile]]:
+    if reviewed is None or basis is None or reviewed.basis != basis or not all(current.values()):
+        return None, scoped
+    if current == reviewed.files:
+        return reviewed, []
+    if reviewed.outcome == retry.SUCCESS and tier.name != SCOPELESS_TIER and set(reviewed.files) <= set(current):
+        return reviewed, [item for item in scoped if reviewed.files.get(item.path) != current[item.path]]
+    return reviewed, scoped
+
+
+def _merge_base(repo: str, base_sha: str, head_sha: str) -> str | None:
+    try:
+        merge_base = github.get_json(f"repos/{repo}/compare/{base_sha}...{head_sha}")["merge_base_commit"]["sha"]
+    except (github.GitHubError, KeyError, TypeError, ValueError):
+        return None
+    if not isinstance(merge_base, str) or re.fullmatch(r"[0-9a-f]{40}", merge_base) is None:
+        return None
+    return merge_base
+
+
+def review_basis(merge_base: str, tier: Tier, policy: Policy, excluded: Iterable[str], policy_text: str) -> str:
+    material = {
+        "merge_base": merge_base,
+        "tier": tier.name,
+        "blocking": list(tier.blocking),
+        "chain": [reviewer.to_json() for reviewer in policy.chain(tier.name)],
+        "excluded_families": sorted(excluded),
+        "policy": policy_text,
+        "brief": BRIEF_TEMPLATE,
+        "schema": VERDICT_SCHEMA,
+        "implementation": IMPLEMENTATION_DIGEST,
+        "workflow": hashlib.sha256(WORKFLOW_SOURCE.read_bytes()).hexdigest() if WORKFLOW_SOURCE.is_file() else "",
+    }
+    digest = hashlib.sha256(json.dumps(material, sort_keys=True).encode("utf-8")).hexdigest()
+    return f"{tier.name}:{merge_base}:{digest}"
+
+
 def _finish_plan(out_dir: Path, plan: dict[str, Any]) -> int:
     _write_json(out_dir / PLAN_FILE, plan)
-    post = plan["decision"] in (REVIEW, SUCCESS, FORK)
+    post = plan["decision"] in (REVIEW, SUCCESS, FORK, CARRY)
     _output(
         {
             "decision": plan["decision"],
@@ -149,6 +227,9 @@ def command_plan(args: argparse.Namespace) -> int:
         plan["decision_reason"] = "a newer head exists; its own run reviews it"
         return _finish_plan(out_dir, plan)
     files = [ChangedFile.from_api(item) for item in github.get_paginated(f"repos/{repo}/pulls/{pr}/files?per_page=100")]
+    if github.get_json(f"repos/{repo}/pulls/{pr}")["head"]["sha"] != plan["head_sha"]:
+        plan["decision_reason"] = "the head moved while the plan read it; its own run reviews it"
+        return _finish_plan(out_dir, plan)
     labels = [label["name"] for label in pull.get("labels", [])]
     classification = classify(files, labels, policy, _soundness_predicate())
     plan["tier"] = classification.tier
@@ -181,7 +262,44 @@ def command_plan(args: argparse.Namespace) -> int:
         plan["decision_reason"] = rerun.reason
         return _finish_plan(out_dir, plan)
     tier = policy.tiers[classification.tier or "very-high"]
-    diff_text = github.get_diff(repo, pr)
+    in_scope = set(classification.soundness_paths)
+    scoped = [
+        item for item in files if any(path in in_scope or not path.endswith(PROSE_SUFFIXES) for path in item.paths)
+    ]
+    current = _identities(repo, plan["head_sha"], scoped)
+    if len(files) < int(pull.get("changed_files") or 0):
+        current = dict.fromkeys(current, "")
+    merge_base = _merge_base(repo, plan["base_sha"], plan["head_sha"])
+    excluded = selection.excluded_families(labels, policy)
+    policy_text = Path(args.policy).read_text(encoding="utf-8")
+    basis = review_basis(merge_base, tier, policy, excluded, policy_text) if merge_base else None
+    reviewed = previous.reviewed if previous and action != "edited" else None
+    reviewed, changed = _reusable(reviewed, basis, scoped, tier, current)
+    plan["reviewed_files"] = current
+    plan["review_basis"] = basis or ""
+    try:
+        plan["open_findings"] = dedup.open_fingerprints(github.review_threads(repo, pr), policy.bot_login)
+    except (github.GitHubError, KeyError, ValueError) as exc:
+        _summary(f"oracle-review-shadow: open review threads could not be read, so none are suppressed: {exc}")
+    previous_json = previous.to_json() if previous else None
+    if reviewed is not None and not changed:
+        plan.update(
+            {
+                "decision": CARRY,
+                "decision_reason": f"only prose changed since head {reviewed.head_sha} was reviewed",
+                "reviewed_head": reviewed.head_sha,
+                "manual": manual,
+                "previous_state": previous_json,
+            }
+        )
+        return _finish_plan(out_dir, plan)
+    full_diff = github.get_diff(repo, pr)
+    partial = len(changed) < len(scoped)
+    diff_text = full_diff
+    if partial and full_diff is not None:
+        diff_text = select_files(full_diff, frozenset(path for item in changed for path in item.paths))
+        if set(commentable_lines(diff_text)) != {item.path for item in changed}:
+            partial, diff_text, changed = False, full_diff, scoped
     brief = build_brief(
         repo=repo,
         pr=pr,
@@ -189,12 +307,15 @@ def command_plan(args: argparse.Namespace) -> int:
         head_sha=plan["head_sha"],
         tier=tier.name,
         blocking=tier.blocking,
-        files=files,
+        files=changed if partial else files,
         diff_text=diff_text,
         max_bytes=policy.brief_max_bytes,
+        reviewed_head=reviewed.head_sha if partial and reviewed else None,
+        unchanged=[item for item in scoped if item not in changed] if partial else [],
+        untracked=[item for item in files if item not in scoped] if partial else [],
     )
     write_private(out_dir / BRIEF_FILE, brief.text)
-    write_private(out_dir / DIFF_FILE, diff_text or "")
+    write_private(out_dir / DIFF_FILE, full_diff or "")
     plan.update(
         {
             "decision": REVIEW,
@@ -202,15 +323,17 @@ def command_plan(args: argparse.Namespace) -> int:
             "blocking": list(tier.blocking),
             "chain": [reviewer.to_json() for reviewer in policy.chain(tier.name)],
             "diversity_exempt": list(tier.diversity_exempt),
-            "excluded_families": sorted(selection.excluded_families(labels, policy)),
+            "excluded_families": sorted(excluded),
             "brief_mode": brief.mode,
             "manual": manual,
+            "scope": "changed" if partial else "full",
+            "reviewed_head": reviewed.head_sha if partial and reviewed else None,
             "pool_blocked_until": {
                 pool: moment.isoformat()
                 for pool, moment in (previous.pool_blocked_until.items() if previous else ())
                 if moment > now
             },
-            "previous_state": previous.to_json() if previous else None,
+            "previous_state": previous_json,
         }
     )
     return _finish_plan(out_dir, plan)
@@ -305,6 +428,20 @@ def command_finalize(args: argparse.Namespace) -> int:
         final = report.fixed(retry.SUCCESS, "no soundness path changed")
     elif plan["decision"] == FORK:
         final = report.fixed(retry.PENDING, "fork: owner review")
+    elif plan["decision"] == CARRY:
+        previous = retry.State.from_json(plan["previous_state"])
+        assert previous.reviewed is not None
+        final = report.carried(plan, previous.reviewed.outcome)
+        state = retry.next_state(
+            previous=previous,
+            pr=plan["pr"],
+            head_sha=plan["head_sha"],
+            outcome=final.state,
+            manual=bool(plan["manual"]),
+            now=now,
+            pool_blocked_until=previous.pool_blocked_until,
+        )
+        _write_json(out_dir / "state" / github.STATE_FILE, state.to_json())
     else:
         selection_input = _selection(plan)
         loaded = attempt_files.load(Path(args.attempts_dir), plan, os.environ["GITHUB_RUN_ID"])
@@ -322,10 +459,13 @@ def command_finalize(args: argparse.Namespace) -> int:
             now=now,
             pool_blocked_until=selection.pool_resets(selection_input, loaded.attempts),
             pending_cause=final.pending_cause,
+            reviewed=retry.Reviewed(
+                plan["head_sha"], plan.get("review_basis", ""), final.state, plan.get("reviewed_files", {})
+            ),
         )
         _write_json(out_dir / "state" / github.STATE_FILE, state.to_json())
     _write_json(out_dir / "status.json", report.status_payload(plan, final, run_url))
-    if final.body and plan["findings_delivery"] == "comment":
+    if final.body and (plan["findings_delivery"] == "comment" or final.review is None):
         _write_json(out_dir / "comment.json", {"body": final.body})
     if final.review is not None:
         _write_json(out_dir / "review.json", final.review)

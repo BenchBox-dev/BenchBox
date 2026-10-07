@@ -2,6 +2,7 @@ version: 1
 mode: shadow
 status_context: oracle-review-shadow
 findings_delivery: comment
+bot_login: benchbox-oracle
 brief_max_bytes: 100000
 max_attempts: 4
 author_label_prefix: "author-family:"

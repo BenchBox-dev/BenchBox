@@ -51,7 +51,40 @@ Without the App secrets, the `post` job logs the result and succeeds.
    artifact with the run ID, head SHA, reviewer and either a validated verdict
    or an absence.
 4. `post` re-validates every artifact from this run, replays the selection,
-   and posts the status and, when there is something to say, one comment.
+   and posts the status and the findings. `findings_delivery` in
+   `.github/oracle-reviewers.yml` chooses how:
+   - `comment` (the shadow default) posts one pull request comment, so
+     findings never block a merge.
+   - `review` posts one pull request review per result on the head commit,
+     with a thread for each finding on a diff line and the summary and any
+     finding outside the diff in the body. A run with no verdict still posts
+     a review that explains the pending result, so the latest review always
+     reflects the latest run. The ruleset requires every thread to be
+     resolved, so these threads block merges like the connector's; switching
+     to `review` starts the parity period before the cut-over.
+
+`plan` also limits spend to code that changed. The retry state records the
+blob SHA and tree mode of each changed file at the last success or failure, except prose
+files (`.md`, `.mdx`, `.rst`) outside soundness paths, with the basis
+of that result: the merge base of the head with `develop`, the tier, its
+blocking severities and reviewer settings, the excluded author families, and a
+hash of the policy file, brief template, verdict schema, reviewer code and this
+workflow. When the basis is unchanged and the new
+head has exactly those files at those SHAs, the run posts the recorded result
+to the new head without running a reviewer, so a push that changes only prose
+costs nothing. When the last result was a success below the very-high tier and some
+of those files changed, the brief diffs only the changed files, lists the
+others and any changed prose separately, and asks the reviewer to check the
+effect on them. A file renamed between code and prose counts as code. Every other case gets a full
+review: after a failure, because a scoped review cannot re-check findings in
+files it does not read; at the very-high tier; and after a basis change, a
+file leaving the diff, a diff that cannot be split by file, or a missing state.
+
+Before posting, `post` drops any finding that matches an open review thread
+from this App, by file and normalized title, unless the new finding is more
+severe than the open thread. Each new thread carries a hidden `oracle-finding`
+marker with that fingerprint. A dropped finding still counts toward this run's
+result and is listed in the review body.
 
 A blocking finding fails the review even when its line is outside the diff.
 Such a finding cannot become a line comment, so it is listed under "Findings
@@ -101,3 +134,37 @@ These checks must pass before the cut-over that makes the context required.
 
 During the shadow period, compare each `oracle-review-shadow` result with the
 review the pull request actually received.
+
+## Cut-over
+
+The required `oracle-review` check takes `--signal connector` (the default) or
+`--signal oracle`. With `connector` it requires the Codex connector's review
+of the head, or its thumbs-up, and counts the connector's open threads. With
+`oracle` it requires, from the `benchbox-oracle` App's Bot account:
+
+- a review of the head, not pending or dismissed, submitted after any retarget,
+  whose latest one opens with `### oracle-review-shadow: success for` the head
+  SHA, because the oracle posts every verdict as a comment review and a
+  blocking finding outside the diff has no thread;
+- no unresolved review thread from the App.
+
+The verdict is read from the pull request's own review, not from the commit
+status, which any pull request with the same head commit could set. The
+oracle signal needs `findings_delivery: review`, under which every run that
+reaches a result, including a pending one, posts a review, so the latest
+review is the latest result.
+
+The stand-in attestation passes under either signal. Under `oracle` it must be
+posted after the oracle's latest review of the head, so overriding a failing
+verdict is a deliberate act; it never overrides an open thread.
+
+Every run also evaluates the signal it does not require and logs the result on
+two `parity:` lines. That evaluation fetches its own inputs, and an error in it
+is logged and never changes the check's result. Compare those lines across real
+pull requests before the cut-over.
+
+The checker runs from the base commit, so the workflow can pass `--signal`
+only after `develop`'s copy of the script accepts it. The cut-over sets
+`mode: enforce` in `.github/oracle-reviewers.yml` and adds `--signal oracle`
+to `.github/workflows/oracle-review.yml` in the same change; a unit test fails
+if they disagree or if delivery is not `review`.

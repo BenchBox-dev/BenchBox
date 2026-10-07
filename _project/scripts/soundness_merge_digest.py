@@ -13,11 +13,11 @@ from pathlib import Path
 from typing import Any
 
 from oracle_review_check import (
+    _ORACLE_VERDICT,
+    ORACLE_LOGIN,
     STANDIN_ATTESTERS,
     _attested_shas,
-    head_transition_date,
     latest_base_change,
-    own_run_dates,
 )
 
 MANIFEST_PATH = ".github/soundness-paths.txt"
@@ -58,6 +58,8 @@ class Review:
     commit_sha: str
     submitted_at: str
     state: str
+    user_type: str = ""
+    body: str = ""
 
 
 @dataclass(frozen=True)
@@ -102,7 +104,6 @@ class PullEvidence:
     comments: tuple[Comment, ...] = ()
     threads: tuple[Thread, ...] = ()
     base_changed_at: str = ""
-    head_date: str = ""
 
     @property
     def content_cutoff(self) -> str:
@@ -140,13 +141,31 @@ class Entry:
         return tuple(reasons)
 
 
+def _oracle_success(evidence: PullEvidence) -> bool:
+    candidates = [
+        review
+        for review in evidence.reviews
+        if review.login == f"{ORACLE_LOGIN}[bot]"
+        and review.user_type == "Bot"
+        and review.commit_sha in evidence.content_shas
+        and evidence.base_changed_at < review.submitted_at <= evidence.merged_at
+    ]
+    latest = max(candidates, key=lambda review: review.submitted_at, default=None)
+    verdict = _ORACLE_VERDICT.match(latest.body) if latest else None
+    return (
+        latest is not None
+        and verdict is not None
+        and verdict.group("state") == "success"
+        and verdict.group("sha") == latest.commit_sha
+    )
+
+
 def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
     cutoff = evidence.content_cutoff
 
     def in_window(at: str) -> bool:
         return cutoff <= at <= evidence.merged_at
 
-    standin_after = max(evidence.head_date, evidence.base_changed_at)
     signals: list[str] = []
     if any(
         r.login in CONNECTOR_LOGINS
@@ -156,6 +175,8 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
         for r in evidence.reviews
     ):
         signals.append("connector-review")
+    if _oracle_success(evidence):
+        signals.append("oracle-review")
     if any(r.login in CONNECTOR_LOGINS and r.content == "+1" and in_window(r.created_at) for r in evidence.reactions):
         signals.append("connector-approval")
     for comment in evidence.comments:
@@ -166,8 +187,7 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
             comment.login in STANDIN_ATTESTERS
             and comment.user_type == "User"
             and comment.updated_at in (None, comment.created_at)
-            and evidence.head_date
-            and standin_after < comment.created_at <= evidence.merged_at
+            and evidence.base_changed_at < comment.created_at <= evidence.merged_at
             and evidence.commits[-1].sha in _attested_shas({"body": comment.body})
         ):
             signals.append("stand-in")
@@ -390,15 +410,6 @@ def collect_commits(
     return tuple(built)
 
 
-def collect_head_date(repo: str, head: PullCommit) -> str:
-    runs = [
-        run_
-        for page in gh_pages(f"repos/{repo}/actions/runs?head_sha={head.sha}&event=pull_request&per_page=100")
-        for run_ in page["workflow_runs"]
-    ]
-    return head_transition_date(head.committed_at, own_run_dates(runs))
-
-
 def collect_pull(repo: str, sha: str) -> PullEvidence | None:
     number = merged_pull_number(repo, sha)
     if number is None:
@@ -416,6 +427,8 @@ def collect_pull(repo: str, sha: str) -> PullEvidence | None:
                 r.get("commit_id") or "",
                 r.get("submitted_at") or "",
                 r.get("state") or "",
+                (r.get("user") or {}).get("type", ""),
+                r.get("body") or "",
             )
             for r in gh_pages(f"repos/{repo}/pulls/{number}/reviews")
         ),
@@ -435,7 +448,6 @@ def collect_pull(repo: str, sha: str) -> PullEvidence | None:
         ),
         threads=collect_threads(repo, number),
         base_changed_at=latest_base_change(gh_pages(f"repos/{repo}/issues/{number}/timeline")) or "",
-        head_date=collect_head_date(repo, commits[-1]) if commits else "",
     )
 
 

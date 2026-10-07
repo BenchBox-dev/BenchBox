@@ -26,6 +26,7 @@ AFTER_HEAD = "2026-10-01T13:00:00Z"
 SOUNDNESS_FILES = ["benchbox/core/equivalence/checker.py", "README.md"]
 OTHER_FILES = ["README.md", "docs/index.md"]
 CONNECTOR = "chatgpt-codex-connector[bot]"
+ORACLE = "benchbox-oracle[bot]"
 
 
 def _decide(
@@ -35,6 +36,7 @@ def _decide(
     threads: list[dict[str, Any]] | None = None,
     base_date: str | None = None,
     comments: list[dict[str, Any]] | None = None,
+    signal: str = "connector",
 ) -> tuple[int, str]:
     return oracle_review_check.decide(
         HEAD,
@@ -46,6 +48,7 @@ def _decide(
         oracle_review_check.any_soundness_path,
         base_date,
         comments or [],
+        signal,
     )
 
 
@@ -296,7 +299,6 @@ def test_standin_attestation_for_the_head_passes() -> None:
     "comment",
     [
         _attestation(sha=OLDER),
-        _attestation(created_at=BEFORE_HEAD),
         _attestation(login="someone-else"),
         _attestation(prefix="> "),
         _attestation(body="Looks good to me"),
@@ -319,7 +321,6 @@ def test_standin_attestation_for_the_head_passes() -> None:
     ],
     ids=[
         "older-commit",
-        "before-head",
         "not-an-attester",
         "quoted",
         "no-marker",
@@ -384,3 +385,189 @@ def test_fetch_comments_maps_author_type_and_edit_time(monkeypatch: pytest.Monke
     assert oracle_review_check.fetch_comments("t", "o/r", 1) == [
         {"login": "joeharris76", "user_type": "User", "body": "x", "created_at": AFTER_HEAD, "updated_at": AFTER_HEAD}
     ]
+
+
+def _oracle_review(state: str = "success", submitted_at: str = AFTER_HEAD, **over: Any) -> dict[str, Any]:
+    body = f"### oracle-review-shadow: {state} for `{over.get('commit_id', HEAD)}`\n\nDetails."
+    review = {**_review(login=ORACLE, submitted_at=submitted_at), "user_type": "Bot", "body": body}
+    return {**review, **over}
+
+
+def _oracle(**kwargs: Any) -> tuple[int, str]:
+    return oracle_review_check.decide(
+        HEAD,
+        None,
+        SOUNDNESS_FILES,
+        kwargs.pop("reviews", [_oracle_review()]),
+        kwargs.pop("reactions", []),
+        kwargs.pop("threads", []),
+        oracle_review_check.any_soundness_path,
+        kwargs.pop("base_date", None),
+        kwargs.pop("comments", []),
+        "oracle",
+    )
+
+
+def test_oracle_success_review_passes_only_under_the_oracle_signal() -> None:
+    assert _oracle() == (0, f"oracle-review: pass (oracle review of {HEAD})")
+    assert _decide(reviews=[_oracle_review()])[0] == 1
+
+
+@pytest.mark.parametrize(
+    "reviews",
+    [
+        [_oracle_review("failure")],
+        [_oracle_review("pending")],
+        [_oracle_review("success", submitted_at=BEFORE_HEAD), _oracle_review("failure")],
+        [_oracle_review(body="No verdict header")],
+        [_oracle_review(body=f"### oracle-review-shadow: success for `{OLDER}`")],
+        [_oracle_review(body=f"Intro\n### oracle-review-shadow: success for `{HEAD}`")],
+    ],
+    ids=["failure", "pending", "latest-failure", "no-header", "other-sha", "header-not-first"],
+)
+def test_oracle_signal_needs_a_success_verdict_in_the_latest_review(reviews: list[dict[str, Any]]) -> None:
+    status, message = _oracle(reviews=reviews)
+    assert status == 1
+    assert "the oracle's latest review" in message
+
+
+def test_latest_oracle_success_wins() -> None:
+    reviews = [_oracle_review("failure", submitted_at=BEFORE_HEAD), _oracle_review("success")]
+    assert _oracle(reviews=reviews)[0] == 0
+
+
+def test_connector_review_does_not_satisfy_the_oracle_signal() -> None:
+    status, message = _oracle(reviews=[_review()], reactions=[_reaction()])
+    assert status == 1
+    assert "waiting for the oracle's review" in message
+
+
+@pytest.mark.parametrize(
+    "review",
+    [
+        _oracle_review(commit_id=OLDER),
+        _oracle_review(state="PENDING"),
+        _oracle_review(state="DISMISSED"),
+        _oracle_review(login="benchbox-oracle", user_type="User"),
+        _oracle_review(user_type=None),
+    ],
+    ids=["older-commit", "pending", "dismissed", "user-account", "no-type"],
+)
+def test_oracle_review_must_be_the_apps_and_on_the_head(review: dict[str, Any]) -> None:
+    assert _oracle(reviews=[review])[0] == 1
+
+
+def test_oracle_review_before_a_retarget_waits() -> None:
+    assert _oracle(reviews=[_oracle_review(submitted_at=BEFORE_HEAD)], base_date=HEAD_DATE)[0] == 1
+
+
+def test_open_oracle_threads_block_the_oracle_signal_only() -> None:
+    reviews = [_review(), _oracle_review()]
+    threads = [{"resolved": False, "author": "benchbox-oracle", "author_type": "Bot"}]
+    status, message = _oracle(reviews=reviews, threads=threads)
+    assert status == 1
+    assert "1 unresolved oracle review thread(s)" in message
+    assert _decide(reviews=reviews, threads=threads)[0] == 0
+    others = [
+        _thread(False),
+        {"resolved": True, "author": "benchbox-oracle", "author_type": "Bot"},
+        {"resolved": False, "author": "benchbox-oracle", "author_type": "User"},
+    ]
+    assert _oracle(reviews=reviews, threads=others)[0] == 0
+
+
+def _standin_comment() -> dict[str, Any]:
+    return {
+        "login": "joeharris76",
+        "user_type": "User",
+        "body": f"Stand-in oracle review: APPROVE {HEAD}",
+        "created_at": AFTER_HEAD,
+        "updated_at": AFTER_HEAD,
+    }
+
+
+def test_standin_after_a_failing_oracle_review_overrides_it_but_not_open_threads() -> None:
+    failing = [_oracle_review("failure", submitted_at=HEAD_DATE)]
+    assert _oracle(reviews=failing, comments=[_standin_comment()]) == (
+        0,
+        f"oracle-review: pass (stand-in review attested by joeharris76 for {HEAD})",
+    )
+    early = {**_standin_comment(), "created_at": BEFORE_HEAD, "updated_at": BEFORE_HEAD}
+    assert _oracle(reviews=failing, comments=[early])[0] == 1
+    assert _oracle(reviews=[], comments=[early])[0] == 0
+    threads = [{"resolved": False, "author": "benchbox-oracle", "author_type": "Bot"}]
+    assert _oracle(reviews=failing, comments=[_standin_comment()], threads=threads)[0] == 1
+
+
+def test_force_push_back_to_an_attested_head_keeps_the_attestation() -> None:
+    comment = {**_standin_comment(), "created_at": BEFORE_HEAD, "updated_at": BEFORE_HEAD}
+    assert _decide(comments=[comment])[0] == 0
+
+
+def _stub_main(monkeypatch: pytest.MonkeyPatch, reactions: Any) -> None:
+    check = oracle_review_check
+    monkeypatch.setenv("GITHUB_TOKEN", "token")
+    monkeypatch.setattr(check, "fetch_pull", lambda token, repo, pr: {"head": {"sha": HEAD}, "changed_files": 1})
+    monkeypatch.setattr(check, "fetch_files", lambda token, repo, pr: [{"filename": SOUNDNESS_FILES[0]}])
+    monkeypatch.setattr(check, "fetch_head_date", lambda token, repo, sha: HEAD_DATE)
+    monkeypatch.setattr(check, "fetch_reviews", lambda token, repo, pr: [_review(), _oracle_review("failure")])
+    monkeypatch.setattr(check, "fetch_reactions", reactions)
+    monkeypatch.setattr(check, "fetch_threads", lambda token, repo, pr: [])
+    monkeypatch.setattr(check, "fetch_base_change_date", lambda token, repo, pr: None)
+    monkeypatch.setattr(check, "fetch_comments", lambda token, repo, pr: [])
+
+
+def test_main_reports_the_other_signal_for_parity(monkeypatch: pytest.MonkeyPatch, capsys: Any) -> None:
+    _stub_main(monkeypatch, lambda token, repo, pr: [])
+    assert oracle_review_check.main(["--repo", "o/r", "--pr", "7"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[0] == f"oracle-review: pass (Codex connector review of {HEAD})"
+    assert out[1] == "parity: required=connector pass; oracle waiting"
+    assert out[2].startswith("parity: oracle: oracle-review: the oracle's latest review")
+    assert oracle_review_check.main(["--repo", "o/r", "--pr", "7", "--signal", "oracle"]) == 1
+    assert capsys.readouterr().out.splitlines()[1] == "parity: required=oracle waiting; connector pass"
+
+
+def test_connector_only_inputs_never_decide_the_oracle_signal(monkeypatch: pytest.MonkeyPatch, capsys: Any) -> None:
+    def broken(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
+        raise oracle_review_check.CheckError("GitHub returned HTTP 502")
+
+    _stub_main(monkeypatch, broken)
+    assert oracle_review_check.main(["--repo", "o/r", "--pr", "7", "--signal", "oracle"]) == 1
+    assert capsys.readouterr().out.splitlines()[1] == (
+        "parity: connector: not evaluated: CheckError('GitHub returned HTTP 502')"
+    )
+    assert oracle_review_check.main(["--repo", "o/r", "--pr", "7"]) == 2
+
+
+def test_an_unexpected_parity_error_never_changes_the_result(monkeypatch: pytest.MonkeyPatch, capsys: Any) -> None:
+    def odd(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
+        raise AttributeError("payload")
+
+    _stub_main(monkeypatch, odd)
+    monkeypatch.setattr(oracle_review_check, "fetch_reviews", lambda token, repo, pr: [_oracle_review()])
+    assert oracle_review_check.main(["--repo", "o/r", "--pr", "7", "--signal", "oracle"]) == 0
+    assert capsys.readouterr().out.splitlines()[1] == "parity: connector: not evaluated: AttributeError('payload')"
+
+
+def test_fetch_threads_and_reviews_keep_the_author_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    node = {"isResolved": False, "comments": {"nodes": [{"author": {"__typename": "Bot", "login": "benchbox-oracle"}}]}}
+    page = {
+        "data": {
+            "repository": {"pullRequest": {"reviewThreads": {"pageInfo": {"hasNextPage": False}, "nodes": [node]}}}
+        }
+    }
+    monkeypatch.setattr(oracle_review_check, "_request", lambda token, url, body=None: page)
+    assert oracle_review_check.fetch_threads("t", "o/r", 7) == [
+        {"resolved": False, "author": "benchbox-oracle", "author_type": "Bot"}
+    ]
+    review = {
+        "user": {"login": ORACLE, "type": "Bot"},
+        "commit_id": HEAD,
+        "state": "COMMENTED",
+        "submitted_at": AFTER_HEAD,
+        "body": "b",
+    }
+    monkeypatch.setattr(oracle_review_check, "_paginate", lambda token, path: [review])
+    fetched = oracle_review_check.fetch_reviews("t", "o/r", 7)[0]
+    assert (fetched["user_type"], fetched["body"]) == ("Bot", "b")

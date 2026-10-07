@@ -68,6 +68,9 @@ The workflow posts a separate, non-required `oracle-review-shadow` status and,
 for failures, pending results and findings, one pull request comment. It posts
 findings as a comment rather than review threads, because the ruleset requires
 every review thread to be resolved and shadow findings must not block merges.
+`findings_delivery: review` posts review threads instead; switching to it is a
+deliberate step that makes oracle threads binding and starts the parity period
+before the cut-over.
 
 It does not change the required `oracle-review` check, the ruleset, the digest
 or the soundness manifest. It does not post a pending status when a run
