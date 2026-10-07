@@ -15122,7 +15122,8 @@
     "pvm-s0b-polars-engine-option": {
       "claim": null,
       "needs": [
-        "pvm-d0-external-plan-review"
+        "pvm-d0-external-plan-review",
+        "pvm-s0a-polars2-compat-fixes"
       ],
       "priority": "medium-high",
       "status": "open",
