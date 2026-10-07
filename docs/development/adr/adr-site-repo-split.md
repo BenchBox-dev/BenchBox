@@ -4,8 +4,8 @@
 
 Accepted under S1 design authority (tracker item
 `site-split-00-adr-soundness-scope`). Oracle review: PR link recorded here on
-merge. Plan: `_project/handoffs/site-repo-split-handoff-20261006.md`
-(plan branch `origin/claude/bold-newton-uudn48`, unmerged at the time of writing).
+merge. Plan recorded on branch `origin/claude/bold-newton-uudn48`
+(unmerged at the time of writing).
 
 ## Context
 
