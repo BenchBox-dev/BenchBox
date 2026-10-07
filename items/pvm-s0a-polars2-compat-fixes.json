@@ -4,6 +4,7 @@
     "python -m benchbox.core.equivalence.cross_surface --benchmark <b> reports no divergences beyond cross_surface_baseline.yaml for all four benchmarks on both 2.0.0 and 1.44.2",
     "cast_date uses an API available from Polars 1.0.0 onwards, and a unit test covers a String input",
     "The PR body lists every 2.0 removal or default change checked against BenchBox code with file:line, and every added deterministic sort per query",
+    "A CI job installs polars==2.0.0 over the locked environment and runs the polars-df SF 0.01 smoke and the four cross-surface gates; it passes alongside the existing locked-version (1.44.2) jobs",
     "uv.lock, the pyproject polars floor and the main checkout's environment are unchanged; existing CI is green"
   ],
   "context": "Evidence (HEAD d076a974d): polars_df.py:241 cast_date returns column.cast(pl.Date). PyPI: polars 2.0.0 requires_python >=3.10 and depends on polars-runtime-32==2.0.0; wheels are abi3. Cross-surface gates for ssb, clickbench, tpcds and tpch are defined at cross_surface.py:1917-2075; EQUIVALENCE_SCALE = 0.1 (cross_surface.py:162).",
@@ -22,6 +23,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "221dc72df98e46b8bed3b72d0bc3e908",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-07T20:57:42Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "beb7f5826be040ae98fb31905b1a4c57",
       "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
     }
   ]
