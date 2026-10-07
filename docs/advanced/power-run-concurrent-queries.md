@@ -74,8 +74,7 @@ tpch = TPCH(scale_factor=0.1)
 
 # Power iterations are a plain loop over stream IDs: each TPCHPowerTest
 # run executes the 22 queries in that stream's permutation against a real
-# connection and reports Power@Size. (The former PowerRunExecutor wrapper
-# is removed; see adr-concurrency-public-api-reconciliation.)
+# connection and reports Power@Size.
 connection = duckdb.connect("test.db")
 
 power_values = []
@@ -216,10 +215,8 @@ tpch = TPCH(scale_factor=0.1)
 # Generate and load it first, or replace this path with an initialized database.
 
 # One throughput test owns all of its streams: the connection factory
-# hands each stream its session (see the adapter session-capability
-# contract), and StreamRunner executes them concurrently with fail-closed
-# accounting. (The former ConcurrentQueryExecutor wrapper is removed; see
-# adr-concurrency-public-api-reconciliation.)
+# hands each stream its session, and StreamRunner executes them
+# concurrently with fail-closed accounting.
 connection = duckdb.connect("throughput.db")
 
 throughput_test = TPCHThroughputTest(

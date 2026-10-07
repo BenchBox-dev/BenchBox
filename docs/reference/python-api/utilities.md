@@ -99,7 +99,7 @@ postgresql
 
 **Supported Dialects**:
 
-SQLGlot 30.21.0, the release this page was checked against, registers these dialect names, among others. The function passes them through unchanged:
+SQLGlot 30.21.0 registers these dialect names, among others. The function passes them through unchanged:
 
 - **Cloud**: athena, bigquery, databricks, redshift, snowflake
 - **Open Source**: clickhouse, duckdb, mysql, postgres, sqlite

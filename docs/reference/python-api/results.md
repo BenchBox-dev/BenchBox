@@ -274,7 +274,7 @@ PASSED
 
 `BenchmarkResults` in 0.4.1 has no `to_json_file`, `from_json_file`, `to_json`, `to_dict` or `from_dict` method, and no `QueryResult` class backs `query_results`. Calling the missing methods raises `AttributeError`. Use `ResultExporter` and `dataclasses.asdict` instead; see [Saving Results](#saving-results).
 
-<span id="benchbox.core.results.models.BenchmarkResults.flightdata_source_provenance"></span>`flightdata_source_provenance` (`dict[str, Any] | None`) is a field of `BenchmarkResults` in the development source at SHA `c52e06e6` but not in the 0.4.1 release: its constructor takes no such argument and the attribute does not exist. Do not rely on it until a release ships it.
+<span id="benchbox.core.results.models.BenchmarkResults.flightdata_source_provenance"></span>`flightdata_source_provenance` (`dict[str, Any] | None`, default `None`) holds the source provenance from the data-generation manifest of a FlightData run, and is `None` for other benchmarks. Exported results carry it as `source_provenance`. Added in 0.4.2.
 
 ### ExecutionPhases
 

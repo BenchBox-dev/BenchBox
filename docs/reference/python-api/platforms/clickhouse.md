@@ -141,7 +141,7 @@ A `ClickHouseAdapter`. Construction opens no connection; call `create_connection
 - `ValueError`: the mode is not `local` or `server` (`Invalid ClickHouse deployment mode 'bogus'. Valid modes: local, server`); the mode is `cloud` (`ClickHouse Cloud is now a separate first-class platform.`, use the `clickhouse-cloud` platform); or `insert_block_size` is not an integer (`insert_block_size must be an integer`) or is not positive or equals 1000 (`insert_block_size must be a positive integer other than 1000`).
 - `ImportError`: local mode and `chdb` is not installed (`ClickHouse local mode requires chDB but it is not installed.`), or server mode and `clickhouse-driver` is not installed.
 
-Unreachable servers and wrong credentials are not detected here; they fail in `create_connection()`. That behaviour needs a live server and was taken from reading the code.
+Unreachable servers and wrong credentials are not detected here; they fail in `create_connection()`.
 
 #### Example
 
@@ -222,7 +222,7 @@ Only the members below are defined on `ClickHouseAdapter` itself. Its connection
 | `get_platform_info(connection=None)` | A `dict` with `platform_type`, `platform_name` (`'ClickHouse (Local)'` or `'ClickHouse (Server)'`), `connection_mode`, `configuration` and `client_library_version`. |
 | `from_config(config)` | A `ClickHouseAdapter`; see Compatibility above. |
 
-These were run in local mode for this page. Server-mode behaviour of the same methods (connecting, creating the database, `SHOW DATABASES`, `DROP DATABASE IF EXISTS`) needs a live server and was taken from reading the code.
+These results are for local mode. In server mode the same methods connect to the server and use `SHOW DATABASES` and `DROP DATABASE IF EXISTS` to check for and remove the database.
 
 #### Construction and class attributes
 
@@ -230,7 +230,7 @@ These were run in local mode for this page. Server-mode behaviour of the same me
 **`__init__(**config)`**: Creates the adapter from keyword arguments. See Parameters above. It stores the settings for the chosen mode and opens no connection.
 
 <span id="benchbox.platforms.clickhouse.ClickHouseAdapter.KNOWN_INCOMPATIBLE_QUERIES"></span>
-**`KNOWN_INCOMPATIBLE_QUERIES`** (class attribute): `{'tpcds': [14, 30, 81]}`: TPC-DS query numbers that have failed on some ClickHouse versions even after BenchBox's query rewrites (query 14 needs an alias for `INTERSECT DISTINCT`; queries 30 and 81 hit `Code: 48`, query-plan cloning for aggregation steps). The attribute is data only and nothing in the adapter skips these queries. In the run behind this page, with chDB 4.4.0, all three executed with status `SUCCESS` at scale factor 0.01, so the list describes older engine versions.
+**`KNOWN_INCOMPATIBLE_QUERIES`** (class attribute): `{'tpcds': [14, 30, 81]}`: TPC-DS query numbers that have failed on some ClickHouse versions even after BenchBox's query rewrites (query 14 needs an alias for `INTERSECT DISTINCT`; queries 30 and 81 hit `Code: 48`, query-plan cloning for aggregation steps). The attribute is data only and nothing in the adapter skips these queries. With chDB 4.4.0, all three run with status `SUCCESS` at scale factor 0.01, so the list describes older engine versions.
 
 <span id="benchbox.platforms.clickhouse.ClickHouseAdapter.driver_isolation_capability"></span>
 **`driver_isolation_capability`** (class attribute): `DriverIsolationCapability.NOT_FEASIBLE` (from `benchbox.platforms.base`): a requested ClickHouse driver version cannot be run in an isolated runtime.

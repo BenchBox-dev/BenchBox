@@ -434,10 +434,9 @@ composite metrics.
 | 100 | ~100 GB | Enterprise simulation |
 | 1000+ | ~1+ TB | Large-scale testing |
 
-**Subscale behavior:** Scale factors below 1 are supported for development use
-with the patched `dsdgen` bundled under `_binaries/tpc-ds/` (see
-`patch-and-redistribute-tpcds-dsdgen-subscale-support`). Runs at SF < 1 are
-allowed by default, but remain unofficial and are not compliance-valid.
+**Subscale behavior:** Scale factors below 1 are supported for development and
+testing. Runs at SF < 1 are allowed by default, but remain unofficial and are
+not compliance-valid.
 
 **Note:** Query execution times depend on platform, hardware, query complexity, and configuration. Run benchmarks to establish baselines for your environment.
 

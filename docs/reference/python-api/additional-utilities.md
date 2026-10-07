@@ -311,7 +311,7 @@ Utilities for validating BenchBox dependency definitions.
 
 ### Overview
 
-The dependency validation utilities verify that all declared dependencies in `pyproject.toml` have corresponding locked versions in `uv.lock` that satisfy the declared specifiers. This ensures dependency consistency and helps catch dependency issues early.
+The dependency validation utilities verify that all declared dependencies in `pyproject.toml` have corresponding locked versions in `uv.lock` that satisfy the declared specifiers. Both files are part of a BenchBox source checkout, not the installed package, so these utilities need a source checkout (or your own `pyproject.toml` and `uv.lock`).
 
 **Key Features**:
 
@@ -488,7 +488,7 @@ python -m benchbox.utils.dependency_validation \
     --lock path/to/uv.lock
 ```
 
-By default it reads `pyproject.toml` and `uv.lock` in the current directory. With `--matrix` the summary is printed only after validation passes. Problems are written to standard error, one per line.
+By default it reads `pyproject.toml` and `uv.lock` in the current directory, so run it from the root of a source checkout or pass both paths. With `--matrix` the summary is printed only after validation passes. Problems are written to standard error, one per line.
 
 **Exit Codes**:
 

@@ -243,8 +243,8 @@ def build_combined_evidence(
 ) -> CombinedGateEvidence:
     """Aggregate 3 stage `GateSummary` records into one release-evidence verdict.
 
-    Mechanized APPROVE checklist (docs/operations/uat-framework.md
-    "APPROVE / HOLD gate"): every stage's own verdict is green, every
+    Mechanized APPROVE checklist (docs/operations/uat-release-campaign.md
+    "Campaign report: COMPLETE / HOLD"): every stage's own verdict is green, every
     stage's accounting sidecar was present (not estimated), and
     explorer_smoke actually ran for every stage whose `phases:` list
     included it (`"explorer_smoke" in phase_exit_codes` is the same

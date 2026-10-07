@@ -5,10 +5,10 @@
 ```{tags} intermediate, guide, pyspark, dataframe-platform
 ```
 
-PySpark is the Python API for Apache Spark, providing distributed analytics through both SQL and DataFrame interfaces. BenchBox now supports PySpark in dual execution modes:
+PySpark is the Python API for Apache Spark, providing distributed analytics through both SQL and DataFrame interfaces. BenchBox supports PySpark in two execution modes:
 
-- **SQL mode** (new): `benchbox run --platform pyspark --mode sql ...`
-- **DataFrame mode** (existing): `benchbox run --platform pyspark-df ...`
+- **SQL mode**: `benchbox run --platform pyspark --mode sql ...`
+- **DataFrame mode**: `benchbox run --platform pyspark-df ...`
 
 ## Overview
 

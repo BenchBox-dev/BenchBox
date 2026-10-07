@@ -3,7 +3,7 @@
 ```{tags} intermediate, reference
 ```
 
-BenchBox platform metadata now carries a `support_status` value from the public support taxonomy: `stable`, `beta`, `experimental`, `repo_only`, `deprecated`, or `document_only`.
+BenchBox platform metadata carries a `support_status` value from the public support taxonomy: `stable`, `beta`, `experimental`, `repo_only`, `deprecated`, or `document_only`.
 
 This status is intentionally separate from local dependency availability. For example, Snowflake can be `beta` product surface while unavailable on a machine that has not installed `snowflake-connector-python`.
 
@@ -50,16 +50,3 @@ Diagnostic statuses:
 | `deprecated_platform` | The platform selector is retained only for migration. |
 | `intentionally_disabled` | The support status indicates a non-runtime surface. |
 | `not_configured` | The requested platform is not in optional adapter registration. |
-
-## Inventory Notes
-
-Top-level platform files that are not direct optional adapter registration modules were classified during this migration:
-
-| Path | Classification | Rationale |
-| --- | --- | --- |
-| `benchbox/platforms/fabric_spark.py` | supported wrapper | Stable import path that re-exports `benchbox.platforms.azure.fabric_spark_adapter.FabricSparkAdapter`. |
-| `benchbox/platforms/datafusion_query_transformer.py` | supported helper | Lazy helper imported by the DataFusion adapter for SQL compatibility. |
-| `benchbox/platforms/datafusion_write_transformer.py` | supported helper | Write-path SQL compatibility helper for DataFusion. |
-| `benchbox/platforms/presto_trino_utils.py` | supported helper | Shared helper module used by Presto-family adapters. |
-| `benchbox/platforms/questdb_rewriter.py` | supported helper | QuestDB SQL compatibility helper. |
-| `benchbox/platforms/dataframe/cudf_df.py` | experimental DataFrame support | cuDF coverage lives in the DataFrame platform family (`CuDFDataFrameAdapter`); the legacy top-level `benchbox/platforms/cudf.py` adapter was removed. |

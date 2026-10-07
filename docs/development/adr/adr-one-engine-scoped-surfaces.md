@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted. Supersedes the 2026-05-21 decision recorded on the tracker item
-`mcp-product-surface-and-shared-run-service-decision`, which designated MCP a
-"smoke/control-plane surface, not a CLI-equivalent execution surface".
+Accepted. Supersedes the 2026-05-21 MCP product-surface decision, which
+designated MCP a "smoke/control-plane surface, not a CLI-equivalent execution
+surface".
 
 ## Date
 
@@ -29,12 +29,12 @@ The 2026-05-21 decision answered the *product scope* question ("is MCP
 CLI-equivalent?") with "no", and deferred the *architecture* question ("where
 does the logic live?") behind that answer. Two things overtook it:
 
-1. The remote/tenant MCP investment (#1447–#1513) turned MCP into a durable,
+1. The remote/tenant MCP investment turned MCP into a durable,
    authenticated, multi-tenant execution service. "Smoke/control-plane" no
    longer describes what the surface is used for.
 2. The duplication produced a recurring defect class in which a request was
    accepted by one half of a pair and rejected or mishandled by the other —
-   "schema half closed, adapter half open" (#1513, #1514, #1515, #1520).
+   "schema half closed, adapter half open".
 
 Those two facts are independent of the product-scope answer. Whether or not MCP
 ever reaches CLI option parity, having two implementations of one behavior is
@@ -70,7 +70,7 @@ the actual defect source.
 |---|---|---|---|
 | `security-scoped` | Permanent | Admitting the control would let a request name credentials, endpoints, filesystem or cloud destinations, or unbounded resources — or would trigger destructive or publishing side effects. The narrow surface is what makes remote/tenant mode safe. | None. Parity never applies to credential, destination, or resource-budget controls. A bounded, typed, server-validated subset may be added to the MCP allow-list, which is a *new* narrow control, not a promotion of the CLI flag. |
 | `interaction-scoped` | Permanent | The control governs terminal interaction or presentation (progress bars, verbosity, prompts). It has no meaning in a structured request/response protocol. | None. MCP returns structured JSON; there is no console to configure. |
-| `not-yet-demanded` | Provisional | Nothing about security or interaction blocks the control. It is absent because no MCP client has asked for it. | Record a deferral on the `one-engine-parity-ledger` tracker item when a client demands it, then add the parameter. Demand-driven expansion is recorded as a deferral, never as a speculative TODO. |
+| `not-yet-demanded` | Provisional | Nothing about security or interaction blocks the control. It is absent because no MCP client has asked for it. | When a client demands the control, add the parameter and remove its ledger entry. Expansion follows demand, never speculation. |
 
 The tiers are about *why the surface is scoped*, not about implementation
 difficulty. Because the engine is shared, adding a `not-yet-demanded` control is
@@ -169,8 +169,7 @@ agreeing about how it was produced.
 
 ## Implementation
 
-This ADR is governance only and changes no runtime code. The runtime work lands
-in the `one-engine` tracker worktree: a shared core run service, unified
-statistics, unified regression policy, unified constants, MCP adoption of the
-run service, sink removal in both surfaces, and the parity ledger enforcement
-item that owns demand-driven expansion.
+This ADR is governance only and changes no runtime code. The runtime work it
+requires is a shared core run service, unified statistics, unified regression
+policy, unified constants, MCP adoption of the run service, sink removal in both
+surfaces, and enforcement of the omission ledger.

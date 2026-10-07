@@ -16,7 +16,6 @@ BenchBox/
 ├── examples/              # Example scripts and configs
 ├── scripts/               # Development and CI scripts
 ├── _binaries/             # TPC tool binaries (dsdgen, dsqgen)
-├── _project/              # Project management (TODOs, indexes)
 ├── _sources/              # TPC specification source files
 ├── pyproject.toml         # Project metadata and dependencies
 ├── Makefile               # Development task shortcuts

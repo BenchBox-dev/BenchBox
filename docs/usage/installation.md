@@ -62,9 +62,8 @@ python -m pip install "benchbox[duckdb]" "duckdb==1.6.0.dev379"
 ```
 
 DuckDB distributes the 2.0 alpha engine in the Python package's 1.6 development
-series. BenchBox's nightly checks pin `1.6.0.dev379`, which contains engine
-`v2.0.0-alpha39998`, so a later preview does not enter supported environments
-without a compatibility run and an explicit pin update.
+series. Use `1.6.0.dev379` (engine `v2.0.0-alpha39998`); later preview builds
+are not yet tested with BenchBox.
 
 ### Cloud Spark Platforms
 

@@ -96,10 +96,7 @@ Databricks platform metadata includes:
 
 ### Provenance cutoff
 
-Untuned runs made before the #2177 fix reported
-`databricks_clustering_strategy: "z_order"` while applying only plain
-OPTIMIZE compaction. `export.benchbox_version` (recorded since #2199)
-is the cutoff marker: a Databricks bundle without it that claims
-`"z_order"` outside any tuning context predates provenance and must be
-treated as unknown. Submission validation warns on that shape without
-failing it, and old bundles are never rewritten.
+Older untuned result bundles may report
+`databricks_clustering_strategy: "z_order"` even though only plain OPTIMIZE
+compaction ran; treat that value as unknown when the bundle has no tuning
+context and no `export.benchbox_version`.

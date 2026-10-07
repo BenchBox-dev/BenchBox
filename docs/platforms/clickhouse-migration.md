@@ -94,25 +94,21 @@ platform: clickhouse-server
 
 Result JSON files written before this migration may contain
 `"platform_type": "clickhouse"` or related legacy labels. These files remain
-readable during the migration window. Bulk artifact relabeling is deferred
-until after alias removal.
+readable.
 
 ## What Was Changed
 
-- `clickhouse-local` and `clickhouse-server` are now registered as first-class
-  platform identifiers in the registry, adapter factory, CLI, DDL generator,
-  cost calculator, and dependency surfaces.
+- `clickhouse-local` and `clickhouse-server` are first-class platform names
+  everywhere a platform is selected, including the CLI and configuration files.
 - `clickhouse-cloud` was already a first-class platform and is unchanged.
 - Bare `clickhouse` has been removed and now raises an error naming the
   first-class replacements. Colon-suffix syntax (`clickhouse:local`, etc.)
   remains a compatibility alias with explicit `DeprecationWarning` emission.
-- Shared ClickHouse SQL dialect, workload, and tuning logic is unchanged and
-  shared across all three platform identifiers.
+- SQL dialect, workloads, and tuning behave the same on all three platforms.
 
 ## Alias Removal Timeline
 
 The bare `clickhouse` alias has now been **removed** (after the v0.2.1 → v0.3.1
 deprecation window); passing it raises an error naming the first-class
 replacements. The colon-suffix selectors (`clickhouse:local` / `:server` /
-`:cloud`) remain as deprecating aliases. Bulk relabeling of historical result
-artifacts that carry the legacy `clickhouse` platform label is still deferred.
+`:cloud`) remain as deprecating aliases.

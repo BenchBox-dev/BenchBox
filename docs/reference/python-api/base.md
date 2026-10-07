@@ -140,7 +140,7 @@ ValueError: Scale factors >= 1 must be whole integers. Got: 1.5. Use values like
 
 <span id="benchbox.base.BaseBenchmark.SKIP_DATA_LOADING"></span>
 
-`SKIP_DATA_LOADING` is not part of the 0.4.1 release. The development branch adds it as a `bool` that defaults to `False`, for benchmarks that need schema objects but no data files. Do not rely on it with 0.4.1.
+`SKIP_DATA_LOADING` is a `bool` class attribute that defaults to `False`. Set it to `True` for a benchmark that needs schema objects but no data files; the platform adapter then creates the schema and skips data loading. Added in 0.4.2.
 
 ### Other members
 

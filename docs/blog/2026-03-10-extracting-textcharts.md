@@ -110,7 +110,7 @@ The trade-off is operational rather than architectural. BenchBox now depends on 
 
 This post is an architecture retrospective, not a runtime benchmark report, so the numbers here describe code structure rather than hardware performance. Unless noted otherwise, counts such as 7,500 lines, 19 modules, 17 shim files, and ~290 moved test methods come from source-tree measurements we collected during the extraction work on March 10, 2026, using BenchBox v0.1.4 locally and the standalone `textcharts` package at the same migration point.
 
-Approximate figures are rounded because they summarize moved test methods and pre-extraction file sizes from the research notes rather than a single immutable file snapshot. The accepted ADR from March 5, 2026 documents the ownership boundary and migration constraints that shaped the extraction.
+Approximate figures are rounded because they summarize moved test methods and pre-extraction file sizes rather than a single immutable file snapshot. The [accepted ADR](../development/adr/adr-textcharts-extraction.md) from March 5, 2026 documents the ownership boundary and migration constraints that shaped the extraction.
 
 ---
 

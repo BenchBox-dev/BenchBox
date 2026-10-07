@@ -233,7 +233,7 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 | Data and configuration | <span id="benchbox.h2odb.H2ODB.output_dir"></span>`output_dir` | property | The resolved directory from the constructor argument. |
 | Data and configuration | <span id="benchbox.h2odb.H2ODB.run_with_platform_api_surface"></span>`run_with_platform_api_surface` | class attribute | |
 | Data and configuration | <span id="benchbox.h2odb.H2ODB.scale_factor"></span>`scale_factor` | instance attribute | The constructor argument. |
-| Data and configuration | <span id="benchbox.h2odb.H2ODB.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Not defined in the released 0.4.1 wheel. Source builds after 0.4.1 define it on `BaseBenchmark`, default `False`. |
+| Data and configuration | <span id="benchbox.h2odb.H2ODB.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Defined on `BaseBenchmark` from 0.4.2, default `False`. Set it to `True` for a benchmark that needs schema objects but no data files. |
 | Data and configuration | <span id="benchbox.h2odb.H2ODB.tables"></span>`tables` | property | Empty until `generate_data()` has run, then the table-to-path mapping. |
 
 ## Usage Examples

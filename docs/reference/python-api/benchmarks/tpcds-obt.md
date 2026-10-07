@@ -7,10 +7,10 @@ Python API reference for the TPC-DS One Big Table (OBT) benchmark.
 
 TPCDSOBT flattens the TPC-DS sales and returns facts and their dimensions into one wide table, `tpcds_sales_returns_obt`, and serves TPC-DS queries rewritten to run against that table.
 
-Two limits apply to the released 0.4.1 wheel, and both were hit while checking this page:
+Two limits apply to the 0.4.1 release:
 
 - `get_query()` and `get_queries()` fail with `FileNotFoundError` when BenchBox is installed from PyPI, because the TPC-DS query templates they read are not at the location they look in. See `get_query()` below.
-- `generate_data()` needs a scale factor of at least 1, which writes the full TPC-DS source data first. It was not run for this page.
+- `generate_data()` needs a scale factor of at least 1, which writes the full TPC-DS source data first.
 
 ## `benchbox.TPCDSOBT`
 
@@ -24,7 +24,7 @@ Creates a TPC-DS OBT benchmark that provides a single wide table and its `CREATE
 | --- | --- | --- | --- |
 | `scale_factor` | `float` | `1.0` | TPC-DS scale factor. Must be a whole number of at least 1. |
 | `output_dir` | `str`, `Path` or `None` | `None` | Directory for the OBT file. When `None`, the directory is `benchmark_runs/datagen/tpcds_obt_<sf token>` under the current directory (for example `tpcds_obt_sf1`), or under `$BENCHBOX_OUTPUT_DIR/datagen` when that variable is set. |
-| `**kwargs` | keyword arguments | none | `tpcds_source_dir` is the directory for the TPC-DS source data (default `benchmark_runs/datagen/tpcds_<sf token>`). `output_format` is `"parquet"` (default) or `"dat"`. `dimension_mode` is `"full"` (default) or `"minimal"`. `channels` is a list drawn from `"store"`, `"web"` and `"catalog"` (default: all three). `parallel` (`int`, default `1`), `force_regenerate` (`bool`) and the compression keywords `compress_data`, `compression_type` and `compression_level` are passed to the TPC-DS generator. `verbose` (`bool` or `int`) and `quiet` (`bool`) set the log level. Their effects are not verified here because `generate_data()` was not run; the constructor does not validate their values. |
+| `**kwargs` | keyword arguments | none | `tpcds_source_dir` is the directory for the TPC-DS source data (default `benchmark_runs/datagen/tpcds_<sf token>`). `output_format` is `"parquet"` (default) or `"dat"`. `dimension_mode` is `"full"` (default) or `"minimal"`. `channels` is a list drawn from `"store"`, `"web"` and `"catalog"` (default: all three). `parallel` (`int`, default `1`), `force_regenerate` (`bool`) and the compression keywords `compress_data`, `compression_type` and `compression_level` are passed to the TPC-DS generator. `verbose` (`bool` or `int`) and `quiet` (`bool`) set the log level. The constructor does not validate their values. |
 
 The constructor creates no files.
 
@@ -72,13 +72,13 @@ obt_out
 
 `generate_data() -> dict[str, Any]` generates the TPC-DS source data in `tpcds_source_dir`, then transforms it into the OBT table in `output_dir`. It returns a `dict` with the keys `table` (the path of the OBT file) and `manifest` (the path of `tpcds_sales_returns_obt_manifest.json`); `benchmark.tables` maps `tpcds_sales_returns_obt` to the table path.
 
-Not run: scale factor 1 writes about a gigabyte of source data, and this was not done on 0.4.1. The return keys come from reading the code of the released wheel.
+Scale factor 1 writes about a gigabyte of source data.
 
 ### `get_query(query_id)`
 
 `get_query(query_id, **kwargs) -> str` is meant to return one TPC-DS query rewritten for the OBT table. `query_id` is an `int` or a numeric `str`.
 
-On 0.4.1 installed from PyPI it raises `FileNotFoundError` for every query id. The behaviour with templates present (in a source checkout) was not run, so this page does not list which query ids exist.
+On 0.4.1 installed from PyPI it raises `FileNotFoundError` for every query id, because the query templates are not where it looks for them.
 
 ```python
 from benchbox import TPCDSOBT

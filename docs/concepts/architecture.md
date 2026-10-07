@@ -57,7 +57,6 @@ tests, examples, and project operations:
 | `examples/` | Runnable examples, notebooks, tuning files, and workflow patterns |
 | `results-explorer/` | Browser application for published benchmark results |
 | `results-data/` | Public result corpus and its validation metadata |
-| `_project/` | Repository operations, audits, and project tooling; not part of the public Python API |
 
 This map describes ownership boundaries rather than every directory. Use the
 linked component documentation below for implementation details.

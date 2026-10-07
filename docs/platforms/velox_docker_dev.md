@@ -93,20 +93,18 @@ docker compose down velox-connect
 The Spark server runs inside the container and reads files by their **host-side absolute paths** (BenchBox sends paths over gRPC, not file contents). The compose file bind-mounts `$BENCHBOX_DATA_DIR` at the **same absolute path** inside the container, so host paths resolve identically server-side.
 
 ```text
-Host:      /Users/joe/Developer/BenchBox/benchmark_runs/tpch_sf1/lineitem.parquet
-Container: /Users/joe/Developer/BenchBox/benchmark_runs/tpch_sf1/lineitem.parquet
+Host:      /data/benchmark_runs/tpch_sf1/lineitem.parquet
+Container: /data/benchmark_runs/tpch_sf1/lineitem.parquet
            └── same path, mounted :ro
 ```
 
-`BENCHBOX_DATA_DIR` has **no default** in the compose file — export it as an **absolute path** before running compose. There is deliberately no fallback: any default that could live in the compose file or a checked-in `.env` can only ever be a directory-relative path (e.g. `./benchmark_runs`), and a relative container mount target can never equal an absolute host path, breaking the exact contract above (`docker/velox/.env` shipped a relative fallback briefly and was reverted for this reason). `make test-docker-up-velox` validates the variable is set and absolute before invoking compose; a bare `docker compose` run must export it manually:
+`BENCHBOX_DATA_DIR` has **no default** in the compose file — export it as an **absolute path** before running compose. There is deliberately no fallback: any default that could live in the compose file or a checked-in `.env` can only ever be a directory-relative path (e.g. `./benchmark_runs`), and a relative container mount target can never equal an absolute host path, breaking the exact contract above. `make test-docker-up-velox` validates the variable is set and absolute before invoking compose; a bare `docker compose` run must export it manually:
 
 ```bash
 export BENCHBOX_DATA_DIR=/mnt/benchdata
 docker compose up -d velox-connect
 # Then run benchbox so the paths it sends are under /mnt/benchdata/
 ```
-
-The mount also stays a bare `${BENCHBOX_DATA_DIR}` reference with no inline default syntax at all, because [mocker](../operations/uat-framework.md) — the Apple-silicon local Docker-compatible engine used by `make test-docker-* CONTAINER_ENGINE=mocker` — supports neither a nested default (`${VAR:-${OTHER}}`) nor the `${VAR:?message}` required-variable form; it silently leaves either one unresolved instead of substituting or erroring.
 
 The mount is read-only (`:ro`). Spark's managed table warehouse is redirected to `/tmp/spark-warehouse` inside the container.
 

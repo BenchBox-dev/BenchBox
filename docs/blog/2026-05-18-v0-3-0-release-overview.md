@@ -161,4 +161,3 @@ The deep-dive post has the full set of invocations including ClickHouse-native a
 - Companion post: [Reworking JoinOrder around the IMDb 2013 dataset](./2026-05-18-joinorder-imdb-2013-dataset.md)
 - Approximate functions reference: `docs/benchmarks/read-primitives-approximate-functions.md`
 - Sketch functions reference: `docs/benchmarks/write-primitives-sketch-functions.md`
-- Prompt route decision: `_project/decisions/landing-prompts-route.md`

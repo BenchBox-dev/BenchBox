@@ -10,64 +10,25 @@ suite also create native thread pools, parse large module trees, or spawn
 subprocess-heavy workloads. That combination is enough to make a developer
 machine unresponsive if worker counts are not capped early enough.
 
-This page records the debugging outcome and the guardrails that must remain in
+This page explains the two causes and the guardrails that must remain in
 place when contributors change pytest configuration, xdist behavior, or
 concurrency-heavy tests.
 
-## Executive Summary
+## Root causes
 
-Two root causes were identified and fixed:
+1. **Worker oversubscription.** Uncapped workers multiply memory and thread
+   use: `-n 8` on a 114-test sample reached about 3.9 GB RSS and 181 threads.
+   An early-loaded plugin caps macOS runs to 2 workers.
 
-1. **Worker oversubscription** (found first): `-n 8` with uncapped workers
-   created ~3.9 GB RSS and 181 threads on 114 tests. Fixed by an early-loaded
-   plugin that caps macOS to 2 workers.
+2. **`setproctitle` → `launchservicesd` load.** Even with 2 workers, large
+   parallel runs made macOS unresponsive. xdist calls `setproctitle()` twice
+   per test to update worker titles, and on macOS each call makes
+   `launchservicesd` rebuild its process registry. Disabling the
+   `setproctitle` C extension, or patching `worker_title` to a no-op, brings
+   `launchservicesd` CPU from over 200% back to 0%. BenchBox patches
+   `worker_title` to a no-op on macOS in `pytest_configure`.
 
-2. **`setproctitle` → `launchservicesd` storm** (found second, the real
-   beachball driver): Even with workers capped to 2, the macOS beachball
-   persisted during large suite runs. The root cause was `setproctitle()`:
-   xdist calls it twice per test (~200 calls/second) to update worker process
-   titles. On macOS this triggers `launchservicesd` to continuously rebuild its
-   process registry, consuming **200%+ CPU** and **~900 MB RSS**. Fixed by
-   patching `worker_title` to a no-op on macOS via stack walking in
-   `pytest_configure`.
-
-## Investigation Timeline
-
-### Phase 1: Worker Oversubscription (Original Finding)
-
-A minimal reproducer with 114 tests showed that `-n 8` created too many workers:
-
-```bash
-uv run -- python -m pytest -vv -n 8 \
-  tests/unit/test_release_readiness.py \
-  tests/unit/test_marker_strategy.py \
-  tests/unit/platforms/dataframe/test_unified_frame.py
-```
-
-This was solved by capping workers to 2 on macOS via
-[`_benchbox_pytest_xdist_safety.py`](../../_benchbox_pytest_xdist_safety.py).
-
-### Phase 2: Persistent Beachball (New Finding)
-
-After the worker cap, the beachball still occurred during real test runs
-(12,900+ tests). Systematic monitoring revealed `launchservicesd` as the #1
-CPU consumer at **200%+ CPU**, not pytest.
-
-### Phase 2 Controlled Experiments
-
-| Experiment | launchservicesd CPU | Result |
-|---|---|---|
-| Baseline (no tests) | 0% | Normal |
-| Pure CPU load (no pytest) | 0% | Not CPU-related |
-| Serial pytest (`-n 0`, 2380 tests) | 0% | Not file I/O |
-| 2 concurrent serial pytests | 0% | Not concurrent Python |
-| Parallel collection only (`-n 2 --collect-only`) | 0% | Not collection |
-| Parallel execution (`-n 2`, 2380 tests) | **228%** | **xdist-specific** |
-| Parallel with output `/dev/null` | **211%** | Not terminal rendering |
-| Parallel with `setproctitle` C ext disabled | **0%** | **ROOT CAUSE** |
-| Parallel with `worker_title` patched to no-op | **0%** | **FIX CONFIRMED** |
-
-## Root Cause: `setproctitle` → `launchservicesd`
+## How `setproctitle` overloads `launchservicesd`
 
 The `setproctitle` package (installed as a transitive dependency via `mutmut`)
 provides a C extension that modifies process titles via macOS kernel APIs.
@@ -90,12 +51,8 @@ sustained high-CPU loop that:
 - Starves `WindowServer` and the terminal app of responsive CPU/memory
 - Causes the macOS beachball
 
-### Why the Initial Investigation Missed This
-
-The original 114-test reproducer was too small to trigger the effect. At low
-test counts, `setproctitle` calls are infrequent enough that `launchservicesd`
-handles them without stress. The threshold appears to be around several hundred
-tests in parallel before `launchservicesd` CPU becomes dominant.
+The effect needs several hundred tests running in parallel; small samples
+do not show it.
 
 ## Current Protections
 
@@ -171,24 +128,10 @@ asserts that:
 
 If you change xdist startup behavior, update those tests in the same change.
 
-## Before/After Validation
+## Expected behavior
 
-The reproducer above was run across `-n 0/1/2/4/8` before and after the final
-fix. The critical signal is that requested `-n 4` and `-n 8` now collapse to
-the same resource profile as safe `-n 2`.
-
-| Requested `-n` | Before fix | After fix |
-|---|---|---|
-| `0` | `14.1s`, `590 MB`, `21` threads, `3` procs | `11.9s`, `589 MB`, `21` threads, `2` procs |
-| `1` | `19.7s`, `749 MB`, `37` threads, `3` procs | `18.0s`, `751 MB`, `37` threads, `4` procs |
-| `2` | `19.2s`, `1292 MB`, `59` threads, `6` procs | `18.0s`, `1294 MB`, `61` threads, `4` procs |
-| `4` | `20.0s`, `2368 MB`, `102` threads, `7` procs | `18.4s`, `1293 MB`, `60` threads, `5` procs |
-| `8` | `23.1s`, `3882 MB`, `181` threads, `13` procs | `18.4s`, `1292 MB`, `59` threads, `5` procs |
-
-Direct sanity checks after the fix:
-
-- `pytest -n 4 ...` reports `created: 2/2 workers`
-- `pytest -n 8 ...` reports `created: 2/2 workers`
+With the cap in place, requested `-n 4` and `-n 8` runs on macOS report
+`created: 2/2 workers` and use the same resources as `-n 2`.
 
 ## Contributor Checklist
 
@@ -204,7 +147,7 @@ tests, do all of the following:
 5. Keep the `setproctitle` suppression in `pytest_configure`. If `setproctitle`
    is re-enabled, verify that `launchservicesd` stays below 10% CPU during a
    12,000+ test parallel run.
-6. Re-run the reproducer matrix at `-n 0/1/2/4/8`.
+6. Re-run the reproducer below at `-n 0/1/2/4/8`.
 7. Collect resource data, not just pass/fail. At minimum record wall time, peak
    RSS, thread count, process count, `launchservicesd` CPU, and whether
    requested `-n 4` or `-n 8` actually created only two workers on macOS.
@@ -242,5 +185,5 @@ BENCHBOX_MAX_XDIST_WORKERS=3 uv run -- python -m pytest -vv -n 3 <target>
 ```
 
 That override is for measurement only. Do not use it as evidence that the
-default should be raised unless you also capture the same before/after resource
-metrics documented above.
+default should be raised unless you also capture before and after resource
+metrics as listed in the checklist above.

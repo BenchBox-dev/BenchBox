@@ -2,13 +2,12 @@
 
 ## Status
 
-Accepted, 2026-07-12. Decided by Joe.
+Accepted, 2026-07-12. Decided by the project maintainer.
 
 ## Context
 
-The 2026-07-12 tuning-system deep review (evidence pinned to commit
-`acfb8992`) surfaced two unresolved product questions blocking soundness
-remediation of the tuning pipeline:
+A 2026-07-12 review of the tuning system surfaced two unresolved product
+questions that blocked soundness fixes to the tuning pipeline:
 
 **1. Trust model.** Published tuning claims are, today, self-attested and
 nothing says so:
@@ -25,11 +24,10 @@ nothing says so:
   the requested tuning was physically realized in the database.
 - No mechanism lets an evaluator verify a published tuning claim against
   the actual database state.
-- `docs/reference/threat-model.md` already defines a trust-label
-  vocabulary for the results platform (`maintainer-run`,
-  `community-submission`, `verified` — the last one explicitly "reserved
-  for future third-party attestation"). Tuning claims need an equivalent
-  label without forking that vocabulary.
+- Published results already carry a provenance trust label
+  (`maintainer-run`, `community-submission`, `vendor-supplied`), and a
+  further `verified` label is reserved for future third-party attestation.
+  Tuning claims need an equivalent label without forking that vocabulary.
 
 **2. Hash semantics.** The tuning "hash" concept is four disjoint,
 inconsistent things across the codebase, and the one field meant to
@@ -44,8 +42,7 @@ carry it is never populated:
   non-dict-like inputs).
 - The bundle's `tuning_config_hash` field: defined but never set by any
   code path — bundles ship with no populated hash at all.
-- `_project/scripts/explorer_pipeline/transformer.py:187-201` —
-  `_tuning_hash()`: an 8-character SHA-256 hash computed independently
+- The Results Explorer ingest pipeline's `_tuning_hash()`: an 8-character SHA-256 hash computed independently
   by the explorer ingest pipeline from `{"mode": ..., "detail": ...}`,
   derived from whatever ad hoc `tuning_mode`/`tuning_config` keys happen
   to be present in the ingested JSON — not derived from the canonical
@@ -63,9 +60,7 @@ decides what the hash(es) must certify going forward.
 All published tuning claims remain **self-attested**. This is labeled
 explicitly in the explorer UI and in docs — evaluators must not be able
 to mistake a self-attested claim for an independently verified one.
-Labeling implementation itself belongs to the TODOs that touch the
-explorer UI and docs surfaces; this ADR only fixes the decision, not the
-UI copy.
+This ADR fixes the decision, not the UI copy.
 
 Post-load schema-introspection receipts (querying the live database
 after load to confirm the DDL/settings that were requested actually took
@@ -75,11 +70,11 @@ by this decision and are not a blocker for the current soundness work.
 
 Third-party attestation (an independent party re-running and certifying
 a result) stays **deferred**, consistent with the `verified` trust
-label already reserved but unimplemented in
-`docs/reference/threat-model.md`. This decision does not fork or extend
-that vocabulary; it reuses "self-attested" as the tuning-specific
-instance of the same "not independently verified" concept the threat
-model already anticipates.
+label that is reserved for results but not yet implemented. This
+decision does not fork or extend that vocabulary; it reuses
+"self-attested" as the tuning-specific instance of the same "not
+independently verified" concept the results trust labels already
+anticipate.
 
 ### 2. Hash semantics: two hashes, each with a distinct, named purpose
 
@@ -100,7 +95,7 @@ forward. They are replaced by exactly two named hashes:
    ledger**: the ordered record of DDL clauses, post-load statements,
    and session `SET`s that were *actually executed* against the target
    platform. (Exact failure representation and ordering guarantees are
-   design decisions owned by the implementing TODO.) This is the
+   left to the implementation; §3 records them.) This is the
    **platform-specific physical identity** of the run — it changes if
    the platform renders the same requested template into different
    physical statements, or if some statements fail to apply.
@@ -112,8 +107,8 @@ two runs physically do the same thing to the database."
 
 The exact serialization format of the applied-statement ledger itself
 (what constitutes a "statement," ordering guarantees, failure
-representation) is implementation detail owned by
-`tuning-applied-ledger-and-validation-status-20260712`, not this ADR.
+representation) is an implementation detail; §3 records the shape that
+landed.
 
 ### 3. Realized ledger: the `.applied.json` companion and vocabulary
 
@@ -177,40 +172,34 @@ old values meant "a statement executed" under the new model), and
 
 ## Consequences
 
-Implementing TODOs must honor these decisions as fixed constraints:
+Implementations must honor these decisions as fixed constraints:
 
-- **`tuning-applied-ledger-and-validation-status-20260712`** — must
-  build the applied-statement ledger this ADR assumes exists, compute
-  `applied_ledger_hash` from it, and must not conflate `tunings_applied`
-  (requested) with what was physically applied. `tuning_validation_status`
-  must be able to express partial application, not just
-  `APPLIED`/`FAILED_TO_SAVE`/`NOT_APPLICABLE`. Owns populating
-  `applied_ledger_hash` onto the bundle: it depends on
-  `tuning-bundle-provenance-and-config-export-20260712` (the bundle's
-  `requested_config_hash` field and export scaffolding must exist
-  first), so it is this TODO — not bundle-provenance — that completes
-  the "both hashes carried on the bundle" requirement below.
-- **`tuning-bundle-provenance-and-config-export-20260712`** — must
-  populate `requested_config_hash` on the bundle (replacing the
-  never-set `tuning_config_hash` field) and carry/display the
-  self-attested trust label alongside it. Does **not** populate
-  `applied_ledger_hash`: this TODO has no dependency on
-  `tuning-applied-ledger-and-validation-status-20260712` (the applied
-  statement ledger does not exist yet at this TODO's build time — the
-  dependency runs the other way), so requiring it here would be
-  unsatisfiable in dependency order (review finding, 2026-07-12).
-- **`tuning-mode-vocabulary-and-facet-implementation-20260712`** — any
-  facet or mode-derived data surfaced to evaluators must not imply
-  verification beyond self-attestation, and must source hash values from
-  the two canonical hashes above rather than recomputing an ad hoc hash
-  (e.g., the explorer must stop deriving its own hash from ingested
-  `tuning_mode`/`tuning_config` JSON and instead consume
-  `requested_config_hash` / `applied_ledger_hash` directly from the
-  bundle).
+- **Applied-statement ledger.** The implementation builds the ledger this
+  ADR assumes, computes `applied_ledger_hash` from it, and never conflates
+  `tunings_applied` (requested) with what was physically applied.
+  `tuning_validation_status` must be able to express partial application,
+  not just `APPLIED`/`FAILED_TO_SAVE`/`NOT_APPLICABLE`. Populating
+  `applied_ledger_hash` onto the bundle needs the bundle's
+  `requested_config_hash` field and export scaffolding to exist first, so
+  the ledger work is what completes the "both hashes carried on the
+  bundle" requirement.
+- **Bundle provenance and config export.** The bundle populates
+  `requested_config_hash` (replacing the never-set `tuning_config_hash`
+  field) and carries and displays the self-attested trust label alongside
+  it. This step does **not** populate `applied_ledger_hash`: the ledger
+  depends on it, not the other way round, so requiring the hash here could
+  not be satisfied in build order.
+- **Mode vocabulary and facets.** Any facet or mode-derived data surfaced
+  to evaluators must not imply verification beyond self-attestation, and
+  must source hash values from the two canonical hashes above rather than
+  recomputing an ad hoc hash (e.g., the explorer must stop deriving its
+  own hash from ingested `tuning_mode`/`tuning_config` JSON and instead
+  consume `requested_config_hash` / `applied_ledger_hash` directly from
+  the bundle).
 
-Any doc or UI surface that currently implies tuning claims are verified
-(rather than self-attested) is out of compliance with this ADR and
-should be corrected by the owning TODO.
+Any doc or UI surface that implies tuning claims are verified (rather
+than self-attested) is out of compliance with this ADR and must be
+corrected.
 
 ## Rejected options
 
@@ -232,8 +221,7 @@ should be corrected by the owning TODO.
 
 ## Addendum (2026-07-23): drift-validation bundle routing
 
-`tuning-drift-validation-bundle-routing-20260722` asked where the rerun
-**drift-validation** result belongs in the published bundle. When a run
+The open question was where the rerun **drift-validation** result belongs in the published bundle. When a run
 reuses an existing database, `TuningValidator` compares the database's
 persisted tuning metadata against the expected
 `UnifiedTuningConfiguration` (`platforms/base/tuning_config.py`
@@ -471,9 +459,9 @@ A platform is admitted later only when all three hold:
 
 1. its layout renders at execution (its capability-registry entry is neither
    `none` nor `:preview_only`);
-2. tuned runs on it are planned (a tuned corpus bundle exists or work is
-   tracked);
-3. the owner approves a live confirmation run.
+2. tuned runs on it are planned (a tuned corpus bundle exists or one is
+   scheduled);
+3. a live confirmation run on that platform is approved.
 
 Any introspector must be bounded (filter inside the SQL `WHERE` and measure
 truncation on the raw row count before filtering), non-raising, and read
@@ -492,12 +480,6 @@ truncation is measured before filtering.
 - `benchbox/platforms/base/adapter.py:743-747`
 - `benchbox/core/tuning/interface.py:846-863`
 - `benchbox/core/tuning/profile_validation.py:324-333`
-- `_project/scripts/explorer_pipeline/transformer.py:187-201`
-- `docs/reference/threat-model.md`
-- `docs/development/adapter-refactor-map.md` (design-record style precedent)
-- `_project/TODO/main/planning/tuning-applied-ledger-and-validation-status-20260712.yaml`
-- `_project/TODO/main/planning/tuning-bundle-provenance-and-config-export-20260712.yaml`
-- `_project/TODO/main/planning/tuning-mode-vocabulary-and-facet-implementation-20260712.yaml`
 
 ## Addendum (2026-10-05): fail-closed tuned-run marker
 

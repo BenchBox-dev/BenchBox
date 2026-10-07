@@ -340,7 +340,7 @@ print(f"Data quality score: {primary['data_quality_score']:.2f}")
 
 <span id="benchbox.tpcdi.TPCDI.create_schema"></span>
 
-`create_schema(connection, dialect="duckdb") -> None` creates the 16 warehouse tables on `connection` and prints `Created TPC-DI schema for duckdb`. A second call on the same connection also succeeded.
+`create_schema(connection, dialect="duckdb") -> None` creates the 16 warehouse tables on `connection` and prints `Created TPC-DI schema for duckdb`. It can be called again on the same connection.
 
 ```python
 benchmark.create_schema(conn)
@@ -373,7 +373,7 @@ print(validation_results.passed_validations, "/", validation_results.total_valid
 
 <span id="benchbox.tpcdi.TPCDI.calculate_official_metrics"></span>
 
-`calculate_official_metrics(etl_result, validation_result)` takes the `ETLResult` from `run_etl_benchmark` and the `DataQualityResult` from `run_data_validation` and returns a `BenchmarkMetrics` object. Attributes include `etl_throughput` (records per second), `data_quality_score` (0 to 1), `overall_performance`, `total_records_processed`, `historical_load_time`, `incremental_load_time`, `validations_passed`, `validations_total`, `tpc_di_compliant` (`False` at the scale factors tested), `scale_factor` and `benchmark_date`.
+`calculate_official_metrics(etl_result, validation_result)` takes the `ETLResult` from `run_etl_benchmark` and the `DataQualityResult` from `run_data_validation` and returns a `BenchmarkMetrics` object. Attributes include `etl_throughput` (records per second), `data_quality_score` (0 to 1), `overall_performance`, `total_records_processed`, `historical_load_time`, `incremental_load_time`, `validations_passed`, `validations_total`, `tpc_di_compliant`, `scale_factor` and `benchmark_date`.
 
 ```python
 # Run ETL and validation
@@ -448,19 +448,19 @@ if benchmark.etl_mode:
 
 <span id="benchbox.tpcdi.TPCDI.validator"></span>
 
-`validator` is `None` until a method that uses a connection (such as `run_etl_pipeline` or `run_data_validation`) has run, then the internal validator object (a `TPCDIValidator`). Its methods are not part of the contract; the old example calling `run_all_validations` on it raises `AttributeError`. Use `validate_etl_results()` or `run_data_validation()`.
+`validator` is `None` until a method that uses a connection (such as `run_etl_pipeline` or `run_data_validation`) has run, then the internal validator object (a `TPCDIValidator`). Its methods are not part of the contract. Use `validate_etl_results()` or `run_data_validation()`.
 
 ### schema_manager
 
 <span id="benchbox.tpcdi.TPCDI.schema_manager"></span>
 
-`schema_manager` returns the internal schema manager (a `TPCDISchemaManager`). Its methods are not part of the contract; the old example calling `get_table_info` on it raises `AttributeError`. Use `get_schema()`.
+`schema_manager` returns the internal schema manager (a `TPCDISchemaManager`). Its methods are not part of the contract. Use `get_schema()`.
 
 ### metrics_calculator
 
 <span id="benchbox.tpcdi.TPCDI.metrics_calculator"></span>
 
-`metrics_calculator` returns the internal metrics calculator (a `TPCDIMetrics`). Its methods are not part of the contract; the old example calling `calculate_metrics` on it raises `AttributeError`. Use `calculate_official_metrics()`.
+`metrics_calculator` returns the internal metrics calculator (a `TPCDIMetrics`). Its methods are not part of the contract. Use `calculate_official_metrics()`.
 
 ### Inherited members
 
@@ -505,7 +505,7 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 | Data and configuration | <span id="benchbox.tpcdi.TPCDI.output_dir"></span>`output_dir` | property | The resolved directory from the constructor argument (or from `config`). |
 | Data and configuration | <span id="benchbox.tpcdi.TPCDI.run_with_platform_api_surface"></span>`run_with_platform_api_surface` | class attribute | |
 | Data and configuration | <span id="benchbox.tpcdi.TPCDI.scale_factor"></span>`scale_factor` | instance attribute | The constructor argument. |
-| Data and configuration | <span id="benchbox.tpcdi.TPCDI.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Not defined in the released 0.4.1 wheel. Source builds after 0.4.1 define it on `BaseBenchmark`, default `False`. |
+| Data and configuration | <span id="benchbox.tpcdi.TPCDI.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Defined on `BaseBenchmark` from 0.4.2, default `False`. Set it to `True` for a benchmark that needs schema objects but no data files. |
 | Data and configuration | <span id="benchbox.tpcdi.TPCDI.tables"></span>`tables` | property | Empty until `generate_data()` has run, then the table-to-path mapping. |
 
 ## Usage Examples

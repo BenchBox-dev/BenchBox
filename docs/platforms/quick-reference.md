@@ -237,7 +237,7 @@ from benchbox.platforms.databricks import DatabricksAdapter
 adapter = DatabricksAdapter(
     server_hostname="dbc-12345678-abcd.cloud.databricks.com",
     http_path="/sql/1.0/warehouses/abcd1234efgh5678",
-    access_token="dapi1234567890abcdef",
+    access_token="<token>",
     catalog="hive_metastore",
     schema="default"
 )
@@ -340,8 +340,9 @@ adapter = SQLiteAdapter(database_path="benchmark.db")
 # Install the Spark Connect-capable PySpark client
 uv add benchbox --extra lakesail
 
-# Start the local Docker-backed Sail server
-make uat-bring-up PLATFORM=lakesail
+# Install and start a local Sail server (separate terminal)
+uv add pysail
+python -m pysail spark server --port 50051
 
 # SQL mode
 benchbox run --platform lakesail --benchmark tpch --scale 1.0

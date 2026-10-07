@@ -47,13 +47,8 @@ move the test out of the fast lane.
 
 `tests/fixtures/test_durations.json` is a checked-in, schema-versioned map from
 pytest node ID to p95 duration in seconds. T3 JUnit reports are the source of
-truth. The refresh utility merges one or more reports and writes stable JSON:
-
-```bash
-uv run -- python _project/scripts/update_test_durations.py \
-  --input t3-junit-1.xml \
-  --input t3-junit-2.xml
-```
+truth. A maintainer refresh script merges one or more reports and writes
+stable JSON.
 
 The nightly T3 publication job is responsible for supplying those reports and
 refreshing the artifact. It merges the fast and T3 reports so the artifact

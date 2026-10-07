@@ -214,7 +214,6 @@ clickhouse-local-mode
 clickhouse-server
 clickhouse-cloud
 clickhouse-migration
-workaround-index
 postgresql
 pg_duckdb
 pg_mooncake

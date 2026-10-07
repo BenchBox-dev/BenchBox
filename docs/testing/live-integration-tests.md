@@ -350,7 +350,7 @@ uv run -- python -m pytest -m live_databricks -v --log-cli-level=DEBUG
 
 ## Additional Resources
 
-- [BenchBox Documentation](../../README.md)
+- [BenchBox Documentation](../index.md)
 - [Platform Setup Guide](../platforms/index.md)
 - [Databricks SQL Warehouse Docs](https://docs.databricks.com/aws/en/compute/sql-warehouse/create)
 - [Snowflake Connection Docs](https://docs.snowflake.com/en/user-guide/admin-account-identifier)
@@ -359,7 +359,7 @@ uv run -- python -m pytest -m live_databricks -v --log-cli-level=DEBUG
 ## Support
 
 For issues or questions:
-- [GitHub Issues](https://github.com/joeharris76/benchbox/issues)
+- [GitHub Issues](https://github.com/BenchBox-dev/BenchBox/issues)
 - Review test output for specific error messages
 - Check platform-specific documentation
 

@@ -66,12 +66,12 @@ _BANNER = (
 _LICENSE = "<!-- Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License. -->"
 
 # Benchmarks whose queries derive from TPC materials -- their catalog page
-# carries the trademark notice (see docs/benchmarks/tpc-licensing-analysis.md).
+# carries the TPC trademark notice.
 _TPC_DERIVED = {"tpch", "tpcds", "tpcdi", "tpch_skew", "tpchavoc", "tpcds_obt", "datavault"}
 _TPC_NOTICE = (
     "> TPC Benchmark, TPC-H, TPC-DS, and TPC-DI are trademarks of the Transaction "
     "Processing Performance Council. Query text shown here is derived from TPC "
-    "materials; see [TPC licensing analysis](../../../tpc-licensing-analysis.md)."
+    "materials."
 )
 
 # TPC-family benchmarks whose parameter substitution is seed-driven.
