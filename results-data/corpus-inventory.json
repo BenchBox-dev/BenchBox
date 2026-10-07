@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-10-07T19:57:11.881247+00:00",
+  "generated_at": "2026-10-07T21:39:35.849492+00:00",
   "bundles": [
     {
       "file": "amplab_sf01_bigquery_sql_20260920_000055_35490af7.json",
@@ -3951,6 +3951,20 @@
       "bundle_sha256": "1fd9a95b990a5f2369317bfb2704aeb6ef7055d00d8acc68d9c3554a9d7361c5"
     },
     {
+      "file": "tpch_sf1_doris_sql_20261007_172956_5e453c54.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "Apache Doris",
+      "platform_version": "4.0.3-rc03",
+      "scale_factor": 1.0,
+      "phase": "throughput",
+      "timestamp": "2026-10-07T17:29:56.433033",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "2c74ef0a0d5df520b4e3afd0d0fe6b6bb6b4125a453406a6068a09159bb0f73a"
+    },
+    {
       "file": "tpch_sf01_bigquery_sql_20261003_114214_37cecbba.json",
       "benchmark": "tpch",
       "benchmark_name": "TPC-H",
@@ -6162,6 +6176,7 @@
       "Spark v4.1.1"
     ],
     "tpch@sf1.0#throughput#3streams": [
+      "Apache Doris v4.0.3-rc03",
       "DuckDB v1.5.5",
       "Spark v4.2.0"
     ],
@@ -6282,7 +6297,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 412,
+    "total_bundles": 413,
     "by_benchmark": {
       "amplab": 25,
       "clickbench": 23,
@@ -6298,7 +6313,7 @@
       "tpcdi": 18,
       "tpcds": 34,
       "tpcds_obt": 6,
-      "tpch": 61,
+      "tpch": 62,
       "tpch_skew": 24,
       "tpchavoc": 18,
       "transaction_primitives": 9,
@@ -6306,6 +6321,7 @@
       "write_primitives": 9
     },
     "by_platform": {
+      "Apache Doris": 1,
       "BigQuery": 51,
       "CedarDB": 1,
       "ClickHouse Local": 40,
@@ -6324,14 +6340,14 @@
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 412
+      "maintainer-run": 413
     },
     "by_funding": {
-      "unspecified": 412
+      "unspecified": 413
     },
     "by_phase": {
       "power": 410,
-      "throughput": 2
+      "throughput": 3
     }
   }
 }
