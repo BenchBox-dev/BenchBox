@@ -139,10 +139,30 @@ def test_record_baseline_captures_throughput_runner_and_run_identity(tmp_path: P
     assert record["cpu_count"] == 4
     assert record["run_id"] == "555"
     assert record["run_attempt"] == "2"
+    assert record["commit_sha"] == ""
+    assert record["runner_image"] == ""
     assert record["platform"] == "duckdb"
     assert record["scale_factor"] == 1.0
     assert record["streams"] == 3
     assert record["recorded_at"] == "2026-10-04T06:00:00+00:00"
+
+
+def test_record_baseline_captures_commit_and_runner_image_from_the_environment(tmp_path: Path):
+    path = record_baseline(
+        tmp_path,
+        _good_result(1.0),
+        platform="duckdb",
+        benchmark="tpch",
+        scale=1,
+        streams=3,
+        env={"GITHUB_SHA": "abc123", "ImageVersion": "20260930.1"},
+        cpu_model=SLOW,
+        cpu_count=4,
+    )
+
+    record = json.loads(path.read_text(encoding="utf-8"))
+
+    assert (record["commit_sha"], record["runner_image"]) == ("abc123", "20260930.1")
 
 
 def test_runner_class_separates_cpu_models_and_core_counts():

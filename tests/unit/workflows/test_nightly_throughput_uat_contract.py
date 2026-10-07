@@ -70,12 +70,17 @@ def test_throughput_job_is_not_continue_on_error() -> None:
     assert "if" not in job
 
 
-def test_only_the_cedardb_sweep_and_assert_steps_are_quarantined() -> None:
-    quarantined = [step["name"] for step in _steps() if _is_quarantined(step)]
-    assert len(quarantined) == 2
-    assert all("CedarDB" in name and "#2571" in name for name in quarantined)
-    assert any(name.startswith("Run CedarDB throughput UAT cell") for name in quarantined)
-    assert any(name.startswith("Assert the CedarDB cell") for name in quarantined)
+def test_no_throughput_step_is_quarantined() -> None:
+    assert [step["name"] for step in _steps() if _is_quarantined(step)] == []
+    assert "#2571" not in yaml.safe_dump(_jobs()["throughput-uat"])
+
+
+def test_cedardb_steps_gate_like_the_duckdb_steps() -> None:
+    sweep = _step("Run CedarDB throughput UAT cell")
+    assert "continue-on-error" not in sweep
+    assert "if" not in sweep
+    assert "uat-throughput-cedardb-nightly.yaml" in sweep["run"]
+    assert "continue-on-error" not in _step("Assert the CedarDB cell")
 
 
 def test_cedardb_assert_still_runs_after_a_failed_sweep() -> None:
@@ -132,11 +137,12 @@ def test_only_a_successful_job_publishes_a_success_status() -> None:
     assert "*) state=failure ;;" in run
 
 
-def test_status_description_reports_the_quarantined_cedardb_sweep_outcome() -> None:
+def test_status_description_reports_the_cedardb_sweep_outcome_without_a_quarantine_label() -> None:
     assert _jobs()["throughput-uat"]["outputs"] == {"cedardb_sweep_outcome": "${{ steps.cedardb-sweep.outcome }}"}
     assert _step("Run CedarDB throughput UAT cell")["id"] == "cedardb-sweep"
     run = "\n".join(str(step.get("run", "")) for step in _jobs()["throughput-uat-signal"]["steps"])
     assert "CEDARDB_SWEEP_OUTCOME" in run
+    assert "quarantine" not in run
 
 
 def test_cedardb_cell_keeps_the_throughput_workload_and_a_bounded_timeout() -> None:
@@ -157,3 +163,33 @@ def test_cedardb_image_is_pinned_by_digest() -> None:
     assert compose["services"]["cedardb"]["image"] == (
         "cedardb/cedardb@sha256:dbbacb16b24421a9a123cd1d065e2a049c60b7cc6060d7db2f3cccbf69f5ff62"
     )
+
+
+def test_throughput_job_grants_only_contents_and_actions_read() -> None:
+    assert _jobs()["throughput-uat"]["permissions"] == {"contents": "read", "actions": "read"}
+    assert "actions" not in (yaml.safe_load(NIGHTLY.read_text(encoding="utf-8")).get("permissions") or {})
+
+
+def test_baseline_history_is_downloaded_before_the_duckdb_assert() -> None:
+    names = [step.get("name", "") for step in _steps()]
+    download = _step("Download retained Throughput@Size baselines")
+    assert names.index(download["name"]) < names.index(_step("Assert the requested stream count")["name"])
+    assert names.index(download["name"]) > names.index(_step("Run DuckDB throughput UAT cell")["name"])
+    assert "continue-on-error" not in download
+    assert _condition(download) == "${{!cancelled()}}"
+    assert download["env"] == {"GH_TOKEN": "${{ github.token }}"}
+    run = download["run"]
+    assert "gh run list" in run
+    assert "--workflow nightly.yml" in run
+    assert "--branch develop" in run
+    assert "gh run download" in run
+    assert "--pattern 'throughput-baseline-duckdb-tpch-sf1-*'" in run
+    assert "${GITHUB_RUN_ID}" in run
+
+
+def test_duckdb_assert_reads_the_downloaded_history_not_the_output_dir() -> None:
+    run = _step("Assert the requested stream count reached the driver")["run"]
+    history = '--baseline-history "$HOME/Developer/benchmark_runs/throughput-baseline-history"'
+    assert history in run
+    assert '--baseline-out "$HOME/Developer/benchmark_runs/throughput-baseline"' in run
+    assert "--baseline-history" not in _step("Assert the CedarDB cell")["run"]

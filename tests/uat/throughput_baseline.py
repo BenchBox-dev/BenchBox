@@ -13,6 +13,7 @@ from typing import Any, NamedTuple
 
 BASELINE_SCHEMA_VERSION = 1
 DEFAULT_ROLLING_WINDOW = 10
+MIN_FLOOR_SAMPLES = 5
 
 
 class RollingMedian(NamedTuple):
@@ -53,6 +54,10 @@ def runner_class_for(cpu_model: str, cpu_count: int) -> str:
     return f"{re.sub(r'[^a-z0-9]+', '-', cpu_model.lower()).strip('-') or 'unknown'}-{cpu_count}cpu"
 
 
+def current_runner_class() -> str:
+    return runner_class_for(detect_cpu_model(), os.cpu_count() or 0)
+
+
 def record_baseline(
     directory: Path,
     result_json: dict[str, Any],
@@ -81,6 +86,8 @@ def record_baseline(
         "cpu_count": cpu_count,
         "run_id": env.get("GITHUB_RUN_ID", ""),
         "run_attempt": env.get("GITHUB_RUN_ATTEMPT", ""),
+        "commit_sha": env.get("GITHUB_SHA", ""),
+        "runner_image": env.get("ImageVersion", ""),
         "recorded_at": (recorded_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(),
     }
     directory.mkdir(parents=True, exist_ok=True)

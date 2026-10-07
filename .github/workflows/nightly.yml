@@ -977,13 +977,16 @@ jobs:
     # ~25 min headroom for checkout, deps, integration tests, Docker
     # startup/cleanup, and both assert steps.
     timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
     outputs:
       cedardb_sweep_outcome: ${{ steps.cedardb-sweep.outcome }}
     env:
-      # Throughput@Size floor activation: repository configuration variables
-      # flow into the DuckDB assert step below. Unset vars evaluate to empty,
-      # which the assert step treats as unconfigured, so the floor stays in
-      # observe-only mode until the variables are actually set.
+      # Throughput@Size floor: the DuckDB assert step derives the median from
+      # the retained per-runner-class baselines downloaded just before it.
+      # THROUGHPUT_FLOOR_MEDIAN, when set, overrides that median. Unset vars
+      # evaluate to empty, which the assert step treats as unconfigured.
       THROUGHPUT_FLOOR_MEDIAN: ${{ vars.THROUGHPUT_FLOOR_MEDIAN }}
       THROUGHPUT_FLOOR_MAX_DROP_FRACTION: ${{ vars.THROUGHPUT_FLOOR_MAX_DROP_FRACTION }}
     steps:
@@ -1021,16 +1024,33 @@ jobs:
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
 
-      - name: "Run CedarDB throughput UAT cell (TPC-H SF1, run-official --streams 3) (quarantine #2571)"
+      - name: Run CedarDB throughput UAT cell (TPC-H SF1, run-official --streams 3)
         id: cedardb-sweep
         # Unlike DuckDB's SHARED_CURSOR fast path, CedarDB uses
         # INDEPENDENT_CONNECTION (a fresh connection per stream), so this cell
         # proves N concurrent independent sessions end to end via the
         # production CLI. The cell manages its own compose stack
         # (cleanup.docker_manage_platforms); no service container is needed.
-        continue-on-error: true
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-cedardb-nightly.yaml
+
+      - name: Download retained Throughput@Size baselines
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          history="$HOME/Developer/benchmark_runs/throughput-baseline-history"
+          mkdir -p "$history"
+          if ! run_ids=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow nightly.yml --branch develop --limit 30 \
+            --json databaseId --jq ".[] | select(.databaseId != ${GITHUB_RUN_ID}) | .databaseId"); then
+            echo "::warning::could not list prior nightly runs; the Throughput@Size floor stays observe-only"
+            exit 0
+          fi
+          for run_id in ${run_ids}; do
+            gh run download "${run_id}" --repo "$GITHUB_REPOSITORY" \
+              --pattern 'throughput-baseline-duckdb-tpch-sf1-*' --dir "${history}/${run_id}" 2>/dev/null || true
+          done
+          echo "Downloaded $(find "$history" -name 'throughput-baseline-*.json' | wc -l) baseline record(s)"
 
       - name: Assert the requested stream count reached the driver and every stream succeeded
         if: ${{ !cancelled() }}
@@ -1039,11 +1059,11 @@ jobs:
             --cells-glob "$HOME/Developer/benchmark_runs/logs/uat_throughput_duckdb_nightly_*/cells.jsonl" \
             --platform duckdb --benchmark tpch --scale 1 --streams 3 \
             --evaluate-floor \
+            --baseline-history "$HOME/Developer/benchmark_runs/throughput-baseline-history" \
             --baseline-out "$HOME/Developer/benchmark_runs/throughput-baseline"
 
-      - name: "Assert the CedarDB cell stream count and per-stream success (quarantine #2571)"
+      - name: Assert the CedarDB cell stream count and per-stream success
         if: ${{ !cancelled() }}
-        continue-on-error: true
         run: |
           uv run -- python -m tests.uat.throughput assert \
             --cells-glob "$HOME/Developer/benchmark_runs/logs/uat_throughput_cedardb_nightly_*/cells.jsonl" \
@@ -1092,7 +1112,7 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state="${state}" \
             -f context="nightly/throughput-uat" \
-            -f description="throughput-uat ${THROUGHPUT_UAT_RESULT}; cedardb cell (quarantined) ${CEDARDB_SWEEP_OUTCOME:-not run}" \
+            -f description="throughput-uat ${THROUGHPUT_UAT_RESULT}; cedardb cell ${CEDARDB_SWEEP_OUTCOME:-not run}" \
             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
   pyspark-tests:
