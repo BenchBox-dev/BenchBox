@@ -499,6 +499,63 @@ def test_standin_after_a_failing_oracle_review_overrides_it_but_not_open_threads
     assert _oracle(reviews=failing, comments=[_standin_comment()], threads=threads)[0] == 1
 
 
+LATER = "2026-10-01T14:00:00Z"
+LATEST = "2026-10-01T15:00:00Z"
+
+
+def _standin_at(created_at: str) -> dict[str, Any]:
+    return {**_standin_comment(), "created_at": created_at, "updated_at": created_at}
+
+
+def test_pending_reviews_do_not_void_a_standin_posted_after_the_last_verdict() -> None:
+    reviews = [
+        _oracle_review("failure", submitted_at=HEAD_DATE),
+        _oracle_review("pending", submitted_at=LATER),
+        _oracle_review("pending", submitted_at=LATEST),
+    ]
+    assert _oracle(reviews=reviews, comments=[_standin_at(AFTER_HEAD)])[0] == 0
+
+
+def test_a_standin_before_the_last_verdict_still_waits_after_later_pending_reviews() -> None:
+    reviews = [_oracle_review("failure", submitted_at=AFTER_HEAD), _oracle_review("pending", submitted_at=LATEST)]
+    assert _oracle(reviews=reviews, comments=[_standin_at(HEAD_DATE)])[0] == 1
+
+
+def test_a_review_without_a_verdict_does_not_advance_the_standin_window() -> None:
+    bare = {**_oracle_review(submitted_at=LATER), "body": "Carried forward without a verdict."}
+    reviews = [_oracle_review("failure", submitted_at=HEAD_DATE), bare]
+    assert _oracle(reviews=reviews, comments=[_standin_at(AFTER_HEAD)])[0] == 0
+
+
+def test_a_review_for_another_head_does_not_advance_the_standin_window() -> None:
+    stale = {
+        **_oracle_review("failure", submitted_at=LATER),
+        "body": f"### oracle-review-shadow: failure for `{OLDER}`",
+    }
+    reviews = [_oracle_review("failure", submitted_at=HEAD_DATE), stale]
+    assert _oracle(reviews=reviews, comments=[_standin_at(AFTER_HEAD)])[0] == 0
+
+
+def test_a_later_decisive_review_voids_an_earlier_standin() -> None:
+    reviews = [_oracle_review("failure", submitted_at=HEAD_DATE), _oracle_review("failure", submitted_at=LATER)]
+    assert _oracle(reviews=reviews, comments=[_standin_at(AFTER_HEAD)])[0] == 1
+
+
+def test_a_standin_after_pending_reviews_never_overrides_an_open_thread() -> None:
+    reviews = [_oracle_review("failure", submitted_at=HEAD_DATE), _oracle_review("pending", submitted_at=LATER)]
+    threads = [{"resolved": False, "author": "benchbox-oracle", "author_type": "Bot"}]
+    assert _oracle(reviews=reviews, comments=[_standin_at(LATEST)], threads=threads)[0] == 1
+
+
+def test_the_verdict_still_comes_from_the_latest_review() -> None:
+    reviews = [_oracle_review("failure", submitted_at=HEAD_DATE), _oracle_review("success", submitted_at=LATER)]
+    assert _oracle(reviews=reviews)[0] == 0
+    reviews.reverse()
+    assert _oracle(reviews=reviews)[0] == 0
+    reviews = [_oracle_review("success", submitted_at=HEAD_DATE), _oracle_review("failure", submitted_at=LATER)]
+    assert _oracle(reviews=reviews)[0] == 1
+
+
 def test_force_push_back_to_an_attested_head_keeps_the_attestation() -> None:
     comment = {**_standin_comment(), "created_at": BEFORE_HEAD, "updated_at": BEFORE_HEAD}
     assert _decide(comments=[comment])[0] == 0

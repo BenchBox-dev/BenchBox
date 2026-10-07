@@ -55,11 +55,15 @@ Without the App secrets, the `post` job logs the result and succeeds.
    `.github/oracle-reviewers.yml` chooses how:
    - `comment` posts one pull request comment, so findings never block a
      merge.
-   - `review` posts one pull request review per result on the head commit,
-     with a thread for each finding on a diff line and the summary and any
-     finding outside the diff in the body. A run with no verdict still posts
-     a review that explains the pending result, so the latest review always
-     reflects the latest run. The ruleset requires every thread to be
+   - `review` posts one pull request review per result on the head commit.
+     A finding opens a thread only when its severity is in the tier's
+     `blocking` list and it lands on a diff line; a finding that spans lines
+     gets a multi-line thread when every line of the span is in the diff, and
+     a single-line thread at its first line otherwise. Every other finding,
+     blocking or not, is listed in the review body with the summary, and
+     non-blocking findings never open threads. A run with no verdict still
+     posts a review that explains the pending result, so the latest review
+     always reflects the latest run. The ruleset requires every thread to be
      resolved, so these threads block merges like the connector's. The
      policy uses `review` from the start of the parity period before the
      cut-over.
@@ -94,7 +98,9 @@ would let a reviewer's report of a real defect pass because it cited an
 unchanged line.
 
 Reviewers run one at a time, so a blocking verdict stops the run and an absent
-reviewer hands over to the next.
+reviewer hands over to the next. The workflow-level group for the pull request
+serializes runs on one pull request; the attempt jobs have no concurrency group
+of their own.
 
 ## Commands
 

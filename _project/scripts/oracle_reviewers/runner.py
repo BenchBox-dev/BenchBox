@@ -35,6 +35,28 @@ def _git(workspace: Path, *args: str) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+STAGED_DIFF_NAME = ".oracle-pull-request.diff"
+
+
+def stage_pull_request_diff(source: Path, workspace: Path) -> Path | None:
+    target = workspace / STAGED_DIFF_NAME
+    exclude = _git(workspace, "rev-parse", "--git-path", "info/exclude")
+    if not source.is_file() or not exclude or os.path.lexists(target):
+        return None
+    text = source.read_text(encoding="utf-8")
+    if not text.strip():
+        return None
+    exclude_path = workspace / exclude
+    try:
+        exclude_path.parent.mkdir(parents=True, exist_ok=True)
+        with exclude_path.open("a", encoding="utf-8") as handle:
+            handle.write(f"/{STAGED_DIFF_NAME}\n")
+        target.write_text(text, encoding="utf-8")
+    except OSError:
+        return None
+    return target
+
+
 def execute(invocation: Invocation, timeout_seconds: int) -> RunResult:
     try:
         process = subprocess.Popen(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,7 +14,8 @@ MAX_TITLE = 200
 MAX_DETAIL = 4000
 MAX_PATH = 400
 
-FINDING_KEYS = ("severity", "file", "line", "title", "detail")
+FINDING_KEYS = ("severity", "file", "line", "end_line", "title", "detail")
+OPTIONAL_FINDING_KEYS = frozenset({"end_line"})
 VERDICT_KEYS = ("summary", "findings")
 
 VERDICT_SCHEMA: dict[str, Any] = {
@@ -33,6 +34,7 @@ VERDICT_SCHEMA: dict[str, Any] = {
                     "severity": {"type": "string", "enum": list(SEVERITIES)},
                     "file": {"type": "string"},
                     "line": {"type": "integer"},
+                    "end_line": {"type": ["integer", "null"]},
                     "title": {"type": "string"},
                     "detail": {"type": "string"},
                 },
@@ -75,12 +77,14 @@ class Finding:
     line: int
     title: str
     detail: str
+    end_line: int | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
             "severity": self.severity,
             "file": self.file,
             "line": self.line,
+            "end_line": self.end_line,
             "title": self.title,
             "detail": self.detail,
         }
@@ -124,16 +128,27 @@ def _valid_path(path: str) -> bool:
     )
 
 
+def _is_line(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+
+
 def _finding(data: Any) -> Finding:
     _require(isinstance(data, dict), "each finding must be an object")
-    _require(set(data) == set(FINDING_KEYS), f"each finding must have exactly the keys {FINDING_KEYS}")
-    severity, path, line, title, detail = (data[key] for key in FINDING_KEYS)
+    keys = set(data)
+    _require(
+        set(FINDING_KEYS) - OPTIONAL_FINDING_KEYS <= keys <= set(FINDING_KEYS),
+        f"each finding must have the keys {FINDING_KEYS}, of which {sorted(OPTIONAL_FINDING_KEYS)} may be omitted",
+    )
+    severity, path, line, title, detail = (data[key] for key in ("severity", "file", "line", "title", "detail"))
+    end_line = data.get("end_line")
     _require(isinstance(severity, str) and severity in SEVERITIES, f"severity must be one of {SEVERITIES}")
     _require(isinstance(path, str) and _valid_path(path), "file must be a repository-relative path")
-    _require(isinstance(line, int) and not isinstance(line, bool) and line >= 1, "line must be a positive integer")
+    _require(_is_line(line), "line must be a positive integer")
+    _require(end_line is None or (_is_line(end_line) and end_line >= line), "end_line must be an integer >= line")
     _require(isinstance(title, str) and title.strip() != "", "title must be a non-empty string")
     _require(isinstance(detail, str), "detail must be a string")
-    return Finding(severity, path, line, sanitize(title, MAX_TITLE), sanitize(detail, MAX_DETAIL))
+    span_end = end_line if end_line is not None and end_line > line else None
+    return Finding(severity, path, line, sanitize(title, MAX_TITLE), sanitize(detail, MAX_DETAIL), span_end)
 
 
 def validate(data: Any) -> Verdict:
@@ -174,7 +189,25 @@ class Placement:
     summary: tuple[Finding, ...]
 
 
-def place(findings: tuple[Finding, ...], commentable: Mapping[str, frozenset[int]]) -> Placement:
-    inline = tuple(finding for finding in findings if finding.line in commentable.get(finding.file, frozenset()))
+def place(
+    findings: tuple[Finding, ...],
+    commentable: Mapping[str, frozenset[int]],
+    thread_severities: Collection[str] | None = None,
+) -> Placement:
+    inline = tuple(
+        finding
+        for finding in findings
+        if finding.line in commentable.get(finding.file, frozenset())
+        and (thread_severities is None or finding.severity in thread_severities)
+    )
     summary = tuple(finding for finding in findings if finding not in inline)
     return Placement(inline, summary)
+
+
+def comment_span(finding: Finding, commentable: Mapping[str, frozenset[int]]) -> tuple[int, int] | None:
+    if finding.end_line is None:
+        return None
+    lines = commentable.get(finding.file, frozenset())
+    if all(number in lines for number in range(finding.line, finding.end_line + 1)):
+        return finding.line, finding.end_line
+    return None

@@ -32,9 +32,54 @@ def _always(repo: str, sha: str) -> bool:
     return True
 
 
+def _never(repo: str, sha: str) -> bool:
+    return False
+
+
+def _pull(base_ref: str) -> dict[str, Any]:
+    return {
+        "id": 2001,
+        "number": 7,
+        "url": f"https://api.github.com/repos/{REPO}/pulls/7",
+        "head": {"ref": "feature", "sha": SHA, "repo": {"id": 1, "name": "BenchBox"}},
+        "base": {"ref": base_ref, "sha": "b" * 40, "repo": {"id": 1, "name": "BenchBox"}},
+    }
+
+
+def _target_run(base_ref: str = "develop", **over: Any) -> dict[str, Any]:
+    return _run(event="pull_request_target", pull_requests=[_pull(base_ref)], **over)
+
+
 def test_trusted_run_accepts_this_workflow_from_develop() -> None:
     assert github.trusted_run(_run(), REPO, _always)
-    assert github.trusted_run(_run(event="pull_request_target"), REPO, _always)
+    assert github.trusted_run(_target_run(), REPO, _never)
+
+
+def test_trusted_run_accepts_a_pull_request_target_run_whose_head_is_the_pr_head() -> None:
+    assert github.trusted_run(_target_run(), REPO, lambda repo, sha: False)
+
+
+@pytest.mark.parametrize("event", ["issue_comment", "schedule", "workflow_dispatch"])
+def test_trusted_run_checks_develop_ancestry_for_other_events(event: str) -> None:
+    assert github.trusted_run(_run(event=event), REPO, _always)
+    assert not github.trusted_run(_run(event=event), REPO, _never)
+
+
+@pytest.mark.parametrize("pull_requests", [None, [], [_pull("release/1.0")], [_pull("main"), _pull("feature")]])
+def test_trusted_run_rejects_a_pull_request_target_run_not_based_on_develop(pull_requests: Any) -> None:
+    run = _run(event="pull_request_target", pull_requests=pull_requests)
+    assert not github.trusted_run(run, REPO, _always)
+
+
+def test_trusted_run_accepts_a_pull_request_target_run_with_any_develop_pull() -> None:
+    run = _run(event="pull_request_target", pull_requests=[_pull("main"), _pull("develop")])
+    assert github.trusted_run(run, REPO, _never)
+
+
+def test_trusted_run_rejects_a_pull_request_target_run_from_another_workflow() -> None:
+    assert not github.trusted_run(_target_run(path=".github/workflows/other.yml"), REPO, _always)
+    assert not github.trusted_run(_target_run(head_sha="not-a-sha"), REPO, _always)
+    assert not github.trusted_run(_target_run(repository={"full_name": "someone/BenchBox"}), REPO, _always)
 
 
 @pytest.mark.parametrize(
@@ -52,7 +97,23 @@ def test_trusted_run_rejects_other_sources(run: dict[str, Any]) -> None:
 
 
 def test_trusted_run_rejects_workflow_code_that_is_not_on_develop() -> None:
-    assert not github.trusted_run(_run(), REPO, lambda repo, sha: False)
+    assert not github.trusted_run(_run(), REPO, _never)
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"),
+    [("ahead", True), ("identical", True), ("behind", False), ("diverged", False)],
+)
+def test_on_develop_reads_the_compare_status(monkeypatch: pytest.MonkeyPatch, status: str, expected: bool) -> None:
+    paths: list[str] = []
+
+    def get_json(path: str) -> Any:
+        paths.append(path)
+        return {"status": status}
+
+    monkeypatch.setattr(github, "get_json", get_json)
+    assert github.on_develop(REPO, SHA) is expected
+    assert paths == [f"repos/{REPO}/compare/{SHA}...develop"]
 
 
 def test_latest_state_skips_untrusted_runs(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -64,7 +125,7 @@ def test_latest_state_skips_untrusted_runs(monkeypatch: pytest.MonkeyPatch) -> N
             {"created_at": "2026-10-05T13:00:00Z", "workflow_run": {"id": 3}, "expired": True},
         ]
     }
-    runs = {"2": _run(event="pull_request"), "1": _run()}
+    runs = {"2": _run(event="pull_request"), "1": _target_run()}
     downloaded: list[str] = []
 
     def get_json(path: str) -> Any:
@@ -72,7 +133,7 @@ def test_latest_state_skips_untrusted_runs(monkeypatch: pytest.MonkeyPatch) -> N
             return listing
         if path.startswith(f"repos/{REPO}/actions/runs/"):
             return runs[path.rsplit("/", 1)[1]]
-        return {"status": "ahead"}
+        raise AssertionError(f"unexpected request {path}")
 
     def fake_run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         downloaded.append(argv[3])
@@ -84,6 +145,22 @@ def test_latest_state_skips_untrusted_runs(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(github.subprocess, "run", fake_run)
     assert github.latest_state(REPO, 7) == state
     assert downloaded == ["1"]
+
+
+def test_latest_state_skips_a_pull_request_target_run_not_based_on_develop(monkeypatch: pytest.MonkeyPatch) -> None:
+    listing = {"artifacts": [{"created_at": "2026-10-05T12:00:00Z", "workflow_run": {"id": 5}, "expired": False}]}
+
+    def get_json(path: str) -> Any:
+        if path.startswith(f"repos/{REPO}/actions/artifacts"):
+            return listing
+        return _target_run("release/1.0")
+
+    def no_download(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        raise AssertionError("an untrusted run must not be downloaded")
+
+    monkeypatch.setattr(github, "get_json", get_json)
+    monkeypatch.setattr(github.subprocess, "run", no_download)
+    assert github.latest_state(REPO, 7) is None
 
 
 def test_latest_state_without_artifacts_is_none(monkeypatch: pytest.MonkeyPatch) -> None:

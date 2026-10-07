@@ -18,15 +18,15 @@ KINDS = (OK, QUOTA, AUTH, TIMEOUT, INVALID, EMPTY, ERROR)
 
 CALIBRATED_QUOTA_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     "agy": (re.compile(r"RESOURCE_EXHAUSTED \(code 429\)"),),
-    "claude": (),
-    "codex": (),
+    "claude": (re.compile(r"You[\u2019']ve hit your session limit"),),
+    "codex": (re.compile(r"^ERROR: You[\u2019']ve hit your usage limit", re.MULTILINE),),
     "muse": (),
 }
 CALIBRATED_AUTH_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     "agy": (),
-    "claude": (),
-    "codex": (),
-    "muse": (),
+    "claude": (re.compile(r"Failed to authenticate\. API Error: 401[^\"\n]*"),),
+    "codex": (re.compile(r"^ERROR: unexpected status 401 Unauthorized", re.MULTILINE),),
+    "muse": (re.compile(r"authentication failed: your API key from META_API_KEY was rejected"),),
 }
 CALIBRATED_EMPTY_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     "agy": (re.compile(r"no output (?:was )?produced.*auto-denied", re.IGNORECASE | re.DOTALL),),

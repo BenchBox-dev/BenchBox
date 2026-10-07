@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from _project.scripts.oracle_reviewers import absence, runner
+from _project.scripts.oracle_reviewers import absence, cli, runner
+from _project.scripts.oracle_reviewers.brief import FULL_DIFF_LINE
 from _project.scripts.oracle_reviewers.commands import Invocation
 from _project.scripts.oracle_reviewers.policy import Policy
 
@@ -119,3 +120,146 @@ def test_execute_kills_on_timeout(tmp_path: Path) -> None:
     invocation = Invocation((sys.executable, "-c", "import time; time.sleep(30)"), tmp_path, None)
     result = runner.execute(invocation, 1)
     assert result.timed_out is True
+
+
+def _status(workspace: Path) -> str:
+    return subprocess.run(
+        ["git", "-C", str(workspace), "status", "--porcelain", "--untracked-files=all"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+
+def test_staged_diff_is_readable_in_the_workspace_and_leaves_it_clean(tmp_path: Path) -> None:
+    workspace, _ = _workspace(tmp_path)
+    source = tmp_path / "diff.patch"
+    source.write_text("diff --git a/a.txt b/a.txt\n+changed\n", encoding="utf-8")
+    staged = runner.stage_pull_request_diff(source, workspace)
+    assert staged == workspace / runner.STAGED_DIFF_NAME
+    assert staged.read_text(encoding="utf-8") == source.read_text(encoding="utf-8")
+    assert staged.resolve().is_relative_to(workspace.resolve())
+    assert _status(workspace) == ""
+
+
+@pytest.mark.parametrize("content", [None, "", "  \n"])
+def test_nothing_is_staged_without_a_diff(tmp_path: Path, content: str | None) -> None:
+    workspace, _ = _workspace(tmp_path)
+    source = tmp_path / "diff.patch"
+    if content is not None:
+        source.write_text(content, encoding="utf-8")
+    assert runner.stage_pull_request_diff(source, workspace) is None
+    assert not (workspace / runner.STAGED_DIFF_NAME).exists()
+
+
+def test_a_pull_request_file_with_the_staging_name_is_never_overwritten(tmp_path: Path) -> None:
+    workspace, _ = _workspace(tmp_path)
+    (workspace / runner.STAGED_DIFF_NAME).write_text("from the pull request\n", encoding="utf-8")
+    source = tmp_path / "diff.patch"
+    source.write_text("+x\n", encoding="utf-8")
+    assert runner.stage_pull_request_diff(source, workspace) is None
+    assert (workspace / runner.STAGED_DIFF_NAME).read_text(encoding="utf-8") == "from the pull request\n"
+
+
+def test_a_symlink_with_the_staging_name_is_never_followed(tmp_path: Path) -> None:
+    workspace, _ = _workspace(tmp_path)
+    outside = tmp_path / "outside.txt"
+    (workspace / runner.STAGED_DIFF_NAME).symlink_to(outside)
+    source = tmp_path / "diff.patch"
+    source.write_text("+x\n", encoding="utf-8")
+    assert runner.stage_pull_request_diff(source, workspace) is None
+    assert not outside.exists()
+
+
+def test_a_directory_that_is_not_a_repository_stages_nothing(tmp_path: Path) -> None:
+    source = tmp_path / "diff.patch"
+    source.write_text("+x\n", encoding="utf-8")
+    plain = tmp_path / "plain"
+    plain.mkdir()
+    assert runner.stage_pull_request_diff(source, plain) is None
+
+
+def _plan_dir(policy: Policy, tmp_path: Path, head: str, scope: str, brief: str, diff: str | None) -> Path:
+    plan_dir = tmp_path / "plan"
+    plan_dir.mkdir()
+    plan = {
+        "pr": 7,
+        "head_sha": head,
+        "brief_mode": "inline",
+        "scope": scope,
+        "chain": [policy.reviewers["muse"].to_json()],
+    }
+    (plan_dir / "plan.json").write_text(json.dumps(plan), encoding="utf-8")
+    (plan_dir / "brief.md").write_text(brief, encoding="utf-8")
+    if diff is not None:
+        (plan_dir / "diff.patch").write_text(diff, encoding="utf-8")
+    return plan_dir / "plan.json"
+
+
+def _run_review(
+    plan_path: Path,
+    workspace: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> dict:
+    monkeypatch.setenv("GITHUB_RUN_ID", "99")
+    monkeypatch.setenv("GITHUB_OUTPUT", str(tmp_path / "out.txt"))
+    cli.main(
+        [
+            "review",
+            "--plan",
+            str(plan_path),
+            "--slot",
+            "1",
+            "--reviewer",
+            "muse",
+            "--harness",
+            "muse",
+            "--workspace",
+            str(workspace),
+            "--scratch",
+            str(tmp_path / "scratch"),
+            "--out-dir",
+            str(tmp_path / "attempt"),
+        ]
+    )
+    return json.loads((tmp_path / "attempt" / "attempt-1.json").read_text(encoding="utf-8"))
+
+
+def _capture_prompt_body(tmp_path: Path) -> str:
+    return f"open('{tmp_path}/prompt.txt', 'w').write(sys.argv[-1])\nprint({json.dumps(json.dumps(VERDICT))})"
+
+
+def test_a_scoped_review_gives_the_reviewer_a_readable_full_diff(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    brief = f"Intro.\n{FULL_DIFF_LINE}Files changed.\n"
+    plan_path = _plan_dir(policy, tmp_path, head, "changed", brief, "diff --git a/a.txt b/a.txt\n+whole\n")
+    _fake_muse(tmp_path, monkeypatch, _capture_prompt_body(tmp_path))
+    artifact = _run_review(plan_path, workspace, tmp_path, monkeypatch)
+    prompt = (tmp_path / "prompt.txt").read_text(encoding="utf-8")
+    staged = workspace / runner.STAGED_DIFF_NAME
+    assert f"The whole pull request diff is at {staged};" in prompt
+    assert "+whole" in staged.read_text(encoding="utf-8")
+    assert artifact["outcome"] == "verdict" and artifact["absence"] is None
+    assert artifact["verdict"]["summary"] == VERDICT["summary"]
+
+
+def test_a_full_review_stages_no_diff(policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    workspace, head = _workspace(tmp_path)
+    plan_path = _plan_dir(policy, tmp_path, head, "full", "Intro.\n", "diff --git a/a.txt b/a.txt\n+whole\n")
+    _fake_muse(tmp_path, monkeypatch, _capture_prompt_body(tmp_path))
+    _run_review(plan_path, workspace, tmp_path, monkeypatch)
+    assert not (workspace / runner.STAGED_DIFF_NAME).exists()
+    assert (tmp_path / "prompt.txt").read_text(encoding="utf-8") == "Intro.\n"
+
+
+def test_a_scoped_review_without_a_diff_drops_the_diff_line(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    plan_path = _plan_dir(policy, tmp_path, head, "changed", f"Intro.\n{FULL_DIFF_LINE}Files.\n", None)
+    _fake_muse(tmp_path, monkeypatch, _capture_prompt_body(tmp_path))
+    _run_review(plan_path, workspace, tmp_path, monkeypatch)
+    assert (tmp_path / "prompt.txt").read_text(encoding="utf-8") == "Intro.\nFiles.\n"

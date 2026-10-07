@@ -7,7 +7,7 @@ from typing import Any
 from . import dedup, selection
 from .retry import ALL_ABSENT, FAILURE, INTEGRITY, PENDING, SUCCESS, UNREPORTED
 from .selection import Attempt, Step
-from .verdict import Finding, Placement, Verdict, place
+from .verdict import Finding, Placement, Verdict, comment_span, place
 
 DESCRIPTION_LIMIT = 140
 STATES = {selection.PASS: SUCCESS, selection.FAIL: FAILURE, selection.PENDING: PENDING}
@@ -29,7 +29,8 @@ def _clip(text: str, limit: int = DESCRIPTION_LIMIT) -> str:
 
 def _finding_line(finding: Finding) -> str:
     detail = f"\n  {finding.detail}" if finding.detail else ""
-    return f"- **{finding.severity}** `{finding.file}:{finding.line}`: {finding.title}{detail}"
+    span = f"{finding.line}-{finding.end_line}" if finding.end_line else str(finding.line)
+    return f"- **{finding.severity}** `{finding.file}:{span}`: {finding.title}{detail}"
 
 
 def _section(title: str, lines: list[str]) -> list[str]:
@@ -60,21 +61,27 @@ def _absences(attempts: list[Attempt], step: Step) -> list[str]:
     return lines
 
 
-def _review_payload(plan: Mapping[str, Any], body: str, placement: Placement) -> dict[str, Any]:
+def _review_comment(finding: Finding, commentable: Mapping[str, frozenset[int]]) -> dict[str, Any]:
+    span = comment_span(finding, commentable)
+    anchor: dict[str, Any] = {"line": finding.line, "side": "RIGHT"}
+    if span is not None:
+        anchor = {"start_line": span[0], "start_side": "RIGHT", "line": span[1], "side": "RIGHT"}
+    return {
+        "path": finding.file,
+        **anchor,
+        "body": f"**{finding.severity}**: {finding.title}\n\n{finding.detail}".rstrip()
+        + f"\n\n{dedup.marker(finding)}",
+    }
+
+
+def _review_payload(
+    plan: Mapping[str, Any], body: str, placement: Placement, commentable: Mapping[str, frozenset[int]]
+) -> dict[str, Any]:
     return {
         "commit_id": plan["head_sha"],
         "event": "COMMENT",
         "body": body,
-        "comments": [
-            {
-                "path": finding.file,
-                "line": finding.line,
-                "side": "RIGHT",
-                "body": f"**{finding.severity}**: {finding.title}\n\n{finding.detail}".rstrip()
-                + f"\n\n{dedup.marker(finding)}",
-            }
-            for finding in placement.inline
-        ],
+        "comments": [_review_comment(finding, commentable) for finding in placement.inline],
     }
 
 
@@ -90,7 +97,11 @@ def finalize(
         body = "\n".join(
             [*_header(plan, PENDING), *_section("Result withheld: the run's artifacts failed validation", errors)]
         )
-        review = _review_payload(plan, body, Placement((), ())) if plan.get("findings_delivery") == "review" else None
+        review = (
+            _review_payload(plan, body, Placement((), ()), commentable)
+            if plan.get("findings_delivery") == "review"
+            else None
+        )
         return Final(PENDING, "result withheld: artifacts failed validation", body, review, None, INTEGRITY)
     pending_cause = ALL_ABSENT
     if step.kind == selection.REVIEW:
@@ -109,7 +120,8 @@ def finalize(
         placement = Placement((), ())
     else:
         fresh, repeated = dedup.split(verdict.findings, plan.get("open_findings", ()))
-        placement = place(fresh, commentable)
+        thread_severities = tuple(plan["blocking"]) if plan.get("findings_delivery") == "review" else None
+        placement = place(fresh, commentable, thread_severities)
     blocking = verdict.blocking(tuple(plan["blocking"])) if verdict else ()
     if state == SUCCESS:
         description = f"{reviewer}: no blocking findings"
@@ -125,7 +137,9 @@ def finalize(
         lines += [verdict.summary, ""]
     if delivery == "comment":
         lines += _section("Findings on diff lines", findings_lines)
-    lines += _section("Findings outside the diff", other_lines)
+    lines += _section(
+        "Findings without a review thread" if delivery == "review" else "Findings outside the diff", other_lines
+    )
     if any(finding in blocking for finding in placement.summary):
         lines += ["Blocking findings outside the diff still fail the review.", ""]
     lines += _section(
@@ -137,7 +151,7 @@ def finalize(
     lines += _section("Reviewers not available", _absences(attempts, step))
     body = "\n".join(lines).rstrip() + "\n"
     has_content = bool(placement.inline or placement.summary or state != SUCCESS)
-    review = _review_payload(plan, body, placement) if delivery == "review" else None
+    review = _review_payload(plan, body, placement, commentable) if delivery == "review" else None
     cause = pending_cause if state == PENDING else None
     return Final(state, _clip(description), body if has_content else "", review, reviewer, cause)
 

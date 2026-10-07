@@ -103,15 +103,27 @@ def on_develop(repo: str, sha: str) -> bool:
     return comparison.get("status") in ("ahead", "identical")
 
 
+def _targets_develop(run: dict[str, Any]) -> bool:
+    return any(
+        ((pull.get("base") or {}).get("ref") == "develop")
+        for pull in run.get("pull_requests") or []
+        if isinstance(pull, dict)
+    )
+
+
 def trusted_run(run: dict[str, Any], repo: str, is_on_develop: Callable[[str, str], bool] = on_develop) -> bool:
     head_sha = str(run.get("head_sha", ""))
-    return (
+    event = run.get("event")
+    if not (
         str(run.get("path", "")).split("@", 1)[0] == WORKFLOW_PATH
         and (run.get("repository") or {}).get("full_name") == repo
-        and run.get("event") in TRUSTED_EVENTS
+        and event in TRUSTED_EVENTS
         and re.fullmatch(r"[0-9a-f]{40}", head_sha) is not None
-        and is_on_develop(repo, head_sha)
-    )
+    ):
+        return False
+    if event == "pull_request_target":
+        return _targets_develop(run)
+    return is_on_develop(repo, head_sha)
 
 
 def latest_state(repo: str, pr: int) -> State | None:

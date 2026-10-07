@@ -156,9 +156,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-claude
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -234,9 +231,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-codex
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -321,9 +315,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-muse
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -437,9 +428,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-claude
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -515,9 +503,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-codex
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -602,9 +587,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-muse
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -718,9 +700,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-claude
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -796,9 +775,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-codex
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -883,9 +859,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-muse
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -999,9 +972,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-claude
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -1077,9 +1047,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-codex
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:
@@ -1164,9 +1131,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: oracle
-    concurrency:
-      group: oracle-review-shadow-credential-muse
-      cancel-in-progress: false
     permissions:
       contents: read
     steps:

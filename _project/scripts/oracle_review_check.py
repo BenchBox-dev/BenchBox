@@ -83,13 +83,24 @@ def _is_reviewer(login: str | None, signal: str, account_type: str | None = None
     return _login(login) == SIGNALS[signal][0] and (signal == CONNECTOR or account_type == "Bot")
 
 
+DECISIVE_VERDICTS = frozenset({"success", "failure"})
+
+
+def _review_verdict(review: dict[str, Any], head_sha: str) -> str | None:
+    match = _ORACLE_VERDICT.match(review.get("body") or "")
+    return match.group("state") if match and match.group("sha") == head_sha else None
+
+
 def _oracle_verdict(reviews: list[dict[str, Any]], head_sha: str) -> tuple[str | None, datetime | None]:
-    latest = max(reviews, key=lambda review: _parse_time(review["submitted_at"]), default=None)
-    if latest is None:
+    ordered = sorted(reviews, key=lambda review: _parse_time(review["submitted_at"]))
+    if not ordered:
         return None, None
-    match = _ORACLE_VERDICT.match(latest.get("body") or "")
-    state = match.group("state") if match and match.group("sha") == head_sha else None
-    return state, _parse_time(latest["submitted_at"])
+    decisive = [
+        _parse_time(review["submitted_at"])
+        for review in ordered
+        if _review_verdict(review, head_sha) in DECISIVE_VERDICTS
+    ]
+    return _review_verdict(ordered[-1], head_sha), max(decisive, default=None)
 
 
 def _parse_time(value: str) -> datetime:
