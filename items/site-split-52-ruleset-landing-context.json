@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Before and after ruleset JSON recorded; the only difference is the removed landing context",
+    "Drift check output recorded showing only the landing difference"
+  ],
+  "context": "Owner decision D17 (2026-10-06): the agent may make this one hosted-ruleset edit and no other. If the API refuses, or the before-state differs from the documented contexts (core, explorer, results-data, docs, landing, tooling, oracle-review), stop and ask the owner.",
+  "description": "Agent action via gh api; no PR. Do it right after the C2 PR merges.\n\n1. Read ruleset 15611785 and save the JSON in the item context.\n2. Remove only the `landing` entry from the required status checks. Change nothing else.\n3. Read the ruleset back and record the result.\n4. Run scripts/ruleset_drift_check.py against the live state. Expect only the landing difference; site-split-53 then removes it from the approved list.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:53:18Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ab00dc23bd164dd0b991c47236335f28",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    }
+  ]
+}
