@@ -40,6 +40,7 @@ Classification values:
 | Release curation and readiness | `scripts/check_release_curation.py`, `tests/unit/scripts/test_check_release_curation.py`, `.github/workflows/validate-release-pr.yml`, `.github/workflows/release-canary.yml`, `scripts/release_flow.py`, `tests/unit/scripts/test_release_flow.py` | ci.yml always-required `ci-paths` selects release identity changes and checks them against the immutable event base; release workflow | pending | open |
 | Ruleset and settings drift | `scripts/ruleset_drift_check.py`, `tests/unit/release/test_ruleset_drift_review_coverage.py`, `tests/unit/release/test_ruleset_review_enforcement.py` | Advisory nightly and manual verification; enforced release-canary and release-PR bootstrap; thread-resolution and tag-protection predicates retained | pending | open |
 | Soundness-path review | `.github/soundness-paths.txt`, `_project/scripts/soundness_paths.py`, `tests/unit/scripts/test_soundness_paths.py` | Required oracle-review on the exact head, required thread resolution and post-merge soundness digest | pending | open |
+| Corpus-to-artifact bijection after ledger-seed retirement | `scripts/publication/check_corpus_bijection.py` with `publication/ledger-seed.json` | site-inputs attestations: snapshot digest equality when the corpus is unchanged, `validator_parity` over the parent-to-head range when it changed, plus `explorer_compat` and `snapshot_invariants` on every bundle | pending | open |
 | Durable auto-merge hold | `no-auto-merge` label and draft status | Exact-head arming refuses holds; the label is not enforced after arming | pending | open |
 | Workflow context validity | `tests/unit/workflows/test_workflow_expression_contexts.py` | ci.yml `tooling` | pending | open |
 | Combined-tree validation before merge (retired) | Former merge-group required checks | Required PR checks, then exact-commit trunk validation; composition failures are detected after merge and handled by revert | pending | open |
@@ -93,6 +94,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `release-canary.yml` | product-safety | Release canary protection |
 | `seed-corpus.yml` | product-safety | Corpus seeding |
 | `site-deploy.yml` | product-safety | Single-writer site deployment |
+| `site-inputs.yml` | product-safety | Versioned site-inputs bundle build, attestation, artifact upload and site dispatch |
 | `soundness-merge-digest.yml` | product-safety | Post-merge soundness review digest |
 | `submission-validator-drift-check.yml` | product-safety | Submission validator sync |
 | `sync-results-data-to-published.yml` | product-safety | Corpus trust boundary sync |
@@ -160,6 +162,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_blind_spot_tools.py` | product-safety |
 | `test_blog_content_validation.py` | product-safety |
 | `test_branch_prune_merged.py` | pure-process |
+| `test_browser_fixtures_port.py` | product-safety | Fixture-query port byte-identity |
 | `test_browser_gate_aggregate.py` | product-safety |
 | `test_build_joinorder_data.py` | product-safety |
 | `test_check_api_contract_symbols.py` | product-safety |
@@ -243,6 +246,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `test_scan_explorer_stale_theme.py` | product-safety |
 | `test_scan_explorer_tokens.py` | product-safety |
 | `test_shrink_rollup.py` | pure-process |
+| `test_site_inputs.py` | product-safety | Site-inputs bundle manifest, digests and verify |
 | `test_site_inventory.py` | product-safety |
 | `test_skill_sync_ci_policy.py` | tooling |
 | `test_soundness_merge_digest.py` | product-safety | Post-merge soundness review digest |
@@ -343,6 +347,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `check_release_curation.py` | product-safety | Release curation |
 | `assemble_public_site.py` | product-safety | Public-site assembly and privacy scan |
 | `generate_landing_quickstarts.py` | product-safety | Landing quickstart generation |
+| `site_inputs.py` | product-safety | Site-inputs bundle build and verify |
 | `check_doc_relative_links.py` | tooling | Docs hygiene |
 | `check_duplicate_code.py` | tooling | Hygiene |
 | `check_windows_antipatterns.py` | tooling | Hygiene |
@@ -385,6 +390,7 @@ Each is `product-safety` or `tooling`, never `pure-process`:
 | `preflight_targets.py` | pure-process | Changed-file lint and test selection for the local preflight |
 | `dev_loop_pr_metrics.py` | pure-process | Program baseline metrics mechanics |
 | Remaining project scripts (ledger-catch-all: _project/scripts/) | product-safety | Sweep, corpus, and validation product code; reclassify individually before any deletion |
+| `_project/scripts/explorer_pipeline/browser_fixtures.py` | product-safety | Browser fixture queries for the site-inputs bundle |
 
 ### `.pre-commit-config.yaml` hooks
 

@@ -280,6 +280,19 @@
       "alternative": "Removing the notice would discard attribution.",
       "owner": "Joe Harris",
       "removal": "Retain while this source remains licensed."
+    },
+    {
+      "path": "tests/unit/scripts/test_browser_fixtures_port.py",
+      "symbol": "_run_c",
+      "text": "unresolved executable source: script",
+      "payload": "sha256:30e9188dc00d595e3e0a428fa51c0b1506a7fe5219d65290dbace0be752378be",
+      "finding_kind": "payload-error",
+      "kind": "fixture",
+      "consumer": "tests/unit/scripts/test_browser_fixtures_port.py",
+      "necessity": "The port test executes the reviewer-verified .mjs inline queries, extracted verbatim at test time, to prove the core port's output is byte-identical. Its executable argument is derived test input bound to this file's AST digest.",
+      "alternative": "A static copy of the queries would reintroduce the drift the port exists to remove; a text assertion would not prove byte identity.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when site-split-22 rewires the .mjs callers to the port and this equivalence test is replaced by the single-source assertion."
     }
   ]
 }
