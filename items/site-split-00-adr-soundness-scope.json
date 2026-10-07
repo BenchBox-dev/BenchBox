@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "ADR merged and passes check_decision_records",
+    "oracle_review_check.py reports no soundness path for a change touching only .github/workflows/publication-deploy.yml, and still reports one for trunk.yml and site-deploy.yml (evidence in PR body)",
+    "test_soundness_paths passes with the new regex coverage assertions",
+    "Oracle review cleared by the Codex connector or the owner's stand-in comment on the exact head"
+  ],
+  "context": "Owner decision D14 (2026-10-06): narrow the soundness paths first, so later deletions of retiring paths need no oracle review. muse AR-03 (accepted): keep the live deploy plane under review until it is deleted, and assert regex coverage. Stop if the Codex connector is unavailable and the owner has not posted the stand-in `Stand-in oracle review: APPROVE <40-hex head sha>` (owner only; the agent never posts it).",
+  "description": "Core PR to develop. It needs oracle review: it changes `.github/soundness-paths.txt`. This is review 1 of 3 in the batch.\n\n1. Write `docs/development/adr/adr-site-repo-split.md`:\n   - Motivation: the Astro cutover was delayed by coupling to core CI, so the site needs isolated CI and fast rollouts.\n   - Decisions D1-D20 from the plan.\n   - The language rule: no Python source in the site repo, no JS/TS source in core; run-time third-party tools are allowed.\n   - Supersessions:\n     - `single-repo-migration.md`, in part;\n     - `adr-astro-unified-site.md` D12, D13 and D14, where they conflict;\n     - `adr-independent-publication-authorities.md`.\n   - The \"Consumers\" appendix.\n   Satisfy `scripts/check_decision_records.py`.\n2. In `.github/soundness-paths.txt`:\n   - Replace `prefix .github/workflows/` with a `regex` that excludes only `docs.yml`, `publication-*.yml` and `rehearse-release-isolation.yml`.\n   - Remove the `file` lines for those workflows and for the missing `publication-lane-docs.yml` and `publication-lane-explorer.yml`.\n   - Replace `prefix publication/` and `prefix scripts/publication/` with `file` entries for the corpus files that survive the publication retirement. Derive the list from the imports of the corpus workflows and `scripts/publication/verify_corpus_promotion.py`.\n   - Keep `scripts/site_deploy/`, `deploy/`, `site-deploy.yml` and the site-inventory entries. Core deploys production until the cutover.\n3. In `tests/unit/scripts/test_soundness_paths.py`:\n   - Drop the expectations for the excluded and missing workflows.\n   - Assert that the regex still matches `ci.yml`, `trunk.yml`, `oracle-review.yml`, `release.yml`, `site-deploy.yml`, `validate-submission.yml` and a made-up `new-example.yml`.\n   - Assert that it matches none of the excluded files.",
+  "links": [
+    ".github/soundness-paths.txt",
+    "_project/scripts/soundness_paths.py",
+    "tests/unit/scripts/test_soundness_paths.py",
+    "_project/decisions/single-repo-migration.md",
+    "_project/decisions/adr-astro-unified-site.md",
+    "docs/development/adr/adr-independent-publication-authorities.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:47:17Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "0b48875a1f4a4529b43bccc3d712b331",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    }
+  ]
+}
