@@ -5,6 +5,7 @@
     "Metric values match the Explorer for the same snapshot (shared-code test)",
     "Pages without embeds still fetch zero Explorer bytes; axe clean"
   ],
+  "context": "site-split-01 (2026-10-07): stays open per the batch plan. Its paths (website/ results embeds) now live in BenchBox-dev/benchbox-site; implementation happens there after the seed (site-split-20).",
   "description": "A post-cutover feature with its own owner approval before starting. Add two distinct Preact-island components:\n- **Cited result.** Frozen to a named corpus snapshot or bundle id. Shows that id and date, and never changes after publication. Use this in blog analysis.\n- **Current results.** Explicitly labelled live, reading the current published snapshot.\n\nBoth use the Explorer's canonical metric definitions, imported from the Explorer package, never reimplemented. Both honour the same visibility, admission and withdrawal rules as the Explorer: a withdrawn result renders as withdrawn and is never silently dropped or kept. Both load DuckDB only when scrolled into view, and pages without embeds ship zero Explorer bytes.",
   "sessions": [
     {
@@ -14,6 +15,14 @@
       "op": "create",
       "op_id": "f320205e4b414fa69cabec54697ed0cc",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T12:04:12Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "9fee99944a6342e9a18d20414f85f42f",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
 }
