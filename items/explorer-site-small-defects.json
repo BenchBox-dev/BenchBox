@@ -4,6 +4,7 @@
     "Drafts page out of the sitemap",
     "Test stable under xdist"
   ],
+  "context": "2026-10-07 triage: (1) flaky test not reproduced: tests/unit/scripts/explorer_pipeline ran 3x under -n 8, 455 passed each time; the original failure happened while the disk was full (ENOSPC), so it may not be a real flake. Re-check under a full parallel run before changing code. (2) /blog/drafts.html in the sitemap is deliberate blog behaviour, and the sitemap feeds site-parity; decide in the site repo after the site-repo split. (3) results-explorer/index.html favicon: the file overlaps open PR #2614; do it after #2614 lands, or in the site repo.",
   "description": "results-explorer/index.html links /results/favicon.svg, which is not built. /blog/drafts.html is in the sitemap and would list future-dated posts. tests/unit/scripts/explorer_pipeline/test_pipeline.py::TestExplorerPipelineRun::test_does_not_emit_manifest_json failed under a parallel run and passed alone.",
   "sessions": [
     {
@@ -13,6 +14,14 @@
       "op": "create",
       "op_id": "008b082348e546faabc02c8ead610710",
       "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-07T22:54:12Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "cbcaf5c752354bd391cc5db11de10306",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
     }
   ]
 }
