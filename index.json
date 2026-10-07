@@ -19102,6 +19102,15 @@
       "status": "open",
       "title": "Make the site and Explorer build only from the repo and the fetched core bundle"
     },
+    "site-split-23-node-deploy-plane": {
+      "claim": null,
+      "needs": [
+        "site-split-22-build-from-bundle"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Build the Node deploy plane in the site repo: resolve, gates, Pages deploy, probes, receipts, rollback"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],
