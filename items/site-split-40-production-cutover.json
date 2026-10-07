@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Owner said go in chat before SITE_DEPLOY_TARGET=production was set (quote recorded in context)",
+    "First production deploy green with receipt; all routes and CLI URLs verified",
+    "Per-route-class production deploys and a production rollback drill recorded with run ids",
+    "Core site-deploy.yml disabled; core Pages untouched apart from the domain removal"
+  ],
+  "context": "Owner decisions D11 (rollback until site-split-50 = move the domain back) and D19 (owner approves the first production deploy live); owner 2026-10-04: evidence, not elapsed time. muse AR-01 and AR-12 (accepted). Stop and ask on any red probe that a rollback does not fix.",
+  "description": "OWNER PAUSE. This is the only planned interruption.\n\n1. Agent: post a summary in chat:\n   - the rehearsal receipts, probe results and rollback drill run ids;\n   - the variable changes it will make.\n   Then run `gh workflow disable site-deploy.yml -R BenchBox-dev/BenchBox`. Core Pages and its last deployment stay in place as the rollback target.\n2. Owner, in a low-traffic window: remove benchbox.dev from core Pages and add it to the site Pages. DNS does not change.\n3. Agent: poll the site Pages API every 2 minutes, for at most 60 minutes, until the certificate is approved, then enforce HTTPS. On timeout, ask the owner to move the domain back, re-enable core site-deploy.yml, and stop.\n4. Agent: set SITE_ORIGIN=https://benchbox.dev and SITE_HOST=benchbox.dev. Ask the owner for go in chat (D19). Only then set SITE_DEPLOY_TARGET=production and dispatch a deploy.\n5. Agent: verify:\n   - probes are green and a receipt exists;\n   - /, /docs/, /docs/dev/, /blog/, /results/, 404.html and objects.inv all serve;\n   - no page carries noindex;\n   - the CLI URLs resolve: https://benchbox.dev/docs/ (cli/app.py:30, onboarding.py:99), /docs/contributing-results.html (cli/commands/submit.py:72,99,500) and /results/r (submit_service.py:17).\n6. Evidence before site-split-50 starts:\n   - one production deploy per route class, each with green probes: docs through a core bundle, blog and landing through a site merge, and a results-data change through a bundle;\n   - one production rollback drill to a site receipt, then forward again.\n   Wait for natural core merges for the bundle classes. Do not create artificial core changes; if none arrive, ask the owner.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:52:27Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9d1bf85f8c2743c4b2bcd0e4788db862",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    }
+  ]
+}

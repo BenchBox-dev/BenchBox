@@ -19139,6 +19139,15 @@
       "status": "open",
       "title": "Rehearse real deploys, rollback and the failure path from the site repo on next.benchbox.dev"
     },
+    "site-split-40-production-cutover": {
+      "claim": null,
+      "needs": [
+        "site-split-30-rehearsal"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Cut benchbox.dev over to the site repo with the owner present, then gather per-route production evidence"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],
