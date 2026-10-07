@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "Each reviewer either returned a complete findings list or is recorded as unavailable or waived by the user, with date and reason",
+    "Every returned finding has a recorded ruling (accept, partly accept, or rebut) with file:line or packet evidence; no finding is silently dropped",
+    "Every accepted finding is reflected in the description, acceptance, or needs of a named pvm-* item, and the item IDs are listed in this item's context",
+    "Reviewers ran read-only: codex with --sandbox read-only; agy in a detached worktree created at the reviewed revision and removed afterwards; git status in the main checkout is unchanged"
+  ],
+  "context": "2026-10-07: codex usage limit resets 18:17 local time; agy quota reset roughly 2 hours after 15:40 local. Review packet format: role (findings only), goal, output contract (ID, severity, target, finding, evidence, recommended change; at most 15; ends \"No further findings.\").",
+  "description": "Decision gate before any implementation of the Polars version matrix. The plan (umbrella item pvm-polars-2-version-matrix) has had one complete external review (muse-spark-1.3) and one partial one: codex (gpt-6.1-sol) hit its usage limit after raising two leads, and agy (gemini-3.8-flash) never ran because of quota. Both leads were verified and are already in the plan (DataFrame validation cannot return a clean pass outside TPC-H SF1; Polars scalar() collects bypass the engine setting).\n\nWork: re-run codex (gpt-6.1-sol, medium effort, read-only sandbox) and agy (gemini-3.8-flash-high, plan mode, detached worktree, evidence inline because headless agy cannot run tools) against the current item set. Rule on every finding (accept / partly accept / rebut, with file:line evidence). Apply accepted findings with update_item to the affected pvm-* items.\n\nDecision gate: the user decides whether to wait for these reviews or to waive them. A waiver must be recorded in context with the date and the user's words.",
+  "links": [
+    "/Users/joe/.claude/skills/shared-agent-execution/references/external-harnesses.md",
+    "benchbox/core/dataframe/query_validation.py",
+    "benchbox/platforms/dataframe/polars_df.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-07T20:54:30Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ea57632580c74115b552a4ea11bccaae",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    }
+  ]
+}

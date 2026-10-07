@@ -15086,6 +15086,13 @@
       "status": "dropped",
       "title": "Find and correct durable copies of the stale 'git config user.email noreply@anthropic.com' instruction"
     },
+    "pvm-d0-external-plan-review": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Gate: finish external adversarial review of the Polars version-matrix plan and fold in accepted findings"
+    },
     "pypi-environment-protection-drift-canary-20260805": {
       "claim": null,
       "needs": [
