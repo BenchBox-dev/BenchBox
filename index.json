@@ -19084,6 +19084,15 @@
       "status": "open",
       "title": "Seed BenchBox-dev/benchbox-site from core with filtered, Python-free history and protect main"
     },
+    "site-split-21-site-bootstrap-ci": {
+      "claim": null,
+      "needs": [
+        "site-split-20-seed-site-repo"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Bootstrap the site repo: settings, agent instructions, Node hooks, CI and nightly probes"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],
