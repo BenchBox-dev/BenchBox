@@ -461,7 +461,7 @@ class TestStaleCancelEventDoesNotLeakAcrossReusedConfig:
         assert any("timed out" in e.lower() for e in run1_result.errors)
         cancel_events_after_run1 = getattr(config, "_stream_cancel_events", None)
         assert cancel_events_after_run1 is not None
-        assert cancel_events_after_run1[0].is_set()
+        assert cancel_events_after_run1[1].is_set()
 
         # Run 2 reuses the SAME config object: cooperative cancel now
         # disabled, timeout generous, no sleep left to trigger (sleep_once_
