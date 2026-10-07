@@ -20,28 +20,6 @@ dependencies.
 
 ---
 
-## Library Performance Baselines
-
-The automated performance suite exercises the BenchBox orchestration layer to
-ensure the library remains lightweight. The current guardrails are summarized
-below.
-
-| Scenario | Metric | Threshold | Status |
-| --- | --- | --- | --- |
-| Lifecycle orchestration vs. direct adapter | Runtime overhead ratio | `< 1.30x` | Target* |
-| Lifecycle orchestration | Peak memory overhead | `< 1 MB` | Enforced |
-| Result exporting (`json`) | Peak allocation during export | `< 2.5 MB` | Enforced |
-| Result exporting (`csv`) | Peak allocation during export | `< 3.0 MB` | Enforced |
-
-*The runtime overhead test is currently skipped due to timing variability across
-systems. Memory thresholds are actively enforced.
-
-These baselines are defined in `tests/performance/test_library_overhead.py`. If
-new functionality increases memory usage beyond the limits, the performance
-tests will fail and surface a regression alert.
-
----
-
 ## Monitoring Utilities
 
 BenchBox ships with reusable monitoring helpers in
@@ -310,29 +288,6 @@ print(f"Total time: {benchmark_results['timing']['total_seconds']:.2f}s")
 print(f"Average query time: {benchmark_results['query_stats']['average_query_time_ms']:.1f}ms")
 print(f"Success rate: {benchmark_results['query_stats']['successful_queries']}/{benchmark_results['query_stats']['total_queries']}")
 ```
-
-### Library Overhead Baselines
-
-BenchBox includes automated performance tests that track the framework's own
-runtime and memory overhead relative to direct adapter execution. The suite in
-`tests/performance/test_library_overhead.py` establishes two baselines:
-
-- **Runtime overhead** - `run_benchmark_lifecycle` must remain within 30% of the
-  adapter-only baseline when executing a representative workload. The test
-  simulates short-lived runs (1 ms) for both in-memory and file-backed
-  configurations and asserts on the measured ratio.
-- **Peak memory overhead** - lifecycle orchestration must add less than 1 MB of
-  additional peak memory compared to the direct adapter path. Memory is tracked
-  via `tracemalloc`, ensuring regressions are caught automatically.
-
-Run the tests locally with:
-
-```bash
-uv run -- python -m pytest tests/performance/test_library_overhead.py
-```
-
-The failure messages include the measured ratio and peak memory deltas to aid
-investigation should a regression occur.
 
 ### Performance Profiling
 

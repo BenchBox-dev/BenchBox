@@ -239,7 +239,7 @@ BenchBox provides advanced execution modes for systematic performance testing wi
 
 ### Power Run Iterations Example
 
-Execute multiple test iterations to gather statistical confidence. Power iterations are a plain loop over stream IDs. Each `TPCHPowerTest` run executes the 22 queries in that stream's permutation against a real connection and reports Power@Size. The former `PowerRunExecutor` wrapper is removed; see `adr-concurrency-public-api-reconciliation`. The loop runs 5 test iterations, and validation is off (`validation=False`) because answer sets exist for stream 0 only:
+Execute multiple test iterations to gather statistical confidence. Power iterations are a plain loop over stream IDs. Each `TPCHPowerTest` run executes the 22 queries in that stream's permutation against a real connection and reports Power@Size. The loop runs 5 test iterations, and validation is off (`validation=False`) because answer sets exist for stream 0 only:
 
 ```python
 import statistics
@@ -293,7 +293,7 @@ for i, power_at_size in enumerate(power_values, 1):
 
 ### Concurrent Query Execution Example
 
-Execute queries concurrently to test throughput and scalability. One throughput test owns all of its streams: the connection factory hands each stream its session, and `StreamRunner` executes them concurrently with fail-closed accounting. The former `ConcurrentQueryExecutor` wrapper is removed; see `adr-concurrency-public-api-reconciliation`. The example generates and loads the data before opening throughput sessions, and runs 3 concurrent streams (`num_streams=3`):
+Execute queries concurrently to test throughput and scalability. One throughput test owns all of its streams: the connection factory hands each stream its session, and `StreamRunner` executes them concurrently with fail-closed accounting. The example generates and loads the data before opening throughput sessions, and runs 3 concurrent streams (`num_streams=3`):
 
 ```python
 import duckdb

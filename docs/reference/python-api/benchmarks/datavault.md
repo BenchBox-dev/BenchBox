@@ -5,7 +5,7 @@
 
 Python API reference for the Data Vault benchmark.
 
-Data Vault turns the eight TPC-H tables into 21 Data Vault 2.0 tables (7 hubs, 6 links and 8 satellites) and serves 22 TPC-H-derived queries written for that model. Every statement on this page was checked against the released 0.4.1 wheel.
+Data Vault turns the eight TPC-H tables into 21 Data Vault 2.0 tables (7 hubs, 6 links and 8 satellites) and serves 22 TPC-H-derived queries written for that model.
 
 ## `benchbox.DataVault`
 

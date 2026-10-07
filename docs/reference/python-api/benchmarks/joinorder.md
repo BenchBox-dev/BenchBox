@@ -250,7 +250,7 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 | Data and configuration | <span id="benchbox.joinorder.JoinOrder.output_dir"></span>`output_dir` | property | The resolved directory from the constructor argument. |
 | Data and configuration | <span id="benchbox.joinorder.JoinOrder.run_with_platform_api_surface"></span>`run_with_platform_api_surface` | class attribute | |
 | Data and configuration | <span id="benchbox.joinorder.JoinOrder.scale_factor"></span>`scale_factor` | instance attribute | Always `1.0`. |
-| Data and configuration | <span id="benchbox.joinorder.JoinOrder.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Not defined in the released 0.4.1 wheel. Source builds after 0.4.1 define it on `BaseBenchmark`, default `False`. |
+| Data and configuration | <span id="benchbox.joinorder.JoinOrder.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Defined on `BaseBenchmark` from 0.4.2, default `False`. Set it to `True` for a benchmark that needs schema objects but no data files. |
 | Data and configuration | <span id="benchbox.joinorder.JoinOrder.tables"></span>`tables` | property | Empty until `generate_data()` has run, then the table-to-path mapping. |
 
 ## JoinOrderQueryManager

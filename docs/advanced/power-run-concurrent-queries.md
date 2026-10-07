@@ -97,7 +97,7 @@ print(f"Confidence: {len(power_values)}/5 iterations successful")
 
 This example requires `test.db` to contain a loaded TPC-H SF 0.1 dataset. Generate and load it first, or replace the path with an initialized database.
 
-Power iterations are a plain loop over stream IDs. Each `TPCHPowerTest` run executes the 22 queries in that stream's permutation against a real connection and reports Power@Size. The former `PowerRunExecutor` wrapper is removed; see `adr-concurrency-public-api-reconciliation`. Validation is off because answer sets exist for stream 0 only.
+Power iterations are a plain loop over stream IDs. Each `TPCHPowerTest` run executes the 22 queries in that stream's permutation against a real connection and reports Power@Size. Validation is off because answer sets exist for stream 0 only.
 
 #### Advanced-level Statistical Analysis
 
@@ -233,7 +233,7 @@ for stream in result.stream_results:
 
 This example requires `throughput.db` to contain a loaded TPC-H SF 0.1 dataset. Generate and load it first, or replace the path with an initialized database.
 
-One throughput test owns all of its streams. The connection factory hands each stream its session (see the adapter session-capability contract), and `StreamRunner` executes the streams concurrently with fail-closed accounting. The former `ConcurrentQueryExecutor` wrapper is removed; see `adr-concurrency-public-api-reconciliation`.
+One throughput test owns all of its streams. The connection factory hands each stream its session, and `StreamRunner` executes the streams concurrently with fail-closed accounting.
 
 #### Scalability Analysis
 

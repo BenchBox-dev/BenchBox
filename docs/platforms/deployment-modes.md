@@ -448,14 +448,15 @@ Single-node multi-threaded execution. Start a Sail server locally, then connect 
 ```bash
 uv add benchbox --extra lakesail
 
-make uat-bring-up PLATFORM=lakesail
+uv add pysail
+python -m pysail spark server --port 50051
 
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 ```
 
-The extra installs the Spark Connect-capable PySpark client, `make uat-bring-up` starts the local Docker-backed Sail server, and the two runs are the SQL and DataFrame benchmarks. Endpoint and tuning overrides need the Python adapter (see the LakeSail Platform Guide); LakeSail registers no `--platform-option` keys.
+The extra installs the Spark Connect-capable PySpark client, `pysail` installs the Sail server, and `python -m pysail spark server` starts it locally (run it in a separate terminal and leave it running). The two runs are the SQL and DataFrame benchmarks. Endpoint and tuning overrides need the Python adapter (see the LakeSail Platform Guide); LakeSail registers no `--platform-option` keys.
 
 ### Distributed Mode
 

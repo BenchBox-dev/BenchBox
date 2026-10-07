@@ -18,7 +18,7 @@ POSTGRES_WRITE_PRIMITIVES_OPERATION_SKIPS = {
     "merge_overlap_90pct": "PostgreSQL MERGE requires an explicit INSERT VALUES clause; the catalog uses DuckDB shorthand.",
     "merge_no_overlap_all_insert": "PostgreSQL MERGE requires an explicit INSERT VALUES clause; the catalog uses DuckDB shorthand.",
     "merge_conditional_update": "PostgreSQL MERGE requires an explicit INSERT VALUES clause; the catalog uses DuckDB shorthand.",
-    "merge_returning_clause": "pg_duckdb rejects the catalog's MERGE RETURNING form in UAT.",
+    "merge_returning_clause": "pg_duckdb rejects the catalog's MERGE RETURNING form.",
     "merge_error_handling": "PostgreSQL MERGE requires an explicit INSERT VALUES clause; the catalog uses DuckDB shorthand.",
 }
 

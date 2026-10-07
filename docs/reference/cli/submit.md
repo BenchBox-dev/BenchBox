@@ -66,15 +66,15 @@ submission/
 | `submission_path` | `"PR-based"` or `"hosted-service"` |
 | `submitted_by` | Explicit flag, `git config user.name`, or empty with warning |
 
-## Phase 2 vs Phase 3
+## PR Submission and Hosted Upload
 
-`benchbox submit --output` is the Phase 2 community PR path.
-`benchbox submit --service` is the Phase 3 hosted API path.
+`benchbox submit --output` packages a result for a community pull request.
+`benchbox submit --service` uploads a result to the hosted API.
 
-| Phase | Workflow | Auth required |
-|-------|----------|---------------|
-| 2 (current) | Package locally → open PR manually | No |
-| 3 (hosted) | `--service` uploads to the hosted API | Yes (`benchbox auth login` or env token) |
+| Mode | Workflow | Auth required |
+|------|----------|---------------|
+| PR submission | Package locally → open PR manually | No |
+| Hosted upload | `--service` uploads to the hosted API | Yes (`benchbox auth login` or env token) |
 
 Both modes use the same canonical schema-v2 result JSON and companion files.
 There is no second hosted-only wire format.

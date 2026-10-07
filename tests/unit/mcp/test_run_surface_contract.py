@@ -686,7 +686,7 @@ class TestScopedSurfaceADR:
         adr = (REPO_ROOT / "docs/development/adr/adr-one-engine-scoped-surfaces.md").read_text(encoding="utf-8")
         normalized = " ".join(adr.split())
 
-        assert "mcp-product-surface-and-shared-run-service-decision" in normalized
+        assert "smoke/control-plane surface, not a CLI-equivalent execution surface" in normalized
         assert "Supersedes" in normalized
         for tier in sorted(RATIFIED_OMISSION_TIERS):
             assert tier in normalized

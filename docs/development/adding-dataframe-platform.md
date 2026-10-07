@@ -209,11 +209,8 @@ DATAFRAME_ADAPTERS = {
 }
 ```
 
-Run the scaffold helper before implementation to inspect the expected file plan:
-
-```bash
-uv run -- python _project/scripts/platform_scaffold.py --name myplatform --kind dataframe
-```
+Before implementation, maintainers can print the expected file plan with the
+platform scaffold script (`--kind dataframe`).
 
 ## Step 5: Add Tests
 

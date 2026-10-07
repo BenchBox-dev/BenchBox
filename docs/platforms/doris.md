@@ -57,7 +57,7 @@ image and applies a small amount of startup configuration for local Docker
 Desktop environments, including Doris' `vm.max_map_count`, `ulimit -n`, and
 Java requirements.
 
-By default the stack now runs without `privileged` mode. Set
+By default the stack runs without `privileged` mode. Set
 `DORIS_PRIVILEGED=true` only if your Docker VM still reports
 `vm.max_map_count < 2000000` and you want the container to raise it at startup;
 preconfiguring the Docker VM once is the narrower alternative.
@@ -84,14 +84,10 @@ These are environment limits, not adapter correctness issues. Increase Docker
 memory and the Doris `mem_limit` if you need those datasets to load reliably at
 SF=1.
 
-### Validation Caveat For Major Upgrades
+### Validation Caveat
 
-BenchBox's Doris benchmark runs are still commonly exercised under loose
-row-count validation for TPC-H and TPC-DS. That catches gross regressions, but
-it is weaker than exact cross-platform validation for detecting silent semantic
-drift across Doris majors. Treat future compose image bumps as engine upgrades:
-re-run exact or targeted cross-platform spot checks before changing the pinned
-Docker tag.
+TPC-H and TPC-DS validation on Doris checks row counts only, so it can miss
+wrong result values.
 
 ## Configuration Options
 

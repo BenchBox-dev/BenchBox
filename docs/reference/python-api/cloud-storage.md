@@ -19,7 +19,7 @@ BenchBox provides cloud storage integration through a minimal abstraction layer 
 - **Platform Integration**: Staging wrappers for Databricks volumes, ADLS Gen2 and Snowflake stages
 - **Error Handling**: Error messages that name the missing environment variables or package
 
-The examples on this page were run without network access and without credentials. Functions that contact a cloud provider are described, but only their offline branches are run.
+The example outputs on this page show what each function does without network access or credentials.
 
 ## Quick Start
 
@@ -42,7 +42,7 @@ results = adapter.run_benchmark(benchmark)
 
 The benchmark takes its output directory from `output_dir`. `generate_data()` writes the data to that directory, and the adapter then runs the benchmark.
 
-This example needs the `cloudstorage` extra and credentials for the bucket, so it was not run.
+This example needs the `cloudstorage` extra and credentials for the bucket.
 
 ## Installation
 
@@ -680,7 +680,7 @@ True False
 
 - **Pass a handler, not a URI string:** a string such as `"s3://bucket/data"` reaches `local_generate_func` as a string, so a function that builds `Path(output_dir)` writes into a local directory with that name. Convert URIs with `create_path_handler` first, as the example does for `abfss://`.
 - **Staging wrappers:** for `dbfs:`, `abfss:` and Snowflake stage targets the generation function writes to the local staging directory. Uploading from there to the remote target is not done by this mixin.
-- **Removed method:** <span id="generate_with_cloud_upload"></span>earlier versions of this page listed `_generate_with_cloud_upload`. It does not exist in 0.4.1.
+- **No upload method:** <span id="generate_with_cloud_upload"></span>the mixin has no `_generate_with_cloud_upload` method.
 
 ### Usage Guide Formatting
 
@@ -1045,7 +1045,7 @@ A `DatabricksVolumeAdapter`, built from a `WorkspaceClient` that is constructed 
 
 ### Multi-Cloud Benchmark Execution
 
-Run benchmarks across multiple cloud providers. The benchmark steps need credentials for each provider and were not run. Without credentials, every provider is skipped and the loop prints the error from `validate_cloud_credentials`.
+Run benchmarks across multiple cloud providers. The benchmark steps need credentials for each provider. Without credentials, every provider is skipped and the loop prints the error from `validate_cloud_credentials`.
 
 For each location the loop validates the credentials before it starts, reads the path information, then creates and runs the benchmark. A summary of the results is printed at the end.
 

@@ -2,9 +2,8 @@
 
 ## Status
 
-Accepted. Implements `tpcdi-enhanced-parallel-support-decision` and resolves
-the TPC-DI portion of `decide-fate-of-documented-unimplemented-surfaces`
-(the admin and explorer portions of that item are untouched).
+Accepted. Settles the TPC-DI part of the review of documented but
+unimplemented surfaces; the admin and explorer surfaces are out of scope.
 
 ## Date
 
@@ -12,7 +11,7 @@ the TPC-DI portion of `decide-fate-of-documented-unimplemented-surfaces`
 
 ## Context
 
-After false-success containment (`tpcdi-parallel-phase-truthful-outcome`),
+After the parallel phase was made to report failures truthfully,
 the TPC-DI tree carries two parallel-execution stories:
 
 1. **Canonical path.** `TPCDIBenchmark(enable_parallel: bool, max_workers: int)`
@@ -71,8 +70,8 @@ consumes (`TPCDIConfig` carries only `enable_parallel`, `max_workers`,
 
 No beta compatibility cycle applies: the removed surface had no
 production callers, no CLI/MCP exposure, and no package export, so
-nothing external can depend on it. The tracker portion for admin/explorer
-surfaces stays with `decide-fate-of-documented-unimplemented-surfaces`.
+nothing external can depend on it. The admin and explorer surfaces are
+decided separately.
 
 ## Alternatives considered
 

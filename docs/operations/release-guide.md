@@ -108,7 +108,7 @@ make uat-gate-check STAGE1=<run-dir> STAGE2=<run-dir> STAGE3=<run-dir>
 ```
 
 Review the campaign report. It is historical evidence, not a release input.
-See `docs/operations/uat-framework.md` "Three-stage UAT campaign" for campaign
+See `docs/operations/uat-release-campaign.md` for campaign
 ordering and its report checklist. The emergency override below applies only
 to the blocking canary check.
 

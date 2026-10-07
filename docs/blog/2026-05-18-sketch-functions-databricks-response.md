@@ -18,7 +18,7 @@ meta_description: "Why BenchBox split approximate analytics coverage across one-
 - `read_primitives` measures one-shot approximate aggregates: HLL distinct counts, KLL or T-Digest quantiles, vector quantiles, and Top-K.
 - `write_primitives` measures persisted sketch state: store compact summaries, merge them later, validate the extracted answer, and track storage size.
 
-The current `develop` branch also adds ClickHouse-native lifecycle coverage, DuckDB-only CPC and REQ variants, parameter sweeps, and a PySpark DataFrame HLL persist-merge path. Tuple sketches and cloud live verification remain deferred.
+BenchBox v0.3.0 also adds ClickHouse-native lifecycle coverage, DuckDB-only CPC and REQ variants, parameter sweeps, and a PySpark DataFrame HLL persist-merge path. Tuple sketches and cloud live verification remain deferred.
 
 ---
 
@@ -66,7 +66,7 @@ But the sketch lifecycle is a different workload. It has at least three steps:
 
 The second and third steps are the interesting part. They turn "approximate aggregate" from a function call into a data management pattern. A single-query catalog can produce numbers for step one. It cannot exercise the durable state loop.
 
-This surfaced as a framework-gap finding in our own planning notes: function-parity evaluation under-weights claims that depend on the benchmark execution model. Mapping names is necessary, but it is not enough. We also have to ask whether the benchmark can express the capability under test.
+Function-parity evaluation under-weights claims that depend on the benchmark execution model. Mapping names is necessary, but it is not enough. We also have to ask whether the benchmark can express the capability under test.
 
 ## From function parity to lifecycle tests
 
@@ -202,12 +202,12 @@ uv run -- benchbox run --platform pyspark-df --benchmark write_primitives \
 
 The public reference docs are the best place to start:
 
-- [`read_primitives` approximate aggregate functions](https://github.com/joeharris76/BenchBox/blob/develop/docs/benchmarks/read-primitives-approximate-functions.md)[^13]
-- [`write_primitives` sketch persistence operations](https://github.com/joeharris76/BenchBox/blob/develop/docs/benchmarks/write-primitives-sketch-functions.md)[^14]
+- [`read_primitives` approximate aggregate functions](https://github.com/joeharris76/BenchBox/blob/v0.3.0/docs/benchmarks/read-primitives-approximate-functions.md)[^13]
+- [`write_primitives` sketch persistence operations](https://github.com/joeharris76/BenchBox/blob/v0.3.0/docs/benchmarks/write-primitives-sketch-functions.md)[^14]
 
 ## Test environment
 
-This post was reviewed against `origin/develop` at commit `c48c299b4`. The v0.3.0 version bump has not yet landed on `develop`, so `pyproject.toml` still reads `0.2.1`; the public release will pin against the bump commit.
+This post describes BenchBox v0.3.0.
 
 Evidence status for this post:
 
@@ -257,8 +257,8 @@ The support matrix separates catalog support from live verification. Cloud verif
 
 [^12]: DuckDB, [Aggregate Functions](https://duckdb.org/docs/stable/sql/functions/aggregates), accessed May 18, 2026.
 
-[^13]: BenchBox, [`read_primitives` approximate aggregate functions](https://github.com/joeharris76/BenchBox/blob/develop/docs/benchmarks/read-primitives-approximate-functions.md), accessed May 18, 2026.
+[^13]: BenchBox, [`read_primitives` approximate aggregate functions](https://github.com/joeharris76/BenchBox/blob/v0.3.0/docs/benchmarks/read-primitives-approximate-functions.md), accessed May 18, 2026.
 
-[^14]: BenchBox, [`write_primitives` sketch persistence operations](https://github.com/joeharris76/BenchBox/blob/develop/docs/benchmarks/write-primitives-sketch-functions.md), accessed May 18, 2026.
+[^14]: BenchBox, [`write_primitives` sketch persistence operations](https://github.com/joeharris76/BenchBox/blob/v0.3.0/docs/benchmarks/write-primitives-sketch-functions.md), accessed May 18, 2026.
 
 *Questions or feedback? [Open an issue](https://github.com/joeharris76/BenchBox/issues) or join the discussion.*

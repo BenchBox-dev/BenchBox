@@ -12,19 +12,15 @@ The public anonymization boundary replaces machine-local strings with
 `<prefix>_<12 hex>` pseudonyms. Two facts about that scheme were established
 together and change the picture:
 
-**The pseudonyms are a confirmation oracle.** `machine_id_salt` defaults to
-`None`, so the digest is computed over an empty salt, and the algorithm is
-documented in `docs/reference/result-formats.md`. Anyone can hash a candidate
-value and match it against the corpus with certainty — no false positives, no
-rate limit, no server involved. A 1550-candidate dictionary sweep over the 1615
-pseudonym occurrences in `results-data/` confirmed two distinct tokens in about
-a second, and the double-hashed form of one of them is present on the public
-`published-results` branch. Double hashing provides no protection: the
-transform is deterministic and public, so an attacker simply applies it twice.
+**The pseudonyms did not prevent re-identification.** `machine_id_salt`
+defaults to empty and the hashing algorithm is documented in
+`docs/reference/result-formats.md`, so the published identifier fields allowed
+the original values to be re-identified. Hashing twice does not change this,
+because the second step is just as deterministic and public as the first.
 
 The existing gate cannot see this. `find_public_path_leaks` detects *plaintext*
-absolute paths, so it reports the corpus clean while the corpus is recoverable
-by dictionary. It measures the wrong property.
+absolute paths, so it reports the corpus clean even when its pseudonyms can be
+re-identified. It measures the wrong property.
 
 **Most of the protected fields have no reader.** An audit across the publication
 pipeline, the Explorer application, and the published contract found that six of
@@ -42,8 +38,8 @@ the nine pseudonymised field names are consumed by nothing:
 | `database_name` | – | yes | – |
 | `endpoint` | yes | yes | yes |
 
-The read model has no machine or host column. The stated motivation for the
-idempotence fix in #1512 — "pseudonym stability is what lets the Explorer
+The read model has no machine or host column. The stated motivation for making
+anonymization idempotent — "pseudonym stability is what lets the Explorer
 correlate results from the same machine" — describes a capability that is not
 implemented. Nothing correlates by machine today.
 
@@ -100,7 +96,7 @@ the right default for an operator who will publish other people's submissions.
 |---|---|---|
 | Keep empty default salt | Residual oracle on retained fields; fixed point and current corpus bytes unchanged | **Chosen for OSS default** |
 | Mint a baked-in non-empty default salt | Salt is public in git, so the oracle remains; only obscures the empty-string case | **Rejected** |
-| One-time rehash of retained fields under a new salt | Breaks the #1512 publication fixed point; rotates `result_id` again; history still holds the old tokens; without a *secret* salt the oracle returns | **Rejected** |
+| One-time rehash of retained fields under a new salt | Breaks the publication fixed point; rotates `result_id` again; history still holds the old tokens; without a *secret* salt the oracle returns | **Rejected** |
 | Require a non-empty operator-configured salt before public export | Closes the oracle for deployments that set it; needs a secret outside the repo | **Recommended for community-facing operators** (documented; not a hard fail of the OSS default path in this ADR) |
 
 Rationale:
@@ -111,8 +107,8 @@ Rationale:
 2. **The publication fixed point stays.** Already-public-shaped
    `endpoint_` / `database_` / `path_` tokens continue to pass through. A
    one-time rehash would not remove retained history tokens on
-   `published-results` and would force another free-only-once `result_id`
-   rotation after #1578.
+   `published-results` and would force another `result_id` rotation, which
+   is a compatibility event now that result routes are public.
 3. **The unread-field drop already removed the highest-risk empty-salt
    surfaces** (`machine_id`, home-directory paths, `engine_host`, …). What
    remains is low-entropy product material (database names, local endpoints)
@@ -136,8 +132,7 @@ close the oracle for future captures. Rejected as the primary remedy for the
 *unread* fields because it does not close the oracle for the corpus already
 published, keeps paying a privacy cost for data no consumer reads, and — once
 the salt question is examined for retained fields — a baked-in salt is still
-public. A hashed `working_dir` has no analytical value; the reductio is
-`database_5d7b725135a6`, which decodes to the string `benchbox`.
+public. A hashed `working_dir` has no analytical value.
 
 **Accept the oracle and document it (for unread fields).** Defensible on the
 material exposed so far — a repository path and a database name are low
@@ -152,29 +147,27 @@ bundles are the product.
 
 ## Consequences
 
-- Every bundle's bytes change, so **every `result_id` changes**. That is free
-  exactly once, while no Explorer is deployed and `published-results` records
-  no `result_id`. It is not free later. See
-  `public-result-id-permanence-and-documented-format`.
-- This supersedes the re-derivation in progress in #1537, which re-derives to a
-  single anonymization pass but keeps the field set. Doing both as one
-  re-derivation avoids rotating every id twice.
+- Every bundle's bytes change, so **every `result_id` changes**. The rotation
+  happened before result routes were publicly served, so it needed no redirect.
+  Any later rotation of a public id is a compatibility event; see
+  [ADR: `public_result_id` permanence attaches at publication](adr-public-result-id-permanence.md).
+- The field-set drop and the move to a single anonymization pass share one
+  re-derivation, so every id rotates once rather than twice.
 - `find_public_path_leaks` stays, but is no longer sufficient on its own. A
   recovery gate that attempts dictionary confirmation against the corpus is
   required alongside it.
 - Retained `published-results` history keeps the superseded values reachable.
-  That decision was recorded in `adr-published-results-history-retention.md`
-  before reversibility was known, and is re-examined separately under
-  `published-history-retention-premise-predates-oracle`.
+  The history-retention policy was set before reversibility was known and is
+  decided separately.
 - Retained-field salt decision (2026-08-05): empty OSS default; residual
   confirmation oracle documented; operator-configured non-empty salt recommended
-  for community-facing publishes; publication fixed point from #1512 preserved.
+  for community-facing publishes; publication fixed point preserved.
 - Residual local-path keys (2026-08-05): additional pure-FS compact keys dropped
   at the public boundary; remote-ish path/host keys remain hashed; no corpus
   re-derive when tip bundles lack those keys.
 
 ## What this does not change
 
-`[COMMIT-IDENTITY-001]`, trust labels, and provenance are untouched. Pseudonym
+Trust labels and provenance are untouched. Pseudonym
 identity was never a provenance signal and must not become one — a submitter
 can choose a pseudonym-shaped value and have it pass through by design.

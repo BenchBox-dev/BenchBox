@@ -234,7 +234,7 @@ from benchbox.platforms.databricks import DatabricksAdapter
 adapter = DatabricksAdapter(
     server_hostname="dbc-12345678-abcd.cloud.databricks.com",
     http_path="/sql/1.0/warehouses/abcd1234efgh5678",
-    access_token="dapi1234567890abcdef",
+    access_token="<token>",
     catalog="hive_metastore",
     schema="default"
 )
@@ -336,7 +336,8 @@ The first adapter uses an in-memory database. The second uses a file-based datab
 ```bash
 uv add benchbox --extra lakesail
 
-make uat-bring-up PLATFORM=lakesail
+uv add pysail
+python -m pysail spark server --port 50051
 
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
@@ -345,7 +346,7 @@ benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 benchbox run --platform lakesail --benchmark tpch --scale 10.0
 ```
 
-In order, these commands install the Spark Connect-capable PySpark client, start the local Docker-backed Sail server, run SQL mode, run DataFrame mode and run at a larger scale. Distributed mode is selected through the Python adapter, because LakeSail registers no `--platform-option` keys.
+In order, these commands install the Spark Connect-capable PySpark client, install the Sail server (`pysail`), start it in a separate terminal, run SQL mode, run DataFrame mode and run at a larger scale. Distributed mode is selected through the Python adapter, because LakeSail registers no `--platform-option` keys.
 
 See [LakeSail Platform Guide](lakesail.md) for the full configuration reference.
 

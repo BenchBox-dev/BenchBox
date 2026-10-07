@@ -31,8 +31,7 @@ The embedded chDB connection used by `clickhouse-local` runs as its built-in
 `default` user and does not expose the grants required to inspect
 `system.users`, `system.roles`, or `system.grants`. The metadata-primitives ACL
 workload therefore requires `clickhouse-server` (or ClickHouse Cloud) with an
-appropriately privileged user; it is not an executable `clickhouse-local` UAT
-cell. Non-ACL catalog queries remain supported in local mode.
+appropriately privileged user; it is unsupported in local mode. Non-ACL catalog queries remain supported in local mode.
 
 ## Installation
 

@@ -29,26 +29,20 @@ frozenset({PUBLIC_CLEAN_VALIDATION_STATUS})` — `"passed"` only
 The allowlist has changed twice, and the reasoning for the second change is
 not obvious from the diff:
 
-1. **`5ef373e70` (PR #1589, 2026-08-05)** introduced the allowlist as
-   `{"passed", "partial"}`, letting the trusted mirror admit partial cohorts
-   while community submissions stayed `passed`-only.
-2. **`ca08895fd` (PR #1909, 2026-08-26)** added `"not_run"`. Read as a bare
-   diff, this looks like a loosening — admitting *unvalidated* results into a
-   published corpus. It is the opposite. `results-data/CORPUS_NOTES.md`
-   ("Legacy validation-claim normalization (2026-08-25)") records why:
-
-   > The 136-bundle develop corpus contained 52 legacy bundles whose
-   > `phases.validation.status` was `NOT_RUN` while `summary.validation`
-   > claimed `passed` (23 bundles) or `partial` (29 bundles). These are
-   > historical claims, not rerun evidence. Their summary status is now
-   > `not_run`; their query timing and failure records remain unchanged.
-   >
-   > This preserves truthful partial measurements as non-ranking capability
-   > evidence. It does not promote failed queries or infer validation
-   > results. A future rerun may replace the `not_run` claim only when the
-   > validation phase records actual evidence. Submission admission also
-   > rejects a `passed` or `partial` summary claim paired with an unrun
-   > validation phase.
+1. **2026-08-05:** the allowlist was introduced as `{"passed", "partial"}`,
+   letting the trusted mirror admit partial cohorts while community
+   submissions stayed `passed`-only.
+2. **2026-08-26:** `"not_run"` was added. Read as a bare diff, this looks like
+   a loosening — admitting *unvalidated* results into a published corpus. It
+   is the opposite. The corpus then held 136 bundles, 52 of which were legacy
+   bundles whose `phases.validation.status` was `NOT_RUN` while
+   `summary.validation` claimed `passed` (23 bundles) or `partial` (29
+   bundles). Those were historical claims, not rerun evidence. Their summary
+   status became `not_run`; their query timing and failure records were left
+   unchanged. This keeps truthful partial measurements as non-ranking
+   capability evidence without promoting failed queries or inferring
+   validation results. A future rerun may replace a `not_run` claim only when
+   the validation phase records actual evidence.
 
    The alternative to admitting `not_run` was not "publish nothing for
    those 52 bundles" — it was "keep publishing them as `passed`/`partial`,
@@ -59,10 +53,9 @@ not obvious from the diff:
 
    This is the same pattern as the 2026-08-24 withdrawal of 60 legacy
    DataFrame bundles that claimed `summary.validation=passed` after
-   executing zero queries (`CORPUS_NOTES.md`, "Zero-query DataFrame
-   withdrawal"): a false clean claim is worse than an honest non-clean one,
-   and the fix in both cases was to correct the label, not hide the
-   evidence.
+   executing zero queries: a false clean claim is worse than an honest
+   non-clean one, and the fix in both cases was to correct the label, not
+   hide the evidence.
 
 ### What admitting `not_run` costs the corpus
 
@@ -96,10 +89,10 @@ comparisons — downstream exclusion is:
 
 - `NON_CLEAN_VALIDATION_STATUSES` includes `"not_run"`
   (`benchbox/core/results/status.py:10-11`).
-- `is_ranking_eligible` (`_project/scripts/explorer_pipeline/models.py:485-495`)
-  gates on `not validation_status_is_non_clean(entry.validation_status)`.
-- `ranking_exclusion_reason` (`models.py:509-524`) returns
-  `"validation_not_clean"` for any non-clean status, `not_run` included.
+- The Results Explorer build pipeline's `is_ranking_eligible` gates on
+  `not validation_status_is_non_clean(entry.validation_status)`.
+- Its `ranking_exclusion_reason` returns `"validation_not_clean"` for any
+  non-clean status, `not_run` included.
 - The Compare view's exclusion catalog carries a matching
   `validation_not_clean` entry with a recovery hint
   (`results-explorer/src/lib/compareExclusionReasons.ts:119-125`):
@@ -108,10 +101,7 @@ comparisons — downstream exclusion is:
   outright; only the trusted mirror path can admit `partial` or `not_run`,
   and only through the explicit `--allow-partial-validation` flag.
 
-This was verified by tracing the code paths above. A rendered-Explorer
-check that these bundles do not surface in ranked or compared views on the
-live site is in progress separately; its result is not yet in and is not a
-premise of this ADR.
+This was verified by tracing the code paths above.
 
 ## Decision
 
@@ -141,7 +131,7 @@ at the admission gate. But `uncertain` means an oracle ran and reported
 incomplete coverage; `not_run` means nothing was checked at all. `uncertain`
 is strictly more evidence than `not_run`. The current allowlist admits the
 weaker signal and rejects the stronger one. This asymmetry is not
-resolved here; the maintainer has not authorized admitting `uncertain`.
+resolved here; admitting `uncertain` is deferred.
 
 **Whether `not_run` should be split.** The current taxonomy cannot
 distinguish "no oracle exists for this benchmark/platform combination" from
@@ -157,7 +147,7 @@ accordingly; this ADR does not propose one.
 **Positive**
 
 - The corpus can carry an honest label for 43 DataFrame bundles (52 legacy
-  bundles at the time of `ca08895fd`) that ran but were never validated,
+  bundles when `not_run` was admitted) that ran but were never validated,
   instead of a false `passed`/`partial` claim.
 - `_validate_validation_phase_consistency` closes the matching hole:
   a bundle can no longer claim `passed`/`partial` while its own
@@ -177,7 +167,7 @@ accordingly; this ADR does not propose one.
   design (`not_run` and `partial` are admitted but not ranking-eligible),
   which is a two-gate model a future contributor could conflate into one.
 - A future rerun is the only way to move a `not_run` bundle to `passed`;
-  the label change made by `ca08895fd` is one-directional and does not by
+  the relabeling is one-directional and does not by
   itself improve DataFrame validation coverage.
 
 ## Alternatives rejected
@@ -187,7 +177,7 @@ accordingly; this ADR does not propose one.
 | Leave the 52 legacy bundles as `passed`/`partial` | Publishes a false validation claim; the exact defect class the 2026-08-24 zero-query withdrawal and this normalization both exist to remove. |
 | Withdraw the 52 legacy bundles instead of relabeling | Loses truthful capability evidence (query timings, failure records) that the relabel preserves; several cohorts would have dropped below corpus depth floors with no replacement available at the time. |
 | Narrow the mirror allowlist back to `{"passed", "partial"}` and exclude `not_run` bundles entirely | Re-admits the choice between a false claim and no coverage that this decision exists to avoid; downstream ranking already excludes `not_run`, so narrowing admission buys no additional ranking safety, only fewer honest capability records. |
-| Also admit `uncertain` now | Not authorized. Deferred pending visual verification of the Explorer; recorded as an open question above rather than decided. |
+| Also admit `uncertain` now | Deferred pending visual verification of the Explorer; recorded as an open question above rather than decided. |
 
 ## References
 
@@ -199,13 +189,5 @@ accordingly; this ADR does not propose one.
 - `benchbox/core/results/status.py:10-41` (`NON_CLEAN_VALIDATION_STATUSES`,
   `CLI_FAILURE_VALIDATION_STATUSES`, `UNVALIDATED_VALIDATION_STATUSES`,
   `validation_status_is_non_clean`)
-- `_project/scripts/explorer_pipeline/models.py:485-524`
-  (`is_ranking_eligible`, `ranking_exclusion_reason`)
 - `results-explorer/src/lib/compareExclusionReasons.ts:119-125`
   (`validation_not_clean` Compare-view exclusion entry)
-- `results-data/CORPUS_NOTES.md` — "Zero-query DataFrame withdrawal
-  (2026-08-24)" and "Legacy validation-claim normalization (2026-08-25)"
-- `5ef373e70` (PR #1589, 2026-08-05) — allowlist introduced as
-  `{"passed", "partial"}`
-- `ca08895fd` (PR #1909, 2026-08-26) — `"not_run"` added; validation-phase
-  consistency check added

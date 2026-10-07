@@ -10,34 +10,28 @@ For the **one-shot** approximate-aggregate path (HLL distinct, T-Digest /
 KLL single quantile, top-K), see
 [read_primitives approximate-aggregate functions](read-primitives-approximate-functions.md).
 
-## DuckDB community-extension status (2026-05-06)
+## DuckDB community-extension status
 
-Four ops below are currently **blocked on upstream extension stability**:
+Four ops below do not run on DuckDB with the current community
+`datasketches` extension:
 
 - `sketch_insert_theta_per_partition`
 - `sketch_insert_topk_per_shard`
 - `sketch_query_theta_union_merge`
 - `sketch_query_topk_combine`
 
-Extension version `2e38607` of the duckdb-community-extensions
-`datasketches` build dropped the `theta` and `frequent_items` families
-between PR #114 morning and the audit later that day. CPC, REQ, KLL,
-and HLL families still load. The four ops above remain in
-`benchbox/core/write_primitives/catalog/operations.yaml` per
-`scope_limit` on the source TODO; CI's
-`extension-smoke.yml` workflow reports this reviewed `2e38607` state as
-known drift and goes red for any new missing family, affected extension
-version, or non-missing-function error from a fresh install. See
-[ADR: DuckDB datasketches vendoring vs HLL fallback](../development/adr/adr-duckdb-datasketches-vendoring.md)
-for the long-term path.
+Extension build `2e38607` dropped the `theta` and `frequent_items`
+families. The CPC, REQ, KLL and HLL families still load. The four ops
+stay in the catalog so they run again once the extension restores those
+families.
 
 ## Operation lifecycle
 
 Each sketch op is fully self-contained — CREATE the persistent table,
 populate sketches per partition, run the merge query, DROP. No
-cross-op dependencies. Sketch tables live outside `STAGING_TABLES` so
-that BINARY-column DDL stays out of the bootstrap loop on dialects
-without a binary type (DataFusion, SQLite).
+cross-op dependencies. Sketch tables are not created during benchmark
+setup, so dialects without a binary type (DataFusion, SQLite) can still
+run the other write operations.
 
 | Op ID                                     | Stage   | Notes                                          |
 |-------------------------------------------|---------|------------------------------------------------|
@@ -74,76 +68,31 @@ DataSketches binary format is portable across Databricks / Snowflake /
 BigQuery / DuckDB-with-extension (all built on the same C++/Java/WASM
 DataSketches core). ClickHouse uses its own `-State`/`-Merge` combinator
 serialization, which is comparable algorithmically but **not**
-binary-compatible. ClickHouse-native variants are deferred to a follow-up
-to keep this benchmark scoped to the cross-engine portability story.
+binary-compatible.
 
-## Live cloud survey (2026-09-25)
+## Platform status
 
-The 22 SQL sketch ops ran against Snowflake (account `ZY50805`,
-warehouse `COMPUTE_WH`) and Databricks (Serverless Starter warehouse)
-at SF=0.1 (600,572 LINEITEM rows) and SF=1.0 (6,001,215 rows), using
-each op's catalog `platform_overrides` SQL timed per statement. The
-sketch ops are currently unreachable via `benchbox run --queries`
-(`get_queries()` excludes category `sketch` from the SQL path), so
-the survey drove catalog SQL directly; wiring sketch selection into
-the CLI is a tracked follow-up.
+The support matrix above lists catalog support. Current status on
+Snowflake and Databricks:
 
-| Op | Snowflake SF=0.1 | Snowflake SF=1.0 | Databricks SF=0.1 | Databricks SF=1.0 |
-|----|------------------|------------------|-------------------|-------------------|
-| `sketch_ddl_create_persistent_table` | pass (502 ms) | pass (625 ms) | pass (1.8 s) | pass (2.1 s) |
-| `sketch_insert_theta_per_partition` | FAIL — unknown `DATASKETCHES_THETA_ACCUMULATE` | FAIL (same) | pass (insert 3.2 s) | pass (insert 10.3 s) |
-| `sketch_insert_kll_per_partition` | FAIL — unknown `DATASKETCHES_KLL_ACCUMULATE` | FAIL (same) | pass (insert 1.6 s) | pass (insert 2.2 s) |
-| `sketch_insert_topk_per_shard` | FAIL — `APPROX_TOP_K_ACCUMULATE` returns OBJECT, column is BINARY | FAIL (same) | FAIL — executed two-arg `approx_top_k_accumulate(l_shipmode, 10000)` (datatype mismatch); the catalog override is one-arg `approx_top_k_accumulate(l_shipmode)` and was not exercised — re-run pending | FAIL (same) |
-| ★ `sketch_query_theta_union_merge` | FAIL (theta accumulate unknown) | FAIL (same) | pass (merge 0.7 s at SF=0.1; 1.2 s at SF=1.0; merge fan-in unchanged — see note) | pass |
-| ★ `sketch_query_kll_quantiles_merge` | FAIL (KLL accumulate unknown) | FAIL (same) | pass (merge 0.5 s at SF=0.1; 0.6 s at SF=1.0; merge fan-in unchanged — see note) | pass |
-| ★ `sketch_query_topk_combine` | FAIL (accumulate type mismatch) | FAIL (same) | FAIL (same unexercised-override cause as insert; re-run pending) | FAIL (same) |
-| `sketch_drop_persistent_table` | pass (933 ms) | pass (750 ms) | pass (2.4 s) | pass (2.4 s) |
-| `sketch_cpc_*` (4 ops), `sketch_req_*` (4 ops), `sketch_*_lgk*` (2), `sketch_*_k100/k1000` (2), `sketch_*_lgmm*` (2) | SKIP — explicit `snowflake: null` override (unsupported; never executed) | SKIP (same) | SKIP — explicit `databricks: null` override (unsupported; never executed) | SKIP (same) |
+- **Databricks:** Theta and KLL persist, merge and requery work with
+  the native `theta_sketch_*` and `kll_sketch_*` functions. The Top-K
+  ops are not yet verified.
+- **Snowflake:** the Theta and KLL ops need the
+  `DATASKETCHES_THETA_ACCUMULATE` and `DATASKETCHES_KLL_ACCUMULATE`
+  functions, which are not available on every account. Treat Snowflake
+  Theta and KLL sketch persistence as unverified. The Top-K insert fails
+  because `APPROX_TOP_K_ACCUMULATE` returns `OBJECT` while the sketch
+  column is `BINARY`.
+- **Both:** the CPC, REQ and parameter-sweep ops carry explicit `null`
+  platform overrides, so the runner reports them as skipped and runs no
+  SQL.
+- Firebolt and Starburst/Trino have not been verified.
 
-Score: Snowflake 2/8 attempted, Databricks 6/8 attempted (identical at
-both scale factors). The remaining 14 CPC/REQ/sweep ops carry explicit
-`null` platform overrides and are skipped as unsupported before any SQL
-runs (null-override skip in `benchmark.py`); they are excluded from the
-scores rather than counted as failures.
-Raw per-statement timings: `$BENCHBOX_OUTPUT_DIR/logs/approx-survey-20260925-1136/{snowflake,databricks}-sketch-{sf01,sf1}.jsonl`.
-
-Unsurveyed platforms and the reason:
-
-| Platform | Reason |
-|----------|--------|
-| Firebolt | no credentials on survey host |
-| Starburst/Trino | no credentials on survey host |
-
-What this corrects in the matrix above:
-
-- Snowflake Theta/KLL rows assume `DATASKETCHES_*` functions exist.
-  On the surveyed account they do not — Snowflake's DataSketches
-  functions require an extension/account feature that is not enabled
-  here. Until the catalog gains a fallback or the docs scope the
-  requirement, treat Snowflake Theta/KLL sketch persistence as
-  **unverified**, not supported.
-- Databricks Theta and KLL persist + merge + requery all pass with
-  native `theta_sketch_*` / `kll_sketch_*` functions. Merge times were
-  0.7 s at SF=0.1 vs 1.2 s at SF=1.0 (Theta) and 0.5 s vs 0.6 s (KLL),
-  but Theta/KLL partition by `l_shipdate, l_returnflag`, so scaling
-  SF=0.1 to SF=1.0 grows rows within groups while the merge fan-in
-  (partition count) stays roughly fixed. These numbers do not
-  demonstrate sub-linear scaling with 10x merge input; a fan-in-varying
-  run (more persisted partitions) is needed before claiming the
-  O(1)-ish merge story.
-- Databricks Top-K: the reported two-arg
-  `approx_top_k_accumulate(l_shipmode, 10000)` failure did not execute
-  the catalog override (one-arg `approx_top_k_accumulate(l_shipmode)`),
-  so it cannot establish catalog drift. Re-run the exact override before
-  recording this as a catalog failure; do not fix the catalog based on
-  this run alone.
-- CPC/REQ/lgk/k100/lgmm ops carry explicit `null` overrides for both
-  Snowflake and Databricks, so the runner reports them as
-  skipped-unsupported and never executes SQL. They are out of scope for
-  this survey; extending overrides is a follow-up.
-- Firebolt and Starburst/Trino remain unsurveyed (no credentials on
-  the survey host). Their rows belong in the matrix above once the
-  remaining-legs follow-up runs them.
+The SQL sketch ops are not part of the CLI query path: `benchbox run`
+does not include them, and `--queries` rejects their IDs. Run them from
+Python with `execute_operation` (see
+[Try it locally on clickhouse-local](#try-it-locally-on-clickhouse-local)).
 
 ### Redshift HLL-only ceiling
 
@@ -169,11 +118,8 @@ catalog persists on Redshift is `HLLSKETCH`. Coverage rolls up to:
 cannot be `DISTKEY` / `SORTKEY`, cannot appear in `GROUP BY` /
 `ORDER BY` / `DISTINCT`, fixed default `logm=15`, not supported in
 Spectrum or Python UDFs, JDBC/ODBC drivers return them as VARCHAR
-JSON/Base64. Each Redshift override emits its DDL inline with
-`DISTSTYLE EVEN` to honor these restrictions, rather than activating the generic
-`_BINARY_TYPE_BY_DIALECT[redshift] = HLLSKETCH` translator (the
-abstraction can't express the constraints safely; per-op explicit DDL
-is the chosen pattern).
+JSON/Base64. Each Redshift override emits its own DDL with
+`DISTSTYLE EVEN` to honor these restrictions.
 
 UDF emulation of the missing families would measure UDF dispatch
 overhead, not sketch performance, so KLL / Top-K stay skipped on
@@ -192,15 +138,10 @@ Redshift with explicit rationale comments.
 | DataFusion | `BINARY`     | — (skipped)                                    |
 | SQLite     | `BINARY`     | — (skipped)                                    |
 
-The `translate_column_type` helper in
-`benchbox/core/write_primitives/schema.py` rewrites the logical
-`BINARY` type per dialect. Tables that declare `BINARY` columns must be
-filtered out of `STAGING_TABLES` for unsupported dialects — the sketch
-ops do this implicitly by managing their own DDL inside `write_sql`.
-On Redshift, the `_BINARY_TYPE_BY_DIALECT` translator stays in place as
-documentation but is not activated by any op — `HLLSKETCH` semantics
-(no `DISTKEY` / `SORTKEY` / `GROUP BY`) don't fit the generic abstraction
-safely, so each Redshift override emits its DDL inline.
+BenchBox rewrites the logical `BINARY` type per dialect. The sketch ops
+create and drop their own tables, so dialects without a binary type skip
+them. On Redshift, each override emits its own `HLLSKETCH` DDL because of
+the column restrictions listed above.
 
 ## Per-engine function-name reference
 
@@ -285,19 +226,18 @@ columns the other engines use.
 ## Validation tolerance methodology
 
 Each ★ headline op declares `expected_value_min/max` bounds tuned
-empirically against DuckDB SF=0.01:
+against DuckDB at SF=0.01:
 
-| Op                                | Observation                              | Bounds            | Rationale                                       |
-|-----------------------------------|------------------------------------------|-------------------|--------------------------------------------------|
-| `sketch_query_theta_union_merge`  | 14836.89 (deterministic over 5 runs)     | [14500, 15500]    | True distinct = 15000; tightened after HLL logm=15 review |
-| `sketch_query_kll_quantiles_merge`| 34027.29 – 34361.75 (5 runs)             | [30000, 40000]    | Generous to tolerate SF=0.1 drift; catches no-op |
-| `sketch_query_topk_combine`       | 7 (deterministic; lineitem has 7 modes)  | [6, 8]            | Lower bound catches loss; upper catches false-positive |
+| Op                                | Bounds            | Rationale                                       |
+|-----------------------------------|-------------------|--------------------------------------------------|
+| `sketch_query_theta_union_merge`  | [14500, 15500]    | True distinct = 15000                           |
+| `sketch_query_kll_quantiles_merge`| [30000, 40000]    | Generous to tolerate SF=0.1 drift; catches no-op |
+| `sketch_query_topk_combine`       | [6, 8]            | Lineitem has 7 ship modes; lower bound catches loss, upper catches false positives |
 
 Bounds are intentionally wide enough to never false-fail on a healthy
 sketch but tight enough to catch a regression to a no-op (sketch
 returning 0) or a wildly off estimate. Cloud engines may shift the
-ranges; tolerances will need re-tuning when first-class cloud coverage
-lands.
+ranges, so the bounds may need re-tuning for cloud runs.
 
 ## Storage-size methodology
 
@@ -321,13 +261,13 @@ before alarming. Each variant runs only on its target engine via explicit
 | `sketch_cpc_query_union_merge`    | `cpc_storage_size` [400, 4000] (DuckDB-only)    | —                                                  |
 | `sketch_req_query_quantile_merge` | `req_storage_size` [1000, 8000] (DuckDB-only)   | —                                                  |
 
-Observed sizes at SF=0.01 (the source of the bounds): Theta lg_k=12 ~16KB
-on DuckDB and ~60KB on ClickHouse (60003 bytes verified clickhouse-local
-25.4.2, uniq HLL++ default precision); KLL k=200 ~3KB on DuckDB and ~4.3KB
-on ClickHouse (4314 bytes verified clickhouse-local 25.4.2, T-Digest
-compression=100); frequent-items lg_max_map_size=8 ~600B on DuckDB and
-~317B on ClickHouse (317 bytes verified clickhouse-local 25.4.2, topK K=8);
-CPC lg_k=11 ~1.2KB merged; REQ k=12 ~2.5KB merged.
+Typical merged sizes at SF=0.01: Theta lg_k=12 ~16KB on DuckDB and ~60KB
+on ClickHouse (60003 bytes verified clickhouse-local 25.4.2, uniq HLL++
+default precision); KLL k=200 ~3KB on DuckDB and ~4.3KB on ClickHouse
+(4314 bytes verified clickhouse-local 25.4.2, T-Digest compression=100);
+frequent-items lg_max_map_size=8 ~600B on DuckDB and ~317B on ClickHouse
+(317 bytes verified clickhouse-local 25.4.2, topK K=8); CPC lg_k=11 ~1.2KB;
+REQ k=12 ~2.5KB.
 
 CPC vs Theta storage: CPC at ~1.2KB is roughly **13× smaller** than Theta
 at ~16KB on the same 15K distinct keys at SF=0.01. The tradeoff is
@@ -352,14 +292,8 @@ Per-engine SQL is wired through `validation_query.platform_overrides`:
   do not interpret the absolute number as the storage cost a ClickHouse
   user actually pays.
 - Other engines (Databricks, Snowflake, BigQuery, Redshift, DataFusion,
-  SQLite, StarRocks): skipped via explicit `null` overrides because their
-  byte-length probes for sketch state aren't yet wired. Add them in
-  follow-up TODOs as cloud verification lands.
-
-Bounds span both engines so a single validation passes on whichever
-engine the op runs on. Per-engine tightening (separate
-`*_storage_size_<engine>` validations with engine-specific bounds) is a
-future option if drift detection needs to be tighter.
+  SQLite, StarRocks): skipped via explicit `null` overrides because
+  byte-length probes for their sketch state are not implemented.
 
 ## Try it locally on clickhouse-local
 
@@ -367,35 +301,24 @@ BenchBox's `clickhouse-local` platform uses embedded ClickHouse through
 chDB, so it runs the headline ClickHouse sketch overrides without any
 cloud credentials or external ClickHouse server. Install BenchBox with the
 `clickhouse-local` extra (or add `chdb` to an existing BenchBox dev
-environment) and run the first command below. The second command (`uv add chdb`) applies to an existing BenchBox development checkout.
+environment). The first command below installs the extra. The second command (`uv add chdb`) applies to an existing BenchBox development checkout:
 
 ```bash
 uv add benchbox --extra clickhouse-local
 uv add chdb
 ```
 
-Then run:
+The sketch ops are not selectable with `benchbox run --queries`, so run
+them from Python. Load TPC-H SF=0.01 data, call `setup(connection)` on a
+`WritePrimitives` instance, then call
+`execute_operation(op_id, connection, platform_key="clickhouse")` for each
+op in lifecycle order: `sketch_ddl_create_persistent_table`, the three
+`sketch_insert_*` ops, the three `sketch_query_*` merge ops, and
+`sketch_drop_persistent_table`.
 
-```bash
-uv run -- benchbox run --platform clickhouse-local --benchmark write_primitives \
-  --scale 0.01 \
-  --queries sketch_ddl_create_persistent_table,\
-sketch_insert_theta_per_partition,\
-sketch_insert_kll_per_partition,\
-sketch_insert_topk_per_shard,\
-sketch_query_theta_union_merge,\
-sketch_query_kll_quantiles_merge,\
-sketch_query_topk_combine,\
-sketch_drop_persistent_table
-```
-
-Expected: 8/8 ops pass, both scalar-bounds and per-engine
-`*_storage_size_clickhouse` validations report passed (DuckDB
-`*_storage_size_duckdb` siblings are skipped via `null` overrides on
-ClickHouse and vice versa). Live observations from clickhouse-local
-25.4.2 at SF=0.01: theta merged state 60003 bytes, KLL merged state
-4314 bytes, topK merged state 317 bytes — all inside the bounds in
-`operations.yaml`.
+On ClickHouse, the scalar-bounds and `*_storage_size_clickhouse`
+validations run; the `*_storage_size_duckdb` variants are skipped through
+their `null` overrides.
 
 ## Parameter sweeps (DuckDB-only)
 
@@ -425,44 +348,36 @@ compare different algorithms (fixed-precision `uniqHLL12` versus
 `uniqExact`, `quantileBFloat16` versus `quantileExact`) rather than the
 swept parameter — results labeled as `lg_k`, `k`, or `lg_max_map_size`
 effects would actually measure algorithm changes. The sweep ops are
-therefore unsupported on ClickHouse (null platform override, the
-established skip). Remaining cloud engines stay deferred: each has
-different parameter knobs (Snowflake `APPROX_TOP_K` `counters` vs
-DataSketches `lg_max_map_size`, etc.); 6 families × remaining cloud
-engines is out of proportion with the analytical value. The DuckDB-only
-sweep demonstrates the tradeoff; cloud users tune at their end with
-vendor-specific knobs.
+therefore unsupported on ClickHouse (null platform override). Cloud
+engines are not covered either: each has different parameter knobs
+(Snowflake `APPROX_TOP_K` `counters` vs DataSketches `lg_max_map_size`,
+etc.). The DuckDB-only sweep demonstrates the tradeoff; on cloud engines,
+tune with the vendor-specific knobs.
 
-Use the SF=0.01 TPC-H catalog validations to check the KLL median and
-storage bounds. Results from synthetic integer sequences do not establish
-those corpus bounds. Trino is unsupported for the headline sketch
-operations and parameter sweeps; its operation overrides skip execution
-before either the sketch SQL or validation SQL reaches the engine.
-Check the parameterized casts and merge calls separately from the
-headline functions: their availability alone does not establish sweep
-compatibility. Theta and frequent-items variants remain subject to the
-recorded extension drift in
-`_project/blind-spots/2026-05-02-155524-duckdb-datasketches-extension-drift.md`.
+The KLL median and storage bounds apply to the SF=0.01 TPC-H data. Trino
+is unsupported for the headline sketch operations and parameter sweeps;
+its operation overrides skip them before any SQL reaches the engine.
+The Theta and frequent-items variants do not run on
+DuckDB while the community extension lacks those families (see
+[DuckDB community-extension status](#duckdb-community-extension-status)).
 
 ## Single-query scope: what this benchmark is **not**
 
 This benchmark measures **latency under approximate semantics**, not
 **approximation error magnitude**. Users who want to evaluate
 approximation-quality tradeoffs (paired exact/approximate queries with
-relative-error metrics) will need a separate benchmark — that's
-deliberately deferred (see TODO `deferred:` block).
+relative-error metrics) need a separate benchmark.
 
 Cross-engine sketch portability tests (write a sketch on engine A,
-query it on engine B) are also deferred — this needs two-engine
-orchestration that BenchBox does not have today.
+query it on engine B) are not supported; they need two-engine
+orchestration that BenchBox does not have.
 
-## Catalog extension points (architecture-fixes 2026-05-04)
+## Catalog extension points
 
-Two catalog extension points support engine-specific sketch work without
-abusing existing schemas. Both were added so cross-engine sketch follow-ups
-(ClickHouse-native `-State`/`-Merge`, PySpark DataFrame HLL, etc.) can land
-without forcing per-engine SQL into a single body or routing aggregate-state
-DataFrame ops through row-level mutation APIs.
+Two catalog extension points support engine-specific sketch work
+(ClickHouse-native `-State`/`-Merge`, PySpark DataFrame HLL, etc.)
+without forcing per-engine SQL into a single body or routing
+aggregate-state DataFrame ops through row-level mutation APIs.
 
 ### `validation_query.platform_overrides`
 
@@ -486,7 +401,7 @@ operations:
 
 In this example the top-level `write_sql` and validation `sql` are the defaults (DuckDB). The ClickHouse override is ClickHouse-native validation, and `redshift: null` is an explicit skip.
 
-Resolution rules (see `_resolve_validation_sql` in `benchmark.py`):
+Resolution rules:
 
 - **No override key** → the active platform falls through to the default
   `sql`. Existing catalog entries are unchanged.
@@ -504,7 +419,7 @@ you want to skip; do not rely on omission.
 
 ### `AGGREGATE_PERSIST` / `AGGREGATE_MERGE` DataFrame op types
 
-`WriteOperationType` now models DataFrame-layer aggregate-state work as two
+`WriteOperationType` models DataFrame-layer aggregate-state work as two
 distinct types so the persist and merge phases produce separate user-facing
 measurements (write latency + persisted state size vs. merge+extract
 latency).
@@ -547,9 +462,7 @@ failure with a clear "use the SQL surface or skip this op" message.
 
 Cleanup of the persisted state directory is the consumer's responsibility
 today (the persist phase leaves a Parquet directory at `target_path`;
-remove it with `shutil.rmtree` after the merge phase). A dedicated
-`execute_aggregate_cleanup` helper may land later if symmetry becomes
-load-bearing — surface the request in a follow-up TODO if you need it.
+remove it with `shutil.rmtree` after the merge phase).
 
 ### PySpark sketch factory helpers
 
@@ -569,26 +482,16 @@ top-K factory; older runtimes should skip cleanly with a logged reason.
 The guard is conservative: it requires both the version gate (≥4.1) and
 the function symbol — distributions that backport the function to a
 3.5.x build will be rejected by the version check. If you hit that case,
-bypass the guard or open a TODO to add a backport-detection branch.
+bypass the guard.
 
-The factory unit tests are MagicMock-based and verify call patterns. The
-real-Spark CLI integration is wired through the catalog ops
-`sketch_df_hll_persist_merge` and `sketch_df_topk_persist_merge` — both
-declare an `aggregate_state` block that the dispatch fork in
-`WritePrimitivesBenchmark._execute_dataframe_sql_parity_workload` routes
-through `manager.execute_aggregate_persist` /
-`manager.execute_aggregate_merge` on the active platform's
-`DataFrameWriteOperationsManager` instead of through the DuckDB parity
-path. HLL is verified live on PySpark 4.1.1 at SF=0.01:
-`aggregate_value=14852` (true distinct l_orderkeys = 15000, 0.99% RSE,
-inside the `[14250, 15750]` bound). Top-K skips cleanly on the same
-runtime because the PySpark 4.1.1 client wheel does not expose
-`F.approx_top_k_accumulate` / `F.approx_top_k_combine` /
-`F.approx_top_k_estimate` in its Python `functions` namespace —
-`pyspark_supports_approx_top_k(spark)` returns `False` and the dispatch
-fork records a structured `SKIPPED` result. To exercise top-K live, run
-on a Spark distribution that surfaces `approx_top_k_accumulate` in the
-Python API.
+From the CLI, the catalog ops `sketch_df_hll_persist_merge` and
+`sketch_df_topk_persist_merge` run this cycle on PySpark through
+`manager.execute_aggregate_persist` / `manager.execute_aggregate_merge`.
+At SF=0.01 the HLL estimate must fall within `[14250, 15750]` (true
+distinct `l_orderkey` count = 15000). The Top-K op reports `SKIPPED` when
+the PySpark client does not expose `F.approx_top_k_accumulate`,
+`F.approx_top_k_combine` and `F.approx_top_k_estimate` in its Python
+`functions` namespace; run it on a Spark distribution that does.
 
 KLL is intentionally **not** implemented at the DataFrame layer because
 Spark's KLL surface is SQL-UDAF-only today; using `percentile_approx`
@@ -618,12 +521,3 @@ merge_extract = make_pyspark_hll_merge_extract(spark, sketch_col="sketch")
 merge = manager.execute_aggregate_merge(target, merge_extract)
 distinct_estimate = merge.metrics["aggregate_value"]
 ```
-
-**CLI integration gap.** `benchbox run --platform pyspark --benchmark
-write_primitives --queries sketch_df_hll_persist_merge` does not yet
-dispatch through these factories — the catalog has no `sketch_df_*`
-entries and `_execute_dataframe_sql_parity_workload` always routes to
-embedded DuckDB. The factory helpers are usable today via direct manager
-calls (covered by `tests/unit/core/write_primitives/test_pyspark_sketch_factories.py`);
-wiring them into the benchmark CLI is tracked as a follow-up. See
-`_project/blind-spots/2026-05-04-011321-pyspark-sketch-todo-scope-vs-verification-mismatch.md`.

@@ -161,7 +161,7 @@ The values are stored as attributes of the same name (`DataFusionAdapter().force
 **`get_target_dialect() -> str`**: Returns `'datafusion'`, the SQL dialect BenchBox translates queries into.
 
 <span id="benchbox.platforms.datafusion.DataFusionAdapter.get_platform_info"></span>
-**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict`: `platform_type` (`'datafusion'`), `platform_name`, `connection_mode` (`'in-memory'`), `configuration` (`working_dir`, `memory_limit`, `target_partitions`, `data_format`, `temp_dir`, `batch_size`, `result_cache_enabled` which is `False`), `client_library_version`, `platform_version` and `driver_version_actual` (all three are the installed `datafusion` version, `54.0.0` for the run on this page). The `connection` argument is accepted and not used.
+**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict`: `platform_type` (`'datafusion'`), `platform_name`, `connection_mode` (`'in-memory'`), `configuration` (`working_dir`, `memory_limit`, `target_partitions`, `data_format`, `temp_dir`, `batch_size`, `result_cache_enabled` which is `False`), `client_library_version`, `platform_version` and `driver_version_actual` (all three are the installed `datafusion` version). The `connection` argument is accepted and not used.
 
 #### Connection and schema
 
@@ -218,10 +218,10 @@ The values are stored as attributes of the same name (`DataFusionAdapter().force
 <span id="benchbox.platforms.datafusion.DataFusionAdapter.driver_isolation_capability"></span>
 **`driver_isolation_capability`** (class attribute): `DriverIsolationCapability.SUPPORTED` (from `benchbox.platforms.base`): a requested DataFusion driver version can run in an isolated runtime.
 
-#### Not in the 0.4.1 release
+#### Added in 0.4.2
 
 <span id="benchbox.platforms.datafusion.DataFusionAdapter.materialize_schema_only_tables"></span>
-**`materialize_schema_only_tables`**: `materialize_schema_only_tables` is not part of the 0.4.1 release. It exists only on the development branch, where it returns a `dict` of table name to row count. Do not rely on it with 0.4.1; `load_data` already creates empty tables for tables that have no data files.
+**`materialize_schema_only_tables(benchmark, connection: Any) -> dict[str, int]`**: Creates empty tables from the schema recorded by `create_schema` and returns a `dict` of table name to row count. BenchBox calls it instead of `load_data` for benchmarks that set `SKIP_DATA_LOADING`.
 
 ## Configuration Examples
 

@@ -8,7 +8,7 @@ from benchbox.sql_compat.registry import REGISTRY
 _READ_PRIMITIVES_SKIPS: dict[str, str] = {
     "approx_top_k_lineitem": "Sail rejects `APPROX_TOP_K` with `unknown function: APPROX_TOP_K`.",
     "window_moving_frame": "Sail rejects the interval RANGE window frame with an invalid argument error.",
-    "json_extract_nested": "Sail lacks `JSON_VALID`; UAT reports `unknown function: JSON_VALID`.",
+    "json_extract_nested": "Sail lacks `JSON_VALID` and reports `unknown function: JSON_VALID`.",
     "json_aggregates": "Sail parser rejects the JSON object syntax with `found :`.",
     "fulltext_simple_search": "Sail parser rejects MySQL full-text `MATCH ... AGAINST` syntax.",
     "fulltext_boolean_search": "Sail parser rejects MySQL full-text boolean search syntax.",

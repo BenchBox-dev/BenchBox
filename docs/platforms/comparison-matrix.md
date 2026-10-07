@@ -349,7 +349,8 @@ Native-code engines that accept Spark SQL / DataFrame workloads without running 
 
 ```bash
 uv add benchbox --extra lakesail
-make uat-bring-up PLATFORM=lakesail
+uv add pysail
+python -m pysail spark server --port 50051
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
 uv add benchbox --extra velox
@@ -357,7 +358,7 @@ benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar
 ```
 
-LakeSail uses the standard PySpark client through Spark Connect. Velox pulls in `pyspark[connect]>=3.5.0` and requires the Gluten bundle jar.
+Run the `pysail` server in a separate terminal. LakeSail uses the standard PySpark client through Spark Connect. Velox pulls in `pyspark[connect]>=3.5.0` and requires the Gluten bundle jar.
 
 See [LakeSail Platform Guide](lakesail.md), [Velox Platform Guide](velox.md), and [Velox Jar Setup](velox_jar_setup.md) for full setup instructions.
 

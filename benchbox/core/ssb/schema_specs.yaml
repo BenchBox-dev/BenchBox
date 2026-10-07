@@ -126,6 +126,7 @@ tables:
     - name: lo_orderdate
       type: INTEGER
       foreign_key: date.d_datekey
+      nullable: false
     - name: lo_orderpriority
       type: VARCHAR(15)
     - name: lo_shippriority

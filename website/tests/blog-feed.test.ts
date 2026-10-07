@@ -48,8 +48,8 @@ const asList = (value: unknown): Node[] => (Array.isArray(value) ? (value as Nod
 const toLinks = (node: Node): Link[] => asList(node.link).map((link) => ({ href: String(link["@_href"]), ...(link["@_rel"] ? { rel: String(link["@_rel"]) } : {}) }));
 
 describe("blog sources", () => {
-  it("covers all sixteen posts", () => {
-    expect(posts).toHaveLength(16);
+  it("covers all seventeen posts", () => {
+    expect(posts).toHaveLength(17);
   });
 });
 
@@ -136,7 +136,7 @@ describe("blog urls", () => {
   it("groups posts under every tag, newest first", () => {
     const groups = tagGroups(posts);
     expect(groups.get("duckdb")?.map((post) => post.slug)).toEqual(["2026-05-18-sketch-functions-databricks-response", "2026-03-03-duckdb-tpch-extension-vs-benchbox"]);
-    expect(groups.size).toBe(64);
+    expect(groups.size).toBe(66);
   });
 });
 

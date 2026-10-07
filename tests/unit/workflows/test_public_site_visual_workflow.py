@@ -19,7 +19,7 @@ CAPTURE_SPEC = REPO_ROOT / "results-explorer" / "e2e" / "captures" / "public-sit
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 CLASSIFY_STEP = "Classify site inputs and validate recovery source"
 GATE_STEP = "Require comparison for affected develop trees"
-RUNBOOK = REPO_ROOT / "docs" / "development" / "results-explorer-browser-testing.md"
+RUNBOOK = REPO_ROOT / "docs" / "operations" / "public-site-visual-baseline.md"
 
 
 def _workflow() -> dict[str, Any]:

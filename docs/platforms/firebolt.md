@@ -111,7 +111,7 @@ benchbox run --platform firebolt:cloud --benchmark tpch --scale 1.0 \
 Start the Core container first, then run the benchmark:
 
 ```bash
-docker run -d -p 3473:3473 ghcr.io/firebolt-db/firebolt-core:preview-rc
+docker run -d -p 127.0.0.1:3473:3473 ghcr.io/firebolt-db/firebolt-core:preview-rc
 
 benchbox run --platform firebolt --benchmark tpch --scale 0.1 \
   --platform-option url=http://localhost:3473

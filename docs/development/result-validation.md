@@ -70,10 +70,6 @@ row/column locators; the rest are counted.
 uv run -- python -m pytest tests/unit/core/test_cross_platform_validation.py -q
 ```
 
-The integration matrix (DuckDB × ClickHouse-local / DataFusion / Polars-DF)
-and the nightly GitHub Actions workflow are tracked in a follow-up TODO:
-`quality-cross-platform-validation-integration-matrix`.
-
 ## Adding a new platform
 
 1. Add a pytest case that executes the benchmark on DuckDB (reference) and

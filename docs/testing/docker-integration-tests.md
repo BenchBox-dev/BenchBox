@@ -84,8 +84,8 @@ The first command runs all Docker integration tests, and the services must be ru
 On Apple-silicon macOS without Docker Desktop, the same stacks run through
 `mocker` (a Docker-compatible CLI over the Apple `container` runtime).
 `CONTAINER_ENGINE=mocker` swaps only the compose driver; the compose files
-stay unmodified. This is local-dev only and must not run in CI. Verified
-2026-09-26 against the `postgres-integration` CI job's two steps:
+stay unmodified. This is local-dev only and must not run in CI. The steps
+below mirror the `postgres-integration` CI job:
 
 ```bash
 CONTAINER_ENGINE=mocker make test-docker-up-postgresql
@@ -119,9 +119,8 @@ The steps are:
 3. Run the CI TPC-Havoc equivalence sample verbatim, with the same guard.
 4. Stop the service when done.
 
-Result on that run: 8 live integration tests passed, 2 equivalence tests
-passed, matching the CI job's pass criteria (at least one passing test per
-step, so the sample cannot silently render as green).
+Each step must report at least one passing test, as in CI, so an all-skipped
+run cannot pass silently.
 
 ## Pytest Markers
 

@@ -13,7 +13,7 @@ BenchBox includes a three-tier integrity validator for benchmark result JSON fil
 |----------|-------|
 | Module | `benchbox.core.results.integrity_validator` |
 | Specs | `benchbox.core.results.benchmark_specs` |
-| CLI script | `_project/scripts/validate_results.py` |
+| CLI script | `validate_results.py` maintainer script (source checkout only) |
 | MCP tool | `validate_results` (in `benchbox.mcp.tools.analytics`) |
 | Tests | `tests/unit/core/results/test_integrity_validator.py` |
 
@@ -214,7 +214,7 @@ Both functions handle invalid JSON gracefully - returning a FAIL report rather t
 
 | Interface | Usage |
 |-----------|-------|
-| **CLI script** | `uv run _project/scripts/validate_results.py <path> [options]` |
+| **CLI script** | `validate_results.py <path> [options]` maintainer script, in a source checkout |
 | **MCP tool** | `validate_results(result_file="...", verbose=True)` |
 | **Python API** | `from benchbox.core.results.integrity_validator import validate_file` |
 

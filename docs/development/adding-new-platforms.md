@@ -758,11 +758,8 @@ platform option specs/config builders, DataFrame factory routing, tuning
 capabilities, or format preferences. Those maps do not define platform
 identity and their keys must resolve through the manifest drift gate.
 
-Run the scaffold helper before implementation to inspect the expected file plan:
-
-```bash
-uv run -- python _project/scripts/platform_scaffold.py --name newdatabase --kind sql
-```
+Before implementation, maintainers can print the expected file plan with the
+platform scaffold script (`--kind sql`).
 
 Regenerate the inventory and run the drift gate after editing the manifest:
 

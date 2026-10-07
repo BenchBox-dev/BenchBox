@@ -240,10 +240,9 @@ This example shows:
 
 ## Adding many queries
 
-When bulk-loading SQL from external sources, prefer authoring a small helper
-script under `_project/` that outputs the YAML structure (see existing history
-for examples). Temporary tooling should stay in `_project/` and be removed or
-ignored once the catalog has been updated.
+When bulk-loading SQL from external sources, write a small helper script that
+outputs the YAML structure. Keep it out of the package, and remove it once the
+catalog has been updated.
 
 ## Attribution and Lineage
 

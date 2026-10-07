@@ -43,9 +43,6 @@ sha256sum gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar
 
 ## Known versions
 
-When bumping `GLUTEN_VERSION` in the Dockerfile, add a row here with the
-official tarball and extracted jar name.
-
 | Version | Spark | Architecture | Release tarball | Extracted jar | Notes |
 |---------|-------|--------------|-----------------|---------------|-------|
 | 1.6.0 | 4.0 | amd64 | `apache-gluten-1.6.0-bin-spark-4.0.tar.gz` | `gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar` | Dockerfile verifies the published tarball `.sha512` before extraction |

@@ -73,7 +73,7 @@ result = conn.execute("""
 """).fetchdf()
 ```
 
-## Format Deep Dive <!-- content-ok: cliche -->
+## Format Deep Dive
 
 ### Apache Parquet
 
@@ -637,7 +637,7 @@ benchbox convert --input ./data --format parquet --no-validate
 For conceptual depth on each format, see the Table Format Guides:
 
 - [Table Format Guides Overview](../guides/table-formats/index.md) - When format choice matters for benchmarks
-- [Parquet Deep Dive](../guides/table-formats/parquet-deep-dive.md) - Row groups, compression options, statistics <!-- content-ok: cliche -->
+- [Parquet Deep Dive](../guides/table-formats/parquet-deep-dive.md) - Row groups, compression options, statistics
 - [Delta Lake Guide](../guides/table-formats/delta-lake-guide.md) - Transaction overhead, OPTIMIZE, Z-ORDER
 - [Apache Iceberg Guide](../guides/table-formats/iceberg-guide.md) - Multi-engine support, partition evolution
 - [Vortex Guide](../guides/table-formats/vortex-guide.md) - Composable encodings, maturity considerations

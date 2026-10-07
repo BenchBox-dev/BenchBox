@@ -105,7 +105,7 @@ A `BigQueryAdapter`. Construction makes no network call; call `create_connection
 - `ConfigurationError` (from `benchbox.core.exceptions`): `project_id` is missing or empty (`BigQuery configuration requires project_id.`).
 - `ValueError`: `staging_root` is not a `gs://` location (`BigQuery requires GCS (gs://) staging location, got: s3://`).
 
-Credentials are not checked here. They fail in `create_connection()`, which needs a live connection and was taken from reading the code.
+Credentials are not checked here. They fail in `create_connection()`.
 
 #### Example
 
@@ -160,108 +160,106 @@ The values are stored as attributes of the same name (`BigQueryAdapter(project_i
 
 ### Methods and attributes
 
-Each method is marked with how its description was checked. Calls that talk to BigQuery need credentials and a live connection; those are marked as taken from reading the code. The others were run offline, either directly or against a stub client object that records the calls the adapter makes.
-
 #### Construction and configuration
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.__init__"></span>
-**`__init__(**config)`**: Creates the adapter from keyword arguments. See Parameters above. It checks that the BigQuery client packages are importable and that `project_id` is set, and opens no connection. *Checked offline.*
+**`__init__(**config)`**: Creates the adapter from keyword arguments. See Parameters above. It checks that the BigQuery client packages are importable and that `project_id` is set, and opens no connection.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.from_config"></span>
-**`from_config(config: dict[str, Any])`** (class method): Builds an adapter from a unified configuration dictionary and returns it. `benchmark` and `scale_factor` are required (a missing key raises `KeyError`). `dataset_id` is always generated from them as `<benchmark>_sf<token>_<tuning>`, for example `tpch_sf001_notuning_noconstraints`; a `dataset_id` in the configuration is ignored. `project_id` is used when given; otherwise the adapter asks Google Application Default Credentials for a project (this contacts Google's credential machinery) and leaves it unset if none is found, which then fails in the constructor. These keys pass through when present: `location`, `credentials_path`, `storage_bucket`, `storage_prefix`, `staging_root`, `job_priority`, `biglake_connection`, `query_cache`, `disable_result_cache`, `maximum_bytes_billed`, the tuning keys and the verbosity keys. Other keys are dropped, including `force` and `force_recreate`. *Checked offline with `project_id` supplied; the credential lookup was taken from reading the code.*
+**`from_config(config: dict[str, Any])`** (class method): Builds an adapter from a unified configuration dictionary and returns it. `benchmark` and `scale_factor` are required (a missing key raises `KeyError`). `dataset_id` is always generated from them as `<benchmark>_sf<token>_<tuning>`, for example `tpch_sf001_notuning_noconstraints`; a `dataset_id` in the configuration is ignored. `project_id` is used when given; otherwise the adapter asks Google Application Default Credentials for a project (this contacts Google's credential machinery) and leaves it unset if none is found, which then fails in the constructor. These keys pass through when present: `location`, `credentials_path`, `storage_bucket`, `storage_prefix`, `staging_root`, `job_priority`, `biglake_connection`, `query_cache`, `disable_result_cache`, `maximum_bytes_billed`, the tuning keys and the verbosity keys. Other keys are dropped, including `force` and `force_recreate`.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.add_cli_arguments"></span>
-**`add_cli_arguments(parser: argparse.ArgumentParser) -> None`** (static method): Adds a `BigQuery Arguments` group to an `argparse.ArgumentParser` and returns `None`: `--project-id`, `--dataset-id`, `--location` (default `US`), `--credentials-path` and `--storage-bucket`; all except `--location` default to `None`. *Checked offline.*
+**`add_cli_arguments(parser: argparse.ArgumentParser) -> None`** (static method): Adds a `BigQuery Arguments` group to an `argparse.ArgumentParser` and returns `None`: `--project-id`, `--dataset-id`, `--location` (default `US`), `--credentials-path` and `--storage-bucket`; all except `--location` default to `None`.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.platform_name"></span>
-**`platform_name`** (property): Always the string `'BigQuery'`. *Checked offline.*
+**`platform_name`** (property): Always the string `'BigQuery'`.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.get_target_dialect"></span>
-**`get_target_dialect() -> str`**: Returns `'bigquery'`, the SQL dialect BenchBox translates queries into. *Checked offline.*
+**`get_target_dialect() -> str`**: Returns `'bigquery'`, the SQL dialect BenchBox translates queries into.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.get_platform_info"></span>
-**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict` describing the platform. Without a connection it holds `platform_type` (`'bigquery'`), `platform_name`, `connection_mode` (`'remote'`), `cloud_provider` (`'GCP'`), `configuration` (`project_id`, `dataset_id`, `location`, `storage_bucket`, `storage_prefix`, `staging_root`, `biglake_connection`, `job_timeout`, `job_priority`, `query_cache_enabled`, `maximum_bytes_billed`), `client_library_version` (the installed `google-cloud-bigquery` version) and `platform_version` (`None`). With a connection it also reads the dataset and, best effort, the project's reservation information from `INFORMATION_SCHEMA`, and adds that as `compute_configuration`; failures there are tolerated. *The no-connection form was checked offline; the connected form needs a live connection and was taken from reading the code.*
+**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict` describing the platform. Without a connection it holds `platform_type` (`'bigquery'`), `platform_name`, `connection_mode` (`'remote'`), `cloud_provider` (`'GCP'`), `configuration` (`project_id`, `dataset_id`, `location`, `storage_bucket`, `storage_prefix`, `staging_root`, `biglake_connection`, `job_timeout`, `job_priority`, `query_cache_enabled`, `maximum_bytes_billed`), `client_library_version` (the installed `google-cloud-bigquery` version) and `platform_version` (`None`). With a connection it also reads the dataset and, best effort, the project's reservation information from `INFORMATION_SCHEMA`, and adds that as `compute_configuration`; failures there are tolerated.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.get_normalized_result_metadata"></span>
-**`get_normalized_result_metadata(*, connection: Any | None = None, platform_info: Mapping[str, Any] | None = None) -> dict[str, Any]`**: Returns the platform metadata that BenchBox stores with results, as a `dict` with the entries `execution_environment`, `platform_deployment` (`deployment_type` `'serverless'`), `platform_raw_config`, `platform_cloud`, `platform_compute`, `platform_raw_metadata` and `platform_storage`. Pass `connection` or a precomputed `platform_info` (keyword-only); without either it calls `get_platform_info()`. Without a connection the compute entries are marked `collection_status: 'partial'`. *Checked offline.*
+**`get_normalized_result_metadata(*, connection: Any | None = None, platform_info: Mapping[str, Any] | None = None) -> dict[str, Any]`**: Returns the platform metadata that BenchBox stores with results, as a `dict` with the entries `execution_environment`, `platform_deployment` (`deployment_type` `'serverless'`), `platform_raw_config`, `platform_cloud`, `platform_compute`, `platform_raw_metadata` and `platform_storage`. Pass `connection` or a precomputed `platform_info` (keyword-only); without either it calls `get_platform_info()`. Without a connection the compute entries are marked `collection_status: 'partial'`.
 
 #### Connection and datasets
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.create_connection"></span>
-**`create_connection(**connection_config) -> Any`**: Returns a `google.cloud.bigquery.Client` for `project_id` and `location`. Existing-dataset handling comes first: with `force_recreate=True` the dataset is dropped, and otherwise it is validated and kept if it passes (`database_was_reused` becomes `True`, and empty tables left by a failed earlier load are removed). Credentials come from the service-account file at `credentials_path`, or Application Default Credentials when it is `None`. The client runs `SELECT 1` to prove the connection works, so bad credentials or a wrong project raise here, as the underlying Google exception. *Needs a live connection; taken from reading the code.*
+**`create_connection(**connection_config) -> Any`**: Returns a `google.cloud.bigquery.Client` for `project_id` and `location`. Existing-dataset handling comes first: with `force_recreate=True` the dataset is dropped, and otherwise it is validated and kept if it passes (`database_was_reused` becomes `True`, and empty tables left by a failed earlier load are removed). Credentials come from the service-account file at `credentials_path`, or Application Default Credentials when it is `None`. The client runs `SELECT 1` to prove the connection works, so bad credentials or a wrong project raise here, as the underlying Google exception.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.close_connection"></span>
-**`close_connection(connection: Any) -> None`**: Closes the client and returns `None`. `None` is accepted. Errors about credentials, tokens or authentication during cleanup are suppressed; other errors are logged as warnings, not raised. *Checked offline against a stub client.*
+**`close_connection(connection: Any) -> None`**: Closes the client and returns `None`. `None` is accepted. Errors about credentials, tokens or authentication during cleanup are suppressed; other errors are logged as warnings, not raised.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.check_server_database_exists"></span>
-**`check_server_database_exists(**connection_config) -> bool`**: Returns `True` when the project has a dataset named `dataset_id` (or the `dataset` keyword), by listing the project's datasets. Any error, including missing credentials, returns `False`. *Needs a live connection; taken from reading the code.*
+**`check_server_database_exists(**connection_config) -> bool`**: Returns `True` when the project has a dataset named `dataset_id` (or the `dataset` keyword), by listing the project's datasets. Any error, including missing credentials, returns `False`.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.drop_database"></span>
-**`drop_database(**connection_config) -> None`**: Deletes the dataset and every table in it (`delete_contents=True`; a missing dataset is not an error) and returns `None`. Raises `RuntimeError` (`Failed to drop BigQuery dataset ...`) on failure. *Needs a live connection; taken from reading the code.*
+**`drop_database(**connection_config) -> None`**: Deletes the dataset and every table in it (`delete_contents=True`; a missing dataset is not an error) and returns `None`. Raises `RuntimeError` (`Failed to drop BigQuery dataset ...`) on failure.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.configure_for_benchmark"></span>
-**`configure_for_benchmark(connection: Any, benchmark_type: str) -> None`**: Stores default query-job settings on the connection (as `connection._default_job_config`) and returns `None`. The settings are: priority from `job_priority` (an unknown name falls back to `INTERACTIVE`), `use_query_cache` from `query_cache`, `dry_run`, `maximum_bytes_billed` when set, the default dataset `<project_id>.<dataset_id>`, and, for the benchmark types `olap`, `analytics`, `tpch` and `tpcds`, standard SQL with unflattened results. `execute_query` runs queries with these settings. *Checked offline against a stub client.*
+**`configure_for_benchmark(connection: Any, benchmark_type: str) -> None`**: Stores default query-job settings on the connection (as `connection._default_job_config`) and returns `None`. The settings are: priority from `job_priority` (an unknown name falls back to `INTERACTIVE`), `use_query_cache` from `query_cache`, `dry_run`, `maximum_bytes_billed` when set, the default dataset `<project_id>.<dataset_id>`, and, for the benchmark types `olap`, `analytics`, `tpch` and `tpcds`, standard SQL with unflattened results. `execute_query` runs queries with these settings.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.create_schema"></span>
-**`create_schema(benchmark, connection: Any) -> float`**: Creates the dataset if it does not exist (with `location`) and then runs one `CREATE OR REPLACE TABLE` per benchmark table, returning the elapsed time in seconds (`float`). Table names are upper-cased (`LINEITEM`). `partitioning_field` and `clustering_fields`, when set, are added to every table whose statement has no `PARTITION BY` or `CLUSTER BY`, so every table must contain those columns. *The statement rewriting was checked offline; the dataset and table creation needs a live connection and was taken from reading the code.*
+**`create_schema(benchmark, connection: Any) -> float`**: Creates the dataset if it does not exist (with `location`) and then runs one `CREATE OR REPLACE TABLE` per benchmark table, returning the elapsed time in seconds (`float`). Table names are upper-cased (`LINEITEM`). `partitioning_field` and `clustering_fields`, when set, are added to every table whose statement has no `PARTITION BY` or `CLUSTER BY`, so every table must contain those columns.
 
 #### Loading data into tables
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.load_data"></span>
-**`load_data(benchmark, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]`**: Loads the benchmark's data files into the tables and returns `(table_row_counts, seconds, per_table_timings)`; `table_row_counts` maps table names to row counts and `per_table_timings` maps each table to its timing. Files go through Cloud Storage when `storage_bucket` (or `staging_root`) is set, and are loaded directly from local files otherwise. Parquet and delimited text (`.tbl`, `.csv`) are supported. Zstandard-compressed files are rejected with a `ValueError` that tells you to regenerate the data with gzip or no compression. The first file of a table replaces its content and later files append. *Needs a live connection; taken from reading the code.*
+**`load_data(benchmark, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]`**: Loads the benchmark's data files into the tables and returns `(table_row_counts, seconds, per_table_timings)`; `table_row_counts` maps table names to row counts and `per_table_timings` maps each table to its timing. Files go through Cloud Storage when `storage_bucket` (or `staging_root`) is set, and are loaded directly from local files otherwise. Parquet and delimited text (`.tbl`, `.csv`) are supported. Zstandard-compressed files are rejected with a `ValueError` that tells you to regenerate the data with gzip or no compression. The first file of a table replaces its content and later files append.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.create_external_tables"></span>
-**`create_external_tables(benchmark: Any, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]`**: Uploads Parquet files (or Delta and Iceberg directories) to the Cloud Storage bucket and registers BigQuery external tables over them, returning `(table_row_counts, seconds, None)`. It first calls `validate_external_table_requirements`, so it raises `ValueError` when no bucket is configured. Delta and Iceberg sources also need `biglake_connection`. A table with no supported source raises `ValueError`. *Needs a live connection; taken from reading the code.*
+**`create_external_tables(benchmark: Any, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]`**: Uploads Parquet files (or Delta and Iceberg directories) to the Cloud Storage bucket and registers BigQuery external tables over them, returning `(table_row_counts, seconds, None)`. It first calls `validate_external_table_requirements`, so it raises `ValueError` when no bucket is configured. Delta and Iceberg sources also need `biglake_connection`. A table with no supported source raises `ValueError`.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.supports_external_tables"></span>
-**`supports_external_tables`** (class attribute): `True`. The adapter implements `create_external_tables`. *Checked offline.*
+**`supports_external_tables`** (class attribute): `True`. The adapter implements `create_external_tables`.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.validate_external_table_requirements"></span>
-**`validate_external_table_requirements() -> None`**: Returns `None` when a Cloud Storage bucket is configured (`storage_bucket`, or `staging_root` as `gs://...`). Otherwise raises `ValueError` with the message `BigQuery external mode requires a GCS bucket (set --platform-option storage_bucket=<bucket> or provide --platform-option staging_root=gs://bucket/path).` *Checked offline.*
+**`validate_external_table_requirements() -> None`**: Returns `None` when a Cloud Storage bucket is configured (`storage_bucket`, or `staging_root` as `gs://...`). Otherwise raises `ValueError` with the message `BigQuery external mode requires a GCS bucket (set --platform-option storage_bucket=<bucket> or provide --platform-option staging_root=gs://bucket/path).`
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.get_table_row_count"></span>
-**`get_table_row_count(connection: Any, table: str) -> int`**: Returns the number of rows in a table, as an `int`, by running `SELECT COUNT(*)` against `<project_id>.<dataset_id>.<TABLE>` (the upper-case name is tried first, then the name as given). Returns `0` when the count cannot be determined, for example when the table does not exist. *The fallback to `0` was checked against a stub client; the count itself needs a live connection.*
+**`get_table_row_count(connection: Any, table: str) -> int`**: Returns the number of rows in a table, as an `int`, by running `SELECT COUNT(*)` against `<project_id>.<dataset_id>.<TABLE>` (the upper-case name is tried first, then the name as given). Returns `0` when the count cannot be determined, for example when the table does not exist.
 
 #### Query execution and plans
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.execute_query"></span>
-**`execute_query(connection: Any, query: str, query_id: str, benchmark_type: str | None = None, scale_factor: float | None = None, validate_row_count: bool = True, stream_id: int | None = None) -> dict[str, Any]`**: Runs one query and returns a result `dict`; it does not raise for SQL errors. Unquoted table names are rewritten to `` `project.dataset.TABLE` ``, divisions are routed through `SAFE_DIVIDE`, and TPC-DI queries get extra rewrites. On success `status` is `'SUCCESS'` with `query_id`, `execution_time_seconds`, `rows_returned`, `first_row`, `translated_query` (`None` when unchanged), `job_id`, and `job_statistics` (`bytes_processed`, `bytes_billed`, `slot_ms`, `creation_time`, `start_time`, `end_time`; the same dict is under `resource_usage`). With `capture_plans` set it adds `query_plan` and `plan_fingerprint` from the finished job. On an error `status` is `'FAILED'` with `error` and `error_type`. With `dry_run` set the query is only estimated, not run. *Checked offline against a stub client.*
+**`execute_query(connection: Any, query: str, query_id: str, benchmark_type: str | None = None, scale_factor: float | None = None, validate_row_count: bool = True, stream_id: int | None = None) -> dict[str, Any]`**: Runs one query and returns a result `dict`; it does not raise for SQL errors. Unquoted table names are rewritten to `` `project.dataset.TABLE` ``, divisions are routed through `SAFE_DIVIDE`, and TPC-DI queries get extra rewrites. On success `status` is `'SUCCESS'` with `query_id`, `execution_time_seconds`, `rows_returned`, `first_row`, `translated_query` (`None` when unchanged), `job_id`, and `job_statistics` (`bytes_processed`, `bytes_billed`, `slot_ms`, `creation_time`, `start_time`, `end_time`; the same dict is under `resource_usage`). With `capture_plans` set it adds `query_plan` and `plan_fingerprint` from the finished job. On an error `status` is `'FAILED'` with `error` and `error_type`. With `dry_run` set the query is only estimated, not run.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.get_query_plan"></span>
-**`get_query_plan(connection: Any, query: str) -> dict[str, Any] | None`**: Returns a `dict` with the dry-run estimate for the query, or `None` on any failure: `bytes_processed` (`int`), `estimated_cost` (US dollars at the on-demand price for `location`, `bytes_processed / 1024**4 * price per TiB`; `None` if no price is known) and `pricing_fallback` (`True` when a default price was used). BigQuery has no `EXPLAIN` text, so this is a cost estimate and not a plan tree. For 2 TiB in `US` the estimate is `12.5` (6.25 dollars per TiB). A dry-run job does not run the query. *Checked offline against a stub client.*
+**`get_query_plan(connection: Any, query: str) -> dict[str, Any] | None`**: Returns a `dict` with the dry-run estimate for the query, or `None` on any failure: `bytes_processed` (`int`), `estimated_cost` (US dollars at the on-demand price for `location`, `bytes_processed / 1024**4 * price per TiB`; `None` if no price is known) and `pricing_fallback` (`True` when a default price was used). BigQuery has no `EXPLAIN` text, so this is a cost estimate and not a plan tree. For 2 TiB in `US` the estimate is `12.5` (6.25 dollars per TiB). A dry-run job does not run the query.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.get_query_plan_parser"></span>
-**`get_query_plan_parser()`**: Returns a `BigQueryQueryPlanParser` (from `benchbox.core.query_plans.parsers.bigquery`). *Checked offline.*
+**`get_query_plan_parser()`**: Returns a `BigQueryQueryPlanParser` (from `benchbox.core.query_plans.parsers.bigquery`).
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.plan_capture_phase_eligible"></span>
-**`plan_capture_phase_eligible`** (class attribute): `False`. BigQuery has no `EXPLAIN` statement and a second run would cost money, so plans are captured from the finished query job (`job.query_plan`) during `execute_query`, not in a separate pass. *Checked offline.*
+**`plan_capture_phase_eligible`** (class attribute): `False`. BigQuery has no `EXPLAIN` statement and a second run would cost money, so plans are captured from the finished query job (`job.query_plan`) during `execute_query`, not in a separate pass.
 
 #### Tuning
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.generate_tuning_clause"></span>
-**`generate_tuning_clause(table_tuning) -> str`**: Returns the clauses to append to `CREATE TABLE`, or `''` when there is no tuning. A partitioning column of `DATE` type gives `PARTITION BY <column>`, a `TIMESTAMP` or `DATETIME` column gives `PARTITION BY DATE(<column>)`, an integer column gives `PARTITION BY RANGE_BUCKET(<column>, GENERATE_ARRAY(0, 1000000, 10000))`, and any other type gives `PARTITION BY DATE(<column>)`; only the first partitioning column (by `order`) is used. Clustering columns give `CLUSTER BY` with at most the first four. Sorting and distribution add nothing. Example: partition on a `DATE` column plus one clustering column gives `PARTITION BY d CLUSTER BY c`. *Checked offline.*
+**`generate_tuning_clause(table_tuning) -> str`**: Returns the clauses to append to `CREATE TABLE`, or `''` when there is no tuning. A partitioning column of `DATE` type gives `PARTITION BY <column>`, a `TIMESTAMP` or `DATETIME` column gives `PARTITION BY DATE(<column>)`, an integer column gives `PARTITION BY RANGE_BUCKET(<column>, GENERATE_ARRAY(0, 1000000, 10000))`, and any other type gives `PARTITION BY DATE(<column>)`; only the first partitioning column (by `order`) is used. Clustering columns give `CLUSTER BY` with at most the first four. Sorting and distribution add nothing. Example: partition on a `DATE` column plus one clustering column gives `PARTITION BY d CLUSTER BY c`.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.apply_table_tunings"></span>
-**`apply_table_tunings(table_tuning, connection: Any) -> None`**: Compares a table's tuning with the existing table and returns `None`. It does not change the table: it logs the partitioning and clustering the table has, warns when they differ from the request, and warns that distribution is unsupported. BigQuery partitioning and clustering are set when the table is created (see `generate_tuning_clause`). It does nothing for an empty tuning. Raises `ValueError` (`Failed to apply tunings to BigQuery table <name>: ...`) if reading the table fails. *Checked offline against a stub client.*
+**`apply_table_tunings(table_tuning, connection: Any) -> None`**: Compares a table's tuning with the existing table and returns `None`. It does not change the table: it logs the partitioning and clustering the table has, warns when they differ from the request, and warns that distribution is unsupported. BigQuery partitioning and clustering are set when the table is created (see `generate_tuning_clause`). It does nothing for an empty tuning. Raises `ValueError` (`Failed to apply tunings to BigQuery table <name>: ...`) if reading the table fails.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.apply_unified_tuning"></span>
-**`apply_unified_tuning(unified_config: UnifiedTuningConfiguration, connection: Any) -> None`**: Applies a `UnifiedTuningConfiguration` and returns `None`: it calls `apply_constraint_configuration`, then `apply_platform_optimizations` when the configuration has platform optimisations, then `apply_table_tunings` for each table. It does nothing for an empty configuration. *Checked offline against a stub client.*
+**`apply_unified_tuning(unified_config: UnifiedTuningConfiguration, connection: Any) -> None`**: Applies a `UnifiedTuningConfiguration` and returns `None`: it calls `apply_constraint_configuration`, then `apply_platform_optimizations` when the configuration has platform optimisations, then `apply_table_tunings` for each table. It does nothing for an empty configuration.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.apply_platform_optimizations"></span>
-**`apply_platform_optimizations(platform_config: PlatformOptimizationConfiguration, connection: Any) -> None`**: Logs that the optimisations are stored for query execution and returns `None`. It changes nothing in BigQuery, and does nothing for `None`. *Checked offline against a stub client.*
+**`apply_platform_optimizations(platform_config: PlatformOptimizationConfiguration, connection: Any) -> None`**: Logs that the optimisations are stored for query execution and returns `None`. It changes nothing in BigQuery, and does nothing for `None`.
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.apply_constraint_configuration"></span>
-**`apply_constraint_configuration(primary_key_config: PrimaryKeyConfiguration, foreign_key_config: ForeignKeyConfiguration, connection: Any) -> None`**: Logs that primary-key or foreign-key constraints are enabled and returns `None`. It runs no SQL. *Checked offline against a stub client.*
+**`apply_constraint_configuration(primary_key_config: PrimaryKeyConfiguration, foreign_key_config: ForeignKeyConfiguration, connection: Any) -> None`**: Logs that primary-key or foreign-key constraints are enabled and returns `None`. It runs no SQL.
 
 #### Capabilities
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.driver_isolation_capability"></span>
-**`driver_isolation_capability`** (class attribute): `DriverIsolationCapability.FEASIBLE_CLIENT_ONLY` (from `benchbox.platforms.base`): a requested client-library version can run in an isolated runtime, but the BigQuery service itself cannot be versioned. *Checked offline.*
+**`driver_isolation_capability`** (class attribute): `DriverIsolationCapability.FEASIBLE_CLIENT_ONLY` (from `benchbox.platforms.base`): a requested client-library version can run in an isolated runtime, but the BigQuery service itself cannot be versioned.
 
-#### Not in the 0.4.1 release
+#### Added in 0.4.2
 
 <span id="benchbox.platforms.bigquery.BigQueryAdapter.preprocess_operation_sql"></span>
-**`preprocess_operation_sql`**: `preprocess_operation_sql` is not part of the 0.4.1 release of `BigQueryAdapter`; it exists only on the development branch. Do not rely on it with 0.4.1.
+**`preprocess_operation_sql(query_id: str, operation: Any) -> str | None`**: Returns the write SQL of a Write Primitives operation rewritten for BigQuery, or `None` when the operation's `bigquery` override skips it. It starts from the `bigquery` override when one exists, otherwise from the default write SQL, and then: turns `CAST(x AS VARCHAR)` into `CAST(x AS STRING)`, turns `INTERVAL 'N' UNIT` into `INTERVAL N UNIT`, types bare decimal literals as `NUMERIC`, adds `WHERE true` to an `UPDATE` or `DELETE` that has no `WHERE`, and turns a trailing bare `WHEN NOT MATCHED ... THEN INSERT` into `INSERT ROW`.
 
 ## Configuration Examples
 

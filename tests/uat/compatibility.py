@@ -153,9 +153,9 @@ _RELEASE_GATE_RUNTIME_ENVELOPES = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES | {
 _RELEASE_GATE_STAGES_UNUSED_RUNTIME_ENVELOPES = frozenset(_PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES)
 
 _RELEASE_GATE_RUNTIME_ENVELOPE_EVIDENCE = {
-    ("datafusion", "datavault"): "docs/operations/uat-framework.md: DataVault evidence (2026-08-25)",
-    ("sqlite", "tpcds"): "docs/operations/uat-framework.md: SQLite TPC-DS evidence (2026-08-25)",
-    ("sqlite", "tpcds_obt"): "PR #1904; docs/operations/uat-framework.md: SQLite OBT evidence (2026-08-25)",
+    ("datafusion", "datavault"): "docs/operations/uat-release-campaign.md: DataFusion DataVault (2026-08-25)",
+    ("sqlite", "tpcds"): "docs/operations/uat-release-campaign.md: SQLite TPC-DS (2026-08-25)",
+    ("sqlite", "tpcds_obt"): "PR #1904; docs/operations/uat-release-campaign.md: SQLite TPC-DS OBT (2026-08-25)",
 }
 
 

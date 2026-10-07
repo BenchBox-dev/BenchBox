@@ -323,14 +323,16 @@ The first command lists available benchmarks, the second runs Write Primitives, 
 ```text
 WritePrimitives(
     scale_factor: float = 1.0,
-    output_dir: str = "_project/data",
+    output_dir: str | Path | None = None,
     quiet: bool = False
 )
 ```
 
 **Parameters**:
 - `scale_factor`: TPC-H scale factor (must match TPC-H data)
-- `output_dir`: Directory for data files
+- `output_dir`: Directory for data files. Defaults to the shared TPC-H data
+  directory, `benchmark_runs/datagen/tpch_<scale>` (or under
+  `BENCHBOX_OUTPUT_DIR` when set)
 - `quiet`: Suppress verbose logging
 
 #### Lifecycle Methods
@@ -429,7 +431,7 @@ Result object returned by `execute_operation` and `run_benchmark`.
 from benchbox import TPCH, WritePrimitives
 import duckdb
 
-tpch = TPCH(scale_factor=0.01, output_dir="_project/data")
+tpch = TPCH(scale_factor=0.01)
 tpch.generate_data()
 
 conn = duckdb.connect(":memory:")

@@ -286,13 +286,13 @@ Raises `ValueError` for a negative id or an id of 100 or more.
 
 <span id="benchbox.tpcds.TPCDS.queries"></span>
 
-`queries` returns the internal query manager (a `TPCDSQueryManager`). Its methods are not part of the contract; the old example calling `get_query_info(1)` on it raises `AttributeError`. Use `get_query()`, `get_queries()` and `get_available_queries()`.
+`queries` returns the internal query manager (a `TPCDSQueryManager`). Its methods are not part of the contract. Use `get_query()`, `get_queries()` and `get_available_queries()`.
 
 ### generator
 
 <span id="benchbox.tpcds.TPCDS.generator"></span>
 
-`generator` returns the internal data generator (a `TPCDSDataGenerator`). Its methods are not part of the contract; the old example calling `get_table_info("store_sales")` on it raises `AttributeError`. Use `generate_data()` and `get_schema()`.
+`generator` returns the internal data generator (a `TPCDSDataGenerator`). Its methods are not part of the contract. Use `generate_data()` and `get_schema()`.
 
 ### Inherited members
 
@@ -338,7 +338,7 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 | Data and configuration | <span id="benchbox.tpcds.TPCDS.output_dir"></span>`output_dir` | property | The resolved directory from the constructor argument. |
 | Data and configuration | <span id="benchbox.tpcds.TPCDS.run_with_platform_api_surface"></span>`run_with_platform_api_surface` | class attribute | |
 | Data and configuration | <span id="benchbox.tpcds.TPCDS.scale_factor"></span>`scale_factor` | instance attribute | The constructor argument. |
-| Data and configuration | <span id="benchbox.tpcds.TPCDS.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Not defined in the released 0.4.1 wheel. Source builds after 0.4.1 define it on `BaseBenchmark`, default `False`. |
+| Data and configuration | <span id="benchbox.tpcds.TPCDS.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Defined on `BaseBenchmark` from 0.4.2, default `False`. Set it to `True` for a benchmark that needs schema objects but no data files. |
 | Data and configuration | <span id="benchbox.tpcds.TPCDS.tables"></span>`tables` | property | Empty until `generate_data()` has run, then the table-to-paths mapping. |
 
 ## Usage Examples

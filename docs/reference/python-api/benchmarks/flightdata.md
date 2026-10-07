@@ -5,9 +5,9 @@
 
 Python API reference for the FlightData benchmark.
 
-FlightData models US domestic flight on-time performance (the Bureau of Transportation Statistics "On-Time Performance" data). It has a `flights` fact table, two small reference tables (`airlines` and `airports`) and 20 analytical queries in five categories. Every statement on this page was checked against the released 0.4.1 wheel, with one exception that is marked as not run.
+FlightData models US domestic flight on-time performance (the Bureau of Transportation Statistics "On-Time Performance" data). It has a `flights` fact table, two small reference tables (`airlines` and `airports`) and 20 analytical queries in five categories.
 
-Network access matters for this benchmark. `generate_data()` tries to download each month of real data from the Bureau of Transportation Statistics and generates synthetic rows for any month it cannot download. The runs on this page had no access to that site, so every example output below comes from synthetic data. Row counts and query results from a run with network access will differ.
+Network access matters for this benchmark. `generate_data()` tries to download each month of real data from the Bureau of Transportation Statistics and generates synthetic rows for any month it cannot download. The example outputs below come from synthetic data. Row counts and query results from downloaded data differ.
 
 ## `benchbox.FlightData`
 
@@ -66,7 +66,7 @@ Output on 0.4.1, without access to the Bureau of Transportation Statistics site:
 
 `generate_data() -> list[str | Path]` writes `flights.csv`, `airlines.csv` and `airports.csv` to `output_dir`, plus `_datagen_manifest.json`, and returns the file paths as a list of `Path` objects in that order. The files are comma-delimited with a header row. `benchmark.tables` maps the table names `flights`, `airlines` and `airports` to the same paths.
 
-`airlines` has 25 rows and `airports` has 50 rows. With a `seed` of 1 the synthetic `flights.csv` for December 2024 has 566,315 rows and is 60 MB; scale factors of 1 or more select 41 or more months. Not run: the code writes the `flights` table as several monthly files at those sizes, and `tables["flights"]` is then a list of paths.
+`airlines` has 25 rows and `airports` has 50 rows. With a `seed` of 1 the synthetic `flights.csv` for December 2024 has 566,315 rows and is 60 MB; scale factors of 1 or more select 41 or more months. At those sizes the `flights` table is written as several monthly files, and `tables["flights"]` is then a list of paths.
 
 ### `get_query(query_id, *, params=None, **kwargs)`
 

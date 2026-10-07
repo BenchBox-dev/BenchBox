@@ -2,9 +2,8 @@
 
 ## Status
 
-Accepted. This decision gates the architecture-simplification program's
-composition work. It does not authorize a repo-wide import migration or a
-production adapter fold in this item.
+Accepted. This decision sets the boundary for later composition work. It does
+not itself perform a repo-wide import migration or a production adapter fold.
 
 ## Date
 
@@ -135,14 +134,14 @@ replacement path and `make lint-imports` is green.
    risk. Retain their explicit allowlist entries until their replacement
    contracts and public registry counts are independently verified.
 
-No `.importlinter` ignore is deleted by this ADR. The ordered removal belongs to
-later implementation items, one validated boundary at a time.
+No `.importlinter` ignore is deleted by this ADR. The ordered removal happens in
+later changes, one validated boundary at a time.
 
 ## Alternatives rejected
 
 ### Option B — introduce `benchbox.runtime`
 
-Rejected for this program. It is greenfield, has no current consumer that sits
+Rejected. It is greenfield, has no current consumer that sits
 above both core and platforms, and would add a third composition vocabulary
 while the existing `run_service.AdapterFactory` seam is still underused. It
 would also postpone the concrete SQL decision rather than resolve it. Revisit
@@ -181,16 +180,16 @@ Costs and safeguards:
   messages require explicit compatibility tests.
 - The core layer gains a small protocol surface and must stay free of concrete
   platform imports. `make lint-imports` remains a required gate for every
-  deletion wave.
+  allowlist deletion.
 - Until the later migration lands, the two incumbents remain intentionally
   present and their divergence is documented rather than hidden.
 
-## Follow-up ownership
+## Follow-up constraints
 
-- `arch-canonical-sql-execute-primitive` owns the later canonical SQL helper
-  implementation after this ADR is merged.
-- `arch-ssb-family-plugin-seam-pilot` may use the same core-kernel boundary but
-  must not introduce `benchbox.runtime` or a third execution helper.
-- `arch-retire-compat-surfaces` owns compatibility cleanup that is independent
-  of this decision; it must not delete the reserved dataframe-runner stub
-  before its own `is_dataframe_execution` migration is complete.
+- The canonical SQL helper is implemented in core, as decided above, in a later
+  change.
+- A benchmark-family plugin seam may use the same core-kernel boundary but must
+  not introduce `benchbox.runtime` or a third execution helper.
+- Compatibility cleanup that is independent of this decision must not delete the
+  reserved dataframe-runner stub before the `is_dataframe_execution` migration
+  is complete.

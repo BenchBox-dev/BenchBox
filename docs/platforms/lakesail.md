@@ -20,12 +20,13 @@ LakeSail Sail is a Rust-based, drop-in replacement for Apache Spark built on Dat
 
 ## Quick Start
 
-The commands below install the Spark Connect-capable PySpark client, start a local Docker-backed Sail Spark Connect server, check client and endpoint readiness without starting a server, and then run the SQL and DataFrame benchmarks.
+The commands below install the Spark Connect-capable PySpark client and the Sail server, start a local Sail Spark Connect server, check client and endpoint readiness without starting a server, and then run the SQL and DataFrame benchmarks. Start the server in a separate terminal. SQL mode can start one for you, but DataFrame mode needs a running server.
 
 ```bash
 uv add benchbox --extra lakesail
+uv add pysail
 
-make uat-bring-up PLATFORM=lakesail
+python -m pysail spark server --port 50051
 
 benchbox platforms check lakesail-df
 
@@ -42,14 +43,13 @@ reachability; they do not instantiate the adapter or start a Sail server. SQL mo
 server when `pysail` is installed and the endpoint is unreachable, but DataFrame mode requires an already-running
 endpoint.
 
-For UAT and host-run local smoke tests, BenchBox includes `docker/lakesail/docker-compose.yml`. The compose service
+To run Sail in Docker from a BenchBox source checkout, use `docker/lakesail/docker-compose.yml`. The compose service
 builds a `benchbox-lakesail` image from the public PySail package and starts `sail spark server` on
 `sc://localhost:50051`. Like other Spark Connect backends, the server reads files by absolute path; the compose
 workflow mounts `BENCHBOX_DATA_DIR` at the same absolute path inside the container.
 
-`BENCHBOX_DATA_DIR` has **no default** and must be exported as an **absolute path** before invoking compose
-directly (`make uat-bring-up PLATFORM=lakesail` and the UAT harness set it for you). A relative value or a
-directory-relative default can never equal an absolute host path, breaking the mount above, so
+`BENCHBOX_DATA_DIR` has **no default** and must be exported as an **absolute path** before invoking compose.
+A relative value can never equal an absolute host path, which breaks the mount above.
 `make test-docker-up-lakesail` validates the variable is set and absolute before starting the stack:
 
 ```bash

@@ -45,7 +45,7 @@ _TPC_DERIVED = {"tpch", "tpcds", "tpcdi", "tpch_skew", "tpchavoc", "tpcds_obt", 
 _TPC_NOTICE = (
     "> TPC Benchmark, TPC-H, TPC-DS, and TPC-DI are trademarks of the Transaction "
     "Processing Performance Council. Query text shown here is derived from TPC "
-    "materials; see [TPC licensing analysis](../../../tpc-licensing-analysis.md)."
+    "materials."
 )
 
 _SEED_DRIVEN = {"tpch", "tpcds", "tpch_skew", "tpchavoc"}
