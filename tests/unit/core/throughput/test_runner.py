@@ -666,8 +666,8 @@ class TestStreamRunnerNonBlockingShutdown:
         be QUEUED (never dispatched to a worker) at the timeout deadline -
         distinct from a leaked RUNNING future. Without cancel_futures=True,
         that queued stream would start executing once the sole worker frees
-        up (when the hung stream 0 finally returns), well after execute()
-        has already returned and counted stream 1 as timed out too - extra
+        up (when the hung stream 1 finally returns), well after execute()
+        has already returned and counted stream 2 as timed out too - extra
         DB work overlapping with whatever runs next."""
         started = threading.Event()
 
@@ -675,7 +675,7 @@ class TestStreamRunnerNonBlockingShutdown:
             if stream_id == 1:
                 time.sleep(self.HANG_SLEEP)  # occupies the sole worker past the timeout
             else:
-                started.set()  # only reachable if stream 1 was ever dispatched
+                started.set()  # only reachable if stream 2 was ever dispatched
             return _make_stream_result(stream_id)
 
         config = _FakeConfig(num_streams=2, max_workers=1, stream_timeout=self.TINY_TIMEOUT, cancel_on_timeout=False)
@@ -685,7 +685,7 @@ class TestStreamRunnerNonBlockingShutdown:
         StreamRunner.execute(stream_fn, config, result, logger)
 
         assert result.streams_executed == 1
-        assert result.cancelled_stream_ids == [1]
+        assert result.cancelled_stream_ids == [2]
         assert len(result.errors) == 2
 
         # Wait well past HANG_SLEEP (when the sole worker frees up) - a
@@ -710,7 +710,7 @@ class TestHungStreamDoesNotBlockInterpreterExit:
         elapsed = time.monotonic() - started
 
         assert completed.returncode == 0, completed.stderr
-        assert "OUTSTANDING [0, 1]" in completed.stdout
+        assert "OUTSTANDING [1, 2]" in completed.stdout
         assert elapsed < 30
 
 
@@ -766,7 +766,7 @@ class TestStreamRunnerSettlementEdges:
         started = threading.Event()
 
         def stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
-            if stream_id == 0:
+            if stream_id == 1:
                 release.wait(timeout=10)
             else:
                 started.set()
@@ -781,8 +781,8 @@ class TestStreamRunnerSettlementEdges:
             release.set()
 
         assert result.streams_executed == 1
-        assert result.outstanding_stream_ids == [0]
-        assert result.cancelled_stream_ids == [1, 2]
+        assert result.outstanding_stream_ids == [1]
+        assert result.cancelled_stream_ids == [2, 3]
         assert not started.wait(timeout=0.5)
 
     def test_submit_failure_surfaces_original_error_and_tracks_submitted_streams(self, monkeypatch) -> None:
@@ -796,7 +796,7 @@ class TestStreamRunnerSettlementEdges:
         with pytest.raises(RuntimeError, match="can't start new thread"):
             StreamRunner.execute(Mock(), config, result, logging.getLogger("test-throughput-runner"))
 
-        assert result.outstanding_stream_ids == [0]
+        assert result.outstanding_stream_ids == [1]
         assert result.cleanup_state == "outstanding"
         assert executor.shutdown_calls == [(False, True)]
         assert "abandoned" in result.errors[0]
@@ -812,6 +812,6 @@ class TestStreamRunnerSettlementEdges:
             StreamRunner.execute(Mock(), config, result, logging.getLogger("test-throughput-runner"))
 
         assert queued.cancelled()
-        assert result.cancelled_stream_ids == [0]
+        assert result.cancelled_stream_ids == [1]
         assert result.streams_executed == 0
         assert result.cleanup_state == "complete"

@@ -419,7 +419,7 @@ def _good_result(throughput_at_size: float | None = None) -> dict:
             total_queries=66, total_time_seconds=1000.0, scale_factor=1.0, num_streams=3
         )
     )
-    return _result_json(streams={0: 22, 1: 22, 2: 22}, throughput_at_size=value)
+    return _result_json(streams={1: 22, 2: 22, 3: 22}, throughput_at_size=value)
 
 
 def _write_cells(logs_dir: Path, rows: list[dict]) -> Path:
