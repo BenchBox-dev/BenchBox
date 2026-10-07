@@ -4,7 +4,7 @@
     "URL compatibility report: zero broken public URLs and fragments; every redirect and allowed difference has a reason and approval",
     "Owner sign-off recorded in _project/decisions/astro-parity-signoff.md, re-run on the cutover base SHA"
   ],
-  "context": "Resumption 2026-10-04: harness landed in PR #2606 (awaiting owner ruleset-bypass merge; oracle-review blocked by Codex quota; substitute Opus review PASS posted). Follow-up tightening (exact canonicals, objects.inv address checks, blog validity-only scope, off-site rejection, /results/ canonical) on branch wip/astro-50 (c1e04b20), merged into wip/astro-52. Full make site-parity on ab44cd56: PASS, 0 broken URLs/fragments, 0 canonical problems, objects.inv 0 lost beyond 2 allowed, 34 validity-only. Owner approved Sphinx build-file removals 2026-10-04 (recorded in 2501cc6a). G2 still needs owner sign-off in _project/decisions/astro-parity-signoff.md and a re-run on the cutover base.",
+  "context": "Resumption 2026-10-04: harness landed in PR #2606 (awaiting owner ruleset-bypass merge; oracle-review blocked by Codex quota; substitute Opus review PASS posted). Follow-up tightening (exact canonicals, objects.inv address checks, blog validity-only scope, off-site rejection, /results/ canonical) on branch wip/astro-50 (c1e04b20), merged into wip/astro-52. Full make site-parity on ab44cd56: PASS, 0 broken URLs/fragments, 0 canonical problems, objects.inv 0 lost beyond 2 allowed, 34 validity-only. Owner approved Sphinx build-file removals 2026-10-04 (recorded in 2501cc6a). G2 still needs owner sign-off in _project/decisions/astro-parity-signoff.md and a re-run on the cutover base. site-split-01 (2026-10-07): G2 sign-off recorded (approved) in _project/decisions/astro-parity-signoff.md (verified); re-run on the cutover base not recorded here. Parity comparison is superseded by site-split-25 (three-bundle shadow match). Remaining verification owned by site-split-25. Do not finish here.",
   "description": "Add a non-required CI job that builds both renderers from the same develop SHA and docs/ sources and runs `site_inventory diff` (astro-site-01) on them.\n\nIt checks:\n- missing paths\n- lost anchors and fragments\n- changed titles and headings\n- broken internal links\n- missing images\n- tag pages, archives and series\n- atom.xml entry ids\n- generated query pages\n- the API URL map\n\nIt also runs axe over every page template, the docs/blog Explorer-byte check, check_artifact_privacy.py, and the Pagefind smoke search.\n\nOutput a URL compatibility report. It requires zero broken public URLs and zero broken fragments. It lists every redirect page and every allowed difference, each with a reason and an owner approval.\n\nGate G2: the owner reviews and signs off the report before astro-site-53 may start.",
   "links": [
     "scripts/publication/check_artifact_privacy.py"
@@ -33,6 +33,14 @@
       "op": "update",
       "op_id": "14ae58fa182744cfb6af1bcd901e427a",
       "session_id": "2d370a7de0824103affe317bc26fbae9"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T12:03:04Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "73b8cc23f1754d8588649663b4d9809f",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
 }
