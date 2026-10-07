@@ -4,7 +4,7 @@
     "Chart script runs against a pinned benchbox version and regenerates one existing chart identically or with a recorded, explained difference",
     "No Python in the site repo"
   ],
-  "context": "Owner decision D10 (2026-10-06): _blog moves; re-evaluate the need for each asset; migrate any Python to JS/TS as needed. Under D9, invoking the published benchbox CLI at run time is allowed. muse AR-19 (accepted): pin the CLI version.",
+  "context": "Read-only inventory 2026-10-07 (core side; site drafts/ unavailable until item 20 seeds the site repo): core _blog/ + docs/blog/ hold 110 png, 2 json (tpch measurement files under building-benchbox/research/), 1 py (_blog/table-formats/research/format_benchmark.py), 1 sh (_blog/benchbox-in-action/research/scripts/run_platform_optimization_matrix.sh). Keep/delete/port decisions and drafts/ASSETS.md belong to S1 implementation.",
   "description": "PR group S1, with site-split-21 and site-split-22.\n\n1. Inventory every non-Markdown file in the site's `drafts/` (formerly `_blog/`), plus the .py and .sh files the seed left behind in core `_blog/`. These include `_blog/table-formats/research/format_benchmark.py` and the shell script.\n2. Decide keep, delete or port for each file, and commit the decision table as `drafts/ASSETS.md`.\n3. Chart rendering: add a Node script that calls the published CLI as an external tool, pinned to the bundle's version: `uvx benchbox==<package_version> visualize ...`. It replaces `scripts/_render_blog_charts.py` and `capture_chart_images.py` for blog use, and writes the images into `drafts/` or `blog/`.\n4. Port any research script still needed for a current draft to TS. Mark the rest for deletion from core in site-split-50.",
   "sessions": [
     {
@@ -14,6 +14,14 @@
       "op": "create",
       "op_id": "bdd0bcb29bb54e2fbc32ade5bbe9e906",
       "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:86f6da90fc8e4c14af03225c",
+      "at": "2026-10-07T19:12:39Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "1583d78553ce40b984133d608d115159",
+      "session_id": "bded665cd1c546e5acaf7fa074a0853d"
     }
   ]
 }
