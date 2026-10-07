@@ -117,7 +117,9 @@ of the head, or its thumbs-up, and counts the connector's open threads. With
 
 The verdict is read from the pull request's own review, not from the commit
 status, which any pull request with the same head commit could set. The
-oracle signal needs `findings_delivery: review`.
+oracle signal needs `findings_delivery: review`, under which every run that
+reaches a result, including a pending one, posts a review, so the latest
+review is the latest result.
 
 The stand-in attestation passes under either signal. Under `oracle` it must be
 posted after the oracle's latest review of the head, so overriding a failing

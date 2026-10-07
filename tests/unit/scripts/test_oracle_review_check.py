@@ -534,8 +534,20 @@ def test_connector_only_inputs_never_decide_the_oracle_signal(monkeypatch: pytes
 
     _stub_main(monkeypatch, broken)
     assert oracle_review_check.main(["--repo", "o/r", "--pr", "7", "--signal", "oracle"]) == 1
-    assert capsys.readouterr().out.splitlines()[1] == "parity: connector: not evaluated: GitHub returned HTTP 502"
+    assert capsys.readouterr().out.splitlines()[1] == (
+        "parity: connector: not evaluated: CheckError('GitHub returned HTTP 502')"
+    )
     assert oracle_review_check.main(["--repo", "o/r", "--pr", "7"]) == 2
+
+
+def test_an_unexpected_parity_error_never_changes_the_result(monkeypatch: pytest.MonkeyPatch, capsys: Any) -> None:
+    def odd(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
+        raise AttributeError("payload")
+
+    _stub_main(monkeypatch, odd)
+    monkeypatch.setattr(oracle_review_check, "fetch_reviews", lambda token, repo, pr: [_oracle_review()])
+    assert oracle_review_check.main(["--repo", "o/r", "--pr", "7", "--signal", "oracle"]) == 0
+    assert capsys.readouterr().out.splitlines()[1] == "parity: connector: not evaluated: AttributeError('payload')"
 
 
 def test_fetch_threads_and_reviews_keep_the_author_type(monkeypatch: pytest.MonkeyPatch) -> None:

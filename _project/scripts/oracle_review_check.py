@@ -375,8 +375,8 @@ def main(argv: list[str] | None = None) -> int:
     for other in sorted(set(SIGNALS) - {args.signal}):
         try:
             other_status, other_message = run(other)
-        except (CheckError, KeyError, TypeError, ValueError) as exc:
-            print(f"parity: {other}: not evaluated: {exc}")
+        except Exception as exc:
+            print(f"parity: {other}: not evaluated: {exc!r}")
             continue
         print(f"parity: required={args.signal} {_STATUS_NAMES[status]}; {other} {_STATUS_NAMES[other_status]}")
         print(f"parity: {other}: {other_message}")
