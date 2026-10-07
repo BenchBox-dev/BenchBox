@@ -15100,6 +15100,16 @@
       "status": "open",
       "title": "Gate: user decides how Polars matrix results are published"
     },
+    "pvm-polars-2-version-matrix": {
+      "claim": null,
+      "needs": [
+        "pvm-s6-publish-polars-results",
+        "pvm-s6b-polars-2-blog-draft"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Measure Polars performance across 1.x and 2.0 with a reproducible version matrix"
+    },
     "pvm-s0a-polars2-compat-fixes": {
       "claim": null,
       "needs": [

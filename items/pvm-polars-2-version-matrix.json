@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "Every pvm-* step item is done, or dropped with the user's recorded decision",
+    "The published outputs match the scope chosen in pvm-d1-publication-scope-decision",
+    "The DuckDB matrix golden dry-run test still passes on develop"
+  ],
+  "context": "Plan history 2026-10-07: first plan reviewed by muse-spark-1.3 (15 findings: 9 accepted, 5 partly, 1 rebutted); codex gpt-6.1-sol partial review raised two verified leads (DataFrame validation scope; collects bypassing the engine setting); agy did not run (quota). Host: Apple M4, 10 cores, 16 GiB RAM.",
+  "description": "Umbrella for repeating the DuckDB version-matrix experiment for Polars, to show what the Polars 2.0.0 release (2026-10-06) changed. It closes when every pvm-* step item is done.\n\nObjective: a reproducible, correctness-checked comparison of polars-df on TPC-H, TPC-DS, SSB and ClickBench across selected Polars versions, separating the change of default engine in 2.0 from real engine improvements.\n\nPrior art (extend):\n- The DuckDB matrix: scripts/run_duckdb_version_matrix.py and scripts/analyze_duckdb_version_matrix.py (#1946).\n- 28 median bundles in results-data/bundles/duckdb-version-matrix/, documented in results-data/CORPUS_NOTES.md.\n- The cross-surface equivalence gates in benchbox/core/equivalence/cross_surface.py.\n\nDesign: three engine setups.\n- A: each version's default collect(), which is in-memory on 1.x and streaming with out-of-core spill on 2.0.\n- B: 2.0.0 forced in-memory.\n- C: streaming against streaming, where supported.\nOnly setup A is a corpus candidate.\n\nSequence and gates:\n1. pvm-d0 (external review, or a recorded waiver)\n2. pvm-s0a and pvm-s0b (2.0 compatibility; engine option)\n3. pvm-s1 (versions and correctness; a guaranteed version failing is a stop)\n4. pvm-s2 (SF10 feasibility; the user approves the run budget)\n5. pvm-s3a, then pvm-s3b (tooling; DuckDB output unchanged)\n6. pvm-s4 (run)\n7. pvm-s5 (analysis)\n8. pvm-d1 (the user chooses the publication scope), then pvm-s6 and pvm-s6b\n\nGlobal guardrails:\n- Never install non-lock Polars versions into the main checkout's environment; use a separate worktree and environment.\n- Do not bump uv.lock or the pyproject polars floor as part of this work.\n- One query code path for all versions: no version branches or shims.\n- Fix decision rules (correctness, abort, mover, no-rerun) in code before timed runs.\n- Raw data stays outside the repository.\n- No speed claims against DuckDB.\n- Stage files explicitly; no git add -A.\n\nOut of scope, as separate follow-ups if wanted:\n- Rerunning DuckDB TPC-H SF10 with the fixed generator, to restore those seven unranked bundles.\n- A DataFrame validation provider that would make Polars bundles rankable (see pvm-d1 option c).",
+  "links": [
+    "scripts/run_duckdb_version_matrix.py",
+    "scripts/analyze_duckdb_version_matrix.py",
+    "results-data/CORPUS_NOTES.md",
+    "benchbox/core/equivalence/cross_surface.py",
+    "https://docs.pola.rs/releases/upgrade/2/"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-07T20:57:07Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "86c9535e5c6844dc853e1e3786c8d644",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    }
+  ]
+}
