@@ -5,7 +5,7 @@
     "Preview deploy of that candidate with probes, receipt and a rollback-by-receipt drill to the last Sphinx artifact",
     "Pre-deploy visual comparison of the assembled candidate exists; dev-loop-property-ledger visual row updated with the real guard and evidence"
   ],
-  "context": "Because of D13 there is no mixed-version window in production. landing/shared stays until astro-site-54 because Sphinx keeps rendering every route until the release cutover.\n\nResumption 2026-10-04: code on wip/astro-52 (head 64837e7f, worktree /home/user/BenchBox.wt-astro-52 in session 68d30365), two independent reviews, final PASS. routes.yml pins renderer: sphinx; the cutover PR flips it to auto. Single-renderer selection from the release tag tree, mixed-renderer refusal in assembly and the mixed_version gate, pre-deploy visual comparison bound to release_sha+candidate sha256+baseline sha256 (vars SITE_DEPLOY_VISUAL_APPROVED_BINDING / SITE_DEPLOY_VISUAL_APPROVAL_REASON, not yet created), /docs/dev/ link rebase, ledger row updated. Remaining acceptance: preview deploy of an all-Astro candidate with probes, receipt and rollback drill needs owner github-pages approval and dlv2-62.",
+  "context": "Because of D13 there is no mixed-version window in production. landing/shared stays until astro-site-54 because Sphinx keeps rendering every route until the release cutover. Resumption 2026-10-04: code on wip/astro-52 (head 64837e7f, worktree /home/user/BenchBox.wt-astro-52 in session 68d30365), two independent reviews, final PASS. routes.yml pins renderer: sphinx; the cutover PR flips it to auto. Single-renderer selection from the release tag tree, mixed-renderer refusal in assembly and the mixed_version gate, pre-deploy visual comparison bound to release_sha+candidate sha256+baseline sha256 (vars SITE_DEPLOY_VISUAL_APPROVED_BINDING / SITE_DEPLOY_VISUAL_APPROVAL_REASON, not yet created), /docs/dev/ link rebase, ledger row updated. Remaining acceptance: preview deploy of an all-Astro candidate with probes, receipt and rollback drill needs owner github-pages approval and dlv2-62. site-split-01 (2026-10-07): renderer now single (auto) and production deploys green (site-deploy runs 37532428364, 37406123669); preview/rollback-drill evidence superseded by site-split-25 (shadow) and site-split-30 (rehearsal incl. rollback drill). Remaining verification owned by site-split-25 and site-split-30. Do not finish here.",
   "description": "After dlv2-62, site-deploy is the only production writer. Extend routes.yml and assembly so the renderer is selected per artifact, not per route:\n- Sphinx for every route until the latest release tag contains website/ and all migrated content.\n- From that release on, Astro for every route: / and /docs/ from the release tag; /docs/dev/ and /blog/ from trunk; /results/ from the Explorer artifact plus corpus snapshot, each pinned by its own SHA and digest. The API reference is release-pinned.\nAssembly must refuse a mixed-renderer artifact (D13), and this is covered by tests.\n\nKeep every dlv2-60 gate: per-route source SHA, corpus SHA, artifact sha256, privacy, explorer-compat (both orders), corpus bijection, digest, cross-route link check, post-deploy probes, receipts, rollback-by-receipt.\n\nVisual guard: dev-loop-property-ledger.md maps \"Public-site visual acceptance\" to site-deploy route and digest probes. Those prove availability and artifact identity, not layout. Name the real layout guard and its evidence: the required CI context for trunk renders, plus a visual capture of the assembled release-sourced candidate compared with the last production artifact before deploy. Update the ledger row to match.",
   "links": [
     "dlv2-60-publication-integration",
@@ -38,6 +38,14 @@
       "op": "update",
       "op_id": "9093d94acb9e40a891a98414a912135b",
       "session_id": "2d370a7de0824103affe317bc26fbae9"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T12:03:20Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "66a64708b2114816ae2eaa84db59c15e",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
 }
