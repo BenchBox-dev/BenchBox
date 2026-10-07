@@ -107,7 +107,7 @@ def test_throughput_stream_count_tpch_matches_requested(tmp_path, requested, exp
 
     assert result.streams_executed == expected
     assert result.streams_successful == expected
-    assert sorted({r.get("stream_id") for r in results}) == list(range(expected))
+    assert sorted({r.get("stream_id") for r in results}) == list(range(1, expected + 1))
 
 
 def test_throughput_stream_count_tpcds_matches_requested(tmp_path):
@@ -135,7 +135,7 @@ def test_throughput_stream_count_tpcds_matches_requested(tmp_path):
         result = adapter._last_throughput_test_result
 
         assert result.streams_executed == 2
-        assert sorted({r.get("stream_id") for r in results}) == [0, 1]
+        assert sorted({r.get("stream_id") for r in results}) == [1, 2]
         assert {str(r.get("query_id")) for r in results} == {"1", "3"}
         assert len(results) == 4
     finally:

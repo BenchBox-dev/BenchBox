@@ -23,7 +23,7 @@ from typing import Any, Callable, Optional
 from benchbox.core.plan_capture_phase import (
     propagate_query_execution_metadata,
 )
-from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
+from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult, throughput_stream_ids
 from benchbox.core.throughput.runner import StreamRunner
 from benchbox.core.tpch.power_test import _parse_tpch_query_id
 from benchbox.core.validation.query_validation import (
@@ -284,7 +284,7 @@ class TPCHThroughputTest:
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures: list[concurrent.futures.Future[tuple[int, list[Any]]]] = [
                 executor.submit(contextvars.copy_context().run, _generate_one_stream, sid)
-                for sid in range(config.num_streams)
+                for sid in throughput_stream_ids(config.num_streams)
             ]
             for future in concurrent.futures.as_completed(futures):
                 stream_id, sql_list = future.result()

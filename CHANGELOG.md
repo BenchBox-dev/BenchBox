@@ -63,6 +63,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `RunConfig.concurrent_streams` default to `None`, which runs the
   2-stream default. An explicit count below 2 is rejected when the run
   includes throughput. Saved runs that recorded 1 replay as not set.
+- **TPC-H Power@Size changes.** Warm-up and measured power iterations now all
+  run stream 00, so they use its query ordering and substitution parameters
+  instead of streams 1, 2 and 3, in SQL and DataFrame runs. SQL runs now
+  also check row counts on every measured iteration under the default
+  validation mode. Power results are not comparable with earlier bundles.
+- **Throughput streams are numbered 1 to S.** TPC-H and TPC-DS throughput runs
+  used streams 0 to S-1, so stream 0 repeated the power ordering. Stream 0 is
+  now left to the power test and a new stream S takes its place, which changes
+  the queries and parameters each run executes. Throughput results are not
+  comparable with earlier bundles. TPC-DS power ordering is unchanged.
+- **TPC-H Q13 accepts 41 or 42 rows under non-reference seeds.** Its row count
+  depends on the two comment words the seed picks, so a valid throughput
+  stream no longer fails against the answer-file count of 42. Runs with the
+  default parameters still require 42.
+- **Throughput results record how streams are numbered.** The new key
+  `phases.throughput_test.stream_numbering` holds the basis and the first
+  stream id. `run.streams` in a combined run now counts throughput streams
+  only.
 
 ### Added
 

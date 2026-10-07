@@ -357,6 +357,21 @@ def test_run_official_benchmark_does_not_copy_a_withheld_throughput(tpcds_benchm
     assert any("withheld" in error for error in result["errors"])
 
 
+def test_run_throughput_test_numbers_streams_one_to_s_and_records_the_basis(tpcds_benchmark, monkeypatch):
+    monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
+
+    result = tpcds_benchmark.run_throughput_test(
+        connection_factory=lambda: _Conn(),
+        num_streams=3,
+        query_timeout=1,
+        stream_timeout=10,
+        max_retries=0,
+    )
+
+    assert sorted(stream["stream_id"] for stream in result.stream_results) == [1, 2, 3]
+    assert result.stream_numbering == {"basis": "tpc_spec_throughput_streams_1_to_s", "first_stream_id": 1}
+
+
 def test_run_power_test_collects_query_error(tpcds_benchmark, monkeypatch):
     monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
 

@@ -71,13 +71,13 @@ class TestTPCHThroughputDialect:
         test._pregenerate_stream_queries(config)
         pregenerated_calls = list(benchmark.calls)
         benchmark.calls.clear()
-        test._resolve_query_text(None, 0, 1, _SEED, 5, config)
+        test._resolve_query_text(None, 0, 2, _SEED, 5, config)
 
         assert len(pregenerated_calls) == 2 * 22
         for call in pregenerated_calls + benchmark.calls:
             assert call["dialect"] == "sqlite"
             assert call["params"] == {"stream_id": call["params"]["stream_id"]}
-            assert call["params"]["stream_id"] in (0, 1)
+            assert call["params"]["stream_id"] in (1, 2)
             assert "stream_id" not in call
 
     def test_stream_id_beyond_the_permutation_matrix_wraps_like_the_permutation(self) -> None:
@@ -143,7 +143,7 @@ class TestTPCHPregenerationTranslationContext:
         assert {outcome.status for outcome in outcomes} == {"failed"}
         assert all(isinstance(entry, SQLTranslationError) for sql_list in streams.values() for entry in sql_list)
         with pytest.raises(SQLTranslationError):
-            test._resolve_query_text(streams[0], 0, 0, _SEED, 1, config)
+            test._resolve_query_text(streams[1], 0, 1, _SEED, 1, config)
 
     def test_non_strict_translation_falls_back_and_records_the_fallback(self) -> None:
         benchmark = TPCHBenchmark(scale_factor=0.01)
@@ -156,7 +156,7 @@ class TestTPCHPregenerationTranslationContext:
             streams = test._pregenerate_stream_queries(config)
 
         assert {outcome.status for outcome in outcomes} == {"fallback"}
-        assert all(isinstance(entry, str) for entry in streams[0])
+        assert all(isinstance(entry, str) for entry in streams[1])
 
 
 class TestTPCDSStreamSeedValidationPolicy:
@@ -209,7 +209,7 @@ class TestTPCDSFailedPlatformResult:
         monkeypatch.setattr(
             "benchbox.core.tpcds.streams.generate_dsqgen_streams",
             lambda **_kwargs: {
-                0: [StreamQuery(stream_id=0, position=i, query_id=i + 1, sql=sql) for i, sql in enumerate(statements)]
+                1: [StreamQuery(stream_id=1, position=i, query_id=i + 1, sql=sql) for i, sql in enumerate(statements)]
             },
         )
         return _Benchmark()
@@ -345,7 +345,7 @@ class TestStreamSeedOverrideWarning:
         monkeypatch.setenv("BENCHBOX_QUERY_VALIDATION_MODE", "exact")
         monkeypatch.setattr(
             "benchbox.core.tpcds.streams.generate_dsqgen_streams",
-            lambda **_kwargs: {0: [StreamQuery(stream_id=0, position=0, query_id=1, sql="SELECT 1")]},
+            lambda **_kwargs: {1: [StreamQuery(stream_id=1, position=0, query_id=1, sql="SELECT 1")]},
         )
 
         class _Benchmark:

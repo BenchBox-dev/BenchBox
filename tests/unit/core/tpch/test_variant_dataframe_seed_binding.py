@@ -71,7 +71,7 @@ def _variant_dataframe_bindings(benchmark_id: str, seed: int | None) -> dict[int
 def test_variant_dataframe_binds_same_qgen_parameters_as_sql(benchmark_id: str, seed: int) -> None:
     benchmark = _benchmark(benchmark_id)
     dataframe = _variant_dataframe_bindings(benchmark_id, seed)
-    assert sorted(dataframe) == [0, 1]
+    assert sorted(dataframe) == [0]
 
     for stream_id, bindings in sorted(dataframe.items()):
         stream_seed = power_stream_seed(seed, stream_id)
@@ -91,7 +91,7 @@ def test_variant_dataframe_binds_same_qgen_parameters_as_sql(benchmark_id: str, 
 @pytest.mark.parametrize("benchmark_id", ["tpch_skew", "tpchavoc"])
 def test_variant_dataframe_unseeded_binds_defaults(benchmark_id: str) -> None:
     dataframe = _variant_dataframe_bindings(benchmark_id, None)
-    assert sorted(dataframe) == [0, 1]
+    assert sorted(dataframe) == [0]
 
     for _stream_id, bindings in sorted(dataframe.items()):
         for number, params in bindings:

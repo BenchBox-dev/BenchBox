@@ -344,6 +344,7 @@ class ThroughputTestPhase:
     success: bool = True
     errors: list[str] = field(default_factory=list)
     outstanding_work: ThroughputOutstandingWork | None = None
+    stream_numbering: dict[str, Any] | None = None
 
 
 @dataclass
