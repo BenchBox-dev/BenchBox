@@ -488,7 +488,10 @@ def _standin_comment() -> dict[str, Any]:
 
 def test_standin_after_a_failing_oracle_review_overrides_it_but_not_open_threads() -> None:
     failing = [_oracle_review("failure", submitted_at=HEAD_DATE)]
-    assert _oracle(reviews=failing, comments=[_standin_comment()])[0] == 0
+    assert _oracle(reviews=failing, comments=[_standin_comment()]) == (
+        0,
+        f"oracle-review: pass (stand-in review attested by joeharris76 for {HEAD})",
+    )
     early = {**_standin_comment(), "created_at": BEFORE_HEAD, "updated_at": BEFORE_HEAD}
     assert _oracle(reviews=failing, comments=[early])[0] == 1
     assert _oracle(reviews=[], comments=[early])[0] == 0

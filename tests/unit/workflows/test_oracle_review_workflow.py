@@ -78,6 +78,7 @@ def test_required_signal_matches_the_oracle_policy_mode() -> None:
     steps = _load()["jobs"]["oracle-review"]["steps"]
     run = next(step["run"] for step in steps if SCRIPT in step.get("run", ""))
     policy = yaml.safe_load((REPO_ROOT / ".github/oracle-reviewers.yml").read_text(encoding="utf-8"))
+    assert f'ORACLE_CONTEXT = "{policy["status_context"]}"' in (REPO_ROOT / SCRIPT).read_text(encoding="utf-8")
     if policy["mode"] == "enforce":
         assert "--signal oracle" in run
         assert policy["findings_delivery"] == "review"

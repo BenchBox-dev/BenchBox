@@ -19,7 +19,8 @@ ORACLE_LOGIN = "benchbox-oracle"
 CONNECTOR = "connector"
 ORACLE = "oracle"
 SIGNALS = {CONNECTOR: (CONNECTOR_LOGIN, "Codex connector"), ORACLE: (ORACLE_LOGIN, "oracle")}
-_ORACLE_VERDICT = re.compile(r"### oracle-review-shadow: (?P<state>[a-z]+) for `(?P<sha>[0-9a-f]{40})`")
+ORACLE_CONTEXT = "oracle-review-shadow"
+_ORACLE_VERDICT = re.compile(rf"### {ORACLE_CONTEXT}: (?P<state>[a-z]+) for `(?P<sha>[0-9a-f]{{40}})`")
 # Accounts whose stand-in attestation substitutes for the Codex connector when it
 # cannot review (for example at its usage limit). The attestation must name the
 # exact head commit, so it records who vouched for which reviewed code.
@@ -159,7 +160,7 @@ def decide(
             "resolve them and rerun this check"
         )
 
-    if review_signal:
+    if review_signal and (signal == CONNECTOR or verdict == "success"):
         return PASS, f"oracle-review: pass ({name} review of {head_sha})"
     if reaction_signal:
         return PASS, f"oracle-review: pass (Codex connector +1 after the head commit {head_sha})"
