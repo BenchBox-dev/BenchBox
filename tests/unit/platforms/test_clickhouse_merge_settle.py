@@ -75,11 +75,11 @@ class _Adapter(ClickHouseWorkloadMixin):
         self.unified_tuning_configuration = None
 
 
-def _load(adapter: _Adapter) -> None:
+def _load(adapter: _Adapter) -> tuple[dict[str, int], float, object]:
     loader = Mock()
     loader.load.return_value = ({"lineitem": 1}, 1.5)
     with patch("benchbox.platforms.base.data_loading.DataLoader", return_value=loader):
-        adapter.load_data(Mock(), Mock(), Path("/tmp"))
+        return adapter.load_data(Mock(), Mock(), Path("/tmp"))
 
 
 def test_server_load_waits_for_merges() -> None:
@@ -89,9 +89,10 @@ def test_server_load_waits_for_merges() -> None:
         "benchbox.platforms.clickhouse.workload.wait_for_merges_to_settle",
         return_value=MergeSettleResult(True, 0.0, 6),
     ) as wait:
-        _load(adapter)
+        _, loading_time, _ = _load(adapter)
 
     wait.assert_called_once()
+    assert loading_time == 1.5
 
 
 def test_local_load_does_not_wait_for_merges() -> None:

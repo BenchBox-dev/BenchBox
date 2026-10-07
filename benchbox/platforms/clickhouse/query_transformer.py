@@ -397,8 +397,7 @@ class ClickHouseQueryTransformer:
             Q23a/b unaliased inner subquery, Q87 EXCEPT set op subquery).
 
         ``additional_settings`` is reserved for a narrow query-adapter policy
-        when a ClickHouse Local query needs an engine-supported execution
-        setting. It is appended to this statement-level clause rather than
+        when a query needs an engine-supported execution setting. It is appended to this statement-level clause rather than
         changing the session, so baseline and tuned session contracts remain
         distinct.
 
