@@ -146,7 +146,6 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
     def in_window(at: str) -> bool:
         return cutoff <= at <= evidence.merged_at
 
-    standin_after = max(evidence.head_date, evidence.base_changed_at)
     signals: list[str] = []
     if any(
         r.login in CONNECTOR_LOGINS
@@ -166,8 +165,7 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
             comment.login in STANDIN_ATTESTERS
             and comment.user_type == "User"
             and comment.updated_at in (None, comment.created_at)
-            and evidence.head_date
-            and standin_after < comment.created_at <= evidence.merged_at
+            and evidence.base_changed_at < comment.created_at <= evidence.merged_at
             and evidence.commits[-1].sha in _attested_shas({"body": comment.body})
         ):
             signals.append("stand-in")

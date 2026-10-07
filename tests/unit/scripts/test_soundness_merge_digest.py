@@ -172,12 +172,9 @@ def test_a_standin_approval_must_name_the_merged_head_after_a_refresh_merge():
     assert digest.review_signals(refreshed(comments=(standin(HEAD, at=AFTER_REFRESH),))) == ()
 
 
-def test_a_standin_approval_posted_at_the_head_arrival_instant_is_not_a_signal():
-    assert digest.review_signals(evidence(comments=(standin(HEAD, at=PUSHED),))) == ()
-
-
-def test_a_standin_approval_with_no_established_head_date_is_not_a_signal():
-    assert digest.review_signals(evidence(comments=(standin(HEAD),), head_date="")) == ()
+def test_a_standin_approval_is_not_timed_against_the_head_arrival():
+    assert digest.review_signals(evidence(comments=(standin(HEAD, at=PUSHED),))) == ("stand-in",)
+    assert digest.review_signals(evidence(comments=(standin(HEAD),), head_date="")) == ("stand-in",)
 
 
 def test_a_standin_approval_posted_before_a_retarget_is_not_a_signal():
@@ -195,14 +192,13 @@ def test_a_standin_approval_posted_after_the_merge_is_not_a_signal():
     [
         standin(OLD),
         standin(HEAD, login="dev"),
-        standin(HEAD, at=BEFORE),
         digest.Comment("joeharris76", f"```\nStand-in oracle review: APPROVE {HEAD}\n```", AFTER, "User"),
         standin(HEAD, prefix="Looks fine. "),
         standin(HEAD, user_type="Bot"),
         standin(HEAD, user_type=""),
         standin(HEAD, updated_at=LATER),
     ],
-    ids=["wrong-sha", "non-attester", "before-last-commit", "fenced", "mid-line", "bot", "no-type", "edited"],
+    ids=["wrong-sha", "non-attester", "fenced", "mid-line", "bot", "no-type", "edited"],
 )
 def test_a_standin_approval_that_does_not_qualify_is_not_a_signal(comment):
     assert digest.review_signals(evidence(comments=(comment,))) == ()
@@ -943,11 +939,8 @@ def rest_comment(sha, at):
     }
 
 
-@pytest.mark.parametrize(
-    ("approved_at", "expected"),
-    [("2026-10-02T10:05:00Z", ()), ("2026-10-02T10:10:00Z", ()), ("2026-10-02T10:15:00Z", ("stand-in",))],
-)
-def test_a_standin_for_a_refresh_head_must_follow_the_run_that_pushed_it(monkeypatch, approved_at, expected):
+@pytest.mark.parametrize("approved_at", ["2026-10-02T10:05:00Z", "2026-10-02T10:10:00Z", "2026-10-02T10:15:00Z"])
+def test_a_standin_for_a_refresh_head_is_not_timed_against_its_run(monkeypatch, approved_at):
     commits = [api_commit(OLD, BEFORE), api_commit(REFRESH, "2026-10-02T10:00:00Z", 2)]
     pull = collected_pull(
         monkeypatch,
@@ -957,18 +950,15 @@ def test_a_standin_for_a_refresh_head_must_follow_the_run_that_pushed_it(monkeyp
         [rest_comment(REFRESH, approved_at)],
     )
     assert pull.commits[-1].is_refresh
-    assert digest.review_signals(pull) == expected
+    assert digest.review_signals(pull) == ("stand-in",)
 
 
-@pytest.mark.parametrize(
-    ("approved_at", "expected"),
-    [("2026-10-02T10:30:00Z", ()), ("2026-10-02T11:30:00Z", ("stand-in",))],
-)
-def test_a_standin_must_follow_the_latest_run_when_the_head_moved_away_and_back(monkeypatch, approved_at, expected):
+@pytest.mark.parametrize("approved_at", ["2026-10-02T10:30:00Z", "2026-10-02T11:30:00Z"])
+def test_a_standin_survives_the_head_moving_away_and_back(monkeypatch, approved_at):
     commits = [api_commit(OLD, BEFORE), api_commit(HEAD, "2026-10-02T09:30:00Z")]
     runs = [oracle_run("2026-10-02T10:00:00Z", "opened"), oracle_run("2026-10-02T11:00:00Z")]
     pull = collected_pull(monkeypatch, commits, HEAD, runs, [rest_comment(HEAD, approved_at)])
-    assert digest.review_signals(pull) == expected
+    assert digest.review_signals(pull) == ("stand-in",)
 
 
 def test_a_failing_head_runs_fetch_fails_closed(monkeypatch):
