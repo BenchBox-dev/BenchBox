@@ -15093,6 +15093,15 @@
       "status": "open",
       "title": "Gate: finish external adversarial review of the Polars version-matrix plan and fold in accepted findings"
     },
+    "pvm-s0a-polars2-compat-fixes": {
+      "claim": null,
+      "needs": [
+        "pvm-d0-external-plan-review"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Make the Polars DataFrame benchmarks run correctly on Polars 2.0 without breaking 1.x"
+    },
     "pypi-environment-protection-drift-canary-20260805": {
       "claim": null,
       "needs": [
