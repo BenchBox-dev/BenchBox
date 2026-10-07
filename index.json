@@ -19075,6 +19075,15 @@
       "status": "open",
       "title": "Make core produce and attest the versioned site-inputs bundle and dispatch it to the site repo"
     },
+    "site-split-20-seed-site-repo": {
+      "claim": null,
+      "needs": [
+        "site-split-10-core-site-inputs"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Seed BenchBox-dev/benchbox-site from core with filtered, Python-free history and protect main"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],

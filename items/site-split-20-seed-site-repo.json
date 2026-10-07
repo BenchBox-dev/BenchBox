@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Site repo main exists with the renamed tree and filtered history",
+    "History contains no Python, shell, pyproject or uv.lock objects (command output recorded)",
+    "gitleaks clean on rewritten history; repo size recorded and under 500 MB or owner-approved",
+    "Ruleset applied immediately after the push (timestamps recorded)"
+  ],
+  "context": "muse AR-06 and AR-18 (accepted in part): `--path` keeps only the named paths, so results-data/ and _binaries/ do not travel. Everything kept is already public in core. Guardrails: never push to core from this clone; delete the clone after the push; never force-push site main once the ruleset exists. Owner pre-work: the repo exists, public and empty, and the agent's gh identity has admin on it. The seed can start once site-split-10's PR has merged; the bundle workflow must exist on develop first.",
+  "description": "One push to the empty `main` of the owner-created repo, then immediate protection. This item is not a PR.\n\n1. Make a fresh clone of core at the merge commit of site-split-10, outside any BenchBox worktree.\n2. Run `git filter-repo`:\n   - `--path` website/, results-explorer/, landing/, docs/blog/, _blog/ and _project/design/site-inventory/;\n   - `--path landing/prompts/catalog.yaml --invert-paths`;\n   - `--path-glob '*.py' --path-glob '*.sh' --invert-paths`;\n   - `--path-rename` results-explorer/:explorer/, docs/blog/:blog/, _blog/:drafts/ and _project/design/site-inventory/:inventory/.\n3. Before pushing, verify the following and record the results in the item context:\n   - `git rev-list --all --objects` lists no .py, .sh, pyproject.toml or uv.lock;\n   - `gitleaks detect` on the rewritten history is clean;\n   - the .git size after `git gc --aggressive --prune=now`. Stop and ask the owner if it is over 500 MB.\n4. Push `main` to BenchBox-dev/benchbox-site. This is the only direct push to its main.\n5. Immediately apply site-split-21 step 1: the ruleset, the github-pages environment, the Pages source and the variables.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:50:26Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b58993db84ab4b239c2ed6aa736bfc7a",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    }
+  ]
+}
