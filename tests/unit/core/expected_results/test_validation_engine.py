@@ -129,9 +129,9 @@ class TestParameterSensitiveValidation:
         clear_reference_seed_context()
 
     def test_parameter_sensitive_query_ids_constant(self):
-        """The TPC-H parameter-sensitive set matches the four documented
-        answer-set-boundary queries."""
-        assert frozenset({"11", "16", "18", "20"}) == PARAMETER_SENSITIVE_QUERY_IDS
+        """The TPC-H parameter-sensitive set matches the documented queries
+        whose cardinality depends on the substitution parameters."""
+        assert frozenset({"11", "13", "16", "18", "20"}) == PARAMETER_SENSITIVE_QUERY_IDS
         assert set(TPCH_RANGE_ROW_COUNT_BOUNDS) | set(TPCH_LOOSE_QUERY_IDS) == PARAMETER_SENSITIVE_QUERY_IDS
 
     def test_tpch_provider_assigns_exact_mode_with_ride_along_bounds(self):
@@ -223,6 +223,39 @@ class TestParameterSensitiveValidation:
         )
         assert not result.is_valid
         assert result.validation_mode == ValidationMode.RANGE
+
+    def test_q13_row_count_from_a_non_reference_word_pair_validates(self):
+        set_reference_seed_context(False)
+        result = QueryValidator().validate_query_result(
+            benchmark_type="tpch",
+            query_id="13",
+            actual_row_count=41,
+            scale_factor=1.0,
+        )
+
+        assert result.is_valid
+        assert result.validation_mode == ValidationMode.RANGE
+        assert result.expected_row_count is None or result.expected_row_count != 41
+
+    def test_q13_reference_seed_still_requires_the_answer_file_count(self):
+        set_reference_seed_context(True)
+        validator = QueryValidator()
+
+        assert validator.validate_query_result("tpch", "13", 42, 1.0).is_valid
+        assert not validator.validate_query_result("tpch", "13", 41, 1.0).is_valid
+
+    @pytest.mark.parametrize("query_id", ["2", "9", "15", "21"])
+    def test_queries_with_fixed_sf1_cardinality_stay_exact_under_non_reference_context(self, query_id):
+        set_reference_seed_context(False)
+        validator = QueryValidator()
+        expected = validator.registry.get_expected_result("tpch", query_id, 1.0)
+        assert expected is not None
+        count = expected.get_expected_count(1.0)
+        assert count is not None
+
+        assert query_id not in PARAMETER_SENSITIVE_QUERY_IDS
+        assert validator.validate_query_result("tpch", query_id, count, 1.0).is_valid
+        assert not validator.validate_query_result("tpch", query_id, count + 1, 1.0).is_valid
 
     def test_loose_query_uses_tolerance_under_non_reference_context(self):
         set_reference_seed_context(False)

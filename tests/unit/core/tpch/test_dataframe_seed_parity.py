@@ -20,7 +20,7 @@ SCALE_FACTOR = 0.01
 SEEDS = [None, 17039360, 4242]
 WARMUPS = 1
 ITERATIONS = 2
-STREAMS = list(range(WARMUPS + ITERATIONS))
+STREAMS = [0]
 
 
 @pytest.fixture(scope="module")
@@ -131,21 +131,27 @@ def test_sql_and_dataframe_bind_identical_parameters(tpch_benchmark: TPCHBenchma
 
     for stream_id in STREAMS:
         sql = _sql_power_stream(tpch_benchmark, seed, stream_id)
-        bindings = dataframe[stream_id]
+        runs = [dataframe[stream_id][start : start + 22] for start in range(0, len(dataframe[stream_id]), 22)]
+        assert len(runs) == WARMUPS + ITERATIONS
 
-        assert [number for number, _ in bindings] == list(sql)
-        for number, params in bindings:
-            assert set(dq.TPCH_DEFAULT_PARAMS[number]) <= set(params), f"Q{number} lost a parameter"
-            _assert_bound_in_sql(number, params, sql[number])
+        for bindings in runs:
+            assert [number for number, _ in bindings] == list(sql)
+            for number, params in bindings:
+                assert set(dq.TPCH_DEFAULT_PARAMS[number]) <= set(params), f"Q{number} lost a parameter"
+                _assert_bound_in_sql(number, params, sql[number])
 
-        defaults_used = sum(
-            all(params.get(key) == value for key, value in dq.TPCH_DEFAULT_PARAMS[number].items() if key != "fraction")
-            for number, params in bindings
-        )
-        if seed is None:
-            assert defaults_used == 22
-        else:
-            assert defaults_used <= 2, f"stream {stream_id} bound qgen -d values for {defaults_used} queries"
+            defaults_used = sum(
+                all(
+                    params.get(key) == value
+                    for key, value in dq.TPCH_DEFAULT_PARAMS[number].items()
+                    if key != "fraction"
+                )
+                for number, params in bindings
+            )
+            if seed is None:
+                assert defaults_used == 22
+            else:
+                assert defaults_used <= 2, f"stream {stream_id} bound qgen -d values for {defaults_used} queries"
 
 
 def test_seeded_overrides_do_not_leak_past_the_run() -> None:
@@ -242,3 +248,33 @@ def test_failed_parameter_extraction_preserves_outer_bindings() -> None:
                 pytest.fail("failed extraction entered the run")
         assert dq.get_tpch_parameters(3)["segment"] == "BUILDING"
         assert dq.get_tpch_parameters(11)["fraction"] == 0.001
+
+
+@pytest.mark.parametrize("seed", SEEDS, ids=lambda s: "no-seed" if s is None else f"seed-{s}")
+def test_dataframe_power_iterations_all_run_stream_zero(seed: int | None) -> None:
+    from benchbox.core.tpch.streams import TPCHStreams
+    from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+
+    adapter = PolarsDataFrameAdapter()
+
+    def _record(ctx: Any, query: Any, **_kwargs: Any) -> dict[str, Any]:
+        return {"query_id": query.query_id, "status": "SUCCESS", "execution_time_seconds": 0.0, "rows_returned": 1}
+
+    options: dict[str, Any] = {"power_warmup_iterations": WARMUPS, "power_iterations": ITERATIONS}
+    if seed is not None:
+        options["seed"] = seed
+    config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=SCALE_FACTOR, options=options)
+
+    with patch.object(adapter, "execute_query", _record):
+        results = adapter._execute_queries_phase(
+            ctx=None, benchmark_config=config, benchmark_instance=None, monitor=None
+        )
+
+    assert {result["stream_id"] for result in results} == {0}
+    assert {(result["run_type"], result["iteration"]) for result in results} == {
+        ("warmup", 0),
+        *(("measurement", iteration) for iteration in range(1, ITERATIONS + 1)),
+    }
+    for iteration in range(1, ITERATIONS + 1):
+        order = [int(str(r["query_id"]).lstrip("Qq")) for r in results if r["iteration"] == iteration]
+        assert order == TPCHStreams.PERMUTATION_MATRIX[0]

@@ -441,18 +441,6 @@ def test_official_run_withholds_phase_metrics_for_failed_phases(tpcds_benchmark,
     assert any("Throughput@Size withheld" in error for error in result["errors"])
 
 
-def _flaky_factory(failures):
-    calls = {"n": 0}
-
-    def factory():
-        calls["n"] += 1
-        if calls["n"] <= failures:
-            raise RuntimeError("connect failed")
-        return _Conn()
-
-    return factory
-
-
 def test_run_power_test_collects_query_error(tpcds_benchmark, monkeypatch):
     monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
 

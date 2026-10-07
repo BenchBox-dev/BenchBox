@@ -65,22 +65,55 @@ def build_drift_check_payload(adapter: PlatformAdapter) -> dict[str, Any] | None
         return None
 
 
+def _fold_one_layout_op(ledger: Any, op: dict[str, Any]) -> str:
+    """Fold one layout op into *ledger*; return the fold outcome.
+
+    Outcomes: ``executed`` (applied), ``failed`` (a real failure: an
+    attempted statement that errored, or an unrecognized status), or
+    ``dropped`` (a deliberate skip, recorded with its ``skipped:`` reason so
+    it still blocks ``applied_verified`` without producing ``failed``).
+    """
+    status = op.get("status")
+    if status == "applied":
+        ledger.record(
+            op.get("statement", ""),
+            op.get("phase") or PHASE_POST_LOAD,
+            status=EXECUTED,
+            mechanism=op.get("mechanism"),
+            table=op.get("table"),
+            error=op.get("error_message"),
+        )
+        return EXECUTED
+    if status == "skipped" and not op.get("error_class") and not op.get("error_message"):
+        mechanism = op.get("mechanism") or "layout"
+        table = op.get("table")
+        reason = f"skipped: {mechanism} not executed" + (f" for {table}" if table else "")
+        ledger.record_dropped(str(op.get("statement", "")), reason)
+        return "dropped"
+    ledger.record(
+        op.get("statement", ""),
+        op.get("phase") or PHASE_POST_LOAD,
+        status=STATEMENT_FAILED,
+        mechanism=op.get("mechanism"),
+        table=op.get("table"),
+        error=op.get("error_message"),
+    )
+    return STATEMENT_FAILED
+
+
 def fold_layout_operations_into_ledger(adapter: PlatformAdapter) -> None:
     ledger = getattr(adapter, "_applied_tuning_ledger", None)
-    layout_ops = getattr(adapter, "_applied_layout_operations", None)
-    if ledger is None or not layout_ops:
+    if ledger is None:
         return
-    for op in layout_ops:
+    applied_ops = getattr(adapter, "_applied_layout_operations", None) or []
+    skipped_ops = getattr(adapter, "_skipped_layout_operations", None) or []
+    if not applied_ops and not skipped_ops:
+        return
+    for op in list(applied_ops) + list(skipped_ops):
         try:
-            op_status = EXECUTED if op.get("status") == "applied" else STATEMENT_FAILED
-            ledger.record(
-                op.get("statement", ""),
-                op.get("phase") or PHASE_POST_LOAD,
-                status=op_status,
-                mechanism=op.get("mechanism"),
-                table=op.get("table"),
-                error=op.get("error_message"),
-            )
+            outcome = _fold_one_layout_op(ledger, op)
+            if outcome == STATEMENT_FAILED and op.get("status") not in ("failed", "applied", "skipped"):
+                adapter.logger.debug("applied-ledger unknown layout-op status %r; recorded as failed", op.get("status"))
         except Exception as exc:
             adapter.logger.debug("applied-ledger layout fold degraded: %s", exc)
 

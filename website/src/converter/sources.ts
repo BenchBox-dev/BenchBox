@@ -8,6 +8,8 @@ export const EXCLUDED_FILES: ReadonlySet<string> = new Set([
   "development/dependency-audit-raw.md",
   "development/unified_frame_any_survey.md",
   "development/duplication-residuals.md",
+  "development/comment-policy.md",
+  "development/comment-cleanup-scope.md",
 ]);
 
 export type DocSourceFile = { absolute: string; relative: string };

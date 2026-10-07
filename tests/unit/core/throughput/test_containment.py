@@ -75,7 +75,7 @@ def _make_stream_result(stream_id: int) -> ThroughputStreamResult:
 
 
 def _blocking_stream_fn(release: threading.Event):
-    """Stream function where stream 1 blocks until released; stream 0 is fast."""
+    """Stream function where stream 1 blocks until released; stream 2 is fast."""
 
     def _fn(stream_id: int, seed: int, config: _Config) -> ThroughputStreamResult:
         if stream_id == 1:
@@ -120,7 +120,7 @@ class TestOutstandingOwnershipState:
         logger = logging.getLogger("test-throughput-containment")
 
         def _fn(stream_id: int, seed: int, config: _Config) -> ThroughputStreamResult:
-            if stream_id == 0:
+            if stream_id == 1:
                 assert release.wait(timeout=10)
             else:
                 started.set()
@@ -133,9 +133,9 @@ class TestOutstandingOwnershipState:
 
         assert result.streams_executed == 1
         assert len(result.errors) == 2
-        # Stream 0 leaked while running; stream 1 never started and was cancelled.
-        assert result.outstanding_stream_ids == [0]
-        assert result.cancelled_stream_ids == [1]
+        # Stream 1 leaked while running; stream 2 never started and was cancelled.
+        assert result.outstanding_stream_ids == [1]
+        assert result.cancelled_stream_ids == [2]
         assert result.cleanup_state == "outstanding"
         assert not started.wait(timeout=1.0)
 
