@@ -67,7 +67,12 @@ jobs:
         run: |
           CORE_SHA="$(git rev-parse HEAD)"
           echo "core_sha=${CORE_SHA}" >> "$GITHUB_OUTPUT"
-          BUNDLED_SHAS="$(gh api "repos/${REPO}/actions/artifacts" --paginate -q '.artifacts[] | select(.name | startswith("site-inputs-")) | .name | ltrimstr("site-inputs-")')"
+          RUN_IDS="$(gh run list --workflow site-inputs.yml --status success --json databaseId --limit 10 -q '.[].databaseId')"
+          BUNDLED_SHAS=""
+          for RUN in $RUN_IDS; do
+            NAMES="$(gh api "repos/${REPO}/actions/runs/${RUN}/artifacts" -q '.artifacts[] | select(.expired == false and (.name | startswith("site-inputs-"))) | .name | ltrimstr("site-inputs-")')"
+            BUNDLED_SHAS="$(printf '%s\n%s' "$BUNDLED_SHAS" "$NAMES")"
+          done
           if [ -n "$DISPATCH_PARENT" ]; then
             if ! git merge-base --is-ancestor "$DISPATCH_PARENT" "$CORE_SHA"; then
               echo "parent_core_sha ${DISPATCH_PARENT} is not an ancestor of ${CORE_SHA}" >&2

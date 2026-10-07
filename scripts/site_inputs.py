@@ -68,6 +68,8 @@ VALIDATOR_EXACT_PATHS = (
     "scripts/validate_submission.py",
     "scripts/publication/validator_parity.py",
     "scripts/generate_corpus_inventory.py",
+    "pyproject.toml",
+    "uv.lock",
 )
 VALIDATOR_PREFIXES = (
     "benchbox/validation/",
@@ -252,6 +254,23 @@ def attestation(name: str, command: list[str], inputs: dict[str, str], compared:
     }
 
 
+def export_accepted_bundles(accepted_sha: str, dest: Path) -> None:
+    import io
+    import tarfile
+
+    proc = subprocess.run(
+        ["git", "-C", str(ROOT), "archive", accepted_sha, "results-data/bundles"],
+        cwd=str(ROOT),
+        check=False,
+        text=False,
+        capture_output=True,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"git archive {accepted_sha} failed ({proc.returncode}): {proc.stderr[-500:]}")
+    with tarfile.open(fileobj=io.BytesIO(proc.stdout)) as archive:
+        archive.extractall(dest, filter="data")
+
+
 def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) -> None:
     db = bundle / "explorer/results.duckdb"
     digest = member_digest(bundle)
@@ -292,34 +311,39 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
     accepted_sha = must_run(
         "git", "-C", str(ROOT), "rev-parse", "--verify", f"{ACCEPTED_CORPUS_REF}^{{commit}}"
     ).strip()
-    entries.append(
-        attestation(
-            "corpus_bijection",
-            [
-                "uv",
-                "run",
-                "--",
-                "python",
-                "scripts/publication/check_corpus_bijection.py",
-                "--accepted-ref",
-                accepted_sha,
-                "--bundles-dir",
-                str(ROOT / "results-data/bundles"),
-                "--artifact",
-                str(db),
-                "--require-artifact",
-                "--ledger-seed",
-                str(bundle / "ledger-seed-omitted.json"),
-            ],
-            {
-                "snapshot": file_sha(db),
-                "bundles": tree_sha(core_sha, "results-data/bundles"),
-                "accepted_bundles": tree_sha(accepted_sha, "results-data/bundles"),
-                "ledger_seed": "omitted",
-            },
-            {"accepted_ref": accepted_sha},
+    seed = ROOT / "publication/ledger-seed.json"
+    if not seed.is_file():
+        raise RuntimeError("ledger seed missing: re-home its dispositions before removing it")
+    import tempfile
+
+    with tempfile.TemporaryDirectory(prefix="benchbox-accepted-bundles-") as tmp:
+        export_accepted_bundles(accepted_sha, Path(tmp))
+        entries.append(
+            attestation(
+                "corpus_bijection",
+                [
+                    "uv",
+                    "run",
+                    "--",
+                    "python",
+                    "scripts/publication/check_corpus_bijection.py",
+                    "--accepted-ref",
+                    accepted_sha,
+                    "--bundles-dir",
+                    str(Path(tmp) / "results-data" / "bundles"),
+                    "--artifact",
+                    str(db),
+                    "--require-artifact",
+                ],
+                {
+                    "snapshot": file_sha(db),
+                    "bundles": tree_sha(core_sha, "results-data/bundles"),
+                    "accepted_bundles": tree_sha(accepted_sha, "results-data/bundles"),
+                    "ledger_seed": file_sha(seed),
+                },
+                {"accepted_ref": accepted_sha},
+            )
         )
-    )
     corpus_unchanged = tree_sha(core_sha, "results-data") == tree_sha(parent_sha, "results-data")
     if corpus_unchanged and not validator_changed(parent_sha, core_sha):
         entries.append(
@@ -481,7 +505,7 @@ def cmd_verify(out: Path) -> int:
         if isinstance(e.get("compared"), dict)
         and (
             ("head" in e["compared"] and e["compared"]["head"] != core_sha)
-            or ("base" in e["compared"] and parent_sha is not None and e["compared"]["base"] != parent_sha)
+            or ("base" in e["compared"] and e["compared"]["base"] != parent_sha)
         )
     ]
     if rebound:

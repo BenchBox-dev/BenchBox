@@ -184,8 +184,32 @@ def test_is_validator_path_matches_exact_and_prefix() -> None:
     assert site_inputs.is_validator_path("benchbox/core/results/schema_policy.py") is True
     assert site_inputs.is_validator_path("benchbox/core/results/provenance.py") is True
     assert site_inputs.is_validator_path("benchbox/core/results/anonymization.py") is True
+    assert site_inputs.is_validator_path("pyproject.toml") is True
+    assert site_inputs.is_validator_path("uv.lock") is True
     assert site_inputs.is_validator_path("benchbox/core/validation/engines.py") is False
     assert site_inputs.is_validator_path("scripts/validate_submission_test.py") is False
+    assert site_inputs.is_validator_path("_project/scripts/explorer_pipeline/transformer.py") is False
+
+
+def test_export_accepted_bundles_matches_ref_tree(tmp_path: Path) -> None:
+    dest = tmp_path / "export"
+    dest.mkdir()
+    head = site_inputs.must_run("git", "-C", str(site_inputs.ROOT), "rev-parse", "HEAD").strip()
+    site_inputs.export_accepted_bundles(head, dest)
+    exported = sorted(p.name for p in (dest / "results-data" / "bundles").rglob("*") if p.is_file())
+    assert exported, "export holds no bundles"
+    listed = site_inputs.must_run(
+        "git", "-C", str(site_inputs.ROOT), "ls-tree", "-r", "--name-only", head, "results-data/bundles"
+    ).splitlines()
+    assert exported == sorted(Path(p).name for p in listed)
+
+
+def test_verify_rejects_compared_base_without_parent(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    del manifest["parent_core_sha"]
+    (out / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
 
 
 def test_validator_changed_is_false_for_same_sha() -> None:
