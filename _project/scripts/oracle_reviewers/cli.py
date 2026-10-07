@@ -24,6 +24,7 @@ PLAN_FILE = "plan.json"
 BRIEF_FILE = "brief.md"
 DIFF_FILE = "diff.patch"
 WORKFLOW_FILE = "oracle-review-shadow.yml"
+WORKFLOW_SOURCE = Path(".github/workflows") / WORKFLOW_FILE
 DEVELOP_REF = "refs/heads/develop"
 NEW_DIFF_ACTIONS = ("opened", "synchronize")
 REVIEW = "review"
@@ -118,16 +119,33 @@ IMPLEMENTATION_DIGEST = hashlib.sha256(
 ).hexdigest()
 
 
+def _identities(repo: str, head_sha: str, files: list[ChangedFile]) -> dict[str, str]:
+    try:
+        tree = github.get_json(f"repos/{repo}/git/trees/{head_sha}?recursive=1")
+        modes = {} if tree.get("truncated") else {entry["path"]: entry["mode"] for entry in tree["tree"]}
+    except (github.GitHubError, KeyError, TypeError, ValueError):
+        modes = {}
+    return {
+        item.path: f"{'removed' if item.removed else modes.get(item.path, '')}:{item.sha}"
+        if item.sha and (item.removed or item.path in modes)
+        else ""
+        for item in files
+    }
+
+
 def _reusable(
-    reviewed: retry.Reviewed | None, basis: str | None, scoped: list[ChangedFile], tier: Tier
+    reviewed: retry.Reviewed | None,
+    basis: str | None,
+    scoped: list[ChangedFile],
+    tier: Tier,
+    current: dict[str, str],
 ) -> tuple[retry.Reviewed | None, list[ChangedFile]]:
-    current = {item.path: item.sha for item in scoped}
     if reviewed is None or basis is None or reviewed.basis != basis or not all(current.values()):
         return None, scoped
     if current == reviewed.files:
         return reviewed, []
     if reviewed.outcome == retry.SUCCESS and tier.name != SCOPELESS_TIER and set(reviewed.files) <= set(current):
-        return reviewed, [item for item in scoped if reviewed.files.get(item.path) != item.sha]
+        return reviewed, [item for item in scoped if reviewed.files.get(item.path) != current[item.path]]
     return reviewed, scoped
 
 
@@ -152,6 +170,7 @@ def review_basis(merge_base: str, tier: Tier, policy: Policy, excluded: Iterable
         "brief": BRIEF_TEMPLATE,
         "schema": VERDICT_SCHEMA,
         "implementation": IMPLEMENTATION_DIGEST,
+        "workflow": hashlib.sha256(WORKFLOW_SOURCE.read_bytes()).hexdigest() if WORKFLOW_SOURCE.is_file() else "",
     }
     digest = hashlib.sha256(json.dumps(material, sort_keys=True).encode("utf-8")).hexdigest()
     return f"{tier.name}:{merge_base}:{digest}"
@@ -241,13 +260,13 @@ def command_plan(args: argparse.Namespace) -> int:
     scoped = [
         item for item in files if any(path in in_scope or not path.endswith(PROSE_SUFFIXES) for path in item.paths)
     ]
-    current = {item.path: item.sha for item in scoped}
+    current = _identities(repo, plan["head_sha"], scoped)
     merge_base = _merge_base(repo, plan["base_sha"], plan["head_sha"])
     excluded = selection.excluded_families(labels, policy)
     policy_text = Path(args.policy).read_text(encoding="utf-8")
     basis = review_basis(merge_base, tier, policy, excluded, policy_text) if merge_base else None
     reviewed = previous.reviewed if previous and action != "edited" else None
-    reviewed, changed = _reusable(reviewed, basis, scoped, tier)
+    reviewed, changed = _reusable(reviewed, basis, scoped, tier, current)
     plan["reviewed_files"] = current
     plan["review_basis"] = basis or ""
     try:

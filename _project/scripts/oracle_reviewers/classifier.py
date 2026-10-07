@@ -15,6 +15,11 @@ class ChangedFile:
     additions: int
     deletions: int
     sha: str = ""
+    status: str = ""
+
+    @property
+    def removed(self) -> bool:
+        return self.status == "removed"
 
     @property
     def lines(self) -> int:
@@ -32,6 +37,7 @@ class ChangedFile:
             additions=int(data.get("additions") or 0),
             deletions=int(data.get("deletions") or 0),
             sha=str(data.get("sha") or ""),
+            status=str(data.get("status") or ""),
         )
 
 

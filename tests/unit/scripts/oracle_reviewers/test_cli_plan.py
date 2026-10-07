@@ -23,6 +23,7 @@ HEAD = "a" * 40
 BASE = "b" * 40
 DIFF = "diff --git a/x b/x\n"
 MERGE_BASE = "e" * 40
+MODE = "100644"
 
 
 def _pull(**over: Any) -> dict[str, Any]:
@@ -54,6 +55,7 @@ class FakeGitHub:
         self.diff = diff
         self.diff_reads = 0
         self.merge_base: str | None = MERGE_BASE
+        self.modes: dict[str, str] = {}
         self.dispatched: list[int] = []
 
     def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -67,6 +69,9 @@ class FakeGitHub:
     def _json(self, path: str) -> dict[str, Any]:
         if "/compare/" in path:
             return {"merge_base_commit": {"sha": self.merge_base}}
+        if "/git/trees/" in path:
+            tree = [{"path": item["filename"], "mode": self.modes.get(item["filename"], MODE)} for item in self.files]
+            return {"truncated": False, "tree": tree}
         return self.pull
 
     def _threads(self, repo: str, pr: int) -> list[dict[str, Any]]:
@@ -269,7 +274,7 @@ def _basis(tier: str = "medium-high", merge_base: str = MERGE_BASE, excluded: tu
 
 
 def _reviewed_state(files: dict[str, str], basis: str = _basis(), outcome: str = "failure") -> State:
-    reviewed = Reviewed(OLD_HEAD, basis, outcome, files)
+    reviewed = Reviewed(OLD_HEAD, basis, outcome, {path: f"{MODE}:{sha}" for path, sha in files.items()})
     return State(7, OLD_HEAD, outcome, datetime.now(UTC) - timedelta(hours=1), reviewed=reviewed)
 
 
@@ -292,7 +297,7 @@ def test_push_touching_one_file_reviews_only_that_file(monkeypatch: pytest.Monke
     _, values, plan = _plan(monkeypatch, tmp_path, fake)
     assert values["decision"] == "review"
     assert plan["scope"] == "changed" and plan["reviewed_head"] == OLD_HEAD
-    assert plan["reviewed_files"] == {CHECKER: "1" * 40, CAPTURE: "2" * 40}
+    assert plan["reviewed_files"] == {CHECKER: f"{MODE}:{'1' * 40}", CAPTURE: f"{MODE}:{'2' * 40}"}
     brief = (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
     assert "capture change" in brief and "checker change" not in brief
     assert f"since head {OLD_HEAD} was reviewed" in brief
@@ -453,3 +458,10 @@ def test_prose_is_listed_apart_and_a_rename_from_code_stays_tracked(
     assert "notes/rules.md" in plan["reviewed_files"] and "README.md" not in plan["reviewed_files"]
     brief = (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
     assert "README.md" in brief.split("not compared with that review:", 1)[1]
+
+
+def test_a_mode_only_change_is_reviewed_not_carried(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fake = FakeGitHub(_pull(), TWO_FILES, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}), diff=TWO_FILE_DIFF)
+    fake.modes = {CHECKER: "100755"}
+    _, values, _ = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "review"

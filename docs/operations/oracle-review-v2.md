@@ -59,11 +59,12 @@ Without the App secrets, the `post` job logs the result and succeeds.
    latest run.
 
 `plan` also limits spend to code that changed. The retry state records the
-blob SHA of each changed file at the last success or failure, except prose
+blob SHA and tree mode of each changed file at the last success or failure, except prose
 files (`.md`, `.mdx`, `.rst`, `.txt`) outside soundness paths, with the basis
 of that result: the merge base of the head with `develop`, the tier, its
 blocking severities and reviewer settings, the excluded author families, and a
-hash of the policy file, brief template, verdict schema and reviewer code. When the basis is unchanged and the new
+hash of the policy file, brief template, verdict schema, reviewer code and this
+workflow. When the basis is unchanged and the new
 head has exactly those files at those SHAs, the run posts the recorded result
 to the new head without running a reviewer, so a push that changes only prose
 costs nothing. When the last result was a success below the very-high tier and some
