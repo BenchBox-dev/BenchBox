@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Archive tag exists on the remote at the recorded head",
+    "Before-state recorded; branch, environment and the two secrets deleted (gh api reads confirm)",
+    "App uninstalled or listed for the owner"
+  ],
+  "context": "Owner decision D18 (2026-10-06): the agent performs this cleanup after archiving. The tag date comes from the branch head (muse AR-24). These are the only deletions of GitHub objects the batch may make; never delete any other branch, tag, environment, secret or App.",
+  "description": "Agent action via gh api; no PR. Do it after the C2 PR merges.\n\n1. Record the before-state in the item context:\n   - the `publication` branch head SHA and commit date;\n   - the `publication-attestation` environment config and its secret names;\n   - the repo secret names PUBLICATION_APP_ID and PUBLICATION_APP_PRIVATE_KEY;\n   - the publication App id and installation id.\n2. Create and push the tag `archive/publication-<UTC date of that head, YYYYMMDD>` on the branch head. Verify it on the remote.\n3. Delete:\n   - the `publication` branch;\n   - the `publication-attestation` environment;\n   - the repo secrets PUBLICATION_APP_ID and PUBLICATION_APP_PRIVATE_KEY.\n4. Uninstall the publication App from the org. If the API refuses, add it to the owner list in the batch's final report.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:53:30Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "a4cac9f5129647b29064eb37d5ebcf0e",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    }
+  ]
+}

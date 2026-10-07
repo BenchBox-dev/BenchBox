@@ -19184,6 +19184,15 @@
       "status": "open",
       "title": "Delete the landing stub aggregate and its approved-context entries from core"
     },
+    "site-split-54-publication-github-cleanup": {
+      "claim": null,
+      "needs": [
+        "site-split-51-publication-retirement"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Archive and delete the publication branch, environment, secrets and App after the plane is retired"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],
