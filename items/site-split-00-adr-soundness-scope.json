@@ -1,12 +1,12 @@
 {
   "acceptance": [
-    "ADR merged and passes check_decision_records",
-    "oracle_review_check.py reports no soundness path for a change touching only .github/workflows/publication-deploy.yml, and still reports one for trunk.yml and site-deploy.yml (evidence in PR body)",
-    "test_soundness_paths passes with the new regex coverage assertions",
-    "Oracle review cleared by the Codex connector or the owner's stand-in comment on the exact head"
+    "ADR merged; check_decision_records shows no new failure beyond the two pre-existing ones",
+    "Every path that was a soundness path on develop still is; scripts/site_inputs.py and browser_fixtures.py are soundness paths (oracle_review_check predicate output in PR)",
+    "oracle-review-shadow blocking findings on the final head fixed or dispositioned in the PR before the stand-in is requested",
+    "Oracle review cleared on the exact final head"
   ],
   "context": "Resumption: C1 PR #2748 open (branch fix/site-split-c1-adr-site-inputs, head a47c25b73, base develop). CI running; required oracle-review check waits on the Codex connector or owner stand-in APPROVE a47c25b73. Next: watch CI + connector, fix findings, pr-arm, monitor to merge, then re-take 00 and 10 to finish. 00 slice e333691ed, 10 slice a47c25b73 (amended with review fixes).\n2026-10-07 pm: owner added d4c12b892 (fixtures corpus), ed5b67ab1 (landing test), 2097ec50e (ADR plan pointer, pushed). Agent committed ed1a4b553 (fast marker) and 4e4ddb3bb (ADR corrections: D5 detection-after-merge, D16 bundle-compat, dropped merge-queue claim); PR head now 4e4ddb3bb, pushed, CI re-running, shadow review re-dispatched. PR body already discloses the pre-existing check_decision_records failure. Still owner-gated: oracle stand-in APPROVE on the merge head, bridge App/secrets, site repo. Next: read CI + shadow results, fix, pr-arm, monitor to merge.",
-  "description": "PR group C1: one core PR shared with site-split-10, with separate commits, so the batch needs one oracle review instead of two. It needs oracle review because it changes `.github/soundness-paths.txt`.\n\n1. Write `docs/development/adr/adr-site-repo-split.md`:\n   - Motivation: the Astro cutover was delayed by coupling to core CI, so the site needs isolated CI and fast rollouts.\n   - Decisions D1-D20 from the plan.\n   - The language rule: no Python source in the site repo, no JS/TS source in core; run-time third-party tools are allowed.\n   - Supersessions:\n     - `single-repo-migration.md`, in part;\n     - `adr-astro-unified-site.md` D12, D13 and D14, where they conflict;\n     - `adr-independent-publication-authorities.md`.\n   - The \"Consumers\" appendix.\n   Satisfy `scripts/check_decision_records.py`.\n2. In `.github/soundness-paths.txt`:\n   - Replace `prefix .github/workflows/` with a `regex` that excludes only `docs.yml`, `publication-*.yml` and `rehearse-release-isolation.yml`.\n   - Remove the `file` lines for those workflows and for the missing `publication-lane-docs.yml` and `publication-lane-explorer.yml`.\n   - Replace `prefix publication/` and `prefix scripts/publication/` with `file` entries for the corpus files that survive the publication retirement. Derive the list from the imports of the corpus workflows and `scripts/publication/verify_corpus_promotion.py`.\n   - Keep `scripts/site_deploy/`, `deploy/`, `site-deploy.yml` and the site-inventory entries. Core deploys production until the cutover.\n3. In `tests/unit/scripts/test_soundness_paths.py`:\n   - Drop the expectations for the excluded and missing workflows.\n   - Assert that the regex still matches `ci.yml`, `trunk.yml`, `oracle-review.yml`, `release.yml`, `site-deploy.yml`, `validate-submission.yml` and a made-up `new-example.yml`.\n   - Assert that it matches none of the excluded files.",
+  "description": "PR group C1: one core PR shared with site-split-10 (PR #2748).\n\n1. Write `docs/development/adr/adr-site-repo-split.md`:\n   - Motivation: the Astro cutover was delayed by shared required checks, soundness and oracle review, runner contention and approval gates. Core has no merge queue. The site needs isolated CI and fast rollouts.\n   - Decisions D1-D20, stated once each, as in the plan.\n   - The language rule.\n   - Supersessions:\n     - `single-repo-migration.md`, in part;\n     - `adr-astro-unified-site.md` D12, D13 and D14, where they conflict;\n     - `adr-independent-publication-authorities.md`.\n   - The Consumers appendix.\n   - No plan or handoff paths, plan branches, tracker ids or PR-group labels (DURABLE-ARTIFACTS-001).\n2. Soundness (D14, AMENDED by the owner 2026-10-07):\n   - Add `file scripts/site_inputs.py` and `file _project/scripts/explorer_pipeline/browser_fixtures.py` to `.github/soundness-paths.txt`, with test expectations.\n   - Remove nothing. Revert any earlier narrowing of the `.github/workflows/`, `publication/` and `scripts/publication/` prefixes, and its test changes.\n   - The narrowing happens in site-split-50, in the same commit as the deletions.",
   "links": [
     ".github/soundness-paths.txt",
     "_project/scripts/soundness_paths.py",
@@ -90,6 +90,14 @@
       "op": "update",
       "op_id": "e5944010d5c94261a31aa574e95bbf02",
       "session_id": "bded665cd1c546e5acaf7fa074a0853d"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T13:59:26Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "acde183cacf54a678aa91d42d14e992a",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
     }
   ]
 }

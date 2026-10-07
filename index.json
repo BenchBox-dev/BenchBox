@@ -19055,7 +19055,7 @@
       ],
       "priority": "high",
       "status": "active",
-      "title": "Record the site-repo split ADR and narrow soundness paths to exclude retiring publication workflows"
+      "title": "Record the site-repo split ADR and add the bundle attestation producer to soundness paths"
     },
     "site-split-01-tracker-reconcile": {
       "claim": null,
