@@ -3,6 +3,7 @@
     "Exclusion lists shrink to root entries",
     "All references resolve"
   ],
+  "context": "2026-10-07: branch docs/publish-policy-data (local commit a9107bea0, PR to open after #2763 merges) moves the per-file exclusions into docs/publish-exclusions.txt, which both builds read. Moving pages into docs/internal/ then only shrinks that data file; no renderer code changes. Many target files overlap open PR #2614, so do the move after #2614 lands.",
   "description": "About 60 excluded pages remain in docs/development/ and docs/operations/, listed one by one in both exclusion lists (website/src/converter/sources.ts and docs/conf.py). Move them to docs/internal/ and update path references in AGENTS.md, scripts, tests and _project.",
   "sessions": [
     {
@@ -12,6 +13,14 @@
       "op": "create",
       "op_id": "ea816427edf7409b810a82701b1e439a",
       "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-07T22:54:42Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f7e26ada23944f648eb02547748529f7",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
     }
   ]
 }
