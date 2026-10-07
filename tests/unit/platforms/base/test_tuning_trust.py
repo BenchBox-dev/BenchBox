@@ -157,6 +157,24 @@ def test_fold_records_skipped_with_error_as_failed() -> None:
     assert [s.status for s in ledger.statements] == [FAILED]
 
 
+def test_fold_records_skipped_with_empty_error_message_as_failed() -> None:
+    adapter, ledger = _fold_adapter(
+        [
+            {
+                "statement": "OPTIMIZE T",
+                "phase": PHASE_POST_LOAD,
+                "status": "skipped",
+                "mechanism": "optimize",
+                "error_class": "TimeoutError",
+                "error_message": "",
+            }
+        ]
+    )
+    tuning_trust.fold_layout_operations_into_ledger(adapter)
+    assert ledger.dropped == []
+    assert [s.status for s in ledger.statements] == [FAILED]
+
+
 def test_fold_records_unknown_status_as_failed() -> None:
     adapter, ledger = _fold_adapter(
         [{"statement": "OPTIMIZE T", "phase": PHASE_POST_LOAD, "status": "weird", "mechanism": "optimize"}]

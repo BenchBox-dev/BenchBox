@@ -84,7 +84,7 @@ def _fold_one_layout_op(ledger: Any, op: dict[str, Any]) -> str:
             error=op.get("error_message"),
         )
         return EXECUTED
-    if status == "skipped" and not op.get("error_message"):
+    if status == "skipped" and not op.get("error_class") and not op.get("error_message"):
         mechanism = op.get("mechanism") or "layout"
         table = op.get("table")
         reason = f"skipped: {mechanism} not executed" + (f" for {table}" if table else "")
