@@ -10,7 +10,7 @@ merge. Plan recorded on branch `origin/claude/bold-newton-uudn48`
 ## Context
 
 The Astro cutover was delayed by coupling to core CI: every site change ran the
-full core pipeline, and site deploys shared the core merge queue. The site
+full core pipeline, which also gated site deploys. The site
 needs isolated CI and fast rollouts. This ADR moves every site asset out of
 `BenchBox-dev/BenchBox` (core) into `BenchBox-dev/benchbox-site` (site),
 connected by one versioned contract: the site-inputs bundle that core produces
@@ -30,7 +30,7 @@ the refinement governs execution.
 | D2 | Repo name and visibility | `BenchBox-dev/benchbox-site`, public. | Plan |
 | D3 | Rehearsal host | `next.benchbox.dev` CNAME, pointed at the site repo Pages before cutover. | Plan; item 30 |
 | D4 | Deploy control plane port | Plan: port the Python plane to TypeScript later (Phase 5); move it as-is first. Refinement (operative): replace the Python control plane with Node now; no Python in the site repo. | Plan; item 23 |
-| D5 | Docs-PR site gate | Core `docs/` PRs are gated on a site build (`site-compat` job against the pinned site SHA). | Plan |
+| D5 | Docs-PR site gate | Plan: core `docs/` PRs are gated on a site build (`site-compat` job against the pinned site SHA). Refinement (operative): no pre-merge site gate in core and no Node build in core; breakage is detected after merge by the `site-inputs` bundle build and the site repo bundle-consume CI. | Plan; item 10 |
 | D6 | Deploy trigger | Plan: dispatch-only with a required reviewer. Refinement (operative): auto-deploy with no reviewer on `github-pages`; no required reviewers on that environment. | Plan; items 21, 23 |
 | D7 | Trunk-only docs | Trunk-only docs supersede release-pinned docs. | Item 01 |
 | D8 | Visual regression | Advisory (non-blocking) in site CI. | Item 21 |
@@ -41,7 +41,7 @@ the refinement governs execution.
 | D13 | Runner pool | The runner-pool decision leaves the batch to a follow-up 30 days after cutover, using receipt queue-time and latency data. | Item 99 |
 | D14 | Soundness narrowing first | Narrow the soundness paths before deleting retiring paths, so the deletions need no oracle review. | Item 00 |
 | D15 | External links | lychee external-link checks are non-blocking (open or update one issue). | Item 21 |
-| D16 | Unrecorded | No D16 wording was found in the plan or tracker. No batch step depends on it. | This ADR |
+| D16 | Bundle compatibility | The `site-inputs` schema uses integer majors; the site supports N and N-1 for one release; core lands first. | Plan; item 22 |
 | D17 | Hosted ruleset edit | The agent may make exactly one hosted-ruleset edit (remove the `landing` context from ruleset 15611785) and no other. | Item 52 |
 | D18 | GitHub cleanup | The agent archives (tag) then deletes the `publication` branch, the `publication-attestation` environment, the two publication secrets, and uninstalls the publication App. These are the only GitHub-object deletions the batch may make. | Item 54 |
 | D19 | First production deploy | The owner approves the first production deploy live in chat before `SITE_DEPLOY_TARGET=production` is set. | Item 40 |
