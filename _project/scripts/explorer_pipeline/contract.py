@@ -54,13 +54,6 @@ EXPLORER_BUILD_CONTRACT_VERSION = "6"
 #      listResults() projection that powers the benchmark browser). A v12
 #      snapshot lacks the column, so a v12 snapshot would hit a DuckDB
 #      binder error instead of the intended rebuild message.
-# v14: results gained throughput_at_size and stream_count; benchmark_rankings
-#      gained throughput_at_size and stream_count; benchmark_matrix_cells and
-#      cohort_metadata gained stream_count. TPC-H and TPC-DS throughput cohorts
-#      now rank on throughput_at_size and split by stream count, so ranking
-#      and cohort identity changed. A v13 snapshot lacks the columns, so a v13
-#      snapshot would hit a DuckDB binder error instead of the intended
-#      rebuild message.
 EXPLORER_READ_MODEL_VERSION = 14
 EXPLORER_READ_MODEL_COMPATIBILITY = {
     "minimum_supported": EXPLORER_READ_MODEL_VERSION,

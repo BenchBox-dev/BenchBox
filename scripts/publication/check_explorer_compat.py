@@ -3,11 +3,11 @@
 
 This CLI tool verifies that the Results Explorer SPA and its artifacts
 maintain compatibility with the current corpus DuckDB read-model schema
-(v14). It also validates hermetic, content-addressed Explorer application
+(v13). It also validates hermetic, content-addressed Explorer application
 artifact bundles.
 
 Usage:
-    # Run schema compatibility checks only (v14 only):
+    # Run schema compatibility checks only (v13 only):
     uv run -- python scripts/publication/check_explorer_compat.py --schema-only
 
     # Validate an Explorer build artifact directory or archive:
@@ -22,8 +22,8 @@ Usage:
     # Validate a specific DuckDB database snapshot file:
     uv run -- python scripts/publication/check_explorer_compat.py --db-path results-explorer/public/data/results.duckdb
 
-    # Check specific schema versions (only 14 is supported):
-    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 14
+    # Check specific schema versions (only 13 is supported):
+    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 13
 
     # Output machine-readable JSON:
     uv run -- python scripts/publication/check_explorer_compat.py --schema-only --json
