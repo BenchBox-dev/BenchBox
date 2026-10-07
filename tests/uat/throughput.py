@@ -63,34 +63,6 @@ def validate_result_identity(
 
 
 def validate_stream_count(result_json: dict[str, Any], *, requested_streams: int) -> tuple[bool, str]:
-    """Check that every requested stream actually executed at least one query.
-
-    This is the core signal the throughput-uat-and-ci-coverage TODO exists to
-    protect: a regression that silently drops the requested stream count (see
-    the throughput-stream-count-wiring-defect TODO) must be caught even when
-    an unrelated correctness issue (see ``validate_throughput_metric``) keeps
-    the overall run from being "clean". Split out from
-    ``validate_throughput_result`` so a caller (e.g. nightly CI) can hard-gate
-    on this specific invariant independent of that separate concern.
-
-    Derived from the distinct ``stream`` ids across throughput ``queries[]``
-    rows -- NOT the top-level ``run.streams`` field, which is
-    ``max(stream_id)`` (an index, not a count) and so is off-by-one from the
-    real stream count (see ``benchbox/core/results/schema.py::_build_run_section``).
-
-    Deliberately status-blind: a stream counts as "executed" the moment it
-    contributes >=1 row to ``queries[]``, regardless of whether that query
-    passed or failed. That is by design -- this check exists purely to catch
-    the concurrency-wiring regression (a requested stream never reaching the
-    driver at all), and stays a pure "did the request reach the driver"
-    signal so callers (e.g. the nightly wiring-defect assert step) can use it
-    independent of run outcome. See ``validate_stream_success`` for the
-    stricter, outcome-sensitive companion that checks each executed stream
-    actually succeeded.
-
-    Returns ``(ok, reason)``; `reason` is a human-readable explanation on
-    failure, or ``"ok"`` on success.
-    """
     streams_seen = {row["stream"] for row in _throughput_rows(result_json)}
     executed = len(streams_seen)
     if executed != requested_streams:

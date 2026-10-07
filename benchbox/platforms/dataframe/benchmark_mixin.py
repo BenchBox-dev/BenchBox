@@ -1271,7 +1271,9 @@ class BenchmarkExecutionMixin:
 
     @staticmethod
     def _power_iteration_stream_id(benchmark_config: BenchmarkConfig, default_stream_id: int) -> int:
-        if normalize_benchmark_id(benchmark_config.name) != "tpch":
+        from benchbox.core.tpch.dataframe_queries import TPCH_FAMILY_DATAFRAME_IDS
+
+        if normalize_benchmark_id(benchmark_config.name) not in TPCH_FAMILY_DATAFRAME_IDS:
             return default_stream_id
         return int(getattr(benchmark_config, "stream_id", 0) or 0)
 
