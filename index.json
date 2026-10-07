@@ -19057,6 +19057,15 @@
       "status": "open",
       "title": "Record the site-repo split ADR and narrow soundness paths to exclude retiring publication workflows"
     },
+    "site-split-10-core-site-inputs": {
+      "claim": null,
+      "needs": [
+        "site-split-00-adr-soundness-scope"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Make core produce and attest the versioned site-inputs bundle and dispatch it to the site repo"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],
