@@ -54,7 +54,13 @@ def _bundle(tmp_path: Path, schema: int = 1, attestations: str = "pass") -> Path
         "api-public-symbols.json": '{"symbols": []}\n',
         "attestations.json": "attestation tree",
     }
-    att = [{"name": "privacy", "result": attestations}, {"name": "validator_parity", "result": "skip"}]
+    att = [
+        {"name": "privacy", "result": attestations},
+        {"name": "explorer_compat", "result": "pass"},
+        {"name": "snapshot_invariants", "result": "pass"},
+        {"name": "corpus_bijection", "result": "pass"},
+        {"name": "validator_parity", "result": "skip"},
+    ]
     members["attestations.json"] = json.dumps(att) + "\n"
     digests = {}
     dirs = {"docs", "explorer/fixtures", "explorer/parity"}
@@ -87,6 +93,36 @@ def test_verify_rejects_schema_mismatch(tmp_path: Path) -> None:
 
 def test_verify_rejects_failed_attestation(tmp_path: Path) -> None:
     assert site_inputs.cmd_verify(_bundle(tmp_path, attestations="fail")) == 1
+
+
+def test_verify_rejects_missing_member(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    manifest["members"].pop("docs")
+    (out / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_missing_attestation(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    kept = [e for e in json.loads((out / "attestations.json").read_text(encoding="utf-8")) if e["name"] != "privacy"]
+    (out / "attestations.json").write_text(json.dumps(kept) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_skipped_required_attestation(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, result="skip") if e["name"] == "privacy" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_member_digest_raises_on_missing_path(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        site_inputs.member_digest(tmp_path / "absent")
 
 
 def test_build_refuses_foreign_core_sha(tmp_path: Path) -> None:

@@ -58,13 +58,19 @@ jobs:
         env:
           DISPATCH_PARENT: ${{ inputs.parent_core_sha }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           CORE_SHA="$(git rev-parse HEAD)"
           echo "core_sha=${CORE_SHA}" >> "$GITHUB_OUTPUT"
           if [ -n "$DISPATCH_PARENT" ]; then
             echo "parent_sha=${DISPATCH_PARENT}" >> "$GITHUB_OUTPUT"
           else
-            echo "parent_sha=$(git rev-parse "${CORE_SHA}~1")" >> "$GITHUB_OUTPUT"
+            PREV="$(gh run list --workflow trunk.yml --branch develop --status success --json headSha --limit 5 -q '.[].headSha' | grep -vx "$CORE_SHA" | head -n 1)"
+            if [ -n "$PREV" ]; then
+              echo "parent_sha=${PREV}" >> "$GITHUB_OUTPUT"
+            else
+              echo "parent_sha=$(git rev-parse "${CORE_SHA}~1")" >> "$GITHUB_OUTPUT"
+            fi
           fi
           echo "certified_by=${RUN_ID:-dispatch}" >> "$GITHUB_OUTPUT"
 

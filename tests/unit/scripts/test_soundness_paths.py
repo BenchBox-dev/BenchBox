@@ -173,8 +173,6 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         ".github/workflows/publication-soak-monitor.yml",
         ".github/workflows/publication-recover.yml",
         ".github/workflows/publication-canaries.yml",
-        ".github/workflows/publication-lane-docs.yml",
-        ".github/workflows/publication-lane-explorer.yml",
         ".github/workflows/publication-corpus-cutover.yml",
         ".github/workflows/rehearse-release-isolation.yml",
         "scripts/publication/verify_lane_isolation.py",
@@ -193,14 +191,14 @@ RETIRING_WORKFLOWS = (
     ".github/workflows/publication-deploy.yml",
     ".github/workflows/publication-preview-deploy.yml",
     ".github/workflows/publication-preview-soak.yml",
-    ".github/workflows/publication-lane-docs.yml",
-    ".github/workflows/publication-lane-explorer.yml",
     ".github/workflows/publication-corpus-cutover.yml",
     ".github/workflows/publication-transaction.yml",
     ".github/workflows/publication-soak-monitor.yml",
     ".github/workflows/publication-recover.yml",
     ".github/workflows/publication-canaries.yml",
     ".github/workflows/rehearse-release-isolation.yml",
+    ".github/workflows/docs.yaml",
+    ".github/workflows/publication-deploy.yaml",
 )
 
 
@@ -213,6 +211,9 @@ def test_soundness_workflow_regex_keeps_live_workflows() -> None:
         ".github/workflows/site-deploy.yml",
         ".github/workflows/validate-submission.yml",
         ".github/workflows/new-example.yml",
+        ".github/workflows/new-example.yaml",
+        ".github/workflows/publication-lane-docs.yml",
+        ".github/workflows/publication-future.yml",
     ):
         assert soundness.is_soundness_path(path) is True
 

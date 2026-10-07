@@ -46,9 +46,30 @@ def file_sha(path: Path) -> str:
     return digest.hexdigest()
 
 
+REQUIRED_MEMBERS = (
+    "docs",
+    "repo-files.json",
+    "explorer/results.duckdb",
+    "explorer/contract.json",
+    "explorer/fixtures",
+    "explorer/parity",
+    "landing/prompt-catalog.json",
+    "api-public-symbols.json",
+    "attestations.json",
+)
+REQUIRED_ATTESTATIONS = (
+    "privacy",
+    "explorer_compat",
+    "snapshot_invariants",
+    "corpus_bijection",
+)
+
+
 def member_digest(root: Path) -> str:
     if root.is_file():
         return file_sha(root)
+    if not root.is_dir():
+        raise FileNotFoundError(f"bundle member missing: {root}")
     lines = [f"{p.relative_to(root)}:{file_sha(p)}" for p in sorted(root.rglob("*")) if p.is_file()]
     return hashlib.sha256(("\n".join(lines) + "\n").encode()).hexdigest()
 
@@ -296,10 +317,17 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
 def cmd_build(args: argparse.Namespace) -> int:
     out = Path(args.out)
     core_sha = args.core_sha or must_run("git", "-C", str(ROOT), "rev-parse", "HEAD").strip()
+    parent_sha = args.parent_core_sha or must_run("git", "-C", str(ROOT), "rev-parse", f"{core_sha}~1").strip()
     head = must_run("git", "-C", str(ROOT), "rev-parse", "HEAD").strip()
     if head != core_sha:
         raise RuntimeError(f"worktree HEAD {head} is not the bundle core_sha {core_sha}")
-    parent_sha = args.parent_core_sha or must_run("git", "-C", str(ROOT), "rev-parse", f"{core_sha}~1").strip()
+    dirty = must_run("git", "-C", str(ROOT), "status", "--porcelain").splitlines()
+    tracked_edits = [line for line in dirty if not line.startswith("??")]
+    if tracked_edits:
+        raise RuntimeError(f"worktree has tracked modifications: {tracked_edits[:5]}")
+    ancestor = run("git", "-C", str(ROOT), "merge-base", "--is-ancestor", parent_sha, core_sha)
+    if ancestor.returncode != 0 or parent_sha == core_sha:
+        raise RuntimeError(f"parent_core_sha {parent_sha} is not a strict ancestor of {core_sha}")
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
@@ -345,16 +373,28 @@ def cmd_verify(out: Path) -> int:
         print(f"schema mismatch: {manifest.get('schema')!r}")
         return 1
     expected = manifest.get("members", {})
+    if sorted(expected) != sorted(REQUIRED_MEMBERS):
+        print(f"member set mismatch: {sorted(expected)}")
+        return 1
     bad = [name for name, sha in expected.items() if member_digest(out / name) != sha]
     if bad:
         print(f"digest mismatch: {', '.join(bad)}")
         return 1
     attestations = json.loads((out / "attestations.json").read_text(encoding="utf-8"))
-    failed = [e["name"] for e in attestations if e["result"] == "fail"]
+    by_name = {e["name"]: e["result"] for e in attestations}
+    missing = [name for name in list(REQUIRED_ATTESTATIONS) + ["validator_parity"] if name not in by_name]
+    if missing:
+        print(f"missing attestations: {', '.join(missing)}")
+        return 1
+    failed = [name for name, result in by_name.items() if result == "fail"]
     if failed:
         print(f"failed attestations: {', '.join(failed)}")
         return 1
-    unknown = [e["name"] for e in attestations if e["result"] not in ("pass", "skip")]
+    required_skipped = [name for name in REQUIRED_ATTESTATIONS if by_name[name] == "skip"]
+    if required_skipped:
+        print(f"required attestations skipped: {', '.join(required_skipped)}")
+        return 1
+    unknown = [name for name, result in by_name.items() if result not in ("pass", "skip")]
     if unknown:
         print(f"unknown attestation results: {', '.join(unknown)}")
         return 1

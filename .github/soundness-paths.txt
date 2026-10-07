@@ -19,7 +19,7 @@ file	scripts/publication/validator_parity.py
 file	scripts/publication/verify_live.py
 prefix	scripts/site_deploy/
 prefix	deploy/
-regex	^\.github/workflows/(?!docs\.yml$|publication-[^/]*\.yml$|rehearse-release-isolation\.yml$)[^/]+\.yml$
+regex	^\.github/workflows/(?!docs\.ya?ml$|publication-(?:canaries|corpus-cutover|deploy|preview-deploy|preview-soak|recover|soak-monitor|transaction)\.ya?ml$|rehearse-release-isolation\.ya?ml$)[^/]+\.ya?ml$
 prefix	_sources/tpc-h/dbgen/answers/
 prefix	_sources/tpc-ds/answer_sets/
 prefix	_project/design/site-inventory/release-known-broken/
