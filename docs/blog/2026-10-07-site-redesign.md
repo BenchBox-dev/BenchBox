@@ -24,7 +24,7 @@ We added a new block-character wordmark for the project that is used in the CLI 
 
 The previous site lacked any distinctive identity: it looked too much like a generic template. The new design is inspired by the new logo and improves the overall navigation so that it's easier to see where you are in the site.
 
-The old site relied on the Sphinx static site engine and the Furo template theme. The new site moves to the more flexible Astro engine.
+The old site relied on the Sphinx static site engine and the Furo template theme. The new site drops all use of Python from the site infrastructure and moves to the more flexible Astro engine.
 
 ## Inspiration
 
