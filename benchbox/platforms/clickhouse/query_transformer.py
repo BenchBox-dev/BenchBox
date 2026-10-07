@@ -81,6 +81,11 @@ class ClickHouseQueryTransformer:
             r"\b[A-Z][A-Z_]+_SK\b",  # Foreign keys like CUSTOMER_SK
             r"\b[A-Z][A-Z_]+_AMT\b",  # Amount columns
             r"\b[A-Z][A-Z_]+_QTY\b",  # Quantity columns
+            r"\b[A-Z][A-Z_]+_FEE\b",  # Fee columns like SR_FEE in TPC-DS Q1
+            r"\b[A-Z][A-Z_]+_CASH\b",  # Cash columns like SR_REFUNDED_CASH in TPC-DS Q1
+            r"\b[A-Z][A-Z_]+_CREDIT\b",  # Credit columns like SR_STORE_CREDIT in TPC-DS Q1
+            r"\b[A-Z][A-Z_]+_TAX\b",  # Tax columns like SR_RETURN_TAX in TPC-DS Q1
+            r"\b[A-Z][A-Z_]+_CHARGE\b",  # Charge columns like SR_REVERSED_CHARGE in TPC-DS Q1
             r"\bD_YEAR\b",
             r"\bD_MOY\b",
             r"\bD_DATE_SK\b",
