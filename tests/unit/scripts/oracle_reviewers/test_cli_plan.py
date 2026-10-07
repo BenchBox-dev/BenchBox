@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import stat
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -9,7 +10,8 @@ from typing import Any
 import pytest
 
 from _project.scripts.oracle_reviewers import cli, github
-from _project.scripts.oracle_reviewers.retry import State
+from _project.scripts.oracle_reviewers.dedup import fingerprint
+from _project.scripts.oracle_reviewers.retry import Reviewed, State
 
 from .conftest import POLICY_PATH
 
@@ -35,18 +37,38 @@ def _pull(**over: Any) -> dict[str, Any]:
 
 
 class FakeGitHub:
-    def __init__(self, pull: dict[str, Any], files: list[dict[str, Any]], state: State | None = None) -> None:
+    def __init__(
+        self,
+        pull: dict[str, Any],
+        files: list[dict[str, Any]],
+        state: State | None = None,
+        threads: Sequence[dict[str, Any]] | None = (),
+        diff: str = DIFF,
+    ) -> None:
         self.pull = pull
         self.files = files
         self.state = state
+        self.threads = None if threads is None else list(threads)
+        self.diff = diff
+        self.diff_reads = 0
         self.dispatched: list[int] = []
 
     def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(github, "get_json", lambda path: self.pull)
         monkeypatch.setattr(github, "get_paginated", self._paginated)
-        monkeypatch.setattr(github, "get_diff", lambda repo, pr: DIFF)
+        monkeypatch.setattr(github, "get_diff", self._diff)
+        monkeypatch.setattr(github, "review_threads", self._threads)
         monkeypatch.setattr(github, "latest_state", lambda repo, pr: self.state)
         monkeypatch.setattr(github, "dispatch", lambda repo, workflow, pr: self.dispatched.append(pr))
+
+    def _threads(self, repo: str, pr: int) -> list[dict[str, Any]]:
+        if self.threads is None:
+            raise github.GitHubError("threads unavailable")
+        return self.threads
+
+    def _diff(self, repo: str, pr: int) -> str:
+        self.diff_reads += 1
+        return self.diff
 
     def _paginated(self, path: str) -> list[dict[str, Any]]:
         return [self.pull] if path.startswith(f"repos/{REPO}/pulls?") else self.files
@@ -217,3 +239,103 @@ def test_sweep_skips_draft_and_fork_prs(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert cli.main(["sweep", "--policy", str(POLICY_PATH)]) == 0
     assert fake.dispatched == []
     assert looked_up == []
+
+
+CHECKER = "benchbox/core/equivalence/checker.py"
+CAPTURE = "benchbox/core/expected_results/registry.py"
+TWO_FILES = [
+    {"filename": CHECKER, "additions": 4, "deletions": 1, "sha": "1" * 40},
+    {"filename": CAPTURE, "additions": 2, "deletions": 0, "sha": "2" * 40},
+]
+TWO_FILE_DIFF = (
+    f"diff --git a/{CHECKER} b/{CHECKER}\n--- a/{CHECKER}\n+++ b/{CHECKER}\n@@ -1,1 +1,2 @@\n a\n+checker change\n"
+    f"diff --git a/{CAPTURE} b/{CAPTURE}\n--- a/{CAPTURE}\n+++ b/{CAPTURE}\n@@ -1,1 +1,2 @@\n a\n+capture change\n"
+)
+OLD_HEAD = "c" * 40
+
+
+def _reviewed_state(files: dict[str, str], tier: str = "medium-high", outcome: str = "failure") -> State:
+    reviewed = Reviewed(OLD_HEAD, tier, outcome, files)
+    return State(7, OLD_HEAD, outcome, datetime.now(UTC) - timedelta(hours=1), reviewed=reviewed)
+
+
+def test_push_without_soundness_change_carries_the_result_without_a_reviewer(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    files = [*TWO_FILES, {"filename": "README.md", "additions": 1, "deletions": 0, "sha": "9" * 40}]
+    fake = FakeGitHub(_pull(), files, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}))
+    _, values, plan = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "carry" and values["post"] == "true"
+    assert plan["reviewed_head"] == OLD_HEAD
+    assert plan["chain"] == []
+    assert fake.diff_reads == 0
+    assert not (tmp_path / "plan" / "brief.md").exists()
+
+
+def test_push_touching_one_file_reviews_only_that_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40}, outcome="success")
+    fake = FakeGitHub(_pull(), TWO_FILES, state, diff=TWO_FILE_DIFF)
+    _, values, plan = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "review"
+    assert plan["scope"] == "changed" and plan["reviewed_head"] == OLD_HEAD
+    assert plan["reviewed_files"] == {CHECKER: "1" * 40, CAPTURE: "2" * 40}
+    brief = (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
+    assert "capture change" in brief and "checker change" not in brief
+    assert f"since head {OLD_HEAD} was reviewed" in brief
+    assert (tmp_path / "plan" / "diff.patch").read_text(encoding="utf-8") == TWO_FILE_DIFF
+
+
+@pytest.mark.parametrize(
+    ("state", "event"),
+    [
+        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}, tier="very-high"), {"action": "synchronize"}),
+        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}), {"action": "edited", "changes": {"base": {}}}),
+        (None, {"action": "synchronize"}),
+        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40}), {"action": "synchronize"}),
+        (_reviewed_state({CHECKER: "1" * 40, "gone.py": "3" * 40}, outcome="success"), {"action": "synchronize"}),
+    ],
+    ids=["tier-changed", "base-changed", "no-state", "after-failure", "file-left-the-diff"],
+)
+def test_full_review_when_the_last_review_does_not_cover_this_change(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, state: State | None, event: dict[str, Any]
+) -> None:
+    fake = FakeGitHub(_pull(), TWO_FILES, state, diff=TWO_FILE_DIFF)
+    _, values, plan = _plan(monkeypatch, tmp_path, fake, event=event)
+    assert values["decision"] == "review" and plan["scope"] == "full"
+    assert "checker change" in (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
+
+
+def test_open_oracle_threads_are_recorded_for_suppression(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    threads = [
+        {"resolved": False, "path": CHECKER, "author": "benchbox-oracle", "body": "**High**: Drops a row"},
+        {"resolved": True, "path": CHECKER, "author": "benchbox-oracle", "body": "**High**: Fixed already"},
+        {"resolved": False, "path": CHECKER, "author": "someone", "body": "**High**: Human note"},
+    ]
+    _, _, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), SOUNDNESS, threads=threads))
+    assert plan["open_findings"] == [fingerprint(CHECKER, "Drops a row")]
+
+
+def test_unreadable_threads_suppress_nothing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), SOUNDNESS, threads=None))
+    assert values["decision"] == "review" and plan["open_findings"] == []
+
+
+def test_failure_is_carried_only_while_the_reviewed_files_are_unchanged(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    exact = FakeGitHub(_pull(), TWO_FILES, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}))
+    (tmp_path / "exact").mkdir()
+    (tmp_path / "reverted").mkdir()
+    _, values, _ = _plan(monkeypatch, tmp_path / "exact", exact)
+    assert values["decision"] == "carry"
+    reverted = FakeGitHub(
+        _pull(), TWO_FILES[:1], _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}), diff=TWO_FILE_DIFF
+    )
+    _, values, plan = _plan(monkeypatch, tmp_path / "reverted", reverted)
+    assert values["decision"] == "review" and plan["scope"] == "full"
+
+
+def test_manual_carry_is_recorded_as_a_retry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fake = FakeGitHub(_pull(), TWO_FILES, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}))
+    _, values, plan = _plan(monkeypatch, tmp_path, fake, event_name="issue_comment", event={})
+    assert values["decision"] == "carry" and plan["manual"] is True

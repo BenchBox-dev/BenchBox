@@ -56,6 +56,7 @@ def build_brief(
     files: list[ChangedFile],
     diff_text: str | None,
     max_bytes: int,
+    reviewed_head: str | None = None,
 ) -> Brief:
     header = _HEADER.format(
         pr=pr,
@@ -67,8 +68,14 @@ def build_brief(
         schema=json.dumps(VERDICT_SCHEMA, sort_keys=True),
     )
     listing = f"\nChanged files:\n{_file_list(files)}\n"
+    if reviewed_head is not None:
+        listing = (
+            f"\nFiles changed since head {reviewed_head} was reviewed:\n{_file_list(files)}\n"
+            "Review only these files. The pull request's other files were reviewed at that head and have not"
+            " changed since; read them in the working directory only for context.\n"
+        )
     if diff_text is not None:
-        inline = f"{header}{listing}\nUnified diff from base to head:\n{diff_text}"
+        inline = f"{header}{listing}\nUnified diff of these files from base to head:\n{diff_text}"
         if len(inline.encode("utf-8")) <= max_bytes:
             return Brief("inline", inline)
     reduced = (

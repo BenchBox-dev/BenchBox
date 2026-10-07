@@ -51,7 +51,24 @@ Without the App secrets, the `post` job logs the result and succeeds.
    artifact with the run ID, head SHA, reviewer and either a validated verdict
    or an absence.
 4. `post` re-validates every artifact from this run, replays the selection,
-   and posts the status and, when there is something to say, one comment.
+   and posts the status and one pull request review on the head commit. Each
+   finding on a diff line becomes its own review thread; the review body
+   holds the summary and any finding outside the diff.
+
+`plan` also limits spend to code that changed. The retry state records the
+blob SHA of each soundness file at the last success or failure. When the new
+head has exactly those files at those SHAs, the run posts the recorded result
+to the new head without running a reviewer, so a push of docs or tests costs
+nothing. When the last result was a success and some of those files changed,
+the brief lists and diffs only the changed files. Every other case gets a full
+review: after a failure, because a scoped review cannot re-check findings in
+files it does not read, and after a tier change, a base change, a file leaving
+the diff or a missing state.
+
+Before posting, `post` drops any finding that matches an open review thread
+from this App, by file and normalized title. Each new thread carries a hidden
+`oracle-finding` marker with that fingerprint. A dropped finding still counts
+toward this run's result.
 
 A blocking finding fails the review even when its line is outside the diff.
 Such a finding cannot become a line comment, so it is listed under "Findings

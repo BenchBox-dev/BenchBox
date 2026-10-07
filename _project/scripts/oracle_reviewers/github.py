@@ -42,6 +42,50 @@ def get_diff(repo: str, pr: int) -> str | None:
         return None
 
 
+_THREADS_QUERY = """
+query($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          isResolved
+          path
+          comments(first: 1) { nodes { author { login } body } }
+        }
+      }
+    }
+  }
+}
+"""
+
+
+def review_threads(repo: str, pr: int) -> list[dict[str, Any]]:
+    owner, name = repo.split("/", 1)
+    threads: list[dict[str, Any]] = []
+    after: str | None = None
+    while True:
+        args = ["graphql", "-f", f"query={_THREADS_QUERY}", "-f", f"owner={owner}", "-f", f"name={name}"]
+        args += ["-F", f"number={pr}", *(("-f", f"after={after}") if after else ())]
+        payload = json.loads(_gh(*args))
+        if payload.get("errors"):
+            raise GitHubError(f"GitHub GraphQL returned errors: {payload['errors']}")
+        connection = payload["data"]["repository"]["pullRequest"]["reviewThreads"]
+        for node in connection["nodes"]:
+            first = (node["comments"]["nodes"] or [{}])[0]
+            threads.append(
+                {
+                    "resolved": node["isResolved"],
+                    "path": node.get("path"),
+                    "author": (first.get("author") or {}).get("login"),
+                    "body": first.get("body") or "",
+                }
+            )
+        if not connection["pageInfo"]["hasNextPage"]:
+            return threads
+        after = connection["pageInfo"]["endCursor"]
+
+
 def state_artifact_name(pr: int) -> str:
     return f"{STATE_ARTIFACT_PREFIX}{pr}"
 

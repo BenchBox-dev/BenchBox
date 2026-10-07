@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from . import selection
+from . import dedup, selection
 from .retry import ALL_ABSENT, FAILURE, INTEGRITY, PENDING, SUCCESS, UNREPORTED
 from .selection import Attempt, Step
 from .verdict import Finding, Placement, Verdict, place
@@ -40,7 +40,7 @@ def _header(plan: Mapping[str, Any], state: str) -> list[str]:
     lines = [f"### {plan['status_context']}: {state} for `{plan['head_sha']}`", ""]
     if plan.get("mode") == "shadow":
         lines += ["Shadow mode: this result is advisory and does not replace the required `oracle-review` check.", ""]
-    lines += ["Results from earlier heads of this pull request are outdated.", ""]
+    lines += ["This result supersedes those for earlier heads; their open review threads still apply.", ""]
     if plan.get("tier"):
         lines += [f"Tier: {plan['tier']} ({'; '.join(plan.get('tier_reasons', []))}).", ""]
     return lines
@@ -70,7 +70,8 @@ def _review_payload(plan: Mapping[str, Any], body: str, placement: Placement) ->
                 "path": finding.file,
                 "line": finding.line,
                 "side": "RIGHT",
-                "body": f"**{finding.severity}**: {finding.title}\n\n{finding.detail}".rstrip(),
+                "body": f"**{finding.severity}**: {finding.title}\n\n{finding.detail}".rstrip()
+                + f"\n\n{dedup.marker(finding)}",
             }
             for finding in placement.inline
         ],
@@ -102,10 +103,12 @@ def finalize(
         None,
     )
     verdict = verdicts.get(terminal.slot) if terminal is not None else None
+    repeated: tuple[Finding, ...] = ()
     if verdict is None:
         placement = Placement((), ())
     else:
-        placement = place(verdict.findings, commentable)
+        fresh, repeated = dedup.split(verdict.findings, plan.get("open_findings", ()))
+        placement = place(fresh, commentable)
     blocking = verdict.blocking(tuple(plan["blocking"])) if verdict else ()
     if state == SUCCESS:
         description = f"{reviewer}: no blocking findings"
@@ -124,12 +127,32 @@ def finalize(
     lines += _section("Findings outside the diff", other_lines)
     if any(finding in blocking for finding in placement.summary):
         lines += ["Blocking findings outside the diff still fail the review.", ""]
+    lines += _section(
+        "Findings already open as review threads, not posted again",
+        [f"- **{finding.severity}** `{finding.file}`: {finding.title}" for finding in repeated],
+    )
+    if plan.get("scope") == "changed":
+        lines += [f"Scope: files changed since head `{plan['reviewed_head']}` was reviewed.", ""]
     lines += _section("Reviewers not available", _absences(attempts, step))
     body = "\n".join(lines).rstrip() + "\n"
     has_content = bool(placement.inline or placement.summary or state != SUCCESS)
     review = _review_payload(plan, body, placement) if delivery == "review" and verdict is not None else None
     cause = pending_cause if state == PENDING else None
     return Final(state, _clip(description), body if has_content else "", review, reviewer, cause)
+
+
+def carried(plan: Mapping[str, Any], outcome: str) -> Final:
+    reviewed_head = plan["reviewed_head"]
+    description = f"carried from {reviewed_head[:12]}: no soundness file changed"
+    lines = [
+        *_header(plan, outcome),
+        f"No soundness file changed since head `{reviewed_head}` was reviewed, so its {outcome} result is"
+        " carried to this head without running a reviewer.",
+        "",
+    ]
+    body = "\n".join(lines).rstrip() + "\n"
+    review = {"commit_id": plan["head_sha"], "event": "COMMENT", "body": body, "comments": []}
+    return Final(outcome, _clip(description), body, review if plan.get("findings_delivery") == "review" else None, None)
 
 
 def fixed(state: str, description: str) -> Final:

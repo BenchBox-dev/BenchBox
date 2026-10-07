@@ -9,9 +9,10 @@ import pytest
 
 from _project.scripts.oracle_reviewers import attempts, cli, report, selection
 from _project.scripts.oracle_reviewers.absence import Absence
+from _project.scripts.oracle_reviewers.dedup import fingerprint
 from _project.scripts.oracle_reviewers.diff import commentable_lines
 from _project.scripts.oracle_reviewers.policy import Policy
-from _project.scripts.oracle_reviewers.retry import ALL_ABSENT, INTEGRITY, UNREPORTED
+from _project.scripts.oracle_reviewers.retry import ALL_ABSENT, INTEGRITY, UNREPORTED, Reviewed, State
 from _project.scripts.oracle_reviewers.selection import Attempt, SelectionInput, Step, excluded_families
 from _project.scripts.oracle_reviewers.verdict import validate
 
@@ -318,3 +319,102 @@ def test_blocking_finding_outside_the_diff_still_fails(policy: Policy, tmp_path:
     assert "Findings on diff lines" not in final.body
     assert "checker.py:400`" in final.body.split("**Findings outside the diff**")[1]
     assert "Blocking findings outside the diff still fail the review." in final.body
+
+
+CHECKER = "benchbox/core/equivalence/checker.py"
+
+
+def test_review_threads_carry_a_fingerprint_marker(policy: Policy, tmp_path: Path) -> None:
+    plan = {**_plan(policy), "findings_delivery": "review"}
+    _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": [_finding("High", 2)]})
+    loaded, step, errors = _decide(policy, plan, tmp_path)
+    final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
+    assert final.review is not None
+    assert f"<!-- oracle-finding: {fingerprint(CHECKER, 'High issue')} -->" in final.review["comments"][0]["body"]
+
+
+def test_findings_already_open_are_not_posted_again_but_still_block(policy: Policy, tmp_path: Path) -> None:
+    plan = {**_plan(policy), "findings_delivery": "review", "open_findings": [fingerprint(CHECKER, "High issue")]}
+    findings = [_finding("High", 2), _finding("Medium", 2)]
+    _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": findings})
+    loaded, step, errors = _decide(policy, plan, tmp_path)
+    final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
+    assert final.state == "failure"
+    assert final.review is not None
+    assert [item["body"].split("\n", 1)[0] for item in final.review["comments"]] == ["**Medium**: Medium issue"]
+    assert "**Findings already open as review threads, not posted again**" in final.body
+    assert f"- **High** `{CHECKER}`: High issue" in final.body
+
+
+def test_second_run_with_every_finding_open_adds_no_thread(policy: Policy, tmp_path: Path) -> None:
+    findings = [_finding("High", 2), _finding("Low", 40)]
+    prints = [fingerprint(CHECKER, "High issue"), fingerprint(CHECKER, "Low issue")]
+    plan = {**_plan(policy), "findings_delivery": "review", "open_findings": prints}
+    _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": findings})
+    loaded, step, errors = _decide(policy, plan, tmp_path)
+    final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
+    assert final.review is not None and final.review["comments"] == []
+    assert "checker.py:40`" not in final.body
+
+
+def test_cli_finalize_carries_the_reviewed_result(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    old = "c" * 40
+    reviewed = Reviewed(old, "medium-high", "success", {CHECKER: "1" * 40})
+    previous = State(7, old, "success", NOW, reviewed=reviewed)
+    plan = {
+        **_plan(policy),
+        "decision": "carry",
+        "findings_delivery": "review",
+        "reviewed_head": old,
+        "previous_state": previous.to_json(),
+    }
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+    out = _run_cli(
+        monkeypatch,
+        tmp_path,
+        "finalize",
+        "--plan",
+        str(plan_path),
+        "--attempts-dir",
+        str(tmp_path),
+        "--out-dir",
+        str(tmp_path / "o"),
+    )
+    assert out == {"state": "success", "comment": "false", "review": "true", "has_state": "true"}
+    review = json.loads((tmp_path / "o" / "review.json").read_text(encoding="utf-8"))
+    assert review["commit_id"] == HEAD and review["comments"] == []
+    assert f"since head `{old}` was reviewed" in review["body"]
+    state = json.loads((tmp_path / "o" / "state" / "state.json").read_text(encoding="utf-8"))
+    assert state["head_sha"] == HEAD
+    assert state["reviewed"] == reviewed.to_json()
+
+
+def test_cli_finalize_records_the_reviewed_files(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan = {**_plan(policy), "reviewed_files": {CHECKER: "1" * 40}}
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+    attempts_dir = tmp_path / "attempts"
+    _write(attempts_dir, 1, "sonnet", verdict={"summary": "", "findings": []})
+    _run_cli(
+        monkeypatch,
+        tmp_path,
+        "finalize",
+        "--plan",
+        str(plan_path),
+        "--attempts-dir",
+        str(attempts_dir),
+        "--out-dir",
+        str(tmp_path / "o"),
+    )
+    state = json.loads((tmp_path / "o" / "state" / "state.json").read_text(encoding="utf-8"))
+    assert state["reviewed"] == {
+        "head_sha": HEAD,
+        "tier": "medium-high",
+        "outcome": "success",
+        "files": {CHECKER: "1" * 40},
+    }

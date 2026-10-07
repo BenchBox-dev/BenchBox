@@ -10,11 +10,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from . import attempts as attempt_files, github, report, retry, runner, selection
+from . import attempts as attempt_files, dedup, github, report, retry, runner, selection
 from .absence import ERROR, Absence
 from .brief import build_brief, write_private
 from .classifier import ChangedFile, classify
-from .diff import commentable_lines
+from .diff import commentable_lines, select_files
 from .policy import Policy, Reviewer, load_policy
 from .selection import SelectionInput
 
@@ -28,6 +28,7 @@ REVIEW = "review"
 SUCCESS = "success"
 FORK = "fork"
 SKIP = "skip"
+CARRY = "carry"
 
 
 def _now() -> datetime:
@@ -97,6 +98,10 @@ def _base_plan(policy: Policy, repo: str, pr: int, run_id: str) -> dict[str, Any
         "diversity_exempt": [],
         "excluded_families": [],
         "brief_mode": "oversize",
+        "scope": "full",
+        "reviewed_head": None,
+        "reviewed_files": {},
+        "open_findings": [],
         "max_attempts": policy.max_attempts,
         "pool_blocked_until": {},
         "manual": False,
@@ -106,7 +111,7 @@ def _base_plan(policy: Policy, repo: str, pr: int, run_id: str) -> dict[str, Any
 
 def _finish_plan(out_dir: Path, plan: dict[str, Any]) -> int:
     _write_json(out_dir / PLAN_FILE, plan)
-    post = plan["decision"] in (REVIEW, SUCCESS, FORK)
+    post = plan["decision"] in (REVIEW, SUCCESS, FORK, CARRY)
     _output(
         {
             "decision": plan["decision"],
@@ -181,7 +186,41 @@ def command_plan(args: argparse.Namespace) -> int:
         plan["decision_reason"] = rerun.reason
         return _finish_plan(out_dir, plan)
     tier = policy.tiers[classification.tier or "very-high"]
-    diff_text = github.get_diff(repo, pr)
+    in_scope = set(classification.soundness_paths)
+    scoped = [item for item in files if any(path in in_scope for path in item.paths)]
+    current = {item.path: item.sha for item in scoped}
+    reviewed = previous.reviewed if previous and action != "edited" else None
+    if reviewed is not None and (reviewed.tier != tier.name or not all(current.values())):
+        reviewed = None
+    plan["reviewed_files"] = current
+    changed = scoped
+    if reviewed is not None and current == reviewed.files:
+        changed = []
+    elif reviewed is not None and reviewed.outcome == retry.SUCCESS and set(reviewed.files) <= set(current):
+        # A scoped review cannot re-check findings in files it does not read, so
+        # it follows only a success whose files are all still in the diff.
+        changed = [item for item in scoped if reviewed.files.get(item.path) != item.sha]
+    try:
+        plan["open_findings"] = dedup.open_fingerprints(github.review_threads(repo, pr), policy.bot_login)
+    except (github.GitHubError, KeyError, ValueError) as exc:
+        _summary(f"oracle-review-shadow: open review threads could not be read, so none are suppressed: {exc}")
+    previous_json = previous.to_json() if previous else None
+    if reviewed is not None and not changed:
+        plan.update(
+            {
+                "decision": CARRY,
+                "decision_reason": f"no soundness file changed since head {reviewed.head_sha} was reviewed",
+                "reviewed_head": reviewed.head_sha,
+                "manual": manual,
+                "previous_state": previous_json,
+            }
+        )
+        return _finish_plan(out_dir, plan)
+    full_diff = github.get_diff(repo, pr)
+    partial = len(changed) < len(scoped)
+    diff_text = full_diff
+    if partial and full_diff is not None:
+        diff_text = select_files(full_diff, frozenset(path for item in changed for path in item.paths))
     brief = build_brief(
         repo=repo,
         pr=pr,
@@ -189,12 +228,13 @@ def command_plan(args: argparse.Namespace) -> int:
         head_sha=plan["head_sha"],
         tier=tier.name,
         blocking=tier.blocking,
-        files=files,
+        files=changed if partial else files,
         diff_text=diff_text,
         max_bytes=policy.brief_max_bytes,
+        reviewed_head=reviewed.head_sha if partial and reviewed else None,
     )
     write_private(out_dir / BRIEF_FILE, brief.text)
-    write_private(out_dir / DIFF_FILE, diff_text or "")
+    write_private(out_dir / DIFF_FILE, full_diff or "")
     plan.update(
         {
             "decision": REVIEW,
@@ -205,12 +245,14 @@ def command_plan(args: argparse.Namespace) -> int:
             "excluded_families": sorted(selection.excluded_families(labels, policy)),
             "brief_mode": brief.mode,
             "manual": manual,
+            "scope": "changed" if partial else "full",
+            "reviewed_head": reviewed.head_sha if partial and reviewed else None,
             "pool_blocked_until": {
                 pool: moment.isoformat()
                 for pool, moment in (previous.pool_blocked_until.items() if previous else ())
                 if moment > now
             },
-            "previous_state": previous.to_json() if previous else None,
+            "previous_state": previous_json,
         }
     )
     return _finish_plan(out_dir, plan)
@@ -305,6 +347,20 @@ def command_finalize(args: argparse.Namespace) -> int:
         final = report.fixed(retry.SUCCESS, "no soundness path changed")
     elif plan["decision"] == FORK:
         final = report.fixed(retry.PENDING, "fork: owner review")
+    elif plan["decision"] == CARRY:
+        previous = retry.State.from_json(plan["previous_state"])
+        assert previous.reviewed is not None
+        final = report.carried(plan, previous.reviewed.outcome)
+        state = retry.next_state(
+            previous=previous,
+            pr=plan["pr"],
+            head_sha=plan["head_sha"],
+            outcome=final.state,
+            manual=bool(plan["manual"]),
+            now=now,
+            pool_blocked_until=previous.pool_blocked_until,
+        )
+        _write_json(out_dir / "state" / github.STATE_FILE, state.to_json())
     else:
         selection_input = _selection(plan)
         loaded = attempt_files.load(Path(args.attempts_dir), plan, os.environ["GITHUB_RUN_ID"])
@@ -322,6 +378,7 @@ def command_finalize(args: argparse.Namespace) -> int:
             now=now,
             pool_blocked_until=selection.pool_resets(selection_input, loaded.attempts),
             pending_cause=final.pending_cause,
+            reviewed=retry.Reviewed(plan["head_sha"], plan["tier"], final.state, plan.get("reviewed_files", {})),
         )
         _write_json(out_dir / "state" / github.STATE_FILE, state.to_json())
     _write_json(out_dir / "status.json", report.status_payload(plan, final, run_url))
