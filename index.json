@@ -22314,17 +22314,12 @@
       "title": "Record tuning-policy generation in bundles; explorer warns when comparing across the ADR-003 seam"
     },
     "tuning-portable-metadata-store-20261001": {
-      "claim": {
-        "expires_at": "2026-10-08T22:00:04Z",
-        "generation": "2c203258b3c44ac7aa2b5affb2e1c3bf",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:154ae91a481281d11ac2019e"
-      },
+      "claim": null,
       "needs": [
         "tuning-no-midrun-destructive-db-handling-20261001"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "open",
       "title": "Make the tuning metadata store portable (no unsupported CREATE INDEX; per-dialect DDL)"
     },
     "tuning-post-load-live-certification-20261005": {
