@@ -363,6 +363,50 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("Native: 2,500")).toBeTruthy();
   });
 
+  it("labels throughput cohorts with Throughput@Size and their stream count", () => {
+    const throughputCohort = {
+      ...DATA.cohorts[0]!,
+      key: "tpch-sf1-throughput-3streams",
+      benchmark: "tpch",
+      scale_factor: 1,
+      phase: "throughput",
+      stream_count: 3,
+      label: "TPC-H SF1 Throughput (3 streams)",
+      primary_metric: "throughput_at_size",
+      primary_order: "desc" as const,
+      platforms: [
+        {
+          ...DATA.cohorts[0]!.platforms![0]!,
+          result_id: "r-throughput",
+          metric_value: 3741.26,
+          primary_metric: "throughput_at_size",
+          primary_order: "desc" as const,
+        },
+      ],
+    };
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [throughputCohort],
+      platforms: [
+        {
+          ...DATA.platforms[0]!,
+          n_cohorts: 1,
+          ranks: { [throughputCohort.key]: { rank: 1, total: 1, metric_value: 3741.26, speedup_vs_best: 1 } },
+        },
+      ],
+    };
+
+    render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
+
+    const header = screen.getByRole("columnheader", { name: /TPC-H SF1 Throughput \(3 streams\)/ });
+    expect(header.textContent).toContain("throughput (3 streams) · Throughput@Size · higher is better");
+    expect(screen.getByText("3,741")).toBeTruthy();
+    const cell = screen.getByRole("gridcell", {
+      name: "DuckDB times for TPC-H SF1 Throughput (3 streams): 3,741",
+    });
+    expect(cell.getAttribute("title")).toContain("Exact Throughput@Size: 3,741.26");
+  });
+
   it("does not focus the first leaderboard cell on initial render", () => {
     render(<MetaLeaderboard data={DATA} mode="times" onModeChange={vi.fn()} />);
 

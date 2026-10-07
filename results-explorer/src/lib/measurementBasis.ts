@@ -946,6 +946,7 @@ export function resolveResultsForBasis(
       display_geomean_ms: preservedGeomean,
       display_timings: newDisplayTimings,
       power_score: isDefault ? r.power_score : null,
+      throughput_at_size: isDefault ? (r.throughput_at_size ?? null) : null,
       normalized_cost_usd: isDefault ? r.normalized_cost_usd : null,
       cost_status: isDefault ? r.cost_status : "unavailable",
       valid_query_count: validQueryCount,

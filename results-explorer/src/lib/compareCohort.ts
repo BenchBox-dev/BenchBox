@@ -25,6 +25,7 @@ export interface CompareCohortSignature {
   benchmark: string;
   scaleFactor: string;
   phase: string;
+  streamCount: string;
   /** Nullable because generic `bench.results` rows are result-level, not ranking rows. */
   primaryMetric: string | null;
   /**
@@ -44,6 +45,7 @@ export type CompareCohortField =
   | "benchmark"
   | "scale"
   | "phase"
+  | "streams"
   | "primary metric"
   | "measurement basis";
 
@@ -52,6 +54,7 @@ export interface CompareCohortRow {
   scale_factor?: unknown;
   phase?: unknown;
   test_type?: unknown;
+  stream_count?: unknown;
   primary_metric?: unknown;
   /**
    * `result_basis_availability.available_bases` for this run, when the caller
@@ -84,6 +87,7 @@ export function compareCohortSignatureForRow(
     benchmark: canonicalBenchmarkSlug(asText(row.benchmark)),
     scaleFactor: asText(row.scale_factor),
     phase: canonicalPhase(asText(row.phase ?? row.test_type)),
+    streamCount: asText(row.stream_count),
     primaryMetric: asText(row.primary_metric) || null,
     basis,
   };
@@ -123,6 +127,7 @@ export function compareCohortMismatches(
   if (candidate.benchmark !== signature.benchmark) mismatches.push("benchmark");
   if (candidate.scaleFactor !== signature.scaleFactor) mismatches.push("scale");
   if (candidate.phase !== signature.phase) mismatches.push("phase");
+  if (candidate.streamCount !== signature.streamCount) mismatches.push("streams");
   if (
     signature.primaryMetric !== null &&
     candidate.primaryMetric !== null &&
@@ -138,6 +143,7 @@ export function compareCohortSummary(signature: CompareCohortSignature): string 
   const parts = [formatBenchmarkLabel(signature.benchmark)];
   if (signature.scaleFactor !== "") parts.push(`SF ${signature.scaleFactor}`);
   if (signature.phase !== "") parts.push(signature.phase);
+  if (signature.streamCount !== "") parts.push(`${signature.streamCount} streams`);
   if (signature.basis !== null) parts.push(`at ${formatBasisLabel(signature.basis)}`);
   return parts.join(" ");
 }

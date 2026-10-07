@@ -12,6 +12,7 @@ import { queryRows } from "@/db";
 import type { BuiltQuery } from "@/lib/queryFilters";
 import { canonicalPhaseSql, type FacetWhereClause } from "@/lib/facetModel";
 import { canonicalBenchmarkSlug } from "@/lib/displayLabels";
+import { normalizePrimaryMetric, type PrimaryMetric } from "@/lib/displayEligibility";
 import type {
   BenchmarkSummary,
   CostDeploymentFields,
@@ -128,6 +129,8 @@ export interface ResultRow extends CostDeploymentFields {
   driver_version: string | null;
   run_date: string;
   power_score: number | null;
+  throughput_at_size?: number | null;
+  stream_count?: number | null;
   total_duration_s: number;
   geomean_ms: number | null;
   display_geomean_ms: number | null;
@@ -284,6 +287,7 @@ export interface BenchmarkMatrixCellRow {
   display_ms: number | null;
   is_valid_display_timing: boolean;
   timing_exclusion_reason: string | null;
+  stream_count: number | null;
 }
 
 export interface BenchmarkRankingRow extends CostDeploymentFields {
@@ -317,6 +321,8 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
   comparison_exclusion_reason: string | null;
   ranking_exclusion_reason: string | null;
   power_score: number | null;
+  throughput_at_size: number | null;
+  stream_count: number | null;
   display_geomean_ms: number | null;
   sample_geomean_ms: number | null;
   cost_usd: number | null;
@@ -346,6 +352,8 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   platform_version?: string | null;
   run_date: string;
   power_score: number | null;
+  throughput_at_size?: number | null;
+  stream_count?: number | null;
   total_duration_s: number;
   geomean_ms: number | null;
   display_geomean_ms: number | null;
@@ -381,6 +389,7 @@ export interface CohortMetadataRow {
   benchmark: string;
   scale_factor: number;
   phase: string;
+  stream_count: number | null;
   cohort_label: string;
   cohort_href: string;
   /** Count of ranking-eligible rows with non-null primary metrics. */
@@ -444,6 +453,8 @@ const RESULT_COLUMNS = [
   "driver_version",
   "run_date",
   "power_score",
+  "throughput_at_size",
+  "stream_count",
   "total_duration_s",
   "geomean_ms",
   "display_geomean_ms",
@@ -510,6 +521,8 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "driver_version",
   "run_date",
   "power_score",
+  "throughput_at_size",
+  "stream_count",
   "total_duration_s",
   "geomean_ms",
   "display_geomean_ms",
@@ -589,6 +602,7 @@ const COHORT_METADATA_COLUMNS = [
   "benchmark",
   "scale_factor",
   "phase",
+  "stream_count",
   "cohort_label",
   "cohort_href",
   "platform_count",
@@ -640,6 +654,8 @@ const BENCHMARK_RANKING_COLUMNS = [
   "br.comparison_exclusion_reason",
   "br.ranking_exclusion_reason",
   "br.power_score",
+  "br.throughput_at_size",
+  "br.stream_count",
   "br.display_geomean_ms",
   "br.sample_geomean_ms",
   "br.cost_usd",
@@ -959,6 +975,8 @@ function detailResultFromWideRow(
     geomean_ms: wide.geomean_ms,
     display_geomean_ms: wide.display_geomean_ms,
     power_score: wide.power_score,
+    throughput_at_size: wide.throughput_at_size ?? null,
+    stream_count: wide.stream_count ?? null,
     has_display_timing: wide.has_display_timing,
     logical_query_count: wide.logical_query_count,
     valid_query_count: wide.valid_query_count,
@@ -1046,19 +1064,27 @@ export async function getDetailResult(resultId: string): Promise<DetailResult | 
   return detailResultFromWideRow(wide, executionRows, timingRows);
 }
 
+function streamCountClause(column: string, streamCount: number | null): { sql: string; params: number[] } {
+  return streamCount === null
+    ? { sql: ` AND ${column} IS NULL`, params: [] }
+    : { sql: ` AND ${column} = ?`, params: [streamCount] };
+}
+
 export async function getBenchmarkMatrixCells(
   benchmark: string,
   scaleFactor: number,
   phase: string,
+  streamCount: number | null = null,
 ): Promise<BenchmarkMatrixCellRow[]> {
   benchmark = canonicalBenchmarkSlug(benchmark);
+  const streams = streamCountClause("stream_count", streamCount);
   return queryRows<BenchmarkMatrixCellRow>(
     "SELECT benchmark, scale_factor, phase, result_id, platform_id, query_id, display_ms," +
-      " is_valid_display_timing, timing_exclusion_reason" +
+      " is_valid_display_timing, timing_exclusion_reason, stream_count" +
       " FROM bench.benchmark_matrix_cells" +
-      " WHERE benchmark = ? AND scale_factor = ? AND phase = ?" +
+      ` WHERE benchmark = ? AND scale_factor = ? AND phase = ?${streams.sql}` +
       " ORDER BY platform_id, query_id",
-    [benchmark, scaleFactor, phase],
+    [benchmark, scaleFactor, phase, ...streams.params],
   );
 }
 
@@ -1066,8 +1092,10 @@ export async function getBenchmarkRanking(
   benchmark: string,
   scaleFactor: number,
   phase: string,
+  streamCount: number | null = null,
 ): Promise<BenchmarkRankingRow[]> {
   benchmark = canonicalBenchmarkSlug(benchmark);
+  const streams = streamCountClause("br.stream_count", streamCount);
   return queryRows<BenchmarkRankingRow>(
     `SELECT ${BENCHMARK_RANKING_COLUMNS}, r.platform_version, r.validation_status, r.override_rules,` +
       " r.normalized_cost_usd, r.cost_model_version, r.cost_model_source," +
@@ -1076,9 +1104,9 @@ export async function getBenchmarkRanking(
       " r.storage_format" +
       " FROM bench.benchmark_rankings br" +
       " LEFT JOIN bench.results r USING (result_id)" +
-      " WHERE br.benchmark = ? AND br.scale_factor = ? AND br.phase = ?" +
+      ` WHERE br.benchmark = ? AND br.scale_factor = ? AND br.phase = ?${streams.sql}` +
       " ORDER BY br.rank NULLS LAST, br.platform_id",
-    [benchmark, scaleFactor, phase],
+    [benchmark, scaleFactor, phase, ...streams.params],
   );
 }
 
@@ -1121,11 +1149,12 @@ export async function getBenchmarkSummaryFromDuckDB(
   benchmark: string,
   scaleFactor: number,
   phase: string,
+  streamCount: number | null = null,
 ): Promise<BenchmarkSummary | null> {
   benchmark = canonicalBenchmarkSlug(benchmark);
   return memoizedSnapshotQuery(
-    `benchmark-summary:${benchmark}\u0000${scaleFactor}\u0000${phase}`,
-    () => loadBenchmarkSummaryFromDuckDB(benchmark, scaleFactor, phase),
+    `benchmark-summary:${benchmark}\u0000${scaleFactor}\u0000${phase}\u0000${streamCount ?? ""}`,
+    () => loadBenchmarkSummaryFromDuckDB(benchmark, scaleFactor, phase, streamCount),
   );
 }
 
@@ -1133,10 +1162,11 @@ async function loadBenchmarkSummaryFromDuckDB(
   benchmark: string,
   scaleFactor: number,
   phase: string,
+  streamCount: number | null,
 ): Promise<BenchmarkSummary | null> {
   const [rankingRows, cellRows] = await Promise.all([
-    getBenchmarkRanking(benchmark, scaleFactor, phase),
-    getBenchmarkMatrixCells(benchmark, scaleFactor, phase),
+    getBenchmarkRanking(benchmark, scaleFactor, phase, streamCount),
+    getBenchmarkMatrixCells(benchmark, scaleFactor, phase, streamCount),
   ]);
   if (rankingRows.length === 0) return null;
 
@@ -1201,6 +1231,7 @@ async function loadBenchmarkSummaryFromDuckDB(
       comparison_exclusion_reason: row.comparison_exclusion_reason,
       ranking_exclusion_reason: row.ranking_exclusion_reason,
       power_score: row.power_score,
+      throughput_at_size: row.throughput_at_size,
       display_geomean_ms: row.display_geomean_ms,
       sample_geomean_ms: row.sample_geomean_ms,
       cost_usd: row.cost_usd,
@@ -1229,12 +1260,13 @@ async function loadBenchmarkSummaryFromDuckDB(
     benchmark,
     scale_factor: scaleFactor,
     phase,
+    stream_count: streamCount,
     query_ids: queryIds,
     platforms,
     cell_reduction: "median_successful_measurement_ms",
     ranking: {
       primary_metric: first.primary_metric,
-      secondary_metric: first.primary_metric === "power_score" ? "display_geomean_ms" : "power_score",
+      secondary_metric: normalizePrimaryMetric(first.primary_metric) === "display_geomean_ms" ? "power_score" : "display_geomean_ms",
       primary_order: first.primary_order,
     },
   };
@@ -1266,6 +1298,8 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " r.platform_version," +
     " r.run_date," +
     " r.power_score," +
+    " r.throughput_at_size," +
+    " r.stream_count," +
     " r.total_duration_s," +
     " r.geomean_ms," +
     " r.display_geomean_ms," +
@@ -1302,7 +1336,8 @@ function loadPlatformIndexRows(platformId?: string): Promise<PlatformIndexRowRow
     " e.arch," +
     " e.cpu_family," +
     " e.memory_gb," +
-    " CASE WHEN br.primary_metric IS NOT NULL THEN br.primary_metric WHEN r.power_score IS NOT NULL THEN 'power_score' ELSE 'display_geomean_ms' END" +
+    " CASE WHEN br.primary_metric IS NOT NULL THEN br.primary_metric WHEN r.power_score IS NOT NULL THEN 'power_score'" +
+    " WHEN r.throughput_at_size IS NOT NULL THEN 'throughput_at_size' ELSE 'display_geomean_ms' END" +
     " AS primary_metric" +
     " FROM bench.results r" +
     " LEFT JOIN bench.short_ids si ON si.result_id = r.result_id" +
@@ -1389,6 +1424,7 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
         benchmark: row.benchmark,
         scale_factor: row.scale_factor,
         phase: row.phase,
+        stream_count: row.stream_count,
         label: row.cohort_label,
         href: row.cohort_href,
         platform_count: row.platform_count,
@@ -1477,13 +1513,19 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
  * Falls back to `"display_geomean_ms"` only when the benchmark has no rows
  * yet (empty corpus), matching Python's `_DEFAULT_RANKING`.
  */
-export async function getPrimaryMetricForBenchmark(benchmark: string): Promise<"power_score" | "display_geomean_ms"> {
+export async function getPrimaryMetricForBenchmark(benchmark: string, phase?: string): Promise<PrimaryMetric> {
+  if (phase !== undefined) {
+    const phaseRows = await queryRows<{ primary_metric: string }>(
+      "SELECT DISTINCT primary_metric FROM bench.benchmark_rankings WHERE benchmark = ? AND phase = ? LIMIT 1",
+      [benchmark, phase],
+    );
+    if (phaseRows[0] !== undefined) return normalizePrimaryMetric(phaseRows[0].primary_metric);
+  }
   const rows = await queryRows<{ primary_metric: string }>(
     "SELECT DISTINCT primary_metric FROM bench.benchmark_rankings WHERE benchmark = ? LIMIT 1",
     [benchmark],
   );
-  const metric = rows[0]?.primary_metric;
-  return metric === "power_score" ? "power_score" : "display_geomean_ms";
+  return normalizePrimaryMetric(rows[0]?.primary_metric);
 }
 
 const SHORT_ID_PATTERN = /^[0-9a-f]{8,}$/i;

@@ -1051,7 +1051,7 @@ describe("Compare", () => {
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
-    expect(getPrimaryMetricForBenchmark).toHaveBeenCalledWith("tpch");
+    expect(getPrimaryMetricForBenchmark).toHaveBeenCalledWith("tpch", "unknown");
     const labels = screen.getAllByText(/Power score/i);
     expect(labels.length).toBeGreaterThan(0);
   });

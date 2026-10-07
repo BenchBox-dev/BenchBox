@@ -6,6 +6,7 @@ export const CORE_FACET_KEYS = [
   "benchmark",
   "scale_factor",
   "phase",
+  "stream_count",
   "platform",
   "execution_mode",
   "tuning_mode",
@@ -71,6 +72,7 @@ export interface FacetState {
   benchmark: string[];
   scale_factor: string[];
   phase: string[];
+  stream_count: string[];
   platform: string[];
   execution_mode: string[];
   tuning_mode: string[];
@@ -110,6 +112,7 @@ export const DEFAULT_FACETS: FacetState = {
   benchmark: [],
   scale_factor: [],
   phase: [],
+  stream_count: [],
   platform: [],
   execution_mode: [],
   tuning_mode: [],
@@ -132,6 +135,7 @@ export const FACET_URL_KEYS: Record<ExplorerFacetKey, string> = {
   benchmark: "benchmark",
   scale_factor: "sf",
   phase: "phase",
+  stream_count: "streams",
   platform: "platform",
   execution_mode: "execution",
   tuning_mode: "tuning",
@@ -195,6 +199,7 @@ export const FACET_URL_SERDES = {
   benchmark: multiValueSerde,
   scale_factor: multiValueSerde,
   phase: multiValueSerde,
+  stream_count: multiValueSerde,
   platform: multiValueSerde,
   execution_mode: multiValueSerde,
   tuning_mode: multiValueSerde,
@@ -218,6 +223,7 @@ export function normalizeFacetState(input: PartialFacetState = {}): FacetState {
     benchmark: normalizeFacetList("benchmark", input.benchmark ?? DEFAULT_FACETS.benchmark),
     scale_factor: normalizeFacetList("scale_factor", input.scale_factor ?? DEFAULT_FACETS.scale_factor),
     phase: normalizeFacetList("phase", input.phase ?? DEFAULT_FACETS.phase),
+    stream_count: normalizeFacetList("stream_count", input.stream_count ?? DEFAULT_FACETS.stream_count),
     platform: normalizeFacetList("platform", input.platform ?? DEFAULT_FACETS.platform),
     execution_mode: normalizeFacetList("execution_mode", input.execution_mode ?? DEFAULT_FACETS.execution_mode),
     tuning_mode: normalizeFacetList("tuning_mode", input.tuning_mode ?? DEFAULT_FACETS.tuning_mode),
@@ -306,6 +312,7 @@ export function useFacetState(): UseFacetStateResult {
   const [benchmark, setBenchmark] = useFacetUrlState("benchmark");
   const [scaleFactor, setScaleFactor] = useFacetUrlState("scale_factor");
   const [phase, setPhase] = useFacetUrlState("phase");
+  const [streamCount, setStreamCount] = useFacetUrlState("stream_count");
   const [platform, setPlatform] = useFacetUrlState("platform");
   const [executionMode, setExecutionMode] = useFacetUrlState("execution_mode");
   const [tuningMode, setTuningMode] = useFacetUrlState("tuning_mode");
@@ -328,6 +335,7 @@ export function useFacetState(): UseFacetStateResult {
       benchmark,
       scale_factor: scaleFactor,
       phase,
+      stream_count: streamCount,
       platform,
       execution_mode: executionMode,
       tuning_mode: tuningMode,
@@ -362,6 +370,7 @@ export function useFacetState(): UseFacetStateResult {
       platformVersion,
       scaleFactor,
       storageFormat,
+      streamCount,
       trustTier,
       tuningMode,
       validationStatus,
@@ -374,6 +383,7 @@ export function useFacetState(): UseFacetStateResult {
       benchmark: setBenchmark,
       scale_factor: setScaleFactor,
       phase: setPhase,
+      stream_count: setStreamCount,
       platform: setPlatform,
       execution_mode: setExecutionMode,
       tuning_mode: setTuningMode,
@@ -418,6 +428,7 @@ export function facetsToWhereClause(
   addCanonicalBenchmarkClause(facets.benchmark, clauses, params);
   addNumericListClause("scale_factor", facets.scale_factor, clauses, params);
   addCanonicalPhaseClause(facets.phase, clauses, params);
+  addNumericListClause("stream_count", facets.stream_count, clauses, params);
   addPlatformClause(facets.platform, clauses, params);
   addListClause("execution_mode", facets.execution_mode, clauses, params);
   addNullableSentinelClause("tuning_mode", facets.tuning_mode, NULL_TUNING_MODE_SENTINELS, clauses, params);

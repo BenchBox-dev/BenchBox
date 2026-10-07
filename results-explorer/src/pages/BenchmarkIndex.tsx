@@ -48,6 +48,7 @@ import {
   formatArchitecture,
   formatCpuFamily,
   formatMemoryGb,
+  formatPhaseWithStreams,
   formatTrustLabel,
   formatValidationStatus,
   parseOverrideRules,
@@ -255,6 +256,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
         benchmark: canonicalBenchmark ? [canonicalBenchmark] : [],
         scale_factor: [],
         phase: [],
+        stream_count: [],
         tuning_mode: [],
         trust_tier: [],
       }),
@@ -283,6 +285,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       benchmark: canonicalBenchmark ? [canonicalBenchmark] : [],
       scale_factor: [],
       phase: [],
+      stream_count: [],
       tuning_mode: [],
       trust_tier: [],
       platform_version: [],
@@ -308,6 +311,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
 
   const setScaleFilter = (value: string | null) => setFacet("scale_factor", value ? [value] : []);
   const setPhaseFilter = (value: string) => setFacet("phase", value === "power" ? [] : [value]);
+  const setStreamFilter = (value: number | null) => setFacet("stream_count", value === null ? [] : [String(value)]);
   const setTuningFilter = (value: string) => setFacet("tuning_mode", value === "all" ? [] : [value]);
   const setTrustFilter = (value: Set<string> | null) => setFacet("trust_tier", value ? [...value].sort() : []);
 
@@ -403,12 +407,34 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   // If the stored phaseFilter isn't available for the current SF, fall back to
   // the first available phase so we never request a non-existent artifact.
   const effectivePhase = phases.includes(phaseFilter) ? phaseFilter : (phases[0] ?? phaseFilter);
-  const summaryKey = JSON.stringify([benchmark, effectiveSf, effectivePhase]);
+  const streamCountsInPhase = new Map<number, number>();
+  for (const result of benchmarkResults) {
+    if (String(result.scale_factor) !== effectiveSf || canonicalPhase(result.test_type) !== effectivePhase) continue;
+    if (result.stream_count === null || result.stream_count === undefined) continue;
+    streamCountsInPhase.set(result.stream_count, (streamCountsInPhase.get(result.stream_count) ?? 0) + 1);
+  }
+  const streamCounts = [...streamCountsInPhase.keys()].sort((a, b) => a - b);
+  const requestedStreams = singleFacetValue(facets.stream_count);
+  const requestedStreamCount = requestedStreams === null ? null : Number(requestedStreams);
+  const effectiveStreams: number | null =
+    streamCounts.length === 0
+      ? null
+      : requestedStreamCount !== null && streamCounts.includes(requestedStreamCount)
+        ? requestedStreamCount
+        : streamCounts.reduce((best, count) =>
+            (streamCountsInPhase.get(count) ?? 0) > (streamCountsInPhase.get(best) ?? 0) ? count : best,
+          );
+  const summaryKey = JSON.stringify([benchmark, effectiveSf, effectivePhase, effectiveStreams]);
 
   useEffect(() => {
     if (!results || phases.length === 0 || phaseFilter === effectivePhase) return;
     setPhaseFilter(effectivePhase);
   }, [effectivePhase, phaseFilter, phases.length, results, setPhaseFilter]);
+
+  useEffect(() => {
+    if (!results || requestedStreams === null || requestedStreamCount === effectiveStreams) return;
+    setStreamFilter(effectiveStreams);
+  }, [effectiveStreams, requestedStreamCount, requestedStreams, results, setStreamFilter]);
 
   // Load the BenchmarkSummary from DuckDB whenever (sf, phase) changes.
   useEffect(() => {
@@ -419,7 +445,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     setSummaryError(null);
     setSummaryLoading(true);
     setSettledSummaryKey(null);
-    getBenchmarkSummaryFromDuckDB(benchmark, Number(effectiveSf), effectivePhase)
+    getBenchmarkSummaryFromDuckDB(benchmark, Number(effectiveSf), effectivePhase, effectiveStreams)
       .then((s) => {
         if (!cancelled) {
           setSummary(s);
@@ -442,7 +468,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
     // already triggers this effect. Including phaseFilter would cause a redundant
     // double-fetch when the user picks a phase that is available.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [results, benchmark, effectiveSf, effectivePhase]);
+  }, [results, benchmark, effectiveSf, effectivePhase, effectiveStreams]);
 
   // Native fragment navigation happens before async sections exist. Wait for
   // the current cohort so replacing its skeleton cannot move the target away.
@@ -615,6 +641,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   const historicalEntries = benchmarkResults.filter((result) => {
     if (String(result.scale_factor) !== effectiveSf) return false;
     if (canonicalPhase(result.test_type) !== effectivePhase) return false;
+    if (effectiveStreams !== null && (result.stream_count ?? null) !== effectiveStreams) return false;
     if (!isResultTimingDisplayable(result)) return false;
     return matchesFacetRow(result, facets, { keys: BENCHMARK_ROW_FACET_KEYS });
   });
@@ -686,6 +713,22 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       onChange: (value) => setPhaseFilter(value),
       disabledReason: singleValueFilterReason(phases.length, false),
     },
+    ...(streamCounts.length > 0
+      ? [
+          {
+            id: "stream-filter",
+            testId: "benchmark-stream-filter",
+            label: "Streams",
+            value: String(effectiveStreams),
+            options: streamCounts.map((count) => ({
+              value: String(count),
+              label: `${count} ${count === 1 ? "stream" : "streams"}`,
+            })),
+            onChange: (value: string) => setStreamFilter(Number(value)),
+            disabledReason: singleValueFilterReason(streamCounts.length, false),
+          },
+        ]
+      : []),
     {
       id: "tuning-filter",
       label: "Tuning",
@@ -792,7 +835,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
               </span>
               <span class="bb-meta-chip">{filteredSummary.query_ids.length} queries</span>
               <span class="bb-meta-chip">SF {filteredSummary.scale_factor}</span>
-              <span class="bb-meta-chip">{effectivePhase}</span>
+              <span class="bb-meta-chip">{formatPhaseWithStreams(effectivePhase, effectiveStreams)}</span>
             </>
           ) : undefined
         }
@@ -935,6 +978,7 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
           results={results}
           scaleFactor={effectiveSf}
           phase={effectivePhase}
+          streamCount={effectiveStreams}
           facets={facets}
           compareEligibilityByResultId={compareEligibilityByResultId}
           compareEligibilityState={
@@ -1060,6 +1104,7 @@ function ListTable({
   results,
   scaleFactor,
   phase,
+  streamCount,
   facets,
   compareEligibilityByResultId,
   compareEligibilityState,
@@ -1072,6 +1117,7 @@ function ListTable({
   results: ResultRow[];
   scaleFactor: string;
   phase?: string;
+  streamCount?: number | null;
   facets: FacetState;
   /** The matching summary PlatformRow for a result_id, scoped to the current SF/phase cohort. */
   compareEligibilityByResultId: Map<string, PlatformRow>;
@@ -1092,6 +1138,7 @@ function ListTable({
   const byCohort = benchmarkResults.filter((r) => {
     if (String(r.scale_factor) !== scaleFactor) return false;
     if (phase && canonicalPhase(r.test_type) !== phase) return false;
+    if (streamCount !== undefined && streamCount !== null && (r.stream_count ?? null) !== streamCount) return false;
     return true;
   });
 
@@ -1127,6 +1174,7 @@ function ListTable({
     benchmark,
     scaleFactor,
     phase,
+    streamCount,
     facets.platform,
     facets.execution_mode,
     facets.tuning_mode,
@@ -1259,7 +1307,7 @@ function ListTable({
               onSort={toggleSort}
             />
             <ListSortHeader
-              label="Power score"
+              label={phase === "throughput" ? "Throughput@Size" : "Power score"}
               sortKey="power_score"
               ariaSort={ariaSort}
               sortArrow={sortArrow}
@@ -1469,7 +1517,7 @@ function BenchmarkRow({
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateChip runDate={entry.run_date} /></td>
-      <td class="table-td font-mono">{fmtScore(entry.power_score)}</td>
+      <td class="table-td font-mono">{fmtScore(entry.power_score ?? entry.throughput_at_size ?? null)}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.display_geomean_ms ?? entry.geomean_ms)}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.query_count}</td>
       <td class="table-td">
@@ -1562,6 +1610,13 @@ function compareListRows(a: ResultRow, b: ResultRow, sort: SortState<BenchmarkLi
   }
   if (sort.key === "memory_gb") {
     return compareNullableNumber(a.memory_gb ?? null, b.memory_gb ?? null, sort.direction);
+  }
+  if (sort.key === "power_score") {
+    return compareNullableNumber(
+      a.power_score ?? a.throughput_at_size ?? null,
+      b.power_score ?? b.throughput_at_size ?? null,
+      sort.direction,
+    );
   }
   return compareNullableNumber(a[sort.key], b[sort.key], sort.direction);
 }

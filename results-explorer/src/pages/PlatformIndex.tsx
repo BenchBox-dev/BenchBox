@@ -22,11 +22,13 @@ import {
   formatBenchmarkLabel,
   formatCpuFamily,
   formatMemoryGb,
+  formatPhaseWithStreams,
   formatTrustLabel,
   formatValidationStatus,
   isValidationNotClean,
   parseOverrideRules,
 } from "@/lib/displayLabels";
+import { normalizePrimaryMetric, primaryMetricHigherIsBetter, type PrimaryMetric } from "@/lib/displayEligibility";
 import {
   compareCohortLockReason,
   compareCohortSignatureForRow,
@@ -77,7 +79,7 @@ interface PlatformIndexProps extends RoutableProps {
 }
 
 type PlatformSortKey = "benchmark" | "scale_factor" | "run_date" | "power_score" | "geomean_ms" | "arch" | "cpu_family" | "memory_gb";
-type TrendMetric = "power_score" | "display_geomean_ms";
+type TrendMetric = PrimaryMetric;
 const TABLE_RENDER_LIMIT = 200;
 const TABLE_RENDER_INCREMENT = 200;
 const MIN_TREND_OBSERVATIONS = 3;
@@ -155,7 +157,9 @@ function platformRowsForRequest(rows: PlatformIndexRowRow[], platform: string): 
 }
 
 function trendMetricDescription(metric: TrendMetric): string {
-  return metric === "power_score" ? "Power score (higher is better)" : "Geomean latency (lower is better)";
+  if (metric === "power_score") return "Power score (higher is better)";
+  if (metric === "throughput_at_size") return "Throughput@Size (higher is better)";
+  return "Geomean latency (lower is better)";
 }
 
 /** The version this row reports, normalized, or null when none is recorded. */
@@ -191,7 +195,10 @@ function primaryMetricContract(metric: string): string {
 
 /** Short form for the per-row "Ranked on" cell; the full contract is its title. */
 function primaryMetricShort(metric: string): string {
-  return normalizeTrendMetric(metric) === "power_score" ? "Power score ↑" : "Geomean ↓";
+  const normalized = normalizeTrendMetric(metric);
+  if (normalized === "power_score") return "Power score ↑";
+  if (normalized === "throughput_at_size") return "Throughput@Size ↑";
+  return "Geomean ↓";
 }
 
 function platformTableColumnIndex(column: PlatformTableColumn, showMetricContract: boolean): number {
@@ -1284,11 +1291,13 @@ function buildTrendCohorts(rows: PlatformIndexRowRow[]): TrendCohort[] {
 }
 
 function normalizeTrendMetric(metric: string): TrendMetric {
-  return metric === "power_score" ? "power_score" : "display_geomean_ms";
+  return normalizePrimaryMetric(metric);
 }
 
 function trendValue(row: PlatformIndexRowRow, metric: TrendMetric): number | null {
-  return metric === "power_score" ? row.power_score : row.display_geomean_ms;
+  if (metric === "power_score") return row.power_score;
+  if (metric === "throughput_at_size") return row.throughput_at_size ?? null;
+  return row.display_geomean_ms;
 }
 
 /** Shared thumbnail chrome for the Analysis card grid's preview state. */
@@ -1337,7 +1346,7 @@ function TrendsThumbnail({ cohorts }: { cohorts: TrendCohort[] }) {
           .map((value, pointIndex) => {
             const x = values.length > 1 ? (pointIndex / (values.length - 1)) * width : width / 2;
             const normalized = (value - min) / span;
-            const y = cohort.primaryMetric === "power_score" ? height - normalized * height : normalized * height;
+            const y = primaryMetricHigherIsBetter(cohort.primaryMetric) ? height - normalized * height : normalized * height;
             return `${x.toFixed(1)},${y.toFixed(1)}`;
           })
           .join(" ");
@@ -1539,7 +1548,7 @@ function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle,
       </td>
       <td class="table-td font-medium" aria-colindex={platformTableColumnIndex("benchmark", showMetricContract)}>{humanizeBenchmark(entry.benchmark)}</td>
       <td class="table-td" aria-colindex={platformTableColumnIndex("scale", showMetricContract)}>SF {entry.scale_factor}</td>
-      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("phase", showMetricContract)}>{entry.phase}</td>
+      <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("phase", showMetricContract)}>{formatPhaseWithStreams(entry.phase, entry.stream_count)}</td>
       {showMetricContract && (
         <td
           class="table-td whitespace-nowrap text-xs text-[var(--bb-data-fg-muted)]"
@@ -1550,7 +1559,13 @@ function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle,
         </td>
       )}
       <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("date", showMetricContract)}><RunDateChip runDate={entry.run_date} /></td>
-      <td class="table-td font-mono" aria-colindex={platformTableColumnIndex("power_score", showMetricContract)}>{fmtScore(entry.power_score)}</td>
+      <td
+        class="table-td font-mono"
+        aria-colindex={platformTableColumnIndex("power_score", showMetricContract)}
+        title={entry.power_score == null && entry.throughput_at_size != null ? "Throughput@Size" : undefined}
+      >
+        {fmtScore(entry.power_score ?? entry.throughput_at_size ?? null)}
+      </td>
       <td class="table-td font-mono" aria-colindex={platformTableColumnIndex("geomean", showMetricContract)}>{fmtGeomean(entry.geomean_ms)}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("queries", showMetricContract)}>{entry.query_count}</td>
       <td class="table-td" aria-colindex={platformTableColumnIndex("source", showMetricContract)}>

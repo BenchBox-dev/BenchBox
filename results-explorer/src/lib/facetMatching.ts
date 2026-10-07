@@ -24,6 +24,7 @@ export interface FacetMatchRow {
   scale_factor?: string | number | null;
   phase?: string | null;
   test_type?: string | null;
+  stream_count?: number | null;
   platform?: string | null;
   platform_id?: string | null;
   execution_mode?: string | null;
@@ -109,6 +110,8 @@ function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: ExplorerFa
       return matchesRequired(row.scale_factor === undefined || row.scale_factor === null ? null : String(row.scale_factor), facets.scale_factor);
     case "phase":
       return matchesOptional(canonicalPhase(row.test_type ?? row.phase), facets.phase);
+    case "stream_count":
+      return matchesOptional(row.stream_count == null ? null : String(row.stream_count), facets.stream_count);
     case "platform":
       return matchesPlatform(row, facets.platform);
     case "execution_mode":

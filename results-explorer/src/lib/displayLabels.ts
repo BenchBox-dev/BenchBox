@@ -314,6 +314,11 @@ export function canonicalPhase(raw: string | null | undefined): string {
   return normalized === "standard" ? "power" : normalized;
 }
 
+export function formatPhaseWithStreams(phase: string, streamCount: number | null | undefined): string {
+  if (streamCount === null || streamCount === undefined) return phase;
+  return `${phase} (${streamCount} ${streamCount === 1 ? "stream" : "streams"})`;
+}
+
 /**
  * Render a benchmark slug for facet/listing contexts. The canonical SSB slug
  * is `ssb`; the historical `star_schema` value remains visibly identifiable

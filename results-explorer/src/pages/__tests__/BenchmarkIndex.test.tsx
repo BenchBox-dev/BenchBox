@@ -1390,4 +1390,71 @@ describe("BenchmarkIndex", () => {
     expect(within(listSection as HTMLElement).getByText("Showing 2 of 2 results for SF 0.1")).toBeTruthy();
     expect(within(listSection as HTMLElement).queryByText("ClickHouse")).toBeNull();
   });
+
+  describe("throughput cohorts split by stream count", () => {
+    function throughputFixtures() {
+      const base = RESULT_ROWS[0]!;
+      const rows = [
+        { ...base, result_id: "tp-spark-3", platform: "Spark", platform_id: "spark", test_type: "throughput", stream_count: 3, throughput_at_size: 3741, power_score: null },
+        { ...base, result_id: "tp-duck-3", platform: "DuckDB", platform_id: "duckdb", test_type: "throughput", stream_count: 3, throughput_at_size: 1500, power_score: null },
+        { ...base, result_id: "tp-spark-2", platform: "Spark", platform_id: "spark", test_type: "throughput", stream_count: 2, throughput_at_size: 3500, power_score: null },
+      ];
+      const rankings = RANKING_ROWS.map((r) => ({ ...r, phase: "throughput", primary_metric: "throughput_at_size" }));
+      const cells = CELL_ROWS.map((c) => ({ ...c, phase: "throughput" }));
+      return { rows, rankings, cells };
+    }
+
+    function rankingParams() {
+      return vi
+        .mocked(queryRows)
+        .mock.calls.filter(([sql]) => String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"))
+        .map(([, params]) => params);
+    }
+
+    it("offers a Streams filter and loads the stream count with the most runs by default", async () => {
+      const { rows, rankings, cells } = throughputFixtures();
+      vi.mocked(queryRows).mockImplementation(defaultImpl(rows, rankings, cells));
+
+      render(<BenchmarkIndex benchmark="tpch" />);
+
+      const streams = (await screen.findByTestId("benchmark-stream-filter")) as HTMLSelectElement;
+      expect(Array.from(streams.options).map((option) => option.textContent)).toEqual(["2 streams", "3 streams"]);
+      await waitFor(() => expect(streams.value).toBe("3"));
+      await waitFor(() => expect(rankingParams().at(-1)).toEqual(["tpch", 0.1, "throughput", 3]));
+      await waitFor(() => expect(screen.getByText("throughput (3 streams)")).toBeTruthy());
+    });
+
+    it("reloads the cohort when another stream count is selected", async () => {
+      const { rows, rankings, cells } = throughputFixtures();
+      vi.mocked(queryRows).mockImplementation(defaultImpl(rows, rankings, cells));
+
+      render(<BenchmarkIndex benchmark="tpch" />);
+      const streams = (await screen.findByTestId("benchmark-stream-filter")) as HTMLSelectElement;
+      await waitFor(() => expect(streams.value).toBe("3"));
+
+      fireEvent.change(streams, { target: { value: "2" } });
+
+      await waitFor(() => expect(rankingParams().at(-1)).toEqual(["tpch", 0.1, "throughput", 2]));
+      expect(new URL(window.location.href).searchParams.get("streams")).toBe("2");
+    });
+
+    it("coerces an unavailable streams URL value to the rendered stream count", async () => {
+      const { rows, rankings, cells } = throughputFixtures();
+      vi.mocked(queryRows).mockImplementation(defaultImpl(rows, rankings, cells));
+      window.history.replaceState(null, "", "/results/tpch/?sf=0.1&phase=throughput&streams=9");
+
+      render(<BenchmarkIndex benchmark="tpch" />);
+
+      await waitFor(() => expect(new URL(window.location.href).searchParams.get("streams")).toBe("3"));
+      await waitFor(() => expect(rankingParams().at(-1)).toEqual(["tpch", 0.1, "throughput", 3]));
+    });
+
+    it("does not show a Streams filter for a power cohort", async () => {
+      render(<BenchmarkIndex benchmark="tpch" />);
+      await waitFor(() => screen.getAllByText("DuckDB"));
+
+      expect(screen.queryByTestId("benchmark-stream-filter")).toBeNull();
+      await waitFor(() => expect(rankingParams().at(-1)).toEqual(["tpch", 0.1, "power"]));
+    });
+  });
 });

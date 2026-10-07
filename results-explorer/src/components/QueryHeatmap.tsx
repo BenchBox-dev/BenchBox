@@ -27,7 +27,7 @@ import { FundingChip } from "@/components/FundingChip";
 import { parseOverrideRules } from "@/lib/displayLabels";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { fmtMs as formatDurationMs, fmtGeomean } from "@/utils";
-import { formatLatencyMs, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
+import { formatLatencyMs, formatScoreMetric, formatSpeedup } from "@/lib/metricFormatters";
 import { queryDisplayLabel, sortQueryIds } from "@/lib/queryLabels";
 import { compareSelectionLabel } from "@/lib/compareCohort";
 import { MAX_COMPARE_SELECTIONS, resultIdentityAriaLabel, resultReceiptHref } from "@/lib/resultLinks";
@@ -42,7 +42,9 @@ import {
   formatTimingExclusion,
   isComparable,
   isRankable,
+  normalizePrimaryMetric,
   platformTimingValue,
+  primaryMetricLabel,
   validPrimaryMetricValue,
 } from "@/lib/displayEligibility";
 
@@ -195,7 +197,7 @@ export function QueryHeatmap({
   }, [platforms, sortedQueryIds]);
 
   // Determine primary display metric from the artifact's ranking config.
-  const primaryMetric = ranking?.primary_metric === "power_score" ? "power_score" : "display_geomean_ms";
+  const primaryMetric = normalizePrimaryMetric(ranking?.primary_metric);
   const higherIsBetter = ranking?.primary_order === "desc";
   const defaultPrimaryDirection: SortDirection = higherIsBetter ? "desc" : "asc";
   type MatrixSortKey = "platform" | "primary" | "geomean" | `query:${string}`;
@@ -211,7 +213,7 @@ export function QueryHeatmap({
 
   function fmtPrimary(val: number | null): string {
     if (val === null) return "-";
-    return primaryMetric === "power_score" ? formatPowerScore(val).valueText : fmtGeomean(val);
+    return primaryMetric === "display_geomean_ms" ? fmtGeomean(val) : formatScoreMetric(primaryMetric, val);
   }
 
   function compareNullableNumber(a: number | null, b: number | null, direction: SortDirection): number {
@@ -379,8 +381,8 @@ export function QueryHeatmap({
   // Column headers name the measure, not its unit: every rendered value in
   // these columns already carries its unit ("5.9 ms"), so "latency" in the
   // header only costs width.
-  const primaryLabel = primaryMetric === "power_score" ? "Power score" : "Geomean";
-  const primaryDirectionLabel = primaryMetric === "power_score" ? "higher is better" : "lower is better";
+  const primaryLabel = primaryMetric === "display_geomean_ms" ? "Geomean" : primaryMetricLabel(primaryMetric);
+  const primaryDirectionLabel = primaryMetric === "display_geomean_ms" ? "lower is better" : "higher is better";
   // The legend heading describes what the *cells* show, not the cohort's
   // primary score metric. Heatmap cells are always per-query latency values,
   // regardless of whether the primary score column is power_score or

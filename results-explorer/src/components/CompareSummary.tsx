@@ -169,8 +169,8 @@ function SummaryCard({
 }
 
 function formatPrimaryValue(value: number | null, primaryMetric: CompareDecisionSummary["primaryMetric"]) {
-  if (primaryMetric === "power_score") return fmtScore(value);
-  return fmtGeomean(value);
+  if (primaryMetric === "display_geomean_ms") return fmtGeomean(value);
+  return fmtScore(value);
 }
 
 function formatCostSummary(cost: NonNullable<CompareDecisionSummary["cost"]>) {

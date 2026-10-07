@@ -26,7 +26,10 @@ import {
   isRankable,
   isTimingDisplayable,
   isValidTimingValue,
+  normalizePrimaryMetric,
   platformTimingValue,
+  primaryMetricHigherIsBetter,
+  primaryMetricValue,
   summarizeChartDatasetExclusions,
   validPrimaryMetricValue,
 } from "@/lib/displayEligibility";
@@ -126,11 +129,15 @@ export function SummaryChartOverview({
   const displayRows = summary.platforms.filter(
     (platform) => isTimingDisplayable(platform) && validPrimaryMetricValue(platform, "display_geomean_ms") !== null,
   );
+  const scoreMetric = normalizePrimaryMetric(summary.ranking?.primary_metric) === "throughput_at_size"
+    ? "throughput_at_size"
+    : "power_score";
+  const scoreName = scoreMetric === "throughput_at_size" ? "Throughput@Size" : "Power@Size";
   const powerRows = summary.platforms.filter(
-    (platform) => isRankable(platform) && validPrimaryMetricValue(platform, "power_score") !== null,
+    (platform) => isRankable(platform) && validPrimaryMetricValue(platform, scoreMetric) !== null,
   );
   const displayScale = buildLatencyBarScale(displayRows.map((platform) => platform.display_geomean_ms));
-  const maxPower = Math.max(...powerRows.map((platform) => platform.power_score ?? 0), 1);
+  const maxPower = Math.max(...powerRows.map((platform) => primaryMetricValue(platform, scoreMetric) ?? 0), 1);
   const labels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
   );
@@ -159,7 +166,7 @@ export function SummaryChartOverview({
             aria-label="Speed and throughput by platform"
           >
             <caption class="sr-only">
-              Display geomean latency and Power@Size for every submitted platform in this cohort
+              Display geomean latency and {scoreName} for every submitted platform in this cohort
             </caption>
             <thead>
               <tr class="border-b border-[var(--bb-data-border-strong)]">
@@ -174,7 +181,7 @@ export function SummaryChartOverview({
                   <span class="font-normal text-[var(--bb-data-fg-subtle)]">lower is better</span>
                 </th>
                 <th scope="col" class="px-2 py-2 text-left text-xs font-medium text-[var(--bb-data-fg-muted)]">
-                  <span class="block">Power@Size</span>
+                  <span class="block">{scoreName}</span>
                   <span class="font-normal text-[var(--bb-data-fg-subtle)]">higher is better</span>
                 </th>
               </tr>
@@ -185,7 +192,7 @@ export function SummaryChartOverview({
                 const color = paletteColor(sourceIndex);
                 const displayValue = validPrimaryMetricValue(platform, "display_geomean_ms");
                 const powerValue = isRankable(platform)
-                  ? validPrimaryMetricValue(platform, "power_score")
+                  ? validPrimaryMetricValue(platform, scoreMetric)
                   : null;
                 const displayFraction = displayValue !== null && displayScale
                   ? latencyScaleFraction(displayValue, displayScale)
@@ -224,8 +231,8 @@ export function SummaryChartOverview({
                       color={color}
                       title={
                         powerValue === null
-                          ? "Power@Size unavailable or not rank-safe"
-                          : `${fmtScore(powerValue)} Power@Size`
+                          ? `${scoreName} unavailable or not rank-safe`
+                          : `${fmtScore(powerValue)} ${scoreName}`
                       }
                     />
                   </tr>
@@ -531,7 +538,7 @@ function renderExpandedChart(
       return (
         <TimeSeries
           entries={historical}
-          primaryMetric={summary.ranking?.primary_metric as "power_score" | "display_geomean_ms" | undefined}
+          primaryMetric={normalizePrimaryMetric(summary.ranking?.primary_metric)}
         />
       );
     case "rank_table":
@@ -761,8 +768,8 @@ function MiniPhases({ summary }: { summary: BenchmarkSummary }) {
 }
 
 function MiniTrend({ summary, historical }: { summary: BenchmarkSummary; historical: ChartHistoricalEntry[] }) {
-  const metric = summary.ranking?.primary_metric === "power_score" ? "power_score" : "display_geomean_ms";
-  const values = historical.map((entry) => entry[metric]).filter(isValidTimingValue);
+  const metric = normalizePrimaryMetric(summary.ranking?.primary_metric);
+  const values = historical.map((entry) => trendEntryValue(entry, metric)).filter(isValidTimingValue);
   if (values.length < 2) return <MiniUnavailable label="Not enough history for a trend" />;
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -785,13 +792,13 @@ function MiniTrend({ summary, historical }: { summary: BenchmarkSummary; histori
         <line x1="8" y1="76" x2="232" y2="76" stroke="var(--bb-chart-grid)" />
         {Array.from(byPlatform.values()).slice(0, 6).map((entries, index) => {
           const points = entries
-            .filter((entry) => isValidTimingValue(entry[metric]))
+            .filter((entry) => isValidTimingValue(trendEntryValue(entry, metric)))
             .sort((a, b) => a.run_date.localeCompare(b.run_date));
           if (points.length < 2) return null;
           const d = points.map((entry, pointIndex) => {
             const x = 12 + (pointIndex / Math.max(points.length - 1, 1)) * 216;
-            const normalized = ((entry[metric] as number) - min) / span;
-            const y = metric === "power_score" ? 10 + (1 - normalized) * 62 : 10 + normalized * 62;
+            const normalized = ((trendEntryValue(entry, metric) as number) - min) / span;
+            const y = primaryMetricHigherIsBetter(metric) ? 10 + (1 - normalized) * 62 : 10 + normalized * 62;
             return `${pointIndex === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
           }).join(" ");
           return <path key={index} d={d} fill="none" stroke={timeSeriesColor(index)} stroke-width="1.5" />;
@@ -799,6 +806,12 @@ function MiniTrend({ summary, historical }: { summary: BenchmarkSummary; histori
       </svg>
     </MiniFrame>
   );
+}
+
+function trendEntryValue(entry: ChartHistoricalEntry, metric: ReturnType<typeof normalizePrimaryMetric>): number | null {
+  if (metric === "power_score") return entry.power_score;
+  if (metric === "throughput_at_size") return entry.throughput_at_size ?? null;
+  return entry.display_geomean_ms;
 }
 
 function MiniRanks({ summary }: { summary: BenchmarkSummary }) {
@@ -842,7 +855,7 @@ function MiniRanks({ summary }: { summary: BenchmarkSummary }) {
 }
 
 function MiniCost({ summary }: { summary: BenchmarkSummary }) {
-  const metric = summary.ranking?.primary_metric === "power_score" ? "power_score" : "display_geomean_ms";
+  const metric = normalizePrimaryMetric(summary.ranking?.primary_metric);
   const points = summary.platforms.filter(
     (platform) =>
       Number.isFinite(platform.normalized_cost_usd) &&
@@ -856,7 +869,7 @@ function MiniCost({ summary }: { summary: BenchmarkSummary }) {
   const maxCost = Math.max(...costs);
   const minMetric = Math.min(...metricValues);
   const maxMetric = Math.max(...metricValues);
-  const higherIsBetter = metric === "power_score";
+  const higherIsBetter = primaryMetricHigherIsBetter(metric);
   return (
     <MiniFrame>
       <div class="summary-mini-plot relative h-[5.5rem] w-full border-b border-l border-[var(--bb-data-border)]">

@@ -22,6 +22,7 @@ import {
   isTimingDisplayable,
   isValidTimingValue,
   type ChartDatasetEligibilityClass,
+  type PrimaryMetric,
 } from "@/lib/displayEligibility";
 
 /**
@@ -39,6 +40,7 @@ export interface ChartHistoricalEntry {
   platform_id: string;
   run_date: string;
   power_score: number | null;
+  throughput_at_size?: number | null;
   display_geomean_ms: number | null;
 }
 
@@ -327,14 +329,14 @@ export type ChartContext =
       kind: "compare";
       results: DetailResult[];
       /** Canonical `benchmark_rankings.primary_metric`, loaded from DuckDB. */
-      primaryMetric?: "power_score" | "display_geomean_ms";
+      primaryMetric?: PrimaryMetric;
     }
   | {
       kind: "detail";
       detail: DetailResult;
       historical?: ChartHistoricalEntry[];
       /** Canonical `benchmark_rankings.primary_metric`, loaded from DuckDB. */
-      primaryMetric?: "power_score" | "display_geomean_ms";
+      primaryMetric?: PrimaryMetric;
     };
 
 interface ChartCapabilities {
@@ -349,21 +351,22 @@ interface ChartCapabilities {
 }
 
 function rankingFromPrimaryMetric(
-  primaryMetric: "power_score" | "display_geomean_ms" | undefined,
+  primaryMetric: PrimaryMetric | undefined,
 ): { primary_metric: string; primary_order: "asc" | "desc" } {
-  return primaryMetric === "power_score"
-    ? { primary_metric: "power_score", primary_order: "desc" }
+  return primaryMetric === "power_score" || primaryMetric === "throughput_at_size"
+    ? { primary_metric: primaryMetric, primary_order: "desc" }
     : { primary_metric: "display_geomean_ms", primary_order: "asc" };
 }
 
 function buildDetailSummary(
   detail: DetailResult,
-  primaryMetric: "power_score" | "display_geomean_ms" | undefined,
+  primaryMetric: PrimaryMetric | undefined,
 ): BenchmarkSummary {
   return {
     benchmark: detail.benchmark,
     scale_factor: detail.scale_factor,
     phase: canonicalPhase(detail.test_type),
+    stream_count: detail.stream_count ?? null,
     query_ids: detail.display_timings.map((timing) => timing.query_id),
     platforms: [detailToPlatformRow(detail)],
     cell_reduction: "median",
@@ -376,7 +379,7 @@ function buildDetailSummary(
 
 function buildCompareSummary(
   results: DetailResult[],
-  primaryMetric: "power_score" | "display_geomean_ms" | undefined,
+  primaryMetric: PrimaryMetric | undefined,
 ): BenchmarkSummary | null {
   if (results.length === 0) return null;
 
@@ -388,6 +391,7 @@ function buildCompareSummary(
     benchmark: results[0]!.benchmark,
     scale_factor: results[0]!.scale_factor,
     phase: canonicalPhase(results[0]!.test_type),
+    stream_count: results[0]!.stream_count ?? null,
     query_ids: queryIds,
     platforms: results.map(detailToPlatformRow),
     cell_reduction: "median",
@@ -420,6 +424,7 @@ function detailToPlatformRow(detail: DetailResult): PlatformRow {
     comparison_exclusion_reason: detail.comparison_exclusion_reason,
     ranking_exclusion_reason: detail.ranking_exclusion_reason,
     power_score: detail.power_score,
+    throughput_at_size: detail.throughput_at_size ?? null,
     display_geomean_ms: detail.display_geomean_ms,
     sample_geomean_ms: detail.geomean_ms,
     cost_usd: detail.cost_usd,

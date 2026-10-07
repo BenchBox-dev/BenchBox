@@ -15,7 +15,7 @@ import { formatAverageRank, formatCoverage, formatRank, formatSpeedup } from "@/
 import { fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
-import { parseOverrideRules } from "@/lib/displayLabels";
+import { formatPhaseWithStreams, parseOverrideRules } from "@/lib/displayLabels";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { formatRunAge } from "@/lib/runAge";
@@ -572,12 +572,14 @@ function cohortMetricSublabel(cohort: MetaCohort): string {
   const direction = cohort.primary_order === "desc" ? "higher is better" : "lower is better";
   const metricLabel = metric === "power_score"
     ? "Power score"
-    : metric === "display_geomean_ms" || metric === "geomean_ms"
-      ? "Geomean latency"
-      : metric === "total_duration_s"
-        ? "Total duration"
-        : metric;
-  return `${cohort.phase} · ${metricLabel} · ${direction}`;
+    : metric === "throughput_at_size"
+      ? "Throughput@Size"
+      : metric === "display_geomean_ms" || metric === "geomean_ms"
+        ? "Geomean latency"
+        : metric === "total_duration_s"
+          ? "Total duration"
+          : metric;
+  return `${formatPhaseWithStreams(cohort.phase, cohort.stream_count)} · ${metricLabel} · ${direction}`;
 }
 
 function cellText(rank: MetaRank, cohort: MetaCohort, mode: MetaLeaderboardMode): string {
@@ -601,6 +603,9 @@ function exactMetricTitle(rank: MetaRank | undefined, cohort: MetaCohort): strin
   if (!rank || rank.metric_value === null || rank.metric_value === undefined) return null;
   if (cohort.primary_metric === "power_score") {
     return `Exact power score: ${fmtScoreExact(rank.metric_value)}`;
+  }
+  if (cohort.primary_metric === "throughput_at_size") {
+    return `Exact Throughput@Size: ${fmtScoreExact(rank.metric_value)}`;
   }
   return null;
 }

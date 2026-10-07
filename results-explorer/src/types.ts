@@ -69,6 +69,8 @@ export interface DetailResult extends CostDeploymentFields {
   geomean_ms: number | null;
   display_geomean_ms: number | null;
   power_score: number | null;
+  throughput_at_size?: number | null;
+  stream_count?: number | null;
   has_display_timing: boolean;
   logical_query_count?: number;
   valid_query_count: number;
@@ -211,6 +213,7 @@ export interface PlatformRow extends CostDeploymentFields {
   comparison_exclusion_reason: string | null;
   ranking_exclusion_reason: string | null;
   power_score: number | null;
+  throughput_at_size?: number | null;
   display_geomean_ms: number | null;
   sample_geomean_ms: number | null;
   cost_usd: number | null;
@@ -230,6 +233,7 @@ export interface BenchmarkSummary {
   benchmark: string;
   scale_factor: number;
   phase: string;
+  stream_count?: number | null;
   query_ids: string[];
   platforms: PlatformRow[];
   cell_reduction: string;
@@ -282,6 +286,7 @@ export interface MetaCohort {
   benchmark: string;
   scale_factor: number;
   phase: string;
+  stream_count?: number | null;
   label: string;
   href: string;
   /** Count of ranking-eligible platforms with non-null primary metrics. */

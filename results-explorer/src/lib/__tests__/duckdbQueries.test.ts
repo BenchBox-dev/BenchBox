@@ -16,6 +16,7 @@ import {
   getBenchmarkMatrixCells,
   getBenchmarkRanking,
   getBenchmarkSummaryFromDuckDB,
+  getPrimaryMetricForBenchmark,
   getPlatformIndexRows,
   getCohort,
   getMetaLeaderboard,
@@ -832,5 +833,142 @@ describe("toShortIds", () => {
     // 3 inputs → 3 ? placeholders
     expect(sql).toMatch(/IN \(\?, \?, \?\)/);
     expect(params).toEqual(["id-a", "id-b", "id-c"]);
+  });
+});
+
+describe("throughput cohorts split by stream count", () => {
+  it("scopes matrix cells and rankings by stream_count when one is given", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await getBenchmarkMatrixCells("tpch", 1, "throughput", 3);
+    await getBenchmarkRanking("tpch", 1, "throughput", 3);
+
+    const [cellsSql, cellsParams] = mockedQueryRows.mock.calls[0]!;
+    expect(cellsSql).toContain("AND stream_count = ?");
+    expect(cellsParams).toEqual(["tpch", 1, "throughput", 3]);
+    const [rankingSql, rankingParams] = mockedQueryRows.mock.calls[1]!;
+    expect(rankingSql).toContain("AND br.stream_count = ?");
+    expect(rankingSql).toMatch(/br\.throughput_at_size/);
+    expect(rankingParams).toEqual(["tpch", 1, "throughput", 3]);
+  });
+
+  it("matches only rows without a stream_count when none is given", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await getBenchmarkMatrixCells("tpch", 1, "power");
+    await getBenchmarkRanking("tpch", 1, "power");
+
+    expect(mockedQueryRows.mock.calls[0]![0]).toContain("AND stream_count IS NULL");
+    expect(mockedQueryRows.mock.calls[1]![0]).toContain("AND br.stream_count IS NULL");
+  });
+
+  it("keeps separate cached summaries per stream count", async () => {
+    mockedQueryRows.mockResolvedValue([]);
+
+    await getBenchmarkSummaryFromDuckDB("tpch", 1, "throughput", 2);
+    await getBenchmarkSummaryFromDuckDB("tpch", 1, "throughput", 3);
+    await getBenchmarkSummaryFromDuckDB("tpch", 1, "throughput", 3);
+
+    const rankingCalls = mockedQueryRows.mock.calls.filter(([sql]) => String(sql).includes("benchmark_rankings"));
+    expect(rankingCalls.map(([, params]) => params)).toEqual([
+      ["tpch", 1, "throughput", 2],
+      ["tpch", 1, "throughput", 3],
+    ]);
+  });
+
+  it("builds a throughput summary ranked on Throughput@Size", async () => {
+    mockedQueryRows
+      .mockResolvedValueOnce([
+        {
+          benchmark: "tpch",
+          scale_factor: 1,
+          phase: "throughput",
+          result_id: "r1",
+          platform_id: "spark",
+          platform: "Spark",
+          short_id: "r1",
+          trust_label: "maintainer-run",
+          run_date: "2026-10-03",
+          is_ranking_eligible: true,
+          has_display_timing: true,
+          valid_query_count: 22,
+          missing_query_count: 0,
+          zero_timing_count: 0,
+          display_exclusion_reason: null,
+          comparison_exclusion_reason: null,
+          ranking_exclusion_reason: null,
+          power_score: null,
+          throughput_at_size: 3741.26,
+          stream_count: 3,
+          display_geomean_ms: 2509.5,
+          sample_geomean_ms: 2509.5,
+          cost_usd: null,
+          compliance_class: "official",
+          primary_metric: "throughput_at_size",
+          primary_order: "desc",
+          rank: 1,
+          percentile_p50: null,
+          percentile_p90: null,
+          percentile_p95: null,
+          percentile_p99: null,
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const summary = await getBenchmarkSummaryFromDuckDB("tpch", 1, "throughput", 3);
+
+    expect(summary?.stream_count).toBe(3);
+    expect(summary?.ranking).toEqual({
+      primary_metric: "throughput_at_size",
+      secondary_metric: "display_geomean_ms",
+      primary_order: "desc",
+    });
+    expect(summary?.platforms[0]?.throughput_at_size).toBe(3741.26);
+  });
+
+  it("reads the primary metric for a benchmark phase, falling back to the benchmark", async () => {
+    mockedQueryRows.mockResolvedValueOnce([{ primary_metric: "throughput_at_size" }]);
+    await expect(getPrimaryMetricForBenchmark("tpch", "throughput")).resolves.toBe("throughput_at_size");
+    expect(mockedQueryRows.mock.calls[0]![0]).toContain("AND phase = ?");
+    expect(mockedQueryRows.mock.calls[0]![1]).toEqual(["tpch", "throughput"]);
+
+    mockedQueryRows.mockResolvedValueOnce([]).mockResolvedValueOnce([{ primary_metric: "power_score" }]);
+    await expect(getPrimaryMetricForBenchmark("tpch", "unknown")).resolves.toBe("power_score");
+
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await expect(getPrimaryMetricForBenchmark("tpch")).resolves.toBe("display_geomean_ms");
+  });
+
+  it("carries stream_count from cohort_metadata onto the cohort", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        cohort_key: "tpch-sf1-throughput-3streams",
+        benchmark: "tpch",
+        scale_factor: 1,
+        phase: "throughput",
+        stream_count: 3,
+        cohort_label: "TPC-H SF1 Throughput (3 streams)",
+        cohort_href: "/results/tpch/?sf=1&phase=throughput&streams=3",
+        platform_count: 3,
+        cohort_ranked_count: 3,
+        cohort_ranking_exclusion_reason: null,
+        primary_metric: "throughput_at_size",
+        primary_order: "desc",
+        platform_id: "spark",
+        platform: "Spark",
+        result_id: "r1",
+        short_id: "",
+        tuning_mode: "notuning",
+        trust_label: "maintainer-run",
+        rank: 1,
+        metric_value: 3741.26,
+        speedup_vs_best: 1,
+      },
+    ]);
+
+    const data = await getMetaLeaderboardData();
+
+    expect(data!.cohorts[0]).toMatchObject({ stream_count: 3, primary_metric: "throughput_at_size" });
   });
 });

@@ -1,4 +1,6 @@
 import type { DetailResult, Environment, QueryDisplayTiming, QueryTiming } from "@/types";
+import { canonicalPhase } from "@/lib/displayLabels";
+import type { PrimaryMetric } from "@/lib/displayEligibility";
 
 export const MAX_LOCAL_RESULT_BYTES = 10 * 1024 * 1024;
 
@@ -32,7 +34,7 @@ const KNOWN_LOGICAL_QUERY_COUNTS: Record<string, number> = {
 };
 
 type JsonObject = Record<string, unknown>;
-export type LocalPrimaryMetric = "power_score" | "display_geomean_ms";
+export type LocalPrimaryMetric = PrimaryMetric;
 
 export interface LocalResultPreview {
   detail: DetailResult;
@@ -119,6 +121,11 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
   const logicalQueryCount = inferLogicalQueryCount(bundle, benchmarkId, displayTimings);
   const eligibility = timingEligibility(displayTimings, logicalQueryCount);
   const powerScore = firstFiniteNumber(objectValue(summary, "tpc_metrics"), ["power_at_size"]);
+  const throughputScore = firstFiniteNumber(objectValue(summary, "tpc_metrics"), ["throughput_at_size"]);
+  const phase = testType(bundle, benchmark);
+  const streamCount = phase !== null && canonicalPhase(phase) === "throughput"
+    ? throughputStreamCount(objectValue(bundle, "phases"))
+    : null;
   const resultId = localResultId();
   const validationStatus = validationStatusFor(bundle, failedQueryCount(bundle));
   const environment = safeEnvironment(bundle.environment);
@@ -148,6 +155,8 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
       displayTimings.flatMap((timing) => timing.display_ms !== null && timing.display_ms > 0 ? [timing.display_ms] : []),
     ),
     power_score: powerScore,
+    throughput_at_size: throughputScore,
+    stream_count: streamCount,
     has_display_timing: eligibility.validQueryCount > 0,
     logical_query_count: logicalQueryCount,
     valid_query_count: eligibility.validQueryCount,
@@ -179,7 +188,7 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
     override_approver: null,
     override_expires: null,
     tuning_policy_generation: stringOrNull(tuning.tuning_policy_generation),
-    test_type: testType(bundle, benchmark),
+    test_type: phase,
     validation_status: validationStatus,
     cost_usd: normalizedCost.normalized_cost_usd,
     ...normalizedCost,
@@ -194,9 +203,7 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
   return {
     detail,
     fileName,
-    primaryMetric: (benchmarkId === "tpch" || benchmarkId === "tpcds") && powerScore !== null
-      ? "power_score"
-      : "display_geomean_ms",
+    primaryMetric: localPrimaryMetric(benchmarkId, phase, powerScore, throughputScore),
   };
 }
 
@@ -460,6 +467,25 @@ function testType(bundle: JsonObject, benchmark: JsonObject): string | null {
   if (phaseExecuted(phases.power_test)) return "power";
   if (phaseExecuted(phases.throughput_test)) return "throughput";
   return null;
+}
+
+function throughputStreamCount(phases: JsonObject): number | null {
+  const throughput = objectValue(phases, "throughput_test");
+  const streams = throughput.stream_results;
+  return Array.isArray(streams) && streams.length > 0 ? streams.length : null;
+}
+
+function localPrimaryMetric(
+  benchmarkId: string,
+  phase: string | null,
+  powerScore: number | null,
+  throughputScore: number | null,
+): LocalPrimaryMetric {
+  if (benchmarkId !== "tpch" && benchmarkId !== "tpcds") return "display_geomean_ms";
+  if (phase !== null && canonicalPhase(phase) === "throughput") {
+    return throughputScore !== null ? "throughput_at_size" : "display_geomean_ms";
+  }
+  return powerScore !== null ? "power_score" : "display_geomean_ms";
 }
 
 function phaseExecuted(phase: unknown): boolean {

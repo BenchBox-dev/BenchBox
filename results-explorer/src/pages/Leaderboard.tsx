@@ -107,6 +107,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
   const benchmarkFilters = facets.benchmark;
   const scaleFilters = facets.scale_factor;
   const phaseFilter = singleFacetValue(facets.phase, "all");
+  const streamFilters = facets.stream_count;
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all");
   const trustFilter = singleFacetValue(facets.trust_tier, "all");
   const dateWindow = facets.date_window;
@@ -127,6 +128,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
       facets.platform,
       facets.scale_factor,
       facets.storage_format,
+      facets.stream_count,
       facets.trust_tier,
       facets.tuning_mode,
       facets.validation_status,
@@ -272,6 +274,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
       ) return false;
       if (scaleFilters.length > 0 && !scaleFilters.includes(String(cohort.scale_factor))) return false;
       if (phaseFilter !== "all" && cohort.phase !== phaseFilter) return false;
+      if (streamFilters.length > 0 && !streamFilters.includes(String(cohort.stream_count ?? ""))) return false;
 
       return (cohort.platforms ?? []).length > 0;
     });
@@ -428,7 +431,10 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
     const params = new URLSearchParams();
     params.set("sf", String(cohort.scale_factor));
     params.set("phase", cohort.phase);
-    appendFacetParams(params, facets, new Set(["benchmark", "scale_factor", "phase"]));
+    if (cohort.stream_count !== null && cohort.stream_count !== undefined) {
+      params.set("streams", String(cohort.stream_count));
+    }
+    appendFacetParams(params, facets, new Set(["benchmark", "scale_factor", "phase", "stream_count"]));
     const query = params.toString();
     return `/results/${cohort.benchmark}/${query ? `?${query}` : ""}`;
   }
@@ -775,6 +781,7 @@ const FACET_LABELS: Record<ExplorerFacetKey, string> = {
   benchmark: "Benchmark",
   scale_factor: "Scale factor",
   phase: "Phase",
+  stream_count: "Streams",
   platform: "Platform",
   execution_mode: "Execution",
   tuning_mode: "Tuning",
