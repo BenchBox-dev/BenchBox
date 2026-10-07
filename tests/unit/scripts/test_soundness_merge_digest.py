@@ -992,3 +992,12 @@ def test_an_oracle_success_review_of_the_merged_content_is_a_signal():
 )
 def test_an_oracle_review_that_does_not_qualify_is_not_a_signal(oracle_review):
     assert digest.review_signals(evidence(reviews=(oracle_review,))) == ()
+
+
+def test_only_the_latest_oracle_verdict_after_a_retarget_counts():
+    success = review(ORACLE_BOT, HEAD, PUSHED, user_type="Bot", body=oracle_verdict(HEAD))
+    failure = review(ORACLE_BOT, HEAD, AFTER, user_type="Bot", body=oracle_verdict(HEAD, "failure"))
+    assert digest.review_signals(evidence(reviews=(success, failure))) == ()
+    assert digest.review_signals(evidence(reviews=(failure, success), base_changed_at=AFTER)) == ()
+    later_success = review(ORACLE_BOT, HEAD, AFTER, user_type="Bot", body=oracle_verdict(HEAD))
+    assert digest.review_signals(evidence(reviews=(later_success,), base_changed_at=PUSHED)) == ("oracle-review",)

@@ -141,16 +141,22 @@ class Entry:
         return tuple(reasons)
 
 
-def _is_oracle_success(review: Review, evidence: PullEvidence) -> bool:
-    verdict = _ORACLE_VERDICT.match(review.body)
-    return (
-        review.login == f"{ORACLE_LOGIN}[bot]"
+def _oracle_success(evidence: PullEvidence) -> bool:
+    candidates = [
+        review
+        for review in evidence.reviews
+        if review.login == f"{ORACLE_LOGIN}[bot]"
         and review.user_type == "Bot"
         and review.commit_sha in evidence.content_shas
-        and review.submitted_at <= evidence.merged_at
+        and evidence.base_changed_at < review.submitted_at <= evidence.merged_at
+    ]
+    latest = max(candidates, key=lambda review: review.submitted_at, default=None)
+    verdict = _ORACLE_VERDICT.match(latest.body) if latest else None
+    return (
+        latest is not None
         and verdict is not None
         and verdict.group("state") == "success"
-        and verdict.group("sha") == review.commit_sha
+        and verdict.group("sha") == latest.commit_sha
     )
 
 
@@ -169,7 +175,7 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
         for r in evidence.reviews
     ):
         signals.append("connector-review")
-    if any(_is_oracle_success(r, evidence) for r in evidence.reviews):
+    if _oracle_success(evidence):
         signals.append("oracle-review")
     if any(r.login in CONNECTOR_LOGINS and r.content == "+1" and in_window(r.created_at) for r in evidence.reactions):
         signals.append("connector-approval")
