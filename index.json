@@ -19120,6 +19120,16 @@
       "status": "open",
       "title": "Re-evaluate every blog draft asset and port chart rendering to a pinned external CLI call"
     },
+    "site-split-25-shadow-parity": {
+      "claim": null,
+      "needs": [
+        "site-split-23-node-deploy-plane",
+        "site-split-24-blog-drafts"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Run the site build in shadow against core site-deploy until three consecutive certified bundles match"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],

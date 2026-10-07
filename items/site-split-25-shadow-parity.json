@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Three consecutive certified bundles produce matching trees apart from the allowlist (run ids and digests recorded in context)",
+    "shadow-allowlist.json committed with a reason per entry",
+    "No production change made"
+  ],
+  "context": "muse AR-20 (accepted in part): the allowlist is enumerated in a file. Dispatching core site-deploy in preview mode is allowed; mode=deploy is not. If a match cannot be reached after two fix attempts, record the diff and ask the owner.",
+  "description": "This item produces evidence in the tracker. Fix any mismatch in a small site PR; it may be stacked.\n\n1. Set the core repo variable SITE_BRIDGE_ENABLED=true, so every certified bundle dispatches to the site.\n2. For each certified bundle, compare the site build with a core `site-deploy.yml` preview (`-f mode=preview`) at the same core_sha. Use tree-digest.ts for the comparison.\n3. Allowed differences live in `inventory/shadow-allowlist.json`, each with a reason. Only these are allowed:\n   - the edit-link and GitHub source-link URL rewrites from site-split-22;\n   - the receipt file;\n   - files that embed those.\n   Fix anything else.\n\nCore site-deploy stays the production writer throughout. SITE_DEPLOY_TARGET stays unset in the site repo.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:51:45Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "ee8f0da6bc6b47d3a42f1b2de383e373",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    }
+  ]
+}
