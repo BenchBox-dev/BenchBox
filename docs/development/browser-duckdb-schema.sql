@@ -155,7 +155,12 @@ CREATE TABLE IF NOT EXISTS results (
     -- rendering strategy id. NULL when the bundle never recorded a logical
     -- tuning profile.
     physical_mechanisms   VARCHAR,
-    physical_rendering_id VARCHAR
+    physical_rendering_id VARCHAR,
+    -- Registry-declared product support status for the benchmark
+    -- (stable / beta / experimental / deprecated / document_only /
+    -- repo_only). NULL when the benchmark slug is not in the registry.
+    -- Display-only: the benchmark browser groups and badges on it.
+    benchmark_support_status VARCHAR
 );
 
 -- ---------------------------------------------------------------------------
@@ -264,6 +269,7 @@ SELECT
     r.bundle_download_url,
     r.physical_mechanisms,
     r.physical_rendering_id,
+    r.benchmark_support_status,
     e.os,
     e.arch,
     e.cpu_count,
