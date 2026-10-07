@@ -19058,17 +19058,12 @@
       "title": "Record the site-repo split ADR and narrow soundness paths to exclude retiring publication workflows"
     },
     "site-split-01-tracker-reconcile": {
-      "claim": {
-        "expires_at": "2026-10-08T11:59:43Z",
-        "generation": "f8be61d391ef462cbee44de85e5b1f4e",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc"
-      },
+      "claim": null,
       "needs": [
         "site-split-agy-plan-review"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "open",
       "title": "Reconcile open astro-site and dlv2-6x tracker items with the site-repo split"
     },
     "site-split-10-core-site-inputs": {
