@@ -39,6 +39,32 @@ _PARAMETER_SENSITIVE_QUERY_IDS_BY_BENCHMARK: dict[str, frozenset[str]] = {
 }
 
 
+_NON_REFERENCE_SEED_EXCLUDED_BENCHMARKS: frozenset[str] = frozenset({"tpcds"})
+_stream_seed_override_warned: set[str] = set()
+_stream_seed_override_lock = threading.Lock()
+
+
+def reset_stream_seed_override_warnings() -> None:
+    with _stream_seed_override_lock:
+        _stream_seed_override_warned.clear()
+
+
+def _warn_stream_seed_override_once(benchmark_type: str, requested_mode: ValidationMode | None) -> None:
+    if requested_mode is None or requested_mode is ValidationMode.SKIP:
+        return
+    key = f"{benchmark_type.lower()}:{requested_mode.value}"
+    with _stream_seed_override_lock:
+        if key in _stream_seed_override_warned:
+            return
+        _stream_seed_override_warned.add(key)
+    logger.warning(
+        "Row-count validation mode '%s' was requested for '%s', but queries run with stream-seeded parameters "
+        "that differ from the answer-set parameters, so answer-set row counts are not checked for them.",
+        requested_mode.value,
+        benchmark_type,
+    )
+
+
 def get_parameter_sensitive_query_ids(benchmark_type: str) -> frozenset[str]:
     """Return the parameter-sensitive query-id set for a benchmark, if any.
 
@@ -67,31 +93,6 @@ def _set_thread_context(state: threading.local, attribute: str, value: object) -
 
 
 def set_reference_seed_context(is_reference_seed: bool | None) -> None:
-    """Record, for the CURRENT THREAD, whether the query about to run through
-    QueryValidator is using the pinned TPC reference seed's substitution
-    parameters.
-
-    This module never derives or compares seeds itself -- callers (the TPC-H
-    power/throughput drivers) compute the comparison against
-    benchbox.core.tpch.benchmark.get_reference_seed() and pass the result in.
-
-    Values:
-        True: this query's actual seed matches the reference seed for its
-            scale factor (or the run used qgen defaults, which the TPC-H
-            drivers treat as reference-equivalent) -- exact validation applies
-            normally, including for the parameter-sensitive queries.
-        False: this query is running under different substitution parameters
-            than the reference answer set -- get_parameter_sensitive_query_ids
-            entries are relaxed from their canonical EXACT mode to their RANGE
-            bounds (or LOOSE tolerance) rather than exact-compared, so
-            spec-sanctioned parameter variance is accepted while a 0-row or
-            out-of-range result still fails.
-        None (the default/unset value): unknown -- preserves the pre-existing
-            behavior of always attempting EXACT validation. Benchmarks that
-            never call this function (TPC-DS, DataFrame validation, any other
-            QueryValidator caller) are therefore completely unaffected by the
-            relaxation below.
-    """
     _set_thread_context(_reference_seed_state, "is_reference_seed", is_reference_seed)
 
 
@@ -270,6 +271,21 @@ class QueryValidator:
         # Normalize query_id for lookups in expected results
         # Benchmarks may use int keys but expected results use string keys
         query_id_normalized = self._normalize_query_id(benchmark_type, query_id)
+
+        if get_reference_seed_context() is False and benchmark_type.lower() in _NON_REFERENCE_SEED_EXCLUDED_BENCHMARKS:
+            _warn_stream_seed_override_once(benchmark_type, self._resolve_tpcds_run_mode(benchmark_type))
+            return ValidationResult(
+                is_valid=True,
+                query_id=query_id_str,
+                expected_row_count=None,
+                actual_row_count=actual_row_count,
+                validation_mode=ValidationMode.SKIP,
+                warning_message=(
+                    f"Query '{query_id}' ran with stream-seeded parameters that differ from the "
+                    f"'{benchmark_type}' answer-set parameters. Row-count validation excluded. "
+                    f"Actual rows returned: {actual_row_count}"
+                ),
+            )
 
         # Get expected result from registry with the classified load outcome.
         # A provider failure or timeout is never reported as a normal skip.

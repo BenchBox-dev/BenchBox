@@ -1,74 +1,25 @@
-"""Support for real, multi-stream throughput/concurrent UAT cells.
-
-`benchbox run` (the CLI surface `benchbox_run_argv` in `tests.uat.matrix`
-shells out to for every other UAT phase) has no `--streams`/`--concurrency`
-option of its own -- see the `throughput-stream-count-wiring-defect` TODO's
-`deferred` section. `benchbox run-official --streams N` is, today, the only
-CLI surface that can make a requested stream count reach the throughput
-driver, via a transient `BenchmarkOrchestrator.execute_benchmark` patch
-(`benchbox/cli/commands/run_official.py::_forward_requested_streams`). UAT
-now runs that deprecated command with `--quiet`, so it reuses the same final
-bare-path stdout contract as every other `benchbox run` cell. This module
-supplies the two things a `run-official`-backed UAT cell needs:
-
-1. `resolve_official_result_path` -- reads the emitted quiet-path line through
-   a backward-compatible resolver wrapper, so the official branch keeps its
-   existing call shape while retiring glob/mtime inference entirely.
-2. `validate_throughput_result` -- checks the exported result JSON for the
-   three things a silent concurrency regression would break: every requested
-   stream actually executed at least one query (`validate_stream_count`),
-   every stream that executed actually had at least one SUCCESSFUL query and
-   didn't just fail out immediately (`validate_stream_success`), and
-   Throughput@Size was actually computed (`validate_throughput_metric`).
-
-`TPC_ALLOWED_SCALE_FACTORS` mirrors `run_official.py`'s own constant (kept as
-a local copy rather than importing from a `deprecated` CLI command module)
-so config validation can fail fast on a non-TPC-compliant scale factor
-instead of surfacing only as a buried subprocess exit.
-"""
+"""Throughput UAT cell support: result resolution, validation and the `assert`/`rolling-median` CLI."""
 
 from __future__ import annotations
 
-import datetime as _dt
+import argparse
+import glob
+import json
+import math
+import os
+import re
+import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from benchbox.core.results.metrics import TPCMetricsCalculator
+from tests.uat import throughput_baseline as baseline
 
-# Mirrors benchbox/cli/commands/run_official.py::TPC_ALLOWED_SCALE_FACTORS.
-# `run-official` rejects any other scale factor outright, so a throughput UAT
-# cell must pick one of these (the verification command in the
-# throughput-uat-and-ci-coverage TODO uses the smallest, SF=1).
 TPC_ALLOWED_SCALE_FACTORS = {1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000}
 
 
-def resolve_official_result_path(
-    results_dir: Path,
-    *,
-    platform: str,
-    benchmark: str,
-    started_after: _dt.datetime,
-    scale: float | None = None,
-    emitted_path: str | None = None,
-) -> Path | None:
-    """Resolve the result JSON path emitted by `run-official --quiet`.
-
-    The authoritative contract is now the same one `benchbox run --quiet`
-    already exposes: the final non-empty stdout line is the exported result
-    JSON path. `run_cell` passes that line here via `emitted_path`.
-
-    `results_dir`/`platform`/`benchmark`/`started_after`/`scale` remain in the
-    signature for backward compatibility with the historical glob-based
-    resolver and existing call sites/tests, but resolution itself is now a
-    read, not a filename search. There is intentionally NO fallback to glob or
-    mtime inference: a missing/invalid emitted path returns `None`, and the
-    caller must fail loudly.
-
-    Relative paths resolve the same way the runner resolves quiet output from
-    normal `benchbox run` cells: relative to the shared runs root, with a
-    leading `benchmark_runs/...` anchored one directory above it.
-    """
-    _ = (platform, benchmark, started_after, scale)
+def resolve_official_result_path(results_dir: Path, *, emitted_path: str | None = None) -> Path | None:
     if not emitted_path:
         return None
     path = Path(emitted_path).expanduser()
@@ -80,155 +31,76 @@ def resolve_official_result_path(
     return runs_dir / path
 
 
-def validate_stream_count(
-    result_json: dict[str, Any],
-    *,
-    requested_streams: int,
+def _throughput_rows(result_json: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        query
+        for query in result_json.get("queries") or []
+        if isinstance(query, dict) and query.get("test_type") == "throughput" and query.get("stream") is not None
+    ]
+
+
+def _is_success(query: dict[str, Any]) -> bool:
+    return str(query.get("status", "")).upper() == "SUCCESS"
+
+
+def _token(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(value).lower())
+
+
+def validate_result_identity(
+    result_json: dict[str, Any], *, platform: str, benchmark: str, scale: float
 ) -> tuple[bool, str]:
-    """Check that every requested stream actually executed at least one query.
+    section = result_json.get("benchmark") or {}
+    found = ((result_json.get("platform") or {}).get("name"), section.get("id"), section.get("scale_factor"))
+    if _token(found[0]) != _token(platform) or found[0] is None:
+        return False, f"result JSON platform {found[0]!r} does not match requested {platform!r}"
+    if _token(found[1]) != _token(benchmark) or found[1] is None:
+        return False, f"result JSON benchmark {found[1]!r} does not match requested {benchmark!r}"
+    if not isinstance(found[2], (int, float)) or not math.isclose(float(found[2]), float(scale)):
+        return False, f"result JSON scale factor {found[2]!r} does not match requested {scale!r}"
+    return True, "ok"
 
-    This is the core signal the throughput-uat-and-ci-coverage TODO exists to
-    protect: a regression that silently drops the requested stream count (see
-    the throughput-stream-count-wiring-defect TODO) must be caught even when
-    an unrelated correctness issue (see ``validate_throughput_metric``) keeps
-    the overall run from being "clean". Split out from
-    ``validate_throughput_result`` so a caller (e.g. nightly CI) can hard-gate
-    on this specific invariant independent of that separate concern.
 
-    Derived from the distinct ``stream`` ids across ``queries[]`` -- NOT the
-    top-level ``run.streams`` field, which is ``max(stream_id)`` (an index,
-    not a count) and so is off-by-one from the real stream count (see
-    ``benchbox/core/results/schema.py::_build_run_section``).
-
-    Deliberately status-blind: a stream counts as "executed" the moment it
-    contributes >=1 row to ``queries[]``, regardless of whether that query
-    passed or failed. That is by design -- this check exists purely to catch
-    the concurrency-wiring regression (a requested stream never reaching the
-    driver at all), and stays a pure "did the request reach the driver"
-    signal so callers (e.g. the nightly wiring-defect assert step) can use it
-    independent of run outcome. See ``validate_stream_success`` for the
-    stricter, outcome-sensitive companion that checks each executed stream
-    actually succeeded.
-
-    Returns ``(ok, reason)``; `reason` is a human-readable explanation on
-    failure, or ``"ok"`` on success.
-    """
-    queries = result_json.get("queries") or []
-    streams_seen = {
-        query.get("stream") for query in queries if isinstance(query, dict) and query.get("stream") is not None
-    }
-    executed = len(streams_seen)
+def validate_stream_count(result_json: dict[str, Any], *, requested_streams: int) -> tuple[bool, str]:
+    executed = len({row["stream"] for row in _throughput_rows(result_json)})
     if executed != requested_streams:
-        return (
-            False,
-            f"throughput stream count mismatch: requested {requested_streams}, executed {executed}",
-        )
+        return False, f"throughput stream count mismatch: requested {requested_streams}, executed {executed}"
     return True, "ok"
 
 
 def validate_stream_success(result_json: dict[str, Any]) -> tuple[bool, str]:
-    """Check that every stream that executed at least one query had at least
-    one SUCCESSFUL query.
-
-    ``validate_stream_count`` counts a stream as "executed" the moment it
-    contributes >=1 row to ``queries[]``, REGARDLESS of that row's
-    ``status`` -- so a stream whose every query failed (e.g. it errored out
-    on its first query and never got another chance) still counts as
-    "executed", silently masking a fully-dead stream behind a passing
-    stream-count check. This is the stricter companion: every distinct
-    stream id present in ``queries[]`` must carry at least one row whose
-    ``status`` is ``"SUCCESS"`` (matched case-insensitively, mirroring
-    ``benchbox/core/results/schema.py``'s own status comparison).
-
-    Deliberately independent of ``requested_streams`` (unlike
-    ``validate_stream_count``): a stream missing entirely from ``queries[]``
-    is a count mismatch -- that check's job. A stream that's present but
-    100% failed is this check's job. Both are needed for a throughput cell
-    to be trustworthy, which is why ``validate_throughput_result`` runs both
-    (plus ``validate_throughput_metric``).
-
-    Split out (rather than folded into ``validate_stream_count``) so the
-    nightly wiring-defect assert step -- which must stay a pure
-    concurrency-wiring signal, independent of run outcome, see
-    ``validate_stream_count`` -- is unaffected by this stricter,
-    outcome-sensitive check. This check instead feeds the sweep/report-facing
-    ``validate_throughput_result`` composition.
-
-    Returns ``(ok, reason)``; `reason` is a human-readable explanation on
-    failure, or ``"ok"`` on success.
-    """
-    queries = result_json.get("queries") or []
-    stream_has_success: dict[Any, bool] = {}
-    for query in queries:
-        if not isinstance(query, dict):
-            continue
-        stream_id = query.get("stream")
-        if stream_id is None:
-            continue
-        is_success = str(query.get("status", "")).upper() == "SUCCESS"
-        stream_has_success[stream_id] = stream_has_success.get(stream_id, False) or is_success
-
-    failed_streams = sorted(stream_id for stream_id, has_success in stream_has_success.items() if not has_success)
+    rows = _throughput_rows(result_json)
+    if not rows:
+        return False, "no throughput rows in result JSON"
+    failed_streams = sorted({row["stream"] for row in rows} - {row["stream"] for row in rows if _is_success(row)})
     if failed_streams:
-        return (
-            False,
-            f"stream(s) {failed_streams} executed but had zero SUCCESSFUL queries",
-        )
+        return False, f"stream(s) {failed_streams} executed but had zero SUCCESSFUL queries"
     return True, "ok"
 
 
 def validate_throughput_metric(result_json: dict[str, Any]) -> tuple[bool, str]:
-    """Check that Throughput@Size is positive and plausibly spec-scaled.
-
-    It is ``None`` (and therefore absent from the exported JSON's
-    ``summary.tpc_metrics``) whenever the run's overall validation status is
-    not clean.
-
-    HISTORICAL NOTE: prior to #1142, TPC-H throughput mode failed this check
-    at SF=1 on DuckDB regardless of ``--seed`` choice -- queries 11/16/18/20
-    (TPC-H's own parameter-sensitive query set) were EXACT-compared against
-    one answer-set parameterization even when throughput derived different
-    parameters for each stream and position. #1142 added a thread-local
-    reference-seed context that excluded those queries under a non-reference
-    seed. The expected-results provider now gives Q11/Q18/Q20 exact SF=1.0
-    RANGE bounds and Q16 a LOOSE tolerance, and the runtime validator uses that
-    same reference-seed context to relax the four queries from EXACT to
-    RANGE/LOOSE under a non-reference seed while keeping the exact answer-file
-    check under the reference seed -- a bound instead of the old skip. This is
-    orthogonal to stream-count wiring -- see ``validate_stream_count`` for that
-    separate concern, and ``validate_stream_success`` for the per-stream
-    pass/fail check this metric check doesn't cover.
-
-    Returns ``(ok, reason)``; `reason` is a human-readable explanation on
-    failure, or ``"ok"`` on success.
-    """
     tpc_metrics = (result_json.get("summary") or {}).get("tpc_metrics") or {}
     throughput_at_size = tpc_metrics.get("throughput_at_size")
     if not isinstance(throughput_at_size, (int, float)) or throughput_at_size <= 0:
         return False, f"Throughput@Size not positive (got {throughput_at_size!r})"
 
-    queries = result_json.get("queries") or []
-    total_queries = sum(1 for query in queries if isinstance(query, dict) and "stream" in query)
+    rows = _throughput_rows(result_json)
+    total_queries = sum(1 for row in rows if _is_success(row))
     scale_factor = (result_json.get("benchmark") or {}).get("scale_factor")
     duration_ms = ((result_json.get("phases") or {}).get("throughput_test") or {}).get("duration_ms")
-    if not isinstance(scale_factor, (int, float)) or scale_factor <= 0:
-        return False, f"Throughput@Size plausibility unavailable: invalid scale factor {scale_factor!r}"
-    if not isinstance(duration_ms, (int, float)) or duration_ms <= 0:
-        return False, f"Throughput@Size plausibility unavailable: invalid throughput duration {duration_ms!r}"
+    if not all(isinstance(value, (int, float)) and value > 0 for value in (scale_factor, duration_ms)):
+        return False, f"Throughput@Size plausibility unavailable: scale {scale_factor!r}, duration {duration_ms!r}"
 
-    stream_ids = {query.get("stream") for query in queries if isinstance(query, dict) and "stream" in query}
     expected = TPCMetricsCalculator.calculate_throughput_at_size(
         total_queries=total_queries,
         total_time_seconds=duration_ms / 1000.0,
         scale_factor=float(scale_factor),
-        num_streams=len(stream_ids),
+        num_streams=len({row["stream"] for row in rows}),
     )
-    lower_bound = expected / 2.0
-    upper_bound = expected * 2.0
-    if not lower_bound <= throughput_at_size <= upper_bound:
-        return False, (
-            f"Throughput@Size outside plausibility band: got {throughput_at_size:.2f}, "
-            f"expected {expected:.2f} ({lower_bound:.2f}..{upper_bound:.2f})"
+    if not expected / 2.0 <= throughput_at_size <= expected * 2.0:
+        return (
+            False,
+            f"Throughput@Size outside plausibility band: got {throughput_at_size:.2f}, expected {expected:.2f}",
         )
     return True, "ok"
 
@@ -237,27 +109,159 @@ def validate_throughput_result(
     result_json: dict[str, Any],
     *,
     requested_streams: int,
+    platform: str | None = None,
+    benchmark: str | None = None,
+    scale: float | None = None,
 ) -> tuple[bool, str]:
-    """Validate a throughput cell's exported result JSON.
+    checks = [
+        lambda: validate_stream_count(result_json, requested_streams=requested_streams),
+        lambda: validate_stream_success(result_json),
+        lambda: validate_throughput_metric(result_json),
+    ]
+    if platform is not None and benchmark is not None and scale is not None:
+        checks.insert(
+            0, lambda: validate_result_identity(result_json, platform=platform, benchmark=benchmark, scale=scale)
+        )
+    for check in checks:
+        ok, reason = check()
+        if not ok:
+            return ok, reason
+    return True, "ok"
 
-    Combines the three checks a throughput cell needs to be
-    acceptance-passing: ``validate_stream_count`` (the concurrency-wiring
-    signal this TODO exists to protect), ``validate_stream_success`` (every
-    executed stream actually had a SUCCESSFUL query, not just rows that all
-    failed), and ``validate_throughput_metric`` (the run produced a usable
-    Throughput@Size). See each for what it checks and why they are split.
 
-    Checked in that order and short-circuits on the first failure, so a
-    stream-count mismatch is reported ahead of a same-run success or
-    throughput-metric failure.
+ThroughputGateError = ValueError
 
-    Returns ``(ok, reason)``; `reason` is a human-readable explanation on
-    failure, or ``"ok"`` on success.
-    """
-    ok, reason = validate_stream_count(result_json, requested_streams=requested_streams)
+
+class CellResultFile(NamedTuple):
+    result_path: Path
+    payload: dict[str, Any]
+    passed: bool
+
+
+def load_cell_result(cells_glob: str, *, platform: str, benchmark: str, scale: float) -> CellResultFile:
+    matches = sorted(glob.glob(os.path.expanduser(cells_glob)))
+    if len(matches) != 1:
+        raise ThroughputGateError(f"expected exactly one cells.jsonl matching {cells_glob!r}, found {len(matches)}")
+    rows = [
+        row
+        for row in map(json.loads, filter(str.strip, Path(matches[0]).read_text(encoding="utf-8").splitlines()))
+        if _token(row.get("platform")) == _token(platform)
+        and _token(row.get("benchmark")) == _token(benchmark)
+        and math.isclose(float(row.get("scale", math.nan)), float(scale))
+    ]
+    if len(rows) != 1:
+        raise ThroughputGateError(
+            f"expected exactly one {platform}/{benchmark}/sf{scale:g} cell in {matches[0]}, found {len(rows)}"
+        )
+    if not rows[0].get("result_path"):
+        raise ThroughputGateError(f"cell {platform}/{benchmark}/sf{scale:g} recorded no result_path")
+    result_path = Path(rows[0]["result_path"]).expanduser()
+    try:
+        payload = json.loads(result_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ThroughputGateError(f"could not read result JSON {result_path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise ThroughputGateError(f"result JSON {result_path} is not an object")
+    return CellResultFile(result_path, payload, rows[0].get("status") == "passed")
+
+
+def evaluate_floor(
+    observed: float | None, *, median: str | float | None, max_drop: str | float | None = None
+) -> tuple[bool, str]:
+    if median is None or median == "":
+        return True, "no Throughput@Size floor median configured; floor check in observe-only mode"
+    try:
+        median_value, drop = float(median), float(max_drop or 0.2)
+    except ValueError:
+        median_value = drop = math.nan
+    values = (median_value, drop, observed or math.nan)
+    if not (all(map(math.isfinite, values)) and median_value > 0 and 0 < drop < 1 and observed > 0):
+        return False, "Throughput@Size floor misconfigured or unobserved; refusing to gate"
+    floor = median_value * (1 - drop)
+    if observed < floor:
+        return (
+            False,
+            f"Throughput@Size regression: observed {observed:.2f} below floor {floor:.2f} (median {median_value:.2f})",
+        )
+    return True, f"Throughput@Size {observed:.2f} clears floor {floor:.2f}"
+
+
+def _error(message: str) -> int:
+    print(f"::error::{message}")
+    return 1
+
+
+def _run_assert(args: argparse.Namespace) -> int:
+    where = {"platform": args.platform, "benchmark": args.benchmark, "scale": args.scale}
+    try:
+        cell = load_cell_result(args.cells_glob, **where)
+    except ThroughputGateError as exc:
+        return _error(str(exc))
+    ok, reason = validate_throughput_result(cell.payload, requested_streams=args.streams, **where)
     if not ok:
-        return ok, reason
-    ok, reason = validate_stream_success(result_json)
-    if not ok:
-        return ok, reason
-    return validate_throughput_metric(result_json)
+        return _error(reason)
+    observed = baseline.observed_throughput_at_size(cell.payload)
+    print(f"OK: verified {cell.result_path}")
+    print(f"::notice::Throughput@Size observed: {observed!r}")
+    if args.evaluate_floor:
+        floor = {
+            k: os.environ.get(v)
+            for k, v in (("median", "THROUGHPUT_FLOOR_MEDIAN"), ("max_drop", "THROUGHPUT_FLOOR_MAX_DROP_FRACTION"))
+        }
+        ok, message = evaluate_floor(observed, **floor)
+        if not ok:
+            return _error(message)
+        print(f"::notice::{message}" if "observe-only" in message else f"OK: {message}")
+    if args.baseline_out and cell.passed:
+        path = baseline.record_baseline(
+            Path(args.baseline_out).expanduser(), cell.payload, streams=args.streams, **where
+        )
+        print(f"OK: recorded baseline {path}")
+    return 0
+
+
+def _run_rolling_median(args: argparse.Namespace) -> int:
+    runner_class = args.runner_class or baseline.runner_class_for(baseline.detect_cpu_model(), os.cpu_count() or 0)
+    records = baseline.load_baseline_records(Path(args.baseline_dir).expanduser())
+    result = baseline.rolling_median(
+        records,
+        platform=args.platform,
+        benchmark=args.benchmark,
+        scale=args.scale,
+        runner_class=runner_class,
+        window=args.window,
+    )
+    if result is None:
+        return _error(f"no retained baselines for runner class {runner_class!r}")
+    print(json.dumps({"runner_class": runner_class, **result._asdict()}, sort_keys=True))
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="python -m tests.uat.throughput")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    assert_parser = subparsers.add_parser("assert")
+    assert_parser.add_argument("--cells-glob", required=True)
+    assert_parser.add_argument("--streams", type=int, required=True)
+    assert_parser.add_argument("--evaluate-floor", action="store_true")
+    assert_parser.add_argument("--baseline-out")
+    assert_parser.set_defaults(handler=_run_assert)
+    median_parser = subparsers.add_parser("rolling-median")
+    median_parser.add_argument("--baseline-dir", required=True)
+    median_parser.add_argument("--runner-class")
+    median_parser.add_argument("--window", type=int, default=baseline.DEFAULT_ROLLING_WINDOW)
+    median_parser.set_defaults(handler=_run_rolling_median)
+    for subparser in (assert_parser, median_parser):
+        subparser.add_argument("--platform", required=True)
+        subparser.add_argument("--benchmark", required=True)
+        subparser.add_argument("--scale", type=float, required=True)
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    return int(args.handler(args))
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -487,8 +487,14 @@ function addCanonicalBenchmarkClause(values: readonly string[], clauses: string[
  * `POWER`/`power` casing difference would drop rows the matcher accepts,
  * leaving the leaderboard empty or inconsistent with its own facet counts.
  */
-const CANONICAL_PHASE_SQL =
-  "CASE WHEN trim(lower(coalesce(test_type, ''))) = '' THEN 'unknown' ELSE trim(lower(test_type)) END";
+export function canonicalPhaseSql(column: string): string {
+  return (
+    `CASE WHEN trim(lower(coalesce(${column}, ''))) = '' THEN 'unknown' ` +
+    `WHEN trim(lower(${column})) = 'standard' THEN 'power' ELSE trim(lower(${column})) END`
+  );
+}
+
+const CANONICAL_PHASE_SQL = canonicalPhaseSql("test_type");
 
 function addCanonicalPhaseClause(values: readonly string[], clauses: string[], params: unknown[]) {
   if (values.length === 0) return;

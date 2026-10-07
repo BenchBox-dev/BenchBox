@@ -19,10 +19,22 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'; worker-src 'self' blob:; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; object-src 'none'; base-uri 'self'"
     />
-    <link rel="icon" type="image/svg+xml" href="/results/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="BenchBox Results Explorer - browse, compare, and analyze public benchmark results across platforms." />
     <title>BenchBox Results Explorer</title>
+    <link rel="canonical" href="https://benchbox.dev/results/" />
+    <meta property="og:site_name" content="BenchBox" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="BenchBox Results Explorer" />
+    <meta property="og:description" content="BenchBox Results Explorer - browse, compare, and analyze public benchmark results across platforms." />
+    <meta property="og:url" content="https://benchbox.dev/results/" />
+    <meta property="og:image" content="https://benchbox.dev/hero.png" />
+    <meta property="og:image:alt" content="BenchBox - Database Benchmarking Toolkit" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="BenchBox Results Explorer" />
+    <meta name="twitter:description" content="BenchBox Results Explorer - browse, compare, and analyze public benchmark results across platforms." />
+    <meta name="twitter:image" content="https://benchbox.dev/hero.png" />
     <script>
       (function () {
         try {
@@ -41,7 +53,7 @@
       })();
     </script>
   </head>
-  <body>
+  <body class="bb-explorer-page">
     <div id="app"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

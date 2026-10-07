@@ -1,5 +1,7 @@
 # Decision: approving-review count stays zero; review gates stay advisory
 
+> Partly superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md): item 3 (no merge-blocking automated review gate); the required `oracle-review` check is one for result-affecting changes. Items 1 and 2 stand.
+
 Date: 2026-09-15
 Status: Accepted. This record pins two constraints so they are not re-derived
 from first principles in a later review.
@@ -35,6 +37,10 @@ enforcement"); `_project/scripts/ruleset_review_enforcement.py`;
    queue. Automated review signals stay advisory: recorded, never a member
    of the readiness failure set. This does not weaken item 2 — the human
    CODEOWNERS gate above stays merge-blocking.
+   Amended 2026-10-02: for paths on `.github/soundness-paths.txt`, `make pr-arm`
+   will refuse until a completed external review is visible on the head. Any of
+   four independent reviewers satisfies it, so one provider's limit does not
+   deadlock the queue. See `docs/development/adr/adr-dev-loop-v2.md` D4.
 
 ## What this item does not do
 

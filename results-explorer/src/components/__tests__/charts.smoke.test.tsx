@@ -508,6 +508,19 @@ describe("PowerBar", () => {
     expect(midIdx).toBeLessThan(lowIdx);
   });
 
+  it("labels the metric Power@Size without a QphH unit", () => {
+    const summary = makeSummary({
+      platforms: [makePlatform({ result_id: "r1", platform: "High", power_score: 900 })],
+    });
+    const { container } = render(<PowerBar summary={summary} />);
+
+    expect(container.textContent).toContain("Power@Size - higher is better");
+    expect(container.textContent).not.toContain("QphH");
+    const tooltip = container.querySelector("title")?.textContent ?? "";
+    expect(tooltip).toContain("Power@Size");
+    expect(tooltip).not.toContain("QphH");
+  });
+
   it("excludes power scores from rows that are not rank-safe", () => {
     const summary = makeSummary({
       platforms: [

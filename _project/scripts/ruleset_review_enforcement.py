@@ -1,18 +1,4 @@
 #!/usr/bin/env python3
-"""Predicates for live develop-review and v* tag-creation enforcement.
-
-The develop ruleset's ``require_code_owner_review`` parameter is a
-repo-admin control for CODEOWNERS-owned soundness paths. It is deliberately
-checked without asserting ``required_approving_review_count``: that count is
-branch-wide and would gate every develop PR. The same predicate is used by
-the standalone CLI and ``scripts/ruleset_drift_check.py``'s canary wiring.
-
-The v* tag-creation predicate remains in this module as the second live
-ruleset control. Both predicates fail closed on missing or incomplete live
-payloads; the caller decides whether a finding is blocking during an explicit
-migration override.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -21,16 +7,6 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
-
-from auto_merge_soundness_paths import SOUNDNESS_FILES, SOUNDNESS_PREFIXES
-
-# Human-readable globs for the CODEOWNERS-owned soundness surface, derived from
-# the shared predicate so this narration cannot drift from auto-merge gating.
-SOUNDNESS_PATH_GLOBS: tuple[str, ...] = (
-    tuple(f"{prefix}**" if prefix.endswith("/") else prefix for prefix in SOUNDNESS_PREFIXES)
-    + SOUNDNESS_FILES
-    + ("benchbox/core/**/validation.py",)
-)
 
 
 def extract_rules(payload: Any) -> list[dict[str, Any]]:
@@ -51,23 +27,35 @@ def _pull_request_parameters(rules: list[dict[str, Any]]) -> dict[str, Any] | No
 
 
 def review_enforcement_findings(rules: list[dict[str, Any]]) -> list[str]:
-    """Return reasons the develop ruleset lacks a code-owner review rule."""
+    """Return reasons the develop ruleset lacks required review enforcement."""
     params = _pull_request_parameters(rules)
     if params is None:
-        return [
-            "develop ruleset has no pull_request rule: a soundness-path PR "
-            f"({', '.join(SOUNDNESS_PATH_GLOBS)}) can squash-auto-merge with zero reviews"
-        ]
-    if not params.get("require_code_owner_review", False):
-        return [
-            f"require_code_owner_review={params.get('require_code_owner_review', False)} (need true) "
-            f"for CODEOWNERS-owned soundness paths: {', '.join(SOUNDNESS_PATH_GLOBS)}"
-        ]
-    return []
+        return ["develop ruleset has no pull_request rule: a PR can squash-auto-merge without review thread resolution"]
+    findings: list[str] = []
+    if params.get("required_review_thread_resolution") is not True:
+        findings.append(
+            f"required_review_thread_resolution={params.get('required_review_thread_resolution', False)} (need true)"
+        )
+    status_rule = next((rule for rule in rules if rule.get("type") == "required_status_checks"), None)
+    if status_rule is None:
+        findings.append("develop ruleset has no required_status_checks rule: oracle-review must be required")
+        return findings
+    status_params = status_rule.get("parameters")
+    if not isinstance(status_params, dict):
+        findings.append("required_status_checks parameters are malformed: oracle-review enforcement is unverified")
+        return findings
+    checks = status_params.get("required_status_checks")
+    if not isinstance(checks, list) or any(
+        not isinstance(check, dict) or not isinstance(check.get("context"), str) or not check["context"].strip()
+        for check in checks
+    ):
+        findings.append("required_status_checks are malformed: oracle-review enforcement is unverified")
+    elif not any(check["context"] == "oracle-review" for check in checks):
+        findings.append("required_status_checks must include oracle-review")
+    return findings
 
 
 def is_review_enforced(rules: list[dict[str, Any]]) -> bool:
-    """True when the ruleset requires a code-owner review."""
     return not review_enforcement_findings(rules)
 
 
@@ -355,7 +343,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"- {finding}")
         return 1
     print(f"# Ruleset review enforcement ({args.branch}) - OK")
-    print(f"- code-owner review required for {', '.join(SOUNDNESS_PATH_GLOBS)}")
+    print("- oracle-review required")
+    print("- review thread resolution required")
     return 0
 
 

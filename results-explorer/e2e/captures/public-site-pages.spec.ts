@@ -5,7 +5,7 @@ import path from "node:path";
 import { type Browser, expect, test } from "@playwright/test";
 
 import {
-  compareVisualManifests,
+  compareVisualManifestsAcrossRenderers,
   PUBLIC_SITE_CAPTURE_PROFILE,
   type VisualCapture,
   type VisualManifest,
@@ -28,11 +28,20 @@ if (!["", "capture", "compare"].includes(PHASE)) {
   throw new Error(`PUBLIC_SITE_VISUAL_PHASE must be capture, compare, or unset; got ${PHASE}`);
 }
 const SOURCE_SHA = process.env.PUBLIC_SITE_VISUAL_SOURCE_SHA ?? "unknown";
+const RENDERERS = ["sphinx", "astro"] as const;
+type Renderer = (typeof RENDERERS)[number];
+const RENDERER = (process.env.PUBLIC_SITE_VISUAL_RENDERER ?? "sphinx") as Renderer;
+if (!RENDERERS.includes(RENDERER)) {
+  throw new Error(`PUBLIC_SITE_VISUAL_RENDERER must be one of ${RENDERERS.join(", ")}; got ${RENDERER}`);
+}
+if (RENDERER === "astro" && PHASE !== "capture") {
+  throw new Error("PUBLIC_SITE_VISUAL_RENDERER=astro supports only PUBLIC_SITE_VISUAL_PHASE=capture until the renderer cutover");
+}
 // Match the protected baseline's UTC capture day so relative run ages do not
 // make an otherwise unchanged screenshot expire every midnight.
 const VISUAL_REFERENCE_TIME = new Date("2026-09-08T19:35:00Z");
 const VIEWPORTS = [390, 768, 1280, 1600] as const;
-const ROUTES = [
+const ALL_ROUTES = [
   { slug: "landing", path: "/", heading: /benchbox/i },
   { slug: "getting-started", path: "/docs/usage/getting-started.html", heading: /getting started/i },
   {
@@ -54,6 +63,16 @@ const ROUTES = [
     ready: /published platform/i,
   },
 ] as const;
+const SELECTED_SLUGS = (process.env.PUBLIC_SITE_VISUAL_ROUTES ?? "")
+  .split(",")
+  .map((slug) => slug.trim())
+  .filter((slug) => slug.length > 0);
+const UNKNOWN_SLUGS = SELECTED_SLUGS.filter((slug) => !ALL_ROUTES.some((route) => route.slug === slug));
+if (UNKNOWN_SLUGS.length > 0) {
+  throw new Error(`PUBLIC_SITE_VISUAL_ROUTES names unknown routes: ${UNKNOWN_SLUGS.join(", ")}`);
+}
+const ROUTES =
+  SELECTED_SLUGS.length > 0 ? ALL_ROUTES.filter((route) => SELECTED_SLUGS.includes(route.slug)) : ALL_ROUTES;
 const MANIFEST = path.join(OUTPUT, "manifest.json");
 
 // Each Results viewport can spend up to 46 seconds on bounded cold-snapshot
@@ -64,7 +83,12 @@ test.describe.configure({ mode: "serial", timeout: 240_000 });
 // of the Explorer-only blocking command unless that site is explicitly mounted.
 test.skip(!process.env.E2E_PAGES_SHAPED || !process.env.E2E_SITE_DIR, "requires E2E_PAGES_SHAPED and E2E_SITE_DIR");
 
-type CapturedManifest = VisualManifest & { browser: string; source_sha: string; viewports: readonly number[] };
+type CapturedManifest = VisualManifest & {
+  browser: string;
+  renderer?: Renderer;
+  source_sha: string;
+  viewports: readonly number[];
+};
 
 async function captureManifest(browser: Browser): Promise<CapturedManifest> {
   await mkdir(OUTPUT, { recursive: true });
@@ -79,6 +103,7 @@ async function captureManifest(browser: Browser): Promise<CapturedManifest> {
       await expect(page.locator("body")).toContainText(route.heading);
       if ("ready" in route) await waitForDataLoaded(page, route.ready);
       if (route.slug === "landing") {
+        await page.addStyleTag({ content: "html { scroll-behavior: auto !important; }" });
         for (const selector of [".feature-card", ".benchmark-card", ".install-step"]) {
           const cards = page.locator(selector);
           for (let index = 0; index < (await cards.count()); index += 1) {
@@ -114,6 +139,25 @@ async function captureManifest(browser: Browser): Promise<CapturedManifest> {
 
       const filename = `${route.slug}-${width}.png`;
       const screenshotPath = path.join(OUTPUT, filename);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      if (route.slug === "landing") {
+        await expect
+          .poll(() =>
+            page.evaluate(
+              () =>
+                new Promise<string>((resolve) =>
+                  requestAnimationFrame(() =>
+                    requestAnimationFrame(() =>
+                      resolve(document.querySelector(".section-nav__link[aria-current]")?.getAttribute("href") ?? ""),
+                    ),
+                  ),
+                ),
+            ),
+          )
+          .toBe("#overview");
+        await page.evaluate(() => document.querySelector(".section-nav__links")?.scrollTo({ left: 0, behavior: "instant" }));
+        await expect.poll(() => page.evaluate(() => document.querySelector(".section-nav__links")?.scrollLeft ?? 0)).toBe(0);
+      }
       await page.screenshot({ path: screenshotPath, fullPage: true });
       const digest = createHash("sha256").update(await readFile(screenshotPath)).digest("hex");
       captures.push({ digest, filename, route: route.path, viewport_width: width });
@@ -125,6 +169,7 @@ async function captureManifest(browser: Browser): Promise<CapturedManifest> {
     browser: "chromium",
     capture_profile: PUBLIC_SITE_CAPTURE_PROFILE,
     captures,
+    renderer: RENDERER,
     source_sha: SOURCE_SHA,
     viewports: VIEWPORTS,
   };
@@ -158,7 +203,7 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
     /^[0-9a-f]{40}$/,
   );
   expect(baseline.source_sha).toBe(process.env.PUBLIC_SITE_VISUAL_BASE_SHA);
-  const comparison = compareVisualManifests(
+  const comparison = compareVisualManifestsAcrossRenderers(
     baseline as VisualManifest,
     manifest as VisualManifest,
     {
@@ -172,7 +217,7 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
     { missing, unexpected },
     "visual baseline route/viewport matrix must match exactly",
   ).toEqual({ missing: [], unexpected: [] });
-  expect(changed, `visual baseline mismatch; changed captures: ${changed.join(", ")}`).toEqual([]);
+  expect(changed, comparison.message).toEqual([]);
 
   if (comparison.approvalApplied) {
     console.info(

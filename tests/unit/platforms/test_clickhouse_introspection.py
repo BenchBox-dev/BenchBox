@@ -240,7 +240,7 @@ class TestTunedSortKeyFold:
         connection = _FakeCHConnection([])
         adapter.apply_unified_tuning = lambda _config, _connection: None
         adapter.save_tuning_metadata = lambda _connection: True
-        adapter.load_data = lambda _benchmark, _connection, _data_dir: ({}, 0.0, None)
+        adapter.load_data = lambda _benchmark, _connection, _data_dir: ({"lineitem": 1}, 0.0, None)
 
         adapter._setup_fresh_database_phases(benchmark, connection, config)
 

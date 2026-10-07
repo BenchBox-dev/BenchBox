@@ -666,6 +666,7 @@ postgresql|username|PostgreSQL username|{'default': 'postgres'}
 postgresql|password|PostgreSQL password|{}
 postgresql|schema|PostgreSQL schema name|{'default': 'public'}
 postgresql|work_mem|PostgreSQL work_mem setting for queries|{'default': '256MB'}
+postgresql|statement_timeout|PostgreSQL per-statement timeout in milliseconds (0 disables)|{'parser': 'int'}
 postgresql|enable_timescale|Enable TimescaleDB extensions if available|{'default': 'false'}
 timescaledb|host|TimescaleDB server hostname|{'default': 'localhost'}
 timescaledb|port|TimescaleDB server port|{'parser': 'int', 'default': 5432}
@@ -806,6 +807,9 @@ clickhouse-cloud|oauth_token|OAuth token for keyless authentication (alternative
 clickhouse-cloud|s3_staging_url|S3 URL for bulk data loading (e.g., s3://my-bucket/benchbox-staging/)|{}
 clickhouse-cloud|s3_region|AWS region for the S3 staging bucket|{'default': 'us-east-1'}
 clickhouse-cloud|gcs_staging_url|GCS URL for bulk data loading (e.g., gs://my-bucket/benchbox-staging/)|{}
+clickhouse-local|optimize_after_load|Run OPTIMIZE TABLE FINAL on each table after it loads, on tuned runs only; off by default, and its time is reported separately from load time|{'parser': 'parse_bool', 'default': False}
+clickhouse-server|optimize_after_load|Run OPTIMIZE TABLE FINAL on each table after it loads, on tuned runs only; off by default, and its time is reported separately from load time|{'parser': 'parse_bool', 'default': False}
+clickhouse-cloud|optimize_after_load|Run OPTIMIZE TABLE FINAL on each table after it loads, on tuned runs only; off by default, and its time is reported separately from load time|{'parser': 'parse_bool', 'default': False}
 starrocks|host|StarRocks FE hostname|{'default': 'localhost'}
 starrocks|port|StarRocks FE MySQL protocol port|{'default': '9030'}
 starrocks|username|StarRocks username|{'default': 'root'}

@@ -39,6 +39,12 @@ platform_to_extra:
   singlestore: singlestore
   postgresql: postgresql
   postgres: postgresql
+  timescaledb: postgresql
+  pg-duckdb: postgresql
+  pg-mooncake: postgresql
+  paradedb: postgresql
+  citus: postgresql
+  cedardb: postgresql
   questdb: questdb
 dataframe_dependency_groups:
   pandas:

@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
-pytestmark = [pytest.mark.unit, pytest.mark.fast]
+pytestmark = [pytest.mark.unit, pytest.mark.fast, pytest.mark.usefixtures("spark_runtime_environment")]
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +285,38 @@ class TestExecuteQuery:
 
         assert result["status"] == "SUCCESS"
         mock_session.catalog.clearCache.assert_called_once()
+
+    def test_cache_clearing_is_outside_the_timed_window(self, mock_pyspark):
+        import time
+
+        from benchbox.platforms.spark import SparkAdapter
+
+        _, mock_session = mock_pyspark
+        mock_df = MagicMock()
+        mock_df.collect.return_value = [(1,)]
+        mock_session.sql.return_value = mock_df
+        mock_session.catalog.clearCache.side_effect = lambda: time.sleep(0.3)
+
+        adapter = SparkAdapter(disable_cache=True)
+
+        result = adapter.execute_query(mock_session, "SELECT 1", "q1")
+
+        assert result["status"] == "SUCCESS"
+        assert result["query_statistics"]["execution_time_seconds"] < 0.2
+
+    def test_cache_clear_failure_is_reported_as_query_failure(self, mock_pyspark):
+        from benchbox.platforms.spark import SparkAdapter
+
+        _, mock_session = mock_pyspark
+        mock_session.catalog.clearCache.side_effect = RuntimeError("clear failed")
+
+        adapter = SparkAdapter(disable_cache=True)
+
+        result = adapter.execute_query(mock_session, "SELECT 1", "q1")
+
+        assert result["status"] == "FAILED"
+        assert "clear failed" in result["error"]
+        mock_session.sql.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

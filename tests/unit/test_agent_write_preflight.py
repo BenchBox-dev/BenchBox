@@ -9,13 +9,15 @@ from pathlib import Path
 
 import pytest
 
+from tests.utilities.paths import REPO_ROOT
+
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
 
 
-SCRIPT = Path("scripts/agent_write_preflight.sh")
+SCRIPT = REPO_ROOT / "scripts" / "agent_write_preflight.sh"
 
 # These exercise the clone-location guard, so pin a human identity: otherwise
 # the preflight's [COMMIT-IDENTITY-001] assertion decides the result instead,
@@ -34,7 +36,7 @@ AGENT_IDENTITY = {
 def _configured_write_hook() -> dict[str, object]:
     import yaml
 
-    config = yaml.safe_load(Path(".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    config = yaml.safe_load((REPO_ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
     hooks = [hook for repo in config["repos"] for hook in repo.get("hooks", [])]
     return next(hook for hook in hooks if hook["id"] == "agent-write-preflight")
 
@@ -44,7 +46,7 @@ def _install_configured_write_hook(repo: Path) -> None:
     scripts = repo / "scripts"
     scripts.mkdir()
     (scripts / SCRIPT.name).write_text(SCRIPT.read_text(encoding="utf-8"), encoding="utf-8")
-    guard = Path("scripts/agent_pre_commit_guard.sh")
+    guard = REPO_ROOT / "scripts" / "agent_pre_commit_guard.sh"
     (scripts / guard.name).write_text(guard.read_text(encoding="utf-8"), encoding="utf-8")
     (repo / ".pre-commit-config.yaml").write_text(
         "repos:\n"
@@ -83,7 +85,7 @@ def _run_preflight(*, primary_clone: Path, allow: bool = False) -> subprocess.Co
 
     return subprocess.run(
         ["sh", str(SCRIPT)],
-        cwd=Path.cwd(),
+        cwd=REPO_ROOT,
         env=env,
         capture_output=True,
         text=True,
@@ -92,7 +94,7 @@ def _run_preflight(*, primary_clone: Path, allow: bool = False) -> subprocess.Co
 
 
 def test_preflight_rejects_primary_clone_without_override() -> None:
-    result = _run_preflight(primary_clone=Path.cwd())
+    result = _run_preflight(primary_clone=REPO_ROOT)
 
     assert result.returncode == 1
     assert "Refusing BenchBox write preflight in the primary clone" in result.stderr
@@ -218,7 +220,7 @@ def test_configured_hook_allows_linked_worktree_commit(tmp_path: Path) -> None:
 
 
 def test_claude_pr_command_runs_write_preflight_before_pr_workflow() -> None:
-    command = Path(".claude/commands/pr.md").read_text(encoding="utf-8")
+    command = (REPO_ROOT / ".claude" / "commands" / "pr.md").read_text(encoding="utf-8")
 
     assert "make agent-write-preflight" in command
     assert "make worktree-create BRANCH=<name> WORKTREE_PATH=<path>" in command
@@ -226,7 +228,7 @@ def test_claude_pr_command_runs_write_preflight_before_pr_workflow() -> None:
 
 
 def test_skill_sync_write_target_runs_preflight() -> None:
-    makefile = Path("Makefile").read_text(encoding="utf-8")
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
     target = makefile.split("\nskill-sync:", maxsplit=1)[1].split("\nskill-sync-check:", maxsplit=1)[0]
 
     assert "$(MAKE) -s agent-write-preflight" in target

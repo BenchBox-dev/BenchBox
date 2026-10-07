@@ -45,27 +45,27 @@ def validate_tpc_scale_factor(scale: float) -> None:
 
 
 def validate_stream_count(streams: int | None, phases: str | None = None) -> None:
-    """Validate ``--streams`` for official runs.
-
-    Mirrors the CLI guardrails in ``run_official``:
-    - ``--streams`` is required when throughput is requested.
-    - Negative values are rejected.
-    - Explicit ``1`` is rejected (TPC minimum is 2; the driver floors 1→2
-      without an error, so callers must be told here).
-
-    Raises:
-        ValueError: On invalid stream count.
-    """
     phase_set: set[str] = set()
     if phases:
         phase_set = {p.strip().lower() for p in phases.split(",")}
 
     if "throughput" in phase_set and streams is None:
         raise ValueError("--streams is required for throughput test")
-    if streams is not None and streams < 0:
-        raise ValueError(f"--streams must be a non-negative integer, got: {streams}")
-    if streams == 1:
-        raise ValueError("--streams must be >= 2 (TPC throughput minimum); got: 1")
+    if streams is not None and streams < 2 and "throughput" in phase_set:
+        raise ValueError(f"--streams must be >= 2 (TPC throughput minimum); got: {streams}")
+
+
+_DATAFRAME_THROUGHPUT_UNSUPPORTED = (
+    "The throughput phase is not supported in DataFrame mode. DataFrame platforms run no "
+    "concurrent query streams, so a throughput request would only repeat the power-test "
+    "iterations under a throughput label and ignore --streams. Use --phases power for "
+    "DataFrame platforms, or run the throughput phase on a SQL platform."
+)
+
+
+def reject_unsupported_dataframe_phases(execution_mode: str | None, phases_to_run: list[str] | None) -> None:
+    if execution_mode == "dataframe" and phases_to_run and "throughput" in phases_to_run:
+        raise ValueError(_DATAFRAME_THROUGHPUT_UNSUPPORTED)
 
 
 from benchbox.core.platform_registry import PlatformRegistry
@@ -75,6 +75,7 @@ from benchbox.core.runner.runner import (
     ValidationOptions,
     run_benchmark_lifecycle,
 )
+from benchbox.core.schemas import reject_single_stream_throughput
 from benchbox.utils.toggles import is_probe_requested
 
 if TYPE_CHECKING:
@@ -185,6 +186,9 @@ def resolve_run_config(
         iterations=max(1, iterations),
         warm_up_iterations=max(0, warmups),
         power_fail_fast=fail_fast,
+        stream_timeout_seconds=options.get("stream_timeout_seconds"),
+        stream_timeout_source=options.get("stream_timeout_source"),
+        cancel_on_timeout=bool(options.get("cancel_on_timeout", False)),
         client_region=getattr(config, "client_region", None) or options.get("client_region"),
         client_cloud=getattr(config, "client_cloud", None) or options.get("client_cloud"),
         # RunConfig.link_probe defaults True, so the toggle always resolves
@@ -328,11 +332,13 @@ def execute_run(
     load-phase warning, and the credential-setup retry all stay in the CLI,
     which is where the new contract puts them.
     """
+    reject_single_stream_throughput(getattr(config, "concurrency", None), phases_to_run)
     stamp_requested_phases(config, phases_to_run)
 
     phases = resolve_lifecycle_phases(phases_to_run)
     validation = resolve_validation_options(getattr(config, "options", None))
     execution_mode = resolve_execution_mode(database_config)
+    reject_unsupported_dataframe_phases(execution_mode, phases_to_run)
 
     adapter = adapter_factory(execution_mode=execution_mode, output_root=output_root, phases=phases)
 
@@ -476,6 +482,7 @@ __all__ = [
     "get_execution_mode",
     "is_dataframe_execution",
     "map_phases_to_execution_type",
+    "reject_unsupported_dataframe_phases",
     "resolve_execution_mode",
     "resolve_lifecycle_phases",
     "resolve_mode_with_registry",

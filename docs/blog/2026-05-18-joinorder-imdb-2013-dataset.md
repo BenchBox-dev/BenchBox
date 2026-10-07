@@ -148,7 +148,7 @@ The implementation adds more than the initial report requested, especially aroun
 - Query corpus: [gregrahn/join-order-benchmark](https://github.com/gregrahn/join-order-benchmark)
 - Dataset DOI: [10.7910/DVN/2QYZBT](https://doi.org/10.7910/DVN/2QYZBT)
 - Changelog entry: `CHANGELOG.md` (`[0.3.0] - 2026-05-16`)
-- JoinOrder benchmark docs: `docs/benchmarks/join-order.md`, `docs/reference/python-api/benchmarks/joinorder.rst`
+- JoinOrder benchmark docs: `docs/benchmarks/join-order.md`, `docs/reference/python-api/benchmarks/joinorder.md`
 - JoinOrder data manifest: `benchbox/core/joinorder/data_manifest.toml`
 - JoinOrder data license note: `benchbox/core/joinorder/DATA-LICENSE.md`
 - JoinOrder licensing decision: `_project/decisions/joinorder-canonical-data-licensing-2026-05-12.md`

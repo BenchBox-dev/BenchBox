@@ -317,10 +317,14 @@ class DuckLakeAdapter(DuckDBAdapter):
     # DuckDBAdapter's EXPLAIN-based plan capture unchanged, so this mirrors
     # DuckDBAdapter's value.
     plan_capture_phase_eligible = True
+    index_ddl_unsupported_reason = "ducklake: CREATE INDEX unsupported"
 
     @property
     def platform_name(self) -> str:
         return "DuckLake"
+
+    def get_tuning_introspector(self) -> None:
+        return None
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
@@ -803,10 +807,16 @@ class DuckLakeAdapter(DuckDBAdapter):
             )
             return
 
+        if getattr(self, "_validating_database", False) or getattr(self, "_existing_db_decided", False):
+            self.log_very_verbose("DuckLake catalog decision already made for this run (or validating) - skipping.")
+            return
+
         if self.is_dry_run:
             # Never mutate on-disk artifacts during a dry run.
             self.log_verbose("DuckLake catalog validation skipped (dry run mode)")
             return
+
+        self._existing_db_decided = True
 
         if not self.metadata_path.exists():
             self.log_very_verbose("DuckLake catalog does not exist yet - nothing to handle")
@@ -1001,6 +1011,11 @@ class DuckLakeAdapter(DuckDBAdapter):
         if self.is_dry_run:
             self.log_verbose("DuckLake postgres catalog reuse detection skipped (dry run mode)")
             return
+
+        if getattr(self, "_validating_database", False) or getattr(self, "_existing_db_decided", False):
+            self.log_very_verbose("DuckLake postgres catalog decision already made for this run (or validating).")
+            return
+        self._existing_db_decided = True
 
         existing = self._existing_lake_tables(setup_conn)
         if not existing:

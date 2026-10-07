@@ -84,6 +84,16 @@ class TestToManifestEntry:
 
         assert entry.power_score == pytest.approx(1234.56)
 
+    def test_composite_metrics_are_not_used_as_the_power_score(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["summary"]["tpc_metrics"] = {"qphh_at_size": 777.0, "qphds_at_size": 888.0}
+        bundle = tmp_path / "legacy-composite.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+
+        assert entry.power_score is None
+
     def test_driver_version_extracted(self, bundle_file: Path) -> None:
         transformer = BundleTransformer()
         entry = transformer.to_manifest_entry(bundle_file)
@@ -693,6 +703,23 @@ class TestExtendedManifestFields:
         assert transformer.to_manifest_entry(bundle).tuning_validation_status == "applied_verified"
         assert transformer.to_detail_result(bundle, result_id="v").tuning_validation_status == "applied_verified"
 
+    def test_untuned_bundle_not_applicable_status_ingested_verbatim(self, tmp_path: Path) -> None:
+        """An untuned run states ``not_applicable`` in ``platform.tuning`` with no
+        other tuning fields; it is ingested as-is and is not mistaken for a run
+        that carries a requested-tuning block."""
+        import copy
+
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["platform"]["tuning"] = {"validation_status": "not_applicable"}
+        bundle = tmp_path / "untuned.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        transformer = BundleTransformer()
+        assert transformer.to_manifest_entry(bundle).tuning_validation_status == "not_applicable"
+        detail = transformer.to_detail_result(bundle, result_id="untuned")
+        assert detail.tuning_validation_status == "not_applicable"
+        assert detail.has_tuning is False
+
     def test_tuning_validation_status_none_for_legacy_bundle(self, bundle_file: Path) -> None:
         """Legacy bundles (no platform.tuning.validation_status) load unchanged:
         the field stays None -- downstream that absence is "unknown"."""
@@ -700,7 +727,9 @@ class TestExtendedManifestFields:
         assert transformer.to_manifest_entry(bundle_file).tuning_validation_status is None
         assert transformer.to_detail_result(bundle_file, result_id="legacy").tuning_validation_status is None
 
-    def test_dataframe_bundle_applied_ledger_hash_ingests_end_to_end(self, tmp_path: Path) -> None:
+    def test_dataframe_bundle_applied_ledger_hash_ingests_end_to_end(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """A real tuned DataFrame run's exported bundle carries its applied-ledger
         hash in platform.tuning, and the explorer ingests it verbatim.
 
@@ -716,7 +745,9 @@ class TestExtendedManifestFields:
         from benchbox.core.schemas import BenchmarkConfig
         from benchbox.platforms.dataframe.benchmark_mixin import DataFramePhases, DataFrameRunOptions
         from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
+        from tests.utilities.session_isolation import own_environment
 
+        own_environment(monkeypatch, ["POLARS_MAX_THREADS"])
         cfg = DataFrameTuningConfiguration()
         cfg.parallelism.thread_count = 4
         cfg.execution.streaming_mode = True
@@ -1202,6 +1233,20 @@ class TestExtendedManifestFields:
 
         assert entry.test_type is None
 
+    def test_not_run_phase_block_does_not_infer_test_type(self, tmp_path: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        del data["benchmark"]["test_type"]
+        data["phases"] = {
+            "power_test": {"status": "NOT_RUN"},
+            "throughput_test": {"status": "COMPLETED", "streams": 3},
+        }
+        bundle = tmp_path / "phases_not_run.json"
+        bundle.write_text(json.dumps(data), encoding="utf-8")
+
+        entry = BundleTransformer().to_manifest_entry(bundle)
+
+        assert entry.test_type == "throughput"
+
     def test_extended_fields_in_detail_result(self, bundle_file: Path) -> None:
         """DetailResult carries the same extended fields as ManifestEntry."""
         import math
@@ -1552,3 +1597,84 @@ class TestClientLinkProducerShape:
         data = copy.deepcopy(MINIMAL_BUNDLE)
         data["platform"]["deployment"] = {"endpoint_class": "cloud_endpoint"}
         assert transformer_module._deployment_class_from_contract(transformer_module._parse_bundle(data)) == "cloud"
+
+
+class TestKnownDefectExclusion:
+    def _write_sidecar(self, bundle_file: Path, payload: object) -> None:
+        sidecar = bundle_file.parent / f"{bundle_file.stem}.manifest.json"
+        if isinstance(payload, str):
+            sidecar.write_text(payload, encoding="utf-8")
+        else:
+            sidecar.write_text(json.dumps(payload), encoding="utf-8")
+
+    def test_known_defects_exclude_manifest_entry(self, bundle_file: Path) -> None:
+        self._write_sidecar(bundle_file, {"known_defects": ["defective-macdbgen-addresses"]})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == "known_defective_data"
+
+    def test_known_defects_exclude_detail_result(self, bundle_file: Path) -> None:
+        self._write_sidecar(bundle_file, {"known_defects": ["defective-macdbgen-addresses"]})
+        transformer = BundleTransformer()
+        rid = transformer.result_id_from_bundle(bundle_file)
+        detail = transformer.to_detail_result(bundle_file, rid)
+
+        assert detail.ranking_exclusion_reason == "known_defective_data"
+
+    def test_unlisted_defect_id_still_excludes(self, bundle_file: Path) -> None:
+        self._write_sidecar(bundle_file, {"known_defects": ["future-defect"]})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == "known_defective_data"
+
+    def test_absent_sidecar_preserves_baseline(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, {"result_source": "internal"})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
+    def test_empty_known_defects_preserves_baseline(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, {"known_defects": []})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
+    def test_malformed_sidecar_preserves_baseline(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, "{not json")
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
+    def test_non_dict_sidecar_preserves_baseline(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, [1, 2, 3])
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
+    def test_non_list_known_defects_preserves_baseline(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, {"known_defects": "defective-macdbgen-addresses"})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
+    def test_non_string_entries_are_ignored(self, bundle_file: Path) -> None:
+        baseline = BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason
+        self._write_sidecar(bundle_file, {"known_defects": [123, None]})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == baseline
+
+    def test_known_defects_take_precedence_over_other_reasons(self, bundle_file: Path) -> None:
+        data = copy.deepcopy(MINIMAL_BUNDLE)
+        data["summary"]["queries"]["failed"] = 1
+        bundle_file.write_text(json.dumps(data), encoding="utf-8")
+        assert BundleTransformer().to_manifest_entry(bundle_file).ranking_exclusion_reason == "failed_queries"
+        self._write_sidecar(bundle_file, {"known_defects": ["defective-macdbgen-addresses"]})
+        entry = BundleTransformer().to_manifest_entry(bundle_file)
+
+        assert entry.ranking_exclusion_reason == "known_defective_data"

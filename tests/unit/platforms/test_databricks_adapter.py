@@ -13,6 +13,7 @@ from unittest.mock import Mock, call, patch
 import pytest
 
 from benchbox.platforms.base.data_loading import DataSource
+from benchbox.platforms.base.validation import SchemaValidator, TuningValidator, ValidationResult
 from benchbox.platforms.databricks import DatabricksAdapter
 from benchbox.platforms.databricks.adapter import _select_databricks_warehouse
 
@@ -424,6 +425,34 @@ class TestDatabricksAdapter:
                 assert "USE CATALOG test_catalog" in executed
                 assert "USE SCHEMA test_schema" in executed
                 assert ("CREATE SCHEMA IF NOT EXISTS test_catalog.test_schema" in executed) is expect_create
+
+    @patch("benchbox.platforms.databricks.adapter.databricks_sql")
+    def test_native_compatibility_validation_does_not_create_schema(self, mock_databricks_sql):
+        mock_connection = Mock()
+        mock_cursor = Mock()
+        mock_connection.cursor.return_value = mock_cursor
+        mock_cursor.fetchone.return_value = ("use_cached_result", "false")
+        mock_databricks_sql.connect.return_value = mock_connection
+
+        adapter = DatabricksAdapter(
+            server_hostname="test.cloud.databricks.com",
+            http_path="/sql/1.0/warehouses/test",
+            access_token="test_token",
+            catalog="test_catalog",
+            schema="test_schema",
+        )
+        adapter.benchmark_instance = Mock()
+
+        with (
+            patch.object(TuningValidator, "validate", return_value=ValidationResult(is_valid=True)),
+            patch.object(SchemaValidator, "validate", return_value=ValidationResult(is_valid=False)),
+        ):
+            adapter._validate_database_compatibility()
+
+        executed = [c.args[0] for c in mock_cursor.execute.call_args_list]
+        assert "USE CATALOG test_catalog" in executed
+        assert "USE SCHEMA test_schema" in executed
+        assert not any(sql.startswith("CREATE SCHEMA") for sql in executed)
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_connection_defers_context_when_creating_catalog(self, mock_databricks_sql):
@@ -1018,7 +1047,7 @@ class TestDatabricksAdapter:
 
             # Should execute clustering optimization via Z-ORDER
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
-            assert any("OPTIMIZE TEST_TABLE ZORDER BY" in call for call in execute_calls)
+            assert any("OPTIMIZE test_table ZORDER BY" in call for call in execute_calls)
 
         mock_cursor.close.assert_called()
 

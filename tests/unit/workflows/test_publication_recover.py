@@ -24,31 +24,11 @@ def _workflow() -> dict[str, Any]:
     return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
 
 
-def test_recover_workflow_triggers_and_schedules() -> None:
+def test_recover_workflow_is_dispatch_only() -> None:
     wf = _workflow()
     triggers = wf.get("on") or wf.get(True) or {}
 
-    assert "push" not in triggers
-    assert "pull_request" not in triggers
-
-    # workflow_run on the three writer workflows
-    assert "workflow_run" in triggers
-    wf_run = triggers["workflow_run"]
-    expected_workflows = {
-        "Publication Transactions",
-        "Publication Control Plane Deployment",
-        "Publication Preview Deploy (G2)",
-    }
-    assert set(wf_run.get("workflows", [])) == expected_workflows
-    assert wf_run.get("types") == ["completed"]
-
-    # schedule: 5-minute reconciliation cron (2-57/5 * * * *)
-    assert "schedule" in triggers
-    schedules = triggers["schedule"]
-    crons = [s.get("cron", "") for s in schedules]
-    assert "2-57/5 * * * *" in crons
-
-    assert "workflow_dispatch" in triggers
+    assert set(triggers) == {"workflow_dispatch"}
 
 
 def test_recover_workflow_permissions_follow_least_privilege() -> None:

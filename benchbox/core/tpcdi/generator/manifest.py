@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 
-from benchbox.utils.datagen_manifest import DataGenerationManifest
+from benchbox.utils.datagen_manifest import DataGenerationManifest, require_manifest_files
 from benchbox.utils.file_format import detect_compression, validate_tbl_compression_consistency
 
 
@@ -83,6 +83,7 @@ class ManifestMixin:
             p = Path(path_str)
             rows = self._count_rows(p)
             manifest.add_entry(table, p, row_count=rows, metadata=_TPCDI_CSV_METADATA)
+        require_manifest_files(manifest.file_counts()[1], label="TPC-DI", output_dir=output_dir)
         manifest.write()
 
 

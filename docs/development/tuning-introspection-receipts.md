@@ -47,6 +47,50 @@ The earlier name `verifiable_total` was removed because a count that includes
 consumers of this additive receipt-summary key; the upgrade decision continues
 to use the entry verdicts directly.
 
+## Where the trust code lives
+
+The adapter-side corroboration, drift-check routing, layout-operation fold,
+apply-phase status, introspector selection, and ledger read-back live in
+`benchbox/platforms/base/tuning_trust.py`.
+`PlatformAdapter._corroborate_applied_ledger`,
+`_attach_applied_ledger_payload`, `_build_drift_check_payload`, and
+`_fold_layout_operations_into_ledger` remain as one-line delegates, so callers
+and subclasses keep their existing entry points. `run_enhanced_benchmark`
+derives its apply-phase status and reads the ledger back through that module
+too, including the validation-failure path, which attaches the payload via
+the same delegate. The DuckDB, ClickHouse, and Snowflake
+`get_tuning_introspector` overrides are one-line delegates to that module's
+per-platform factories -- the admitted verdict-producing set stays exactly
+those three platforms (see the ADR-001 verification-reach addendum), and no
+new introspector is constructed. The DataFrame ledger status derivation and
+result attach live in `benchbox/platforms/dataframe/tuning_trust.py`, with
+`TuningConfigurableMixin` keeping one-line delegates. `applied_verified` is
+still emitted only by `corroborate_applied_ledger`, whose behavior is
+unchanged: it returns the status untouched unless the derived status is
+`applied_unverified`, and any introspector or corroboration error leaves the
+status as it was and logs at debug level.
+
+These files are soundness-manifest paths (`.github/soundness-paths.txt`), so a
+change to any of them needs the external soundness review before it is armed:
+`benchbox/platforms/base/tuning_trust.py`,
+`benchbox/core/tuning/introspection.py`, `applied_ledger.py`,
+`capability_registry.py`, `metadata.py`,
+`benchbox/platforms/*_introspection.py`,
+`benchbox/platforms/clickhouse/introspection.py`, and
+`benchbox/platforms/dataframe/tuning_trust.py`. The manifest cannot name a
+region of a file, which is why the logic sits in its own modules instead of
+making all of `adapter.py` (or the DataFrame mixins) a soundness path.
+
+What is *not* gated: the adapter files themselves (`adapter.py`,
+`duckdb.py`, `clickhouse/adapter.py`, `snowflake.py`, the DataFrame mixins)
+stay outside the manifest. Their trust-relevant methods are one-line
+delegates pinned by tests -- a change that routes around the gated module
+fails the suite -- but the manifest alone does not flag edits there, so those
+pins are load-bearing. Likewise the `benchbox/platforms/*_introspection.py`
+glob uses `fnmatch` semantics, where `*` crosses `/`: it also matches nested
+`benchbox/platforms/<sub>/*_introspection.py` files, not just the top-level
+modules.
+
 ## Statement classes (per phase x mechanism)
 
 `corroborate()` gates every ledger statement by recorded status and phase,
@@ -142,19 +186,39 @@ that itself reaches the cap remains explicitly truncated.
   bounded query, filtered to the ledger's tables. Corroborates each
   `CREATE INDEX` ledger entry against its `index` row.
 
-  DuckDB sorting is verification-eligible end to end. The initial tuned
-  `CREATE INDEX` is dropped by the loader's
-  `CREATE OR REPLACE TABLE ... ORDER BY` CTAS, so
-  `DuckDBAdapter.apply_ctas_sort` re-creates that same index after CTAS using
-  the shared `_duckdb_sort_index_sql` helper (the generator renders the CTAS
-  `ORDER BY`, not this index statement). `_record_sort_index_layout_op` records
-  the successful or
-  failed re-creation as a `post_load` layout operation, and
-  `PlatformAdapter._fold_layout_operations_into_ledger` folds it into the
-  ledger before corroboration. The live full-flow test
-  `tests/unit/platforms/test_duckdb_introspection.py::TestDuckDBCtasIndexRecreation::test_full_flow_reaches_applied_verified`
-  pins the surviving catalog index and verified outcome. Dry runs capture SQL
-  but neither execute nor record the re-creation.
+  DuckDB index statements are corroborated against the physical identifiers
+  `create_schema` produced. The tuning builder resolves each logical table and
+  column through `duckdb_tables()` / `duckdb_columns()` (case-insensitive,
+  returning the catalog's stored spelling) and emits the index DDL with those
+  names quoted, for example `ON "lineitem" ("l_orderkey", "l_linenumber")`.
+  Quoting matters: an index written against a differently-cased name
+  (`ON LINEITEM (L_ORDERKEY)` over a table created as `lineitem`) is stored by
+  DuckDB as the bound expression `(LINEITEM.L_ORDERKEY)`. That fact still
+  produces a `mismatch`, and its diff states that the catalog stored a bound
+  expression because the identifier case in the DDL differs from the catalog.
+  `normalize_columns` is deliberately unchanged, so a bound form is never
+  unwrapped into a match.
+
+  The loader's `CREATE OR REPLACE TABLE ... ORDER BY` CTAS drops the initial
+  index, so `DuckDBAdapter.apply_ctas_sort` re-creates the same index after the
+  CTAS using the shared `_duckdb_sort_index_sql` helper.
+  `_record_sort_index_layout_op` records the re-creation as a `post_load`
+  layout operation, and `PlatformAdapter._fold_layout_operations_into_ledger`
+  folds it into the ledger before corroboration. Dry runs capture SQL but
+  neither execute nor record the re-creation.
+
+  A corroborated index is evidence of the index, not of row order: an index can
+  exist when the data was never sorted. Reaching `applied_verified` also needs
+  every other statement in the ledger to corroborate, so a run that also
+  requests constraints, partitioning or CHECK constraints stays
+  `applied_unverified` until those have catalog rules. A sort-only
+  configuration built through the real `create_schema` is pinned by
+  `tests/unit/platforms/test_physical_identifier_resolution.py::TestDuckDBPhysicalIdentifiers::test_sort_only_config_reaches_applied_verified_without_mismatch`.
+
+  DuckLake cannot build indexes (`CREATE INDEX` raises `DuckLake does not
+  support indexes`). Its adapter records each requested sort or clustering
+  index as a dropped intent with the reason `ducklake: CREATE INDEX
+  unsupported`, issues no `CREATE INDEX`, and does not use this introspector.
 
 - **Snowflake** (`benchbox/platforms/snowflake_introspection.py`): reads
   `INFORMATION_SCHEMA.TABLES.CLUSTERING_KEY` with bound, normalized schema

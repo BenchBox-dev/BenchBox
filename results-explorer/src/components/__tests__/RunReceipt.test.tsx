@@ -379,7 +379,31 @@ describe("RunReceipt", () => {
     render(<RunReceipt detail={makeDetail({ tuning_validation_status: "applied_unverified" })} />);
 
     const receipt = screen.getByRole("region", { name: "Run receipt" });
-    expect(within(receipt).getByText("Applied, not independently checked")).toBeTruthy();
+    expect(within(receipt).getByText("Applied; no live-database check recorded")).toBeTruthy();
+    expect(within(receipt).queryByText("Verified")).toBeNull();
+  });
+
+  it("states a completed check when an applied_unverified run carries a receipt", () => {
+    const receipt = JSON.stringify({
+      corroborated: false,
+      summary: { mismatch: 2, unverifiable: 1 },
+      entries: [{ statement: "CREATE INDEX i ON t(c)", phase: "post_load", verdict: "mismatch" }],
+    });
+    render(
+      <RunReceipt detail={makeDetail({ tuning_validation_status: "applied_unverified", applied_receipt: receipt })} />,
+    );
+
+    const region = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(region).getByText("Checked; not corroborated (2 mismatches, 1 unverifiable)")).toBeTruthy();
+    expect(within(region).queryByText("Applied; no live-database check recorded")).toBeNull();
+  });
+
+  it("shows an untuned run's not_applicable state as a recorded row, not a missing field", () => {
+    render(<RunReceipt detail={makeDetail({ tuning_validation_status: "not_applicable" })} />);
+
+    const receipt = screen.getByRole("region", { name: "Run receipt" });
+    expect(within(receipt).getByText("Tuning verification")).toBeTruthy();
+    expect(within(receipt).getByText("Not applicable")).toBeTruthy();
     expect(within(receipt).queryByText("Verified")).toBeNull();
   });
 
@@ -517,15 +541,16 @@ describe("RunReceipt applied-tuning receipt drill-down", () => {
   });
 
   it("leaves a self-attested run's badge untouched when a receipt is present", () => {
+    const uncorroborated = JSON.stringify({ ...JSON.parse(APPLIED_RECEIPT), corroborated: false });
     render(
       <RunReceipt
-        detail={makeDetail({ tuning_validation_status: "applied_unverified", applied_receipt: APPLIED_RECEIPT })}
+        detail={makeDetail({ tuning_validation_status: "applied_unverified", applied_receipt: uncorroborated })}
       />,
     );
 
     const receipt = screen.getByRole("region", { name: "Run receipt" });
     // The drill-down never upgrades the badge - corroboration is not decided here.
-    expect(within(receipt).getByText("Applied, not independently checked")).toBeTruthy();
+    expect(within(receipt).getByText("Checked; not corroborated")).toBeTruthy();
     expect(within(receipt).queryByText("Verified")).toBeNull();
     expect(within(receipt).getByTestId("applied-receipt-drilldown")).toBeTruthy();
   });

@@ -282,11 +282,7 @@ class TestNoDeploySource:
 class TestLiveTreeIntegration:
     """Run the verifier against the real .github/workflows tree at HEAD."""
 
-    def test_current_tree_is_not_isolated_while_docs_yml_deploys(self):
-        docs_yml = REPO_ROOT / ".github" / "workflows" / "docs.yml"
-        if not docs_yml.exists() or "deploy-pages" not in docs_yml.read_text():
-            pytest.skip("docs.yml no longer carries a Pages deploy step")
+    def test_docs_yml_is_not_a_pages_deploy_source(self):
         report = verify_release_isolation.verify_release_isolation(ref="HEAD", mode="rehearsal")
-        assert report.isolation_proven is False
-        assert report.legacy_deploy_workflow_deploys is True
-        assert any("docs.yml" in e for e in report.errors)
+        assert report.legacy_deploy_workflow_deploys is False
+        assert not any("docs.yml" in e for e in report.errors)

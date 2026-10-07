@@ -15,9 +15,6 @@ name: Publication Canaries & Drift Reconciliation
 # --pages-dir to each step.
 
 on:
-  schedule:
-    # Daily 07:15 UTC canary execution
-    - cron: "15 7 * * *"
   workflow_dispatch:
 
 permissions:

@@ -7,6 +7,196 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Before you upgrade
+
+- **Tuning maintenance runs after the load.** ClickHouse `OPTIMIZE TABLE ...
+  FINAL`, Redshift `ANALYZE` and `VACUUM`, Databricks Delta `OPTIMIZE` and
+  `ANALYZE`, and Snowflake `RESUME RECLUSTER` ran before any data was loaded,
+  on empty tables. They now run after each table loads. ClickHouse `OPTIMIZE`
+  is off unless you set the `optimize_after_load` platform option to `true`.
+  Redshift keeps its existing isolated `VACUUM` and `ANALYZE` pass over every
+  loaded table, so the tuning step adds an `ANALYZE` only when `auto_analyze`
+  is off. Databricks does not repeat its load-time `OPTIMIZE` on a table the
+  tuning step already optimized. A load-only run (`--phases generate,load`)
+  does not run Redshift's isolated pass, so it no longer vacuums tuned tables;
+  the next benchmark run does.
+  Data-loading time, in total and per table, excludes this maintenance; its
+  time is reported as `phases.post_load_maintenance`.
+- **ClickHouse primary keys and tuned sort keys.** With a tuned sort key,
+  `primary_keys.enabled: false` now takes effect and emits no `PRIMARY KEY`
+  clause. Before, it was ignored and a date-first sort key such as
+  `(O_ORDERDATE, O_ORDERKEY)` stopped schema creation with a ClickHouse error.
+  An enabled primary key that is not a prefix of the tuned sort key now fails
+  before any table is created, with a message that says to put the key columns
+  first or disable `primary_keys`.
+- **Spark, LakeSail and Velox per-query times no longer include `clearCache()`.**
+  With `disable_cache` on (the default), these adapters cleared the session
+  cache inside each query's timer. They now clear it before the timer starts,
+  so recorded query times can drop compared with earlier runs. On a shared
+  session another stream's clear can still overlap a timed query during
+  throughput and stays inside the throughput total time. Don't compare their
+  per-query times recorded before this change with results after it.
+- **A throughput run limited to a query subset reports no Throughput@Size.**
+  Subset runs follow filtered parameter positions and are not TPC-compliant.
+  The run still succeeds and reports query throughput.
+- **Throughput now honors `validation_mode` and `--queries`.** TPC-H
+  throughput ignored `validation_mode`, so `--validation-mode disabled` still
+  failed streams on a row-count mismatch. Neither TPC-H nor TPC-DS throughput
+  read the query subset, so `--queries 1,6 --phases power,throughput` ran the
+  subset in the power phase and every query in the throughput phase. Both now
+  follow the options, and each stream runs its own permutation filtered to the
+  subset.
+- **A saved stream timeout now applies to throughput runs.**
+  `execution.concurrent_queries.stream_timeout_seconds` used to be read by
+  nothing; it now sets the timeout of every TPC-H and TPC-DS throughput stream
+  (0 disables it), and `cancel_on_timeout` next to it stops a timed-out stream
+  before its next query. Config files written by `ExecutionConfigHelper`
+  (`apply_performance_profile`, `optimize_for_system`, or any settings update)
+  or by an earlier default often hold 1800, 3600, 7200 or 10800. A TPC-DS
+  stream that runs longer than a saved value now times out and the run
+  reports no Throughput@Size, where before it ran for the 7200 s default.
+  Check `execution.concurrent_queries.stream_timeout_seconds` in your config
+  file and remove it to keep each benchmark's default (3600 s for TPC-H, 7200 s
+  for TPC-DS). The helper no longer writes a stream timeout unless you set one,
+  and each throughput run prints the effective timeout and where it came from.
+- **A stream count of 1 is no longer raised to 2.** `BenchmarkConfig.concurrency`
+  and `RunConfig.concurrent_streams` default to `None`, which runs the
+  2-stream default. An explicit count below 2 is rejected when the run
+  includes throughput. Saved runs that recorded 1 replay as not set.
+
+### Added
+
+- **Curated ClickHouse tuning templates.** TPC-H, SSB, and TPC-DS ship tuned
+  templates for ClickHouse, so `--tuning tuned` there applies sort keys and
+  partitions instead of falling back to session settings.
+- **DataFrame tuned profiles.** `--tuning tuned` on Polars, pandas, and cuDF
+  now resolves the curated `examples/tunings/dataframe/<platform>_optimized.yaml`
+  profile and records mode `tuned`. Platforms without a profile, such as Dask,
+  still resolve to `tuned-fallback`.
+- **`benchbox tuning validate` accepts SQL tuning files.** For example,
+  `benchbox tuning validate examples/tunings/duckdb/tpch_tuned.yaml --platform
+  duckdb` checks the file against the platform's capabilities.
+- **Applied ledger `satisfied` list.** When a platform realizes a requested
+  sort through `ORDER BY` in `CREATE TABLE`, as ClickHouse and StarRocks do,
+  the ledger records it as satisfied by that statement instead of dropped.
+  Sorts that no executed statement realized are still dropped. This lets
+  ClickHouse tuned runs reach `applied_verified`.
+
+### Changed
+
+- **The `--tuning tuned` fallback names what each platform applies.** The
+  message said "using basic constraints" everywhere. It now says "engine
+  runtime defaults (streaming)" for Polars and "OLAP session pack" for
+  ClickHouse, for example.
+
+## [0.4.2] - 2026-10-05
+
+### Before you upgrade
+
+- **BREAKING: Runs now fail on errors they used to hide.** A run fails if any
+  query fails validation, including warm-up queries, or if no table loads any
+  rows. DataFrame platforms refuse `--phases throughput`; use `--phases power`
+  or a SQL platform. FlightData at scale factor 0.1 and above fails when a
+  month can't be downloaded. To use synthetic rows for missing months, set the
+  `allow_synthetic_fallback` option.
+- **Some results can't be compared with 0.4.1.** TPC-DS runs at scale factors
+  other than 1 now use query parameters for that scale, which changes up to 12
+  queries. DataFrame runs use the same parameters as SQL runs, and TPC-H
+  DataFrame runs now follow `--seed`. Power-phase times, and the cost per hour
+  based on them, now include the time between queries.
+- **Some answers change because they were wrong before.** SQLite TPC-H Q6,
+  write primitives on Snowflake and Databricks, TPC-Havoc Q16-Q18 on
+  DataFrame platforms, NYC Taxi weekdays on Polars, and many DataFusion
+  DataFrame queries now return correct answers.
+- **Databricks turns off the result cache.** BenchBox checks that the
+  warehouse confirms the setting and stops if it doesn't. To measure with the
+  cache, set the `disable_result_cache` option to `false`. When BenchBox
+  rebuilds a schema, it now empties tables instead of dropping them, so
+  repeated runs no longer use up the Unity Catalog table quota.
+- **Regenerate some data.** TPC-H data generated on macOS by earlier versions
+  has wrong supplier and customer addresses. FlightData downloads and
+  generates its data again on the next run.
+- **Stricter submissions.** A TPC-Havoc submission must include every variant.
+  A result in which every query was skipped no longer passes integrity
+  certification. Nine incorrect TPC-H results from early BigQuery, Databricks
+  and Snowflake runs are removed from Results Explorer.
+- **DuckDB tuned databases are rebuilt.** The shipped DuckDB tuned templates
+  no longer include partitioning or CHECK constraints, so a new tuned run
+  records a different `requested_config_hash` than earlier results and the
+  cached tuned database is rebuilt on the next run (for example
+  `tpch_sf1_custom_pk_fk_uniq_check_part_sort` becomes
+  `tpch_sf1_custom_pk_fk_uniq_sort`).
+- **Cached TPC-H and TPC-DS data regenerates once.** Dataset manifests now
+  record the SHA-256 of the bundled `dbgen` or `dsdgen` binary that wrote the
+  data. A cache that records no generator, or that a known-defective `dbgen`
+  wrote, is regenerated on the next run. This covers TPC-H data generated on
+  macOS by the earlier `dbgen`, which wrote non-canonical supplier and
+  customer addresses (Q2, Q10, Q15 and Q20 return different values), and
+  TPC-DS data generated on Windows before `dsdgen` options were passed
+  correctly, which was always scale factor 1. The TPC-H Skew, TPC-Havoc,
+  primitives and Data Vault datasets are built from `dbgen` and regenerate too.
+
+### Added
+
+- **ParadeDB and Citus platforms (experimental).** Use `--platform paradedb`
+  or `--platform citus`. On Citus, the `distribution_column` option spreads
+  tables across workers.
+- **More data sources.** DuckLake can store data on Google Cloud Storage and
+  Azure as well as S3. NYC Taxi can load For-Hire Vehicle trips and run three
+  queries on them. The synthetic Join Order Benchmark has all 113 queries, up
+  from 13, each with pandas and Polars versions.
+- **More tuning templates.** BenchBox ships Snowflake templates for TPC-H and
+  TPC-DS. SSB can now be tuned.
+- **Choose TPC-DS query values.** In Python,
+  `DSQGenBinary.generate_with_parameters` now applies the values you pass, and
+  `DSQGenBinary.generate_parameter_log` lists the values used for a seed and
+  scale factor. BenchBox includes the qualification values from the TPC-DS
+  specification.
+
+### Changed
+
+- **Vector Search is stable.** It remains SQL-only.
+- **Faster loads and queries.** Loading is faster on BigQuery, ClickHouse
+  Cloud and PostgreSQL. Snowflake no longer pauses after each query. pandas
+  runs TPC-DS Q78 in about 0.3 seconds at scale factor 0.1, down from about
+  14 seconds.
+- **TPC-Havoc runs on more engines.** Variants that were skipped now run on
+  BigQuery, Databricks, Snowflake, PostgreSQL-family engines, ClickHouse and
+  DataFusion. `--dry-run` saves the same SQL a real run would use.
+- **Result files always record tuning status.** Every result now includes
+  `platform.tuning.validation_status`, including runs without tuning. No
+  existing field changes.
+
+### Fixed
+
+- **DataFrame answers match SQL.** All 103 TPC-DS queries return the same
+  answers as SQL on Polars, pandas and DataFusion. TPC-H Q1, Q3, Q5, Q10, Q14
+  and Q15 are fixed on DataFusion. TPC-H Q17 returns the right answer on empty
+  input, and Dask sorts NULLs like the other platforms.
+- **DataFrame runs no longer crash when two runs share the data cache.**
+- **Cloud platforms.** TPC-DS One Big Table on Snowflake and BigQuery no longer
+  runs against an empty table. Generated data for eight more benchmarks now
+  reaches cloud storage. Data Vault, TSBS DevOps and the read, write,
+  transaction and metadata primitives run on Snowflake, BigQuery and
+  Databricks, and skip unsupported queries with a reason. Exasol, Presto and
+  Trino load data correctly.
+- **Tuning.** The tuning wizard saves the table layouts you choose. DuckDB
+  tuned runs no longer report false index mismatches, and TPC-DS tuned runs
+  load on engines that enforce primary keys. Runs without tuning reuse their
+  database. The console reports only tuning work that succeeded. DuckLake no
+  longer deletes its data partway through a run.
+- **Command line.** `--show-plans` prints query plans. Selectors such as
+  `--platform clickhouse:local` work, and an unknown deployment lists the
+  ones that exist.
+- **Data generation.** TPC-DS generation on Windows uses the scale factor you
+  ask for. TPC-H Skew at scale factor 10 fits in 16 GB of memory. Read
+  Primitives data loads on the first run.
+- **Other fixes.** Seeded TPC-H runs no longer report false failures on Q11,
+  Q16, Q18 and Q20. Anonymized results hide more cloud account details.
+  SQLite throughput streams no longer mix up rows. TPC-DS One Big Table works
+  from an installed package. Results Explorer recovers from startup errors and
+  no longer stalls on links to missing results.
+
 ## [0.4.1] - 2026-09-24
 
 ### Before you upgrade
@@ -838,7 +1028,8 @@ benchbox run --platform polars-df --benchmark tpch --scale 0.01
 - **Discussions**: [Ask questions and request features](https://github.com/BenchBox-dev/BenchBox/discussions)
 - **PyPI**: [pypi.org/project/benchbox](https://pypi.org/project/benchbox/)
 
-[Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/BenchBox-dev/BenchBox/compare/v0.3.0...v0.3.1

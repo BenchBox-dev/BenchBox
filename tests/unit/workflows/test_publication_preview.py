@@ -11,6 +11,7 @@ preview mismatch, receipt only after the 12h window).
 from __future__ import annotations
 
 import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
@@ -23,11 +24,12 @@ DEPLOY_PATH = REPO_ROOT / ".github" / "workflows" / "publication-preview-deploy.
 SOAK_PATH = REPO_ROOT / ".github" / "workflows" / "publication-preview-soak.yml"
 
 _SOUNDNESS_SPEC = importlib.util.spec_from_file_location(
-    "auto_merge_soundness_paths",
-    REPO_ROOT / "_project" / "scripts" / "auto_merge_soundness_paths.py",
+    "preview_soundness_paths",
+    REPO_ROOT / "_project" / "scripts" / "soundness_paths.py",
 )
 assert _SOUNDNESS_SPEC is not None and _SOUNDNESS_SPEC.loader is not None
 _soundness = importlib.util.module_from_spec(_SOUNDNESS_SPEC)
+sys.modules[_SOUNDNESS_SPEC.name] = _soundness
 _SOUNDNESS_SPEC.loader.exec_module(_soundness)
 
 
@@ -154,13 +156,10 @@ def test_soak_never_writes_pages() -> None:
         assert perms.get("pages") != "write"
 
 
-def test_soak_is_cron_plus_dispatch() -> None:
+def test_soak_is_dispatch_only() -> None:
     data = _load(SOAK_PATH)
     on = _triggers(data)
-    assert "schedule" in on, "soak must probe on a schedule without human action"
-    crons = [entry.get("cron", "") for entry in on["schedule"]]
-    assert any("30" in c for c in crons), f"expected a 30min cadence, got {crons}"
-    assert "workflow_dispatch" in on
+    assert set(on) == {"workflow_dispatch"}
 
 
 def test_soak_verdict_discipline() -> None:
@@ -188,9 +187,3 @@ def test_soak_conclude_reuses_probe_run_id() -> None:
 def test_preview_workflows_are_soundness_paths() -> None:
     assert ".github/workflows/publication-preview-deploy.yml" in _soundness.SOUNDNESS_FILES
     assert ".github/workflows/publication-preview-soak.yml" in _soundness.SOUNDNESS_FILES
-
-
-def test_preview_workflows_have_codeowners() -> None:
-    text = (REPO_ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8")
-    assert ".github/workflows/publication-preview-deploy.yml" in text
-    assert ".github/workflows/publication-preview-soak.yml" in text

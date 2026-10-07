@@ -31,6 +31,22 @@ from pathlib import Path
 
 TEMPLATES_ROOT = Path(__file__).resolve().parent / "templates"
 
+# Platform variants that share one curated template directory. This map stays
+# separate from capability_registry.PLATFORM_ALIASES: that map also sends
+# spark to databricks, which is wrong for template lookup.
+TEMPLATE_PLATFORM_KEYS = {
+    "clickhouse-local": "clickhouse",
+    "clickhouse-server": "clickhouse",
+    "clickhouse-cloud": "clickhouse",
+    "chdb": "clickhouse",
+}
+
+
+def template_platform_key(platform: str) -> str:
+    """Return the template directory name for a platform, mapping variants to their family."""
+    base = platform.lower().split(":", 1)[0]
+    return TEMPLATE_PLATFORM_KEYS.get(base, platform.lower())
+
 
 def packaged_template_path(platform: str, benchmark: str) -> Path:
     """Build the candidate packaged-template path for platform/benchmark.

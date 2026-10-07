@@ -20,8 +20,8 @@ Two independent breaks fed this defect:
    at the driver boundary (fixed here via the shared
    ``_resolve_requested_stream_count`` helper).
 2. ``run-official --streams N`` validated and printed the value but never
-   forwarded it anywhere (fixed here via ``_forward_requested_streams`` in
-   ``benchbox/cli/commands/run_official.py``).
+   forwarded it anywhere (fixed by passing it to ``run`` as ``concurrency``
+   in ``benchbox/cli/commands/run_official.py``).
 
 Follow-up (review): mapping ``concurrent_streams`` straight through initially
 introduced a second regression -- ``BenchmarkConfig.concurrency`` defaults to
@@ -97,9 +97,6 @@ def _run_tpch_throughput(
 @pytest.mark.parametrize(
     ("requested", "expected"),
     [
-        # Below the TPC throughput minimum: floored to 2 (must_preserve /
-        # official TPC-H 2-stream minimum -- see _resolve_requested_stream_count).
-        (1, 2),
         (4, 4),
         (8, 8),
     ],
@@ -132,12 +129,15 @@ def test_throughput_stream_count_tpcds_matches_requested(tmp_path):
             "scale_factor": 0.01,
             "concurrent_streams": 2,
             "validation_mode": "skip",
+            "query_subset": ["1", "3"],
         }
         results = adapter._execute_queries_by_type(bench, conn, run_config)
         result = adapter._last_throughput_test_result
 
         assert result.streams_executed == 2
         assert sorted({r.get("stream_id") for r in results}) == [0, 1]
+        assert {str(r.get("query_id")) for r in results} == {"1", "3"}
+        assert len(results) == 4
     finally:
         conn.close()
 
@@ -190,11 +190,8 @@ def _run_tpch_throughput_via_real_pipeline_shape(tmp_path: Path):
         run_config = {k: v for k, v in run_config_model.__dict__.items() if k != "benchmark"}
         run_config.setdefault("benchmark_name", run_config_model.benchmark)
 
-        assert run_config["concurrent_streams"] == 1, (
-            "sanity check: the real pipeline's default run_config must carry "
-            "concurrent_streams=1, not omit the key -- otherwise this test "
-            "isn't reproducing the production shape it's meant to guard"
-        )
+        assert "concurrent_streams" in run_config
+        assert run_config["concurrent_streams"] is None
 
         results = adapter._execute_queries_by_type(bench, conn, run_config)
         return adapter._last_throughput_test_result, results
@@ -218,11 +215,13 @@ def test_throughput_stream_count_default_preserved_via_real_pipeline_shape(tmp_p
     assert result.streams_executed == 2
 
 
-def test_throughput_stream_count_low_request_floored_to_two(tmp_path):
-    """Pin the floor itself: an explicit request of 1 stream still floors to 2."""
-    result, _results = _run_tpch_throughput(tmp_path, concurrent_streams=1)
+@pytest.mark.parametrize("key", ["num_streams", "concurrent_streams"])
+def test_throughput_stream_count_explicit_single_stream_is_rejected(tmp_path, key):
+    result, results = _run_tpch_throughput(tmp_path, **{key: 1})
 
-    assert result.streams_executed == 2
+    assert result is None
+    assert results[0]["query_id"] == "throughput_test_error"
+    assert "at least 2" in results[0]["error"]
 
 
 def test_throughput_stream_count_legacy_num_streams_key_still_wins(tmp_path):
@@ -235,61 +234,6 @@ def test_throughput_stream_count_legacy_num_streams_key_still_wins(tmp_path):
     result, _results = _run_tpch_throughput(tmp_path, concurrent_streams=8, num_streams=3)
 
     assert result.streams_executed == 3
-
-
-def test_run_official_forward_requested_streams_sets_concurrency():
-    """CLI regression: run-official's --streams forwarding sets BenchmarkConfig.concurrency.
-
-    ``run()`` has no ``--streams``/``--concurrency`` option of its own, so
-    ``run_official.py`` cannot forward the value as a keyword argument to
-    ``ctx.invoke(run, ...)``. Instead it patches
-    ``BenchmarkOrchestrator.execute_benchmark`` for the duration of that one
-    call so the requested count lands on the same ``BenchmarkConfig.concurrency``
-    field the throughput drivers now read. This drives that mechanism
-    directly (no CLI harness, no data generation) so it stays fast and
-    deterministic while still exercising the real production code path.
-    """
-    from types import SimpleNamespace
-
-    from benchbox.cli.commands.run_official import _forward_requested_streams
-    from benchbox.cli.orchestrator import BenchmarkOrchestrator
-
-    original = BenchmarkOrchestrator.execute_benchmark
-    captured: dict = {}
-
-    def _stub_execute_benchmark(
-        self, config, system_profile, database_config, phases_to_run=None, progress=None, execution_context=None
-    ):
-        captured["concurrency"] = config.concurrency
-        return "stub-result"
-
-    BenchmarkOrchestrator.execute_benchmark = _stub_execute_benchmark
-    try:
-        with _forward_requested_streams(4):
-            patched = BenchmarkOrchestrator.execute_benchmark
-            assert patched is not _stub_execute_benchmark, "context manager should have wrapped execute_benchmark"
-
-            fake_config = SimpleNamespace(concurrency=1)
-            outcome = patched(object(), fake_config, None, None)
-
-            assert outcome == "stub-result"
-            assert fake_config.concurrency == 4, "requested streams must be set on the BenchmarkConfig"
-
-        # Restored after the context manager exits.
-        assert BenchmarkOrchestrator.execute_benchmark is _stub_execute_benchmark
-        assert captured["concurrency"] == 4
-    finally:
-        BenchmarkOrchestrator.execute_benchmark = original
-
-
-def test_run_official_forward_requested_streams_noop_when_not_requested():
-    """When --streams is absent (None), execute_benchmark must be left untouched."""
-    from benchbox.cli.commands.run_official import _forward_requested_streams
-    from benchbox.cli.orchestrator import BenchmarkOrchestrator
-
-    original = BenchmarkOrchestrator.execute_benchmark
-    with _forward_requested_streams(None):
-        assert BenchmarkOrchestrator.execute_benchmark is original
 
 
 def test_run_official_rejects_explicit_streams_one():

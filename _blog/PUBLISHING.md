@@ -33,7 +33,7 @@ Published posts only, with ABlog frontmatter:
 
 ```
 docs/blog/
-  index.rst               # Blog index (postlist + toctree)
+  index.md                # Blog index (postlist + toctree)
   2025-01-22-welcome.md   # Published post
 ```
 
@@ -124,18 +124,19 @@ filename. Do not rely on a blind copy when either form appears in the source.
 
 ### 6. Register the post in the blog index
 
-Edit `docs/blog/index.rst`. Add the post filename (without extension) to the `toctree`:
+Edit `docs/blog/index.md`. Add the post filename (without extension) to the `toctree`:
 
-```rst
-.. toctree::
-   :maxdepth: 1
-   :hidden:
+````md
+```{toctree}
+:maxdepth: 1
+:hidden:
 
-   2025-01-22-welcome
-   YYYY-MM-DD-{slug}
+2025-01-22-welcome
+YYYY-MM-DD-{slug}
 ```
+````
 
-The `postlist::` directive at the top of the index will automatically pick up the new post for the recent posts listing.
+The `postlist` directive at the top of the index will automatically pick up the new post for the recent posts listing.
 
 ### 7. Open the development pull request
 
@@ -147,7 +148,7 @@ public-site browser gate.
 ```bash
 git add _blog/{series}/published/{post}.md \
   docs/blog/YYYY-MM-DD-{slug}.md docs/blog/images/{image}.png \
-  docs/blog/index.rst
+  docs/blog/index.md
 git commit -m "docs(blog): publish {title}"
 ```
 
@@ -189,7 +190,7 @@ The post will appear at `https://benchbox.dev/blog/YYYY-MM-DD-{slug}/` and will 
 - [ ] `_blog/` archive keeps `../images/` links; `docs/blog/` copy uses `./images/`
 - [ ] Companion links use exact date-prefixed filenames in `docs/blog/`
 - [ ] Post copied to `docs/blog/` in the same repository
-- [ ] Post added to `docs/blog/index.rst` toctree
+- [ ] Post added to `docs/blog/index.md` toctree
 - [ ] Development PR checks pass against `develop`
 - [ ] Site published via candidate build plus `github-pages`-approved transaction
 - [ ] Signed live receipt verified; post checked live at `https://benchbox.dev/blog/`

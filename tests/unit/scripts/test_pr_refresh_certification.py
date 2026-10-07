@@ -379,6 +379,11 @@ def test_fallback_unknown_path() -> None:
     assert result.reasons == [REASON_UNKNOWN_PATH]
 
 
+def test_website_paths_are_known_roots() -> None:
+    result = classify(_eligible_request(authored_paths=["website/src/pages/index.astro"]))
+    assert REASON_UNKNOWN_PATH not in result.reasons
+
+
 def test_fallback_missing_path_evidence() -> None:
     result = classify(_eligible_request(authored_paths=None, intervening_paths=None))
     assert result.decision == DECISION_FULL

@@ -1,0 +1,57 @@
+# ClickHouse TPC-H Tuned Configuration
+# Sort keys and partitions are rendered into MergeTree DDL at CREATE TABLE time.
+# Constraints are disabled: ClickHouse has no enforced constraints and the sort key
+# is the primary index, so nothing here needs a primary key that matches it.
+
+primary_keys:
+  enabled: false
+
+foreign_keys:
+  enabled: false
+
+unique_constraints:
+  enabled: false
+
+check_constraints:
+  enabled: false
+
+platform_optimizations:
+  z_ordering_enabled: false
+  z_ordering_columns: []
+  auto_optimize_enabled: false
+  auto_compact_enabled: false
+  bloom_filters_enabled: false
+  bloom_filter_columns: []
+  materialized_views_enabled: false
+
+table_tunings:
+  LINEITEM:
+    table_name: LINEITEM
+    partitioning:
+    - name: L_SHIPDATE
+      type: DATE
+      order: 1
+    sorting:
+    - name: L_SHIPDATE
+      type: DATE
+      order: 1
+    - name: L_ORDERKEY
+      type: INTEGER
+      order: 2
+    - name: L_LINENUMBER
+      type: INTEGER
+      order: 3
+
+  ORDERS:
+    table_name: ORDERS
+    partitioning:
+    - name: O_ORDERDATE
+      type: DATE
+      order: 1
+    sorting:
+    - name: O_ORDERDATE
+      type: DATE
+      order: 1
+    - name: O_ORDERKEY
+      type: INTEGER
+      order: 2

@@ -13,6 +13,7 @@ from __future__ import annotations
 import inspect
 import logging
 from abc import abstractmethod
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -229,6 +230,26 @@ class DataLoadingError(RuntimeError):
         self.per_table_stats = per_table_stats or {}
 
 
+def _describe_query_parameters(benchmark_config: Any) -> str | None:
+    from benchbox.core.tpch.dataframe_queries import TPCH_FAMILY_DATAFRAME_IDS
+
+    benchmark_id = normalize_benchmark_id(benchmark_config.name)
+    if benchmark_id in TPCH_FAMILY_DATAFRAME_IDS:
+        from benchbox.core.tpch.benchmark import describe_query_parameters
+
+        seed = (getattr(benchmark_config, "options", {}) or {}).get("seed")
+        return describe_query_parameters(None if seed is None else int(seed))
+    if benchmark_id != "tpcds":
+        return None
+    from benchbox.core.tpcds.dataframe_queries.production_binding import (
+        describe_query_parameters,
+        run_seed,
+        selected_query_numbers,
+    )
+
+    return describe_query_parameters(run_seed(benchmark_config), selected_query_numbers(benchmark_config))
+
+
 def _client_host_profile(system_profile: Any) -> dict[str, Any]:
     """Return the client-host profile dict for a DataFrame run.
 
@@ -443,6 +464,7 @@ class BenchmarkExecutionMixin:
                 query_subset=getattr(benchmark_config, "queries", None),
                 tuning_mode=options_map.get("tuning_mode"),
                 tuning_config=options_map.get("df_tuning_config"),
+                query_parameters=_describe_query_parameters(benchmark_config),
             )
         )
 
@@ -1221,29 +1243,42 @@ class BenchmarkExecutionMixin:
 
         console.print(f"\n[yellow]Running {warmup_iterations} warmup iteration(s)...[/yellow]")
         for warmup_iter in range(warmup_iterations):
+            warmup_stream_id = warmup_iter
             warmup_queries = self._filter_queries(
-                self._get_queries_for_benchmark(benchmark_config, benchmark_instance, stream_id=0),
+                self._get_queries_for_benchmark(benchmark_config, benchmark_instance, stream_id=warmup_stream_id),
                 skip_query_ids,
                 query_filter,
             )
 
-            console.print(f"[dim]Warmup {warmup_iter + 1}/{warmup_iterations} (stream 0)[/dim]")
-            for query in warmup_queries:
-                try:
-                    result = self.execute_query(ctx, query)
-                    result = dict(result)
-                except Exception as e:
-                    logger.warning(f"Warmup query {query.query_id} failed: {e}")
-                    result = {
-                        "query_id": query.query_id,
-                        "status": "FAILED",
-                        "error": str(e),
-                        "execution_time_seconds": 0.0,
-                    }
-                result["iteration"] = 0
-                result["stream_id"] = 0
-                result["run_type"] = "warmup"
-                query_results.append(result)
+            console.print(f"[dim]Warmup {warmup_iter + 1}/{warmup_iterations} (stream {warmup_stream_id})[/dim]")
+            with self._stream_parameter_scope(benchmark_config, warmup_stream_id):
+                for query in warmup_queries:
+                    try:
+                        result = self.execute_query(ctx, query)
+                        result = dict(result)
+                    except Exception as e:
+                        logger.warning(f"Warmup query {query.query_id} failed: {e}")
+                        result = {
+                            "query_id": query.query_id,
+                            "status": "FAILED",
+                            "error": str(e),
+                            "execution_time_seconds": 0.0,
+                        }
+                    result["iteration"] = 0
+                    result["stream_id"] = warmup_stream_id
+                    result["run_type"] = "warmup"
+                    query_results.append(result)
+
+    @staticmethod
+    def _stream_parameter_scope(benchmark_config: BenchmarkConfig, stream_id: int) -> AbstractContextManager[None]:
+        from benchbox.core.tpch.dataframe_queries import TPCH_FAMILY_DATAFRAME_IDS, seeded_parameter_overrides
+
+        if normalize_benchmark_id(benchmark_config.name) not in TPCH_FAMILY_DATAFRAME_IDS:
+            return nullcontext()
+
+        seed = (getattr(benchmark_config, "options", {}) or {}).get("seed")
+        scale_factor = getattr(benchmark_config, "scale_factor", 1.0)
+        return seeded_parameter_overrides(None if seed is None else int(seed), scale_factor, stream_id)
 
     def _run_measurement_iterations(
         self,
@@ -1288,24 +1323,25 @@ class BenchmarkExecutionMixin:
             )
 
             iteration_results: list[dict[str, Any]] = []
-            for i, query in enumerate(measurement_queries, 1):
-                if run_options and (run_options.verbose or run_options.very_verbose):
-                    console.print(f"[blue]Executing query {i}/{total_queries}: {query.query_id}[/blue]")
+            with self._stream_parameter_scope(benchmark_config, measurement_stream_id):
+                for i, query in enumerate(measurement_queries, 1):
+                    if run_options and (run_options.verbose or run_options.very_verbose):
+                        console.print(f"[blue]Executing query {i}/{total_queries}: {query.query_id}[/blue]")
 
-                result = self._execute_single_measurement_query(
-                    ctx=ctx,
-                    query=query,
-                    capture_plans=capture_plans,
-                    supports_profiled=supports_profiled,
-                    supports_capture_plan_kw=supports_capture_plan_kw,
-                    profiled_runner=profiled_runner,
-                    iteration=iteration + 1,
-                    stream_id=measurement_stream_id,
-                    monitor=monitor,
-                )
-                query_results.append(result)
-                executed_query_ids.append(str(query.query_id).strip().upper())
-                iteration_results.append(result)
+                    result = self._execute_single_measurement_query(
+                        ctx=ctx,
+                        query=query,
+                        capture_plans=capture_plans,
+                        supports_profiled=supports_profiled,
+                        supports_capture_plan_kw=supports_capture_plan_kw,
+                        profiled_runner=profiled_runner,
+                        iteration=iteration + 1,
+                        stream_id=measurement_stream_id,
+                        monitor=monitor,
+                    )
+                    query_results.append(result)
+                    executed_query_ids.append(str(query.query_id).strip().upper())
+                    iteration_results.append(result)
 
             self._print_iteration_summary(
                 iteration + 1,

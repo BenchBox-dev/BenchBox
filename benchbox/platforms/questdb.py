@@ -41,7 +41,7 @@ from ..utils.dependencies import (
     get_dependency_error_message,
 )
 from ..utils.file_format import get_data_extension
-from .base import DriverIsolationCapability, PlatformAdapter, PsycopgConnectionMixin, StreamConnectionCapability
+from .base import DriverIsolationCapability, PlatformAdapter, PsycopgConnectionMixin
 from .base.data_loading import (
     CsvDialect,
     DataSourceResolver,
@@ -130,15 +130,6 @@ class QuestDBAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     _max_identifier_length = 127  # QuestDB supports identifiers up to 127 chars (PostgreSQL caps at 63)
-    # QuestDB is a server engine over the PG wire protocol: one psycopg
-    # connection is one session, so streams need independent connections
-    # (QuestDBAdapter is NOT a PostgreSQLAdapter subclass, so this needs its
-    # own override below - the manifest sweep fails the build otherwise).
-    # Connection params come from QuestDB._get_connection_params, autocommit
-    # is restored inline by the override (required over the PG wire), and
-    # tuning by QuestDB.configure_for_benchmark (cairo parallel-filter
-    # SETs). See StreamConnectionCapability dimensions.
-    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     @property
     def platform_name(self) -> str:

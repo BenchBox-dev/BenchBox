@@ -49,6 +49,8 @@ def test_canonical_cohort_identity_preserves_alias_and_unknown_phase() -> None:
     assert canonical_benchmark_slug(" SSB ") == "ssb"
     assert canonical_phase(None) == "unknown"
     assert canonical_phase(" POWER ") == "power"
+    assert canonical_phase(" Standard ") == "power"
+    assert canonical_phase("throughput") == "throughput"
 
 
 # ---------------------------------------------------------------------------

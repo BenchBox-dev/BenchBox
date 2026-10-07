@@ -6,8 +6,9 @@ export function LoadingSpinner({ message = "Loading..." }: LoadingSpinnerProps) 
   return (
     <section
       role="status"
+      aria-label={message}
       aria-live="polite"
-      aria-busy="true"
+      aria-atomic="true"
       class="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8"
     >
       <p class="mb-4 text-sm font-medium text-[var(--bb-data-fg-muted)]">{message}</p>
@@ -93,7 +94,7 @@ export function MetaLeaderboardSkeleton({
 
 export function BenchmarkMatrixSkeleton({ message = "Loading matrix..." }: LoadingSpinnerProps) {
   return (
-    <section role="status" aria-live="polite" aria-busy="true" class="space-y-4">
+    <section role="status" aria-label={message} aria-live="polite" aria-atomic="true" class="space-y-4">
       <p class="text-sm font-medium text-[var(--bb-data-fg-muted)]">{message}</p>
       <div class="overflow-x-auto rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm">
         <table aria-hidden="true" class="min-w-full text-sm">
@@ -131,8 +132,9 @@ export function QueryRowsSkeleton({
   return (
     <section
       role="status"
+      aria-label={message}
       aria-live="polite"
-      aria-busy="true"
+      aria-atomic="true"
       class="overflow-hidden rounded-lg border border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] shadow-sm"
     >
       <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3">
@@ -179,8 +181,9 @@ export function CompareSummarySkeleton({
   return (
     <section
       role="status"
+      aria-label={message}
       aria-live="polite"
-      aria-busy="true"
+      aria-atomic="true"
       class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8"
     >
       <p class="mb-4 text-sm font-medium text-[var(--bb-data-fg-muted)]">{message}</p>

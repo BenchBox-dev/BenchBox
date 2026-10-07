@@ -298,6 +298,7 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
             "max_threads",
             "disable_result_cache",
             "compression",
+            "optimize_after_load",
         ]:
             if key in config and config[key] is not None:
                 adapter_config[key] = config[key]
@@ -917,6 +918,7 @@ class ClickHouseCloudAdapter(ClickHouseAdapter):
                     effective_tuning = self.get_effective_tuning_configuration()
                     if effective_tuning is not None:
                         self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
+                        self.run_post_load_tunings(table_name_lower, effective_tuning, connection)
 
                     load_time = elapsed_seconds(load_start)
                     self.logger.info(
@@ -1087,6 +1089,7 @@ _build_clickhouse_cloud_config = make_registered_platform_config_builder(
         "max_execution_time",
         "disable_result_cache",
         "compression",
+        "optimize_after_load",
     ],
 )
 

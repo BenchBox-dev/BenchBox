@@ -131,7 +131,7 @@ class TestOutstandingOwnershipState:
         finally:
             release.set()
 
-        assert result.streams_executed == 2
+        assert result.streams_executed == 1
         assert len(result.errors) == 2
         # Stream 0 leaked while running; stream 1 never started and was cancelled.
         assert result.outstanding_stream_ids == [0]

@@ -5,6 +5,7 @@ into all six adapters, and bakes in the capture_plans + status=="SUCCESS" guard
 universally.
 """
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -190,3 +191,114 @@ class TestExecuteQueryWithPlanCapture:
         )
         assert result == {"status": "SUCCESS"}
         assert host.capture_calls == []
+
+
+class _MetadataHost(ResultCaptureMixin):
+    table_mode = "native"
+    external_format = None
+
+    def _hash_connection_config(self, connection_config):
+        return "connection-hash"
+
+    def get_sorted_ingestion_metadata(self):
+        return None
+
+    def get_post_load_maintenance_metadata(self):
+        return None
+
+    def build_post_load_maintenance_phase(self):
+        return None
+
+    def _build_tuning_profile_metadata(self, run_config):
+        return None
+
+
+@pytest.mark.parametrize(
+    "name,seed,expected",
+    [
+        ("tpch", None, "qgen -d (TPC-H default substitution parameters)"),
+        ("TPC-H", 17039360, "qgen -r (17039360 + 1000 * stream_id)"),
+        ("tpch", 42, "qgen -r (42 + 1000 * stream_id)"),
+    ],
+)
+def test_sql_metadata_records_the_bound_tpch_parameter_set(name, seed, expected):
+    from benchbox.core.results.result_factory import build_enhanced_benchmark_result
+    from benchbox.core.results.schema import build_result_payload
+
+    metadata, _, _ = _MetadataHost()._build_execution_metadata(
+        {"benchmark_name": name, "seed": seed, "test_execution_type": "power"}
+    )
+    assert metadata["run_config"]["query_parameters"] == expected
+    result = build_enhanced_benchmark_result(
+        benchmark=SimpleNamespace(benchmark_name="TPC-H", scale_factor=1.0),
+        platform="duckdb",
+        query_results=[],
+        execution_metadata=metadata,
+    )
+    assert build_result_payload(result)["config"]["query_parameters"] == expected
+
+
+def test_other_sql_benchmarks_keep_their_existing_metadata_shape():
+    metadata, _, _ = _MetadataHost()._build_execution_metadata({"benchmark_name": "tpcds", "seed": 42})
+    assert "query_parameters" not in metadata["run_config"]
+
+
+@pytest.mark.parametrize("seed", [None, 42])
+def test_standard_sql_metadata_records_defaults_even_with_a_requested_seed(seed):
+    metadata, _, _ = _MetadataHost()._build_execution_metadata({"benchmark_name": "tpch", "seed": seed})
+    assert metadata["run_config"]["query_parameters"] == "qgen -d (TPC-H default substitution parameters)"
+
+
+@pytest.mark.parametrize("seed", [None, 42, 7])
+def test_throughput_sql_metadata_matches_the_production_generation_convention(seed):
+    from benchbox.core.tpch.throughput_test import TPCHThroughputTest, TPCHThroughputTestConfig
+
+    calls = []
+    benchmark = SimpleNamespace(
+        get_query=lambda query_id, **kwargs: calls.append(kwargs) or "SELECT 1",
+    )
+    throughput = TPCHThroughputTest(benchmark, lambda: None)
+    config = TPCHThroughputTestConfig(num_streams=2) if seed is None else TPCHThroughputTestConfig(base_seed=seed)
+    throughput._pregenerate_stream_queries(config)
+    base_seed = config.base_seed
+    for stream in range(2):
+        emitted = [call["seed"] for call in calls if call["params"]["stream_id"] == stream]
+        assert emitted == [base_seed + 1001 * stream + position for position in range(22)]
+    metadata, _, _ = _MetadataHost()._build_execution_metadata(
+        {"benchmark_name": "tpch", "seed": seed, "test_execution_type": "throughput"}
+    )
+    assert metadata["run_config"]["query_parameters"] == (f"qgen -r ({base_seed} + 1001 * stream_id + query_position)")
+
+
+def test_fallback_sql_metadata_records_the_standard_generation_convention():
+    metadata, _, _ = _MetadataHost()._build_execution_metadata(
+        {
+            "benchmark_name": "tpch",
+            "seed": 7,
+            "test_execution_type": "throughput",
+            "_effective_execution_type": "power",
+        }
+    )
+    assert metadata["run_config"]["query_parameters"] == "qgen -d (TPC-H default substitution parameters)"
+
+
+def test_combined_sql_metadata_describes_only_the_requested_query_phases():
+    metadata, _, _ = _MetadataHost()._build_execution_metadata(
+        {
+            "benchmark_name": "tpch",
+            "seed": 7,
+            "test_execution_type": "combined",
+            "options": {"requested_phases": ["throughput", "maintenance"]},
+        }
+    )
+    assert metadata["run_config"]["query_parameters"] == (
+        "throughput: qgen -r (7 + 1001 * stream_id + query_position); "
+        "maintenance: not applicable (TPC-H refresh functions)"
+    )
+
+
+def test_maintenance_sql_metadata_does_not_claim_qgen_substitution_parameters():
+    metadata, _, _ = _MetadataHost()._build_execution_metadata(
+        {"benchmark_name": "tpch", "seed": 7, "test_execution_type": "maintenance"}
+    )
+    assert metadata["run_config"]["query_parameters"] == "not applicable (TPC-H refresh functions)"

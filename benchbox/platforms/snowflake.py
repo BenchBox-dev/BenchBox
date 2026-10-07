@@ -59,6 +59,7 @@ class SnowflakeAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
+    physical_identifier_case = "upper"
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -850,6 +851,7 @@ class SnowflakeAdapter(PlatformAdapter):
                 effective_tuning = self.get_effective_tuning_configuration()
                 if effective_tuning is not None:
                     self.apply_ctas_sort(table_name_upper, effective_tuning, connection)
+                    self.run_post_load_tunings(table_name_upper, effective_tuning, connection)
 
             # Fail fast: loads are full refreshes, so a failed table must
             # abort the run instead of benchmarking a wiped table.
@@ -1905,8 +1907,9 @@ class SnowflakeAdapter(PlatformAdapter):
         cursor = connection.cursor()
         try:
             # Snowflake automatically maintains statistics, but we can trigger clustering
-            cursor.execute(f"ALTER TABLE {table_name.upper()} RECLUSTER")
-            self.logger.info(f"Triggered reclustering for table {table_name.upper()}")
+            physical_table = self.resolve_physical_table(table_name, connection)
+            cursor.execute(f"ALTER TABLE {physical_table} RECLUSTER")
+            self.logger.info(f"Triggered reclustering for table {physical_table}")
         finally:
             cursor.close()
 
@@ -1919,9 +1922,9 @@ class SnowflakeAdapter(PlatformAdapter):
         in a recording connection), so this supplies the catalog side that lets
         them be corroborated instead of classified ``unverifiable``.
         """
-        from benchbox.platforms.snowflake_introspection import SnowflakeTuningIntrospector
+        from benchbox.platforms.base import tuning_trust
 
-        return SnowflakeTuningIntrospector(schema=self.schema)
+        return tuning_trust.snowflake_tuning_introspector(self.schema)
 
     def close_connection(self, connection: Any) -> None:
         """Close Snowflake connection."""
@@ -1983,6 +1986,34 @@ class SnowflakeAdapter(PlatformAdapter):
 
         return " ".join(clauses)
 
+    def _reset_run_scoped_state(self) -> None:
+        super()._reset_run_scoped_state()
+        self._resume_recluster_tables = set()
+
+    def _pending_resume_recluster(self) -> set[str]:
+        pending = getattr(self, "_resume_recluster_tables", None)
+        if pending is None:
+            pending = set()
+            self._resume_recluster_tables = pending
+        return pending
+
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> bool:
+        physical_table = self.resolve_physical_table(table_name, connection)
+        pending = self._pending_resume_recluster()
+        if physical_table not in pending:
+            return False
+        pending.discard(physical_table)
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"ALTER TABLE {physical_table} RESUME RECLUSTER")
+            self.logger.info(f"Enabled automatic clustering for {physical_table}")
+        except Exception as e:
+            self.logger.warning(f"Could not enable automatic clustering for {physical_table}: {e}")
+            self.note_post_load_maintenance_failure()
+        finally:
+            cursor.close()
+        return True
+
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         """Apply tuning configurations to a Snowflake table.
 
@@ -2001,7 +2032,7 @@ class SnowflakeAdapter(PlatformAdapter):
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name.upper()
+        table_name = self.resolve_physical_table(table_tuning.table_name, connection)
         self.logger.info(f"Applying Snowflake tunings for table: {table_name}")
 
         cursor = connection.cursor()
@@ -2058,13 +2089,8 @@ class SnowflakeAdapter(PlatformAdapter):
                         cursor.execute(cluster_sql)
                         self.logger.info(f"Applied clustering key to {table_name}: {', '.join(clustering_columns)}")
 
-                        # Enable automatic clustering if desired
                         if len(clustering_columns) <= 4:  # Snowflake recommendation
-                            try:
-                                cursor.execute(f"ALTER TABLE {table_name} RESUME RECLUSTER")
-                                self.logger.info(f"Enabled automatic clustering for {table_name}")
-                            except Exception as e:
-                                self.logger.debug(f"Could not enable automatic clustering for {table_name}: {e}")
+                            self._pending_resume_recluster().add(table_name)
 
                     except Exception as e:
                         self.logger.warning(f"Failed to apply clustering key to {table_name}: {e}")
@@ -2072,17 +2098,19 @@ class SnowflakeAdapter(PlatformAdapter):
                     self.logger.info(f"Table {table_name} already has desired clustering key: {current_clustering}")
                     ledger = getattr(self, "_applied_tuning_ledger", None)
                     if ledger is not None:
-                        ledger.record_dropped(cluster_sql, "already present in Snowflake catalog; ALTER skipped")
+                        from benchbox.core.tuning.applied_ledger import SATISFIED_BY_PREEXISTING_STATE
+
+                        ledger.record_satisfied(
+                            cluster_sql,
+                            SATISFIED_BY_PREEXISTING_STATE,
+                            "already present in Snowflake catalog; ALTER skipped",
+                        )
 
                     # A reused table can have the right key while Automatic
                     # Clustering is suspended. The key check and maintenance
                     # state are independent catalog facts.
                     if len(clustering_columns) <= 4 and not automatic_clustering_on:
-                        try:
-                            cursor.execute(f"ALTER TABLE {table_name} RESUME RECLUSTER")
-                            self.logger.info(f"Enabled automatic clustering for {table_name}")
-                        except Exception as e:
-                            self.logger.debug(f"Could not enable automatic clustering for {table_name}: {e}")
+                        self._pending_resume_recluster().add(table_name)
 
             # Handle sorting - in Snowflake, this is achieved through clustering
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)

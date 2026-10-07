@@ -295,9 +295,12 @@ Performance and execution control settings.
 | `enabled` | boolean | `false` | Enable concurrent query streams |
 | `max_concurrent` | integer | `2` | Number of concurrent query streams |
 | `query_timeout_seconds` | integer | `300` | Per-query timeout in concurrent mode |
-| `stream_timeout_seconds` | integer | `3600` | Timeout for an entire concurrent stream |
+| `stream_timeout_seconds` | integer | unset | Timeout in seconds for each throughput stream in `benchbox run`. Unset keeps the benchmark default (3600 for TPC-H, 7200 for TPC-DS) |
+| `cancel_on_timeout` | boolean | `false` | Signal a timed-out throughput stream to stop before its next query |
 | `retry_failed_queries` | boolean | `true` | Retry failed queries in concurrent streams |
 | `max_retries` | integer | `3` | Maximum retry attempts per query |
+
+Only `stream_timeout_seconds` and `cancel_on_timeout` are read by `benchbox run`. The other settings are read only through `ExecutionConfigHelper`.
 
 ### `tuning`
 

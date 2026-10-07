@@ -13,10 +13,12 @@ subclass overrides respectively per refactor map §3.
 
 from __future__ import annotations
 
+import inspect
 import logging
 import sys
+from contextlib import contextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator
 
 from benchbox.utils.printing import quiet_console
 
@@ -134,12 +136,33 @@ class ConnectionLifecycleMixin:
     def get_connection_from_pool(self) -> Any:
         """Get connection from pool (if supported by platform).
 
+        Without a pool this creates a fresh connection, matching the call
+        shape each adapter's ``create_connection`` declares: adapters that
+        accept arbitrary keywords receive the whole platform config, an
+        adapter that declares a single ``connection_config`` dict receives
+        the config as that mapping, and an adapter that takes no arguments
+        is called bare. This keeps Glue (no-arg) and MotherDuck
+        (single-dict) working while preserving today's behaviour for every
+        ``**connection_config`` adapter.
+
         Returns:
             Database connection from pool or new connection
         """
         if self.connection_pool:
             return self.connection_pool.get_connection()
-        return self.create_connection(**self.platform_config)
+        return self._create_unpooled_connection()
+
+    def _create_unpooled_connection(self) -> Any:
+        """Create a fresh connection using the adapter's declared signature."""
+        try:
+            parameters = inspect.signature(self.create_connection).parameters
+        except (TypeError, ValueError):
+            return self.create_connection(**self.platform_config)
+        if any(param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters.values()):
+            return self.create_connection(**self.platform_config)
+        if "connection_config" in parameters:
+            return self.create_connection(connection_config=dict(self.platform_config))
+        return self.create_connection()
 
     def get_database_path(self, **connection_config) -> str | None:
         """Get the database file path for file-based databases.
@@ -184,6 +207,23 @@ class ConnectionLifecycleMixin:
         """
         return None
 
+    @contextmanager
+    def non_destructive_connection_context(self) -> Iterator[None]:
+        """Guard extra mid-run connections against create/drop handling.
+
+        Helpers that must open their own connection mid-run (metadata capture,
+        introspection, link probe, statistics) wrap the open in this context so
+        the resulting `handle_existing_database` call takes the validation
+        early-return instead of validating an unfinished database and removing
+        it. Restores the prior flag value on exit; safe to nest.
+        """
+        prior = getattr(self, "_validating_database", False)
+        self._validating_database = True
+        try:
+            yield
+        finally:
+            self._validating_database = prior
+
     def handle_existing_database(self, **connection_config) -> None:
         """Handle existing database non-interactively for core/programmatic usage.
 
@@ -218,6 +258,16 @@ class ConnectionLifecycleMixin:
             self.log_very_verbose("Inside validation context - skipping reuse/recreate logic.")
             return
 
+        # Once-per-run decision: the first call above decides reuse/recreate for
+        # the whole run. Any later connection (metadata, introspection, link
+        # probe, statistics helpers) must not re-validate an empty database and
+        # drop the run's own database mid-run. Reset per run (see
+        # _reset_run_scoped_state and _execute_load_only_mode).
+        if getattr(self, "_existing_db_decided", False):
+            self.log_very_verbose("Existing-database decision already made for this run - skipping.")
+            return
+        self._existing_db_decided = True
+
         self.log_very_verbose("Checking if database exists...")
         if not self.check_database_exists(**connection_config):
             self.log_very_verbose("Database does not exist. Returning.")
@@ -248,8 +298,19 @@ class ConnectionLifecycleMixin:
                 self.logger.warning(f"⚠️ {warning}")
 
         if validation_result.issues:
+            from benchbox.core.tuning.metadata import NO_TUNING_METADATA_ERROR
+
+            fresh_database_issue = f"Tuning: {NO_TUNING_METADATA_ERROR}"
             for issue in validation_result.issues:
-                self.logger.error(f"❌ {issue}")
+                if getattr(validation_result, "database_empty", False) and (
+                    issue == fresh_database_issue or issue.startswith("Missing tables:")
+                ):
+                    # A database holding none of the benchmark's tables is
+                    # recreated either way; reporting the expected absence as
+                    # an error misleads, so it stays in verbose output only.
+                    self.log_verbose(issue)
+                else:
+                    self.logger.error(f"❌ {issue}")
 
         if validation_result.is_valid:
             self.log_verbose("Database is configured for this run")
@@ -303,6 +364,26 @@ class ConnectionLifecycleMixin:
         keep counting against a catalog quota.
         """
         return False
+
+    def fail_closed_on_force_recreate(self, *, platform_label: str, database: str | None, manual_hint: str) -> None:
+        """Refuse ``--force-recreate`` when the adapter cannot recreate the database.
+
+        Fail-closed guard for adapters without a docs-supported automatic drop path: on a real (non-dry)
+        run with ``force_recreate`` set, raise a clear error naming the platform and telling the user to
+        drop the database manually, instead of silently reusing it. No-op when ``force_recreate`` is unset
+        or the run is a dry run (which changes nothing and must stay plannable).
+        """
+        if not getattr(self, "force_recreate", False):
+            return
+        if getattr(self, "dry_run", False) or getattr(self, "dry_run_mode", False):
+            self.log_verbose(f"--force-recreate has no automatic drop on {platform_label} (dry run: nothing to drop)")
+            return
+        name = database or "default"
+        raise RuntimeError(
+            f"{platform_label} does not support --force-recreate: BenchBox cannot drop "
+            f"database '{name}' automatically. {manual_hint} "
+            "Re-run without --force-recreate once the database has been removed."
+        )
 
     def drop_database(self, **connection_config) -> None:
         """Drop/remove database on server (for server-based databases).

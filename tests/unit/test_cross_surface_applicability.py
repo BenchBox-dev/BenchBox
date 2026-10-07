@@ -68,12 +68,10 @@ def test_w2_fallback_set_is_exactly_the_registry_less_benchmarks(rows):
 # cross-surface gates, so they no longer appear among the unguarded candidates.
 # tpcds_obt was previously here; its id correspondence was then explicitly
 # abandoned, so it is `abandoned` instead. datavault was previously here too;
-# it is now an enforced cross-surface gate.)
-# tpcds is a STAGED gate (registered but not CI-enforced): its
-# expression/pandas implementations are separately handwritten per query, but
-# the verbatim id overlap is still zero, so it stays candidate-unverified
-# until the mapping is verified.
-_CANDIDATE_UNVERIFIED_BENCHMARKS = {"tpcds"}
+# it is now an enforced cross-surface gate.
+# tpcds was previously here; its builder now pins every SQL statement to its
+# DataFrame registry entry and it is an enforced cross-surface gate.)
+_CANDIDATE_UNVERIFIED_BENCHMARKS: set[str] = set()
 
 # Benchmarks that cannot land as a routine-PR gate because they reject the
 # bounded SF=0.01 cell, fetch a canonical dataset via data_manifest.toml, or
@@ -177,14 +175,14 @@ def test_data_provenance_detects_downloaders_with_bounded_offline_exception():
 def test_staged_gates_are_marked_not_unguarded(rows):
     """Staged (registered but not CI-enforced) candidates are marked as staged."""
     by_id = {r["benchmark"]: r for r in rows}
-    # flightdata and datavault both graduated to enforced GATES, so neither is
-    # a candidate anymore, and tpch, tpch_skew, nyctaxi, and tsbs_devops are
-    # enforced too. tpcds is the only staged gate: registered in
-    # STAGED_GATES but not CI-enforced, so it is drilled here and marked staged.
+    # flightdata, datavault, tpch, tpch_skew, nyctaxi, tsbs_devops and tpcds all
+    # graduated to enforced GATES, so none of them is a candidate and no gate is
+    # staged.
     assert "flightdata" not in by_id
     assert "datavault" not in by_id
+    assert "tpcds" not in by_id
     staged = {r["benchmark"] for r in rows if r.get("staged")}
-    assert staged == {"tpcds"}, f"staged set changed: {sorted(staged)}"
+    assert staged == set(), f"staged set changed: {sorted(staged)}"
     assert by_id["joinorder"].get("staged") is False
 
 

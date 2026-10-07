@@ -1,14 +1,3 @@
-"""Pin CONTRIBUTING.md to the arm-the-exact-head, monitor-to-merge policy.
-
-A PR is done when it is merged. The author arms the exact head with
-``gh pr merge <n> --squash --match-head-commit <head>`` and monitors the queue; a
-push after arming is handled by arming the new head, not by holding PRs back.
-``auto-merge-on-open.yml`` is revoke-only. CONTRIBUTING used to teach that
-``make pr-open`` withholds auto-merge until a human runs ``make pr-ready``, which
-turned every green PR into a hand-back. This module is a cheap docs contract so
-that drift back to that wording fails in the fast unit lane.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -51,8 +40,9 @@ def test_contributing_documents_arming_the_exact_head_and_monitoring_to_merge(co
         "[WRITE-CLOSEOUT-001]",
     ):
         assert required in contributing_text, f"CONTRIBUTING missing cue {required!r}"
-    # The workflow is documented as revoke-only: there is no draft-to-ready arm path.
-    assert "only revokes and never arms" in contributing_text
+    assert "blocks arming only" in contributing_text
+    assert "gh pr merge <n> --disable-auto" in contributing_text
+    assert "auto-merge-on-open" not in contributing_text
 
 
 def test_contributing_does_not_teach_holding_a_finished_pr(contributing_text: str) -> None:

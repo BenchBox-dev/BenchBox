@@ -126,6 +126,7 @@ class ClickHouseSetupMixin:
         self.max_memory_usage = config.get("max_memory_usage", "0")  # Let cloud manage
         self.max_execution_time = config.get("max_execution_time", 600)  # Longer timeout for cloud
         self.max_threads = config.get("max_threads", 0)  # Let cloud manage
+        self.send_receive_timeout = config.get("send_receive_timeout", 300)
 
         # Result cache control - disable by default for accurate benchmarking
         self.disable_result_cache = config.get("disable_result_cache", True)
@@ -227,7 +228,11 @@ class ClickHouseSetupMixin:
         database = connection_config.get("database", self.database)
 
         try:
-            self._ensure_server_database_exists(database, **connection_config)
+            # `database` is also a key of connection_config whenever the caller
+            # forwards the platform config, so drop it here to avoid passing
+            # the same argument positionally and by keyword.
+            admin_kwargs = {key: value for key, value in connection_config.items() if key != "database"}
+            self._ensure_server_database_exists(database, **admin_kwargs)
             client = ClickHouseClient(
                 **params,
                 database=database,

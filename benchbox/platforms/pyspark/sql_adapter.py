@@ -34,9 +34,6 @@ class PySparkSQLAdapter(SparkAdapter):
         """Create or reuse the shared SparkSession via SparkSessionManager."""
         self.log_operation_start("PySpark SQL session")
 
-        # Ensure existing warehouse/database handling remains consistent
-        self.handle_existing_database(**connection_config)
-
         extra_configs = self._get_spark_conf()
 
         try:
@@ -52,6 +49,11 @@ class PySparkSQLAdapter(SparkAdapter):
             )
             self._session_claimed = True
             self._spark_session = spark
+
+            # Decide reuse/recreate after the session exists: the check queries the
+            # session catalog, so running it earlier always reports no database and
+            # force_recreate never acts.
+            self.handle_existing_database(**connection_config)
 
             target_database = connection_config.get("database", self.database)
 

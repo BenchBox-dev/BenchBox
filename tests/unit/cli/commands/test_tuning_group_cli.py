@@ -8,6 +8,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import sys as _sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -254,6 +255,138 @@ class TestTuningValidate:
                 obj=_obj(),
             )
         assert any("error" in call.lower() for call in calls)
+
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+
+
+def _run_validate(args):
+    runner = CliRunner()
+    calls = []
+    with patch.object(_tuning_group_module, "console") as mock_console:
+        mock_console.print.side_effect = lambda *a, **k: calls.append(" ".join(str(x) for x in a))
+        result = runner.invoke(tuning_group, ["validate", *args], obj=_obj())
+    return result, "\n".join(calls)
+
+
+class TestTuningValidateSql:
+    def test_shipped_duckdb_template_validates(self):
+        template = REPO_ROOT / "examples/tunings/duckdb/tpch_tuned.yaml"
+
+        result, output = _run_validate([str(template), "--platform", "duckdb"])
+
+        assert result.exit_code == 0, output
+        assert "Configuration is valid for duckdb" in output
+        assert "Enabled tuning types: 4" in output
+
+    def test_sql_validation_goes_through_validate_for_platform_detailed(self):
+        template = REPO_ROOT / "examples/tunings/duckdb/tpch_tuned.yaml"
+
+        with patch(
+            "benchbox.core.tuning.interface.UnifiedTuningConfiguration.validate_for_platform_detailed",
+            return_value=(["boom for duckdb"], ["careful"]),
+        ) as detailed:
+            result, output = _run_validate([str(template), "--platform", "duckdb"])
+
+        detailed.assert_called_once_with("duckdb")
+        assert result.exit_code != 0
+        assert "boom for duckdb" in output
+        assert "careful" in output
+
+    def test_incompatible_tuning_type_is_an_error(self):
+        template = REPO_ROOT / "examples/tunings/duckdb/tpch_tuned.yaml"
+
+        result, output = _run_validate([str(template), "--platform", "bigquery"])
+
+        assert result.exit_code != 0
+        assert "Tuning type 'sorting' is not supported by platform 'bigquery'" in output
+        assert "Configuration has errors" in output
+
+    def test_registry_unrendered_type_is_reported_as_warning(self):
+        template = REPO_ROOT / "examples/tunings/databricks/tpch_tuned.yaml"
+
+        result, output = _run_validate([str(template), "--platform", "databricks"])
+
+        assert result.exit_code == 0, output
+        assert "'distribution' is accepted by platform 'databricks' but not rendered yet" in output
+        assert "Configuration is valid but has warnings" in output
+
+    def test_platform_alias_resolves_to_registry_key(self):
+        template = REPO_ROOT / "examples/tunings/duckdb/tpch_tuned.yaml"
+
+        with patch(
+            "benchbox.core.tuning.interface.UnifiedTuningConfiguration.validate_for_platform_detailed",
+            return_value=([], []),
+        ) as detailed:
+            result, _ = _run_validate([str(template), "--platform", "clickhouse-local"])
+
+        detailed.assert_called_once_with("clickhouse")
+        assert result.exit_code == 0
+
+    def test_unknown_platform_is_rejected_with_choices(self):
+        template = REPO_ROOT / "examples/tunings/duckdb/tpch_tuned.yaml"
+
+        result, _ = _run_validate([str(template), "--platform", "no-such-platform"])
+
+        assert result.exit_code == 2
+        assert "unknown platform 'no-such-platform'" in result.output
+        assert "duckdb" in result.output
+
+    def test_dataframe_file_is_rejected_for_sql_platform(self):
+        template = REPO_ROOT / "examples/tunings/dataframe/polars_optimized.yaml"
+
+        result, output = _run_validate([str(template), "--platform", "duckdb"])
+
+        assert result.exit_code != 0
+        assert "is a DataFrame tuning file" in output
+
+    def test_empty_file_is_rejected(self, tmp_path):
+        empty = tmp_path / "empty.yaml"
+        empty.write_text("")
+
+        result, output = _run_validate([str(empty), "--platform", "duckdb"])
+
+        assert result.exit_code != 0
+        assert "Configuration file is empty" in output
+
+
+class TestTuningValidateMode:
+    def test_sql_datafusion_file_validates_with_mode_sql(self, tmp_path):
+        target = tmp_path / "datafusion_tuned.yaml"
+        target.write_text("table_tunings: {}\n")
+
+        result, output = _run_validate([str(target), "--platform", "datafusion", "--mode", "sql"])
+
+        assert result.exit_code == 0, output
+        assert "Enabled tuning types: 4" in output
+
+    def test_dataframe_file_rejected_with_mode_sql(self):
+        template = REPO_ROOT / "examples/tunings/dataframe/polars_optimized.yaml"
+
+        result, output = _run_validate([str(template), "--platform", "datafusion", "--mode", "sql"])
+
+        assert result.exit_code != 0
+        assert "DataFrame tuning file" in output
+
+    def test_auto_datafusion_validates_dataframe_file(self, tmp_path):
+        from benchbox.core.dataframe.tuning import get_smart_defaults, save_dataframe_tuning
+
+        target = tmp_path / "datafusion_df.yaml"
+        save_dataframe_tuning(get_smart_defaults("datafusion"), target, platform="datafusion")
+
+        result, output = _run_validate([str(target), "--platform", "datafusion"])
+
+        assert result.exit_code == 0, output
+        assert "Configuration is valid for datafusion" in output
+
+    def test_dataframe_mode_rejected_for_sql_platform(self, tmp_path):
+        target = tmp_path / "tuned.yaml"
+        target.write_text("table_tunings: {}\n")
+
+        result, output = _run_validate([str(target), "--platform", "duckdb", "--mode", "dataframe"])
+
+        assert result.exit_code != 0
+        assert "does not support DataFrame mode" in output
 
 
 class TestTuningDefaults:

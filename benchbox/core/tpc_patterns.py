@@ -15,8 +15,6 @@ def generate_official_benchmark_audit_trail(
     result: Any,
     benchmark_title: str,
     benchmark_slug: str,
-    qph_label: str,
-    qph_attr: str,
     output_file: Optional[Union[str, Path]] = None,
 ) -> Path:
     """Write the shared audit trail format used by official TPC benchmarks."""
@@ -40,8 +38,7 @@ def generate_official_benchmark_audit_trail(
         file_obj.write(f"Total Time: {result.total_time:.3f} seconds\n\n")
 
         file_obj.write(f"Power@Size: {result.power_at_size:.2f}\n")
-        file_obj.write(f"Throughput@Size: {result.throughput_at_size:.2f}\n")
-        file_obj.write(f"{qph_label}: {getattr(result, qph_attr):.2f}\n\n")
+        file_obj.write(f"Throughput@Size: {result.throughput_at_size:.2f}\n\n")
 
         file_obj.write(f"Success: {result.success}\n")
         if result.errors:

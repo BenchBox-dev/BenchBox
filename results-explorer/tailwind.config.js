@@ -1,31 +1,14 @@
-/** @type {import('tailwindcss').Config} */
+const brandStops = [50, 100, 200, 300, 500, 600, 700, 900];
+
 export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        brand: {
-          50: "#eff6ff",
-          100: "#dbeafe",
-          200: "#bfdbfe",
-          300: "#93c5fd",
-          500: "#3b82f6",
-          600: "#2563eb",
-          700: "#1d4ed8",
-          900: "#1e3a8a",
-        },
+        brand: Object.fromEntries(brandStops.map((stop) => [stop, `var(--bb-brand-${stop})`])),
       },
       fontFamily: {
-        mono: [
-          "ui-monospace",
-          "SFMono-Regular",
-          "Menlo",
-          "Monaco",
-          "Consolas",
-          "Liberation Mono",
-          "Courier New",
-          "monospace",
-        ],
+        mono: ["var(--bb-font-mono-system)"],
       },
     },
   },

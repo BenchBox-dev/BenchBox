@@ -419,7 +419,11 @@ class DataVaultETLTransformer(CompressionMixin):
         load_timestamp: datetime,
     ) -> None:
         """Persist a manifest describing generated tables using the shared helper."""
-        from benchbox.utils.datagen_manifest import DataGenerationManifest, resolve_compression_metadata
+        from benchbox.utils.datagen_manifest import (
+            DataGenerationManifest,
+            require_manifest_files,
+            resolve_compression_metadata,
+        )
 
         manifest = DataGenerationManifest(
             output_dir=output_dir,
@@ -457,6 +461,7 @@ class DataVaultETLTransformer(CompressionMixin):
                 metadata=dialect_metadata,
             )
 
+        require_manifest_files(manifest.file_counts()[1], label="Data Vault", output_dir=output_dir)
         manifest.write()
 
     def _get_hub_sql(self, table_name: str, load_dts: str) -> str:

@@ -7,6 +7,9 @@ and are valid for SF >= 1.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -48,23 +51,30 @@ def _load_default_params() -> dict[int, dict[str, Any]]:
 
 TPCDS_DEFAULT_PARAMS: dict[int, dict[str, Any]] = _load_default_params()
 
-# Module-level parameter overrides. When set by the DataFrame run path before
-# query execution, get_parameters() merges these into the defaults. This avoids
-# changing the call signature that all 99 query functions depend on.
-_parameter_overrides: dict[int, dict[str, Any]] | None = None
+_parameter_overrides: ContextVar[dict[int, dict[str, Any]] | None] = ContextVar(
+    "tpcds_parameter_overrides", default=None
+)
 
 
 def set_parameter_overrides(overrides: dict[int, dict[str, Any]] | None) -> None:
-    """Set parameter overrides for the current benchmark run."""
-    global _parameter_overrides
-    _parameter_overrides = overrides
+    _parameter_overrides.set(overrides)
+
+
+@contextmanager
+def parameter_overrides(overrides: dict[int, dict[str, Any]]) -> Iterator[None]:
+    token = _parameter_overrides.set({**(_parameter_overrides.get() or {}), **overrides})
+    try:
+        yield
+    finally:
+        _parameter_overrides.reset(token)
 
 
 def get_parameters(query_id: int) -> TPCDSParameters:
     """Get parameters for a TPC-DS query."""
     params = dict(TPCDS_DEFAULT_PARAMS.get(query_id, {}))
-    if _parameter_overrides is not None and query_id in _parameter_overrides:
-        params.update(_parameter_overrides[query_id])
+    overrides = _parameter_overrides.get()
+    if overrides is not None and query_id in overrides:
+        params.update(overrides[query_id])
     return TPCDSParameters(query_id=query_id, params=params)
 
 

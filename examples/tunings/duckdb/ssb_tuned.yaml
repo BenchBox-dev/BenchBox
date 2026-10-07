@@ -18,7 +18,7 @@ unique_constraints:
   ignore_nulls: false
 
 check_constraints:
-  enabled: true
+  enabled: false
   enforce_on_insert: true
   enforce_on_update: true
 
@@ -34,10 +34,6 @@ platform_optimizations:
 table_tunings:
   lineorder:
     table_name: lineorder
-    partitioning:
-    - name: lo_orderdate
-      type: INTEGER
-      order: 1
     sorting:
     - name: lo_orderdate
       type: INTEGER

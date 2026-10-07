@@ -81,6 +81,35 @@ class TestManifestProvenance:
         vr = self._run({"result_source": "vendor"}, subdir="bundles/vendor")
         assert vr.ok
 
+    def test_absent_known_defects_ok(self):
+        assert self._run({}).ok
+
+    def test_valid_known_defects_ok(self):
+        assert self._run({"known_defects": ["defective-macdbgen-addresses"]}).ok
+
+    def test_multiple_known_defects_ok(self):
+        assert self._run({"known_defects": ["defective-macdbgen-addresses", "defective-windows-dsdgen-scale"]}).ok
+
+    def test_unknown_known_defect_rejected(self):
+        vr = self._run({"known_defects": ["defective-everything"]})
+        assert not vr.ok
+        assert any("known_defects" in e for e in vr.errors)
+
+    def test_non_list_known_defects_rejected(self):
+        vr = self._run({"known_defects": "defective-macdbgen-addresses"})
+        assert not vr.ok
+        assert any("known_defects" in e for e in vr.errors)
+
+    def test_empty_known_defects_rejected(self):
+        vr = self._run({"known_defects": []})
+        assert not vr.ok
+        assert any("known_defects" in e for e in vr.errors)
+
+    def test_non_string_known_defect_member_rejected(self):
+        vr = self._run({"known_defects": ["defective-macdbgen-addresses", 7]})
+        assert not vr.ok
+        assert any("known_defects" in e for e in vr.errors)
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -204,6 +233,29 @@ class TestValidateBundle:
     def test_cutoff_warn_only_for_untuned_pre_provenance_z_order(self, platform):
         data = _minimal_bundle()
         data["platform"] = platform
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert not any("provenance cutoff" in warning for warning in vr.warnings)
+
+    @pytest.mark.parametrize("tuning", [{"validation_status": "not_applicable"}, {}])
+    def test_untuned_status_only_tuning_block_still_warns(self, tuning):
+        data = self._databricks_bundle()
+        data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}
+        data["platform"]["tuning"] = tuning
+        vr = ValidationResult("test")
+        _validate_bundle(data, vr)
+        assert vr.ok, vr.errors
+        assert any("provenance cutoff" in warning for warning in vr.warnings)
+
+    @pytest.mark.parametrize(
+        "tuning",
+        [{"requested": {"table_tunings": {"t": {}}}}, {"source": "yaml", "hash": "a" * 64}],
+    )
+    def test_requested_or_legacy_tuning_evidence_suppresses_the_warning(self, tuning):
+        data = self._databricks_bundle()
+        data["platform"]["config"] = {"databricks_clustering_strategy": "z_order"}
+        data["platform"]["tuning"] = tuning
         vr = ValidationResult("test")
         _validate_bundle(data, vr)
         assert vr.ok, vr.errors

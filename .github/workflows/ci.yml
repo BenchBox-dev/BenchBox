@@ -4,19 +4,22 @@ name: CI
 # docs, landing, and tooling. The classifier maps changed paths to units
 # (.github/ci-units.yml); an untouched unit reports success immediately, and a
 # touched unit must succeed in every job it required (a skipped required job
-# fails the unit). There is deliberately no branch filter on pull_request, so a
-# change opened against any base gets CI instead of an empty check list.
+# fails the unit). pull_request filters out only the release base, so a change
+# opened against any other base gets CI instead of an empty check list. A
+# release PR carries the curated release tree, which lacks the development
+# files these lanes read; validate-release-pr.yml (validate-base) and test.yml
+# (release-required-result) validate it.
 
 env:
   BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
-  merge_group:
+    types: [opened, synchronize, reopened, edited, ready_for_review, converted_to_draft]
+    branches-ignore: [release]
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.event.merge_group.head_sha || github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -24,6 +27,47 @@ permissions:
   pull-requests: read
 
 jobs:
+  comment-policy:
+    name: comment-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.11'
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+        with:
+          enable-cache: false
+          working-directory: ${{ runner.temp }}
+          ignore-empty-workdir: true
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '20'
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Enforce comment and docstring policy
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          : "${BASE_REF:?BASE_REF is required}"
+          installed="$(git ls-tree -r --name-only "$BASE_REF" -- \
+            scripts/check_comment_policy.py scripts/comment_syntax.py scripts/comment_syntax_js.cjs \
+            scripts/comment_payloads.py scripts/comment_execution.py scripts/comment_policy_entry.py \
+            quality/comment-policy.json quality/comment-policy-requirements.txt \
+            quality/comment-policy-package.json quality/comment-policy-package-lock.json)"
+          if git cat-file -e "${BASE_REF}:scripts/run_comment_policy.py" 2>/dev/null; then
+            git show "${BASE_REF}:scripts/run_comment_policy.py" > "$RUNNER_TEMP/comment-policy-runner.py"
+          elif [ -z "$installed" ] && git merge-base --is-ancestor ed5c263c513ba65499f4918d3a7de607f280c65b "$BASE_REF"; then
+            cp scripts/run_comment_policy.py "$RUNNER_TEMP/comment-policy-runner.py"
+          else
+            echo "Trusted comment-policy launcher is missing" >&2
+            exit 1
+          fi
+          python -I "$RUNNER_TEMP/comment-policy-runner.py" --native-tests
+
   # Base guard: stacked PRs get CI from this workflow (no branch filter),
   # so an unsupported feature-branch base must fail loudly here instead of
   # sliding into develop unvalidated under a parent PR.
@@ -36,6 +80,7 @@ jobs:
       - name: Check base branch
         env:
           BASE_REF: ${{ github.base_ref }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -euo pipefail
           case "$BASE_REF" in
@@ -43,9 +88,13 @@ jobs:
               echo "Base branch '$BASE_REF' is an integration branch; the normal CI lanes apply."
               ;;
             *)
-              echo "::error::PR base branch is '$BASE_REF', not develop, release or published-results."
-              echo "Retarget this PR at develop, or fold the change into the parent PR."
-              exit 1
+              if [ "$IS_DRAFT" = "true" ]; then
+                echo "Draft PR stacked on '$BASE_REF'; it cannot be armed until it is retargeted at develop."
+              else
+                echo "::error::Ready PR base branch is '$BASE_REF', not develop, release or published-results."
+                echo "Only a draft PR may target a parent branch. After the parent merges, retarget this PR at develop and rebase it onto the squash commit."
+                exit 1
+              fi
               ;;
           esac
 
@@ -64,12 +113,15 @@ jobs:
       unknown-paths: ${{ steps.classify.outputs.unknown-paths }}
       estimated-runner-minutes-saved: ${{ steps.classify.outputs.estimated-runner-minutes-saved }}
       packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
+      framing-needed: ${{ steps.classify.outputs.framing-needed }}
       heavy-needed: ${{ steps.heavy.outputs.heavy-needed }}
       viz-needed: ${{ steps.classify.outputs.viz-needed }}
       explorer-vitest-needed: ${{ steps.classify.outputs.explorer-vitest-needed }}
       explorer-paths-needed: ${{ steps.classify.outputs.explorer-paths-needed }}
       explorer-tokens-needed: ${{ steps.classify.outputs.explorer-tokens-needed }}
       site-theme-needed: ${{ steps.classify.outputs.site-theme-needed }}
+      site-needed: ${{ steps.classify.outputs.site-needed }}
+      site-parity-needed: ${{ steps.classify.outputs.site-parity-needed }}
       unit-core: ${{ steps.units.outputs.unit-core }}
       unit-explorer: ${{ steps.units.outputs.unit-explorer }}
       unit-results-data: ${{ steps.units.outputs.unit-results-data }}
@@ -91,7 +143,7 @@ jobs:
       - name: Select release candidate
         id: release
         env:
-          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           [[ "$EVENT_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid event base SHA" >&2; exit 1; }
@@ -106,7 +158,7 @@ jobs:
         if: steps.release.outputs.release-check-needed == 'true'
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.release-version }}
-          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: make release-check VERSION="$RELEASE_VERSION" BASE_REF="$EVENT_BASE_SHA"
 
       - name: Fetch base branch
@@ -121,7 +173,7 @@ jobs:
           # later develop merge may make this PR BEHIND, but must not change
           # the tree whose paths and manifest structure this run certifies.
           python scripts/path_filter_decision.py \
-            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
+            --base-ref "${{ github.event.pull_request.base.sha }}" \
             --json-out ci-path-decision.json \
             --lists-dir .ci-paths \
             --github-output "$GITHUB_OUTPUT" \
@@ -133,7 +185,7 @@ jobs:
         # classifier fails closed: a diff error or an unowned path runs core.
         run: |
           python scripts/ci_units.py \
-            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
+            --base-ref "${{ github.event.pull_request.base.sha }}" \
             --json-out ci-unit-decision.json \
             --github-output "$GITHUB_OUTPUT" \
             --summary "$GITHUB_STEP_SUMMARY"
@@ -159,197 +211,20 @@ jobs:
           python scripts/heavy_tier_needed.py \
             --decision-in ci-path-decision.json \
             --event "${{ github.event_name }}" \
-            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
+            --base-ref "${{ github.event.pull_request.base.sha }}" \
             --github-output "$GITHUB_OUTPUT" \
             --summary "$GITHUB_STEP_SUMMARY"
 
-  # Tooling: soundness review flag (unit-independent; runs on every event).
-  soundness-flag:
-    name: soundness-flag
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          fetch-depth: 0
-
-      - name: Fetch pull request base
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-        run: git fetch --no-tags origin "${BASE_SHA}:refs/remotes/origin/ci-v2-base"
-
-      - name: Collect changed paths
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-        run: git diff --name-only --no-renames "${BASE_SHA}...HEAD" > "$RUNNER_TEMP/changed-paths.txt"
-
-      - name: soundness-flag
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-          PR_BODY: ${{ github.event.pull_request.body || '' }}
-          MERGE_GROUP_PRS: ${{ toJson(github.event.merge_group.pull_requests) }}
-        run: |
-          set -euo pipefail
-
-          check_one() {
-            local paths_file="$1"
-            local body_file="$2"
-            local trusted_root="$RUNNER_TEMP/trusted-soundness"
-            local result
-            rm -rf "$trusted_root"
-            mkdir -p "$trusted_root/_project/scripts"
-            mkdir -p "$trusted_root/.github"
-
-            # After this rollout lands, the base revision contains the checker
-            # and manifest. Execute those immutable base files, never the PR
-            # checkout, so a PR cannot narrow its own soundness predicate.
-            if git cat-file -e "${BASE_SHA}:_project/scripts/check_soundness_review.py" 2>/dev/null \
-              && git cat-file -e "${BASE_SHA}:_project/scripts/soundness_paths.py" 2>/dev/null \
-              && git cat-file -e "${BASE_SHA}:.github/soundness-paths.txt" 2>/dev/null; then
-              git show "${BASE_SHA}:_project/scripts/check_soundness_review.py" \
-                > "$trusted_root/_project/scripts/check_soundness_review.py"
-              git show "${BASE_SHA}:_project/scripts/soundness_paths.py" \
-                > "$trusted_root/_project/scripts/soundness_paths.py"
-              git show "${BASE_SHA}:.github/soundness-paths.txt" \
-                > "$trusted_root/.github/soundness-paths.txt"
-              python "$trusted_root/_project/scripts/check_soundness_review.py" \
-                --paths-file "$paths_file" \
-                --body-file "$body_file"
-              return
-            fi
-
-            # Bootstrap compatibility for this first rollout: develop does not
-            # yet contain the new checker. Use the immutable legacy predicate
-            # plus the fixed gate-file list, then validate the required body
-            # fields without executing any PR-side path predicate. Once this
-            # workflow is on develop, this branch is unreachable.
-            git show "${BASE_SHA}:_project/scripts/auto_merge_soundness_paths.py" \
-              > "$trusted_root/auto_merge_soundness_paths.py"
-            result="$(python "$trusted_root/auto_merge_soundness_paths.py" \
-              --paths-file "$paths_file" --format github-output)"
-            case "$result" in
-              soundness_path=true|soundness_path=false) ;;
-              *)
-                echo "soundness-flag: trusted bootstrap predicate returned an invalid result" >&2
-                return 1
-                ;;
-            esac
-
-            for protected_path in \
-              "AGENTS.md" \
-              ".github/CODEOWNERS" \
-              ".github/PULL_REQUEST_TEMPLATE.md" \
-              ".github/soundness-paths.txt" \
-              ".github/workflows/ci.yml" \
-              "_project/scripts/auto_merge_soundness_paths.py" \
-              "_project/scripts/check_soundness_review.py" \
-              "_project/scripts/soundness_paths.py"; do
-              if ! grep -qxF "$protected_path" "$paths_file"; then
-                continue
-              fi
-              result="soundness_path=true"
-              break
-            done
-            if [ "$result" = "soundness_path=false" ]; then
-              return
-            fi
-
-            grep -Eiq '^[[:space:]]*(#{1,6}[[:space:]]+)?Soundness review:[[:space:]]*$' "$body_file" \
-              || { echo "soundness-flag: missing Soundness review section" >&2; return 1; }
-            grep -Eiq '^[[:space:]]*(-[[:space:]]+)?(External[[:space:]]+)?reviewer:[[:space:]]*(codex|muse|agy)\b' "$body_file" \
-              || { echo "soundness-flag: missing approved external reviewer" >&2; return 1; }
-            grep -Eiq 'https://github\.com/[^/[:space:])]+/[^/[:space:])]+/pull/[0-9]+#issuecomment-[0-9]+' "$body_file" \
-              || { echo "soundness-flag: missing external review PR comment link" >&2; return 1; }
-            grep -Eiq '^[[:space:]]*(-[[:space:]]+)?all[[:space:]]+(critical/high|critical[[:space:]]+and[[:space:]]+high)[[:space:]]+findings[[:space:]]+(are[[:space:]]+)?resolved[.!]?[[:space:]]*$' "$body_file" \
-              || { echo "soundness-flag: missing resolved Critical/High finding statement" >&2; return 1; }
-            echo "soundness-flag: passed (trusted bootstrap path)"
-          }
-
-          if [ "${{ github.event_name }}" = "merge_group" ]; then
-            if [ -z "$MERGE_GROUP_PRS" ] || [ "$MERGE_GROUP_PRS" = "null" ]; then
-              echo "soundness-flag: merge_group payload has no pull_requests; resolving anchor from queue ref" >&2
-              QUEUE_REF="${{ github.ref }}"
-              ANCHOR_NUMBER="$(printf '%s' "$QUEUE_REF" | grep -oE 'pr-[0-9]+' | head -1 | cut -d- -f2)"
-              if [ -z "$ANCHOR_NUMBER" ]; then
-                echo "soundness-flag: cannot parse anchor PR from queue ref $QUEUE_REF; failing closed" >&2
-                exit 1
-              fi
-              ANCHOR_HEAD="$(gh api "repos/$REPO/pulls/$ANCHOR_NUMBER" --jq '.head.sha')"
-              if [ -z "$ANCHOR_HEAD" ]; then
-                echo "soundness-flag: cannot resolve head of anchor PR #$ANCHOR_NUMBER; failing closed" >&2
-                exit 1
-              fi
-              # The queue squashes the anchor PR onto the group base, so the
-              # anchor head is never an ancestor of the group HEAD. Verify the
-              # squash by content: every file the anchor PR changed (relative
-              # to its own base) must be byte-identical between the anchor
-              # head and the group HEAD. A mismatch means the queued content
-              # is not what reviewers approved. Files the group base changed
-              # identically do not matter; files only the group changed are
-              # covered by the group-base diff check below.
-              git fetch --no-tags origin "$ANCHOR_HEAD" 2>/dev/null || true
-              ANCHOR_BASE="$(gh api "repos/$REPO/pulls/$ANCHOR_NUMBER" --jq '.base.sha')"
-              if [ -z "$ANCHOR_BASE" ]; then
-                echo "soundness-flag: cannot resolve base of anchor PR #$ANCHOR_NUMBER; failing closed" >&2
-                exit 1
-              fi
-              git fetch --no-tags origin "$ANCHOR_BASE" 2>/dev/null || true
-              ANCHOR_FILES="$(git diff --name-only --no-renames "${ANCHOR_BASE}...${ANCHOR_HEAD}")"
-              if [ -z "$ANCHOR_FILES" ]; then
-                echo "soundness-flag: anchor #$ANCHOR_NUMBER changed no files; failing closed" >&2
-                exit 1
-              fi
-              MISMATCH=0
-              while IFS= read -r f; do
-                [ -n "$f" ] || continue
-                if ! git diff --quiet "$ANCHOR_HEAD" HEAD -- "$f"; then
-                  echo "soundness-flag: anchor #$ANCHOR_NUMBER file differs in queue: $f" >&2
-                  MISMATCH=1
-                fi
-              done <<< "$ANCHOR_FILES"
-              if [ "$MISMATCH" != "0" ]; then
-                echo "soundness-flag: anchor #$ANCHOR_NUMBER content mismatch in queue; failing closed" >&2
-                exit 1
-              fi
-              echo "soundness-flag: anchor #$ANCHOR_NUMBER content verified in queue" >&2
-              printf '%s\n' "$ANCHOR_NUMBER" > "$RUNNER_TEMP/merge-group-prs.txt"
-              echo "soundness-flag: payload empty; validating anchor PR #$ANCHOR_NUMBER with group base diff" >&2
-            else
-              printf '%s' "$MERGE_GROUP_PRS" | jq -r '.[].number' > "$RUNNER_TEMP/merge-group-prs.txt"
-            fi
-            if [ ! -s "$RUNNER_TEMP/merge-group-prs.txt" ]; then
-              echo "soundness-flag: merge_group has no pull requests to validate" >&2
-              exit 1
-            fi
-            while IFS= read -r pr_number; do
-              gh api "repos/$REPO/pulls/$pr_number" --jq '.body // empty' > "$RUNNER_TEMP/pr-body.md"
-              gh api --paginate "repos/$REPO/pulls/$pr_number/files" \
-                --jq '.[] | .filename, (.previous_filename // empty)' > "$RUNNER_TEMP/changed-paths.txt"
-              check_one "$RUNNER_TEMP/changed-paths.txt" "$RUNNER_TEMP/pr-body.md"
-            done < "$RUNNER_TEMP/merge-group-prs.txt"
-            if [ -z "$MERGE_GROUP_PRS" ] || [ "$MERGE_GROUP_PRS" = "null" ]; then
-              echo "soundness-flag: also validating full group base diff for soundness paths" >&2
-              git diff --name-only --no-renames "${BASE_SHA}...HEAD" > "$RUNNER_TEMP/group-diff-paths.txt"
-              gh api "repos/$REPO/pulls/$(head -1 "$RUNNER_TEMP/merge-group-prs.txt")" --jq '.body // empty' > "$RUNNER_TEMP/pr-body.md"
-              check_one "$RUNNER_TEMP/group-diff-paths.txt" "$RUNNER_TEMP/pr-body.md"
-            fi
-            exit 0
-          fi
-          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
-          check_one "$RUNNER_TEMP/changed-paths.txt" "$RUNNER_TEMP/pr-body.md"
-
   # Cross-platform TPC-H binary framing: the only pre-merge macOS/Windows
-  # execution of the bundled dbgen framing guard. The merge queue runs direct
-  # macOS and Windows execution on every code-routed tree, while pull_request
-  # runs skip it unless a carve-out applies (merge_group event, soundness
-  # paths, or packaging paths via the heavy-needed output). Nightly retains
-  # the complete three-platform matrix.
+  # execution of the bundled dbgen framing guard. Pull requests run it when a
+  # carve-out applies (soundness or packaging paths via the heavy-needed
+  # output) or when the change touches test infrastructure or the bundled
+  # binaries (the framing-needed output). Nightly retains the complete
+  # three-platform matrix.
   tpch-binary-framing:
     name: TPC-H binary framing (${{ matrix.os }})
     needs: ci-paths
-    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' }}
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' || needs.ci-paths.outputs.framing-needed == 'true' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     strategy:
@@ -402,7 +277,7 @@ jobs:
         # Bare python is intentional: the classifier is stdlib-only.
         run: |
           python scripts/path_filter_decision.py \
-            --base-ref "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}" \
+            --base-ref "${{ github.event.pull_request.base.sha }}" \
             --json-out ci-path-decision.json \
             --lists-dir .ci-paths
 
@@ -613,7 +488,7 @@ jobs:
 
       - name: Audit instruction authority and PR commit identity
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           python3 _project/scripts/agent_instruction_audit.py
           python3 _project/scripts/agent_instruction_audit.py --check-commit-range "$BASE_SHA"
@@ -652,22 +527,6 @@ jobs:
           BASE_REF: ${{ github.base_ref || 'develop' }}
         run: git fetch --no-tags origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
 
-      - name: Fetch PR head for audit ancestry (merge queue only)
-        # Merge-queue runs check out a squashed preview commit whose
-        # single-parent history never contains the PR's branch commits, so an
-        # audit measured on the branch tree cannot descend from HEAD. Fetch
-        # the PR head (parsed from the queue's gh-readonly-queue/.../pr-N-...
-        # branch name) and validate measurement ancestry against it instead.
-        # Falls back to HEAD with a warning if the PR number cannot be parsed.
-        if: github.event_name == 'merge_group'
-        run: |
-          set -euo pipefail
-          if [[ "${GITHUB_REF:-}" =~ /pr-([0-9]+)- ]]; then
-            git fetch --no-tags origin "pull/${BASH_REMATCH[1]}/head:refs/remotes/origin/audit-ancestry-pr-head"
-          else
-            echo "::warning::Could not parse PR number from ${GITHUB_REF:-}; audit measurement ancestry falls back to HEAD."
-          fi
-
       - name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
@@ -682,49 +541,11 @@ jobs:
             exit 0
           fi
           ANCESTRY_REF="HEAD"
-          if [ "${{ github.event_name }}" = "merge_group" ] && git rev-parse --verify --quiet origin/audit-ancestry-pr-head >/dev/null; then
-            ANCESTRY_REF="origin/audit-ancestry-pr-head"
-          fi
           while IFS= read -r audit_path; do
             make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref || 'develop' }}" AUDIT_SHA_ANCESTRY_REF="$ANCESTRY_REF"
           done < /tmp/changed-audits.txt
 
-  ruleset-drift:
-    name: ruleset-drift
-    needs: ci-paths
-    # Queue-only: the job reads a token that can see hosted governance. PR
-    # events never receive it. The script and the expected settings are read
-    # from the trusted base revision, never from the change under test.
-    if: ${{ github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout trusted base policy
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          ref: ${{ github.event.merge_group.base_sha }}
-          persist-credentials: false
-
-      - name: Compare live governance with the trusted runbook
-        env:
-          RULESET_DRIFT_TOKEN: ${{ secrets.RULESET_DRIFT_TOKEN }}
-        run: |
-          set -euo pipefail
-          python scripts/ruleset_drift_check.py \
-            --token "${RULESET_DRIFT_TOKEN}" \
-            --require-bypass-actor-visibility \
-            --output ruleset-drift.json
-
-      - name: Upload drift evidence
-        if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: ci-ruleset-drift-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ruleset-drift.json
-          if-no-files-found: warn
-          retention-days: 30
-
-  # Core: light tier (runs on pull_request and merge_group).
+  # Core: light tier.
   code-lint:
     name: lint
     needs: ci-paths
@@ -762,14 +583,14 @@ jobs:
         id: guard-uv-lock-revision
         continue-on-error: true
         env:
-          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: make uv-lock-revision-check
 
       - name: SQLGlot repro retirement check (runs repros on sqlglot upgrade)
         id: guard-sqlglot-repro-retirement
         continue-on-error: true
         env:
-          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: make sqlglot-repro-retirement-check
 
       - name: Stale _project/ reference check
@@ -839,50 +660,10 @@ jobs:
         continue-on-error: true
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
-      - name: Fast lane ceiling
-        id: guard-fast-lane-ceiling
+      - name: Fast lane marker and path guards
+        id: guard-fast-lane-markers
         continue-on-error: true
-        # A merge group composes independently green PRs, so an overage of up
-        # to one delta limit per possible queued entry warns instead of
-        # ejecting the group. The script grants the grace only when the runner's own event file
-        # says merge_group, so a PR cannot self-grant it by editing this line:
-        # ci.yml executes the PR's own workflow copy, but GITHUB_EVENT_PATH is
-        # written by the runner. The delta guard below stays pull_request-only,
-        # so a composed overage cannot slip through it either.
-        run: |
-          args=(--strict)
-          if [ "${{ github.event_name }}" = "merge_group" ]; then
-            # APPROVED_MERGE_QUEUE permits five entries; 150 per entry keeps
-            # every independently compliant composition from being ejected.
-            args+=(--ceiling-grace 750)
-          fi
-          uv run -- python _project/scripts/fast_lane_ceiling_check.py "${args[@]}"
-
-      - name: Restore fast-lane develop baseline count
-        # Not a guard itself (no `id: guard-*`/`continue-on-error` -- see the
-        # naming-convention comment above): a cache miss here is not itself a
-        # failure, but the delta guard below reports it as a blocking baseline
-        # error. The key is the PR event's actual develop base SHA; a prefix
-        # restore would compare the PR against an unrelated develop tip when
-        # merges or baseline jobs complete out of order.
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
-        with:
-          path: fast-lane-count.txt
-          key: fast-lane-count-develop-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
-
-      - name: Fast lane ceiling delta vs develop
-        # Pull requests only: in a merge group the delta is the sum of every
-        # composed PR, so it would eject groups whose members each fit.
-        if: github.event_name == 'pull_request'
-        # Additive to guard-fast-lane-ceiling above, never a replacement: that
-        # step enforces the absolute max_fast_tests ceiling unconditionally.
-        # The pull-request lane requires the exact develop baseline so every
-        # queued member proves its +150 per-PR delta before composition grace
-        # is allowed. A missing cache fails closed instead of weakening that
-        # prerequisite.
-        id: guard-fast-lane-delta
-        continue-on-error: true
-        run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --delta-check --develop-count-file fast-lane-count.txt --require-develop-baseline
+        run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict
 
       - name: UAT spec LOC table drift check
         # Mirrors the release-branch Lint gate (.github/workflows/lint.yml). The
@@ -952,7 +733,7 @@ jobs:
         id: guard-duplicate-delta
         continue-on-error: true
         env:
-          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: make duplicate-check-delta
 
       - name: Complexity policy and report
@@ -979,9 +760,6 @@ jobs:
           set -euo pipefail
           printf '%s\n' "$STEPS_CONTEXT" > "$RUNNER_TEMP/steps_context.json"
 
-          # FAIL CLOSED: the whole gate rests on this step's exit code, so a
-          # jq parse failure or an empty guard set must fail the job -- never
-          # fall through to "all passed" with zero guards inspected.
           ids=$(jq -r 'keys[] | select(startswith("guard-"))' "$RUNNER_TEMP/steps_context.json" | sort) || {
             echo "aggregator: jq failed to parse the steps context" >&2
             exit 1
@@ -1003,12 +781,6 @@ jobs:
             outcome=$(jq -r --arg id "$id" '.[$id].outcome' "$RUNNER_TEMP/steps_context.json")
             if [ "$outcome" = "success" ]; then
               echo "| $id | ✅ success |" >> "$GITHUB_STEP_SUMMARY"
-            elif [ "$id" = "guard-fast-lane-delta" ] \
-              && [ "${GITHUB_EVENT_NAME:-}" = "merge_group" ] \
-              && [ "$outcome" = "skipped" ]; then
-              # This guard is intentionally pull_request-only because its
-              # aggregate delta is not meaningful for a composed merge group.
-              echo "| $id | ✅ skipped (merge_group composition) |" >> "$GITHUB_STEP_SUMMARY"
             else
               echo "| $id | ⚠️ $outcome |" >> "$GITHUB_STEP_SUMMARY"
               echo "FAILED: $id ($outcome)"
@@ -1028,6 +800,7 @@ jobs:
     needs: ci-paths
     if: ${{ needs.ci-paths.outputs.code-tests-needed == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -1048,6 +821,12 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --group dev
+
+      - name: Summarize Make interface changes
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: python make/interface_summary.py --base-ref "$BASE_REF" --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Run cross-surface mutation target drift guard
         run: |
@@ -1143,6 +922,13 @@ jobs:
             tests/integration/test_tpch_throughput_test.py \
             -m "slow" -n 0 -k "boundary_query" --tb=short -q
 
+      # A changed test that reads a path release-cut removes would fail the
+      # release PR's required test job; run changed tests on that tree now.
+      - name: Run changed tests on the curated release tree
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: uv run -- python scripts/release_curation_dry_run.py --changed-since "$BASE_SHA"
+
       - name: Run fast tests
         run: |
           # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
@@ -1195,7 +981,7 @@ jobs:
             --input t2-artifacts/medium-collect.txt \
             --nodeids-output t2-artifacts/medium-nodeids.txt \
             --summary-output t2-artifacts/medium-collection.json \
-            --expected-count "$count" --shard-count 2 \
+            --expected-count "$count" --shard-count 4 \
             --workflow ci.yml --job medium-collect \
             --marker-expression "medium and not (slow or stress or resource_heavy or live_integration)" \
             --checked-ref "${{ github.ref }}" --checked-sha "${{ github.sha }}"
@@ -1214,11 +1000,11 @@ jobs:
     needs: [ci-paths, medium-collect]
     if: ${{ !cancelled() && needs.medium-collect.result == 'success' && needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        shard_index: [0, 1]
+        shard_index: [0, 1, 2, 3]
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -1252,7 +1038,7 @@ jobs:
             --input t2-artifacts/medium-nodeids.txt \
             --nodeids-output "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt" \
             --summary-output "t2-artifacts/shard-${SHARD_INDEX}-summary.json" \
-            --shard-index "$SHARD_INDEX" --shard-count 2 \
+            --shard-index "$SHARD_INDEX" --shard-count 4 \
             --workflow ci.yml --job medium-test \
             --marker-expression "medium and not (slow or stress or resource_heavy or live_integration)" \
             --collection-summary t2-artifacts/medium-collection.json --checked-sha "${{ github.sha }}"
@@ -1265,13 +1051,29 @@ jobs:
           set -euo pipefail
           test -s "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt"
           mapfile -t node_ids < "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt"
+          sample_resources() {
+            while sleep 30; do
+              echo "[resources $(date -u +%H:%M:%S)] $(free -m | awk '/Mem:/ {print "used_mb=" $3 " available_mb=" $7}') load=$(cut -d' ' -f1-3 /proc/loadavg)"
+              ps -eo pid,rss,etimes,comm --sort=-rss | awk 'NR <= 4 {print "  " $0}'
+            done
+          }
+          sample_resources &
+          sampler=$!
+          trap 'pkill -P "${sampler}" 2>/dev/null || true; kill "${sampler}" 2>/dev/null || true' EXIT
           BENCHBOX_TEST_TIER=t2 uv run -- python -m pytest \
             -m "medium and not (slow or stress or resource_heavy or live_integration)" \
-            --tb=short --timeout=60 -n 5 \
+            --tb=short --timeout=60 -n 5 --durations=25 \
             -p scripts.pytest_shard_evidence \
             --assigned-nodeids "t2-artifacts/shard-${SHARD_INDEX}-nodeids.txt" \
             --shard-evidence "t2-artifacts/shard-${SHARD_INDEX}-execution.json" \
             --checked-sha "${{ github.sha }}" "${node_ids[@]}"
+
+      - name: Record kernel memory events for the medium shard
+        if: always()
+        shell: bash
+        run: |
+          free -m
+          sudo dmesg -T 2>/dev/null | grep -iE 'out of memory|oom-kill|killed process' | tail -20 || true
 
       - name: Upload medium shard evidence
         if: always()
@@ -1376,6 +1178,43 @@ jobs:
       - name: Run TPC-H cross-surface SQL<->DataFrame equivalence gate
         if: matrix.partition == 'a'
         run: make tpch-cross-surface-equivalence-report
+
+      - name: Run TPC-DS cross-surface SQL<->DataFrame equivalence gate (Polars and DataFusion)
+        if: matrix.partition == 'b'
+        run: make tpcds-cross-surface-equivalence-report
+
+      - name: Run TPC-DS cross-surface SQL<->DataFrame equivalence gate (pandas)
+        if: matrix.partition == 'a'
+        run: make tpcds-pandas-cross-surface-equivalence-report
+
+  required-local-cases:
+    name: required-local-cases
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run the required local-engine cases
+        run: make test-required-local-cases
 
   plan-capture-gate:
     name: plan-capture-gate
@@ -1489,66 +1328,10 @@ jobs:
           # contract whose absence let v0.3.0 ship a broken clean install.
           uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
           uv run --isolated --no-project --with "$wheel" -- benchbox --help
-
-  dist-artifact:
-    name: dist-artifact
-    needs: ci-paths
-    permissions:
-      contents: read
-      actions: read
-    # Merge-group only: builds the exact wheel+sdist the release workflow
-    # publishes (docs/operations/release-artifacts.md). Runs on every merge
-    # group so the tag commit has an attempt-bound artifact; never gated
-    # on packaging paths because release needs it for every merge.
-    if: ${{ github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: '3.12'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
-
-      - name: Verify source bundled binary manifest
-        run: uv run --locked --no-dev -- python scripts/bundled_binary_manifest.py
-
-      - name: Build wheel and sdist
-        run: |
-          set -euo pipefail
-          uv build
-          wheel_count=$(find dist -maxdepth 1 -name '*.whl' | wc -l | tr -d '[:space:]')
-          sdist_count=$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l | tr -d '[:space:]')
-          if [ "$wheel_count" != "1" ] || [ "$sdist_count" != "1" ]; then
-            echo "::error::Expected exactly one wheel and one sdist, found $wheel_count wheel(s) and $sdist_count sdist(s)"
-            find dist -maxdepth 1 -type f -print
-            exit 1
-          fi
-          uv run --locked --no-dev -- python scripts/verify_distribution_binaries.py dist/*.whl dist/*.tar.gz
-          (cd dist && sha256sum -- *.whl *.tar.gz > SHA256SUMS)
-          cat dist/SHA256SUMS
-
-      - name: Bind distributions to the producer attempt
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python -I -S scripts/release_artifact_consumer.py producer --dist dist
-
-      - name: Upload dist artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: dist-${{ github.sha }}-attempt-${{ github.run_attempt }}
-          path: |
-            dist/*.whl
-            dist/*.tar.gz
-            dist/SHA256SUMS
-            dist/producer-receipt.json
-          if-no-files-found: error
-          retention-days: 90
+          # Wheel-truth gate for TPC-DS-OBT templates: the 0.4.1 wheel shipped
+          # without top-level _sources/, so the OBT template dir resolved into
+          # site-packages/_sources and get_queries() raised FileNotFoundError.
+          uv run --isolated --no-project --with "$wheel" -- python -c "from benchbox import TPCDSOBT; benchmark = TPCDSOBT(scale_factor=1.0); queries = benchmark.get_queries(); assert queries, 'expected OBT queries from wheel install'; assert benchmark.get_query(next(iter(queries))); print(f'TPC-DS-OBT wheel smoke: {len(queries)} queries')"
 
   dependency-audit:
     name: dependency-audit
@@ -1847,7 +1630,6 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          GROUP_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           RECOVERY_SOURCE_SHA: ${{ inputs.baseline_source_sha }}
           CURRENT_SHA: ${{ github.sha }}
           CURRENT_REF: ${{ github.ref }}
@@ -1868,15 +1650,15 @@ jobs:
             SOURCE_SHA="$RECOVERY_SOURCE_SHA"
           fi
           echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
-          BASE_SHA="${PR_BASE_SHA:-$GROUP_BASE_SHA}"
+          BASE_SHA="$PR_BASE_SHA"
           echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
-          if [ "$EVENT_NAME" != pull_request ] && [ "$EVENT_NAME" != merge_group ]; then
+          if [ "$EVENT_NAME" != pull_request ]; then
             echo 'changed=true' >> "$GITHUB_OUTPUT"
             echo 'render_changed=true' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           if [[ ! "$BASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::Missing exact PR or merge-group base SHA."
+            echo "::error::Missing exact PR base SHA."
             exit 1
           fi
           git cat-file -e "$BASE_SHA^{commit}" || {
@@ -1889,7 +1671,7 @@ jobs:
           # rendered output as much as any source file. uv.lock and
           # results-explorer/package-lock.json must stay in this list.
           SITE_PATHS=(
-            benchbox/ docs/ examples/ landing/
+            benchbox/ docs/ examples/ landing/ website/
             _project/scripts/explorer_pipeline/
             _project/scripts/explorer_publish.py
             _project/scripts/results_explorer_snapshot_invariants.py
@@ -1901,7 +1683,7 @@ jobs:
           # and the baseline ancestor walk use the narrow rendered-input list.
           # Keep this a subset of SITE_PATHS.
           RENDER_PATHS=(
-            docs/ landing/ examples/ results-data/ results-explorer/
+            docs/ landing/ examples/ results-data/ results-explorer/ website/
             _project/scripts/explorer_pipeline/
             _project/scripts/explorer_publish.py
             _project/scripts/results_explorer_snapshot_invariants.py
@@ -1928,8 +1710,8 @@ jobs:
           # input is byte-identical to the base, because it renders the same
           # site; this is the premise that lets unchanged trees skip the gate.
           # The walk stops at the first ancestor whose site inputs differ, so a
-          # differently rendered tree is never used. This covers a queue group
-          # ahead that changed no site inputs and therefore published nothing.
+          # differently rendered tree is never used. This covers a base whose
+          # predecessor changed no site inputs and therefore published nothing.
           CANDIDATES="$BASE_SHA"
           ANCESTORS=$(git rev-list --first-parent --max-count=25 "$BASE_SHA^" 2>/dev/null || true)
           for ANCESTOR in $ANCESTORS; do
@@ -1967,6 +1749,9 @@ jobs:
           key: ${{ runner.os }}-sphinx-${{ hashFiles('docs/**', 'pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-sphinx-
+
+      - name: Generate documentation inputs
+        run: make docs-generate
 
       - name: Build documentation
         # -W turns every Sphinx warning into a failure, including unknown
@@ -2055,12 +1840,9 @@ jobs:
 
   public-site-visual-regression:
     name: Public-site visual regression
-    if: ${{ needs.visual-inputs.outputs.render_changed == 'true' && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
+    if: ${{ needs.visual-inputs.outputs.render_changed == 'true' && github.event_name == 'pull_request' }}
     needs: [visual-inputs, docs-build]
     runs-on: ubuntu-latest
-    # Build (about 15 minutes) plus this job must fit inside the 60-minute
-    # merge-queue check timeout with room for runner queueing, so the job
-    # never idles long on a runner waiting for a baseline.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2098,29 +1880,22 @@ jobs:
         run: npm run test:e2e:public-site
         working-directory: results-explorer
 
-      # A merge-queue follower's base is the head of the group ahead of it. That
-      # group publishes a candidate baseline for its exact head once its own
-      # comparison passes. When the group ahead changed no site inputs it
-      # publishes nothing, so the lookup also accepts the nearest ancestor whose
-      # site inputs are byte-identical to the base, which is found at once. The
-      # bounded queue wait only matters when the group ahead did change site
-      # inputs; both groups build concurrently, so its candidate usually lands
-      # within minutes of this capture. Pull requests keep the short retry only.
+      # When no baseline is bound to the exact base, the lookup also accepts the
+      # nearest ancestor whose site inputs are byte-identical to the base.
       - name: Download visual baseline for base or site-equivalent ancestor
         id: baseline
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ needs.visual-inputs.outputs.base_sha }}
           PUBLIC_SITE_VISUAL_BASELINE_CANDIDATES: ${{ needs.visual-inputs.outputs.baseline_candidates }}
           PUBLIC_SITE_VISUAL_BASELINE: ${{ runner.temp }}/public-site-visual-baseline
-          PUBLIC_SITE_VISUAL_BASELINE_WAIT_SECONDS: ${{ github.event_name == 'merge_group' && '600' || '0' }}
         run: node scripts/download-public-site-visual-baseline.mjs
         working-directory: results-explorer
 
       - name: Compare public site with exact base
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: github.event_name == 'pull_request'
         env:
           E2E_PAGES_SHAPED: "1"
           E2E_SITE_DIR: ${{ github.workspace }}/site
@@ -2130,9 +1905,9 @@ jobs:
           PUBLIC_SITE_VISUAL_BASE_SHA: ${{ steps.baseline.outputs.baseline_sha }}
           PUBLIC_SITE_VISUAL_REQUIRE_BASELINE: "1"
           PUBLIC_SITE_VISUAL_SOURCE_SHA: ${{ needs.visual-inputs.outputs.source_sha }}
-          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.event.merge_group.head_sha || '' }}
-          APPROVED_HEAD_SHA: ${{ github.event_name == 'merge_group' && vars.APPROVED_MERGE_GROUP_SHA || github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
-          APPROVAL_REASON: ${{ github.event_name == 'merge_group' && vars.MERGE_GROUP_APPROVAL_REASON || github.event_name == 'pull_request' && vars.APPROVAL_REASON || '' }}
+          PR_HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+          APPROVED_HEAD_SHA: ${{ github.event_name == 'pull_request' && vars.APPROVED_HEAD_SHA || '' }}
+          APPROVAL_REASON: ${{ github.event_name == 'pull_request' && vars.APPROVAL_REASON || '' }}
         run: npm run test:e2e:public-site
         working-directory: results-explorer
 
@@ -2146,18 +1921,6 @@ jobs:
           path: ${{ runner.temp }}/public-site-visual-current
           retention-days: 30
 
-      # Runs only after this group's exact-base comparison passed. The capture
-      # is of `merge_group.head_sha`, the exact tree the next queue group merges
-      # onto, and the download script trusts it only from a merge_group run of
-      # this workflow on this repository's develop queue branch.
-      - name: Upload merge-queue candidate visual baseline
-        if: github.event_name == 'merge_group'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
-          path: ${{ runner.temp }}/public-site-visual-current
-          retention-days: 7
-
       - name: Upload visual diagnostics
         if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
@@ -2169,6 +1932,229 @@ jobs:
             results-explorer/playwright-report
           if-no-files-found: ignore
           retention-days: 3
+
+  site-build:
+    name: site-build
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.site-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            results-explorer/package-lock.json
+            website/package-lock.json
+
+      - name: Install results-explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Build explorer data
+        run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
+
+      - name: Build results-explorer
+        run: npm run build
+        working-directory: results-explorer
+
+      - name: Install website dependencies
+        run: npm ci
+        working-directory: website
+
+      - name: Typecheck, audit and build website
+        run: make site-check site-build
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('website/package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: website
+
+      - name: Test built website and not-found fallback
+        run: make site-test-built
+
+      - name: Scan website output for privacy leaks
+        run: uv run python scripts/publication/check_artifact_privacy.py website/dist
+
+  site-parity:
+    name: site-parity
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.site-parity-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            results-explorer/package-lock.json
+            website/package-lock.json
+
+      - name: Install results-explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Build explorer data
+        run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
+
+      - name: Build results-explorer
+        run: npm run build
+        working-directory: results-explorer
+
+      - name: Generate Explorer browser fixtures
+        run: npm run test:e2e:fixtures
+        working-directory: results-explorer
+
+      - name: Install website dependencies
+        run: npm ci
+        working-directory: website
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('website/package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: website
+
+      - name: Compare the Astro build with the Sphinx site
+        run: make site-parity SITE_PARITY_SHA=${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Upload the URL compatibility report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: url-compatibility-report
+          path: |
+            site-parity/report
+            site-parity/browser-report.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  public-site-visual-astro-dry-run:
+    name: Public-site visual Astro dry run
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.site-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            results-explorer/package-lock.json
+            website/package-lock.json
+
+      - name: Install results-explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Build explorer data
+        run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
+
+      - name: Build results-explorer
+        run: npm run build
+        working-directory: results-explorer
+
+      - name: Install website dependencies
+        run: npm ci
+        working-directory: website
+
+      - name: Build website
+        run: make site-build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: results-explorer
+
+      - name: Capture public site from the Astro build
+        run: make site-visual-capture SITE_VISUAL_DIR=${{ runner.temp }}/public-site-visual-astro SITE_VISUAL_SOURCE_SHA=${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Upload Astro visual captures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: public-site-visual-astro-${{ github.run_id }}
+          path: ${{ runner.temp }}/public-site-visual-astro
+          if-no-files-found: ignore
+          retention-days: 3
+
+  api-contract-check:
+    name: api-contract-check
+    needs: ci-paths
+    if: ${{ contains(needs.ci-paths.outputs.changed-paths, '_project/design/site-inventory/api-public-symbols.json') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/check_api_contract_symbols.py') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/api_contract_probe.py') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Verify public API symbols against the released wheel
+        run: make api-contract-check
 
   example-validation:
     needs: visual-inputs
@@ -2223,40 +2209,19 @@ jobs:
           ignore_words_file: .codespell-ignore.txt
           skip: "*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv"
 
-  docstring-coverage:
-    needs: visual-inputs
-    if: needs.visual-inputs.outputs.changed == 'true'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install interrogate
-
-      - name: Check docstring coverage
-        run: |
-          interrogate -c pyproject.toml --fail-under 90 benchbox/
-
-      - name: Generate docstring coverage badge
-        run: |
-          mkdir -p docs/_static
-          interrogate -c pyproject.toml --generate-badge docs/_static/ benchbox/
-
   # Unit result: core. Required by the merge ruleset; reports on every event and passes when untouched.
   core:
     name: core
-    needs: [ci-paths, code-lint, code-test, medium-collect, medium-test, correctness-gate, plan-capture-gate, tpch-binary-framing, datafusion-integration, package-smoke, dist-artifact, dependency-audit]
+    needs: [ci-paths, code-lint, code-test, medium-collect, medium-test, correctness-gate, required-local-cases, plan-capture-gate, tpch-binary-framing, datafusion-integration, package-smoke, dependency-audit]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2281,6 +2246,7 @@ jobs:
         run: python scripts/release_canary_sharding.py verify-medium --artifacts t2-evidence --checked-sha "${{ github.sha }}"
 
       - name: Aggregate core result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2294,20 +2260,47 @@ jobs:
             --expect medium-collect=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect medium-test=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect correctness-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
+            --expect required-local-cases=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect plan-capture-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
-            --expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' }} \
+            --expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' || needs.ci-paths.outputs.framing-needed == 'true' }} \
             --expect datafusion-integration=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect package-smoke=${{ needs.ci-paths.outputs.packaging-needed == 'true' }} \
-            --expect dist-artifact=${{ github.event_name == 'merge_group' }} \
-            --expect dependency-audit=${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
+            --expect dependency-audit=${{ needs.ci-paths.outputs.packaging-needed == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   # Unit result: explorer.
   explorer:
     name: explorer
-    needs: [ci-paths, explorer-tokens, explorer-vitest, parity-check, explorer-e2e, visual-inputs, public-site-visual-regression]
+    needs: [ci-paths, explorer-tokens, explorer-vitest, parity-check, explorer-e2e, visual-inputs]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2318,6 +2311,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate explorer result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2330,8 +2324,28 @@ jobs:
             --expect explorer-vitest=${{ needs.ci-paths.outputs.explorer-vitest-needed == 'true' }} \
             --expect parity-check=${{ needs.ci-paths.outputs.viz-needed == 'true' }} \
             --expect explorer-e2e=${{ needs.ci-paths.outputs.unit-explorer == 'true' }} \
-            --expect visual-inputs=${{ true }} \
-            --expect public-site-visual-regression=${{ needs.visual-inputs.outputs.render_changed == 'true' && needs.ci-paths.outputs.unit-explorer == 'true' }}
+            --expect visual-inputs=${{ true }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   # Unit result: results-data.
   results-data:
@@ -2340,6 +2354,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2350,6 +2370,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate results-data result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2358,15 +2379,42 @@ jobs:
             --unit results-data \
             --needs "$NEEDS_JSON" \
             --always ci-paths \
-            --expect results-data-check=${{ needs.ci-paths.outputs.unit-results-data == 'true' }}
+            --expect results-data-check=${{ needs.ci-paths.outputs.unit-results-data == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   # Unit result: docs.
   docs:
     name: docs
-    needs: [ci-paths, visual-inputs, docs-build, public-site-visual-regression, example-validation, spellcheck, docstring-coverage]
+    needs: [ci-paths, visual-inputs, docs-build, example-validation, spellcheck]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2377,6 +2425,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate docs result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2387,18 +2436,43 @@ jobs:
             --always ci-paths \
             --expect visual-inputs=${{ true }} \
             --expect docs-build=${{ needs.visual-inputs.outputs.changed == 'true' }} \
-            --expect public-site-visual-regression=${{ needs.visual-inputs.outputs.render_changed == 'true' && needs.ci-paths.outputs.unit-docs == 'true' }} \
             --expect example-validation=${{ needs.visual-inputs.outputs.changed == 'true' }} \
-            --expect spellcheck=${{ needs.visual-inputs.outputs.changed == 'true' }} \
-            --expect docstring-coverage=${{ needs.visual-inputs.outputs.changed == 'true' }}
+            --expect spellcheck=${{ needs.visual-inputs.outputs.changed == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   # Unit result: landing.
   landing:
     name: landing
-    needs: [ci-paths, site-theme-tokens, visual-inputs, public-site-visual-regression]
+    needs: [ci-paths, site-theme-tokens, visual-inputs, site-build]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2409,6 +2483,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate landing result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2419,15 +2494,42 @@ jobs:
             --always ci-paths \
             --expect site-theme-tokens=${{ needs.ci-paths.outputs.site-theme-needed == 'true' }} \
             --expect visual-inputs=${{ true }} \
-            --expect public-site-visual-regression=${{ needs.visual-inputs.outputs.render_changed == 'true' && needs.ci-paths.outputs.unit-landing == 'true' }}
+            --expect site-build=${{ needs.ci-paths.outputs.site-needed == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   # Unit result: tooling.
   tooling:
     name: tooling
-    needs: [ci-paths, base-guard, soundness-flag, content-guard, skill-integrity, audit-sha, ruleset-drift]
+    needs: [ci-paths, base-guard, content-guard, skill-integrity, audit-sha, comment-policy]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2438,6 +2540,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate tooling result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2446,9 +2549,29 @@ jobs:
             --unit tooling \
             --needs "$NEEDS_JSON" \
             --always ci-paths \
-            --always soundness-flag \
+            --always comment-policy \
             --expect base-guard=${{ github.event_name == 'pull_request' }} \
             --expect content-guard=${{ needs.ci-paths.outputs.content-guard-needed == 'true' }} \
             --expect skill-integrity=${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }} \
-            --expect audit-sha=${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }} \
-            --expect ruleset-drift=${{ github.event_name == 'merge_group' }}
+            --expect audit-sha=${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90

@@ -1,8 +1,9 @@
 # Results Explorer — Token-Scan Gate
 
 The Results Explorer retheme moves public surfaces onto CSS-variable tokens
-defined in `results-explorer/src/index.css` and the shared static theme at
-`landing/shared/site-theme.css`. This gate keeps the contract durable: a PR
+defined in the single shared token file `landing/shared/site-tokens.css`
+(consumed by `website/`, the Results Explorer and the landing page) and the
+legacy static theme at `landing/shared/site-theme.css`. This gate keeps the contract durable: a PR
 that reintroduces a raw Tailwind palette literal (`text-gray-700`,
 `bg-blue-500`, `border-red-300`, …), arbitrary color literal, SVG hex color,
 or raw `rgb()` / `rgba()` value breaks CI rather than ships silently.
@@ -93,17 +94,18 @@ skins, deliberate palette exports for design tooling, and similar.
 
 ## CI wiring
 
-`.github/workflows/ci.yml` job `explorer-tokens` runs on any pull request or
-merge-group event where the `ci-paths` classifier sets
+`.github/workflows/ci.yml` job `explorer-tokens` runs on a pull request where
+the `ci-paths` classifier sets
 `explorer-paths-needed`, which is the `explorer-tokens` group in
 `.github/path-filters.yml` (a change under `results-explorer/src/`). It runs
 `make lint-explorer-tokens`. The shared site theme has its own
 `site-theme-tokens` job in the `landing` unit. The job is
 part of the `explorer` unit in `.github/ci-units.yml`, so `explorer` fails when
 the scan fails and, because a skipped required job also fails its unit, when
-the scan is skipped while its paths changed. The merge queue runs the scan
-again on the composed tree, which is what catches a squash race that
-reintroduces literals after each PR passed on its own.
+the scan is skipped while its paths changed. The scan validates the pull request
+head; with the queue retired, it is not repeated on the composed tree. The
+post-merge trunk suite does not run this token scan, so a squash race that
+reintroduces literals is not covered by a second scan.
 
 ### When the gate is wrong (false positive)
 

@@ -1,7 +1,7 @@
 {
   "benchmark": "tpch",
   "scale_factor": 1.0,
-  "reference_seed": 17039360,
+  "reference_seed": null,
   "digest": {
     "primitive": "benchbox.core.tpchavoc.validation.calculate_checksum",
     "algorithm": "md5-of-order-normalized-rows",
@@ -9,29 +9,29 @@
     "emitter": "benchbox.core.results.result_digest.compute_result_digest"
   },
   "provenance": {
-    "generated_with_duckdb": "1.3.2",
+    "generated_with_duckdb": "1.5.5",
     "generated_with_platform": "duckdb",
     "phases": "generate,load,power",
-    "note": "Reference VALUE digests for the bounded correctness-gate TPC-H queries at SF=1 with the pinned reference qgen seed. REGENERATE with `make correctness-gate-digests-regen` (_project/scripts/regenerate_correctness_gate_digests.py), which runs the same gate configuration with BENCHBOX_EMIT_RESULT_DIGEST=1 and writes this file -- do NOT hand-copy. This oracle is a REGRESSION SNAPSHOT vs a DuckDB-pinned baseline (it detects change from the frozen benchbox-on-DuckDB answer), NOT an independent correctness oracle: a conceptual value bug present at freeze time is enshrined, not caught. The digest is a value+TYPE-rendering digest (int renders exactly, float/Decimal at fixed significant figures), so it is DuckDB-pinned; cross-engine reuse is deferred (see _project/analysis/value-digest-cross-engine-independence-decision.md). Digests are tied to the DuckDB build pinned in uv.lock; a DuckDB bump that changes a query's emitted values requires regenerating this file."
+    "note": "Reference VALUE digests for the bounded correctness-gate TPC-H queries at SF=1 with the qgen -d default substitution parameters. REGENERATE with `make correctness-gate-digests-regen` (_project/scripts/regenerate_correctness_gate_digests.py), which runs the same gate configuration with BENCHBOX_EMIT_RESULT_DIGEST=1 and writes this file -- do NOT hand-copy. This oracle is a REGRESSION SNAPSHOT vs a DuckDB-pinned baseline (it detects change from the frozen benchbox-on-DuckDB answer), NOT an independent correctness oracle: a conceptual value bug present at freeze time is enshrined, not caught. The digest is a value+TYPE-rendering digest (int renders exactly, float/Decimal at fixed significant figures), so it is DuckDB-pinned; cross-engine reuse is deferred (see _project/analysis/value-digest-cross-engine-independence-decision.md). Digests are tied to the DuckDB build pinned in uv.lock; a DuckDB bump that changes a query's emitted values requires regenerating this file."
   },
   "digests": {
-    "1": "d38718127eb3d68cccfef8c41c94c536",
-    "2": "9e98f3d582e9c8cf16c106e6d51d1417",
-    "3": "975269739f453a1474e96916fcbba336",
-    "4": "5108dddc1d008a283dc2b2a2f47c542f",
-    "5": "25f857d3c8bfa69119e97c39450a5e2e",
-    "6": "dd3928aa71a856036e6f483549f4249d",
-    "7": "efb636348f198e98e74161cfc576d8b1",
-    "8": "a690a43d7fcbe2e3632e659f1c97039a",
-    "9": "c26d63720f9f8259496609d00642a5e0",
-    "10": "b1ed69129a8851b94c876bd40e6e2625",
-    "12": "71b94cfdba724e44a6501b4856d66bd0",
-    "13": "dd63022d52a7aace7b367d2b2bddf596",
-    "14": "ab2c9cac10d0aa0bc2acc4602d8cb75a",
-    "15": "da98d50d52d5feb91794d7ea6af9d05b",
-    "17": "cf28a9f9416ca848e991ec00a1124ec0",
-    "19": "af8e9131586fda7b75d59088f72b71d2",
-    "21": "2964d9f6de0ed47c8e976975d0c5652c",
-    "22": "5380803b80ab3272f1c71b6ce5e1e4a2"
+    "1": "45f5f52875c7077e8e1bdd77dfd51960",
+    "2": "457effac6a92468fc364a0c0963140e6",
+    "3": "6524452df7bb8ffebdf62f4553dc8979",
+    "4": "84c2061f218660ea71dcbee1b308ab1a",
+    "5": "74d8a2a67f35a4c3348054617589bd9d",
+    "6": "89eec3fd2eea76cf6ddbfdab00712a1d",
+    "7": "37dfe27b0cf7c755d7c323f80fde3a2b",
+    "8": "8028fbb14cbddf14cc7fd2d511c2f753",
+    "9": "c34dc2f4a2509b1a7214497c610e7b55",
+    "10": "7a4af9e6b89d38716c5394585652e05b",
+    "12": "271d70a5ed9963264c015d824439b45d",
+    "13": "59fe8f063cf903e3d24e5225cd02a627",
+    "14": "33438928c92b6aa06e97ddeb0190e843",
+    "15": "4864a2d322f1040440fdb909391cabd4",
+    "17": "985ec3d086775bc2c2b33d6721358030",
+    "19": "2312f5353efac8444a3065955374f593",
+    "21": "4ed785880a105e6ac006bada220e1c3d",
+    "22": "827f4d90057f4df3b760f61901b4feac"
   }
 }

@@ -45,6 +45,22 @@ def pyspark_test_environment() -> Generator[None, None, None]:
                 os.environ[key] = value
 
 
+SPARK_RUNTIME_ENV_KEYS = ("JAVA_HOME", "PYSPARK_PYTHON", "SPARK_AUTH_SOCKET_TIMEOUT", "SPARK_BUFFER_SIZE")
+
+
+@pytest.fixture
+def spark_runtime_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Own the variables that Java discovery and the PySpark gateway write while a test runs.
+
+    ``get_java_skip_reason`` and ``ensure_compatible_java`` set ``JAVA_HOME``, and starting a real
+    Spark gateway sets the two ``SPARK_*`` socket variables. They are runtime outputs of the code
+    under test, so each test restores them rather than leaving them in the process.
+    """
+    from tests.utilities.session_isolation import own_environment
+
+    own_environment(monkeypatch, SPARK_RUNTIME_ENV_KEYS)
+
+
 @pytest.fixture
 def temp_dir() -> Generator[Path, None, None]:
     """Create a temporary directory for test data."""

@@ -96,6 +96,13 @@ bundle_failed_query_count = _load_bundle_failed_query_count()
 # Max length for the optional free-text submission_notes manifest field.
 SUBMISSION_NOTES_MAX_LEN = 500
 
+KNOWN_DEFECT_IDS = frozenset(
+    {
+        "defective-macdbgen-addresses",
+        "defective-windows-dsdgen-scale",
+    }
+)
+
 # Applied tuning receipts are attacker-controlled submission companions. These
 # ceilings sit well above realistic runs while bounding validation and Explorer
 # ingestion work. Oversized submissions fail loudly; the Explorer pipeline has
@@ -412,6 +419,7 @@ KNOWN_PLATFORMS = {
     "firebolt",
     # SQL - self-hosted & extensions
     "postgresql",
+    "cedardb",
     "timescaledb",
     "pg-duckdb",
     "pg_duckdb",
@@ -1687,6 +1695,9 @@ def _validate_platform_config_clustering(data: dict, vr: ValidationResult) -> No
         vr.warn(f"Unknown platform.config.databricks_clustering_strategy: {strategy!r}")
 
 
+_TUNING_EVIDENCE_KEYS = ("requested", "tuning_source", "requested_config_hash", "hash", "source")
+
+
 def _warn_pre_cutoff_clustering_claim(data: dict, vr: ValidationResult) -> None:
     """Warn on Databricks ``z_order`` claims that predate provenance.
 
@@ -1695,8 +1706,9 @@ def _warn_pre_cutoff_clustering_claim(data: dict, vr: ValidationResult) -> None:
     (introduced in #2199, after the fix) is the cutoff marker: a bundle
     without it that claims ``z_order`` outside any tuning context may be
     a mislabeled untuned run, so readers must treat it as unknown. Tuned
-    runs (non-empty ``platform.tuning``) and post-cutoff bundles are
-    unaffected. Old bundles are never rewritten; warn only.
+    runs (``platform.tuning`` carrying a requested configuration or its
+    source or hash) and post-cutoff bundles are unaffected. Old bundles are
+    never rewritten; warn only.
     """
     platform = data.get("platform")
     if not isinstance(platform, dict):
@@ -1709,7 +1721,7 @@ def _warn_pre_cutoff_clustering_claim(data: dict, vr: ValidationResult) -> None:
     if config.get("databricks_clustering_strategy") != "z_order":
         return
     tuning = platform.get("tuning")
-    if isinstance(tuning, dict) and tuning:
+    if isinstance(tuning, dict) and any(tuning.get(key) for key in _TUNING_EVIDENCE_KEYS):
         return
     export = data.get("export")
     if isinstance(export, dict) and export.get("benchbox_version"):
@@ -2311,6 +2323,7 @@ def _oversized_applied_ledger_arrays(applied: dict) -> list[tuple[str, int]]:
     candidates = (
         ("statements", applied.get("statements")),
         ("dropped", applied.get("dropped")),
+        ("satisfied", applied.get("satisfied")),
         ("receipt.entries", receipt.get("entries")),
         ("receipt.observed", receipt.get("observed")),
         ("receipt.dropped", receipt.get("dropped")),
@@ -2355,17 +2368,28 @@ def _validate_manifest_provenance(manifest: dict[str, Any], primary_path: Path, 
             vr.error(f"Manifest submission_notes exceeds {SUBMISSION_NOTES_MAX_LEN} characters ({len(notes)})")
 
     result_source = manifest.get("result_source")
-    if result_source is None:
-        return
-    if result_source not in RESULT_SOURCES:
-        vr.error(f"Invalid manifest result_source {result_source!r}: must be one of {sorted(RESULT_SOURCES)}")
-        return
-    if result_source == "vendor" and primary_path.parent.name != "vendor":
-        vr.error(
-            "Manifest result_source 'vendor' is only valid for bundles directly "
-            "under a maintainer-controlled results-data/bundles/vendor/ path; a "
-            "community submission cannot self-assert the vendor-supplied label."
-        )
+    if result_source is not None:
+        if result_source not in RESULT_SOURCES:
+            vr.error(f"Invalid manifest result_source {result_source!r}: must be one of {sorted(RESULT_SOURCES)}")
+        elif result_source == "vendor" and primary_path.parent.name != "vendor":
+            vr.error(
+                "Manifest result_source 'vendor' is only valid for bundles directly "
+                "under a maintainer-controlled results-data/bundles/vendor/ path; a "
+                "community submission cannot self-assert the vendor-supplied label."
+            )
+
+    known_defects = manifest.get("known_defects")
+    if known_defects is not None:
+        if (
+            not isinstance(known_defects, list)
+            or not known_defects
+            or any(not isinstance(item, str) for item in known_defects)
+        ):
+            vr.error("Manifest known_defects must be a non-empty list of defect id strings")
+        else:
+            for defect in known_defects:
+                if defect not in KNOWN_DEFECT_IDS:
+                    vr.error(f"Unknown manifest known_defects id {defect!r}: must be one of {sorted(KNOWN_DEFECT_IDS)}")
 
 
 # ---------------------------------------------------------------------------

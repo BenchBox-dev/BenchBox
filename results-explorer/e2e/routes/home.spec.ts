@@ -54,8 +54,8 @@ test.describe("Home", () => {
       hero.evaluate((element) => getComputedStyle(element).backgroundColor),
       dataSurface.evaluate((element) => getComputedStyle(element).backgroundColor),
     ]);
-    expect(lightHeroBg).toBe("rgb(255, 255, 255)");
-    expect(lightDataBg).toBe("rgb(245, 246, 248)");
+    expect(lightHeroBg).toBe("rgb(249, 240, 231)");
+    expect(lightDataBg).toBe("rgb(242, 225, 212)");
 
     await page.evaluate(() => localStorage.setItem("benchbox:theme", "dark"));
     await page.reload();
@@ -65,8 +65,8 @@ test.describe("Home", () => {
       page.getByTestId("home-hero-filter-band").evaluate((element) => getComputedStyle(element).backgroundColor),
       page.getByTestId("home-data-surface").evaluate((element) => getComputedStyle(element).backgroundColor),
     ]);
-    expect(darkHeroBg).toBe("rgb(13, 17, 23)");
-    expect(darkDataBg).toBe("rgb(13, 17, 23)");
+    expect(darkHeroBg).toBe("rgb(74, 21, 38)");
+    expect(darkDataBg).toBe("rgb(74, 21, 38)");
   });
 
   test("browse-by-benchmark link deep-links to the benchmark index under /results/", async ({

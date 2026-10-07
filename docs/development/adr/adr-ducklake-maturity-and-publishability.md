@@ -129,7 +129,7 @@ approval enforcement was **retired on 2026-07-18** - the sole owner authors ever
 PR and GitHub forbids self-approval. The file's two live roles are:
 
 1. mirroring `SOUNDNESS_PREFIXES` in
-   `_project/scripts/auto_merge_soundness_paths.py`, which **withholds
+   `_project/scripts/soundness_paths.py`, which **withholds
    auto-merge**; and
 2. routing review requests.
 
@@ -190,6 +190,6 @@ layout in results metadata.
   and comparison grouping is follow-up work, not covered here.
 - w13 leaves `SOUNDNESS_PREFIXES` and CODEOWNERS unchanged - and they must stay
   in lockstep, pinned by
-  `tests/unit/test_auto_merge_soundness_paths.py::test_codeowners_covers_soundness_paths`.
+  `tests/unit/scripts/test_soundness_paths.py`.
 - w14 adds a caveat to the DuckLake platform guide. Any future published
   DuckLake comparison should link it.

@@ -23,14 +23,9 @@ two release Make targets handle the cut and finalization. Wheel install,
 release canary, and correctness remain the blocking gates; UAT is a
 non-blocking matrix campaign.
 
-This flow releases the Python package. It does not publish `benchbox.dev` while independent
-publication owns Pages: the site publishes from `develop` through the candidate build plus
-`github-pages`-approved transaction in `docs/operations/publication-deployer-soak-and-retirement.md`.
-The `docs.yml` release-to-Pages job is a legacy fallback that is skipped while a recent
-independent publication owns Pages. The guard detects ownership through unexpired
-`publication-live-receipt-*` artifacts (live receipts are retained 90 days), so the skip
-guarantee lapses if no publication has run within that window or the receipt artifacts are
-gone; a later package release could then execute the legacy Pages deploy.
+This flow releases the Python package. It does not publish `benchbox.dev`: production Pages is
+deployed by `.github/workflows/site-deploy.yml`. `docs.yml` no longer deploys Pages; it builds the
+site and captures the protected-develop visual baseline only.
 
 ## Pre-merge release-required contract
 
@@ -46,7 +41,7 @@ Before a release PR can merge, the `release-only` ruleset must require:
 
 - the required fast lane, `test (ubuntu-latest, 3.12)`;
 - the bounded real-result correctness gate, `make test-correctness-gate`
-  (`DuckDB x TPC-H` at SF=1 with the pinned reference qgen seed, through
+  (`DuckDB x TPC-H` at SF=1 with `qgen -d` default substitution parameters, through
   generate/load/execute with EXACT stored answer-set row-count validation of the
   18 answer-stable TPC-H queries; Q11/Q16/Q18/Q20 are excluded for answer-set
   boundary sensitivity, and validation is cardinality-level, not value-level).
@@ -134,11 +129,30 @@ must not be bypassed with an undocumented local change.
    attached, then gates on `generate_changelog_entry.py --check-curation`,
    which inspects the drafted section's text: it rejects verbatim commit
    subjects (trailing `(#NNNN)`), the manual-edit placeholder, and more than
-   60 bullets. Curation is always required — the draft is the raw
+   45 bullets or 160 lines (see "Curating release notes" below). Curation is
+   always required — the draft is the raw
    `origin/release..HEAD` delta, hundreds of commits whenever `release` lags
-   `develop`. Headless runs stop here: hand-curate the section, then re-run
-   `make release-cut` (see "Resuming or aborting a cut" below).
+   `develop`. A headless run without curated text stops here: hand-curate the
+   section, then re-run `make release-cut` (see "Resuming or aborting a cut"
+   below). That resume is refused once `origin/develop` moves past the cut's
+   starting commit, which a busy `develop` does within minutes.
    `RELEASE_ALLOW_RAW_CHANGELOG=1` accepts the raw draft deliberately.
+
+   **Non-interactive cuts (agents, CI).** Write the curated section first and
+   pass it in, so the cut finishes in one invocation:
+
+   ```bash
+   make release-cut VERSION=X.Y.Z CHANGELOG_SECTION=/tmp/benchbox-X.Y.Z-section.md
+   ```
+
+   The file holds the section body only: the `###` groups and their bullets,
+   without the `## [X.Y.Z] - date` header, which the cut adds. Keep it outside
+   the worktree, because an untracked file there blocks `release-cut-abort`.
+   The text replaces any `[X.Y.Z]` section an earlier pass left, and goes below
+   `[Unreleased]`, which the cut leaves unchanged. The
+   `--check-curation` gate checks it like any other section, so raw commit
+   subjects are still refused, and the exact-`origin/develop` start check still
+   runs first.
 4. Curates the release branch — `git rm`'s the dev-only and deferred
    release paths while retaining the curated Results Explorer publication
    inputs: `results-data/`, `results-explorer/`,
@@ -162,6 +176,46 @@ must not be bypassed with an undocumented local change.
 7. Pushes and opens a PR against `release`.
 8. Sweeps prior `v*` branches on origin (option-c lifecycle: keep until
    superseded, then auto-delete on the next `release-cut`).
+
+### Curating release notes
+
+Write for users, not contributors: include only changes a user would notice,
+grouped by theme (`Before you upgrade`, `Added`, `Changed`, `Fixed`) and
+matching the structure and length of earlier entries. Use plain language. Mark
+behavior changes in `Before you upgrade` with `BREAKING:` and date the section
+with the publication date. The curation gate enforces the length half of this
+standard: at most 45 bullets and 160 lines, set from the largest hand-curated
+section shipped (0.2.1, 39 bullets over 139 lines). A longer draft means the
+curation is not done yet — group and cut further rather than working around
+the gate.
+
+### Tests on the release tree
+
+The release PR's required test job runs the fast test selection on the curated
+tree. A test that reads a path removed in step 4 passes on develop but fails or
+errors there, and blocks `release-required-result`.
+`scripts/release_curation_dry_run.py` catches this early. It reads the
+`git rm` commands from the `release-cut:` recipe, so it removes exactly what a
+cut removes. It applies them in a scratch worktree of the committed `HEAD`, then
+runs pytest there. CI runs it on every pull request for the test modules the PR
+changes. Before a cut, run the full fast selection on the curated tree (about
+8 minutes locally):
+
+```bash
+uv run -- python scripts/release_curation_dry_run.py
+```
+
+To fix a failure, change the test, not the curation:
+
+- When one test reads a file that release-cut removes, skip that test when the
+  file is absent, for example
+  `@pytest.mark.skipif(not PATH.exists(), reason="_project scripts are not in this checkout (release tree)")`.
+- When every test in a module needs a removed file, put the same `skipif` in the
+  module's `pytestmark`. When the module imports a removed helper, use
+  `pytest.importorskip`.
+- Add the test file to the release-cut strip list only when the whole file tests
+  development-only tooling. The list is the `git rm` lines in the `release-cut:`
+  target and the leftover guard below them.
 
 ### Resuming or aborting a cut
 
@@ -224,6 +278,14 @@ raw commit subjects, which step 3 requires you to curate anyway.
    design (per A3 in `_project/decisions/single-repo-migration.md`); the
    release squash on `release` does not need to be replayed onto develop.
 
+**Deploying the site.** `docs.yml` no longer deploys on release. After
+`release-finalize` succeeds, dispatch `.github/workflows/site-deploy.yml` with
+`mode=deploy` from `develop`, for example
+`gh workflow run site-deploy.yml --ref develop -f mode=deploy`, and have the
+owner approve the `github-pages` deployment. `publication-deploy.yml` remains
+the manual fallback until `site-deploy.yml` records its first receipted
+production deploy.
+
 **Resuming finalization.** Run `make release-finalize VERSION=X.Y.Z` again after
 an interrupted merge, tag creation, or tag push. If the PR is still open, its
 current exact head must pass the required checks before merge. If it is merged,
@@ -248,9 +310,18 @@ so `develop` no longer trails PyPI.
 
 The fast guard
 `tests/unit/release/test_changelog_tag_guard.py::test_repo_release_accounting_matches_*`
-pins the published version as its own literal. No tooling updates that literal:
-rename the test to the new version by hand at each cut (or extend
-`scripts/update_version.py`, which currently has no reference to it). It stays
+pins the published version as its own literal. Keep that literal at the version
+PyPI currently serves: on the release branch it stays at the previous release,
+and it moves to the new version only in the develop version-sync PR after
+publication (renaming the test, for example from `..._matches_v041_...` to
+`..._matches_v042_...`, as #2669 did). The same timing applies to the
+CHANGELOG `[Unreleased]` compare link: on the release branch it still starts at
+the previous release's tag, and it moves to the new tag in the version-sync PR.
+Moving either at cut time fails the required test job, because
+`check_release_accounting` validates what PyPI serves, not what the release
+branch is about to publish. No tooling updates the literal today; automating
+that move means extending `scripts/update_version.py`, which currently has no
+reference to it. It stays
 a literal rather than reading
 `pyproject.toml`, because that is exactly what the accounting check validates;
 deriving it from the checked source would let a sync to an unpublished version
@@ -369,7 +440,7 @@ recovery version through this same flow.
 `release-prep` and `release-check` prepare release content in an ordinary pull
 request against `develop`. They do not replace `release-cut` and
 `release-finalize` above. Do not tag the merged develop commit until the
-replacement publisher has passed its exact merge-group artifact, attestation,
+replacement publisher has passed its exact `trunk.yml` distribution artifact, attestation,
 installed-artifact matrix, and release acceptance checks. The legacy
 `release.yml` publisher requires `origin/release` ancestry and rejects develop
 tags. Passing the content check alone does not authorize tagging or publication.
@@ -405,7 +476,7 @@ baseline defaults to the newest final release tag older than `VERSION`; that
 tag is resolved once to a commit. CI selects changes to managed release markers,
 the current version's changelog section, the lock schema, or release enforcement
 inputs. Its always-required `ci-paths` job runs the check with the immutable
-pull-request or merge-group event base SHA as `BASE_REF`; a failed check blocks
+pull-request event base SHA as `BASE_REF`; a failed check blocks
 `core`. Unchanged release identity avoids the dependency installation and check.
 Missing baseline history fails the check. Preparation uses a frozen environment
 until its explicit `uv lock` step. It validates the date and changelog lower

@@ -120,16 +120,17 @@ class InfluxDBSetupMixin:
         - Core/OSS: Databases are created automatically
         - Cloud: Databases are managed via the InfluxDB UI or API
 
-        For benchmarking, we typically work with existing databases.
+        There is no docs-supported automatic drop, so a requested recreate fails closed with a
+        manual-drop error instead of warning and silently reusing the database.
 
         Args:
             **connection_config: Connection configuration
         """
-        if getattr(self, "force_recreate", False):
-            self.logger.warning(
-                "InfluxDB does not support database recreation via SQL. "
-                "Database must be managed via InfluxDB UI or API."
-            )
+        self.fail_closed_on_force_recreate(
+            platform_label="InfluxDB",
+            database=connection_config.get("database", getattr(self, "database", None)),
+            manual_hint="Delete the database manually via the InfluxDB UI, CLI, or management API",
+        )
         base_handler = getattr(super(), "handle_existing_database", None)
         if base_handler is not None:
             base_handler(**connection_config)

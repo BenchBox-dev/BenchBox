@@ -41,7 +41,6 @@ from .base.config_utils import (
     POSTGRES_FAMILY_PLATFORM_FIELDS,
     make_platform_config_builder,
 )
-from .base.connection_wrappers import StreamConnectionCapability
 from .base.data_loading import (
     CsvDialect,
     DataSourceResolver,
@@ -335,14 +334,6 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     plan_capture_phase_eligible = True
     default_service_port = 5432
-    # psycopg connections do not support true concurrent statement execution
-    # across cursors of one connection (server-side session state --
-    # transactions, SET, prepared statements -- lives on the connection, and
-    # concurrent cursor use serializes or raises). Each throughput/pool-test
-    # stream therefore gets its own independent connection/session; see
-    # new_stream_connection() below and
-    # benchbox/platforms/base/connection_wrappers.py:StreamConnectionCapability.
-    stream_connection_capability = StreamConnectionCapability.INDEPENDENT_CONNECTION
 
     @property
     def platform_name(self) -> str:
@@ -898,6 +889,7 @@ class PostgreSQLAdapter(PsycopgConnectionMixin, PlatformAdapter):
 
                 if effective_tuning:
                     self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
+                    self.run_post_load_tunings(table_name_lower, effective_tuning, connection)
 
                 self.log_verbose(f"Loaded {row_count:,} rows into {table_name_lower}")
             except Exception as e:
@@ -1336,7 +1328,7 @@ _build_postgresql_config = make_platform_config_builder(
     __name__,
     "PostgreSQL",
     "psycopg",
-    POSTGRES_FAMILY_PLATFORM_FIELDS + ("enable_timescale",),
+    POSTGRES_FAMILY_PLATFORM_FIELDS + ("enable_timescale", "statement_timeout"),
     base_options={"schema": "public"},
-    field_defaults={**POSTGRES_FAMILY_BASE_OPTIONS, "enable_timescale": False},
+    field_defaults={**POSTGRES_FAMILY_BASE_OPTIONS, "enable_timescale": False, "statement_timeout": 0},
 )

@@ -21,36 +21,72 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import csv
+import re
 import statistics
 from dataclasses import dataclass, field
 from datetime import datetime
 from html import escape as html_escape
 from pathlib import Path
-from typing import Optional, Union
+from types import SimpleNamespace
+from typing import Any, Optional, Union
 
 from benchbox.core.tpch.official_benchmark import TPCHOfficialBenchmarkResult
+
+
+def _as_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return value
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        return to_dict()
+    return dict(vars(value)) if value is not None else {}
+
+
+def _query_times(power: dict[str, Any]) -> dict[int, float]:
+    times: dict[int, float] = {}
+    for query in power.get("query_results") or []:
+        match = re.search(r"\d+", str(query.get("query_id", "")))
+        seconds = query.get("execution_time_seconds")
+        if match and query.get("success", True) and isinstance(seconds, (int, float)):
+            times[int(match.group())] = float(seconds)
+    return times
+
+
+def _report_view(result: Any) -> Any:
+    if hasattr(result, "power_test"):
+        return result
+    power = _as_mapping(result.power_test_result)
+    throughput = _as_mapping(result.throughput_test_result)
+    return SimpleNamespace(
+        success=result.success,
+        scale_factor=result.config.scale_factor,
+        total_benchmark_time=result.total_time,
+        power_test=SimpleNamespace(
+            total_time=power.get("total_time", 0.0),
+            power_at_size=result.power_at_size,
+            success=bool(power.get("success", result.power_at_size > 0)),
+            query_times=_query_times(power),
+        ),
+        throughput_test=SimpleNamespace(
+            total_time=throughput.get("total_time", 0.0),
+            throughput_at_size=result.throughput_at_size,
+            num_streams=throughput.get("streams_executed") or result.config.num_streams,
+            success=bool(throughput.get("success", result.throughput_at_size > 0)),
+        ),
+    )
 
 
 @dataclass
 class PerformanceMetrics:
     """Comprehensive performance metrics for TPC-H benchmark."""
 
-    qphh_at_size: float
     power_at_size: float
     throughput_at_size: float
     total_execution_time: float
     average_query_time: float
     median_query_time: float
     query_time_std_dev: float
-    throughput_efficiency: float
-    power_efficiency: float
     scale_factor: float
-
-    def __post_init__(self) -> None:
-        """Calculate derived metrics."""
-        if self.qphh_at_size > 0:
-            self.throughput_efficiency = self.throughput_at_size / self.qphh_at_size
-            self.power_efficiency = self.power_at_size / self.qphh_at_size
 
 
 @dataclass
@@ -68,8 +104,8 @@ class ValidationResult:
 class ComparisonResult:
     """Result comparison between benchmark runs."""
 
-    baseline_qphh: float
-    current_qphh: float
+    baseline_power_at_size: float
+    current_power_at_size: float
     performance_change: float
     relative_change: float
     significant_change: bool
@@ -102,7 +138,7 @@ class TPCHReportGenerator:
         """Generate a comprehensive TPC-H benchmark report.
 
         Args:
-            result: QphH benchmark result
+            result: TPC-H benchmark result
             report_title: Title for the report
             include_detailed_analysis: Include detailed performance analysis
             include_certification_info: Include certification information
@@ -110,6 +146,7 @@ class TPCHReportGenerator:
         Returns:
             Path to generated report file
         """
+        result = _report_view(result)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         report_file = self.output_dir / f"tpch_comprehensive_report_{timestamp}.html"
 
@@ -138,11 +175,12 @@ class TPCHReportGenerator:
         """Generate a certification-ready TPC-H report.
 
         Args:
-            result: QphH benchmark result
+            result: TPC-H benchmark result
 
         Returns:
             Path to generated certification report
         """
+        result = _report_view(result)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         report_file = self.output_dir / f"tpch_certification_report_{timestamp}.txt"
 
@@ -156,7 +194,6 @@ class TPCHReportGenerator:
             # Executive Summary
             f.write("EXECUTIVE SUMMARY\n")
             f.write("-" * 20 + "\n")
-            f.write(f"QphH@Size: {result.qphh_at_size:.2f}\n")
             f.write(f"Scale Factor: {result.scale_factor}\n")
             f.write(f"Certification Ready: {'YES' if validation.certification_ready else 'NO'}\n")
             f.write(f"Specification Compliant: {'YES' if validation.compliant else 'NO'}\n\n")
@@ -231,11 +268,12 @@ class TPCHReportGenerator:
         """Generate CSV file with detailed performance data.
 
         Args:
-            result: QphH benchmark result
+            result: TPC-H benchmark result
 
         Returns:
             Path to generated CSV file
         """
+        result = _report_view(result)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         csv_file = self.output_dir / f"tpch_performance_data_{timestamp}.csv"
 
@@ -268,7 +306,6 @@ class TPCHReportGenerator:
             writer.writerow([])
             writer.writerow(["SUMMARY"])
             writer.writerow(["Metric", "Value"])
-            writer.writerow(["QphH@Size", result.qphh_at_size])
             writer.writerow(["Power@Size", result.power_test.power_at_size])
             writer.writerow(["Throughput@Size", result.throughput_test.throughput_at_size])
             writer.writerow(["Scale_Factor", result.scale_factor])
@@ -292,13 +329,15 @@ class TPCHReportGenerator:
         Returns:
             ComparisonResult with detailed comparison analysis
         """
+        baseline_result = _report_view(baseline_result)
+        current_result = _report_view(current_result)
         # Calculate overall performance change
-        baseline_qphh = baseline_result.qphh_at_size
-        current_qphh = current_result.qphh_at_size
+        baseline_power = baseline_result.power_test.power_at_size
+        current_power = current_result.power_test.power_at_size
 
-        if baseline_qphh > 0:
-            performance_change = current_qphh - baseline_qphh
-            relative_change = performance_change / baseline_qphh
+        if baseline_power > 0:
+            performance_change = current_power - baseline_power
+            relative_change = performance_change / baseline_power
             significant_change = abs(relative_change) > significance_threshold
         else:
             performance_change = 0.0
@@ -316,8 +355,8 @@ class TPCHReportGenerator:
                 query_changes[query_id] = change
 
         return ComparisonResult(
-            baseline_qphh=baseline_qphh,
-            current_qphh=current_qphh,
+            baseline_power_at_size=baseline_power,
+            current_power_at_size=current_power,
             performance_change=performance_change,
             relative_change=relative_change,
             significant_change=significant_change,
@@ -340,6 +379,8 @@ class TPCHReportGenerator:
         Returns:
             Path to generated comparison report
         """
+        baseline_result = _report_view(baseline_result)
+        current_result = _report_view(current_result)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         report_file = self.output_dir / f"tpch_comparison_report_{timestamp}.html"
 
@@ -360,15 +401,12 @@ class TPCHReportGenerator:
         if not query_times:
             # Return default metrics if no query times available
             return PerformanceMetrics(
-                qphh_at_size=result.qphh_at_size,
                 power_at_size=result.power_test.power_at_size,
                 throughput_at_size=result.throughput_test.throughput_at_size,
                 total_execution_time=result.total_benchmark_time,
                 average_query_time=0.0,
                 median_query_time=0.0,
                 query_time_std_dev=0.0,
-                throughput_efficiency=0.0,
-                power_efficiency=0.0,
                 scale_factor=result.scale_factor,
             )
 
@@ -377,15 +415,12 @@ class TPCHReportGenerator:
         std_dev = statistics.stdev(query_times) if len(query_times) > 1 else 0.0
 
         return PerformanceMetrics(
-            qphh_at_size=result.qphh_at_size,
             power_at_size=result.power_test.power_at_size,
             throughput_at_size=result.throughput_test.throughput_at_size,
             total_execution_time=result.total_benchmark_time,
             average_query_time=avg_query_time,
             median_query_time=median_query_time,
             query_time_std_dev=std_dev,
-            throughput_efficiency=0.0,  # Will be calculated in __post_init__
-            power_efficiency=0.0,  # Will be calculated in __post_init__
             scale_factor=result.scale_factor,
         )
 
@@ -411,8 +446,6 @@ class TPCHReportGenerator:
         issues = []
         if not result.success:
             issues.append("Benchmark did not complete successfully")
-        if result.qphh_at_size <= 0:
-            issues.append("QphH@Size must be positive")
         if not result.power_test.success:
             issues.append("Power Test failed")
         elif len(result.power_test.query_times) != 22:
@@ -536,10 +569,6 @@ class TPCHReportGenerator:
         <h2>Executive Summary</h2>
         <div class="metrics">
             <div class="metric">
-                <h3>QphH@Size</h3>
-                <p><strong>{result.qphh_at_size:.2f}</strong></p>
-            </div>
-            <div class="metric">
                 <h3>Power@Size</h3>
                 <p><strong>{result.power_test.power_at_size:.2f}</strong></p>
             </div>
@@ -662,11 +691,11 @@ class TPCHReportGenerator:
         <div class="comparison">
             <div class="result">
                 <h3>Baseline</h3>
-                <p>QphH@Size: <strong>{comparison.baseline_qphh:.2f}</strong></p>
+                <p>Power@Size: <strong>{comparison.baseline_power_at_size:.2f}</strong></p>
             </div>
             <div class="result">
                 <h3>Current</h3>
-                <p>QphH@Size: <strong>{comparison.current_qphh:.2f}</strong></p>
+                <p>Power@Size: <strong>{comparison.current_power_at_size:.2f}</strong></p>
             </div>
             <div class="result">
                 <h3>Change</h3>

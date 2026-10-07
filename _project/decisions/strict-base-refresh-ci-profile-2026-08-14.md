@@ -1,5 +1,7 @@
 # Decision: whole-event CI latency profile for strict-base refresh
 
+> Superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md).
+
 Date: 2026-08-14
 Status: Measurement for the TODO 06 activation gate. This record does not
 skip jobs, change required contexts, or remove tests.

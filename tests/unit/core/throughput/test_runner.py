@@ -15,9 +15,13 @@ real-DuckDB oracle for this remains
 from __future__ import annotations
 
 import logging
+import subprocess
+import sys
 import threading
 import time
+from concurrent.futures import Future
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 from unittest.mock import Mock
 
@@ -219,6 +223,40 @@ class TestStreamRunnerComputeMetrics:
         assert result.throughput_at_size == expected_throughput_at_size
         assert result.query_throughput == pytest.approx(66 / 3600.0)
         assert result.end_time != ""
+
+    def test_phase_window_follows_first_stream_start_and_last_stream_end(self) -> None:
+        config = _FakeConfig(num_streams=2)
+        result = _make_result()
+        first = _make_stream_result(0, start_time=100.0, end_time=105.0)
+        first.start_wall_time = "2026-10-04T10:00:00"
+        first.end_wall_time = "2026-10-04T10:00:05"
+        last = _make_stream_result(1, start_time=101.0, end_time=110.0)
+        last.start_wall_time = "2026-10-04T10:00:01"
+        last.end_wall_time = "2026-10-04T10:00:10"
+        result.stream_results = [first, last]
+        result.streams_executed = 2
+        result.streams_successful = 2
+
+        StreamRunner.compute_metrics(result, config, start_time=0.0)
+
+        assert result.total_time == pytest.approx(10.0)
+        assert result.start_time == "2026-10-04T10:00:00"
+        assert result.end_time == "2026-10-04T10:00:10"
+
+    def test_scored_queries_per_stream_overrides_executed_statement_count(self) -> None:
+        config = _FakeConfig(num_streams=2, scale_factor=1.0)
+        result = _make_result()
+        result.stream_results = [
+            _make_stream_result(0, start_time=0.0, end_time=3600.0, queries_executed=103, queries_successful=103),
+            _make_stream_result(1, start_time=0.0, end_time=3600.0, queries_executed=103, queries_successful=103),
+        ]
+        result.streams_executed = 2
+        result.streams_successful = 2
+
+        StreamRunner.compute_metrics(result, config, start_time=0.0, queries_per_stream=99)
+
+        assert result.throughput_at_size == pytest.approx(198.0)
+        assert result.query_throughput == pytest.approx(206 / 3600.0)
 
     def test_zero_queries_yields_zero_query_throughput(self) -> None:
         config = _FakeConfig(num_streams=1, scale_factor=0.1)
@@ -646,10 +684,134 @@ class TestStreamRunnerNonBlockingShutdown:
 
         StreamRunner.execute(stream_fn, config, result, logger)
 
-        assert result.streams_executed == 2
+        assert result.streams_executed == 1
+        assert result.cancelled_stream_ids == [1]
         assert len(result.errors) == 2
 
         # Wait well past HANG_SLEEP (when the sole worker frees up) - a
         # cancelled queued future must never be dispatched, even once a
         # worker becomes free.
         assert not started.wait(timeout=self.HANG_SLEEP + 1.0)
+
+
+EXIT_PROBE_PATH = Path(__file__).with_name("hung_stream_exit_probe.py")
+
+
+class TestHungStreamDoesNotBlockInterpreterExit:
+    def test_process_exits_while_a_timed_out_stream_is_still_running(self) -> None:
+        started = time.monotonic()
+        completed = subprocess.run(
+            [sys.executable, str(EXIT_PROBE_PATH)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        elapsed = time.monotonic() - started
+
+        assert completed.returncode == 0, completed.stderr
+        assert "OUTSTANDING [0, 1]" in completed.stdout
+        assert elapsed < 30
+
+
+class _RacingFuture(Future):
+    def __init__(self, outcome: ThroughputStreamResult) -> None:
+        super().__init__()
+        self._outcome = outcome
+
+    def cancel(self) -> bool:
+        self.set_result(self._outcome)
+        return super().cancel()
+
+
+class _ScriptedExecutor:
+    def __init__(self, futures: list[Future], fail_on_submit: int | None = None) -> None:
+        self._futures = futures
+        self._fail_on_submit = fail_on_submit
+        self.submitted = 0
+        self.shutdown_calls: list[tuple[bool, bool]] = []
+
+    def submit(self, fn, /, *args, **kwargs) -> Future:
+        index = self.submitted
+        if self._fail_on_submit is not None and index == self._fail_on_submit:
+            raise RuntimeError("can't start new thread")
+        self.submitted += 1
+        return self._futures[index]
+
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        self.shutdown_calls.append((wait, cancel_futures))
+
+
+class TestStreamRunnerSettlementEdges:
+    def test_future_finishing_while_deadline_is_settled_is_recorded_as_completed(self, monkeypatch) -> None:
+        racing = _RacingFuture(_make_stream_result(1))
+        done = Future()
+        done.set_result(_make_stream_result(0))
+        executor = _ScriptedExecutor([done, racing])
+        monkeypatch.setattr("benchbox.core.throughput.runner.DaemonStreamExecutor", lambda max_workers: executor)
+        config = _FakeConfig(num_streams=2, stream_timeout=0.05)
+        result = _make_result()
+
+        StreamRunner.execute(Mock(), config, result, logging.getLogger("test-throughput-runner"))
+
+        assert result.streams_executed == 2
+        assert result.streams_successful == 2
+        assert result.errors == []
+        assert result.cancelled_stream_ids == []
+        assert result.outstanding_stream_ids == []
+        assert result.cleanup_state == "complete"
+
+    def test_stream_cancelled_before_start_is_not_counted_as_executed(self) -> None:
+        release = threading.Event()
+        started = threading.Event()
+
+        def stream_fn(stream_id: int, seed: int, cfg: _FakeConfig) -> ThroughputStreamResult:
+            if stream_id == 0:
+                release.wait(timeout=10)
+            else:
+                started.set()
+            return _make_stream_result(stream_id)
+
+        config = _FakeConfig(num_streams=3, max_workers=1, stream_timeout=0.1)
+        result = _make_result()
+
+        try:
+            StreamRunner.execute(stream_fn, config, result, logging.getLogger("test-throughput-runner"))
+        finally:
+            release.set()
+
+        assert result.streams_executed == 1
+        assert result.outstanding_stream_ids == [0]
+        assert result.cancelled_stream_ids == [1, 2]
+        assert not started.wait(timeout=0.5)
+
+    def test_submit_failure_surfaces_original_error_and_tracks_submitted_streams(self, monkeypatch) -> None:
+        running = Future()
+        running.set_running_or_notify_cancel()
+        executor = _ScriptedExecutor([running], fail_on_submit=1)
+        monkeypatch.setattr("benchbox.core.throughput.runner.DaemonStreamExecutor", lambda max_workers: executor)
+        config = _FakeConfig(num_streams=2, stream_timeout=5)
+        result = _make_result()
+
+        with pytest.raises(RuntimeError, match="can't start new thread"):
+            StreamRunner.execute(Mock(), config, result, logging.getLogger("test-throughput-runner"))
+
+        assert result.outstanding_stream_ids == [0]
+        assert result.cleanup_state == "outstanding"
+        assert executor.shutdown_calls == [(False, True)]
+        assert "abandoned" in result.errors[0]
+
+    def test_submit_failure_cancels_streams_that_never_started(self, monkeypatch) -> None:
+        queued = Future()
+        executor = _ScriptedExecutor([queued], fail_on_submit=1)
+        monkeypatch.setattr("benchbox.core.throughput.runner.DaemonStreamExecutor", lambda max_workers: executor)
+        config = _FakeConfig(num_streams=2, stream_timeout=5)
+        result = _make_result()
+
+        with pytest.raises(RuntimeError, match="can't start new thread"):
+            StreamRunner.execute(Mock(), config, result, logging.getLogger("test-throughput-runner"))
+
+        assert queued.cancelled()
+        assert result.cancelled_stream_ids == [0]
+        assert result.streams_executed == 0
+        assert result.cleanup_state == "complete"

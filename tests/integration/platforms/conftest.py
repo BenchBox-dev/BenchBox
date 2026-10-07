@@ -7,6 +7,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 
 import os
 import socket
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -644,3 +645,123 @@ def live_cedardb_adapter():
         database=os.getenv("CEDARDB_DATABASE", "benchbox_test"),
     )
     yield adapter
+
+
+# ==============================================================================
+# Stub-installer leak guard
+# ==============================================================================
+
+#: Adapter (and adapter-adjacent) modules that platform stub installers patch.
+#: Every installer in ``common.py`` patches these only through ``monkeypatch``,
+#: so a test whose net effect changes any attribute is leaking stub state into
+#: other tests. This complements the unit-tier ``tests.utilities.leak_detector``
+#: (owned elsewhere; intentionally not modified) with integration-tier coverage.
+STUB_PATCHED_MODULES: tuple[str, ...] = (
+    "benchbox.platforms.databricks.adapter",
+    "benchbox.platforms.bigquery",
+    "benchbox.platforms.redshift",
+    "benchbox.platforms.snowflake",
+    "benchbox.platforms.athena",
+    "benchbox.platforms.clickhouse._dependencies",
+    "benchbox.platforms.clickhouse.setup",
+    "benchbox.platforms.trino",
+    "benchbox.platforms.presto",
+    "benchbox.platforms.postgresql",
+    "benchbox.platforms.influxdb",
+    "benchbox.platforms.influxdb._dependencies",
+    "benchbox.platforms.influxdb.adapter",
+    "benchbox.platforms.influxdb.client",
+    "benchbox.platforms.starrocks._dependencies",
+    "benchbox.platforms.starrocks.setup",
+    "benchbox.platforms.databend.adapter",
+    "benchbox.platforms.doris",
+    "benchbox.platforms.lakesail",
+    "benchbox.platforms.aws.athena_spark_adapter",
+    "benchbox.platforms.aws.emr_serverless_adapter",
+    "benchbox.platforms.gcp.dataproc_adapter",
+    "benchbox.platforms.gcp.dataproc_serverless_adapter",
+    "benchbox.utils.dependencies",
+)
+
+_STUB_BASELINE_KEY = pytest.StashKey[dict[str, dict[str, Any]]]()
+
+
+def import_stub_patched_modules() -> None:
+    """Import every watched module that is importable, for pre-test baselines.
+
+    Helpers read ``sys.modules`` without importing (mirroring the unit-tier leak
+    detector), so modules first imported inside a test body would otherwise have
+    no baseline to compare against.
+    """
+    import importlib
+
+    for name in STUB_PATCHED_MODULES:
+        try:
+            importlib.import_module(name)
+        except ImportError:
+            continue
+
+
+def snapshot_stub_adapter_attrs() -> dict[str, dict[str, Any]]:
+    """Snapshot watched adapter-module attributes without importing anything."""
+    snapshot: dict[str, dict[str, Any]] = {}
+    for name in STUB_PATCHED_MODULES:
+        module = sys.modules.get(name)
+        if module is not None:
+            snapshot[name] = dict(vars(module))
+    return snapshot
+
+
+def find_stub_adapter_attr_leaks(before: dict[str, dict[str, Any]]) -> list[str]:
+    """Return ``module.attr`` names whose identity changed since ``before``."""
+    problems: list[str] = []
+    for name, old_attrs in before.items():
+        module = sys.modules.get(name)
+        if module is None:  # pragma: no cover - defensive
+            problems.append(f"{name} (module removed)")
+            continue
+        current = vars(module)
+        for attr, old_value in old_attrs.items():
+            if attr not in current or current[attr] is not old_value:
+                problems.append(f"{name}.{attr}")
+        for attr in current:
+            if attr not in old_attrs:
+                problems.append(f"{name}.{attr}")
+    return problems
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_setup(item):
+    """Capture the adapter-module baseline before any fixture is set up.
+
+    This must run before function-scoped fixtures: the session-wide
+    ``mock_platform_dependency_checks`` fixture legitimately patches some of
+    these same attributes with mocks and restores them at teardown (net zero),
+    so a baseline taken after fixture setup would mistake the restore for a
+    leak. A yield-fixture check would have the symmetric problem at teardown,
+    running before ``monkeypatch`` undo.
+    """
+    item.stash[_STUB_BASELINE_KEY] = snapshot_stub_adapter_attrs()
+    yield
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_teardown(item):
+    """Fail a test whose net effect changed stub-installer-patched attributes.
+
+    This runs after all function-scoped fixture finalizers, so ``monkeypatch``
+    has already undone legitimate stub installs. Anything still changed was
+    assigned directly and would leak into other tests.
+    """
+    yield
+    baseline = item.stash.get(_STUB_BASELINE_KEY, None)
+    if baseline is None:
+        return None
+    problems = find_stub_adapter_attr_leaks(baseline)
+    if problems:
+        pytest.fail(
+            "test leaked stub-installer state on adapter modules "
+            "(patch via monkeypatch so it is restored): " + ", ".join(sorted(problems)),
+            pytrace=False,
+        )
+    return None

@@ -71,7 +71,20 @@ const CUSTOM_FAILED_CONFIG: TuningEntry = {
   title: "Custom tuning was requested, but BenchBox could not apply it.",
 };
 
+const REQUESTED_NOOP_CONFIG: TuningEntry = {
+  label: "No tuning applied",
+  tone: "neutral",
+  title: "Tuning was requested, but the run recorded no applied tuning settings.",
+};
+
+const REQUESTED_FAILED_CONFIG: TuningEntry = {
+  label: "Tuning failed",
+  tone: "danger",
+  title: "Tuning was requested, but BenchBox could not apply it.",
+};
+
 const APPLIED_TUNING_STATUSES = new Set(["applied_unverified", "applied_verified"]);
+const STATUS_AWARE_TUNING_MODES = new Set(["tuned", "tuned-fallback", "auto"]);
 
 function resolveConfig(
   tuningMode: string | null | undefined,
@@ -83,6 +96,10 @@ function resolveConfig(
     if (tuningValidationStatus === "noop" || tuningValidationStatus === "not_applicable") return CUSTOM_NOOP_CONFIG;
     if (tuningValidationStatus === "failed") return CUSTOM_FAILED_CONFIG;
     return CUSTOM_REQUESTED_CONFIG;
+  }
+  if (STATUS_AWARE_TUNING_MODES.has(tuningMode)) {
+    if (tuningValidationStatus === "noop" || tuningValidationStatus === "not_applicable") return REQUESTED_NOOP_CONFIG;
+    if (tuningValidationStatus === "failed") return REQUESTED_FAILED_CONFIG;
   }
   return TUNING_CONFIG[tuningMode] ?? DEFAULT_CONFIG;
 }
