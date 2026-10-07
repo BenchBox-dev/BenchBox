@@ -15186,6 +15186,16 @@
       "status": "open",
       "title": "Publish the Polars matrix results in the scope the user chose"
     },
+    "pvm-s6b-polars-2-blog-draft": {
+      "claim": null,
+      "needs": [
+        "pvm-s5-analyze-polars-matrix",
+        "pvm-d1-publication-scope-decision"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Draft the blog post on Polars 2.0 performance across versions"
+    },
     "pypi-environment-protection-drift-canary-20260805": {
       "claim": null,
       "needs": [

@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "A draft exists in the blog drafts area following _blog/STYLE_GUIDE.md and passes the blog skill's critique, voice and style checks",
+    "Every figure in the draft traces to the pvm-s5 analysis output (a mapping table is in the draft's research notes)",
+    "The disclosures listed in the description are present",
+    "The draft links to the published results from pvm-s6-publish-polars-results, or states where the data lives"
+  ],
+  "description": "Write the post that presents the Polars 2.0 results, using the blog skill (plan, draft, critique, voice and style checks).\n\nGuardrails:\n- Choose the title and angle after reading the pvm-s5 findings, not before.\n- Lead with the default-settings comparison (setup A), then separate the engine-default change from engine improvements (setup B) and streaming against streaming (setup C).\n- Include the disclosures: host (Apple M4, 16 GiB), thread count, data generation, Parquet reads in each run, min–max per median, did-not-complete cells, the correctness evidence used, and no speed claims against DuckDB.\n- Every chart and number cites the analysis output.\n- Draft only: publishing goes through the blog skill's normal review, and its own approval.",
+  "links": [
+    "_blog/STYLE_GUIDE.md",
+    "_blog/VOICE_REFERENCE.md",
+    "_blog/building-benchbox/published/16-results-explorer-introduction.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-07T20:56:46Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b217967e5d5741feb4630ee8f8ed3e70",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    }
+  ]
+}
