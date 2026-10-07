@@ -1251,6 +1251,9 @@ class ResultCaptureMixin:
                 "cleanup_state": cleanup_state,
             }
 
+        raw_stream_numbering = getattr(throughput_result, "stream_numbering", None)
+        stream_numbering = dict(raw_stream_numbering) if isinstance(raw_stream_numbering, dict) else None
+
         return ThroughputTestPhase(
             start_time=throughput_result.start_time,
             end_time=end_time_iso,
@@ -1262,6 +1265,7 @@ class ResultCaptureMixin:
             success=phase_success,
             errors=list(getattr(throughput_result, "errors", []) or []),
             outstanding_work=outstanding_work,
+            stream_numbering=stream_numbering,
         )
 
     @staticmethod

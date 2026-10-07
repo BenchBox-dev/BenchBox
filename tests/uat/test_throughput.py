@@ -98,7 +98,7 @@ def _result_json(
 
 
 def test_validate_throughput_result_accepts_correct_metric_and_rejects_old_formula():
-    result = _result_json(streams={0: 22, 1: 22, 2: 22}, throughput_at_size=123.4)
+    result = _result_json(streams={1: 22, 2: 22, 3: 22}, throughput_at_size=123.4)
     ok, reason = validate_throughput_result(result, requested_streams=3)
     assert ok is True
     assert reason == "ok"
@@ -110,28 +110,28 @@ def test_validate_throughput_result_accepts_correct_metric_and_rejects_old_formu
 
 
 def test_validate_throughput_result_fails_on_stream_count_mismatch():
-    result = _result_json(streams={0: 22, 1: 22}, throughput_at_size=123.4)
+    result = _result_json(streams={1: 22, 2: 22}, throughput_at_size=123.4)
     ok, reason = validate_throughput_result(result, requested_streams=3)
     assert ok is False
     assert "requested 3, executed 2" in reason
 
 
 def test_validate_throughput_result_fails_on_missing_throughput_metric():
-    result = _result_json(streams={0: 22, 1: 22, 2: 22}, throughput_at_size=None)
+    result = _result_json(streams={1: 22, 2: 22, 3: 22}, throughput_at_size=None)
     ok, reason = validate_throughput_result(result, requested_streams=3)
     assert ok is False
     assert "Throughput@Size" in reason
 
 
 def test_validate_throughput_result_fails_on_zero_throughput_metric():
-    result = _result_json(streams={0: 22, 1: 22, 2: 22}, throughput_at_size=0)
+    result = _result_json(streams={1: 22, 2: 22, 3: 22}, throughput_at_size=0)
     ok, reason = validate_throughput_result(result, requested_streams=3)
     assert ok is False
     assert "Throughput@Size" in reason
 
 
 def test_validate_throughput_result_ignores_queries_without_stream_id():
-    result = _result_json(streams={0: 22, 1: 22}, throughput_at_size=100.0)
+    result = _result_json(streams={1: 22, 2: 22}, throughput_at_size=100.0)
     result["queries"].append({"id": "99", "status": "SUCCESS", "test_type": "throughput"})
     ok, reason = validate_throughput_result(result, requested_streams=2)
     assert ok is True, reason
@@ -144,7 +144,7 @@ def test_validate_throughput_result_handles_empty_queries_list():
 
 
 def test_validate_throughput_result_rejects_all_queries_failed_stream():
-    result = _result_json(streams={0: 22, 1: 22, 2: 22}, throughput_at_size=123.4, failed_stream_ids=frozenset({2}))
+    result = _result_json(streams={1: 22, 2: 22, 3: 22}, throughput_at_size=123.4, failed_stream_ids=frozenset({2}))
     ok, reason = validate_throughput_result(result, requested_streams=3)
     assert ok is False
     assert "stream" in reason
@@ -152,42 +152,49 @@ def test_validate_throughput_result_rejects_all_queries_failed_stream():
 
 
 def test_validate_stream_count_ignores_throughput_metric():
-    result = _result_json(streams={0: 22, 1: 22, 2: 22}, throughput_at_size=None)
+    result = _result_json(streams={1: 22, 2: 22, 3: 22}, throughput_at_size=None)
     ok, reason = validate_stream_count(result, requested_streams=3)
     assert ok is True
     assert reason == "ok"
 
 
 def test_validate_stream_count_fails_on_mismatch():
-    result = _result_json(streams={0: 22, 1: 22}, throughput_at_size=None)
+    result = _result_json(streams={1: 22, 2: 22}, throughput_at_size=None)
     ok, reason = validate_stream_count(result, requested_streams=3)
     assert ok is False
     assert "requested 3, executed 2" in reason
 
 
+def test_validate_stream_count_rejects_zero_based_stream_ids():
+    result = _result_json(streams={0: 22, 1: 22}, throughput_at_size=None)
+    ok, reason = validate_stream_count(result, requested_streams=2)
+    assert ok is False
+    assert "spec numbering [1, 2]" in reason
+
+
 def test_validate_throughput_metric_ignores_stream_count():
-    result = _result_json(streams={0: 22}, throughput_at_size=55.5)
+    result = _result_json(streams={1: 22}, throughput_at_size=55.5)
     ok, reason = validate_throughput_metric(result)
     assert ok is True
     assert reason == "ok"
 
 
 def test_validate_throughput_metric_fails_on_missing_metric():
-    result = _result_json(streams={0: 22}, throughput_at_size=None)
+    result = _result_json(streams={1: 22}, throughput_at_size=None)
     ok, reason = validate_throughput_metric(result)
     assert ok is False
     assert "Throughput@Size" in reason
 
 
 def test_validate_throughput_result_composes_both_checks():
-    result = _result_json(streams={0: 22}, throughput_at_size=None)
+    result = _result_json(streams={1: 22}, throughput_at_size=None)
     ok, reason = validate_throughput_result(result, requested_streams=3)
     assert ok is False
     assert "stream count mismatch" in reason
 
 
 def test_validate_throughput_result_composes_all_three_checks_stream_success_between_count_and_metric():
-    result = _result_json(streams={0: 22, 1: 22}, throughput_at_size=None, failed_stream_ids=frozenset({1}))
+    result = _result_json(streams={1: 22, 2: 22}, throughput_at_size=None, failed_stream_ids=frozenset({1}))
     ok, reason = validate_throughput_result(result, requested_streams=2)
     assert ok is False
     assert "SUCCESSFUL" in reason
@@ -195,14 +202,14 @@ def test_validate_throughput_result_composes_all_three_checks_stream_success_bet
 
 
 def test_validate_stream_success_ok_when_every_stream_has_a_success():
-    result = _result_json(streams={0: 22, 1: 22, 2: 22}, throughput_at_size=None)
+    result = _result_json(streams={1: 22, 2: 22, 3: 22}, throughput_at_size=None)
     ok, reason = validate_stream_success(result)
     assert ok is True
     assert reason == "ok"
 
 
 def test_validate_stream_success_rejects_stream_with_zero_successful_queries():
-    result = _result_json(streams={0: 22, 1: 22, 2: 22}, throughput_at_size=None, failed_stream_ids=frozenset({1}))
+    result = _result_json(streams={1: 22, 2: 22, 3: 22}, throughput_at_size=None, failed_stream_ids=frozenset({1}))
     ok, reason = validate_stream_success(result)
     assert ok is False
     assert "[1]" in reason
@@ -210,7 +217,7 @@ def test_validate_stream_success_rejects_stream_with_zero_successful_queries():
 
 
 def test_validate_stream_success_rejects_multiple_all_failed_streams():
-    result = _result_json(streams={0: 22, 1: 22, 2: 22}, throughput_at_size=None, failed_stream_ids=frozenset({1, 2}))
+    result = _result_json(streams={1: 22, 2: 22, 3: 22}, throughput_at_size=None, failed_stream_ids=frozenset({1, 2}))
     ok, reason = validate_stream_success(result)
     assert ok is False
     assert "[1, 2]" in reason
@@ -231,7 +238,7 @@ def test_validate_stream_success_is_case_insensitive_on_status():
 
 
 def test_validate_stream_success_ignores_queries_without_stream_id():
-    result = _result_json(streams={0: 22, 1: 22}, throughput_at_size=None)
+    result = _result_json(streams={1: 22, 2: 22}, throughput_at_size=None)
     result["queries"].append({"id": "99", "status": "FAILED", "test_type": "throughput"})
     ok, reason = validate_stream_success(result)
     assert ok is True, reason
@@ -244,7 +251,7 @@ def test_validate_stream_success_fails_when_no_throughput_rows_exist():
 
 
 def test_validate_stream_success_ignores_throughput_metric():
-    result = _result_json(streams={0: 22}, throughput_at_size=None)
+    result = _result_json(streams={1: 22}, throughput_at_size=None)
     ok, reason = validate_stream_success(result)
     assert ok is True
     assert reason == "ok"
@@ -354,7 +361,7 @@ def _good_result(throughput_at_size: float | None = None) -> dict:
             total_queries=66, total_time_seconds=1000.0, scale_factor=1.0, num_streams=3
         )
     )
-    return _result_json(streams={0: 22, 1: 22, 2: 22}, throughput_at_size=value)
+    return _result_json(streams={1: 22, 2: 22, 3: 22}, throughput_at_size=value)
 
 
 def _write_cells(logs_dir: Path, rows: list[dict]) -> Path:

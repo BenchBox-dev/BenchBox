@@ -637,6 +637,11 @@ def _parser() -> argparse.ArgumentParser:
     check.add_argument("--inventory", type=Path, required=True)
     check.add_argument("--known-broken", type=Path)
     check.add_argument("--write-known-broken", type=Path)
+    check.add_argument(
+        "--fail-on-stale",
+        action="store_true",
+        help="also fail when a --known-broken entry no longer matches a broken link, so it is removed with the fix",
+    )
     return parser
 
 
@@ -682,6 +687,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         report["stale allowance"] = [f"{p}: {t} ({r}) (no longer broken)" for p, t, r in sorted(allowed - broken)]
         report["missing image"] = [f"{p}: {k} (not served)" for p, k in sorted(missing_images(inventory))]
         sys.stdout.write(format_report(report))
+        if args.fail_on_stale and report["stale allowance"]:
+            print(f"remove the stale allowance(s) above from {args.known_broken}", file=sys.stderr)
+            return 1
         return exit_code(report, strict=False)
     except (OSError, ValueError, ET.ParseError) as exc:
         print(f"site_inventory: {exc}", file=sys.stderr)

@@ -196,6 +196,7 @@ def test_validator_parity_uses_the_deployed_trunk_as_base_only_when_the_corpus_c
     assert command[command.index("--base-sha") + 1] == OLD_TRUNK
     assert command[command.index("--merge-sha") + 1] == TRUNK
     assert command[command.index("--head-sha") + 1] == TRUNK
+    assert "--allow-partial-validation" in command
 
 
 def test_link_gate_builds_an_inventory_then_checks_it(tmp_path: Path) -> None:

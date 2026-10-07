@@ -1,6 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
@@ -17,6 +18,30 @@ pytestmark = [
 ]
 
 
+def _power(value, *, success=True):
+    return SimpleNamespace(power_at_size=value, success=success, queries_executed=22, queries_successful=22)
+
+
+def _throughput(value):
+    return SimpleNamespace(throughput_at_size=value, success=True, outstanding_stream_ids=[])
+
+
+@pytest.fixture
+def phases(monkeypatch):
+    module = "benchbox.core.tpch.official_benchmark"
+    power = Mock()
+    power.return_value.run.return_value = _power(100.0)
+    adapter = Mock()
+    adapter._run_routed_throughput.return_value = _throughput(200.0)
+    throughput = adapter._run_routed_throughput
+    maintenance = Mock()
+    maintenance.return_value.run_maintenance_test.return_value = Mock(success=True, errors=[])
+    monkeypatch.setattr(f"{module}.TPCHPowerTest", power)
+    monkeypatch.setattr(f"{module}.TPCHMaintenanceTest", maintenance)
+    return SimpleNamespace(power=power, throughput=throughput, maintenance=maintenance, adapter=adapter)
+
+
+@pytest.mark.filterwarnings("ignore:TPCHOfficialBenchmark.run_official_benchmark is deprecated:DeprecationWarning")
 class TestTPCHOfficialBenchmark:
     @pytest.fixture
     def temp_dir(self):
@@ -96,12 +121,9 @@ class TestTPCHOfficialBenchmark:
         assert config.audit_trail is False
         assert config.verbose is True
 
-    def test_run_official_benchmark_basic(self, benchmark_instance, mock_connection_factory):
-        benchmark_instance.benchmark.run_power_test = Mock(return_value={"power_at_size": 100.0})
-        benchmark_instance.benchmark.run_throughput_test = Mock(return_value={"throughput_at_size": 200.0})
-        benchmark_instance.benchmark.run_maintenance_test = Mock(return_value=Mock(success=True))
+    def test_run_official_benchmark_basic(self, benchmark_instance, mock_connection_factory, phases):
 
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory)
+        result = benchmark_instance.run_official_benchmark(mock_connection_factory, adapter=phases.adapter)
 
         assert isinstance(result, TPCHOfficialBenchmarkResult)
         assert result.success is True
@@ -112,7 +134,13 @@ class TestTPCHOfficialBenchmark:
         assert result.throughput_at_size == 200.0
         assert not hasattr(result, "qphh_at_size")
 
-    def test_run_official_benchmark_with_custom_config(self, benchmark_instance, mock_connection_factory):
+    def test_run_official_benchmark_warns_that_the_api_is_deprecated(
+        self, benchmark_instance, mock_connection_factory, phases
+    ):
+        with pytest.warns(DeprecationWarning, match="TPC-H throughput driver"):
+            benchmark_instance.run_official_benchmark(mock_connection_factory, adapter=phases.adapter)
+
+    def test_run_official_benchmark_with_custom_config(self, benchmark_instance, mock_connection_factory, phases):
         custom_config = TPCHOfficialBenchmarkConfig(
             scale_factor=0.01,
             num_streams=2,
@@ -122,9 +150,11 @@ class TestTPCHOfficialBenchmark:
             verbose=True,
         )
 
-        benchmark_instance.benchmark.run_power_test = Mock(return_value={"power_at_size": 150.0})
+        phases.power.return_value.run.return_value = _power(150.0)
 
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory, config=custom_config)
+        result = benchmark_instance.run_official_benchmark(
+            mock_connection_factory, config=custom_config, adapter=phases.adapter
+        )
 
         assert result.success is True
         assert result.power_at_size == 150.0
@@ -195,6 +225,7 @@ class TestTPCHOfficialBenchmark:
             assert "TPC-H Official Benchmark Audit Trail" in content
             assert "Scale Factor: 0.01" in content
             assert "Number of Streams: 2" in content
+            assert "Throughput@Size:" in content
             assert "QphH" not in content
         finally:
             if audit_file.exists():
@@ -229,24 +260,29 @@ class TestTPCHOfficialBenchmark:
         assert "Power Test failed" in result.errors[0]
         assert "Database connection failed" in result.errors[0]
 
-    def test_component_metrics_pass_through_without_composite(self, benchmark_instance, mock_connection_factory):
+    def test_phase_metrics_are_reported_and_no_combined_metric_is_computed(
+        self, benchmark_instance, mock_connection_factory, phases
+    ):
         for power, throughput in [(100.0, 400.0), (360.0, 480.0), (1000.0, 1000.0)]:
-            benchmark_instance.benchmark.run_power_test = Mock(return_value={"power_at_size": power})
-            benchmark_instance.benchmark.run_throughput_test = Mock(return_value={"throughput_at_size": throughput})
+            phases.power.return_value.run.return_value = _power(power)
+            phases.throughput.return_value = _throughput(throughput)
 
             config = TPCHOfficialBenchmarkConfig(maintenance_test_enabled=False)
-            result = benchmark_instance.run_official_benchmark(mock_connection_factory, config=config)
+            result = benchmark_instance.run_official_benchmark(
+                mock_connection_factory, config=config, adapter=phases.adapter
+            )
 
             assert result.power_at_size == power
             assert result.throughput_at_size == throughput
             assert not hasattr(result, "qphh_at_size")
 
-    def test_partial_failure_handling(self, benchmark_instance, mock_connection_factory):
-        benchmark_instance.benchmark.run_power_test = Mock(return_value={"power_at_size": 100.0})
-        benchmark_instance.benchmark.run_throughput_test = Mock(side_effect=Exception("Throughput failed"))
+    def test_partial_failure_handling(self, benchmark_instance, mock_connection_factory, phases):
+        phases.throughput.side_effect = Exception("Throughput failed")
 
         config = TPCHOfficialBenchmarkConfig(maintenance_test_enabled=False)
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory, config=config)
+        result = benchmark_instance.run_official_benchmark(
+            mock_connection_factory, config=config, adapter=phases.adapter
+        )
 
         assert result.success is False
         assert len(result.errors) > 0
@@ -255,43 +291,40 @@ class TestTPCHOfficialBenchmark:
         assert result.throughput_at_size == 0.0
         assert not hasattr(result, "qphh_at_size")
 
-    def test_timing_metrics(self, benchmark_instance, mock_connection_factory):
-        benchmark_instance.benchmark.run_power_test = Mock(return_value={"power_at_size": 100.0})
-        benchmark_instance.benchmark.run_throughput_test = Mock(return_value={"throughput_at_size": 200.0})
+    def test_timing_metrics(self, benchmark_instance, mock_connection_factory, phases):
 
         config = TPCHOfficialBenchmarkConfig(maintenance_test_enabled=False)
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory, config=config)
+        result = benchmark_instance.run_official_benchmark(
+            mock_connection_factory, config=config, adapter=phases.adapter
+        )
 
         assert result.start_time is not None
         assert result.end_time is not None
         assert result.total_time > 0
         assert result.start_time < result.end_time
 
-    def test_all_phases_enabled(self, benchmark_instance, mock_connection_factory):
-        mock_power = Mock(return_value={"power_at_size": 500.0})
-        mock_throughput = Mock(return_value={"throughput_at_size": 800.0})
-        mock_maintenance = Mock(return_value=Mock(success=True))
+    def test_all_phases_enabled(self, benchmark_instance, mock_connection_factory, phases):
+        phases.power.return_value.run.return_value = _power(500.0)
+        phases.throughput.return_value = _throughput(800.0)
 
-        benchmark_instance.benchmark.run_power_test = mock_power
-        benchmark_instance.benchmark.run_throughput_test = mock_throughput
-        benchmark_instance.benchmark.run_maintenance_test = mock_maintenance
+        result = benchmark_instance.run_official_benchmark(mock_connection_factory, adapter=phases.adapter)
 
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory)
-
-        assert mock_power.called
-        assert mock_throughput.called
-        assert mock_maintenance.called
+        assert phases.power.return_value.run.called
+        assert phases.throughput.called
+        assert phases.maintenance.return_value.run_maintenance_test.called
 
         assert result.success is True
         assert result.power_at_size == 500.0
         assert result.throughput_at_size == 800.0
         assert not hasattr(result, "qphh_at_size")
 
-    def test_zero_metric_handling(self, benchmark_instance, mock_connection_factory):
-        benchmark_instance.benchmark.run_power_test = Mock(return_value={"power_at_size": 0.0})
+    def test_zero_metric_handling(self, benchmark_instance, mock_connection_factory, phases):
+        phases.power.return_value.run.return_value = _power(0.0)
 
         config = TPCHOfficialBenchmarkConfig(throughput_test_enabled=False, maintenance_test_enabled=False)
-        result = benchmark_instance.run_official_benchmark(mock_connection_factory, config=config)
+        result = benchmark_instance.run_official_benchmark(
+            mock_connection_factory, config=config, adapter=phases.adapter
+        )
 
         assert result.power_at_size == 0.0
         assert result.throughput_at_size == 0.0

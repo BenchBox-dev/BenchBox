@@ -1654,7 +1654,7 @@ class TestDeltaOperationsSql:
                 "mechanism": "optimize",
                 "table": "LINEITEM",
                 "statement": "OPTIMIZE LINEITEM",
-                "phase": "manual",
+                "phase": "post_load",
                 "status": "applied",
             }
         ]
@@ -1674,7 +1674,7 @@ class TestDeltaOperationsSql:
                 "mechanism": "optimize",
                 "table": "LINEITEM",
                 "statement": "OPTIMIZE LINEITEM",
-                "phase": "manual",
+                "phase": "post_load",
                 "status": "skipped",
                 "error_class": "RuntimeError",
                 "error_message": "optimize unavailable",

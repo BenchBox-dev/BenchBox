@@ -228,6 +228,16 @@ def test_check_reports_allowances_that_no_longer_match(tmp_path: Path, capsys: p
     assert "stale allowance: /index.html: /gone.html (missing path) (no longer broken)" in out
     assert "broken internal link" not in out.split("summary:")[0]
 
+    check = ["check", "--inventory", str(inventory_path), "--known-broken", str(known), "--fail-on-stale"]
+    assert site_inventory.main(check) == 1
+    assert "remove the stale allowance(s) above" in capsys.readouterr().err
+    still_broken = [
+        ["/index.html", "/docs/guide.html#setup", "missing fragment"],
+        ["/index.html", "/index.html#x", "missing fragment"],
+    ]
+    known.write_text(json.dumps(still_broken), encoding="utf-8")
+    assert site_inventory.main(check) == 0
+
 
 def test_missing_site_dir_is_a_usage_error(tmp_path: Path) -> None:
     code = site_inventory.main(["build", "--site-dir", str(tmp_path / "none"), "--output", str(tmp_path / "o.json")])

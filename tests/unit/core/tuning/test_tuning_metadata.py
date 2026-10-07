@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import pytest
@@ -229,7 +229,7 @@ def test_clear_tunings_uses_where_true_for_bigquery():
     [
         ("bigquery", "CREATE TABLE"),
         ("snowflake", "TIMESTAMP_NTZ"),
-        ("redshift", "ENCODE AUTO"),
+        ("redshift", "CREATE TABLE IF NOT EXISTS"),
         ("clickhouse", "ENGINE = MergeTree()"),
         ("duckdb", "CREATE TABLE IF NOT EXISTS"),
     ],
@@ -237,6 +237,227 @@ def test_clear_tunings_uses_where_true_for_bigquery():
 def test_create_table_sql_varies_by_platform(platform, needle):
     manager = TuningMetadataManager(_Adapter(platform_name=platform))
     assert needle in manager._get_create_table_sql()
+    assert "ENCODE AUTO" not in manager._get_create_table_sql()
+
+
+def test_bigquery_table_uses_bigquery_types():
+    sql = TuningMetadataManager(_Adapter(platform_name="bigquery"))._get_create_table_sql()
+    assert "STRING NOT NULL" in sql
+    assert "INT64 NOT NULL" in sql
+    assert "TIMESTAMP NOT NULL" in sql
+    assert "VARCHAR" not in sql
+    assert "INTEGER" not in sql
+
+
+@pytest.mark.parametrize(
+    "platform",
+    [
+        "duckdb",
+        "motherduck",
+        "sqlite",
+        "postgresql",
+        "timescaledb",
+        "pg_duckdb",
+        "paradedb",
+        "citus",
+        "cedardb",
+    ],
+)
+def test_create_index_sql_uses_plain_form_where_supported(platform):
+    sql = TuningMetadataManager(_Adapter(platform_name=platform))._get_create_index_sql()
+    assert sql is not None
+    assert "CREATE INDEX IF NOT EXISTS" in sql
+
+
+@pytest.mark.parametrize("platform", ["azure_synapse", "fabric_warehouse"])
+def test_create_index_sql_uses_sys_indexes_guard_on_tsql(platform):
+    sql = TuningMetadataManager(_Adapter(platform_name=platform))._get_create_index_sql()
+    assert sql is not None
+    assert "IF NOT EXISTS" in sql
+    assert "sys.indexes" in sql
+    assert "CREATE INDEX" in sql
+
+
+@pytest.mark.parametrize(
+    "platform",
+    [
+        "clickhouse",
+        "clickhouse-local",
+        "clickhouse-server",
+        "clickhouse-cloud",
+        "bigquery",
+        "snowflake",
+        "databricks",
+        "redshift",
+        "trino",
+        "presto",
+        "athena",
+        "spark",
+        "datafusion",
+        "questdb",
+        "doris",
+        "starrocks",
+        "firebolt",
+        "singlestore",
+        "mystery_engine",
+    ],
+)
+def test_create_index_sql_is_table_only_where_unsupported_or_unverified(platform):
+    assert TuningMetadataManager(_Adapter(platform_name=platform))._get_create_index_sql() is None
+
+
+@pytest.mark.parametrize(
+    ("platform", "dialect"),
+    [
+        ("duckdb", "duckdb"),
+        ("postgresql", "postgres"),
+        ("timescaledb", "postgres"),
+        ("sqlite", "sqlite"),
+        ("motherduck", "duckdb"),
+        ("snowflake", "snowflake"),
+        ("bigquery", "bigquery"),
+        ("redshift", "redshift"),
+        ("clickhouse", "clickhouse"),
+        ("clickhouse-cloud", "clickhouse"),
+        ("trino", "trino"),
+        ("presto", "presto"),
+        ("spark", "spark"),
+        ("databricks", "databricks"),
+        ("datafusion", None),
+        ("azure_synapse", "tsql"),
+        ("fabric_warehouse", "tsql"),
+        ("doris", "doris"),
+        ("athena", "athena"),
+    ],
+)
+def test_metadata_ddl_parses_for_target_dialect(platform, dialect):
+    import sqlglot
+
+    manager = TuningMetadataManager(_Adapter(platform_name=platform))
+    statements = [manager._get_create_table_sql()]
+    index_sql = manager._get_create_index_sql()
+    if index_sql is not None:
+        statements.append(index_sql)
+    assert statements
+    for sql in statements:
+        parsed = sqlglot.parse_one(sql, read=dialect) if dialect else sqlglot.parse_one(sql)
+        assert type(parsed).__name__ != "Command", f"{platform}: {sql[:80]}"
+
+
+def test_index_creation_failure_does_not_fail_table_creation(caplog):
+
+    class _IndexFailingCursor(_Cursor):
+        def execute(self, sql, params=None):
+            if sql.strip().upper().startswith("CREATE INDEX") or "sys.indexes" in sql:
+                raise RuntimeError("index boom")
+            return super().execute(sql, params)
+
+    class _IndexFailingConn(_Conn):
+        def __init__(self):
+            super().__init__(_IndexFailingCursor())
+
+    class _IndexFailingAdapter(_Adapter):
+        def create_connection(self, **_kwargs):
+            conn = _IndexFailingConn()
+            self.connections.append(conn)
+            return conn
+
+    manager = TuningMetadataManager(_IndexFailingAdapter(platform_name="duckdb"))
+    with caplog.at_level("WARNING"):
+        assert manager.create_metadata_table() is True
+    assert "non-fatal" in caplog.text
+
+
+def test_table_creation_failure_still_fails_closed(caplog):
+
+    class _TableFailingCursor(_Cursor):
+        def execute(self, sql, params=None):
+            if sql.strip().upper().startswith("CREATE TABLE"):
+                raise RuntimeError("table boom")
+            return super().execute(sql, params)
+
+    class _TableFailingConn(_Conn):
+        def __init__(self):
+            super().__init__(_TableFailingCursor())
+
+    class _TableFailingAdapter(_Adapter):
+        def create_connection(self, **_kwargs):
+            conn = _TableFailingConn()
+            self.connections.append(conn)
+            return conn
+
+    manager = TuningMetadataManager(_TableFailingAdapter(platform_name="duckdb"))
+    assert manager.create_metadata_table() is False
+
+
+def test_athena_metadata_is_unsupported_with_a_clear_message(caplog):
+    manager = TuningMetadataManager(_Adapter(platform_name="athena"))
+    with caplog.at_level("ERROR"):
+        assert manager.create_metadata_table() is False
+    assert "Athena" in caplog.text
+    assert "Iceberg" in caplog.text
+
+
+class _StatefulCursor(_Cursor):
+    def __init__(self):
+        super().__init__()
+        self.rows: list[tuple] = []
+
+    def execute(self, sql, params=None):
+        if sql.strip().upper().startswith("INSERT INTO") and params is not None:
+            self.rows.append(tuple(params))
+        else:
+            super().execute(sql, params)
+
+    def fetchall(self):
+        return sorted(self.rows)
+
+    def fetchone(self):
+        return (1,)
+
+
+class _StatefulConn(_Conn):
+    def __init__(self):
+        super().__init__(_StatefulCursor())
+
+
+def _round_trip_config() -> UnifiedTuningConfiguration:
+    config = UnifiedTuningConfiguration()
+    config.table_tunings["events"] = TableTuning(
+        table_name="events",
+        sorting=[TuningColumn(name="event_id", type="INTEGER", order=1)],
+    )
+    return config
+
+
+@pytest.mark.parametrize(
+    "platform",
+    [
+        "duckdb",
+        "postgresql",
+        "sqlite",
+        "datafusion",
+        "snowflake",
+        "trino",
+        "redshift",
+        "databricks",
+        "clickhouse-server",
+        "bigquery",
+    ],
+)
+def test_metadata_save_load_round_trip_per_platform(platform, caplog):
+    adapter = _Adapter(platform_name=platform)
+    manager = TuningMetadataManager(adapter, connection=_StatefulConn())
+    config = _round_trip_config()
+    with caplog.at_level("WARNING"):
+        assert manager.save_unified_tunings(config) is True
+    assert "Failed to save tuning metadata" not in caplog.text
+    assert "Failed to save unified tunings" not in caplog.text
+    assert "Failed to create metadata table" not in caplog.text
+
+    loaded = manager.load_unified_tunings()
+    assert loaded is not None
+    assert set(loaded.table_tunings) == {"events"}
 
 
 @pytest.mark.parametrize("platform", ["clickhouse", "clickhouse-local", "clickhouse-server"])
@@ -961,3 +1182,41 @@ def test_manager_without_supplied_connection_still_opens_temp_connections():
 
     assert adapter.opened >= 1
     assert len(adapter.closed) == adapter.opened
+
+
+class _NoCursorConn:
+    def __init__(self):
+        self.executed: list[str] = []
+
+    def execute(self, sql):
+        self.executed.append(sql)
+        return {}
+
+
+class _ExecuteQueryAdapter(_Adapter):
+    def execute_query(self, connection, sql, *_args, **_kwargs):
+        return connection.execute(sql)
+
+
+def test_format_literal_datetime_uses_space_separator():
+    manager = TuningMetadataManager(_Adapter())
+    assert manager._format_literal(datetime(2026, 10, 6, 20, 56, 51, 252740)) == "'2026-10-06 20:56:51'"
+    aware = datetime(2026, 10, 6, 20, 56, 51, tzinfo=timezone(timedelta(hours=5)))
+    assert manager._format_literal(aware) == "'2026-10-06 15:56:51'"
+    assert manager._format_literal(None) == "NULL"
+    assert manager._format_literal(True) == "TRUE"
+    assert manager._format_literal(7) == "7"
+    assert manager._format_literal("o'clock") == "'o''clock'"
+
+
+def test_batch_insert_inline_datetime_has_no_iso_t_separator():
+    adapter = _ExecuteQueryAdapter(platform_name="clickhouse-server")
+    connection = _NoCursorConn()
+    manager = TuningMetadataManager(adapter, connection=connection)
+
+    record = manager._build_run_kind_record(datetime(2026, 10, 6, 20, 56, 51, 252740))
+    manager._batch_insert_records([record])
+
+    assert len(connection.executed) == 1
+    assert "'2026-10-06 20:56:51'" in connection.executed[0]
+    assert "2026-10-06T20:56" not in connection.executed[0]

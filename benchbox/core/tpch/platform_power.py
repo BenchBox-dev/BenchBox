@@ -91,7 +91,7 @@ def execute_tpch_power_test(
         all_results = []
 
         for i in range(warm_up_iterations):
-            current_stream_id = i
+            current_stream_id = stream_id
             console.print(f"[cyan]--- Warm-up Run {i + 1}/{warm_up_iterations} ---[/cyan]")
             power_test = TPCHPowerTest(
                 benchmark=benchmark,
@@ -118,7 +118,7 @@ def execute_tpch_power_test(
                 )
 
         for i in range(iterations):
-            current_stream_id = warm_up_iterations + i
+            current_stream_id = stream_id
             console.print(f"[cyan]--- Measurement Run {i + 1}/{iterations} ---[/cyan]")
             power_test = TPCHPowerTest(
                 benchmark=benchmark,

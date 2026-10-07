@@ -156,6 +156,6 @@ def test_soak_conclude_reuses_probe_run_id() -> None:
     assert "probe did not resolve a deploy run" in text
 
 
-def test_preview_workflows_are_soundness_paths() -> None:
-    assert ".github/workflows/publication-preview-deploy.yml" in _soundness.SOUNDNESS_FILES
-    assert ".github/workflows/publication-preview-soak.yml" in _soundness.SOUNDNESS_FILES
+def test_preview_workflows_are_retiring_not_soundness() -> None:
+    assert _soundness.is_soundness_path(".github/workflows/publication-preview-deploy.yml") is False
+    assert _soundness.is_soundness_path(".github/workflows/publication-preview-soak.yml") is False

@@ -219,6 +219,8 @@ def test_cli_installs_come_from_official_sources_with_pins() -> None:
         if name.startswith("attempt-") and _harness(name) == "muse":
             install = next(step for step in job["steps"] if step["name"] == "Install muse")
             assert install["run"].startswith("curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o ")
+            assert 'bash "$RUNNER_TEMP/muse-install.sh"' in install["run"]
+            assert not any(line.strip().startswith("sh ") for line in install["run"].splitlines())
             assert job["permissions"] == {"contents": "read"}
             assert _secrets(job) == {"META_API_KEY"}
             assert "--harness muse" in _run(job, "Run the reviewer")

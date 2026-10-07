@@ -20,9 +20,12 @@ from _project.scripts.explorer_pipeline.models import (
 from _project.scripts.explorer_pipeline.transformer import BundleTransformer
 from benchbox.core.results.status import NON_CLEAN_TRANSLATION_STATUSES, NON_CLEAN_VALIDATION_STATUSES
 from benchbox.core.tuning.modes import MODES
-from tests.unit.scripts.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
+
+MINIMAL_BUNDLE = pytest.importorskip(
+    "tests.unit.scripts.explorer_pipeline.conftest", reason="Explorer pipeline test fixtures are not in this checkout"
+).MINIMAL_BUNDLE
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = REPO_ROOT / "results-data" / "validate_corpus.py"

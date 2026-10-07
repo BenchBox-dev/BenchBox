@@ -2803,7 +2803,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name_upper,
                 statement=f"OPTIMIZE {table_name_upper}",
                 status="skipped",
-                phase="manual",
+                phase="post_load",
             )
             self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name_upper}")
             return
@@ -2820,7 +2820,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name_upper,
                 statement=statement,
                 status="applied",
-                phase="manual",
+                phase="post_load",
             )
             self.logger.info(f"Optimized Delta table {table_name_upper}")
         except Exception as e:
@@ -2829,7 +2829,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name_upper,
                 statement=statement,
                 status="skipped",
-                phase="manual",
+                phase="post_load",
                 error=e,
             )
             self.logger.warning(f"Failed to optimize table {table_name}: {e}")
@@ -2843,7 +2843,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name.upper(),
                 statement=f"VACUUM {table_name.upper()}",
                 status="skipped",
-                phase="manual",
+                phase="post_load",
             )
             self.logger.info(f"Skipped Delta-only VACUUM for Hudi table {table_name.upper()}")
             return
@@ -3078,7 +3078,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name,
                 statement=f"OPTIMIZE {table_name} ZORDER BY ({', '.join(zorder_columns)})",
                 status="skipped",
-                phase="pre_load",
+                phase="ddl",
                 columns=zorder_columns,
             )
             self.logger.info(f"Skipped Delta-only Z-ORDER for Hudi table {table_name}")
@@ -3096,7 +3096,7 @@ class DatabricksAdapter(PlatformAdapter):
                     table=table_name,
                     statement=clause,
                     status="skipped",
-                    phase="pre_load",
+                    phase="ddl",
                     columns=effective,
                 )
                 self.logger.info(f"Skipped Delta-only Liquid Clustering for Hudi table {table_name}")
@@ -3106,7 +3106,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name,
                 statement=f"OPTIMIZE {table_name}",
                 status="skipped",
-                phase="pre_load",
+                phase="ddl",
             )
             self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name}")
 
@@ -3138,7 +3138,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name,
                 statement=clause,
                 status="skipped",
-                phase="pre_load",
+                phase="ddl",
             )
             self.logger.info(f"Liquid AUTO selected for {table_name} but table is not Delta")
             return
@@ -3153,7 +3153,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name,
                 statement=clause,
                 status="applied",
-                phase="pre_load",
+                phase="ddl",
             )
             self.logger.info(f"Applied automatic Liquid Clustering to {table_name}")
         except Exception as e:
@@ -3162,7 +3162,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name,
                 statement=clause,
                 status="skipped",
-                phase="pre_load",
+                phase="ddl",
                 error=e,
             )
             self.logger.warning(f"Failed to apply automatic Liquid Clustering to {table_name}: {e}")
@@ -3195,7 +3195,7 @@ class DatabricksAdapter(PlatformAdapter):
                     table=table_name,
                     statement=clause,
                     status="applied",
-                    phase="pre_load",
+                    phase="ddl",
                     columns=liquid_columns,
                 )
                 self.logger.info(f"Applied Liquid Clustering to {table_name}: {', '.join(liquid_columns)}")
@@ -3205,7 +3205,7 @@ class DatabricksAdapter(PlatformAdapter):
                     table=table_name,
                     statement=clause,
                     status="skipped",
-                    phase="pre_load",
+                    phase="ddl",
                     columns=liquid_columns,
                     error=e,
                 )
@@ -3216,7 +3216,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name,
                 statement=f"ALTER TABLE {table_name} CLUSTER BY (...)",
                 status="skipped",
-                phase="pre_load",
+                phase="ddl",
             )
             self.logger.info(f"Liquid Clustering selected for {table_name} but no clustering columns were available")
 
@@ -3227,7 +3227,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name,
                 statement=f"OPTIMIZE {table_name} ZORDER BY ({', '.join(zorder_columns)})",
                 status="skipped",
-                phase="pre_load",
+                phase="ddl",
                 columns=zorder_columns,
             )
             self.logger.info(f"Skipped Delta-only Z-ORDER for Hudi table {table_name}")
@@ -3241,7 +3241,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name,
                 statement=clause,
                 status="applied",
-                phase="pre_load",
+                phase="ddl",
                 columns=zorder_columns,
             )
             self.logger.info(f"Applied Z-ORDER optimization to {table_name}: {', '.join(zorder_columns)}")
@@ -3251,7 +3251,7 @@ class DatabricksAdapter(PlatformAdapter):
                 table=table_name,
                 statement=clause,
                 status="skipped",
-                phase="pre_load",
+                phase="ddl",
                 columns=zorder_columns,
                 error=e,
             )

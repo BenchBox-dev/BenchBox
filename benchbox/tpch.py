@@ -96,12 +96,14 @@ class TPCH(BaseBenchmark):
     def tables(self) -> dict[str, Path]:
         return getattr(self._impl, "tables", {})
 
-    def run_official_benchmark(self, connection_factory, config=None):
+    def run_official_benchmark(self, connection_factory, config=None, *, adapter=None):
         try:
+            from benchbox.core.throughput.entrypoints import warn_legacy_throughput_api
             from benchbox.core.tpch.official_benchmark import TPCHOfficialBenchmark
 
-            official = TPCHOfficialBenchmark(self)
-            return official.run_official_benchmark(connection_factory, config)
+            warn_legacy_throughput_api("TPCH.run_official_benchmark", "tpch")
+            official = TPCHOfficialBenchmark(scale_factor=self.scale_factor, output_dir=self.output_dir)
+            return official.run_official_benchmark(connection_factory, config, adapter=adapter, _warn_deprecated=False)
         except ImportError:
             connection = connection_factory() if callable(connection_factory) else connection_factory
 

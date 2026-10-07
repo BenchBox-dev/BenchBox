@@ -11,6 +11,7 @@ from benchbox.core.tuning.applied_ledger import (
     APPLIED_VERIFIED,
     EXECUTED,
     FAILED,
+    LEDGER_PHASES,
     NOOP,
     NOT_APPLICABLE,
     PHASE_DDL,
@@ -19,6 +20,7 @@ from benchbox.core.tuning.applied_ledger import (
     STATEMENT_FAILED,
     AppliedTuningLedger,
     is_schema_tuning_statement,
+    normalize_ledger_phase,
     recording_connection,
 )
 
@@ -192,6 +194,37 @@ class TestDroppedIntents:
         assert payload["statements"][0]["mechanism"] == "index"
         assert payload["statements"][0]["table"] == "t"
         assert payload["statements"][0]["status"] == EXECUTED
+
+
+class TestPhaseNormalization:
+    @pytest.mark.parametrize(
+        ("raw", "expected"),
+        [
+            ("ddl", PHASE_DDL),
+            ("post_load", PHASE_POST_LOAD),
+            ("session", PHASE_SESSION),
+            ("pre_load", PHASE_DDL),
+            ("preload", PHASE_DDL),
+            ("schema", PHASE_DDL),
+            ("postload", PHASE_POST_LOAD),
+            ("maintenance", PHASE_POST_LOAD),
+        ],
+    )
+    def test_aliases_fold_to_closed_set(self, raw: str, expected: str) -> None:
+        assert normalize_ledger_phase(raw) == expected
+
+    def test_unknown_phase_coerces_to_ddl(self) -> None:
+        assert normalize_ledger_phase("pre-launch") == PHASE_DDL
+        assert normalize_ledger_phase("") == PHASE_DDL
+
+    def test_record_normalizes_pre_load_so_it_counts_as_physical(self) -> None:
+        ledger = AppliedTuningLedger()
+        ledger.record("ALTER TABLE T CLUSTER BY (A)", "pre_load", status=STATEMENT_FAILED)
+        assert ledger.statements[0].phase == PHASE_DDL
+        assert ledger.overall_status(tuning_enabled=True, has_config=True) == FAILED
+
+    def test_closed_set_members_pass_through(self) -> None:
+        assert {normalize_ledger_phase(p) for p in LEDGER_PHASES} == set(LEDGER_PHASES)
 
 
 class TestRecordingConnectionHarness:

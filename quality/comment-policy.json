@@ -73,7 +73,7 @@
       "provenance": "_sources/README.md"
     },
     {
-      "path": "_project/scripts/vendor/todo_db-0.9.1-py3-none-any.whl",
+      "path": "_project/scripts/vendor/todo_db-0.8.1-py3-none-any.whl",
       "owner": "todo-db",
       "provenance": "_project/scripts/pyproject.toml"
     }
@@ -38870,6 +38870,44 @@
       "necessity": "The test writes fixed placeholder HTML into a temporary site tree under tmp_path to exercise the deploy gates; the written text holds no comment.",
       "alternative": "A literal output path would stop the test from exercising the gate's own site-directory handling.",
       "removal": "Remove when the executable-payload adapter can resolve this source statically."
+    },
+    {
+      "path": "tests/unit/scripts/test_browser_fixtures_port.py",
+      "symbol": "_run_c",
+      "text": "unresolved executable source: script",
+      "payload": "sha256:c9f8c67251bedd8e471bff2a7df68f503838fa424036ff7ebe0876e0671a253b",
+      "finding_kind": "payload-error",
+      "kind": "fixture",
+      "consumer": "tests/unit/scripts/test_browser_fixtures_port.py",
+      "necessity": "The port test executes the reviewer-verified .mjs inline queries, extracted verbatim at test time, to prove the core port's output is byte-identical. Its executable argument is derived test input bound to this file's AST digest.",
+      "alternative": "A static copy of the queries would reintroduce the drift the port exists to remove; a text assertion would not prove byte identity.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when site-split-22 rewires the .mjs callers to the port and this equivalence test is replaced by the single-source assertion."
+    },
+    {
+      "path": "benchbox/core/tuning/applied_ledger.py",
+      "symbol": "normalize_ledger_phase",
+      "text": "# pragma: no cover",
+      "kind": "directive",
+      "consumer": "pyproject.toml",
+      "necessity": "coverage.py excludes this branch through exclude_lines in pyproject.toml; the branch is a defensive fallback that the default test tiers do not execute. Recorded reason: phase normalization must never break a run.",
+      "alternative": "Add a test that executes the branch, then delete the exclusion.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when a test covers the branch.",
+      "expires": "2027-01-04"
+    },
+    {
+      "path": "tests/unit/core/throughput/test_stream_numbering.py",
+      "symbol": "_qgen_stream_order.run",
+      "text": "unresolved executable source: qgen.qgen_path",
+      "payload": "sha256:b175bd1d59f47515afa75a70d125aa1b004a5f76d0585dd9376279f973b6a657",
+      "finding_kind": "payload-error",
+      "kind": "fixture",
+      "consumer": "tests/unit/core/throughput/test_stream_numbering.py",
+      "necessity": "The test runs the bundled TPC-H qgen binary, resolved at run time for the host platform, to read its stream permutations; the arguments are fixed generator options.",
+      "alternative": "A literal binary path would stop the test from exercising the binary the package ships for the host.",
+      "owner": "BenchBox maintainers",
+      "removal": "Remove when the executable-payload adapter can resolve the bundled binary path statically."
     }
   ]
 }

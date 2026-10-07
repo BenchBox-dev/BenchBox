@@ -653,6 +653,15 @@ class TestReleaseInfrastructure:
         rm_idx = recipe.index("git rm")
         assert gen_idx < check_idx < rm_idx, "curation check must gate between changelog draft and `git rm`"
 
+    def test_release_cut_takes_a_curated_section_in_one_pass_without_skipping_gates(self):
+        recipe = _make_target_recipe("release-cut")
+
+        assert '$(if $(CHANGELOG_SECTION),--section-file "$(CHANGELOG_SECTION)")' in recipe
+        assert recipe.index('sh scripts/release_cut_start.sh "$(VERSION)"') < recipe.index("--section-file")
+        assert recipe.index("--section-file") < recipe.index("--check-curation --version $(VERSION)")
+        assert 'if [ -n "$(CHANGELOG_SECTION)" ]' in recipe
+        assert recipe.count("CHANGELOG_SECTION") == 5, "CHANGELOG_SECTION must not gate anything else"
+
     def test_release_cut_is_resumable_and_has_an_abort_target(self):
         recipe = _make_target_recipe("release-cut")
         assert "release-cut: .release-cut-tree-required" in _makefile_text()

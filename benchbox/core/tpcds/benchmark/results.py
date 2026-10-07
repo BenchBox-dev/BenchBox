@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 
+from benchbox.core.throughput.result import throughput_stream_numbering
+
 from .config import ThroughputTestConfig
 
 
@@ -17,6 +19,8 @@ class ThroughputTestResult:
     throughput_at_size: Optional[float]
     success: bool
     error: Optional[str] = None
+    stream_numbering: dict[str, Any] = field(default_factory=throughput_stream_numbering)
+    outstanding_stream_ids: list[int] = field(default_factory=list)
 
 
 @dataclass

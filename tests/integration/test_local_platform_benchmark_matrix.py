@@ -308,6 +308,7 @@ def _validate_against_expected_results(
 
     validator = QueryValidator()
     checked = 0
+    checked_ids: set[str] = set()
     digest_evaluated = 0
     digest_reference_count = 0
     failures: list[str] = []
@@ -333,6 +334,7 @@ def _validate_against_expected_results(
             continue
 
         checked += 1
+        checked_ids.add(str(query["id"]))
         if not validation.is_valid:
             failures.append(
                 f"{benchmark_name} query {validation.query_id}: expected={validation.expected_row_count}, "
@@ -355,11 +357,12 @@ def _validate_against_expected_results(
     if strict:
         configured = set(expected_query_ids or ())
         if configured:
-            assert checked == len(configured), (
-                f"strict expected-results: evaluated {checked} of {len(configured)} configured "
-                f"{benchmark_name} queries (sf={scale_factor}); every configured query must produce a "
-                f"non-SKIP row-count validation. Unevaluated queries indicate missing answer files, a "
-                f"skipped/failed query, or scale/benchmark drift that disarmed the gate."
+            assert checked_ids == configured, (
+                f"strict expected-results: validated {sorted(checked_ids)} of {len(configured)} configured "
+                f"{benchmark_name} queries (sf={scale_factor}, {checked} evaluations); every configured query "
+                f"must produce a non-SKIP row-count validation. Missing: {sorted(configured - checked_ids)}. "
+                f"Missing queries indicate missing answer files, a skipped/failed query, or scale/benchmark "
+                f"drift that disarmed the gate."
             )
         else:
             assert checked > 0, (

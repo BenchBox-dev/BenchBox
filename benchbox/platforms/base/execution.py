@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import signal
 from datetime import datetime
 from pathlib import Path
@@ -25,7 +26,11 @@ from benchbox.core.results.builder import benchmark_family, normalize_benchmark_
 from benchbox.core.results.models import QUERY_RUN_TYPE_MEASUREMENT, QUERY_RUN_TYPE_WARMUP
 from benchbox.core.schemas import MIN_THROUGHPUT_STREAMS
 from benchbox.core.throughput.containment import await_quiescence, check_phase_boundary
-from benchbox.core.throughput.result import throughput_result_succeeded
+from benchbox.core.throughput.entrypoints import (
+    finalize_throughput_metrics,
+    require_stream_minimum,
+    warn_legacy_throughput_api,
+)
 from benchbox.core.tpch.platform_power import _power_query_result, _power_test_error_result
 from benchbox.platforms.base.connection_wrappers import (
     PlatformAdapterConnection,
@@ -40,33 +45,32 @@ from benchbox.utils.printing import quiet_console
 __all__ = ["TestDriversMixin", "_power_query_result", "_power_test_error_result"]
 
 
-def _require_stream_minimum(count: int, source: str) -> int:
-    if count < MIN_THROUGHPUT_STREAMS:
-        raise ValueError(
-            f"Throughput requires at least {MIN_THROUGHPUT_STREAMS} concurrent streams (TPC minimum); "
-            f"got {count} from '{source}'."
-        )
-    return count
-
-
 def _resolve_requested_stream_count(run_config: dict, default: int = MIN_THROUGHPUT_STREAMS) -> int:
-    for key in ("num_streams", "streams"):
+    for key in ("num_streams", "stream_count", "streams"):
         value = run_config.get(key)
         if value is not None:
-            return _require_stream_minimum(int(value), key)
+            return require_stream_minimum(int(value), key)
     value = run_config.get("concurrent_streams")
     if value is None:
         return default
-    return _require_stream_minimum(int(value), "concurrent_streams")
+    return require_stream_minimum(int(value), "concurrent_streams")
 
 
-def _finalize_throughput_metrics(result: Any, num_streams: int, query_subset: list[str] | None) -> None:
-    result.success = throughput_result_succeeded(result, num_streams)
-    if not result.success:
-        result.throughput_at_size = None
-        result.query_throughput = 0.0
-    elif query_subset:
-        result.throughput_at_size = None
+def _throughput_benchmark_id(benchmark: Any) -> str:
+    name = getattr(benchmark, "benchmark_name", None)
+    return normalize_benchmark_id(name) if isinstance(name, str) else ""
+
+
+def _legacy_throughput_run_config(benchmark: Any, benchmark_id: str, options: dict[str, Any]) -> dict[str, Any]:
+    run_config = dict(options)
+    for legacy, current in (("base_seed", "seed"), ("stream_timeout", "stream_timeout_seconds")):
+        if legacy in run_config:
+            run_config.setdefault(current, run_config.pop(legacy))
+    if run_config.pop("enable_validation", True) is False:
+        run_config.setdefault("validation_mode", "disabled")
+    run_config.setdefault("scale_factor", getattr(benchmark, "scale_factor", 1.0))
+    run_config["benchmark_name"] = benchmark_id
+    return run_config
 
 
 def _format_throughput_metric(result: Any) -> str:
@@ -256,7 +260,7 @@ class TestDriversMixin:
             console.print(f"[dim]{_describe_stream_timeout(cfg, run_config)}[/dim]")
             throughput_test_result = throughput_test.run(config=cfg)
 
-            _finalize_throughput_metrics(throughput_test_result, num_streams, cfg.query_subset)
+            finalize_throughput_metrics(throughput_test_result, num_streams, cfg.query_subset)
 
             if self.very_verbose:
                 with contextlib.suppress(Exception):
@@ -376,7 +380,7 @@ class TestDriversMixin:
             console.print(f"[dim]{_describe_stream_timeout(cfg, run_config)}[/dim]")
             throughput_test_result = throughput_test.run(config=cfg)
 
-            _finalize_throughput_metrics(throughput_test_result, num_streams, cfg.query_subset)
+            finalize_throughput_metrics(throughput_test_result, num_streams, cfg.query_subset)
             self._last_throughput_test_result = throughput_test_result
 
             if throughput_test_result.success:
@@ -1248,22 +1252,43 @@ class TestDriversMixin:
             return self.run_benchmark(benchmark, **kwargs).__dict__
 
     def run_throughput_test(self, benchmark, **kwargs) -> dict[str, Any]:
-        if hasattr(benchmark, "run_throughput_test") and callable(benchmark.run_throughput_test):
-            connection = kwargs.pop("connection", None)
-            if connection is None:
-                raise ValueError("TPC benchmarks require a connection object for throughput tests")
-
-            def _default_connection_factory():
-                return _make_stream_cursor(connection)
-
-            connection_factory = kwargs.pop("connection_factory", _default_connection_factory)
-
-            if "dialect" not in kwargs:
-                kwargs["dialect"] = self.get_target_dialect()
-
-            return benchmark.run_throughput_test(connection_factory=connection_factory, **kwargs).__dict__
-        else:
+        benchmark_id = _throughput_benchmark_id(benchmark)
+        warn_legacy_throughput_api("PlatformAdapter.run_throughput_test", benchmark_id)
+        if resolve_throughput_harness(benchmark_id) is None:
             return self.run_power_test(benchmark, **kwargs)
+        options = dict(kwargs)
+        connection = options.pop("connection", None)
+        if connection is None:
+            raise ValueError("TPC benchmarks require a connection object for throughput tests")
+        result = self._run_routed_throughput(benchmark, connection, options)
+        return {
+            **vars(result),
+            "total_duration": result.total_time,
+            "stream_results": [dataclasses.asdict(stream) for stream in result.stream_results],
+            "error": "; ".join(result.errors) or None,
+        }
+
+    def _run_routed_throughput(self, benchmark, connection: Any, options: dict[str, Any]) -> Any:
+        if options.get("connection_factory") is not None:
+            raise TypeError(
+                "connection_factory is not supported: per-stream sessions come from the platform adapter "
+                "(new_stream_connection). Pass the shared `connection` instead."
+            )
+        benchmark_id = _throughput_benchmark_id(benchmark)
+        harness = resolve_throughput_harness(benchmark_id)
+        if harness is None:
+            raise ValueError(f"No supported throughput driver for benchmark '{benchmark_id or benchmark}'")
+        run_config = _legacy_throughput_run_config(benchmark, benchmark_id, options)
+        require_throughput_stream_capability(self, platform_name=self.platform_name)
+        _resolve_requested_stream_count(run_config)
+        self._last_throughput_test_result = None
+        rows = getattr(self, harness.adapter_method)(benchmark, connection, run_config)
+        result = self._last_throughput_test_result
+        self._last_throughput_test_result = None
+        if result is None:
+            detail = "; ".join(str(row.get("error")) for row in rows if row.get("error")) or "no result produced"
+            raise RuntimeError(f"Throughput test did not run: {detail}")
+        return result
 
     def run_maintenance_test(self, benchmark, **kwargs) -> dict[str, Any]:
         return self.run_benchmark(benchmark, **kwargs).__dict__

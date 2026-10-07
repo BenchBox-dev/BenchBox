@@ -99,7 +99,8 @@ CREATE TABLE IF NOT EXISTS results (
     has_tuning           BOOLEAN  NOT NULL,
     bundle_download_url  VARCHAR  NOT NULL,
     physical_mechanisms   VARCHAR,
-    physical_rendering_id VARCHAR
+    physical_rendering_id VARCHAR,
+    benchmark_support_status VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS query_display_timings (
@@ -190,6 +191,7 @@ SELECT
     r.bundle_download_url,
     r.physical_mechanisms,
     r.physical_rendering_id,
+    r.benchmark_support_status,
     e.os,
     e.arch,
     e.cpu_count,

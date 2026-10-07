@@ -161,6 +161,7 @@ help:
 	@echo ""
 	@echo "Release Workflow (2-command flow; see docs/operations/release-guide.md):"
 	@echo "  make release-cut VERSION=X.Y.Z      Cut v\$$VERSION off develop, bump + changelog + curate, push, open PR vs release (re-run to resume)"
+	@echo "                                      CHANGELOG_SECTION=<path> supplies the curated changelog body in one pass"
 	@echo "  make release-cut-abort VERSION=X.Y.Z  Discard an unpushed v\$$VERSION cut and return to develop"
 	@echo "  make release-finalize VERSION=X.Y.Z Verify validate-base and release-required-result, squash-merge the release PR, tag release, push tag"
 	@echo ""

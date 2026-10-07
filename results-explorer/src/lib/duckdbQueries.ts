@@ -136,6 +136,7 @@ export interface ResultRow extends CostDeploymentFields {
   validation_status: string | null;
   cost_usd: number | null;
   compliance_class: string | null;
+  benchmark_support_status?: string | null;
   is_ranking_eligible: boolean;
   has_plans: boolean;
   plans_published: boolean;
@@ -409,6 +410,7 @@ const RESULT_COLUMNS = [
   "has_tuning",
   "bundle_download_url",
   "physical_rendering_id",
+  "benchmark_support_status",
 ].join(", ");
 
 const RESULT_HARDWARE_COLUMNS = `${RESULT_COLUMNS}, arch, cpu_family, memory_gb`;

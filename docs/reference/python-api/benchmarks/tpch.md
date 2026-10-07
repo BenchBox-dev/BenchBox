@@ -289,7 +289,7 @@ TPCHPowerTestResult True 22 22
 
 <span id="benchbox.tpch.TPCH.run_official_benchmark"></span>
 
-`run_official_benchmark(connection_factory, config=None)` is meant to run the power, throughput and maintenance tests and report Power@Size and Throughput@Size. On 0.4.1 it raises `TypeError: scale_factor must be a number, got TPCH` for every argument.
+`run_official_benchmark(connection_factory, config=None, *, adapter)` runs the power, throughput and maintenance tests and reports Power@Size and Throughput@Size. On 0.4.1 it raises `TypeError: scale_factor must be a number, got TPCH` for every argument. In later releases it builds the official benchmark from the facade's scale factor, runs the same TPC-H throughput driver as `benchbox run`, and emits a `DeprecationWarning`. The `adapter` argument (a platform adapter) is required whenever the throughput test is enabled: the streams run behind the platform's stream capability gate with one adapter session per stream, and the factory's first connection is the shared connection. Without it the call raises `TypeError`; use `benchbox run --phases throughput` instead. `connection_factory` must return a new connection on each call, because each phase closes its connection. Power@Size is reported only when the power phase finished all 22 queries, Throughput@Size only when every stream succeeded, and a run with fewer than 2 streams is refused.
 
 `TPCH` has no `run_throughput_test` method on 0.4.1.
 

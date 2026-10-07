@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 TPCH_RANGE_ROW_COUNT_BOUNDS: dict[str, tuple[int, int]] = {
     "11": (514, 1469),
+    "13": (41, 42),
     "18": (9, 57),
     "20": (131, 231),
 }

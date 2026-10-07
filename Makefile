@@ -858,13 +858,16 @@ release-cut: .release-cut-tree-required
 	sh scripts/release_cut_start.sh "$(VERSION)"
 	uv run -- python scripts/update_version.py --version $(VERSION) --update-pyproject
 	uv lock
-	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/release
-	@if [ -n "$$EDITOR" ] && [ -t 0 ]; then \
+	uv run -- python scripts/generate_changelog_entry.py --version $(VERSION) --since-ref origin/release $(if $(CHANGELOG_SECTION),--section-file "$(CHANGELOG_SECTION)")
+	@if [ -n "$(CHANGELOG_SECTION)" ]; then \
+		echo "==> CHANGELOG.md [$(VERSION)] section written from $(CHANGELOG_SECTION)"; \
+	elif [ -n "$$EDITOR" ] && [ -t 0 ]; then \
 		echo "==> Opening CHANGELOG.md in $$EDITOR for hand-curation"; \
 		$$EDITOR CHANGELOG.md; \
 	else \
 		echo "==> Non-interactive: CHANGELOG.md holds the raw generated draft."; \
 		echo "    Hand-curate the [$(VERSION)] section, then re-run: make release-cut VERSION=$(VERSION)"; \
+		echo "    Or pass the curated section body in one pass: CHANGELOG_SECTION=<path>"; \
 	fi
 	uv run -- python scripts/generate_changelog_entry.py --check-curation --version $(VERSION)
 	git rm -rf --ignore-unmatch _project ':(exclude)_project/scripts/explorer_pipeline/**' ':(exclude)_project/scripts/explorer_publish.py' ':(exclude)_project/scripts/results_explorer_snapshot_invariants.py' _blog .claude .codex .gemini tools

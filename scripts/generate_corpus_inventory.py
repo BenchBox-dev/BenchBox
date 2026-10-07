@@ -207,7 +207,6 @@ def generate_inventory(bundles_dir: Path) -> dict:
         )
     )
 
-    cohorts: dict[str, list[str]] = {}
     cohort_members: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
     for entry in entries:
         key = (entry["benchmark"], str(entry["scale_factor"]) + _cohort_phase_suffix(bundles_dir / entry["file"]))
@@ -216,6 +215,7 @@ def generate_inventory(bundles_dir: Path) -> dict:
             identity = f"{identity} v{entry['platform_version']}"
         cohort_members[key].add(identity)
 
+    cohorts: dict[str, list[str]] = {}
     for (benchmark, scale_factor), platforms in sorted(cohort_members.items()):
         cohorts[f"{benchmark}@sf{scale_factor}"] = sorted(platforms)
 

@@ -7,7 +7,7 @@ import json
 import logging
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Iterator, Optional
 
 from benchbox.core.primitives_benchmark_utils import failed_platform_error
@@ -412,9 +412,39 @@ class TuningMetadataManager:
                 )
                 result.add_error("Table tuning column attributes drifted from persisted database metadata")
 
+    _INDEX_PLAIN_FORM_PLATFORMS = frozenset(
+        {
+            "duckdb",
+            "motherduck",
+            "sqlite",
+            "postgresql",
+            "timescaledb",
+            "pg_duckdb",
+            "paradedb",
+            "citus",
+            "cedardb",
+        }
+    )
+    _INDEX_TSQL_PLATFORMS = frozenset({"azure_synapse", "fabric_warehouse"})
+
+    def _metadata_unsupported_reason(self) -> Optional[str]:
+        if self._platform_key() == "athena":
+            return (
+                "Tuning metadata is not supported on Athena: the metadata table "
+                "needs an Iceberg table with an explicit warehouse LOCATION, which "
+                "BenchBox does not provision. Runs continue without persisted tuning "
+                "metadata (reuse and drift detection stay disabled)."
+            )
+        return None
+
     def create_metadata_table(self) -> bool:
         if self._table_exists:
             return True
+
+        unsupported = self._metadata_unsupported_reason()
+        if unsupported is not None:
+            self.logger.error(unsupported)
+            return False
 
         try:
             create_sql = self._get_create_table_sql()
@@ -423,17 +453,20 @@ class TuningMetadataManager:
 
             with self._managed_connection() as conn:
                 self._execute_sql(conn, create_sql)
-
-                index_sql = self._get_create_index_sql()
-                if index_sql:
-                    self._execute_sql(conn, index_sql)
-
-            self._table_exists = True
-            return True
-
         except Exception as e:
             self.logger.error(f"Failed to create metadata table: {e}")
             return False
+
+        self._table_exists = True
+
+        index_sql = self._get_create_index_sql()
+        if index_sql:
+            try:
+                with self._managed_connection() as conn:
+                    self._execute_sql(conn, index_sql)
+            except Exception as e:
+                self.logger.warning(f"Failed to create tuning metadata index (non-fatal): {e}")
+        return True
 
     def _get_create_table_sql(self) -> str:
         platform = self._platform_key()
@@ -450,26 +483,48 @@ class TuningMetadataManager:
         )"""
 
         if platform == "bigquery":
-            return base_sql.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE")
+            bigquery_sql = base_sql.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE")
+            for narrow, broad in (
+                ("VARCHAR(255)", "STRING"),
+                ("VARCHAR(50)", "STRING"),
+                ("VARCHAR(64)", "STRING"),
+                ("INTEGER", "INT64"),
+                ("TIMESTAMP", "TIMESTAMP"),
+            ):
+                bigquery_sql = bigquery_sql.replace(narrow, broad)
+            return bigquery_sql
         elif platform == "snowflake":
             return base_sql.replace("TIMESTAMP", "TIMESTAMP_NTZ")
         elif platform == "redshift":
-            return base_sql + " ENCODE AUTO"
-        elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
+            return base_sql
+        elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server", "clickhouse-cloud"}:
             return base_sql + " ENGINE = MergeTree() ORDER BY (table_name, tuning_type)"
         else:
             return base_sql
 
     def _get_create_index_sql(self) -> Optional[str]:
         platform = self._platform_key()
+        index_name = f"idx_{self._metadata_table_name}_lookup"
 
-        if platform in {"clickhouse", "clickhouse-local", "clickhouse-server"} or platform == "bigquery":
+        if (
+            platform in {"clickhouse", "clickhouse-local", "clickhouse-server", "clickhouse-cloud"}
+            or platform == "bigquery"
+        ):
             return None
-        else:
+        elif platform in self._INDEX_PLAIN_FORM_PLATFORMS:
             return f"""
-            CREATE INDEX IF NOT EXISTS idx_{self._metadata_table_name}_lookup
+            CREATE INDEX IF NOT EXISTS {index_name}
             ON {self._metadata_table_name} (table_name, configuration_hash)
             """
+        elif platform in self._INDEX_TSQL_PLATFORMS:
+            return f"""
+            IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = '{index_name}'
+            AND object_id = OBJECT_ID('{self._metadata_table_name}'))
+            CREATE INDEX {index_name}
+            ON {self._metadata_table_name} (table_name, configuration_hash)
+            """
+        else:
+            return None
 
     def save_tunings(self, benchmark_tunings: BenchmarkTunings) -> bool:
         try:
@@ -579,7 +634,9 @@ class TuningMetadataManager:
         if isinstance(value, (int, float)):
             return str(value)
         if isinstance(value, datetime):
-            return f"'{value.isoformat()}'"
+            if value.tzinfo is not None:
+                value = value.astimezone(timezone.utc).replace(tzinfo=None)
+            return f"'{value.strftime('%Y-%m-%d %H:%M:%S')}'"
         return "'" + str(value).replace("'", "''") + "'"
 
     def _batch_insert_records(self, records: list[TuningMetadata]) -> None:

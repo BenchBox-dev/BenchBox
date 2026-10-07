@@ -48,7 +48,7 @@ def parse_main_only_allowlist(doc: Path) -> set[str]:
     return {p.rstrip("/") for p in paths}
 
 
-def parse_curation_list(makefile: Path) -> set[str]:
+def release_cut_rm_commands(makefile: Path) -> list[list[str]]:
     text = makefile.read_text(encoding="utf-8")
     match = re.search(
         r"^release-cut:[^\n]*\n((?:[ \t].*\n|\n)+)",
@@ -57,13 +57,18 @@ def parse_curation_list(makefile: Path) -> set[str]:
     )
     if not match:
         sys.exit(f"ERROR: could not find release-cut: target in {makefile}")
-    body = match.group(1)
-    paths: set[str] = set()
-    for line in body.splitlines():
+    commands: list[list[str]] = []
+    for line in match.group(1).splitlines():
         rm_match = re.search(r"git rm (?:-rf|-f)(?: --ignore-unmatch)? (.+?)$", line.strip())
-        if not rm_match:
-            continue
-        paths.update(p for p in shlex.split(rm_match.group(1)) if not p.startswith("-"))
+        if rm_match:
+            commands.append(shlex.split(rm_match.group(0)))
+    return commands
+
+
+def parse_curation_list(makefile: Path) -> set[str]:
+    paths: set[str] = set()
+    for command in release_cut_rm_commands(makefile):
+        paths.update(p for p in command[2:] if not p.startswith("-"))
     return paths
 
 

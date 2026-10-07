@@ -300,7 +300,7 @@ class TestHungStreamDeferredClose:
             result = test.run(config)
 
             assert result.success is False
-            assert sorted(result.outstanding_stream_ids) == [0, 1]
+            assert sorted(result.outstanding_stream_ids) == [1, 2]
             adapter._last_throughput_test_result = result
             assert adapter._contain_outstanding_throughput_work({"stream_cleanup_timeout_seconds": 0.2}) is False
             adapter._close_run_connection()

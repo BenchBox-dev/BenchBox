@@ -640,4 +640,4 @@ class TestEndToEndThroughputTest:
 
             assert result.streams_executed == 3
             assert len(result.stream_results) == 3
-            assert all(sr.stream_id in [0, 1, 2] for sr in result.stream_results)
+            assert all(sr.stream_id in [1, 2, 3] for sr in result.stream_results)

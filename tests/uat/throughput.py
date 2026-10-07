@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from benchbox.core.results.metrics import TPCMetricsCalculator
+from benchbox.core.throughput.result import throughput_stream_ids
 from tests.uat import throughput_baseline as baseline
 
 TPC_ALLOWED_SCALE_FACTORS = {1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000}
@@ -60,9 +61,19 @@ def validate_result_identity(
 
 
 def validate_stream_count(result_json: dict[str, Any], *, requested_streams: int) -> tuple[bool, str]:
-    executed = len({row["stream"] for row in _throughput_rows(result_json)})
+    streams_seen = {row["stream"] for row in _throughput_rows(result_json)}
+    executed = len(streams_seen)
     if executed != requested_streams:
-        return False, f"throughput stream count mismatch: requested {requested_streams}, executed {executed}"
+        return (
+            False,
+            f"throughput stream count mismatch: requested {requested_streams}, executed {executed}",
+        )
+    expected_ids = set(throughput_stream_ids(requested_streams))
+    if streams_seen != expected_ids:
+        return (
+            False,
+            f"throughput stream ids {sorted(streams_seen)} do not match the spec numbering {sorted(expected_ids)}",
+        )
     return True, "ok"
 
 

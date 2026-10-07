@@ -34,7 +34,7 @@ def test_answer_files_are_low_medium_whatever_their_size(policy: Policy) -> None
 
 
 def test_small_single_area_code_change_is_low_medium(policy: Policy) -> None:
-    result = _classify(policy, _file("scripts/publication/verify_lane_isolation.py", 20, 3))
+    result = _classify(policy, _file("scripts/publication/validator_parity.py", 20, 3))
     assert result.tier == "low-medium"
 
 
@@ -52,8 +52,10 @@ def test_comparison_validation_and_capture_logic_is_medium_high(policy: Policy, 
 
 
 def test_larger_or_multi_area_code_diff_is_medium_high(policy: Policy) -> None:
-    assert _classify(policy, _file("scripts/publication/a.py", 200)).tier == "medium-high"
-    assert _classify(policy, _file("scripts/publication/a.py"), _file("deploy/x.sh")).tier == "medium-high"
+    assert _classify(policy, _file("scripts/publication/validator_parity.py", 200)).tier == "medium-high"
+    assert (
+        _classify(policy, _file("scripts/publication/validator_parity.py"), _file("deploy/x.sh")).tier == "medium-high"
+    )
 
 
 @pytest.mark.parametrize(
@@ -87,9 +89,9 @@ def test_renaming_a_gate_file_away_is_very_high(policy: Policy) -> None:
 def test_large_multi_area_diff_is_very_high(policy: Policy) -> None:
     result = _classify(
         policy,
-        _file("scripts/publication/a.py", 400),
+        _file("scripts/publication/validator_parity.py", 400),
         _file("deploy/b.sh", 300),
-        _file("publication/c.py", 200),
+        _file("publication/ledger-seed.json", 200),
     )
     assert result.tier == "very-high"
 

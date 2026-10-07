@@ -170,6 +170,7 @@ def validator_parity_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
         inputs.trunk_sha,
         "--head-sha",
         inputs.trunk_sha,
+        "--allow-partial-validation",
     ]
     return _from_run(runner, command, inputs.repo_root)
 

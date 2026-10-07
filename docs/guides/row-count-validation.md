@@ -287,11 +287,12 @@ The validation system is thread-safe for concurrent query execution:
 ```python
 results = adapter.run_throughput_test(
     benchmark=benchmark,
-    num_streams=4
+    connection=connection,
+    num_streams=4,
 )
 ```
 
-Throughput tests with concurrent queries are safe. `num_streams=4` runs 4 concurrent query streams, and each stream can validate concurrently without conflicts.
+Throughput tests with concurrent queries are safe. The streams share one connection, and each stream gets its own session. `num_streams=4` runs 4 concurrent query streams, and each stream can validate concurrently without conflicts.
 
 **Implementation:**
 - Registry uses `threading.Lock` to protect cache and provider registry

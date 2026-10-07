@@ -43,6 +43,19 @@ PHASE_DDL = "ddl"
 PHASE_POST_LOAD = "post_load"
 PHASE_SESSION = "session"
 
+LEDGER_PHASES = frozenset({PHASE_DDL, PHASE_POST_LOAD, PHASE_SESSION})
+
+PHASE_ALIASES = {
+    "pre_load": PHASE_DDL,
+    "preload": PHASE_DDL,
+    "pre-load": PHASE_DDL,
+    "schema": PHASE_DDL,
+    "create": PHASE_DDL,
+    "postload": PHASE_POST_LOAD,
+    "post-load": PHASE_POST_LOAD,
+    "maintenance": PHASE_POST_LOAD,
+}
+
 SATISFIED_BY_PREEXISTING_STATE = -1
 
 _READBACK_PREFIXES = ("select", "show", "describe", "desc ", "explain", "values ")
@@ -97,6 +110,19 @@ def _split_sql_script(script: Any) -> list[str]:
         return statements
     except Exception:
         return [text]
+
+
+def normalize_ledger_phase(phase: Any) -> str:
+    try:
+        text = str(phase).strip().lower()
+        if text in LEDGER_PHASES:
+            return text
+        if text in PHASE_ALIASES:
+            return PHASE_ALIASES[text]
+        logger.warning("applied-ledger unknown phase %r; recording as %r", phase, PHASE_DDL)
+        return PHASE_DDL
+    except Exception:  # pragma: no cover
+        return PHASE_DDL
 
 
 def _is_recordable_statement(statement: Any) -> bool:
@@ -170,7 +196,7 @@ class AppliedTuningLedger:
             self.statements.append(
                 AppliedStatement(
                     statement=str(statement),
-                    phase=phase,
+                    phase=normalize_ledger_phase(phase),
                     status=status,
                     mechanism=mechanism,
                     table=table,

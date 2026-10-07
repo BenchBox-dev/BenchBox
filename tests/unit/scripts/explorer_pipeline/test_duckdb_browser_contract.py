@@ -91,6 +91,7 @@ class TestG1SchemaContract:
             "bundle_download_url",
             "physical_mechanisms",
             "physical_rendering_id",
+            "benchmark_support_status",
             "tuning_policy_generation",
         },
         "result_environment": {
@@ -267,6 +268,7 @@ class TestG1SchemaContract:
             "bundle_download_url",
             "physical_mechanisms",
             "physical_rendering_id",
+            "benchmark_support_status",
             "tuning_policy_generation",
             "os",
             "arch",

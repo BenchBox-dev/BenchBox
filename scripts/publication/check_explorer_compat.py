@@ -60,8 +60,8 @@ try:
     CURRENT_SCHEMA_VERSION: int = _READ_MODEL_VERSION
     CONTRACT_VERSION: str = _CONTRACT_VERSION
 except ImportError:
-    SUPPORTED_SCHEMA_VERSIONS: tuple[int, ...] = (12,)
-    CURRENT_SCHEMA_VERSION: int = 12
+    SUPPORTED_SCHEMA_VERSIONS: tuple[int, ...] = (13,)
+    CURRENT_SCHEMA_VERSION: int = 13
     CONTRACT_VERSION: str = "6"
 
 _TYPE_ALIASES: dict[str, str] = {
@@ -175,6 +175,7 @@ TABLE_COLUMNS_V9: dict[str, dict[str, str]] = {
         "bundle_download_url": "VARCHAR",
         "physical_mechanisms": "VARCHAR",
         "physical_rendering_id": "VARCHAR",
+        "benchmark_support_status": "VARCHAR",
     },
     "query_display_timings": {
         "result_id": "VARCHAR",
@@ -312,11 +313,20 @@ TABLE_COLUMNS_V11: dict[str, dict[str, str]] = {
 
 TABLE_COLUMNS_V12: dict[str, dict[str, str]] = {**TABLE_COLUMNS_V11}
 
+TABLE_COLUMNS_V13: dict[str, dict[str, str]] = {
+    **TABLE_COLUMNS_V12,
+    "results": {
+        **TABLE_COLUMNS_V12["results"],
+        "benchmark_support_status": "VARCHAR",
+    },
+}
+
 SCHEMA_REGISTRY: dict[int, dict[str, dict[str, str]]] = {
     9: TABLE_COLUMNS_V9,
     10: TABLE_COLUMNS_V10,
     11: TABLE_COLUMNS_V11,
     12: TABLE_COLUMNS_V12,
+    13: TABLE_COLUMNS_V13,
 }
 
 REQUIRED_INDEXES_V9: list[tuple[str, str, list[str]]] = [
@@ -346,6 +356,17 @@ REQUIRED_VIEW_COLUMNS_V11: dict[str, list[str]] = {
         "override_evidence",
         "override_approver",
         "override_expires",
+    ],
+}
+
+REQUIRED_VIEW_COLUMNS_V12: dict[str, list[str]] = {
+    "result_detail_metrics": list(REQUIRED_VIEW_COLUMNS_V11["result_detail_metrics"]),
+}
+
+REQUIRED_VIEW_COLUMNS_V13: dict[str, list[str]] = {
+    "result_detail_metrics": [
+        *REQUIRED_VIEW_COLUMNS_V11["result_detail_metrics"],
+        "benchmark_support_status",
     ],
 }
 
@@ -449,7 +470,7 @@ CORE_EXPLORER_QUERIES: list[tuple[str, str]] = [
         "total_duration_s, geomean_ms, display_geomean_ms, query_count, logical_query_count, "
         "has_display_timing, valid_query_count, missing_query_count, zero_timing_count, "
         "display_exclusion_reason, comparison_exclusion_reason, ranking_exclusion_reason, "
-        "trust_label, visibility, funding, validation_status, cost_usd "
+        "trust_label, visibility, funding, validation_status, cost_usd, benchmark_support_status "
         "FROM results ORDER BY run_date DESC LIMIT 24",
     ),
     (
@@ -564,8 +585,14 @@ def validate_database_schema(con: Any, expected_version: int | None = None) -> l
     if missing_views:
         errors.append(f"missing required views for v{version_to_check}: {', '.join(missing_views)}")
 
+    if version_to_check >= 13:
+        view_column_requirements = REQUIRED_VIEW_COLUMNS_V13
+    elif version_to_check >= 12:
+        view_column_requirements = REQUIRED_VIEW_COLUMNS_V12
+    else:
+        view_column_requirements = REQUIRED_VIEW_COLUMNS_V11
     if version_to_check >= 11:
-        for view, required_cols in REQUIRED_VIEW_COLUMNS_V11.items():
+        for view, required_cols in view_column_requirements.items():
             if view not in existing_views:
                 continue
             view_col_rows = con.execute(

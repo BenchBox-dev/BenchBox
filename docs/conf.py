@@ -122,6 +122,8 @@ exclude_patterns = [
     "development/duplication-residuals.md",
     "development/unified_frame_any_survey.md",
     "development/unified_frame_any_survey.csv",
+    "development/comment-policy.md",
+    "development/comment-cleanup-scope.md",
 ]
 
 language = "en"

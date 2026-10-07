@@ -231,7 +231,7 @@ class TestStreamTimeoutOptions:
         try:
             result, _rows = _run_tpch(driver, stream_timeout_seconds=1, cancel_on_timeout=cancel)
 
-            assert sorted(result.outstanding_stream_ids) == [0, 1]
+            assert sorted(result.outstanding_stream_ids) == [1, 2]
             gate.set()
             assert await_quiescence(result, timeout=30.0) is True
             if cancel:

@@ -10,7 +10,12 @@ from benchbox.core.plan_capture_phase import (
     propagate_query_execution_metadata,
 )
 from benchbox.core.results.metrics import TPC_QUERIES_PER_STREAM
-from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
+from benchbox.core.throughput.result import (
+    THROUGHPUT_FIRST_STREAM_ID,
+    ThroughputResult,
+    ThroughputStreamResult,
+    throughput_stream_ids,
+)
 from benchbox.core.throughput.runner import StreamRunner
 from benchbox.core.validation.query_validation import (
     clear_reference_seed_context,
@@ -209,7 +214,7 @@ class TPCDSThroughputTest:
         try:
             available_query_ids = list(range(1, 100))
 
-            for stream_id in range(config.num_streams):
+            for stream_id in throughput_stream_ids(config.num_streams):
                 for position, query_id in enumerate(available_query_ids):
                     stream_seed = config.base_seed + stream_id * 1000 + position
                     try:
@@ -233,7 +238,7 @@ class TPCDSThroughputTest:
 
         try:
             all_streams = generate_dsqgen_streams(
-                num_streams=config.num_streams,
+                num_streams=config.num_streams + THROUGHPUT_FIRST_STREAM_ID,
                 scale_factor=config.scale_factor,
                 seed=config.base_seed,
             )
@@ -243,7 +248,7 @@ class TPCDSThroughputTest:
         stream_queries: dict[int, list[tuple[Any, str]]] = {}
         failures: list[str] = []
 
-        for stream_id in range(config.num_streams):
+        for stream_id in throughput_stream_ids(config.num_streams):
             query_subset = _apply_query_subset(all_streams.get(stream_id, []), config.query_subset)
             if config.queries_per_stream is not None:
                 query_subset = query_subset[: min(config.queries_per_stream, len(query_subset))]
@@ -309,7 +314,7 @@ class TPCDSThroughputTest:
         query_range = (min(available_query_ids), max(available_query_ids)) if available_query_ids else (1, 99)
         stream_manager = create_standard_streams(
             query_manager=query_manager,
-            num_streams=config.num_streams,
+            num_streams=config.num_streams + THROUGHPUT_FIRST_STREAM_ID,
             query_range=query_range,
             base_seed=config.base_seed,
         )

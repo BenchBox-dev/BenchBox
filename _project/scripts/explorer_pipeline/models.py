@@ -129,6 +129,7 @@ class ManifestEntry(BaseModel):
     test_type: str | None = None
     validation_status: str | None = None
     failed_query_count: int = 0
+    benchmark_support_status: str | None = None
     cost_usd: float | None = None
     normalized_cost: NormalizedCost = Field(default_factory=_unavailable_normalized_cost)
     deployment_class: str | None = None

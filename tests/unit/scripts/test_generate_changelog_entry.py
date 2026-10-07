@@ -77,6 +77,99 @@ def test_curated_section_body_rejects_empty_and_raw_sections(tmp_path: Path) -> 
     assert any("verbatim commit subjects" in problem for problem in problems)
 
 
+CHANGELOG_BEFORE_CUT = """\
+# Changelog
+
+## [Unreleased]
+
+## [0.4.0] - 2026-08-27
+
+### Added
+
+- shipped feature
+"""
+
+CURATED_BODY = """\
+### Before you upgrade
+
+- **Cached databases are rebuilt.** Tuned databases from earlier versions are
+  rebuilt on the next run.
+
+### Fixed
+
+- Throughput runs stop at the configured time limit.
+"""
+
+
+def _section_file_cli(tmp_path: Path, monkeypatch, *extra: str) -> int:
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["generate_changelog_entry.py", "--source", str(tmp_path), "--version", "0.4.1", *extra],
+    )
+    return generate_changelog_entry.main()
+
+
+def test_section_file_writes_a_curated_section_that_passes_the_gate(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "CHANGELOG.md").write_text(CHANGELOG_BEFORE_CUT, encoding="utf-8")
+    section = tmp_path.parent / "section.md"
+    section.write_text(CURATED_BODY, encoding="utf-8")
+
+    assert _section_file_cli(tmp_path, monkeypatch, "--release-date", "2026-10-06", "--section-file", str(section)) == 0
+
+    text = (tmp_path / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert text.index("## [Unreleased]") < text.index("## [0.4.1] - 2026-10-06") < text.index("## [0.4.0]")
+    assert generate_changelog_entry.section_body(text, "0.4.1").strip() == CURATED_BODY.strip()
+    assert generate_changelog_entry.check_changelog_curation(tmp_path, "0.4.1") == (True, [])
+    assert _section_file_cli(tmp_path, monkeypatch, "--check-curation") == 0
+
+
+def test_section_file_with_raw_generated_text_is_still_refused(tmp_path: Path, monkeypatch, capsys) -> None:
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "CHANGELOG.md").write_text(CHANGELOG_BEFORE_CUT, encoding="utf-8")
+    section = tmp_path.parent / "raw.md"
+    section.write_text("### Added\n\n- add tuned template hashing (#2636)\n", encoding="utf-8")
+    monkeypatch.delenv("RELEASE_ALLOW_RAW_CHANGELOG", raising=False)
+
+    assert _section_file_cli(tmp_path, monkeypatch, "--section-file", str(section)) == 0
+    assert _section_file_cli(tmp_path, monkeypatch, "--check-curation") == 1
+    assert "does not look hand-curated" in capsys.readouterr().out
+
+
+def test_section_file_replaces_a_raw_section_left_by_an_earlier_pass(tmp_path: Path, monkeypatch) -> None:
+    (tmp_path / ".git").mkdir()
+    raw = CHANGELOG_BEFORE_CUT.replace(
+        "## [0.4.0]", "## [0.4.1] - 2026-10-05\n\n### Added\n\n- raw subject (#2700)\n\n## [0.4.0]"
+    )
+    (tmp_path / "CHANGELOG.md").write_text(raw, encoding="utf-8")
+    section = tmp_path.parent / "section.md"
+    section.write_text(CURATED_BODY, encoding="utf-8")
+
+    assert _section_file_cli(tmp_path, monkeypatch, "--release-date", "2026-10-06", "--section-file", str(section)) == 0
+
+    text = (tmp_path / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "raw subject" not in text
+    assert text.count("## [0.4.1]") == 1
+    assert "## [0.4.1] - 2026-10-06" in text
+    assert generate_changelog_entry.section_body(text, "0.4.0").strip() == "### Added\n\n- shipped feature"
+
+
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [("", "is empty"), ("## [0.4.1] - 2026-10-06\n\n- note\n", "without a '## ' version header")],
+)
+def test_section_file_rejects_empty_or_headed_bodies(tmp_path: Path, monkeypatch, capsys, body, message) -> None:
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "CHANGELOG.md").write_text(CHANGELOG_BEFORE_CUT, encoding="utf-8")
+    section = tmp_path.parent / "section.md"
+    section.write_text(body, encoding="utf-8")
+
+    assert _section_file_cli(tmp_path, monkeypatch, "--section-file", str(section)) == 1
+    assert message in capsys.readouterr().out
+    assert (tmp_path / "CHANGELOG.md").read_text(encoding="utf-8") == CHANGELOG_BEFORE_CUT
+
+
 def test_print_section_cli_refuses_uncurated_notes(tmp_path: Path, monkeypatch, capsys) -> None:
     (tmp_path / ".git").mkdir()
     (tmp_path / "CHANGELOG.md").write_text(
@@ -356,6 +449,29 @@ class TestChangelogCurationGuard:
         ok, problems = generate_changelog_entry.check_changelog_curation(tmp_path, "0.3.1")
         assert not ok
         assert any("ceiling" in p for p in problems)
+
+    def test_line_ceiling_is_enforced(self, tmp_path: Path) -> None:
+        lines = ["## [0.3.1] - 2026-07-09", "", "### Added", ""]
+        lines.append("- **One change.** A single curated bullet.")
+        lines.extend(f"filler line {i}" for i in range(generate_changelog_entry.MAX_CURATED_LINES))
+        self._write(tmp_path, "\n".join(lines) + "\n")
+        ok, problems = generate_changelog_entry.check_changelog_curation(tmp_path, "0.3.1")
+        assert not ok
+        assert any("ceiling" in p for p in problems)
+
+    def test_contributor_level_draft_is_rejected_without_raw_subjects(self, tmp_path: Path) -> None:
+        bullets = "\n".join(
+            f"- **Change number {i}.** User-visible improvement.\n"
+            f"  Further detail on change {i}.\n"
+            f"  Even more detail on change {i}.\n"
+            f"  Final detail on change {i}."
+            for i in range(53)
+        )
+        self._write(tmp_path, f"## [0.3.1] - 2026-07-09\n\n### Added\n\n{bullets}\n")
+        ok, problems = generate_changelog_entry.check_changelog_curation(tmp_path, "0.3.1")
+        assert not ok
+        assert any("53 bullets exceeds" in p for p in problems)
+        assert any("lines exceeds" in p for p in problems)
 
     def test_missing_section_is_rejected(self, tmp_path: Path) -> None:
         self._write(tmp_path, "## [0.3.0] - 2026-05-16\n\n### Added\n\n- **Thing** - does things.\n")
