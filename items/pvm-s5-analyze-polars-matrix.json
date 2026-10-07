@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Analysis JSON and CSV exist in the output directory, and a findings summary is written (path recorded in context)",
+    "Each headline number in the summary traces to a value in the analysis output",
+    "Movers are listed only when ranges do not overlap, with plans attached for the top five per benchmark",
+    "The summary contains the Parquet-read disclosure, the no-cross-engine-claims statement, the did-not-complete list, and the rejected-cell list",
+    "Any cell whose rounds spread unusually (for example, max/min > 1.25) is flagged as noisy, not rerun"
+  ],
+  "description": "Turn the run into findings that hold up to scrutiny.\n\nWork:\n- Run the analyzer on the manifest.\n- Headline comparisons, in this order: 2.0.0 setup A vs 1.44.2 (what users get by default); 2.0.0 setup B vs 1.44.2 (same in-memory engine, isolating engine improvements from the default change); setup C across versions (streaming vs streaming).\n- Long-run trend: the oldest admitted version through 2.0.0, per setup.\n- List movers by the non-overlap rule, and capture query plans for the five largest movers per benchmark (benchbox plan capture or get_query_plan) to explain them.\n- Report every did-not-complete cell, including any cell where 2.0 out-of-core spilling completes and 1.x does not.\n\nGuardrails:\n- State in the analysis that Polars timings include reading Parquet in each run, and that DuckDB matrix timings read a pre-loaded database. Make no speed comparison against DuckDB.\n- Report the min–max alongside every median.\n- Correctness: every reported cell passed the pvm-s3b evidence rule; any rejected cell is listed with its reason.\n- Claims reference analysis output values, not memory.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-07T20:56:17Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "64c9d67d3b1a419093eecc6dfec70652",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    }
+  ]
+}
