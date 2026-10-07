@@ -72,6 +72,12 @@ every review thread to be resolved and shadow findings must not block merges.
 deliberate step that makes oracle threads binding and starts the parity period
 before the cut-over.
 
+Parity period: the policy now uses `findings_delivery: review`. Each run posts
+a pull request review on the head, and its threads must be resolved before a
+merge, like the connector's. The required check still requires the connector;
+each `oracle-review` run logs the oracle's verdict on `parity:` lines for
+comparison. Setting `findings_delivery: comment` ends the period.
+
 It does not change the required `oracle-review` check, the ruleset, the digest
 or the soundness manifest. It does not post a pending status when a run
 starts, because only the final job holds the App key. Without the App secrets
