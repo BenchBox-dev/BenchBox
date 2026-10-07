@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Certificate approved and HTTPS enforced on next.benchbox.dev",
+    "Push-triggered and bundle-triggered rehearsal deploys green with receipts (run ids recorded)",
+    "Rollback drill and forward deploy green",
+    "Wrong-digest dispatch refused before deploy and issue opened",
+    "noindex present on rehearsal pages"
+  ],
+  "context": "Owner pre-work: the next.benchbox.dev DNS record exists. Owner decision D3. muse AR-01, AR-07 and AR-21 (accepted). Never set SITE_DEPLOY_TARGET=production in this item.",
+  "description": "Site configuration plus evidence; open a PR only for fixes.\n\n1. Set the site Pages custom domain to next.benchbox.dev via gh api. Poll the Pages API every 2 minutes, for at most 60 minutes, until the certificate is approved, then enforce HTTPS. On timeout, remove the domain and stop.\n2. Set SITE_DEPLOY_TARGET=rehearsal.\n3. Run one deploy from a push to main and one from a core-bundle dispatch. Check:\n   - every route class: /, /docs/, /docs/dev/, /blog/ and /results/;\n   - 404.html and objects.inv;\n   - every page carries noindex, and the origin gate passed.\n4. Rollback drill: dispatch mode=rollback to the first rehearsal receipt, check the probes, then deploy forward again.\n5. Failure path: a workflow_dispatch whose payload carries a wrong digest must not deploy, and must open or update the site-bundle-failed issue in core. \"Newest certified\" comes from core runs, so this test cannot poison later resolves.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:51:51Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "4de321df434f4917871a379c663b12e7",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    }
+  ]
+}

@@ -19130,6 +19130,15 @@
       "status": "open",
       "title": "Run the site build in shadow against core site-deploy until three consecutive certified bundles match"
     },
+    "site-split-30-rehearsal": {
+      "claim": null,
+      "needs": [
+        "site-split-25-shadow-parity"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Rehearse real deploys, rollback and the failure path from the site repo on next.benchbox.dev"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],
