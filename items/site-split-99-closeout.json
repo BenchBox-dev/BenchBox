@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Superseded items dropped with reasons and links",
+    "Every follow-up exists as a tracker item",
+    "Final report delivered with the owner list"
+  ],
+  "context": "REVIEW-NARROWING-001: scope removed from this batch must be re-homed to a named item or killed with a recorded reason.",
+  "description": "Tracker only; no PR.\n\n1. Drop astro-site-54, dlv2-61 and dlv2-62, each with the reason \"scope delivered by site-split-*\" and the PR links.\n2. Create follow-up items, so the scope removed by this batch is re-homed:\n   - D13 runner-pool decision, with not_before set 30 days after the cutover, using the receipts' queue time and latency;\n   - release-pinned /docs/, plus canonical tags from /docs/dev/;\n   - an advisory pre-merge site build for core docs PRs;\n   - generating the landing-data.ts cards from the bundle;\n   - updating the blog skill in the skill catalog source, then `make skill-sync`;\n   - deciding whether to retire the MyST converter;\n   - porting comment-policy enforcement parity to the site (if site-split-21 left gaps).\n3. Write the final report: one row per item, plus the owner list of anything refused or deferred (for example, the App uninstall).",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:55:57Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "b541b429e05248a78f49f1d700eb2480",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    }
+  ]
+}
