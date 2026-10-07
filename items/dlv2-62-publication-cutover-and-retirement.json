@@ -5,7 +5,7 @@
     "G4 sweep clean for every retired publication name",
     "Archive tag for `publication` exists; environment, secrets, and App removed; before-state archived"
   ],
-  "context": "Stop only if production probes fail after cutover and rollback does not restore green (unexpected situation).",
+  "context": "Stop only if production probes fail after cutover and rollback does not restore green (unexpected situation). site-split-01 step map (2026-10-07): this item folds into the batch as follows. Cutover steps (disable old triggers, production run, probes, receipt, rollback drill) -> site-split-40-production-cutover. Workflow/script/seed retirement -> site-split-51-publication-retirement. GitHub cleanup (branch tag+delete, environment, secrets, App) -> site-split-54-publication-github-cleanup. Docs steps -> site-split-51. Owner decision D12 (2026-10-06): all of dlv2-62 is in this batch. Owner decision D18 (2026-10-06): the agent performs the GitHub cleanup after archiving. Drop only after the mapped scope has merged; the batch closeout (site-split-99) does the drop.",
   "description": "After dlv2-60 shadow parity. Pre-approved admin changes (standing approvals) with G5 backups. Owner decision 2026-10-04: retirement is gated on evidence, with no elapsed-time observation window.\n1. Cutover: disable old publication triggers (workflow_dispatch-only first), run site-deploy to production, verify probes and receipt, run one production rollback drill to the previous artifact and forward again.\n2. Evidence before retiring: at least one green production deploy from site-deploy for each route class (release docs, dev docs, blog, results/corpus), green probes, and the rollback drill on record.\n3. Retire workflows: publication-deploy.yml, publication-transaction.yml, publication-preview-deploy.yml, publication-preview-soak.yml, publication-soak-monitor.yml (*/5 cron), publication-recover.yml (*/5 cron), publication-canaries.yml (daily availability probe moves to nightly t3:site), publication-corpus-cutover.yml (after ledger shows its property covered or pure-process).\n4. Retire scripts/publication/* not used by site-deploy (expected: transaction.py, transaction_executor.py, journal.py, reconciler.py, reconciliation.py, create_ledger_seed.py, acquire_canary_evidence.py, capture_baseline.py, verify_shadow_site.py, verify_lane_isolation.py, verify_release_isolation.py, verify_independence_matrix.py, check_operational_receipts.py, check_plan_reconciliation.py, check_control_plane.py, check_workflow_permissions.py, audit_mirror_prs.py, pages.cjs if superseded) plus publication/ledger-seed.json and their tests (tests/unit/scripts/publication/*, tests/unit/workflows/test_publication_*), keeping tests for reused checks.\n5. GitHub: archive-tag and delete branch `publication`; delete environment publication-attestation; delete secrets PUBLICATION_APP_ID and PUBLICATION_APP_PRIVATE_KEY; uninstall the publication GitHub App.\n6. Docs: supersede adr-independent-publication-authorities (reference adr-dev-loop-v2); delete or rewrite docs/operations/{publication-*, independent-publication-*} and docs/development/independent-publication-threat-model.md; write docs/operations/site-deploy.md (deploy, rollback, receipts).",
   "sessions": [
     {
@@ -31,6 +31,14 @@
       "op": "update",
       "op_id": "4a0703cf36534b98aa224729b35b91fc",
       "session_id": "8bc6380f11ef418691917c994cf8845c"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T12:03:52Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "3b08b6a19b6f4ee2a4114314ffc00f8d",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
 }
