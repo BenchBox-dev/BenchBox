@@ -1,0 +1,28 @@
+{
+  "acceptance": [
+    "A unit test fails if any Polars code path in benchbox/platforms/dataframe/ calls .collect( outside the single helper (static scan or monkeypatched LazyFrame.collect counting engine arguments)",
+    "A test proves engine=in-memory reaches scalar(), get_row_count() and unified-frame collects (for example by patching LazyFrame.collect and asserting the engine keyword on every call during TPC-H Q11, Q15 and Q22 at SF 0.01)",
+    "Result bundles carry requested engine, effective engine, polars version and polars-runtime-32 version (or an explicit absent marker); a fixture test covers both a pre-1.35 and a post-1.35 package layout",
+    "Requesting an unsupported engine value fails the run with an error naming the version and value",
+    "With no engine option, run output and bundle fields other than the new metadata are unchanged on 1.44.2; existing CI is green"
+  ],
+  "context": "Evidence (HEAD d076a974d): polars_df.py:372-374 collect() uses engine=\"streaming\" when self.streaming, otherwise bare collect(); polars_df.py:406-408 scalar() does df.collect() when lazy; tpch/dataframe_queries.py:829, 863 and 1092 call ctx.scalar. Explorer _driver_version (transformer.py:374) prefers driver_version_actual for non-DuckDB platforms.",
+  "description": "The version matrix compares three engine setups: (A) each version's default collect(), which is in-memory on 1.x and streaming on 2.0; (B) in-memory on every version, which means engine=\"in-memory\" on 2.0; (C) engine=\"streaming\" where supported. That only works if one setting controls every materialization, and today it does not: PolarsDataFrameAdapter.scalar() calls a bare df.collect() (polars_df.py:408), and TPC-H Q11, Q15 and Q22 and several TPC-DS queries use ctx.scalar. get_row_count (polars_df.py:388), the path at polars_df.py:462, and 12 call sites in unified_frame.py also collect directly. As it stands, setup B would still run those inner steps streaming on 2.0.\n\nWork:\n- Add a polars-df platform option `engine` with values default, in-memory and streaming. `default` calls collect() with no engine argument, so each version uses its own default.\n- Route every Polars materialization through one adapter helper that applies the option.\n- Fold the existing streaming flag and engine_affinity tuning into the same helper without changing their current behaviour.\n- Record in the result bundle the requested engine, the engine actually passed to collect, the polars version, and the polars-runtime-32 version when that package is installed (it exists from 1.35.2).\n\nGuardrails:\n- Default behaviour is unchanged: with no option set, the calls made must equal today's on the locked version.\n- If a version does not support the requested engine value, fail the run with a clear error. Never fall back silently.\n- No version-string branching, apart from detecting whether the `engine` keyword is accepted, if that proves necessary; document it if used.",
+  "links": [
+    "benchbox/platforms/dataframe/polars_df.py",
+    "benchbox/platforms/dataframe/unified_frame.py",
+    "benchbox/platforms/dataframe/expression_family.py",
+    "benchbox/core/tpch/dataframe_queries.py",
+    "_project/scripts/explorer_pipeline/transformer.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-07T20:55:02Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c5fed1d12ea446ec91b450d1836df46c",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    }
+  ]
+}
