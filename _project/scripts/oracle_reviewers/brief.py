@@ -8,7 +8,7 @@ from pathlib import Path
 from .classifier import ChangedFile
 from .verdict import VERDICT_SCHEMA
 
-_HEADER = """You are an independent, adversarial reviewer of pull request {pr} in {repo}, a SQL benchmarking
+BRIEF_TEMPLATE = """You are an independent, adversarial reviewer of pull request {pr} in {repo}, a SQL benchmarking
 framework whose published results must be correct. Review the change from base {base} to head {head}.
 The working directory is a read-only checkout of the head commit.
 
@@ -58,7 +58,7 @@ def build_brief(
     max_bytes: int,
     reviewed_head: str | None = None,
 ) -> Brief:
-    header = _HEADER.format(
+    header = BRIEF_TEMPLATE.format(
         pr=pr,
         repo=repo,
         base=base_sha,

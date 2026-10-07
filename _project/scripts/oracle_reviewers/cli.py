@@ -1,22 +1,24 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from . import attempts as attempt_files, dedup, github, report, retry, runner, selection
 from .absence import ERROR, Absence
-from .brief import build_brief, write_private
+from .brief import BRIEF_TEMPLATE, build_brief, write_private
 from .classifier import ChangedFile, classify
 from .diff import commentable_lines, select_files
 from .policy import Policy, Reviewer, Tier, load_policy
 from .selection import SelectionInput
+from .verdict import VERDICT_SCHEMA
 
 PLAN_FILE = "plan.json"
 BRIEF_FILE = "brief.md"
@@ -102,7 +104,7 @@ def _base_plan(policy: Policy, repo: str, pr: int, run_id: str) -> dict[str, Any
         "scope": "full",
         "reviewed_head": None,
         "reviewed_files": {},
-        "open_findings": [],
+        "open_findings": {},
         "max_attempts": policy.max_attempts,
         "pool_blocked_until": {},
         "manual": False,
@@ -110,15 +112,29 @@ def _base_plan(policy: Policy, repo: str, pr: int, run_id: str) -> dict[str, Any
     }
 
 
-def _review_basis(repo: str, base_sha: str, head_sha: str, tier: Tier, policy: Policy) -> str | None:
+def _merge_base(repo: str, base_sha: str, head_sha: str) -> str | None:
     try:
         merge_base = github.get_json(f"repos/{repo}/compare/{base_sha}...{head_sha}")["merge_base_commit"]["sha"]
     except (github.GitHubError, KeyError, TypeError, ValueError):
         return None
     if not isinstance(merge_base, str) or re.fullmatch(r"[0-9a-f]{40}", merge_base) is None:
         return None
-    chain = ",".join(reviewer.name for reviewer in policy.chain(tier.name))
-    return f"{tier.name}|{','.join(tier.blocking)}|{chain}|{merge_base}"
+    return merge_base
+
+
+def review_basis(merge_base: str, tier: Tier, policy: Policy, excluded: Iterable[str], policy_text: str) -> str:
+    material = {
+        "merge_base": merge_base,
+        "tier": tier.name,
+        "blocking": list(tier.blocking),
+        "chain": [reviewer.to_json() for reviewer in policy.chain(tier.name)],
+        "excluded_families": sorted(excluded),
+        "policy": policy_text,
+        "brief": BRIEF_TEMPLATE,
+        "schema": VERDICT_SCHEMA,
+    }
+    digest = hashlib.sha256(json.dumps(material, sort_keys=True).encode("utf-8")).hexdigest()
+    return f"{tier.name}:{merge_base}:{digest}"
 
 
 def _finish_plan(out_dir: Path, plan: dict[str, Any]) -> int:
@@ -201,7 +217,10 @@ def command_plan(args: argparse.Namespace) -> int:
     in_scope = set(classification.soundness_paths)
     scoped = [item for item in files if any(path in in_scope for path in item.paths)]
     current = {item.path: item.sha for item in scoped}
-    basis = _review_basis(repo, plan["base_sha"], plan["head_sha"], tier, policy)
+    merge_base = _merge_base(repo, plan["base_sha"], plan["head_sha"])
+    excluded = selection.excluded_families(labels, policy)
+    policy_text = Path(args.policy).read_text(encoding="utf-8")
+    basis = review_basis(merge_base, tier, policy, excluded, policy_text) if merge_base else None
     reviewed = previous.reviewed if previous and action != "edited" else None
     if reviewed is None or basis is None or reviewed.basis != basis or not all(current.values()):
         reviewed = None
@@ -257,7 +276,7 @@ def command_plan(args: argparse.Namespace) -> int:
             "blocking": list(tier.blocking),
             "chain": [reviewer.to_json() for reviewer in policy.chain(tier.name)],
             "diversity_exempt": list(tier.diversity_exempt),
-            "excluded_families": sorted(selection.excluded_families(labels, policy)),
+            "excluded_families": sorted(excluded),
             "brief_mode": brief.mode,
             "manual": manual,
             "scope": "changed" if partial else "full",

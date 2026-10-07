@@ -59,8 +59,9 @@ Without the App secrets, the `post` job logs the result and succeeds.
 
 `plan` also limits spend to code that changed. The retry state records the
 blob SHA of each soundness file at the last success or failure, with the basis
-of that result: the tier, its blocking severities, its reviewer chain and the
-merge base of the head with `develop`. When the basis is unchanged and the new
+of that result: the merge base of the head with `develop`, the tier, its
+blocking severities and reviewer settings, the excluded author families, and a
+hash of the policy file, brief template and verdict schema. When the basis is unchanged and the new
 head has exactly those files at those SHAs, the run posts the recorded result
 to the new head without running a reviewer, so a push of docs or tests costs
 nothing. When the last result was a success below the very-high tier and some
@@ -71,9 +72,10 @@ files it does not read; at the very-high tier; and after a basis change, a
 file leaving the diff, a diff that cannot be split by file, or a missing state.
 
 Before posting, `post` drops any finding that matches an open review thread
-from this App, by file and normalized title. Each new thread carries a hidden
-`oracle-finding` marker with that fingerprint. A dropped finding still counts
-toward this run's result.
+from this App, by file and normalized title, unless the new finding is more
+severe than the open thread. Each new thread carries a hidden `oracle-finding`
+marker with that fingerprint. A dropped finding still counts toward this run's
+result and is listed in the review body.
 
 A blocking finding fails the review even when its line is outside the diff.
 Such a finding cannot become a line comment, so it is listed under "Findings

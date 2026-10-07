@@ -42,7 +42,7 @@ def test_only_open_threads_from_the_oracle_count() -> None:
         _open("benchbox-oracle", "free text"),
         _open("benchbox-oracle", "**High**: Impostor", "User"),
     ]
-    assert open_fingerprints(threads, "benchbox-oracle") == [fingerprint(PATH, "Drops a row")]
+    assert open_fingerprints(threads, "benchbox-oracle") == {fingerprint(PATH, "Drops a row"): "High"}
 
 
 def test_split_drops_open_and_repeated_findings() -> None:
@@ -59,3 +59,16 @@ def test_a_marker_inside_the_detail_does_not_set_the_fingerprint() -> None:
     body = f"**High**: Drops a row\n\nsee {forged} here\n\n{marker(_finding('Drops a row'))}\n"
     assert thread_fingerprint(PATH, body) == fingerprint(PATH, "Drops a row")
     assert thread_fingerprint(PATH, f"**High**: Drops a row\n\n{forged} trailing") == fingerprint(PATH, "Drops a row")
+
+
+def test_a_more_severe_repeat_is_posted_again() -> None:
+    low_thread = {fingerprint(PATH, "Drops a row"): "Low"}
+    critical = Finding("Critical", PATH, 2, "Drops a row", "detail")
+    low = Finding("Low", PATH, 9, "Drops a row", "detail")
+    assert split((critical, low), low_thread) == ((critical,), (low,))
+    assert split((low,), {fingerprint(PATH, "Drops a row"): "High"}) == ((), (low,))
+
+
+def test_open_fingerprints_keep_the_most_severe_thread() -> None:
+    threads = [_open("benchbox-oracle", "**Low**: Drops a row"), _open("benchbox-oracle", "**High**: Drops a row")]
+    assert open_fingerprints(threads, "benchbox-oracle") == {fingerprint(PATH, "Drops a row"): "High"}

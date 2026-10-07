@@ -11,6 +11,7 @@ import pytest
 
 from _project.scripts.oracle_reviewers import cli, github
 from _project.scripts.oracle_reviewers.dedup import fingerprint
+from _project.scripts.oracle_reviewers.policy import load_policy
 from _project.scripts.oracle_reviewers.retry import Reviewed, State
 
 from .conftest import POLICY_PATH
@@ -261,10 +262,10 @@ TWO_FILE_DIFF = (
 OLD_HEAD = "c" * 40
 
 
-def _basis(tier: str = "medium-high", merge_base: str = MERGE_BASE) -> str:
-    chain = {"medium-high": "sonnet,sol,luna,muse,agy", "very-high": "opus,sol"}[tier]
-    blocking = {"medium-high": "Critical,High", "very-high": "Critical,High,Medium"}[tier]
-    return f"{tier}|{blocking}|{chain}|{merge_base}"
+def _basis(tier: str = "medium-high", merge_base: str = MERGE_BASE, excluded: tuple[str, ...] = ("codex",)) -> str:
+    policy = load_policy(POLICY_PATH)
+    text = POLICY_PATH.read_text(encoding="utf-8")
+    return cli.review_basis(merge_base, policy.tiers[tier], policy, excluded, text)
 
 
 def _reviewed_state(files: dict[str, str], basis: str = _basis(), outcome: str = "failure") -> State:
@@ -307,6 +308,7 @@ def test_push_touching_one_file_reviews_only_that_file(monkeypatch: pytest.Monke
             {"action": "synchronize"},
         ),
         (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}, "medium-high"), {"action": "synchronize"}),
+        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}, _basis(excluded=())), {"action": "synchronize"}),
         (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}), {"action": "edited", "changes": {"base": {}}}),
         (None, {"action": "synchronize"}),
         (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40}), {"action": "synchronize"}),
@@ -316,6 +318,7 @@ def test_push_touching_one_file_reviews_only_that_file(monkeypatch: pytest.Monke
         "tier-changed",
         "merge-base-moved",
         "older-state",
+        "author-family-changed",
         "base-changed",
         "no-state",
         "after-failure",
@@ -356,12 +359,12 @@ def test_open_oracle_threads_are_recorded_for_suppression(monkeypatch: pytest.Mo
         },
     ]
     _, _, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), SOUNDNESS, threads=threads))
-    assert plan["open_findings"] == [fingerprint(CHECKER, "Drops a row")]
+    assert plan["open_findings"] == {fingerprint(CHECKER, "Drops a row"): "High"}
 
 
 def test_unreadable_threads_suppress_nothing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), SOUNDNESS, threads=None))
-    assert values["decision"] == "review" and plan["open_findings"] == []
+    assert values["decision"] == "review" and plan["open_findings"] == {}
 
 
 def test_failure_is_carried_only_while_the_reviewed_files_are_unchanged(
