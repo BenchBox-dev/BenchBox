@@ -808,3 +808,43 @@ def test_cli_assert_min_recorded_at_resets_a_runner_class_baseline(tmp_path: Pat
     monkeypatch.setenv("THROUGHPUT_BASELINE_MIN_RECORDED_AT", "2026-10-06")
     assert main(argv) == 0
     assert "0 of 5 required baseline samples" in capsys.readouterr().out
+
+
+def test_cli_assert_fails_loudly_on_a_malformed_reset_date(tmp_path: Path, slow_runner, monkeypatch, capsys):
+    monkeypatch.setenv("THROUGHPUT_BASELINE_MIN_RECORDED_AT", "10/01/2026")
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", _history(tmp_path, [1.0]))) == 1
+
+    output = capsys.readouterr().out
+    assert "::error::THROUGHPUT_BASELINE_MIN_RECORDED_AT '10/01/2026' is not an ISO date" in output
+
+
+def test_cli_assert_warns_when_a_populated_history_still_leaves_the_floor_observe_only(
+    tmp_path: Path, slow_runner, capsys
+):
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", _history(tmp_path, [1.0]))) == 0
+
+    assert "::warning::1 of 5 required baseline samples" in capsys.readouterr().out
+
+
+def test_cli_assert_only_notices_when_the_history_is_empty(tmp_path: Path, slow_runner, capsys):
+    (tmp_path / "history").mkdir()
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", str(tmp_path / "history"))) == 0
+
+    output = capsys.readouterr().out
+    assert "::notice::0 of 5 required baseline samples" in output
+    assert "::warning::" not in output
+
+
+def test_cli_assert_notices_when_the_median_gates(tmp_path: Path, slow_runner, capsys):
+    history = _history(tmp_path, [_observed()] * 5)
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)) == 0
+
+    assert "::notice::5 of 5 required baseline samples" in capsys.readouterr().out

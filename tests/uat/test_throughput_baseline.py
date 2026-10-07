@@ -361,3 +361,25 @@ def test_rolling_median_never_mixes_stream_counts(tmp_path: Path):
     ) == (100.0, 1)
     assert rolling_median(records, streams=4, **kwargs).median == 900.0
     assert rolling_median(records, streams=5, **kwargs) is None
+
+
+def test_load_baseline_records_requires_the_run_id_as_the_first_directory(tmp_path: Path):
+    when = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    _record(tmp_path / "100", 1.0, run_id="100", recorded_at=when)
+    _record(tmp_path / "100" / "200", 2.0, run_id="200", recorded_at=when)
+    _record(tmp_path / "artifact" / "300", 3.0, run_id="300", recorded_at=when)
+
+    assert _values(load_baseline_records(tmp_path)) == [1.0]
+
+
+@pytest.mark.parametrize("value", ["10/01/2026", "yesterday", "2026-13-01"])
+def test_load_baseline_records_rejects_a_malformed_not_before(tmp_path: Path, value: str):
+    with pytest.raises(ValueError, match="THROUGHPUT_BASELINE_MIN_RECORDED_AT"):
+        load_baseline_records(tmp_path, not_before=value)
+
+
+def test_load_baseline_records_treats_a_naive_not_before_as_utc(tmp_path: Path):
+    _record(tmp_path / "100", 1.0, run_id="100", recorded_at=datetime(2026, 1, 1, 6, tzinfo=timezone.utc))
+
+    assert _values(load_baseline_records(tmp_path, not_before="2026-01-01T06:00:00")) == [1.0]
+    assert load_baseline_records(tmp_path, not_before="2026-01-01T06:00:01") == []

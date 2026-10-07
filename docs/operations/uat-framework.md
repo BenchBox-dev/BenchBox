@@ -677,7 +677,12 @@ Median. `python -m tests.uat.throughput rolling-median --baseline-dir DIR
 --platform duckdb --benchmark tpch --scale 1 --streams 3 [--runner-class C]
 [--window N]` reads downloaded records and prints the median of the latest N
 matching the runner class, defaulting to the current machine's class. The
-floor never compares across runner classes or stream counts.
+floor never compares across runner classes or stream counts. `DIR` must use
+the layout the nightly download produces, `DIR/<run_id>/.../throughput-baseline-*.json`,
+where the first directory is the record's own `run_id`; a record anywhere
+else is ignored. The `<run_id>` is the `run_id` field, which local runs leave
+empty unless `GITHUB_RUN_ID` is set, so a local record needs that variable
+and a matching directory.
 
 Status: active per runner class. The nightly `throughput-uat` job runs a
 "Download retained Throughput@Size baselines" step before the DuckDB assert.
@@ -703,14 +708,17 @@ tolerates two outlier nights; the measured per-class spread (below) is 6 to
 fewer matching records, including the first nights after the artifacts were
 introduced and a cold start with no artifacts at all, the assert prints
 `N of 5 required baseline samples for runner class ...; floor stays
-observe-only` and passes. A run that fails the floor writes no record, so a
+observe-only` and passes. The line is a `::notice::` when no record files
+were downloaded and a `::warning::` when some were but too few survived the
+checks, so a broken download or a rejected artifact shows up as an annotation. A run that fails the floor writes no record, so a
 regression cannot lower the baseline it is judged against.
 
 The loader also rejects records that do not belong to the run they came
 from, so a hostile or mislabeled artifact cannot supply the median:
 
-- a record is kept only when its `run_id` equals the name of the run
-  directory it was downloaded into;
+- a record is kept only when its `run_id` equals the first directory under
+  the history root, so a record nested deeper under another run's directory
+  does not count;
 - a record with a `recorded_at` in the future is dropped;
 - a run counts once: the record with the highest `run_attempt` wins, so a
   re-run does not double its weight;
@@ -721,7 +729,9 @@ Recovery from a permanent slowdown. Only passing runs write records, so after
 a real, lasting slowdown on one runner class the median stays at the old
 level and the floor keeps failing. To accept the new level, set the
 repository variable `THROUGHPUT_BASELINE_MIN_RECORDED_AT` to a UTC date such
-as `2026-10-20` (or a full ISO timestamp with `+00:00`). Records recorded
+as `2026-10-20` (or a full ISO timestamp; a value without an offset is read
+as UTC). A value that is not an ISO date or timestamp fails the assert with
+an error instead of being ignored. Records recorded
 before it are ignored, so the class returns to observe-only until 5 new
 records accumulate, then gates on the new median. Clear the variable
 afterward; it is harmless to leave set. Runner image changes need no reset:

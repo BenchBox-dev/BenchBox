@@ -201,14 +201,16 @@ def resolve_floor_median(history_dir: str | None, **where: Any) -> str | float |
     override = os.environ.get("THROUGHPUT_FLOOR_MEDIAN")
     if override or not history_dir:
         return override
-    runner_class = baseline.current_runner_class()
+    directory = Path(history_dir).expanduser()
+    runner_class = baseline.runner_class_for(baseline.detect_cpu_model(), os.cpu_count() or 0)
     not_before = os.environ.get("THROUGHPUT_BASELINE_MIN_RECORDED_AT", "")
-    records = baseline.load_baseline_records(Path(history_dir).expanduser(), not_before=not_before)
+    records = baseline.load_baseline_records(directory, not_before=not_before)
     found = baseline.rolling_median(records, runner_class=runner_class, **where)
     count = found.count if found else 0
     verdict = f"rolling median {found.median:.2f}" if found and count >= baseline.MIN_FLOOR_SAMPLES else None
+    level = "warning" if verdict is None and any(directory.rglob("throughput-baseline-*.json")) else "notice"
     print(
-        f"::notice::{count} of {baseline.MIN_FLOOR_SAMPLES} required baseline samples for runner class "
+        f"::{level}::{count} of {baseline.MIN_FLOOR_SAMPLES} required baseline samples for runner class "
         f"{runner_class!r}; {verdict or 'floor stays observe-only'}"
     )
     return found.median if verdict else None
@@ -221,10 +223,7 @@ def _error(message: str) -> int:
 
 def _run_assert(args: argparse.Namespace) -> int:
     where = {"platform": args.platform, "benchmark": args.benchmark, "scale": args.scale}
-    try:
-        cell = load_cell_result(args.cells_glob, **where)
-    except ThroughputGateError as exc:
-        return _error(str(exc))
+    cell = load_cell_result(args.cells_glob, **where)
     ok, reason = validate_throughput_result(cell.payload, requested_streams=args.streams, **where)
     if not ok:
         return _error(reason)
@@ -248,7 +247,7 @@ def _run_assert(args: argparse.Namespace) -> int:
 
 
 def _run_rolling_median(args: argparse.Namespace) -> int:
-    runner_class = args.runner_class or baseline.current_runner_class()
+    runner_class = args.runner_class or baseline.runner_class_for(baseline.detect_cpu_model(), os.cpu_count() or 0)
     records = baseline.load_baseline_records(Path(args.baseline_dir).expanduser())
     where = {key: getattr(args, key) for key in ("platform", "benchmark", "scale", "streams")}
     result = baseline.rolling_median(records, runner_class=runner_class, window=args.window, **where)
@@ -282,7 +281,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    return int(args.handler(args))
+    try:
+        return int(args.handler(args))
+    except ThroughputGateError as exc:
+        return _error(str(exc))
 
 
 if __name__ == "__main__":

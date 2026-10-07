@@ -54,10 +54,6 @@ def runner_class_for(cpu_model: str, cpu_count: int) -> str:
     return f"{re.sub(r'[^a-z0-9]+', '-', cpu_model.lower()).strip('-') or 'unknown'}-{cpu_count}cpu"
 
 
-def current_runner_class() -> str:
-    return runner_class_for(detect_cpu_model(), os.cpu_count() or 0)
-
-
 def record_baseline(
     directory: Path,
     result_json: dict[str, Any],
@@ -99,22 +95,28 @@ def record_baseline(
     return path
 
 
+def parse_not_before(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value) if value else datetime.min
+    except ValueError as exc:
+        raise ValueError(f"THROUGHPUT_BASELINE_MIN_RECORDED_AT {value!r} is not an ISO date or timestamp") from exc
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
 def load_baseline_records(directory: Path, *, not_before: str = "") -> list[dict[str, Any]]:
-    limit = datetime.now(timezone.utc).isoformat()
+    floor, now = parse_not_before(not_before), datetime.now(timezone.utc)
     latest: dict[str, dict[str, Any]] = {}
     for path in sorted(directory.rglob("throughput-baseline-*.json")):
         try:
             record = json.loads(path.read_text(encoding="utf-8"))
-            run_id, attempt, recorded_at = (
-                str(record["run_id"]),
-                int(record["run_attempt"] or 1),
-                str(record["recorded_at"]),
-            )
+            run_id, attempt = str(record["run_id"]), int(record["run_attempt"] or 1)
+            recorded_at = datetime.fromisoformat(record["recorded_at"])
+            in_window = floor <= recorded_at <= now
         except (OSError, ValueError, KeyError, TypeError):
             continue
-        if record.get("schema_version") != BASELINE_SCHEMA_VERSION or run_id not in path.relative_to(directory).parts:
+        if record.get("schema_version") != BASELINE_SCHEMA_VERSION or path.relative_to(directory).parts[0] != run_id:
             continue
-        if not_before <= recorded_at <= limit and attempt >= int(latest.get(run_id, {}).get("run_attempt", 0)):
+        if in_window and attempt >= int(latest.get(run_id, {}).get("run_attempt", 0)):
             latest[run_id] = record
     return list(latest.values())
 
