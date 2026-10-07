@@ -6,7 +6,7 @@
     "No new docstrings (comment-policy-check green); examples covered by example-validation",
     "api-docs lane outputs documented and tested"
   ],
-  "context": "Prepared locally in worktree BenchBox.wt-astro-34 (uncommitted), to ship in one PR with astro-site-31 after PR #2597 merges. [Prior review history retained in sessions.] site-split-01 (2026-10-07): authored contracts present at docs/reference/python-api (verified); 27 autodoc pages replaced. Inventory-diff and drift-check evidence not recorded here with run ids. Remaining verification owned by site-split-25 and site-split-30. Do not finish here.",
+  "context": "Prepared locally in worktree BenchBox.wt-astro-34 (uncommitted), to ship in one PR with astro-site-31 after PR #2597 merges. 27 autodoc .rst pages replaced by authored .md contract pages plus new pages for the previously uncovered symbols (benchmarks/{coffeeshop,datavault,flightdata,metadata-primitives,nyctaxi,tpcds-obt,tpch-skew,tpchavoc,tsbs-devops,transaction-primitives,vector-search}, dataframe.md, core.md, platforms/polars.md; sections added to tuning/platforms/utilities/tpcdi). All 81 symbols covered; known_import_failure symbols documented as failing. Full Sphinx -W build clean; all 1851 url-map ids present once, section ids keep heading text (only the get_query \\* escape differs); expected-removals-api-reference.json (85 entries) + repeatable --expected-removals in scripts/site_inventory.py with a test; 44 stale autodoc consumer_edges removed from quality/comment-cleanup-scope.json. Independent review round 1 FAIL (coverage, stale edges) -> fixed; round 2 PASS (no Critical/High); its Medium (TPC-H Skew uniform phase on empty tables) and Lows fixed. Known product defects documented on pages, follow-ups queued: TPCDSOBT templates missing from the wheel; TPC-H DataFrame registry circular import. site-split-01 (2026-10-07): authored contracts present at docs/reference/python-api (verified); 27 autodoc pages replaced. Inventory-diff and drift-check evidence not recorded here with run ids. Remaining verification owned by site-split-25 and site-split-30. Do not finish here.",
   "description": "Implement ADR D7. For each symbol on the explicit public-symbol list, write a curated Markdown contract: purpose, parameters, return semantics, errors, examples and compatibility notes.\n\nDocstrings at the pinned SHA are source material to select from and validate against current behaviour. Do not copy them wholesale, and never archive removed prose.\n\nIf D7 chose a drift tool, wire it as a CI check that compares the authored contracts with the released wheel's signatures and types, importing only the listed symbols in an isolated pinned environment.\n\nEvery current reference URL and anchor serves the new page or a listed redirect page. Update the api-docs lane contract to the new outputs.\n\nDelete the 27 autodoc .rst files in this item's PR, once their replacements exist. Rendered output changes, so use the astro-site-03 visual procedure. Do not add docstrings to code.",
   "links": [
     "docs/reference/python-api",
@@ -59,6 +59,14 @@
       "client": "tbh",
       "op": "update",
       "op_id": "196d26f01875441486fe4b6e116307db",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T12:02:32Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "ca441c644dce48afa8a9274aae4589c9",
       "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
