@@ -1,7 +1,7 @@
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
-export const EXCLUDED_ROOTS: ReadonlySet<string> = new Set(["_build", "_tags", "_static", "_templates", "_project", "agent"]);
+export const EXCLUDED_ROOTS: ReadonlySet<string> = new Set(["_build", "_tags", "_static", "_templates", "_project", "agent", "internal"]);
 
 export const EXCLUDED_FILES: ReadonlySet<string> = new Set([
   "development/task-management-design.md",
@@ -77,13 +77,35 @@ export const EXCLUDED_FILES: ReadonlySet<string> = new Set([
   "tpc-licensing-analysis.md",
 ]);
 
+// Pages under these directories are published only when docs/publish-allowlist.txt
+// lists them, so a new maintainer document stays off the site until someone decides
+// it is for users. docs/conf.py applies the same list to Sphinx.
+export const PUBLISH_LIST_ROOTS: readonly string[] = ["development", "operations"];
+export const PUBLISH_LIST_FILE = "publish-allowlist.txt";
+
 export type DocSourceFile = { absolute: string; relative: string };
+
+export function readPublishList(docsRoot: string): ReadonlySet<string> {
+  let text: string;
+  try {
+    text = readFileSync(path.join(docsRoot, PUBLISH_LIST_FILE), "utf-8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return new Set();
+    throw error;
+  }
+  const entries = text.split("\n").map((line) => line.trim());
+  return new Set(entries.filter((line) => line !== "" && !line.startsWith("#")));
+}
+
+export function underPublishListRoot(relative: string): boolean {
+  return PUBLISH_LIST_ROOTS.some((root) => relative.startsWith(`${root}/`));
+}
 
 function compareNames(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-function walk(root: string, directory: string, suffix: string, found: DocSourceFile[]): void {
+function walk(root: string, directory: string, suffix: string, published: ReadonlySet<string>, found: DocSourceFile[]): void {
   const entries = readdirSync(directory, { withFileTypes: true }).sort((a, b) => compareNames(a.name, b.name));
   for (const entry of entries) {
     const absolute = path.join(directory, entry.name);
@@ -92,8 +114,8 @@ function walk(root: string, directory: string, suffix: string, found: DocSourceF
     if (entry.isDirectory()) {
       if (directory === root && EXCLUDED_ROOTS.has(entry.name)) continue;
       if (entry.name === "_sources" || entry.name.endsWith(".lproj")) continue;
-      walk(root, absolute, suffix, found);
-    } else if (entry.name.endsWith(suffix) && !EXCLUDED_FILES.has(relative)) {
+      walk(root, absolute, suffix, published, found);
+    } else if (entry.name.endsWith(suffix) && !EXCLUDED_FILES.has(relative) && (!underPublishListRoot(relative) || published.has(relative))) {
       found.push({ absolute, relative });
     }
   }
@@ -101,6 +123,6 @@ function walk(root: string, directory: string, suffix: string, found: DocSourceF
 
 export function listDocSources(docsRoot: string, suffix: ".md" | ".rst" = ".md"): DocSourceFile[] {
   const found: DocSourceFile[] = [];
-  walk(docsRoot, docsRoot, suffix, found);
+  walk(docsRoot, docsRoot, suffix, readPublishList(docsRoot), found);
   return found;
 }
