@@ -1465,6 +1465,20 @@ release-check:
 # =============================================================================
 
 
+MAKE_TIMING_SHELL := $(BENCHBOX_MAKEFILE_ROOT)scripts/make_timing_shell.sh
+MAKE_TIMED_TARGETS := \
+	agent-write-preflight comment-policy-check pr-arm pr-open pr-preflight pr-preflight-fast-tests \
+	test-fast test-medium
+$(MAKE_TIMED_TARGETS): SHELL := $(MAKE_TIMING_SHELL)
+$(MAKE_TIMED_TARGETS): export BENCHBOX_MAKE_TIMING_TARGET = $@
+$(MAKE_TIMED_TARGETS): export BENCHBOX_MAKE_TIMING_GOALS = $(MAKECMDGOALS)
+
+MAKE_TIMINGS_DAYS ?= 30
+MAKE_TIMINGS_SLOWEST ?= 5
+.PHONY: make-timings-report
+make-timings-report:
+	@uv run -- python scripts/make_timing.py report --days "$(MAKE_TIMINGS_DAYS)" --slowest "$(MAKE_TIMINGS_SLOWEST)"
+
 .PHONY: agent-write-preflight
 agent-write-preflight:
 	@sh scripts/agent_write_preflight.sh
