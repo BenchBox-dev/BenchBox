@@ -19,8 +19,9 @@ can substitute an independent stand-in review. After that review of the
 current head, the attester posts a PR comment whose whole text is the line
 `Stand-in oracle review: APPROVE <full head SHA>`; the review itself goes in a
 separate comment. The check accepts it only for
-that exact head, only if posted after the head commit and any retarget, and
-never while a Codex connector review thread is unresolved. An edited comment
+that exact head, only if posted after any retarget, and never while a review
+thread from the required reviewer is unresolved. It is not compared with the
+push time, so it can be posted as soon as the head exists. An edited comment
 does not count, and neither does one with any other text, because Markdown
 around the line can hide or quote it.
 Posting the comment does not rerun the check: rerun the latest oracle-review

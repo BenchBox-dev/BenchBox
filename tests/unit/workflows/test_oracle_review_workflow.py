@@ -49,7 +49,13 @@ def test_triggers_cover_pushes_reviews_and_dispatch() -> None:
 
 
 def test_permissions_are_read_only() -> None:
-    assert _load()["permissions"] == {"actions": "read", "contents": "read", "issues": "read", "pull-requests": "read"}
+    assert _load()["permissions"] == {
+        "actions": "read",
+        "contents": "read",
+        "issues": "read",
+        "pull-requests": "read",
+        "statuses": "read",
+    }
     assert "permissions" not in _load()["jobs"]["oracle-review"]
 
 
@@ -72,6 +78,19 @@ def test_job_invokes_the_script_with_the_pull_request_number_and_token() -> None
     assert "--pr" in step["run"]
     assert "MERGE_GROUP_REF" not in step["env"]
     assert "MERGE_GROUP_REF" not in step["run"]
+
+
+def test_required_signal_matches_the_oracle_policy_mode() -> None:
+    steps = _load()["jobs"]["oracle-review"]["steps"]
+    run = next(step["run"] for step in steps if SCRIPT in step.get("run", ""))
+    mode = yaml.safe_load((REPO_ROOT / ".github/oracle-reviewers.yml").read_text(encoding="utf-8"))["mode"]
+    # The checker runs from the base commit, so the flag can only be added once
+    # develop's copy of the script accepts it; without it the checker requires
+    # the connector.
+    if mode == "enforce":
+        assert "--signal oracle" in run
+    else:
+        assert "--signal" not in run
 
 
 def test_actions_are_pinned_to_full_commit_shas() -> None:
