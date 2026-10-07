@@ -21356,10 +21356,15 @@
       "title": "TPC-H DataFrame runs must bind the SQL run's seed-derived parameters, and the reference-seed assumption must be corrected (needs owner sign-off)"
     },
     "tpch-power-measured-iterations-stream-and-validation": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-08T11:28:09Z",
+        "generation": "536ea000b64c48739f944e29e88c1876",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4c91b0dc8d7199ddf93ae735"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "TPC-H measured power iterations run stream 1..k permutations and skip row-count validation"
     },
     "tpch-qphh-missing-refresh-functions": {

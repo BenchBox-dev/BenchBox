@@ -19,6 +19,15 @@
       "op": "create",
       "op_id": "3d7fd69ce92946d88227c742760bee16",
       "session_id": "a33f303e25d74b4284982579345d9fdb"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:4c91b0dc8d7199ddf93ae735",
+      "at": "2026-10-07T11:28:09Z",
+      "client": "tbh",
+      "generation": "536ea000b64c48739f944e29e88c1876",
+      "op": "take",
+      "op_id": "a2ba42c0f1b844fca43adf3a5828027a",
+      "session_id": "9598fe17125f4aaa9a545972066aa1ac"
     }
   ]
 }
