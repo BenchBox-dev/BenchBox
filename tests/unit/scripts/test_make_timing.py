@@ -47,6 +47,10 @@ def _load(name: str, path: Path):
 make_timing = _load("make_timing", SCRIPT)
 
 
+def _exit_with(status: int) -> list[str]:
+    return [sys.executable, "-c", f"import sys; sys.exit({status})"]
+
+
 def _clean_environment(timings_file: Path, **extra: str) -> dict[str, str]:
     environment = {
         key: value for key, value in os.environ.items() if not key.startswith(("BENCHBOX_MAKE_TIMING", "GIT_"))
@@ -64,7 +68,7 @@ def test_successful_command_appends_one_complete_record(tmp_path: Path) -> None:
     timings_file = tmp_path / "nested" / "timings.jsonl"
     environment = _clean_environment(timings_file, BENCHBOX_MAKE_TIMING_GOALS="pr-preflight test")
 
-    status = make_timing.run_and_record(["sh", "-c", "exit 0"], target="pr-preflight", environ=environment)
+    status = make_timing.run_and_record(_exit_with(0), target="pr-preflight", environ=environment)
 
     assert status == 0
     (record,) = _lines(timings_file)
@@ -84,9 +88,7 @@ def test_successful_command_appends_one_complete_record(tmp_path: Path) -> None:
 def test_failing_command_status_is_returned_and_recorded(tmp_path: Path) -> None:
     timings_file = tmp_path / "timings.jsonl"
 
-    status = make_timing.run_and_record(
-        ["sh", "-c", "exit 7"], target="pr-open", environ=_clean_environment(timings_file)
-    )
+    status = make_timing.run_and_record(_exit_with(7), target="pr-open", environ=_clean_environment(timings_file))
 
     assert status == 7
     (record,) = _lines(timings_file)
@@ -112,14 +114,14 @@ def test_unwritable_timings_file_never_changes_the_exit_status(
     blocker.write_text("a file where a directory is needed", encoding="utf-8")
     environment = _clean_environment(blocker / "timings.jsonl")
 
-    status = make_timing.run_and_record(["sh", "-c", f"exit {command_status}"], target="t", environ=environment)
+    status = make_timing.run_and_record(_exit_with(command_status), target="t", environ=environment)
 
     assert status == command_status
     assert "could not record timing" in capsys.readouterr().err
 
 
 def test_directory_as_timings_file_never_changes_the_exit_status(tmp_path: Path) -> None:
-    status = make_timing.run_and_record(["sh", "-c", "exit 0"], target="t", environ=_clean_environment(tmp_path))
+    status = make_timing.run_and_record(_exit_with(0), target="t", environ=_clean_environment(tmp_path))
 
     assert status == 0
 
@@ -130,7 +132,11 @@ def test_switch_disables_recording_but_still_runs_the_command(tmp_path: Path, va
     marker = tmp_path / "ran"
     environment = _clean_environment(timings_file, BENCHBOX_MAKE_TIMINGS=value)
 
-    status = make_timing.run_and_record(["sh", "-c", f"touch {marker}; exit 4"], target="t", environ=environment)
+    status = make_timing.run_and_record(
+        [sys.executable, "-c", f"import pathlib, sys; pathlib.Path({str(marker)!r}).touch(); sys.exit(4)"],
+        target="t",
+        environ=environment,
+    )
 
     assert status == 4
     assert marker.exists()
@@ -150,7 +156,7 @@ def test_concurrent_runs_append_whole_lines(tmp_path: Path) -> None:
     runs = 24
     processes = [
         subprocess.Popen(
-            [sys.executable, str(SCRIPT), "run", "--target", f"target-{index % 3}", "--", "sh", "-c", "exit 0"],
+            [sys.executable, str(SCRIPT), "run", "--target", f"target-{index % 3}", "--", *_exit_with(0)],
             env=environment,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
@@ -173,7 +179,7 @@ def test_concurrent_appends_of_large_records_do_not_interleave(tmp_path: Path) -
     long_directory.mkdir()
     processes = [
         subprocess.Popen(
-            [sys.executable, str(SCRIPT), "run", "--target", "wide", "--", "sh", "-c", "exit 0"],
+            [sys.executable, str(SCRIPT), "run", "--target", "wide", "--", *_exit_with(0)],
             env=environment,
             cwd=long_directory,
         )
@@ -192,7 +198,15 @@ def test_target_comes_from_the_make_environment_when_not_given(tmp_path: Path) -
     environment = _clean_environment(timings_file, BENCHBOX_MAKE_TIMING_TARGET="from-make")
 
     completed = subprocess.run(
-        [sys.executable, str(SCRIPT), "run", "--", "sh", "-c", "echo out; echo err >&2; exit 5"],
+        [
+            sys.executable,
+            str(SCRIPT),
+            "run",
+            "--",
+            sys.executable,
+            "-c",
+            "import sys; print('out'); print('err', file=sys.stderr); sys.exit(5)",
+        ],
         env=environment,
         capture_output=True,
         text=True,
@@ -356,7 +370,7 @@ def test_makefile_routes_the_timed_targets_through_the_shell_shim() -> None:
     assert os.access(SHELL_SHIM, os.X_OK)
 
 
-@pytest.mark.skipif(shutil.which("make") is None, reason="make is required")
+@pytest.mark.skipif(shutil.which("make") is None or sys.platform == "win32", reason="POSIX make is required")
 def test_make_recipe_runs_through_the_shim_with_unchanged_output_and_status(tmp_path: Path) -> None:
     timings_file = tmp_path / "timings.jsonl"
     wiring = [
@@ -406,7 +420,7 @@ def test_make_recipe_runs_through_the_shim_with_unchanged_output_and_status(tmp_
     assert (second["target"], second["exit_code"]) == ("probe-fail", 9)
 
 
-@pytest.mark.skipif(shutil.which("make") is None, reason="make is required")
+@pytest.mark.skipif(shutil.which("make") is None or sys.platform == "win32", reason="POSIX make is required")
 def test_make_switch_skips_recording_and_keeps_the_recipe_running(tmp_path: Path) -> None:
     timings_file = tmp_path / "timings.jsonl"
     wiring = [
@@ -440,3 +454,42 @@ def test_make_switch_skips_recording_and_keeps_the_recipe_running(tmp_path: Path
     assert completed.returncode == 0
     assert completed.stdout == "ran\n"
     assert not timings_file.exists()
+
+
+@pytest.mark.skipif(shutil.which("make") is None or sys.platform == "win32", reason="POSIX make is required")
+def test_parallel_make_jobserver_reaches_a_nested_make_through_the_shim(tmp_path: Path) -> None:
+    timings_file = tmp_path / "timings.jsonl"
+    wiring = [
+        line
+        for line in _makefile_text().splitlines()
+        if line.startswith("$(MAKE_TIMED_TARGETS):") or line.startswith("MAKE_TIMING_SHELL :=")
+    ]
+    (tmp_path / "Makefile").write_text(
+        "\n".join(
+            [
+                f"BENCHBOX_MAKEFILE_ROOT := {ROOT}/",
+                "MAKE_TIMED_TARGETS := outer",
+                *wiring,
+                ".PHONY: outer inner",
+                "outer:",
+                "\t@$(MAKE) -s inner",
+                "inner:",
+                "\t@echo nested-ran",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        ["make", "-j2", "-s", "-C", str(tmp_path), "outer"],
+        env=_clean_environment(timings_file),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0
+    assert completed.stdout == "nested-ran\n"
+    assert "jobserver" not in completed.stderr
+    assert [record["target"] for record in _lines(timings_file)] == ["outer"]

@@ -135,7 +135,7 @@ def _run_child(argv: Sequence[str]) -> int:
         for number in TERMINAL_SIGNALS:
             saved[number] = signal.signal(number, lambda *_: None)
         try:
-            child = subprocess.Popen(list(argv))
+            child = subprocess.Popen(list(argv), close_fds=False)
         except FileNotFoundError:
             print(f"make_timing: command not found: {argv[0]}", file=sys.stderr)
             return EXIT_COMMAND_NOT_FOUND
@@ -214,7 +214,7 @@ def read_records(path: Path) -> tuple[list[dict[str, Any]], int]:
             record = json.loads(line)
             _parse_iso_utc(record["started_at"])
             float(record["duration_seconds"])
-            record["target"]
+            str(record["target"])
         except (ValueError, KeyError, TypeError):
             skipped += 1
             continue
