@@ -126,6 +126,10 @@ tables:
     - name: lo_orderdate
       type: INTEGER
       foreign_key: date.d_datekey
+      # The generator always assigns a real DATE day (never NULL); 6M-row SF1
+      # scan confirms zero empty values. Declared non-nullable so tuned sort
+      # keys on this column pass the ClickHouse nullable-key guard.
+      nullable: false
     - name: lo_orderpriority
       type: VARCHAR(15)
     - name: lo_shippriority
