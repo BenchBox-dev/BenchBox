@@ -77,7 +77,10 @@ def test_job_invokes_the_script_with_the_pull_request_number_and_token() -> None
 def test_required_signal_matches_the_oracle_policy_mode() -> None:
     steps = _load()["jobs"]["oracle-review"]["steps"]
     run = next(step["run"] for step in steps if SCRIPT in step.get("run", ""))
-    policy = yaml.safe_load((REPO_ROOT / ".github/oracle-reviewers.yml").read_text(encoding="utf-8"))
+    policy_path = REPO_ROOT / ".github/oracle-reviewers.yml"
+    if not policy_path.is_file():
+        pytest.skip("the release tree has no oracle reviewer policy")
+    policy = yaml.safe_load(policy_path.read_text(encoding="utf-8"))
     assert f'ORACLE_CONTEXT = "{policy["status_context"]}"' in (REPO_ROOT / SCRIPT).read_text(encoding="utf-8")
     if policy["mode"] == "enforce":
         assert "--signal oracle" in run
