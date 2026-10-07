@@ -240,7 +240,7 @@ class TestTPCHThroughputRealDuckDB:
             assert row["status"] == "SUCCESS"
             by_stream[row["stream_id"]].append(row["query_id"])
 
-        assert set(by_stream.keys()) == set(range(_TPCH_NUM_STREAMS))
+        assert set(by_stream.keys()) == set(range(1, _TPCH_NUM_STREAMS + 1))
         for stream_id, query_ids in by_stream.items():
             assert sorted(query_ids) == list(range(1, 23)), (
                 f"stream {stream_id} must run each of the 22 TPC-H queries exactly once"
@@ -355,7 +355,7 @@ class TestTPCDSThroughputRealDuckDB:
             assert row["status"] == "SUCCESS"
             by_stream[row["stream_id"]].append(row["query_id"])
 
-        assert set(by_stream.keys()) == set(range(_TPCDS_NUM_STREAMS))
+        assert set(by_stream.keys()) == set(range(1, _TPCDS_NUM_STREAMS + 1))
 
         # Each stream must have run the exact expected, seed-invariant TPC-DS
         # query multiset - not just the right count. A stream that duplicates

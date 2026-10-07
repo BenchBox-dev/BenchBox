@@ -157,7 +157,7 @@ class TestTimingMeasurementAccuracy:
         with patch("benchbox.core.tpcds.streams.create_standard_streams") as mock_create:
             mock_manager = Mock()
             mock_streams = {}
-            for stream_id in range(2):
+            for stream_id in range(3):
                 mock_streams[stream_id] = [
                     Mock(stream_id=stream_id, query_id=1, position=1, variant=None, sql="SELECT 1"),
                     Mock(stream_id=stream_id, query_id=2, position=2, variant=None, sql="SELECT 2"),
@@ -608,7 +608,8 @@ class TestTimeoutDetectionAndCooperativeCancellation:
         with patch("benchbox.core.tpcds.streams.create_standard_streams") as mock_create:
             mock_manager = Mock()
             mock_manager.generate_streams.return_value = {
-                0: [Mock(stream_id=0, query_id=1, position=1, variant=None, sql="SELECT 1")],
+                stream_id: [Mock(stream_id=stream_id, query_id=1, position=1, variant=None, sql="SELECT 1")]
+                for stream_id in range(2)
             }
             mock_create.return_value = mock_manager
 
