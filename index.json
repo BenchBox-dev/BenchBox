@@ -19124,6 +19124,8 @@
     "site-split-25-shadow-parity": {
       "claim": null,
       "needs": [
+        "site-split-21-site-bootstrap-ci",
+        "site-split-22-build-from-bundle",
         "site-split-23-node-deploy-plane",
         "site-split-24-blog-drafts"
       ],
