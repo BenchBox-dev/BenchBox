@@ -441,6 +441,52 @@ def test_official_run_withholds_phase_metrics_for_failed_phases(tpcds_benchmark,
     assert any("Throughput@Size withheld" in error for error in result["errors"])
 
 
+def test_run_throughput_test_carries_outstanding_stream_ids(tpcds_benchmark):
+    leaked = _routed_driver_result(success=False, throughput_at_size=None, outstanding_stream_ids=[1])
+
+    with pytest.warns(DeprecationWarning):
+        result = tpcds_benchmark.run_throughput_test(
+            Mock(), num_streams=2, adapter=_adapter(leaked), connection=object()
+        )
+
+    assert result.outstanding_stream_ids == [1]
+
+
+def test_official_run_refuses_maintenance_while_streams_are_outstanding(tpcds_benchmark, monkeypatch):
+    monkeypatch.setattr(tpcds_benchmark, "run_power_test", lambda **kwargs: {"total_time": 1.0, "power_at_size": 16.0})
+    monkeypatch.setattr(
+        tpcds_benchmark,
+        "run_throughput_test",
+        lambda **kwargs: SimpleNamespace(throughput_at_size=None, success=False, outstanding_stream_ids=[1]),
+    )
+    maintenance = Mock()
+    monkeypatch.setattr(tpcds_benchmark, "run_maintenance_test", maintenance)
+
+    result = tpcds_benchmark.run_official_benchmark(object(), adapter=object())
+
+    maintenance.assert_not_called()
+    assert result["success"] is False
+    assert result["maintenance_test_result"]["status"] == "contained"
+    assert result["maintenance_test_result"]["outstanding_stream_ids"] == [1]
+    assert any("Maintenance Test refused" in error for error in result["errors"])
+
+
+def test_official_run_still_runs_maintenance_when_boundary_is_clear(tpcds_benchmark, monkeypatch):
+    monkeypatch.setattr(tpcds_benchmark, "run_power_test", lambda **kwargs: {"total_time": 1.0, "power_at_size": 16.0})
+    monkeypatch.setattr(
+        tpcds_benchmark,
+        "run_throughput_test",
+        lambda **kwargs: SimpleNamespace(throughput_at_size=9.0, success=True),
+    )
+    maintenance = Mock(return_value=SimpleNamespace(successful_operations=1, total_operations=1))
+    monkeypatch.setattr(tpcds_benchmark, "run_maintenance_test", maintenance)
+
+    result = tpcds_benchmark.run_official_benchmark(object(), adapter=object())
+
+    maintenance.assert_called_once()
+    assert result["success"] is True
+
+
 def test_run_power_test_collects_query_error(tpcds_benchmark, monkeypatch):
     monkeypatch.setattr(tpcds_benchmark, "get_query", lambda qid, **kwargs: f"SELECT {qid}")
 

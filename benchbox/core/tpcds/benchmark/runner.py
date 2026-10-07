@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection as _DatabaseConnection
+from benchbox.core.throughput.containment import check_phase_boundary
 from benchbox.core.throughput.entrypoints import (
     require_adapter,
     require_stream_minimum,
@@ -1224,9 +1225,23 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             if throughput_test:
                 self._run_throughput_phase(num_streams, logger, result, adapter, connection, dialect)
 
-            # Phase 3: Maintenance Test
+            # Phase 3: Maintenance Test -- refused while throughput work is
+            # outstanding, so maintenance never overlaps leaked streams or
+            # reuses their still-owned resources for measured work.
             if maintenance_test:
-                self._run_maintenance_phase(connection, dialect, logger, result)
+                boundary = check_phase_boundary(result["throughput_test_result"])
+                if not boundary.proceed:
+                    refusal = f"Maintenance Test refused: {boundary.reason}"
+                    result["errors"].append(refusal)
+                    result["maintenance_test_result"] = {
+                        "success": False,
+                        "status": "contained",
+                        "reason": refusal,
+                        "outstanding_stream_ids": list(boundary.outstanding_stream_ids),
+                    }
+                    result["success"] = False
+                else:
+                    self._run_maintenance_phase(connection, dialect, logger, result)
 
             self._finalize_benchmark_result(result, benchmark_start_time, logger)
             return result
@@ -1432,6 +1447,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             throughput_at_size=routed.throughput_at_size,
             success=routed.success,
             error="; ".join(routed.errors) or None,
+            outstanding_stream_ids=list(getattr(routed, "outstanding_stream_ids", None) or []),
         )
 
     def run_power_test(
