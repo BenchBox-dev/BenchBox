@@ -100,6 +100,31 @@ def test_the_gate_detects_a_one_platform_cohort(tmp_path: Path) -> None:
     assert shallow == {("tpcds", "10.0"): {"DuckDB"}}
 
 
+def _write_phase_bundle(directory: Path, name: str, *, platform: str, power: str, throughput: str) -> None:
+    payload = {
+        "benchmark": {"id": "tpch", "scale_factor": 1.0},
+        "platform": {"name": platform},
+        "run": {"timestamp": "2026-08-01T12:00:00"},
+        "phases": {"power_test": {"status": power}, "throughput_test": {"status": throughput}},
+    }
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / name).write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_throughput_bundles_form_their_own_cohort(tmp_path: Path) -> None:
+    """A throughput bundle must not borrow depth from the power cohort of the same scale."""
+    validator = _load_validator()
+    for platform in ("DuckDB", "DataFusion", "Spark"):
+        _write_phase_bundle(
+            tmp_path, f"{platform}-power.json", platform=platform, power="COMPLETED", throughput="NOT_RUN"
+        )
+    _write_phase_bundle(tmp_path, "duckdb-tp.json", platform="DuckDB", power="NOT_RUN", throughput="COMPLETED")
+
+    shallow = validator.shallow_cohorts(validator.cohort_platforms(validator.discover_bundles(tmp_path)))
+
+    assert shallow == {("tpch", "1.0#throughput"): {"DuckDB"}}
+
+
 def test_the_gate_accepts_a_full_cohort(tmp_path: Path) -> None:
     """Positive control: three platforms in one cohort must not be flagged."""
     validator = _load_validator()

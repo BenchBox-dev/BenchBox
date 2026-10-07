@@ -76,12 +76,41 @@ def _load_bundle(bundle: pathlib.Path) -> dict:
         raise CorpusReadError(f"ERROR reading {bundle}: {exc}") from exc
 
 
+def _phase_executed(phase: object) -> bool:
+    if not isinstance(phase, dict) or not phase:
+        return False
+    return str(phase.get("status") or "").upper() != "NOT_RUN"
+
+
+def bundle_phase(payload: dict) -> str:
+    """Measured phase, resolved exactly as `scripts/generate_corpus_inventory.py` does.
+
+    Multi-stream throughput timings are not comparable with single-stream power
+    timings, so a throughput bundle must not borrow depth from the power cohort.
+    """
+    benchmark = payload.get("benchmark") or {}
+    declared = benchmark.get("test_type") if isinstance(benchmark, dict) else None
+    if declared:
+        return str(declared)
+    phases = payload.get("phases") or {}
+    if not isinstance(phases, dict):
+        return "unknown"
+    if _phase_executed(phases.get("power_test")):
+        return "power"
+    if _phase_executed(phases.get("throughput_test")):
+        return "throughput"
+    return "unknown"
+
+
 def _cohort_key(payload: dict) -> CohortKey:
     try:
         benchmark_id = payload["benchmark"]["id"]
         scale_factor = str(payload["benchmark"].get("scale_factor", ""))
     except Exception as exc:  # noqa: BLE001
         raise CorpusReadError(f"ERROR missing cohort fields: {exc}") from exc
+    phase = bundle_phase(payload)
+    if phase not in ("power", "unknown"):
+        scale_factor = f"{scale_factor}#{phase}"
     return (benchmark_id, scale_factor)
 
 
