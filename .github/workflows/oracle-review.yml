@@ -20,7 +20,6 @@ permissions:
   contents: read
   issues: read
   pull-requests: read
-  statuses: read
 
 concurrency:
   group: oracle-review-${{ github.event.pull_request.number || inputs.pr }}

@@ -15,15 +15,12 @@ from typing import Any
 from soundness_paths import any_soundness_path
 
 CONNECTOR_LOGIN = "chatgpt-codex-connector"
-# The App that posts the oracle reviewer chain's reviews and verdict status from
-# oracle-review-shadow.yml. Its entries must also come from a Bot account, so a
-# user who registers the same login cannot stand in for it.
 ORACLE_LOGIN = "benchbox-oracle"
-ORACLE_CONTEXT = "oracle-review-shadow"
 CONNECTOR = "connector"
 ORACLE = "oracle"
 SIGNALS = {CONNECTOR: (CONNECTOR_LOGIN, "Codex connector"), ORACLE: (ORACLE_LOGIN, "oracle")}
-# Accounts whose stand-in attestation substitutes for the required reviewer when it
+_ORACLE_VERDICT = re.compile(r"### oracle-review-shadow: (?P<state>[a-z]+) for `(?P<sha>[0-9a-f]{40})`")
+# Accounts whose stand-in attestation substitutes for the Codex connector when it
 # cannot review (for example at its usage limit). The attestation must name the
 # exact head commit, so it records who vouched for which reviewed code.
 STANDIN_ATTESTERS = frozenset({"joeharris76"})
@@ -35,17 +32,14 @@ def _attested_shas(comment: dict[str, Any]) -> list[str]:
     return [match.group(1)] if match else []
 
 
-def _is_standin(comment: dict[str, Any], head_sha: str, base_time: datetime | None) -> bool:
+def _is_standin(comment: dict[str, Any], head_sha: str, not_before: datetime | None) -> bool:
     # Exact login and a human account: a "[bot]" suffix is not stripped here. An
     # edited comment does not count, because its text may not be the author's.
-    # The attestation names the full head SHA, so only a retarget can change what
-    # it vouches for. It is not compared with the push time, which GitHub records
-    # when the workflow run is created, often seconds after the attester posts.
     return (
         comment.get("login") in STANDIN_ATTESTERS
         and comment.get("user_type") == "User"
         and comment.get("updated_at") in (None, comment.get("created_at"))
-        and (base_time is None or _parse_time(comment["created_at"]) > base_time)
+        and (not_before is None or _parse_time(comment["created_at"]) > not_before)
         and head_sha in _attested_shas(comment)
     )
 
@@ -88,15 +82,13 @@ def _is_reviewer(login: str | None, signal: str, account_type: str | None = None
     return _login(login) == SIGNALS[signal][0] and (signal == CONNECTOR or account_type == "Bot")
 
 
-def _oracle_verdict(statuses: Iterable[dict[str, Any]], base_time: datetime | None) -> str | None:
-    own = [
-        status
-        for status in statuses
-        if status.get("context") == ORACLE_CONTEXT
-        and _is_reviewer(status.get("creator"), ORACLE, status.get("creator_type"))
-        and (base_time is None or _parse_time(status["created_at"]) > base_time)
-    ]
-    return max(own, key=lambda status: _parse_time(status["created_at"]))["state"] if own else None
+def _oracle_verdict(reviews: list[dict[str, Any]], head_sha: str) -> tuple[str | None, datetime | None]:
+    latest = max(reviews, key=lambda review: _parse_time(review["submitted_at"]), default=None)
+    if latest is None:
+        return None, None
+    match = _ORACLE_VERDICT.match(latest.get("body") or "")
+    state = match.group("state") if match and match.group("sha") == head_sha else None
+    return state, _parse_time(latest["submitted_at"])
 
 
 def _parse_time(value: str) -> datetime:
@@ -105,7 +97,7 @@ def _parse_time(value: str) -> datetime:
 
 def decide(
     head_sha: str,
-    head_date: str,
+    head_date: str | None,
     files: Iterable[str],
     reviews: Iterable[dict[str, Any]],
     reactions: Iterable[dict[str, Any]],
@@ -114,39 +106,42 @@ def decide(
     base_date: str | None = None,
     comments: Iterable[dict[str, Any]] = (),
     signal: str = CONNECTOR,
-    statuses: Iterable[dict[str, Any]] = (),
 ) -> tuple[int, str]:
     if not paths(files):
         return PASS, "oracle-review: not a soundness path change"
 
     name = SIGNALS[signal][1]
     base_time = _parse_time(base_date) if base_date else None
-    review_signal = any(
-        _is_reviewer(review.get("login"), signal, review.get("user_type"))
+    head_reviews = [
+        review
+        for review in reviews
+        if _is_reviewer(review.get("login"), signal, review.get("user_type"))
         and review.get("commit_id") == head_sha
         and review.get("state") not in {"PENDING", "DISMISSED"}
         and (base_time is None or (review.get("submitted_at") and _parse_time(review["submitted_at"]) > base_time))
-        for review in reviews
-    )
-    head_time = max(_parse_time(head_date), base_time) if base_time else _parse_time(head_date)
-    # Only the connector approves by reaction; the oracle always posts a review.
-    reaction_signal = signal == CONNECTOR and any(
-        _is_reviewer(reaction.get("login"), signal)
-        and reaction.get("content") == "+1"
-        and _parse_time(reaction["created_at"]) > head_time
-        for reaction in reactions
-    )
-    standin = next((comment for comment in comments if _is_standin(comment, head_sha, base_time)), None)
-    if signal == ORACLE and review_signal and not standin:
-        # The oracle posts every verdict as a COMMENT review, including a failure,
-        # and a blocking finding outside the diff has no thread. Its status on the
-        # head is the verdict.
-        verdict = _oracle_verdict(statuses, base_time)
-        if verdict != "success":
-            return WAITING, (
-                f"oracle-review: the oracle's {ORACLE_CONTEXT} status on {head_sha} is {verdict or 'missing'}, "
-                "not success; fix the findings, or post a stand-in attestation, then rerun this check"
-            )
+    ]
+    review_signal = bool(head_reviews)
+    reaction_signal = False
+    standin_after = base_time
+    verdict = None
+    if signal == CONNECTOR:
+        head_time = _parse_time(head_date or "")
+        head_time = max(head_time, base_time) if base_time else head_time
+        reaction_signal = any(
+            _is_reviewer(reaction.get("login"), signal)
+            and reaction.get("content") == "+1"
+            and _parse_time(reaction["created_at"]) > head_time
+            for reaction in reactions
+        )
+    else:
+        verdict, verdict_time = _oracle_verdict(head_reviews, head_sha)
+        standin_after = max(filter(None, (base_time, verdict_time)), default=None)
+    standin = next((comment for comment in comments if _is_standin(comment, head_sha, standin_after)), None)
+    if review_signal and signal == ORACLE and verdict != "success" and not standin:
+        return WAITING, (
+            f"oracle-review: the oracle's latest review of {head_sha} reports {verdict or 'no verdict'}, not "
+            "success; fix the findings, or post a stand-in attestation after that review, then rerun this check"
+        )
     if not (review_signal or reaction_signal or standin):
         return WAITING, (
             f"oracle-review: waiting for the {name}'s review of {head_sha}, or a stand-in attestation "
@@ -259,21 +254,9 @@ def fetch_reviews(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
             "commit_id": item.get("commit_id"),
             "state": item.get("state"),
             "submitted_at": item.get("submitted_at"),
+            "body": item.get("body"),
         }
         for item in _paginate(token, f"/repos/{repo}/pulls/{pr}/reviews")
-    ]
-
-
-def fetch_statuses(token: str, repo: str, sha: str) -> list[dict[str, Any]]:
-    return [
-        {
-            "context": item.get("context"),
-            "state": item.get("state"),
-            "creator": (item.get("creator") or {}).get("login"),
-            "creator_type": (item.get("creator") or {}).get("type"),
-            "created_at": item["created_at"],
-        }
-        for item in _paginate(token, f"/repos/{repo}/commits/{sha}/statuses")
     ]
 
 
@@ -371,32 +354,31 @@ def main(argv: list[str] | None = None) -> int:
         if not matcher(files):
             print("oracle-review: not a soundness path change")
             return PASS
-        inputs = (
-            head_sha,
-            fetch_head_date(token, args.repo, head_sha),
-            files,
-            fetch_reviews(token, args.repo, args.pr),
-            fetch_reactions(token, args.repo, args.pr),
-            fetch_threads(token, args.repo, args.pr),
-            matcher,
-            fetch_base_change_date(token, args.repo, args.pr),
-            fetch_comments(token, args.repo, args.pr),
-        )
-        statuses = fetch_statuses(token, args.repo, head_sha) if args.signal == ORACLE else []
-        status, message = decide(*inputs, signal=args.signal, statuses=statuses)
+        reviews = fetch_reviews(token, args.repo, args.pr)
+        threads = fetch_threads(token, args.repo, args.pr)
+        base_date = fetch_base_change_date(token, args.repo, args.pr)
+        comments = fetch_comments(token, args.repo, args.pr)
+
+        def run(signal: str) -> tuple[int, str]:
+            head_date, reactions = (None, [])
+            if signal == CONNECTOR:
+                head_date = fetch_head_date(token, args.repo, head_sha)
+                reactions = fetch_reactions(token, args.repo, args.pr)
+            return decide(head_sha, head_date, files, reviews, reactions, threads, matcher, base_date, comments, signal)
+
+        status, message = run(args.signal)
     except (CheckError, KeyError, ValueError) as exc:
         print(f"oracle-review: error: {exc}", file=sys.stderr)
         return ERROR
     print(message)
     for other in sorted(set(SIGNALS) - {args.signal}):
-        # The comparison is informational: no failure in it may change this check's result.
         try:
-            other_statuses = statuses or (fetch_statuses(token, args.repo, head_sha) if other == ORACLE else [])
-            other_status, other_message = decide(*inputs, signal=other, statuses=other_statuses)
-            print(f"parity: required={args.signal} {_STATUS_NAMES[status]}; {other} {_STATUS_NAMES[other_status]}")
-            print(f"parity: {other}: {other_message}")
-        except Exception as exc:  # noqa: BLE001
+            other_status, other_message = run(other)
+        except (CheckError, KeyError, TypeError, ValueError) as exc:
             print(f"parity: {other}: not evaluated: {exc}")
+            continue
+        print(f"parity: required={args.signal} {_STATUS_NAMES[status]}; {other} {_STATUS_NAMES[other_status]}")
+        print(f"parity: {other}: {other_message}")
     return status
 
 
