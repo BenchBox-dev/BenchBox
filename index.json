@@ -19209,10 +19209,15 @@
       "title": "Close out the site-repo split: fold superseded tracker items and record follow-ups"
     },
     "site-split-agy-plan-review": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-08T01:13:31Z",
+        "generation": "1f5a636da9ff4fc6bbfcb8b8a10bb062",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Run the owed agy adversarial review of the site-repo split plan and adjudicate its findings"
     },
     "skill-integrity-ci-lane-live-validation": {
