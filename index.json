@@ -19111,6 +19111,15 @@
       "status": "open",
       "title": "Build the Node deploy plane in the site repo: resolve, gates, Pages deploy, probes, receipts, rollback"
     },
+    "site-split-24-blog-drafts": {
+      "claim": null,
+      "needs": [
+        "site-split-20-seed-site-repo"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Re-evaluate every blog draft asset and port chart rendering to a pinned external CLI call"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],
