@@ -19093,6 +19093,15 @@
       "status": "open",
       "title": "Bootstrap the site repo: settings, agent instructions, Node hooks, CI and nightly probes"
     },
+    "site-split-22-build-from-bundle": {
+      "claim": null,
+      "needs": [
+        "site-split-20-seed-site-repo"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Make the site and Explorer build only from the repo and the fetched core bundle"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],
