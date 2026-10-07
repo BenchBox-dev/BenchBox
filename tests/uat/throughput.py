@@ -14,11 +14,8 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 from benchbox.core.results.metrics import TPCMetricsCalculator
-<<<<<<< HEAD
-from tests.uat import throughput_baseline as baseline
-=======
 from benchbox.core.throughput.result import throughput_stream_ids
->>>>>>> 170e5d03b (fix(tpc): run power on stream 0 and number throughput streams 1 to S)
+from tests.uat import throughput_baseline as baseline
 
 TPC_ALLOWED_SCALE_FACTORS = {1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000}
 
