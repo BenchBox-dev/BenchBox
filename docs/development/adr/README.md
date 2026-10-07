@@ -24,3 +24,4 @@
 - [ADR: Prove FlightData Source Months Before Reusing a Corpus](adr-flightdata-month-source-policy.md)
 - [ADR: Preserve Read-Primitives Capabilities Across Cloud Dialects](adr-read-primitives-cloud-variants.md)
 - [ADR: Development Loop Architecture (v2)](adr-dev-loop-v2.md)
+- [ADR: Split the public site into its own repository](adr-site-repo-split.md)
