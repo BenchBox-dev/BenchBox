@@ -834,7 +834,7 @@ def _throughput_payload(*, platform_name: str = "DuckDB", scale_factor: float = 
 
     queries = [
         {"id": str(i), "stream": stream, "status": "SUCCESS", "run_type": "measurement", "test_type": "throughput"}
-        for stream in (0, 1, 2)
+        for stream in (1, 2, 3)
         for i in range(1, 23)
     ]
     return {
