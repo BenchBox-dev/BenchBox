@@ -1085,7 +1085,10 @@ class BundlePhaseBlock(_BundleBlock):
     """Typed view of one entry in a bundle ``phases`` block."""
 
     duration_ms: Any = None
+    status: Any = None
     stream_results: Any = None
+    errors: Any = None
+    outstanding_work: Any = None
 
 
 class BundleQueryRow(_BundleBlock):

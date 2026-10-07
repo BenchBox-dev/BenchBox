@@ -24,6 +24,7 @@ import {
   formatTimingExclusion,
   isComparable,
   isTimingDisplayable,
+  phaseScoreValue,
 } from "@/lib/displayEligibility";
 import { describeCompareExclusionReason, summarizeCompareExclusionReasons } from "@/lib/compareExclusionReasons";
 import { compareSelectionLabel } from "@/lib/compareCohort";
@@ -408,12 +409,17 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
   // the first available phase so we never request a non-existent artifact.
   const effectivePhase = phases.includes(phaseFilter) ? phaseFilter : (phases[0] ?? phaseFilter);
   const streamCountsInPhase = new Map<number, number>();
+  const rankableStreamCounts = new Map<number, number>();
   for (const result of benchmarkResults) {
     if (String(result.scale_factor) !== effectiveSf || canonicalPhase(result.test_type) !== effectivePhase) continue;
     if (result.stream_count === null || result.stream_count === undefined) continue;
     streamCountsInPhase.set(result.stream_count, (streamCountsInPhase.get(result.stream_count) ?? 0) + 1);
+    if (result.ranking_exclusion_reason === null) {
+      rankableStreamCounts.set(result.stream_count, (rankableStreamCounts.get(result.stream_count) ?? 0) + 1);
+    }
   }
   const streamCounts = [...streamCountsInPhase.keys()].sort((a, b) => a - b);
+  const defaultStreamCounts = rankableStreamCounts.size > 0 ? rankableStreamCounts : streamCountsInPhase;
   const requestedStreams = singleFacetValue(facets.stream_count);
   const requestedStreamCount = requestedStreams === null ? null : Number(requestedStreams);
   const effectiveStreams: number | null =
@@ -421,9 +427,9 @@ export function BenchmarkIndex({ benchmark = "" }: BenchmarkIndexProps) {
       ? null
       : requestedStreamCount !== null && streamCounts.includes(requestedStreamCount)
         ? requestedStreamCount
-        : streamCounts.reduce((best, count) =>
-            (streamCountsInPhase.get(count) ?? 0) > (streamCountsInPhase.get(best) ?? 0) ? count : best,
-          );
+        : [...defaultStreamCounts.keys()]
+            .sort((a, b) => a - b)
+            .reduce((best, count) => ((defaultStreamCounts.get(count) ?? 0) > (defaultStreamCounts.get(best) ?? 0) ? count : best));
   const summaryKey = JSON.stringify([benchmark, effectiveSf, effectivePhase, effectiveStreams]);
 
   useEffect(() => {
@@ -1517,7 +1523,7 @@ function BenchmarkRow({
       </td>
       <td class="table-td">SF {entry.scale_factor}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]"><RunDateChip runDate={entry.run_date} /></td>
-      <td class="table-td font-mono">{fmtScore(entry.power_score ?? entry.throughput_at_size ?? null)}</td>
+      <td class="table-td font-mono">{fmtScore(phaseScoreValue(entry))}</td>
       <td class="table-td font-mono">{fmtGeomean(entry.display_geomean_ms ?? entry.geomean_ms)}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]">{entry.query_count}</td>
       <td class="table-td">
@@ -1612,11 +1618,7 @@ function compareListRows(a: ResultRow, b: ResultRow, sort: SortState<BenchmarkLi
     return compareNullableNumber(a.memory_gb ?? null, b.memory_gb ?? null, sort.direction);
   }
   if (sort.key === "power_score") {
-    return compareNullableNumber(
-      a.power_score ?? a.throughput_at_size ?? null,
-      b.power_score ?? b.throughput_at_size ?? null,
-      sort.direction,
-    );
+    return compareNullableNumber(phaseScoreValue(a), phaseScoreValue(b), sort.direction);
   }
   return compareNullableNumber(a[sort.key], b[sort.key], sort.direction);
 }

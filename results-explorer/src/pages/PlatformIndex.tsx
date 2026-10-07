@@ -18,6 +18,7 @@ import { AnalysisCard, AnalysisCardGrid } from "@/components/AnalysisCardGrid";
 import { paletteColor, timeSeriesColor } from "@/lib/chartTheme";
 import {
   canonicalBenchmarkSlug,
+  canonicalPhase,
   formatArchitecture,
   formatBenchmarkLabel,
   formatCpuFamily,
@@ -28,7 +29,12 @@ import {
   isValidationNotClean,
   parseOverrideRules,
 } from "@/lib/displayLabels";
-import { normalizePrimaryMetric, primaryMetricHigherIsBetter, type PrimaryMetric } from "@/lib/displayEligibility";
+import {
+  normalizePrimaryMetric,
+  phaseScoreValue,
+  primaryMetricHigherIsBetter,
+  type PrimaryMetric,
+} from "@/lib/displayEligibility";
 import {
   compareCohortLockReason,
   compareCohortSignatureForRow,
@@ -551,8 +557,8 @@ export function PlatformIndex({ platform = "" }: PlatformIndexProps) {
       const comparison = dir * (av - bv);
       return comparison !== 0 ? comparison : a.result_id.localeCompare(b.result_id);
     }
-    const av = a[sort.key];
-    const bv = b[sort.key];
+    const av = sort.key === "power_score" ? phaseScoreValue(a) : a[sort.key];
+    const bv = sort.key === "power_score" ? phaseScoreValue(b) : b[sort.key];
     // Nulls sort last in BOTH directions. Convention varies (Excel flips
     // null position with direction; React Table / AG Grid default to
     // always-last). We pick always-last so a click never buries the
@@ -1260,13 +1266,13 @@ function buildTrendCohorts(rows: PlatformIndexRowRow[]): TrendCohort[] {
   const groups = new Map<string, TrendCohort>();
   for (const row of rows) {
     const primaryMetric = normalizeTrendMetric(row.primary_metric);
-    const key = `${row.benchmark}-sf${row.scale_factor}-${row.phase}-${primaryMetric}`;
+    const key = `${row.benchmark}-sf${row.scale_factor}-${row.phase}${row.stream_count == null ? "" : `-${row.stream_count}streams`}-${primaryMetric}`;
     let cohort = groups.get(key);
     if (!cohort) {
       const metricDescription = trendMetricDescription(primaryMetric);
       cohort = {
         key,
-        label: `${humanizeBenchmark(row.benchmark)} · SF ${row.scale_factor} · ${row.phase} · ${metricDescription}`,
+        label: `${humanizeBenchmark(row.benchmark)} · SF ${row.scale_factor} · ${formatPhaseWithStreams(row.phase, row.stream_count)} · ${metricDescription}`,
         primaryMetric,
         metricDescription,
         observationCount: 0,
@@ -1562,9 +1568,9 @@ function PlatformRow({ entry, runIdentityLabel, versionLabel, checked, onToggle,
       <td
         class="table-td font-mono"
         aria-colindex={platformTableColumnIndex("power_score", showMetricContract)}
-        title={entry.power_score == null && entry.throughput_at_size != null ? "Throughput@Size" : undefined}
+        title={canonicalPhase(entry.phase) === "throughput" ? "Throughput@Size" : undefined}
       >
-        {fmtScore(entry.power_score ?? entry.throughput_at_size ?? null)}
+        {fmtScore(phaseScoreValue(entry))}
       </td>
       <td class="table-td font-mono" aria-colindex={platformTableColumnIndex("geomean", showMetricContract)}>{fmtGeomean(entry.geomean_ms)}</td>
       <td class="table-td text-[var(--bb-data-fg-muted)]" aria-colindex={platformTableColumnIndex("queries", showMetricContract)}>{entry.query_count}</td>

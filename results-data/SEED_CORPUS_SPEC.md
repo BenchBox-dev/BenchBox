@@ -54,9 +54,12 @@ Trust label and visibility come from where a bundle is published, not from its c
 so the validator does not check them.
 
 TPC-H and TPC-DS throughput cohorts are split by stream count, so runs with different
-stream counts are never compared. A throughput bundle without a positive `throughput_at_size`
-(for example one with a failed stream, which exports none) contributes no identity, and a
-cohort in which no bundle has one is reported as `UNRANKED`.
+stream counts are never compared. `throughput_at_size` counts only when the throughput phase
+is `COMPLETED`, has a non-empty `stream_results` in which every entry has `success: true`, and
+records no `errors` or `outstanding_work`; otherwise it is treated as absent even if the bundle
+carries a value (a timed-out stream is such a case). A throughput bundle without a positive
+`throughput_at_size` contributes no identity, and a cohort in which no bundle has one is
+reported as `UNRANKED`.
 
 The depth gate applies to cohorts that publish a ranking:
 

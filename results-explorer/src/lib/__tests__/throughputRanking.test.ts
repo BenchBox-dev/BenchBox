@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { DetailResult, PlatformRow } from "@/types";
 import {
   normalizePrimaryMetric,
+  phaseScoreValue,
   primaryMetricHigherIsBetter,
   primaryMetricLabel,
   primaryMetricValue,
@@ -136,6 +137,16 @@ describe("primary metric helpers", () => {
   });
 });
 
+describe("phase score column", () => {
+  it("shows Throughput@Size for throughput rows and Power@Size otherwise, never the other metric", () => {
+    expect(phaseScoreValue({ test_type: "throughput", power_score: 10, throughput_at_size: 3741 })).toBe(3741);
+    expect(phaseScoreValue({ test_type: "throughput", power_score: 10, throughput_at_size: null })).toBeNull();
+    expect(phaseScoreValue({ phase: "throughput", power_score: null, throughput_at_size: 5 })).toBe(5);
+    expect(phaseScoreValue({ test_type: "power", power_score: 10, throughput_at_size: 3741 })).toBe(10);
+    expect(phaseScoreValue({ test_type: "standard", power_score: null, throughput_at_size: 3741 })).toBeNull();
+  });
+});
+
 describe("stream count facet", () => {
   it("round-trips through the streams URL parameter", () => {
     expect(readFacetParam(new URLSearchParams("streams=2,3"), "stream_count")).toEqual(["2", "3"]);
@@ -263,14 +274,63 @@ describe("local throughput import", () => {
     expect(preview.primaryMetric).toBe("throughput_at_size");
   });
 
-  it("falls back to geomean when a throughput run exported no score", async () => {
+  it("treats a timed-out stream as having no Throughput@Size even when the bundle carries a score", async () => {
+    const bundle = throughputBundle({
+      summary: {
+        queries: { total: 4, passed: 4, failed: 0 },
+        validation: "passed",
+        tpc_metrics: { throughput_at_size: 500 },
+      },
+      phases: {
+        power_test: { status: "NOT_RUN" },
+        throughput_test: {
+          status: "FAILED",
+          stream_results: [
+            { stream_id: 1, success: true },
+            { stream_id: 2, success: true },
+          ],
+          errors: ["Stream 3 timed out after 600s"],
+        },
+      },
+    });
+    const preview = await parseLocalResultText(JSON.stringify(bundle), "tp.json");
+
+    expect(preview.detail.throughput_at_size).toBeNull();
+    expect(preview.detail.stream_count).toBe(2);
+    expect(preview.primaryMetric).toBe("throughput_at_size");
+  });
+
+  it.each([
+    ["a failed status", { status: "FAILED" }],
+    ["an unsuccessful stream", { stream_results: [{ stream_id: 1, success: false }] }],
+    ["a non-boolean success", { stream_results: [{ stream_id: 1, success: "true" }] }],
+    ["no stream results", { stream_results: [] }],
+    ["phase errors", { errors: ["boom"] }],
+    ["outstanding work", { outstanding_work: { stream_ids: [3], cleanup_state: "outstanding" } }],
+  ])("drops the score for %s", async (_label, change) => {
+    const base = throughputBundle() as { phases: { throughput_test: Record<string, unknown> } };
+    base.phases.throughput_test = { ...base.phases.throughput_test, ...change };
+    const preview = await parseLocalResultText(JSON.stringify(base), "tp.json");
+
+    expect(preview.detail.throughput_at_size).toBeNull();
+  });
+
+  it("keeps the score when the error fields are present but empty", async () => {
+    const base = throughputBundle() as { phases: { throughput_test: Record<string, unknown> } };
+    base.phases.throughput_test = { ...base.phases.throughput_test, errors: [], outstanding_work: null };
+    const preview = await parseLocalResultText(JSON.stringify(base), "tp.json");
+
+    expect(preview.detail.throughput_at_size).toBe(3741.26);
+  });
+
+  it("reports a missing score as the throughput metric rather than falling back to geomean", async () => {
     const bundle = throughputBundle({
       summary: { queries: { total: 4, passed: 4, failed: 0 }, validation: "passed", tpc_metrics: {} },
     });
     const preview = await parseLocalResultText(JSON.stringify(bundle), "tp.json");
 
     expect(preview.detail.throughput_at_size).toBeNull();
-    expect(preview.primaryMetric).toBe("display_geomean_ms");
+    expect(preview.primaryMetric).toBe("throughput_at_size");
   });
 
   it("does not assign a stream count to power runs", async () => {

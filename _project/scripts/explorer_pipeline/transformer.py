@@ -427,7 +427,21 @@ def _power_score(bundle: BundleDocument) -> float | None:
     return _tpc_metric(bundle.summary.tpc_metrics.power_at_size)
 
 
+def _throughput_phase_clean(bundle: BundleDocument) -> bool:
+    block = bundle.phases.get("throughput_test")
+    if block is None or str(block.status or "").upper() != "COMPLETED":
+        return False
+    streams = block.stream_results
+    if not isinstance(streams, list) or not streams:
+        return False
+    if not all(isinstance(stream, dict) and stream.get("success") is True for stream in streams):
+        return False
+    return not block.errors and not block.outstanding_work
+
+
 def _throughput_at_size(bundle: BundleDocument) -> float | None:
+    if not _throughput_phase_clean(bundle):
+        return None
     return _tpc_metric(bundle.summary.tpc_metrics.throughput_at_size)
 
 

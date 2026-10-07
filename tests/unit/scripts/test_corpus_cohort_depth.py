@@ -802,7 +802,42 @@ def _parity_variants() -> dict[str, dict]:
             data["summary"] = {**data["summary"], **changes["summary"]}
         return data
 
+    def throughput_phase_variant(**phase_changes: object) -> dict:
+        data = throughput_variant(throughput_at_size=500.0, streams=3)
+        phase = data["phases"]["throughput_test"]
+        phase.update(phase_changes)
+        return data
+
+    def timed_out_stream() -> dict:
+        data = throughput_variant(throughput_at_size=500.0, streams=3)
+        phase = data["phases"]["throughput_test"]
+        phase["status"] = "FAILED"
+        phase["stream_results"] = phase["stream_results"][:2]
+        phase["errors"] = ["Stream 3 timed out after 600s"]
+        return data
+
     return {
+        "throughput-timed-out-stream-with-score": timed_out_stream(),
+        "throughput-phase-failed-with-score": throughput_phase_variant(status="FAILED"),
+        "throughput-stream-unsuccessful-with-score": throughput_phase_variant(
+            stream_results=[
+                {"stream_id": 1, "success": True},
+                {"stream_id": 2, "success": True},
+                {"stream_id": 3, "success": False},
+            ]
+        ),
+        "throughput-stream-success-not-boolean": throughput_phase_variant(
+            stream_results=[{"stream_id": 1, "success": "true"}]
+        ),
+        "throughput-phase-errors-with-score": throughput_phase_variant(errors=["stream 2 reported an error"]),
+        "throughput-outstanding-work-with-score": throughput_phase_variant(
+            outstanding_work={"stream_ids": [3], "cleanup_state": "outstanding"}
+        ),
+        "throughput-empty-stream-results-with-score": throughput_phase_variant(stream_results=[]),
+        "throughput-phase-block-missing-with-score": with_tpc_metrics(
+            {"throughput_at_size": 500.0}, test_type="throughput"
+        ),
+        "throughput-clean-empty-errors": throughput_phase_variant(errors=[], outstanding_work=None),
         "throughput-without-power-score": with_tpc_metrics({"throughput_at_size": 3741.0}, test_type="throughput"),
         "throughput-clean": throughput_variant(),
         "throughput-clean-tpcds": throughput_variant(benchmark="tpcds"),
@@ -998,3 +1033,57 @@ def test_copied_constants_match_their_explorer_sources() -> None:
     assert validator.NON_CLEAN_TRANSLATION_STATUSES == NON_CLEAN_TRANSLATION_STATUSES
     assert validator.UNOFFICIAL_COMPLIANCE_CLASSES == UNOFFICIAL_COMPLIANCE_CLASSES
     assert validator.PHASE_ALIASES == _PHASE_ALIASES
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "throughput-timed-out-stream-with-score",
+        "throughput-phase-failed-with-score",
+        "throughput-stream-unsuccessful-with-score",
+        "throughput-stream-success-not-boolean",
+        "throughput-phase-errors-with-score",
+        "throughput-outstanding-work-with-score",
+        "throughput-empty-stream-results-with-score",
+        "throughput-phase-block-missing-with-score",
+    ],
+)
+def test_an_unvalidated_throughput_phase_is_not_ranked_even_with_a_score(tmp_path: Path, name: str) -> None:
+    validator = _load_validator()
+    path = tmp_path / "bundle.json"
+    payload = _parity_variants()[name]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    explorer_phase, explorer_reason = _explorer_view(path)
+
+    assert validator.exclusion_reason(payload) == "missing_primary_metric"
+    assert explorer_reason == "missing_primary_metric"
+    assert explorer_phase == "throughput"
+    assert BundleTransformer().to_manifest_entry(path).throughput_at_size is None
+
+
+def test_a_timed_out_stream_cannot_form_a_throughput_identity(tmp_path: Path) -> None:
+    validator = _load_validator()
+    for platform in ("DuckDB", "Spark"):
+        _write_phase_bundle(
+            tmp_path,
+            f"{platform}.json",
+            platform=platform,
+            power="NOT_RUN",
+            throughput="COMPLETED",
+            test_type="throughput",
+        )
+    timed_out = json.loads((tmp_path / "Spark.json").read_text(encoding="utf-8"))
+    timed_out["platform"]["name"] = "Doris"
+    phase = timed_out["phases"]["throughput_test"]
+    phase["status"] = "FAILED"
+    phase["stream_results"] = phase["stream_results"][:2]
+    phase["errors"] = ["Stream 3 timed out"]
+    timed_out["summary"]["tpc_metrics"]["throughput_at_size"] = 500.0
+    (tmp_path / "Doris.json").write_text(json.dumps(timed_out), encoding="utf-8")
+
+    cohorts = validator.cohort_platforms(validator.discover_bundles(tmp_path))
+
+    assert cohorts[("tpch", "1.0#throughput#3streams")] == {"DuckDB", "Spark"}
+    assert cohorts[("tpch", "1.0#throughput#2streams")] == set()
+    assert validator.main(tmp_path) == 1

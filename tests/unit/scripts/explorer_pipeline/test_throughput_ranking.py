@@ -108,6 +108,59 @@ def test_throughput_bundle_without_stream_results_has_no_stream_count(tmp_path: 
     ((entry, _),) = _pairs(tmp_path, {"spark": payload})
 
     assert entry.stream_count is None
+    assert entry.throughput_at_size is None
+    assert entry.ranking_exclusion_reason == "missing_primary_metric"
+
+
+def _timed_out_stream_bundle() -> dict:
+    payload = throughput_bundle("spark", streams=3, throughput_at_size=500.0)
+    phase = payload["phases"]["throughput_test"]
+    phase["status"] = "FAILED"
+    phase["stream_results"] = phase["stream_results"][:2]
+    phase["errors"] = ["Stream 3 timed out after 600s"]
+    return payload
+
+
+def test_timed_out_stream_with_a_score_and_no_failed_queries_is_not_ranked(tmp_path: Path) -> None:
+    payload = _timed_out_stream_bundle()
+    assert payload["summary"]["queries"]["failed"] == 0
+    ((entry, detail),) = _pairs(tmp_path, {"spark": payload})
+
+    assert canonical_phase(entry.test_type) == "throughput"
+    assert entry.stream_count == 2
+    assert entry.throughput_at_size is None
+    assert detail.throughput_at_size is None
+    assert entry.ranking_exclusion_reason == "missing_primary_metric"
+    assert detail.ranking_exclusion_reason == "missing_primary_metric"
+
+
+@pytest.mark.parametrize(
+    "phase_changes",
+    [
+        {"status": "FAILED"},
+        {"status": "PARTIAL"},
+        {"stream_results": []},
+        {"stream_results": [{"stream_id": 1, "success": True}, {"stream_id": 2, "success": False}]},
+        {"stream_results": [{"stream_id": 1, "success": "true"}]},
+        {"errors": ["stream 2 reported an error"]},
+        {"outstanding_work": {"stream_ids": [3], "cleanup_state": "outstanding"}},
+    ],
+)
+def test_throughput_score_is_absent_unless_the_phase_completed_cleanly(tmp_path: Path, phase_changes: dict) -> None:
+    payload = throughput_bundle("spark", streams=3, throughput_at_size=500.0)
+    payload["phases"]["throughput_test"].update(phase_changes)
+    ((entry, _),) = _pairs(tmp_path, {"spark": payload})
+
+    assert entry.throughput_at_size is None
+    assert entry.ranking_exclusion_reason == "missing_primary_metric"
+
+
+def test_completed_phase_with_empty_error_fields_keeps_its_score(tmp_path: Path) -> None:
+    payload = throughput_bundle("spark", streams=3, throughput_at_size=500.0)
+    payload["phases"]["throughput_test"].update({"errors": [], "outstanding_work": None})
+    ((entry, _),) = _pairs(tmp_path, {"spark": payload})
+
+    assert entry.throughput_at_size == pytest.approx(500.0)
     assert entry.ranking_exclusion_reason is None
 
 

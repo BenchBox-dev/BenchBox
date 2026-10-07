@@ -358,7 +358,21 @@ def _power_score(payload: dict) -> float | None:
     return _tpc_metric(payload, "power_at_size")
 
 
+def _throughput_phase_clean(payload: dict) -> bool:
+    block = _mapping(_mapping(payload.get("phases")).get("throughput_test"))
+    if str(block.get("status") or "").upper() != "COMPLETED":
+        return False
+    streams = block.get("stream_results")
+    if not isinstance(streams, list) or not streams:
+        return False
+    if not all(isinstance(stream, dict) and stream.get("success") is True for stream in streams):
+        return False
+    return not block.get("errors") and not block.get("outstanding_work")
+
+
 def _throughput_score(payload: dict) -> float | None:
+    if not _throughput_phase_clean(payload):
+        return None
     return _tpc_metric(payload, "throughput_at_size")
 
 

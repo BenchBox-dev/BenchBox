@@ -1424,6 +1424,20 @@ describe("BenchmarkIndex", () => {
       await waitFor(() => expect(screen.getByText("throughput (3 streams)")).toBeTruthy());
     });
 
+    it("chooses the default stream count from rankable runs only", async () => {
+      const { rows, rankings, cells } = throughputFixtures();
+      const unrankable = rows.map((row) =>
+        row.stream_count === 3 ? { ...row, ranking_exclusion_reason: "missing_primary_metric" } : row,
+      );
+      vi.mocked(queryRows).mockImplementation(defaultImpl(unrankable, rankings, cells));
+
+      render(<BenchmarkIndex benchmark="tpch" />);
+
+      const streams = (await screen.findByTestId("benchmark-stream-filter")) as HTMLSelectElement;
+      await waitFor(() => expect(streams.value).toBe("2"));
+      await waitFor(() => expect(rankingParams().at(-1)).toEqual(["tpch", 0.1, "throughput", 2]));
+    });
+
     it("reloads the cohort when another stream count is selected", async () => {
       const { rows, rankings, cells } = throughputFixtures();
       vi.mocked(queryRows).mockImplementation(defaultImpl(rows, rankings, cells));

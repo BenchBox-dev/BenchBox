@@ -417,14 +417,35 @@ class DuckDBSnapshotBuilder:
                 execution_mode       VARCHAR,
                 tuning_mode          VARCHAR,
                 tuning_hash          VARCHAR,
+                -- ADR-1 bundle-emitted tuning identities (display-only, never
+                -- a join/dedup key): canonical requested-config hash and the
+                -- physical applied-ledger hash. NULL for legacy bundles.
                 requested_config_hash VARCHAR,
                 applied_ledger_hash   VARCHAR,
+                -- ADR-1 tuning verified-state (not_applicable / noop /
+                -- applied_unverified / applied_verified / failed). NULL for
+                -- legacy bundles; distinct from the run/query validation_status
+                -- column below.
                 tuning_validation_status VARCHAR,
+                -- ADR-1 per-statement introspection receipt, stored verbatim
+                -- as a canonical JSON string (the {stem}.applied.json
+                -- companion's "receipt" sub-object). NULL when no receipt was
+                -- published. Opaque read-only payload: never parsed, joined
+                -- on, or re-derived anywhere downstream.
                 applied_receipt      VARCHAR,
+                -- Accepted plausibility overrides ({stem}.override.json
+                -- companion), stored verbatim as display-only badge data:
+                -- override_rules holds the covered rule ids as a canonical
+                -- JSON array string; the audit fields are plain text. NULL /
+                -- empty when no override was accepted. Never parsed, joined
+                -- on, or re-derived downstream.
                 override_rules       VARCHAR,
                 override_evidence    VARCHAR,
                 override_approver    VARCHAR,
                 override_expires     VARCHAR,
+                -- ADR-3 seam: explicit tuning-policy generation marker
+                -- (display-only, never a join/dedup key). NULL for legacy
+                -- bundles, treated downstream as the "pre-seam" generation.
                 tuning_policy_generation VARCHAR,
                 test_type            VARCHAR,
                 validation_status    VARCHAR,
@@ -452,8 +473,17 @@ class DuckDBSnapshotBuilder:
                 plans_published      BOOLEAN  NOT NULL,
                 has_tuning           BOOLEAN  NOT NULL,
                 bundle_download_url  VARCHAR  NOT NULL,
+                -- ADR-2 §3: platform-rendered physical tuning mechanisms
+                -- (comma-joined, sorted) and, for platforms that expose one,
+                -- the physical rendering strategy id. NULL when the bundle
+                -- never recorded a logical tuning profile.
                 physical_mechanisms   VARCHAR,
                 physical_rendering_id VARCHAR,
+                -- Registry-declared product support status for the benchmark
+                -- (stable / beta / experimental / deprecated / document_only
+                -- / repo_only). NULL when the benchmark slug is not in the
+                -- registry. Display-only: the benchmark browser groups and
+                -- badges on it; never a join/dedup key.
                 benchmark_support_status VARCHAR,
                 throughput_at_size   DOUBLE,
                 stream_count         INTEGER

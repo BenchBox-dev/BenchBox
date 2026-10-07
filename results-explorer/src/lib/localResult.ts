@@ -121,8 +121,10 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
   const logicalQueryCount = inferLogicalQueryCount(bundle, benchmarkId, displayTimings);
   const eligibility = timingEligibility(displayTimings, logicalQueryCount);
   const powerScore = firstFiniteNumber(objectValue(summary, "tpc_metrics"), ["power_at_size"]);
-  const throughputScore = firstFiniteNumber(objectValue(summary, "tpc_metrics"), ["throughput_at_size"]);
   const phase = testType(bundle, benchmark);
+  const throughputScore = throughputPhaseClean(objectValue(bundle, "phases"))
+    ? firstFiniteNumber(objectValue(summary, "tpc_metrics"), ["throughput_at_size"])
+    : null;
   const streamCount = phase !== null && canonicalPhase(phase) === "throughput"
     ? throughputStreamCount(objectValue(bundle, "phases"))
     : null;
@@ -203,7 +205,7 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
   return {
     detail,
     fileName,
-    primaryMetric: localPrimaryMetric(benchmarkId, phase, powerScore, throughputScore),
+    primaryMetric: localPrimaryMetric(benchmarkId, phase, powerScore),
   };
 }
 
@@ -475,16 +477,25 @@ function throughputStreamCount(phases: JsonObject): number | null {
   return Array.isArray(streams) && streams.length > 0 ? streams.length : null;
 }
 
-function localPrimaryMetric(
-  benchmarkId: string,
-  phase: string | null,
-  powerScore: number | null,
-  throughputScore: number | null,
-): LocalPrimaryMetric {
+function throughputPhaseClean(phases: JsonObject): boolean {
+  const throughput = objectValue(phases, "throughput_test");
+  if (String(throughput.status ?? "").toUpperCase() !== "COMPLETED") return false;
+  const streams = throughput.stream_results;
+  if (!Array.isArray(streams) || streams.length === 0) return false;
+  if (!streams.every((stream) => isObject(stream) && stream.success === true)) return false;
+  return isEmptyEvidence(throughput.errors) && isEmptyEvidence(throughput.outstanding_work);
+}
+
+function isEmptyEvidence(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (isObject(value)) return Object.keys(value).length === 0;
+  return !value;
+}
+
+function localPrimaryMetric(benchmarkId: string, phase: string | null, powerScore: number | null): LocalPrimaryMetric {
   if (benchmarkId !== "tpch" && benchmarkId !== "tpcds") return "display_geomean_ms";
-  if (phase !== null && canonicalPhase(phase) === "throughput") {
-    return throughputScore !== null ? "throughput_at_size" : "display_geomean_ms";
-  }
+  if (phase !== null && canonicalPhase(phase) === "throughput") return "throughput_at_size";
   return powerScore !== null ? "power_score" : "display_geomean_ms";
 }
 

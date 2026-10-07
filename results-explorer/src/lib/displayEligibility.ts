@@ -1,3 +1,4 @@
+import { canonicalPhase } from "@/lib/displayLabels";
 import type {
   BenchmarkSummary,
   DetailResult,
@@ -219,6 +220,15 @@ export function primaryMetricLabel(metric: PrimaryMetric): string {
     case "display_geomean_ms":
       return "Geomean query time";
   }
+}
+
+export function phaseScoreValue(row: {
+  test_type?: string | null;
+  phase?: string | null;
+  power_score: number | null;
+  throughput_at_size?: number | null;
+}): number | null {
+  return canonicalPhase(row.phase ?? row.test_type) === "throughput" ? (row.throughput_at_size ?? null) : row.power_score;
 }
 
 export function primaryMetricValue(row: PrimaryMetricRow, metric: PrimaryMetric): number | null {
