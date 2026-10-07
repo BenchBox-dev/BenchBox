@@ -15139,6 +15139,17 @@
       "status": "open",
       "title": "Generalize the DuckDB version-matrix runner and analyzer into engine-neutral tools without changing DuckDB output"
     },
+    "pvm-s3b-polars-matrix-spec": {
+      "claim": null,
+      "needs": [
+        "pvm-s3a-generalize-matrix-tooling",
+        "pvm-s1-version-correctness-probe",
+        "pvm-s2-sf10-memory-time-probe"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Add the Polars matrix spec with interleaved runs, engine setups, correctness evidence and fair analysis"
+    },
     "pypi-environment-protection-drift-canary-20260805": {
       "claim": null,
       "needs": [
