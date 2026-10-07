@@ -5,7 +5,7 @@
     "Affected site-split items updated; any finding that reopens an owner decision was put to the owner and answered",
     "The isolated review worktree was removed and showed no modifications"
   ],
-  "context": "Plan revision reviewed by muse: the first revision, written in session 2026-10-06; muse findings AR-01..AR-24 have already been dispositioned in the plan. The agy reviewer rules live in the shared-agent-execution skill (references/external-harnesses.md, under \"agy\" and \"Reviewer panels\").",
+  "context": "agy unavailable again: 2026-10-07 probe `agy --model gemini-3.8-flash-high --mode plan --print-timeout 90s` returned RESOURCE_EXHAUSTED 429, quota resets in ~20h (error_id 23d1186f). Self-contained brief was built (plan d7492c69ca 486 lines + 18 item specs + verified facts F1-F7 at develop d076a974d) but not dispatched; staged files removed. codex 0.160.0 present as substitute. Awaiting owner: codex (gpt-6-astra, hard read-only) or skip. Item 00 not started.",
   "description": "The owner asked for two external reviewers (agy and muse) on the site-repo split plan. muse reviewed it on 2026-10-06; agy was out of quota (HTTP 429). Owner decision D20 (2026-10-06): proceed with muse alone and run agy as the first step of the batch.\n\nSteps:\n1. Build a self-contained brief: agy headless runs cannot use tools, so inline the plan text and the verified repository facts. Dispatch it as a Soft Read-Only reviewer in a detached worktree at the current develop head, using `agy --model gemini-3.8-flash-high --mode plan --print=\"$BRIEF\"`. Do not pass `--effort`. macOS has no `timeout`; bound the run with the shell's background timeout instead.\n2. Accept or rebut each finding with evidence. Owner decisions D1-D20 are not reopened as preferences; a finding that shows a concrete defect in one goes to the owner.\n3. Update the plan file and every affected `site-split-*` item, and append the agy dispositions to the plan's \"Review record\".\n4. If agy is still unavailable, record that, ask the owner whether to substitute codex (gpt-6-astra, hard read-only) or skip, and do not start item 00 until answered.",
   "links": [
     "_project/handoffs/site-repo-split-handoff-20261006.md",
@@ -27,6 +27,14 @@
       "generation": "1f5a636da9ff4fc6bbfcb8b8a10bb062",
       "op": "take",
       "op_id": "3531c95468334fe99430e482647ea5a0",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T01:19:32Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "521dc73c80204a4b966460378bf81a27",
       "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
