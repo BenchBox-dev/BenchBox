@@ -5,7 +5,7 @@
     "test_soundness_paths passes with the new regex coverage assertions",
     "Oracle review cleared by the Codex connector or the owner's stand-in comment on the exact head"
   ],
-  "context": "Resumption: C1 PR #2748 open (branch fix/site-split-c1-adr-site-inputs, head a47c25b73, base develop). CI running; required oracle-review check waits on the Codex connector or owner stand-in APPROVE a47c25b73. Next: watch CI + connector, fix findings, pr-arm, monitor to merge, then re-take 00 and 10 to finish. 00 slice e333691ed, 10 slice a47c25b73 (amended with review fixes).",
+  "context": "Resumption: C1 PR #2748 open (branch fix/site-split-c1-adr-site-inputs, head a47c25b73, base develop). CI running; required oracle-review check waits on the Codex connector or owner stand-in APPROVE a47c25b73. Next: watch CI + connector, fix findings, pr-arm, monitor to merge, then re-take 00 and 10 to finish. 00 slice e333691ed, 10 slice a47c25b73 (amended with review fixes).\n2026-10-07 pm: owner added d4c12b892 (fixtures corpus), ed5b67ab1 (landing test), 2097ec50e (ADR plan pointer, pushed). Agent committed ed1a4b553 (fast marker) and 4e4ddb3bb (ADR corrections: D5 detection-after-merge, D16 bundle-compat, dropped merge-queue claim); PR head now 4e4ddb3bb, pushed, CI re-running, shadow review re-dispatched. PR body already discloses the pre-existing check_decision_records failure. Still owner-gated: oracle stand-in APPROVE on the merge head, bridge App/secrets, site repo. Next: read CI + shadow results, fix, pr-arm, monitor to merge.",
   "description": "PR group C1: one core PR shared with site-split-10, with separate commits, so the batch needs one oracle review instead of two. It needs oracle review because it changes `.github/soundness-paths.txt`.\n\n1. Write `docs/development/adr/adr-site-repo-split.md`:\n   - Motivation: the Astro cutover was delayed by coupling to core CI, so the site needs isolated CI and fast rollouts.\n   - Decisions D1-D20 from the plan.\n   - The language rule: no Python source in the site repo, no JS/TS source in core; run-time third-party tools are allowed.\n   - Supersessions:\n     - `single-repo-migration.md`, in part;\n     - `adr-astro-unified-site.md` D12, D13 and D14, where they conflict;\n     - `adr-independent-publication-authorities.md`.\n   - The \"Consumers\" appendix.\n   Satisfy `scripts/check_decision_records.py`.\n2. In `.github/soundness-paths.txt`:\n   - Replace `prefix .github/workflows/` with a `regex` that excludes only `docs.yml`, `publication-*.yml` and `rehearse-release-isolation.yml`.\n   - Remove the `file` lines for those workflows and for the missing `publication-lane-docs.yml` and `publication-lane-explorer.yml`.\n   - Replace `prefix publication/` and `prefix scripts/publication/` with `file` entries for the corpus files that survive the publication retirement. Derive the list from the imports of the corpus workflows and `scripts/publication/verify_corpus_promotion.py`.\n   - Keep `scripts/site_deploy/`, `deploy/`, `site-deploy.yml` and the site-inventory entries. Core deploys production until the cutover.\n3. In `tests/unit/scripts/test_soundness_paths.py`:\n   - Drop the expectations for the excluded and missing workflows.\n   - Assert that the regex still matches `ci.yml`, `trunk.yml`, `oracle-review.yml`, `release.yml`, `site-deploy.yml`, `validate-submission.yml` and a made-up `new-example.yml`.\n   - Assert that it matches none of the excluded files.",
   "links": [
     ".github/soundness-paths.txt",
@@ -81,6 +81,14 @@
       "generation": "6f748f69641b4b49940f953ae5684ed7",
       "op": "take",
       "op_id": "449a0f101f904deda417cf791853bbd1",
+      "session_id": "bded665cd1c546e5acaf7fa074a0853d"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:86f6da90fc8e4c14af03225c",
+      "at": "2026-10-07T13:51:11Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "e5944010d5c94261a31aa574e95bbf02",
       "session_id": "bded665cd1c546e5acaf7fa074a0853d"
     }
   ]
