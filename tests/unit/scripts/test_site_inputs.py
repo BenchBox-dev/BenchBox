@@ -54,23 +54,25 @@ def _bundle(tmp_path: Path, schema: int = 1, attestations: str = "pass") -> Path
         "api-public-symbols.json": '{"symbols": []}\n',
         "attestations.json": "attestation tree",
     }
-    att = [
-        {"name": "privacy", "result": attestations},
-        {"name": "explorer_compat", "result": "pass"},
-        {"name": "snapshot_invariants", "result": "pass"},
-        {"name": "corpus_bijection", "result": "pass"},
-        {"name": "validator_parity", "result": "skip"},
-    ]
-    members["attestations.json"] = json.dumps(att) + "\n"
-    digests = {}
     dirs = {"docs", "explorer/fixtures", "explorer/parity"}
     for name, body in members.items():
+        if name == "attestations.json":
+            continue
         target = out / name
         if name in dirs:
             _write(target / "member.txt", body)
         else:
             _write(target, body)
-        digests[name] = site_inputs.member_digest(target)
+    snapshot = site_inputs.member_digest(out / "explorer/results.duckdb")
+    att = [
+        {"name": "privacy", "result": attestations, "inputs": {"bundle": "fixture-bundle"}},
+        {"name": "explorer_compat", "result": "pass", "inputs": {"snapshot": snapshot}},
+        {"name": "snapshot_invariants", "result": "pass", "inputs": {"snapshot": snapshot}},
+        {"name": "corpus_bijection", "result": "pass", "inputs": {"snapshot": snapshot}},
+        {"name": "validator_parity", "result": "skip"},
+    ]
+    _write(out / "attestations.json", json.dumps(att) + "\n")
+    digests = {name: site_inputs.member_digest(out / name) for name in members}
     manifest = {"schema": schema, "core_sha": "abc", "members": digests}
     _write(out / "manifest.json", json.dumps(manifest) + "\n")
     return out
@@ -118,6 +120,53 @@ def test_verify_rejects_skipped_required_attestation(tmp_path: Path) -> None:
     ]
     (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
     assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_empty_attestations(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    (out / "attestations.json").write_text("[]\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_pass_entry_without_inputs(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        {k: v for k, v in e.items() if k != "inputs"} if e["name"] == "explorer_compat" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_snapshot_digest_mismatch(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, inputs={"snapshot": "0" * 64}) if e["name"] == "snapshot_invariants" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_empty_member_digest(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    manifest["members"]["docs"] = ""
+    (out / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_is_validator_path_matches_exact_and_prefix() -> None:
+    assert site_inputs.is_validator_path("benchbox/validation/engines.py") is True
+    assert site_inputs.is_validator_path("scripts/validate_submission.py") is True
+    assert site_inputs.is_validator_path("scripts/publication/validator_parity.py") is True
+    assert site_inputs.is_validator_path("benchbox/core/validation/engines.py") is False
+    assert site_inputs.is_validator_path("scripts/validate_submission_test.py") is False
+
+
+def test_validator_changed_is_false_for_same_sha() -> None:
+    head = site_inputs.must_run("git", "-C", str(site_inputs.ROOT), "rev-parse", "HEAD").strip()
+    assert site_inputs.validator_changed(head, head) is False
 
 
 def test_member_digest_raises_on_missing_path(tmp_path: Path) -> None:

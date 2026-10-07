@@ -45,6 +45,9 @@ jobs:
           ref: develop
           fetch-depth: 0
 
+      - name: Fetch accepted corpus ref
+        run: git fetch origin +refs/heads/published-results:refs/remotes/origin/published-results
+
       - name: Set up Python 3.12
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
@@ -58,18 +61,35 @@ jobs:
         env:
           DISPATCH_PARENT: ${{ inputs.parent_core_sha }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
           GH_TOKEN: ${{ github.token }}
         run: |
           CORE_SHA="$(git rev-parse HEAD)"
           echo "core_sha=${CORE_SHA}" >> "$GITHUB_OUTPUT"
+          BUNDLE_SHAS="$(gh run list --workflow site-inputs.yml --branch develop --status success --json headSha --limit 20 -q '.[].headSha')"
           if [ -n "$DISPATCH_PARENT" ]; then
+            if ! git merge-base --is-ancestor "$DISPATCH_PARENT" "$CORE_SHA"; then
+              echo "parent_core_sha ${DISPATCH_PARENT} is not an ancestor of ${CORE_SHA}" >&2
+              exit 1
+            fi
+            if ! printf '%s\n' "$BUNDLE_SHAS" | grep -qx "$DISPATCH_PARENT"; then
+              echo "no successful site-inputs run on parent ${DISPATCH_PARENT}" >&2
+              exit 1
+            fi
             echo "parent_sha=${DISPATCH_PARENT}" >> "$GITHUB_OUTPUT"
           else
-            PREV="$(gh run list --workflow trunk.yml --branch develop --status success --json headSha --limit 5 -q '.[].headSha' | grep -vx "$CORE_SHA" | head -n 1)"
+            PREV="$(printf '%s\n' "$BUNDLE_SHAS" | grep -vx "$CORE_SHA" | head -n 1)"
             if [ -n "$PREV" ]; then
               echo "parent_sha=${PREV}" >> "$GITHUB_OUTPUT"
             else
               echo "parent_sha=$(git rev-parse "${CORE_SHA}~1")" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+          if [ "$IS_DISPATCH" = "true" ]; then
+            CERTIFIED="$(gh run list --workflow trunk.yml --branch develop --status success --json headSha,event --limit 20 -q '[.[] | select(.event == "push") | .headSha] | .[]')"
+            if ! printf '%s\n' "$CERTIFIED" | grep -qx "$CORE_SHA"; then
+              echo "no successful trunk.yml push run on ${CORE_SHA}" >&2
+              exit 1
             fi
           fi
           echo "certified_by=${RUN_ID:-dispatch}" >> "$GITHUB_OUTPUT"

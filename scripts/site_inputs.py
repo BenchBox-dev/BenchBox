@@ -63,6 +63,21 @@ REQUIRED_ATTESTATIONS = (
     "snapshot_invariants",
     "corpus_bijection",
 )
+ACCEPTED_CORPUS_REF = "origin/published-results"
+VALIDATOR_EXACT_PATHS = (
+    "scripts/validate_submission.py",
+    "scripts/publication/validator_parity.py",
+)
+VALIDATOR_PREFIX = "benchbox/validation/"
+
+
+def is_validator_path(path: str) -> bool:
+    return path in VALIDATOR_EXACT_PATHS or path.startswith(VALIDATOR_PREFIX)
+
+
+def validator_changed(parent_sha: str, core_sha: str) -> bool:
+    changed = must_run("git", "-C", str(ROOT), "diff", "--name-only", parent_sha, core_sha).splitlines()
+    return any(is_validator_path(path) for path in changed)
 
 
 def member_digest(root: Path) -> str:
@@ -270,6 +285,9 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
             {"core_sha": core_sha},
         )
     )
+    accepted_sha = must_run(
+        "git", "-C", str(ROOT), "rev-parse", "--verify", f"{ACCEPTED_CORPUS_REF}^{{commit}}"
+    ).strip()
     entries.append(
         attestation(
             "corpus_bijection",
@@ -280,27 +298,31 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
                 "python",
                 "scripts/publication/check_corpus_bijection.py",
                 "--accepted-ref",
-                core_sha,
-                "--expect-source",
-                core_sha,
+                ACCEPTED_CORPUS_REF,
                 "--bundles-dir",
                 str(ROOT / "results-data/bundles"),
                 "--artifact",
                 str(db),
                 "--require-artifact",
                 "--ledger-seed",
-                str(ROOT / "publication/ledger-seed.json"),
+                str(bundle / "ledger-seed-omitted.json"),
             ],
-            {"snapshot": file_sha(db), "bundles": tree_sha(core_sha, "results-data/bundles")},
-            {"accepted_ref": core_sha},
+            {
+                "snapshot": file_sha(db),
+                "bundles": tree_sha(core_sha, "results-data/bundles"),
+                "accepted_bundles": tree_sha(accepted_sha, "results-data/bundles"),
+                "ledger_seed": "omitted",
+            },
+            {"accepted_ref": accepted_sha},
         )
     )
-    if tree_sha(core_sha, "results-data") == tree_sha(parent_sha, "results-data"):
+    corpus_unchanged = tree_sha(core_sha, "results-data") == tree_sha(parent_sha, "results-data")
+    if corpus_unchanged and not validator_changed(parent_sha, core_sha):
         entries.append(
             {
                 "name": "validator_parity",
                 "result": "skip",
-                "reason": "corpus tree unchanged since parent",
+                "reason": "corpus tree and validator code unchanged since parent",
                 "compared": {"base": parent_sha, "head": core_sha},
             }
         )
@@ -352,6 +374,13 @@ def cmd_build(args: argparse.Namespace) -> int:
         shutil.rmtree(out)
     out.mkdir(parents=True)
     build_docs(out / "docs")
+    regenerated = [
+        line
+        for line in must_run("git", "-C", str(ROOT), "status", "--porcelain").splitlines()
+        if not line.startswith("??")
+    ]
+    if regenerated:
+        raise RuntimeError(f"docs generation dirtied the tree at {core_sha}: {regenerated[:5]}")
     build_repo_files(out / "repo-files.json", core_sha)
     build_explorer_snapshot(out / "explorer")
     build_contract(out / "explorer/contract.json")
@@ -393,14 +422,23 @@ def cmd_verify(out: Path) -> int:
         print(f"schema mismatch: {manifest.get('schema')!r}")
         return 1
     expected = manifest.get("members", {})
+    if not expected:
+        print("empty manifest")
+        return 1
     if sorted(expected) != sorted(REQUIRED_MEMBERS):
         print(f"member set mismatch: {sorted(expected)}")
+        return 1
+    if any(not sha for sha in expected.values()):
+        print("empty member digest in manifest")
         return 1
     bad = [name for name, sha in expected.items() if member_digest(out / name) != sha]
     if bad:
         print(f"digest mismatch: {', '.join(bad)}")
         return 1
     attestations = json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    if not attestations:
+        print("empty attestations")
+        return 1
     by_name = {e["name"]: e["result"] for e in attestations}
     missing = [name for name in list(REQUIRED_ATTESTATIONS) + ["validator_parity"] if name not in by_name]
     if missing:
@@ -417,6 +455,19 @@ def cmd_verify(out: Path) -> int:
     unknown = [name for name, result in by_name.items() if result not in ("pass", "skip")]
     if unknown:
         print(f"unknown attestation results: {', '.join(unknown)}")
+        return 1
+    snapshot = expected["explorer/results.duckdb"]
+    inputless = [e["name"] for e in attestations if e["result"] == "pass" and not e.get("inputs")]
+    if inputless:
+        print(f"passing attestations without inputs: {', '.join(inputless)}")
+        return 1
+    drifted = [
+        e["name"]
+        for e in attestations
+        if isinstance(e.get("inputs"), dict) and "snapshot" in e["inputs"] and e["inputs"]["snapshot"] != snapshot
+    ]
+    if drifted:
+        print(f"attestation inputs drifted from manifest: {', '.join(drifted)}")
         return 1
     print(
         f"verify OK: schema {SCHEMA}, {len(expected)} members, "
