@@ -39,8 +39,8 @@ def commit(sha, arrived_at, refresh=False):
     return digest.PullCommit(sha, arrived_at, refresh)
 
 
-def review(login, sha, submitted_at=AFTER, state="COMMENTED"):
-    return digest.Review(login, sha, submitted_at, state)
+def review(login, sha, submitted_at=AFTER, state="COMMENTED", user_type="", body=""):
+    return digest.Review(login, sha, submitted_at, state, user_type, body)
 
 
 def evidence(**overrides):
@@ -49,7 +49,6 @@ def evidence(**overrides):
         "author": "dev",
         "merged_at": MERGED_AT,
         "commits": (commit(OLD, BEFORE), commit(HEAD, PUSHED)),
-        "head_date": PUSHED,
     }
     fields.update(overrides)
     return digest.PullEvidence(**fields)
@@ -57,7 +56,7 @@ def evidence(**overrides):
 
 def refreshed(**overrides):
     commits = (commit(OLD, BEFORE), commit(HEAD, PUSHED), commit(REFRESH, AFTER, refresh=True))
-    return evidence(commits=commits, **{"head_date": AFTER, **overrides})
+    return evidence(commits=commits, **overrides)
 
 
 def test_connector_review_of_the_last_content_commit_is_a_signal():
@@ -172,12 +171,8 @@ def test_a_standin_approval_must_name_the_merged_head_after_a_refresh_merge():
     assert digest.review_signals(refreshed(comments=(standin(HEAD, at=AFTER_REFRESH),))) == ()
 
 
-def test_a_standin_approval_posted_at_the_head_arrival_instant_is_not_a_signal():
-    assert digest.review_signals(evidence(comments=(standin(HEAD, at=PUSHED),))) == ()
-
-
-def test_a_standin_approval_with_no_established_head_date_is_not_a_signal():
-    assert digest.review_signals(evidence(comments=(standin(HEAD),), head_date="")) == ()
+def test_a_standin_approval_is_not_timed_against_the_head_arrival():
+    assert digest.review_signals(evidence(comments=(standin(HEAD, at=PUSHED),))) == ("stand-in",)
 
 
 def test_a_standin_approval_posted_before_a_retarget_is_not_a_signal():
@@ -195,14 +190,13 @@ def test_a_standin_approval_posted_after_the_merge_is_not_a_signal():
     [
         standin(OLD),
         standin(HEAD, login="dev"),
-        standin(HEAD, at=BEFORE),
         digest.Comment("joeharris76", f"```\nStand-in oracle review: APPROVE {HEAD}\n```", AFTER, "User"),
         standin(HEAD, prefix="Looks fine. "),
         standin(HEAD, user_type="Bot"),
         standin(HEAD, user_type=""),
         standin(HEAD, updated_at=LATER),
     ],
-    ids=["wrong-sha", "non-attester", "before-last-commit", "fenced", "mid-line", "bot", "no-type", "edited"],
+    ids=["wrong-sha", "non-attester", "fenced", "mid-line", "bot", "no-type", "edited"],
 )
 def test_a_standin_approval_that_does_not_qualify_is_not_a_signal(comment):
     assert digest.review_signals(evidence(comments=(comment,))) == ()
@@ -943,11 +937,8 @@ def rest_comment(sha, at):
     }
 
 
-@pytest.mark.parametrize(
-    ("approved_at", "expected"),
-    [("2026-10-02T10:05:00Z", ()), ("2026-10-02T10:10:00Z", ()), ("2026-10-02T10:15:00Z", ("stand-in",))],
-)
-def test_a_standin_for_a_refresh_head_must_follow_the_run_that_pushed_it(monkeypatch, approved_at, expected):
+@pytest.mark.parametrize("approved_at", ["2026-10-02T10:05:00Z", "2026-10-02T10:10:00Z", "2026-10-02T10:15:00Z"])
+def test_a_standin_for_a_refresh_head_is_not_timed_against_its_run(monkeypatch, approved_at):
     commits = [api_commit(OLD, BEFORE), api_commit(REFRESH, "2026-10-02T10:00:00Z", 2)]
     pull = collected_pull(
         monkeypatch,
@@ -957,23 +948,56 @@ def test_a_standin_for_a_refresh_head_must_follow_the_run_that_pushed_it(monkeyp
         [rest_comment(REFRESH, approved_at)],
     )
     assert pull.commits[-1].is_refresh
-    assert digest.review_signals(pull) == expected
+    assert digest.review_signals(pull) == ("stand-in",)
 
 
-@pytest.mark.parametrize(
-    ("approved_at", "expected"),
-    [("2026-10-02T10:30:00Z", ()), ("2026-10-02T11:30:00Z", ("stand-in",))],
-)
-def test_a_standin_must_follow_the_latest_run_when_the_head_moved_away_and_back(monkeypatch, approved_at, expected):
+@pytest.mark.parametrize("approved_at", ["2026-10-02T10:30:00Z", "2026-10-02T11:30:00Z"])
+def test_a_standin_survives_the_head_moving_away_and_back(monkeypatch, approved_at):
     commits = [api_commit(OLD, BEFORE), api_commit(HEAD, "2026-10-02T09:30:00Z")]
     runs = [oracle_run("2026-10-02T10:00:00Z", "opened"), oracle_run("2026-10-02T11:00:00Z")]
     pull = collected_pull(monkeypatch, commits, HEAD, runs, [rest_comment(HEAD, approved_at)])
-    assert digest.review_signals(pull) == expected
+    assert digest.review_signals(pull) == ("stand-in",)
 
 
-def test_a_failing_head_runs_fetch_fails_closed(monkeypatch):
+def test_the_digest_no_longer_reads_head_workflow_runs(monkeypatch):
     commits = [api_commit(OLD, BEFORE), api_commit(HEAD, "2026-10-02T09:30:00Z")]
-    with pytest.raises(digest.ReadError):
-        collected_pull(
-            monkeypatch, commits, HEAD, [], [rest_comment(HEAD, AFTER)], runs_error=digest.ReadError("runs failed")
-        )
+    pull = collected_pull(
+        monkeypatch, commits, HEAD, [], [rest_comment(HEAD, AFTER)], runs_error=digest.ReadError("runs failed")
+    )
+    assert digest.review_signals(pull) == ("stand-in",)
+
+
+ORACLE_BOT = "benchbox-oracle[bot]"
+
+
+def oracle_verdict(sha, state="success"):
+    return f"### oracle-review-shadow: {state} for `{sha}`\n\nDetails."
+
+
+def test_an_oracle_success_review_of_the_merged_content_is_a_signal():
+    pull = evidence(reviews=(review(ORACLE_BOT, HEAD, user_type="Bot", body=oracle_verdict(HEAD)),))
+    assert digest.review_signals(pull) == ("oracle-review",)
+
+
+@pytest.mark.parametrize(
+    "oracle_review",
+    [
+        review(ORACLE_BOT, HEAD, user_type="Bot", body=oracle_verdict(HEAD, "failure")),
+        review(ORACLE_BOT, HEAD, user_type="Bot", body=oracle_verdict(OLD)),
+        review(ORACLE_BOT, OLD, user_type="Bot", body=oracle_verdict(OLD)),
+        review("benchbox-oracle", HEAD, user_type="User", body=oracle_verdict(HEAD)),
+        review(ORACLE_BOT, HEAD, LATER, user_type="Bot", body=oracle_verdict(HEAD)),
+    ],
+    ids=["failure", "other-sha", "older-commit", "user-account", "after-merge"],
+)
+def test_an_oracle_review_that_does_not_qualify_is_not_a_signal(oracle_review):
+    assert digest.review_signals(evidence(reviews=(oracle_review,))) == ()
+
+
+def test_only_the_latest_oracle_verdict_after_a_retarget_counts():
+    success = review(ORACLE_BOT, HEAD, PUSHED, user_type="Bot", body=oracle_verdict(HEAD))
+    failure = review(ORACLE_BOT, HEAD, AFTER, user_type="Bot", body=oracle_verdict(HEAD, "failure"))
+    assert digest.review_signals(evidence(reviews=(success, failure))) == ()
+    assert digest.review_signals(evidence(reviews=(failure, success), base_changed_at=AFTER)) == ()
+    later_success = review(ORACLE_BOT, HEAD, AFTER, user_type="Bot", body=oracle_verdict(HEAD))
+    assert digest.review_signals(evidence(reviews=(later_success,), base_changed_at=PUSHED)) == ("oracle-review",)

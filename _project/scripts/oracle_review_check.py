@@ -15,6 +15,12 @@ from typing import Any
 from soundness_paths import any_soundness_path
 
 CONNECTOR_LOGIN = "chatgpt-codex-connector"
+ORACLE_LOGIN = "benchbox-oracle"
+CONNECTOR = "connector"
+ORACLE = "oracle"
+SIGNALS = {CONNECTOR: (CONNECTOR_LOGIN, "Codex connector"), ORACLE: (ORACLE_LOGIN, "oracle")}
+ORACLE_CONTEXT = "oracle-review-shadow"
+_ORACLE_VERDICT = re.compile(rf"### {ORACLE_CONTEXT}: (?P<state>[a-z]+) for `(?P<sha>[0-9a-f]{{40}})`")
 # Accounts whose stand-in attestation substitutes for the Codex connector when it
 # cannot review (for example at its usage limit). The attestation must name the
 # exact head commit, so it records who vouched for which reviewed code.
@@ -27,14 +33,14 @@ def _attested_shas(comment: dict[str, Any]) -> list[str]:
     return [match.group(1)] if match else []
 
 
-def _is_standin(comment: dict[str, Any], head_sha: str, head_time: datetime) -> bool:
+def _is_standin(comment: dict[str, Any], head_sha: str, not_before: datetime | None) -> bool:
     # Exact login and a human account: a "[bot]" suffix is not stripped here. An
     # edited comment does not count, because its text may not be the author's.
     return (
         comment.get("login") in STANDIN_ATTESTERS
         and comment.get("user_type") == "User"
         and comment.get("updated_at") in (None, comment.get("created_at"))
-        and _parse_time(comment["created_at"]) > head_time
+        and (not_before is None or _parse_time(comment["created_at"]) > not_before)
         and head_sha in _attested_shas(comment)
     )
 
@@ -46,6 +52,7 @@ HEAD_MOVING_RUN_SUFFIXES = ("(opened)", "(synchronize)")
 PASS = 0
 WAITING = 1
 ERROR = 2
+_STATUS_NAMES = {PASS: "pass", WAITING: "waiting", ERROR: "error"}
 
 _THREADS_QUERY = """
 query($owner: String!, $name: String!, $number: Int!, $after: String) {
@@ -55,7 +62,7 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
         pageInfo { hasNextPage endCursor }
         nodes {
           isResolved
-          comments(first: 1) { nodes { author { login } } }
+          comments(first: 1) { nodes { author { __typename login } } }
         }
       }
     }
@@ -72,8 +79,17 @@ def _login(value: str | None) -> str:
     return (value or "").removesuffix("[bot]")
 
 
-def _is_connector(login: str | None) -> bool:
-    return _login(login) == CONNECTOR_LOGIN
+def _is_reviewer(login: str | None, signal: str, account_type: str | None = None) -> bool:
+    return _login(login) == SIGNALS[signal][0] and (signal == CONNECTOR or account_type == "Bot")
+
+
+def _oracle_verdict(reviews: list[dict[str, Any]], head_sha: str) -> tuple[str | None, datetime | None]:
+    latest = max(reviews, key=lambda review: _parse_time(review["submitted_at"]), default=None)
+    if latest is None:
+        return None, None
+    match = _ORACLE_VERDICT.match(latest.get("body") or "")
+    state = match.group("state") if match and match.group("sha") == head_sha else None
+    return state, _parse_time(latest["submitted_at"])
 
 
 def _parse_time(value: str) -> datetime:
@@ -82,7 +98,7 @@ def _parse_time(value: str) -> datetime:
 
 def decide(
     head_sha: str,
-    head_date: str,
+    head_date: str | None,
     files: Iterable[str],
     reviews: Iterable[dict[str, Any]],
     reactions: Iterable[dict[str, Any]],
@@ -90,41 +106,62 @@ def decide(
     paths: Callable[[Iterable[str]], bool],
     base_date: str | None = None,
     comments: Iterable[dict[str, Any]] = (),
+    signal: str = CONNECTOR,
 ) -> tuple[int, str]:
     if not paths(files):
         return PASS, "oracle-review: not a soundness path change"
 
+    name = SIGNALS[signal][1]
     base_time = _parse_time(base_date) if base_date else None
-    review_signal = any(
-        _is_connector(review.get("login"))
+    head_reviews = [
+        review
+        for review in reviews
+        if _is_reviewer(review.get("login"), signal, review.get("user_type"))
         and review.get("commit_id") == head_sha
         and review.get("state") not in {"PENDING", "DISMISSED"}
         and (base_time is None or (review.get("submitted_at") and _parse_time(review["submitted_at"]) > base_time))
-        for review in reviews
-    )
-    head_time = max(_parse_time(head_date), base_time) if base_time else _parse_time(head_date)
-    reaction_signal = any(
-        _is_connector(reaction.get("login"))
-        and reaction.get("content") == "+1"
-        and _parse_time(reaction["created_at"]) > head_time
-        for reaction in reactions
-    )
-    standin = next((comment for comment in comments if _is_standin(comment, head_sha, head_time)), None)
+    ]
+    review_signal = bool(head_reviews)
+    reaction_signal = False
+    standin_after = base_time
+    verdict = None
+    if signal == CONNECTOR:
+        head_time = _parse_time(head_date or "")
+        head_time = max(head_time, base_time) if base_time else head_time
+        reaction_signal = any(
+            _is_reviewer(reaction.get("login"), signal)
+            and reaction.get("content") == "+1"
+            and _parse_time(reaction["created_at"]) > head_time
+            for reaction in reactions
+        )
+    else:
+        verdict, verdict_time = _oracle_verdict(head_reviews, head_sha)
+        standin_after = max(filter(None, (base_time, verdict_time)), default=None)
+    standin = next((comment for comment in comments if _is_standin(comment, head_sha, standin_after)), None)
+    if review_signal and signal == ORACLE and verdict != "success" and not standin:
+        return WAITING, (
+            f"oracle-review: the oracle's latest review of {head_sha} reports {verdict or 'no verdict'}, not "
+            "success; fix the findings, or post a stand-in attestation after that review, then rerun this check"
+        )
     if not (review_signal or reaction_signal or standin):
         return WAITING, (
-            f"oracle-review: waiting for the Codex connector's review of {head_sha}, or a stand-in attestation "
+            f"oracle-review: waiting for the {name}'s review of {head_sha}, or a stand-in attestation "
             f"'Stand-in oracle review: APPROVE {head_sha}' from a listed attester; rerun this check after it lands"
         )
 
-    open_threads = sum(1 for thread in threads if not thread.get("resolved") and _is_connector(thread.get("author")))
+    open_threads = sum(
+        1
+        for thread in threads
+        if not thread.get("resolved") and _is_reviewer(thread.get("author"), signal, thread.get("author_type"))
+    )
     if open_threads:
         return WAITING, (
-            f"oracle-review: {open_threads} unresolved Codex connector review thread(s) on {head_sha}; "
+            f"oracle-review: {open_threads} unresolved {name} review thread(s) on {head_sha}; "
             "resolve them and rerun this check"
         )
 
-    if review_signal:
-        return PASS, f"oracle-review: pass (Codex connector review of {head_sha})"
+    if review_signal and (signal == CONNECTOR or verdict == "success"):
+        return PASS, f"oracle-review: pass ({name} review of {head_sha})"
     if reaction_signal:
         return PASS, f"oracle-review: pass (Codex connector +1 after the head commit {head_sha})"
     assert standin is not None
@@ -214,9 +251,11 @@ def fetch_reviews(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
     return [
         {
             "login": (item.get("user") or {}).get("login"),
+            "user_type": (item.get("user") or {}).get("type"),
             "commit_id": item.get("commit_id"),
             "state": item.get("state"),
             "submitted_at": item.get("submitted_at"),
+            "body": item.get("body"),
         }
         for item in _paginate(token, f"/repos/{repo}/pulls/{pr}/reviews")
     ]
@@ -270,8 +309,10 @@ def fetch_threads(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
         connection = payload["data"]["repository"]["pullRequest"]["reviewThreads"]
         for node in connection["nodes"]:
             comments = node["comments"]["nodes"]
-            author = ((comments[0].get("author") or {}).get("login")) if comments else None
-            threads.append({"resolved": node["isResolved"], "author": author})
+            author = (comments[0].get("author") or {}) if comments else {}
+            threads.append(
+                {"resolved": node["isResolved"], "author": author.get("login"), "author_type": author.get("__typename")}
+            )
         if not connection["pageInfo"]["hasNextPage"]:
             return threads
         after = connection["pageInfo"]["endCursor"]
@@ -280,12 +321,19 @@ def fetch_threads(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Require the Codex connector's review on result-affecting pull requests, or a stand-in "
-            "attestation for the exact head commit from a listed attester."
+            "Require a review of the head commit on result-affecting pull requests, from the Codex connector "
+            "or the oracle reviewer chain, or a stand-in attestation for the exact head commit from a listed "
+            "attester."
         )
     )
     parser.add_argument("--repo", required=True, help="Repository as OWNER/NAME.")
     parser.add_argument("--pr", required=True, type=int, help="Pull request number.")
+    parser.add_argument(
+        "--signal",
+        choices=sorted(SIGNALS),
+        default=CONNECTOR,
+        help="Reviewer whose review of the head this check requires. The other is reported for comparison only.",
+    )
     return parser.parse_args(argv)
 
 
@@ -307,21 +355,31 @@ def main(argv: list[str] | None = None) -> int:
         if not matcher(files):
             print("oracle-review: not a soundness path change")
             return PASS
-        status, message = decide(
-            head_sha,
-            fetch_head_date(token, args.repo, head_sha),
-            files,
-            fetch_reviews(token, args.repo, args.pr),
-            fetch_reactions(token, args.repo, args.pr),
-            fetch_threads(token, args.repo, args.pr),
-            matcher,
-            fetch_base_change_date(token, args.repo, args.pr),
-            fetch_comments(token, args.repo, args.pr),
-        )
+        reviews = fetch_reviews(token, args.repo, args.pr)
+        threads = fetch_threads(token, args.repo, args.pr)
+        base_date = fetch_base_change_date(token, args.repo, args.pr)
+        comments = fetch_comments(token, args.repo, args.pr)
+
+        def run(signal: str) -> tuple[int, str]:
+            head_date, reactions = (None, [])
+            if signal == CONNECTOR:
+                head_date = fetch_head_date(token, args.repo, head_sha)
+                reactions = fetch_reactions(token, args.repo, args.pr)
+            return decide(head_sha, head_date, files, reviews, reactions, threads, matcher, base_date, comments, signal)
+
+        status, message = run(args.signal)
     except (CheckError, KeyError, ValueError) as exc:
         print(f"oracle-review: error: {exc}", file=sys.stderr)
         return ERROR
     print(message)
+    for other in sorted(set(SIGNALS) - {args.signal}):
+        try:
+            other_status, other_message = run(other)
+        except Exception as exc:
+            print(f"parity: {other}: not evaluated: {exc!r}")
+            continue
+        print(f"parity: required={args.signal} {_STATUS_NAMES[status]}; {other} {_STATUS_NAMES[other_status]}")
+        print(f"parity: {other}: {other_message}")
     return status
 
 

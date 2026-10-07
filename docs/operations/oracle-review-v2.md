@@ -134,3 +134,37 @@ These checks must pass before the cut-over that makes the context required.
 
 During the shadow period, compare each `oracle-review-shadow` result with the
 review the pull request actually received.
+
+## Cut-over
+
+The required `oracle-review` check takes `--signal connector` (the default) or
+`--signal oracle`. With `connector` it requires the Codex connector's review
+of the head, or its thumbs-up, and counts the connector's open threads. With
+`oracle` it requires, from the `benchbox-oracle` App's Bot account:
+
+- a review of the head, not pending or dismissed, submitted after any retarget,
+  whose latest one opens with `### oracle-review-shadow: success for` the head
+  SHA, because the oracle posts every verdict as a comment review and a
+  blocking finding outside the diff has no thread;
+- no unresolved review thread from the App.
+
+The verdict is read from the pull request's own review, not from the commit
+status, which any pull request with the same head commit could set. The
+oracle signal needs `findings_delivery: review`, under which every run that
+reaches a result, including a pending one, posts a review, so the latest
+review is the latest result.
+
+The stand-in attestation passes under either signal. Under `oracle` it must be
+posted after the oracle's latest review of the head, so overriding a failing
+verdict is a deliberate act; it never overrides an open thread.
+
+Every run also evaluates the signal it does not require and logs the result on
+two `parity:` lines. That evaluation fetches its own inputs, and an error in it
+is logged and never changes the check's result. Compare those lines across real
+pull requests before the cut-over.
+
+The checker runs from the base commit, so the workflow can pass `--signal`
+only after `develop`'s copy of the script accepts it. The cut-over sets
+`mode: enforce` in `.github/oracle-reviewers.yml` and adds `--signal oracle`
+to `.github/workflows/oracle-review.yml` in the same change; a unit test fails
+if they disagree or if delivery is not `review`.
