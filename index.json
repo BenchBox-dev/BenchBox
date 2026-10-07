@@ -15121,6 +15121,15 @@
       "status": "open",
       "title": "Probe candidate Polars versions for correctness and engine support, and fix the matrix version list"
     },
+    "pvm-s2-sf10-memory-time-probe": {
+      "claim": null,
+      "needs": [
+        "pvm-s1-version-correctness-probe"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Measure Polars SF10 memory, feasibility and run time on the 16 GB host, and capture reference row counts"
+    },
     "pypi-environment-protection-drift-canary-20260805": {
       "claim": null,
       "needs": [
