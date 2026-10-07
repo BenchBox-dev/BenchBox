@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Rerun green twice in a row on clickhouse-server (notuning, then tuned and notuning matrix as applicable)",
+    "Regression test covering rerun-into-existing-tables for both tuned and notuning modes"
+  ],
+  "context": "Reproduced 2026-10-07 against mocker-hosted ClickHouse 25.8 with CLICKHOUSE_MEMORY_LIMIT=5.25g. Full failing log: /tmp/ch-notuning-ctrl.log. Tuned rerun reference showing \"Dropped database\": /tmp/ch-benefit-sf1-tuned-rerun.log (ssb-tuned cell). Related code: run-connection/database lifecycle in benchbox/platforms/base + clickhouse setup.py create_connection/handle_existing_database.",
+  "description": "Rerun-hygiene inconsistency between tuning modes on clickhouse-server.\n\nRepro steps:\n1. BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs benchbox run --platform clickhouse-server --benchmark tpch --scale 1 --seed 42 --tuning notuning --phases generate,load ...\n2. Run the exact same command a second time against the same server/database.\n3. Second run fails during schema creation with Code: 57. DB::Exception: Table default.region already exists (exits 1), because it issues plain CREATE TABLE without IF NOT EXISTS and without dropping first.\n\nContrast: a --tuning tuned run drops the pre-existing database/tables before recreating them (log shows \"Dropped database\").\n\nExpected behavior: notuning reruns are idempotent like tuned runs (recreate or reuse cleanly), or fail early with an actionable message before partial work.\n\nConstraint: any drop-behavior change is destructive and needs owner review before implementation.",
+  "sessions": [
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:37239ebe83f9fd8040427e24",
+      "at": "2026-10-07T18:54:16Z",
+      "client": "tbh",
+      "op": "create",
+      "op_id": "d5ef7b7aa63c43b0b522ac99c34f9f36",
+      "session_id": "0885d7ba433140acb23523a9d5a0abb4"
+    }
+  ]
+}
