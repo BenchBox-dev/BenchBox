@@ -1,0 +1,26 @@
+{
+  "acceptance": [
+    "A test asserts the DuckDB spec's --dry-run command list equals a golden copy captured from HEAD d076a974d",
+    "Re-analyzing the archived DuckDB manifest gives byte-identical analysis JSON and CSV and identical median-bundle content to the archived outputs (or every difference is listed and explained in the PR)",
+    "Existing tests in tests/unit/scripts/test_duckdb_version_matrix.py pass unchanged, or each changed assertion is justified in the PR body",
+    "Docs that name the old scripts are updated or still accurate"
+  ],
+  "description": "scripts/run_duckdb_version_matrix.py and scripts/analyze_duckdb_version_matrix.py hard-code DuckDB versions, benchmarks, database clearing and the pre-release rule. A second engine needs the same machinery, so extend rather than copy: move the engine-specific parts into a per-engine spec (platform, versions, benchmarks with scale factors, per-cell setup and cleanup, pre-release handling, required validation status), and keep DuckDB as one spec.\n\nGuardrails:\n- DuckDB reproducibility is the blocking test: for the DuckDB spec, the new runner's --dry-run must emit exactly the same 116 commands, in the same order, as today's script at HEAD d076a974d.\n- The analyzer must give identical analysis JSON and CSV, and identical median bundles, when run on the archived DuckDB manifest at ~/Developer/benchmark_runs/duckdb-version-matrix-20260829-sf10-v2/matrix-manifest.json.\n- Keep the old script paths working (as thin wrappers or documented replacements), and update every reference to them: results-data/SEED_CORPUS_SPEC.md, results-data/CORPUS_NOTES.md, and tests/unit/scripts/test_duckdb_version_matrix.py.\n- No Polars-specific behaviour in this item; that belongs to pvm-s3b.",
+  "links": [
+    "scripts/run_duckdb_version_matrix.py",
+    "scripts/analyze_duckdb_version_matrix.py",
+    "tests/unit/scripts/test_duckdb_version_matrix.py",
+    "results-data/SEED_CORPUS_SPEC.md",
+    "results-data/CORPUS_NOTES.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-07T20:55:42Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c37028943f5046daaabc18f1b8e9c67e",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    }
+  ]
+}
