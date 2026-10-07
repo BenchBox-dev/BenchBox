@@ -10,6 +10,8 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
+CLI_DESCRIPTION = "Run tests on a simulated release tree to find tests that read curated-away paths."
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from check_release_curation import release_cut_rm_commands
 
@@ -78,7 +80,7 @@ def run(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("tests", nargs="*", help="test paths to run; default: every test in the fast selection")
     parser.add_argument("--changed-since", metavar="REF", help="run only test modules changed since REF")
     args = parser.parse_args(argv)

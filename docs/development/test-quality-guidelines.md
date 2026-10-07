@@ -184,7 +184,7 @@ def test_empty_table_generates_no_rows():
 ### Test intent
 
 Use names and assertions that state the behavior being checked. Keep explanatory
-prose in test documentation, following the [comment policy](comment-policy.md).
+prose in test documentation, following the comment policy in `docs/development/comment-policy.md`.
 Do not add source comments or docstrings.
 
 For example, a TPC-H scale-factor test can name the required customer count:
