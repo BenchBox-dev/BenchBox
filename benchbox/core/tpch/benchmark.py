@@ -159,7 +159,6 @@ NAMED_COLUMN_ALIAS_UNSUPPORTED_DIALECTS = frozenset({"sqlite", "mysql", "bigquer
 
 
 def _expand_named_column_aliases(query: str) -> str:
-    """Move TPC-H named table-alias columns into SELECT aliases for dialects that reject them."""
     import re
 
     alias_pattern = re.compile(r"(\bAS\s+c_orders)\s*\(\s*c_custkey\s*,\s*c_count\s*\)", re.IGNORECASE)

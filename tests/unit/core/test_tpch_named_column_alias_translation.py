@@ -1,10 +1,3 @@
-"""Q13 derived-table column-alias translation for dialects that reject the syntax.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 import duckdb
 import pytest
 import sqlglot
