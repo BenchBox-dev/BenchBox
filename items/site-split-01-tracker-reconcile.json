@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Every listed item is finished with evidence, annotated with its owning site-split item, or folded with a step map",
+    "Owner decisions D7, D11, D12, D18 recorded on the named items with date and wording",
+    "No item closed without evidence links in its context"
+  ],
+  "context": "muse AR-16 (accepted): every closure needs evidence links. The cutover handoff is in commit 9fc9fee4e on origin/claude/bold-newton-uudn48 (`_project/handoffs/astro-cutover-handoff-20261005.md`); it lists runs 37332041883 and 37406123669 as evidence candidates. Re-verify them live, per EVIDENCE-FRESHNESS-001.",
+  "description": "Tracker only; no PR.\n\n1. For each open item in astro-site-21, 22, 33, 34, 35, 36, 40, 50, 51, 52 and 53:\n   - read its acceptance;\n   - finish it only when live evidence (run ids, receipt digests, PR links) shows the acceptance is met;\n   - record that evidence in the item's context.\n   Otherwise add a note naming the `site-split-*` item that now covers the remaining work.\n2. Fold astro-site-54, dlv2-61 and dlv2-62 into this batch. Add a context line mapping each of their steps to the owning `site-split-*` item. Drop each one, with that reason, only after its mapped scope has merged; the batch's final step does this.\n3. Record the owner decisions, verbatim with their dates:\n   - D11 on astro-site-54: Sphinx rollback retention waived at cutover, 2026-10-06;\n   - D7 on dlv2-60: trunk-only docs supersede release-pinned docs;\n   - D12 and D18 on dlv2-62.\n   dlv2-60 holds a stale expired claim: take it over with a reason, or release it, before finishing or dropping it.\n4. astro-site-60 and 61 stay open, with a note that their paths now live in BenchBox-dev/benchbox-site.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:48:58Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "dc68f660284d4171af32ef8a5c7d3b5c",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    }
+  ]
+}
