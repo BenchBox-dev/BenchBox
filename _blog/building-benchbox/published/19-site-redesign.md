@@ -1,13 +1,12 @@
 ---
-title: "A 'spezial' new look for the benchbox project"
 blogpost: true
-status: draft
+status: published
 date: October 7, 2026
 author: Joe Harris
 series: building-benchbox
 post_number: 19
 type: architecture-design
-tags: [benchbox, design, website, results-explorer]
+tags: benchbox, design, website, results-explorer
 meta_description: "benchbox.dev has a new block-character logo and a burgundy and cream design inspired by the Adidas Handball Spezial, with clear, consistent navigation."
 ---
 

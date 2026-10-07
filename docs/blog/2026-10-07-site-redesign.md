@@ -1,13 +1,12 @@
 ---
-title: "A 'spezial' new look for the benchbox project"
 blogpost: true
-status: draft
+status: published
 date: October 7, 2026
 author: Joe Harris
 series: building-benchbox
 post_number: 19
 type: architecture-design
-tags: [benchbox, design, website, results-explorer]
+tags: benchbox, design, website, results-explorer
 meta_description: "benchbox.dev has a new block-character logo and a burgundy and cream design inspired by the Adidas Handball Spezial, with clear, consistent navigation."
 ---
 
@@ -17,7 +16,7 @@ meta_description: "benchbox.dev has a new block-character logo and a burgundy an
 
 **TL;DR**: We updated the `benchbox` site with a new logo and a new look inspired by the Adidas Handball Spezial. The new design drops the generic templated look and provides clear and consistent navigation.
 
-![Light and dark versions of the new benchbox.dev home page, side by side.](../images/redesign_light_vs_dark.png)
+![Light and dark versions of the new benchbox.dev home page, side by side.](./images/redesign_light_vs_dark.png)
 
 ## Why redesign?
 
@@ -31,7 +30,7 @@ The old site relied on the Sphinx static site engine and the Furo template theme
 
 The new burgundy and cream color scheme was mostly inspired by the Adidas Handball Spezial shoe. But, of course, the new iPhones use a similar palette and the most interesting new items from IKEA are also burgundy.
 
-![The "Burgundy Spezial" mood board: an IKEA burgundy lamp, the Adidas Handball Spezial in burgundy, the iPhone 18 Pro range, and the seven site colors from Spezial burgundy to Pro blue.](../images/redesign_moodboard.png)
+![The "Burgundy Spezial" mood board: an IKEA burgundy lamp, the Adidas Handball Spezial in burgundy, the iPhone 18 Pro range, and the seven site colors from Spezial burgundy to Pro blue.](./images/redesign_moodboard.png)
 
 The palette has seven colors: three burgundies, three creams and tans, and one light blue. The blue is our only highlight color. It marks where you are: the current page, the current section, and the current tab in the header.
 
@@ -55,7 +54,7 @@ Each part of the site uses the same pattern:
 - **Blog**: a new left nav lists all posts, an archive by year, the current post's sections, and the most-used tags.
 - **Home page**: a sticky section nav shows which part of the page you are reading.
 
-![The TPC-H Benchmark docs page in the dark theme, with the breadcrumb bar at the top and the page's sections listed in the left nav.](../images/redesign_docs_dark.png)
+![The TPC-H Benchmark docs page in the dark theme, with the breadcrumb bar at the top and the page's sections listed in the left nav.](./images/redesign_docs_dark.png)
 
 ## Self-contained
 
