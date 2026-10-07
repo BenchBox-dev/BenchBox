@@ -155,8 +155,11 @@ def _resolve_tpch_seed(
     return actual_seed
 
 
-def _expand_sqlite_named_column_aliases(query: str) -> str:
-    """Move TPC-H named table-alias columns into SELECT aliases for SQLite translation."""
+NAMED_COLUMN_ALIAS_UNSUPPORTED_DIALECTS = frozenset({"sqlite", "mysql", "bigquery", "doris"})
+
+
+def _expand_named_column_aliases(query: str) -> str:
+    """Move TPC-H named table-alias columns into SELECT aliases for dialects that reject them."""
     import re
 
     alias_pattern = re.compile(r"(\bAS\s+c_orders)\s*\(\s*c_custkey\s*,\s*c_count\s*\)", re.IGNORECASE)
@@ -331,8 +334,8 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
         src = (source_dialect or "netezza").lower()
         tgt = (target_dialect or src).lower()
-        if tgt in ("sqlite", "mysql", "bigquery"):
-            query = _expand_sqlite_named_column_aliases(query)
+        if tgt in NAMED_COLUMN_ALIAS_UNSUPPORTED_DIALECTS:
+            query = _expand_named_column_aliases(query)
 
         return translate_sql_query(
             query=query,

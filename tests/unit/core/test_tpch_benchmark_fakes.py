@@ -110,8 +110,8 @@ def test_get_table_loading_order_is_fk_safe_for_available_subset(fake_tpch_compo
     assert "some_extra_table" in order_with_extra
 
 
-def test_expand_sqlite_named_column_aliases():
-    from benchbox.core.tpch.benchmark import _expand_sqlite_named_column_aliases
+def test_expand_named_column_aliases():
+    from benchbox.core.tpch.benchmark import _expand_named_column_aliases
 
     raw_query = """
     select c_count, count(*) as custdist
@@ -122,7 +122,7 @@ def test_expand_sqlite_named_column_aliases():
     ) as c_orders (c_custkey, c_count)
     group by c_count
     """
-    transformed = _expand_sqlite_named_column_aliases(raw_query)
+    transformed = _expand_named_column_aliases(raw_query)
     assert "(c_custkey, c_count)" not in transformed
     assert "AS c_count" in transformed
     assert ") as c_orders" in transformed.lower()
