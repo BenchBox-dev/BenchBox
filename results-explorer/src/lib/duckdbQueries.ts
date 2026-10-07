@@ -1514,18 +1514,12 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
  * yet (empty corpus), matching Python's `_DEFAULT_RANKING`.
  */
 export async function getPrimaryMetricForBenchmark(benchmark: string, phase?: string): Promise<PrimaryMetric> {
-  if (phase !== undefined) {
-    const phaseRows = await queryRows<{ primary_metric: string }>(
-      "SELECT DISTINCT primary_metric FROM bench.benchmark_rankings WHERE benchmark = ? AND phase = ? LIMIT 1",
-      [benchmark, phase],
-    );
-    if (phaseRows[0] !== undefined) return normalizePrimaryMetric(phaseRows[0].primary_metric);
-  }
-  const rows = await queryRows<{ primary_metric: string }>(
-    "SELECT DISTINCT primary_metric FROM bench.benchmark_rankings WHERE benchmark = ? LIMIT 1",
-    [benchmark],
+  const rows = await queryRows<{ phase: string; primary_metric: string }>(
+    "SELECT DISTINCT phase, primary_metric FROM bench.benchmark_rankings WHERE benchmark = ? ORDER BY phase, primary_metric",
+    [canonicalBenchmarkSlug(benchmark)],
   );
-  return normalizePrimaryMetric(rows[0]?.primary_metric);
+  const match = phase === undefined ? undefined : rows.find((row) => row.phase === phase);
+  return normalizePrimaryMetric((match ?? rows[0])?.primary_metric);
 }
 
 const SHORT_ID_PATTERN = /^[0-9a-f]{8,}$/i;

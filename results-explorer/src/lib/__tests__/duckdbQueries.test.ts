@@ -927,17 +927,38 @@ describe("throughput cohorts split by stream count", () => {
     expect(summary?.platforms[0]?.throughput_at_size).toBe(3741.26);
   });
 
-  it("reads the primary metric for a benchmark phase, falling back to the benchmark", async () => {
-    mockedQueryRows.mockResolvedValueOnce([{ primary_metric: "throughput_at_size" }]);
-    await expect(getPrimaryMetricForBenchmark("tpch", "throughput")).resolves.toBe("throughput_at_size");
-    expect(mockedQueryRows.mock.calls[0]![0]).toContain("AND phase = ?");
-    expect(mockedQueryRows.mock.calls[0]![1]).toEqual(["tpch", "throughput"]);
+  it("reads the primary metric for a benchmark phase in a single query on the canonical slug", async () => {
+    mockedQueryRows.mockResolvedValueOnce([
+      { phase: "power", primary_metric: "power_score" },
+      { phase: "throughput", primary_metric: "throughput_at_size" },
+    ]);
 
-    mockedQueryRows.mockResolvedValueOnce([]).mockResolvedValueOnce([{ primary_metric: "power_score" }]);
+    await expect(getPrimaryMetricForBenchmark("tpch", "throughput")).resolves.toBe("throughput_at_size");
+
+    expect(mockedQueryRows).toHaveBeenCalledTimes(1);
+    expect(mockedQueryRows.mock.calls[0]![0]).toContain("FROM bench.benchmark_rankings WHERE benchmark = ?");
+    expect(mockedQueryRows.mock.calls[0]![1]).toEqual(["tpch"]);
+  });
+
+  it("looks up star_schema results under the canonical ssb ranking rows without a second query", async () => {
+    mockedQueryRows.mockResolvedValueOnce([{ phase: "power", primary_metric: "display_geomean_ms" }]);
+
+    await expect(getPrimaryMetricForBenchmark("star_schema", "power")).resolves.toBe("display_geomean_ms");
+
+    expect(mockedQueryRows).toHaveBeenCalledTimes(1);
+    expect(mockedQueryRows.mock.calls[0]![1]).toEqual(["ssb"]);
+  });
+
+  it("falls back to the benchmark's first ranking row when the phase has none, and to geomean when it has no rows", async () => {
+    mockedQueryRows.mockResolvedValueOnce([{ phase: "power", primary_metric: "power_score" }]);
     await expect(getPrimaryMetricForBenchmark("tpch", "unknown")).resolves.toBe("power_score");
 
+    mockedQueryRows.mockResolvedValueOnce([{ phase: "power", primary_metric: "power_score" }]);
+    await expect(getPrimaryMetricForBenchmark("tpch")).resolves.toBe("power_score");
+
     mockedQueryRows.mockResolvedValueOnce([]);
-    await expect(getPrimaryMetricForBenchmark("tpch")).resolves.toBe("display_geomean_ms");
+    await expect(getPrimaryMetricForBenchmark("tpch", "power")).resolves.toBe("display_geomean_ms");
+    expect(mockedQueryRows).toHaveBeenCalledTimes(3);
   });
 
   it("carries stream_count from cohort_metadata onto the cohort", async () => {
