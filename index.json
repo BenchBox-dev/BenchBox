@@ -15093,6 +15093,13 @@
       "status": "open",
       "title": "Gate: finish external adversarial review of the Polars version-matrix plan and fold in accepted findings"
     },
+    "pvm-d1-publication-scope-decision": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Gate: user decides how Polars matrix results are published"
+    },
     "pvm-s0a-polars2-compat-fixes": {
       "claim": null,
       "needs": [

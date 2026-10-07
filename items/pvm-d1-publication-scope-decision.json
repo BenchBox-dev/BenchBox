@@ -1,0 +1,23 @@
+{
+  "acceptance": [
+    "The user's choice (a, b, c, or another option) is recorded in context with date and the user's words",
+    "If (b) or (c) is chosen, pvm-s6-publish-polars-results is updated with the matching scope and acceptance before it is taken",
+    "If (c) is chosen, a separate item for the validation provider exists and pvm-s6-publish-polars-results lists it in needs"
+  ],
+  "description": "Polars DataFrame bundles at SF10 cannot be ranked in Results Explorer. DataFrame validation returns UNCERTAIN (TPC-H outside SF1, TPC-DS) or NOT_RUN (SSB, ClickBench) (query_validation.py:89-101), and validate_corpus.py treats both as validation_not_clean (validate_corpus.py:41-42, 376). Unranked bundles also contribute no comparison identity to the cohort depth gate.\n\nOptions for the user:\n(a) Recommended: publish the analysis and a blog post only; do not add bundles to results-data/.\n(b) Promote the setup A median bundles unranked under results-data/bundles/polars-version-matrix/. This needs an explicit allowlist entry in validate_corpus.py (replacing the hard-coded duckdb-version-matrix check, not a suffix rule), plus spec and test updates.\n(c) First build a DataFrame validation provider that turns cross-surface and row-count evidence into a clean status, so the bundles rank. This is a product change with its own spec and review, and it would be a new item.\n\nGuardrail: no work in pvm-s6 starts until the user's choice is recorded here with date and wording. The decision can be taken at any time; it does not need to wait for the run.",
+  "links": [
+    "results-data/validate_corpus.py",
+    "results-data/SEED_CORPUS_SPEC.md",
+    "benchbox/core/dataframe/query_validation.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-07T20:56:30Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "958f55a5cb8c4a71afb79bc5ff2f9166",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    }
+  ]
+}
