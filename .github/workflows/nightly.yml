@@ -983,10 +983,6 @@ jobs:
     outputs:
       cedardb_sweep_outcome: ${{ steps.cedardb-sweep.outcome }}
     env:
-      # Throughput@Size floor: the DuckDB assert step derives the median from
-      # the retained per-runner-class baselines downloaded just before it.
-      # THROUGHPUT_FLOOR_MEDIAN, when set, overrides that median. Unset vars
-      # evaluate to empty, which the assert step treats as unconfigured.
       THROUGHPUT_FLOOR_MEDIAN: ${{ vars.THROUGHPUT_FLOOR_MEDIAN }}
       THROUGHPUT_FLOOR_MAX_DROP_FRACTION: ${{ vars.THROUGHPUT_FLOOR_MAX_DROP_FRACTION }}
       THROUGHPUT_BASELINE_MIN_RECORDED_AT: ${{ vars.THROUGHPUT_BASELINE_MIN_RECORDED_AT }}
