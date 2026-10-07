@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-10-04T03:43:19.952395+00:00",
+  "generated_at": "2026-10-07T01:17:12.787875+00:00",
   "bundles": [
     {
       "file": "amplab_sf01_bigquery_sql_20260920_000055_35490af7.json",
@@ -3864,6 +3864,58 @@
       "bundle_sha256": "6d73f24155c25e2d9e972b7414dd17427a2ba6767ed9cb1b15dfaada7a621407"
     },
     {
+      "file": "tpch_sf1_duckdb_sql_20260925_224454_6155be3c.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DuckDB",
+      "platform_version": "1.5.5",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-25T22:44:54.004622",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "d721e109b1b4769f1acd3cfd923f3432575f0989acda9526428fe9f904a3be15"
+    },
+    {
+      "file": "tpch_sf1_duckdb_sql_20260925_224522_0d8b1e17.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DuckDB",
+      "platform_version": "1.5.5",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-25T22:45:22.464894",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "5bf3ed6a0e69c6974ca0e582c4701ec2cbd0d56f5b756a763f56415fe810a85b"
+    },
+    {
+      "file": "tpch_sf1_duckdb_sql_20260925_224539_eeeb3da1.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DuckDB",
+      "platform_version": "1.5.5",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-25T22:45:38.976131",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "83eee4223584c7bde89f7f0a14839a4bd81d19890467034c6279a5f58ba51495"
+    },
+    {
+      "file": "tpch_sf1_duckdb_sql_20260925_224553_0d266bf3.json",
+      "benchmark": "tpch",
+      "benchmark_name": "TPC-H",
+      "platform": "DuckDB",
+      "platform_version": "1.5.5",
+      "scale_factor": 1.0,
+      "timestamp": "2026-09-25T22:45:53.298249",
+      "query_count": 66,
+      "trust_label": "maintainer-run",
+      "funding": "unspecified",
+      "bundle_sha256": "bd359ac39f62737ed78b860cb35452beb21390973394755155074effa51a0f80"
+    },
+    {
       "file": "duckdb-version-matrix/tpch_sf10_duckdb_v1_0_0_median.json",
       "benchmark": "tpch",
       "benchmark_name": "TPC-H",
@@ -5515,6 +5567,9 @@
       "Snowflake v10.35.101",
       "Spark v4.1.1"
     ],
+    "tpch@sf1.0#throughput#3streams": [
+      "DuckDB v1.5.5"
+    ],
     "tpch@sf10.0": [
       "BigQuery",
       "Databricks v2026.36",
@@ -5632,7 +5687,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 395,
+    "total_bundles": 399,
     "by_benchmark": {
       "amplab": 25,
       "clickbench": 23,
@@ -5648,7 +5703,7 @@
       "tpcdi": 18,
       "tpcds": 31,
       "tpcds_obt": 6,
-      "tpch": 53,
+      "tpch": 57,
       "tpch_skew": 24,
       "tpchavoc": 18,
       "transaction_primitives": 9,
@@ -5662,7 +5717,7 @@
       "ClickHouse Server": 1,
       "DataFusion": 45,
       "Databricks": 50,
-      "DuckDB": 80,
+      "DuckDB": 84,
       "DuckLake": 1,
       "LakeSail": 1,
       "Pandas": 17,
@@ -5674,10 +5729,10 @@
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 395
+      "maintainer-run": 399
     },
     "by_funding": {
-      "unspecified": 395
+      "unspecified": 399
     }
   }
 }
