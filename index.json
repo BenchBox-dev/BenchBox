@@ -19172,7 +19172,8 @@
     "site-split-52-ruleset-landing-context": {
       "claim": null,
       "needs": [
-        "site-split-50-core-site-removal"
+        "site-split-50-core-site-removal",
+        "site-split-51-publication-retirement"
       ],
       "priority": "high",
       "status": "open",
