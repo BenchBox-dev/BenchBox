@@ -98,6 +98,7 @@ jobs:
       skill-integrity-only: ${{ steps.classify.outputs.skill-integrity-only }}
       audit-paths-changed: ${{ steps.path-flags.outputs.audit-paths-changed }}
       submission-validator-changed: ${{ steps.path-flags.outputs.submission-validator-changed }}
+      api-contract-changed: ${{ steps.path-flags.outputs.api-contract-changed }}
       estimated-runner-minutes-saved: ${{ steps.classify.outputs.estimated-runner-minutes-saved }}
       packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
       framing-needed: ${{ steps.classify.outputs.framing-needed }}
@@ -166,10 +167,13 @@ jobs:
           test -f .ci-paths/changed.txt
           audit=false
           validator=false
+          api=false
           if grep -qE '^(_project/audits/|results-explorer/e2e/captures/)' .ci-paths/changed.txt; then audit=true; fi
           if grep -qxE '\.github/workflows/validate-submission\.yml|scripts/check_submission_validator_sync\.py' .ci-paths/changed.txt; then validator=true; fi
+          if grep -qxE '_project/design/site-inventory/api-public-symbols\.json|scripts/check_api_contract_symbols\.py|scripts/api_contract_probe\.py' .ci-paths/changed.txt; then api=true; fi
           echo "audit-paths-changed=$audit" >> "$GITHUB_OUTPUT"
           echo "submission-validator-changed=$validator" >> "$GITHUB_OUTPUT"
+          echo "api-contract-changed=$api" >> "$GITHUB_OUTPUT"
 
       - name: Classify merge units
         id: units
@@ -1907,7 +1911,7 @@ jobs:
   api-contract-check:
     name: api-contract-check
     needs: ci-paths
-    if: ${{ contains(needs.ci-paths.outputs.changed-paths, '_project/design/site-inventory/api-public-symbols.json') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/check_api_contract_symbols.py') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/api_contract_probe.py') }}
+    if: ${{ needs.ci-paths.outputs.api-contract-changed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -2309,7 +2313,7 @@ jobs:
             --expect base-guard=${{ github.event_name == 'pull_request' }} \
             --expect content-guard=${{ needs.ci-paths.outputs.content-guard-needed == 'true' }} \
             --expect skill-integrity=${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }} \
-            --expect audit-sha=${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }} || {
+            --expect audit-sha=${{ needs.ci-paths.outputs.audit-paths-changed == 'true' }} || {
             rc=$?
             if [ "$rc" -eq 3 ]; then
               echo "superseded=true" >> "$GITHUB_OUTPUT"

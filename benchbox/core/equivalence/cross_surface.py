@@ -39,7 +39,7 @@ from benchbox.utils.printing import quiet_console as console
 
 _BACKEND_FAMILIES = {"expression": "expression", "pandas": "pandas", "datafusion": "expression"}
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from benchbox.core.tpchavoc.validation import ResultValidator
 
 
@@ -1787,5 +1787,5 @@ def main(argv: list[str] | None = None) -> int:
     return run_gate(gate, update_baseline=args.update_baseline, repeats=args.repeats)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

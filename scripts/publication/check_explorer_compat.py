@@ -19,11 +19,11 @@ CLI_DESCRIPTION = (
     "\n"
     "This CLI tool verifies that the Results Explorer SPA and its artifacts\n"
     "maintain compatibility with the current corpus DuckDB read-model schema\n"
-    "(v11). It also validates hermetic, content-addressed Explorer application\n"
+    "(v13). It also validates hermetic, content-addressed Explorer application\n"
     "artifact bundles.\n"
     "\n"
     "Usage:\n"
-    "    # Run schema compatibility checks only (v11 only):\n"
+    "    # Run schema compatibility checks only (v13 only):\n"
     "    uv run -- python scripts/publication/check_explorer_compat.py --schema-only\n"
     "\n"
     "    # Validate an Explorer build artifact directory or archive:\n"
@@ -38,8 +38,8 @@ CLI_DESCRIPTION = (
     "    # Validate a specific DuckDB database snapshot file:\n"
     "    uv run -- python scripts/publication/check_explorer_compat.py --db-path results-explorer/public/data/results.duckdb\n"
     "\n"
-    "    # Check specific schema versions (only 11 is supported):\n"
-    "    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 10\n"
+    "    # Check specific schema versions (only 13 is supported):\n"
+    "    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --schema-versions 13\n"
     "\n"
     "    # Output machine-readable JSON:\n"
     "    uv run -- python scripts/publication/check_explorer_compat.py --schema-only --json\n"
@@ -48,6 +48,7 @@ CLI_DESCRIPTION = (
     "    0 - All compatibility and artifact checks passed\n"
     "    1 - Compatibility or artifact validation failed\n"
     "    2 - CLI argument or environment error\n"
+    ""
 )
 
 try:

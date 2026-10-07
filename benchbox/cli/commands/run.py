@@ -2381,12 +2381,12 @@ def _interactive_handle_result(s: types.SimpleNamespace, result: Any, orchestrat
     "run",
     cls=BenchBoxCommand,
     help=(
-        "Run benchmarks.\n\n\\b\nExamples:\n"
+        "Run benchmarks.\n\n\b\nExamples:\n"
         "  benchbox run --platform duckdb --benchmark tpch\n"
         "  benchbox run --platform duckdb --benchmark tpch --queries Q1,Q6,Q17\n"
         "  benchbox run --dry-run ./preview --platform snowflake --benchmark tpch\n"
         "  benchbox run --official --platform snowflake --benchmark tpch --scale 100 --seed 42\n"
-        "\n\\b\nDeployment Targets:\n"
+        "\n\b\nDeployment Targets:\n"
         "  benchbox run --platform clickhouse:local --benchmark tpch    # ClickHouse local mode via chDB\n"
         "  benchbox run --platform clickhouse:server --benchmark tpch   # ClickHouse server\n"
         "  benchbox run --platform clickhouse-cloud --benchmark tpch    # ClickHouse Cloud\n"

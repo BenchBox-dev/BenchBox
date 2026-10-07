@@ -60,7 +60,7 @@ class PySparkSQLAdapter(SparkAdapter):
             )
 
             return spark
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover
             logger.error("Failed to create PySpark SQL session: %s", exc)
             raise
 

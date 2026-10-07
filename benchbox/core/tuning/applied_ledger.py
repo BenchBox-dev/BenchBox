@@ -108,7 +108,7 @@ def _split_sql_script(script: Any) -> list[str]:
         if pending and "".join(pending).strip():
             statements.append("".join(pending).strip())
         return statements
-    except Exception:
+    except Exception:  # pragma: no cover
         return [text]
 
 
@@ -128,7 +128,7 @@ def normalize_ledger_phase(phase: Any) -> str:
 def _is_recordable_statement(statement: Any) -> bool:
     try:
         text = str(statement).lstrip().lstrip("(").lstrip().lower()
-    except Exception:
+    except Exception:  # pragma: no cover
         return True
     return not text.startswith(_READBACK_PREFIXES)
 
@@ -431,6 +431,6 @@ def recording_connection(
         return connection
     try:
         return RecordingConnection(connection, ledger, phase, statement_filter)
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover
         logger.debug("applied-ledger connection wrap degraded: %s", exc)
         return connection
