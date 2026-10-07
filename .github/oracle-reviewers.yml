@@ -65,7 +65,7 @@ reviewers:
     harness: muse
     family: muse
     pool: muse
-    model: muse-spark-1.3
+    model: muse-spark-1.3-contributor
     effort: medium
     read_only: hard
     timeout_minutes: 25

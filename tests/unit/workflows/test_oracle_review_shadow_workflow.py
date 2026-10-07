@@ -289,7 +289,7 @@ MODEL_PINS = {
     "sonnet": ("claude-sonnet-5-5", "medium"),
     "sol": ("gpt-6.1-sol", "medium"),
     "luna": ("gpt-6-luna", "high"),
-    "muse": ("muse-spark-1.3", "medium"),
+    "muse": ("muse-spark-1.3-contributor", "medium"),
     "agy": ("gemini-3.8-flash-medium", "medium"),
 }
 

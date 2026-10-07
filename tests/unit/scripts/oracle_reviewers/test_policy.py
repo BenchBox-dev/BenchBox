@@ -31,7 +31,7 @@ def test_policy_is_in_shadow_mode_with_its_own_context(policy: Policy) -> None:
         ("sonnet", "claude", "claude", "claude-sonnet-5-5", "medium", "hard"),
         ("sol", "codex", "codex", "gpt-6.1-sol", "medium", "hard"),
         ("luna", "codex", "codex", "gpt-6-luna", "high", "hard"),
-        ("muse", "muse", "muse", "muse-spark-1.3", "medium", "hard"),
+        ("muse", "muse", "muse", "muse-spark-1.3-contributor", "medium", "hard"),
         ("agy", "agy", "agy", "gemini-3.8-flash-medium", "medium", "soft"),
     ],
 )
