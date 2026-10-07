@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 import pytest
@@ -1332,6 +1332,8 @@ def test_format_literal_datetime_uses_space_separator():
     """
     manager = TuningMetadataManager(_Adapter())
     assert manager._format_literal(datetime(2026, 10, 6, 20, 56, 51, 252740)) == "'2026-10-06 20:56:51'"
+    aware = datetime(2026, 10, 6, 20, 56, 51, tzinfo=timezone(timedelta(hours=5)))
+    assert manager._format_literal(aware) == "'2026-10-06 15:56:51'"
     assert manager._format_literal(None) == "NULL"
     assert manager._format_literal(True) == "TRUE"
     assert manager._format_literal(7) == "7"

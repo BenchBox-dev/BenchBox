@@ -14,7 +14,7 @@ import json
 import logging
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Iterator, Optional
 
 from benchbox.core.primitives_benchmark_utils import failed_platform_error
@@ -915,7 +915,12 @@ class TuningMetadataManager:
             # fractional seconds (a tuned-run marker write failed a whole
             # benchmark cell on exactly this). The space-separated form
             # parses on every engine this path serves (ClickHouse DateTime,
-            # BigQuery TIMESTAMP, Snowflake TIMESTAMP_NTZ).
+            # BigQuery TIMESTAMP, Snowflake TIMESTAMP_NTZ). Normalize aware
+            # values to UTC first: the space form carries no offset, so
+            # formatting an aware non-UTC value directly would store a
+            # different instant.
+            if value.tzinfo is not None:
+                value = value.astimezone(timezone.utc).replace(tzinfo=None)
             return f"'{value.strftime('%Y-%m-%d %H:%M:%S')}'"
         return "'" + str(value).replace("'", "''") + "'"
 
