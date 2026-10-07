@@ -5,7 +5,7 @@
     "No cdnjs or other third-party script requests on / (network assertion in e2e)",
     "landing/prompts/a11y-checklist.md items pass"
   ],
-  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 (35062d97, c558dd40, 7b585697, 5b21daa7, cd6c875a), 2026-10-04. Reviews: round 1 FAIL (quickstart tests on static composer) fixed; round 2 PASS; Mediums (Prism colour parity vs real Prism 1.29, light-mode code contrast >=4.5:1, prompt-content invariants mutation-checked) fixed in cd6c875a. CI: make site-test-built runs verify:landing with 176-state old-vs-new parity.",
+  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 (35062d97, c558dd40, 7b585697, 5b21daa7, cd6c875a), 2026-10-04. Reviews: round 1 FAIL (quickstart tests on static composer) fixed; round 2 PASS; Mediums (Prism colour parity vs real Prism 1.29, light-mode code contrast >=4.5:1, prompt-content invariants mutation-checked) fixed in cd6c875a. CI: make site-test-built runs verify:landing with 176-state old-vs-new parity. site-split-01 (2026-10-07): code merged; inventory-diff and composer-behaviour evidence not recorded here with run ids. Remaining verification owned by site-split-25 and site-split-30. Do not finish here.",
   "description": "Port landing/index.html, style.css and script.js to an Astro page using the shared shell and tokens. Keep the section structure and copy unless the owner approves changes. Replace Prism (cdnjs) with build-time Shiki, so there are no CDN scripts (G-g).\n\nPort landing/prompts/ (index.html, prompts.js, prompts.css, catalog.generated.js from catalog.yaml) as a page with a Preact island for the interactive composer, at its current URL. Keep the generated quickstarts from generate_landing_quickstarts.py.\n\nDo not add the analytics placeholder in landing/script.js:188.",
   "links": [
     "landing/index.html",
@@ -29,6 +29,14 @@
       "op": "update",
       "op_id": "0075ced0e5014caf96761d50b6e6ac8e",
       "session_id": "2d370a7de0824103affe317bc26fbae9"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T12:02:43Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "ec74de0210214ffcbf4fc48b874f38e6",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
 }
