@@ -13,7 +13,7 @@ from sqlglot import exp
 from benchbox.core.tpch.benchmark import TPCHBenchmark
 from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 AFFECTED_DIALECTS = ["bigquery", "doris", "mysql", "sqlite"]
 
