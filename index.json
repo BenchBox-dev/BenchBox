@@ -19175,6 +19175,15 @@
       "status": "open",
       "title": "Remove the landing required context from core ruleset 15611785"
     },
+    "site-split-53-landing-stub-removal": {
+      "claim": null,
+      "needs": [
+        "site-split-52-ruleset-landing-context"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Delete the landing stub aggregate and its approved-context entries from core"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],

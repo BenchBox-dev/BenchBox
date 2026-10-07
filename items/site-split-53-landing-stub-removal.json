@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "Drift check clean against the live ruleset",
+    "No `landing` unit or context remains in core",
+    "Core CI green; oracle review cleared if ci.yml still requires it (Codex or owner stand-in)"
+  ],
+  "context": "ci.yml is a soundness file entry, so this PR needs oracle review. Ask for the Codex connector first. If the owner's stand-in is needed, ping once and keep working on other items while waiting.",
+  "description": "Core PR C3: small and separate, because it must follow the live ruleset change. It may be stacked on nothing else.\n\nRemove the `landing` stub aggregate job from ci.yml. Remove the `landing` context from:\n- APPROVED_MERGE_QUEUE_CONTEXTS (scripts/ruleset_drift_check.py:336-344);\n- REQUIRED_CONTEXTS (scripts/pr_landing.py:56-63);\n- UNITS (scripts/ci_units.py:30);\n- docs/operations/repo-admin-settings.md:51-61;\n- ci-units.yml and their tests.\n\nRun the drift check against the live ruleset before opening the PR.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:53:24Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f152434a75114887833b9b5b33f3fb65",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    }
+  ]
+}
