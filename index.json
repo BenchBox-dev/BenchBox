@@ -19157,6 +19157,15 @@
       "status": "open",
       "title": "Remove the site, Sphinx and all JS/TS from core and re-point CI, release tooling, tests and docs"
     },
+    "site-split-51-publication-retirement": {
+      "claim": null,
+      "needs": [
+        "site-split-40-production-cutover"
+      ],
+      "priority": "high",
+      "status": "open",
+      "title": "Retire the publication control plane workflows, scripts, ledger seed and docs from core"
+    },
     "site-split-agy-plan-review": {
       "claim": null,
       "needs": [],
