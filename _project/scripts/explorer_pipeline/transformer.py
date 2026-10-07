@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from _project.scripts.explorer_pipeline.models import (
+    KNOWN_DEFECT_RANKING_EXCLUSION,
     BasisAvailability,
     BundleContainerBlock,
     BundleDocument,
@@ -413,13 +414,12 @@ def _driver_version(bundle: BundleDocument) -> str | None:
 def _power_score(bundle: BundleDocument) -> float | None:
     """Extract TPC power@size metric from a schema-v2 bundle."""
     tpc = bundle.summary.tpc_metrics
-    for key in ("power_at_size", "qphh_at_size", "qphds_at_size"):
-        val = getattr(tpc, key)
-        if val is not None:
-            try:
-                return float(val)
-            except (TypeError, ValueError):
-                pass
+    val = tpc.power_at_size
+    if val is not None:
+        try:
+            return float(val)
+        except (TypeError, ValueError):
+            pass
     return None
 
 
@@ -702,6 +702,20 @@ def _override_display(bundle_path: Path) -> dict[str, Any]:
     }
 
 
+def _sidecar_known_defects(bundle_path: Path) -> list[str]:
+    manifest_path = bundle_path.parent / f"{bundle_path.stem}.manifest.json"
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(payload, dict):
+        return []
+    recorded = payload.get("known_defects")
+    if not isinstance(recorded, list):
+        return []
+    return [item for item in recorded if isinstance(item, str) and item]
+
+
 def _applied_receipt(bundle_path: Path, bundle: BundleDocument | None = None) -> str | None:
     """Ingest the per-statement introspection receipt for a run.
 
@@ -805,6 +819,13 @@ def _physical_rendering_id(bundle: BundleDocument) -> str | None:
     return str(val) if val else None
 
 
+def _phase_executed(phase: Any) -> bool:
+    if phase is None:
+        return False
+    evidence = phase.model_dump(exclude_unset=True)
+    return bool(evidence) and str(evidence.get("status") or "").upper() != "NOT_RUN"
+
+
 def _test_type(bundle: BundleDocument) -> str | None:
     """Extract test type (power/throughput) from schema-v2 bundle."""
     if bundle.benchmark.test_type:
@@ -812,11 +833,9 @@ def _test_type(bundle: BundleDocument) -> str | None:
     # A present-but-empty phase block carries no evidence the phase ran;
     # truthiness on the unset-excluded dump matches the historical
     # raw-mapping check.
-    power_phase = bundle.phases.get("power_test")
-    if power_phase is not None and bool(power_phase.model_dump(exclude_unset=True)):
+    if _phase_executed(bundle.phases.get("power_test")):
         return "power"
-    throughput_phase = bundle.phases.get("throughput_test")
-    if throughput_phase is not None and bool(throughput_phase.model_dump(exclude_unset=True)):
+    if _phase_executed(bundle.phases.get("throughput_test")):
         return "throughput"
     return None
 
@@ -1598,7 +1617,10 @@ class BundleTransformer:
             compliance_class=_compliance_class(bundle),
             basis_availability=_compute_basis_availability(timings),
         )
-        return entry.model_copy(update={"ranking_exclusion_reason": ranking_exclusion_reason(entry)})
+        reason = ranking_exclusion_reason(entry)
+        if _sidecar_known_defects(bundle_path):
+            reason = KNOWN_DEFECT_RANKING_EXCLUSION
+        return entry.model_copy(update={"ranking_exclusion_reason": reason})
 
     def to_detail_result(
         self,
@@ -1707,7 +1729,10 @@ class BundleTransformer:
             validation_status=detail.validation_status,
             failed_query_count=detail.failed_query_count,
         )
-        return detail.model_copy(update={"ranking_exclusion_reason": ranking_exclusion_reason(manifest_peer)})
+        reason = ranking_exclusion_reason(manifest_peer)
+        if _sidecar_known_defects(bundle_path):
+            reason = KNOWN_DEFECT_RANKING_EXCLUSION
+        return detail.model_copy(update={"ranking_exclusion_reason": reason})
 
 
 __all__ = ["BundleTransformer"]

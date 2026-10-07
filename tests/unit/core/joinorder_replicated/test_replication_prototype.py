@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from benchbox.core.joinorder_replicated.replicator import (
@@ -322,6 +324,12 @@ def test_lookup_fk_values_never_shift():
     assert ("movie_companies", "company_type_id", "company_type") in LOOKUP_FK_COLUMNS
 
 
+_PROJECT_DIR = Path(__file__).resolve().parents[4] / "_project"
+_DECISION_RECORD = _PROJECT_DIR / "decisions" / "joinorder-track2-scaling-direction-2026-07-04.md"
+_REFERENCE_CARDINALITIES = _PROJECT_DIR / "joinorder" / "reference_cardinalities.json"
+
+
+@pytest.mark.skipif(not _DECISION_RECORD.exists(), reason="_project decision records are not in this checkout")
 def test_prototype_stays_deferred_until_reapproval():
     import re
     from pathlib import Path
@@ -366,6 +374,7 @@ def test_manifest_provenance_matches_canonical_vocabulary():
     assert "source_archive_hash" not in body
 
 
+@pytest.mark.skipif(not _REFERENCE_CARDINALITIES.exists(), reason="_project joinorder oracle is not in this checkout")
 def test_expected_cardinality_scaling_against_oracle():
     import json
     from pathlib import Path

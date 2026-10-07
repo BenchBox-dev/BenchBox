@@ -6,8 +6,6 @@ name: Publication Availability Monitor
 # transition or a missing observation into healthy coverage.
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 permissions:

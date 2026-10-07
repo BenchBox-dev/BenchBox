@@ -1,0 +1,11 @@
+{
+  "bundle_file": "datavault_sf10_bigquery_sql_20261001_110327_d1328d05.json",
+  "bundle_hash": "3eeebe24bad274bb218b009375a36038d30150d541284f3060fae685f78d06dd",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}

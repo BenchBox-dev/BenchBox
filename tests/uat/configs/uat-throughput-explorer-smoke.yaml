@@ -64,6 +64,7 @@ package:
 
 explorer_smoke:
   playwright_browsers: ["chromium"]
+  require_throughput_streams: 3
 
 report:
   matrix_summary_tsv: "matrix_summary.tsv"

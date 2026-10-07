@@ -283,6 +283,30 @@ query_stream = tpcds.get_query(42,
                                stream_id=0)
 ```
 
+### Scale factor and query parameters
+
+dsqgen derives some query parameters from the scale factor, so the SQL for a
+few queries depends on it. Standard runs now generate every query with the scale
+factor of the data you loaded. Earlier versions used the scale factor 1 values
+at every scale, which made a few queries test different values than the data
+called for.
+
+This can change the SQL of these queries when the scale factor is not 1:
+
+| Scale factor | Queries whose SQL can differ |
+|--------------|------------------------------|
+| 0.01 and 0.1 | Q9, Q44, Q46, Q68 |
+| 10 | Q9, Q44, Q46, Q68, plus Q1, Q16, Q27, Q34, Q36, Q73 |
+| 100 and above | Q9, Q44, Q46, Q68, plus Q1, Q16, Q27, Q33, Q34, Q36, Q43, Q73 |
+
+For a given seed some of these queries can come out the same at both scales,
+because the random values they draw can coincide.
+
+Runs at scale factor 1 are unchanged. Power and throughput runs already
+generated their queries for the data's scale factor and are unchanged. Results
+recorded before this change at other scale factors used the old SQL for the
+queries above, so don't compare those queries one for one with newer results.
+
 ## Query Characteristics
 
 ### Query Complexity Categories
@@ -320,18 +344,22 @@ query_stream = tpcds.get_query(42,
 
 ## Official TPC-DS Metrics
 
-BenchBox computes the TPC-DS composite metric family when the `power`, `throughput`,
-and `maintenance` phases run successfully. Values are surfaced in the executive
-summary (`Power@Size`, `Throughput@Size`, `QphDS@Size`) and in the JSON results.
+BenchBox exports Power@Size and Throughput@Size when the `power` and `throughput`
+phases run successfully. Values are surfaced in the JSON results.
 
 | Metric | Meaning | Source |
 |--------|---------|--------|
 | **Power@Size** | Single-stream power test throughput at the given scale factor | `power_at_size` - computed from the 99-query power stream |
-| **Throughput@Size** | Multi-stream throughput at the given scale factor | `throughput_at_size` - computed across parallel streams |
-| **QphDS@Size** | Final composite metric: `sqrt(Power@Size × Throughput@Size)` | `qphds_at_size` - the headline figure |
+| **Throughput@Size** | Multi-stream throughput at the given scale factor, scored with `Q = 99 × S` queries | `throughput_at_size` - computed across parallel streams |
 
-Implementation: `benchbox/core/tpcds/reporting.py` (surfacing) and
-`benchbox/core/tpcds/power_test.py` / `TPCMetricsCalculator` (computation).
+BenchBox does not export QphDS@Size. The specification formula is
+`SF × Q / (T_PT × T_TT × T_DM × T_LD)^(1/4)` with `Q = 99 × S`, and it needs
+the data maintenance and load times. The geometric mean of Power@Size and
+Throughput@Size that BenchBox previously exported under this name is not
+that metric. Implementing the specification formula is tracked as follow-up
+work.
+
+Implementation: `benchbox/core/tpcds/power_test.py` / `TPCMetricsCalculator` (computation).
 
 ### Throughput Permutation
 

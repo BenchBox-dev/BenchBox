@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from benchbox.core.results.query_status import bundle_failed_query_count, int_or_none
+from benchbox.core.results.query_status import bundle_failed_query_count, has_failed_query_validation, int_or_none
 
 NON_CLEAN_VALIDATION_STATUSES: frozenset[str] = frozenset(
     {"failed", "interrupted", "partial", "error", "not_run", "not_validated", "uncertain", "unknown"}
@@ -70,21 +70,28 @@ def result_failed_query_count(result: Any) -> int:
     return 0
 
 
-def result_non_clean_reason(result: Any) -> str | None:
-    """Return a user-facing reason when a result is not a clean pass."""
+def _result_reason(result: Any, failing_validation_statuses: frozenset[str]) -> str | None:
     failed = result_failed_query_count(result)
     if failed:
         noun = "query" if failed == 1 else "queries"
         return f"{failed} failed {noun}"
 
+    if has_failed_query_validation(getattr(result, "query_results", None)):
+        return "query validation failed"
+
     status = normalize_validation_status(getattr(result, "validation_status", None))
-    if status in NON_CLEAN_VALIDATION_STATUSES:
+    if status in failing_validation_statuses:
         return f"validation_status={status}"
 
     translation_status = _result_translation_status(result)
     if translation_status in NON_CLEAN_TRANSLATION_STATUSES:
         return f"translation_status={translation_status}"
     return None
+
+
+def result_non_clean_reason(result: Any) -> str | None:
+    """Return a user-facing reason when a result is not a clean pass."""
+    return _result_reason(result, NON_CLEAN_VALIDATION_STATUSES)
 
 
 def result_is_clean_pass(result: Any) -> bool:
@@ -99,19 +106,7 @@ def result_cli_failure_reason(result: Any) -> str | None:
     executed (``not_run``/``not_validated``/...) keeps the bundle non-clean for
     publication, but does not fail the run itself.
     """
-    failed = result_failed_query_count(result)
-    if failed:
-        noun = "query" if failed == 1 else "queries"
-        return f"{failed} failed {noun}"
-
-    status = normalize_validation_status(getattr(result, "validation_status", None))
-    if status in CLI_FAILURE_VALIDATION_STATUSES:
-        return f"validation_status={status}"
-
-    translation_status = _result_translation_status(result)
-    if translation_status in NON_CLEAN_TRANSLATION_STATUSES:
-        return f"translation_status={translation_status}"
-    return None
+    return _result_reason(result, CLI_FAILURE_VALIDATION_STATUSES)
 
 
 def result_unvalidated_reason(result: Any) -> str | None:
@@ -125,7 +120,7 @@ def result_unvalidated_reason(result: Any) -> str | None:
     ``None`` when there are failed queries (those take precedence) or when the
     validation status is not in the unvalidated partition.
     """
-    if result_failed_query_count(result):
+    if result_failed_query_count(result) or has_failed_query_validation(getattr(result, "query_results", None)):
         return None
 
     status = normalize_validation_status(getattr(result, "validation_status", None))
@@ -140,6 +135,9 @@ def bundle_non_clean_reason(data: dict[str, Any]) -> str | None:
     if failed:
         noun = "query" if failed == 1 else "queries"
         return f"{failed} failed {noun}"
+
+    if has_failed_query_validation(data.get("queries")):
+        return "query validation failed"
 
     status = _bundle_validation_status(data)
     if status in NON_CLEAN_VALIDATION_STATUSES:

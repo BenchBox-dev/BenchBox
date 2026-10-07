@@ -54,8 +54,9 @@ def test_parse_expected_rulesets_from_admin_runbook() -> None:
         "docs",
         "landing",
         "tooling",
+        "oracle-review",
     )
-    assert expected["develop-squash-only"].strict_required_status_checks_policy is True
+    assert expected["develop-squash-only"].strict_required_status_checks_policy is False
     assert expected["release-only"].ref == "refs/heads/release"
     assert expected["release-only"].required_checks == ("validate-base", "release-required-result")
     assert expected["release-only"].strict_required_status_checks_policy is False
@@ -215,55 +216,34 @@ def _live_with_queue(params: dict | None) -> dict:
     return live
 
 
-def test_merge_queue_approved_params_pass() -> None:
-    live = _live_with_queue(
-        {
-            "merge_method": "SQUASH",
-            "grouping_strategy": "ALLGREEN",
-            "min_entries_to_merge": 1,
-            "max_entries_to_build": 2,
-            "max_entries_to_merge": 3,
-            "check_response_timeout_minutes": 60,
-            "min_entries_to_merge_wait_minutes": 0,
-        }
-    )
-    assert ruleset_drift_check.merge_queue_findings(live, "develop-squash-only") == []
+def test_merge_queue_absent_passes() -> None:
+    assert ruleset_drift_check.merge_queue_findings(_live_with_queue(None), "develop-squash-only") == []
 
 
-def test_merge_queue_param_change_is_blocking() -> None:
-    params = dict(ruleset_drift_check.APPROVED_MERGE_QUEUE)
-    params["grouping_strategy"] = "HEADGREEN"
-    findings = ruleset_drift_check.merge_queue_findings(_live_with_queue(params), "develop-squash-only")
-    assert any("grouping_strategy" in f for f in findings)
-    assert ruleset_drift_check.blocking_findings(findings) == findings
-
-
-def test_merge_queue_absent_is_blocking_when_rules_visible() -> None:
-    findings = ruleset_drift_check.merge_queue_findings(_live_with_queue(None), "develop-squash-only")
+def test_merge_queue_present_is_blocking() -> None:
+    live = _live_with_queue({"merge_method": "SQUASH", "check_response_timeout_minutes": 90})
+    findings = ruleset_drift_check.merge_queue_findings(live, "develop-squash-only")
     assert len(findings) == 1
+    assert "merge_queue" in findings[0]
     assert ruleset_drift_check.blocking_findings(findings) == findings
-
-
-def test_merge_queue_absent_is_warning_only_when_payload_empty() -> None:
-    findings = ruleset_drift_check.merge_queue_findings({"name": "x", "rules": []}, "develop-squash-only")
-    assert len(findings) == 1
-    assert ruleset_drift_check.blocking_findings(findings) == []
 
 
 def _verified_develop_queue() -> dict:
     live = _live_ruleset(
         "refs/heads/develop",
-        ["core", "explorer", "results-data", "docs", "landing", "tooling"],
-        strict=True,
+        ["core", "explorer", "results-data", "docs", "landing", "tooling", "oracle-review"],
+        strict=False,
     )
     live["name"] = "develop-squash-only"
     live["rules"].append(
         {
             "type": "pull_request",
-            "parameters": {"require_code_owner_review": True},
+            "parameters": {
+                "require_code_owner_review": True,
+                "required_review_thread_resolution": True,
+            },
         }
     )
-    live["rules"].append({"type": "merge_queue", "parameters": dict(ruleset_drift_check.APPROVED_MERGE_QUEUE)})
     return live
 
 
@@ -280,8 +260,7 @@ def test_queue_policy_requires_all_develop_protections() -> None:
 @pytest.mark.parametrize(
     "mutate, expected_text",
     [
-        (lambda live: live["rules"].pop(), "merge_queue"),
-        (lambda live: live["rules"][-1]["parameters"].update(max_entries_to_merge=4), "max_entries_to_merge"),
+        (lambda live: live["rules"].append({"type": "merge_queue", "parameters": {}}), "merge_queue"),
         (lambda live: live["rules"].insert(0, {"type": "required_status_checks", "parameters": {}}), "required checks"),
         (lambda live: live.pop("bypass_actors"), "bypass actors are not visible"),
     ],
@@ -297,15 +276,6 @@ def test_queue_policy_fails_closed_on_missing_or_drifted_protection(mutate, expe
 
     assert any(expected_text in finding for finding in findings)
     assert queue_policy_verified(expected, live) is False
-
-
-def test_merge_queue_malformed_parameters_fail_closed() -> None:
-    live = _live_with_queue(None)
-    live["rules"].append({"type": "merge_queue", "parameters": []})
-
-    findings = ruleset_drift_check.merge_queue_findings(live, "develop-squash-only")
-
-    assert any("parameters are malformed" in finding for finding in findings)
 
 
 def test_queue_policy_cli_emits_machine_readable_verified_result(

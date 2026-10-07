@@ -88,6 +88,16 @@ class TestParseDsqgenParameterLog:
 
         assert (template.query_id, template.variant) == (14, "a")
 
+    @pytest.mark.parametrize(
+        "template", ["../query_variants/query5a.tpl", "..\\query_variants\\query5a.tpl", "query_templates/query5a.tpl"]
+    )
+    def test_template_path_is_parsed(self, template):
+        log = f"BEGIN STREAM 0\nTemplate: {template}\n\tYEAR.01 = 2002\n\nEND STREAM 0\n"
+
+        (parsed,) = parse_dsqgen_parameter_log(log)[0]
+
+        assert (parsed.query_id, parsed.variant) == (5, "a")
+
     def test_value_may_contain_spaces_and_equals(self):
         log = "BEGIN STREAM 0\nTemplate: query1.tpl\n\tREASON.01 = reason 28\n\tX.01 = a=b\n\nEND STREAM 0\n"
 

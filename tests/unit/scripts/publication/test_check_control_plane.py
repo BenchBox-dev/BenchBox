@@ -12,30 +12,29 @@ from scripts.publication import check_control_plane as control_mod
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-def test_strict_without_live_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(control_mod, "check_codeowners", list)
+def test_strict_without_live_fails() -> None:
     rc = control_mod.main(["--strict"])
     assert rc != 0
 
 
-def test_local_without_strict_can_pass(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(control_mod, "check_codeowners", list)
+def test_without_live_can_pass_in_checkout_without_codeowners(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(control_mod, "ROOT", tmp_path)
     rc = control_mod.main([])
     assert rc == 0
 
 
-def test_check_codeowners_missing_patterns(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    codeowners = tmp_path / "CODEOWNERS"
-    codeowners.write_text("# incomplete\n*.py @dev\n", encoding="utf-8")
-    monkeypatch.setattr(control_mod, "ROOT", tmp_path.parent)
-    # mock .github directory
-    gh_dir = tmp_path.parent / ".github"
-    gh_dir.mkdir(parents=True, exist_ok=True)
-    (gh_dir / "CODEOWNERS").write_text("# incomplete\n*.py @dev\n", encoding="utf-8")
+@pytest.mark.parametrize("role", ["journal", "legacy_app", "all"])
+def test_live_contract_failure_still_fails_main(monkeypatch: pytest.MonkeyPatch, role: str) -> None:
+    checked_roles: list[str] = []
 
-    errors = control_mod.check_codeowners()
-    assert any("publication/**" in err for err in errors)
-    assert any("scripts/publication/**" in err for err in errors)
+    def failing_live_check(role: str) -> list[str]:
+        checked_roles.append(role)
+        return ["Branch 'publication' permits force pushes"]
+
+    monkeypatch.setattr(control_mod, "check_live_app_and_branch", failing_live_check)
+
+    assert control_mod.main(["--live", "--strict", "--role", role]) != 0
+    assert checked_roles == [role]
 
 
 def test_check_permissions_journal_role() -> None:

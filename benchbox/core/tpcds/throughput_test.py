@@ -23,8 +23,14 @@ from benchbox.core.connection import DatabaseConnection
 from benchbox.core.plan_capture_phase import (
     propagate_query_execution_metadata,
 )
+from benchbox.core.results.metrics import TPC_QUERIES_PER_STREAM
 from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
 from benchbox.core.throughput.runner import StreamRunner
+from benchbox.core.validation.query_validation import (
+    clear_reference_seed_context,
+    reset_stream_seed_override_warnings,
+    set_reference_seed_context,
+)
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
@@ -46,34 +52,46 @@ class TPCDSThroughputTestConfig:
     # never hard-kills anything -- see benchbox/core/throughput/runner.py's
     # module docstring ("Timed-out streams") for the full design.
     cancel_on_timeout: bool = False
+    query_subset: Optional[list[str]] = None
     # Number of queries to execute per stream (None = all queries, ~99 for TPC-DS)
     # NOTE: Per TPC-DS spec, full query set should be executed. Use subset only for testing.
     queries_per_stream: Optional[int] = None  # Default: execute all queries
     # Enable preflight validation (validates query generation before execution)
     enable_preflight: bool = True
-    # Legacy per-stream reporting threshold retained for configuration
-    # compatibility. Product scoring is stricter: StreamRunner emits
-    # Throughput@Size only when every requested stream and query succeeds.
-    #
-    # Spec citation: NOT derived from a TPC-DS "acceptable failure rate"
-    # clause -- no such partial-success allowance exists in the TPC-DS
-    # specification v4.0.0. A compliant/audited run requires every stream and
-    # query to complete successfully (mirroring TPC-H specification 5.1.1.6's
-    # "A failed run is defined as a run that did not complete successfully
-    # due to unforeseen system failures"). 0.70 is a BenchBox-internal
-    # tolerance for treating a run as "usable" for iterative development/CI
-    # despite some stream/query failures; it is NOT an official TPC-DS
-    # compliance gate, and results below 100% success are not eligible for
-    # TPC-DS-compliant/audited reporting regardless of this setting.
-    #
-    # The threshold still drives _finalize_stream_success() so historical
-    # per-stream status remains visible, but it cannot make a partial run
-    # scoreable at the shared metric boundary.
     min_success_rate: float = 0.70
 
 
 # Backward-compatibility alias - ThroughputStreamResult is the canonical type.
 TPCDSThroughputStreamResult = ThroughputStreamResult
+
+
+def _query_token(value: Any) -> str:
+    token = str(value).strip().lower()
+    return token[1:] if token.startswith("q") else token
+
+
+def _apply_query_subset(stream_queries: list[Any], query_subset: Optional[list[str]]) -> list[Any]:
+    if not isinstance(query_subset, (list, tuple)) or not query_subset:
+        return stream_queries
+    wanted = {_query_token(query_id) for query_id in query_subset}
+    selected = [
+        stream_query
+        for stream_query in stream_queries
+        if str(stream_query.query_id) in wanted or f"{stream_query.query_id}{stream_query.variant or ''}" in wanted
+    ]
+    available = {str(stream_query.query_id) for stream_query in stream_queries} | {
+        f"{stream_query.query_id}{stream_query.variant or ''}" for stream_query in stream_queries
+    }
+    unknown = sorted(wanted - available)
+    if unknown:
+        raise ValueError(f"Invalid TPC-DS query ids in query_subset: {unknown}")
+    return selected
+
+
+def _scored_queries_per_stream(config: TPCDSThroughputTestConfig) -> int:
+    if config.queries_per_stream is None:
+        return TPC_QUERIES_PER_STREAM["tpcds"]
+    return min(config.queries_per_stream, TPC_QUERIES_PER_STREAM["tpcds"])
 
 
 def _count_cursor_rows(cursor: Any) -> int:
@@ -241,6 +259,7 @@ class TPCDSThroughputTest:
         # (falls back to inline per-query generation in _execute_single_query)
         # when enable_preflight=False, matching today's behavior for callers
         # that explicitly opt out of upfront validation/generation.
+        reset_stream_seed_override_warnings()
         self._pregenerated_queries = None
         if config.enable_preflight:
             self._pregenerated_queries = self._pregenerate_stream_queries(config)
@@ -252,14 +271,16 @@ class TPCDSThroughputTest:
             # A throughput metric is valid only when every requested stream
             # completed successfully. Partial success remains visible in the
             # result details but is never published as a scored measurement.
-            result.success = StreamRunner.compute_metrics(result, config, start_time)
+            result.success = StreamRunner.compute_metrics(
+                result, config, start_time, queries_per_stream=_scored_queries_per_stream(config)
+            )
 
             success_rate = result.streams_successful / max(config.num_streams, 1)
 
             if config.verbose:
                 self.logger.info(f"Throughput Test completed in {result.total_time:.3f}s")
                 self.logger.info(f"Successful streams: {result.streams_successful}/{config.num_streams}")
-                self.logger.info(f"Stream success rate: {success_rate:.2%} (threshold: {config.min_success_rate:.2%})")
+                self.logger.info(f"Stream success rate: {success_rate:.2%}")
                 self.logger.info(f"Throughput@Size: {result.throughput_at_size:.2f}")
                 self.logger.info(f"Query throughput: {result.query_throughput:.2f} queries/sec")
 
@@ -327,7 +348,7 @@ class TPCDSThroughputTest:
         (``benchbox.core.tpcds.streams.generate_dsqgen_streams``), which
         yields both the official per-stream query ORDERING and the official
         per-stream substitution PARAMETERS -- the TPC-DS compliance-relevant
-        inputs to QphDS. This is the throughput-test default and retires the
+        inputs to the throughput test. This is the throughput-test default and retires the
         home-grown ``TPCDSPermutationGenerator`` ordering / RNG-jitter
         parameter path for this (the timed, scored) path; that Python path
         remains available, unchanged, via ``_build_stream_queries`` for
@@ -362,7 +383,7 @@ class TPCDSThroughputTest:
         failures: list[str] = []
 
         for stream_id in range(config.num_streams):
-            query_subset = all_streams.get(stream_id, [])
+            query_subset = _apply_query_subset(all_streams.get(stream_id, []), config.query_subset)
             if config.queries_per_stream is not None:
                 query_subset = query_subset[: min(config.queries_per_stream, len(query_subset))]
 
@@ -468,7 +489,7 @@ class TPCDSThroughputTest:
         )
 
         streams = stream_manager.generate_streams()
-        all_queries = streams.get(stream_id, [])
+        all_queries = _apply_query_subset(streams.get(stream_id, []), config.query_subset)
 
         if config.queries_per_stream is not None:
             subset = all_queries[: min(config.queries_per_stream, len(all_queries))]
@@ -517,17 +538,20 @@ class TPCDSThroughputTest:
     ) -> tuple[dict[str, Any] | None, int]:
         if hasattr(connection, "set_query_context"):
             connection.set_query_context(query_display_id, stream_id=stream_id)
-        cursor = connection.execute(query_text)
-        # _count_cursor_rows() reads the adapter-reported count directly (when
-        # available) instead of materializing the result set via fetchall() -
-        # see PlatformAdapterCursor.row_count() in connection_wrappers.py.
-        # Previously this called cursor.fetchall() and discarded the return
-        # value entirely, so TPC-DS result_count was hardcoded to 0 below
-        # regardless of the true result size.
+        set_reference_seed_context(False)
+        try:
+            cursor = connection.execute(query_text)
+        finally:
+            clear_reference_seed_context()
+        platform_result = getattr(cursor, "platform_result", None)
+        if isinstance(platform_result, dict) and platform_result.get("status") == "FAILED":
+            raise RuntimeError(
+                platform_result.get("error", platform_result.get("row_count_validation_error", "Query failed"))
+            )
         row_count = _count_cursor_rows(cursor)
         if hasattr(connection, "commit"):
             connection.commit()
-        return getattr(cursor, "platform_result", None), row_count
+        return platform_result, row_count
 
     def _execute_single_query(
         self,
@@ -625,16 +649,13 @@ class TPCDSThroughputTest:
                 self.logger.info(f"Stream {stream_id} completed: no queries executed")
             return
 
-        # Preserve the configurable per-stream reporting threshold. The shared
-        # metric boundary independently requires every query and stream to
-        # succeed before the run can produce a score.
         success_rate = stream_result.queries_successful / stream_result.queries_executed
-        stream_result.success = success_rate >= config.min_success_rate
+        stream_result.success = stream_result.queries_failed == 0
         if config.verbose:
             self.logger.info(
                 f"Stream {stream_id} completed: "
                 f"{stream_result.queries_successful}/{stream_result.queries_executed} successful "
-                f"(success rate: {success_rate:.2%}, threshold: {config.min_success_rate:.2%})"
+                f"(success rate: {success_rate:.2%})"
             )
 
     def _close_stream_connection(self, connection, stream_id: int, config: TPCDSThroughputTestConfig) -> None:
@@ -659,6 +680,7 @@ class TPCDSThroughputTest:
             queries_executed=0,
             queries_successful=0,
             queries_failed=0,
+            start_wall_time=datetime.now().isoformat(),
         )
 
         connection = None
@@ -667,6 +689,8 @@ class TPCDSThroughputTest:
                 self.logger.info(f"Starting stream {stream_id} with seed {seed}")
 
             connection = self.connection_factory()
+            stream_result.start_time = mono_time()
+            stream_result.start_wall_time = datetime.now().isoformat()
 
             # When run() pre-generated this stream (the normal path with
             # enable_preflight=True), reuse its already-resolved ordering
@@ -728,9 +752,10 @@ class TPCDSThroughputTest:
             if config.verbose:
                 self.logger.error(f"Stream {stream_id} failed: {e}")
         finally:
-            self._close_stream_connection(connection, stream_id, config)
             stream_result.end_time = mono_time()
+            stream_result.end_wall_time = datetime.now().isoformat()
             stream_result.duration = stream_result.end_time - stream_result.start_time
+            self._close_stream_connection(connection, stream_id, config)
 
         return stream_result
 

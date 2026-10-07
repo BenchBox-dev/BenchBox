@@ -106,11 +106,18 @@ class TestBuildShortIds:
 
 def test_mismatched_query_sets_are_not_ranked(tmp_path: Path) -> None:
     transformer = BundleTransformer()
-    bundle_paths = [
+    source_paths = [
         Path("results-data/bundles/tpchavoc_sf001_clickhouse_local_sql_20260826_171608_ce266327.json"),
         Path("results-data/bundles/tpchavoc_sf001_datafusion_sql_20260826_165844_721d2f5e.json"),
         Path("results-data/bundles/tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json"),
     ]
+    data_dir = tmp_path / "input"
+    bundle_dir = data_dir / "bundles"
+    bundle_dir.mkdir(parents=True)
+    bundle_paths = []
+    for path in source_paths:
+        shutil.copy2(path, bundle_dir / path.name)
+        bundle_paths.append(bundle_dir / path.name)
     pairs = []
     for path in bundle_paths:
         entry = transformer.to_manifest_entry(path)
@@ -128,11 +135,6 @@ def test_mismatched_query_sets_are_not_ranked(tmp_path: Path) -> None:
     assert all(not row.is_ranking_eligible for row in rows)
     assert {row.ranking_exclusion_reason for row in rows} == {"mismatched_query_set"}
 
-    data_dir = tmp_path / "input"
-    bundle_dir = data_dir / "bundles"
-    bundle_dir.mkdir(parents=True)
-    for path in bundle_paths:
-        shutil.copy2(path, bundle_dir / path.name)
     output = tmp_path / "output"
     ExplorerPipeline().run(data_dir, output)
 
@@ -145,9 +147,11 @@ def test_mismatched_query_sets_are_not_ranked(tmp_path: Path) -> None:
     assert eligibility == [(False,)]
 
 
-def test_non_rankable_query_gap_does_not_exclude_rankable_peers() -> None:
+def test_non_rankable_query_gap_does_not_exclude_rankable_peers(tmp_path: Path) -> None:
     transformer = BundleTransformer()
-    path = Path("results-data/bundles/tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json")
+    source = Path("results-data/bundles/tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json")
+    path = tmp_path / source.name
+    shutil.copy2(source, path)
     entry = transformer.to_manifest_entry(path)
     detail = transformer.to_detail_result(path, entry.result_id)
     peer_entry = entry.model_copy(update={"result_id": "eligible-peer", "platform_id": "eligible-peer"})
@@ -177,9 +181,40 @@ def test_non_rankable_query_gap_does_not_exclude_rankable_peers() -> None:
     assert rows[incomplete_entry.result_id].ranking_exclusion_reason == "missing_primary_metric"
 
 
-def test_partial_query_set_does_not_poison_complete_majority() -> None:
+def test_known_defective_entry_does_not_vote_in_canonical_query_set(tmp_path: Path) -> None:
     transformer = BundleTransformer()
-    path = Path("results-data/bundles/tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json")
+    source = Path("results-data/bundles/tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json")
+    path = tmp_path / source.name
+    shutil.copy2(source, path)
+    entry = transformer.to_manifest_entry(path)
+    detail = transformer.to_detail_result(path, entry.result_id)
+    defective_entry = entry.model_copy(
+        update={
+            "result_id": "known-defective",
+            "platform_id": "known-defective",
+            "ranking_exclusion_reason": "known_defective_data",
+        }
+    )
+    defective_detail = detail.model_copy(
+        update={"result_id": "known-defective", "display_timings": detail.display_timings[:-1]}
+    )
+    pairs = [(entry, detail), (defective_entry, defective_detail)]
+
+    summaries = _build_benchmark_summaries(
+        {("tpchavoc", 0.01, "power"): pairs},
+        {candidate.result_id: candidate.result_id[-8:] for candidate, _ in pairs},
+    )
+
+    rows = {row.result_id: row for row in summaries[0][1].platforms}
+    assert rows[entry.result_id].is_ranking_eligible is True
+    assert rows[defective_entry.result_id].ranking_exclusion_reason == "known_defective_data"
+
+
+def test_partial_query_set_does_not_poison_complete_majority(tmp_path: Path) -> None:
+    transformer = BundleTransformer()
+    source = Path("results-data/bundles/tpchavoc_sf001_duckdb_sql_20260826_163147_d96baca2.json")
+    path = tmp_path / source.name
+    shutil.copy2(source, path)
     entry = transformer.to_manifest_entry(path)
     detail = transformer.to_detail_result(path, entry.result_id)
     peer_entry = entry.model_copy(update={"result_id": "complete-peer", "platform_id": "complete-peer"})

@@ -135,6 +135,9 @@ def test_delete_queries_rowcount_branch():
             def __init__(self, n):
                 self.rowcount = n
 
+            def fetchone(self):
+                return (0,)
+
         def execute(self, sql, params=None):
             self.executed.append((sql, params))
             return self.Result(2)

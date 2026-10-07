@@ -22,6 +22,7 @@ from tests.utilities.optional_engines import pyspark_skip_reason, pyspark_usable
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.medium,
+    pytest.mark.usefixtures("spark_runtime_environment"),
     pytest.mark.skipif(
         sys.platform == "win32",
         reason="PySpark tests skipped on Windows - Hadoop requires winutils.exe setup",

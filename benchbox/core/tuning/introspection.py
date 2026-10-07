@@ -275,7 +275,7 @@ _TRANSIENT_PREFIXES = ("set ", "pragma ", "set\t", "pragma\t", "reset ", "use ")
 _MAINTENANCE_PREFIXES = ("optimize ", "vacuum", "analyze", "compact ")
 
 
-def _strip_sql_literals_and_comments(statement: str) -> str:
+def _strip_sql_literals_and_comments(statement: str, keep_double_quoted: bool = False) -> str:
     """Blank quoted/comment text while preserving offsets and SQL shape.
 
     This is deliberately a small lexical guard, not a SQL parser. Existing
@@ -290,14 +290,17 @@ def _strip_sql_literals_and_comments(statement: str) -> str:
         char = chars[index]
         following = chars[index + 1] if index + 1 < len(chars) else ""
         if quote_end is not None:
+            keep_quoted = keep_double_quoted and quote_end == '"'
             if char == quote_end:
-                chars[index] = " "
+                if not keep_quoted:
+                    chars[index] = " "
                 if following == quote_end and quote_end != "]":
-                    chars[index + 1] = " "
+                    if not keep_quoted:
+                        chars[index + 1] = " "
                     index += 2
                     continue
                 quote_end = None
-            elif char != "\n":
+            elif char != "\n" and not keep_quoted:
                 chars[index] = " "
             index += 1
             continue
@@ -320,7 +323,8 @@ def _strip_sql_literals_and_comments(statement: str) -> str:
             continue
         if char in "'\"`":
             quote_end = char
-            chars[index] = " "
+            if not (keep_double_quoted and char == '"'):
+                chars[index] = " "
         elif char == "[":
             quote_end = "]"
             chars[index] = " "
@@ -415,6 +419,15 @@ def _statement_table(statement: AppliedStatement) -> str | None:
     return None
 
 
+def statement_table(statement: AppliedStatement) -> str | None:
+    return _statement_table(statement)
+
+
+def statement_order_by_columns(statement: AppliedStatement) -> tuple[str, ...] | None:
+    match = _ORDER_BY_RE.search(_strip_sql_literals_and_comments(str(statement.statement or "")))
+    return normalize_columns(match.group("cols")) if match else None
+
+
 def ledger_tables(ledger: AppliedTuningLedger) -> set[str]:
     """Normalized table names the executed ledger statements reference.
 
@@ -454,7 +467,9 @@ def _classify(statement: AppliedStatement) -> tuple[str, list[_Intent]]:
     if lowered.startswith(_MAINTENANCE_PREFIXES):
         return MAINTENANCE, []
 
-    m = _CREATE_INDEX_RE.match(text)
+    m = _CREATE_INDEX_RE.match(
+        _strip_sql_literals_and_comments(str(statement.statement or ""), keep_double_quoted=True).strip()
+    )
     if m:
         return "verifiable", [
             _Intent(
@@ -517,8 +532,17 @@ def _classify(statement: AppliedStatement) -> tuple[str, list[_Intent]]:
 # ---------------------------------------------------------------------------
 # Corroboration.
 # ---------------------------------------------------------------------------
-def _short_diff(expected: tuple[str, ...], observed: tuple[str, ...]) -> str:
-    return f"expected {list(expected)} != observed {list(observed)}"
+_BOUND_REFERENCE_RE = re.compile(r"^\((?P<table>[^.()]+)\.(?P<column>[^.()]+)\)$")
+BOUND_EXPRESSION_DIFF_NOTE = "catalog stored a bound expression; identifier case in the DDL differs from the catalog"
+
+
+def _short_diff(expected: tuple[str, ...], observed: tuple[str, ...], table: str | None = None) -> str:
+    diff = f"expected {list(expected)} != observed {list(observed)}"
+    if table and any(
+        (match := _BOUND_REFERENCE_RE.match(column)) and match.group("table") == table for column in observed
+    ):
+        return f"{diff}; {BOUND_EXPRESSION_DIFF_NOTE}"
+    return diff
 
 
 def _match_object(intent: _Intent, state: IntrospectedState) -> tuple[str, IntrospectedObject | None]:
@@ -664,7 +688,7 @@ def corroborate(ledger: AppliedTuningLedger, introspected_state: IntrospectedSta
                 entry.evidence = dict(fact.evidence) if fact.evidence else None
             if verdict == MISMATCH:
                 observed = fact.columns if fact is not None else ()
-                entry.diff = _short_diff(intent.columns, observed)
+                entry.diff = _short_diff(intent.columns, observed, intent.table)
             elif verdict == ABSENT:
                 entry.reason = f"no {intent.kind} found in catalog"
             entries.append(entry)

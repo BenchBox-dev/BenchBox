@@ -7,14 +7,27 @@
 
 ## The signal, and what it is not
 
-Soundness-path PRs (see `_project/scripts/auto_merge_soundness_paths.py`'s
-`SOUNDNESS_PREFIXES`, mirrored in `.github/CODEOWNERS`) correctly **never
-auto-merge**. `.github/workflows/auto-merge-on-open.yml` withholds or revokes
-squash auto-merge the moment a PR's diff touches the comparator/parser
-surface, the oracle-adjacent reference data, the `sql_compat` rule-dispatch
-core, or the gate machinery itself. That withholding is intentional — CI
-cannot catch a change that redefines the oracle it validates against, so
-those PRs must be reviewed and merged by hand.
+Soundness-path PRs (paths in `.github/soundness-paths.txt`) merge only after
+the required `oracle-review` check passes, which needs the Codex connector's
+review of the current head. CI cannot catch a change that redefines the oracle
+it validates against, so such a PR can sit green but unmergeable while it
+waits for that review.
+
+When the Codex connector cannot review (for example at its usage limit), a
+listed attester in `STANDIN_ATTESTERS` (`_project/scripts/oracle_review_check.py`)
+can substitute an independent stand-in review. After that review of the
+current head, the attester posts a PR comment whose whole text is the line
+`Stand-in oracle review: APPROVE <full head SHA>`; the review itself goes in a
+separate comment. The check accepts it only for
+that exact head, only if posted after the head commit and any retarget, and
+never while a Codex connector review thread is unresolved. An edited comment
+does not count, and neither does one with any other text, because Markdown
+around the line can hide or quote it.
+Posting the comment does not rerun the check: rerun the latest oracle-review
+run (`gh run rerun <run-id>`) or dispatch it with
+`gh workflow run oracle-review.yml --ref <feature-branch> -f pr=<number>`.
+The attester account is also the one local automation uses, so the
+attestation records who vouched for the review, not that a human read it.
 
 What the gate does not do on its own is tell anyone a PR is *waiting*. Two
 PRs (#1116, #1142) sat parked for days, accumulating merge conflicts,
@@ -43,9 +56,9 @@ hold:
   a missing run is fail-closed, not an absent requirement.
 - **(b) awaiting the owner** — auto-merge is currently OFF, **and** either
   the diff touches a soundness-critical path (reused via
-  `any_soundness_path` imported from `auto_merge_soundness_paths.py` —
-  never re-derived or edited), or the owner (`joeharris76`, per
-  `.github/CODEOWNERS`) is a requested reviewer.
+  `any_soundness_path` imported from `soundness_paths.py` —
+  never re-derived or edited), or the owner (`joeharris76`) is a requested
+  reviewer.
 - **(c) parked > 24h** — more than 24 hours of park time (see below).
   The gate deliberately does NOT use `updated_at`: the script's own label
   writes and ordinary human comments bump `updated_at`, so an idle-based
@@ -91,8 +104,8 @@ back under 24h on a fresh push, etc.). Do not hand-manage it — the next
 ## The digest issue
 
 No workflow runs the report on a schedule any more: the daily
-`soundness-drain.yml` was retired with the six-unit CI, whose `soundness-flag`
-job now fails a soundness-path PR that lacks its review evidence. Run
+`soundness-drain.yml` was retired with the six-unit CI; the Codex connector
+now reviews soundness-path PRs. Run
 `make soundness-drain-report` for the read-only view, or the script with
 `--apply` when you want the label and issue updated. The digest is posted to a single pinned issue titled
 **"Soundness-PR drain queue"** — found by exact title plus a body marker

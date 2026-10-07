@@ -1,0 +1,11 @@
+{
+  "bundle_file": "datavault_sf1_databricks_sql_20260930_180331_e7b23724.json",
+  "bundle_hash": "f830fa9abf22561ebcc9ba5bc64976aa7adee15e3dcf6cf19343d77cc164a211",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}

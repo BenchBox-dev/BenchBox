@@ -650,6 +650,13 @@ class BenchmarkDataValidator:
                         "row_count": rows if len(paths) == 1 else 0,  # store total on single file entries
                     }
                 )
+        from benchbox.utils.datagen_manifest import require_manifest_files
+
+        require_manifest_files(
+            sum(len(entries) for entries in manifest["tables"].values()),
+            label=self.benchmark_name,
+            output_dir=data_dir,
+        )
         mp = self._manifest_path(data_dir)
         with open(mp, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)

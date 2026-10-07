@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from benchbox.core.tuning.applied_ledger import PHASE_DDL, AppliedTuningLedger, recording_connection
+from benchbox.core.tuning.applied_ledger import PHASE_DDL, PHASE_POST_LOAD, AppliedTuningLedger, recording_connection
 
 pytestmark = [
     pytest.mark.unit,
@@ -1101,9 +1101,15 @@ class TestApplyTableTunings:
         adapter.apply_table_tunings(tuning, mock_conn)
 
         all_sqls = [call.args[0] for call in mock_cursor.execute.call_args_list]
-        assert "ALTER TABLE ORDERS RESUME RECLUSTER" in all_sqls
+        assert "ALTER TABLE ORDERS RESUME RECLUSTER" not in all_sqls
 
-    def test_linear_catalog_form_skips_alter_and_records_dropped_intent(self):
+        mock_cursor.execute.reset_mock()
+        adapter.apply_post_load_tunings("ORDERS", None, mock_conn)
+
+        post_load_sqls = [call.args[0] for call in mock_cursor.execute.call_args_list]
+        assert post_load_sqls == ["ALTER TABLE ORDERS RESUME RECLUSTER"]
+
+    def test_linear_catalog_form_skips_alter_and_records_satisfied_intent(self):
         adapter = _make_adapter()
         adapter._applied_tuning_ledger = AppliedTuningLedger()
         mock_conn = Mock()
@@ -1119,10 +1125,12 @@ class TestApplyTableTunings:
 
         all_sqls = [call.args[0] for call in mock_cursor.execute.call_args_list]
         assert not any("ALTER TABLE" in sql.upper() and "CLUSTER BY" in sql.upper() for sql in all_sqls)
-        assert [d.intent for d in adapter._applied_tuning_ledger.dropped] == [
+        # An already-present key counts as satisfied, not dropped (D10).
+        assert [s.intent for s in adapter._applied_tuning_ledger.satisfied] == [
             "ALTER TABLE ORDERS CLUSTER BY (o_orderdate, o_custkey)"
         ]
-        assert "already present" in adapter._applied_tuning_ledger.dropped[0].reason
+        assert "already present" in adapter._applied_tuning_ledger.satisfied[0].reason
+        assert adapter._applied_tuning_ledger.dropped == []
 
     def test_clustering_precheck_binds_normalized_schema_and_table(self):
         adapter = _make_adapter(schema="bench")
@@ -1154,7 +1162,13 @@ class TestApplyTableTunings:
 
         assert [statement.statement for statement in ledger.executed_statements] == [
             "ALTER TABLE ORDERS CLUSTER BY (o_orderdate)",
-            "ALTER TABLE ORDERS RESUME RECLUSTER",
+        ]
+
+        adapter.run_post_load_tunings("ORDERS", SimpleNamespace(table_tunings={}), mock_conn)
+
+        assert [(statement.statement, statement.phase) for statement in ledger.executed_statements] == [
+            ("ALTER TABLE ORDERS CLUSTER BY (o_orderdate)", PHASE_DDL),
+            ("ALTER TABLE ORDERS RESUME RECLUSTER", PHASE_POST_LOAD),
         ]
         assert ledger.dropped == []
 

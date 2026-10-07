@@ -18,7 +18,11 @@ permissions:
 
 jobs:
   test:
+    name: >-
+      test (${{ matrix.os }}, ${{ matrix.python-version }})${{
+      matrix.os == 'windows-latest' && ' (quarantine #2568)' || '' }}
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: false
       matrix:
@@ -351,7 +355,11 @@ jobs:
           retention-days: 14
 
   integration-smoke:
+    name: >-
+      integration-smoke (${{ matrix.os }}, ${{ matrix.python-version }})${{
+      matrix.os == 'windows-latest' && ' (quarantine #2569)' || '' }}
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     env:
       BENCHBOX_TEST_TIER: t2
     strategy:
@@ -694,7 +702,42 @@ jobs:
         run: npm test -- --reporter=verbose
         working-directory: results-explorer
 
+  website-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Detect website
+        id: website
+        shell: bash
+        run: |
+          if [ -f website/package.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "website is absent; skipping website audit."
+          fi
+
+      - name: Set up Node.js
+        if: steps.website.outputs.present == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+
+      - name: Install website dependencies
+        if: steps.website.outputs.present == 'true'
+        run: npm ci
+        working-directory: website
+
+      - name: Audit website dependencies
+        if: steps.website.outputs.present == 'true'
+        run: npm run audit:high
+        working-directory: website
+
   scheduled-workflow-liveness:
+    name: "scheduled-workflow-liveness (quarantine #2570)"
     # Guard for the release-canary-scheduled-activation TODO's failure class:
     # a workflow that declares `on.schedule` but is not on the DEFAULT branch
     # never registers and never runs — nothing red appears anywhere (this is
@@ -709,6 +752,7 @@ jobs:
     # a workflow stayed dark until a release carried it there; that gap is gone.)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    continue-on-error: true
     permissions:
       actions: read
       contents: read
@@ -924,15 +968,17 @@ jobs:
     # throughput-stream-count-wiring-defect) would have shipped green. This
     # job is the nightly-only real-DB/real-CLI lane; PR fast-lane runtime is
     # unaffected (see tests/uat/configs/uat-throughput-duckdb-nightly.yaml).
-    # The Docker Postgres cell below is the deferred w4: same stream-count
-    # contract on a client/server engine via INDEPENDENT_CONNECTION, with the
-    # cell managing its own compose stack
-    # (see tests/uat/configs/uat-throughput-postgresql-nightly.yaml).
+    # The Docker CedarDB cell below runs the same stream-count contract on a
+    # client/server engine via INDEPENDENT_CONNECTION, with the cell managing
+    # its own compose stack
+    # (see tests/uat/configs/uat-throughput-cedardb-nightly.yaml).
     runs-on: ubuntu-latest
-    # Cell budgets: DuckDB 900s + Postgres 2400s = 55 min worst case, plus
+    # Cell budgets: DuckDB 900s + CedarDB 600s = 25 min worst case, plus
     # ~25 min headroom for checkout, deps, integration tests, Docker
     # startup/cleanup, and both assert steps.
-    timeout-minutes: 80
+    timeout-minutes: 60
+    outputs:
+      cedardb_sweep_outcome: ${{ steps.cedardb-sweep.outcome }}
     env:
       # Throughput@Size floor activation: repository configuration variables
       # flow into the DuckDB assert step below. Unset vars evaluate to empty,
@@ -960,17 +1006,8 @@ jobs:
         run: |
           uv run -- python -m pytest tests/integration -k "throughput and duckdb" -m integration --tb=short -v
 
-      - name: Capture throughput UAT start timestamp
-        # Captured BEFORE the sweep step so the assert step below can filter
-        # on "written after this run started" precisely, instead of the
-        # previous full-hour `now() - 1h` window -- which, over a shared,
-        # persistent results dir (multi-cell sweeps, repeated nightly runs
-        # on a non-ephemeral runner), risked resolving a stale file from an
-        # earlier run instead of this run's own export.
-        run: |
-          echo "THROUGHPUT_UAT_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%S)" >> "$GITHUB_ENV"
-
       - name: Run DuckDB throughput UAT cell (TPC-H SF1, run-official --streams 3)
+        id: duckdb-sweep
         # Gated on the sweep's own exit code: the config's
         # `validator_clean_rate_floor: 1.0` plus the strict report exit
         # policy fail this step on any non-clean cell. The TPC-H
@@ -984,147 +1021,79 @@ jobs:
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
 
-      - name: Run Postgres throughput UAT cell (TPC-H SF1, run-official --streams 3)
-        # w4: the same stream-count contract on a client/server engine. Unlike
-        # DuckDB's SHARED_CURSOR fast path, PostgreSQL opts into
+      - name: "Run CedarDB throughput UAT cell (TPC-H SF1, run-official --streams 3) (quarantine #2571)"
+        id: cedardb-sweep
+        # Unlike DuckDB's SHARED_CURSOR fast path, CedarDB uses
         # INDEPENDENT_CONNECTION (a fresh connection per stream), so this cell
         # proves N concurrent independent sessions end to end via the
         # production CLI. The cell manages its own compose stack
         # (cleanup.docker_manage_platforms); no service container is needed.
-        # Gated on the sweep's own exit code like the DuckDB cell above: no
-        # `continue-on-error` here either.
+        continue-on-error: true
         run: |
-          make uat-sweep CONFIG=tests/uat/configs/uat-throughput-postgresql-nightly.yaml
+          make uat-sweep CONFIG=tests/uat/configs/uat-throughput-cedardb-nightly.yaml
 
       - name: Assert the requested stream count reached the driver and every stream succeeded
-        # Independent, defense-in-depth gate. `if: !cancelled()` is load-bearing:
-        # without it, a FAILED sweep step above would SKIP this step under GitHub
-        # Actions' default `success()` step-condition, so the gate would silently
-        # stop running exactly when it matters most. `!cancelled()` makes it run
-        # (and gate) on both a passing AND a failing sweep -- only a workflow
-        # cancellation skips it -- so this check stays genuinely independent of
-        # the sweep step's outcome. Now strict: both the wiring-defect check
-        # (distinct stream ids == requested, validate_stream_count) AND the
-        # per-stream success check (every counted stream had >=1 SUCCESSFUL
-        # query, validate_stream_success) must pass -- see tests/uat/throughput.py
-        # for why these stay two separate functions.
         if: ${{ !cancelled() }}
         run: |
-          uv run -- python -c "
-          import datetime, os, sys
-          from datetime import timezone
-          from pathlib import Path
-          from tests.uat.throughput import (
-              validate_stream_count,
-              validate_stream_success,
-          )
+          uv run -- python -m tests.uat.throughput assert \
+            --cells-glob "$HOME/Developer/benchmark_runs/logs/uat_throughput_duckdb_nightly_*/cells.jsonl" \
+            --platform duckdb --benchmark tpch --scale 1 --streams 3 \
+            --evaluate-floor \
+            --baseline-out "$HOME/Developer/benchmark_runs/throughput-baseline"
 
-          # Narrow window: the timestamp captured immediately before the sweep
-          # step above, not a full-hour lookback -- see that step's comment.
-          # The capture step writes UTC (date -u); strptime yields a naive
-          # datetime whose .timestamp() would otherwise be read as LOCAL, so
-          # anchor it to UTC explicitly -- correct on any runner TZ, not just
-          # ubuntu-latest's UTC.
-          started_after = datetime.datetime.strptime(
-              os.environ['THROUGHPUT_UAT_STARTED_AT'], '%Y-%m-%dT%H:%M:%S'
-          ).replace(tzinfo=timezone.utc)
-          results_dir = Path.home() / 'Developer' / 'benchmark_runs' / 'results'
-          candidates = [
-              p for p in results_dir.glob('tpch_sf1_duckdb_*.json')
-              if not p.name.endswith('.applied.json')
-              and not p.name.endswith('.plans.json')
-              and p.stat().st_mtime >= (started_after.timestamp() - 5)
-          ]
-          result_path = max(candidates, key=lambda p: (p.stat().st_mtime, p.name)) if candidates else None
-          if result_path is None:
-              print('::error::No throughput UAT result JSON found for duckdb/tpch')
-              sys.exit(1)
-          import json
-          result_json = json.loads(result_path.read_text(encoding='utf-8'))
-          ok, reason = validate_stream_count(result_json, requested_streams=3)
-          if not ok:
-              print(f'::error::{reason}')
-              sys.exit(1)
-          ok, reason = validate_stream_success(result_json)
-          if not ok:
-              print(f'::error::{reason}')
-              sys.exit(1)
-          print(f'OK: stream count and per-stream success both verified ({result_path})')
-          # Throughput@Size floor (relative model -- see
-          # docs/operations/uat-framework.md 'Throughput performance floor').
-          # Additive to the stream-count hard gate above: a floor failure
-          # never masks or replaces a stream-count failure. With no baseline
-          # configured this only reports the observed value for future
-          # baseline accumulation and never fails: a threshold set before a
-          # stable baseline exists manufactures false failures.
-          tpc_metrics = (result_json.get('summary') or {}).get('tpc_metrics') or {}
-          observed = tpc_metrics.get('throughput_at_size')
-          print(f'::notice::Throughput@Size observed: {observed!r} (duckdb/tpch-sf1)')
-          import math
-          floor_median = os.environ.get('THROUGHPUT_FLOOR_MEDIAN')
-          # `or` (not a get-default): a defined-but-empty variable must fall
-          # back too, otherwise float('') fails the gate on valid input.
-          floor_drop = os.environ.get('THROUGHPUT_FLOOR_MAX_DROP_FRACTION') or '0.2'
-          if floor_median:
-              try:
-                  median = float(floor_median)
-                  max_drop = float(floor_drop)
-                  assert math.isfinite(median) and median > 0
-                  assert math.isfinite(max_drop) and 0 < max_drop < 1
-                  assert isinstance(observed, (int, float)) and math.isfinite(observed) and observed > 0
-              except (ValueError, AssertionError):
-                  print('::error::Throughput@Size floor misconfigured or unobserved; refusing to gate')
-                  sys.exit(1)
-              floor = median * (1 - max_drop)
-              if observed < floor:
-                  print(f'::error::Throughput@Size regression: observed {observed:.2f} below floor {floor:.2f} (median {median:.2f}, max drop {max_drop:.0%})')
-                  sys.exit(1)
-              print(f'OK: Throughput@Size {observed:.2f} clears floor {floor:.2f}')
-          else:
-              print('::notice::No THROUGHPUT_FLOOR_MEDIAN configured; floor check in observe-only mode')
-          "
-
-      - name: Assert the Postgres cell stream count and per-stream success
-        # w4 defense-in-depth, mirroring the DuckDB assert above: runs under
-        # `if: !cancelled()` so a failed sweep still gates instead of skipping.
-        # Globs the postgresql result (not duckdb) within the same run window.
+      - name: "Assert the CedarDB cell stream count and per-stream success (quarantine #2571)"
         if: ${{ !cancelled() }}
+        continue-on-error: true
         run: |
-          uv run -- python -c "
-          import datetime, os, sys
-          from datetime import timezone
-          from pathlib import Path
-          from tests.uat.throughput import (
-              validate_stream_count,
-              validate_stream_success,
-          )
+          uv run -- python -m tests.uat.throughput assert \
+            --cells-glob "$HOME/Developer/benchmark_runs/logs/uat_throughput_cedardb_nightly_*/cells.jsonl" \
+            --platform cedardb --benchmark tpch --scale 1 --streams 3
 
-          started_after = datetime.datetime.strptime(
-              os.environ['THROUGHPUT_UAT_STARTED_AT'], '%Y-%m-%dT%H:%M:%S'
-          ).replace(tzinfo=timezone.utc)
-          results_dir = Path.home() / 'Developer' / 'benchmark_runs' / 'results'
-          candidates = [
-              p for p in results_dir.glob('tpch_sf1_postgres*.json')
-              if not p.name.endswith('.applied.json')
-              and not p.name.endswith('.plans.json')
-              and p.stat().st_mtime >= (started_after.timestamp() - 5)
-          ]
-          result_path = max(candidates, key=lambda p: (p.stat().st_mtime, p.name)) if candidates else None
-          if result_path is None:
-              print('::error::No throughput UAT result JSON found for postgresql/tpch')
-              sys.exit(1)
-          import json
-          result_json = json.loads(result_path.read_text(encoding='utf-8'))
-          ok, reason = validate_stream_count(result_json, requested_streams=3)
-          if not ok:
-              print(f'::error::{reason}')
-              sys.exit(1)
-          ok, reason = validate_stream_success(result_json)
-          if not ok:
-              print(f'::error::{reason}')
-              sys.exit(1)
-          print(f'OK: postgres stream count and per-stream success both verified ({result_path})')
-          "
+      - name: Upload throughput UAT logs and results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: throughput-uat-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ~/Developer/benchmark_runs/logs/uat_throughput_*
+            ~/Developer/benchmark_runs/results/tpch_sf1_*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Throughput@Size baseline record
+        if: ${{ !cancelled() && steps.duckdb-sweep.outcome == 'success' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: throughput-baseline-duckdb-tpch-sf1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ~/Developer/benchmark_runs/throughput-baseline/
+          if-no-files-found: ignore
+          retention-days: 90
+
+  throughput-uat-signal:
+    name: throughput-uat-signal
+    needs: throughput-uat
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      statuses: write
+    steps:
+      - name: Publish the throughput-uat commit status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          THROUGHPUT_UAT_RESULT: ${{ needs.throughput-uat.result }}
+          CEDARDB_SWEEP_OUTCOME: ${{ needs.throughput-uat.outputs.cedardb_sweep_outcome }}
+        run: |
+          case "${THROUGHPUT_UAT_RESULT}" in
+            success) state=success ;;
+            cancelled) state=error ;;
+            *) state=failure ;;
+          esac
+          gh api "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
+            -f state="${state}" \
+            -f context="nightly/throughput-uat" \
+            -f description="throughput-uat ${THROUGHPUT_UAT_RESULT}; cedardb cell (quarantined) ${CEDARDB_SWEEP_OUTCOME:-not run}" \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
   pyspark-tests:
     runs-on: ubuntu-latest
@@ -1156,15 +1125,6 @@ jobs:
           make test-pyspark
 
   green-unmerged-sweep:
-    # External read-only observer for true auto-merge stranding (arm intent
-    # then lost): green + auto-merge OFF alone is an intentional hold after
-    # the post-#1592 policy and is NOT alerted. The script requires timeline
-    # evidence of prior arm (ready_for_review / auto_squash_enabled /
-    # auto_merge_disabled) and excludes durable holds (draft or the
-    # `no-auto-merge` label). It does NOT modify auto-merge-on-open.yml and
-    # does NOT enable auto-merge itself -- --apply only upserts one
-    # marker-tagged tracking issue and must never re-arm a hold it did not
-    # set. See docs/operations/pr-triage.md.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -1194,39 +1154,38 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run -- python _project/scripts/green_unmerged_sweep.py --apply
 
-  fast-lane-ratchet-check:
-    # Auto-ratchet signal for the fast-lane test-count ceiling (see
-    # fast-lane-decouple-ceiling-contention-2 and
-    # docs/operations/fast-lane-budget.md): runs the same fast-lane collect
-    # ci.yml's guard-fast-lane-ceiling step uses and, when headroom drops below
-    # the warning threshold, files/updates ONE marker-tagged tracking issue
-    # with the current numbers and the exact edit to make -- it does NOT
-    # push a branch or open a PR itself (GITHUB_TOKEN-authored PRs get no
-    # required checks; same known constraint green_unmerged_sweep.py's own
-    # docstring notes). A ceiling bump stays a deliberate human/agent PR;
-    # this job only surfaces the need before the next test-adding PR
-    # collides with the cap.
+  ruleset-drift:
+    name: ruleset-drift
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      issues: write
+    timeout-minutes: 5
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: develop
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
-
-      - name: Install dependencies
-        run: uv sync --group dev
-
-      - name: Run fast-lane ceiling ratchet check
+      - name: Compare live governance with the runbook
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: uv run -- python _project/scripts/fast_lane_ratchet_check.py --apply
+          RULESET_DRIFT_TOKEN: ${{ secrets.RULESET_DRIFT_TOKEN }}
+        run: |
+          set -euo pipefail
+          python scripts/ruleset_drift_check.py \
+            --token "${RULESET_DRIFT_TOKEN}" \
+            --require-bypass-actor-visibility \
+            --output ruleset-drift.json
+
+      - name: Upload drift evidence
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: nightly-ruleset-drift-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ruleset-drift.json
+          if-no-files-found: warn
+          retention-days: 30

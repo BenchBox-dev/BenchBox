@@ -82,6 +82,8 @@ class DatabendAdapter(PlatformAdapter):
     - Edge-case optimizations applied via _optimize_table_definition()
     """
 
+    physical_identifier_case = "lower"
+
     plan_capture_phase_eligible = True
     default_service_port = 8000
 
@@ -775,7 +777,7 @@ class DatabendAdapter(PlatformAdapter):
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name.lower()
+        table_name = self.resolve_physical_table(table_tuning.table_name, connection)
         self.logger.info(f"Applying Databend tunings for table: {table_name}")
 
         try:

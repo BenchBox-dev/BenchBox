@@ -193,7 +193,7 @@ def test_container_name_budget_fits_every_config_and_platform(replica_index):
     `compose_project_name` with each config's *actual*
     `cleanup.docker_project_prefix`, not the three-arg default -- five
     checked-in configs (release-gate-02/03, uat-enabled-platforms-full,
-    uat-lakesail-failing-benchmarks, uat-throughput-postgresql-nightly)
+    uat-lakesail-failing-benchmarks, uat-throughput-cedardb-nightly)
     declare a non-default prefix, and the real production caller
     (`tests/uat/phases/execute.py::_start_docker_platform_if_needed`) always
     passes `config.cleanup.docker_project_prefix` explicitly. A prior version

@@ -22,14 +22,21 @@ from benchbox.cli.onboarding import _show_welcome_message
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
-README = Path(__file__).resolve().parents[3] / "README.md"
+ROOT = Path(__file__).resolve().parents[3]
+README = ROOT / "README.md"
+SITE_SHELL_MODEL = ROOT / "results-explorer" / "src" / "components" / "shellModel.ts"
 LOGO_FIRST_ROW = LOGO.splitlines()[1]
 
 
 def test_logo_matches_readme() -> None:
-    match = re.search(r"```\n(.*?)\n```", README.read_text(encoding="utf-8"), re.DOTALL)
+    match = re.search(r"```(?:text)?\n(.*?)\n```", README.read_text(encoding="utf-8"), re.DOTALL)
     assert match is not None
     assert match.group(1) == LOGO
+
+
+def test_logo_matches_site_shell_model() -> None:
+    model = SITE_SHELL_MODEL.read_text(encoding="utf-8")
+    assert all(f'"{row}"' in model for row in LOGO.splitlines())
 
 
 @pytest.mark.parametrize(("encoding", "expected"), [("utf-8", True), ("cp1252", False), ("ascii", False)])

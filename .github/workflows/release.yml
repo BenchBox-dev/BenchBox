@@ -285,6 +285,8 @@ jobs:
   cleanup-artifacts:
     needs: [publish, test-installation]
     runs-on: ubuntu-latest
+    # Housekeeping after publication; a failure here must not mark a published release red.
+    continue-on-error: true
     permissions:
       actions: write
     steps:
@@ -293,27 +295,22 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
+            const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-            // List artifacts older than 7 days with 'release-dist' or 'dist' name
-            const artifacts = await github.rest.actions.listArtifactsForRepo({
-              owner,
-              repo,
-              per_page: 100,
-            });
-
-            const now = new Date();
-            const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
-
-            for (const artifact of artifacts.data.artifacts) {
-              const createdAt = new Date(artifact.created_at);
-              // Delete old dist artifacts to prevent confusion
-              if (createdAt < sevenDaysAgo &&
-                  (artifact.name === 'dist' || artifact.name === 'release-dist' || artifact.name === 'test-dist')) {
-                console.log(`Deleting old artifact: ${artifact.name} (${artifact.id}) from ${artifact.created_at}`);
-                await github.rest.actions.deleteArtifact({
-                  owner,
-                  repo,
-                  artifact_id: artifact.id,
-                });
+            // Query each artifact name separately. Listing every artifact in the
+            // repository returns only the newest page and intermittently fails
+            // with HTTP 500 once the repository holds tens of thousands of them.
+            for (const name of ['dist', 'release-dist', 'test-dist']) {
+              const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
+                owner,
+                repo,
+                name,
+                per_page: 100,
+              });
+              for (const artifact of artifacts) {
+                if (new Date(artifact.created_at) < sevenDaysAgo) {
+                  console.log(`Deleting old artifact: ${artifact.name} (${artifact.id}) from ${artifact.created_at}`);
+                  await github.rest.actions.deleteArtifact({ owner, repo, artifact_id: artifact.id });
+                }
               }
             }

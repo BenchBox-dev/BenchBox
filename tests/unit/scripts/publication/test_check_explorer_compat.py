@@ -364,6 +364,7 @@ def test_cli_default_schema_checks(capsys: pytest.CaptureFixture[str]) -> None:
     assert "Results Explorer Compatibility" in captured.out
     assert "Schema v12" in captured.out
     assert "Schema v11" not in captured.out
+    assert "Schema v10" not in captured.out
     assert "Schema v9" not in captured.out
     assert "All Results Explorer compatibility checks PASSED" in captured.out
 
@@ -377,6 +378,7 @@ def test_cli_json_mode(capsys: pytest.CaptureFixture[str]) -> None:
     assert data["current_version"] == 12
     assert "v12" in data["schema_checks"]
     assert "v11" not in data["schema_checks"]
+    assert "v10" not in data["schema_checks"]
 
 
 def test_cli_specific_schema_version(capsys: pytest.CaptureFixture[str]) -> None:
@@ -385,6 +387,7 @@ def test_cli_specific_schema_version(capsys: pytest.CaptureFixture[str]) -> None
     captured = capsys.readouterr()
     assert "Schema v12" in captured.out
     assert "Schema v11" not in captured.out
+    assert "Schema v10" not in captured.out
 
 
 def test_cli_invalid_schema_version(capsys: pytest.CaptureFixture[str]) -> None:

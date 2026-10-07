@@ -17,7 +17,9 @@ guarantee is always exercised, not only inside the heavy SF=1 gate.
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -339,3 +341,174 @@ def test_sf1_value_digest_is_not_reused_at_other_scales():
     # At other scales the SF=1 digest is declined (row-count fallback still applies).
     assert matrix._stored_value_digest(validator, "tpch", "1", 0.01, 0) is None
     assert matrix._stored_value_digest(validator, "tpch", "1", 10.0, 0) is None
+
+
+@pytest.fixture
+def digest_reference_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    from benchbox.core.expected_results import loader
+
+    path = tmp_path / "digest-reference.json"
+    monkeypatch.setattr(loader, "_TPCH_VALUE_DIGEST_REFERENCE_PATH", path)
+    return path
+
+
+@pytest.mark.parametrize("seed", [0, -1, 98741, None])
+def test_digest_snapshot_seed_comes_from_metadata(digest_reference_path: Path, seed: int) -> None:
+    from benchbox.core.expected_results.loader import load_tpch_value_digest_seed
+
+    digest_reference_path.write_text(
+        json.dumps({"benchmark": "tpch", "scale_factor": 1.0, "reference_seed": seed}), encoding="utf-8"
+    )
+    assert load_tpch_value_digest_seed() == seed
+
+
+@pytest.mark.parametrize("seed", [True, False, "17", 1.5, {}, []])
+def test_digest_snapshot_rejects_noninteger_seed(digest_reference_path: Path, seed) -> None:
+    from benchbox.core.expected_results.loader import load_tpch_value_digest_seed
+
+    digest_reference_path.write_text(
+        json.dumps({"benchmark": "tpch", "scale_factor": 1.0, "reference_seed": seed}), encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="reference_seed must be an integer or null"):
+        load_tpch_value_digest_seed()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"benchmark": "tpch", "scale_factor": 1.0},
+        {"benchmark": "tpcds", "scale_factor": 1.0, "reference_seed": 31},
+        {"benchmark": "tpch", "scale_factor": 0.1, "reference_seed": 31},
+        {"benchmark": "tpch", "scale_factor": True, "reference_seed": 31},
+        [],
+    ],
+)
+def test_digest_snapshot_rejects_missing_seed_or_wrong_identity(digest_reference_path: Path, payload) -> None:
+    from benchbox.core.expected_results.loader import load_tpch_value_digest_seed
+
+    digest_reference_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_tpch_value_digest_seed()
+
+
+def test_digest_snapshot_missing_or_unreadable_metadata_fails_closed(digest_reference_path: Path) -> None:
+    from benchbox.core.expected_results.loader import load_tpch_value_digest_seed
+
+    with pytest.raises(FileNotFoundError):
+        load_tpch_value_digest_seed()
+    digest_reference_path.write_text("{broken", encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_tpch_value_digest_seed()
+
+
+@pytest.mark.parametrize(
+    "benchmark_name,platform,scale,query_ids,strict,emit,seeded",
+    [
+        ("tpch", "duckdb", 1.0, "1,6", True, True, True),
+        ("tpch", "duckdb", 1.0, "1,6", True, True, None),
+        ("tpch", "duckdb", 1.0, "", True, True, False),
+        ("tpch", "duckdb", 0.1, "1,6", True, True, False),
+        ("tpcds", "duckdb", 1.0, "1,6", True, True, False),
+        ("tpch", "datafusion", 1.0, "1,6", True, True, False),
+        ("tpch", "duckdb", 1.0, "1,6", False, True, False),
+        ("tpch", "duckdb", 1.0, "1,6", True, False, False),
+    ],
+)
+def test_only_bounded_digest_gate_binds_snapshot_seed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    digest_reference_path: Path,
+    benchmark_name: str,
+    platform: str,
+    scale: float,
+    query_ids: str,
+    strict: bool,
+    emit: bool,
+    seeded: bool | None,
+) -> None:
+    """``seeded`` None means a qgen -d (null seed) snapshot: the gate runs without --seed."""
+    import tests.integration.test_local_platform_benchmark_matrix as matrix
+
+    snapshot_seed = None if seeded is None else 31
+    digest_reference_path.write_text(
+        json.dumps(
+            {"benchmark": "tpch", "scale_factor": 1.0, "reference_seed": snapshot_seed, "digests": {"1": "a", "6": "b"}}
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(matrix.CORRECTNESS_GATE_QUERY_IDS_ENV, query_ids)
+    monkeypatch.setenv("BENCHBOX_STRICT_EXPECTED_RESULTS", str(int(strict)))
+    monkeypatch.setenv("BENCHBOX_EMIT_RESULT_DIGEST", str(int(emit)))
+    monkeypatch.setattr(matrix, "is_platform_available", lambda _: True)
+    monkeypatch.setattr(matrix, "_local_sql_case_enabled", lambda *_: True)
+    monkeypatch.setattr(matrix, "_select_scale", lambda *_: scale)
+    command = []
+
+    def capture_cli(args, **kwargs):
+        command.extend(args)
+        raise RuntimeError("command captured")
+
+    monkeypatch.setattr(matrix, "run_cli_command", capture_cli)
+    with pytest.raises(RuntimeError, match="command captured"):
+        matrix.test_local_platform_benchmark_matrix(tmp_path, monkeypatch, platform, benchmark_name)
+    assert ("--seed" in command) is bool(seeded)
+    if seeded:
+        assert command[command.index("--seed") + 1] == "31"
+
+
+@pytest.mark.parametrize("query_ids,seed", [("1", True), ("11", 31)])
+def test_digest_gate_rejects_bad_snapshot_before_cli(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    digest_reference_path: Path,
+    query_ids: str,
+    seed,
+) -> None:
+    import tests.integration.test_local_platform_benchmark_matrix as matrix
+
+    digest_reference_path.write_text(
+        json.dumps({"benchmark": "tpch", "scale_factor": 1.0, "reference_seed": seed, "digests": {"1": "a"}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv(matrix.CORRECTNESS_GATE_QUERY_IDS_ENV, query_ids)
+    monkeypatch.setenv("BENCHBOX_STRICT_EXPECTED_RESULTS", "1")
+    monkeypatch.setenv("BENCHBOX_EMIT_RESULT_DIGEST", "1")
+    monkeypatch.setattr(matrix, "is_platform_available", lambda _: True)
+    monkeypatch.setattr(
+        matrix, "run_cli_command", lambda *_args, **_kwargs: pytest.fail("invalid snapshot reached CLI")
+    )
+    with pytest.raises(ValueError):
+        matrix.test_local_platform_benchmark_matrix(tmp_path, monkeypatch, "duckdb", "tpch")
+
+
+@pytest.mark.skipif(
+    not (
+        Path(__file__).resolve().parents[2] / "_project" / "scripts" / "regenerate_correctness_gate_digests.py"
+    ).exists(),
+    reason="_project scripts are not in this checkout (release tree)",
+)
+@pytest.mark.parametrize("seed", [31, None, True])
+def test_digest_regeneration_binds_validated_snapshot_seed(
+    monkeypatch: pytest.MonkeyPatch, digest_reference_path: Path, seed: object
+) -> None:
+    import _project.scripts.regenerate_correctness_gate_digests as regeneration
+
+    digest_reference_path.write_text(
+        json.dumps({"benchmark": "tpch", "scale_factor": 1.0, "reference_seed": seed}), encoding="utf-8"
+    )
+    monkeypatch.setenv(regeneration.CORRECTNESS_GATE_QUERY_IDS_ENV, "1,6")
+    captured = []
+
+    def capture_gate(work_dir, query_ids, bound_seed):
+        captured.append((query_ids, bound_seed))
+        raise RuntimeError("gate captured")
+
+    monkeypatch.setattr(regeneration, "_run_gate", capture_gate)
+    if seed is None or type(seed) is int:
+        with pytest.raises(RuntimeError, match="gate captured"):
+            regeneration.main()
+        assert captured == [(["1", "6"], seed)]
+    else:
+        with pytest.raises(ValueError, match="reference_seed must be an integer or null"):
+            regeneration.main()
+        assert not captured

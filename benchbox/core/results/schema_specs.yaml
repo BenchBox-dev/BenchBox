@@ -46,12 +46,14 @@ config_key_order:
 - table_format
 - table_format_compression
 - table_format_partition_cols
+- query_parameters
 - mode
 - test_type
 phase_key_order:
 - data_generation
 - schema_creation
 - data_loading
+- post_load_maintenance
 - validation
 - statistics
 - migration

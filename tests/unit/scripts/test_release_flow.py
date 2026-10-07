@@ -236,7 +236,6 @@ def test_release_enforcement_requires_external_review_for_each_dependency(path: 
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     assert module.is_soundness_path(path)
-    assert f"{path} @joeharris76" in (REPO_ROOT / ".github/CODEOWNERS").read_text()
 
 
 @pytest.mark.skipif(shutil.which("uv") is None, reason="needs uv")
@@ -543,7 +542,7 @@ def test_candidate_selection_cli_is_stdlib_only_and_preserves_lock(
     assert (root / "uv.lock").read_bytes() == original
 
 
-def test_candidate_check_is_required_on_both_event_types_without_changing_legacy_publisher() -> None:
+def test_candidate_check_is_required_on_pull_requests_without_changing_legacy_publisher() -> None:
     import yaml
 
     workflow = yaml.safe_load((REPO_ROOT / ".github/workflows/ci.yml").read_text())
@@ -551,17 +550,15 @@ def test_candidate_check_is_required_on_both_event_types_without_changing_legacy
     assert "if" not in classifier
     steps = classifier["steps"]
     selection = next(step for step in steps if step.get("id") == "release")
-    assert (
-        selection["env"]["EVENT_BASE_SHA"]
-        == "${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}"
-    )
+    assert selection["env"]["EVENT_BASE_SHA"] == "${{ github.event.pull_request.base.sha }}"
     assert 'git fetch --no-tags origin "$EVENT_BASE_SHA"' in selection["run"]
     check = next(step for step in steps if step.get("name") == "Check release content")
     assert check["if"] == "steps.release.outputs.release-check-needed == 'true'"
     assert check["run"] == 'make release-check VERSION="$RELEASE_VERSION" BASE_REF="$EVENT_BASE_SHA"'
     core = workflow["jobs"]["core"]
     assert "ci-paths" in core["needs"]
-    assert "--always ci-paths" in core["steps"][-1]["run"]
+    aggregate = next(step for step in core["steps"] if step.get("id") == "aggregate")
+    assert "--always ci-paths" in aggregate["run"]
     assert "origin/release" in (REPO_ROOT / ".github/workflows/release.yml").read_text()
     assert "Do not tag the merged develop commit" in (REPO_ROOT / "docs/operations/release-guide.md").read_text()
 

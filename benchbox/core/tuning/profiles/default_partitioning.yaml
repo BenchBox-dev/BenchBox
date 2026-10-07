@@ -1,0 +1,67 @@
+amplab:
+  uservisits:
+  - name: visitdate
+    type: VARCHAR
+    order: 1
+clickbench:
+  hits:
+  - name: EventDate
+    type: DATE
+    order: 1
+read_primitives:
+  LINEITEM:
+  - name: L_SHIPDATE
+    type: DATE
+    order: 1
+  ORDERS:
+  - name: O_ORDERDATE
+    type: DATE
+    order: 1
+ssb:
+  lineorder:
+  - name: lo_orderdate
+    type: INTEGER
+    order: 1
+tpcds:
+  STORE_SALES:
+  - name: SS_SOLD_DATE_SK
+    type: INTEGER
+    order: 1
+  STORE_RETURNS:
+  - name: SR_RETURNED_DATE_SK
+    type: INTEGER
+    order: 1
+  CATALOG_SALES:
+  - name: CS_SOLD_DATE_SK
+    type: INTEGER
+    order: 1
+  CATALOG_RETURNS:
+  - name: CR_RETURNED_DATE_SK
+    type: INTEGER
+    order: 1
+  WEB_SALES:
+  - name: WS_SOLD_DATE_SK
+    type: INTEGER
+    order: 1
+  WEB_RETURNS:
+  - name: WR_RETURNED_DATE_SK
+    type: INTEGER
+    order: 1
+tpch:
+  LINEITEM:
+  - name: L_SHIPDATE
+    type: DATE
+    order: 1
+  ORDERS:
+  - name: O_ORDERDATE
+    type: DATE
+    order: 1
+tpchavoc:
+  LINEITEM:
+  - name: L_SHIPDATE
+    type: DATE
+    order: 1
+  ORDERS:
+  - name: O_ORDERDATE
+    type: DATE
+    order: 1

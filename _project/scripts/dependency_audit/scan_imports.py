@@ -26,6 +26,7 @@ from collections import defaultdict
 # counts as a use of the package.
 PKG_TO_IMPORTS: dict[str, set[str]] = {
     "pyyaml": {"yaml"},
+    "markdown-it-py": {"markdown_it"},
     "psycopg2-binary": {"psycopg2"},
     "google-cloud-bigquery": {"google.cloud.bigquery", "google.cloud.bigquery_storage"},
     "google-cloud-storage": {"google.cloud.storage"},

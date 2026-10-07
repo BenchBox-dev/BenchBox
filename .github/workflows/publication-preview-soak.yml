@@ -1,12 +1,12 @@
 # G2 dual-publication soak prober (same-site preview path).
 #
-# Cron (every 30 min) probes the preview generation deployed by
+# Manual dispatch probes the preview generation deployed by
 # publication-preview-deploy.yml plus root stability, and uploads each
 # observation as a dated, append-only artifact. Nothing here writes Pages.
 #
 # Verdict discipline (fail-safe, never fail-open):
 # - Root-stability probe fails (/, /results/, live DB digest moved) ->
-#   INCONCLUSIVE. Production moved under the soak (e.g. a docs.yml release
+#   INCONCLUSIVE. Production moved under the soak (e.g. a production
 #   deploy wiped /preview/*); the soak must re-run, and G2 must not pass.
 # - Preview-equivalence probe fails -> FAIL. The generation is bad.
 # - Both pass -> observation PASS for that timestamp.
@@ -21,8 +21,6 @@
 name: Publication Preview Soak (G2)
 
 "on":
-  schedule:
-    - cron: "*/30 * * * *"
   workflow_dispatch:
     inputs:
       generation:

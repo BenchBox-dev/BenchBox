@@ -17,7 +17,7 @@ from benchbox.cli.shared import console
 @click.option("--format", "output_format", type=click.Choice(["text", "json"], case_sensitive=False), default="text")
 @click.option("--output", "output_file", type=click.Path(), help="Save output to file")
 def calculate_qphh(power_results, throughput_results, scale_factor, output_format, output_file):
-    """Calculate TPC-H QphH@Size. Deprecated; use `benchbox metrics qphh`."""
+    """Calculate Power@Size and Throughput@Size. Deprecated; use `benchbox metrics qphh`."""
     console.print(
         "[yellow]DeprecationWarning: 'benchbox calculate-qphh' is deprecated. "
         "Use 'benchbox metrics qphh' instead.[/yellow]\n"

@@ -106,8 +106,8 @@ Order:
    `https://www.benchbox.dev/` HTTP 200.
    `gh api repos/BenchBox-dev/BenchBox/pages` still has
    `cname=benchbox.dev`. This is **not** publish-path proof.
-   `.github/workflows/docs.yml` `deploy` runs only on `push` to
-   `refs/heads/release`. G7b is the next release-branch deploy.
+   Production Pages is deployed by `.github/workflows/site-deploy.yml`;
+   `docs.yml` no longer deploys.
 7. **After G4 and those 200s**, org-verify `benchbox.dev` (now click
    Verify). If GitHub says the domain is already verified by the user,
    remove user-account Pages verification **only after** the repo is in
@@ -120,7 +120,7 @@ Order:
 ## G6 — Pin-update (after G5)
 
 Retarget public and load-bearing owner strings. Do not touch
-`SOUNDNESS_PREFIXES` / CODEOWNERS soundness paths, JoinOrder
+`SOUNDNESS_PREFIXES` soundness paths, JoinOrder
 `data_manifest.toml`, or `_DEFAULT_ANSWERS_BASE_URL`. Edit
 `repo-admin-settings.md` parse blocks **in place** (owner strings and
 new ruleset IDs only). See the tracker item
@@ -140,5 +140,4 @@ Serving-only success at G5 does not close G7b.
 
 > Historical note: this transfer predates independent publication. Current production writes use
 > the `develop`-dispatched transaction writer in `publication-deployer-soak-and-retirement.md`;
-> the `docs.yml` release-to-Pages job is a legacy fallback skipped while independent publication
-> owns Pages.
+> production Pages is now deployed by `.github/workflows/site-deploy.yml`.

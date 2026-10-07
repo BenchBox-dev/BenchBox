@@ -205,7 +205,16 @@ class MotherDuckAdapter(PlatformAdapter):
 
         Returns:
             DuckDB connection connected to MotherDuck
+
+        Raises:
+            RuntimeError: If ``force_recreate`` is set: the adapter never acted on the flag, so it
+                fails closed instead of silently reusing the database.
         """
+        self.fail_closed_on_force_recreate(
+            platform_label="MotherDuck",
+            database=self.database,
+            manual_hint="Delete the database manually via the MotherDuck UI",
+        )
         if self.connection is not None:
             return self.connection
 
@@ -478,6 +487,7 @@ class MotherDuckAdapter(PlatformAdapter):
 
             if effective_tuning:
                 self.apply_ctas_sort(table_name, effective_tuning, connection)
+                self.run_post_load_tunings(table_name, effective_tuning, connection)
 
         load_time = time.perf_counter() - start_time
         return row_counts, load_time, None

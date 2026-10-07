@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
@@ -10,6 +11,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 from path_filter_decision import (
     classify_paths,
     git_changed_paths,
@@ -195,6 +197,97 @@ def test_public_site_theme_inputs_trigger_their_dedicated_gate(rules: dict[str, 
     assert decision["site_theme_needed"] is True
     assert decision["site_theme_paths"] == paths
     assert decision["explorer_paths_needed"] is False
+
+
+FRAMING_TRIGGER_PATHS = [
+    "tests/utilities/session_isolation.py",
+    "tests/conftest.py",
+    "tests/unit/core/conftest.py",
+    "tests/plugins/hook.py",
+    "tests/unit/plugins/hook.py",
+    "tests/fixtures/utility_fixtures.py",
+    "_benchbox_pytest_xdist_safety.py",
+    "scripts/local_validation.py",
+    "tests/duration_policy.py",
+    "pytest.ini",
+    "tests/unit/core/tpch/test_tpch_dbgen_framing_binaries.py",
+    "benchbox/__init__.py",
+    "benchbox/_binaries/tpc-h/windows-x86_64/dbgen.exe",
+]
+
+
+@pytest.mark.parametrize("path", FRAMING_TRIGGER_PATHS)
+def test_framing_inputs_trigger_the_cross_platform_framing_job(rules: dict[str, list[str]], path: str) -> None:
+    decision = classify_paths([path], rules)
+
+    assert decision["framing_needed"] is True
+    assert decision["framing_paths"] == [path]
+    assert decision["needs_code_ci"] is True
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "benchbox/cli/run.py",
+        "tests/unit/core/test_runner.py",
+        "tests/fixtures/golden/q1.sql",
+        "docs/development/testing.md",
+        "benchbox/_binaries/tpc-ds/linux-x86_64/dsdgen",
+    ],
+)
+def test_unrelated_changes_skip_the_cross_platform_framing_job(rules: dict[str, list[str]], path: str) -> None:
+    decision = classify_paths([path], rules)
+
+    assert decision["framing_needed"] is False
+    assert decision["framing_paths"] == []
+
+
+def test_every_registered_pytest_plugin_triggers_the_framing_job(rules: dict[str, list[str]]) -> None:
+    repo_root = REPO_RULES.parents[1]
+    modules = re.findall(r"^\s*-p\s+(?!no:)(\S+)", (repo_root / "pytest.ini").read_text(encoding="utf-8"), re.M)
+    conftest = (repo_root / "tests" / "conftest.py").read_text(encoding="utf-8")
+    block = re.search(r"pytest_plugins\s*=\s*\[(.*?)\]", conftest, re.S)
+    assert block is not None
+    modules += re.findall(r'"([\w.]+)"', block.group(1))
+
+    assert modules
+    for module in modules:
+        path = f"{module.replace('.', '/')}.py"
+        assert (repo_root / path).is_file(), path
+        assert classify_paths([path], rules)["framing_needed"] is True, path
+
+
+def test_first_party_imports_of_pytest_startup_files_trigger_the_framing_job(rules: dict[str, list[str]]) -> None:
+    repo_root = REPO_RULES.parents[1]
+    entry_points = ["tests/conftest.py", "tests/utilities/session_isolation.py"]
+    imported: set[str] = set()
+    for entry in entry_points:
+        tree = ast.parse((repo_root / entry).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                imported.add(node.module)
+            elif isinstance(node, ast.Import):
+                imported.update(alias.name for alias in node.names)
+
+    first_party = sorted(
+        module for module in imported if module.split(".")[0] in {"scripts", "tests"} and module != "tests"
+    )
+    assert "scripts.local_validation" in first_party
+    for module in first_party:
+        path = f"{module.replace('.', '/')}.py"
+        assert (repo_root / path).is_file(), path
+        assert classify_paths([path], rules)["framing_needed"] is True, path
+
+
+def test_github_output_exposes_framing_needed(rules: dict[str, list[str]], tmp_path: Path) -> None:
+    output = tmp_path / "github-output.txt"
+
+    write_github_output(output, classify_paths(["tests/utilities/paths.py"], rules))
+    assert "framing-needed=true\n" in output.read_text(encoding="utf-8")
+
+    skipped = tmp_path / "skipped-output.txt"
+    write_github_output(skipped, classify_paths(["benchbox/cli/run.py"], rules))
+    assert "framing-needed=false\n" in skipped.read_text(encoding="utf-8")
 
 
 def test_github_output_exposes_explorer_paths_alias(rules: dict[str, list[str]], tmp_path: Path) -> None:
@@ -395,3 +488,152 @@ def test_git_changed_paths_includes_deletions(tmp_path: Path) -> None:
 
     assert "benchbox/old.py" in changed
     assert "README.md" in changed
+
+
+CI_WORKFLOW = REPO_RULES.parent / "workflows" / "ci.yml"
+UNIT_RESULT_JOBS = ("core", "explorer", "results-data", "docs", "landing", "tooling")
+SITE_BUILD_INPUTS = [
+    "website/src/pages/index.astro",
+    "website/package-lock.json",
+    "docs/usage/getting-started.md",
+    "landing/hero.png",
+    "results-explorer/src/App.tsx",
+    "results-data/corpus-inventory.json",
+    "scripts/generate_query_docs.py",
+    "benchbox/core/query_catalog.py",
+    "benchbox/__init__.py",
+    "benchbox/utils/dialect_utils.py",
+    "_binaries/tpc-h/linux-x86_64/dbgen",
+    "benchbox/core/tpch/benchmark.py",
+    "_sources/tpc-h/dbgen/queries/1.sql",
+    "scripts/publication/check_artifact_privacy.py",
+    "Makefile",
+    "make/documentation.mk",
+    "pyproject.toml",
+    "uv.lock",
+    ".github/workflows/ci.yml",
+]
+
+
+def _ci_jobs() -> dict[str, dict]:
+    return yaml.safe_load(CI_WORKFLOW.read_text(encoding="utf-8"))["jobs"]
+
+
+def _needs(job: dict) -> list[str]:
+    needs = job.get("needs", [])
+    return [needs] if isinstance(needs, str) else list(needs)
+
+
+def test_site_build_inputs_trigger_the_site_build_gate(rules: dict[str, list[str]]) -> None:
+    for path in SITE_BUILD_INPUTS:
+        decision = classify_paths([path], rules)
+
+        assert decision["site_needed"] is True
+        assert decision["site_paths"] == [path]
+
+
+def test_unrelated_change_skips_the_site_build_gate(rules: dict[str, list[str]]) -> None:
+    decision = classify_paths(["tests/unit/test_x.py", "examples/getting_started/run.py"], rules)
+
+    assert decision["site_needed"] is False
+    assert decision["site_paths"] == []
+
+
+@pytest.mark.parametrize(
+    "path", ["docs/usage/getting-started.md", "docs/conf.py", "website/src/pages/index.astro", "scripts/site_parity.py"]
+)
+def test_docs_and_website_changes_trigger_the_parity_gate(rules: dict[str, list[str]], path: str) -> None:
+    decision = classify_paths([path], rules)
+
+    assert decision["site_parity_needed"] is True
+    assert decision["site_parity_paths"] == [path]
+
+
+def test_unrelated_change_skips_the_parity_gate(rules: dict[str, list[str]]) -> None:
+    assert classify_paths(["tests/unit/test_x.py"], rules)["site_parity_needed"] is False
+
+
+def test_website_sources_are_explicit_product_code(rules: dict[str, list[str]]) -> None:
+    decision = classify_paths(["website/src/pages/index.astro", "website/package.json"], rules)
+
+    assert decision["needs_code_ci"] is True
+    assert decision["unknown_paths"] == []
+    assert decision["safe_content_only"] is False
+
+
+def test_github_output_exposes_site_needed(rules: dict[str, list[str]], tmp_path: Path) -> None:
+    output = tmp_path / "github-output.txt"
+    write_github_output(output, classify_paths(["website/astro.config.ts"], rules))
+    assert "site-needed=true\n" in output.read_text(encoding="utf-8")
+
+    skipped = tmp_path / "skipped-output.txt"
+    write_github_output(skipped, classify_paths(["tests/unit/test_x.py"], rules))
+    assert "site-needed=false\n" in skipped.read_text(encoding="utf-8")
+
+
+def test_site_build_job_is_gated_on_the_site_filter_and_feeds_the_landing_unit() -> None:
+    jobs = _ci_jobs()
+    landing_run = "\n".join(step.get("run", "") for step in jobs["landing"]["steps"])
+
+    assert jobs["site-build"]["if"] == "${{ needs.ci-paths.outputs.site-needed == 'true' }}"
+    assert "site-needed" in jobs["ci-paths"]["outputs"]
+    assert tuple(unit for unit in UNIT_RESULT_JOBS if unit in jobs) == UNIT_RESULT_JOBS
+    assert [name for name, job in jobs.items() if "site-build" in _needs(job)] == ["landing"]
+    assert "--expect site-build=${{ needs.ci-paths.outputs.site-needed == 'true' }}" in landing_run
+
+
+def test_site_jobs_run_the_site_gates_on_node_22_only() -> None:
+    jobs = _ci_jobs()
+    steps = jobs["site-build"]["steps"]
+    versions = {
+        job_name: [str(step["with"]["node-version"]) for step in job["steps"] if "setup-node" in step.get("uses", "")]
+        for job_name, job in jobs.items()
+    }
+    commands = [step.get("run", "") for step in steps]
+
+    site_jobs = {"site-build", "site-parity", "public-site-visual-astro-dry-run"}
+    assert versions["site-build"] == ["22"]
+    assert all(version == ["20"] for name, version in versions.items() if name not in site_jobs and version)
+    assert "make site-check site-build" in commands
+    assert "uv run python scripts/publication/check_artifact_privacy.py website/dist" in commands
+
+
+@pytest.mark.parametrize(
+    "changed_path",
+    ["website/src/pages/index.astro", "website/package-lock.json", "website/astro.config.ts"],
+)
+def test_visual_inputs_classify_website_as_a_render_input(tmp_path: Path, changed_path: str) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "--initial-branch=develop", "-q")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test")
+    (repo / "README.md").write_text("base\n", encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-m", "base", "-q")
+    base = _git(repo, "rev-parse", "HEAD").strip()
+    target = repo / changed_path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("changed\n", encoding="utf-8")
+    _git(repo, "add", changed_path)
+    _git(repo, "commit", "-m", "change", "-q")
+    head = _git(repo, "rev-parse", "HEAD").strip()
+
+    classifier = tmp_path / "classify.sh"
+    classifier.write_text(_ci_jobs()["visual-inputs"]["steps"][1]["run"], encoding="utf-8")
+    output = tmp_path / "github-output"
+    env = {
+        **os.environ,
+        "EVENT_NAME": "pull_request",
+        "PR_BASE_SHA": base,
+        "RECOVERY_SOURCE_SHA": "",
+        "CURRENT_SHA": head,
+        "CURRENT_REF": "refs/pull/1/merge",
+        "GITHUB_OUTPUT": str(output),
+    }
+    result = subprocess.run(["bash", str(classifier)], cwd=repo, env=env, capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    lines = dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines() if "=" in line)
+    assert lines["changed"] == "true"
+    assert lines["render_changed"] == "true"

@@ -1,0 +1,11 @@
+{
+  "bundle_file": "read_primitives_sf01_databricks_sql_20261001_143234_f068492b.json",
+  "bundle_hash": "ec6c7dbf1ac19db03d6af9b03755efce380ea1bc28cefa9b88b8804304364d81",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}

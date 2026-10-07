@@ -13,6 +13,7 @@ from benchbox.utils.datagen_version import (
     compute_datagen_identity_hash,
     current_datagen_stamp,
     describe_datagen_staleness,
+    generator_binary_digest,
     manifest_datagen_is_current,
 )
 
@@ -265,13 +266,7 @@ def test_skew_fingerprint_covers_both_specs() -> None:
     """The skew hash must differ from the base tpch hash (both specs feed it)."""
     assert compute_base_constants_hash("tpch_skew") != compute_base_constants_hash("tpch")
     stamp = current_datagen_stamp("tpch_skew")
-    assert (
-        manifest_datagen_is_current(
-            {"data_generation_version": DATA_GENERATION_VERSION, "base_constants_hash": stamp["base_constants_hash"]},
-            benchmark="tpch_skew",
-        )
-        is True
-    )
+    assert manifest_datagen_is_current(dict(stamp), benchmark="tpch_skew") is True
 
 
 def test_skew_configuration_changes_data_generation_comparison_identity() -> None:
@@ -427,3 +422,147 @@ def test_generation_warning_travels_with_saved_artifacts() -> None:
 
     clean = dict(comparison, generation_compatibility={"status": "compatible", "compatible": True, "warning": None})
     assert "DATA GENERATION" not in _format_text_comparison(clean, _Result(), _Result(), False)
+
+
+DEFECTIVE_DBGEN_SHA256 = (
+    "1ef8282179910b38e517a9393ad8ab0df9f2b6575bbcab6455b38a6617475bc1",
+    "1077578cf4d2bf6754f458d26a7ac95759e3ef1bb02e05d33d0ce17bc2fd8e06",
+    "7f90ccc6fa0313067830b3f04318259a4c2ec182ded55143bbcec4791fdb7fc2",
+    "e08b12a356314a3b305e583c6d4c5621423ec9df5d2ebea4267df3203ed5367a",
+)
+
+
+class _Compiler:
+    def __init__(self, paths: dict[str, Path | None]) -> None:
+        self.paths = paths
+
+    def get_binary_path(self, binary_name: str) -> Path | None:
+        return self.paths.get(binary_name)
+
+
+@pytest.fixture
+def generator_binaries(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    dbgen = tmp_path / "dbgen"
+    dsdgen = tmp_path / "dsdgen"
+    dbgen.write_bytes(b"dbgen-one")
+    dsdgen.write_bytes(b"dsdgen-one")
+    paths: dict[str, Path | None] = {"dbgen": dbgen, "dsdgen": dsdgen}
+    monkeypatch.setattr("benchbox.utils.tpc_compilation.get_tpc_compiler", lambda **_kwargs: _Compiler(paths))
+    return paths
+
+
+@pytest.mark.parametrize(
+    ("name", "binary_name"),
+    [
+        ("tpch", "dbgen"),
+        ("tpchavoc", "dbgen"),
+        ("tpch_skew", "dbgen"),
+        ("read_primitives", "dbgen"),
+        ("write_primitives", "dbgen"),
+        ("transaction_primitives", "dbgen"),
+        ("datavault", "dbgen"),
+        ("tpcds", "dsdgen"),
+        ("tpcds_obt", "dsdgen"),
+        ("TPCH", "dbgen"),
+    ],
+)
+def test_stamp_records_the_generator_binary(generator_binaries, name: str, binary_name: str) -> None:
+    import hashlib
+
+    expected = hashlib.sha256(generator_binaries[binary_name].read_bytes()).hexdigest()
+    assert generator_binary_digest(name) == expected
+    assert current_datagen_stamp(name)["generator_binary_sha256"] == expected
+
+
+@pytest.mark.parametrize("name", ["ssb", "clickbench", "tpcdi", "tsbs_devops", "Test Benchmark", None])
+def test_other_benchmarks_record_no_generator_binary(generator_binaries, name: str | None) -> None:
+    assert generator_binary_digest(name) is None
+    assert "generator_binary_sha256" not in current_datagen_stamp(name)
+
+
+@pytest.mark.parametrize("name", ["tpch", "tpch_skew", "datavault", "write_primitives", "tpcds", "tpcds_obt"])
+def test_freshly_stamped_data_is_current(generator_binaries, name: str) -> None:
+    manifest = {"benchmark": name, **current_datagen_stamp(name)}
+    assert manifest_datagen_is_current(manifest, benchmark=name) is True
+    assert describe_datagen_staleness(manifest, benchmark=name) is None
+
+
+@pytest.mark.parametrize("name", ["tpch", "tpchavoc", "tpch_skew", "datavault", "read_primitives"])
+@pytest.mark.parametrize("digest", DEFECTIVE_DBGEN_SHA256)
+def test_data_written_by_a_defective_dbgen_is_stale(generator_binaries, name: str, digest: str) -> None:
+    manifest = {"benchmark": name, **current_datagen_stamp(name), "generator_binary_sha256": digest}
+    assert manifest_datagen_is_current(manifest, benchmark=name) is False
+    assert "known-defective dbgen" in (describe_datagen_staleness(manifest, benchmark=name) or "")
+
+
+@pytest.mark.parametrize("name", ["tpch", "tpch_skew", "datavault", "tpcds", "tpcds_obt"])
+def test_stamp_without_generator_record_is_stale(generator_binaries, name: str) -> None:
+    manifest = {"benchmark": name, **current_datagen_stamp(name)}
+    del manifest["generator_binary_sha256"]
+    assert manifest_datagen_is_current(manifest, benchmark=name) is False
+    reason = describe_datagen_staleness(manifest, benchmark=name)
+    assert reason is not None and "does not record which" in reason
+
+
+def test_stamp_without_generator_record_stays_current_for_other_benchmarks(generator_binaries) -> None:
+    manifest = {"benchmark": "ssb", **current_datagen_stamp("ssb")}
+    assert manifest_datagen_is_current(manifest, benchmark="ssb") is True
+
+
+def test_data_from_another_good_binary_stays_current(generator_binaries) -> None:
+    manifest = {"benchmark": "tpch", **current_datagen_stamp("tpch")}
+    generator_binaries["dbgen"].write_bytes(b"a different but correct dbgen build")
+    assert manifest_datagen_is_current(manifest, benchmark="tpch") is True
+
+
+def test_generator_binary_does_not_change_the_comparison_hash(generator_binaries) -> None:
+    before = compute_base_constants_hash("tpch")
+    generator_binaries["dbgen"].write_bytes(b"a different dbgen build")
+    assert compute_base_constants_hash("tpch") == before
+    assert compute_datagen_identity_hash("tpch_skew", {"seed": 1}) == compute_datagen_identity_hash(
+        "tpch_skew", {"seed": 1}
+    )
+
+
+def test_unresolvable_generator_leaves_mapped_stamp_unproven(generator_binaries) -> None:
+    generator_binaries["dbgen"] = None
+    stamp = current_datagen_stamp("tpch")
+    assert "generator_binary_sha256" not in stamp
+    assert manifest_datagen_is_current({"benchmark": "tpch", **stamp}, benchmark="tpch") is False
+
+
+def test_shipped_generator_binaries_are_not_marked_defective() -> None:
+    from benchbox.utils.datagen_version import _DEFECTIVE_GENERATOR_BINARIES
+
+    manifest = json.loads((Path(__file__).resolve().parents[3] / "benchbox/_binaries/SHA256MANIFEST.json").read_text())
+    shipped = set(manifest["files"].values())
+    assert shipped.isdisjoint(_DEFECTIVE_GENERATOR_BINARIES["dbgen"])
+
+
+def test_binary_defect_forces_regeneration_on_reuse_check(generator_binaries, tmp_path: Path) -> None:
+    from benchbox.core.runner.runner import _validate_manifest_if_present
+    from benchbox.core.schemas import BenchmarkConfig
+
+    (tmp_path / "customer.tbl").write_text("1|a\n")
+
+    def _write(**extra: object) -> None:
+        manifest = {
+            "benchmark": "tpch",
+            "scale_factor": 1.0,
+            "tables": {"customer": {"formats": {"tbl": [{"path": "customer.tbl", "size_bytes": 4}]}}},
+            **current_datagen_stamp("tpch"),
+            **extra,
+        }
+        (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest))
+
+    class _Benchmark:
+        output_dir = tmp_path
+        tables = None
+
+    config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=1.0, options={})
+
+    _write()
+    assert _validate_manifest_if_present(_Benchmark(), config)[::2] == (True, True)
+
+    _write(generator_binary_sha256=DEFECTIVE_DBGEN_SHA256[1])
+    assert _validate_manifest_if_present(_Benchmark(), config)[::2] == (False, True)

@@ -28,6 +28,7 @@ from pathlib import Path
 
 from benchbox.utils.cloud_storage import CloudStorageGeneratorMixin, create_path_handler
 from benchbox.utils.compression_mixin import CompressionMixin
+from benchbox.utils.datagen_manifest import require_manifest_files
 from benchbox.utils.file_format import detect_compression, validate_tbl_compression_consistency
 
 
@@ -371,6 +372,9 @@ class SSBDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
                     "row_count": rows,
                 }
             )
+        require_manifest_files(
+            sum(len(entries) for entries in manifest["tables"].values()), label="SSB", output_dir=output_dir
+        )
         out = output_dir / "_datagen_manifest.json"
         with open(out, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)

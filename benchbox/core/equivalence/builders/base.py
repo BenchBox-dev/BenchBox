@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +27,7 @@ class CrossSurfaceData:
     # comparison stays a single bounded cell.
     benchmark: Any
     data_dir: Path
+    query_parameters: dict[str, Any] = field(default_factory=dict)
 
 
 def _assemble_simple_duckdb_cell(

@@ -132,7 +132,11 @@ class TestResultDatabase:
         db = ResultDatabase.__new__(ResultDatabase)
         db.db_path = None  # Will be set in __init__
         # The DEFAULT_DB_PATH should be ~/.benchbox/results.db
-        assert Path.home() / ".benchbox" / "results.db" == DEFAULT_DB_PATH
+        # This constant is intentionally captured at import, before the
+        # function-scoped HOME. The early plugin already owns that session HOME.
+        from tests.utilities.session_isolation import session_home
+
+        assert session_home() / ".benchbox" / "results.db" == DEFAULT_DB_PATH
 
     def test_schema_version_stored(self, tmp_path):
         """Test that schema version is stored in database."""

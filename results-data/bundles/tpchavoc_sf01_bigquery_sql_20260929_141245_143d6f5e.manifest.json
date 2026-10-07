@@ -1,0 +1,11 @@
+{
+  "bundle_file": "tpchavoc_sf01_bigquery_sql_20260929_141245_143d6f5e.json",
+  "bundle_hash": "013e70550f571129d7bcb90ae87a6351d3b0026602dfe7f7075f24cb783346b1",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}

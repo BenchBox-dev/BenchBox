@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -149,9 +150,12 @@ class ClickHouseWorkloadMixin:
             # DuckDB-only DDL syntax (Nullable() NOT NULL, FLOAT[N] vector columns)
             # is rewritten in `_optimize_table_definition` below.
             effective_config = self.get_effective_tuning_configuration()
+            schema_config = copy.deepcopy(effective_config)
+            if schema_config is not None:
+                schema_config.primary_keys.enabled = True
             schema_sql = benchmark.get_create_tables_sql(
                 dialect="duckdb",
-                tuning_config=effective_config,
+                tuning_config=schema_config,
             )
             nullable_columns_by_table = self._get_nullable_columns_by_table(benchmark)
 
@@ -164,18 +168,23 @@ class ClickHouseWorkloadMixin:
             if self.tuning_enabled and effective_config is not None:
                 table_tunings = effective_config.table_tunings
 
-            # Split schema into individual statements and execute
+            primary_keys_enabled = effective_config.primary_keys.enabled if effective_config else True
+
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
+            prepared_statements = []
             for statement in statements:
-                # Optimize table definitions for ClickHouse
                 table_name = self._extract_table_name(statement)
                 nullable_columns = nullable_columns_by_table.get(table_name.lower(), set()) if table_name else set()
                 optimized = self._optimize_table_definition(
                     statement,
                     table_tunings,
                     nullable_columns=nullable_columns,
+                    primary_keys_enabled=primary_keys_enabled,
                 )
+                prepared_statements.append((statement, table_name, optimized))
+
+            for statement, table_name, optimized in prepared_statements:
                 connection.execute(optimized)
                 # Record a tuned MergeTree CREATE TABLE into the applied ledger
                 # here, immediately after it executes. The tuned keys are
@@ -202,6 +211,7 @@ class ClickHouseWorkloadMixin:
         table_tunings: dict[str, Any] | None = None,
         *,
         nullable_columns: set[str] | None = None,
+        primary_keys_enabled: bool = True,
     ) -> str:
         """Optimize table definition for ClickHouse.
 
@@ -256,10 +266,25 @@ class ClickHouseWorkloadMixin:
             flags=re.IGNORECASE,
         )
 
-        tuning_clauses = self._resolve_tuned_ddl_clauses(statement, table_tunings)
+        tuned_order_by_applies = "ORDER BY" not in statement.upper()
+        schema_primary_key_columns = self._extract_primary_key_columns(statement)
+        tuning_clauses = self._resolve_tuned_ddl_clauses(
+            statement,
+            table_tunings,
+            primary_key_columns=(
+                schema_primary_key_columns if primary_keys_enabled and tuned_order_by_applies else None
+            ),
+        )
         if nullable_columns:
             key_columns = self._resolve_key_columns(statement, tuning_clauses, nullable_columns)
+            tuned_nullable_keys = self._tuned_nullable_key_columns(tuning_clauses, nullable_columns)
+            if tuned_nullable_keys:
+                raise ValueError(self._nullable_key_error(statement, tuned_nullable_keys))
             statement = self._apply_nullable_column_types(statement, nullable_columns - key_columns)
+
+        tuned_sort_key_applies = tuned_order_by_applies and tuning_clauses is not None and bool(tuning_clauses.sort_by)
+        if tuned_sort_key_applies and schema_primary_key_columns:
+            statement = self._strip_primary_key_constraints(statement)
 
         # Include ClickHouse MergeTree engine and ORDER BY clause if not present
         statement_upper = statement.upper()
@@ -287,6 +312,8 @@ class ClickHouseWorkloadMixin:
                 # Tuned rendering: ORDER BY (sort + clustering columns), via
                 # the shared ClickHouseDDLGenerator.
                 order_by_clause = f" ORDER BY ({tuning_clauses.sort_by})"
+                if tuning_clauses.primary_key:
+                    order_by_clause += f" PRIMARY KEY ({tuning_clauses.primary_key})"
             else:
                 # Engine-mandatory baseline: MergeTree requires ORDER BY.
                 # Extract primary key columns if any exist in the statement.
@@ -437,31 +464,60 @@ class ClickHouseWorkloadMixin:
 
     def _resolve_key_columns(self, statement: str, tuning_clauses: Any, nullable_columns: set[str]) -> set[str]:
         """Return nullable candidates referenced by PK/partition/order keys."""
+        key_columns = {name.lower() for name in self._extract_primary_key_columns(statement)}
+        key_columns.update(self._tuned_nullable_key_columns(tuning_clauses, nullable_columns))
+        return key_columns
+
+    # Tuning-clause attribute -> key role named in the nullable-key error.
+    _TUNED_KEY_ROLES: tuple[tuple[str, str], ...] = (
+        ("partition_by", "PARTITION BY"),
+        ("sort_by", "ORDER BY"),
+        ("order_by", "ORDER BY"),
+        ("cluster_by", "CLUSTER BY"),
+        ("primary_key", "PRIMARY KEY"),
+    )
+
+    def _tuned_nullable_key_columns(self, tuning_clauses: Any, nullable_columns: set[str]) -> dict[str, list[str]]:
+        """Map schema-nullable columns used as tuned keys to their key roles.
+
+        Only clauses from the tuning configuration are considered: statement
+        inline keys keep their existing rendering so untuned DDL is untouched.
+        Returns an empty mapping when tuning does not apply.
+        """
         import re
 
-        key_columns = {name.lower() for name in self._extract_primary_key_columns(statement)}
+        matched: dict[str, list[str]] = {}
         if tuning_clauses is None:
-            return key_columns
-
-        key_expressions = [
-            value
-            for value in (
-                tuning_clauses.partition_by,
-                tuning_clauses.sort_by,
-                tuning_clauses.order_by,
-                tuning_clauses.cluster_by,
-                tuning_clauses.primary_key,
-            )
-            if value
-        ]
+            return matched
+        expressions = [(role, getattr(tuning_clauses, attribute, None)) for attribute, role in self._TUNED_KEY_ROLES]
         for column_name in nullable_columns:
             identifier = re.compile(
                 rf"(?<![A-Za-z0-9_]){re.escape(column_name)}(?![A-Za-z0-9_])",
                 re.IGNORECASE,
             )
-            if any(identifier.search(expression) for expression in key_expressions):
-                key_columns.add(column_name)
-        return key_columns
+            roles = sorted({role for role, expression in expressions if expression and identifier.search(expression)})
+            if roles:
+                matched[column_name] = roles
+        return matched
+
+    @staticmethod
+    def _nullable_key_error(statement: str, tuned_nullable_keys: dict[str, list[str]]) -> str:
+        """Build the actionable error for a tuned key on a nullable column.
+
+        Key columns render non-Nullable, so a NULL in the source data loads
+        as 0 and silently changes query answers. Reject loudly instead.
+        """
+        import re
+
+        match = re.search(r"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+(\w+)", statement, re.IGNORECASE)
+        table = match.group(1) if match else "<unknown table>"
+        columns = ", ".join(f"{name} ({'/'.join(roles)})" for name, roles in sorted(tuned_nullable_keys.items()))
+        return (
+            f"tuned key columns of table {table!r} are nullable in the source schema: {columns}; "
+            "BenchBox renders key columns non-Nullable, which would load their NULLs as 0 and "
+            "silently change query answers. Use NOT NULL key columns (as in the curated ClickHouse "
+            "TPC-DS template) or declare the columns non-nullable."
+        )
 
     @classmethod
     def _apply_nullable_column_types(cls, statement: str, nullable_columns: set[str]) -> str:
@@ -520,7 +576,11 @@ class ClickHouseWorkloadMixin:
 
     @staticmethod
     def _top_level_column_spans(body: str) -> list[tuple[int, int]]:
-        """Return comma-delimited spans while respecting nested SQL syntax."""
+        """Return comma-delimited spans while respecting nested SQL syntax.
+
+        String literals, quoted identifiers, and `--`/`/* */` comments are
+        opaque: commas inside them never split a span.
+        """
         spans: list[tuple[int, int]] = []
         start = 0
         depth = 0
@@ -534,8 +594,16 @@ class ClickHouseWorkloadMixin:
                         index += 2
                         continue
                     quote = None
-            elif char in {"'", '"'}:
+            elif char in {"'", '"', "`"}:
                 quote = char
+            elif char == "-" and body[index + 1 : index + 2] == "-":
+                end = body.find("\n", index)
+                index = len(body) if end == -1 else end
+                continue
+            elif char == "/" and body[index + 1 : index + 2] == "*":
+                end = body.find("*/", index + 2)
+                index = len(body) if end == -1 else end + 2
+                continue
             elif char in "([":
                 depth += 1
             elif char in ")]":
@@ -546,6 +614,69 @@ class ClickHouseWorkloadMixin:
             index += 1
         spans.append((start, len(body)))
         return spans
+
+    @staticmethod
+    def _blank_quoted_and_commented(text: str) -> str:
+        """Blank string literals, quoted identifiers, and comments in place.
+
+        Returns a same-length string where every character inside quotes or
+        comments is a space, so keyword matching on the result only sees real
+        SQL code. Newlines are preserved to keep line structure stable.
+        """
+        chars = list(text)
+        index = 0
+        quote: str | None = None
+        while index < len(chars):
+            char = chars[index]
+            if quote is not None:
+                if chars[index] != "\n":
+                    chars[index] = " "
+                if char == quote:
+                    if index + 1 < len(chars) and chars[index + 1] == quote:
+                        if chars[index + 1] != "\n":
+                            chars[index + 1] = " "
+                        index += 2
+                        continue
+                    quote = None
+            elif char in {"'", '"', "`"}:
+                chars[index] = " "
+                quote = char
+            elif char == "-" and index + 1 < len(chars) and chars[index + 1] == "-":
+                while index < len(chars) and chars[index] != "\n":
+                    chars[index] = " "
+                    index += 1
+                continue
+            elif char == "/" and index + 1 < len(chars) and chars[index + 1] == "*":
+                chars[index] = " "
+                chars[index + 1] = " "
+                index += 2
+                while index < len(chars):
+                    if chars[index] == "*" and index + 1 < len(chars) and chars[index + 1] == "/":
+                        chars[index] = " "
+                        chars[index + 1] = " "
+                        index += 2
+                        break
+                    if chars[index] != "\n":
+                        chars[index] = " "
+                    index += 1
+                continue
+            index += 1
+        return "".join(chars)
+
+    @staticmethod
+    def _strip_inline_primary_key(segment: str) -> str:
+        """Remove an inline column-level PRIMARY KEY outside literals/comments."""
+        import re
+
+        while True:
+            probe = ClickHouseWorkloadMixin._blank_quoted_and_commented(segment)
+            match = re.search(r"PRIMARY\s+KEY\b", probe, flags=re.IGNORECASE)
+            if match is None:
+                return segment
+            start = match.start()
+            while start > 0 and segment[start - 1].isspace():
+                start -= 1
+            segment = segment[:start] + segment[match.end() :]
 
     @staticmethod
     def _column_type_end(segment: str, type_start: int) -> int:
@@ -580,7 +711,41 @@ class ClickHouseWorkloadMixin:
             index += 1
         return len(segment.rstrip())
 
-    def _resolve_tuned_ddl_clauses(self, statement: str, table_tunings: dict[str, Any] | None):
+    @classmethod
+    def _strip_primary_key_constraints(cls, statement: str) -> str:
+        import re
+
+        table_name = r'(?:"[^"]+"|`[^`]+`|\[[^\]]+\]|[A-Za-z_]\w*)'
+        create_match = re.search(rf"CREATE TABLE(?:\s+IF NOT EXISTS)?\s+{table_name}\s*\(", statement, re.IGNORECASE)
+        if create_match is None:
+            return statement
+        open_index = statement.find("(", create_match.start())
+        close_index = find_matching_parenthesis(statement, open_index)
+        body = statement[open_index + 1 : close_index]
+
+        table_constraint = re.compile(r"^\s*(?:CONSTRAINT\s+[\s\S]+?\s+)?PRIMARY\s+KEY\s*\(", re.IGNORECASE)
+        kept_segments: list[str] = []
+        dropped_last_segment = False
+        spans = cls._top_level_column_spans(body)
+        for position, (start, end) in enumerate(spans):
+            segment = body[start:end]
+            probe = cls._blank_quoted_and_commented(segment)
+            if table_constraint.match(probe):
+                dropped_last_segment = position == len(spans) - 1
+                continue
+            kept_segments.append(cls._strip_inline_primary_key(segment))
+
+        rebuilt = ",".join(kept_segments)
+        if dropped_last_segment:
+            rebuilt = rebuilt.rstrip() + body[len(body.rstrip()) :]
+        return statement[: open_index + 1] + rebuilt + statement[close_index:]
+
+    def _resolve_tuned_ddl_clauses(
+        self,
+        statement: str,
+        table_tunings: dict[str, Any] | None,
+        primary_key_columns: list[str] | None = None,
+    ):
         """Resolve tuned PARTITION BY/ORDER BY clauses for this statement's table, if any.
 
         Returns None when tuning is not enabled, no table_tuning is
@@ -610,10 +775,10 @@ class ClickHouseWorkloadMixin:
         if table_tuning is None or not table_tuning.has_any_tuning():
             return None
 
-        from benchbox.core.tuning.ddl_generator import get_ddl_generator
+        from benchbox.core.tuning.generators.clickhouse import ClickHouseDDLGenerator
 
-        generator = get_ddl_generator("clickhouse")
-        clauses = generator.generate_tuning_clauses(table_tuning)
+        generator = ClickHouseDDLGenerator()
+        clauses = generator.generate_tuning_clauses(table_tuning, primary_key_columns=primary_key_columns or None)
         if clauses.is_empty():
             return None
         self._normalize_tuning_clause_identifiers(statement, clauses)

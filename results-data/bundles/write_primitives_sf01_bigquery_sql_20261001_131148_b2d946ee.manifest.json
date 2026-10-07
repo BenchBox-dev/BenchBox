@@ -1,0 +1,11 @@
+{
+  "bundle_file": "write_primitives_sf01_bigquery_sql_20261001_131148_b2d946ee.json",
+  "bundle_hash": "7659f7358f87386c1b664bcd66d7a3ffe9791a2cdb105430ead5543d8243bda8",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}

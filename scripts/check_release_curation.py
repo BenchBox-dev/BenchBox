@@ -47,6 +47,7 @@ REQUIRED_RELEASE_PATHS = frozenset(
     {
         "results-data",
         "results-explorer",
+        "website",
         "_project/scripts/explorer_pipeline",
         "_project/scripts/explorer_publish.py",
         "_project/scripts/results_explorer_snapshot_invariants.py",
@@ -80,8 +81,8 @@ def parse_main_only_allowlist(doc: Path) -> set[str]:
     return {p.rstrip("/") for p in paths}
 
 
-def parse_curation_list(makefile: Path) -> set[str]:
-    """Extract `git rm` paths from the `release-cut:` target body."""
+def release_cut_rm_commands(makefile: Path) -> list[list[str]]:
+    """Return the `git rm` commands of the `release-cut:` target body as argument lists."""
     text = makefile.read_text(encoding="utf-8")
     match = re.search(
         r"^release-cut:[^\n]*\n((?:[ \t].*\n|\n)+)",
@@ -90,17 +91,23 @@ def parse_curation_list(makefile: Path) -> set[str]:
     )
     if not match:
         sys.exit(f"ERROR: could not find release-cut: target in {makefile}")
-    body = match.group(1)
-    paths: set[str] = set()
-    for line in body.splitlines():
+    commands: list[list[str]] = []
+    for line in match.group(1).splitlines():
         # Match `git rm -rf <paths>` and `git rm -f <paths>`, with or without
         # `--ignore-unmatch` and with or without a leading `-` (the Make
         # "ignore exit code" prefix used before --ignore-unmatch was added).
         rm_match = re.search(r"git rm (?:-rf|-f)(?: --ignore-unmatch)? (.+?)$", line.strip())
-        if not rm_match:
-            continue
-        # Skip option tokens such as --ignore-unmatch; only pathspecs count.
-        paths.update(p for p in shlex.split(rm_match.group(1)) if not p.startswith("-"))
+        if rm_match:
+            commands.append(shlex.split(rm_match.group(0)))
+    return commands
+
+
+def parse_curation_list(makefile: Path) -> set[str]:
+    """Extract `git rm` paths from the `release-cut:` target body."""
+    paths: set[str] = set()
+    for command in release_cut_rm_commands(makefile):
+        # Skip `git rm` and option tokens such as --ignore-unmatch; only pathspecs count.
+        paths.update(p for p in command[2:] if not p.startswith("-"))
     return paths
 
 

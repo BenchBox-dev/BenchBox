@@ -11,7 +11,12 @@ from pathlib import Path
 
 import pytest
 
-from scripts.release_canary_sharding import collect_node_ids, partition_node_ids, verify_medium_shards
+from scripts.release_canary_sharding import (
+    MEDIUM_SHARD_COUNT,
+    collect_node_ids,
+    partition_node_ids,
+    verify_medium_shards,
+)
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 ROOT = Path(__file__).resolve().parents[3]
@@ -152,15 +157,15 @@ def test_real_medium_receipts_reject_missing_or_inconsistent_outcomes(tmp_path: 
         collection / "medium-nodeids.txt",
         collection / "medium-collection.json",
         expected_count=4,
-        shard_count=2,
+        shard_count=MEDIUM_SHARD_COUNT,
         checked_sha=sha,
         workflow="ci.yml",
         job="medium-collect",
         marker_expression="medium and not (slow or stress or resource_heavy or live_integration)",
     )
     ids = (collection / "medium-nodeids.txt").read_text().splitlines()
-    for index in range(2):
-        assigned = partition_node_ids(ids, index, 2)
+    for index in range(MEDIUM_SHARD_COUNT):
+        assigned = partition_node_ids(ids, index, MEDIUM_SHARD_COUNT)
         shard = artifacts / f"t2-medium-shard-{index}-{sha}"
         shard.mkdir()
         assignment = shard / "assignment.txt"

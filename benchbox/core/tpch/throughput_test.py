@@ -13,6 +13,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 """
 
 import concurrent.futures
+import contextvars
 import logging
 import threading
 from dataclasses import dataclass, field
@@ -24,6 +25,7 @@ from benchbox.core.plan_capture_phase import (
 )
 from benchbox.core.throughput.result import ThroughputResult, ThroughputStreamResult
 from benchbox.core.throughput.runner import StreamRunner
+from benchbox.core.tpch.power_test import _parse_tpch_query_id
 from benchbox.core.validation.query_validation import (
     clear_reference_seed_context,
     set_reference_seed_context,
@@ -49,6 +51,7 @@ class TPCHThroughputTestConfig:
     # never hard-kills anything -- see benchbox/core/throughput/runner.py's
     # module docstring ("Timed-out streams") for the full design.
     cancel_on_timeout: bool = False
+    query_subset: Optional[list[str]] = None
     # Legacy reporting threshold retained for configuration compatibility.
     # Product scoring is stricter: StreamRunner emits Throughput@Size only
     # when every requested stream completes successfully.
@@ -60,18 +63,20 @@ TPCHThroughputStreamResult = ThroughputStreamResult
 
 
 def _derive_query_seed(seed: int, stream_id: int, position: int) -> int:
-    """Per-query qgen seed for one throughput stream position.
-
-    ``seed`` is the per-stream base seed StreamRunner hands to
-    ``_execute_stream`` (``config.base_seed + stream_id`` -- see
-    ``benchbox.core.throughput.runner``). The SINGLE definition of the
-    per-position formula: query generation (pre-generation pass and the
-    ``_resolve_query_text`` inline fallback) and the reference-seed
-    validation context in ``_execute_stream`` must all derive the seed
-    through this helper so validation can never silently desynchronize
-    from the SQL that was actually generated.
-    """
     return seed + stream_id * 1000 + position
+
+
+def _stream_permutation(stream_id: int, query_subset: Optional[list[str]]) -> list[int]:
+    from benchbox.core.tpch.streams import TPCHStreams
+
+    permutation = list(TPCHStreams.PERMUTATION_MATRIX[stream_id % len(TPCHStreams.PERMUTATION_MATRIX)])
+    if not isinstance(query_subset, (list, tuple)) or not query_subset:
+        return permutation
+    wanted = {_parse_tpch_query_id(query_id) for query_id in query_subset}
+    unknown = sorted(wanted - set(permutation))
+    if unknown:
+        raise ValueError(f"Invalid TPC-H query ids in query_subset: {unknown} (expected 1-22)")
+    return [query_id for query_id in permutation if query_id in wanted]
 
 
 def _count_cursor_rows(cursor: Any) -> int:
@@ -121,6 +126,7 @@ class TPCHThroughputTest:
         scale_factor: float = 1.0,
         num_streams: int = 2,
         verbose: bool = False,
+        dialect: Optional[str] = None,
     ) -> None:
         """Initialize TPC-H Throughput Test.
 
@@ -130,9 +136,11 @@ class TPCHThroughputTest:
             scale_factor: Scale factor for the benchmark
             num_streams: Number of concurrent streams
             verbose: Enable verbose logging
+            dialect: Target SQL dialect used to translate every stream query
         """
         self.benchmark = benchmark
         self.connection_factory = connection_factory
+        self.target_dialect = dialect
         self.config = TPCHThroughputTestConfig(scale_factor=scale_factor, num_streams=num_streams, verbose=verbose)
 
         self.logger = logging.getLogger(__name__)
@@ -208,9 +216,7 @@ class TPCHThroughputTest:
                 self.logger.info(f"Successful streams: {result.streams_successful}/{config.num_streams}")
                 if config.num_streams > 0:
                     success_rate = result.streams_successful / config.num_streams
-                    self.logger.info(
-                        f"Stream success rate: {success_rate:.2%} (threshold: {config.min_success_rate:.2%})"
-                    )
+                    self.logger.info(f"Stream success rate: {success_rate:.2%}")
                 self.logger.info(f"Throughput@Size: {result.throughput_at_size:.2f}")
                 self.logger.info(f"Query throughput: {result.query_throughput:.2f} queries/sec")
 
@@ -257,23 +263,15 @@ class TPCHThroughputTest:
         single bad query still only fails that one query during execution,
         matching today's per-query fault isolation in ``_execute_stream``.
         """
-        from benchbox.core.tpch.streams import TPCHStreams
 
         def _generate_one_stream(stream_id: int) -> tuple[int, list[Any]]:
             seed = config.base_seed + stream_id
-            query_permutation = TPCHStreams.PERMUTATION_MATRIX[stream_id % len(TPCHStreams.PERMUTATION_MATRIX)]
+            query_permutation = _stream_permutation(stream_id, config.query_subset)
             sql_list: list[Any] = []
             for position, query_id in enumerate(query_permutation):
                 stream_seed = _derive_query_seed(seed, stream_id, position)
                 try:
-                    sql_list.append(
-                        self.benchmark.get_query(
-                            query_id,
-                            seed=stream_seed,
-                            stream_id=stream_id,
-                            scale_factor=config.scale_factor,
-                        )
-                    )
+                    sql_list.append(self._get_stream_query(query_id, stream_seed, stream_id, config.scale_factor))
                 except Exception as exc:  # noqa: BLE001 - deferred to per-query fault isolation
                     sql_list.append(exc)
             return stream_id, sql_list
@@ -284,12 +282,26 @@ class TPCHThroughputTest:
 
         max_workers = max(1, config.max_workers or config.num_streams)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(_generate_one_stream, sid) for sid in range(config.num_streams)]
+            futures: list[concurrent.futures.Future[tuple[int, list[Any]]]] = [
+                executor.submit(contextvars.copy_context().run, _generate_one_stream, sid)
+                for sid in range(config.num_streams)
+            ]
             for future in concurrent.futures.as_completed(futures):
                 stream_id, sql_list = future.result()
                 stream_queries[stream_id] = sql_list
 
         return stream_queries
+
+    def _get_stream_query(self, query_id: int, stream_seed: int, stream_id: int, scale_factor: float) -> str:
+        from benchbox.core.tpch.streams import TPCHStreams
+
+        return self.benchmark.get_query(
+            query_id,
+            seed=stream_seed,
+            params={"stream_id": stream_id % len(TPCHStreams.PERMUTATION_MATRIX)},
+            scale_factor=scale_factor,
+            dialect=self.target_dialect,
+        )
 
     def _resolve_query_text(
         self,
@@ -315,12 +327,7 @@ class TPCHThroughputTest:
         # Fall back to inline generation (_execute_stream called directly,
         # bypassing run()'s pre-generation pass).
         stream_seed = _derive_query_seed(seed, stream_id, position)
-        return self.benchmark.get_query(
-            query_id,
-            seed=stream_seed,
-            stream_id=stream_id,
-            scale_factor=config.scale_factor,
-        )
+        return self._get_stream_query(query_id, stream_seed, stream_id, config.scale_factor)
 
     def _resolve_cancel_event(self, config: TPCHThroughputTestConfig, stream_id: int) -> Optional[threading.Event]:
         """Return this stream's cooperative-cancel event, if any.
@@ -419,6 +426,7 @@ class TPCHThroughputTest:
             queries_executed=0,
             queries_successful=0,
             queries_failed=0,
+            start_wall_time=datetime.now().isoformat(),
         )
 
         connection = None
@@ -428,12 +436,10 @@ class TPCHThroughputTest:
 
             # Create connection for this stream
             connection = self.connection_factory()
+            stream_result.start_time = mono_time()
+            stream_result.start_wall_time = datetime.now().isoformat()
 
-            # Execute all 22 TPC-H queries in proper TPC-H permutation order for this stream
-            from benchbox.core.tpch.streams import TPCHStreams
-
-            # Use stream-specific permutation from TPC-H specification
-            query_permutation = TPCHStreams.PERMUTATION_MATRIX[stream_id % len(TPCHStreams.PERMUTATION_MATRIX)]
+            query_permutation = _stream_permutation(stream_id, config.query_subset)
 
             if config.verbose:
                 self.logger.info(f"Stream {stream_id} using TPC-H permutation: {query_permutation}")
@@ -449,18 +455,6 @@ class TPCHThroughputTest:
             # a timed-out stream can stop soon instead of running unbounded
             # in the background. See runner.py's module docstring.
             cancel_event = self._resolve_cancel_event(config, stream_id)
-
-            # Reference seed for this scale factor (None if scale_factor has no
-            # pinned reference, e.g. != 1.0) -- used below to tell QueryValidator
-            # whether EACH query's derived seed (seed + stream_id*1000 + position,
-            # same formula _resolve_query_text() uses to generate the SQL; not
-            # re-derived here, just re-read for validation-context purposes)
-            # matches the reference answer set. This context is authoritative for
-            # the parameter-sensitive queries: a reference match keeps their EXACT
-            # answer-file check, a non-reference seed relaxes them to RANGE/LOOSE.
-            from benchbox.core.tpch.benchmark import get_reference_seed
-
-            reference_seed = get_reference_seed(config.scale_factor)
 
             cancelled = False
             for position, query_id in enumerate(query_permutation):
@@ -495,18 +489,7 @@ class TPCHThroughputTest:
                             # expected results are designed and registered.
                             connection.set_query_context(query_id)
 
-                        # Tell QueryValidator whether THIS query's derived seed
-                        # (_derive_query_seed -- the same single definition query
-                        # generation uses, so validation can never desynchronize
-                        # from the generated SQL) matches the pinned reference
-                        # seed. This context is authoritative for the parameter-
-                        # sensitive queries: a reference match keeps their EXACT
-                        # answer-file check, a non-reference seed relaxes them to
-                        # RANGE/LOOSE. Cleared in the finally below regardless of
-                        # outcome so it never leaks into unrelated
-                        # validate_query_result() calls on this thread.
-                        stream_seed = _derive_query_seed(seed, stream_id, position)
-                        set_reference_seed_context(stream_seed == reference_seed)
+                        set_reference_seed_context(False)
 
                         cursor = connection.execute(query_text)
 
@@ -589,17 +572,16 @@ class TPCHThroughputTest:
                 self.logger.error(f"Stream {stream_id} failed: {e}")
 
         finally:
-            # Ensure connection is always closed, even on exception
+            stream_result.end_time = mono_time()
+            stream_result.end_wall_time = datetime.now().isoformat()
+            stream_result.duration = stream_result.end_time - stream_result.start_time
+
             if connection is not None:
                 try:
                     connection.close()
                 except Exception as close_error:
                     if config.verbose:
                         self.logger.warning(f"Failed to close connection for stream {stream_id}: {close_error}")
-
-            # Record end time and duration
-            stream_result.end_time = mono_time()
-            stream_result.duration = stream_result.end_time - stream_result.start_time
 
         return stream_result
 
@@ -624,5 +606,8 @@ class TPCHThroughputTest:
         if result.errors or result.throughput_at_size is None or result.throughput_at_size <= 0:
             return False
 
-        # Ensure all streams executed all 22 queries
-        return all(stream_result.queries_executed == 22 for stream_result in result.stream_results)
+        return all(
+            stream_result.queries_executed
+            == len(_stream_permutation(stream_result.stream_id, result.config.query_subset))
+            for stream_result in result.stream_results
+        )

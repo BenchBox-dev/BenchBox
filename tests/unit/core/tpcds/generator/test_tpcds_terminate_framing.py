@@ -10,8 +10,10 @@ no-trailing-separator convention the bundled TPC-H binaries enforce via
 
 If a new dsdgen call site forgets ``-terminate n`` (or passes ``-terminate y``),
 that platform's generated data would silently regain trailing delimiters and
-diverge. This test parses the generator source so it catches such regressions
-without needing to execute dsdgen.
+diverge. Options must also go through ``tpcds_option``: the Windows tools ignore
+``-`` prefixed options, so a raw ``"-terminate"`` or ``"-scale"`` literal is
+dropped there. This test parses the generator source so it catches such
+regressions without needing to execute dsdgen.
 
 Copyright 2026 Joe Harris / BenchBox Project
 
@@ -34,11 +36,13 @@ pytestmark = [
 
 _TPCDS_GENERATOR_DIR = Path(benchbox.__file__).parent / "core" / "tpcds" / "generator"
 
-# Matches a ``"-terminate", "<value>"`` pair in a command list, tolerating
-# newlines/whitespace between the two string literals.
-_TERMINATE_PAIR = re.compile(r'"-terminate"\s*,\s*"([^"]+)"')
-# Catches a bare ``"-terminate"`` not immediately followed by a string literal.
-_TERMINATE_TOKEN = re.compile(r'"-terminate"')
+# Matches a ``tpcds_option("terminate"), "<value>"`` pair in a command list,
+# tolerating newlines/whitespace between the two arguments.
+_TERMINATE_PAIR = re.compile(r'tpcds_option\("terminate"\)\s*,\s*"([^"]+)"')
+# Catches a ``tpcds_option("terminate")`` not immediately followed by a string literal.
+_TERMINATE_TOKEN = re.compile(r'tpcds_option\("terminate"\)')
+# A raw dsdgen option literal such as ``"-scale"`` or ``"/SCALE"``.
+_RAW_OPTION = re.compile(r'"[-/][A-Za-z_]+"')
 
 
 def _generator_sources() -> list[Path]:
@@ -70,3 +74,9 @@ def test_every_terminate_flag_is_n(source: Path) -> None:
             "'n' to disable trailing field separators (BenchBox framing "
             "convention)."
         )
+
+
+@pytest.mark.parametrize("source", _generator_sources(), ids=lambda p: p.name)
+def test_dsdgen_options_use_the_platform_prefix(source: Path) -> None:
+    raw = _RAW_OPTION.findall(source.read_text(encoding="utf-8"))
+    assert not raw, f"{source.name}: pass dsdgen options through tpcds_option(), not raw literals {raw}"

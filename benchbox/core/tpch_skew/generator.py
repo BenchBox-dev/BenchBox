@@ -241,7 +241,7 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         Skew transforms preserve row counts, so entries use the spec base
         counts scaled to this run's scale factor; file sizes are measured.
         """
-        from benchbox.utils.datagen_manifest import DataGenerationManifest
+        from benchbox.utils.datagen_manifest import DataGenerationManifest, require_manifest_files
 
         identity = self.skew_config.datagen_identity()
         from benchbox.utils.datagen_version import compute_datagen_identity_hash
@@ -260,6 +260,7 @@ class TPCHSkewDataGenerator(VerbosityMixin):
         for table_name, file_path in table_paths.items():
             base_rows = _TPCH_BASE_ROW_COUNTS.get(table_name, 0)
             manifest.add_entry(table_name, file_path, row_count=int(base_rows * self.scale_factor))
+        require_manifest_files(manifest.file_counts()[1], label="TPC-H Skew", output_dir=self.output_dir)
         manifest.write()
 
     def _collect_table_files(self) -> dict[str, Path]:

@@ -1,0 +1,887 @@
+{
+ "source": {
+  "package": "benchbox",
+  "version": "0.4.1",
+  "source_sha": "c52e06e6cea4b62f0a7794207fdd798c72dfe8da",
+  "python": "3.11",
+  "exclude_newer": "2026-10-03T00:00:00Z"
+ },
+ "rule": "in benchbox.__all__; or documented by autodoc with at least one hand-written import citation; or at least five hand-written import citations. Excludes benchbox.cli.*, benchbox.examples.*, non-exported modules and the dropped list.",
+ "dropped": [
+  "benchbox.core.results.models.ExecutionPhases",
+  "benchbox.monitoring.performance.PerformanceRegressionAlert",
+  "benchbox.monitoring.performance.PerformanceSnapshot",
+  "benchbox.monitoring.performance.PerformanceTracker",
+  "benchbox.monitoring.performance.TimingStats",
+  "benchbox.utils.data_validation.DataValidationResult",
+  "benchbox.utils.data_validation.TableExpectation",
+  "benchbox.utils.system_info.SystemInfo"
+ ],
+ "symbols": [
+  {
+   "symbol": "benchbox.AMPLab",
+   "module": "benchbox",
+   "name": "AMPLab",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [
+    "benchbox.amplab.AMPLab"
+   ],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs) -> None"
+  },
+  {
+   "symbol": "benchbox.BaseBenchmark",
+   "module": "benchbox",
+   "name": "BaseBenchmark",
+   "kind": "class",
+   "area": "core",
+   "aliases": [
+    "benchbox.base.BaseBenchmark"
+   ],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.ClickBench",
+   "module": "benchbox",
+   "name": "ClickBench",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [
+    "benchbox.clickbench.ClickBench"
+   ],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs) -> None"
+  },
+  {
+   "symbol": "benchbox.CoffeeShop",
+   "module": "benchbox",
+   "name": "CoffeeShop",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.DATAFRAME_PLATFORMS",
+   "module": "benchbox",
+   "name": "DATAFRAME_PLATFORMS",
+   "kind": "constant",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": null
+  },
+  {
+   "symbol": "benchbox.DataVault",
+   "module": "benchbox",
+   "name": "DataVault",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.FlightData",
+   "module": "benchbox",
+   "name": "FlightData",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, end_year: int = 2024, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.H2ODB",
+   "module": "benchbox",
+   "name": "H2ODB",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [
+    "benchbox.h2odb.H2ODB"
+   ],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs) -> None"
+  },
+  {
+   "symbol": "benchbox.JoinOrder",
+   "module": "benchbox",
+   "name": "JoinOrder",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [
+    "benchbox.joinorder.JoinOrder"
+   ],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.MetadataPrimitives",
+   "module": "benchbox",
+   "name": "MetadataPrimitives",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.NYCTaxi",
+   "module": "benchbox",
+   "name": "NYCTaxi",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, year: int = 2019, months: Optional[list[int]] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.ReadPrimitives",
+   "module": "benchbox",
+   "name": "ReadPrimitives",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [
+    "benchbox.read_primitives.ReadPrimitives"
+   ],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.SSB",
+   "module": "benchbox",
+   "name": "SSB",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [
+    "benchbox.ssb.SSB"
+   ],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.TPCDI",
+   "module": "benchbox",
+   "name": "TPCDI",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [
+    "benchbox.tpcdi.TPCDI"
+   ],
+   "extras": [
+    "tpcdi"
+   ],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs) -> None"
+  },
+  {
+   "symbol": "benchbox.TPCDS",
+   "module": "benchbox",
+   "name": "TPCDS",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [
+    "benchbox.tpcds.TPCDS"
+   ],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.TPCDSOBT",
+   "module": "benchbox",
+   "name": "TPCDSOBT",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.TPCDS_DATAFRAME_QUERIES",
+   "module": "benchbox",
+   "name": "TPCDS_DATAFRAME_QUERIES",
+   "kind": "constant",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": null
+  },
+  {
+   "symbol": "benchbox.TPCH",
+   "module": "benchbox",
+   "name": "TPCH",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [
+    "benchbox.tpch.TPCH"
+   ],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.TPCHSkew",
+   "module": "benchbox",
+   "name": "TPCHSkew",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, skew_preset: Optional[str] = None, skew_config: Optional[benchbox.core.tpch_skew.skew_config.SkewConfiguration] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.TPCH_DATAFRAME_QUERIES",
+   "module": "benchbox",
+   "name": "TPCH_DATAFRAME_QUERIES",
+   "kind": "constant",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "known_import_failure": {
+    "reason": "circular import between benchbox.core.tpch.dataframe_queries and benchbox.core.dataframe.benchmark_suite in 0.4.1; fails in a fresh process",
+    "match": "cannot import name 'get_tpch_dataframe_queries' from partially initialized module 'benchbox.core.tpch.dataframe_queries'"
+   }
+  },
+  {
+   "symbol": "benchbox.TPCHavoc",
+   "module": "benchbox",
+   "name": "TPCHavoc",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.TSBSDevOps",
+   "module": "benchbox",
+   "name": "TSBSDevOps",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [
+    "benchbox.tsbs_devops.TSBSDevOps"
+   ],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, num_hosts: Optional[int] = None, duration_days: Optional[int] = None, interval_seconds: int = 10, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.TransactionPrimitives",
+   "module": "benchbox",
+   "name": "TransactionPrimitives",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.VectorSearch",
+   "module": "benchbox",
+   "name": "VectorSearch",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, *, dimensions: int = 128, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.WritePrimitives",
+   "module": "benchbox",
+   "name": "WritePrimitives",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [
+    "benchbox.write_primitives.WritePrimitives"
+   ],
+   "extras": [],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, **kwargs: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.core.config.BenchmarkConfig",
+   "module": "benchbox.core.config",
+   "name": "BenchmarkConfig",
+   "kind": "class",
+   "area": "core",
+   "aliases": [
+    "benchbox.core.schemas.BenchmarkConfig"
+   ],
+   "extras": [],
+   "signature": "(*, name: str, display_name: str, scale_factor: float = 0.01, queries: Optional[list[str]] = None, concurrency: int = 1, capture_plans: bool = False, analyze_plans: bool | None = None, strict_plan_capture: bool = False, stats_reset: Optional[bool] = None, stats_per_table_timing: bool = False, options: dict[str, typing.Any] = <factory>, compress_data: bool = False, compression_type: str = 'zstd', compression_level: Optional[int] = None, test_execution_type: str = 'standard', official: bool = False, client_region: str | None = None, client_cloud: str | None = None, link_probe: bool = True) -> None"
+  },
+  {
+   "symbol": "benchbox.core.config.DatabaseConfig",
+   "module": "benchbox.core.config",
+   "name": "DatabaseConfig",
+   "kind": "class",
+   "area": "core",
+   "aliases": [
+    "benchbox.core.schemas.DatabaseConfig"
+   ],
+   "extras": [],
+   "signature": "(*, type: str, name: str, connection_string: Optional[str] = None, options: dict[str, typing.Any] = <factory>, driver_package: Optional[str] = None, driver_version: Optional[str] = None, driver_version_resolved: Optional[str] = None, driver_version_actual: Optional[str] = None, driver_runtime_strategy: Optional[str] = None, driver_runtime_path: Optional[str] = None, driver_runtime_python_executable: Optional[str] = None, driver_auto_install: bool = False, driver_auto_install_used: bool = False, execution_mode: Optional[Literal['sql', 'dataframe', 'data_only']] = None, **extra_data: Any) -> None"
+  },
+  {
+   "symbol": "benchbox.core.platform_registry.PlatformRegistry",
+   "module": "benchbox.core.platform_registry",
+   "name": "PlatformRegistry",
+   "kind": "class",
+   "area": "core",
+   "aliases": [],
+   "extras": [],
+   "signature": "()"
+  },
+  {
+   "symbol": "benchbox.core.results.anonymization.AnonymizationConfig",
+   "module": "benchbox.core.results.anonymization",
+   "name": "AnonymizationConfig",
+   "kind": "class",
+   "area": "results",
+   "aliases": [],
+   "extras": [],
+   "signature": "(machine_id_salt: Optional[str] = None, pii_patterns: list[str] = <factory>, custom_sanitizers: dict[str, str] = <factory>) -> None"
+  },
+  {
+   "symbol": "benchbox.core.results.anonymization.AnonymizationManager",
+   "module": "benchbox.core.results.anonymization",
+   "name": "AnonymizationManager",
+   "kind": "class",
+   "area": "results",
+   "aliases": [],
+   "extras": [],
+   "signature": "(config: Optional[benchbox.core.results.anonymization.AnonymizationConfig] = None)"
+  },
+  {
+   "symbol": "benchbox.core.results.display.display_results",
+   "module": "benchbox.core.results.display",
+   "name": "display_results",
+   "kind": "function",
+   "area": "results",
+   "aliases": [],
+   "extras": [],
+   "signature": "(result_data: 'dict[str, Any]', verbosity: 'int' = 0) -> 'None'"
+  },
+  {
+   "symbol": "benchbox.core.results.exporter.ResultExporter",
+   "module": "benchbox.core.results.exporter",
+   "name": "ResultExporter",
+   "kind": "class",
+   "area": "results",
+   "aliases": [],
+   "extras": [],
+   "signature": "(output_dir: 'str | Path | None' = None, anonymize: 'bool' = True, anonymization_config: 'AnonymizationConfig | None' = None, console: 'Console | None' = None, plan_history_dir: 'str | Path | None' = None)"
+  },
+  {
+   "symbol": "benchbox.core.results.models.BenchmarkResults",
+   "module": "benchbox.core.results.models",
+   "name": "BenchmarkResults",
+   "kind": "class",
+   "area": "results",
+   "aliases": [],
+   "extras": [],
+   "signature": "(benchmark_name: 'str', platform: 'str', scale_factor: 'float', execution_id: 'str', timestamp: 'datetime', duration_seconds: 'float', total_queries: 'int', successful_queries: 'int', failed_queries: 'int', query_results: 'list[dict[str, Any]]' = <factory>, total_execution_time: 'float' = 0.0, average_query_time: 'float' = 0.0, data_loading_time: 'float' = 0.0, schema_creation_time: 'float' = 0.0, total_rows_loaded: 'int' = 0, data_size_mb: 'float' = 0.0, table_statistics: 'dict[str, int]' = <factory>, data_generation_version: 'int | None' = None, data_generation_hash: 'str | None' = None, per_query_timings: 'list[dict[str, Any]] | None' = <factory>, execution_phases: 'ExecutionPhases | None' = None, query_definitions: 'dict[str, dict[str, QueryDefinition]] | None' = None, test_execution_type: 'str' = 'standard', power_at_size: 'float | None' = None, throughput_at_size: 'float | None' = None, qph_at_size: 'float | None' = None, geometric_mean_execution_time: 'float | None' = None, validation_status: 'str' = 'PASSED', validation_details: 'dict[str, Any] | None' = None, execution_environment: 'NormalizedExecutionEnvironment | dict[str, Any] | None' = None, platform_deployment: 'PlatformDeploymentMetadata | dict[str, Any] | None' = None, platform_cloud: 'PlatformCloudMetadata | dict[str, Any] | None' = None, platform_compute: 'PlatformComputeMetadata | dict[str, Any] | None' = None, platform_storage: 'PlatformStorageMetadata | dict[str, Any] | None' = None, platform_raw_config: 'dict[str, Any] | None' = None, platform_raw_metadata: 'dict[str, Any] | None' = None, platform_info: 'dict[str, Any] | None' = None, platform_metadata: 'dict[str, Any] | None' = None, tunings_applied: 'dict[str, Any] | None' = None, tuning_config_hash: 'str | None' = None, applied_tuning_ledger: 'dict[str, Any] | None' = None, applied_ledger_hash: 'str | None' = None, tuning_source_file: 'str | None' = None, tuning_source: 'str | None' = None, tuning_validation_status: 'str' = 'not_validated', tuning_metadata_saved: 'bool' = False, system_profile: 'dict[str, Any] | None' = None, database_name: 'str | None' = None, anonymous_machine_id: 'str | None' = None, execution_metadata: 'dict[str, Any] | None' = None, performance_characteristics: 'dict[str, Any]' = <factory>, performance_summary: 'dict[str, Any]' = <factory>, cost_summary: 'dict[str, Any] | None' = None, driver_package: 'str | None' = None, driver_version_requested: 'str | None' = None, driver_version_resolved: 'str | None' = None, driver_version_actual: 'str | None' = None, driver_runtime_strategy: 'str | None' = None, driver_runtime_path: 'str | None' = None, driver_runtime_python_executable: 'str | None' = None, driver_auto_install: 'bool' = False, engine_version: 'str | None' = None, engine_version_source: 'str | None' = None, output_filename: 'str | None' = None, resource_utilization: 'dict[str, Any] | None' = None, _benchmark_id_override: 'str | None' = None, summary_metrics: 'dict[str, Any]' = <factory>, query_subset: 'list[str] | None' = None, concurrency_level: 'int | None' = None, benchmark_version: 'str | None' = None, query_plans_captured: 'int' = 0, plan_capture_failures: 'int' = 0, plan_capture_errors: 'list[dict[str, str]]' = <factory>, plan_comparison_summary: 'dict[str, Any] | None' = None, total_plan_capture_time_ms: 'float' = 0.0, avg_plan_capture_overhead_pct: 'float' = 0.0, max_plan_capture_time_ms: 'float' = 0.0, execution_context: 'dict[str, Any] | None' = None, native_comparison: 'NativeComparison | None' = None, compliance_class: 'str | None' = None, dataset_version: 'str | None' = None, manifest_hash: 'str | None' = None, data_archive_hash: 'str | None' = None, funding: 'str | None' = None, result_source: 'str | None' = None) -> None"
+  },
+  {
+   "symbol": "benchbox.core.results.timing.QueryTiming",
+   "module": "benchbox.core.results.timing",
+   "name": "QueryTiming",
+   "kind": "class",
+   "area": "results",
+   "aliases": [],
+   "extras": [],
+   "signature": "(query_id: str, query_name: Optional[str] = None, execution_sequence: int = 0, execution_time: float = 0.0, parse_time: Optional[float] = None, optimization_time: Optional[float] = None, execution_only_time: Optional[float] = None, fetch_time: Optional[float] = None, timing_breakdown: dict[str, float] = <factory>, rows_returned: int = 0, bytes_processed: Optional[int] = None, tables_accessed: list[str] = <factory>, timestamp: datetime.datetime = <factory>, thread_id: Optional[str] = None, connection_id: Optional[str] = None, rows_per_second: Optional[float] = None, bytes_per_second: Optional[float] = None, cpu_time: Optional[float] = None, memory_peak: Optional[int] = None, status: str = 'SUCCESS', error_message: Optional[str] = None, warning_count: int = 0, platform_metrics: dict[str, typing.Any] = <factory>) -> None"
+  },
+  {
+   "symbol": "benchbox.core.results.timing.TimingAnalyzer",
+   "module": "benchbox.core.results.timing",
+   "name": "TimingAnalyzer",
+   "kind": "class",
+   "area": "results",
+   "aliases": [],
+   "extras": [],
+   "signature": "(timings: list[benchbox.core.results.timing.QueryTiming])"
+  },
+  {
+   "symbol": "benchbox.core.results.timing.TimingCollector",
+   "module": "benchbox.core.results.timing",
+   "name": "TimingCollector",
+   "kind": "class",
+   "area": "results",
+   "aliases": [],
+   "extras": [],
+   "signature": "(enable_detailed_timing: bool = True)"
+  },
+  {
+   "symbol": "benchbox.core.runner.LifecyclePhases",
+   "module": "benchbox.core.runner",
+   "name": "LifecyclePhases",
+   "kind": "class",
+   "area": "core",
+   "aliases": [
+    "benchbox.core.runner.runner.LifecyclePhases"
+   ],
+   "extras": [],
+   "signature": "(generate: 'bool' = True, load: 'bool' = True, execute: 'bool' = True, statistics: 'bool' = False) -> None"
+  },
+  {
+   "symbol": "benchbox.core.runner.run_benchmark_lifecycle",
+   "module": "benchbox.core.runner",
+   "name": "run_benchmark_lifecycle",
+   "kind": "function",
+   "area": "core",
+   "aliases": [
+    "benchbox.core.runner.runner.run_benchmark_lifecycle"
+   ],
+   "extras": [],
+   "signature": "(benchmark_config: 'BenchmarkConfig', database_config: 'DatabaseConfig | None', system_profile: 'SystemProfile | None', *, platform_config: 'dict[str, Any] | None' = None, platform_adapter: 'Any | None' = None, phases: 'LifecyclePhases | None' = None, validation_opts: 'ValidationOptions | None' = None, output_root: 'str | None' = None, benchmark_instance: 'Any | None' = None, verbosity: 'VerbositySettings | None' = None, monitor: 'PerformanceMonitor | None' = None, enable_resource_monitoring: 'bool' = True, execution_context: 'ExecutionContext | None' = None) -> 'BenchmarkResults'"
+  },
+  {
+   "symbol": "benchbox.core.system.SystemProfiler",
+   "module": "benchbox.core.system",
+   "name": "SystemProfiler",
+   "kind": "class",
+   "area": "core",
+   "aliases": [],
+   "extras": [],
+   "signature": "()"
+  },
+  {
+   "symbol": "benchbox.core.tpc_validation.TPCResultValidator",
+   "module": "benchbox.core.tpc_validation",
+   "name": "TPCResultValidator",
+   "kind": "class",
+   "area": "core",
+   "aliases": [],
+   "extras": [],
+   "signature": "(config: Optional[dict[str, Any]] = None) -> None"
+  },
+  {
+   "symbol": "benchbox.core.tpcdi.benchmark.TPCDIBenchmark",
+   "module": "benchbox.core.tpcdi.benchmark",
+   "name": "TPCDIBenchmark",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [
+    "tpcdi"
+   ],
+   "signature": "(scale_factor: float = 1.0, output_dir: Union[str, pathlib.Path, NoneType] = None, enable_parallel: bool = False, max_workers: Optional[int] = None, config: Optional[benchbox.core.tpcdi.config.TPCDIConfig] = None, **kwargs: Any)"
+  },
+  {
+   "symbol": "benchbox.core.tpcdi.config.TPCDIConfig",
+   "module": "benchbox.core.tpcdi.config",
+   "name": "TPCDIConfig",
+   "kind": "class",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [
+    "tpcdi"
+   ],
+   "signature": "(scale_factor: float = 1.0, output_dir: Optional[pathlib.Path] = None, enable_parallel: bool = False, max_workers: Optional[int] = None, chunk_size: int = 10000, generation_seed: int = 42, enable_validation: bool = True, strict_validation: bool = False, optimize_memory: bool = True, log_level: str = 'INFO') -> None"
+  },
+  {
+   "symbol": "benchbox.core.tpch.dataframe_queries.TPCH_DATAFRAME_QUERIES",
+   "module": "benchbox.core.tpch.dataframe_queries",
+   "name": "TPCH_DATAFRAME_QUERIES",
+   "kind": "constant",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "known_import_failure": {
+    "reason": "circular import between benchbox.core.tpch.dataframe_queries and benchbox.core.dataframe.benchmark_suite in 0.4.1; fails in a fresh process",
+    "match": "cannot import name 'get_tpch_dataframe_queries' from partially initialized module 'benchbox.core.tpch.dataframe_queries'"
+   }
+  },
+  {
+   "symbol": "benchbox.core.tpch.dataframe_queries.get_query",
+   "module": "benchbox.core.tpch.dataframe_queries",
+   "name": "get_query",
+   "kind": "function",
+   "area": "benchmarks",
+   "aliases": [],
+   "extras": [],
+   "known_import_failure": {
+    "reason": "circular import between benchbox.core.tpch.dataframe_queries and benchbox.core.dataframe.benchmark_suite in 0.4.1; fails in a fresh process",
+    "match": "cannot import name 'get_tpch_dataframe_queries' from partially initialized module 'benchbox.core.tpch.dataframe_queries'"
+   }
+  },
+  {
+   "symbol": "benchbox.core.tuning.interface.TableTuning",
+   "module": "benchbox.core.tuning.interface",
+   "name": "TableTuning",
+   "kind": "class",
+   "area": "core",
+   "aliases": [],
+   "extras": [],
+   "signature": "(table_name: str, partitioning: Optional[list[benchbox.core.tuning.interface.TuningColumn]] = None, clustering: Optional[list[benchbox.core.tuning.interface.TuningColumn]] = None, distribution: Optional[list[benchbox.core.tuning.interface.TuningColumn]] = None, sorting: Optional[list[benchbox.core.tuning.interface.TuningColumn]] = None) -> None"
+  },
+  {
+   "symbol": "benchbox.core.tuning.interface.TuningColumn",
+   "module": "benchbox.core.tuning.interface",
+   "name": "TuningColumn",
+   "kind": "class",
+   "area": "core",
+   "aliases": [],
+   "extras": [],
+   "signature": "(name: str, type: str, order: int, sort_order: Literal['ASC', 'DESC'] = 'ASC', nulls_position: Literal['FIRST', 'LAST', 'DEFAULT'] = 'DEFAULT', compression: Optional[str] = None) -> None"
+  },
+  {
+   "symbol": "benchbox.core.tuning.interface.TuningType",
+   "module": "benchbox.core.tuning.interface",
+   "name": "TuningType",
+   "kind": "class",
+   "area": "core",
+   "aliases": [],
+   "extras": [],
+   "signature": "(value, names=None, *, module=None, qualname=None, type=None, start=1, boundary=None)"
+  },
+  {
+   "symbol": "benchbox.core.tuning.interface.UnifiedTuningConfiguration",
+   "module": "benchbox.core.tuning.interface",
+   "name": "UnifiedTuningConfiguration",
+   "kind": "class",
+   "area": "core",
+   "aliases": [],
+   "extras": [],
+   "signature": "(primary_keys: benchbox.core.tuning.interface.PrimaryKeyConfiguration = <factory>, foreign_keys: benchbox.core.tuning.interface.ForeignKeyConfiguration = <factory>, unique_constraints: benchbox.core.tuning.interface.UniqueConstraintConfiguration = <factory>, check_constraints: benchbox.core.tuning.interface.CheckConstraintConfiguration = <factory>, platform_optimizations: benchbox.core.tuning.interface.PlatformOptimizationConfiguration = <factory>, table_tunings: dict[str, benchbox.core.tuning.interface.TableTuning] = <factory>) -> None"
+  },
+  {
+   "symbol": "benchbox.monitoring.PerformanceHistory",
+   "module": "benchbox.monitoring",
+   "name": "PerformanceHistory",
+   "kind": "class",
+   "area": "results",
+   "aliases": [
+    "benchbox.monitoring.performance.PerformanceHistory"
+   ],
+   "extras": [],
+   "signature": "(storage_path: 'Path', max_entries: 'int' = 50) -> 'None'"
+  },
+  {
+   "symbol": "benchbox.monitoring.PerformanceMonitor",
+   "module": "benchbox.monitoring",
+   "name": "PerformanceMonitor",
+   "kind": "class",
+   "area": "results",
+   "aliases": [
+    "benchbox.monitoring.performance.PerformanceMonitor"
+   ],
+   "extras": [],
+   "signature": "() -> 'None'"
+  },
+  {
+   "symbol": "benchbox.platforms",
+   "module": "benchbox.platforms",
+   "name": null,
+   "kind": "module",
+   "area": "platforms",
+   "aliases": [],
+   "extras": [],
+   "signature": null
+  },
+  {
+   "symbol": "benchbox.platforms.DatabricksAdapter",
+   "module": "benchbox.platforms",
+   "name": "DatabricksAdapter",
+   "kind": "class",
+   "area": "platforms",
+   "aliases": [
+    "benchbox.platforms.databricks.DatabricksAdapter"
+   ],
+   "extras": [],
+   "signature": "(**config)"
+  },
+  {
+   "symbol": "benchbox.platforms.DuckDBAdapter",
+   "module": "benchbox.platforms",
+   "name": "DuckDBAdapter",
+   "kind": "class",
+   "area": "platforms",
+   "aliases": [
+    "benchbox.platforms.duckdb.DuckDBAdapter"
+   ],
+   "extras": [],
+   "signature": "(**config)"
+  },
+  {
+   "symbol": "benchbox.platforms.bigquery.BigQueryAdapter",
+   "module": "benchbox.platforms.bigquery",
+   "name": "BigQueryAdapter",
+   "kind": "class",
+   "area": "platforms",
+   "aliases": [],
+   "extras": [],
+   "signature": "(**config)"
+  },
+  {
+   "symbol": "benchbox.platforms.clickhouse.ClickHouseAdapter",
+   "module": "benchbox.platforms.clickhouse",
+   "name": "ClickHouseAdapter",
+   "kind": "class",
+   "area": "platforms",
+   "aliases": [],
+   "extras": [],
+   "signature": "(**config)"
+  },
+  {
+   "symbol": "benchbox.platforms.datafusion.DataFusionAdapter",
+   "module": "benchbox.platforms.datafusion",
+   "name": "DataFusionAdapter",
+   "kind": "class",
+   "area": "platforms",
+   "aliases": [],
+   "extras": [],
+   "signature": "(**config)"
+  },
+  {
+   "symbol": "benchbox.platforms.polars_platform.PolarsAdapter",
+   "module": "benchbox.platforms.polars_platform",
+   "name": "PolarsAdapter",
+   "kind": "class",
+   "area": "platforms",
+   "aliases": [],
+   "extras": [],
+   "signature": "(**config)"
+  },
+  {
+   "symbol": "benchbox.platforms.redshift.RedshiftAdapter",
+   "module": "benchbox.platforms.redshift",
+   "name": "RedshiftAdapter",
+   "kind": "class",
+   "area": "platforms",
+   "aliases": [],
+   "extras": [],
+   "signature": "(**config)"
+  },
+  {
+   "symbol": "benchbox.platforms.snowflake.SnowflakeAdapter",
+   "module": "benchbox.platforms.snowflake",
+   "name": "SnowflakeAdapter",
+   "kind": "class",
+   "area": "platforms",
+   "aliases": [],
+   "extras": [],
+   "signature": "(**config)"
+  },
+  {
+   "symbol": "benchbox.platforms.sqlite.SQLiteAdapter",
+   "module": "benchbox.platforms.sqlite",
+   "name": "SQLiteAdapter",
+   "kind": "class",
+   "area": "platforms",
+   "aliases": [],
+   "extras": [],
+   "signature": "(**config)"
+  },
+  {
+   "symbol": "benchbox.utils.ExecutionConfigHelper",
+   "module": "benchbox.utils",
+   "name": "ExecutionConfigHelper",
+   "kind": "class",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(config_manager: Optional[Any] = None)"
+  },
+  {
+   "symbol": "benchbox.utils.cloud_storage.CloudPathAdapter",
+   "module": "benchbox.utils.cloud_storage",
+   "name": "CloudPathAdapter",
+   "kind": "class",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(path: 'Union[str, Path]')"
+  },
+  {
+   "symbol": "benchbox.utils.cloud_storage.CloudStorageGeneratorMixin",
+   "module": "benchbox.utils.cloud_storage",
+   "name": "CloudStorageGeneratorMixin",
+   "kind": "class",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "()"
+  },
+  {
+   "symbol": "benchbox.utils.cloud_storage.create_path_handler",
+   "module": "benchbox.utils.cloud_storage",
+   "name": "create_path_handler",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(path: 'Union[str, Path]') -> 'Union[Path, CloudPath, DatabricksPath, CloudStagingPath]'"
+  },
+  {
+   "symbol": "benchbox.utils.cloud_storage.ensure_cloud_directory",
+   "module": "benchbox.utils.cloud_storage",
+   "name": "ensure_cloud_directory",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(path: 'Union[str, Path, CloudPath]') -> 'Union[Path, CloudPath, DatabricksPath]'"
+  },
+  {
+   "symbol": "benchbox.utils.cloud_storage.format_cloud_usage_guide",
+   "module": "benchbox.utils.cloud_storage",
+   "name": "format_cloud_usage_guide",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(provider: 'str') -> 'str'"
+  },
+  {
+   "symbol": "benchbox.utils.cloud_storage.get_cloud_path_info",
+   "module": "benchbox.utils.cloud_storage",
+   "name": "get_cloud_path_info",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(path: 'Union[str, Path]') -> 'dict[str, Any]'"
+  },
+  {
+   "symbol": "benchbox.utils.cloud_storage.is_cloud_path",
+   "module": "benchbox.utils.cloud_storage",
+   "name": "is_cloud_path",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(path: 'Union[str, Path]') -> 'bool'"
+  },
+  {
+   "symbol": "benchbox.utils.cloud_storage.validate_cloud_credentials",
+   "module": "benchbox.utils.cloud_storage",
+   "name": "validate_cloud_credentials",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(path: 'Union[str, Path]') -> 'dict[str, Any]'"
+  },
+  {
+   "symbol": "benchbox.utils.cloud_storage.validate_cloud_path_support",
+   "module": "benchbox.utils.cloud_storage",
+   "name": "validate_cloud_path_support",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "() -> 'bool'"
+  },
+  {
+   "symbol": "benchbox.utils.data_validation.BenchmarkDataValidator",
+   "module": "benchbox.utils.data_validation",
+   "name": "BenchmarkDataValidator",
+   "kind": "class",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(benchmark_name: str, scale_factor: float = 1.0)"
+  },
+  {
+   "symbol": "benchbox.utils.dependency_validation.build_matrix_summary",
+   "module": "benchbox.utils.dependency_validation",
+   "name": "build_matrix_summary",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(pyproject_data: 'Mapping[str, object]', lock_data: 'Mapping[str, object]') -> 'dict[str, object]'"
+  },
+  {
+   "symbol": "benchbox.utils.dependency_validation.validate_dependency_versions",
+   "module": "benchbox.utils.dependency_validation",
+   "name": "validate_dependency_versions",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(pyproject_data: 'Mapping[str, object]', lock_data: 'Mapping[str, object]') -> 'list[str]'"
+  },
+  {
+   "symbol": "benchbox.utils.dialect_utils.normalize_dialect_for_sqlglot",
+   "module": "benchbox.utils.dialect_utils",
+   "name": "normalize_dialect_for_sqlglot",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(dialect: str) -> str"
+  },
+  {
+   "symbol": "benchbox.utils.scale_factor.format_benchmark_name",
+   "module": "benchbox.utils.scale_factor",
+   "name": "format_benchmark_name",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(benchmark_name: str, scale_factor: float) -> str"
+  },
+  {
+   "symbol": "benchbox.utils.scale_factor.format_data_directory",
+   "module": "benchbox.utils.scale_factor",
+   "name": "format_data_directory",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(benchmark_name: str, scale_factor: float) -> str"
+  },
+  {
+   "symbol": "benchbox.utils.scale_factor.format_scale_factor",
+   "module": "benchbox.utils.scale_factor",
+   "name": "format_scale_factor",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(scale_factor: float) -> str"
+  },
+  {
+   "symbol": "benchbox.utils.scale_factor.format_schema_name",
+   "module": "benchbox.utils.scale_factor",
+   "name": "format_schema_name",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "(benchmark_name: str, scale_factor: float) -> str"
+  },
+  {
+   "symbol": "benchbox.utils.system_info.get_cpu_info",
+   "module": "benchbox.utils.system_info",
+   "name": "get_cpu_info",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "() -> dict[str, typing.Any]"
+  },
+  {
+   "symbol": "benchbox.utils.system_info.get_memory_info",
+   "module": "benchbox.utils.system_info",
+   "name": "get_memory_info",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "() -> dict[str, float]"
+  },
+  {
+   "symbol": "benchbox.utils.system_info.get_system_info",
+   "module": "benchbox.utils.system_info",
+   "name": "get_system_info",
+   "kind": "function",
+   "area": "utilities",
+   "aliases": [],
+   "extras": [],
+   "signature": "() -> benchbox.utils.system_info.SystemInfo"
+  }
+ ]
+}

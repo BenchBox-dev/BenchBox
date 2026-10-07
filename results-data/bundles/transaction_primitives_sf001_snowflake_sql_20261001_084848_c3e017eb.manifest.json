@@ -1,0 +1,11 @@
+{
+  "bundle_file": "transaction_primitives_sf001_snowflake_sql_20261001_084848_c3e017eb.json",
+  "bundle_hash": "acc10702b195fa4016b961cb58825c031bf6631f0008a2338d83cfb532f6feb2",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}

@@ -4,7 +4,7 @@
 ```{tags} reference, cli, metrics
 ```
 
-Calculate official TPC performance metrics from benchmark results.
+Calculate TPC Power@Size and Throughput@Size from benchmark results.
 
 ## Basic Syntax
 
@@ -14,19 +14,20 @@ benchbox metrics <subcommand> [OPTIONS]
 
 ## Subcommands
 
-### `qphh` - TPC-H QphH@Size
+### `qphh` - Power@Size and Throughput@Size
 
-Calculate the official TPC-H QphH@Size (Queries per Hour) composite metric from power test and throughput test results.
+Calculate Power@Size and Throughput@Size from power test and throughput test results. The subcommand name is kept for compatibility, but it does not compute the composite QphH@Size or QphDS@Size: BenchBox does not yet run the TPC-H refresh functions or the TPC-DS data maintenance phases that the composite requires.
 
 **Formula:**
 
 ```
-QphH@Size = sqrt(Power@Size × Throughput@Size)
+Power@Size       = 3600 × SF / geometric_mean(final power iteration query times)
+Throughput@Size  = Queries × 3600 × SF / Throughput_Phase_Wall_Time
 
-Where:
-  Power@Size       = 3600 × SF / Power_Test_Time
-  Throughput@Size  = Num_Streams × 3600 × SF / Throughput_Test_Time
+Where Queries = 22 × streams for TPC-H and 99 × streams for TPC-DS.
 ```
+
+The command exits non-zero when either file has suppressed TPC metrics, any failed query, or a failed throughput phase.
 
 ```bash
 benchbox metrics qphh --power-results <path> --throughput-results <path> [OPTIONS]
@@ -44,7 +45,7 @@ benchbox metrics qphh --power-results <path> --throughput-results <path> [OPTION
 ## Usage Examples
 
 ```bash
-# Calculate QphH from test results
+# Calculate metrics from test results
 benchbox metrics qphh \
   --power-results results/power/results.json \
   --throughput-results results/throughput/results.json
@@ -65,7 +66,7 @@ benchbox metrics qphh \
 ## Notes
 
 - Scale factor is auto-detected from the `environment.scale_factor` field in result files. If the power and throughput results have mismatched scale factors, an error is raised.
-- The command derives `Power@Size` and `Throughput@Size` from pre-computed TPC metrics in the result files when available, and falls back to calculating them from individual query times.
+- The command uses `Power@Size` and `Throughput@Size` from the result files' `tpc_metrics` when present. Otherwise it derives Power@Size from the final power iteration and Throughput@Size from the throughput phase wall-clock duration, never from summed query time.
 
 ## Related
 

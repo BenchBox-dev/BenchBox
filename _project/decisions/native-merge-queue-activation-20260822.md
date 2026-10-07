@@ -1,5 +1,7 @@
 # Decision: Adopt GitHub Native Merge Queue for `develop` (Post-v0.4.0)
 
+> Superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md).
+
 Date: 2026-08-22
 Status: Completed. Architecture, triggers, tooling, canary verification, and admin configuration fully implemented across Gates MQ-1 through MQ-5.
 Destination: `BenchBox-dev/BenchBox`

@@ -133,7 +133,7 @@ class LoadAnalyzer:
             for execution in stream.query_executions:
                 if execution.queue_wait_time > 0:
                     wait_times_ms.append(execution.queue_wait_time * 1000)
-                exec_time = (execution.end_time - execution.start_time) * 1000
+                exec_time = execution.latency_seconds * 1000
                 execution_times_ms.append(exec_time)
 
         if not wait_times_ms:
@@ -189,7 +189,7 @@ class LoadAnalyzer:
 
         for stream in self._result.streams:
             for execution in stream.query_executions:
-                latency = (execution.end_time - execution.start_time) * 1000
+                latency = execution.latency_seconds * 1000
                 latencies_ms.append(latency)
 
                 if execution.error:
@@ -351,7 +351,7 @@ class LoadAnalyzer:
     @staticmethod
     def _collect_latencies(result: ConcurrentLoadResult) -> list[float]:
         """Collect all query latencies in milliseconds from a load result."""
-        return [(ex.end_time - ex.start_time) * 1000 for stream in result.streams for ex in stream.query_executions]
+        return [ex.latency_seconds * 1000 for stream in result.streams for ex in stream.query_executions]
 
     @staticmethod
     def _compute_scaling_efficiency(concurrency_levels: list[int], throughput_at_level: dict[int, float]) -> float:

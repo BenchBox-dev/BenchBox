@@ -62,6 +62,7 @@ benchbox run --platform postgresql --benchmark tpch --scale 1.0 \
 | `password` | (none) | PostgreSQL password |
 | `schema` | public | Target schema |
 | `work_mem` | 256MB | Working memory for sorts/hashes |
+| `statement_timeout` | (unset) | Per-statement timeout in milliseconds; `0` disables |
 | `enable_timescale` | false | Enable TimescaleDB features |
 | `driver_version` | (latest) | Pin the psycopg2-binary package version (e.g. `2.9.11`) |
 | `driver_auto_install` | false | Auto-install the requested driver version via uv if missing |

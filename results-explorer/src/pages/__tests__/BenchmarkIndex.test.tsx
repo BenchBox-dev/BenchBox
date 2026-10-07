@@ -1062,6 +1062,43 @@ describe("BenchmarkIndex", () => {
     await waitFor(() => expect(scrollIntoView.mock.instances).toContain(rankCard));
   });
 
+  it("anchors every saveable analysis card so saved views deep-link to their chart", async () => {
+    const { container } = render(<BenchmarkIndex benchmark="tpch" />);
+    // Every card SummaryChartOverview can render a save control for needs a
+    // stable anchor: the saved URL stores it, and reopening resolves it.
+    const chartIds = [
+      "query_heatmap",
+      "percentile_ladder",
+      "cdf_chart",
+      "query_histogram",
+      "stacked_phase",
+      "time_series",
+      "rank_table",
+      "cost_scatter",
+    ];
+    for (const chartId of chartIds) {
+      const card = await screen.findByTestId(`summary-chart-preview-${chartId}`);
+      expect(card.getAttribute("id")).toMatch(/^benchmark-section-/);
+    }
+    const anchorIds = chartIds.map((chartId) =>
+      container.querySelector(`[data-testid="summary-chart-preview-${chartId}"]`)?.getAttribute("id")
+    );
+    expect(new Set(anchorIds).size).toBe(chartIds.length);
+  });
+
+  it("opens the saved analysis card for a card deep link", async () => {
+    window.history.replaceState(null, "", "/results/tpch/#benchmark-section-cdf");
+    Element.prototype.scrollIntoView = vi.fn();
+
+    render(<BenchmarkIndex benchmark="tpch" />);
+
+    // A saved CDF (or percentile, histogram, phase, trend, or cost) view
+    // returns to the page with that card open, not closed.
+    await waitFor(() =>
+      expect(screen.getByTestId("summary-chart-full-cdf_chart").textContent).not.toBe("")
+    );
+  });
+
   it("list view sorts rows from table headers", async () => {
     const { container } = render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => expect(screen.getByRole("button", { name: /Geomean/ })).toBeTruthy());
@@ -1279,32 +1316,27 @@ describe("BenchmarkIndex", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Phase guard: when only "standard" phase is available, the page must
-  // request the "standard" cohort (not the stale phaseFilter="power" default).
-  // -----------------------------------------------------------------------
 
-  it("loads standard-phase cohort when only standard is available for the SF", async () => {
-    const standardRows = RESULT_ROWS.map((r) => ({ ...r, test_type: "standard" }));
-    const standardRankings = RANKING_ROWS.map((r) => ({ ...r, phase: "standard" }));
-    const standardCells = CELL_ROWS.map((c) => ({ ...c, phase: "standard" }));
-    vi.mocked(queryRows).mockImplementation(defaultImpl(standardRows, standardRankings, standardCells));
+  it("loads throughput-phase cohort when only throughput is available for the SF", async () => {
+    const throughputRows = RESULT_ROWS.map((r) => ({ ...r, test_type: "throughput" }));
+    const throughputRankings = RANKING_ROWS.map((r) => ({ ...r, phase: "throughput" }));
+    const throughputCells = CELL_ROWS.map((c) => ({ ...c, phase: "throughput" }));
+    vi.mocked(queryRows).mockImplementation(defaultImpl(throughputRows, throughputRankings, throughputCells));
 
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
     await waitFor(() =>
-      expect(new URL(window.location.href).searchParams.get("phase")).toBe("standard"),
+      expect(new URL(window.location.href).searchParams.get("phase")).toBe("throughput"),
     );
 
-    // Verify the last benchmark_rankings call targets "standard" (any earlier
-    // call may still use the default phase filter before results resolve).
     const rankingCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) =>
       String(sql).replace(/\s+/g, " ").includes("FROM bench.benchmark_rankings"),
     );
-    expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "standard"]);
+    expect(rankingCalls[rankingCalls.length - 1]?.[1]).toEqual(["tpch", 0.1, "throughput"]);
   });
 
   it("coerces an unavailable phase URL value to the rendered cohort phase", async () => {
-    window.history.replaceState(null, "", "/results/tpch/?sf=0.1&phase=standard");
+    window.history.replaceState(null, "", "/results/tpch/?sf=0.1&phase=throughput");
 
     render(<BenchmarkIndex benchmark="tpch" />);
     await waitFor(() => screen.getAllByText("DuckDB"));
@@ -1342,8 +1374,8 @@ describe("BenchmarkIndex", () => {
       ...RESULT_ROWS,
       {
         ...RESULT_ROWS[0],
-        result_id: "standard-r1",
-        test_type: "standard",
+        result_id: "throughput-r1",
+        test_type: "throughput",
         platform: "ClickHouse",
         platform_id: "clickhouse",
       },

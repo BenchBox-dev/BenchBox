@@ -316,7 +316,20 @@ Allowed differences:
 - `execution.translation` is SQL-only additive metadata and may appear when SQL
   dialect translation was attempted. DataFrame bundles are not expected to emit
   matching translation metadata.
+- `config.query_parameters` is DataFrame-only for now: a TPC-DS DataFrame run
+  lists, query by query, which queries it bound to the `dsqgen -LOG` values of
+  the SQL power test's `-RNGSEED` for each stream (queries with a parameter
+  adapter) and which ran on `default_parameters.yaml`. SQL bundles do not
+  record it.
 - Exact timing values must not be compared across modes.
+- `config.query_parameters` records the TPC-H substitution parameter convention.
+  Power runs and supported DataFrame runs use `qgen -d` without a seed, or
+  `qgen -r (seed + 1000 * stream_id)` with a seed. Standard SQL uses `qgen -d`.
+  SQL Throughput uses `base_seed + 1001 * stream_id + query_position`, with
+  a default base seed of 42 and positions starting at zero in each stream's
+  permutation. Combined SQL lists the requested phases separately; refresh
+  functions do not use qgen parameters. Unsupported harnesses that fall back
+  to Standard SQL record the default parameters.
 
 ## Result Model Extension Policy
 
@@ -350,6 +363,7 @@ Current extension inventory:
 | `native_comparison` | `comparisons.native_duckdb` | Reconstructs `NativeComparison` from `comparisons.native_duckdb`. | Result loader/exporter; public schema validation now accepts the producer key; explorer ignores the comparison block. | Keep exported key; do not move before a comparison read-model design exists. |
 | `ExecutionPhases.migration` | `phases.migration` | Reconstructs summary-level `MigrationPhase`; per-table stats are intentionally not serialized. | Result loader/exporter; explorer reads phase durations from `phases.*`. | Keep as canonical lifecycle-stage location. |
 | `SetupPhase.statistics_gathering` | `phases.statistics` | Not reconstructed (setup sub-phases serialize as flat summaries); omitted entirely when the opt-in statistics phase did not run. | Result exporter; explorer reads phase durations from `phases.*`; `stats_mode` (`explicit` / `auto-on-load` / `unsupported`) records where statistics time landed. `stats_lifecycle` (`reset` / `unsupported` / `persist`, opt-in via `--stats-reset`/`--no-stats-reset`) and `per_table_ms` (opt-in via `--stats-per-table-timing`) are both additive and omitted when the corresponding control was not used. | Keep as canonical lifecycle-stage location; legacy runs without the phase (or without the reset/per-table controls) stay byte-identical. |
+| `SetupPhase.post_load_maintenance` | `phases.post_load_maintenance` | Not reconstructed (setup sub-phases serialize as flat summaries); omitted entirely when no post-load tuning operation ran. | Result exporter; explorer reads phase durations from `phases.*`. `duration_ms` is the measured time of the post-load tuning hooks across all tables (for example ClickHouse `OPTIMIZE`, Redshift `ANALYZE` with `auto_analyze` off, Databricks Delta `OPTIMIZE`, Snowflake `RESUME RECLUSTER`) and is excluded from `phases.data_loading.duration_ms`; `tables_processed` counts distinct tables. | Keep as canonical lifecycle-stage location; legacy runs without the phase stay byte-identical. |
 | Standalone pg_mooncake migration script | Top-level `migration` in script-emitted payloads | Not reconstructed by result loader. | Script-local reports only; not a canonical schema-v2 result extension. | Leave separate or convert in a dedicated PR to `phases.migration`; do not generalize this top-level key. |
 | `platform_info`, `platform_metadata`, `platform_raw_config`, `platform_raw_metadata` | `platform.config`, `platform.raw_config`, `platform.raw_metadata` | Reconstructs platform info and raw metadata blocks. | Loader/exporter, anonymizer, explorer platform/version extraction. | Keep; move internally only if exported keys remain stable. |
 | `platform_deployment`, `platform_cloud`, `platform_compute`, `platform_storage` | `platform.deployment`, `platform.cloud`, `platform.compute`, `platform.storage` | Reconstructs the normalized platform facets. | Loader/exporter, environment compatibility tests, explorer environment facets. | Keep as canonical platform facets. |
@@ -385,6 +399,24 @@ finalization labels the result `not_run` instead of `passed`.
 Post-load validation that is not applicable because an adapter does not expose
 connection validation hooks records no validation stage; exceptions after a
 validation attempt remain failed validation stages.
+Failed per-query validation, including a warm-up query, prevents a clean pass
+and makes the CLI report failure. Aggregate query counts and timings continue
+to describe measurement executions.
+
+TPC-H SF1 answer files use `qgen -d` defaults. No numeric seed identifies that
+parameter set. Q11, Q16, Q18 and Q20 retain exact answer-file row-count checks
+for the defaults; other substitution parameters use the existing query-specific
+range or loose checks. This does not change value-comparison tolerances.
+`set_reference_seed_context` records this choice for the current thread:
+`True` selects exact validation for the defaults, `False` selects the existing
+query-specific range or loose checks, and `None` preserves exact validation
+when the parameter context is unknown.
+The bounded correctness-gate digest snapshot records the qgen seed it was
+generated with; the gate and its regeneration reuse it. The current snapshot
+records `reference_seed: null`, so both run qgen `-d` without a seed.
+Regenerate the snapshot on Linux with
+`make correctness-gate-digests-regen`; the snapshot detects regressions against
+DuckDB and is separate from the official answer files.
 
 ## Evidence Snapshot
 

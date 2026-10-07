@@ -110,23 +110,19 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from auto_merge_soundness_paths import any_soundness_path  # noqa: E402
 from required_lane import (  # noqa: E402
     REQUIRED_CHECK_NAMES,  # noqa: F401 - re-exported for tests
     is_check_run_success,  # noqa: F401 - re-exported for compat
     is_required_lane_green,
     latest_check_run,  # noqa: F401 - re-exported for tests
 )
+from soundness_paths import any_soundness_path  # noqa: E402
 
 FIXTURE_PATH = SCRIPT_DIR / "fixtures" / "green_unmerged_fixture.json"
 
 DEFAULT_REPO = "BenchBox-dev/BenchBox"
 GRACE_PERIOD_HOURS = 2.0
 API_ROOT = "https://api.github.com"
-# Durable explicit hold shared with `.github/workflows/auto-merge-on-open.yml`
-# (exact label name; keep both layers in lockstep — pinned by
-# tests/unit/test_auto_merge_hold_is_durable.py). Applying this label is the
-# non-draft durable hold; drafts remain a separate, job-level hold.
 AUTO_MERGE_HOLD_LABEL = "no-auto-merge"
 
 PINNED_ISSUE_TITLE = "Green-but-unmerged PR sweep"
@@ -555,7 +551,6 @@ def fetch_open_prs(client: GitHubClient, owner: str, repo: str) -> list[dict[str
                 # never inferred from a workflow run's conclusion. See "Known
                 # timing behavior" in the module docstring.
                 "auto_merge": raw.get("auto_merge"),
-                # Durable hold signal shared with auto-merge-on-open.yml.
                 "labels": [name for name in label_names if name],
                 # Prior arm intent from timeline (ready_for_review /
                 # auto_squash_enabled / auto_merge_disabled). Intentional

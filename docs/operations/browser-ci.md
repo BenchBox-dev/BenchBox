@@ -27,7 +27,10 @@ required by the develop branch ruleset:
 | Ruleset | `develop-squash-only` (resolve by name; current id `15611785` until a transfer) |
 | Required context | `explorer` |
 | Unit job | `explorer` in `ci.yml`, `if: always()` |
-| Unit inputs | `explorer-tokens`, `explorer-vitest`, `parity-check`, `explorer-e2e`, `visual-inputs`, `public-site-visual-regression` |
+| Unit inputs | `explorer-tokens`, `explorer-vitest`, `parity-check`, `explorer-e2e`, `visual-inputs` |
+
+The `public-site-visual-regression` job still runs and uploads its report, but it
+is advisory until the public site is in production and feeds no required context.
 
 The unit job, not the Chromium job itself, holds the required context.
 `explorer-e2e` runs when the `ci-paths` classifier maps a changed path to the
@@ -73,9 +76,14 @@ a known residual risk, not evidence the gate should be unwired.
 ## Frontend dependency audit
 
 The blocking Chromium job and the nightly parity job run
-`npm run audit:high` immediately after `npm ci`. The command fails on any
-high or critical advisory; low-severity build-tool advisories remain visible
-in the audit output and are not silently allowlisted. Dependency updates must
+`npm run audit:high` immediately after `npm ci`. The command runs
+`results-explorer/scripts/audit-high.mjs`, which fails on any high or critical
+advisory except those listed in `results-explorer/scripts/audit-high-allowlist.json`.
+Each entry names the advisory, the reason, a `review_by` date and a link, and
+is printed on every run. An entry stops applying, and the step fails, once its
+`review_by` date passes or the registry has a release outside the advisory's
+vulnerable range; remove the entry and update the dependency at that point.
+Only advisories with no available fix belong in the allowlist. Dependency updates must
 use the narrowest patched range and retain deterministic `npm ci` behavior;
 `npm audit fix --force` is not an accepted remediation. The only transitive
 override currently present is `undici >=7.28.0`, constrained to remove the

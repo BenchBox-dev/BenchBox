@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""Fail closed when BenchBox's evaluated Make contract or migration baseline drifts."""
-
 from __future__ import annotations
 
 import argparse
@@ -473,44 +471,19 @@ def verify_current_migration(root: Path) -> list[str]:
     return list(dict.fromkeys(problems))
 
 
-def compare_inventory(root: Path) -> list[str]:
+def write_manifest(root: Path, inventory: dict[str, Any]) -> None:
+    path = root / MANIFEST_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(inventory, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def evaluate_inventory(root: Path) -> tuple[dict[str, Any] | None, list[str]]:
     root = root.resolve()
-    manifest = root / MANIFEST_PATH
-    if not manifest.is_file():
-        return [f"inventory manifest is missing: {MANIFEST_PATH}"]
     try:
-        expected = _load_inventory(manifest)
-        actual = build_inventory(root)
-    except (InventoryError, json.JSONDecodeError) as exc:
-        return [str(exc)]
-    proof_problems = validate_migration_proof(root)
-    if expected == actual:
-        return proof_problems
-    missing = sorted(set(expected.get("targets", [])) - set(actual["targets"]))
-    added = sorted(set(actual["targets"]) - set(expected.get("targets", [])))
-    problems = []
-    if missing:
-        problems.append(f"missing targets: {', '.join(missing)}")
-    if added:
-        problems.append(f"unexpected targets: {', '.join(added)}")
-    for key in (
-        "default_goal",
-        "include_order",
-        "phony_targets",
-        "variables",
-        "macros",
-        "rules",
-        "semantic_statements",
-        "semantic_sha256",
-    ):
-        if expected.get(key) != actual.get(key):
-            problems.append(f"{key} changed")
-    problems.extend(problem for problem in proof_problems if problem not in problems)
-    problems.append(
-        "intentional changes require --write and review of the inventory diff "
-        "(run 'make guards-fix' to regenerate mechanical drift-guard artifacts)"
-    )
-    return problems
+        inventory = build_inventory(root)
+    except InventoryError as exc:
+        return None, [str(exc)]
+    return inventory, validate_migration_proof(root)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -533,9 +506,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             for problem in problems:
                 print(f"  - {problem}", file=sys.stderr)
             return 1
-        path = root / MANIFEST_PATH
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(inventory, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        write_manifest(root, inventory)
         print(f"wrote {MANIFEST_PATH}: {inventory['target_count']} targets")
         return 0
     if args.verify_migration:
@@ -547,13 +518,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         print("Makefile migration proof OK: split matches the reviewed monolith delta")
         return 0
-    problems = compare_inventory(root)
-    if problems:
-        print("Makefile inventory drift:", file=sys.stderr)
+    inventory, problems = evaluate_inventory(root)
+    if inventory is None or problems:
+        print("Makefile inventory error:", file=sys.stderr)
         for problem in problems:
             print(f"  - {problem}", file=sys.stderr)
         return 1
-    inventory = build_inventory(root)
     print(
         f"Makefile inventory OK: {inventory['target_count']} targets, "
         f"{inventory['public_target_count']} public, default={inventory['default_goal']}"

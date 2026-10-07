@@ -1,0 +1,88 @@
+# ClickHouse TPC-DS Tuned Configuration
+# Sort keys and partitions are rendered into MergeTree DDL at CREATE TABLE time.
+# Constraints are disabled: ClickHouse has no enforced constraints and the sort key
+# is the primary index, so nothing here needs a primary key that matches it.
+# Sort columns are the NOT NULL item and ticket/order keys: BenchBox renders sort-key columns
+# as non-Nullable, so a nullable date key would load its NULLs as 0.
+
+primary_keys:
+  enabled: false
+
+foreign_keys:
+  enabled: false
+
+unique_constraints:
+  enabled: false
+
+check_constraints:
+  enabled: false
+
+platform_optimizations:
+  z_ordering_enabled: false
+  z_ordering_columns: []
+  auto_optimize_enabled: false
+  auto_compact_enabled: false
+  bloom_filters_enabled: false
+  bloom_filter_columns: []
+  materialized_views_enabled: false
+
+table_tunings:
+  STORE_SALES:
+    table_name: STORE_SALES
+    sorting:
+    - name: SS_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: SS_TICKET_NUMBER
+      type: INTEGER
+      order: 2
+
+  STORE_RETURNS:
+    table_name: STORE_RETURNS
+    sorting:
+    - name: SR_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: SR_TICKET_NUMBER
+      type: INTEGER
+      order: 2
+
+  CATALOG_SALES:
+    table_name: CATALOG_SALES
+    sorting:
+    - name: CS_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: CS_ORDER_NUMBER
+      type: INTEGER
+      order: 2
+
+  CATALOG_RETURNS:
+    table_name: CATALOG_RETURNS
+    sorting:
+    - name: CR_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: CR_ORDER_NUMBER
+      type: INTEGER
+      order: 2
+
+  WEB_SALES:
+    table_name: WEB_SALES
+    sorting:
+    - name: WS_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: WS_ORDER_NUMBER
+      type: INTEGER
+      order: 2
+
+  WEB_RETURNS:
+    table_name: WEB_RETURNS
+    sorting:
+    - name: WR_ITEM_SK
+      type: INTEGER
+      order: 1
+    - name: WR_ORDER_NUMBER
+      type: INTEGER
+      order: 2

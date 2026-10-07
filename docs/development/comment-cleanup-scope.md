@@ -80,9 +80,8 @@ uv run -- python scripts/check_comment_cleanup_scope.py \
 The output includes every classified maintained path, its owner, state, rule,
 and blocking disposition with a digest. Freeze that ignored output before
 parallel work. Run it again after integration and allow only authorized path or
-dependency changes. The policy, validator, focused test, dispatch page, index
-link, and the one development-loop ledger row that lists the test are a
-singleton scope-policy slice. The pre-change base proves the
+dependency changes. The policy, validator, focused test, dispatch page, and
+index link are a singleton scope-policy slice. The pre-change base proves the
 starting tree; run a second immutable snapshot after that slice is committed so
 those artifacts receive the same ownership check before dispatch.
 
@@ -174,3 +173,125 @@ Do not change TPC-DS stream ordering, RNG, timing, missing-count behavior, query
 algorithms, or payload identity under this policy. Do not rewrite historical
 results. Preserve useful nonempty query references, and record unsupported
 assurance as a blocker rather than adding inert replacement prose.
+
+## Delivery by integration branch
+
+Module cleanup lands through a small number of integration branches, not one
+pull request per task. An integration branch is cut from `develop`, has one
+integrator, carries a fixed set of module tasks (its members), and lands as one
+pull request into `develop`. Members own disjoint paths because the scope policy
+gives each path exactly one owner. A branch lives about two working days, because
+`develop` merges about eighteen pull requests a day and a long-lived branch would
+always conflict with someone's open work. Foundation work, soundness-path files,
+payload changes, the exception register and the switch to blocking enforcement
+land as their own pull requests.
+
+### An exception to the delivery-mode rule
+
+This is a deliberate exception, approved by the repository owner on 2026-10-02,
+to the delivery-mode rule in `AGENTS.md`. That rule reserves a shared
+integration branch with one final pull request for the tracker's
+registered-batch capability, and says to stay in serial mode, with one pull
+request per task, while the capability is absent. The program cannot use the
+capability today: its first use is a one-way schema migration that every client
+of the tracker must be stopped or upgraded for, the final pull request head can
+be bound only once so a single review fix would abort a branch, and a batch
+cannot be refreshed from `develop`. Serial mode with a pull request per task
+would mean over a hundred pull requests and as many reviews, which is the cost
+this contract avoids.
+
+The exception keeps what the rule is for. The cut commit, an explicit ordered
+member list and frozen member scopes are recorded before work starts. One
+integrator alone writes the branch. Each member's check evidence is listed in
+the pull request. One final pull request goes through required CI, current-head
+review and auto-merge, followed by post-merge trunk validation; there is never
+a ready feature-base pull request, a skipped check, or a
+bypass of review, merge or authority controls. The tracker lifecycle stays
+serial: a member task is taken, worked on the integration branch, released with a
+note naming the commit that carries its work, and finished only after the
+integration pull request has merged. If the registered-batch capability is
+installed later, the program can move to it; nothing here depends on that.
+
+### Cutting a branch
+
+1. Read live `develop`. List the files that every open pull request changes and
+   leave out of the branch any file another open pull request touches; those
+   files wait for the final sweep.
+2. Run the scope validator at the cut commit. It must report no findings; fix
+   ownership first, through the one writer of the scope policy.
+3. Create a linked worktree with `make worktree-create` and run
+   `make agent-write-preflight`. Record the member list, the cut commit and the
+   excluded files in the ignored ledger under `.todo-batch/`.
+
+### Members
+
+Each member is taken by one worker in its own worktree, branched from the
+integration head. A member makes only deletions and the reader migrations that
+its task requires, with the reader migrations committed first. Before handing the
+commits to the integrator, run, without the shared test lock:
+
+- the parity comparator over the changed files, which allows only removed
+  comments, removed leading docstrings and `pass` for a body left empty;
+- `scripts/check_comment_policy.py --mode strict --path <prefix>` for each owned
+  prefix, where only registered directives and notices may remain;
+- a check that the changed files are a subset of the member's owned paths;
+- a check that no deleted docstring has a reader that is not migrated in the same
+  member or an earlier one;
+- `ruff check`, `ruff format --check` and `compileall` on the changed files;
+- the member's own tests and the consumer tests its edges name, once, under the
+  shared lock and bounded to those tests.
+
+### Integrating and landing
+
+Only the integrator writes the integration branch, by cherry-picking member
+commits in dependency order. It reruns the parity and ownership checks over the
+whole branch and one full local preflight on the head; when the preflight cannot
+finish in the available time, hosted CI is the gate, and the pull request says so.
+The pull request is opened as a draft. Its body lists the areas cleaned, the
+parity totals, every change that is not a pure deletion with file and line, the
+contracts moved and where, the files left out because of open pull requests, and
+the checker's summary line.
+
+Before the pull request is marked ready, run one external read-only review over
+the non-deletion diff, a sample of the deleted hunks and every public API file,
+and fix what it finds. Then mark it ready and arm its exact head after required
+CI and the current-head connector review are green and all threads are resolved.
+If a review finding arrives after arming, withdraw auto-merge before editing,
+fix it, push with an exact lease, wait for fresh CI and connector review, resolve
+the threads and arm the new head.
+
+The branch stays current by rebasing onto `develop`, never merging `develop` in,
+when the pull request conflicts and once more before it is marked ready. A branch
+never edits a file that an open pull request touches at cut time, and it does not
+push to or comment on other people's pull requests.
+
+### What stays out of an integration branch
+
+- **Soundness-manifest paths.** Files that the repository's soundness predicate
+  flags are carved out into their own pull requests. Each needs the required
+  `oracle-review` check to pass on the current head and all review threads to be
+  resolved before arming; the PR-body attestation and manual owner merge are
+  retired. Keeping these files out makes each result-affecting change separately
+  reviewable.
+- **Payload changes.** A change to SQL text, generated output or an identity needs
+  its own disclosed pull request with raw-hash, token, order, parameter and hint
+  evidence and the correctness, plan and timing evidence the task requires.
+- **The exception register and the switch to blocking.** The checker starts in
+  advisory mode and reports without failing pull requests. The register of
+  retained directives, notices and fixtures lands after the module work, and the
+  setting moves to blocking only after a final whole-scope scan is clean.
+
+### Sizing and failure handling
+
+The first branch is a pilot that measures authoring time, parity failures, missed
+readers, review findings and CI attempts, and sets the size limit for the rest.
+Until it does, plan for about four hundred files and twenty thousand deleted lines
+per branch, and at most about one thousand changed lines that are not deletions.
+
+| Event | Action |
+| --- | --- |
+| A member fails parity or its tests | Fix it on the member branch, or drop it and rebuild the integration branch from the cut commit with the other members. |
+| Branch CI fails because of one member | Fix or drop that member; do not hold the others. |
+| The pull request conflicts with `develop` | Rebase, rerun parity, push with an exact lease. |
+| A regression is found after merge | Revert the squash commit, or fix forward if one file is the cause. |
+| The branch is abandoned | Close the pull request. Members keep their notes and are taken again later; nothing in the tracker needs undoing, because tasks finish only after merge. |

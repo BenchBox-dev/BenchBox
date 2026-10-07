@@ -794,10 +794,10 @@ def test_run_cell_official_downgrades_passed_cell_on_stream_count_mismatch(tmp_p
     assert "throughput stream count mismatch" in (result.throughput_check or "")
 
 
-def test_run_cell_official_threads_emitted_path_and_scale_into_result_resolution(tmp_path: Path):
-    """run_cell must forward BOTH the emitted quiet-path line and `scale` into the
-    backward-compatible official resolver wrapper. Otherwise the runner silently falls back to
-    a None result even though the CLI emitted the authoritative path.
+def test_run_cell_official_threads_emitted_path_into_result_resolution(tmp_path: Path):
+    """run_cell must forward the emitted quiet-path line into the official resolver.
+    Otherwise the runner silently falls back to a None result even though the CLI
+    emitted the authoritative path.
     """
     result_path = tmp_path / "benchmark_runs" / "results" / "official.json"
     _write_result_json(result_path)
@@ -826,6 +826,84 @@ def test_run_cell_official_threads_emitted_path_and_scale_into_result_resolution
 
     mock_resolve.assert_called_once()
     assert mock_resolve.call_args.kwargs["emitted_path"] == str(result_path)
-    assert mock_resolve.call_args.kwargs["scale"] == 1
-    assert mock_resolve.call_args.kwargs["platform"] == "duckdb"
-    assert mock_resolve.call_args.kwargs["benchmark"] == "tpch"
+    assert set(mock_resolve.call_args.kwargs) == {"emitted_path"}
+
+
+def _throughput_payload(*, platform_name: str = "DuckDB", scale_factor: float = 1.0) -> dict:
+    from benchbox.core.results.metrics import TPCMetricsCalculator
+
+    queries = [
+        {"id": str(i), "stream": stream, "status": "SUCCESS", "run_type": "measurement", "test_type": "throughput"}
+        for stream in (0, 1, 2)
+        for i in range(1, 23)
+    ]
+    return {
+        "platform": {"name": platform_name},
+        "benchmark": {"id": "tpch", "scale_factor": scale_factor},
+        "phases": {"throughput_test": {"duration_ms": 1_000_000}},
+        "queries": queries,
+        "summary": {
+            "tpc_metrics": {
+                "throughput_at_size": TPCMetricsCalculator.calculate_throughput_at_size(
+                    total_queries=66, total_time_seconds=1000.0, scale_factor=scale_factor, num_streams=3
+                )
+            }
+        },
+    }
+
+
+def _run_official_cell_with_result(tmp_path: Path, result_path: Path):
+    timeout_result = TimeoutResult(
+        exit_code=0, timed_out=False, elapsed_s=0.1, stdout=f"{result_path}\n".encode(), stderr=b""
+    )
+    with (
+        patch.object(runner, "benchbox_run_official_argv", return_value=[sys.executable, "-c", "pass"]),
+        patch.object(runner, "run_with_timeout", return_value=timeout_result),
+        patch.object(runner, "classify_for_submit", return_value=runner.SubmitTerminalState.submittable),
+    ):
+        return runner.run_cell("duckdb", "tpch", 1, timeout_s=10, log_dir=tmp_path, official=True, streams=3)
+
+
+def test_run_cell_official_passes_when_result_matches_cell_and_streams(tmp_path: Path):
+    result_path = tmp_path / "results" / "official.json"
+    result_path.parent.mkdir(parents=True)
+    result_path.write_text(json.dumps(_throughput_payload()), encoding="utf-8")
+
+    result = _run_official_cell_with_result(tmp_path, result_path)
+
+    assert result.status == "passed"
+    assert result.throughput_check == "ok"
+
+
+def test_run_cell_official_fails_when_result_json_is_unreadable(tmp_path: Path):
+    result_path = tmp_path / "results" / "official.json"
+    result_path.parent.mkdir(parents=True)
+    result_path.write_text("{not json", encoding="utf-8")
+
+    result = _run_official_cell_with_result(tmp_path, result_path)
+
+    assert result.status == "failed"
+    assert result.exit_code == 1
+    assert "could not read result JSON" in (result.throughput_check or "")
+
+
+def test_run_cell_official_fails_when_result_json_belongs_to_another_platform(tmp_path: Path):
+    result_path = tmp_path / "results" / "official.json"
+    result_path.parent.mkdir(parents=True)
+    result_path.write_text(json.dumps(_throughput_payload(platform_name="PostgreSQL")), encoding="utf-8")
+
+    result = _run_official_cell_with_result(tmp_path, result_path)
+
+    assert result.status == "failed"
+    assert "does not match requested 'duckdb'" in (result.throughput_check or "")
+
+
+def test_run_cell_official_fails_when_result_json_has_another_scale_factor(tmp_path: Path):
+    result_path = tmp_path / "results" / "official.json"
+    result_path.parent.mkdir(parents=True)
+    result_path.write_text(json.dumps(_throughput_payload(scale_factor=10.0)), encoding="utf-8")
+
+    result = _run_official_cell_with_result(tmp_path, result_path)
+
+    assert result.status == "failed"
+    assert "scale factor" in (result.throughput_check or "")

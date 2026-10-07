@@ -498,8 +498,7 @@ class TestMockBaseBenchmarkBenchmarkExecution:
 
     def test_run_benchmark_all_queries_default(self):
         """Test benchmark execution with all queries (default)."""
-        with patch("time.time", side_effect=list(range(20))):  # Plenty of timestamps
-            result = self.benchmark.run_benchmark(self.mock_connection, setup_database=False)
+        result = self.benchmark.run_benchmark(self.mock_connection, setup_database=False)
 
         # Should run all queries in the benchmark
         assert result["total_queries"] == len(self.benchmark.get_queries())
@@ -516,10 +515,7 @@ class TestMockBaseBenchmarkBenchmarkExecution:
 
         self.mock_connection.execute.side_effect = mock_execute
 
-        with patch("time.time", side_effect=list(range(20))):
-            result = self.benchmark.run_benchmark(
-                self.mock_connection, query_ids=[1, "error_query"], setup_database=False
-            )
+        result = self.benchmark.run_benchmark(self.mock_connection, query_ids=[1, "error_query"], setup_database=False)
 
         assert result["total_queries"] == 2
         assert result["successful_queries"] == 1
@@ -539,13 +535,12 @@ class TestMockBaseBenchmarkBenchmarkExecution:
 
     def test_run_benchmark_with_fetch_results(self):
         """Test benchmark execution with result fetching."""
-        with patch("time.time", side_effect=list(range(10))):
-            result = self.benchmark.run_benchmark(
-                self.mock_connection,
-                query_ids=[1],
-                fetch_results=True,
-                setup_database=False,
-            )
+        result = self.benchmark.run_benchmark(
+            self.mock_connection,
+            query_ids=[1],
+            fetch_results=True,
+            setup_database=False,
+        )
 
         query_result = result["query_results"][0]
         assert query_result["results"] == [{"result": "success"}]
@@ -896,13 +891,12 @@ class TestMockBaseBenchmarkIntegration:
         mock_connection.fetchall.return_value = [{"id": 1, "value": "test"}]
 
         # Run complete benchmark
-        with patch("time.time", side_effect=list(range(20))):
-            result = benchmark.run_benchmark(
-                mock_connection,
-                query_ids=[1, 2],
-                fetch_results=True,
-                setup_database=True,
-            )
+        result = benchmark.run_benchmark(
+            mock_connection,
+            query_ids=[1, 2],
+            fetch_results=True,
+            setup_database=True,
+        )
 
         # Verify complete workflow
         assert benchmark._data_generated
@@ -932,13 +926,12 @@ class TestMockBaseBenchmarkIntegration:
         mock_connection.execute.side_effect = mock_execute
         mock_connection.fetchall.return_value = [{"result": "success"}]
 
-        with patch("time.time", side_effect=list(range(20))):
-            result = benchmark.run_benchmark(
-                mock_connection,
-                query_ids=[1, "error_query", 2],
-                fetch_results=True,
-                setup_database=True,
-            )
+        result = benchmark.run_benchmark(
+            mock_connection,
+            query_ids=[1, "error_query", 2],
+            fetch_results=True,
+            setup_database=True,
+        )
 
         assert result["total_queries"] == 3
         assert result["successful_queries"] == 2

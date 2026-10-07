@@ -14,6 +14,7 @@ pytestmark = [
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "scripts"))
 
+import validate_visualization_images as vvi
 from capture_chart_images import sync_existing_images
 from validate_visualization_images import find_mismatches
 
@@ -64,3 +65,20 @@ def test_find_mismatches_detects_missing_and_different_files(tmp_path: Path) -> 
     assert any("Image differs" in mismatch for mismatch in mismatches)
     assert any("Missing docs image" in mismatch for mismatch in mismatches)
     assert any("Missing source image" in mismatch for mismatch in mismatches)
+
+
+def test_main_fails_on_seeded_image_drift(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    source_dir = tmp_path / "source"
+    docs_dir = tmp_path / "docs"
+    source_dir.mkdir()
+    docs_dir.mkdir()
+    (source_dir / "chart.png").write_bytes(b"new")
+    (docs_dir / "chart.png").write_bytes(b"old")
+    monkeypatch.setattr(vvi, "PRIMARY_DIR", source_dir)
+    monkeypatch.setattr(vvi, "DOCS_DIR", docs_dir)
+    monkeypatch.setattr(vvi, "find_mismatches", lambda: find_mismatches(source_dir, docs_dir))
+
+    assert vvi.main() == 1
+
+    (docs_dir / "chart.png").write_bytes(b"new")
+    assert vvi.main() == 0

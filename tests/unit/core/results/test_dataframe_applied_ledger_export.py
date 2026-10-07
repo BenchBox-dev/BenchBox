@@ -41,6 +41,14 @@ def _run(adapter, name: str = "tpch"):
     )
 
 
+@pytest.fixture(autouse=True)
+def _polars_environment(_hermetic_state, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Own thread settings written by tuned adapters in these export tests."""
+    from tests.utilities.session_isolation import own_environment
+
+    own_environment(monkeypatch, ["POLARS_MAX_THREADS"])
+
+
 def _tuned_polars() -> PolarsDataFrameAdapter:
     cfg = DataFrameTuningConfiguration()
     cfg.parallelism.thread_count = 4
@@ -75,14 +83,32 @@ def test_tuned_df_result_emits_applied_json_companion():
     assert all(s.get("mechanism") == "dataframe_runtime" for s in companion["statements"])
 
 
-def test_default_df_result_emits_no_applied_companion_and_noop_status():
+def test_default_df_result_emits_no_applied_companion_and_not_applicable_status():
     result = _run(PolarsDataFrameAdapter())
 
-    # A default/untuned run derives noop and writes no companion.
-    assert result.tuning_validation_status == "noop"
+    assert result.tuning_validation_status == "not_applicable"
     assert build_applied_ledger_payload(result) is None
 
-    # With an empty requested config there is no platform.tuning summary block
-    # (nothing to summarize) -- the honest status still lives on the result.
     payload = build_result_payload(result)
-    assert "tuning" not in payload["platform"]
+    assert payload["platform"]["tuning"] == {"validation_status": "not_applicable"}
+
+
+def test_all_default_config_is_reported_like_no_config():
+    result = _run(PolarsDataFrameAdapter(tuning_config=DataFrameTuningConfiguration()))
+
+    assert result.tuning_validation_status == "not_applicable"
+    assert build_result_payload(result)["platform"]["tuning"] == {"validation_status": "not_applicable"}
+
+
+def test_requested_tuning_that_applied_nothing_reports_noop():
+    cfg = DataFrameTuningConfiguration()
+    cfg.gpu.enabled = True
+    adapter = PolarsDataFrameAdapter(tuning_config=cfg)
+    assert not cfg.is_default()
+    assert not adapter._applied_tuning_ledger.statements
+
+    result = _run(adapter)
+
+    assert result.tuning_validation_status == "noop"
+    assert build_applied_ledger_payload(result) is None
+    assert build_result_payload(result)["platform"]["tuning"]["validation_status"] == "noop"

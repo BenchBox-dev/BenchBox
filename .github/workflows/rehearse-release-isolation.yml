@@ -6,8 +6,7 @@ name: Rehearse Release Isolation
 # This workflow is a read-only rehearsal: it inspects the workflows at a ref
 # with git ls-tree/show and fails loud if a second deploy source or hidden
 # build+deploy coupling is present, without ever deploying or writing GitHub
-# state. It is expected to FAIL while docs.yml still carries its release-driven
-# `deploy` job (the G3 surface that A10 has not yet retired).
+# state.
 
 "on":
   workflow_dispatch:

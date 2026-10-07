@@ -29,10 +29,14 @@ pytestmark = [
 
 def _get_tool_functions():
     """Create a fresh MCP server and expose public tool invokers."""
+    import benchbox.utils.printing as printing
     from benchbox.mcp import create_server
 
-    server = create_server()
-    return get_tool_functions(server)
+    quiet = printing._QUIET
+    try:
+        return get_tool_functions(create_server())
+    finally:
+        printing._QUIET = quiet
 
 
 @pytest.fixture(scope="module")
@@ -568,8 +572,7 @@ class TestRunBenchmarkToolSuccess:
         ):
             result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01)
 
-        # Response still succeeds without result_file
-        assert result["mcp_metadata"]["status"] == "completed"
+        assert result["mcp_metadata"]["status"] == "incomplete"
         assert result["mcp_metadata"]["result_file"] is None
 
     def test_all_query_results_included(self, tool_functions, tmp_path):

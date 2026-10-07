@@ -323,6 +323,7 @@ def reconstruct_benchmark_results(
         tuning_config_hash=tuning["tuning_config_hash"],
         tuning_source=tuning["tuning_source"],
         tuning_validation_status=tuning["tuning_validation_status"],
+        tuning_legacy_source=tuning["tuning_legacy_source"],
         applied_tuning_ledger=_extract_applied_ledger(platform_section, applied_data),
         applied_ledger_hash=_extract_applied_ledger_hash(platform_section, applied_data),
         query_plans_captured=plans_captured,
@@ -440,17 +441,27 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
     that predate this extraction (see schema.py's
     ``_legacy_tuning_source_bridge``).
     """
+    from benchbox.core.tuning.applied_ledger import NOT_VALIDATED
+
     tunings_applied = None
     tuning_source_file = None
     tuning_config_hash = None
     tuning_source = None
     tuning_validation_status = None
+    tuning_legacy_source = None
 
     tuning_summary = platform_section.get("tuning", {})
     if tuning_summary:
         tuning_config_hash = tuning_summary.get("requested_config_hash") or tuning_summary.get("hash")
         tuning_source = tuning_summary.get("tuning_source")
         tuning_validation_status = tuning_summary.get("validation_status")
+        # Preserve the legacy bridge value verbatim so a summary-only bundle
+        # that states only `source: "auto"` (no hash, no tuning source) keeps
+        # its source on re-export. Anything outside the two values pre-ADR-1
+        # bundles ever recorded stays dropped, as before.
+        legacy_source = tuning_summary.get("source")
+        if legacy_source in ("yaml", "auto"):
+            tuning_legacy_source = legacy_source
         # Legacy fidelity: pre-ADR-1 bundles only ever recorded a "yaml"/"auto"
         # source in the summary block, with no companion .tuning.json carrying
         # a real source_file. Reconstruct the old "yaml" sentinel here so those
@@ -479,12 +490,16 @@ def _extract_tuning_info(platform_section: dict[str, Any], tuning_data: dict[str
         tuning_source = tuning_data.get("tuning_source") or tuning_source
         tuning_validation_status = tuning_data.get("validation_status") or tuning_validation_status
 
+    if tuning_validation_status == NOT_VALIDATED:
+        tuning_validation_status = None
+
     return {
         "tunings_applied": tunings_applied,
         "tuning_source_file": tuning_source_file,
         "tuning_config_hash": tuning_config_hash,
         "tuning_source": tuning_source,
         "tuning_validation_status": tuning_validation_status,
+        "tuning_legacy_source": tuning_legacy_source,
     }
 
 

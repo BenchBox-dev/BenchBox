@@ -26,6 +26,7 @@ def _minimal_bundle(*, benchmark_id: str = "tpch", scale_factor: float = 0.01, p
             "id": benchmark_id,
             "name": benchmark_id.upper(),
             "scale_factor": scale_factor,
+            "test_type": "power",
         },
         "platform": {
             "name": platform,

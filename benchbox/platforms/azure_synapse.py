@@ -164,6 +164,8 @@ class AzureSynapseAdapter(PlatformAdapter):
                 "  2. CLI option: --platform-option server=<workspace>.sql.azuresynapse.net"
             )
 
+    physical_identifier_case = "lower"
+
     @property
     def platform_name(self) -> str:
         return "Azure Synapse"
@@ -177,11 +179,12 @@ class AzureSynapseAdapter(PlatformAdapter):
         if method != "ctas":
             raise ValueError(f"Sorted ingestion method '{method}' is not supported for Azure Synapse.")
 
-        order_by = ", ".join(column.name for column in sort_columns)
-        temp_table = f"{table_name}__ctas_sort"
+        physical_table = self.resolve_physical_table(table_name)
+        order_by = ", ".join(self.resolve_physical_column(table_name, column.name) for column in sort_columns)
+        temp_table = f"{physical_table}__ctas_sort"
         return (
             f"CREATE TABLE [{self.schema}].[{temp_table}] WITH (DISTRIBUTION = ROUND_ROBIN, HEAP) AS "
-            f"SELECT * FROM [{self.schema}].[{table_name}] ORDER BY {order_by}"
+            f"SELECT * FROM [{self.schema}].[{physical_table}] ORDER BY {order_by}"
         )
 
     def get_target_dialect(self) -> str:
@@ -580,6 +583,7 @@ class AzureSynapseAdapter(PlatformAdapter):
                 if effective_tuning is not None:
                     ctas_connection = getattr(cursor, "connection", cursor)
                     self.apply_ctas_sort(table_name, effective_tuning, ctas_connection)
+                    self.run_post_load_tunings(table_name, effective_tuning, ctas_connection)
 
                 load_time = elapsed_seconds(load_start)
                 self.logger.info(f"Loaded {row_count:,} rows into {table_name} in {load_time:.2f}s")
@@ -647,6 +651,7 @@ class AzureSynapseAdapter(PlatformAdapter):
                 if effective_tuning is not None:
                     ctas_connection = getattr(cursor, "connection", cursor)
                     self.apply_ctas_sort(table_name, effective_tuning, ctas_connection)
+                    self.run_post_load_tunings(table_name, effective_tuning, ctas_connection)
 
                 load_time = elapsed_seconds(load_start)
                 self.logger.info(f"Loaded {total_rows:,} rows into {table_name} in {load_time:.2f}s")
@@ -1222,7 +1227,8 @@ class AzureSynapseAdapter(PlatformAdapter):
             if distribution_columns:
                 sorted_cols = sorted(distribution_columns, key=lambda col: col.order)
                 dist_col = sorted_cols[0]
-                clauses.append(f"DISTRIBUTION = HASH([{dist_col.name}])")
+                dist_name = self.resolve_physical_column(table_tuning.table_name, dist_col.name)
+                clauses.append(f"DISTRIBUTION = HASH([{dist_name}])")
             else:
                 clauses.append(f"DISTRIBUTION = {self.distribution_default}")
 
@@ -1231,7 +1237,8 @@ class AzureSynapseAdapter(PlatformAdapter):
             if partition_columns:
                 sorted_cols = sorted(partition_columns, key=lambda col: col.order)
                 part_col = sorted_cols[0]
-                clauses.append(f"PARTITION ([{part_col.name}] RANGE RIGHT FOR VALUES ())")
+                part_name = self.resolve_physical_column(table_tuning.table_name, part_col.name)
+                clauses.append(f"PARTITION ([{part_name}] RANGE RIGHT FOR VALUES ())")
 
             # Clustered columnstore index is default for Synapse
             clauses.append("CLUSTERED COLUMNSTORE INDEX")
@@ -1254,7 +1261,7 @@ class AzureSynapseAdapter(PlatformAdapter):
         # refresh failing should not abort table setup, so analyze_table's
         # exception is caught and logged rather than propagated.
         try:
-            self.analyze_table(connection, table_name)
+            self.analyze_table(connection, self.resolve_physical_table(table_name, connection))
         except Exception as e:
             self.logger.warning(f"Failed to update statistics for {table_name}: {e}")
 

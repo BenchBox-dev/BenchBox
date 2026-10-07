@@ -1,0 +1,11 @@
+{
+  "bundle_file": "tpch_sf01_bigquery_sql_20261003_114214_37cecbba.json",
+  "bundle_hash": "ef5d5e2bd34c47f4f132a247d74554490b71bc5e43696d41e3ee3d94828e27f1",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}

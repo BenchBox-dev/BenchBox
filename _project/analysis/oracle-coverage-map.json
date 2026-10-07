@@ -288,7 +288,7 @@
     {
       "benchmark": "tpcds",
       "cross_surface_applicable": false,
-      "cross_surface_enforced": false,
+      "cross_surface_enforced": true,
       "dual_surface": true,
       "guarded": true,
       "independence": "semi-independent",

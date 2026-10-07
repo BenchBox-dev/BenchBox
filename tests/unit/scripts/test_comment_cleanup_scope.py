@@ -396,6 +396,12 @@ def test_every_tracked_eula_and_notice_file_has_a_notice_entry() -> None:
     assert notice_files <= listed
 
 
+def test_committed_payloads_and_edges_validate_at_immutable_head() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    head = scope.git(ROOT, "rev-parse", "HEAD").decode().strip()
+    scope.validate_payloads_and_edges(policy, set(scope.tracked_paths(ROOT, head)))
+
+
 def test_committed_consumer_edges_name_tracked_paths_and_the_docstring_readers() -> None:
     policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
     tracked = set(scope.git(ROOT, "ls-files", "-z").decode().split("\0"))
@@ -406,7 +412,7 @@ def test_committed_consumer_edges_name_tracked_paths_and_the_docstring_readers()
     pairs = {(edge["producer"], edge["consumer"]) for edge in edges}
     assert ("benchbox/mcp/tools/visualization.py", "tests/unit/mcp/test_surface_defect_regressions.py") in pairs
     assert ("benchbox/core/tpch/dataframe_queries.py", "benchbox/core/query_catalog.py") in pairs
-    assert ("benchbox/core/benchmark_result_validation.py", "docs/reference/python-api/base.rst") in pairs
+    assert not [consumer for _, consumer in pairs if consumer.endswith(".rst")]
 
 
 def test_duration_policy_has_exactly_one_exact_path_rule_owned_by_shared_infrastructure() -> None:
@@ -429,6 +435,39 @@ def test_duration_policy_disposition_names_every_importer() -> None:
     assert importers
     missing = {path for path in importers if path not in rule["blocking_disposition"]}
     assert not missing, f"the disposition omits importers: {sorted(missing)}"
+
+
+def test_the_unit_test_umbrella_owns_nothing_and_its_three_children_split_the_tree() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    umbrella = "comment-cleanup-cross-module-unit-tests"
+    assert not [rule["id"] for rule in policy["ownership_rules"] if rule["owner"] == umbrella]
+    assert not [edge["consumer"] for edge in policy["consumer_edges"] if edge["owner"] == umbrella]
+    rules = {rule["id"]: rule for rule in policy["ownership_rules"]}
+    core, platforms, rest = (
+        rules[name] for name in ("unit-tests-core", "unit-tests-platforms", "unit-tests-cli-scripts-rest")
+    )
+    assert {rule["owner"] for rule in (core, platforms, rest)} == {
+        "comment-cleanup-unit-tests-core",
+        "comment-cleanup-unit-tests-platforms",
+        "comment-cleanup-unit-tests-cli-scripts-rest",
+    }
+    assert core["priority"] > platforms["priority"] > rest["priority"]
+    assert {"prefix": "tests/unit/"} in rest["selectors"] and {"prefix": "tests/unit/platforms/"} in platforms[
+        "selectors"
+    ]
+
+
+def test_the_checkers_own_files_have_named_owners() -> None:
+    policy = scope.load_policy(ROOT / "quality/comment-cleanup-scope.json")
+    rules = {rule["id"]: rule for rule in policy["ownership_rules"]}
+    tooling = rules["comment-policy-tooling"]
+    assert tooling["owner"] == "comment-cleanup-checker" and tooling["priority"] > 20
+    assert {"path": "scripts/check_comment_policy.py"} in tooling["selectors"]
+    assert {"path": "scripts/run_comment_policy.py"} in tooling["selectors"]
+    registry = rules["comment-policy-registry"]
+    assert registry["owner"] == "comment-cleanup-exception-register"
+    assert registry["selectors"] == [{"path": "quality/comment-policy.json"}]
+    assert not [edge for edge in policy["consumer_edges"] if edge["consumer"].startswith("docs/")]
 
 
 def _derived_rule(priority: int = 20) -> dict:

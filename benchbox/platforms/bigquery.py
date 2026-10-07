@@ -89,6 +89,7 @@ class BigQueryAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
+    physical_identifier_case = "upper"
     _DELIMITED_FORMATS = frozenset({"tbl", "csv"})
     # Genuine side-effect engine: BigQuery has no EXPLAIN statement; the real plan
     # and stage timing are only available from the executed QueryJob (job.query_plan).
@@ -1301,22 +1302,38 @@ class BigQueryAdapter(PlatformAdapter):
         storage_client = storage.Client(project=self.project_id, credentials=credentials)
         return storage_client.bucket(self.storage_bucket)
 
-    def _resolve_target_table(self, connection: Any, table_name: str) -> tuple[str, Any]:
-        """Resolve target table reference, checking uppercase first with fallback to exact name."""
+    def _lookup_target_table(self, connection: Any, table_name: str) -> tuple[str, Any, Any]:
         table_name_upper = table_name.upper()
         dataset_ref = connection.dataset(self.dataset_id)
-        # Try uppercase table first (default for TPC benchmarks in BigQuery)
         try:
-            connection.get_table(dataset_ref.table(table_name_upper))
-            return table_name_upper, dataset_ref.table(table_name_upper)
+            table_obj = connection.get_table(dataset_ref.table(table_name_upper))
+            return table_name_upper, dataset_ref.table(table_name_upper), table_obj
         except NotFound:
-            # Fallback to exact case if table was created with lowercase or mixed case
             try:
-                connection.get_table(dataset_ref.table(table_name))
-                return table_name, dataset_ref.table(table_name)
+                table_obj = connection.get_table(dataset_ref.table(table_name))
+                return table_name, dataset_ref.table(table_name), table_obj
             except NotFound:
-                # If neither exists yet, default to uppercase
-                return table_name_upper, dataset_ref.table(table_name_upper)
+                return table_name_upper, dataset_ref.table(table_name_upper), None
+
+    def _resolve_target_table(self, connection: Any, table_name: str) -> tuple[str, Any]:
+        resolved_name, table_ref, _ = self._lookup_target_table(connection, table_name)
+        return resolved_name, table_ref
+
+    def resolve_physical_table(self, logical_name: str, connection: Any = None) -> str:
+        if connection is None:
+            return super().resolve_physical_table(logical_name, connection)
+        return self._lookup_target_table(connection, logical_name)[0]
+
+    def resolve_physical_column(self, table_name: str, logical_column: str, connection: Any = None) -> str:
+        if connection is not None:
+            _, _, table_obj = self._lookup_target_table(connection, table_name)
+            try:
+                for field in table_obj.schema if table_obj is not None else ():
+                    if field.name.lower() == logical_column.lower():
+                        return field.name
+            except TypeError:
+                pass
+        return logical_column.lower()
 
     def _get_table_row_count(self, connection: Any, table_name_upper: str) -> int:
         """Return current row count for a BigQuery table."""
@@ -2954,7 +2971,7 @@ class BigQueryAdapter(PlatformAdapter):
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name
+        table_name = self.resolve_physical_table(table_tuning.table_name)
         self.logger.info(f"Applying BigQuery tunings for table: {table_name}")
 
         try:
@@ -2992,7 +3009,9 @@ class BigQueryAdapter(PlatformAdapter):
                 # Check if clustering configuration changed
                 if cluster_columns:
                     sorted_cols = sorted(cluster_columns, key=lambda col: col.order)
-                    desired_clustering = [col.name for col in sorted_cols[:4]]
+                    desired_clustering = [
+                        self.resolve_physical_column(table_name, col.name, connection) for col in sorted_cols[:4]
+                    ]
                     current_clustering = table_obj.clustering_fields or []
 
                     if desired_clustering != current_clustering:

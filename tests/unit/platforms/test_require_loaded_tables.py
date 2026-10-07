@@ -1,10 +1,12 @@
 """A run stops before measuring when a benchmark's query tables were not loaded."""
 
+import logging
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
-from benchbox.core.loaded_tables import require_loaded_tables
+from benchbox.core.loaded_tables import is_data_loading_skipped, require_loaded_tables
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -25,9 +27,28 @@ def test_fails_when_required_table_is_empty():
         require_loaded_tables(OBT, {"tpcds_sales_returns_obt": 0})
 
 
-def test_benchmarks_without_requirements_are_not_checked():
-    require_loaded_tables(SimpleNamespace(), {})
-    require_loaded_tables(object(), None)
+@pytest.mark.parametrize("stats", [{}, {"a": 0}, {"a": -5}, {"a": True}, {"a": "n/a"}])
+def test_unpinned_benchmarks_reject_loads_without_a_table_holding_rows(stats):
+    with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
+        require_loaded_tables(SimpleNamespace(), stats)
+
+
+def test_unpinned_benchmarks_pass_when_one_table_holds_rows_despite_error_sentinels():
+    require_loaded_tables(SimpleNamespace(), {"loaded": 50, "failed": -100})
+
+
+def test_benchmarks_without_requirements_reject_vacuous_loads():
+    with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
+        require_loaded_tables(SimpleNamespace(), {})
+    with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
+        require_loaded_tables(SimpleNamespace(), {"t": 0})
+    require_loaded_tables(SimpleNamespace(), {"t": 3})
+
+
+def test_benchmarks_skipping_data_loading_are_not_checked():
+    skipped = SimpleNamespace(SKIP_DATA_LOADING=True)
+    require_loaded_tables(skipped, {})
+    require_loaded_tables(skipped, None)
 
 
 def test_public_obt_wrapper_exposes_the_contract():
@@ -50,3 +71,93 @@ def test_manifest_reuse_rejects_the_source_manifest_for_own_output_benchmarks():
 
     assert _resolve_manifest_allowed_names(obt, config) == {"tpcds_obt"}
     assert "tpch" in _resolve_manifest_allowed_names(sharer, config)
+
+
+def test_duckdb_run_over_an_empty_manifest_fails_instead_of_validating_vacuously(tmp_path):
+    """A stale manifest listing no tables must not produce a passing, empty run."""
+    import json
+
+    pytest.importorskip("duckdb")
+    from benchbox import TPCH
+    from benchbox.platforms.duckdb import DuckDBAdapter
+    from benchbox.utils.datagen_version import current_datagen_stamp
+
+    (tmp_path / "customer.tbl.zst").write_bytes(b"\x28\xb5\x2f\xfd" + b"x" * 64)
+    manifest = {"benchmark": "tpch", "scale_factor": 0.01, "tables": {}, **current_datagen_stamp("tpch")}
+    (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    benchmark = TPCH(scale_factor=0.01, output_dir=tmp_path)
+    adapter = DuckDBAdapter(database_path=":memory:")
+    connection = adapter.create_connection()
+    try:
+        with pytest.raises((RuntimeError, ValueError), match="No data files found|no rows were loaded"):
+            adapter._setup_fresh_database_phases(benchmark, connection, None)
+    finally:
+        adapter.close_connection(connection)
+
+
+def test_none_requirements_reject_loads_without_rows():
+    """REQUIRED_LOADED_TABLES=None is checked like the empty case.
+
+    A None pin names no tables, so a zero-row load must fail instead of
+    returning early and validating vacuously.
+    """
+    benchmark = SimpleNamespace(REQUIRED_LOADED_TABLES=None)
+    with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
+        require_loaded_tables(benchmark, {})
+    with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
+        require_loaded_tables(benchmark, {"t": 0})
+    require_loaded_tables(benchmark, {"t": 3})
+
+
+@pytest.mark.parametrize("required", ["lineitem", 42, {"lineitem": 1}])
+def test_non_collection_requirements_reject_vacuous_loads(required):
+    """Non-collection pins carry no table list, so they fail closed like empty."""
+    benchmark = SimpleNamespace(REQUIRED_LOADED_TABLES=required)
+    with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
+        require_loaded_tables(benchmark, {"t": 0})
+
+
+def test_partial_load_passes_but_warns_on_zero_row_tables(caplog):
+    """Without a pinned list, >=1 table with rows passes while the zero-row
+    tables are logged for visibility instead of failing the run."""
+    with caplog.at_level(logging.WARNING, logger="benchbox.core.loaded_tables"):
+        require_loaded_tables(SimpleNamespace(), {"loaded": 50, "failed": 0})
+    assert any("failed" in record.message for record in caplog.records)
+
+
+def test_mock_benchmark_does_not_silently_skip_checks():
+    """A Mock auto-creates SKIP_DATA_LOADING as a truthy attribute; the
+    shared helper must ignore it so mock benchmarks cannot disable checks."""
+    benchmark = MagicMock()
+    assert is_data_loading_skipped(benchmark) is False
+    with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
+        require_loaded_tables(benchmark, {})
+
+
+def test_skip_helper_reads_class_flag_first():
+    class SchemaOnly:
+        SKIP_DATA_LOADING = True
+
+    class WithData:
+        SKIP_DATA_LOADING = False
+
+    assert is_data_loading_skipped(SchemaOnly()) is True
+    assert is_data_loading_skipped(WithData()) is False
+
+
+def test_skip_helper_honors_instance_flag_on_real_objects_only():
+    assert is_data_loading_skipped(SimpleNamespace(SKIP_DATA_LOADING=True)) is True
+    assert is_data_loading_skipped(SimpleNamespace()) is False
+
+
+def test_all_load_paths_share_one_skip_helper():
+    """Every load path must read the flag through the single shared helper."""
+    import benchbox.core.loaded_tables as loaded_tables
+    import benchbox.platforms.base.adapter as adapter_module
+    import benchbox.platforms.base.data_loading as data_loading_module
+    import benchbox.platforms.base.spark_execution_mixin as spark_mixin
+
+    assert data_loading_module.is_data_loading_skipped is loaded_tables.is_data_loading_skipped
+    assert adapter_module.is_data_loading_skipped is loaded_tables.is_data_loading_skipped
+    assert spark_mixin.is_data_loading_skipped is loaded_tables.is_data_loading_skipped

@@ -1,5 +1,7 @@
 # Merge-queue visual baseline: site-equivalent ancestors and a short wait
 
+> Superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md).
+
 Date: 2026-09-27
 Status: Decided. Amends `visual-baseline-queue-candidate-2026-09-26.md`: the
 leader candidate stays, the 30-minute follower wait is replaced, and ancestor

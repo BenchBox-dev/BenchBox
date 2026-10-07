@@ -1,0 +1,11 @@
+{
+  "bundle_file": "tpchavoc_sf1_databricks_sql_20261001_075954_ffaa37ca.json",
+  "bundle_hash": "fb47946351a6a1f9bb82f0563ff3b8ce103c84149f5b249bcf4a7c11f005ee59",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}
