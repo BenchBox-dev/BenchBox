@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "matrix-manifest.json in the output directory lists every planned run, with exit status, versions, effective engine, seed and round",
+    "The dry-run count equalled the spec formula (output saved in the output directory)",
+    "Any voided round has its cause and replacement seed recorded; no individual cell was rerun",
+    "The pinned BenchBox commit, pyarrow version and data hashes are identical across all runs (checked by the runner)",
+    "After the run, the environment polars version equals the lock version (command output recorded in context)",
+    "git status in the main checkout shows no changes from this item"
+  ],
+  "description": "Execute the full matrix defined by pvm-s3b, with the budget the user approved in pvm-s2.\n\nProcedure:\n1. Use a new, empty output directory outside the checkout: ~/Developer/benchmark_runs/polars-version-matrix-<YYYYMMDD>.\n2. Run from the BenchBox commit pinned in the spec, in the separate worktree and environment.\n3. Prepare the machine: on mains power, under `caffeinate -dims`, with no other heavy processes (record the `top -l 1` header at start and end).\n4. Run the dry run and confirm the command count matches the spec's formula before starting.\n5. Run the matrix.\n6. Afterwards, restore the environment with `uv sync` and confirm the installed polars matches the lock.\n\nGuardrails:\n- No ad-hoc reruns of individual cells. If infrastructure fails (crash, sleep, power loss, disk full), the whole round is void: record the cause and rerun the complete round in a fresh shuffled order, with a new seed recorded.\n- A cell that hits the pvm-s2 abort rule during the run is recorded as did-not-complete, not retried.\n- Nothing from this item is committed to the repository.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-07T20:56:09Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "c0cae7dc6c564748944208f492aca87c",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    }
+  ]
+}
