@@ -39,8 +39,8 @@ def commit(sha, arrived_at, refresh=False):
     return digest.PullCommit(sha, arrived_at, refresh)
 
 
-def review(login, sha, submitted_at=AFTER, state="COMMENTED"):
-    return digest.Review(login, sha, submitted_at, state)
+def review(login, sha, submitted_at=AFTER, state="COMMENTED", user_type="", body=""):
+    return digest.Review(login, sha, submitted_at, state, user_type, body)
 
 
 def evidence(**overrides):
@@ -965,3 +965,30 @@ def test_the_digest_no_longer_reads_head_workflow_runs(monkeypatch):
         monkeypatch, commits, HEAD, [], [rest_comment(HEAD, AFTER)], runs_error=digest.ReadError("runs failed")
     )
     assert digest.review_signals(pull) == ("stand-in",)
+
+
+ORACLE_BOT = "benchbox-oracle[bot]"
+
+
+def oracle_verdict(sha, state="success"):
+    return f"### oracle-review-shadow: {state} for `{sha}`\n\nDetails."
+
+
+def test_an_oracle_success_review_of_the_merged_content_is_a_signal():
+    pull = evidence(reviews=(review(ORACLE_BOT, HEAD, user_type="Bot", body=oracle_verdict(HEAD)),))
+    assert digest.review_signals(pull) == ("oracle-review",)
+
+
+@pytest.mark.parametrize(
+    "oracle_review",
+    [
+        review(ORACLE_BOT, HEAD, user_type="Bot", body=oracle_verdict(HEAD, "failure")),
+        review(ORACLE_BOT, HEAD, user_type="Bot", body=oracle_verdict(OLD)),
+        review(ORACLE_BOT, OLD, user_type="Bot", body=oracle_verdict(OLD)),
+        review("benchbox-oracle", HEAD, user_type="User", body=oracle_verdict(HEAD)),
+        review(ORACLE_BOT, HEAD, LATER, user_type="Bot", body=oracle_verdict(HEAD)),
+    ],
+    ids=["failure", "other-sha", "older-commit", "user-account", "after-merge"],
+)
+def test_an_oracle_review_that_does_not_qualify_is_not_a_signal(oracle_review):
+    assert digest.review_signals(evidence(reviews=(oracle_review,))) == ()

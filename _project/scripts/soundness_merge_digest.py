@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from oracle_review_check import (
+    _ORACLE_VERDICT,
+    ORACLE_LOGIN,
     STANDIN_ATTESTERS,
     _attested_shas,
     latest_base_change,
@@ -56,6 +58,8 @@ class Review:
     commit_sha: str
     submitted_at: str
     state: str
+    user_type: str = ""
+    body: str = ""
 
 
 @dataclass(frozen=True)
@@ -137,6 +141,19 @@ class Entry:
         return tuple(reasons)
 
 
+def _is_oracle_success(review: Review, evidence: PullEvidence) -> bool:
+    verdict = _ORACLE_VERDICT.match(review.body)
+    return (
+        review.login == f"{ORACLE_LOGIN}[bot]"
+        and review.user_type == "Bot"
+        and review.commit_sha in evidence.content_shas
+        and review.submitted_at <= evidence.merged_at
+        and verdict is not None
+        and verdict.group("state") == "success"
+        and verdict.group("sha") == review.commit_sha
+    )
+
+
 def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
     cutoff = evidence.content_cutoff
 
@@ -152,6 +169,8 @@ def review_signals(evidence: PullEvidence) -> tuple[str, ...]:
         for r in evidence.reviews
     ):
         signals.append("connector-review")
+    if any(_is_oracle_success(r, evidence) for r in evidence.reviews):
+        signals.append("oracle-review")
     if any(r.login in CONNECTOR_LOGINS and r.content == "+1" and in_window(r.created_at) for r in evidence.reactions):
         signals.append("connector-approval")
     for comment in evidence.comments:
@@ -402,6 +421,8 @@ def collect_pull(repo: str, sha: str) -> PullEvidence | None:
                 r.get("commit_id") or "",
                 r.get("submitted_at") or "",
                 r.get("state") or "",
+                (r.get("user") or {}).get("type", ""),
+                r.get("body") or "",
             )
             for r in gh_pages(f"repos/{repo}/pulls/{number}/reviews")
         ),
