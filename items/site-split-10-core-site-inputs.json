@@ -6,7 +6,7 @@
     "One site-inputs.yml run on develop succeeded after merge; the bundle artifact and manifest verify; dispatch skipped with a notice (bridge not yet enabled)",
     "No .js/.ts/.mjs/.cjs/package.json added to core; oracle review cleared"
   ],
-  "context": "muse AR-02, AR-04, AR-05, AR-15 and AR-17 shaped this design; see the plan's Review record. The `benchbox-site-bridge` App and the secrets SITE_BRIDGE_APP_ID and SITE_BRIDGE_PRIVATE_KEY are owner pre-work. Verify they exist before relying on them. If they are missing, stop and ask the owner.",
+  "context": "PR group C1: shares one core PR and one oracle review with site-split-00 (separate commits). muse AR-02, AR-04, AR-05, AR-15 and AR-17 shaped this design; see the plan's Review record. The `benchbox-site-bridge` App and the secrets SITE_BRIDGE_APP_ID and SITE_BRIDGE_PRIVATE_KEY are owner pre-work. Verify they exist before relying on them; if they are missing, stop and ask the owner.",
   "description": "Core PR to develop. It needs oracle review: it adds a workflow and touches explorer_pipeline files. This is review 2 of 3. Add no JS or TS to core.\n\n1. Add `make site-inputs OUT=<dir>`. It writes `manifest.json` and these members:\n   - `manifest.json` fields: schema=1, core_sha, package_version, certified_by, corpus_sha, parent_core_sha, and a sha256 per member.\n   - `docs/`: generated query and compat docs in place; docs/blog and docs/CNAME excluded.\n   - `repo-files.json`: every tracked path, with kind file or tree.\n   - `explorer/results.duckdb`.\n   - `explorer/contract.json`: snapshot schema version, read-model version, tuning vocabulary and browser-duckdb-schema.sql.\n   - `explorer/fixtures/`.\n   - `explorer/parity/`: from tests/parity/fixtures.\n   - `landing/prompt-catalog.json`.\n   - `api-public-symbols.json`.\n   - `attestations.json`.\n2. Port the inline Python in `results-explorer/scripts/generate-browser-fixtures.mjs:798` and `verify-browser-fixtures.mjs:201` to `_project/scripts/explorer_pipeline/`. Add a test that proves its output is byte-identical to the current fixtures.\n3. Write attestations, each with its result, input digests and compared commits:\n   - privacy: `check_artifact_privacy.py` over the bundle;\n   - explorer_compat: `check_explorer_compat.py`, snapshot against contract;\n   - snapshot_invariants;\n   - corpus_bijection: first re-home it off `publication/ledger-seed.json`, or record in the dev-loop ledger which check covers that property;\n   - validator_parity: from parent_core_sha to core_sha when corpus_sha changed, otherwise skipped with the reason.\n4. Add `.github/workflows/site-inputs.yml`:\n   - `workflow_run` on trunk.yml, filtered to event push, head_branch develop and conclusion success;\n   - `concurrency: site-inputs`, with cancel-in-progress false;\n   - `workflow_dispatch` input `parent_core_sha`, which changes only the attestation base;\n   - upload `site-inputs-<core_sha>.tar.zst` with 90-day retention;\n   - send `repository_dispatch` `core-bundle` to BenchBox-dev/benchbox-site with core_sha, run id, artifact id and digest, using a token minted from SITE_BRIDGE_APP_ID and SITE_BRIDGE_PRIVATE_KEY;\n   - while `vars.SITE_BRIDGE_ENABLED != 'true'`, write a job-summary notice and skip the dispatch.\n5. Add ledger rows (`tests/unit/ledger_cutover_files.txt`, `docs/development/dev-loop-property-ledger.md`) and entries in `path-filters.yml` and `ci-units.yml`.",
   "links": [
     "_project/scripts/explorer_publish.py",
@@ -26,6 +26,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "fd28ce67dacf4629a66d374386499010",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:53:45Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "1e57eff4a9e7479cb1a9a23c8b263cae",
       "session_id": "2d03f81d904c4b488222c4b6be81ba33"
     }
   ]
