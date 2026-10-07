@@ -5,7 +5,7 @@
     "Feed validates as Atom 1.0",
     "_blog/ drafts are not built or published"
   ],
-  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 as d2ac2e58 (2026-10-04). Review PASS (88 /blog files identical to ablog; feed ids/links/fields equal ablog for all 10 entries). Medium follow-ups in progress: strip Expressive Code assets from feed content, date-based drafts (date >= tomorrow UTC), real-route feed test that runs in CI.",
+  "context": "IN PR https://github.com/BenchBox-dev/BenchBox/pull/2606 as d2ac2e58 (2026-10-04). Review PASS (88 /blog files identical to ablog; feed ids/links/fields equal ablog for all 10 entries). Medium follow-ups in progress: strip Expressive Code assets from feed content, date-based drafts (date >= tomorrow UTC), real-route feed test that runs in CI. site-split-01 (2026-10-07): code merged; inventory-diff and feed-comparison evidence not recorded here with run ids. Remaining verification owned by site-split-25 and site-split-30. Do not finish here.",
   "description": "Map the 16 posts in docs/blog/*.md (ablog frontmatter: blogpost, date, tags, meta_description, series) to a blog collection. Post URLs stay at /blog/YYYY-MM-DD-slug.html.\n\nBuild the blog index, tag pages, series navigation and author line.\n\nGenerate /blog/atom.xml as Atom, not RSS. Entry <id> and <link> values must be byte-identical to the current ablog feed, so feed readers do not re-show old posts. Keep full-text content in the feed.\n\nKeep any ablog redirect pages (post_redirect) that exist today. Images in docs/blog/images (7.9 MB) keep their current URLs.",
   "links": [
     "docs/blog",
@@ -28,6 +28,14 @@
       "op": "update",
       "op_id": "ba885baf8df649c384e2ffcff67345da",
       "session_id": "2d370a7de0824103affe317bc26fbae9"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T12:02:10Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "4aa2354d74e3447099b6cec2d34bbc3c",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
 }
