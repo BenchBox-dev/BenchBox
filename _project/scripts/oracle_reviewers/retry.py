@@ -21,16 +21,16 @@ WINDOW = timedelta(hours=24)
 @dataclass(frozen=True)
 class Reviewed:
     head_sha: str
-    tier: str
+    basis: str
     outcome: str
     files: Mapping[str, str]
 
     def to_json(self) -> dict[str, Any]:
-        return {"head_sha": self.head_sha, "tier": self.tier, "outcome": self.outcome, "files": dict(self.files)}
+        return {"head_sha": self.head_sha, "basis": self.basis, "outcome": self.outcome, "files": dict(self.files)}
 
     @classmethod
     def from_json(cls, data: Mapping[str, Any]) -> Reviewed:
-        return cls(str(data["head_sha"]), str(data["tier"]), str(data["outcome"]), dict(data["files"]))
+        return cls(str(data["head_sha"]), str(data.get("basis", "")), str(data["outcome"]), dict(data["files"]))
 
 
 @dataclass(frozen=True)

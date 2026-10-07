@@ -53,17 +53,22 @@ Without the App secrets, the `post` job logs the result and succeeds.
 4. `post` re-validates every artifact from this run, replays the selection,
    and posts the status and one pull request review on the head commit. Each
    finding on a diff line becomes its own review thread; the review body
-   holds the summary and any finding outside the diff.
+   holds the summary and any finding outside the diff. A run with no verdict,
+   such as one where every reviewer was absent, posts its explanation as a
+   comment instead.
 
 `plan` also limits spend to code that changed. The retry state records the
-blob SHA of each soundness file at the last success or failure. When the new
+blob SHA of each soundness file at the last success or failure, with the basis
+of that result: the tier, its blocking severities, its reviewer chain and the
+merge base of the head with `develop`. When the basis is unchanged and the new
 head has exactly those files at those SHAs, the run posts the recorded result
 to the new head without running a reviewer, so a push of docs or tests costs
-nothing. When the last result was a success and some of those files changed,
-the brief lists and diffs only the changed files. Every other case gets a full
+nothing. When the last result was a success below the very-high tier and some
+of those files changed, the brief diffs only the changed files and asks the
+reviewer to check their effect on the others. Every other case gets a full
 review: after a failure, because a scoped review cannot re-check findings in
-files it does not read, and after a tier change, a base change, a file leaving
-the diff or a missing state.
+files it does not read; at the very-high tier; and after a basis change, a
+file leaving the diff, a diff that cannot be split by file, or a missing state.
 
 Before posting, `post` drops any finding that matches an open review thread
 from this App, by file and normalized title. Each new thread carries a hidden

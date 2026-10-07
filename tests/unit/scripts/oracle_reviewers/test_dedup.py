@@ -29,13 +29,18 @@ def test_thread_fingerprint_prefers_the_marker_and_reads_legacy_bodies() -> None
     assert thread_fingerprint(None, "**High**: Drops a row") is None
 
 
+def _open(author: str, body: str, author_type: str = "Bot") -> dict[str, object]:
+    return {"resolved": False, "path": PATH, "author": author, "author_type": author_type, "body": body}
+
+
 def test_only_open_threads_from_the_oracle_count() -> None:
     threads = [
-        {"resolved": False, "path": PATH, "author": "benchbox-oracle[bot]", "body": "**High**: Drops a row"},
-        {"resolved": False, "path": PATH, "author": "benchbox-oracle", "body": "**High**: Drops a row"},
-        {"resolved": True, "path": PATH, "author": "benchbox-oracle", "body": "**High**: Resolved one"},
-        {"resolved": False, "path": PATH, "author": "chatgpt-codex-connector", "body": "**High**: Other bot"},
-        {"resolved": False, "path": PATH, "author": "benchbox-oracle", "body": "free text"},
+        _open("benchbox-oracle[bot]", "**High**: Drops a row"),
+        _open("benchbox-oracle", "**High**: Drops a row"),
+        {**_open("benchbox-oracle", "**High**: Resolved one"), "resolved": True},
+        _open("chatgpt-codex-connector", "**High**: Other bot"),
+        _open("benchbox-oracle", "free text"),
+        _open("benchbox-oracle", "**High**: Impostor", "User"),
     ]
     assert open_fingerprints(threads, "benchbox-oracle") == [fingerprint(PATH, "Drops a row")]
 

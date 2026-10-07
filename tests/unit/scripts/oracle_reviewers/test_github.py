@@ -107,8 +107,8 @@ def test_review_threads_pages_and_keeps_the_first_comment(monkeypatch: pytest.Mo
 
     monkeypatch.setattr(github, "_gh", fake_gh)
     assert github.review_threads(REPO, 7) == [
-        {"resolved": False, "path": "a.py", "author": "benchbox-oracle", "body": "**High**: A"},
-        {"resolved": True, "path": "b.py", "author": None, "body": ""},
+        {"resolved": False, "path": "a.py", "author": "benchbox-oracle", "author_type": "Bot", "body": "**High**: A"},
+        {"resolved": True, "path": "b.py", "author": None, "author_type": None, "body": ""},
     ]
     assert "after=c1" in calls[1] and not any(arg.startswith("after=") for arg in calls[0])
     flags = dict(zip(calls[0][1::2], calls[0][2::2], strict=False))
@@ -127,5 +127,5 @@ def test_review_threads_raises_on_graphql_errors(monkeypatch: pytest.MonkeyPatch
 
 
 def _thread(resolved: bool, path: str, author: str | None, body: str) -> dict[str, Any]:
-    comment = {"author": {"login": author} if author else None, "body": body}
+    comment = {"author": {"__typename": "Bot", "login": author} if author else None, "body": body}
     return {"isResolved": resolved, "path": path, "comments": {"nodes": [comment]}}

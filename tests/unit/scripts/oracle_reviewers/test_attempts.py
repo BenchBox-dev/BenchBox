@@ -361,7 +361,7 @@ def test_cli_finalize_carries_the_reviewed_result(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     old = "c" * 40
-    reviewed = Reviewed(old, "medium-high", "success", {CHECKER: "1" * 40})
+    reviewed = Reviewed(old, "medium-high|Critical,High|sonnet|" + "e" * 40, "success", {CHECKER: "1" * 40})
     previous = State(7, old, "success", NOW, reviewed=reviewed)
     plan = {
         **_plan(policy),
@@ -395,7 +395,7 @@ def test_cli_finalize_carries_the_reviewed_result(
 def test_cli_finalize_records_the_reviewed_files(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    plan = {**_plan(policy), "reviewed_files": {CHECKER: "1" * 40}}
+    plan = {**_plan(policy), "reviewed_files": {CHECKER: "1" * 40}, "review_basis": "basis"}
     plan_path = tmp_path / "plan.json"
     plan_path.write_text(json.dumps(plan), encoding="utf-8")
     attempts_dir = tmp_path / "attempts"
@@ -414,7 +414,31 @@ def test_cli_finalize_records_the_reviewed_files(
     state = json.loads((tmp_path / "o" / "state" / "state.json").read_text(encoding="utf-8"))
     assert state["reviewed"] == {
         "head_sha": HEAD,
-        "tier": "medium-high",
+        "basis": "basis",
         "outcome": "success",
         "files": {CHECKER: "1" * 40},
     }
+
+
+def test_a_pending_run_without_a_review_still_posts_its_diagnostics(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(json.dumps({**_plan(policy), "findings_delivery": "review"}), encoding="utf-8")
+    attempts_dir = tmp_path / "attempts"
+    _write(attempts_dir, 1, "sonnet", missing=Absence("quota", "limit"))
+    _write(attempts_dir, 2, "sol", missing=Absence("auth", "bad key"))
+    _write(attempts_dir, 3, "luna", missing=Absence("quota", "limit"))
+    out = _run_cli(
+        monkeypatch,
+        tmp_path,
+        "finalize",
+        "--plan",
+        str(plan_path),
+        "--attempts-dir",
+        str(attempts_dir),
+        "--out-dir",
+        str(tmp_path / "o"),
+    )
+    assert out["state"] == "pending" and out["review"] == "false" and out["comment"] == "true"
+    assert "sol: absent (auth)" in json.loads((tmp_path / "o" / "comment.json").read_text(encoding="utf-8"))["body"]

@@ -51,7 +51,7 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
         nodes {
           isResolved
           path
-          comments(first: 1) { nodes { author { login } body } }
+          comments(first: 1) { nodes { author { __typename login } body } }
         }
       }
     }
@@ -78,6 +78,7 @@ def review_threads(repo: str, pr: int) -> list[dict[str, Any]]:
                     "resolved": node["isResolved"],
                     "path": node.get("path"),
                     "author": (first.get("author") or {}).get("login"),
+                    "author_type": (first.get("author") or {}).get("__typename"),
                     "body": first.get("body") or "",
                 }
             )

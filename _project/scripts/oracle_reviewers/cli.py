@@ -15,7 +15,7 @@ from .absence import ERROR, Absence
 from .brief import build_brief, write_private
 from .classifier import ChangedFile, classify
 from .diff import commentable_lines, select_files
-from .policy import Policy, Reviewer, load_policy
+from .policy import Policy, Reviewer, Tier, load_policy
 from .selection import SelectionInput
 
 PLAN_FILE = "plan.json"
@@ -29,6 +29,7 @@ SUCCESS = "success"
 FORK = "fork"
 SKIP = "skip"
 CARRY = "carry"
+SCOPELESS_TIER = "very-high"
 
 
 def _now() -> datetime:
@@ -107,6 +108,17 @@ def _base_plan(policy: Policy, repo: str, pr: int, run_id: str) -> dict[str, Any
         "manual": False,
         "created_at": _now().isoformat(),
     }
+
+
+def _review_basis(repo: str, base_sha: str, head_sha: str, tier: Tier, policy: Policy) -> str | None:
+    try:
+        merge_base = github.get_json(f"repos/{repo}/compare/{base_sha}...{head_sha}")["merge_base_commit"]["sha"]
+    except (github.GitHubError, KeyError, TypeError, ValueError):
+        return None
+    if not isinstance(merge_base, str) or re.fullmatch(r"[0-9a-f]{40}", merge_base) is None:
+        return None
+    chain = ",".join(reviewer.name for reviewer in policy.chain(tier.name))
+    return f"{tier.name}|{','.join(tier.blocking)}|{chain}|{merge_base}"
 
 
 def _finish_plan(out_dir: Path, plan: dict[str, Any]) -> int:
@@ -189,16 +201,17 @@ def command_plan(args: argparse.Namespace) -> int:
     in_scope = set(classification.soundness_paths)
     scoped = [item for item in files if any(path in in_scope for path in item.paths)]
     current = {item.path: item.sha for item in scoped}
+    basis = _review_basis(repo, plan["base_sha"], plan["head_sha"], tier, policy)
     reviewed = previous.reviewed if previous and action != "edited" else None
-    if reviewed is not None and (reviewed.tier != tier.name or not all(current.values())):
+    if reviewed is None or basis is None or reviewed.basis != basis or not all(current.values()):
         reviewed = None
     plan["reviewed_files"] = current
+    plan["review_basis"] = basis or ""
     changed = scoped
+    scopable = tier.name != SCOPELESS_TIER and set(reviewed.files) <= set(current) if reviewed else False
     if reviewed is not None and current == reviewed.files:
         changed = []
-    elif reviewed is not None and reviewed.outcome == retry.SUCCESS and set(reviewed.files) <= set(current):
-        # A scoped review cannot re-check findings in files it does not read, so
-        # it follows only a success whose files are all still in the diff.
+    elif reviewed is not None and reviewed.outcome == retry.SUCCESS and scopable:
         changed = [item for item in scoped if reviewed.files.get(item.path) != item.sha]
     try:
         plan["open_findings"] = dedup.open_fingerprints(github.review_threads(repo, pr), policy.bot_login)
@@ -221,6 +234,8 @@ def command_plan(args: argparse.Namespace) -> int:
     diff_text = full_diff
     if partial and full_diff is not None:
         diff_text = select_files(full_diff, frozenset(path for item in changed for path in item.paths))
+        if set(commentable_lines(diff_text)) != {item.path for item in changed}:
+            partial, diff_text, changed = False, full_diff, scoped
     brief = build_brief(
         repo=repo,
         pr=pr,
@@ -378,11 +393,13 @@ def command_finalize(args: argparse.Namespace) -> int:
             now=now,
             pool_blocked_until=selection.pool_resets(selection_input, loaded.attempts),
             pending_cause=final.pending_cause,
-            reviewed=retry.Reviewed(plan["head_sha"], plan["tier"], final.state, plan.get("reviewed_files", {})),
+            reviewed=retry.Reviewed(
+                plan["head_sha"], plan.get("review_basis", ""), final.state, plan.get("reviewed_files", {})
+            ),
         )
         _write_json(out_dir / "state" / github.STATE_FILE, state.to_json())
     _write_json(out_dir / "status.json", report.status_payload(plan, final, run_url))
-    if final.body and plan["findings_delivery"] == "comment":
+    if final.body and (plan["findings_delivery"] == "comment" or final.review is None):
         _write_json(out_dir / "comment.json", {"body": final.body})
     if final.review is not None:
         _write_json(out_dir / "review.json", final.review)

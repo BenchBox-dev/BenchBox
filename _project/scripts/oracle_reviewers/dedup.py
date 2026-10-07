@@ -7,16 +7,12 @@ from typing import Any
 
 from .verdict import Finding
 
-# Only a marker that ends the comment counts, so text a reviewer wrote earlier in
-# the comment cannot set the fingerprint.
 _MARKER = re.compile(r"<!-- oracle-finding: (?P<print>[0-9a-f]{16}) -->\s*\Z")
 _TITLE = re.compile(r"^\*\*(?:Critical|High|Medium|Low)\*\*: (?P<title>.+)$", re.MULTILINE)
 _NOT_WORD = re.compile(r"[^a-z0-9]+")
 
 
 def fingerprint(path: str, title: str) -> str:
-    # Lines move between heads and reviewers cite them loosely, so a finding is
-    # identified by its file and normalized title only.
     normal = _NOT_WORD.sub(" ", title.lower()).strip()
     return hashlib.sha256(f"{path}\0{normal}".encode()).hexdigest()[:16]
 
@@ -37,7 +33,9 @@ def open_fingerprints(threads: Iterable[Mapping[str, Any]], login: str) -> list[
     prints = {
         thread_fingerprint(thread.get("path"), thread.get("body") or "")
         for thread in threads
-        if not thread.get("resolved") and (thread.get("author") or "").removesuffix("[bot]") == login
+        if not thread.get("resolved")
+        and thread.get("author_type") == "Bot"
+        and (thread.get("author") or "").removesuffix("[bot]") == login
     }
     return sorted(item for item in prints if item is not None)
 

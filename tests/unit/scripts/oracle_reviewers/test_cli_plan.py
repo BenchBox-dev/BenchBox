@@ -21,6 +21,7 @@ REPO = "BenchBox-dev/BenchBox"
 HEAD = "a" * 40
 BASE = "b" * 40
 DIFF = "diff --git a/x b/x\n"
+MERGE_BASE = "e" * 40
 
 
 def _pull(**over: Any) -> dict[str, Any]:
@@ -51,15 +52,21 @@ class FakeGitHub:
         self.threads = None if threads is None else list(threads)
         self.diff = diff
         self.diff_reads = 0
+        self.merge_base: str | None = MERGE_BASE
         self.dispatched: list[int] = []
 
     def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(github, "get_json", lambda path: self.pull)
+        monkeypatch.setattr(github, "get_json", self._json)
         monkeypatch.setattr(github, "get_paginated", self._paginated)
         monkeypatch.setattr(github, "get_diff", self._diff)
         monkeypatch.setattr(github, "review_threads", self._threads)
         monkeypatch.setattr(github, "latest_state", lambda repo, pr: self.state)
         monkeypatch.setattr(github, "dispatch", lambda repo, workflow, pr: self.dispatched.append(pr))
+
+    def _json(self, path: str) -> dict[str, Any]:
+        if "/compare/" in path:
+            return {"merge_base_commit": {"sha": self.merge_base}}
+        return self.pull
 
     def _threads(self, repo: str, pr: int) -> list[dict[str, Any]]:
         if self.threads is None:
@@ -254,8 +261,14 @@ TWO_FILE_DIFF = (
 OLD_HEAD = "c" * 40
 
 
-def _reviewed_state(files: dict[str, str], tier: str = "medium-high", outcome: str = "failure") -> State:
-    reviewed = Reviewed(OLD_HEAD, tier, outcome, files)
+def _basis(tier: str = "medium-high", merge_base: str = MERGE_BASE) -> str:
+    chain = {"medium-high": "sonnet,sol,luna,muse,agy", "very-high": "opus,sol"}[tier]
+    blocking = {"medium-high": "Critical,High", "very-high": "Critical,High,Medium"}[tier]
+    return f"{tier}|{blocking}|{chain}|{merge_base}"
+
+
+def _reviewed_state(files: dict[str, str], basis: str = _basis(), outcome: str = "failure") -> State:
+    reviewed = Reviewed(OLD_HEAD, basis, outcome, files)
     return State(7, OLD_HEAD, outcome, datetime.now(UTC) - timedelta(hours=1), reviewed=reviewed)
 
 
@@ -288,13 +301,26 @@ def test_push_touching_one_file_reviews_only_that_file(monkeypatch: pytest.Monke
 @pytest.mark.parametrize(
     ("state", "event"),
     [
-        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}, tier="very-high"), {"action": "synchronize"}),
+        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}, _basis("very-high")), {"action": "synchronize"}),
+        (
+            _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}, _basis(merge_base="f" * 40)),
+            {"action": "synchronize"},
+        ),
+        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}, "medium-high"), {"action": "synchronize"}),
         (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}), {"action": "edited", "changes": {"base": {}}}),
         (None, {"action": "synchronize"}),
         (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40}), {"action": "synchronize"}),
         (_reviewed_state({CHECKER: "1" * 40, "gone.py": "3" * 40}, outcome="success"), {"action": "synchronize"}),
     ],
-    ids=["tier-changed", "base-changed", "no-state", "after-failure", "file-left-the-diff"],
+    ids=[
+        "tier-changed",
+        "merge-base-moved",
+        "older-state",
+        "base-changed",
+        "no-state",
+        "after-failure",
+        "file-left-the-diff",
+    ],
 )
 def test_full_review_when_the_last_review_does_not_cover_this_change(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, state: State | None, event: dict[str, Any]
@@ -307,9 +333,27 @@ def test_full_review_when_the_last_review_does_not_cover_this_change(
 
 def test_open_oracle_threads_are_recorded_for_suppression(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     threads = [
-        {"resolved": False, "path": CHECKER, "author": "benchbox-oracle", "body": "**High**: Drops a row"},
-        {"resolved": True, "path": CHECKER, "author": "benchbox-oracle", "body": "**High**: Fixed already"},
-        {"resolved": False, "path": CHECKER, "author": "someone", "body": "**High**: Human note"},
+        {
+            "resolved": False,
+            "path": CHECKER,
+            "author": "benchbox-oracle",
+            "author_type": "Bot",
+            "body": "**High**: Drops a row",
+        },
+        {
+            "resolved": True,
+            "path": CHECKER,
+            "author": "benchbox-oracle",
+            "author_type": "Bot",
+            "body": "**High**: Fixed",
+        },
+        {
+            "resolved": False,
+            "path": CHECKER,
+            "author": "someone",
+            "author_type": "User",
+            "body": "**High**: Human note",
+        },
     ]
     _, _, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), SOUNDNESS, threads=threads))
     assert plan["open_findings"] == [fingerprint(CHECKER, "Drops a row")]
@@ -339,3 +383,26 @@ def test_manual_carry_is_recorded_as_a_retry(monkeypatch: pytest.MonkeyPatch, tm
     fake = FakeGitHub(_pull(), TWO_FILES, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}))
     _, values, plan = _plan(monkeypatch, tmp_path, fake, event_name="issue_comment", event={})
     assert values["decision"] == "carry" and plan["manual"] is True
+
+
+def test_unreadable_merge_base_gives_a_full_review(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fake = FakeGitHub(_pull(), TWO_FILES, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}), diff=TWO_FILE_DIFF)
+    fake.merge_base = None
+    _, values, plan = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "review" and plan["scope"] == "full" and plan["review_basis"] == ""
+
+
+def test_very_high_tier_is_never_scoped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    pull = _pull(labels=[{"name": "oracle-tier:very-high"}])
+    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40}, _basis("very-high"), outcome="success")
+    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(pull, TWO_FILES, state, diff=TWO_FILE_DIFF))
+    assert values["decision"] == "review" and plan["scope"] == "full"
+
+
+def test_a_changed_file_missing_from_the_selected_diff_gives_a_full_review(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    quoted = TWO_FILE_DIFF.replace(f"diff --git a/{CAPTURE} b/{CAPTURE}", f'diff --git "a/{CAPTURE}" "b/{CAPTURE}"')
+    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40}, outcome="success")
+    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), TWO_FILES, state, diff=quoted))
+    assert values["decision"] == "review" and plan["scope"] == "full"
