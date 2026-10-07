@@ -4,7 +4,7 @@
     "linkcheck/spellcheck/example-validation have a new home recorded in the ledger",
     "G4 sweep clean for docs.yml job names"
   ],
-  "context": "Guardrails G3, G4.",
+  "context": "Guardrails G3, G4. site-split-01 step map (2026-10-07): this item folds into the batch as follows. docs.yml deletion and job re-homing -> site-split-50-core-site-removal (deletes docs.yml after moving example validation and codespell into ci.yml). Publication fallback ownership -> site-split-51-publication-retirement. Production-ownership evidence -> site-split-40-production-cutover. Drop only after the mapped scope has merged; the batch closeout (site-split-99) does the drop.",
   "description": "docs.yml carries a legacy release-to-Pages fallback guarded by publication ownership receipts, plus build/linkcheck/spellcheck/example-validation jobs. After dlv2-62 (site-deploy owns production) and dlv2-40 (build/visual jobs moved to ci.yml docs/landing), delete docs.yml; move linkcheck, spellcheck, and example validation into ci.yml docs (fast parts) or nightly (external linkcheck).",
   "sessions": [
     {
@@ -30,6 +30,14 @@
       "op": "update",
       "op_id": "4cfed8d2b7a24c88a37190e9e247d721",
       "session_id": "ebb0f23e7526462c929aaf5d2651ef0a"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T12:03:47Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "2eb596348784412d823f3324a44f9e0b",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
 }
