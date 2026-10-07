@@ -115,7 +115,13 @@ def _base_plan(policy: Policy, repo: str, pr: int, run_id: str) -> dict[str, Any
 
 
 IMPLEMENTATION_DIGEST = hashlib.sha256(
-    b"".join(path.read_bytes() for path in sorted(Path(__file__).parent.glob("*.py")))
+    json.dumps(
+        {
+            path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in sorted(Path(__file__).parent.glob("*.py"))
+        },
+        sort_keys=True,
+    ).encode("utf-8")
 ).hexdigest()
 
 
