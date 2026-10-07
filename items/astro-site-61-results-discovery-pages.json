@@ -5,6 +5,7 @@
     "Withdrawn-result fixture absent from pages and search index after rebuild",
     "Results section of search returns a platform and a benchmark by name"
   ],
+  "context": "site-split-01 (2026-10-07): stays open per the batch plan. Its paths (generated result summary pages, Results search section) now live in BenchBox-dev/benchbox-site; implementation happens there after the seed (site-split-20).",
   "description": "A post-cutover feature with its own owner approval before starting.\n\nPagefind cannot see results loaded through DuckDB-WASM. At build time, generate static summary pages for each platform and benchmark from the same canonical pipeline output as the Explorer (explorer_publish.py and results.duckdb). Each page links into the Explorer view, and Pagefind indexes these pages under the Results search section.\n\nPages carry their snapshot identity, follow admission and withdrawal rules (withdrawn results are excluded from indexes and pages on the next build), and must not conflict with Explorer client routes: agree the URL scheme first, e.g. render at the same /results/platforms/<id> paths with the island hydrating on top.",
   "sessions": [
     {
@@ -14,6 +15,14 @@
       "op": "create",
       "op_id": "9754deb55ef440f48a520910d51ac05e",
       "session_id": "e7a83b2c2f774416b936322fa30d6662"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T12:04:17Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "117a6e5d0aca47a6829d9298bc2fb55b",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
 }
