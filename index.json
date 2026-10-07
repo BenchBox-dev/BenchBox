@@ -15176,6 +15176,16 @@
       "status": "open",
       "title": "Analyze the Polars matrix: engine-separated 2.0 vs 1.x results with disclosed limits"
     },
+    "pvm-s6-publish-polars-results": {
+      "claim": null,
+      "needs": [
+        "pvm-s5-analyze-polars-matrix",
+        "pvm-d1-publication-scope-decision"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Publish the Polars matrix results in the scope the user chose"
+    },
     "pypi-environment-protection-drift-canary-20260805": {
       "claim": null,
       "needs": [
