@@ -63,6 +63,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `RunConfig.concurrent_streams` default to `None`, which runs the
   2-stream default. An explicit count below 2 is rejected when the run
   includes throughput. Saved runs that recorded 1 replay as not set.
+- **Legacy throughput APIs now run the supported drivers and are deprecated.**
+  `PlatformAdapter.run_throughput_test`, `TPCDSBenchmark.run_throughput_test`,
+  `TPCDSBenchmark.run_official_benchmark`,
+  `TPCDSOfficialBenchmark.run_official_benchmark` and
+  `TPCHOfficialBenchmark.run_official_benchmark` emit a `DeprecationWarning`
+  and run the same throughput drivers as `benchbox run`: the dsqgen-based
+  TPC-DS driver (per-stream seeds and permutations, no more shuffled stream
+  order) and the TPC-H driver. The adapter entry point refuses platforms that
+  cannot serve concurrent streams, opens one session per stream and takes the
+  shared connection as `connection`; a `connection_factory` argument is
+  rejected. The other four now require `adapter=` and raise `TypeError`
+  without it, because a bare connection factory cannot be checked for safe
+  concurrent sessions; `TPCDSBenchmark.run_throughput_test` also needs
+  `connection=`. All of them refuse fewer than 2 streams, and none reports
+  Throughput@Size when a stream failed (`throughput_at_size` is `None`).
+  `query_timeout`, `max_retries` and `output_dir` on
+  `TPCDSBenchmark.run_throughput_test` no longer have any effect and warn when
+  you change them. Power@Size from `TPCDSBenchmark.run_power_test` is withheld
+  when a query fails.
+- **`TPCDSOfficialBenchmark` and `TPCHOfficialBenchmark` work end to end.**
+  `TPCDSOfficialBenchmark` used scale factor 1 for the power and throughput
+  tests whatever scale you configured; it now uses the configured scale, and
+  it publishes no Power@Size unless every power query succeeded.
+  `TPCHOfficialBenchmark` ran methods that `TPCHBenchmark` doesn't have and
+  `TPCH.run_official_benchmark` failed with a `TypeError`; both now run the
+  TPC-H power, throughput and maintenance tests and report each metric only
+  from a complete phase.
+- **TPC-H Power@Size changes.** Warm-up and measured power iterations now all
+  run stream 00, so they use its query ordering and substitution parameters
+  instead of streams 1, 2 and 3, in SQL and DataFrame runs. SQL runs now
+  also check row counts on every measured iteration under the default
+  validation mode. Power results are not comparable with earlier bundles.
+- **Throughput streams are numbered 1 to S.** TPC-H and TPC-DS throughput runs
+  used streams 0 to S-1, so stream 0 repeated the power ordering. Stream 0 is
+  now left to the power test and a new stream S takes its place, which changes
+  the queries and parameters each run executes. Throughput results are not
+  comparable with earlier bundles. TPC-DS power ordering is unchanged.
+- **TPC-H Q13 accepts 41 or 42 rows under non-reference seeds.** Its row count
+  depends on the two comment words the seed picks, so a valid throughput
+  stream no longer fails against the answer-file count of 42. Runs with the
+  default parameters still require 42.
+- **Throughput results record how streams are numbered.** The new key
+  `phases.throughput_test.stream_numbering` holds the basis and the first
+  stream id. `run.streams` in a combined run now counts throughput streams
+  only.
 
 ### Added
 

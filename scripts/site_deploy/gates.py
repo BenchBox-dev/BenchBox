@@ -161,6 +161,11 @@ def validator_parity_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
     if inputs.deployed["corpus_sha"] == inputs.corpus_sha:
         return _result(SKIPPED, "corpus tree unchanged since the deployed generation")
     base = inputs.deployed["trunk_sha"]
+    # The trunk corpus is maintainer-curated and deliberately keeps partial and
+    # not-run cohorts, so it is held to the trusted mirror rules that publish it
+    # (sync-results-data-to-published.yml), not the community submission rules.
+    # Without this, a metadata-only manifest edit re-validates already published
+    # partial bundles strictly and blocks every deploy.
     command = [
         sys.executable,
         str(PUBLICATION / "validator_parity.py"),
@@ -170,6 +175,7 @@ def validator_parity_gate(inputs: GateInputs, runner: Runner) -> dict[str, Any]:
         inputs.trunk_sha,
         "--head-sha",
         inputs.trunk_sha,
+        "--allow-partial-validation",
     ]
     return _from_run(runner, command, inputs.repo_root)
 

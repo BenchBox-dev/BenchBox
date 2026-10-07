@@ -313,6 +313,7 @@ def _build_query_results_section(
 
     normalized_results = [_normalize_query_result(qr) for qr in (result.query_results or [])]
 
+    throughput_streams_set: set[int] = set()
     for qr in normalized_results:
         iteration = qr.iteration
         stream_id = qr.stream_id
@@ -320,6 +321,10 @@ def _build_query_results_section(
             iterations_set.add(int(iteration))
         if stream_id is not None:
             streams_set.add(int(stream_id))
+            if qr.test_type == "throughput":
+                throughput_streams_set.add(int(stream_id))
+    if throughput_streams_set:
+        streams_set = throughput_streams_set
 
     for qr in normalized_results:
         query_id = normalize_query_id(qr.query_id)
@@ -1082,6 +1087,8 @@ def _throughput_phase_payload(throughput: Any) -> dict[str, Any]:
             "stream_ids": list(throughput.outstanding_work["stream_ids"]),
             "cleanup_state": throughput.outstanding_work["cleanup_state"],
         }
+    if throughput.stream_numbering is not None:
+        payload["stream_numbering"] = dict(throughput.stream_numbering)
     return payload
 
 

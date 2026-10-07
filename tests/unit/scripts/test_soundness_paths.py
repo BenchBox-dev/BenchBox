@@ -90,13 +90,15 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
         "results-data/bundles/sf1.override.json",
         ".github/workflows/validate-submission.yml",
         ".github/workflows/sync-results-data-to-published.yml",
-        ".github/workflows/docs.yml",
-        ".github/workflows/publication-transaction.yml",
-        ".github/workflows/publication-recover.yml",
-        ".github/workflows/publication-canaries.yml",
-        ".github/workflows/publication-lane-docs.yml",
-        ".github/workflows/publication-lane-explorer.yml",
-        ".github/workflows/publication-corpus-cutover.yml",
+        "publication/ledger-seed.json",
+        "scripts/publication/assembler.py",
+        "scripts/publication/check_artifact_privacy.py",
+        "scripts/publication/check_corpus_bijection.py",
+        "scripts/publication/check_explorer_compat.py",
+        "scripts/publication/compare_db_digest.py",
+        "scripts/publication/reconciler.py",
+        "scripts/publication/validator_parity.py",
+        "scripts/publication/verify_live.py",
         "_project/scripts/soundness_paths.py",
         ".github/workflows/release.yml",
         ".github/workflows/pr.yml",
@@ -163,10 +165,62 @@ def test_soundness_predicate_matches_review_required_paths(path: str) -> None:
         "benchbox/core/equivalencex/helpers.py",
         "benchbox/core/query_plans/parsersx/spark.py",
         "benchbox/core/expected_resultsx/loader.py",
+        ".github/workflows/docs.yml",
+        ".github/workflows/publication-deploy.yml",
+        ".github/workflows/publication-transaction.yml",
+        ".github/workflows/publication-preview-deploy.yml",
+        ".github/workflows/publication-preview-soak.yml",
+        ".github/workflows/publication-soak-monitor.yml",
+        ".github/workflows/publication-recover.yml",
+        ".github/workflows/publication-canaries.yml",
+        ".github/workflows/publication-corpus-cutover.yml",
+        ".github/workflows/rehearse-release-isolation.yml",
+        "scripts/publication/verify_lane_isolation.py",
+        "scripts/publication/verify_corpus_promotion.py",
+        "scripts/publication/verify_shadow_site.py",
+        "scripts/publication/candidate.py",
+        "scripts/publication/pages.cjs",
     ],
 )
 def test_soundness_predicate_ignores_fast_default_paths(path: str) -> None:
     assert soundness.is_soundness_path(path) is False
+
+
+RETIRING_WORKFLOWS = (
+    ".github/workflows/docs.yml",
+    ".github/workflows/publication-deploy.yml",
+    ".github/workflows/publication-preview-deploy.yml",
+    ".github/workflows/publication-preview-soak.yml",
+    ".github/workflows/publication-corpus-cutover.yml",
+    ".github/workflows/publication-transaction.yml",
+    ".github/workflows/publication-soak-monitor.yml",
+    ".github/workflows/publication-recover.yml",
+    ".github/workflows/publication-canaries.yml",
+    ".github/workflows/rehearse-release-isolation.yml",
+    ".github/workflows/docs.yaml",
+    ".github/workflows/publication-deploy.yaml",
+)
+
+
+def test_soundness_workflow_regex_keeps_live_workflows() -> None:
+    for path in (
+        ".github/workflows/ci.yml",
+        ".github/workflows/trunk.yml",
+        ".github/workflows/oracle-review.yml",
+        ".github/workflows/release.yml",
+        ".github/workflows/site-deploy.yml",
+        ".github/workflows/validate-submission.yml",
+        ".github/workflows/new-example.yml",
+        ".github/workflows/new-example.yaml",
+        ".github/workflows/publication-lane-docs.yml",
+        ".github/workflows/publication-future.yml",
+    ):
+        assert soundness.is_soundness_path(path) is True
+
+
+def test_soundness_workflow_regex_excludes_retiring_workflows() -> None:
+    for path in RETIRING_WORKFLOWS:
+        assert soundness.is_soundness_path(path) is False
 
 
 def test_soundness_prefixes_are_directory_prefixes() -> None:

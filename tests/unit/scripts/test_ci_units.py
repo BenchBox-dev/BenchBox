@@ -41,6 +41,7 @@ def needed(paths: list[str], rules: dict[str, list[str]]) -> set[str]:
         (["docs/guides/intro.md"], {"docs"}),
         (["docs/conf.py"], {"core", "docs"}),
         (["scripts/check_windows_antipatterns.py"], {"tooling"}),
+        (["scripts/site_inputs.py"], {"docs", "tooling"}),
         (["Makefile"], {"tooling"}),
         (["AGENTS.md"], {"tooling"}),
         (["_project/decisions/foo.md"], {"tooling"}),

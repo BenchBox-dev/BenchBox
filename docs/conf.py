@@ -192,6 +192,7 @@ exclude_patterns = [
     "development/adr/adr-independent-publication-authorities.md",
     "development/adr/adr-published-results-history-retention.md",
     "development/adr/adr-published-results-slim-corpus-branch.md",
+    "development/adr/adr-site-repo-split.md",
     "operations/agent-instruction-evaluation.md",
     "operations/branch-rename-runbook.md",
     "operations/browser-ci.md",

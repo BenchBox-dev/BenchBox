@@ -354,7 +354,7 @@ class QueryValidator:
                 warning_message=warning_msg,
             )
 
-        # Parameter-sensitive TPC-H queries (answer-set-boundary Q11/16/18/20)
+        # Parameter-sensitive TPC-H queries (Q11/13/16/18/20)
         # carry a canonical EXACT expectation because their answer-file
         # cardinality is known under the reference seed. When a caller has
         # signalled a NON-reference seed (set_reference_seed_context(False)) the

@@ -74,6 +74,15 @@ docs-images-check:
 .PHONY: docs-generate
 docs-generate: query-docs prompt-quickstarts-check compat-docs-check docs-images-check
 
+SITE_INPUTS_OUT ?= site-inputs
+.PHONY: site-inputs
+site-inputs:
+	@uv run -- python scripts/site_inputs.py build --out "$(SITE_INPUTS_OUT)" \
+		$(if $(SITE_INPUTS_CORE_SHA),--core-sha "$(SITE_INPUTS_CORE_SHA)") \
+		$(if $(SITE_INPUTS_PARENT_SHA),--parent-core-sha "$(SITE_INPUTS_PARENT_SHA)") \
+		$(if $(SITE_INPUTS_CERTIFIED_BY),--certified-by "$(SITE_INPUTS_CERTIFIED_BY)")
+	@uv run -- python scripts/site_inputs.py verify "$(SITE_INPUTS_OUT)"
+
 SITE_DIR ?= site
 SITE_INVENTORY ?= $(SITE_DIR)-inventory
 .PHONY: site-inventory
@@ -170,7 +179,7 @@ site-parity-diff: site-parity-inventory
 	@rm -f "$(SITE_PARITY_DIR)/published-diff.txt"
 	@status=0; \
 	uv run -- python scripts/site_inventory.py diff --baseline "$(SITE_PARITY_DIR)/inventory-sphinx" --candidate "$(SITE_PARITY_DIR)/inventory-astro" $(SITE_PARITY_REMOVALS) --allowed-differences "$(SITE_PARITY_DESIGN)/allowed-differences.json" || status=1; \
-	uv run -- python scripts/site_inventory.py check --inventory "$(SITE_PARITY_DIR)/inventory-astro" --known-broken "$(SITE_INVENTORY_KNOWN_BROKEN)" || status=1; \
+	uv run -- python scripts/site_inventory.py check --inventory "$(SITE_PARITY_DIR)/inventory-astro" --known-broken "$(SITE_INVENTORY_KNOWN_BROKEN)" --fail-on-stale || status=1; \
 	echo "site_inventory diff against the published baseline (informational)"; \
 	uv run -- python scripts/site_inventory.py diff --baseline "$(SITE_INVENTORY_BASELINE)" --candidate "$(SITE_PARITY_DIR)/inventory-astro" $(SITE_PARITY_REMOVALS) --allowed-differences "$(SITE_PARITY_DESIGN)/allowed-differences.json" > "$(SITE_PARITY_DIR)/published-diff.txt" || true; \
 	tail -n 1 "$(SITE_PARITY_DIR)/published-diff.txt"; \

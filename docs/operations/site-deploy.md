@@ -242,7 +242,10 @@ run fails closed until `bootstrap` is set.
    Trunk ownership for the link check is derived from `deploy/routes.yml`: every
    path under a route whose ref is a trunk ref, plus the root files, is trunk
    owned. A new broken link whose source or target is trunk owned fails unless it
-   is listed in `_project/design/site-inventory/known-broken-links.json`. Broken
+   is listed in `_project/design/site-inventory/known-broken-links.json`. An entry
+   that no longer matches a broken link fails the `site-parity` CI check
+   (`site_inventory.py check --fail-on-stale`), so the change that fixes a link
+   also removes its entry; this deploy check only reports such entries. Broken
    links among release-tag pages are tolerated only if they belong to a per-tag
    baseline set: the sorted list of release-owned broken links recorded in the
    last deploy's receipt (`link_baseline.links`) for the same release tag, or,

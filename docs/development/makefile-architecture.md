@@ -100,6 +100,44 @@ The writer validates but never rewrites `monolith-baseline.json` or
 `.gitignore`, so it does not appear in `git status`; leave it in place or
 delete it.
 
+At the introducing split commit, or a checkout reconstructed from it, reproduce
+the historical comparison explicitly:
+
+```bash
+uv run -- python make/check_makefile_inventory.py --verify-migration
+```
+
+Later intentional Make changes are expected to diverge from that historical
+comparison; the immutable proof metadata remains valid and auditable without a
+third full inventory copy.
+
+## Local timing records
+
+Gate-style targets append one JSON line per run to `~/.benchbox/make-timings.jsonl`.
+Set `BENCHBOX_MAKE_TIMINGS_FILE` to use another file. Set `BENCHBOX_MAKE_TIMINGS=0`
+(or `off`, `false`, `no`) to stop recording; the targets then run exactly as before.
+The file lives outside the repository and is never committed.
+
+Each record has schema `make_timing_v1` and these fields: `target`, `started_at`
+and `ended_at` (UTC, ISO 8601), `duration_seconds` (monotonic clock), `exit_code`
+(`128` plus the signal number when the command was killed by a signal), `cwd` (the
+worktree), `branch`, `head` (short SHA), `host`, and `make_goals` (the goals given
+to that `make` invocation). It holds no environment variables, arguments or
+command output. A nested `$(MAKE)` call of a timed target writes its own record.
+
+`MAKE_TIMED_TARGETS` in the root `Makefile` is the single list of timed targets.
+Each listed target runs its recipe under `scripts/make_timing_shell.sh` through a
+target-specific `SHELL`, so recipe text is unchanged. A target belongs in the list
+only if it has no prerequisites and a single logical recipe line, because every
+recipe line runs through the shell and writes a record; a test enforces this.
+Writing a record is best effort: if the file cannot be written, a one-line warning
+goes to stderr and the target keeps its own exit status.
+
+`make make-timings-report` prints the run count, failure count, median, p90 and
+maximum per target for the last `MAKE_TIMINGS_DAYS` days (default 30), then the
+`MAKE_TIMINGS_SLOWEST` slowest runs (default 5). The tests set
+`BENCHBOX_MAKE_TIMINGS=0` so test runs never write to the real file.
+
 ## Change and rollback cases
 
 | Change | Required action | Rollback |

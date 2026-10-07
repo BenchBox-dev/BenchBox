@@ -75,7 +75,7 @@ def _make_stream_result(stream_id: int) -> ThroughputStreamResult:
 
 
 def _blocking_stream_fn(release: threading.Event):
-    """Stream function where stream 1 blocks until released; stream 0 is fast."""
+    """Stream function where stream 1 blocks until released; stream 2 is fast."""
 
     def _fn(stream_id: int, seed: int, config: _Config) -> ThroughputStreamResult:
         if stream_id == 1:
@@ -120,7 +120,7 @@ class TestOutstandingOwnershipState:
         logger = logging.getLogger("test-throughput-containment")
 
         def _fn(stream_id: int, seed: int, config: _Config) -> ThroughputStreamResult:
-            if stream_id == 0:
+            if stream_id == 1:
                 assert release.wait(timeout=10)
             else:
                 started.set()
@@ -133,9 +133,9 @@ class TestOutstandingOwnershipState:
 
         assert result.streams_executed == 1
         assert len(result.errors) == 2
-        # Stream 0 leaked while running; stream 1 never started and was cancelled.
-        assert result.outstanding_stream_ids == [0]
-        assert result.cancelled_stream_ids == [1]
+        # Stream 1 leaked while running; stream 2 never started and was cancelled.
+        assert result.outstanding_stream_ids == [1]
+        assert result.cancelled_stream_ids == [2]
         assert result.cleanup_state == "outstanding"
         assert not started.wait(timeout=1.0)
 
@@ -231,13 +231,14 @@ class TestOfficialBenchmarkContainment:
         benchmark = self._official(tmp_path)
         with (
             patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as mock_power,
-            patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest") as mock_throughput,
             patch("benchbox.core.tpcds.maintenance_test.TPCDSMaintenanceTest") as mock_maintenance,
         ):
             mock_power.return_value.run.return_value = {"power_at_size": 100.0}
-            mock_throughput.return_value.run.return_value = self._outstanding_throughput_result()
+            adapter = Mock()
+            adapter._run_routed_throughput.return_value = self._outstanding_throughput_result()
 
-            result = benchmark.run_official_benchmark(lambda: Mock())
+            with pytest.warns(DeprecationWarning):
+                result = benchmark.run_official_benchmark(lambda: Mock(), adapter=adapter)
 
         mock_maintenance.assert_not_called()
         assert result.success is False
@@ -253,14 +254,15 @@ class TestOfficialBenchmarkContainment:
         failed.cleanup_state = "complete"
         with (
             patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as mock_power,
-            patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest") as mock_throughput,
             patch("benchbox.core.tpcds.maintenance_test.TPCDSMaintenanceTest") as mock_maintenance,
         ):
             mock_power.return_value.run.return_value = {"power_at_size": 100.0}
-            mock_throughput.return_value.run.return_value = failed
+            adapter = Mock()
+            adapter._run_routed_throughput.return_value = failed
             mock_maintenance.return_value.run.return_value = {"success": True}
 
-            result = benchmark.run_official_benchmark(lambda: Mock())
+            with pytest.warns(DeprecationWarning):
+                result = benchmark.run_official_benchmark(lambda: Mock(), adapter=adapter)
 
         mock_maintenance.assert_called_once()
         assert result.success is False
@@ -273,14 +275,15 @@ class TestOfficialBenchmarkContainment:
         healthy.throughput_at_size = 200.0
         with (
             patch("benchbox.core.tpcds.power_test.TPCDSPowerTest") as mock_power,
-            patch("benchbox.core.tpcds.throughput_test.TPCDSThroughputTest") as mock_throughput,
             patch("benchbox.core.tpcds.maintenance_test.TPCDSMaintenanceTest") as mock_maintenance,
         ):
             mock_power.return_value.run.return_value = {"power_at_size": 100.0}
-            mock_throughput.return_value.run.return_value = healthy
+            adapter = Mock()
+            adapter._run_routed_throughput.return_value = healthy
             mock_maintenance.return_value.run.return_value = {"success": True}
 
-            result = benchmark.run_official_benchmark(lambda: Mock())
+            with pytest.warns(DeprecationWarning):
+                result = benchmark.run_official_benchmark(lambda: Mock(), adapter=adapter)
 
         assert result.success is True
         assert result.throughput_at_size == 200.0

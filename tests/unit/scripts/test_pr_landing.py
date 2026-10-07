@@ -240,8 +240,8 @@ def test_ready_rejects_empty_review_decision_for_soundness_pr(tmp_path: Path) ->
         ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
     ).stdout.strip()
     (repo / "publication").mkdir()
-    (repo / "publication" / "policy.json").write_text("{}")
-    subprocess.run(["git", "add", "publication/policy.json"], cwd=repo, check=True, capture_output=True)
+    (repo / "publication" / "ledger-seed.json").write_text("{}")
+    subprocess.run(["git", "add", "publication/ledger-seed.json"], cwd=repo, check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "soundness"], cwd=repo, check=True, capture_output=True)
     subprocess.run(["git", "push", "-q", "origin", "HEAD:main"], cwd=repo, check=True, capture_output=True)
     head = subprocess.run(
@@ -306,8 +306,8 @@ def test_ready_holds_soundness_even_with_caller_approval(tmp_path: Path) -> None
         ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
     ).stdout.strip()
     (repo / "publication").mkdir()
-    (repo / "publication" / "policy.json").write_text("{}")
-    subprocess.run(["git", "add", "publication/policy.json"], cwd=repo, check=True, capture_output=True)
+    (repo / "publication" / "ledger-seed.json").write_text("{}")
+    subprocess.run(["git", "add", "publication/ledger-seed.json"], cwd=repo, check=True, capture_output=True)
     subprocess.run(["git", "commit", "-m", "soundness"], cwd=repo, check=True, capture_output=True)
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True

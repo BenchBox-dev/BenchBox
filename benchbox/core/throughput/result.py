@@ -16,6 +16,20 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+THROUGHPUT_FIRST_STREAM_ID = 1
+THROUGHPUT_STREAM_NUMBERING_BASIS = "tpc_spec_throughput_streams_1_to_s"
+
+
+def throughput_stream_ids(num_streams: int) -> range:
+    return range(THROUGHPUT_FIRST_STREAM_ID, THROUGHPUT_FIRST_STREAM_ID + max(num_streams, 0))
+
+
+def throughput_stream_numbering() -> dict[str, Any]:
+    return {
+        "basis": THROUGHPUT_STREAM_NUMBERING_BASIS,
+        "first_stream_id": THROUGHPUT_FIRST_STREAM_ID,
+    }
+
 
 def throughput_stream_succeeded(stream: Any) -> bool:
     """Return whether one stream completed every attempted query successfully."""
@@ -116,6 +130,7 @@ class ThroughputResult:
     # "outstanding" (timed-out work may still be executing), or "quiesced"
     # (termination observed after the fact via await_quiescence).
     cleanup_state: str = "complete"
+    stream_numbering: dict[str, Any] = field(default_factory=throughput_stream_numbering)
 
     @property
     def has_outstanding_work(self) -> bool:

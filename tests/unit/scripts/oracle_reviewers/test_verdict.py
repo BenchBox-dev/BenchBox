@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from _project.scripts.oracle_reviewers.diff import commentable_lines
+from _project.scripts.oracle_reviewers.diff import commentable_lines, select_files
 from _project.scripts.oracle_reviewers.verdict import (
     LINK_REMOVED,
     REDACTED,
@@ -183,3 +183,16 @@ def test_findings_split_into_inline_and_summary() -> None:
         ("benchbox/core/equivalence/checker.py", 30),
         ("benchbox/other.py", 1),
     ]
+
+
+def test_select_files_keeps_only_the_named_file_sections() -> None:
+    diff = (
+        "diff --git a/one.py b/one.py\n--- a/one.py\n+++ b/one.py\n@@ -1 +1 @@\n-a\n+b\n"
+        "diff --git a/old.py b/new.py\nsimilarity index 90%\nrename from old.py\nrename to new.py\n"
+        "diff --git a/two.py b/two.py\n--- a/two.py\n+++ b/two.py\n@@ -1 +1 @@\n-c\n+d\n"
+    )
+    assert select_files(diff, frozenset({"two.py"})) == (
+        "diff --git a/two.py b/two.py\n--- a/two.py\n+++ b/two.py\n@@ -1 +1 @@\n-c\n+d\n"
+    )
+    assert select_files(diff, frozenset({"old.py"})).startswith("diff --git a/old.py b/new.py\n")
+    assert select_files(diff, frozenset()) == ""

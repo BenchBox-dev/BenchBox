@@ -167,8 +167,8 @@ passes when the change touches no soundness path, or when the Codex connector
 has reviewed the current head and none of its review threads is unresolved.
 It also passes when an account in `STANDIN_ATTESTERS`
 (`_project/scripts/oracle_review_check.py`) has posted
-`Stand-in oracle review: APPROVE <full head SHA>` for the exact head after the
-head commit and any retarget, unedited, with no connector thread unresolved. A
+`Stand-in oracle review: APPROVE <full head SHA>` for the exact head after any
+retarget, unedited, with no connector thread unresolved. A
 plain owner comment does not count. See
 [soundness drain](soundness-drain.md).
 

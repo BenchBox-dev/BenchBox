@@ -89,6 +89,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .github/oracle-reviewers.yml
+            .github/workflows/oracle-review-shadow.yml
             .github/soundness-paths.txt
             _project/scripts/oracle_reviewers
             _project/scripts/soundness_paths.py
@@ -357,7 +358,7 @@ jobs:
         continue-on-error: true
         run: |
           curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
-          sh "$RUNNER_TEMP/muse-install.sh"
+          bash "$RUNNER_TEMP/muse-install.sh"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run the reviewer
@@ -638,7 +639,7 @@ jobs:
         continue-on-error: true
         run: |
           curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
-          sh "$RUNNER_TEMP/muse-install.sh"
+          bash "$RUNNER_TEMP/muse-install.sh"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run the reviewer
@@ -919,7 +920,7 @@ jobs:
         continue-on-error: true
         run: |
           curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
-          sh "$RUNNER_TEMP/muse-install.sh"
+          bash "$RUNNER_TEMP/muse-install.sh"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run the reviewer
@@ -1200,7 +1201,7 @@ jobs:
         continue-on-error: true
         run: |
           curl -fsSL --proto '=https' --tlsv1.2 https://dev.meta.ai/install.sh -o "$RUNNER_TEMP/muse-install.sh"
-          sh "$RUNNER_TEMP/muse-install.sh"
+          bash "$RUNNER_TEMP/muse-install.sh"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Run the reviewer
