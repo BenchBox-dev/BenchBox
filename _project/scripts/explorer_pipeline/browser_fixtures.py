@@ -30,6 +30,7 @@ def summary(db_path: Path) -> dict:
     FROM results
     WHERE platform_id IN ('cedardb', 'datafusion', 'duckdb', 'pandas', 'polars', 'spark')
     GROUP BY 1, 2, 3
+    ORDER BY 1, 2, 3
     """
     ).fetchall()
     benchmarks = [row[0] for row in con.execute("SELECT DISTINCT benchmark FROM results ORDER BY 1").fetchall()]
