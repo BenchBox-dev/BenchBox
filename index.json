@@ -19078,6 +19078,7 @@
     "site-split-20-seed-site-repo": {
       "claim": null,
       "needs": [
+        "site-split-00-adr-soundness-scope",
         "site-split-10-core-site-inputs"
       ],
       "priority": "high",
