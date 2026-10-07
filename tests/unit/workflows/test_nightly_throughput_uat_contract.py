@@ -182,6 +182,9 @@ def test_baseline_history_is_downloaded_before_the_duckdb_assert() -> None:
     assert "gh run list" in run
     assert "--workflow nightly.yml" in run
     assert "--branch develop" in run
+    assert "--event schedule" in run
+    assert "--event workflow_dispatch" not in run
+    assert '--dir "${history}/${run_id}"' in run
     assert "gh run download" in run
     assert "--pattern 'throughput-baseline-duckdb-tpch-sf1-*'" in run
     assert "${GITHUB_RUN_ID}" in run
@@ -193,3 +196,8 @@ def test_duckdb_assert_reads_the_downloaded_history_not_the_output_dir() -> None
     assert history in run
     assert '--baseline-out "$HOME/Developer/benchmark_runs/throughput-baseline"' in run
     assert "--baseline-history" not in _step("Assert the CedarDB cell")["run"]
+
+
+def test_baseline_reset_variable_reaches_the_assert_environment() -> None:
+    env = _jobs()["throughput-uat"]["env"]
+    assert env["THROUGHPUT_BASELINE_MIN_RECORDED_AT"] == "${{ vars.THROUGHPUT_BASELINE_MIN_RECORDED_AT }}"

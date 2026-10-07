@@ -99,16 +99,24 @@ def record_baseline(
     return path
 
 
-def load_baseline_records(directory: Path) -> list[dict[str, Any]]:
-    records = []
+def load_baseline_records(directory: Path, *, not_before: str = "") -> list[dict[str, Any]]:
+    limit = datetime.now(timezone.utc).isoformat()
+    latest: dict[str, dict[str, Any]] = {}
     for path in sorted(directory.rglob("throughput-baseline-*.json")):
         try:
             record = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            run_id, attempt, recorded_at = (
+                str(record["run_id"]),
+                int(record["run_attempt"] or 1),
+                str(record["recorded_at"]),
+            )
+        except (OSError, ValueError, KeyError, TypeError):
             continue
-        if isinstance(record, dict) and record.get("schema_version") == BASELINE_SCHEMA_VERSION:
-            records.append(record)
-    return records
+        if record.get("schema_version") != BASELINE_SCHEMA_VERSION or run_id not in path.relative_to(directory).parts:
+            continue
+        if not_before <= recorded_at <= limit and attempt >= int(latest.get(run_id, {}).get("run_attempt", 0)):
+            latest[run_id] = record
+    return list(latest.values())
 
 
 def rolling_median(
@@ -118,14 +126,15 @@ def rolling_median(
     benchmark: str,
     scale: float,
     runner_class: str,
+    streams: int,
     window: int = DEFAULT_ROLLING_WINDOW,
 ) -> RollingMedian | None:
     matching = sorted(
         (
             record
             for record in records
-            if (record.get("platform"), record.get("benchmark"), record.get("runner_class"))
-            == (platform, benchmark, runner_class)
+            if (record.get("platform"), record.get("benchmark"), record.get("runner_class"), record.get("streams"))
+            == (platform, benchmark, runner_class, streams)
             and math.isclose(float(record.get("scale_factor", math.nan)), float(scale))
             and isinstance(record.get("throughput_at_size"), (int, float))
             and record["throughput_at_size"] > 0

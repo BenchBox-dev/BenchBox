@@ -658,7 +658,7 @@ def _history(tmp_path: Path, values: list[float], *, cpu: str = SLOW_CPU) -> str
     history = tmp_path / "history"
     for day, value in enumerate(values, start=1):
         throughput_baseline.record_baseline(
-            history / f"run-{day}",
+            history / str(day),
             {"summary": {"tpc_metrics": {"throughput_at_size": value}}},
             platform="duckdb",
             benchmark="tpch",
@@ -691,8 +691,8 @@ def test_cli_assert_gates_on_the_rolling_median_of_the_runner_class(tmp_path: Pa
     assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)) == 1
 
     output = capsys.readouterr().out
+    assert "5 of 5 required baseline samples" in output
     assert "rolling median" in output
-    assert "of 5 prior runs" in output
     assert "Throughput@Size regression" in output
 
 
@@ -771,3 +771,40 @@ def test_cli_assert_ignores_history_unless_the_floor_is_requested(tmp_path: Path
     history = _history(tmp_path, [_observed() * 100] * 5)
 
     assert main(_assert_argv(_setup_cell(tmp_path), "--baseline-history", history)) == 0
+
+
+def test_cli_assert_ignores_forged_history_records(tmp_path: Path, slow_runner, capsys):
+    history = tmp_path / "history"
+    for index in range(10):
+        throughput_baseline.record_baseline(
+            history / "300",
+            {"summary": {"tpc_metrics": {"throughput_at_size": _observed() * 100}}},
+            platform="duckdb",
+            benchmark="tpch",
+            scale=1,
+            streams=3,
+            env={"GITHUB_RUN_ID": f"forged-{index}", "GITHUB_RUN_ATTEMPT": "1"},
+            cpu_model=SLOW_CPU,
+            cpu_count=4,
+            recorded_at=datetime(9999, 1, 1, tzinfo=timezone.utc),
+        )
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", str(history))) == 0
+
+    assert "0 of 5 required baseline samples" in capsys.readouterr().out
+
+
+def test_cli_assert_min_recorded_at_resets_a_runner_class_baseline(tmp_path: Path, slow_runner, monkeypatch, capsys):
+    history = _history(tmp_path, [_observed() * 2] * 5)
+    glob_pattern = _setup_cell(tmp_path)
+    argv = _assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)
+    assert main(argv) == 1
+
+    monkeypatch.setenv("THROUGHPUT_BASELINE_MIN_RECORDED_AT", "2026-10-04")
+
+    assert main(argv) == 0
+    assert "2 of 5 required baseline samples" in capsys.readouterr().out
+    monkeypatch.setenv("THROUGHPUT_BASELINE_MIN_RECORDED_AT", "2026-10-06")
+    assert main(argv) == 0
+    assert "0 of 5 required baseline samples" in capsys.readouterr().out

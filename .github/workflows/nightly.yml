@@ -989,6 +989,7 @@ jobs:
       # evaluate to empty, which the assert step treats as unconfigured.
       THROUGHPUT_FLOOR_MEDIAN: ${{ vars.THROUGHPUT_FLOOR_MEDIAN }}
       THROUGHPUT_FLOOR_MAX_DROP_FRACTION: ${{ vars.THROUGHPUT_FLOOR_MAX_DROP_FRACTION }}
+      THROUGHPUT_BASELINE_MIN_RECORDED_AT: ${{ vars.THROUGHPUT_BASELINE_MIN_RECORDED_AT }}
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -1041,7 +1042,7 @@ jobs:
         run: |
           history="$HOME/Developer/benchmark_runs/throughput-baseline-history"
           mkdir -p "$history"
-          if ! run_ids=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow nightly.yml --branch develop --limit 30 \
+          if ! run_ids=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow nightly.yml --branch develop --event schedule --limit 30 \
             --json databaseId --jq ".[] | select(.databaseId != ${GITHUB_RUN_ID}) | .databaseId"); then
             echo "::warning::could not list prior nightly runs; the Throughput@Size floor stays observe-only"
             exit 0

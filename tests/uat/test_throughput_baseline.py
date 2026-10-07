@@ -75,7 +75,7 @@ def _good_result(throughput_at_size: float) -> dict:
 
 def _write(tmp_path: Path, value: float, *, run_id: str, day: int, cpu: str = SLOW, cpus: int = 4) -> Path:
     return record_baseline(
-        tmp_path / f"run-{run_id}",
+        tmp_path / run_id,
         _good_result(value),
         platform="duckdb",
         benchmark="tpch",
@@ -174,10 +174,10 @@ def test_runner_class_separates_cpu_models_and_core_counts():
 def test_load_baseline_records_reads_nested_artifact_dirs_and_skips_bad_files(tmp_path: Path):
     _write(tmp_path, 1.0, run_id="555", day=4)
     _write(tmp_path, 2.0, run_id="556", day=5)
-    (tmp_path / "run-557").mkdir()
-    (tmp_path / "run-557" / "throughput-baseline-garbage.json").write_text("{oops", encoding="utf-8")
-    (tmp_path / "run-558").mkdir()
-    (tmp_path / "run-558" / "throughput-baseline-old.json").write_text('{"schema_version": 0}', encoding="utf-8")
+    (tmp_path / "557").mkdir()
+    (tmp_path / "557" / "throughput-baseline-garbage.json").write_text("{oops", encoding="utf-8")
+    (tmp_path / "558").mkdir()
+    (tmp_path / "558" / "throughput-baseline-old.json").write_text('{"schema_version": 0}', encoding="utf-8")
 
     assert sorted(record["run_id"] for record in load_baseline_records(tmp_path)) == ["555", "556"]
 
@@ -189,8 +189,12 @@ def test_rolling_median_is_computed_per_runner_class(tmp_path: Path):
         _write(tmp_path, value, run_id=str(10 + day), day=day, cpu=FAST)
     records = load_baseline_records(tmp_path)
 
-    slow = rolling_median(records, platform="duckdb", benchmark="tpch", scale=1, runner_class=runner_class_for(SLOW, 4))
-    fast = rolling_median(records, platform="duckdb", benchmark="tpch", scale=1, runner_class=runner_class_for(FAST, 4))
+    slow = rolling_median(
+        records, platform="duckdb", benchmark="tpch", scale=1, streams=3, runner_class=runner_class_for(SLOW, 4)
+    )
+    fast = rolling_median(
+        records, platform="duckdb", benchmark="tpch", scale=1, streams=3, runner_class=runner_class_for(FAST, 4)
+    )
 
     assert (slow.median, slow.count) == (75000, 3)
     assert (fast.median, fast.count) == (96000, 3)
@@ -205,6 +209,7 @@ def test_rolling_median_uses_only_the_latest_window_of_runs(tmp_path: Path):
         platform="duckdb",
         benchmark="tpch",
         scale=1,
+        streams=3,
         runner_class=runner_class_for(SLOW, 4),
         window=3,
     )
@@ -217,9 +222,21 @@ def test_rolling_median_needs_a_matching_cell(tmp_path: Path):
     records = load_baseline_records(tmp_path)
     runner_class = runner_class_for(SLOW, 4)
 
-    assert rolling_median(records, platform="postgresql", benchmark="tpch", scale=1, runner_class=runner_class) is None
-    assert rolling_median(records, platform="duckdb", benchmark="tpch", scale=10, runner_class=runner_class) is None
-    assert rolling_median(records, platform="duckdb", benchmark="tpch", scale=1, runner_class="other") is None
+    assert (
+        rolling_median(records, platform="postgresql", benchmark="tpch", scale=1, streams=3, runner_class=runner_class)
+        is None
+    )
+    assert (
+        rolling_median(records, platform="duckdb", benchmark="tpch", scale=10, streams=3, runner_class=runner_class)
+        is None
+    )
+    assert (
+        rolling_median(records, platform="duckdb", benchmark="tpch", scale=1, streams=3, runner_class="other") is None
+    )
+    assert (
+        rolling_median(records, platform="duckdb", benchmark="tpch", scale=1, streams=1, runner_class=runner_class)
+        is None
+    )
 
 
 def _median_argv(tmp_path: Path, runner_class: str) -> list[str]:
@@ -233,6 +250,8 @@ def _median_argv(tmp_path: Path, runner_class: str) -> list[str]:
         "tpch",
         "--scale",
         "1",
+        "--streams",
+        "3",
         "--runner-class",
         runner_class,
     ]
@@ -251,3 +270,94 @@ def test_cli_rolling_median_prints_per_class_median(tmp_path: Path, capsys):
 def test_cli_rolling_median_fails_without_baselines(tmp_path: Path, capsys):
     assert main(_median_argv(tmp_path, "none")) == 1
     assert "no retained baselines" in capsys.readouterr().out
+
+
+def _record(
+    directory: Path, value: float, *, run_id: str, attempt: str = "1", recorded_at: datetime, streams: int = 3
+) -> Path:
+    return record_baseline(
+        directory,
+        _good_result(value),
+        platform="duckdb",
+        benchmark="tpch",
+        scale=1,
+        streams=streams,
+        env={"GITHUB_RUN_ID": run_id, "GITHUB_RUN_ATTEMPT": attempt},
+        cpu_model=SLOW,
+        cpu_count=4,
+        recorded_at=recorded_at,
+    )
+
+
+def _values(records: list[dict]) -> list[float]:
+    return sorted(record["throughput_at_size"] for record in records)
+
+
+def test_load_baseline_records_rejects_a_record_outside_its_own_run_directory(tmp_path: Path):
+    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    _record(tmp_path / "100", 1.0, run_id="100", recorded_at=when)
+    _record(tmp_path / "200", 2.0, run_id="999", recorded_at=when)
+    _record(tmp_path / "300" / "artifact", 3.0, run_id="300", recorded_at=when)
+
+    assert _values(load_baseline_records(tmp_path)) == [1.0, 3.0]
+
+
+def test_load_baseline_records_rejects_records_dated_in_the_future(tmp_path: Path):
+    _record(tmp_path / "100", 1.0, run_id="100", recorded_at=datetime(2026, 10, 1, tzinfo=timezone.utc))
+    _record(tmp_path / "200", 2.0, run_id="200", recorded_at=datetime(9999, 1, 1, tzinfo=timezone.utc))
+
+    assert _values(load_baseline_records(tmp_path)) == [1.0]
+
+
+def test_load_baseline_records_keeps_the_highest_attempt_per_run(tmp_path: Path):
+    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    _record(tmp_path / "100" / "a", 1.0, run_id="100", attempt="1", recorded_at=when)
+    _record(tmp_path / "100" / "b", 2.0, run_id="100", attempt="10", recorded_at=when)
+    _record(tmp_path / "100" / "c", 3.0, run_id="100", attempt="2", recorded_at=when)
+
+    assert _values(load_baseline_records(tmp_path)) == [2.0]
+
+
+def test_load_baseline_records_drops_a_future_dated_attempt_before_choosing_the_latest(tmp_path: Path):
+    _record(
+        tmp_path / "100" / "a", 1.0, run_id="100", attempt="1", recorded_at=datetime(2026, 10, 1, tzinfo=timezone.utc)
+    )
+    _record(
+        tmp_path / "100" / "b", 9.0, run_id="100", attempt="2", recorded_at=datetime(9999, 1, 1, tzinfo=timezone.utc)
+    )
+
+    assert _values(load_baseline_records(tmp_path)) == [1.0]
+
+
+def test_load_baseline_records_ignores_records_older_than_not_before(tmp_path: Path):
+    for run_id, day in (("100", 1), ("200", 10), ("300", 20)):
+        _record(
+            tmp_path / run_id, float(day), run_id=run_id, recorded_at=datetime(2026, 1, day, 6, tzinfo=timezone.utc)
+        )
+
+    assert _values(load_baseline_records(tmp_path, not_before="2026-01-10")) == [10.0, 20.0]
+    assert _values(load_baseline_records(tmp_path, not_before="2026-01-10T07:00:00+00:00")) == [20.0]
+    assert _values(load_baseline_records(tmp_path)) == [1.0, 10.0, 20.0]
+
+
+@pytest.mark.parametrize("payload", ["[]", '{"schema_version": 1}', '{"schema_version": 1, "run_id": "1"}'])
+def test_load_baseline_records_skips_records_missing_identity_fields(tmp_path: Path, payload: str):
+    (tmp_path / "1").mkdir()
+    (tmp_path / "1" / "throughput-baseline-x.json").write_text(payload, encoding="utf-8")
+
+    assert load_baseline_records(tmp_path) == []
+
+
+def test_rolling_median_never_mixes_stream_counts(tmp_path: Path):
+    when = datetime(2026, 10, 1, tzinfo=timezone.utc)
+    _record(tmp_path / "100", 100.0, run_id="100", recorded_at=when, streams=3)
+    _record(tmp_path / "200", 900.0, run_id="200", recorded_at=when, streams=4)
+    records = load_baseline_records(tmp_path)
+    kwargs = {"platform": "duckdb", "benchmark": "tpch", "scale": 1, "runner_class": runner_class_for(SLOW, 4)}
+
+    assert (
+        rolling_median(records, streams=3, **kwargs).median,
+        rolling_median(records, streams=3, **kwargs).count,
+    ) == (100.0, 1)
+    assert rolling_median(records, streams=4, **kwargs).median == 900.0
+    assert rolling_median(records, streams=5, **kwargs) is None

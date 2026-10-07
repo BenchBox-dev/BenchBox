@@ -197,21 +197,21 @@ def evaluate_floor(
     return True, f"Throughput@Size {observed:.2f} clears floor {floor:.2f}"
 
 
-def resolve_floor_median(override: str | None, history_dir: str | None, **where: Any) -> str | float | None:
+def resolve_floor_median(history_dir: str | None, **where: Any) -> str | float | None:
+    override = os.environ.get("THROUGHPUT_FLOOR_MEDIAN")
     if override or not history_dir:
         return override
     runner_class = baseline.current_runner_class()
-    records = baseline.load_baseline_records(Path(history_dir).expanduser())
+    not_before = os.environ.get("THROUGHPUT_BASELINE_MIN_RECORDED_AT", "")
+    records = baseline.load_baseline_records(Path(history_dir).expanduser(), not_before=not_before)
     found = baseline.rolling_median(records, runner_class=runner_class, **where)
     count = found.count if found else 0
-    if found is None or count < baseline.MIN_FLOOR_SAMPLES:
-        print(
-            f"::notice::{count} of {baseline.MIN_FLOOR_SAMPLES} required baseline samples for runner class "
-            f"{runner_class!r}; floor stays observe-only"
-        )
-        return None
-    print(f"::notice::rolling median {found.median:.2f} of {count} prior runs on runner class {runner_class!r}")
-    return found.median
+    verdict = f"rolling median {found.median:.2f}" if found and count >= baseline.MIN_FLOOR_SAMPLES else None
+    print(
+        f"::notice::{count} of {baseline.MIN_FLOOR_SAMPLES} required baseline samples for runner class "
+        f"{runner_class!r}; {verdict or 'floor stays observe-only'}"
+    )
+    return found.median if verdict else None
 
 
 def _error(message: str) -> int:
@@ -232,7 +232,7 @@ def _run_assert(args: argparse.Namespace) -> int:
     print(f"OK: verified {cell.result_path}")
     print(f"::notice::Throughput@Size observed: {observed!r}")
     if args.evaluate_floor:
-        median = resolve_floor_median(os.environ.get("THROUGHPUT_FLOOR_MEDIAN"), args.baseline_history, **where)
+        median = resolve_floor_median(args.baseline_history, streams=args.streams, **where)
         ok, message = evaluate_floor(
             observed, median=median, max_drop=os.environ.get("THROUGHPUT_FLOOR_MAX_DROP_FRACTION")
         )
@@ -250,14 +250,8 @@ def _run_assert(args: argparse.Namespace) -> int:
 def _run_rolling_median(args: argparse.Namespace) -> int:
     runner_class = args.runner_class or baseline.current_runner_class()
     records = baseline.load_baseline_records(Path(args.baseline_dir).expanduser())
-    result = baseline.rolling_median(
-        records,
-        platform=args.platform,
-        benchmark=args.benchmark,
-        scale=args.scale,
-        runner_class=runner_class,
-        window=args.window,
-    )
+    where = {key: getattr(args, key) for key in ("platform", "benchmark", "scale", "streams")}
+    result = baseline.rolling_median(records, runner_class=runner_class, window=args.window, **where)
     if result is None:
         return _error(f"no retained baselines for runner class {runner_class!r}")
     print(json.dumps({"runner_class": runner_class, **result._asdict()}, sort_keys=True))
@@ -269,7 +263,6 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     assert_parser = subparsers.add_parser("assert")
     assert_parser.add_argument("--cells-glob", required=True)
-    assert_parser.add_argument("--streams", type=int, required=True)
     assert_parser.add_argument("--evaluate-floor", action="store_true")
     assert_parser.add_argument("--baseline-out")
     assert_parser.add_argument("--baseline-history")
@@ -281,6 +274,7 @@ def build_parser() -> argparse.ArgumentParser:
     median_parser.set_defaults(handler=_run_rolling_median)
     for subparser in (assert_parser, median_parser):
         subparser.add_argument("--platform", required=True)
+        subparser.add_argument("--streams", type=int, required=True)
         subparser.add_argument("--benchmark", required=True)
         subparser.add_argument("--scale", type=float, required=True)
     return parser

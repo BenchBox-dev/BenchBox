@@ -674,17 +674,21 @@ the assert writes no record for a cell that did not pass. Artifacts expire; a
 longer history needs a copy outside GitHub run data.
 
 Median. `python -m tests.uat.throughput rolling-median --baseline-dir DIR
---platform duckdb --benchmark tpch --scale 1 [--runner-class C] [--window N]`
-reads downloaded records (nested artifact directories are fine) and prints
-the median of the latest N matching the runner class, defaulting to the
-current machine's class. The floor must never compare across classes.
+--platform duckdb --benchmark tpch --scale 1 --streams 3 [--runner-class C]
+[--window N]` reads downloaded records and prints the median of the latest N
+matching the runner class, defaulting to the current machine's class. The
+floor never compares across runner classes or stream counts.
 
 Status: active per runner class. The nightly `throughput-uat` job runs a
 "Download retained Throughput@Size baselines" step before the DuckDB assert.
-It lists the last 30 `nightly.yml` runs on `develop` (excluding the current
-run) with `gh run list` and fetches each run's baseline artifact
-(`throughput-baseline-duckdb-tpch-sf1-*`) with `gh run download` into
-`~/Developer/benchmark_runs/throughput-baseline-history`. The job's
+It lists the last 30 scheduled `nightly.yml` runs on `develop` (excluding
+the current run) with `gh run list --event schedule` and fetches each run's
+baseline artifact (`throughput-baseline-duckdb-tpch-sf1-*`) with
+`gh run download` into
+`~/Developer/benchmark_runs/throughput-baseline-history/<run_id>/`. Only
+scheduled runs count: the branch filter matches a head branch name, which a
+fork pull request controls, and a `workflow_dispatch` run can come from any
+ref. The job's
 `GITHUB_TOKEN` carries `contents: read` and `actions: read`, nothing more. A
 run with no such artifact (its sweep or assert failed, or the 90 days have
 passed) is skipped. A failure to list runs prints a warning and leaves the
@@ -701,6 +705,28 @@ introduced and a cold start with no artifacts at all, the assert prints
 `N of 5 required baseline samples for runner class ...; floor stays
 observe-only` and passes. A run that fails the floor writes no record, so a
 regression cannot lower the baseline it is judged against.
+
+The loader also rejects records that do not belong to the run they came
+from, so a hostile or mislabeled artifact cannot supply the median:
+
+- a record is kept only when its `run_id` equals the name of the run
+  directory it was downloaded into;
+- a record with a `recorded_at` in the future is dropped;
+- a run counts once: the record with the highest `run_attempt` wins, so a
+  re-run does not double its weight;
+- a record whose `streams` differs from the assert's stream count is not
+  compared.
+
+Recovery from a permanent slowdown. Only passing runs write records, so after
+a real, lasting slowdown on one runner class the median stays at the old
+level and the floor keeps failing. To accept the new level, set the
+repository variable `THROUGHPUT_BASELINE_MIN_RECORDED_AT` to a UTC date such
+as `2026-10-20` (or a full ISO timestamp with `+00:00`). Records recorded
+before it are ignored, so the class returns to observe-only until 5 new
+records accumulate, then gates on the new median. Clear the variable
+afterward; it is harmless to leave set. Runner image changes need no reset:
+the 20% tolerance absorbs them, and each record carries `runner_image` and
+`commit_sha` to trace a step change.
 
 `THROUGHPUT_FLOOR_MEDIAN`, when set as a repository variable, overrides the
 history-derived median and gates even with fewer than 5 records. It is a
