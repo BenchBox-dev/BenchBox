@@ -43,17 +43,20 @@ these conditions, in order:
    `applied_verified`).
 5. The timing and coverage contract holds: at least two queries with a valid positive
    display timing, covering at least half of the logical queries.
-6. The benchmark's primary metric is present, finite and positive. TPC-H and TPC-DS rank on
-   `power_score` (from `power_at_size` only; `qphh_at_size`/`qphds_at_size` are
-   non-spec exports the driver no longer validates); other
-   benchmarks rank on the geometric mean of display timings.
+6. The primary metric for the benchmark and phase is present, finite and positive.
+   TPC-H and TPC-DS power cohorts rank on `power_score` (from `power_at_size` only;
+   `qphh_at_size`/`qphds_at_size` are non-spec exports the driver no longer validates).
+   TPC-H and TPC-DS throughput cohorts rank on `throughput_at_size` (Throughput@Size,
+   higher is better). Every other benchmark and phase ranks on the geometric mean of
+   display timings.
 
 Trust label and visibility come from where a bundle is published, not from its content,
 so the validator does not check them.
 
-TPC-H and TPC-DS throughput cohorts cannot be ranked today, because the Explorer ranks those
-benchmarks on `power_score` and throughput bundles do not carry one. Such cohorts are
-reported as `UNRANKED`.
+TPC-H and TPC-DS throughput cohorts are split by stream count, so runs with different
+stream counts are never compared. A throughput bundle without a positive `throughput_at_size`
+(for example one with a failed stream, which exports none) contributes no identity, and a
+cohort in which no bundle has one is reported as `UNRANKED`.
 
 The depth gate applies to cohorts that publish a ranking:
 
