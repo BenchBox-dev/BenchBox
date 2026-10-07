@@ -110,6 +110,8 @@ class TestG1SchemaContract:
             "physical_mechanisms",
             "physical_rendering_id",
             "benchmark_support_status",
+            "throughput_at_size",
+            "stream_count",
             "tuning_policy_generation",
         },
         "result_environment": {
@@ -156,6 +158,7 @@ class TestG1SchemaContract:
             "display_ms",
             "is_valid_display_timing",
             "timing_exclusion_reason",
+            "stream_count",
         },
         "benchmark_rankings": {
             "benchmark",
@@ -197,6 +200,8 @@ class TestG1SchemaContract:
             "percentile_p99",
             "speedup_vs_best",
             "speedup_vs_slowest_in_cohort",
+            "throughput_at_size",
+            "stream_count",
         },
         "cohort_metadata": {
             "cohort_key",
@@ -224,6 +229,7 @@ class TestG1SchemaContract:
             "rank",
             "metric_value",
             "speedup_vs_best",
+            "stream_count",
         },
         "meta_leaderboard": {"platform_id", "platform", "avg_rank", "n_cohorts"},
         "short_ids": {"short_id", "result_id"},
@@ -287,6 +293,8 @@ class TestG1SchemaContract:
             "physical_mechanisms",
             "physical_rendering_id",
             "benchmark_support_status",
+            "throughput_at_size",
+            "stream_count",
             "tuning_policy_generation",
             "os",
             "arch",

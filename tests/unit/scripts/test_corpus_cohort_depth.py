@@ -34,6 +34,8 @@ from _project.scripts.explorer_pipeline.models import (
     _PHASE_ALIASES,
     APPLIED_TUNING_STATUSES,
     RANKING_METRIC_BY_FAMILY,
+    RANKING_METRIC_BY_FAMILY_PHASE,
+    THROUGHPUT_PHASE,
     UNOFFICIAL_COMPLIANCE_CLASSES,
     canonical_phase,
     ranking_exclusion_reason,
@@ -45,9 +47,11 @@ from benchbox.core.tuning.modes import MODES
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 # release-cut removes the Explorer pipeline's test fixtures, so this module skips on the release tree.
-MINIMAL_BUNDLE = pytest.importorskip(
+_EXPLORER_FIXTURES = pytest.importorskip(
     "tests.unit.scripts.explorer_pipeline.conftest", reason="Explorer pipeline test fixtures are not in this checkout"
-).MINIMAL_BUNDLE
+)
+MINIMAL_BUNDLE = _EXPLORER_FIXTURES.MINIMAL_BUNDLE
+throughput_bundle = _EXPLORER_FIXTURES.throughput_bundle
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 VALIDATOR = REPO_ROOT / "results-data" / "validate_corpus.py"
@@ -147,6 +151,7 @@ def _write_phase_bundle(
     test_type: str | None = None,
     benchmark_id: str = "tpch",
     power_score: float | None = 1.0,
+    throughput_score: float | None = 1.0,
 ) -> None:
     benchmark: dict = {"id": benchmark_id, "scale_factor": 1.0}
     if test_type is not None:
@@ -154,7 +159,11 @@ def _write_phase_bundle(
     throughput_phase: dict = {"status": throughput}
     if throughput != "NOT_RUN":
         throughput_phase["stream_results"] = [{"stream_id": index, "success": True} for index in range(streams)]
-    tpc_metrics = {} if power_score is None else {"power_at_size": power_score}
+    tpc_metrics = {}
+    if power_score is not None:
+        tpc_metrics["power_at_size"] = power_score
+    if throughput_score is not None and throughput != "NOT_RUN":
+        tpc_metrics["throughput_at_size"] = throughput_score
     payload = {
         "benchmark": benchmark,
         "platform": {"name": platform},
@@ -196,6 +205,19 @@ def test_throughput_bundles_form_their_own_cohort(tmp_path: Path, test_type: str
     shallow = validator.shallow_cohorts(validator.cohort_platforms(validator.discover_bundles(tmp_path)))
 
     assert shallow == {("tpch", "1.0#throughput#3streams"): {"DuckDB"}}
+    assert validator.main(tmp_path) == 1
+
+
+def test_a_one_engine_throughput_cohort_fails_without_any_power_bundles(tmp_path: Path) -> None:
+    validator = _load_validator()
+    _write_phase_bundle(
+        tmp_path, "duckdb.json", platform="DuckDB", power="NOT_RUN", throughput="COMPLETED", test_type="throughput"
+    )
+
+    assert validator.shallow_cohorts(validator.cohort_platforms(validator.discover_bundles(tmp_path))) == {
+        ("tpch", "1.0#throughput#3streams"): {"DuckDB"}
+    }
+    assert validator.main(tmp_path) == 1
 
 
 def test_three_throughput_engines_pass_the_gate(tmp_path: Path) -> None:
@@ -208,6 +230,7 @@ def test_three_throughput_engines_pass_the_gate(tmp_path: Path) -> None:
             power="NOT_RUN",
             throughput="COMPLETED",
             test_type="throughput",
+            power_score=None,
         )
 
     assert validator.shallow_cohorts(validator.cohort_platforms(validator.discover_bundles(tmp_path))) == {}
@@ -311,7 +334,7 @@ def test_throughput_bundles_without_a_primary_metric_leave_the_cohort_unranked(t
             power="NOT_RUN",
             throughput="COMPLETED",
             test_type="throughput",
-            power_score=None,
+            throughput_score=None,
         )
 
     cohorts = validator.cohort_platforms(validator.discover_bundles(tmp_path))
@@ -332,6 +355,7 @@ def test_throughput_bundles_on_a_geomean_benchmark_are_rankable(tmp_path: Path) 
             test_type="throughput",
             benchmark_id="ssb",
             power_score=None,
+            throughput_score=None,
         )
 
     assert validator.main(tmp_path) == 0
@@ -772,8 +796,34 @@ def _parity_variants() -> dict[str, dict]:
             data[name] = content
         return data
 
+    def throughput_variant(**changes: object) -> dict:
+        data = throughput_bundle(**{k: v for k, v in changes.items() if k != "summary"})
+        if "summary" in changes:
+            data["summary"] = {**data["summary"], **changes["summary"]}
+        return data
+
     return {
         "throughput-without-power-score": with_tpc_metrics({"throughput_at_size": 3741.0}, test_type="throughput"),
+        "throughput-clean": throughput_variant(),
+        "throughput-clean-tpcds": throughput_variant(benchmark="tpcds"),
+        "throughput-clean-two-streams": throughput_variant(streams=2),
+        "throughput-power-score-only": throughput_variant(throughput_at_size=None, power_at_size=1234.0),
+        "throughput-score-and-power-score": throughput_variant(power_at_size=1234.0),
+        "throughput-no-score": throughput_variant(throughput_at_size=None),
+        "throughput-zero-score": throughput_variant(throughput_at_size=0.0),
+        "throughput-negative-score": throughput_variant(throughput_at_size=-1.0),
+        "throughput-nan-score": throughput_variant(throughput_at_size=float("nan")),
+        "throughput-unparseable-score": throughput_variant(throughput_at_size="abc"),
+        "throughput-failed-queries": throughput_variant(
+            summary={"queries": {"total": 66, "passed": 21, "failed": 45}, "validation": "partial"}
+        ),
+        "throughput-unofficial": throughput_variant(compliance_class="unofficial_subscale"),
+        "throughput-geomean-benchmark": throughput_variant(benchmark="ssb", throughput_at_size=None),
+        "power-with-throughput-score-only": with_tpc_metrics({"throughput_at_size": 3741.0}),
+        "combined-phase-ranks-on-power-score": with_tpc_metrics({"power_at_size": 10.0}, test_type="combined"),
+        "combined-phase-with-throughput-score-only": with_tpc_metrics(
+            {"throughput_at_size": 3741.0}, test_type="combined"
+        ),
         "geomean-benchmark-without-power-score": with_tpc_metrics({}, benchmark_id="ssb"),
         "tpch-without-power-score": with_tpc_metrics({}),
         "power-score-zero": with_tpc_metrics({"power_at_size": 0}),
@@ -859,6 +909,21 @@ def test_validator_agrees_with_the_explorer_on_phase_and_rankability(tmp_path: P
     assert validator.bundle_rankable(payload) is (explorer_reason is None)
 
 
+@pytest.mark.parametrize("name", sorted(_parity_variants()))
+def test_validator_agrees_with_the_explorer_on_the_throughput_stream_count(tmp_path: Path, name: str) -> None:
+    validator = _load_validator()
+    path = tmp_path / "bundle.json"
+    payload = _parity_variants()[name]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    entry = BundleTransformer().to_manifest_entry(path)
+    validator_streams = validator._stream_count(payload) if validator.bundle_phase(payload) == "throughput" else None
+
+    assert entry.stream_count == validator_streams
+    if entry.stream_count is not None:
+        assert validator.cohort_phase_suffix(payload) == f"#throughput#{entry.stream_count}streams"
+
+
 def _load_inventory_generator() -> ModuleType:
     path = REPO_ROOT / "scripts" / "generate_corpus_inventory.py"
     spec = importlib.util.spec_from_file_location("generate_corpus_inventory", path)
@@ -917,6 +982,13 @@ def test_copied_constants_match_their_explorer_sources() -> None:
     assert {
         name for name, config in RANKING_METRIC_BY_FAMILY.items() if config.primary_metric == "power_score"
     } == validator.POWER_SCORE_BENCHMARKS
+    assert {
+        family
+        for (family, phase), config in RANKING_METRIC_BY_FAMILY_PHASE.items()
+        if phase == THROUGHPUT_PHASE and config.primary_metric == "throughput_at_size"
+    } == validator.THROUGHPUT_SCORE_BENCHMARKS
+    assert {phase for _, phase in RANKING_METRIC_BY_FAMILY_PHASE} == {validator.THROUGHPUT_PHASE}
+    assert THROUGHPUT_PHASE == validator.THROUGHPUT_PHASE
     assert set(MODES) == validator.CANONICAL_TUNING_MODES
     assert set(APPLIED_TUNING_STATUSES) == validator.APPLIED_TUNING_STATUSES
     assert validator.KNOWN_LOGICAL_QUERY_COUNTS == explorer_transformer._KNOWN_LOGICAL_QUERY_COUNTS

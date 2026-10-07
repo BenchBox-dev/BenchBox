@@ -85,7 +85,7 @@ class TestMetaRankWideningLatency:
             _make_platform_row("polars", display_geomean_ms=400.0),
         ]
         summary = _make_summary(benchmark="clickbench", ranking=ranking, platforms=rows)
-        summaries = [(("clickbench", 0.1, "power"), summary)]
+        summaries = [(("clickbench", 0.1, "power", None), summary)]
         return _build_meta_leaderboard(summaries, _GENERATED_AT)
 
     def _cohort_rank(self, data: dict, platform_id: str) -> dict:
@@ -145,7 +145,7 @@ class TestMetaRankWideningThroughput:
             _make_platform_row("sqlite", power_score=1500.0),
         ]
         summary = _make_summary(benchmark="tpch", ranking=ranking, platforms=rows)
-        summaries = [(("tpch", 0.1, "power"), summary)]
+        summaries = [(("tpch", 0.1, "power", None), summary)]
         return _build_meta_leaderboard(summaries, _GENERATED_AT)
 
     def _rank(self, data: dict, platform_id: str) -> dict:
@@ -190,7 +190,7 @@ class TestMetaRankNullMetric:
             _make_platform_row("sqlite", display_geomean_ms=200.0),
         ]
         summary = _make_summary(benchmark="clickbench", ranking=ranking, platforms=rows)
-        data = _build_meta_leaderboard([(("clickbench", 0.1, "power"), summary)], _GENERATED_AT)
+        data = _build_meta_leaderboard([(("clickbench", 0.1, "power", None), summary)], _GENERATED_AT)
 
         cohort_key = "clickbench-sf0.1-power"
         failed_platform = next((p for p in data["platforms"] if p["platform_id"] == "failed"), None)
@@ -210,7 +210,7 @@ class TestMetaRankNullMetric:
             _make_platform_row("sqlite", display_geomean_ms=200.0),
         ]
         summary = _make_summary(benchmark="clickbench", ranking=ranking, platforms=rows)
-        data = _build_meta_leaderboard([(("clickbench", 0.1, "power"), summary)], _GENERATED_AT)
+        data = _build_meta_leaderboard([(("clickbench", 0.1, "power", None), summary)], _GENERATED_AT)
 
         cohort_key = "clickbench-sf0.1-power"
         duckdb = next(p for p in data["platforms"] if p["platform_id"] == "duckdb")
@@ -232,7 +232,7 @@ class TestMetaRankEligibility:
             _make_platform_row("sqlite", display_geomean_ms=200.0),
         ]
         summary = _make_summary(benchmark="clickbench", ranking=ranking, platforms=rows)
-        data = _build_meta_leaderboard([(("clickbench", 0.1, "power"), summary)], _GENERATED_AT)
+        data = _build_meta_leaderboard([(("clickbench", 0.1, "power", None), summary)], _GENERATED_AT)
 
         cohort_key = "clickbench-sf0.1-power"
         cohort = next(c for c in data["cohorts"] if c["key"] == cohort_key)
@@ -266,7 +266,7 @@ class TestMetaRankEligibility:
         ]
         summary = _make_summary(benchmark="clickbench", ranking=ranking, platforms=rows)
 
-        data = _build_meta_leaderboard([(("clickbench", 0.1, "power"), summary)], _GENERATED_AT)
+        data = _build_meta_leaderboard([(("clickbench", 0.1, "power", None), summary)], _GENERATED_AT)
 
         assert data["cohorts"] == []
         assert data["platforms"] == []
@@ -292,7 +292,7 @@ class TestMetaLeaderboardEdgeCases:
         )
         rows = [_make_platform_row("duckdb", display_geomean_ms=100.0)]
         summary = _make_summary(benchmark="clickbench", ranking=ranking, platforms=rows)
-        data = _build_meta_leaderboard([(("clickbench", 0.1, "power"), summary)], _GENERATED_AT)
+        data = _build_meta_leaderboard([(("clickbench", 0.1, "power", None), summary)], _GENERATED_AT)
         assert data["cohorts"] == []
         assert data["platforms"] == []
 
@@ -316,7 +316,7 @@ class TestMetaLeaderboardEdgeCases:
         cb_summary = _make_summary(benchmark="clickbench", ranking=ranking, platforms=cb_rows)
         ny_summary = _make_summary(benchmark="nyctaxi", ranking=ranking, platforms=ny_rows)
         data = _build_meta_leaderboard(
-            [(("clickbench", 0.1, "power"), cb_summary), (("nyctaxi", 0.1, "power"), ny_summary)],
+            [(("clickbench", 0.1, "power", None), cb_summary), (("nyctaxi", 0.1, "power", None), ny_summary)],
             _GENERATED_AT,
         )
         # SQLite: participated in clickbench (rank 2) only → avg_rank = 2.0
@@ -341,7 +341,7 @@ class TestMetaLeaderboardTieHandling:
             _make_platform_row("polars", display_geomean_ms=200.0),
         ]
         summary = _make_summary(benchmark="clickbench", ranking=ranking, platforms=rows)
-        data = _build_meta_leaderboard([(("clickbench", 0.1, "power"), summary)], _GENERATED_AT)
+        data = _build_meta_leaderboard([(("clickbench", 0.1, "power", None), summary)], _GENERATED_AT)
 
         cohort_key = "clickbench-sf0.1-power"
         duckdb_rank = next(p for p in data["platforms"] if p["platform_id"] == "duckdb")["ranks"][cohort_key]["rank"]

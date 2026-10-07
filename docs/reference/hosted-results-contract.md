@@ -325,11 +325,17 @@ side-by-side in the explore compare view.
 | `canonical_benchmark` | Must be identical across all results. `star_schema` is the legacy raw alias for canonical `ssb`; raw `benchmark` remains available for audit. |
 | `scale_factor` | Must be identical across all results in the cohort (e.g., `1.0`) |
 | `canonical_phase` | Must be identical for ranking identity. It is normalized raw `test_type` (lowercased, with `standard` folded into `power`), or explicit `unknown` when provenance is absent. |
+| `stream_count` | Throughput phase only. Must be identical; throughput results run with different numbers of streams are separate cohorts. It is the number of entries in `phases.throughput_test.stream_results`, and absent for every other phase. |
 
 These fields form the ranking cohort key. Raw submitted benchmark and phase
 values are never rewritten; the derived identity is generated centrally by the
 publish pipeline and consumed by the explorer. Results with different
 canonical values cannot appear in the same ranking claim.
+
+The ranking metric is chosen per benchmark family and phase. TPC-H and TPC-DS
+power cohorts rank on `power_score` and their throughput cohorts rank on
+`throughput_at_size` (Throughput@Size); both rank higher-is-better. Every other
+cohort ranks on `display_geomean_ms`, lower-is-better.
 
 ### 3.2 Hard Blocks
 

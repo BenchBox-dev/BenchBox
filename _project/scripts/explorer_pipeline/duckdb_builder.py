@@ -32,8 +32,7 @@ from _project.scripts.explorer_pipeline.transformer import normalize_cpu_family
 
 logger = logging.getLogger(__name__)
 
-# Type alias for the summary accumulator key: (benchmark, scale_factor, phase)
-_SummaryKey = tuple[str, float, str]
+_SummaryKey = tuple[str, float, str, int | None]
 
 # Keys that ``pipeline._build_meta_leaderboard`` contractually emits on every
 # cohort platform row. ``_populate_cohort_metadata`` validates this contract
@@ -203,6 +202,8 @@ class DuckDBSnapshotBuilder:
         *_ENVIRONMENT_FACET_COLUMNS,
         *_LEGACY_COST_DEPLOYMENT_COLUMNS,
         ("benchmark_support_status", "VARCHAR"),
+        ("throughput_at_size", "DOUBLE"),
+        ("stream_count", "INTEGER"),
     ]
 
     def build(self, entries: list[ManifestEntry], output_path: Path) -> None:
@@ -416,35 +417,14 @@ class DuckDBSnapshotBuilder:
                 execution_mode       VARCHAR,
                 tuning_mode          VARCHAR,
                 tuning_hash          VARCHAR,
-                -- ADR-1 bundle-emitted tuning identities (display-only, never
-                -- a join/dedup key): canonical requested-config hash and the
-                -- physical applied-ledger hash. NULL for legacy bundles.
                 requested_config_hash VARCHAR,
                 applied_ledger_hash   VARCHAR,
-                -- ADR-1 tuning verified-state (not_applicable / noop /
-                -- applied_unverified / applied_verified / failed). NULL for
-                -- legacy bundles; distinct from the run/query validation_status
-                -- column below.
                 tuning_validation_status VARCHAR,
-                -- ADR-1 per-statement introspection receipt, stored verbatim
-                -- as a canonical JSON string (the {stem}.applied.json
-                -- companion's "receipt" sub-object). NULL when no receipt was
-                -- published. Opaque read-only payload: never parsed, joined
-                -- on, or re-derived anywhere downstream.
                 applied_receipt      VARCHAR,
-                -- Accepted plausibility overrides ({stem}.override.json
-                -- companion), stored verbatim as display-only badge data:
-                -- override_rules holds the covered rule ids as a canonical
-                -- JSON array string; the audit fields are plain text. NULL /
-                -- empty when no override was accepted. Never parsed, joined
-                -- on, or re-derived downstream.
                 override_rules       VARCHAR,
                 override_evidence    VARCHAR,
                 override_approver    VARCHAR,
                 override_expires     VARCHAR,
-                -- ADR-3 seam: explicit tuning-policy generation marker
-                -- (display-only, never a join/dedup key). NULL for legacy
-                -- bundles, treated downstream as the "pre-seam" generation.
                 tuning_policy_generation VARCHAR,
                 test_type            VARCHAR,
                 validation_status    VARCHAR,
@@ -472,18 +452,11 @@ class DuckDBSnapshotBuilder:
                 plans_published      BOOLEAN  NOT NULL,
                 has_tuning           BOOLEAN  NOT NULL,
                 bundle_download_url  VARCHAR  NOT NULL,
-                -- ADR-2 §3: platform-rendered physical tuning mechanisms
-                -- (comma-joined, sorted) and, for platforms that expose one,
-                -- the physical rendering strategy id. NULL when the bundle
-                -- never recorded a logical tuning profile.
                 physical_mechanisms   VARCHAR,
                 physical_rendering_id VARCHAR,
-                -- Registry-declared product support status for the benchmark
-                -- (stable / beta / experimental / deprecated / document_only
-                -- / repo_only). NULL when the benchmark slug is not in the
-                -- registry. Display-only: the benchmark browser groups and
-                -- badges on it; never a join/dedup key.
-                benchmark_support_status VARCHAR
+                benchmark_support_status VARCHAR,
+                throughput_at_size   DOUBLE,
+                stream_count         INTEGER
             )
         """)
         con.execute("""
@@ -553,6 +526,8 @@ class DuckDBSnapshotBuilder:
                 r.physical_mechanisms,
                 r.physical_rendering_id,
                 r.benchmark_support_status,
+                r.throughput_at_size,
+                r.stream_count,
                 e.os,
                 e.arch,
                 e.cpu_count,
@@ -603,6 +578,7 @@ class DuckDBSnapshotBuilder:
                 display_ms   DOUBLE,
                 is_valid_display_timing BOOLEAN NOT NULL,
                 timing_exclusion_reason VARCHAR,
+                stream_count INTEGER,
                 PRIMARY KEY (benchmark, scale_factor, phase, result_id, query_id)
             )
         """)
@@ -648,6 +624,8 @@ class DuckDBSnapshotBuilder:
                 percentile_p99               DOUBLE,
                 speedup_vs_best              DOUBLE,
                 speedup_vs_slowest_in_cohort DOUBLE,
+                throughput_at_size           DOUBLE,
+                stream_count                 INTEGER,
                 PRIMARY KEY (benchmark, scale_factor, phase, result_id)
             )
         """)
@@ -730,6 +708,7 @@ class DuckDBSnapshotBuilder:
                 rank             INTEGER,
                 metric_value     DOUBLE,
                 speedup_vs_best  DOUBLE,
+                stream_count     INTEGER,
                 PRIMARY KEY (cohort_key, result_id)
             )
         """)
@@ -922,6 +901,8 @@ class DuckDBSnapshotBuilder:
                     physical_mechanisms,
                     physical_rendering_id,
                     entry.benchmark_support_status,
+                    entry.throughput_at_size,
+                    entry.stream_count,
                 )
             )
         if rows:
@@ -1020,7 +1001,7 @@ class DuckDBSnapshotBuilder:
         summaries: list[tuple[_SummaryKey, BenchmarkSummary]],
     ) -> None:
         rows: list[tuple] = []
-        for (benchmark, scale_factor, phase), summary in summaries:
+        for (benchmark, scale_factor, phase, stream_count), summary in summaries:
             for platform_row in summary.platforms:
                 for query_id, display_ms in platform_row.timings.items():
                     rows.append(
@@ -1034,10 +1015,11 @@ class DuckDBSnapshotBuilder:
                             display_ms,
                             display_timing_is_valid(display_ms),
                             timing_exclusion_reason(display_ms),
+                            stream_count,
                         )
                     )
         if rows:
-            con.executemany("INSERT INTO benchmark_matrix_cells VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+            con.executemany("INSERT INTO benchmark_matrix_cells VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
 
     def _populate_benchmark_rankings(
         self,
@@ -1047,7 +1029,7 @@ class DuckDBSnapshotBuilder:
         entries_by_result: dict[str, ManifestEntry],
     ) -> None:
         rows: list[tuple] = []
-        for (benchmark, scale_factor, phase), summary in summaries:
+        for (benchmark, scale_factor, phase, stream_count), summary in summaries:
             ranked = rank_platforms(summary)
 
             for ranked_row in ranked.rows:
@@ -1109,6 +1091,8 @@ class DuckDBSnapshotBuilder:
                         ps.p99 if ps else None,
                         ranked_row.speedup_vs_best,
                         ranked_row.speedup_vs_slowest,
+                        platform_row.throughput_at_size,
+                        stream_count,
                     )
                 )
         if rows:
@@ -1161,6 +1145,7 @@ class DuckDBSnapshotBuilder:
             )
             primary_metric = cohort["primary_metric"]
             primary_order = cohort["primary_order"]
+            stream_count = cohort.get("stream_count")
             for p in cohort.get("platforms", []):
                 timing_contract, row_ranking_reason, ranked_count, cohort_reason = ranking_context_by_result.get(
                     p["result_id"],
@@ -1219,6 +1204,7 @@ class DuckDBSnapshotBuilder:
                         p.get("rank"),
                         p.get("metric_value"),
                         p.get("speedup_vs_best"),
+                        stream_count,
                     )
                 )
 
@@ -1281,6 +1267,8 @@ class DuckDBSnapshotBuilder:
             *_environment_facet_column_values(entry),
             *_legacy_cost_deployment_column_values(entry),
             entry.benchmark_support_status,
+            entry.throughput_at_size,
+            entry.stream_count,
         )
 
 

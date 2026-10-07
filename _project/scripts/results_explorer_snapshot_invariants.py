@@ -37,6 +37,7 @@ REQUIRED_COLUMNS: dict[str, set[str]] = {
         "comparison_exclusion_reason",
         "ranking_exclusion_reason",
         "power_score",
+        "throughput_at_size",
         "display_geomean_ms",
     },
     "cohort_metadata": {
@@ -175,10 +176,12 @@ def check_snapshot(db_path: Path) -> list[str]:
                     ranking_exclusion_reason IS NOT NULL
                     OR CASE
                         WHEN primary_metric = 'power_score' THEN power_score
+                        WHEN primary_metric = 'throughput_at_size' THEN throughput_at_size
                         ELSE display_geomean_ms
                       END IS NULL
                     OR CASE
                         WHEN primary_metric = 'power_score' THEN power_score
+                        WHEN primary_metric = 'throughput_at_size' THEN throughput_at_size
                         ELSE display_geomean_ms
                       END <= 0
                   )

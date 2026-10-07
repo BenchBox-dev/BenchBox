@@ -20,6 +20,7 @@ from typing import Any, cast
 
 from _project.scripts.explorer_pipeline.models import (
     KNOWN_DEFECT_RANKING_EXCLUSION,
+    THROUGHPUT_PHASE,
     BasisAvailability,
     BundleContainerBlock,
     BundleDocument,
@@ -34,6 +35,7 @@ from _project.scripts.explorer_pipeline.models import (
     QueryTiming,
     _platform_id,
     canonical_benchmark_slug,
+    canonical_phase,
     ranking_exclusion_reason,
     timing_eligibility,
 )
@@ -411,16 +413,30 @@ def _driver_version(bundle: BundleDocument) -> str | None:
     return None
 
 
+def _tpc_metric(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _power_score(bundle: BundleDocument) -> float | None:
     """Extract TPC power@size metric from a schema-v2 bundle."""
-    tpc = bundle.summary.tpc_metrics
-    val = tpc.power_at_size
-    if val is not None:
-        try:
-            return float(val)
-        except (TypeError, ValueError):
-            pass
-    return None
+    return _tpc_metric(bundle.summary.tpc_metrics.power_at_size)
+
+
+def _throughput_at_size(bundle: BundleDocument) -> float | None:
+    return _tpc_metric(bundle.summary.tpc_metrics.throughput_at_size)
+
+
+def _stream_count(bundle: BundleDocument, test_type: str | None) -> int | None:
+    if canonical_phase(test_type) != THROUGHPUT_PHASE:
+        return None
+    block = bundle.phases.get("throughput_test")
+    streams = block.stream_results if block is not None else None
+    return len(streams) if isinstance(streams, list) and streams else None
 
 
 def _geomean_ms(bundle: BundleDocument) -> float | None:
@@ -1567,6 +1583,7 @@ class BundleTransformer:
             normalized_cost=normalized_cost if _raw_normalized_cost_block(bundle) is not None else None,
         )
         override = _override_display(bundle_path)
+        test_type = _test_type(bundle)
         entry = ManifestEntry(
             result_id=rid,
             benchmark=benchmark,
@@ -1576,6 +1593,8 @@ class BundleTransformer:
             driver_version=_driver_version(bundle),
             run_date=run_date,
             power_score=_power_score(bundle),
+            throughput_at_size=_throughput_at_size(bundle),
+            stream_count=_stream_count(bundle, test_type),
             total_duration_s=total_duration_s,
             geomean_ms=_geomean_ms(bundle),
             display_geomean_ms=_display_geomean_ms(display_timings),
@@ -1603,7 +1622,7 @@ class BundleTransformer:
             override_approver=override["override_approver"],
             override_expires=override["override_expires"],
             tuning_policy_generation=_tuning_policy_generation(bundle),
-            test_type=_test_type(bundle),
+            test_type=test_type,
             validation_status=_validation_status(bundle, bundle_data),
             failed_query_count=failed_query_count,
             benchmark_support_status=_benchmark_support_status(canonical_benchmark_slug(str(benchmark))),
@@ -1659,6 +1678,7 @@ class BundleTransformer:
         logical_query_count = _logical_query_count(bundle, display_timings)
         timing_contract = timing_eligibility(display_timings, logical_query_count)
         normalized_cost = _normalized_cost(bundle)
+        test_type = _test_type(bundle)
         detail = DetailResult(
             result_id=result_id,
             benchmark=benchmark,
@@ -1671,6 +1691,8 @@ class BundleTransformer:
             geomean_ms=_geomean_ms(bundle),
             display_geomean_ms=_display_geomean_ms(display_timings),
             power_score=_power_score(bundle),
+            throughput_at_size=_throughput_at_size(bundle),
+            stream_count=_stream_count(bundle, test_type),
             has_display_timing=timing_contract.has_display_timing,
             logical_query_count=logical_query_count,
             valid_query_count=timing_contract.valid_query_count,
@@ -1699,7 +1721,7 @@ class BundleTransformer:
             override_approver=override["override_approver"],
             override_expires=override["override_expires"],
             tuning_policy_generation=_tuning_policy_generation(bundle),
-            test_type=_test_type(bundle),
+            test_type=test_type,
             validation_status=_validation_status(bundle, bundle_data),
             failed_query_count=bundle_failed_query_count(bundle_data),
             cost_usd=_cost_usd_alias(normalized_cost),
@@ -1719,6 +1741,9 @@ class BundleTransformer:
             driver_version=_driver_version(bundle),
             run_date=run_date,
             power_score=detail.power_score,
+            throughput_at_size=detail.throughput_at_size,
+            stream_count=detail.stream_count,
+            test_type=detail.test_type,
             total_duration_s=total_duration_s,
             geomean_ms=detail.geomean_ms,
             display_geomean_ms=detail.display_geomean_ms,
