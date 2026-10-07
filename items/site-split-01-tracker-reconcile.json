@@ -4,7 +4,7 @@
     "Owner decisions D7, D11, D12, D18 recorded on the named items with date and wording",
     "No item closed without evidence links in its context"
   ],
-  "context": "muse AR-16 (accepted): every closure needs evidence links. The cutover handoff is in commit 9fc9fee4e on origin/claude/bold-newton-uudn48 (`_project/handoffs/astro-cutover-handoff-20261005.md`); it lists runs 37332041883 and 37406123669 as evidence candidates. Re-verify them live, per EVIDENCE-FRESHNESS-001.",
+  "context": "Execution record 2026-10-07: all 11 items read; each annotated in its own context with merged-PR evidence and owning site-split-25/30/40 verification (none finished without run-id evidence, per the item rule; the ADR visual-change run ids were never recorded). Step maps added to 54/61/62 contexts; D11 recorded on 54, D12+D18 on 62 (both dated 2026-10-06 per items 51/54; D7 recorded on dlv2-60 without a date as the step gives none). 60/61 stay open with site-repo notes. dlv2-60 stale claim had no live claim (expired); re-adopted by take, D7 recorded, finished with merge + production evidence.",
   "description": "Tracker only; no PR.\n\n1. For each open item in astro-site-21, 22, 33, 34, 35, 36, 40, 50, 51, 52 and 53:\n   - read its acceptance;\n   - finish it only when live evidence (run ids, receipt digests, PR links) shows the acceptance is met;\n   - record that evidence in the item's context.\n   Otherwise add a note naming the `site-split-*` item that now covers the remaining work.\n2. Fold astro-site-54, dlv2-61 and dlv2-62 into this batch. Add a context line mapping each of their steps to the owning `site-split-*` item. Drop each one, with that reason, only after its mapped scope has merged; the batch's final step does this.\n3. Record the owner decisions, verbatim with their dates:\n   - D11 on astro-site-54: Sphinx rollback retention waived at cutover, 2026-10-06;\n   - D7 on dlv2-60: trunk-only docs supersede release-pinned docs;\n   - D12 and D18 on dlv2-62.\n   dlv2-60 holds a stale expired claim: take it over with a reason, or release it, before finishing or dropping it.\n4. astro-site-60 and 61 stay open, with a note that their paths now live in BenchBox-dev/benchbox-site.",
   "sessions": [
     {
@@ -40,6 +40,14 @@
       "generation": "4d8f96c8bb474f188ad05762a56049df",
       "op": "take",
       "op_id": "b51a49d254cf44bdbef53ab6aa790ef4",
+      "session_id": "17181812c7324e43a406f44f60eedacc"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc",
+      "at": "2026-10-07T12:05:17Z",
+      "client": "tbh",
+      "op": "update",
+      "op_id": "516e3ef911a34f309cbcbfb95a540444",
       "session_id": "17181812c7324e43a406f44f60eedacc"
     }
   ]
