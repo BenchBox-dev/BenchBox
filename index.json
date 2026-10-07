@@ -19049,12 +19049,17 @@
       "title": "Keep internal files out of the site under the Sphinx fallback renderer"
     },
     "site-split-00-adr-soundness-scope": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-08T03:30:42Z",
+        "generation": "9af18ab77a7e43daa6de1e46ab01a960",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc"
+      },
       "needs": [
         "site-split-agy-plan-review"
       ],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Record the site-repo split ADR and narrow soundness paths to exclude retiring publication workflows"
     },
     "site-split-01-tracker-reconcile": {
