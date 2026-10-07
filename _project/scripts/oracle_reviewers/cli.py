@@ -126,7 +126,7 @@ def _identities(repo: str, head_sha: str, files: list[ChangedFile]) -> dict[str,
     except (github.GitHubError, KeyError, TypeError, ValueError):
         modes = {}
     return {
-        item.path: f"{'removed' if item.removed else modes.get(item.path, '')}:{item.sha}"
+        item.path: f"{'removed' if item.removed else modes.get(item.path, '')}:{item.sha}:{item.previous_path or ''}"
         if item.sha and (item.removed or item.path in modes)
         else ""
         for item in files
@@ -261,6 +261,8 @@ def command_plan(args: argparse.Namespace) -> int:
         item for item in files if any(path in in_scope or not path.endswith(PROSE_SUFFIXES) for path in item.paths)
     ]
     current = _identities(repo, plan["head_sha"], scoped)
+    if len(files) < int(pull.get("changed_files") or 0):
+        current = dict.fromkeys(current, "")
     merge_base = _merge_base(repo, plan["base_sha"], plan["head_sha"])
     excluded = selection.excluded_families(labels, policy)
     policy_text = Path(args.policy).read_text(encoding="utf-8")

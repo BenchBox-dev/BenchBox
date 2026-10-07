@@ -273,8 +273,12 @@ def _basis(tier: str = "medium-high", merge_base: str = MERGE_BASE, excluded: tu
     return cli.review_basis(merge_base, policy.tiers[tier], policy, excluded, text)
 
 
+def _identity(path: str, sha: str) -> str:
+    return f"{MODE}:{sha}:{'benchbox/utils/rules.py' if path == 'notes/rules.md' else ''}"
+
+
 def _reviewed_state(files: dict[str, str], basis: str = _basis(), outcome: str = "failure") -> State:
-    reviewed = Reviewed(OLD_HEAD, basis, outcome, {path: f"{MODE}:{sha}" for path, sha in files.items()})
+    reviewed = Reviewed(OLD_HEAD, basis, outcome, {path: _identity(path, sha) for path, sha in files.items()})
     return State(7, OLD_HEAD, outcome, datetime.now(UTC) - timedelta(hours=1), reviewed=reviewed)
 
 
@@ -297,7 +301,7 @@ def test_push_touching_one_file_reviews_only_that_file(monkeypatch: pytest.Monke
     _, values, plan = _plan(monkeypatch, tmp_path, fake)
     assert values["decision"] == "review"
     assert plan["scope"] == "changed" and plan["reviewed_head"] == OLD_HEAD
-    assert plan["reviewed_files"] == {CHECKER: f"{MODE}:{'1' * 40}", CAPTURE: f"{MODE}:{'2' * 40}"}
+    assert plan["reviewed_files"] == {CHECKER: _identity(CHECKER, "1" * 40), CAPTURE: _identity(CAPTURE, "2" * 40)}
     brief = (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
     assert "capture change" in brief and "checker change" not in brief
     assert f"since head {OLD_HEAD} was reviewed" in brief
@@ -464,4 +468,18 @@ def test_a_mode_only_change_is_reviewed_not_carried(monkeypatch: pytest.MonkeyPa
     fake = FakeGitHub(_pull(), TWO_FILES, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}), diff=TWO_FILE_DIFF)
     fake.modes = {CHECKER: "100755"}
     _, values, _ = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "review"
+
+
+def test_a_truncated_file_list_gives_a_full_review(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40})
+    fake = FakeGitHub(_pull(changed_files=3001), TWO_FILES, state, diff=TWO_FILE_DIFF)
+    _, values, plan = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "review" and plan["scope"] == "full"
+
+
+def test_a_changed_rename_source_is_reviewed_not_carried(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    moved = {"filename": CAPTURE, "previous_filename": "benchbox/core/expected_results/other.py", "sha": "2" * 40}
+    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40})
+    _, values, _ = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), [TWO_FILES[0], moved], state, diff=TWO_FILE_DIFF))
     assert values["decision"] == "review"
