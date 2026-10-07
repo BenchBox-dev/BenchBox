@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "agy review output saved outside the repo, with its verdict and severity table",
+    "Every agy finding has an accepted or rebutted disposition with evidence in the plan's Review record",
+    "Affected site-split items updated; any finding that reopens an owner decision was put to the owner and answered",
+    "The isolated review worktree was removed and showed no modifications"
+  ],
+  "context": "Plan revision reviewed by muse: the first revision, written in session 2026-10-06; muse findings AR-01..AR-24 have already been dispositioned in the plan. The agy reviewer rules live in the shared-agent-execution skill (references/external-harnesses.md, under \"agy\" and \"Reviewer panels\").",
+  "description": "The owner asked for two external reviewers (agy and muse) on the site-repo split plan. muse reviewed it on 2026-10-06; agy was out of quota (HTTP 429). Owner decision D20 (2026-10-06): proceed with muse alone and run agy as the first step of the batch.\n\nSteps:\n1. Build a self-contained brief: agy headless runs cannot use tools, so inline the plan text and the verified repository facts. Dispatch it as a Soft Read-Only reviewer in a detached worktree at the current develop head, using `agy --model gemini-3.8-flash-high --mode plan --print=\"$BRIEF\"`. Do not pass `--effort`. macOS has no `timeout`; bound the run with the shell's background timeout instead.\n2. Accept or rebut each finding with evidence. Owner decisions D1-D20 are not reopened as preferences; a finding that shows a concrete defect in one goes to the owner.\n3. Update the plan file and every affected `site-split-*` item, and append the agy dispositions to the plan's \"Review record\".\n4. If agy is still unavailable, record that, ask the owner whether to substitute codex (gpt-6-astra, hard read-only) or skip, and do not start item 00 until answered.",
+  "links": [
+    "_project/handoffs/site-repo-split-handoff-20261006.md",
+    "_project/handoffs/site-repo-split-batch-handoff-20261006.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:ce6e60d02a558a65c61d0c88",
+      "at": "2026-10-07T00:46:39Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "aa183ec4ddc9462191276d06e76cfd4f",
+      "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    }
+  ]
+}
