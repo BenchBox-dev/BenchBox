@@ -384,6 +384,42 @@ def _adapter_reused_database(adapter: Any) -> bool:
     return bool(getattr(adapter, "database_was_reused", False))
 
 
+def _collect_reused_table_stats(adapter: Any, benchmark: Any, connection: Any) -> dict[str, int]:
+    """Collect row counts for the tables of a reused database.
+
+    Mirrors the full-run reuse path (``_setup_reused_database_phases``): read
+    live row counts for every schema table instead of loading data. Best
+    effort per table -- adapters without a row-count API contribute nothing
+    rather than failing the run.
+    """
+    table_stats: dict[str, int] = {}
+    get_schema = getattr(benchmark, "get_schema", None)
+    if not callable(get_schema):
+        return table_stats
+    try:
+        schema = get_schema()
+    except Exception as exc:
+        logger.debug("collecting reused table stats skipped (get_schema failed): %s", exc)
+        return table_stats
+    if isinstance(schema, dict):
+        table_names = list(schema)
+    elif isinstance(schema, list):
+        table_names = [str(entry.get("name", entry)).lower() for entry in schema if isinstance(entry, dict)]
+        table_names += [str(entry).lower() for entry in schema if isinstance(entry, str)]
+    else:
+        return table_stats
+    get_row_count = getattr(adapter, "get_table_row_count", None)
+    if not callable(get_row_count):
+        return table_stats
+    for table_name in table_names:
+        try:
+            table_stats[table_name] = int(get_row_count(connection, table_name))
+        except Exception as exc:
+            logger.debug("row count for reused table %s unavailable: %s", table_name, exc)
+            table_stats[table_name] = 0
+    return table_stats
+
+
 def _attach_datagen_version(
     result: BenchmarkResults, benchmark: Any = None, *, dataset_identity_established: bool = True
 ) -> BenchmarkResults:
@@ -584,6 +620,28 @@ def _execute_load_only_mode(
                 "duration_ms": 0,
                 "reason": "External table mode bypasses native schema+load materialization",
             }
+            data_loading_phase_status = "COMPLETED"
+            data_loading_phase_reason: str | None = None
+        elif _adapter_reused_database(adapter):
+            # handle_existing_database() ran inside create_connection() above and
+            # deemed the existing database compatible with this run, so reuse it
+            # exactly like a full run does instead of re-issuing CREATE TABLE
+            # against tables that already exist (ClickHouse fails reruns with
+            # Code: 57 "Table ... already exists"). Nothing is dropped or
+            # overwritten here: an incompatible database was already recreated
+            # by handle_existing_database() before this point, so reaching this
+            # branch proves the contents are safe to keep.
+            logger.info("Database being reused - skipping schema creation and data loading (load-only mode)")
+            table_stats = _collect_reused_table_stats(adapter, benchmark, connection)
+            load_time = 0.0
+            per_table_timings = None
+            schema_phase = {
+                "status": "SKIPPED",
+                "duration_ms": 0,
+                "reason": "Reusing compatible existing database - schema creation skipped",
+            }
+            data_loading_phase_status = "SKIPPED"
+            data_loading_phase_reason = "Reusing compatible existing database - data loading skipped"
         else:
             # Create schema before loading data in native table mode.
             native_loader = as_native_table_loader(adapter)
@@ -594,6 +652,8 @@ def _execute_load_only_mode(
                 "status": "COMPLETED",
                 "duration_ms": int(schema_time * 1000),
             }
+            data_loading_phase_status = "COMPLETED"
+            data_loading_phase_reason = None
 
         if validation_opts.enable_postload_validation:
             if hasattr(benchmark, "validate_loaded_data"):
@@ -608,13 +668,16 @@ def _execute_load_only_mode(
                     benchmark_config.scale_factor,
                 )
 
+        data_loading_phase: dict[str, Any] = {
+            "status": data_loading_phase_status,
+            "duration_ms": int(load_time * 1000),
+        }
+        if data_loading_phase_reason is not None:
+            data_loading_phase["reason"] = data_loading_phase_reason
         phases = {
             "data_generation": {"status": "COMPLETED"},
             "schema_creation": schema_phase,
-            "data_loading": {
-                "status": "COMPLETED",
-                "duration_ms": int(load_time * 1000),
-            },
+            "data_loading": data_loading_phase,
         }
 
         statistics_time_seconds = 0.0
