@@ -12,15 +12,18 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 import hashlib
 import json
 import logging
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Iterator, Optional
 
 from benchbox.core.primitives_benchmark_utils import failed_platform_error
 
 from .interface import BenchmarkTunings, TableTuning, TuningColumn, TuningType, UnifiedTuningConfiguration
 
 logger = logging.getLogger(__name__)
+
+NO_TUNING_METADATA_ERROR = "No tuning metadata found in database"
 
 # The subset of TuningType values that _rebuild_tunings_from_records knows how
 # to place into a TableTuning (column-based, per-table tunings). Any other
@@ -168,6 +171,12 @@ class TuningMetadataManager:
     _TUNING_TYPE_CONSTRAINTS_HASH = "constraints_hash"
     _TUNING_TYPE_PLATFORM_OPT_HASH = "platform_optimizations_hash"
     _TUNING_TYPE_TABLE_ATTRIBUTES_HASH = "table_attributes_hash"
+    # Fail-closed run-kind marker: written by a tuned run *before* any physical
+    # tuning is applied, so a tuned database is recognizable even when the
+    # full tuning metadata was never saved (failed save, crash between apply
+    # and save). A notuning run refuses any database carrying this marker.
+    _TUNING_TYPE_RUN_KIND = "run_kind"
+    _TUNED_RUN_VALUE = "tuned"
 
     # Bumped whenever the *shape* of what gets hashed into the section-marker
     # rows changes (e.g. a new field folded into the constraints payload).
@@ -185,6 +194,7 @@ class TuningMetadataManager:
         platform_adapter,
         database_name: Optional[str] = None,
         connection_config: Optional[dict[str, Any]] = None,
+        connection: Any = None,
     ):
         """Initialize the metadata manager.
 
@@ -192,15 +202,41 @@ class TuningMetadataManager:
             platform_adapter: Database platform adapter instance
             database_name: Optional database name for isolation
             connection_config: Exact connection settings used by validation
+            connection: Optional live connection to reuse. When supplied, every
+                metadata statement runs on it and the manager never opens (or
+                closes) its own connection -- this keeps mid-run metadata I/O
+                from re-entering database create/drop decisions. When omitted,
+                one guarded temporary connection is opened per operation.
         """
         self.platform_adapter = platform_adapter
         self.database_name = database_name
         self.connection_config = dict(connection_config or {})
+        self._shared_connection = connection
         self.logger = logging.getLogger(f"{self.__class__.__name__}")
         self._metadata_table_name = "benchbox_tuning_metadata"
         self._table_exists = None  # Cache for table existence check
         self.last_load_error: str | None = None
         self.marker_save_failed = False
+
+    @contextmanager
+    def _managed_connection(self) -> Iterator[Any]:
+        """Yield the connection metadata statements must use.
+
+        The caller-provided run connection wins; it is yielded as-is and never
+        closed here. Otherwise a single temporary connection is opened under
+        the adapter's non-destructive guard (when the adapter offers one) so
+        even the fallback path cannot re-enter create/drop handling mid-run.
+        """
+        if self._shared_connection is not None:
+            yield self._shared_connection
+            return
+        guard = getattr(self.platform_adapter, "non_destructive_connection_context", None)
+        with ExitStack() as stack:
+            if guard is not None:
+                stack.enter_context(guard())
+            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
+            stack.callback(self.platform_adapter.close_connection, temp_conn)
+            yield temp_conn
 
     def _connection_kwargs(self) -> dict[str, Any]:
         """Use the validated database name instead of silently falling back to another database."""
@@ -227,6 +263,8 @@ class TuningMetadataManager:
                 code = getattr(current, "sqlstate", None) or getattr(current, "pgcode", None)
                 errno = getattr(current, "errno", None) or getattr(current, "code", None)
                 if code == "42P01" or errno in {60, 1146}:
+                    return True
+                if "sqlstate: 42p01" in message:
                     return True
                 if any(
                     phrase in message
@@ -362,13 +400,78 @@ class TuningMetadataManager:
                 return False
 
             platform = self._platform_key()
-            records = self._build_section_marker_records(unified_config, platform, datetime.now())
+            created_at = datetime.now()
+            records = self._build_section_marker_records(unified_config, platform, created_at)
+            # The fail-closed tuned-run marker rides in the same batch, so
+            # every successful save carries refusal evidence for notuning
+            # reuse -- including constraints-only configs that persist no
+            # column-tuning rows.
+            records.append(self._build_run_kind_record(created_at))
             self._batch_insert_records(records)
             self.marker_save_failed = False
             return True
         except Exception as e:
             self.marker_save_failed = True
             self.logger.warning(f"Failed to save tuning section markers (non-fatal): {e}")
+            return False
+
+    def write_tuned_run_marker(self) -> bool:
+        """Write the fail-closed tuned-run marker row.
+
+        Called by a tuned run *before* any physical tuning is applied: the
+        marker reuses the existing metadata-table row shape under the section
+        sentinel table, so no DDL change or migration is needed and older
+        readers still load without error (they skip the sentinel table).
+        Appends (never deletes): a repeated write leaves a duplicate
+        sentinel row, which is harmless -- the probe is existential and
+        sentinel rows are excluded from summaries and rebuilds.
+
+        Returns:
+            True when the marker row is persisted, False otherwise (never
+            raises -- callers fail the tuned run themselves on False).
+        """
+        try:
+            if not self.create_metadata_table():
+                return False
+            self._batch_insert_records([self._build_run_kind_record(datetime.now())])
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to write tuned-run marker: {e}")
+            return False
+
+    def _build_run_kind_record(self, created_at: datetime) -> "TuningMetadata":
+        """Build the fail-closed tuned-run marker row (existing row shape)."""
+        return TuningMetadata(
+            table_name=self._SECTION_MARKER_TABLE,
+            tuning_type=self._TUNING_TYPE_RUN_KIND,
+            column_name="run_kind",
+            column_order=0,
+            configuration_hash=self._TUNED_RUN_VALUE,
+            created_at=created_at,
+            platform=self._platform_key(),
+        )
+
+    def has_tuned_run_marker(self) -> bool:
+        """Return True when the database carries a tuned-run marker row.
+
+        Never raises: a missing metadata table means no marker (False), and
+        any other read failure also reports False -- genuine unreadability is
+        already surfaced by the load path (`last_load_error`), so this stays
+        a pure existence probe for the notuning reuse refusal.
+        """
+        try:
+            if not self._table_exists_check():
+                return False
+            query_sql = (
+                "SELECT 1 FROM "
+                f"{self._metadata_table_name} "
+                f"WHERE table_name = '{self._SECTION_MARKER_TABLE}' "
+                f"AND tuning_type = '{self._TUNING_TYPE_RUN_KIND}' "
+                "LIMIT 1"
+            )
+            with self._managed_connection() as conn:
+                return self._fetch_one(conn, query_sql) is not None
+        except Exception:
             return False
 
     def _load_section_markers(self) -> dict[str, str]:
@@ -387,11 +490,8 @@ class TuningMetadataManager:
         FROM {self._metadata_table_name}
         WHERE table_name = '{self._SECTION_MARKER_TABLE}'
         """
-        temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-        try:
-            rows = self._fetch_all(temp_conn, query_sql)
-        finally:
-            self.platform_adapter.close_connection(temp_conn)
+        with self._managed_connection() as conn:
+            rows = self._fetch_all(conn, query_sql)
 
         return dict(rows)
 
@@ -478,8 +578,45 @@ class TuningMetadataManager:
                 )
                 result.add_error("Table tuning column attributes drifted from persisted database metadata")
 
+    # Platforms whose engines accept plain `CREATE INDEX IF NOT EXISTS`.
+    # Every other platform gets table-only DDL: the index is purely a lookup
+    # optimization for a tiny internal table, so omitting it is always
+    # correct, while emitting it can fail the whole save (observed on
+    # DataFusion: "Unsupported logical plan: CreateIndex"). The Postgres
+    # family entries rely on IF NOT EXISTS support present since PG 9.5.
+    _INDEX_PLAIN_FORM_PLATFORMS = frozenset(
+        {
+            "duckdb",
+            "motherduck",
+            "sqlite",
+            "postgresql",
+            "timescaledb",
+            "pg_duckdb",
+            "paradedb",
+            "citus",
+            "cedardb",
+        }
+    )
+    # T-SQL engines have no IF NOT EXISTS index form; guard via sys.indexes.
+    _INDEX_TSQL_PLATFORMS = frozenset({"azure_synapse", "fabric_warehouse"})
+
+    def _metadata_unsupported_reason(self) -> Optional[str]:
+        """Return a clear message when this platform cannot host the store."""
+        if self._platform_key() == "athena":
+            return (
+                "Tuning metadata is not supported on Athena: the metadata table "
+                "needs an Iceberg table with an explicit warehouse LOCATION, which "
+                "BenchBox does not provision. Runs continue without persisted tuning "
+                "metadata (reuse and drift detection stay disabled)."
+            )
+        return None
+
     def create_metadata_table(self) -> bool:
         """Create the tunings metadata table if it doesn't exist.
+
+        Table creation and index creation are independent steps: an index
+        failure is loud but never marks the table creation failed, so reuse
+        and drift detection keep working wherever the table itself exists.
 
         Returns:
             True if table was created or already exists, False on error
@@ -487,30 +624,38 @@ class TuningMetadataManager:
         if self._table_exists:
             return True
 
+        unsupported = self._metadata_unsupported_reason()
+        if unsupported is not None:
+            self.logger.error(unsupported)
+            return False
+
         try:
             # Platform-specific table creation SQL
             create_sql = self._get_create_table_sql()
 
             self.logger.info(f"Creating tuning metadata table: {self._metadata_table_name}")
 
-            # Create temporary connection for schema operations
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                self._execute_sql(temp_conn, create_sql)
-
-                # Create index for performance
-                index_sql = self._get_create_index_sql()
-                if index_sql:
-                    self._execute_sql(temp_conn, index_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
-
-            self._table_exists = True
-            return True
-
+            # Run schema operations on the shared run connection when one was
+            # supplied; otherwise a single guarded temporary connection.
+            with self._managed_connection() as conn:
+                self._execute_sql(conn, create_sql)
         except Exception as e:
             self.logger.error(f"Failed to create metadata table: {e}")
             return False
+
+        self._table_exists = True
+
+        # Create index for performance where the dialect supports it. A
+        # failure here is loud but non-fatal: the table exists and the store
+        # works without the lookup optimization.
+        index_sql = self._get_create_index_sql()
+        if index_sql:
+            try:
+                with self._managed_connection() as conn:
+                    self._execute_sql(conn, index_sql)
+            except Exception as e:
+                self.logger.warning(f"Failed to create tuning metadata index (non-fatal): {e}")
+        return True
 
     def _get_create_table_sql(self) -> str:
         """Get platform-specific CREATE TABLE SQL."""
@@ -530,15 +675,27 @@ class TuningMetadataManager:
 
         # Platform-specific modifications
         if platform == "bigquery":
-            # BigQuery doesn't support IF NOT EXISTS, but we'll handle that in the adapter
-            return base_sql.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE")
+            # BigQuery types are STRING/INT64/TIMESTAMP. IF NOT EXISTS handling
+            # stays in the adapter, so keep the plain CREATE TABLE form.
+            bigquery_sql = base_sql.replace("CREATE TABLE IF NOT EXISTS", "CREATE TABLE")
+            for narrow, broad in (
+                ("VARCHAR(255)", "STRING"),
+                ("VARCHAR(50)", "STRING"),
+                ("VARCHAR(64)", "STRING"),
+                ("INTEGER", "INT64"),
+                ("TIMESTAMP", "TIMESTAMP"),
+            ):
+                bigquery_sql = bigquery_sql.replace(narrow, broad)
+            return bigquery_sql
         elif platform == "snowflake":
             # Snowflake uses TIMESTAMP_NTZ for deterministic timestamps
             return base_sql.replace("TIMESTAMP", "TIMESTAMP_NTZ")
         elif platform == "redshift":
-            # Redshift prefers explicit column encoding
-            return base_sql + " ENCODE AUTO"
-        elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
+            # No suffix: a table-level ENCODE is not valid Redshift syntax,
+            # and Redshift automatically assigns column encoding when none is
+            # specified. The base DDL parses as-is.
+            return base_sql
+        elif platform in {"clickhouse", "clickhouse-local", "clickhouse-server", "clickhouse-cloud"}:
             # ClickHouse uses specific engine and ordering. base_sql always ends
             # with the CREATE TABLE's closing ")", so appending here is enough -
             # str.replace(")", ...) would also rewrite every VARCHAR(N) column
@@ -549,21 +706,37 @@ class TuningMetadataManager:
             return base_sql
 
     def _get_create_index_sql(self) -> Optional[str]:
-        """Get platform-specific index creation SQL."""
+        """Get platform-specific index creation SQL, or None for table-only DDL."""
         platform = self._platform_key()
+        index_name = f"idx_{self._metadata_table_name}_lookup"
 
-        if platform in {"clickhouse", "clickhouse-local", "clickhouse-server"}:
+        if platform in {"clickhouse", "clickhouse-local", "clickhouse-server", "clickhouse-cloud"}:
             # ClickHouse uses ORDER BY in table definition, no separate index needed
             return None
         elif platform == "bigquery":
             # BigQuery doesn't support explicit indexes
             return None
-        else:
+        elif platform in self._INDEX_PLAIN_FORM_PLATFORMS:
             # Create index for faster lookups
             return f"""
-            CREATE INDEX IF NOT EXISTS idx_{self._metadata_table_name}_lookup
+            CREATE INDEX IF NOT EXISTS {index_name}
             ON {self._metadata_table_name} (table_name, configuration_hash)
             """
+        elif platform in self._INDEX_TSQL_PLATFORMS:
+            # T-SQL has no IF NOT EXISTS index form; guard via sys.indexes.
+            return f"""
+            IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = '{index_name}'
+            AND object_id = OBJECT_ID('{self._metadata_table_name}'))
+            CREATE INDEX {index_name}
+            ON {self._metadata_table_name} (table_name, configuration_hash)
+            """
+        else:
+            # Table-only DDL: secondary indexes are unsupported or unverified
+            # on this engine (Snowflake standard tables, Delta, Redshift,
+            # Trino/Presto/Athena, Spark SQL, DataFusion, ...). Omitting the
+            # lookup optimization is always correct; emitting it can fail the
+            # whole save.
+            return None
 
     def save_tunings(self, benchmark_tunings: BenchmarkTunings) -> bool:
         """Save tuning configuration to metadata table.
@@ -652,13 +825,23 @@ class TuningMetadataManager:
         A section-marker save failure is logged and swallowed -- it must
         never turn an otherwise-successful save into a failure (metadata
         persistence is diagnostic, not required for the run to proceed).
+
+        The fail-closed tuned-run marker rides along in the section-marker
+        rows, so every successful save carries it. The column save starts with
+        a full-table clear that removes the pre-apply marker, so whenever the
+        section-marker batch fails -- or the column save itself fails -- rewrite
+        the marker best-effort (never affecting the non-fatal return) to keep
+        a physically tuned database refusing notuning reuse.
         """
         try:
             if not isinstance(unified_config, UnifiedTuningConfiguration):
                 raise TypeError("Expected UnifiedTuningConfiguration")
             saved = self.save_tunings(self._as_benchmark_tunings(unified_config))
             if saved:
-                self._save_section_markers(unified_config)
+                if not self._save_section_markers(unified_config):
+                    self.write_tuned_run_marker()
+            else:
+                self.write_tuned_run_marker()
             return saved
         except Exception as e:
             self.logger.error(f"Failed to save unified tunings: {e}")
@@ -759,9 +942,8 @@ class TuningMetadataManager:
             )
 
         # Execute batch insert - handle platforms that don't support batch operations
-        temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-        try:
-            if not hasattr(temp_conn, "cursor"):
+        with self._managed_connection() as conn:
+            if not hasattr(conn, "cursor"):
                 # Job-style clients (BigQuery) expose query() instead of a
                 # DBAPI cursor and accept no ? placeholders: run one
                 # qualified INSERT per record through the adapter so the
@@ -774,17 +956,15 @@ class TuningMetadataManager:
          configuration_hash, created_at, platform)
         VALUES ({values})
         """
-                    self._execute_sql(temp_conn, insert_sql)
+                    self._execute_sql(conn, insert_sql)
                 return
-            cursor = temp_conn.cursor()
+            cursor = conn.cursor()
             for params in param_lists:
                 res = cursor.execute(insert_sql, params)
                 target = res if res is not None else cursor
                 if (err := failed_platform_error(target)) is not None:
                     raise RuntimeError(f"Failed to insert tuning metadata: {err}")
-            temp_conn.commit()
-        finally:
-            self.platform_adapter.close_connection(temp_conn)
+            conn.commit()
 
     def load_tunings(self, benchmark_name: Optional[str] = None) -> Optional[BenchmarkTunings]:
         """Load tuning configuration from metadata table.
@@ -808,11 +988,8 @@ class TuningMetadataManager:
             ORDER BY table_name, tuning_type, column_order
             """
 
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                results = self._fetch_all(temp_conn, query_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
+            with self._managed_connection() as conn:
+                results = self._fetch_all(conn, query_sql)
             if not results:
                 return None
 
@@ -832,13 +1009,10 @@ class TuningMetadataManager:
         try:
             # Try to query the table
             query_sql = f"SELECT COUNT(*) FROM {self._metadata_table_name} LIMIT 1"
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                self._fetch_one(temp_conn, query_sql)
+            with self._managed_connection() as conn:
+                self._fetch_one(conn, query_sql)
                 self._table_exists = True
                 return True
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
         except Exception as exc:
             if not self._is_missing_metadata_table_error(exc):
                 self.last_load_error = str(exc)
@@ -935,7 +1109,7 @@ class TuningMetadataManager:
                 if self.last_load_error:
                     result.add_error(f"Failed to load tuning metadata: {self.last_load_error}")
                 else:
-                    result.add_error("No tuning metadata found in database")
+                    result.add_error(NO_TUNING_METADATA_ERROR)
                 return result
 
             # Compare configurations
@@ -1037,11 +1211,8 @@ class TuningMetadataManager:
             # BigQuery rejects WHERE-less DELETE, so spell the full-table
             # clear in a form every engine accepts.
             delete_sql = f"DELETE FROM {self._metadata_table_name} WHERE TRUE"
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                self._execute_sql(temp_conn, delete_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
+            with self._managed_connection() as conn:
+                self._execute_sql(conn, delete_sql)
 
             self.logger.info("Cleared tuning metadata")
             return True
@@ -1076,11 +1247,8 @@ class TuningMetadataManager:
             WHERE table_name != '{self._SECTION_MARKER_TABLE}'
             """
 
-            temp_conn = self.platform_adapter.create_connection(**self._connection_kwargs())
-            try:
-                result = self._fetch_one(temp_conn, summary_sql)
-            finally:
-                self.platform_adapter.close_connection(temp_conn)
+            with self._managed_connection() as conn:
+                result = self._fetch_one(conn, summary_sql)
             if result:
                 return {
                     "table_exists": True,

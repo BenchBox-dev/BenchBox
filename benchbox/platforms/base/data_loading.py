@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from abc import ABC, abstractmethod
@@ -27,6 +28,7 @@ from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any, Protocol
 
+from benchbox.core.loaded_tables import is_data_loading_skipped
 from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.file_format import (
     get_column_names_with_trailing,
@@ -836,9 +838,18 @@ class ZstdHandler(CompressionHandler):
             File object for reading decompressed content
 
         Raises:
+            DataLoadingError: If the ``zstd`` command is not installed. Raised
+                when the first file is opened, before any table loads, instead
+                of surfacing later as an empty load.
             subprocess.CalledProcessError: If zstd decompression fails
-            FileNotFoundError: If zstd command not found
         """
+        if shutil.which("zstd") is None:
+            raise DataLoadingError(
+                f"Cannot load zstd-compressed file '{file_path.name}': the 'zstd' command was not found "
+                "on PATH. Install it (e.g. 'brew install zstd' or 'apt-get install zstd') or regenerate "
+                "uncompressed data."
+            )
+
         # Log decompression start if adapter supports verbosity
         if self.adapter and hasattr(self.adapter, "log_verbose"):
             self.adapter.log_verbose(f"Decompressing {file_path.name} using system zstd command...")
@@ -2650,6 +2661,22 @@ def prepare_local_load_file(
                 tmp_path.unlink(missing_ok=True)
 
 
+def _tables_map_to_no_files(tables: Any) -> bool:
+    """True when every table maps to an empty file list.
+
+    Providers normalize ``benchmark.tables`` values to lists, so a table with
+    no files arrives as ``[]``. A source where *all* tables are file-less is
+    indistinguishable downstream from a table-less source (each table loads
+    zero rows), hence it fails closed in :meth:`DataLoader.load` the same
+    way. Partial sources (at least one table with files) proceed; per-table
+    misses still raise in the sharded/single-file loaders.
+    """
+    if not isinstance(tables, Mapping):
+        return False
+    values = list(tables.values())
+    return bool(values) and all(isinstance(value, (list, tuple)) and len(value) == 0 for value in values)
+
+
 class DataLoader:
     """Main orchestrator for data loading operations."""
 
@@ -2705,11 +2732,19 @@ class DataLoader:
 
         table_stats = {}
 
-        # Resolve data source
+        # Resolve data source. A missing source -- a source naming zero tables,
+        # or a source whose every table maps to an empty file list (e.g. a
+        # stale manifest that still names tables) -- fails the run for
+        # benchmarks that expect data instead of loading nothing and
+        # validating vacuously. Benchmarks that legitimately skip data
+        # loading keep the previous empty result.
         data_source = self.resolver.resolve(self.benchmark, self.data_dir)
-        if not data_source:
-            self.adapter.log_very_verbose("No data source found")
-            return table_stats, elapsed_seconds(start_time)
+        tables = data_source.tables if data_source else None
+        if not data_source or not tables or _tables_map_to_no_files(tables):
+            if is_data_loading_skipped(self.benchmark):
+                self.adapter.log_very_verbose("No data source found (data loading skipped)")
+                return table_stats, elapsed_seconds(start_time)
+            raise ValueError("No data files found. Ensure benchmark.generate_data() was called first.")
 
         table_stats = self._load_file_based_data(data_source)
 
@@ -2789,6 +2824,7 @@ class DataLoader:
             # PlatformAdapter guarantees apply_ctas_sort; unsupported platforms no-op.
             if self.tuning_config:
                 self.adapter.apply_ctas_sort(table_name, self.tuning_config, self.connection)
+                self.adapter.run_post_load_tunings(table_name, self.tuning_config, self.connection)
 
         return table_stats
 

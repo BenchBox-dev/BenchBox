@@ -128,6 +128,13 @@ class ValidationPhase:
 
 
 @dataclass
+class PostLoadMaintenancePhase:
+    duration_ms: int
+    status: str = "SUCCESS"
+    tables_processed: int = 0
+
+
+@dataclass
 class StatisticsGatheringPhase:
     """Optimizer-statistics build between load and query (opt-in).
 
@@ -176,6 +183,7 @@ class SetupPhase:
     data_loading: DataLoadingPhase | None = None
     validation: ValidationPhase | None = None
     statistics_gathering: StatisticsGatheringPhase | None = None
+    post_load_maintenance: PostLoadMaintenancePhase | None = None
 
 
 @dataclass(init=False)
@@ -511,6 +519,11 @@ class BenchmarkResults:
     # "wizard", "fallback", "smart_defaults", "baseline"); see
     # benchbox.cli.tuning_resolver.TuningSource.
     tuning_source: str | None = None
+    # Pre-ADR-1 ``platform.tuning.source`` bridge value ("yaml"/"auto") preserved
+    # across a load -> re-export cycle when the bundle carries no richer tuning
+    # identity (no tuning_source, source_file, or hash). Never invented: None
+    # unless the loaded bundle stated it, and never a substitute for a hash.
+    tuning_legacy_source: str | None = None
     tuning_validation_status: str = "not_validated"
     tuning_metadata_saved: bool = False
     system_profile: dict[str, Any] | None = None

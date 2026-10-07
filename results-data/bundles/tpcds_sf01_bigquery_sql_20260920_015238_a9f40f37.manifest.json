@@ -1,0 +1,8 @@
+{
+  "bundle_file": "tpcds_sf01_bigquery_sql_20260920_015238_a9f40f37.json",
+  "bundle_hash": "4441e69ffb1ef281521cc24ec3db431589e607a6c7c6fbc99df04deb45029560",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer"
+}

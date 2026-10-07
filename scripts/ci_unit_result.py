@@ -12,7 +12,15 @@ gated job:
 A skipped required job is a failure, not a pass, so a path filter or a broken
 ``if:`` can never silently green a tier. ``--always NAME`` marks jobs that
 must succeed on every run. ``--must-succeed`` is a synonym kept for
-readability. Any ``failure`` or ``cancelled`` result always fails.
+readability. Any ``failure`` result always fails.
+
+A ``cancelled`` upstream is not a failure: it means a newer run superseded
+this one (``ci.yml`` cancels in-progress runs), so the aggregate must
+conclude cancelled rather than leave a red check on the commit. The
+``ci.yml`` aggregate steps map a cancelled-only outcome to
+``SUPERSEDED_EXIT_CODE`` and cancel their own run, which flips the aggregate
+job's conclusion from failure to cancelled. Any ``failure`` alongside a
+cancellation still fails the unit.
 """
 
 from __future__ import annotations
@@ -23,18 +31,34 @@ import sys
 
 OK_WHEN_NOT_REQUIRED = {"skipped", "success"}
 
+#: Exit code when upstreams were cancelled but nothing failed. The ``ci.yml``
+#: aggregate steps treat this as "superseded, not failed" and cancel their own
+#: run so the aggregate job concludes cancelled instead of failed.
+SUPERSEDED_EXIT_CODE = 3
 
-def evaluate(needs: dict[str, dict], expectations: dict[str, bool], always: list[str]) -> list[str]:
-    """Return human-readable problems; empty means the unit passes."""
+
+def evaluate(needs: dict[str, dict], expectations: dict[str, bool], always: list[str]) -> tuple[list[str], list[str]]:
+    """Return ``(problems, cancelled)``.
+
+    ``problems`` holds human-readable failures; empty means the unit passes
+    unless upstreams were cancelled. ``cancelled`` names the upstream jobs
+    whose result was ``cancelled`` (``NAME=cancelled``); a cancelled upstream
+    is never reported as a failure.
+    """
     problems: list[str] = []
+    cancelled: list[str] = []
 
     for name, info in sorted(needs.items()):
         result = str(info.get("result", ""))
-        if result in {"failure", "cancelled"}:
-            problems.append(f"{name}={result}")
+        if result == "failure":
+            problems.append(f"{name}=failure")
+        elif result == "cancelled":
+            cancelled.append(f"{name}=cancelled")
 
     for name in always:
         result = str(needs.get(name, {}).get("result", "missing"))
+        if result == "cancelled":
+            continue
         if result != "success":
             problems.append(f"{name}={result} (must succeed on every run)")
 
@@ -43,6 +67,8 @@ def evaluate(needs: dict[str, dict], expectations: dict[str, bool], always: list
             problems.append(f"{name}: not in needs (job missing from the result job's needs list)")
             continue
         result = str(needs[name].get("result", ""))
+        if result == "cancelled":
+            continue
         if required and result != "success":
             problems.append(f"{name}={result} (required for this change; expected success)")
         elif not required and result not in OK_WHEN_NOT_REQUIRED:
@@ -54,7 +80,7 @@ def evaluate(needs: dict[str, dict], expectations: dict[str, bool], always: list
         if problem not in seen:
             seen.add(problem)
             unique.append(problem)
-    return unique
+    return unique, cancelled
 
 
 def parse_expectation(text: str) -> tuple[str, bool]:
@@ -82,12 +108,19 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{args.unit}: needs must be a JSON object", file=sys.stderr)
         return 1
 
-    problems = evaluate(needs, dict(args.expect), list(args.always))
+    problems, cancelled = evaluate(needs, dict(args.expect), list(args.always))
     if problems:
         print(f"{args.unit}: FAILED")
         for problem in problems:
             print(f"  - {problem}")
         return 1
+    if cancelled:
+        print(f"{args.unit}: CANCELLED (not failed): an upstream job was cancelled,")
+        print("usually because a newer run superseded this one; the workflow cancels")
+        print("its own run so this aggregate concludes cancelled instead of failed.")
+        for name in cancelled:
+            print(f"  - {name}")
+        return SUPERSEDED_EXIT_CODE
     ran = sorted(name for name, info in needs.items() if info.get("result") == "success")
     print(f"{args.unit}: ok ({len(ran)} job(s) succeeded, rest skipped as expected)")
     return 0

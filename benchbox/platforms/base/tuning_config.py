@@ -52,6 +52,7 @@ class TuningConfigMixin:
     canonical_platform_type: str
     logger: logging.Logger
     tuning_enabled: bool
+    _tuning_marker_save_failed: bool
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to the database.
@@ -133,17 +134,19 @@ class TuningConfigMixin:
                 temp_connection = self.create_connection(**connection_config)
 
             try:
-                metadata_manager = TuningMetadataManager(self, connection_config=connection_config)
+                metadata_manager = TuningMetadataManager(
+                    self, connection_config=connection_config, connection=temp_connection
+                )
 
                 effective_config = self.get_effective_tuning_configuration()
-                if effective_config:
+                if effective_config and self.tuning_enabled:
                     result = metadata_manager.validate_unified_tunings(effective_config)
                 else:
                     existing_tunings = metadata_manager.load_unified_tunings()
                     result = MetadataValidationResult()
                     if metadata_manager.last_load_error:
                         result.add_error(f"Failed to load tuning metadata: {metadata_manager.last_load_error}")
-                    elif existing_tunings is not None:
+                    elif existing_tunings is not None or self._has_tuned_run_marker(metadata_manager):
                         result.add_warning("Database contains tuning metadata but no tunings expected")
                         if not self.tuning_enabled:
                             result.add_error(
@@ -167,6 +170,53 @@ class TuningConfigMixin:
             self._drift_validation_result = result
             return result
 
+    @staticmethod
+    def _has_tuned_run_marker(metadata_manager: Any) -> bool:
+        """Probe for the fail-closed tuned-run marker without raising.
+
+        A tuned run writes the marker before applying any physical tuning, so
+        a marker-only database (failed save, crash between apply and save, a
+        constraints-only config with its section markers swallowed) is still
+        refused for a notuning run. Managers predating the marker API (and
+        test doubles) lack the probe -- treat that as "no marker", since the
+        legacy `load_unified_tunings` check above still applies.
+        """
+        probe = getattr(metadata_manager, "has_tuned_run_marker", None)
+        if not callable(probe):
+            return False
+        try:
+            return bool(probe())
+        except Exception:
+            return False
+
+    def ensure_tuned_run_marker(self, connection: Any) -> bool:
+        """Write the fail-closed tuned-run marker before any physical tuning.
+
+        A tuned run calls this first: when it returns False the caller must
+        fail the run instead of applying tuning, so a database is never
+        physically tuned without refusal evidence. No-ops (True) for
+        baseline runs, which need no metadata table.
+
+        Args:
+            connection: Database connection
+
+        Returns:
+            True if the marker was written (or no tuning is active), False otherwise
+        """
+        effective_config = self.get_effective_tuning_configuration()
+        if not self.tuning_enabled or not effective_config:
+            return True
+
+        try:
+            from benchbox.core.tuning.metadata import TuningMetadataManager
+
+            metadata_manager = TuningMetadataManager(self, connection=connection)
+            return bool(metadata_manager.write_tuned_run_marker())
+
+        except Exception as e:
+            self.logger.error(f"Failed to write tuned-run marker: {e}")
+            return False
+
     def save_tuning_metadata(self, connection: Any) -> bool:
         """Save tuning metadata to database for future validation.
 
@@ -176,6 +226,7 @@ class TuningConfigMixin:
         Returns:
             True if metadata was saved successfully, False otherwise
         """
+        self._tuning_marker_save_failed = False
         effective_config = self.get_effective_tuning_configuration()
         if not self.tuning_enabled or not effective_config:
             return True
@@ -183,8 +234,9 @@ class TuningConfigMixin:
         try:
             from benchbox.core.tuning.metadata import TuningMetadataManager
 
-            metadata_manager = TuningMetadataManager(self)
+            metadata_manager = TuningMetadataManager(self, connection=connection)
             saved = metadata_manager.save_unified_tunings(effective_config)
+            self._tuning_marker_save_failed = bool(metadata_manager.marker_save_failed)
             if metadata_manager.marker_save_failed:
                 from benchbox.core.tuning.metadata import MetadataValidationResult
 

@@ -61,10 +61,11 @@ DECIMAL(8,2) scale - see ``_H2ODB_PERCENTILE_DECIMAL``), read_primitives,
 flightdata (20 SQL and 20 DataFrame ids overlap verbatim; one synthetic month at
 ``scale_factor=0.01``, which stays offline), and datavault (22 SQL ids ``"1"``
 .. ``"22"`` map 1:1 to the DataFrame ids by a mechanical ``Q`` prefix:
-``"Q1"`` .. ``"Q22"``). Staged (registered in :data:`STAGED_GATES`, runnable
-in report mode, not CI-enforced): ``tpch``, ``tpcds``, ``nyctaxi``,
-``tpch_skew``, and ``tsbs_devops``. TPC-DS runs the full 99-query matrix at
-``SF=0.01`` with bounded empty cells explicitly classified.
+``"Q1"`` .. ``"Q22"``). ``tpch``, ``tpch_skew``, ``nyctaxi``, ``tsbs_devops``
+and ``tpcds`` are enforced too; TPC-DS compares all 103 statements on the
+default Power draw at ``SF=0.01`` on Polars, pandas and DataFusion, with each
+empty cell classified. :data:`STAGED_GATES` holds gates that run in report
+mode only; it is currently empty.
 Additional dual-surface
 benchmarks are added by registering a :class:`CrossSurfaceGate` in :data:`GATES`.
 
@@ -89,6 +90,7 @@ Licensed under the MIT License. See LICENSE file in the project root for details
 from __future__ import annotations
 
 import re
+from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
@@ -122,6 +124,9 @@ from benchbox.core.equivalence.dataframe_surface import (
     find_surface_divergences,
     materialize_rows,
 )
+from benchbox.utils.printing import quiet_console as console
+
+_BACKEND_FAMILIES = {"expression": "expression", "pandas": "pandas", "datafusion": "expression"}
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     # Deferred at runtime: importing benchbox.core.tpchavoc.validation triggers
@@ -360,6 +365,214 @@ def _order_by_result_key(sql: str) -> list[int] | None:
     return resolved
 
 
+@dataclass(frozen=True)
+class OrderStatus:
+    kind: str
+    reason: str = ""
+
+
+ORDER_VERIFIED = "verified"
+ORDER_UNORDERED = "unordered"
+ORDER_UNVERIFIABLE = "unverifiable"
+
+
+@dataclass(frozen=True)
+class _DerivedOrderPlan:
+    terms: tuple[tuple[str, str], ...] = ()
+    columns: tuple[tuple[str, str], ...] = ()
+    status: OrderStatus = OrderStatus(ORDER_UNORDERED, "no ORDER BY")
+
+
+def _projection_column(projection: Any) -> Any | None:
+    from sqlglot import exp
+
+    inner = projection.this if isinstance(projection, exp.Alias) else projection
+    return inner if isinstance(inner, exp.Column) and not isinstance(inner.this, exp.Star) else None
+
+
+def _lone_source_qualifier(tree: Any) -> str | None:
+    """Return the only relation an ORDER BY qualifier may name, if exactly one exists.
+
+    A qualified ORDER BY column may only be read from an unqualified projection
+    when the query draws from a single source and the qualifier names that
+    source (by table name or alias). With joins, an unqualified projection can
+    resolve to a different input than the qualifier names (for example the
+    merged column of a JOIN ... USING), so the binding stays unverifiable.
+    """
+    from sqlglot import exp
+
+    from_node = tree.args.get("from")
+    if from_node is None:
+        from_node = tree.args.get("from_")
+    if from_node is None or tree.args.get("joins"):
+        return None
+    source = from_node.this
+    if source is None:
+        return None
+    if isinstance(source, exp.Table):
+        return source.alias_or_name.lower() or None
+    alias = source.args.get("alias")
+    return alias.alias_or_name.lower() if alias is not None else None
+
+
+def _resolve_output_column(
+    column: Any, names: Sequence[str], projections: Sequence[Any] | None, lone_qualifier: str | None
+) -> int | None:
+    name = column.name.lower()
+    if not column.table:
+        matches = [index for index, output in enumerate(names) if output == name]
+        return matches[0] if len(matches) == 1 else None
+    if projections is None or len(projections) != len(names):
+        return None
+    qualifier = column.table.lower()
+    candidates = []
+    for index, projection in enumerate(projections):
+        source = _projection_column(projection)
+        if source is None or source.name.lower() != name:
+            continue
+        if source.table:
+            if source.table.lower() != qualifier:
+                continue
+        elif lone_qualifier != qualifier:
+            # An unqualified projection does not establish which relation
+            # supplies a qualified ORDER BY column.
+            continue
+        candidates.append(index)
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _rewrite_order_term(
+    target: Any, names: Sequence[str], projections: Sequence[Any] | None, lone_qualifier: str | None
+) -> Any:
+    from sqlglot import exp
+
+    if isinstance(target, exp.Literal) and target.is_int:
+        ordinal = int(target.name)
+        if not 1 <= ordinal <= len(names):
+            return f"ORDER BY position {ordinal} is out of range"
+        return exp.column(f"__c{ordinal - 1}")
+    if target.find(exp.Subquery, exp.Select):
+        return "an ORDER BY term contains a subquery"
+    if not target.find(exp.Column):
+        return "an ORDER BY term has no column reference"
+    for column in list(target.find_all(exp.Column)):
+        position = _resolve_output_column(column, names, projections, lone_qualifier)
+        if position is None:
+            return f"ORDER BY column {column.sql(dialect='duckdb')} is not a unique output column"
+        replacement = exp.column(f"__c{position}")
+        if column is target:
+            target = replacement
+        else:
+            column.replace(replacement)
+    return target
+
+
+def _unverifiable(reason: str) -> _DerivedOrderPlan:
+    return _DerivedOrderPlan(status=OrderStatus(ORDER_UNVERIFIABLE, reason))
+
+
+def _derived_order_plan(sql: str, describe: Callable[[], Sequence[tuple[str, str]]]) -> _DerivedOrderPlan:
+    import sqlglot
+    from sqlglot import exp
+
+    try:
+        tree = sqlglot.parse_one(sql, read="duckdb")
+    except Exception:  # noqa: BLE001 - an unparseable query is just "not checkable"
+        return _unverifiable("the query does not parse")
+    order = tree.args.get("order") if isinstance(tree, exp.Select) else None
+    if order is None:
+        return _DerivedOrderPlan()
+    if any(projection.find(exp.Collate) is not None for projection in tree.expressions):
+        # The check table carries declared types but not output collations, so
+        # it would validate against different sorting semantics.
+        return _unverifiable("an output column specifies a collation the order check cannot reproduce")
+    try:
+        columns = tuple(describe())
+    except Exception:  # noqa: BLE001 - an undescribable query is reported as unverifiable
+        columns = ()
+    if not columns:
+        return _unverifiable("the output columns cannot be described")
+    names = [name.lower() for name, _ in columns]
+    projections = tree.expressions if not any(_is_star_projection(item) for item in tree.expressions) else None
+    lone_qualifier = _lone_source_qualifier(tree)
+
+    entries = []
+    for ordered in order.expressions:
+        target = ordered.this
+        if isinstance(target, exp.Var) and target.name.upper() == "ALL" and len(order.expressions) == 1:
+            if "all" in names:
+                return _unverifiable("ORDER BY ALL with an output column named all")
+            if any(_is_text_type(declared) for _, declared in columns):
+                # The check table carries declared types but not the effective
+                # output collation (which DESCRIBE does not report), so it
+                # would validate text orderings against binary sorting.
+                return _unverifiable("ORDER BY ALL over a text column cannot reproduce the output collation")
+            entries.extend((exp.column(f"__c{index}"), ordered, True) for index in range(len(names)))
+        else:
+            entries.append((target.copy(), ordered, False))
+
+    terms = []
+    for index, (target, ordered, resolved) in enumerate(entries):
+        if not resolved:
+            rewritten = _rewrite_order_term(target, names, projections, lone_qualifier)
+            if isinstance(rewritten, str):
+                return _unverifiable(rewritten)
+            target = rewritten
+        key = ordered.copy()
+        key.set("this", exp.column(f"__k{index}"))
+        terms.append((target.sql(dialect="duckdb"), key.sql(dialect="duckdb")))
+    return _DerivedOrderPlan(tuple(terms), columns, OrderStatus(ORDER_VERIFIED))
+
+
+def _key_column_type(declared: str) -> str:
+    return "DOUBLE" if declared.upper().startswith(("FLOAT", "REAL")) else declared
+
+
+def _is_text_type(declared: str) -> bool:
+    return declared.upper().startswith(("VARCHAR", "CHAR", "BPCHAR", "TEXT"))
+
+
+def _plan_order_violation(plan: _DerivedOrderPlan, rows: list[tuple[Any, ...]]) -> str | None:
+    import duckdb
+
+    columns = plan.columns
+    if plan.status.kind != ORDER_VERIFIED or len(rows) < 2:
+        return None
+
+    def cell(value: Any) -> Any:
+        return None if isinstance(value, float) and value != value else value
+
+    connection = duckdb.connect()
+    try:
+        definitions = ", ".join(
+            f"__c{index} {_key_column_type(declared)}" for index, (_, declared) in enumerate(columns)
+        )
+        connection.execute(f"CREATE TABLE candidate (__pos BIGINT, {definitions})")
+        placeholders = ", ".join("?" for _ in range(len(columns) + 1))
+        connection.executemany(
+            f"INSERT INTO candidate VALUES ({placeholders})",
+            [(position, *(cell(value) for value in row)) for position, row in enumerate(rows)],
+        )
+        keys = ", ".join(f"{expression} AS __k{index}" for index, (expression, _) in enumerate(plan.terms))
+        keyed = f"SELECT __pos, {keys} FROM candidate"
+        returned = connection.execute(f"SELECT * EXCLUDE (__pos) FROM ({keyed}) ORDER BY __pos").fetchall()
+        required = connection.execute(
+            f"SELECT * EXCLUDE (__pos) FROM ({keyed}) ORDER BY {', '.join(key for _, key in plan.terms)}, __pos"
+        ).fetchall()
+    except duckdb.Error as exc:
+        return f"the ORDER BY check could not evaluate the sort keys over the returned rows: {exc}"
+    finally:
+        connection.close()
+    for position, (actual, expected) in enumerate(zip(returned, required, strict=True)):
+        if actual != expected:
+            return f"returned row {position} breaks the ORDER BY: sort key {actual}, expected {expected}"
+    return None
+
+
+def _derived_order_violation(sql: str, columns: Sequence[tuple[str, str]], rows: list[tuple[Any, ...]]) -> str | None:
+    return _plan_order_violation(_derived_order_plan(sql, lambda: columns), rows)
+
+
 def _resolve_order_term(
     target: Any,
     projections: Sequence[Any],
@@ -449,6 +662,12 @@ class CrossSurfaceGate:
     # mismatch the benchmark's own parameters cannot bridge), with a written
     # reason here. NEVER add an entry to mute a query you could make discriminating.
     legitimately_empty: dict[Any, str] = field(default_factory=dict)
+    # False for a run whose parameter draw differs from the one the
+    # ``legitimately_empty`` entries describe (a non-default TPC-DS seed or Power
+    # stream). Vacuous queries are then still excluded from coverage and listed,
+    # but neither an unclassified nor a stale emptiness fails the run; divergences
+    # and flaky cells still do.
+    vacuity_classified: bool = True
     backends: tuple[str, ...] = DATAFRAME_BACKENDS
     tolerance: float = 1e-10
     surface_independence: str = SURFACE_INDEPENDENCE_SHARED_SPEC
@@ -486,6 +705,8 @@ def find_cross_surface_divergences(
     validator: ResultValidator,
     backends: tuple[str, ...] = DATAFRAME_BACKENDS,
     reference_row_counts: dict[Any, int] | None = None,
+    all_null_references: set[Any] | None = None,
+    order_statuses: dict[tuple[Any, str], OrderStatus] | None = None,
 ) -> list[SurfaceDivergence]:
     """Compare each query's DataFrame surface to its own SQL surface on DuckDB.
 
@@ -514,6 +735,16 @@ def find_cross_surface_divergences(
             (it has no row count); it surfaces as a ``reference`` divergence
             instead. Default ``None`` keeps behavior unchanged for callers (e.g.
             the fast-lane integration tests) that do not need the vacuity audit.
+        all_null_references: Optional mutable set; when supplied it collects the
+            query ids whose reference returned one all-NULL row. Those queries
+            are still recorded as 0 rows above, and :func:`_report` lists them
+            separately so a physical zero-row result and an all-NULL aggregate
+            row are never conflated.
+        order_statuses: Optional mutable mapping populated with
+            ``(query_id, backend) -> OrderStatus`` for each compared cell:
+            whether the returned row order was verified, or the cell was compared
+            unordered because the query has no ``ORDER BY`` or its ``ORDER BY``
+            cannot be checked from the returned columns.
 
     Returns:
         One :class:`SurfaceDivergence` per query/backend cell whose DataFrame
@@ -531,6 +762,8 @@ def find_cross_surface_divergences(
             # 0-row vacuous so None == None can never pass as coverage.
             if len(rows) == 1 and all(value is None for value in rows[0]):
                 reference_row_counts[query_id] = 0
+                if all_null_references is not None:
+                    all_null_references.add(query_id)
             else:
                 reference_row_counts[query_id] = len(rows)
         return rows
@@ -567,6 +800,15 @@ def find_cross_surface_divergences(
         # catches a real unique-final-key value bug. Every backend of a query shares
         # the SAME reference, so the extra LIMIT n+1 query runs once, not per backend.
         probe_result: bool | None = None  # None = not yet computed (memo sentinel)
+        derived_plan: _DerivedOrderPlan | None = None
+
+        def order_plan() -> _DerivedOrderPlan:
+            nonlocal derived_plan
+            if derived_plan is None:
+                derived_plan = _derived_order_plan(
+                    sql, lambda: [(row[0], row[1]) for row in connection.execute(f"DESCRIBE {sql}").fetchall()]
+                )
+            return derived_plan
 
         def final_key_tied(reference: list[tuple[Any, ...]]) -> bool:
             nonlocal probe_result
@@ -581,7 +823,7 @@ def find_cross_surface_divergences(
             return probe_result
 
         for backend in backends:
-            impl = query.get_impl_for_family(backend)
+            impl = query.get_impl_for_family(_BACKEND_FAMILIES.get(backend, backend))
             if impl is None:
                 # The DataFrame surface does not implement this backend; there is
                 # nothing to compare. Skip it rather than report a false divergence.
@@ -598,6 +840,11 @@ def find_cross_surface_divergences(
                 order_by: list[int] | None = order_by,
             ) -> None:
                 candidate = materialize_rows(impl(contexts[backend]))
+                plan = None if order_by is not None else order_plan()
+                if order_statuses is not None:
+                    order_statuses[(query_id, backend)] = (
+                        plan.status if plan is not None else OrderStatus(ORDER_VERIFIED)
+                    )
                 validator.validate_results_exact(
                     reference,
                     candidate,
@@ -608,6 +855,9 @@ def find_cross_surface_divergences(
                     order_by=order_by,
                     final_key_tied_beyond_limit=final_key_tied(reference),
                 )
+                violation = _plan_order_violation(plan, candidate) if plan is not None else None
+                if violation is not None:
+                    raise ValidationError(f"Q{query_id}: {violation}")
 
             yield backend, check
 
@@ -638,7 +888,7 @@ def count_executed_cells(
     for query_id in query_ids:
         query = dataframe_query(query_id)
         for backend in backends:
-            if query.get_impl_for_family(backend) is not None:
+            if query.get_impl_for_family(_BACKEND_FAMILIES.get(backend, backend)) is not None:
                 coverage[backend] += 1
     return coverage
 
@@ -756,7 +1006,7 @@ def find_cross_surface_dtype_divergences(
             key = f"{query_id}_{backend}"
             if key in skip_keys:
                 continue
-            impl = query.get_impl_for_family(backend)
+            impl = query.get_impl_for_family(_BACKEND_FAMILIES.get(backend, backend))
             if impl is None:
                 continue
             try:
@@ -801,6 +1051,7 @@ def find_cross_surface_dtype_divergences(
 _PRODUCTION_ADAPTERS: dict[str, str] = {
     "expression": "benchbox.platforms.dataframe.polars_df:PolarsDataFrameAdapter",
     "pandas": "benchbox.platforms.dataframe.pandas_df:PandasDataFrameAdapter",
+    "datafusion": "benchbox.platforms.dataframe.datafusion_df:DataFusionDataFrameAdapter",
 }
 
 
@@ -1546,112 +1797,108 @@ _READ_PRIMITIVES_LEGITIMATELY_EMPTY: dict[Any, str] = {
     ),
 }
 
-# TPC-DS deliberately runs its complete 99-query matrix at SF=0.01. A full
-# SF=0.05 matrix exceeds the gate's short-run budget and also exposes unrelated
-# larger-cell divergences, so these entries describe the bounded gate cell rather
-# than claiming that the predicates are empty at every scale. Every listed query
-# returns zero rows in the SQL reference and in both DataFrame families at SF=0.01.
+# TPC-DS deliberately runs its complete 103-statement matrix at SF=0.01 with the
+# default Power draw (seed None, stream 0). A full SF=0.05 matrix exceeds the
+# gate's short-run budget. Each entry below describes that bounded cell and the
+# value its draw binds, not emptiness at every scale or draw: the SQL reference
+# returns no rows (or, where noted, one all-NULL aggregate row) and every
+# DataFrame backend matches it. The SF=0.01 data has one store (market 2, GMT
+# offset -5, Williamson County TN), one return reason, and catalog sales only
+# through 2001-11-11, which explains several entries. Every listed statement
+# returns rows in the official SF=1 answer set, and the SF=1 qualification
+# runner compares it there on nonempty data. A stale entry fails the gate.
 _TPCDS_LEGITIMATELY_EMPTY: dict[Any, str] = {
-    "3": (
-        "The bounded SF=0.01 cell has no December sales for manufacturer 436, so the exact "
-        "manufacturing and month predicates produce an empty SQL result mirrored by both DataFrame families."
-    ),
+    "3": "No November store sale is for manufacturer 808; dropping that filter alone yields 100 rows.",
     "4": (
-        "The bounded cell has no customer with qualifying year-over-year sales in all required channels; "
-        "the empty SQL result is mirrored by both DataFrame families."
-    ),
-    "6": (
-        "The bounded cell has no state with at least ten February 2000 sales for items above the category-price "
-        "threshold; the empty SQL result is mirrored by both DataFrame families."
+        "No customer has web-channel year totals for both 1998 and 1999 beside the store and catalog totals; "
+        "dropping either web-year requirement yields rows."
     ),
     "8": (
-        "The bounded cell has no store sales matching the preferred-customer ZIP cohort for Q1 2002; "
-        "the empty SQL result is mirrored by both DataFrame families."
+        "The only preferred-customer ZIP group with more than ten customers is the NULL ZIP (12 customers), "
+        "so the ZIP cohort the store prefix must match is empty."
     ),
     "10": (
-        "The bounded cell has no customer county and year combination satisfying the required store and web "
-        "channel overlap; the empty SQL result is mirrored by both DataFrame families."
+        "No customer in the five drawn counties with a January-April 2002 store purchase also bought on the web "
+        "or by catalog then; dropping that requirement yields a row."
     ),
     "11": (
-        "The bounded cell has no customer with qualifying store and web revenue growth across the required "
-        "years; the empty SQL result is mirrored by both DataFrame families."
+        "No customer has both store and web year totals for 1998 and 1999; dropping any one channel-year "
+        "requirement yields rows."
     ),
-    "24": (
-        "The bounded cell has no qualifying store-return rows for the configured item color and market filters; "
-        "the empty SQL result is mirrored by both DataFrame families."
+    "13": (
+        "No store sale satisfies both the demographic and price bands and the "
+        "address and profit bands; dropping either group yields a row."
     ),
-    "31": (
-        "The bounded cell has no customer satisfying the six-channel quarterly sales comparison; the empty SQL "
-        "result is mirrored by both DataFrame families."
+    "18": (
+        "No 2000 catalog sale matches male, Advanced Degree, the six birth months and "
+        "the seven states together; dropping any one of those filters yields rows."
+    ),
+    "20": "Catalog sales end on 2001-11-11, before the drawn 30-day window from 2002-05-11.",
+    "23": (
+        "No item sells more than four times on one day in 1999-2002 (the maximum "
+        "is four), so the frequent-item set is empty."
+    ),
+    "23b": "No item sells more than four times on one day in 1999-2002, so the frequent-item set is empty.",
+    "24": "The only store is in market 2, but the draw binds market 10.",
+    "24b": "The only store is in market 2, but the draw binds market 10.",
+    "31": "No county has web sales in each of the first three quarters of 2000.",
+    "32": (
+        "No catalog sale in the 90 days from 2000-01-13 is for manufacturer 942; dropping that filter yields a row."
     ),
     "37": (
-        "The bounded cell has no inventory and sales combination satisfying the date, manufacturer, and quantity "
-        "filters; the empty SQL result is mirrored by both DataFrame families."
+        "No item from manufacturers 894, 865, 737 or 959 meets the price, date and inventory filters; dropping "
+        "the manufacturer filter alone yields rows."
     ),
     "39": (
-        "The bounded cell has no inventory month pair whose standard-deviation to mean ratio exceeds one; "
-        "the empty SQL result is mirrored by both DataFrame families."
+        "No warehouse item has a January and February 2000 inventory coefficient of variation above one in both "
+        "months; dropping either month filter yields rows."
     ),
+    "39b": "The highest January 2000 inventory coefficient of variation is 1.31, below the 1.5 bound.",
     "41": (
-        "The bounded item dimension contains no product satisfying the manufacturer range and correlated attribute "
-        "conditions; the empty SQL result is mirrored by both DataFrame families."
+        "No item from manufacturers 894-934 has a manufacturer with the correlated color, unit and size "
+        "attributes; dropping that correlated count yields rows."
     ),
     "49": (
-        "The bounded cell has no web, catalog, and store return combination satisfying the December 2000 and "
-        "profit thresholds; the empty SQL result is mirrored by both DataFrame families."
+        "No December 2000 sale in any channel has a return amount above 10000 with the other sale filters; "
+        "dropping the year, the month or any one channel's threshold yields rows."
     ),
-    "53": (
-        "The bounded cell has no manager and item combination satisfying the twelve-month sequence and brand or "
-        "category filters; the empty SQL result is mirrored by both DataFrame families."
-    ),
-    "54": (
-        "The bounded cell has no jewelry or consignment customer revenue segment for March 1999; the empty SQL "
-        "result is mirrored by both DataFrame families."
-    ),
-    "55": (
-        "The bounded cell has no item brand with store sales for manager 36 in December 2001; the empty SQL result "
-        "is mirrored by both DataFrame families."
-    ),
+    "54": "No customer address is in Williamson County TN, the only store's county.",
+    "55": ("No November 1999 store sale is for an item of manager 8; dropping the manager filter yields 66 rows."),
     "58": (
-        "The bounded cell has no item with comparable revenue in all three channels during the week containing the "
-        "configured February 1998 date; the empty SQL result is mirrored by both DataFrame families."
+        "Five items sell in all three channels in the week of 2000-04-24, but none has revenues within ten "
+        "percent of each other in every channel."
     ),
-    "63": (
-        "The bounded cell has no manager whose twelve-month sales deviation exceeds ten percent for the configured "
-        "item filters; the empty SQL result is mirrored by both DataFrame families."
-    ),
+    "61": ("The only store has GMT offset -5, but the draw binds -6; dropping that filter yields a row."),
     "64": (
-        "The bounded cell has no cross-year store-sale and catalog-return pair satisfying the refund, demographic, "
-        "and price filters; the empty SQL result is mirrored by both DataFrame families."
+        "No cross-year store sale and catalog return pair meets the item-color filter; dropping the six drawn "
+        "colors yields 47 rows."
     ),
     "65": (
-        "The bounded cell has no store and item revenue below ten percent of the store average across the configured "
-        "month sequence; the empty SQL result is mirrored by both DataFrame families."
+        "No item's store revenue in month sequence 1176-1187 is at or below ten percent of its store's average; "
+        "dropping that bound yields 90 rows."
+    ),
+    "69": (
+        "No WY, IA or KY customer has an April-June 2003 store purchase without web or catalog purchases then; "
+        "dropping the store requirement or the year yields rows."
     ),
     "73": (
-        "The bounded cell has no store ticket in Williamson County satisfying the day-of-month and household "
-        "vehicle or dependent filters; the empty SQL result is mirrored by both DataFrame families."
+        "No 1998-2000 Williamson County ticket on days one or two has one to five items for the household "
+        "filters; dropping the item-count bound yields 12 rows."
     ),
     "82": (
-        "The bounded cell has no item and inventory combination satisfying the May 2002 date window, manufacturer, "
-        "price, and quantity filters; the empty SQL result is mirrored by both DataFrame families."
+        "No item from manufacturers 759, 224, 231 or 687 meets the price, date and inventory filters; dropping "
+        "the manufacturer filter alone yields rows."
     ),
-    "83": (
-        "The bounded cell has no item returned in all three channels during the weeks containing the configured "
-        "1998 return dates; the empty SQL result is mirrored by both DataFrame families."
-    ),
-    "85": (
-        "The bounded cell has no web return satisfying the 1998 date, customer-demographic, state, and profit "
-        "conditions; the empty SQL result is mirrored by both DataFrame families."
+    "85": ("No 2000 web return meets the demographic, state and profit bands; dropping the year filter yields a row."),
+    "90": (
+        "Web page character counts never reach the template's fixed 5000-5200 range; dropping that range yields a row."
     ),
     "91": (
-        "The bounded cell has no call-center return satisfying the November 1999 demographic and GMT-offset filters; "
-        "the empty SQL result is mirrored by both DataFrame families."
+        "No December 1998 call-center return meets the demographic and GMT-offset filters; dropping the month "
+        "filter yields a row."
     ),
-    "93": (
-        "The bounded cell has no store sale joined to a return reason of 'Did not like the warranty'; the empty SQL "
-        "result is mirrored by both DataFrame families."
-    ),
+    "92": ("No web sale in the 90 days from 2000-01-13 is for manufacturer 942; dropping that filter yields a row."),
+    "93": "The reason table has one row, and it is not the drawn 'reason 33'.",
 }
 
 
@@ -1810,9 +2057,21 @@ GATES: dict[str, CrossSurfaceGate] = {
         ),
         scale_factor=_DATAVAULT_SCALE,
     ),
-    # TPC-H: 22 SQL ids ("1".."22") map 1:1 to the DataFrame ids by the
-    # mechanical Q prefix ("Q1".."Q22"). SQL pinned to fixed stream 0. Q17 is
-    # legitimately empty at its default literals (see _TPCH_Q17_VACUOUS).
+    # TPC-DS: 103 statements (99 templates plus the B statements of Q14, Q23,
+    # Q24 and Q39) on the default Power draw at SF=0.01. Polars, pandas and native
+    # DataFusion are all enforced; CI runs pandas as its own step for the budget.
+    # Repeats and other seeds and streams run after each merge (trunk.yml).
+    "tpcds": CrossSurfaceGate(
+        name="tpcds",
+        build=build_tpcds_duckdb,
+        legitimately_empty=_TPCDS_LEGITIMATELY_EMPTY,
+        backends=("expression", "pandas", "datafusion"),
+        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
+        surface_independence_rationale=(
+            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
+        ),
+        scale_factor=_TPCDS_SCALE,
+    ),
     "tpch": CrossSurfaceGate(
         name="tpch",
         build=build_tpch_duckdb,
@@ -1893,21 +2152,7 @@ GATES: dict[str, CrossSurfaceGate] = {
 # The next gateable benchmarks (nyctaxi,
 # tpcds_obt, tpch_skew, tsbs_devops) land here first when their builders are wired.
 
-STAGED_GATES: dict[str, CrossSurfaceGate] = {
-    # TPC-DS: 99 SQL ids ("1".."99") map 1:1 to the DataFrame ids by the
-    # mechanical Q prefix ("Q1".."Q99"). Bounded empty cells at SF=0.01
-    # are classified explicitly. Registration remains distinct from CI enforcement.
-    "tpcds": CrossSurfaceGate(
-        name="tpcds",
-        build=build_tpcds_duckdb,
-        legitimately_empty=_TPCDS_LEGITIMATELY_EMPTY,
-        surface_independence=SURFACE_INDEPENDENCE_SEPARATE,
-        surface_independence_rationale=(
-            "TPC-DS expression and pandas DataFrame implementations are separately handwritten for each query."
-        ),
-        scale_factor=_TPCDS_SCALE,
-    ),
-}
+STAGED_GATES: dict[str, CrossSurfaceGate] = {}
 
 
 def get_gate(name: str) -> CrossSurfaceGate:
@@ -1940,6 +2185,7 @@ def _apply_baseline_update(
     coverage: dict[str, int],
     reference_row_counts: dict[Any, int],
     vacuous_cells: int,
+    all_null_references: set[Any] | None = None,
 ) -> int:
     """Drop this gate's resolved known-divergence entries from the YAML baseline,
     but ONLY when the run is otherwise completely clean.
@@ -1981,6 +2227,7 @@ def _apply_baseline_update(
         legitimately_empty=gate.legitimately_empty,
         scale_factor=gate.scale_factor,
         vacuous_cells=vacuous_cells,
+        all_null_references=all_null_references,
     )
 
     if exit_code != 0:
@@ -2004,7 +2251,31 @@ def _apply_baseline_update(
     return exit_code
 
 
-def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False) -> int:
+def find_flaky_cells(runs: list[list[SurfaceDivergence]]) -> list[tuple[str, str, list[str | None]]]:
+    per_run = [{(str(d.query_id), d.cell): d.detail for d in divergences} for divergences in runs]
+    keys = {key for seen in per_run for key in seen}
+    outcomes = {key: [seen.get(key) for seen in per_run] for key in keys}
+    flaky = [(query, cell, results) for (query, cell), results in outcomes.items() if len(set(results)) > 1]
+    return sorted(flaky, key=lambda item: (item[0].zfill(8), item[1]))
+
+
+def _report_flaky(name: str, flaky: list[tuple[str, str, list[str | None]]], repeats: int, *, enforced: bool) -> None:
+    from rich.text import Text
+
+    from benchbox.utils.printing import emit
+
+    def line(message: str) -> None:
+        emit(Text(message, no_wrap=True, overflow="ignore"), quiet=False)
+
+    verdict = "FAIL (enforced gate)" if enforced else "report only (staged gate)"
+    line(f"\n[flaky - outcome changed between {repeats} identical runs] {name}: {len(flaky)} cell(s), {verdict}")
+    for query, cell, results in flaky:
+        diverged = sum(1 for result in results if result is not None)
+        detail = next(result for result in results if result is not None)
+        line(f"  {query}_{cell}: diverged in {diverged} of {repeats} runs; e.g. {detail[:200]}")
+
+
+def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False, repeats: int = 1) -> int:
     """Run one benchmark's cross-surface gate and print a categorized report.
 
     When ``update_baseline`` is set, any resolved known-divergence entries are
@@ -2019,7 +2290,19 @@ def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False) -> int:
         data = gate.build(gate.scale_factor, Path(tmp))
         connection = data.connection
         reference_row_counts: dict[Any, int] = {}
+        all_null_references: set[Any] = set()
+        order_statuses: dict[tuple[Any, str], OrderStatus] = {}
         try:
+            if gate.name == "tpcds":
+                from benchbox.core.equivalence.builders.tpcds import validate_tpcds_gate_data
+                from benchbox.core.results.canonical_json import canonical_json_text
+
+                if not gate.backends or len(set(gate.backends)) != len(gate.backends):
+                    raise ValueError("TPC-DS requires distinct nonempty backend selection")
+                validate_tpcds_gate_data(data)
+                console.print(
+                    canonical_json_text(data.query_parameters), markup=False, highlight=False, soft_wrap=True, end=""
+                )
             contexts = build_production_contexts(
                 data.benchmark, data.data_dir, backends=gate.backends, scale_factor=gate.scale_factor
             )
@@ -2032,7 +2315,22 @@ def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False) -> int:
                 validator=gate.build_validator(),
                 backends=gate.backends,
                 reference_row_counts=reference_row_counts,
+                all_null_references=all_null_references,
+                order_statuses=order_statuses,
             )
+            repeat_runs = [divergences]
+            for _ in range(repeats - 1):
+                repeat_runs.append(
+                    find_cross_surface_divergences(
+                        connection,
+                        query_ids=data.query_ids,
+                        reference_sql=data.reference_sql,
+                        dataframe_query=data.dataframe_query,
+                        contexts=contexts,
+                        validator=gate.build_validator(),
+                        backends=gate.backends,
+                    )
+                )
             coverage = count_executed_cells(data.query_ids, data.dataframe_query, gate.backends)
             # Count vacuous CELLS exactly (one per backend a vacuous query
             # actually implements), not an estimate: a future gate may implement
@@ -2048,11 +2346,18 @@ def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False) -> int:
 
     total = len(data.query_ids) * len(gate.backends)
     vacuous_cells_total = sum(vacuous_cells.values())
+    flaky = find_flaky_cells(repeat_runs) if repeats > 1 else []
+    enforced = gate.name in GATES
 
     if update_baseline:
-        return _apply_baseline_update(gate, divergences, total, coverage, reference_row_counts, vacuous_cells_total)
+        if flaky:
+            _report_flaky(gate.name, flaky, repeats, enforced=True)
+            return 1
+        return _apply_baseline_update(
+            gate, divergences, total, coverage, reference_row_counts, vacuous_cells_total, all_null_references
+        )
 
-    return _report(
+    exit_code = _report(
         divergences,
         total,
         coverage,
@@ -2062,7 +2367,15 @@ def run_gate(gate: CrossSurfaceGate, *, update_baseline: bool = False) -> int:
         legitimately_empty=gate.legitimately_empty,
         scale_factor=gate.scale_factor,
         vacuous_cells=vacuous_cells_total,
+        all_null_references=all_null_references,
+        enforce_vacuity=gate.vacuity_classified,
+        order_statuses=order_statuses,
     )
+    if flaky:
+        _report_flaky(gate.name, flaky, repeats, enforced=enforced)
+        if enforced:
+            return exit_code or 1
+    return exit_code
 
 
 def _classification(known: dict[str, str | ClassifiedDivergence], divergence: SurfaceDivergence) -> str | None:
@@ -2086,6 +2399,35 @@ def _requires_live_divergence(entry: str | ClassifiedDivergence) -> bool:
     return entry.requires_live_divergence if isinstance(entry, ClassifiedDivergence) else True
 
 
+def _emit_report_lines(lines: list[str]) -> None:
+    from benchbox.utils.printing import get_console
+
+    output = get_console(quiet=False)
+    for line in lines:
+        output.print(line, markup=False, highlight=False, soft_wrap=True)
+
+
+def _order_report_lines(order_statuses: dict[tuple[Any, str], OrderStatus]) -> list[str]:
+    if not order_statuses:
+        return []
+    kinds = Counter(status.kind for status in order_statuses.values())
+    unordered = kinds[ORDER_UNORDERED] + kinds[ORDER_UNVERIFIABLE]
+    lines = [
+        f"  returned order: {kinds[ORDER_VERIFIED]} of {len(order_statuses)} cells verified, {unordered} compared "
+        f"unordered ({kinds[ORDER_UNORDERED]} without ORDER BY, {kinds[ORDER_UNVERIFIABLE]} with an ORDER BY "
+        "that cannot be checked)"
+    ]
+    reasons = sorted(
+        {
+            (str(query_id), status.reason)
+            for (query_id, _), status in order_statuses.items()
+            if status.kind == ORDER_UNVERIFIABLE
+        }
+    )
+    lines.extend(f"    unverifiable ORDER BY, query {query_id}: {reason}" for query_id, reason in reasons)
+    return lines
+
+
 def _report(
     divergences: list[SurfaceDivergence],
     total: int,
@@ -2097,6 +2439,9 @@ def _report(
     legitimately_empty: dict[Any, str] | None = None,
     scale_factor: float = EQUIVALENCE_SCALE,
     vacuous_cells: int | None = None,
+    all_null_references: set[Any] | None = None,
+    enforce_vacuity: bool = True,
+    order_statuses: dict[tuple[Any, str], OrderStatus] | None = None,
 ) -> int:
     """Print a categorized divergence report and return the gate exit code.
 
@@ -2109,7 +2454,9 @@ def _report(
       * any VACUOUS query - one whose SQL reference returns 0 rows, so every
         backend compares empty-vs-empty and trivially "matches" without
         discriminating anything - UNLESS it is explicitly classified in
-        ``legitimately_empty`` with a rationale.
+        ``legitimately_empty`` with a rationale, and
+      * any ``legitimately_empty`` entry whose reference now returns rows, so a
+        classification cannot outlive the emptiness it describes.
 
     The "compared N of M cells" line reports DISCRIMINATING cells only: a vacuous
     query's cells are excluded from the discriminating count and reported
@@ -2124,6 +2471,7 @@ def _report(
     """
     legitimately_empty = legitimately_empty or {}
     reference_row_counts = reference_row_counts or {}
+    all_null_references = all_null_references or set()
 
     found = {d.key for d in divergences}
     # A divergence is classified only if its key is baselined AND (for a detail-aware
@@ -2155,6 +2503,12 @@ def _report(
     vacuous = sorted(qid for qid, count in reference_row_counts.items() if count == 0)
     classified_empty = [qid for qid in vacuous if qid in legitimately_empty]
     unclassified_empty = [qid for qid in vacuous if qid not in legitimately_empty]
+    all_null = [qid for qid in vacuous if qid in all_null_references]
+    stale_empty = sorted(
+        (qid for qid in legitimately_empty if reference_row_counts.get(qid, 0) > 0), key=lambda qid: str(qid)
+    )
+    if not enforce_vacuity:
+        classified_empty, unclassified_empty, stale_empty = [], [], []
 
     # Each vacuous query compares one trivially-matching cell per gated backend it
     # implements; exclude those from the discriminating count so coverage is
@@ -2176,8 +2530,18 @@ def _report(
     print(
         f"  compared {discriminating} of {total} query-backend cells "
         f"({total - executed} not implemented by the DataFrame surface, "
-        f"{vacuous_executed} vacuous empty-vs-empty) - {len(divergences)} divergent\n"
+        f"{vacuous_executed} vacuous empty-vs-empty) - {len(divergences)} divergent"
     )
+    lines = []
+    if vacuous:
+        lines.append(f"  vacuous queries: {len(vacuous) - len(all_null)} zero-row, {len(all_null)} single all-NULL row")
+        if not enforce_vacuity:
+            lines.append(
+                "  vacuity is classified for the default parameter draw only; this draw lists it without failing: "
+                f"{vacuous}"
+            )
+    lines.extend(_order_report_lines(order_statuses or {}))
+    _emit_report_lines([*lines, ""])
 
     by_class: dict[str, list[SurfaceDivergence]] = {}
     for divergence in sorted(divergences, key=lambda d: d.key):
@@ -2192,7 +2556,8 @@ def _report(
     if classified_empty:
         print("  [legitimately-empty - classified, NON-discriminating]")
         for qid in classified_empty:
-            print(f"    {qid}: {legitimately_empty[qid]}")
+            label = " [all-NULL row]" if qid in all_null_references else ""
+            print(f"    {qid}{label}: {legitimately_empty[qid]}")
         print()
 
     if missing_backends:
@@ -2204,6 +2569,13 @@ def _report(
             "GATE FAILURE - vacuous empty-vs-empty queries (0 reference rows) not classified "
             f"legitimately_empty: {unclassified_empty} - make them discriminating or classify them with a rationale"
         )
+    if stale_empty:
+        _emit_report_lines(
+            [
+                f"GATE FAILURE - legitimately_empty entries whose reference now returns rows: {stale_empty} "
+                "- remove the stale classification in a reviewed change"
+            ]
+        )
     if resolved:
         print(
             "GATE FAILURE - previously-known divergences now equivalent: "
@@ -2214,15 +2586,17 @@ def _report(
             entry = known[key]
             assert isinstance(entry, ClassifiedDivergence)  # narrowed by review_due's filter above
             print(f"WAIVER REVIEW DUE - {key}: review_by {entry.review_by} has passed - {entry.reason}")
-    if not new and not resolved and not missing_backends and not unclassified_empty:
+    if not new and not resolved and not missing_backends and not unclassified_empty and not stale_empty:
         suffix = " (modulo classified exceptions)" if (known or classified_empty) else ""
         print(f"SQL and DataFrame surfaces are equivalent{suffix}.")
-    return 1 if (new or resolved or missing_backends or unclassified_empty) else 0
+    return 1 if (new or resolved or missing_backends or unclassified_empty or stale_empty) else 0
 
 
 def main(argv: list[str] | None = None) -> int:
     """Run the cross-surface gate for the chosen benchmark."""
     import argparse
+    from dataclasses import replace
+    from functools import partial
 
     parser = argparse.ArgumentParser(description="Cross-surface SQL<->DataFrame equivalence gate.")
     parser.add_argument(
@@ -2242,8 +2616,38 @@ def main(argv: list[str] | None = None) -> int:
             "untouched and still fails the command (non-zero exit). Idempotent on a second run."
         ),
     )
+    parser.add_argument(
+        "--repeats",
+        type=int,
+        default=1,
+        help=(
+            "Run the comparison this many times against the same data. A cell whose outcome differs "
+            "between runs is reported as flaky and fails an enforced gate (a staged gate only reports "
+            "it). Default 1: output, exit code and runtime are unchanged."
+        ),
+    )
+    parser.add_argument("--backend", action="append", choices=sorted(_PRODUCTION_ADAPTERS), help="Backend to compare.")
+    parser.add_argument("--seed", type=int, help="TPC-DS Power Test query seed.")
+    parser.add_argument("--power-stream", type=int, help="TPC-DS Power stream ID (default: 0).")
     args = parser.parse_args(argv)
-    return run_gate(get_gate(args.benchmark), update_baseline=args.update_baseline)
+    if args.repeats < 1:
+        parser.error("--repeats must be at least 1")
+    if args.benchmark != "tpcds" and (args.seed is not None or args.power_stream is not None):
+        parser.error("--seed and --power-stream apply only to TPC-DS")
+    if (args.seed is not None and args.seed < 0) or (args.power_stream is not None and args.power_stream < 0):
+        parser.error("--seed and --power-stream must be nonnegative")
+    if args.backend is not None and len(set(args.backend)) != len(args.backend):
+        parser.error("--backend must not repeat a backend")
+    if args.update_baseline and (args.backend is not None or args.seed is not None or args.power_stream is not None):
+        parser.error("--update-baseline requires the default draw and backend selection")
+    gate = get_gate(args.benchmark)
+    if args.backend is not None:
+        gate = replace(gate, backends=tuple(args.backend))
+    if args.benchmark == "tpcds":
+        gate = replace(gate, build=partial(build_tpcds_duckdb, seed=args.seed, stream_id=args.power_stream or 0))
+        if args.seed is not None or args.power_stream:
+            gate = replace(gate, vacuity_classified=False)
+    return run_gate(gate, update_baseline=args.update_baseline, repeats=args.repeats)
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point

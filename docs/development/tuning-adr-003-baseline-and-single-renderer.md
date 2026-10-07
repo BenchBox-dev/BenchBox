@@ -171,3 +171,104 @@ warns on comparisons across that seam. The capability registry is the current
 inventory of migrated and remaining adapter-renderer parity: entries that still
 have a distinct execution renderer remain documented gaps, not evidence that
 the repository-wide migration is complete.
+
+## Addendum (2026-10-04): the local result file is not anonymized
+
+`ResultExporter` anonymizes by default, and the CLI exports the user's own local
+result through that default. Receipt statements, reasons and errors are redacted
+in the file the user reads, and there is no flag to turn it off, so a user cannot
+see why tuning did not verify.
+
+**Decision: write the local result unanonymized; keep every outward path
+anonymized.**
+
+- The CLI writes the local result file unanonymized by default.
+- Every publish, public export and submission path keeps full anonymization,
+  including scrubbing of receipt statements, reasons and errors.
+- The local file's tuning receipt and ledger text (statements, reasons and
+  errors) is unscrubbed, so the user can read why verification did not succeed.
+  Scrubbing of that text applies to anonymized exports only.
+- The bundle states truthfully whether it was anonymized through the existing
+  `export.anonymized` field.
+- `scripts/publication/check_artifact_privacy.py` and submission validation
+  continue to reject an unanonymized bundle, and a test pins that.
+- The exporter's separate redaction of connection-identity keys on
+  non-anonymized exports stays on for local files.
+- The change is limited to exporter defaults and CLI wiring. The anonymizer
+  (`benchbox/core/results/anonymization.py` and `anonymization_specs.yaml`) is
+  owner-reviewed and is not edited by this decision.
+
+Rejected options: a `--no-anonymize` flag, which leaves the unhelpful default in
+place for everyone who does not find it; and keeping the default while printing
+an unredacted console summary, which leaves the file itself uninformative.
+
+## Addendum (2026-10-04): tuning in load-only runs
+
+`_execute_load_only_mode` (`benchbox/core/runner/runner.py`) calls
+`create_schema` and `load_data` directly and never `apply_unified_tuning`. On
+DuckDB with a sort-only custom configuration the loader still sorted and
+re-created the indexes, but constraints, pre-load DDL, dropped-intent accounting
+and platform optimizations were skipped, no metadata was saved, and the bundle
+recorded `tuning_mode: custom` with `platform.tuning: null`.
+
+**Decision: load-only runs get the full tuning lifecycle.** The mode runs the
+same lifecycle as a full run: apply, reconcile, metadata save, ledger, receipt,
+and the `platform.tuning` export. A bundle's `tuning_mode` must never claim
+tuning without a `platform.tuning` section.
+
+The alternative, refusing every `--tuning` value other than `notuning` in
+load-only runs with an actionable error, was considered and not chosen.
+
+## Addendum (2026-10-04): requested-but-not-rendered is a named unsafe combination
+
+Decision 1 says compatibility checks warn first and block only for explicit,
+named unsafe combinations. The validator (`validate_for_platform_detailed`)
+nevertheless accepts tuning that execution never applies. The capability
+registry says so itself: PostgreSQL, Redshift, BigQuery and MySQL render nothing
+at execution for some types. Partitioning is accepted on PostgreSQL, BigQuery,
+Snowflake, Databricks and DuckDB, and distribution and sorting are accepted on
+Redshift. Trino and Athena only warn on unsupported types because they are not
+"known" platforms.
+
+**Decision: three named unsafe combinations, each a validation error.**
+
+1. **Requested but not rendered.** A requested tuning type that the capability
+   registry marks `rendered_via="none"` or `:preview_only` for the target
+   platform is a validation error.
+2. **Unknown platforms.** Platforms the validator does not know, such as Trino
+   and Athena, error on unsupported types in the same way as known platforms.
+3. **ClickHouse primary key not a prefix of the sorting key.** An explicit
+   `PRIMARY KEY` that is not a prefix of the tuned sorting key is a validation
+   error before schema creation.
+
+Everything not named here keeps warn-first behavior.
+
+**Sequencing guard.** The severity change for items 1 and 2 lands together with
+the change that makes the capability registry the single source for validator
+severity and with the per-platform renderers that move registry entries from
+`none` or `:preview_only` to rendered. It ships with a test that every shipped
+template, every `tuned-fallback` configuration and every `auto` configuration
+validates clean on its own platform. A shipped configuration that trips the new
+errors is a defect to fix in that change, not a reason to weaken the rule. Item 3
+is independent of that sequencing and lands with the ClickHouse key handling.
+
+## Addendum (2026-10-04): DuckDB partitioning
+
+Every shipped DuckDB tuned template requests partitioning: TPC-H (`LINEITEM`,
+`ORDERS`), SSB (`LINEORDER`) and TPC-DS (six fact tables). DuckDB always drops
+it (`benchbox/platforms/duckdb.py`), and a dropped intent vetoes
+`applied_verified` in `corroborate()`. The curated templates therefore defeat
+their own verification.
+
+**Decision: remove partitioning from the DuckDB templates.**
+
+- Remove partitioning from every `examples/tunings/duckdb/*_tuned.yaml` and from
+  the packaged mirrors in `benchbox/core/tuning/templates/duckdb/`.
+- Register DuckDB partitioning as `rendered_via="none"` in the capability
+  registry.
+- Keep `TestPackagedTemplatesParity` green.
+- The requested-config hash of the DuckDB tuned templates changes; the changelog
+  records it.
+
+The alternative, implementing partitioning as Hive-partitioned Parquet in
+external-table mode only, was considered and not chosen.

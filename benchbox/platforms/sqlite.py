@@ -27,7 +27,8 @@ if TYPE_CHECKING:
         UnifiedTuningConfiguration,
     )
 
-from .base import DriverIsolationCapability, PlatformAdapter, StreamConnectionCapability
+from .base import DriverIsolationCapability, PlatformAdapter
+from .base.connection_wrappers import _make_stream_cursor
 
 try:
     import sqlite3
@@ -197,11 +198,6 @@ class SQLiteAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.NOT_APPLICABLE
     plan_capture_phase_eligible = True
-    # SQLite serves throughput streams from cursors of the single connection:
-    # the adapter defaults ``check_same_thread`` to False (cross-thread use
-    # is an explicit opt-in, not an accident) against one process-local file,
-    # so per-stream cursors share one session exactly like the DuckDB tier.
-    stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
 
     @property
     def platform_name(self) -> str:
@@ -382,6 +378,57 @@ class SQLiteAdapter(PlatformAdapter):
         # Otherwise return instance database_path
         return self.database_path
 
+    def _open_connection(self, db_path: str | None) -> Any:
+        conn = sqlite3.connect(
+            db_path,
+            timeout=self.timeout,
+            check_same_thread=self.check_same_thread,
+            cached_statements=0,
+        )
+
+        _register_sqlite_compatibility_functions(conn)
+
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = WAL")
+        conn.execute("PRAGMA synchronous = NORMAL")
+        conn.execute("PRAGMA cache_size = 10000")
+        conn.execute("PRAGMA temp_store = MEMORY")
+        return conn
+
+    @staticmethod
+    def _main_database_file(connection: Any) -> str:
+        for _seq, name, file in connection.execute("PRAGMA database_list").fetchall():
+            if name == "main":
+                return file or ""
+        return ""
+
+    _IN_MEMORY_REQUIRES_FILE_MESSAGE = (
+        "SQLite throughput requires a file-backed database: an in-memory database cannot be "
+        "shared by independent stream connections. Use a database_path on disk."
+    )
+
+    def ensure_stream_sessions_supported(self, connection: Any = None) -> None:
+        if connection is not None:
+            in_memory = not self._main_database_file(connection)
+        else:
+            database_path = str(self.get_database_path() or "")
+            in_memory = database_path in {"", ":memory:"} or database_path.startswith("file::memory:")
+        if in_memory:
+            raise RuntimeError(self._IN_MEMORY_REQUIRES_FILE_MESSAGE)
+
+    def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
+        database_file = self._main_database_file(connection)
+        if not database_file:
+            return _make_stream_cursor(connection)
+        stream_connection = self._open_connection(database_file)
+        try:
+            if benchmark_type is not None:
+                self.configure_for_benchmark(stream_connection, benchmark_type)
+        except Exception:
+            stream_connection.close()
+            raise
+        return stream_connection
+
     def create_connection(self, **connection_config) -> Any:
         """Create SQLite connection."""
         self.log_operation_start("SQLite connection")
@@ -397,43 +444,15 @@ class SQLiteAdapter(PlatformAdapter):
         # the adapted real value using its native numeric representation.
         sqlite3.register_adapter(Decimal, float)
 
-        # Create connection. Throughput streams run on cursors of this one
-        # connection (SHARED_CURSOR). CPython's sqlite3 keeps a per-connection
-        # statement cache (sqlite3.connect cached_statements, default 128):
-        # concurrent cursors running identical SQL can share one prepared
-        # statement, so one stream's execute resets another's result set and it
-        # reads wrong or missing rows (sqlite 3.53.1, threadsafety 1). Zero
-        # disables reuse so each cursor prepares its own statement. The cost is
-        # one extra prepare per stream query; benchmark queries dominate it,
-        # and this adapter serves single-file testing, not a hot OLTP path.
-        conn = sqlite3.connect(
-            db_path,
-            timeout=self.timeout,
-            check_same_thread=self.check_same_thread,
-            cached_statements=0,
-        )
+        conn = self._open_connection(db_path)
 
-        _register_sqlite_compatibility_functions(conn)
-
-        # Apply SQLite optimizations
-        optimizations_applied = []
-
-        # Enable foreign keys (disabled by default in SQLite)
-        conn.execute("PRAGMA foreign_keys = ON")
-        optimizations_applied.append("foreign_keys=ON")
-
-        # Optimize for better performance
-        conn.execute("PRAGMA journal_mode = WAL")
-        optimizations_applied.append("journal_mode=WAL")
-
-        conn.execute("PRAGMA synchronous = NORMAL")
-        optimizations_applied.append("synchronous=NORMAL")
-
-        conn.execute("PRAGMA cache_size = 10000")
-        optimizations_applied.append("cache_size=10000")
-
-        conn.execute("PRAGMA temp_store = MEMORY")
-        optimizations_applied.append("temp_store=MEMORY")
+        optimizations_applied = [
+            "foreign_keys=ON",
+            "journal_mode=WAL",
+            "synchronous=NORMAL",
+            "cache_size=10000",
+            "temp_store=MEMORY",
+        ]
 
         self.log_operation_complete("SQLite connection", details=f"Applied: {', '.join(optimizations_applied)}")
 

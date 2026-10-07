@@ -4,15 +4,19 @@ name: CI
 # docs, landing, and tooling. The classifier maps changed paths to units
 # (.github/ci-units.yml); an untouched unit reports success immediately, and a
 # touched unit must succeed in every job it required (a skipped required job
-# fails the unit). There is deliberately no branch filter on pull_request, so a
-# change opened against any base gets CI instead of an empty check list.
+# fails the unit). pull_request filters out only the release base, so a change
+# opened against any other base gets CI instead of an empty check list. A
+# release PR carries the curated release tree, which lacks the development
+# files these lanes read; validate-release-pr.yml (validate-base) and test.yml
+# (release-required-result) validate it.
 
 env:
   BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened, edited, ready_for_review, converted_to_draft]
+    branches-ignore: [release]
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -76,6 +80,7 @@ jobs:
       - name: Check base branch
         env:
           BASE_REF: ${{ github.base_ref }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -euo pipefail
           case "$BASE_REF" in
@@ -83,9 +88,13 @@ jobs:
               echo "Base branch '$BASE_REF' is an integration branch; the normal CI lanes apply."
               ;;
             *)
-              echo "::error::PR base branch is '$BASE_REF', not develop, release or published-results."
-              echo "Retarget this PR at develop, or fold the change into the parent PR."
-              exit 1
+              if [ "$IS_DRAFT" = "true" ]; then
+                echo "Draft PR stacked on '$BASE_REF'; it cannot be armed until it is retargeted at develop."
+              else
+                echo "::error::Ready PR base branch is '$BASE_REF', not develop, release or published-results."
+                echo "Only a draft PR may target a parent branch. After the parent merges, retarget this PR at develop and rebase it onto the squash commit."
+                exit 1
+              fi
               ;;
           esac
 
@@ -111,6 +120,8 @@ jobs:
       explorer-paths-needed: ${{ steps.classify.outputs.explorer-paths-needed }}
       explorer-tokens-needed: ${{ steps.classify.outputs.explorer-tokens-needed }}
       site-theme-needed: ${{ steps.classify.outputs.site-theme-needed }}
+      site-needed: ${{ steps.classify.outputs.site-needed }}
+      site-parity-needed: ${{ steps.classify.outputs.site-parity-needed }}
       unit-core: ${{ steps.units.outputs.unit-core }}
       unit-explorer: ${{ steps.units.outputs.unit-explorer }}
       unit-results-data: ${{ steps.units.outputs.unit-results-data }}
@@ -649,36 +660,10 @@ jobs:
         continue-on-error: true
         run: uv run -- python _project/scripts/timing_policy_check.py --strict
 
-      - name: Fast lane ceiling
-        id: guard-fast-lane-ceiling
+      - name: Fast lane marker and path guards
+        id: guard-fast-lane-markers
         continue-on-error: true
         run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict
-
-      - name: Restore fast-lane develop baseline count
-        # Not a guard itself (no `id: guard-*`/`continue-on-error` -- see the
-        # naming-convention comment above): a cache miss here is not itself a
-        # failure, but the delta guard below reports it as a blocking baseline
-        # error. The key is the PR event's actual develop base SHA; a prefix
-        # restore would compare the PR against an unrelated develop tip when
-        # merges or baseline jobs complete out of order.
-        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
-        with:
-          path: fast-lane-count.txt
-          key: fast-lane-count-develop-${{ github.event.pull_request.base.sha }}
-
-      - name: Fast lane ceiling delta vs develop
-        # Pull requests only: in a merge group the delta is the sum of every
-        # composed PR, so it would eject groups whose members each fit.
-        if: github.event_name == 'pull_request'
-        # Additive to guard-fast-lane-ceiling above, never a replacement: that
-        # step enforces the absolute max_fast_tests ceiling unconditionally.
-        # The pull-request lane requires the exact develop baseline so every
-        # queued member proves its +150 per-PR delta before composition grace
-        # is allowed. A missing cache fails closed instead of weakening that
-        # prerequisite.
-        id: guard-fast-lane-delta
-        continue-on-error: true
-        run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --delta-check --develop-count-file fast-lane-count.txt --require-develop-baseline
 
       - name: UAT spec LOC table drift check
         # Mirrors the release-branch Lint gate (.github/workflows/lint.yml). The
@@ -775,9 +760,6 @@ jobs:
           set -euo pipefail
           printf '%s\n' "$STEPS_CONTEXT" > "$RUNNER_TEMP/steps_context.json"
 
-          # FAIL CLOSED: the whole gate rests on this step's exit code, so a
-          # jq parse failure or an empty guard set must fail the job -- never
-          # fall through to "all passed" with zero guards inspected.
           ids=$(jq -r 'keys[] | select(startswith("guard-"))' "$RUNNER_TEMP/steps_context.json" | sort) || {
             echo "aggregator: jq failed to parse the steps context" >&2
             exit 1
@@ -818,6 +800,7 @@ jobs:
     needs: ci-paths
     if: ${{ needs.ci-paths.outputs.code-tests-needed == 'true' }}
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout code
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -838,6 +821,12 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --group dev
+
+      - name: Summarize Make interface changes
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: python make/interface_summary.py --base-ref "$BASE_REF" --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Run cross-surface mutation target drift guard
         run: |
@@ -932,6 +921,13 @@ jobs:
           uv run -- python -m pytest \
             tests/integration/test_tpch_throughput_test.py \
             -m "slow" -n 0 -k "boundary_query" --tb=short -q
+
+      # A changed test that reads a path release-cut removes would fail the
+      # release PR's required test job; run changed tests on that tree now.
+      - name: Run changed tests on the curated release tree
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: uv run -- python scripts/release_curation_dry_run.py --changed-since "$BASE_SHA"
 
       - name: Run fast tests
         run: |
@@ -1183,6 +1179,14 @@ jobs:
         if: matrix.partition == 'a'
         run: make tpch-cross-surface-equivalence-report
 
+      - name: Run TPC-DS cross-surface SQL<->DataFrame equivalence gate (Polars and DataFusion)
+        if: matrix.partition == 'b'
+        run: make tpcds-cross-surface-equivalence-report
+
+      - name: Run TPC-DS cross-surface SQL<->DataFrame equivalence gate (pandas)
+        if: matrix.partition == 'a'
+        run: make tpcds-pandas-cross-surface-equivalence-report
+
   required-local-cases:
     name: required-local-cases
     needs: ci-paths
@@ -1324,6 +1328,10 @@ jobs:
           # contract whose absence let v0.3.0 ship a broken clean install.
           uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
           uv run --isolated --no-project --with "$wheel" -- benchbox --help
+          # Wheel-truth gate for TPC-DS-OBT templates: the 0.4.1 wheel shipped
+          # without top-level _sources/, so the OBT template dir resolved into
+          # site-packages/_sources and get_queries() raised FileNotFoundError.
+          uv run --isolated --no-project --with "$wheel" -- python -c "from benchbox import TPCDSOBT; benchmark = TPCDSOBT(scale_factor=1.0); queries = benchmark.get_queries(); assert queries, 'expected OBT queries from wheel install'; assert benchmark.get_query(next(iter(queries))); print(f'TPC-DS-OBT wheel smoke: {len(queries)} queries')"
 
   dependency-audit:
     name: dependency-audit
@@ -1663,7 +1671,7 @@ jobs:
           # rendered output as much as any source file. uv.lock and
           # results-explorer/package-lock.json must stay in this list.
           SITE_PATHS=(
-            benchbox/ docs/ examples/ landing/
+            benchbox/ docs/ examples/ landing/ website/
             _project/scripts/explorer_pipeline/
             _project/scripts/explorer_publish.py
             _project/scripts/results_explorer_snapshot_invariants.py
@@ -1675,7 +1683,7 @@ jobs:
           # and the baseline ancestor walk use the narrow rendered-input list.
           # Keep this a subset of SITE_PATHS.
           RENDER_PATHS=(
-            docs/ landing/ examples/ results-data/ results-explorer/
+            docs/ landing/ examples/ results-data/ results-explorer/ website/
             _project/scripts/explorer_pipeline/
             _project/scripts/explorer_publish.py
             _project/scripts/results_explorer_snapshot_invariants.py
@@ -1741,6 +1749,9 @@ jobs:
           key: ${{ runner.os }}-sphinx-${{ hashFiles('docs/**', 'pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-sphinx-
+
+      - name: Generate documentation inputs
+        run: make docs-generate
 
       - name: Build documentation
         # -W turns every Sphinx warning into a failure, including unknown
@@ -1922,6 +1933,229 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
+  site-build:
+    name: site-build
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.site-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            results-explorer/package-lock.json
+            website/package-lock.json
+
+      - name: Install results-explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Build explorer data
+        run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
+
+      - name: Build results-explorer
+        run: npm run build
+        working-directory: results-explorer
+
+      - name: Install website dependencies
+        run: npm ci
+        working-directory: website
+
+      - name: Typecheck, audit and build website
+        run: make site-check site-build
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('website/package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: website
+
+      - name: Test built website and not-found fallback
+        run: make site-test-built
+
+      - name: Scan website output for privacy leaks
+        run: uv run python scripts/publication/check_artifact_privacy.py website/dist
+
+  site-parity:
+    name: site-parity
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.site-parity-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            results-explorer/package-lock.json
+            website/package-lock.json
+
+      - name: Install results-explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Build explorer data
+        run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
+
+      - name: Build results-explorer
+        run: npm run build
+        working-directory: results-explorer
+
+      - name: Generate Explorer browser fixtures
+        run: npm run test:e2e:fixtures
+        working-directory: results-explorer
+
+      - name: Install website dependencies
+        run: npm ci
+        working-directory: website
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('website/package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: website
+
+      - name: Compare the Astro build with the Sphinx site
+        run: make site-parity SITE_PARITY_SHA=${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Upload the URL compatibility report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: url-compatibility-report
+          path: |
+            site-parity/report
+            site-parity/browser-report.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  public-site-visual-astro-dry-run:
+    name: Public-site visual Astro dry run
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.site-needed == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: |
+            results-explorer/package-lock.json
+            website/package-lock.json
+
+      - name: Install results-explorer dependencies
+        run: npm ci
+        working-directory: results-explorer
+
+      - name: Build explorer data
+        run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
+
+      - name: Build results-explorer
+        run: npm run build
+        working-directory: results-explorer
+
+      - name: Install website dependencies
+        run: npm ci
+        working-directory: website
+
+      - name: Build website
+        run: make site-build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+        working-directory: results-explorer
+
+      - name: Capture public site from the Astro build
+        run: make site-visual-capture SITE_VISUAL_DIR=${{ runner.temp }}/public-site-visual-astro SITE_VISUAL_SOURCE_SHA=${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Upload Astro visual captures
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: public-site-visual-astro-${{ github.run_id }}
+          path: ${{ runner.temp }}/public-site-visual-astro
+          if-no-files-found: ignore
+          retention-days: 3
+
+  api-contract-check:
+    name: api-contract-check
+    needs: ci-paths
+    if: ${{ contains(needs.ci-paths.outputs.changed-paths, '_project/design/site-inventory/api-public-symbols.json') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/check_api_contract_symbols.py') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/api_contract_probe.py') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Verify public API symbols against the released wheel
+        run: make api-contract-check
+
   example-validation:
     needs: visual-inputs
     if: needs.visual-inputs.outputs.changed == 'true'
@@ -1982,6 +2216,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2006,6 +2246,7 @@ jobs:
         run: python scripts/release_canary_sharding.py verify-medium --artifacts t2-evidence --checked-sha "${{ github.sha }}"
 
       - name: Aggregate core result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2024,7 +2265,28 @@ jobs:
             --expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' || needs.ci-paths.outputs.framing-needed == 'true' }} \
             --expect datafusion-integration=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect package-smoke=${{ needs.ci-paths.outputs.packaging-needed == 'true' }} \
-            --expect dependency-audit=${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
+            --expect dependency-audit=${{ needs.ci-paths.outputs.packaging-needed == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   # Unit result: explorer.
   explorer:
@@ -2033,6 +2295,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2043,6 +2311,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate explorer result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2055,7 +2324,28 @@ jobs:
             --expect explorer-vitest=${{ needs.ci-paths.outputs.explorer-vitest-needed == 'true' }} \
             --expect parity-check=${{ needs.ci-paths.outputs.viz-needed == 'true' }} \
             --expect explorer-e2e=${{ needs.ci-paths.outputs.unit-explorer == 'true' }} \
-            --expect visual-inputs=${{ true }}
+            --expect visual-inputs=${{ true }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   # Unit result: results-data.
   results-data:
@@ -2064,6 +2354,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2074,6 +2370,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate results-data result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2082,7 +2379,28 @@ jobs:
             --unit results-data \
             --needs "$NEEDS_JSON" \
             --always ci-paths \
-            --expect results-data-check=${{ needs.ci-paths.outputs.unit-results-data == 'true' }}
+            --expect results-data-check=${{ needs.ci-paths.outputs.unit-results-data == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   # Unit result: docs.
   docs:
@@ -2091,6 +2409,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2101,6 +2425,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate docs result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2112,15 +2437,42 @@ jobs:
             --expect visual-inputs=${{ true }} \
             --expect docs-build=${{ needs.visual-inputs.outputs.changed == 'true' }} \
             --expect example-validation=${{ needs.visual-inputs.outputs.changed == 'true' }} \
-            --expect spellcheck=${{ needs.visual-inputs.outputs.changed == 'true' }}
+            --expect spellcheck=${{ needs.visual-inputs.outputs.changed == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   # Unit result: landing.
   landing:
     name: landing
-    needs: [ci-paths, site-theme-tokens, visual-inputs]
+    needs: [ci-paths, site-theme-tokens, visual-inputs, site-build]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2131,6 +2483,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate landing result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2140,7 +2493,29 @@ jobs:
             --needs "$NEEDS_JSON" \
             --always ci-paths \
             --expect site-theme-tokens=${{ needs.ci-paths.outputs.site-theme-needed == 'true' }} \
-            --expect visual-inputs=${{ true }}
+            --expect visual-inputs=${{ true }} \
+            --expect site-build=${{ needs.ci-paths.outputs.site-needed == 'true' }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90
 
   # Unit result: tooling.
   tooling:
@@ -2149,6 +2524,12 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions:write lets a superseded run cancel itself so this aggregate
+    # concludes cancelled instead of failed; contents:read checks out the
+    # result helper. Never widen these: PR code executes in this workflow.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - name: Checkout the result helper
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -2159,6 +2540,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Aggregate tooling result
+        id: aggregate
         env:
           NEEDS_JSON: ${{ toJson(needs) }}
         run: |
@@ -2171,4 +2553,25 @@ jobs:
             --expect base-guard=${{ github.event_name == 'pull_request' }} \
             --expect content-guard=${{ needs.ci-paths.outputs.content-guard-needed == 'true' }} \
             --expect skill-integrity=${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }} \
-            --expect audit-sha=${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }}
+            --expect audit-sha=${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }} || {
+            rc=$?
+            if [ "$rc" -eq 3 ]; then
+              echo "superseded=true" >> "$GITHUB_OUTPUT"
+            fi
+            exit "$rc"
+          }
+
+      - name: Cancel superseded run so the aggregate concludes cancelled
+        if: always() && cancelled() && steps.aggregate.outputs.superseded == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Exit 3 above means an upstream was cancelled by a newer run, not
+          # by a real failure. Cancelling this run makes this job conclude
+          # cancelled (grey) instead of failed (red). `|| true`: the run may
+          # already be fully cancelled. If cancellation never lands, this
+          # step exits 0 and the job still fails on the step above, so a
+          # real problem can never green through this path.
+          gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
+          sleep 90

@@ -41,7 +41,7 @@ schedule and on-demand (`workflow_dispatch`) refresh (see
 [`corpus-refresh.md`](corpus-refresh.md)), ad-hoc UAT integrations like PR #164, validator updates — land on
 `develop` first because that is where the project's tooling and tests live.
 The
-[`sync-results-data-to-published.yml`](../../.github/workflows/sync-results-data-to-published.yml)
+[`sync-results-data-to-published.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/sync-results-data-to-published.yml)
 workflow watches `develop` for changes under the slim-branch allowlist
 paths (`results-data/bundles/`, the corpus docs, the two vendored
 validators, plus `corpus-inventory.json`) and opens a **draft** PR against
@@ -72,7 +72,7 @@ still exists only on published-results becomes published-only and is kept).
 After overlay, the workflow regenerates `corpus-inventory.json` from the
 unioned tree so community-only paths remain inventory-listed. Other allowlist
 files (docs, validators) still use per-path checkout / removal. The scheduled
-[`corpus-drift-check.yml`](../../.github/workflows/corpus-drift-check.yml)
+[`corpus-drift-check.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/corpus-drift-check.yml)
 canary classifies develop-ahead vs published-only and never recommends a
 wipe-based full mirror while published-only paths exist.
 
@@ -227,8 +227,8 @@ reads more protection into a green badge than is there:
 
 The static Explorer at `benchbox.dev/results/` publishes through the independent publication
 transaction from `develop` (candidate build plus `github-pages`-approved promotion in
-`publication-deployer-soak-and-retirement.md`). The legacy `docs.yml` release-to-Pages deploy
-remains in the tree but is skipped while a recent independent publication owns Pages.
+`publication-deployer-soak-and-retirement.md`). Production Pages is now deployed by
+`.github/workflows/site-deploy.yml`; `docs.yml` no longer deploys.
 `published-results` is **not** the Explorer's build source — it is the
 corpus-archive branch that contributor PRs target and that mirrors develop's
 `results-data/`.
@@ -239,10 +239,8 @@ corpus-archive branch that contributor PRs target and that mirrors develop's
 > The `docs.yml` build still gates Explorer steps on
 > `hashFiles('results-explorer/package.json')`, but a release that includes the
 > application now fails closed when the corpus, helper set, or generated
-> snapshot is missing. The legacy `docs.yml` deploy job runs only after a protected push to
-> `release`, and the `github-pages` environment must permit `release` for that fallback path.
-> Normal production writes use the transaction writer, whose `github-pages` approval is granted
-> on a dispatch from `develop`.
+> snapshot is missing. Production Pages is deployed by
+> `.github/workflows/site-deploy.yml`.
 >
 > This is a curated preview, not a broad leaderboard or full-cohort claim.
 > Completion evidence must pin the release SHA, artifact digest, deployment

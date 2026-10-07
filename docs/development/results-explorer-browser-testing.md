@@ -20,14 +20,14 @@ public corpus is never modified.
 Routes and behaviours with at least one browser-functional test:
 
 | Route / surface | Happy path | Failure path |
-|-----------------|------------|--------------|
-| Home            | ✅          | -            |
-| BenchmarkIndex  | ✅          | -            |
-| PlatformIndex   | ✅          | -            |
-| ResultDetail    | ✅          | ✅ (unreachable `results.duckdb`, sidecar fetch failure, unknown id) |
-| Compare         | ✅ (deep link, share URL, sticky-bar flow) | ✅ (benchmark mismatch, scale mismatch, unknown id) |
+| --- | --- | --- |
+| Home | ✅ | - |
+| BenchmarkIndex | ✅ | - |
+| PlatformIndex | ✅ | - |
+| ResultDetail | ✅ | ✅ (unreachable `results.duckdb`, sidecar fetch failure, unknown id) |
+| Compare | ✅ (deep link, share URL, sticky-bar flow) | ✅ (benchmark mismatch, scale mismatch, unknown id) |
 | Query workbench | ✅ (sort, column toggle, starter query, CSV + JSON download) | ✅ (read-only write surfaces error) |
-| NotFound        | ✅ (unknown `/results/...` path renders the 404 card) | - |
+| NotFound | ✅ (unknown `/results/...` path renders the 404 card) | - |
 | DuckDB-WASM attach | ✅ (cold load, `waitForDataLoaded`) | ✅ (RG-2 range-read capability via test server) |
 
 ## Running the suite locally
@@ -66,6 +66,9 @@ and are both gitignored.
 
 ## Public-site visual baseline policy
 
+The public-site visual comparison is advisory until the public site is in
+production and feeds no required status context.
+
 The full public-site visual suite is broader than the Explorer's current
 functional gate. Its baseline policy is recorded in
 `_project/audits/public-site-visual-baseline-policy-2026-08-15.md`:
@@ -75,23 +78,19 @@ artifact. Missing or unverifiable baselines fail closed; a PR diagnostic
 artifact is never promoted directly to a baseline. The capture harness at `results-explorer/e2e/captures/public-site-pages.spec.ts`
 and Pages-shaped server are reusable building blocks. `.github/workflows/docs.yml`
 uploads the protected baseline from `develop` and retrieves the exact
-base-SHA artifact for pull requests and merge groups. A changed public-site
+base-SHA artifact for pull requests. A changed public-site
 tree cannot pass without that comparison. `Public-site visual acceptance`
-reports on every develop PR and merge group; it skips the build only when
+reports on every develop PR; it skips the build only when
 the former documentation input paths are unaffected.
 
-A merge group that passes its comparison also uploads a candidate baseline for
-its own `merge_group.head_sha`. The next queue group uses that head as its base,
-so the candidate is the capture of the exact tree that group merges onto. The
-download script accepts a candidate only from a `merge_group` Documentation run
-on this repository's `gh-readonly-queue/develop/*` branch at that SHA, and it
-prefers a protected `develop` artifact when both exist. Merge groups capture
-their own tree first, then wait up to 30 minutes for the exact-base artifact
-before failing closed. Pull requests keep a short retry.
+Develop has no merge queue and no `merge_group` runs
+(`_project/decisions/merge-queue-retirement-2026-10-03.md`): a pull request
+merges by squash through auto-merge once the required checks are green on its
+exact head. Pull requests keep a short retry when downloading the baseline.
 
 If a protected `develop` push was dropped or its baseline expired, dispatch
 Documentation on `develop` with `baseline_source_sha` set to the exact base
-SHA shown by the failing PR or merge group:
+SHA shown by the failing PR:
 
 ```bash
 gh workflow run docs.yml --ref develop -f baseline_source_sha=<full-protected-develop-base-sha>
@@ -108,26 +107,120 @@ maintainer acceptance. After reviewing the PR's `public-site-visual-diagnostics-
 artifact, set the repository variable `APPROVED_HEAD_SHA` to the PR's complete
 head SHA and set `APPROVAL_REASON` to a nonempty review note, then rerun the
 failed workflow. The approval applies only when both values are present and the
-approved SHA exactly equals GitHub's current PR head SHA. For a merge group,
-the maintainer must inspect that group's diagnostics, set
-`APPROVED_MERGE_GROUP_SHA` to its synthetic `merge_group.head_sha`, and set
-`MERGE_GROUP_APPROVAL_REASON` to a nonempty review note. PR approval variables
-cannot approve a merge group. Clear the group variables after the reviewed
-run. It may accept changed
+approved SHA exactly equals GitHub's current PR head SHA. It may accept changed
 digests and unexpected new captures, but it never accepts a capture missing
 from the current matrix. Clear both variables after the approved run so only
 one reviewed head occupies the repository-wide approval slot.
 
+The PR-head slot is the only approval slot. `ci.yml` triggers only on
+`pull_request`, and its compare step reads only `APPROVED_HEAD_SHA`,
+`APPROVAL_REASON` and the PR head SHA.
+
 This approval does not replace a baseline. The protected `develop` push or its
 validated `workflow_dispatch` run uploads the SHA-bound baseline after the
-reviewed PR merges. An approved merge group also uploads a candidate for its own
-head, which only the queue group stacked on that exact head consumes. PR
-diagnostic artifacts remain short-lived and non-promotable.
+reviewed PR merges. PR diagnostic artifacts remain short-lived and non-promotable.
+
+### Intentional visual changes while the site moves to Astro
+
+Several changes alter what the current site renders before the switch to Astro:
+
+- converting reStructuredText pages to MyST;
+- replacing the autodoc API reference with authored pages;
+- adopting shared design tokens.
+
+The comparison is advisory until the public site is in production
+([merge-queue governance](../operations/merge-queue-governance.md)).
+Until then, a changed capture does not block the merge, but it is still
+reviewed. The procedure has two phases.
+
+**Advisory phase (now).** For a PR whose comparison reports changed captures:
+
+1. Download the PR run's `public-site-visual-diagnostics-*` artifact.
+2. For each changed route and viewport, compare the current capture with the
+   baseline. Confirm the change is the one the PR intends and that nothing else
+   on the page moved.
+3. Record the review in the PR: the run id, each changed capture as
+   route and width, and one line per capture saying why the change is expected.
+
+A change nobody intended is a defect. Fix it in the PR; do not record it as
+expected.
+
+**Gating phase (after the check is required again).** Review the PR run's
+diagnostics, set `APPROVED_HEAD_SHA` to the PR head SHA and `APPROVAL_REASON` to
+the review note, then re-run the failed job. Clear both variables afterwards.
+This is the only approval slot.
+
+**Missing exact-SHA baseline.** Dispatch Documentation on `develop` with
+`baseline_source_sha`, as shown above. Wait for its visual job, then re-run the
+failed job. A PR diagnostic artifact is never a substitute.
+
+### Renderer-switch pull request
+
+The Astro build is captured ahead of the switch by the non-required
+`Public-site visual Astro dry run` job in `ci.yml`, locally by
+`make site-build site-visual-capture`. It captures the same route and viewport
+matrix from `website/dist` with `PUBLIC_SITE_VISUAL_RENDERER=astro`, uploads
+`public-site-visual-astro-<run id>`, and never compares or replaces a baseline.
+Each manifest records its `renderer`. If a route or viewport changes, update
+the matrix in `public-site-pages.spec.ts` in the same change.
+
+When the baseline and the current capture come from different renderers, the
+comparison reports every capture as changed and passes only through the
+exact-head approval described above. A missing capture still fails. The
+comparison is never skipped, disabled or loosened.
+
+**What the switch pull request changes.**
+
+1. `docs.yml`: the `build` job produces the Astro site instead of assembling
+   the Sphinx site (the `Assemble public site` step and the upload named
+   `Upload assembled site for visual acceptance`), and the
+   `Capture public site` step of `public-site-visual-regression` sets
+   `PUBLIC_SITE_VISUAL_RENDERER: astro`. The push run on `develop` then
+   publishes an Astro baseline for the merge commit.
+2. `ci.yml`: the `docs-build` job and the `Capture public site` step of the
+   `Public-site visual regression` job make the same change, so the pull
+   request captures the Astro build against the Sphinx baseline of its exact
+   base.
+3. `public-site-pages.spec.ts`: the guard that restricts
+   `PUBLIC_SITE_VISUAL_RENDERER=astro` to the capture phase stays in place. The
+   workflows' compare step leaves `PUBLIC_SITE_VISUAL_RENDERER` unset, so it
+   defaults to `sphinx` and the astro renderer reaches the comparison through
+   the captured manifest. The guard therefore blocks only a local single-pass
+   or compare run with `PUBLIC_SITE_VISUAL_RENDERER=astro`; lift it only for
+   that local use, after the renderer cutover.
+
+**Approval and baseline.** The decision record requires an exact-head approval
+for the PR head, with queue position never substituting for it. Develop has no
+merge queue, so there is no second slot.
+
+1. PR head. Review the PR run's `public-site-visual-diagnostics-*` artifact
+   against the Sphinx baseline. Set `APPROVED_HEAD_SHA` to the PR head SHA and
+   `APPROVAL_REASON` to the review note, then re-run the failed job.
+2. After the merge, the `Documentation` push run on `develop` must capture the
+   Astro build and upload `public-site-visual-baseline-<merge commit>`. Confirm
+   the artifact exists and that its `manifest.json` has `"renderer": "astro"`.
+   If the push was dropped, dispatch Documentation with `baseline_source_sha`
+   set to the merge commit.
+3. Clear the approval variables. Hold other site-changing PRs until step 2
+   is confirmed, because they need the Astro baseline for their exact base.
+
+### Site-deploy comparison
+
+A site-deploy run whose release commit or renderer differs from the deployed
+one captures the release-sourced pages of the last production artifact and of
+the assembled candidate with the same spec and compares them before the deploy
+job may start (see
+[the site deploy runbook](../operations/site-deploy.md#visual-comparison-before-deploy)).
+The approval rule is the one above, in a separate pair of repository variables
+named in that runbook: the approved value must equal the binding of the release
+commit, the candidate artifact and the production baseline, and the reason must
+be nonempty. The PR slot never applies to a deploy, and a deploy
+approval never applies to a PR.
 
 ## What CI gates
 
-The `explorer-e2e` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
-(Chromium full suite, blocking) runs on **pull requests** and **merge groups**
+The `explorer-e2e` job in [`.github/workflows/ci.yml`](https://github.com/BenchBox-dev/BenchBox/blob/develop/.github/workflows/ci.yml)
+(Chromium full suite, blocking) runs on **pull requests**
 when the change touches the explorer unit (with the `explorer` unit result
 always reporting; the job is skipped when no relevant files change).
 

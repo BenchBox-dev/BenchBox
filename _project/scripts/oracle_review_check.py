@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -14,6 +15,30 @@ from typing import Any
 from soundness_paths import any_soundness_path
 
 CONNECTOR_LOGIN = "chatgpt-codex-connector"
+# Accounts whose stand-in attestation substitutes for the Codex connector when it
+# cannot review (for example at its usage limit). The attestation must name the
+# exact head commit, so it records who vouched for which reviewed code.
+STANDIN_ATTESTERS = frozenset({"joeharris76"})
+_STANDIN_MARKER = re.compile(r"Stand-in oracle review: APPROVE ([0-9a-f]{40})")
+
+
+def _attested_shas(comment: dict[str, Any]) -> list[str]:
+    match = _STANDIN_MARKER.fullmatch((comment.get("body") or "").strip())
+    return [match.group(1)] if match else []
+
+
+def _is_standin(comment: dict[str, Any], head_sha: str, head_time: datetime) -> bool:
+    # Exact login and a human account: a "[bot]" suffix is not stripped here. An
+    # edited comment does not count, because its text may not be the author's.
+    return (
+        comment.get("login") in STANDIN_ATTESTERS
+        and comment.get("user_type") == "User"
+        and comment.get("updated_at") in (None, comment.get("created_at"))
+        and _parse_time(comment["created_at"]) > head_time
+        and head_sha in _attested_shas(comment)
+    )
+
+
 API_ROOT = "https://api.github.com"
 PAGE_SIZE = 100
 WORKFLOW_PATH = ".github/workflows/oracle-review.yml"
@@ -63,26 +88,32 @@ def decide(
     reactions: Iterable[dict[str, Any]],
     threads: Iterable[dict[str, Any]],
     paths: Callable[[Iterable[str]], bool],
+    base_date: str | None = None,
+    comments: Iterable[dict[str, Any]] = (),
 ) -> tuple[int, str]:
     if not paths(files):
         return PASS, "oracle-review: not a soundness path change"
 
+    base_time = _parse_time(base_date) if base_date else None
     review_signal = any(
         _is_connector(review.get("login"))
         and review.get("commit_id") == head_sha
         and review.get("state") not in {"PENDING", "DISMISSED"}
+        and (base_time is None or (review.get("submitted_at") and _parse_time(review["submitted_at"]) > base_time))
         for review in reviews
     )
-    head_time = _parse_time(head_date)
+    head_time = max(_parse_time(head_date), base_time) if base_time else _parse_time(head_date)
     reaction_signal = any(
         _is_connector(reaction.get("login"))
         and reaction.get("content") == "+1"
         and _parse_time(reaction["created_at"]) > head_time
         for reaction in reactions
     )
-    if not (review_signal or reaction_signal):
+    standin = next((comment for comment in comments if _is_standin(comment, head_sha, head_time)), None)
+    if not (review_signal or reaction_signal or standin):
         return WAITING, (
-            f"oracle-review: waiting for the Codex connector's review of {head_sha}; rerun this check after it lands"
+            f"oracle-review: waiting for the Codex connector's review of {head_sha}, or a stand-in attestation "
+            f"'Stand-in oracle review: APPROVE {head_sha}' from a listed attester; rerun this check after it lands"
         )
 
     open_threads = sum(1 for thread in threads if not thread.get("resolved") and _is_connector(thread.get("author")))
@@ -94,7 +125,10 @@ def decide(
 
     if review_signal:
         return PASS, f"oracle-review: pass (Codex connector review of {head_sha})"
-    return PASS, f"oracle-review: pass (Codex connector +1 after the head commit {head_sha})"
+    if reaction_signal:
+        return PASS, f"oracle-review: pass (Codex connector +1 after the head commit {head_sha})"
+    assert standin is not None
+    return PASS, f"oracle-review: pass (stand-in review attested by {standin.get('login')} for {head_sha})"
 
 
 def _request(token: str, url: str, body: dict[str, Any] | None = None) -> Any:
@@ -182,6 +216,7 @@ def fetch_reviews(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
             "login": (item.get("user") or {}).get("login"),
             "commit_id": item.get("commit_id"),
             "state": item.get("state"),
+            "submitted_at": item.get("submitted_at"),
         }
         for item in _paginate(token, f"/repos/{repo}/pulls/{pr}/reviews")
     ]
@@ -196,6 +231,28 @@ def fetch_reactions(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
         }
         for item in _paginate(token, f"/repos/{repo}/issues/{pr}/reactions")
     ]
+
+
+def fetch_comments(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
+    return [
+        {
+            "login": (item.get("user") or {}).get("login"),
+            "user_type": (item.get("user") or {}).get("type"),
+            "body": item.get("body"),
+            "created_at": item["created_at"],
+            "updated_at": item.get("updated_at"),
+        }
+        for item in _paginate(token, f"/repos/{repo}/issues/{pr}/comments")
+    ]
+
+
+def latest_base_change(events: Iterable[dict[str, Any]]) -> str | None:
+    dates = [event["created_at"] for event in events if event.get("event") == "base_ref_changed"]
+    return max(dates, key=_parse_time) if dates else None
+
+
+def fetch_base_change_date(token: str, repo: str, pr: int) -> str | None:
+    return latest_base_change(_paginate(token, f"/repos/{repo}/issues/{pr}/timeline"))
 
 
 def fetch_threads(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
@@ -222,7 +279,10 @@ def fetch_threads(token: str, repo: str, pr: int) -> list[dict[str, Any]]:
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Require the Codex connector's review on result-affecting pull requests."
+        description=(
+            "Require the Codex connector's review on result-affecting pull requests, or a stand-in "
+            "attestation for the exact head commit from a listed attester."
+        )
     )
     parser.add_argument("--repo", required=True, help="Repository as OWNER/NAME.")
     parser.add_argument("--pr", required=True, type=int, help="Pull request number.")
@@ -255,6 +315,8 @@ def main(argv: list[str] | None = None) -> int:
             fetch_reactions(token, args.repo, args.pr),
             fetch_threads(token, args.repo, args.pr),
             matcher,
+            fetch_base_change_date(token, args.repo, args.pr),
+            fetch_comments(token, args.repo, args.pr),
         )
     except (CheckError, KeyError, ValueError) as exc:
         print(f"oracle-review: error: {exc}", file=sys.stderr)

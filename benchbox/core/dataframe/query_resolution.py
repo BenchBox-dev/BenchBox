@@ -73,8 +73,9 @@ def get_dataframe_queries_for_benchmark(
     benchmark_config: Any,
     benchmark_instance: Any | None,
     stream_id: int | None = None,
+    *,
+    bind_parameters: bool = True,
 ) -> list[Any]:
-    """Get DataFrame queries for a benchmark in proper execution order."""
     benchmark_id = normalize_benchmark_id(benchmark_config.name)
     if stream_id is None:
         stream_id = getattr(benchmark_config, "stream_id", 0)
@@ -82,7 +83,9 @@ def get_dataframe_queries_for_benchmark(
     if benchmark_id == "tpch":
         return get_tpch_dataframe_queries(stream_id)
     if benchmark_id == "tpcds":
-        return get_tpcds_dataframe_queries(benchmark_config, benchmark_instance, stream_id)
+        return get_tpcds_dataframe_queries(
+            benchmark_config, benchmark_instance, stream_id, bind_parameters=bind_parameters
+        )
     if benchmark_id == "clickbench":
         return get_clickbench_dataframe_queries(benchmark_config, benchmark_instance, stream_id)
 
@@ -183,9 +186,12 @@ def get_tpcds_legacy_queries(available_query_ids: list[int], stream_id: int) -> 
     return queries
 
 
-def resolve_tpcds_stream_queries(stream_queries: list[Any], allow_variant_fallback: bool) -> list[Any]:
-    """Resolve TPC-DS stream query variants to DataFrame query implementations."""
+_TPCDS_FIRST_STATEMENT_VARIANT = "a"
+
+
+def resolve_tpcds_stream_queries(stream_queries: list[Any], allow_variant_fallback: bool = False) -> list[Any]:
     from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
+    from benchbox.core.tpcds.streams import MULTI_PART_QUERY_IDS
 
     queries: list[Any] = []
     missing_variants: list[str] = []
@@ -201,6 +207,12 @@ def resolve_tpcds_stream_queries(stream_queries: list[Any], allow_variant_fallba
             continue
 
         variant_id = f"{base_query_id}{stream_query.variant.lower()}"
+        if (
+            stream_query.variant.lower() == _TPCDS_FIRST_STATEMENT_VARIANT
+            and int(stream_query.query_id) in MULTI_PART_QUERY_IDS
+        ):
+            queries.append(replace(base_query, query_id=variant_id))
+            continue
         variant_query = (
             TPCDS_DATAFRAME_QUERIES.get(variant_id)
             or TPCDS_DATAFRAME_QUERIES.get(variant_id.upper())
@@ -212,14 +224,21 @@ def resolve_tpcds_stream_queries(stream_queries: list[Any], allow_variant_fallba
 
         missing_variants.append(variant_id)
         if allow_variant_fallback:
+            logger.warning(
+                "TPC-DS DataFrame query %s has no implementation; running %s under its name "
+                "(tpcds_dataframe_variant_fallback=true), so its result does not answer the SQL query %s",
+                variant_id,
+                base_query_id,
+                variant_id,
+            )
             queries.append(replace(base_query, query_id=variant_id))
 
     if missing_variants and not allow_variant_fallback:
         missing = ", ".join(sorted(set(missing_variants)))
         raise RuntimeError(
             "TPC-DS DataFrame SQL parity check failed: missing variant DataFrame implementations "
-            f"for [{missing}]. Set option tpcds_dataframe_variant_fallback=true to allow "
-            "non-parity fallback execution."
+            f"for [{missing}]. Set option tpcds_dataframe_variant_fallback=true to run the base "
+            "implementation in their place (timings only: the results answer a different query)."
         )
 
     return queries
@@ -229,13 +248,27 @@ def get_tpcds_dataframe_queries(
     benchmark_config: Any,
     benchmark_instance: Any | None,
     stream_id: int,
+    *,
+    bind_parameters: bool = True,
 ) -> list[Any]:
-    """Get TPC-DS DataFrame queries in stream-permuted order with variant resolution."""
+    queries = _resolve_tpcds_dataframe_queries(benchmark_config, benchmark_instance, stream_id)
+    if not bind_parameters:
+        return queries
+    from benchbox.core.tpcds.dataframe_queries.production_binding import bind_power_stream_queries
+
+    return bind_power_stream_queries(queries, benchmark_config, stream_id)
+
+
+def _resolve_tpcds_dataframe_queries(
+    benchmark_config: Any,
+    benchmark_instance: Any | None,
+    stream_id: int,
+) -> list[Any]:
     from benchbox.core.tpcds.dataframe_queries import TPCDS_DATAFRAME_QUERIES
     from benchbox.core.tpcds.streams import create_standard_streams
 
     options_map = getattr(benchmark_config, "options", {}) or {}
-    allow_variant_fallback = bool(options_map.get("tpcds_dataframe_variant_fallback", True))
+    allow_variant_fallback = bool(options_map.get("tpcds_dataframe_variant_fallback", False))
 
     available_query_ids = sorted(
         int(qid[1:])

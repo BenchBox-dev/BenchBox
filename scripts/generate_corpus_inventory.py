@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
+import importlib.util
 import json
 import sys
 from collections import Counter, defaultdict
@@ -53,6 +55,20 @@ def _normalize_funding(value: object) -> str:
     """Return a known funding value, defaulting unknown/empty to 'unspecified'."""
     token = str(value).strip().lower() if value is not None else ""
     return token if token in FUNDING_SOURCES else DEFAULT_FUNDING
+
+
+@functools.cache
+def _load_corpus_validator():
+    path = CHECKOUT_ROOT / "results-data" / "validate_corpus.py"
+    spec = importlib.util.spec_from_file_location("validate_corpus", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _cohort_phase_suffix(bundle_path: Path) -> str:
+    payload = json.loads(bundle_path.read_text(encoding="utf-8"))
+    return _load_corpus_validator().cohort_phase_suffix(payload)
 
 
 def discover_bundles(bundles_dir: Path) -> list[Path]:
@@ -195,25 +211,6 @@ def _platform_version(data: dict) -> str:
     return str(value) if value and value != "unknown" else "unknown"
 
 
-def _bundle_phase(data: dict) -> str:
-    benchmark = data.get("benchmark") or {}
-    declared = benchmark.get("test_type") or ""
-    if declared:
-        return str(declared)
-    phases = data.get("phases") or {}
-    if _phase_executed(phases.get("power_test")):
-        return "power"
-    if _phase_executed(phases.get("throughput_test")):
-        return "throughput"
-    return "unknown"
-
-
-def _phase_executed(phase: object) -> bool:
-    if not isinstance(phase, dict) or not phase:
-        return False
-    return str(phase.get("status") or "").upper() != "NOT_RUN"
-
-
 def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
     """Extract inventory metadata from a bundle file."""
     try:
@@ -233,7 +230,6 @@ def extract_metadata(bundle_path: Path, bundles_dir: Path) -> dict:
         "platform": platform.get("name", "unknown"),
         "platform_version": _platform_version(data),
         "scale_factor": benchmark.get("scale_factor", 0),
-        "phase": _bundle_phase(data),
         "timestamp": run.get("timestamp"),
         "query_count": _query_count(data),
         "trust_label": _bundle_trust_label(bundle_path, bundles_dir),
@@ -270,23 +266,22 @@ def generate_inventory(bundles_dir: Path) -> dict:
         )
     )
 
-    cohort_members: defaultdict[str, set[str]] = defaultdict(set)
+    cohort_members: defaultdict[tuple[str, str], set[str]] = defaultdict(set)
     for entry in entries:
-        phase = str(entry.get("phase", "unknown"))
-        suffix = "" if phase in ("power", "unknown") else f"#{phase}"
-        key = f"{entry['benchmark']}@sf{entry['scale_factor']}{suffix}"
+        key = (entry["benchmark"], str(entry["scale_factor"]) + _cohort_phase_suffix(bundles_dir / entry["file"]))
         identity = entry["platform"]
         if entry["platform_version"] != "unknown":
             identity = f"{identity} v{entry['platform_version']}"
         cohort_members[key].add(identity)
 
-    cohorts: dict[str, list[str]] = {key: sorted(platforms) for key, platforms in sorted(cohort_members.items())}
+    cohorts: dict[str, list[str]] = {}
+    for (benchmark, scale_factor), platforms in sorted(cohort_members.items()):
+        cohorts[f"{benchmark}@sf{scale_factor}"] = sorted(platforms)
 
     by_benchmark = Counter(entry["benchmark"] for entry in entries)
     by_platform = Counter(entry["platform"] for entry in entries)
     by_trust_label = Counter(entry["trust_label"] for entry in entries)
     by_funding = Counter(entry["funding"] for entry in entries)
-    by_phase = Counter(entry.get("phase", "unknown") for entry in entries)
 
     return {
         "schema_version": "2.3",
@@ -299,7 +294,6 @@ def generate_inventory(bundles_dir: Path) -> dict:
             "by_platform": dict(sorted(by_platform.items())),
             "by_trust_label": dict(sorted(by_trust_label.items())),
             "by_funding": dict(sorted(by_funding.items())),
-            "by_phase": dict(sorted(by_phase.items())),
         },
     }
 

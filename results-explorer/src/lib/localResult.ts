@@ -118,11 +118,7 @@ export async function parseLocalResultText(text: string, fileName = "local-resul
   const displayTimings = buildDisplayTimings(queries);
   const logicalQueryCount = inferLogicalQueryCount(bundle, benchmarkId, displayTimings);
   const eligibility = timingEligibility(displayTimings, logicalQueryCount);
-  const powerScore = firstFiniteNumber(objectValue(summary, "tpc_metrics"), [
-    "power_at_size",
-    "qphh_at_size",
-    "qphds_at_size",
-  ]);
+  const powerScore = firstFiniteNumber(objectValue(summary, "tpc_metrics"), ["power_at_size"]);
   const resultId = localResultId();
   const validationStatus = validationStatusFor(bundle, failedQueryCount(bundle));
   const environment = safeEnvironment(bundle.environment);
@@ -461,9 +457,14 @@ function testType(bundle: JsonObject, benchmark: JsonObject): string | null {
   const explicit = stringOrNull(benchmark.test_type);
   if (explicit !== null) return explicit;
   const phases = objectValue(bundle, "phases");
-  if (phases.power_test) return "power";
-  if (phases.throughput_test) return "throughput";
+  if (phaseExecuted(phases.power_test)) return "power";
+  if (phaseExecuted(phases.throughput_test)) return "throughput";
   return null;
+}
+
+function phaseExecuted(phase: unknown): boolean {
+  if (!isObject(phase) || Object.keys(phase).length === 0) return false;
+  return String(phase.status ?? "").toUpperCase() !== "NOT_RUN";
 }
 
 function rawMeasurementDurations(queries: QueryTiming[]): number[] {

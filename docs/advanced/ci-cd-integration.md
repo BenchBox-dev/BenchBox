@@ -972,5 +972,5 @@ median_time = sorted(results)[len(results) // 2]
 
 - [Testing Guide](../development/testing.md) - Testing strategies
 - [Performance Guide](./performance.md) - Performance optimization
-- [Result Analysis API](../reference/python-api/result-analysis.rst) - Result analysis utilities
+- [Result Analysis API](../reference/python-api/result-analysis.md) - Result analysis utilities
 - [Examples](../usage/examples.md) - Usage examples

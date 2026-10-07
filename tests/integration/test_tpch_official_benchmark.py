@@ -89,7 +89,6 @@ class TestTPCHOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphh_at_size=0.0,
             success=True,
             errors=[],
         )
@@ -141,8 +140,7 @@ class TestTPCHOfficialBenchmark:
         assert result.total_time > 0
         assert result.power_at_size == 100.0
         assert result.throughput_at_size == 200.0
-        # QphH@Size = sqrt(100 * 200) = sqrt(20000) ≈ 141.42
-        assert abs(result.qphh_at_size - 141.42) < 0.01
+        assert not hasattr(result, "qphh_at_size")
 
     def test_run_official_benchmark_with_custom_config(self, benchmark_instance, mock_connection_factory):
         """Test official benchmark with custom configuration."""
@@ -163,7 +161,7 @@ class TestTPCHOfficialBenchmark:
         assert result.success is True
         assert result.power_at_size == 150.0
         assert result.throughput_at_size == 0.0  # Not run
-        assert result.qphh_at_size == 0.0  # Cannot calculate without both
+        assert not hasattr(result, "qphh_at_size")
 
     def test_validate_compliance(self, benchmark_instance):
         """Test compliance validation."""
@@ -178,7 +176,6 @@ class TestTPCHOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=100.0,
             throughput_at_size=200.0,
-            qphh_at_size=141.42,  # sqrt(100 * 200)
             success=True,
             errors=[],
         )
@@ -196,7 +193,6 @@ class TestTPCHOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphh_at_size=0.0,
             success=False,
             errors=["Test error"],
         )
@@ -215,7 +211,6 @@ class TestTPCHOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=360.0,
             throughput_at_size=480.0,
-            qphh_at_size=415.69,  # sqrt(360 * 480)
             success=True,
             errors=[],
         )
@@ -237,7 +232,7 @@ class TestTPCHOfficialBenchmark:
             assert "TPC-H Official Benchmark Audit Trail" in content
             assert "Scale Factor: 0.01" in content
             assert "Number of Streams: 2" in content
-            assert "QphH@Size: 415.69" in content
+            assert "QphH" not in content
         finally:
             # Clean up the temp file
             if audit_file.exists():
@@ -257,7 +252,6 @@ class TestTPCHOfficialBenchmark:
             maintenance_test_result=None,
             power_at_size=0.0,
             throughput_at_size=0.0,
-            qphh_at_size=0.0,
             success=True,
             errors=[],
         )
@@ -276,23 +270,18 @@ class TestTPCHOfficialBenchmark:
         assert "Power Test failed" in result.errors[0]
         assert "Database connection failed" in result.errors[0]
 
-    def test_qphh_calculation_accuracy(self, benchmark_instance, mock_connection_factory):
-        """Test QphH@Size calculation accuracy with various values."""
-        test_cases = [
-            (100.0, 400.0, 200.0),  # sqrt(100*400) = 200
-            (360.0, 480.0, 415.69),  # sqrt(360*480) ≈ 415.69
-            (1000.0, 1000.0, 1000.0),  # sqrt(1000*1000) = 1000
-        ]
-
-        for power, throughput, expected_qphh in test_cases:
-            # Create mock methods
+    def test_component_metrics_pass_through_without_composite(self, benchmark_instance, mock_connection_factory):
+        """Power@Size and Throughput@Size are reported as-is and no composite is derived."""
+        for power, throughput in [(100.0, 400.0), (360.0, 480.0), (1000.0, 1000.0)]:
             benchmark_instance.benchmark.run_power_test = Mock(return_value={"power_at_size": power})
             benchmark_instance.benchmark.run_throughput_test = Mock(return_value={"throughput_at_size": throughput})
 
             config = TPCHOfficialBenchmarkConfig(maintenance_test_enabled=False)
             result = benchmark_instance.run_official_benchmark(mock_connection_factory, config=config)
 
-            assert abs(result.qphh_at_size - expected_qphh) < 0.01
+            assert result.power_at_size == power
+            assert result.throughput_at_size == throughput
+            assert not hasattr(result, "qphh_at_size")
 
     def test_partial_failure_handling(self, benchmark_instance, mock_connection_factory):
         """Test handling when some phases fail."""
@@ -310,7 +299,7 @@ class TestTPCHOfficialBenchmark:
         assert "Throughput Test failed" in result.errors[0]
         assert result.power_at_size == 100.0  # Power succeeded
         assert result.throughput_at_size == 0.0  # Throughput failed
-        assert result.qphh_at_size == 0.0  # Cannot calculate
+        assert not hasattr(result, "qphh_at_size")
 
     def test_timing_metrics(self, benchmark_instance, mock_connection_factory):
         """Test that timing metrics are properly recorded."""
@@ -348,8 +337,7 @@ class TestTPCHOfficialBenchmark:
         assert result.success is True
         assert result.power_at_size == 500.0
         assert result.throughput_at_size == 800.0
-        # QphH@Size = sqrt(500 * 800) = sqrt(400000) ≈ 632.46
-        assert abs(result.qphh_at_size - 632.46) < 0.01
+        assert not hasattr(result, "qphh_at_size")
 
     def test_zero_metric_handling(self, benchmark_instance, mock_connection_factory):
         """Test handling when metrics are zero (cannot calculate QphH@Size)."""
@@ -361,7 +349,7 @@ class TestTPCHOfficialBenchmark:
 
         assert result.power_at_size == 0.0
         assert result.throughput_at_size == 0.0
-        assert result.qphh_at_size == 0.0  # Cannot calculate geometric mean with zero
+        assert not hasattr(result, "qphh_at_size")
 
     def test_integration_with_base_benchmark(self, temp_dir):
         """Test integration with main TPCHBenchmark class."""

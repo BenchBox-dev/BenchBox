@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 import pytest
-from ci_unit_result import evaluate, parse_expectation
+from ci_unit_result import SUPERSEDED_EXIT_CODE, evaluate, parse_expectation
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
@@ -20,42 +20,68 @@ def needs(**results: str) -> dict[str, dict[str, str]]:
 
 
 def test_untouched_unit_passes_when_all_jobs_skipped() -> None:
-    assert evaluate(needs(lint="skipped", test="skipped"), {"lint": False, "test": False}, []) == []
+    assert evaluate(needs(lint="skipped", test="skipped"), {"lint": False, "test": False}, []) == ([], [])
 
 
 def test_required_job_must_succeed() -> None:
-    problems = evaluate(needs(lint="success", test="success"), {"lint": True, "test": True}, [])
-    assert problems == []
+    problems, cancelled = evaluate(needs(lint="success", test="success"), {"lint": True, "test": True}, [])
+    assert (problems, cancelled) == ([], [])
 
 
 def test_required_job_skipped_is_a_failure() -> None:
     """A skipped required job must never green the unit."""
-    problems = evaluate(needs(lint="skipped"), {"lint": True}, [])
+    problems, _ = evaluate(needs(lint="skipped"), {"lint": True}, [])
     assert problems == ["lint=skipped (required for this change; expected success)"]
 
 
 def test_unexpected_success_when_not_required_is_allowed() -> None:
-    assert evaluate(needs(lint="success"), {"lint": False}, []) == []
+    assert evaluate(needs(lint="success"), {"lint": False}, []) == ([], [])
 
 
-def test_failure_and_cancelled_always_fail() -> None:
-    assert evaluate(needs(lint="failure"), {"lint": False}, []) != []
-    assert evaluate(needs(lint="cancelled", other="success"), {"other": True}, []) != []
+def test_failure_always_fails() -> None:
+    problems, _ = evaluate(needs(lint="failure"), {"lint": False}, [])
+    assert problems != []
+
+
+def test_cancelled_upstream_is_never_a_failure() -> None:
+    """A cancelled upstream means a newer run superseded this one, so the
+    aggregate must conclude cancelled (reported separately) instead of failed."""
+    assert evaluate(needs(lint="cancelled", other="success"), {"other": True}, []) == (
+        [],
+        ["lint=cancelled"],
+    )
+
+
+def test_cancelled_required_job_is_superseded_not_failed() -> None:
+    assert evaluate(needs(lint="cancelled"), {"lint": True}, []) == ([], ["lint=cancelled"])
+
+
+def test_cancelled_always_job_is_superseded_not_failed() -> None:
+    assert evaluate(needs(classify="cancelled"), {}, ["classify"]) == ([], ["classify=cancelled"])
+
+
+def test_failure_beats_cancellation() -> None:
+    """A real failure alongside a cancellation still fails the unit."""
+    problems, cancelled = evaluate(needs(lint="failure", test="cancelled"), {"lint": True, "test": True}, [])
+    assert problems != []
+    assert cancelled == ["test=cancelled"]
 
 
 def test_missing_expected_job_is_reported() -> None:
-    problems = evaluate(needs(lint="success"), {"lint": True, "gone": True}, [])
+    problems, _ = evaluate(needs(lint="success"), {"lint": True, "gone": True}, [])
     assert any(p.startswith("gone: not in needs") for p in problems)
 
 
 def test_always_jobs_must_succeed_even_when_skipped() -> None:
-    assert evaluate(needs(classify="skipped"), {}, ["classify"]) == ["classify=skipped (must succeed on every run)"]
-    assert evaluate(needs(classify="success"), {}, ["classify"]) == []
-    assert evaluate({}, {}, ["classify"]) == ["classify=missing (must succeed on every run)"]
+    problems, _ = evaluate(needs(classify="skipped"), {}, ["classify"])
+    assert problems == ["classify=skipped (must succeed on every run)"]
+    assert evaluate(needs(classify="success"), {}, ["classify"]) == ([], [])
+    problems, _ = evaluate({}, {}, ["classify"])
+    assert problems == ["classify=missing (must succeed on every run)"]
 
 
 def test_problem_list_is_deduplicated() -> None:
-    problems = evaluate(needs(lint="failure"), {"lint": True}, [])
+    problems, _ = evaluate(needs(lint="failure"), {"lint": True}, [])
     assert len(problems) == len(set(problems))
 
 
@@ -90,6 +116,33 @@ def test_cli_exit_codes() -> None:
     assert bad.returncode == 1
     assert "lint=skipped" in bad.stdout
     assert run("not-an-object").returncode == 1
+
+
+def test_cli_superseded_exit_code_for_cancelled_upstreams() -> None:
+    """A cancelled-only outcome exits SUPERSEDED (not 0, not 1) so the
+    workflow can cancel its own run instead of failing the aggregate."""
+    assert SUPERSEDED_EXIT_CODE not in (0, 1)
+    superseded = run(
+        needs(classify="success", lint="cancelled"),
+        "--always",
+        "classify",
+        "--expect",
+        "lint=true",
+    )
+    assert superseded.returncode == SUPERSEDED_EXIT_CODE, superseded.stdout
+    assert "CANCELLED" in superseded.stdout
+    assert "lint=cancelled" in superseded.stdout
+    mixed = run(
+        needs(classify="success", lint="failure", test="cancelled"),
+        "--always",
+        "classify",
+        "--expect",
+        "lint=true",
+        "--expect",
+        "test=true",
+    )
+    assert mixed.returncode == 1
+    assert "FAILED" in mixed.stdout
     assert (
         subprocess.run(
             [sys.executable, str(SCRIPT), "--unit", "core", "--needs", "{"], capture_output=True, text=True

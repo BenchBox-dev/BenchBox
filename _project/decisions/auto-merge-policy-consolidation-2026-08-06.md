@@ -1,11 +1,13 @@
 # Auto-merge policy: adversarial evaluation and consolidation
 
+> Partly superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md): D5's soundness-path revocation and D7's advisory-only review policy are replaced by required `oracle-review`; the PR-body attestation is gone. Explicit arming and durable holds remain.
+
 **Date**: 2026-08-06
 **Status**: historical evaluation; D1–D4 and D6 were later implemented.
 D5 and D7 remain recommendations pending explicit authorization. At the time
 of this evaluation, no mechanism had yet been modified.
 **Related**: PRs #1567, #1592, #1622, #1623, #1624 (policy lineage);
-#1568/#1569 (live arm-on-open failure); #1503/#1521/#1531 (stranded review
+\#1568/#1569 (live arm-on-open failure); #1503/#1521/#1531 (stranded review
 fixes); #1512 (anonymization auto-merge escape); #1543 (red-develop revert);
 UAT batch #1616–#1631. Evidence window: 150 merged PRs (#1459–#1630,
 2026-08-02 → 2026-08-06).
@@ -19,7 +21,7 @@ final — but it carries four pieces of scar tissue: (1) the workflow's arm
 step is dead code (zero `ready_for_review` events in 150 PRs; drafts are
 never used); (2) the "durable" `no-auto-merge` hold is not durable against
 the only live arm path (`make pr-arm-auto-merge` never checks it — proven on
-#1626, armed 52 s after being labeled); (3) two files still document the
+\#1626, armed 52 s after being labeled); (3) two files still document the
 code-owner rule as RETIRED when it is live again; (4) the hook-regenerated
 LOC block in `_project/specs/uat-framework.md` makes any two LOC-changing UAT
 PRs conflict by construction, which is what actually serializes concurrent
@@ -84,7 +86,7 @@ committed numbers so most PRs don't move them.
 ## Prior art — every mechanism, with verdicts
 
 | # | Mechanism | Where | Originating incident | What it prevents | Failure mode still reachable? | Verdict |
-|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- |
 | 1 | Workflow arm on `ready_for_review` | `.github/workflows/auto-merge-on-open.yml:153-169` | #1567/#1592 (was: arm on `opened`) | n/a (it is an *enabling* path) | Dead in practice: 0 `ready_for_review` events in 150 PRs; drafts unused; 0 bot arms since #1592 (last: 85 s before its merge) | **supersede** — delete the arm step; workflow becomes revoke-only (D2) |
 | 2 | Workflow soundness revocation | `auto-merge-on-open.yml:105-151,171-183`; `_project/scripts/auto_merge_soundness_paths.py` | #1512 (anonymization change auto-merged into every published byte) | Hands-free merge of correctness-/privacy-defining paths | Yes — reachable and firing: disable step executed in 20/100 recent runs (upper bound; `\|\| true` masks no-ops) | **extend** — keep; it is the tier boundary (D5) |
 | 3 | Makefile withhold/arm (`pr-open` withholds, `pr-ready`/`READY=1` arms) | `Makefile:1582-1643` | #1503/#1521/#1531 (stranded review fixes) | Merge before the author is finished | The defect class recurs whenever arming precedes finality; observed escapes `16a5a1432e`, #1543 | **keep unchanged** (D1) |
@@ -106,7 +108,7 @@ pre-#1592 workflow token armed it, not that any workflow merged it).
 **Ready → merged latency** (no drafts exist, so created ≈ ready):
 
 | Class | n | p50 | p90 | mean | max |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | Auto-merged (armed at merge) | 141 (94%) | 0.45 h | 3.5 h | 2.85 h | 37.7 h |
 | — bot-armed (pre-#1592 arm-on-open) | 66 | 0.49 h | 3.0 h | 2.59 h | 37.7 h |
 | Manual (never armed) | 9 (6%) | 0.61 h | 12.1 h | 3.03 h | 12.1 h |
@@ -118,7 +120,7 @@ scale the arming question is not a throughput question.**
 **Escaped defects** (the central number):
 
 | Signal | Auto (n=141) | Manual (n=9) |
-|---|---|---|
+| --- | --- | --- |
 | Direct `#N`-referencing fix commit ≤7 d | 2 (1.4%) | 0 |
 | Red-develop revert (#1543) | 1 | 0 |
 | File-overlap ≥75% follow-up "fix" PR ≤7 d | 33 (23.4%) | 2 (22.2%) |
@@ -156,7 +158,7 @@ arm-when-final, not by gating merges.**
 **UAT batch claims from the session, verified:** #1568/#1569 hands-free
 merges 18 s/32 s after opening — confirmed. #1630 merged manually 36 min
 after open with zero completed reviews; cost ≈ 0 — confirmed (its follow-up,
-#1631, is open and held, so "landed later" is not yet true). The 60-second
+\#1631, is open and held, so "landed later" is not yet true). The 60-second
 label fight — confirmed to the second on #1626, all four events actor
 `joeharris76`, no attribution possible. The #1626 trap/cleanup regression and
 the mutation-survival findings are session-reported and **not independently
@@ -176,7 +178,7 @@ multi-agent safety (indistinguishable actors), **S** comprehension cost of
 the mechanism set.
 
 | Policy | A | L | C | M | S | Total | Notes |
-|---|---|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- | --- | --- |
 | (a) No gating: arm on `opened`, merge when green | 5 | 5 | 1 | 1 | 5 | 17 | The pre-#1567 world. Reproduces the only observed incident class (3 stranded-fix incidents in one session; #1512 privacy escape reached published bytes). Fails exactly where reverts are not cheap. |
 | (b) Full manual: no auto-merge anywhere | 2 | 3 | 3 | 2 | 4 | 14 | 141 armed merges become 141 human polls (~33/day). Manual cohort shows no measurable correctness gain (n=9, same defect proxy). Buys nothing the data can see; costs the scarce resource. |
 | (c) Status quo, untouched | 4 | 4 | 4 | 2 | 2 | 16 | Works, but: dead arm path, hold label bypassable by the live arm path, contradictory docs, conflict-by-construction spec file. M=2 because the one coordination primitive doesn't bind. |
@@ -192,7 +194,7 @@ preserves the evaluation and rationale; the current source and operational
 runbook are the operative implementation record.
 
 | ID | Decision | Choice |
-|---|---|---|
+| --- | --- | --- |
 | D1 | Arm-when-final | **Keep unchanged.** `make pr-open` withholds; `make pr-ready` / `READY=1` arms. Its incident class is real and its cost is one command. |
 | D2 | Workflow arm step | **Delete** (`auto-merge-on-open.yml:153-169` and the `hold`-gated enable condition). The workflow becomes revoke-only: soundness revocation + label revocation. Update the header policy comment; keep `ready_for_review` in the trigger list only if the draft path is ever adopted — otherwise drop it. Rationale: 0 firings ever; every line of a dead enabling path is comprehension cost on a security-relevant file. |
 | D3 | Make the durable hold durable | **Extend** `pr-arm-auto-merge` (Makefile:1617-1630) to refuse when the PR carries `no-auto-merge` (one `gh pr view --json labels` check, exact match, same semantics as the workflow's `grep -qxF`). Add a pinning test beside `tests/unit/test_auto_merge_hold_is_durable.py`. This is the multi-agent coordination primitive: with indistinguishable actors, the label is the only cross-session signal; today the only live arm path ignores it (#1626, armed while labeled). |
@@ -204,7 +206,7 @@ runbook are the operative implementation record.
 **Migration path** (each independently landable, smallest first): D4 (comment
 edits + no behavior change) → D3 (Makefile guard + test) → D2 (workflow
 deletion + update `test_auto_merge_enablement_point.py`) → D6 (script + spec
-+ `.pre-commit-config.yaml`; verify `guards-fix` and CI drift check follow).
+\+ `.pre-commit-config.yaml`; verify `guards-fix` and CI drift check follow).
 Leave alone: sweep, soundness predicate/CODEOWNERS lockstep, pr-base-guard,
 conflict-scan, ruleset.
 

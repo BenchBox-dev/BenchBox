@@ -47,24 +47,11 @@ def test_publication_canaries_permissions_are_least_privilege() -> None:
     assert "deploy-pages" not in raw
 
 
-def test_publication_canaries_triggers_and_schedule() -> None:
+def test_publication_canaries_is_dispatch_only() -> None:
     wf = _workflow()
     triggers = wf.get("on") or wf.get(True) or {}
 
-    assert "schedule" in triggers
-    assert "workflow_dispatch" in triggers
-
-    schedules = triggers["schedule"]
-    assert len(schedules) >= 1
-    cron_expr = schedules[0].get("cron", "")
-    assert cron_expr, "Missing cron schedule expression"
-
-    # Validate 5-part cron syntax (minute hour dom month dow)
-    parts = cron_expr.strip().split()
-    assert len(parts) == 5, f"Expected 5 parts in cron expression '{cron_expr}', got {len(parts)}"
-    # Verify valid minute and hour
-    assert re.match(r"^[0-9*,\-/]+$", parts[0]), f"Invalid cron minute: {parts[0]}"
-    assert re.match(r"^[0-9*,\-/]+$", parts[1]), f"Invalid cron hour: {parts[1]}"
+    assert set(triggers) == {"workflow_dispatch"}
 
 
 def test_publication_canaries_referenced_scripts() -> None:

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.influxdb.setup import InfluxDBSetupMixin
 
 pytestmark = [
@@ -13,12 +14,15 @@ pytestmark = [
 ]
 
 
-class _Adapter(InfluxDBSetupMixin):
+class _Adapter(InfluxDBSetupMixin, ConnectionLifecycleMixin):
     def __init__(self):
         self.logger = MagicMock()
         self.force_recreate = False
+        self.dry_run = False
+        self.dry_run_mode = False
         self.log_operation_start = MagicMock()
         self.log_verbose = MagicMock()
+        self.log_very_verbose = MagicMock()
         self.host = "localhost"
         self.port = 8086
         self.token = None
@@ -28,20 +32,6 @@ class _Adapter(InfluxDBSetupMixin):
         self.verify_ssl = True
         self.ca_cert_path = None
         self.mode = "cloud"
-
-
-class _BaseLifecycle:
-    def __init__(self):
-        self.base_handle_calls = []
-
-    def handle_existing_database(self, **connection_config):
-        self.base_handle_calls.append(connection_config)
-
-
-class _AdapterWithBase(_Adapter, _BaseLifecycle):
-    def __init__(self):
-        _Adapter.__init__(self)
-        _BaseLifecycle.__init__(self)
 
 
 def test_setup_connection_params_defaults_and_overrides():
@@ -85,22 +75,29 @@ def test_create_connection_failure_paths(monkeypatch):
     adapter.logger.warning.assert_called()
 
 
-def test_handle_existing_database_and_database_path():
+def test_handle_existing_database_fails_closed_on_force_recreate():
     adapter = _Adapter()
     adapter.force_recreate = True
-    adapter.handle_existing_database()
-    adapter.logger.warning.assert_called()
+
+    with pytest.raises(RuntimeError, match="InfluxDB does not support --force-recreate") as excinfo:
+        adapter.handle_existing_database()
+
+    assert "manually" in str(excinfo.value).lower()
     assert adapter.get_database_path() is None
 
 
-def test_handle_existing_database_preserves_warning_and_delegates_to_base():
-    adapter = _AdapterWithBase()
+def test_handle_existing_database_ignores_force_recreate_on_dry_run():
+    adapter = _Adapter()
     adapter.force_recreate = True
+    adapter.dry_run = True
 
     adapter.handle_existing_database(database="benchbox_test")
 
-    adapter.logger.warning.assert_called_once()
-    assert adapter.base_handle_calls == [{"database": "benchbox_test"}]
+
+def test_handle_existing_database_delegates_to_base_without_force_recreate():
+    adapter = _Adapter()
+
+    adapter.handle_existing_database(database="benchbox_test")
 
 
 def test_check_benchmark_tables_exist_returns_true_when_all_tables_present(monkeypatch):

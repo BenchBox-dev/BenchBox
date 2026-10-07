@@ -1,0 +1,11 @@
+{
+  "bundle_file": "tpchavoc_sf001_clickhouse_local_sql_20260826_171608_ce266327.json",
+  "bundle_hash": "a26b34ac1bc7955067289c951bad6785c33b004557d69b6242f83a167abe80a0",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}

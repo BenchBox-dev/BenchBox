@@ -617,17 +617,6 @@ class TestReleaseInfrastructure:
         assert "RELEASE_READINESS_OVERRIDE_SHA" in readiness_step["env"]
 
     def test_validate_main_pr_restores_ruleset_helper_before_drift_check(self):
-        """scripts/ruleset_drift_check.py imports its enforcement helper from
-        _project/scripts, which release-cut curation strips from both the
-        release head and (once a release has been cut) the trusted release
-        base. The restore-from-develop step must run, and must run before
-        the ruleset drift check, or bootstrap evidence would ModuleNotFoundError
-        on every real release PR.
-
-        The helper itself imports auto_merge_soundness_paths from the same
-        curated-out directory, so restoring only the helper still fails
-        (v0.3.1 release PR #1072). Both modules must be restored.
-        """
         job = _workflow("validate-release-pr.yml")["jobs"]["validate-base"]
         step_names = [step.get("name") for step in job["steps"]]
         restore_index = step_names.index("Restore ruleset review enforcement helper for bootstrap")
@@ -637,7 +626,6 @@ class TestReleaseInfrastructure:
         restore_step = job["steps"][restore_index]
         assert restore_step["if"] == "steps.release-readiness.outputs.bootstrap_required == 'true'"
         assert "_project/scripts/ruleset_review_enforcement.py" in restore_step["run"]
-        assert "_project/scripts/auto_merge_soundness_paths.py" in restore_step["run"]
         assert "origin/develop" in restore_step["run"]
 
     def test_release_docs_name_canary_and_ruleset_drift(self):
@@ -748,6 +736,21 @@ class TestReleaseInfrastructure:
         rm_idx = recipe.index("git rm")
         assert gen_idx < check_idx < rm_idx, "curation check must gate between changelog draft and `git rm`"
 
+    def test_release_cut_takes_a_curated_section_in_one_pass_without_skipping_gates(self):
+        """A non-interactive cut supplies curated text up front instead of resuming later.
+
+        Resume refuses once origin/develop moves, so a two-pass agent cut aborted
+        three times in four during v0.4.2. CHANGELOG_SECTION writes the curated
+        body during the first pass; the start check and the curation gate still run.
+        """
+        recipe = _make_target_recipe("release-cut")
+
+        assert '$(if $(CHANGELOG_SECTION),--section-file "$(CHANGELOG_SECTION)")' in recipe
+        assert recipe.index('sh scripts/release_cut_start.sh "$(VERSION)"') < recipe.index("--section-file")
+        assert recipe.index("--section-file") < recipe.index("--check-curation --version $(VERSION)")
+        assert 'if [ -n "$(CHANGELOG_SECTION)" ]' in recipe
+        assert recipe.count("CHANGELOG_SECTION") == 5, "CHANGELOG_SECTION must not gate anything else"
+
     def test_release_cut_is_resumable_and_has_an_abort_target(self):
         """An interrupted cut must be resumable or discardable, not a manual cleanup.
 
@@ -784,7 +787,9 @@ class TestReleaseInfrastructure:
         assert "git switch --discard-changes" in abort_script
         assert 'git branch -d "$branch"' in abort_script
         assert "git ls-remote --heads origin" in abort_script
-        assert ".PHONY: release-cut release-cut-abort release-finalize" in _makefile_text()
+        phony_lines = {line.strip() for line in _makefile_text().splitlines() if line.startswith(".PHONY:")}
+        for target in ("release-cut", "release-cut-abort", "release-finalize"):
+            assert f".PHONY: {target}" in phony_lines
 
     def test_release_cut_curation_survives_untracked_paths(self):
         """Curation `git rm` lines must use --ignore-unmatch and abort on real failures.
@@ -845,7 +850,6 @@ class TestReleaseInfrastructure:
             "tests/unit/scripts/test_ci_lint_environment_boundary.py",
             "tests/unit/scripts/test_corpus_privacy_invariant.py",
             "tests/unit/scripts/test_dev_loop_pr_metrics.py",
-            "tests/unit/scripts/test_fast_lane_ratchet_check.py",
             "tests/unit/scripts/test_green_unmerged_sweep.py",
             "tests/unit/scripts/test_guard_messages.py",
             "tests/unit/scripts/test_mirror_partial_validation_policy.py",
@@ -874,7 +878,7 @@ class TestReleaseInfrastructure:
             "tests/unit/workflows/test_validate_submission_changed_bundles.py",
             "tests/unit/workflows/test_validate_submission_fail_open.py",
         }
-        assert len(v040_missed_paths) == 38
+        assert len(v040_missed_paths) == 37
         assert v040_missed_paths <= curated_paths, (
             "release-cut is missing tests that had to be curated manually in the v0.4.0 release PR: "
             f"{sorted(v040_missed_paths - curated_paths)}"

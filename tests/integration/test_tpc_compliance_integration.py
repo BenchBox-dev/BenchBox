@@ -25,21 +25,6 @@ pytestmark = [
 ]
 
 
-def _calculate_composite_qph(
-    *,
-    scale_factor: float,
-    power_time: float,
-    throughput_time: float,
-    num_streams: int,
-) -> float:
-    if power_time <= 0 or throughput_time <= 0 or num_streams <= 0:
-        return 0.0
-
-    power_at_size = (3600.0 * scale_factor) / power_time
-    throughput_at_size = (num_streams * 3600.0 * scale_factor) / throughput_time
-    return TPCMetricsCalculator.calculate_qph(power_at_size, throughput_at_size)
-
-
 class TestTPCHCompliance:
     """Test TPC-H compliance implementation."""
 
@@ -171,25 +156,6 @@ class TestTPCHCompliance:
             assert result.total_time > 0
             assert result.rf1_operations > 0
             assert result.rf2_operations > 0
-
-    def test_tpch_qphh_size_calculation(self) -> None:
-        """Test TPC-H QphH@Size calculation integration."""
-        power_time = 360.0  # 6 minutes
-        throughput_time = 720.0  # 12 minutes
-        num_streams = 2
-
-        qphh_size = _calculate_composite_qph(
-            scale_factor=1.0,
-            power_time=power_time,
-            throughput_time=throughput_time,
-            num_streams=num_streams,
-        )
-
-        # Expected calculation:
-        # Power@Size = 3600 * 1.0 / 360.0 = 10.0
-        # Throughput@Size = 2 * 3600 * 1.0 / 720.0 = 10.0
-        # QphH@Size = sqrt(10.0 * 10.0) = 10.0
-        assert abs(qphh_size - 10.0) < 0.0001
 
 
 class TestTPCDSCompliance:
@@ -328,25 +294,6 @@ class TestTPCDSCompliance:
             assert result.test_duration == 60.0
             assert result.overall_throughput == 100.0
 
-    def test_tpcds_qphds_size_calculation(self) -> None:
-        """Test TPC-DS QphDS@Size calculation integration."""
-        power_time = 600.0  # 10 minutes
-        throughput_time = 1200.0  # 20 minutes
-        num_streams = 3
-
-        qphds_size = _calculate_composite_qph(
-            scale_factor=1.0,
-            power_time=power_time,
-            throughput_time=throughput_time,
-            num_streams=num_streams,
-        )
-
-        # Expected calculation:
-        # Power@Size = 3600 * 1.0 / 600.0 = 6.0
-        # Throughput@Size = 3 * 3600 * 1.0 / 1200.0 = 9.0
-        # QphDS@Size = sqrt(6.0 * 9.0) = sqrt(54.0) ≈ 7.35
-        assert abs(qphds_size - 7.35) < 0.01
-
 
 class TestTPCBenchmarkFlows:
     """End-to-end integration tests for TPC benchmark flows."""
@@ -415,44 +362,17 @@ class TestTPCBenchmarkFlows:
             )
             maintenance_result = maintenance_test.run_maintenance_test(rf1_interval=0.0, rf2_interval=0.0)
 
-            qphh_size = _calculate_composite_qph(
-                scale_factor=1.0,
-                power_time=power_result.total_time,
-                throughput_time=throughput_result.total_time,
-                num_streams=2,
-            )
-
             # Verify all tests completed successfully
             assert power_result.power_at_size > 0
             assert throughput_result.throughput_at_size > 0
             assert maintenance_result.total_time > 0
-            assert qphh_size > 0
 
     def test_tpc_metrics_validation(self) -> None:
         """Test TPC metrics validation and error handling."""
-        qphh_size = _calculate_composite_qph(
-            scale_factor=1.0,
-            power_time=0.0,
-            throughput_time=100.0,
-            num_streams=2,
-        )
-        assert qphh_size == 0.0
-
-        qphh_size = _calculate_composite_qph(
-            scale_factor=1.0,
-            power_time=-50.0,
-            throughput_time=100.0,
-            num_streams=2,
-        )
-        assert qphh_size == 0.0
-
-        qphh_size = _calculate_composite_qph(
-            scale_factor=1.0,
-            power_time=100.0,
-            throughput_time=100.0,
-            num_streams=0,
-        )
-        assert qphh_size == 0.0
+        assert TPCMetricsCalculator.calculate_power_at_size([], scale_factor=1.0) == 0.0
+        assert TPCMetricsCalculator.calculate_power_at_size([-50.0], scale_factor=1.0) == 0.0
+        assert TPCMetricsCalculator.calculate_throughput_at_size(44, 0.0, 1.0, 2) == 0.0
+        assert TPCMetricsCalculator.calculate_throughput_at_size(44, 100.0, 1.0, 0) == 0.0
 
 
 if __name__ == "__main__":

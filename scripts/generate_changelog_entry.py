@@ -62,13 +62,15 @@ _FALSE_VALUES = frozenset({"0", "false", "no", "off"})
 # Curation gate. `_build_raw_changelog` emits verbatim commit subjects, which
 # keep their squash-merge PR suffix (e.g. "... (#1086)"); the Claude summary
 # and any hand-curated section do not. That suffix is the precise signal; the
-# bullet ceiling is a backstop for drafts written by other means.
+# bullet and line ceilings are backstops for drafts written by other means.
 #
-# The ceiling is set from evidence, not the prompt's 10-25 target: the largest
-# genuinely hand-curated section shipped so far is 0.2.1 at 39 bullets, while
-# the raw origin/release..HEAD delta at v0.3.1 was 231 conventional commits. 60
-# separates the two with room to spare.
-MAX_CURATED_BULLETS = 60
+# The ceilings are set from evidence: the largest genuinely hand-curated
+# section shipped so far is 0.2.1 at 39 bullets and 139 lines, while the
+# contributor-level 0.4.2 draft that reached the v0.4.2 tag ran 53 bullets
+# and 255 lines. 45 bullets and 160 lines keep every shipped section green
+# with room to spare and reject a draft of that size on both axes.
+MAX_CURATED_BULLETS = 45
+MAX_CURATED_LINES = 160
 RAW_PLACEHOLDER = "(no user-facing changes detected -- please edit manually)"
 _PR_SUFFIX_RE = re.compile(r"\(#\d+\)\s*$")
 _BULLET_RE = re.compile(r"^\s*- \S")
@@ -318,6 +320,56 @@ def has_changelog_section(source: Path, version: str) -> bool:
     return section_body(changelog.read_text(encoding="utf-8"), version) is not None
 
 
+def curated_section_from_file(path: Path, version: str, release_date: str) -> tuple[str | None, str | None]:
+    """Return (section, error) for a hand-curated section body read from ``path``.
+
+    The file holds the body only: the ``###`` groups and their bullets. The
+    ``## [version] - date`` header is added here so the version and date always
+    match the cut. The curation gate checks the result like any other section.
+    """
+    try:
+        body = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        return None, f"cannot read curated section file {path}: {exc}"
+    if not body:
+        return None, f"curated section file {path} is empty"
+    if re.search(r"^## ", body, re.MULTILINE):
+        return None, f"curated section file {path} must hold the section body only, without a '## ' version header"
+    return f"## [{version}] - {release_date}\n\n{body}\n", None
+
+
+def _insert_section(content: str, new_section: str) -> str:
+    """Insert a release section above the newest released one, below ``## [Unreleased]``."""
+    first_release = re.search(r"^## \[\d", content, re.MULTILINE)
+    if first_release is None:
+        return content.rstrip() + "\n\n" + new_section
+    return content[: first_release.start()] + new_section + "\n" + content[first_release.start() :]
+
+
+def _replace_section(content: str, version: str, new_section: str) -> str:
+    header = re.search(rf"^## \[{re.escape(version)}\] - .*$", content, re.MULTILINE)
+    assert header is not None
+    following = re.search(r"^## \[", content[header.end() :], re.MULTILINE)
+    end = header.end() + following.start() if following else len(content)
+    return content[: header.start()] + new_section + ("\n" if following else "") + content[end:]
+
+
+def _write_curated_section(changelog: Path, version: str, release_date: str, section_file: Path) -> bool:
+    new_section, error = curated_section_from_file(section_file, version, release_date)
+    if new_section is None:
+        print(f"  Error: {error}")
+        return False
+    content = changelog.read_text(encoding="utf-8")
+    if section_body(content, version) is None:
+        content = _insert_section(content, new_section)
+        print(f"  Wrote the [{version}] section from {section_file}")
+    else:
+        content = _replace_section(content, version, new_section)
+        print(f"  Replaced the existing [{version}] section with {section_file}")
+    changelog.write_text(content, encoding="utf-8")
+    return True
+
+
 def check_changelog_curation(source: Path, version: str) -> tuple[bool, list[str]]:
     """Return (ok, problems) for the drafted `version` section.
 
@@ -349,6 +401,9 @@ def check_changelog_curation(source: Path, version: str) -> tuple[bool, list[str
         )
     if len(bullets) > MAX_CURATED_BULLETS:
         problems.append(f"{len(bullets)} bullets exceeds the {MAX_CURATED_BULLETS}-bullet curated ceiling")
+    body_lines = len(body.splitlines())
+    if body_lines > MAX_CURATED_LINES:
+        problems.append(f"{body_lines} lines exceeds the {MAX_CURATED_LINES}-line curated ceiling")
     return (not problems), problems
 
 
@@ -712,6 +767,7 @@ def generate_changelog_entry(
     release_date: str,
     since_tag: str | None = None,
     since_ref: str | None = None,
+    section_file: Path | None = None,
 ) -> bool:
     """Generate a changelog entry from conventional commits.
 
@@ -725,6 +781,9 @@ def generate_changelog_entry(
         since_ref: Ref to use as the lower bound (e.g. 'origin/release'). This is
             the release-branch flow default because `develop` is intentionally
             not tagged after releases.
+        section_file: A hand-curated section body to write instead of a
+            generated draft. It replaces an existing section for ``version``,
+            so a cut resumed after a raw first pass takes the curated text.
 
     Returns:
         True if changelog was updated, False otherwise.
@@ -735,6 +794,9 @@ def generate_changelog_entry(
     if not changelog.exists():
         print(f"  Error: {changelog} not found")
         return False
+
+    if section_file is not None:
+        return _write_curated_section(changelog, version, release_date, section_file)
 
     # An interrupted `make release-cut` leaves the drafted section in place.
     # Re-running the cut must not append a second one, and must not discard a
@@ -796,14 +858,7 @@ def generate_changelog_entry(
     if new_section is None:
         new_section = _build_raw_changelog(version, release_date, added, fixed, changed)
 
-    content = changelog.read_text()
-    insertion_marker = "\n## ["
-    idx = content.find(insertion_marker)
-    if idx == -1:
-        content = content.rstrip() + "\n\n" + new_section
-    else:
-        content = content[:idx] + "\n" + new_section + content[idx:]
-
+    content = _insert_section(changelog.read_text(), new_section)
     changelog.write_text(content)
     print(f"  Updated {changelog}")
     return True
@@ -835,8 +890,8 @@ def main() -> int:
         help=(
             "Check that the '## [VERSION]' section has been hand-curated (no raw commit "
             "subjects, no placeholder, at most "
-            f"{MAX_CURATED_BULLETS} bullets), then exit. Requires --version. "
-            "Override with RELEASE_ALLOW_RAW_CHANGELOG=1."
+            f"{MAX_CURATED_BULLETS} bullets and {MAX_CURATED_LINES} lines), then exit. "
+            "Requires --version. Override with RELEASE_ALLOW_RAW_CHANGELOG=1."
         ),
     )
     parser.add_argument(
@@ -868,6 +923,16 @@ def main() -> int:
         "--since-ref",
         default=None,
         help="Lower-bound ref for commit range, e.g. origin/release. Overrides --since-tag.",
+    )
+    parser.add_argument(
+        "--section-file",
+        type=Path,
+        default=None,
+        help=(
+            "Write the [VERSION] section from this hand-curated body (the ### groups and bullets, "
+            "no version header) instead of generating a draft. Replaces an existing [VERSION] section. "
+            "--check-curation still checks the result."
+        ),
     )
     parser.add_argument(
         "--source",
@@ -934,6 +999,7 @@ def main() -> int:
         release_date=args.release_date,
         since_tag=args.since_tag,
         since_ref=args.since_ref,
+        section_file=args.section_file,
     )
     return 0 if success else 1
 

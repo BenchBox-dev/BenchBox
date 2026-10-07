@@ -551,6 +551,11 @@ def _execute_load_only_mode(
     postload_result: ValidationResult | None = None
 
     connection_lifecycle = as_connection_lifecycle(adapter)
+    # New run: allow the existing-database decision to be made once below.
+    # Without this reset, a reused adapter instance would skip first-connection
+    # reuse/recreate handling for the load-only run.
+    # adapter is typed as object, so direct assignment would fail type checking.
+    setattr(adapter, "_existing_db_decided", False)  # noqa: B010
     try:
         connection = connection_lifecycle.create_connection(**(platform_config or {}))
 
@@ -901,6 +906,9 @@ def _build_run_config_from_options(
         iterations=max(1, iterations),
         warm_up_iterations=max(0, warmups),
         power_fail_fast=bool(options.get("power_fail_fast", False)),
+        stream_timeout_seconds=options.get("stream_timeout_seconds"),
+        stream_timeout_source=options.get("stream_timeout_source"),
+        cancel_on_timeout=bool(options.get("cancel_on_timeout", False)),
         capture_plans=benchmark_config.capture_plans,
         # --show-plans travels in DatabaseConfig.options via the CLI runtime
         # overrides (direct path) or as a DatabaseConfig extra (interactive

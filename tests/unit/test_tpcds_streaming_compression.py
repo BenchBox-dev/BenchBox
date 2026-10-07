@@ -5,7 +5,7 @@ Tests for TPC-DS streaming compression functionality.
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 
@@ -273,7 +273,7 @@ def test_generate_local_prefers_data_organization_over_compression(mock_find_dsd
         result = generator._generate_local(tmp_path)
 
     assert result == {"customer": [organized]}
-    mock_gather.assert_called_once_with(tmp_path, use_compression=False)
+    assert mock_gather.call_args_list[0] == call(tmp_path, use_compression=False)
     mock_apply.assert_called_once_with(tmp_path, {"customer": [raw_customer]})
     mock_compress.assert_not_called()
     mock_validate.assert_not_called()

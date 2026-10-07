@@ -170,6 +170,8 @@ describe("formatBenchmarkLabel", () => {
     expect(canonicalBenchmarkSlug(" SSB ")).toBe("ssb");
     expect(canonicalPhase(null)).toBe("unknown");
     expect(canonicalPhase(" POWER ")).toBe("power");
+    expect(canonicalPhase(" Standard ")).toBe("power");
+    expect(canonicalPhase("throughput")).toBe("throughput");
   });
 
   it("falls through to humanizeBenchmark for other slugs", () => {

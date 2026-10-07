@@ -572,8 +572,7 @@ class TestRunBenchmarkToolSuccess:
         ):
             result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01)
 
-        # Response still succeeds without result_file
-        assert result["mcp_metadata"]["status"] == "completed"
+        assert result["mcp_metadata"]["status"] == "incomplete"
         assert result["mcp_metadata"]["result_file"] is None
 
     def test_all_query_results_included(self, tool_functions, tmp_path):

@@ -145,9 +145,9 @@ class ClickHouseAdapter(
         onto the ledger itself; every tuned clause it carries must corroborate
         here before the run reaches ``applied_verified``.
         """
-        from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
+        from benchbox.platforms.base import tuning_trust
 
-        return ClickHouseTuningIntrospector()
+        return tuning_trust.clickhouse_tuning_introspector()
 
 
 __all__ = ["ClickHouseAdapter"]

@@ -121,6 +121,7 @@ KNOWN_ROOTS = (
     "results-explorer/",
     "scripts/",
     "tests/",
+    "website/",
     "vendor/",
     "make/",
 )

@@ -111,18 +111,20 @@ platform and scale.
 
 ## Official TPC-H Metrics
 
-BenchBox computes the official TPC-H composite metrics in
-`benchbox/core/tpch/reporting.py`:
+BenchBox exports two TPC-H metrics:
 
 | Metric | Meaning |
 |--------|---------|
 | **Power@Size** | Single-stream geometric-mean throughput over the 22 queries (power test) |
-| **Throughput@Size** | Multi-stream throughput (queries executed per hour) (throughput test) |
-| **QphH@Size** | The official composite: `sqrt(Power@Size × Throughput@Size)` |
+| **Throughput@Size** | Multi-stream throughput (queries executed per hour) over the wall-clock duration of the throughput test |
 
-`TPCHMaintenanceReporter` emits these three values to text, CSV, and HTML
-outputs and also computes two efficiency ratios (`power_efficiency`,
-`throughput_efficiency`) against `QphH@Size`.
+BenchBox does not export QphH@Size. The specification defines Power@Size
+and the throughput test with the refresh functions RF1 and RF2, and the
+refresh stream runs concurrently with the query streams. BenchBox runs
+the maintenance phase after the throughput test and does not include
+RF1/RF2 in the power or throughput measurement, so a composite from
+these two values would overstate the specification metric. Adding the
+refresh functions to both tests is tracked as follow-up work.
 
 ### Refresh Functions (RF1 / RF2)
 

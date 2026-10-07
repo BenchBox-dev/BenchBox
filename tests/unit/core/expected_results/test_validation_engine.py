@@ -346,10 +346,7 @@ class TestParameterSensitiveValidation:
         assert not result.is_valid
         assert result.validation_mode == ValidationMode.EXACT
 
-    def test_tpcds_query_unaffected_by_reference_seed_context(self):
-        """TPC-DS never sets the reference-seed context, and has no entry in
-        the parameter-sensitive registry -- a non-reference-seed context must
-        not change its (pre-existing, SKIP-by-default) validation behavior."""
+    def test_tpcds_non_reference_seed_context_excludes_row_count_validation(self):
         set_reference_seed_context(False)
         validator = QueryValidator()
         result = validator.validate_query_result(
@@ -360,4 +357,4 @@ class TestParameterSensitiveValidation:
         )
         assert result.is_valid
         assert result.validation_mode == ValidationMode.SKIP
-        assert "SKIP" in result.warning_message or "skip" in result.warning_message
+        assert "excluded" in result.warning_message

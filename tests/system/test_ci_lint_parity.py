@@ -62,20 +62,7 @@ SETUP_STEP_NAMES = {"Install dependencies"}
 # Steps that are genuinely CI-only. Every entry needs a reason, and the test
 # below fails if a listed step is renamed or removed -- so this dict can't
 # rot into cover for a guard that quietly stopped existing.
-EXCLUDED_STEPS: dict[str, str] = {
-    "Fast lane ceiling delta vs develop": (
-        "CI-cache-dependent, no local equivalent: the guard's input is "
-        "`fast-lane-count.txt`, restored from the GitHub Actions cache "
-        "(`actions/cache/restore@v5.1.0`, exact key "
-        "`fast-lane-count-develop-<base-sha>`, populated by "
-        "fast-lane-baseline.yml's cache-save step) -- "
-        "there is no Actions cache to restore from in a local shell. The "
-        "pull-request command passes `--require-develop-baseline`, so a "
-        "missing cache fails closed with `DELTA_CHECK_BASELINE_ERROR`; "
-        "direct callers without that flag retain the compatibility skip. "
-        "See docs/operations/fast-lane-budget.md."
-    ),
-}
+EXCLUDED_STEPS: dict[str, str] = {}
 
 # The develop PR umbrella is not the only merge-gating workflow. Keep the
 # guard-shaped steps in the release test workflow and the independent
@@ -131,7 +118,14 @@ MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "dist-artifact", "Verify source bundled binary manifest"): "scripts/bundled_binary_manifest.py",
     ("ci.yml", "dist-artifact", "Build wheel and sdist"): "scripts/verify_distribution_binaries.py",
     ("ci.yml", "ci-paths", "Check release content"): "release-check",
+    ("ci.yml", "code-test", "Run changed tests on the curated release tree"): "scripts/release_curation_dry_run.py",
     ("ci.yml", "comment-policy", "Enforce comment and docstring policy"): "comment-policy-check",
+    ("ci.yml", "site-build", "Typecheck, audit and build website"): "site-check",
+    ("ci.yml", "site-build", "Test built website and not-found fallback"): "site-test-built",
+    ("ci.yml", "public-site-visual-astro-dry-run", "Capture public site from the Astro build"): "site-visual-capture",
+    ("ci.yml", "site-parity", "Generate Explorer browser fixtures"): "site-parity",
+    ("ci.yml", "site-parity", "Compare the Astro build with the Sphinx site"): "site-parity",
+    ("ci.yml", "api-contract-check", "Verify public API symbols against the released wheel"): "api-contract-check",
     ("ci.yml", "content-guard", "Validate YAML hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate artifact hygiene"): "pr-content-guard",
     ("ci.yml", "content-guard", "Validate markdown hygiene"): "pr-content-guard",
@@ -362,6 +356,9 @@ MERGE_GATE_EXEMPTIONS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "docs-build", "Validate explorer snapshot invariants"): (
         "Hosted snapshot check; covered locally by the explorer-pipeline contract tests."
     ),
+    ("ci.yml", "site-build", "Scan website output for privacy leaks"): (
+        "Hosted build-output scan; the privacy invariant is covered by tests/unit/scripts/test_corpus_privacy_invariant.py."
+    ),
     ("ci.yml", "docs-build", "Scan assembled site for privacy leaks"): (
         "Hosted site-assembly scan; the privacy invariant is covered by tests/unit/scripts/test_corpus_privacy_invariant.py."
     ),
@@ -535,10 +532,9 @@ def test_timing_policy_strict_command_is_mirrored_in_ci_lint() -> None:
     assert strict_command in workflow_run
 
 
-def test_fast_lane_ceiling_strict_command_is_mirrored_in_ci_lint() -> None:
-    """The workflow runs the same strict command as the ci-lint recipe."""
-    ceiling = next(step for step in _load_lint_job_steps() if step.get("id") == "guard-fast-lane-ceiling")
-    workflow_run = str(ceiling["run"])
+def test_fast_lane_guard_command_is_mirrored_in_ci_lint() -> None:
+    guard = next(step for step in _load_lint_job_steps() if step.get("id") == "guard-fast-lane-markers")
+    workflow_run = str(guard["run"])
     recipe_lines = _normalize_recipe_lines(_ci_lint_recipe_text())
     strict_command = "uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict"
 
@@ -576,7 +572,9 @@ def test_non_lint_merge_gate_guards_have_local_equivalent_or_documented_exemptio
 def test_merge_gate_local_equivalents_and_exemptions_are_documented() -> None:
     """Keep the parity inventory fail-closed and its exceptions reviewable."""
     docs = (REPO_ROOT / "docs" / "operations" / "ci-local-parity.md").read_text(encoding="utf-8")
-    makefile = MAKEFILE.read_text(encoding="utf-8")
+    makefile = "\n".join(
+        path.read_text(encoding="utf-8") for path in [MAKEFILE, *sorted((REPO_ROOT / "make").glob("*.mk"))]
+    )
     assert "Hosted-only guard inventory" in docs
 
     for key, target in MERGE_GATE_LOCAL_EQUIVALENTS.items():
@@ -697,15 +695,6 @@ def test_lint_guard_summary_accepts_only_success() -> None:
 
     assert 'if [ "$outcome" = "success" ]; then' in run
     assert "merge_group" not in run
+    assert "skipped" not in run
     assert 'echo "FAILED: $id ($outcome)"' in run
     assert "All lint guards passed." in run
-
-
-def test_delta_baseline_restore_is_keyed_to_the_pr_base_sha() -> None:
-    step = next(
-        step for step in _load_lint_job_steps() if step.get("name") == "Restore fast-lane develop baseline count"
-    )
-    cache_key = step["with"]["key"]
-
-    assert cache_key == "fast-lane-count-develop-${{ github.event.pull_request.base.sha }}"
-    assert "restore-keys" not in step["with"]

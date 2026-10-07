@@ -1,5 +1,7 @@
 # Native queue local landing
 
+> Superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md).
+
 Supersedes the ancestry-freshness gate for author-side publication while the
 approved native merge queue guards `refs/heads/develop`.
 

@@ -40,10 +40,8 @@ class TestTPCPerformanceDuckDB:
             power_time = 100.0 + i * 0.1
             throughput_time = 200.0 + i * 0.2
             power_at_size = 3600.0 / power_time
-            throughput_at_size = (2 * 3600.0) / throughput_time
-            qphh_size = TPCMetricsCalculator.calculate_qph(power_at_size, throughput_at_size)
-
-            assert qphh_size > 0
+            assert TPCMetricsCalculator.calculate_power_at_size([power_time], 1.0) == pytest.approx(power_at_size)
+            assert TPCMetricsCalculator.calculate_throughput_at_size(2, throughput_time, 1.0, 2) > 0
 
         calculation_time = time.time() - start_time
 

@@ -283,8 +283,17 @@ def test_fixture_squash_source_tip_not_ancestor(tmp_path: Path):
     assert cls.item_classification == "finish candidate"
 
 
-def test_make_worktree_audit_json_output(capsys: pytest.CaptureFixture):
-    # Test JSON output formatting and schema via main() offline entrypoint (Spec §10)
+def test_make_worktree_audit_json_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+):
+    # Test JSON output formatting and schema via main() offline entrypoint (Spec §10).
+    # main() audits Path.cwd(), so run it from a small fixture repository:
+    # auditing the live checkout makes this test's runtime grow with the
+    # host's worktree count (it hit the 120 s timeout on a loaded machine).
+    repo = init_repo(tmp_path / "repo")
+    wt = add_worktree(repo, "fix/feature-json", tmp_path / "wt_json")
+    monkeypatch.chdir(repo)
+
     code = audit_mod.main(["--format", "json"])
     assert code == 0
     captured = capsys.readouterr()
@@ -295,6 +304,10 @@ def test_make_worktree_audit_json_output(capsys: pytest.CaptureFixture):
     assert "report_authority" in data
     assert data["report_authority"]["is_deletion_authority"] is False
     assert "snapshot_path" in data
+    # The report covers exactly the fixture repository, never the host's
+    # ambient worktrees: independence from host worktree count is the point.
+    paths = [Path(w["worktree"]["path"]).resolve() for w in data["worktrees"]]
+    assert paths == [wt.resolve()]
 
 
 def test_fixture_primary_clone(tmp_path: Path):

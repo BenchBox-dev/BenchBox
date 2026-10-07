@@ -73,6 +73,8 @@ class AthenaAdapter(PlatformAdapter):
     - Workgroup-based resource management and cost controls
     """
 
+    physical_identifier_case = "lower"
+
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
@@ -867,6 +869,7 @@ class AthenaAdapter(PlatformAdapter):
                     table_stats[table_name_lower] = row_count
                     if count_verified and effective_tuning is not None:
                         self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
+                        self.run_post_load_tunings(table_name_lower, effective_tuning, connection)
 
                     self.logger.info(
                         f"✅ Loaded {table_stats[table_name_lower]:,} rows into {table_name_lower}{chunk_info}"
@@ -879,6 +882,7 @@ class AthenaAdapter(PlatformAdapter):
                 if effective_tuning is not None:
                     for table_name_lower in table_stats:
                         self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
+                        self.run_post_load_tunings(table_name_lower, effective_tuning, connection)
 
             total_time = elapsed_seconds(start_time)
             total_rows = sum(table_stats.values())
@@ -1409,7 +1413,7 @@ class AthenaAdapter(PlatformAdapter):
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name.lower()
+        table_name = self.resolve_physical_table(table_tuning.table_name, connection)
         self.logger.info(f"Athena tunings for {table_name} applied at table creation time")
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:

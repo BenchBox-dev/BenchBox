@@ -80,9 +80,8 @@ uv run -- python scripts/check_comment_cleanup_scope.py \
 The output includes every classified maintained path, its owner, state, rule,
 and blocking disposition with a digest. Freeze that ignored output before
 parallel work. Run it again after integration and allow only authorized path or
-dependency changes. The policy, validator, focused test, dispatch page, index
-link, and the one development-loop ledger row that lists the test are a
-singleton scope-policy slice. The pre-change base proves the
+dependency changes. The policy, validator, focused test, dispatch page, and
+index link are a singleton scope-policy slice. The pre-change base proves the
 starting tree; run a second immutable snapshot after that slice is committed so
 those artifacts receive the same ownership check before dispatch.
 
@@ -198,14 +197,15 @@ capability today: its first use is a one-way schema migration that every client
 of the tracker must be stopped or upgraded for, the final pull request head can
 be bound only once so a single review fix would abort a branch, and a batch
 cannot be refreshed from `develop`. Serial mode with a pull request per task
-would mean over a hundred queue entries and as many reviews, which is the cost
+would mean over a hundred pull requests and as many reviews, which is the cost
 this contract avoids.
 
 The exception keeps what the rule is for. The cut commit, an explicit ordered
 member list and frozen member scopes are recorded before work starts. One
 integrator alone writes the branch. Each member's check evidence is listed in
-the pull request. One final pull request goes through full CI, review and the
-merge queue; there is never a feature-base pull request, a skipped check, or a
+the pull request. One final pull request goes through required CI, current-head
+review and auto-merge, followed by post-merge trunk validation; there is never
+a ready feature-base pull request, a skipped check, or a
 bypass of review, merge or authority controls. The tracker lifecycle stays
 serial: a member task is taken, worked on the integration branch, released with a
 note naming the commit that carries its work, and finished only after the
@@ -254,10 +254,11 @@ the checker's summary line.
 
 Before the pull request is marked ready, run one external read-only review over
 the non-deletion diff, a sample of the deleted hunks and every public API file,
-and fix what it finds. Then mark it ready and arm it. If the merge queue rejects
-the head for a reason that is not a defect, arm it again. If a review finding
-arrives after it was queued, dequeue it, fix it, push with an exact lease, wait
-for green and arm it again.
+and fix what it finds. Then mark it ready and arm its exact head after required
+CI and the current-head connector review are green and all threads are resolved.
+If a review finding arrives after arming, withdraw auto-merge before editing,
+fix it, push with an exact lease, wait for fresh CI and connector review, resolve
+the threads and arm the new head.
 
 The branch stays current by rebasing onto `develop`, never merging `develop` in,
 when the pull request conflicts and once more before it is marked ready. A branch
@@ -267,10 +268,11 @@ push to or comment on other people's pull requests.
 ### What stays out of an integration branch
 
 - **Soundness-manifest paths.** Files that the repository's soundness predicate
-  flags are carved out into their own pull requests. Each needs an external review
-  (codex, muse or agy) with a `Soundness review:` section and the owner's manual
-  merge, so keeping them out of the large branches keeps those branches
-  mergeable by the queue.
+  flags are carved out into their own pull requests. Each needs the required
+  `oracle-review` check to pass on the current head and all review threads to be
+  resolved before arming; the PR-body attestation and manual owner merge are
+  retired. Keeping these files out makes each result-affecting change separately
+  reviewable.
 - **Payload changes.** A change to SQL text, generated output or an identity needs
   its own disclosed pull request with raw-hash, token, order, parameter and hint
   evidence and the correctness, plan and timing evidence the task requires.
@@ -287,7 +289,7 @@ Until it does, plan for about four hundred files and twenty thousand deleted lin
 per branch, and at most about one thousand changed lines that are not deletions.
 
 | Event | Action |
-|---|---|
+| --- | --- |
 | A member fails parity or its tests | Fix it on the member branch, or drop it and rebuild the integration branch from the cut commit with the other members. |
 | Branch CI fails because of one member | Fix or drop that member; do not hold the others. |
 | The pull request conflicts with `develop` | Rebase, rerun parity, push with an exact lease. |

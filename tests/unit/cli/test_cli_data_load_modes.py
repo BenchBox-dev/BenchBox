@@ -442,7 +442,7 @@ class TestCLIDataLoadModes:
             "table_mode": "native",
             "mode": "sql",
             "seed": 41,
-            "concurrency": 1,
+            "concurrency": None,
             **saved_compression,
         }
 
@@ -473,7 +473,7 @@ class TestCLIDataLoadModes:
             "table_mode": "native",
             "mode": "sql",
             "seed": 41,
-            "concurrency": 1,
+            "concurrency": None,
             "compress_data": True,
             "compression_type": "zstd",
             "compression_level": None,

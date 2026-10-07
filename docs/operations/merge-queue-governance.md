@@ -1,75 +1,43 @@
-# Merge Queue Governance and Operational Specification
+# Merge and trunk governance
 
-This document defines the operational architecture, required status check contracts, soundness review invariants, and developer workflows for the GitHub Native Merge Queue on `refs/heads/develop`.
+This document defines how a change reaches `refs/heads/develop` and how `develop` is kept green afterwards: the required checks, the review requirement for result-affecting changes, auto-merge, the post-merge `trunk.yml` run, the revert-first policy and the nightly run. The repository does not use a GitHub merge queue or the strict up-to-date rule; the file keeps its original name so existing links work. The decision and its evidence are in `_project/decisions/merge-queue-retirement-2026-10-03.md`.
 
 ---
 
 ## 1. Governance Invariants
 
 1. **Squash Integration Only:** All pull requests targeting `develop` must be integrated via squash merge. Merge commits and rebase-and-merge remain forbidden.
-2. **Zero Bypass Actors:** The `develop-squash-only` ruleset enforces `bypass_actors: []`. No user, bot, or organization admin may bypass status checks, linear history, or code owner review.
-3. **Soundness Review Boundary:** A pull request touching a path in `.github/soundness-paths.txt` needs a completed external adversarial review before it is armed. The reviewer's Critical and High findings are posted as PR review threads, and required thread resolution makes them binding. The review is not an attestation in the PR body: the author of a change can write that text, so it cannot bind. The attestation check in `ci.yml` has been removed; the Codex connector reviews soundness-path changes, and required thread resolution binds its findings. Arming only once the connector's review is on the current head is a rule for agents (`AGENTS.md`); a mechanical check of it follows.
-4. **Fail-Closed Execution:** If an Actions workflow encounter an unknown or malformed `merge_group` event payload, it must fail closed and withhold reporting green.
+2. **Zero Bypass Actors:** The `develop-squash-only` ruleset enforces `bypass_actors: []`. No user, bot, or organization admin may bypass status checks, linear history or required thread resolution through that ruleset. Code-owner review is disabled.
+3. **Soundness Review Boundary:** A result-affecting pull request (a path in `.github/soundness-paths.txt`) needs a completed external adversarial review of its current head. The required `oracle-review` check passes only when the Codex connector app has reviewed or thumbed up that head, or, when the connector cannot review, a listed attester has posted the stand-in approval for that head after an independent review. The reviewer's Critical and High findings are posted as PR review threads, and required thread resolution makes them binding. A scheduled digest lists the soundness-path commits that merged and the review signal each had, and opens a tracker item for any with none. There is no attestation in the PR body: the author of a change can write that text, so it cannot bind, and the `soundness-flag` check that tested for it is deleted.
+4. **Fail-Closed Execution:** A required check that cannot establish its result must report failure, not success.
 
 ---
 
 ## 2. Required Status Checks Contract
 
-The merge queue creates temporary merge group refs (`refs/heads/gh-readonly-queue/develop/...`) and dispatches GitHub Actions runs under the `merge_group: [checks_requested]` event. Exactly six status checks are required on `develop`. Each is one always-reporting unit job in `.github/workflows/ci.yml`; `.github/ci-units.yml` maps changed paths to units, an untouched unit reports success, and a touched unit succeeds only when every job it requires succeeded (a skipped required job fails the unit).
+Seven status checks are required on `develop`: six always-reporting unit jobs in `.github/workflows/ci.yml`, and `oracle-review`. `.github/ci-units.yml` maps changed paths to units, an untouched unit reports success, and a touched unit succeeds only when every job it requires succeeded (a skipped required job fails the unit). The checks run on the pull request head. The strict up-to-date rule is off, so a pull request does not need to be current with `develop` to merge.
 
-| Required Context | Workflow Path | Trigger Events | Contract on `merge_group` |
-|---|---|---|---|
-| `core` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Lint, type checks, fast tests, and parity gates for the speculative tree. The heavy tier (medium-test, correctness-gate, plan-capture-gate, DataFusion integration, and the macOS and Windows TPC-H binary-framing matrix) runs on `merge_group` for every code-routed tree; `pull_request` runs skip it unless a carve-out applies (soundness paths, packaging paths). The unit models the skip explicitly (success when required, skipped when deferred). |
-| `explorer` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Token scan, Vitest, CLI-versus-explorer parity, the blocking Chromium suite, and the public-site visual comparison on explorer changes. Reports success on unaffected paths. |
-| `results-data` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Corpus inventory and validation, submission validator sync, and corpus contract tests on results-data changes. |
-| `docs` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Sphinx build with warnings as errors, example validation, spell check, and the visual comparison on docs changes. |
-| `landing` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Site theme token scan and the visual comparison on landing changes. |
-| `tooling` | `.github/workflows/ci.yml` | `pull_request`, `merge_group` | Every event. The Codex connector reviews soundness-path changes, and required thread resolution binds its findings. Also runs the base-branch guard, content guard, skill integrity, audit checks by path, and, in the merge queue, ruleset drift from the trusted base checkout. |
+| Required Context | Workflow Path | Contract |
+| --- | --- | --- |
+| `core` | `.github/workflows/ci.yml` | Lint, type checks, fast tests, and parity gates for the pull request head. The heavy tier (medium-test, correctness-gate, required-local-cases, plan-capture-gate, DataFusion integration, and the macOS and Windows TPC-H binary-framing matrix) is skipped on `pull_request` unless a carve-out applies (soundness paths, packaging paths); `trunk.yml` runs the medium tier, the correctness gate and `required-local-cases` on `develop` after each merge. |
+| `explorer` | `.github/workflows/ci.yml` | Token scan, Vitest, CLI-versus-explorer parity, and the blocking Chromium suite on explorer changes. Reports success on unaffected paths. |
+| `results-data` | `.github/workflows/ci.yml` | Corpus inventory and validation, submission validator sync, and corpus contract tests on results-data changes. |
+| `docs` | `.github/workflows/ci.yml` | Sphinx build with warnings as errors, example validation, and spell check on docs changes. |
+| `landing` | `.github/workflows/ci.yml` | Site theme token scan on landing changes. |
+| `tooling` | `.github/workflows/ci.yml` | Every event. Base-branch guard, comment policy, content guard, skill integrity, and audit checks by path. |
+| `oracle-review` | `.github/workflows/oracle-review.yml` (job and check name `oracle-review`) | Passes when no soundness path changes, or when the Codex connector app has reviewed or thumbed up the current head and none of its threads is unresolved. A new push needs a new review. When the connector cannot review, an independent stand-in review of the exact head followed by a `Stand-in oracle review: APPROVE <full head SHA>` comment from an account in `STANDIN_ATTESTERS` satisfies the check (dev-loop ADR, D4; `docs/operations/soundness-drain.md`). A plain owner comment does not. |
 
-The public-site visual comparison runs only when a render input changed. It compares against the exact protected base SHA and fails closed when that baseline is absent (see the follower policy below). The baseline is captured by `.github/workflows/docs.yml` on every push to `develop`.
+The public-site visual comparison runs only when a render input changed. It compares against the exact protected base SHA, captured by `.github/workflows/docs.yml` on every push to `develop`. The comparison is advisory until the public site is in production: the job still runs and uploads its report, but a difference or a missing baseline does not block a merge. It becomes a required check again when the site is in production.
 
-The visual comparison is advisory until the public site is in production: it still runs and uploads its report, but the explorer, docs and landing results do not wait on it.
-
-### Merge-queue follower visual baseline policy
-
-A queue follower's `merge_group.base_sha` is the head of the group ahead of it. The follower can merge only after that group merges as exactly that commit, so a capture of that head is the exact-base baseline. When the leader group's comparison passes, its visual job uploads `public-site-visual-baseline-<merge_group.head_sha>`. It accepts either a protected `develop` artifact (preferred, produced by a Documentation `push` or `workflow_dispatch` run on `develop`) or a candidate from a `merge_group` run of the CI workflow (`.github/workflows/ci.yml`, which validates queue groups and uploads the candidate) on this repository's `gh-readonly-queue/develop/*` branch at that SHA. A leader whose CI run has not finished is trusted once every job named `Public-site visual regression` in it has succeeded (the job list is read page by page, because the run has more jobs than one default page holds), since that job gates the candidate upload and the run's other jobs can last far longer than a follower waits. A leader that finished without succeeding is never trusted, and a job list that cannot be read in full (a failed request, a malformed entry, or more jobs than the page bound) is not evidence of success. If the leader fails, the queue rebuilds the follower on a new base and the old run is discarded, so a candidate for a head that never lands never certifies a merge. A test (`test_the_lookup_trusts_every_workflow_that_publishes_a_merge_queue_candidate`) keeps the workflows that upload candidates and the lookup's trusted list in step. The lookup establishes which workflow run produced an artifact and that the producing job succeeded; it does not authenticate what that workflow did. Trusting `ci.yml` as a producer therefore rests on the review controls for that workflow (code-owner and soundness-path review), the same boundary that already applied to the Documentation workflow.
-
-When the group ahead changed no public-site inputs, its visual job is skipped and publishes nothing. The classifier therefore also lists site-equivalent ancestors: first-parent ancestors of the base whose public-site inputs are byte-identical to the base, stopping at the first one that differs. They render the same site as the base, which is the same premise that lets an unchanged tree skip the gate, so their baseline is the base's baseline. The lookup tries the exact base first, then each ancestor nearest first, and the compare step checks the downloaded manifest against the SHA actually used. A merge-group follower waits at most 10 minutes, because the wait holds a runner; when it ends without a baseline, the follower fails closed with the same recovery message as before.
-
-A develop ancestor whose site inputs differ from the base is never used: it would compare against a tree that renders differently from the one the follower merges onto. Rationale and measurements are in `_project/decisions/visual-baseline-site-equivalent-ancestor-2026-09-27.md`.
-
-Operator flow when a follower still fails at the download step: after the leader merges, confirm `public-site-visual-baseline-<develop head>` exists, or dispatch Documentation on develop with `baseline_source_sha`, then re-queue at the back (`jump:false`).
+The pull request that switches the public-site renderer from Sphinx to Astro needs an exact-head approval for its PR head, and the baseline producer must publish an Astro-rendered baseline for its merge commit. The steps are in the Renderer-switch pull request section of [Results Explorer browser testing](../development/results-explorer-browser-testing.md).
 
 ---
 
-## 3. Queue Configuration Parameters
+## 3. Merge Path
 
-The operator configures the merge queue within the `develop-squash-only` ruleset using the following verified parameters:
+A pull request is armed with `make pr-arm`, which enables auto-merge for the exact head. GitHub merges the pull request with a squash commit once every required check is green on that head and all review threads are resolved. There is no queue and no combined-tree build before the merge. Because the strict up-to-date rule is off, a branch behind `develop` merges without a refresh unless it conflicts. A changed head needs fresh CI and a fresh connector review or stand-in approval before re-arming.
 
-```json
-{
-  "type": "merge_queue",
-  "parameters": {
-    "merge_method": "SQUASH",
-    "min_entries_to_merge": 1,
-    "max_entries_to_merge": 3,
-    "grouping_strategy": "ALLGREEN",
-    "check_response_timeout_minutes": 60,
-    "max_entries_to_build": 2,
-    "min_entries_to_merge_wait_minutes": 0
-  }
-}
-```
-
-- **`merge_method: SQUASH`**: Guarantees atomic, single-commit integration.
-- **`grouping_strategy: ALLGREEN`**: Groups only entries whose required checks are green.
-- **`check_response_timeout_minutes: 60`**: Provides the live queue timeout while preventing hung runners from stalling the queue.
-- **`max_entries_to_build: 2`** and **`max_entries_to_merge: 3`**: Bound speculative builds at two entries and queue merges at three. Five parallel groups saturated the organization runner allowance and were ejected with `checks_timed_out`.
-- **`min_entries_to_merge: 1`** and **`min_entries_to_merge_wait_minutes: 0`**: Permit immediate single-entry merges without an artificial wait.
-
-Slow-marked reproducer jobs remain required PR CI through the `core` unit.
-There is no post-merge lane, so these reproducers must remain in the required
-PR lane.
+Slow-marked reproducer jobs remain required PR CI through the `core` unit, because the post-merge run has no slow-signature lane.
 
 ---
 
@@ -80,50 +48,47 @@ PR lane.
 Developers submit and arm PRs through repository standard Makefile targets:
 
 ```bash
-# Open PR against develop with currency check
 make pr-open
-
-# When PR is ready for merge, run the exact readiness transaction and arm
 make pr-ready PR=<number> HEAD=$(git rev-parse HEAD) EVIDENCE=<readiness.json>
 ```
 
-- `make pr-open` checks the actual `origin/develop`/`HEAD` merge first and
-  refuses only a genuine conflict. A conflict-free branch that is behind
-  `origin/develop` is published without a local refresh and without any live
-  queue check. It also refuses a non-revert branch while the newest completed
-  `trunk.yml` run on develop has been red for more than 30 minutes; run
-  `make trunk-revert PR=<number>` to open a `fix/revert-<number>` PR, which is
-  exempt.
-- `make pr-ready` verifies the exact checkout, live PR identity, review state,
-  required checks, holds, and readiness evidence before arming the queue.
-- Once approved and green on initial `pull_request` checks, GitHub automatically adds the PR to the merge queue.
+- `make pr-open` opens or reuses the pull request. It refuses a branch that is not a revert when the newest `trunk.yml` run on `develop` finished red more than 30 minutes ago (see section 5).
+- `make pr-ready` verifies the exact checkout, live PR identity, review state, required checks, holds, and readiness evidence before arming auto-merge.
+- Once the required checks are green on the head, GitHub merges the pull request.
 
 ### B. Soundness Path Withholding
 
-If a PR modifies any soundness path (e.g. `benchbox/core/equivalence/`, `benchbox/core/expected_results/`, `auto_merge_soundness_paths.py`):
-1. `make pr-ready` withholds auto-enqueue.
-2. The `auto-merge-on-open.yml` workflow revokes any accidental auto-merge flag.
-3. The PR requires maintainer approval before manual enqueuing.
+If a PR modifies any soundness path (e.g. `benchbox/core/equivalence/`, `benchbox/core/expected_results/`, `soundness_paths.py`):
+
+1. Withdraw readiness before editing an armed PR (`make pr-landing-withdraw PR=<n> HEAD=<sha>`). After the last push, obtain CI and the connector's review or thumbs-up (or the stand-in approval) on that exact head before arming with `make pr-arm`. The `no-auto-merge` label blocks arming only; to hold an armed PR, disable auto-merge (`gh pr merge <n> --disable-auto`) or withdraw it as above, then add the label.
+2. The required `oracle-review` check must pass on the current head before the pull request can merge.
+3. A soundness-path pull request that sits green and unarmed is reported by the soundness-drain digest (`make soundness-drain-report`, see `docs/operations/soundness-drain.md`), not by the nightly green-unmerged sweep, which skips soundness-gated pull requests.
 
 ---
 
-## 5. Rollback Procedure
+## 5. Trunk Run and Revert
 
-If the merge queue must be immediately disabled due to CI outages, deadlocks, or GitHub platform degradation, the operator executes:
+`.github/workflows/trunk.yml` runs on pushes to `develop`: the fast lane, the four-shard medium tier, the correctness gate, and the `required-local-cases` job (`make test-required-local-cases`, which fails the run if a required local-engine case skips). The `dist-artifact` job builds and verifies the release wheel and sdist. The test-count ceiling is retired; marker and forbidden-path guards remain. This workflow tests `develop` in its merged state and is not a required PR check.
+
+Runs use `concurrency.queue: max` with running work retained, so later pushes do not replace earlier pending runs. Results can lag during a burst of merges. This protects queued runs for delivered events, not push-event delivery itself. Release admission requires the latest exact-commit trunk `push` run on `develop` to succeed and have a matching artifact attempt; it never falls back to an older success. See [the release artifact contract](release-artifacts.md).
+
+When a trunk run fails, the culprit is reverted first and fixed afterwards:
 
 ```bash
-# Emergency rollback to standard branch protection
-gh api --method PUT repos/BenchBox-dev/BenchBox/rulesets/15611785 \
-  --input docs/operations/rulesets/develop-squash-only-rollback.json
+make trunk-revert PR=<number>
 ```
 
-Disabling the queue restores immediate single-PR squash merges under the `SHADOW_ONLY` strict-base policy.
+`make pr-open` refuses a branch that is not a revert when the newest `trunk.yml` run on `develop` finished red more than 30 minutes ago (`scripts/trunk_revert.py gate`), so nothing new stacks on a broken tip. It does not block while a newer run is still in progress, or when `gh` cannot read the runs; it warns instead. A trunk that stays red for more than two hours with no revert pull request open is a risk signal for the owner, who should revert the culprit; nothing enforces the two-hour figure.
+
+More than one medium-tier shard kill a day means the shard's memory sampler output should be read for the test that is growing a worker.
+
+If a trunk failure is traced to a pull request that was green on an older base more than about once a week, the owner should consider reinstating the strict up-to-date rule and its refresh cost.
 
 ---
 
-## 5. Post-Merge Soundness Digest
+## 6. Post-Merge Soundness Digest
 
-`.github/workflows/soundness-merge-digest.yml` runs daily and on demand. It runs `_project/scripts/soundness_merge_digest.py`, which reads the first-parent commits on `develop` since a stored checkpoint and keeps those that change a path on `.github/soundness-paths.txt`, counting both sides of a rename. Each commit is judged by the manifest and predicate (`_project/scripts/soundness_paths.py`) as they stood at its first parent, so a later commit that removes a rule cannot hide an earlier change, and a commit that removes a rule cannot hide its own. The manifest, the predicate, the digest script and the digest workflow are always kept, whatever the manifest says. The digest script and workflow are also listed in the manifest and in CODEOWNERS. For each one it finds the pull request that merged into `develop` as that commit and records which review signal the pull request had at merge, for its final content:
+`.github/workflows/soundness-merge-digest.yml` runs daily and on demand. It runs `_project/scripts/soundness_merge_digest.py`, which reads the first-parent commits on `develop` since a stored checkpoint and keeps those that change a path on `.github/soundness-paths.txt`, counting both sides of a rename. Each commit is judged by the manifest and predicate (`_project/scripts/soundness_paths.py`) as they stood at its first parent, so a later commit that removes a rule cannot hide an earlier change, and a commit that removes a rule cannot hide its own. The manifest, the predicate, the digest script and the digest workflow are always kept, whatever the manifest says. The digest script and workflow are also listed in the manifest. For each one it finds the pull request that merged into `develop` as that commit and records which review signal the pull request had at merge, for its final content:
 
 - the Codex connector's submitted review of the last content commit, or of a merge that only refreshed the base after it;
 - the connector's thumbs-up reaction, or
@@ -140,3 +105,15 @@ A commit gets an issue labelled `soundness-review-gap` when it has no signal, no
 The checkpoint is stored in the body of the one issue labelled `soundness-merge-digest`, and it must be on the first-parent history of `develop`. A missing issue, a second issue with the label, a body without the checkpoint marker, or a checkpoint off that history fails the run, so a damaged checkpoint cannot silently skip commits. Record the first checkpoint by dispatching the workflow with `bootstrap` set; the run reports nothing and later runs report the commits after it. Restore a damaged checkpoint with `--since <sha> --apply`. A read that fails or comes back incomplete also fails the run and leaves the checkpoint where it was.
 
 Run it locally without changing anything: `uv run -- python _project/scripts/soundness_merge_digest.py --since <sha>`.
+
+---
+
+## 7. Nightly Run
+
+`.github/workflows/nightly.yml` runs once a day (06:00 UTC) and on dispatch. It runs the slow and scheduled checks that no required check covers, plus the advisory ruleset drift check, which no longer runs in `ci.yml` (it ran only in merge groups) and is also run by hand after a settings change. A nightly failure never blocks a merge.
+
+---
+
+## 8. Historical: the Merge Queue
+
+Until 2026-10-03 the repository ran a GitHub merge queue on `develop` with the strict up-to-date rule. The queue's configuration, the follower visual baseline policy and the queue canary rehearsal are kept in `_project/decisions/native-merge-queue-activation-20260822.md`, `_project/decisions/visual-baseline-site-equivalent-ancestor-2026-09-27.md` and `docs/operations/merge-queue-canary-runbook.md`. They no longer apply.

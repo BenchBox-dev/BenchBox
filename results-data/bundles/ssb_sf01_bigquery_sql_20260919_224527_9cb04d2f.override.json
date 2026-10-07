@@ -1,0 +1,19 @@
+{
+  "rules": [
+    {
+      "rule": "timing-plateau",
+      "rule_version": "1"
+    },
+    {
+      "rule": "scale-invariant",
+      "rule_version": "1"
+    }
+  ],
+  "reason": "BigQuery SSB loads 625,757 to 62,322,557 rows from SF 0.1 to SF 10, while scanned bytes grow from 0.846 GB to 84.476 GB. The geometric mean grows only 1.37x and the median per-query mean 1.34x. At SF 0.1, per-query means span 758 to 1,142 ms (max/min 1.51, CV 0.11). Query caching is recorded off and measurement runs at 0.95 to 0.97 of warmup across the cohort. These facts are consistent with fixed per-job and client latency dominating light queries. Provider queue and execution timings were not recorded, so that explanation is an inference.",
+  "evidence": "https://github.com/BenchBox-dev/BenchBox/blob/105f1207d597c9a5e04c40129ea7a42a3fbdbda0/results-data/CORPUS_NOTES.md#bigquery-ssb-timing-2026-10-03",
+  "expires": "single-batch",
+  "approver": "joeharris76",
+  "bundles": [
+    "ssb_sf01_bigquery_sql_20260919_224527_9cb04d2f"
+  ]
+}

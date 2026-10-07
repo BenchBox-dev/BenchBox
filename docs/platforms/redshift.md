@@ -211,6 +211,12 @@ CREATE TABLE nation (...)
 DISTSTYLE ALL;
 ```
 
+Redshift tables are vacuumed and analyzed after loading by the existing
+maintenance pass, which `auto_vacuum` and `auto_analyze` control (both on by
+default). A tuned run adds an `ANALYZE <table>` after a table with a tuning
+entry loads, only when `auto_analyze` is `false`; that time is reported as
+`phases.post_load_maintenance` and is not counted in data-loading time.
+
 ### Sort Keys
 
 ```sql

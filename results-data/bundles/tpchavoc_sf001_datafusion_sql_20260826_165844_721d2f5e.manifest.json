@@ -1,0 +1,11 @@
+{
+  "bundle_file": "tpchavoc_sf001_datafusion_sql_20260826_165844_721d2f5e.json",
+  "bundle_hash": "a543cccc18240a89262eb0ebe61d81ed437ab489d4d382fdc19f11dc420562f9",
+  "funding": "unspecified",
+  "manifest_version": "1.0",
+  "result_source": "internal",
+  "submitted_by": "maintainer",
+  "known_defects": [
+    "defective-macdbgen-addresses"
+  ]
+}

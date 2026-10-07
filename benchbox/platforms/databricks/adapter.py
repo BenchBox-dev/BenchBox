@@ -265,6 +265,8 @@ class DatabricksAdapter(PlatformAdapter):
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
+    physical_identifier_case = "lower"
+    post_load_connection_recording = False
 
     def __init__(self, **config):
         super().__init__(**config)
@@ -1166,17 +1168,6 @@ class DatabricksAdapter(PlatformAdapter):
                 connection.close()
 
     def reset_database_in_place(self, **connection_config) -> bool:
-        """Truncate the schema's tables instead of dropping the schema.
-
-        Unity Catalog keeps dropped tables recoverable for about seven days,
-        and they count against the metastore table quota until then, so a
-        drop-and-recreate on every reload exhausts small quotas. Schema
-        creation replaces tables with ``CREATE OR REPLACE``, which does not add
-        to the quota. Tables created with ``IF NOT EXISTS`` keep their
-        structure and start empty. Returns False, and the caller drops the
-        schema as before, when the schema is absent or any table cannot be
-        truncated.
-        """
         catalog = connection_config.get("catalog", self.catalog)
         schema = connection_config.get("schema", self.schema)
         connection = None
@@ -1191,8 +1182,8 @@ class DatabricksAdapter(PlatformAdapter):
             self._schema_reset_in_place = True
             return True
         except Exception as e:
-            self.log_verbose(f"In-place reset of {catalog}.{schema} failed, dropping instead: {e}")
-            return False
+            self.log_verbose(f"In-place reset of {catalog}.{schema} failed: {e}")
+            raise
         finally:
             if connection is not None:
                 connection.close()
@@ -1251,7 +1242,7 @@ class DatabricksAdapter(PlatformAdapter):
             # create_schema() keeps owning table creation.
             if not (getattr(self, "create_catalog", False) and not getattr(self, "database_was_reused", False)):
                 cursor.execute(f"USE CATALOG {self.catalog}")
-                if not getattr(self, "database_was_reused", False):
+                if not getattr(self, "database_was_reused", False) and not getattr(self, "_validating_database", False):
                     cursor.execute(f"CREATE SCHEMA IF NOT EXISTS {self.catalog}.{self.schema}")
                 cursor.execute(f"USE SCHEMA {self.schema}")
             self.log_very_verbose(f"Set schema context to {self.catalog}.{self.schema}")
@@ -2484,8 +2475,11 @@ class DatabricksAdapter(PlatformAdapter):
         effective_tuning = self.get_effective_tuning_configuration()
         if effective_tuning is not None:
             self.apply_ctas_sort(table_name_upper, effective_tuning, connection)
+            self.run_post_load_tunings(table_name_upper, effective_tuning, connection)
 
         optimize_time = 0.0
+        already_optimized = table_name_upper.lower() in self._delta_optimized_after_load()
+        self._delta_optimized_after_load().discard(table_name_upper.lower())
         if self.table_format == "hudi":
             self._record_layout_operation(
                 mechanism="optimize",
@@ -2495,7 +2489,7 @@ class DatabricksAdapter(PlatformAdapter):
                 phase="post_load",
             )
             self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name_upper}")
-        elif self.enable_delta_optimization:
+        elif self.enable_delta_optimization and not already_optimized:
             optimize_start = mono_time()
             optimize_statement = f"OPTIMIZE {table_name_upper}"
             try:
@@ -2728,12 +2722,6 @@ class DatabricksAdapter(PlatformAdapter):
     def _make_power_connection_adapter(self, connection: Any, benchmark_id: str, scale_factor: float) -> Any:
         self._initialize_query_session(connection)
         return super()._make_power_connection_adapter(connection, benchmark_id, scale_factor)
-
-    def _execute_tpch_throughput_test(self, benchmark: Any, connection: Any, run_config: dict) -> list[dict[str, Any]]:
-        # Databricks currently uses shared cursors. Initialize the actual
-        # connection before the parent harness starts its throughput window.
-        self._initialize_query_session(connection)
-        return super()._execute_tpch_throughput_test(benchmark, connection, run_config)
 
     def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
         stream = super().new_stream_connection(connection, benchmark_type=benchmark_type)
@@ -3511,6 +3499,33 @@ class DatabricksAdapter(PlatformAdapter):
 
         return " ".join(clauses)
 
+    def _delta_optimized_after_load(self) -> set[str]:
+        optimized = getattr(self, "_delta_optimized_tables", None)
+        if optimized is None:
+            optimized = set()
+            self._delta_optimized_tables = optimized
+        return optimized
+
+    def apply_post_load_tunings(self, table_name: str, effective_config: Any, connection: Any) -> bool:
+        table_tuning = self.table_tuning_for(effective_config, table_name)
+        if table_tuning is None or not table_tuning.has_any_tuning() or not self.enable_delta_optimization:
+            return False
+        physical_table = self.resolve_physical_table(table_name)
+        cursor = connection.cursor()
+        try:
+            cursor.execute(f"DESCRIBE EXTENDED {physical_table}")
+            if not any("DELTA" in str(row).upper() for row in cursor.fetchall()):
+                return False
+            # _load_single_table runs its own OPTIMIZE after this hook; hand it a marker to
+            # skip the second pass. The marker is set before the attempt on purpose: a failed
+            # OPTIMIZE is reported through the maintenance phase, not retried by the load path.
+            self._delta_optimized_after_load().add(physical_table.lower())
+            if not self._apply_delta_optimize(cursor, physical_table, phase="post_load"):
+                self.note_post_load_maintenance_failure()
+            return True
+        finally:
+            cursor.close()
+
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
         """Apply tuning configurations to a Databricks Delta Lake table.
 
@@ -3530,7 +3545,7 @@ class DatabricksAdapter(PlatformAdapter):
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
-        table_name = table_tuning.table_name.upper()
+        table_name = self.resolve_physical_table(table_tuning.table_name)
         self.logger.info(f"Applying Databricks tunings for table: {table_name}")
 
         cursor = connection.cursor()
@@ -3552,14 +3567,20 @@ class DatabricksAdapter(PlatformAdapter):
             platform_opts = getattr(effective_config, "platform_optimizations", None)
             clustering_strategy = self._resolve_databricks_clustering_strategy()
             liquid_enabled = bool(getattr(platform_opts, "liquid_clustering_enabled", False))
-            liquid_columns = list(getattr(platform_opts, "liquid_clustering_columns", []))
+            liquid_columns = [
+                self.resolve_physical_column(table_name, column)
+                for column in getattr(platform_opts, "liquid_clustering_columns", [])
+            ]
 
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
             distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
 
-            zorder_columns = self._build_zorder_columns(cluster_columns, distribution_columns)
+            zorder_columns = [
+                self.resolve_physical_column(table_name, column)
+                for column in self._build_zorder_columns(cluster_columns, distribution_columns)
+            ]
             use_liquid = clustering_strategy in {"liquid_clustering", "liquid_clustering_auto"} or liquid_enabled
             if self.table_format == "hudi":
                 # Delta-only clustering/optimize intents are recorded as skipped
@@ -3605,9 +3626,6 @@ class DatabricksAdapter(PlatformAdapter):
                 sort_columns,
                 use_liquid,
             )
-            if is_delta_table and self.enable_delta_optimization:
-                self._apply_delta_optimize(cursor, table_name, phase="pre_load")
-
         except ImportError:
             self.logger.warning("Tuning interface not available - skipping tuning application")
         except Exception as e:
@@ -3649,7 +3667,10 @@ class DatabricksAdapter(PlatformAdapter):
         if use_liquid:
             effective = list(liquid_columns) or list(zorder_columns)
             if not effective and sort_columns:
-                effective = [col.name for col in sorted(sort_columns, key=lambda c: c.order)]
+                effective = [
+                    self.resolve_physical_column(table_name, col.name)
+                    for col in sorted(sort_columns, key=lambda c: c.order)
+                ]
             if effective:
                 clause = f"ALTER TABLE {table_name} CLUSTER BY ({', '.join(effective)})"
                 self._record_layout_operation(
@@ -3741,7 +3762,10 @@ class DatabricksAdapter(PlatformAdapter):
         if not liquid_columns:
             liquid_columns = list(zorder_columns)
         if not liquid_columns and sort_columns:
-            liquid_columns = [col.name for col in sorted(sort_columns, key=lambda c: c.order)]
+            liquid_columns = [
+                self.resolve_physical_column(table_name, col.name)
+                for col in sorted(sort_columns, key=lambda c: c.order)
+            ]
         if liquid_columns and is_delta_table:
             clause = f"ALTER TABLE {table_name} CLUSTER BY ({', '.join(liquid_columns)})"
             try:
@@ -3835,7 +3859,8 @@ class DatabricksAdapter(PlatformAdapter):
                 f"Sorting in Databricks achieved via {mechanism} for table {table_name}: {', '.join(names)}"
             )
 
-    def _apply_delta_optimize(self, cursor: Any, table_name: str, *, phase: str) -> None:
+    def _apply_delta_optimize(self, cursor: Any, table_name: str, *, phase: str) -> bool:
+        """Run OPTIMIZE then ANALYZE; return False when either statement errored."""
         if self.table_format == "hudi":
             self._record_layout_operation(
                 mechanism="optimize",
@@ -3845,7 +3870,7 @@ class DatabricksAdapter(PlatformAdapter):
                 phase=phase,
             )
             self.logger.info(f"Skipped Delta-only OPTIMIZE for Hudi table {table_name}")
-            return
+            return True
         optimize_statement = f"OPTIMIZE {table_name}"
         try:
             cursor.execute(optimize_statement)
@@ -3867,7 +3892,7 @@ class DatabricksAdapter(PlatformAdapter):
                 error=e,
             )
             self.logger.warning(f"Failed to optimize Delta table {table_name}: {e}")
-            return
+            return False
 
         analyze_statement = f"ANALYZE TABLE {table_name} COMPUTE STATISTICS"
         try:
@@ -3890,6 +3915,8 @@ class DatabricksAdapter(PlatformAdapter):
                 error=e,
             )
             self.logger.warning(f"Failed to analyze Delta table {table_name}: {e}")
+            return False
+        return True
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
         """Apply unified tuning configuration to Databricks."""

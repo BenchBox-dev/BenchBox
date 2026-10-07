@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shlex
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
@@ -16,7 +17,7 @@ TRUNK_WORKFLOW = "trunk.yml"
 REVERT_PREFIX = "fix/revert-"
 GRACE = timedelta(minutes=30)
 RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
-RUN_FIELDS = "conclusion,status,updatedAt"
+RUN_FIELDS = "conclusion,status,createdAt,updatedAt,databaseId,url"
 RUN_WINDOW = 30
 
 Runner = Callable[[list[str]], tuple[int, str]]
@@ -43,10 +44,10 @@ def _parse_time(value: str) -> datetime:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
-def trunk_red_since(run: Runner = live_run, repo: str = REPOSITORY) -> datetime | None:
+def trunk_runs(run: Runner = live_run, repo: str = REPOSITORY) -> list[dict]:
     code, out = run(
         ["gh", "run", "list", "--repo", repo, "--workflow", TRUNK_WORKFLOW, "--branch", BASE_BRANCH]
-        + ["--status", "completed", "--limit", str(RUN_WINDOW), "--json", RUN_FIELDS]
+        + ["--limit", str(RUN_WINDOW), "--json", RUN_FIELDS]
     )
     if code != 0:
         raise TrunkError(f"gh run list failed: {out.strip()}")
@@ -54,20 +55,13 @@ def trunk_red_since(run: Runner = live_run, repo: str = REPOSITORY) -> datetime 
         runs = json.loads(out) if out.strip() else []
         if not runs:
             raise TrunkError(f"no {TRUNK_WORKFLOW} runs on {BASE_BRANCH} yet")
-        completed = [
-            (_parse_time(item["updatedAt"]), item.get("conclusion"))
-            for item in runs
-            if item.get("status") == "completed"
-        ]
+        for item in runs:
+            _parse_time(item["updatedAt"])
+            if not isinstance(item["url"], str) or not item["url"].strip():
+                raise ValueError("missing run URL")
+        return sorted(runs, key=lambda item: (_parse_time(item["createdAt"]), int(item["databaseId"])), reverse=True)
     except (ValueError, KeyError, TypeError, AttributeError) as exc:
         raise TrunkError(f"unreadable gh run list output: {exc}") from exc
-    red_start = None
-    for finished, conclusion in sorted(completed, key=lambda pair: pair[0], reverse=True):
-        if conclusion == "success":
-            break
-        if conclusion in RED_CONCLUSIONS:
-            red_start = finished
-    return red_start
 
 
 def trunk_gate(
@@ -80,25 +74,26 @@ def trunk_gate(
     if branch.startswith(REVERT_PREFIX):
         return None
     try:
-        red_since = trunk_red_since(run, repo)
+        newest = trunk_runs(run, repo)[0]
     except TrunkError as exc:
         print(f"trunk-gate: warning: could not read {TRUNK_WORKFLOW} runs ({exc}); not blocking", file=sys.stderr)
         return None
-    if red_since is None:
+    if newest.get("status") != "completed" or newest.get("conclusion") not in RED_CONCLUSIONS:
         return None
+    red_since = _parse_time(newest["updatedAt"])
     age = (now or datetime.now(UTC)) - red_since
     if age <= grace:
         return None
     minutes = int(age.total_seconds() // 60)
     return (
-        f"develop has been red for {minutes} minutes (first failing {TRUNK_WORKFLOW} run since the last success finished at "
-        f"{red_since.isoformat()}). Fix it or revert the culprit with `make trunk-revert PR=<number>`; "
+        f"develop has been red for {minutes} minutes (newest {TRUNK_WORKFLOW} run: {newest['url']}; "
+        f"failed at {red_since.isoformat()}). Fix it or revert the culprit with `make trunk-revert PR=<number>`; "
         f"branches named {REVERT_PREFIX}* are exempt."
     )
 
 
 def revert_commands(
-    number: int, oid: str, title: str, worktree: str, repo: str = REPOSITORY, head: str | None = None
+    number: int, oid: str, title: str, worktree: str, run_url: str, repo: str = REPOSITORY, head: str | None = None
 ) -> list[list[str]]:
     branch = f"{REVERT_PREFIX}{number}"
     subject = f'Revert "{title}" (#{number})'
@@ -108,7 +103,21 @@ def revert_commands(
         ["git", "-C", worktree, "revert", "--no-edit", oid],
         ["git", "-C", worktree, "commit", "--amend", "-m", subject, "-m", f"This reverts commit {oid}."],
         ["git", "-C", worktree, "push", "-u", "origin", branch],
-        ["gh", "pr", "create", "--repo", repo, "--base", BASE_BRANCH, "--head", head or branch, "--fill"],
+        [
+            "gh",
+            "pr",
+            "create",
+            "--repo",
+            repo,
+            "--base",
+            BASE_BRANCH,
+            "--head",
+            head or branch,
+            "--title",
+            subject,
+            "--body",
+            f"Reverts #{number} to address the failed {TRUNK_WORKFLOW} run: {run_url}",
+        ],
     ]
 
 
@@ -147,12 +156,22 @@ def revert(number: int, run: Runner = live_run, repo: str = REPOSITORY) -> int:
         title = view.get("title") or ""
         if not title.strip():
             raise TrunkError(f"PR #{number} has no title")
+        failed = next(
+            (
+                item
+                for item in trunk_runs(run, repo)
+                if item.get("status") == "completed" and item.get("conclusion") in RED_CONCLUSIONS
+            ),
+            None,
+        )
+        if failed is None:
+            raise TrunkError(f"no failed {TRUNK_WORKFLOW} run on {BASE_BRANCH} to name in the revert PR")
         branch = f"{REVERT_PREFIX}{number}"
         head = head_spec(run, repo, branch)
         top = _check(run, ["git", "rev-parse", "--show-toplevel"], "locating this worktree").strip()
         worktree = str(Path(top).parent / f"BenchBox.wt-revert-{number}")
         fetch, create_worktree, revert_cmd, amend, push, create = revert_commands(
-            number, oid, title, worktree, repo, head
+            number, oid, title, worktree, failed["url"], repo, head
         )
         _check(run, fetch, "fetching origin/develop")
         _check(
@@ -176,7 +195,7 @@ def revert(number: int, run: Runner = live_run, repo: str = REPOSITORY) -> int:
         if code != 0:
             raise TrunkError(
                 f"opening the revert PR failed: {out.strip()}; {branch} is pushed from {worktree}, open it with: "
-                f"gh pr create --repo {repo} --base {BASE_BRANCH} --head {head} --fill"
+                + shlex.join(create)
             )
         print(out.strip())
         print(f"Revert worktree: {worktree}")

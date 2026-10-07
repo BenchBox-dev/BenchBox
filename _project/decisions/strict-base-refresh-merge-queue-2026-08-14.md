@@ -1,5 +1,7 @@
 # Assessment: native merge queue and repository transfer
 
+> Superseded on 2026-10-03 by [merge-queue-retirement-2026-10-03](merge-queue-retirement-2026-10-03.md).
+
 Date: 2026-08-14
 Status: Assessment only. No organization was created, no repository was
 transferred, and no hosted setting was changed.

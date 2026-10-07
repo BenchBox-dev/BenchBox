@@ -104,35 +104,17 @@ trailing `; \` continuation marker before comparing it against the `ci.yml`
 command text -- see `_normalize_recipe_lines` in
 `tests/system/test_ci_lint_parity.py`.
 
-If a guard genuinely cannot run locally (see the cache exception below
-for the only current example), add it to the `EXCLUDED_STEPS` dict in the
+If a guard genuinely cannot run locally, add it to the `EXCLUDED_STEPS` dict in the
 parity test with a concrete reason -- do not silently omit it, and do not
 weaken the CI guard itself so a lossier local equivalent can "pass."
-
-## Documented exceptions
-
-### Fast lane delta guard vs. develop
-
-The `lint` job's "Fast lane ceiling delta vs develop" step
-(`guard-fast-lane-delta`) restores a GitHub Actions cache entry (the
-develop fast-lane baseline count, populated by `fast-lane-baseline.yml`
-after every push to develop) and diffs this PR's own fast-lane collect
-count against it. The hosted pull-request command passes
-`--require-develop-baseline`, so a missing or invalid cache fails closed with
-`DELTA_CHECK_BASELINE_ERROR` rather than allowing a PR to enter a composition
-without proving its per-PR delta.
-There is no local equivalent for the cache restore, so `ci-lint` does not run
-this cache-dependent guard. Direct script callers that omit the strict flag
-retain the compatibility `DELTA_CHECK_SKIPPED` behavior. See
-`docs/operations/fast-lane-budget.md` for the full model.
 
 ## Guards `ci-lint` skips when it runs on a CI runner itself
 
 Everything above is about the direction "a `ci.yml` guard must also run
 locally." There is a second, separate direction: `make ci-lint` may itself
-run on a real, ephemeral GitHub-hosted runner. No workflow does so today (the
-post-merge workflow that used to was retired with the six-unit CI), but the
-gate below stays in place so the recipe is safe on any runner. Most `ci-lint`
+run on a real, ephemeral GitHub-hosted runner. The trunk workflow invokes its
+own test and artifact jobs rather than `make ci-lint`; the guard below keeps
+the recipe safe when another hosted workflow invokes it. Most `ci-lint`
 guards are equally meaningful there, because they inspect the checked-out
 tree, the installed venv, or a registry the repo ships -- none of which
 differ between a laptop and a runner. A couple of guards instead read state
@@ -229,8 +211,8 @@ The tool pin is fixed independently in
 `scripts/skill_sync_ci_policy.py`. A maintainer advances it only with a
 clean preview/apply/check/verify proof and full CI. GitHub classification
 binds to `github.event.pull_request.base.sha`, never a mutable branch tip; if
-`develop` advances during the run, strict current-base enforcement may mark
-that correctly certified run BEHIND. Refresh such PRs one at a time.
+`develop` advances during the run, the run still certifies the base it started
+from; the strict up-to-date rule is off, so the PR does not need a refresh.
 
 ### Local preflight
 
@@ -281,6 +263,11 @@ markers, and release curation against the specified base. It is a local
 equivalent, so the parity inventory records `release-check` rather than a
 hosted-only exception.
 
+The `code-test` step that runs changed tests on the curated release tree has a
+local equivalent:
+`uv run -- python scripts/release_curation_dry_run.py --changed-since origin/develop`.
+With no arguments it runs the full fast selection on that tree.
+
 ### Hosted-only guard inventory
 
 Bundled generator integrity has local equivalents. Run
@@ -297,7 +284,7 @@ attestation; a manifest consistency check alone does not establish provenance.
 The explicit exceptions cover inputs that only exist in their hosted gate:
 
 - cross-platform binary smoke tests and promoted slow/medium regression nodes;
-- fresh-runner skill-source cloning and PR-base/merge-queue ancestry checks;
+- fresh-runner skill-source cloning and PR-base ancestry checks;
 - release-branch curation and release-artifact reports; and
 - the audit-SHA comparison against the immutable PR event base.
 

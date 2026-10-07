@@ -54,6 +54,19 @@ function bundle(overrides: Record<string, unknown> = {}) {
 }
 
 describe("local result import", () => {
+  it("does not borrow a composite QphH or QphDS value as the power score", async () => {
+    const legacy = bundle({
+      summary: {
+        queries: { total: 44, passed: 44, failed: 0 },
+        validation: "passed",
+        tpc_metrics: { qphh_at_size: 777, qphds_at_size: 888 },
+      },
+    });
+    const preview = await parseLocalResultText(JSON.stringify(legacy), "legacy.json");
+
+    expect(preview.detail.power_score).toBeNull();
+  });
+
   it("matches the publication transform for the canonical browser fixture", async () => {
     const fixturePath = resolve(
       import.meta.dirname,
@@ -244,6 +257,19 @@ describe("local result import", () => {
     expect(preview.detail.driver_version).toBeNull();
     expect(preview.detail.test_type).toBe("power");
     expect(preview.detail.cost_usd).toBeNull();
+  });
+
+  it("infers the phase from executed phases and ignores NOT_RUN or empty blocks", async () => {
+    const infer = async (phases: Record<string, unknown>) => {
+      const value = bundle({ benchmark: { id: "tpch", name: "TPC-H", scale_factor: 1 }, phases });
+      return (await parseLocalResultText(JSON.stringify(value))).detail.test_type;
+    };
+
+    await expect(
+      infer({ power_test: { status: "NOT_RUN" }, throughput_test: { status: "COMPLETED" } }),
+    ).resolves.toBe("throughput");
+    await expect(infer({ power_test: {}, throughput_test: { status: "COMPLETED" } })).resolves.toBe("throughput");
+    await expect(infer({ power_test: { status: "NOT_RUN" }, throughput_test: { status: "NOT_RUN" } })).resolves.toBeNull();
   });
 
   it.each(["2.0", "2.1", "2.2"])("accepts supported schema %s", async (version) => {

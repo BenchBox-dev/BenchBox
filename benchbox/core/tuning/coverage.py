@@ -1,9 +1,12 @@
 """Tuned-template coverage inventory helpers.
 
 The runtime `--tuning tuned` resolver first looks for
-`examples/tunings/{platform}/{benchmark}_tuned.yaml`; if no template exists,
-it falls back to an enabled but generic constraints-only configuration. These
-helpers make that contract auditable for UAT without making fallback an error.
+`examples/tunings/{platform}/{benchmark}_tuned.yaml`, then the shared family
+directory for platform variants (for example `clickhouse/` covers
+`clickhouse-local`, `clickhouse-server`, `clickhouse-cloud` and `chdb`); if
+no template exists, it falls back to an enabled but generic
+constraints-only configuration. These helpers make that contract auditable
+for UAT without making fallback an error.
 """
 
 from __future__ import annotations
@@ -15,6 +18,9 @@ from pathlib import Path
 from typing import Iterable, Mapping
 
 import yaml
+
+from benchbox.core.tuning.capability_registry import DEFAULT_FALLBACK_DESCRIPTION, PLATFORM_FALLBACK_DESCRIPTIONS
+from benchbox.core.tuning.packaged_templates import template_platform_key
 
 TUNED_TEMPLATE = "tuned_template"
 BASIC_CONSTRAINTS = "basic_constraints"
@@ -36,9 +42,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 TUNING_TEMPLATE_ROOT = REPO_ROOT / "examples" / "tunings"
 MATRIX_COLUMNS = ("platform", "benchmark", "status", "decision", "reason", "template_path")
 
+_FALLBACK_DESCRIPTIONS = (DEFAULT_FALLBACK_DESCRIPTION, *sorted(set(PLATFORM_FALLBACK_DESCRIPTIONS.values())))
+
 _RUNTIME_STATUS_MARKERS: tuple[tuple[str, str], ...] = (
     ("Tuning: auto-discovered template", TUNED_TEMPLATE),
-    ("Tuning: using basic constraints", BASIC_CONSTRAINTS),
+    *((f"Tuning: using {description}", BASIC_CONSTRAINTS) for description in _FALLBACK_DESCRIPTIONS),
     ("Tuning disabled:", UNTUNED),
 )
 
@@ -93,15 +101,21 @@ class RuntimeTuningObservation:
 
 
 def template_path_for(platform: str, benchmark: str, *, root: Path = REPO_ROOT) -> Path:
-    """Return the standard tuned-template path used by `--tuning tuned`."""
+    """Return the per-key tuned-template path for one platform directory.
+
+    `classify_template` tries this path for the platform itself first, then
+    for its shared family directory (see `template_platform_key`), so one
+    curated directory covers every platform variant.
+    """
     return root / "examples" / "tunings" / platform.lower() / f"{benchmark.lower()}_tuned.yaml"
 
 
 def classify_template(platform: str, benchmark: str, *, root: Path = REPO_ROOT) -> tuple[str, str]:
     """Classify one platform/benchmark pair from checked-in tuning templates."""
-    template_path = template_path_for(platform, benchmark, root=root)
-    if template_path.exists():
-        return TUNED_TEMPLATE, _relpath(template_path, root)
+    for key in dict.fromkeys((platform, template_platform_key(platform))):
+        template_path = template_path_for(key, benchmark, root=root)
+        if template_path.exists():
+            return TUNED_TEMPLATE, _relpath(template_path, root)
     return BASIC_CONSTRAINTS, "-"
 
 
@@ -177,6 +191,27 @@ def read_tuning_coverage_tsv(path: Path) -> list[TuningCoverageRow]:
                 )
             )
     return rows
+
+
+def coverage_differences(
+    recorded_rows: Iterable[TuningCoverageRow],
+    current_rows: Iterable[TuningCoverageRow],
+) -> list[str]:
+    """Return sorted platform/benchmark keys whose full row differs.
+
+    Unlike `static_matrix_drift` (downgrades and missing keys only), any
+    difference counts: upgrades, downgrades, and decision, reason, or
+    template-path changes. The checked-in matrix test uses this so a stale
+    waiver where a template now exists fails. Regenerate the matrix with
+    `uv run -- python scripts/generate_tuning_coverage.py`.
+    """
+    recorded = {row.key: row.to_dict() for row in recorded_rows}
+    current = {row.key: row.to_dict() for row in current_rows}
+    return sorted(
+        f"{platform}/{benchmark}"
+        for (platform, benchmark) in set(recorded) | set(current)
+        if recorded.get((platform, benchmark)) != current.get((platform, benchmark))
+    )
 
 
 def static_matrix_drift(
