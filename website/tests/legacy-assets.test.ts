@@ -41,6 +41,7 @@ describe("legacy public file paths", () => {
 describe("download and image records", () => {
   it("records files that Sphinx would publish as downloads and the blog images a page uses", () => {
     const docsRoot = writeDocs({
+      "docs/publish-exclusions.txt": "",
       "docs/guide/a.md": "# A\n\n[Run](../../examples/run.py#L2) [Data](../data.csv) [Readme](../../README.md) [Pkg](../../examples/)\n",
       "docs/data.csv": "a\n",
       "examples/run.py": "x\n",
@@ -60,6 +61,7 @@ describe("download and image records", () => {
 describe("inventory entries", () => {
   it("lists pages, heading targets, blog post labels and the retired index and search labels", () => {
     const docsRoot = writeDocs({
+      "docs/publish-exclusions.txt": "",
       "docs/api.md": "---\nmyst:\n  enable_extensions:\n    - attrs_block\n---\n\n# API\n\n{#thing-example}\n\n## Example\n\n(guide-label)=\n## Guide\n",
       "docs/blog/2026-01-01-hello.md": "---\nblogpost: true\ndate: Jan 1, 2026\n---\n\n# Hello\n",
     });

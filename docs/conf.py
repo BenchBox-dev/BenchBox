@@ -157,9 +157,6 @@ def _read_path_list(path: Path) -> list[str]:
     return [line for line in lines if line and not line.startswith("#")]
 
 
-# docs/publish-exclusions.txt is the shared list of unpublished paths; the Astro
-# converter reads the same file. A missing list would publish maintainer pages,
-# so the build stops instead.
 _publish_exclusions = DOCS_ROOT / "publish-exclusions.txt"
 if not _publish_exclusions.exists():
     raise FileNotFoundError(f"{_publish_exclusions} is missing; it lists the paths that must not be published")

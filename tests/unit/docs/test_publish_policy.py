@@ -1,13 +1,3 @@
-"""Publish policy for docs/: which pages the public site may publish.
-
-docs/publish-exclusions.txt lists paths that are never published, and
-docs/publish-allowlist.txt lists the pages under docs/development/ and
-docs/operations/ that are. The data checks here need no renderer, so they keep
-guarding core pull requests whichever repository builds the site. The Sphinx
-checks cover docs/conf.py, which applies both lists; the Astro converter's side
-is tested in website/tests/sources.test.ts.
-"""
-
 from __future__ import annotations
 
 import runpy
@@ -59,9 +49,7 @@ def test_allowlist_names_existing_pages_in_gated_directories() -> None:
     assert [page for page in ALLOWLIST if not page.startswith(tuple(f"{root}/" for root in PUBLISH_LIST_ROOTS))] == []
 
 
-def test_exclusions_name_top_level_directories_and_existing_files() -> None:
-    # A listed directory may be absent (it is excluded in case it appears); a
-    # listed file that no longer exists is a stale entry.
+def test_excluded_directories_are_top_level_and_excluded_files_exist() -> None:
     assert {"agent", "internal"} <= EXCLUDED_ROOTS
     assert [root for root in EXCLUDED_ROOTS if "/" in root] == []
     assert [path for path in EXCLUDED_FILES if not (DOCS / path).is_file()] == []

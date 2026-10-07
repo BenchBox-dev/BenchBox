@@ -83,8 +83,6 @@ function pagesUnder(docsRoot: string, root: string): string[] {
     .sort();
 }
 
-// Pages under a publish-list directory that are on neither the publish list
-// nor the exclusion list. Each one needs a decision before it can merge.
 function unclassifiedPages(docsRoot: string): string[] {
   const listed = readPublishList(docsRoot);
   return PUBLISH_LIST_ROOTS.flatMap((root) => pagesUnder(docsRoot, root)).filter((page) => !listed.has(page) && !readPublishExclusions(docsRoot).files.has(page));
@@ -111,8 +109,16 @@ describe("publish list for docs/development and docs/operations", () => {
       writeFileSync(path.join(docsRoot, relative), "# Page\n");
     }
     writeFileSync(path.join(docsRoot, PUBLISH_LIST_FILE), "# comment\ndevelopment/kept.md\n");
+    writeFileSync(path.join(docsRoot, EXCLUSIONS_FILE), "");
     expect(unclassifiedPages(docsRoot)).toEqual(["development/new-page.md", "operations/runbook.md"]);
     expect(listDocSources(docsRoot).map((source) => source.relative)).toEqual(["development/kept.md", "guides/user.md"]);
+  });
+
+  it("refuses to list sources when the exclusion list is missing", () => {
+    const docsRoot = path.join(workDir, "no-exclusions");
+    mkdirSync(path.join(docsRoot, "agent"), { recursive: true });
+    writeFileSync(path.join(docsRoot, "agent", "notes.md"), "# Notes\n");
+    expect(() => listDocSources(docsRoot)).toThrow(EXCLUSIONS_FILE);
   });
 
   it("publishes nothing from those directories when the list is missing", () => {
@@ -120,6 +126,7 @@ describe("publish list for docs/development and docs/operations", () => {
     mkdirSync(path.join(docsRoot, "operations"), { recursive: true });
     writeFileSync(path.join(docsRoot, "operations", "runbook.md"), "# Runbook\n");
     writeFileSync(path.join(docsRoot, "index.md"), "# Home\n");
+    writeFileSync(path.join(docsRoot, EXCLUSIONS_FILE), "");
     expect(listDocSources(docsRoot).map((source) => source.relative)).toEqual(["index.md"]);
   });
 });

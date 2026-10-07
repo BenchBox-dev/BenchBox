@@ -97,7 +97,7 @@ describe("writeOutput", () => {
     const before = readFileSync(path.join(docsRoot, "a.md"), "utf-8");
     buildSite({ docsRoot });
     expect(readFileSync(path.join(docsRoot, "a.md"), "utf-8")).toBe(before);
-    expect(readdirSync(docsRoot)).toEqual(["a.md"]);
+    expect(readdirSync(docsRoot).sort()).toEqual(["a.md", "publish-exclusions.txt"]);
   });
 });
 
