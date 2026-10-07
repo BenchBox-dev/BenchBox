@@ -21005,15 +21005,10 @@
       "title": "✅ TPC-Havoc Variant Modularization"
     },
     "tpc-official-benchmark-classes-broken": {
-      "claim": {
-        "expires_at": "2026-10-08T18:00:30Z",
-        "generation": "07f7342a9041417da8b595ded3952573",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:4ee1e53407fc81703cc8e033"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "TPCHOfficialBenchmark and TPCDSOfficialBenchmark produce wrong or no throughput results"
     },
     "tpc-specification-compliance-issues-completed": {
