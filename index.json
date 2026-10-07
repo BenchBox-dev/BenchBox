@@ -21441,10 +21441,15 @@
       "title": "Fix exported Throughput@Size: driver formula omits the queries-per-stream factor (22x/99x understated)"
     },
     "tpch-tpcds-throughput-stream-numbering": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-08T11:28:27Z",
+        "generation": "a30102b4be8d48e4966565efd82965ba",
+        "renewals": 0,
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:4c91b0dc8d7199ddf93ae735"
+      },
       "needs": [],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Number throughput streams 1..S so stream 0 no longer repeats the power ordering"
     },
     "tpch-variant-dataframe-seed-binding": {
