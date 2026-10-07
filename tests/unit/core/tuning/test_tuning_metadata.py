@@ -1304,3 +1304,49 @@ def test_manager_without_supplied_connection_still_opens_temp_connections():
 
     assert adapter.opened >= 1
     assert len(adapter.closed) == adapter.opened
+
+
+class _NoCursorConn:
+    """Mimics the clickhouse-driver Client: execute() but no cursor()."""
+
+    def __init__(self):
+        self.executed: list[str] = []
+
+    def execute(self, sql):
+        self.executed.append(sql)
+        return {}
+
+
+class _ExecuteQueryAdapter(_Adapter):
+    """Adapter routing writes through execute_query like the real path."""
+
+    def execute_query(self, connection, sql, *_args, **_kwargs):
+        return connection.execute(sql)
+
+
+def test_format_literal_datetime_uses_space_separator():
+    """Inline datetime literals must parse as ClickHouse DateTime.
+
+    Regression: ``isoformat()`` emits ``2026-10-06T20:56:51.252740`` and a
+    tuned-run marker write failed a whole benchmark cell on exactly that.
+    """
+    manager = TuningMetadataManager(_Adapter())
+    assert manager._format_literal(datetime(2026, 10, 6, 20, 56, 51, 252740)) == "'2026-10-06 20:56:51'"
+    assert manager._format_literal(None) == "NULL"
+    assert manager._format_literal(True) == "TRUE"
+    assert manager._format_literal(7) == "7"
+    assert manager._format_literal("o'clock") == "'o''clock'"
+
+
+def test_batch_insert_inline_datetime_has_no_iso_t_separator():
+    """The cursor-less INSERT path must not inline ISO-8601 timestamps."""
+    adapter = _ExecuteQueryAdapter(platform_name="clickhouse-server")
+    connection = _NoCursorConn()
+    manager = TuningMetadataManager(adapter, connection=connection)
+
+    record = manager._build_run_kind_record(datetime(2026, 10, 6, 20, 56, 51, 252740))
+    manager._batch_insert_records([record])
+
+    assert len(connection.executed) == 1
+    assert "'2026-10-06 20:56:51'" in connection.executed[0]
+    assert "2026-10-06T20:56" not in connection.executed[0]

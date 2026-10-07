@@ -900,8 +900,9 @@ class TuningMetadataManager:
         Only the tuning-metadata INSERT path uses this: job-style clients
         such as BigQuery accept no ``?`` placeholders, so values are inlined
         into the statement the adapter qualifies. Strings are single-quoted
-        with embedded quotes doubled; datetimes use ISO format; booleans
-        render as TRUE/FALSE; None renders as NULL.
+        with embedded quotes doubled; datetimes use the space-separated
+        ``YYYY-MM-DD HH:MM:SS`` form; booleans render as TRUE/FALSE; None
+        renders as NULL.
         """
         if value is None:
             return "NULL"
@@ -910,7 +911,12 @@ class TuningMetadataManager:
         if isinstance(value, (int, float)):
             return str(value)
         if isinstance(value, datetime):
-            return f"'{value.isoformat()}'"
+            # ClickHouse DateTime rejects ISO-8601's ``T`` separator and
+            # fractional seconds (a tuned-run marker write failed a whole
+            # benchmark cell on exactly this). The space-separated form
+            # parses on every engine this path serves (ClickHouse DateTime,
+            # BigQuery TIMESTAMP, Snowflake TIMESTAMP_NTZ).
+            return f"'{value.strftime('%Y-%m-%d %H:%M:%S')}'"
         return "'" + str(value).replace("'", "''") + "'"
 
     def _batch_insert_records(self, records: list[TuningMetadata]) -> None:
@@ -944,8 +950,9 @@ class TuningMetadataManager:
         # Execute batch insert - handle platforms that don't support batch operations
         with self._managed_connection() as conn:
             if not hasattr(conn, "cursor"):
-                # Job-style clients (BigQuery) expose query() instead of a
-                # DBAPI cursor and accept no ? placeholders: run one
+                # Clients without a DBAPI cursor -- job-style clients such as
+                # BigQuery, and the clickhouse-driver Client used for
+                # clickhouse-server -- accept no ? placeholders: run one
                 # qualified INSERT per record through the adapter so the
                 # table resolves and values are inlined safely.
                 for params in param_lists:
