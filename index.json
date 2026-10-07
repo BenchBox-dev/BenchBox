@@ -7270,17 +7270,12 @@
       "title": "Retire the release branch, its ruleset, workflows, scripts, targets, and tests"
     },
     "dlv2-60-publication-integration": {
-      "claim": {
-        "expires_at": "2026-10-08T12:04:40Z",
-        "generation": "59b7a971f1d44ee4a15e9b59c15ce779",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:ed041bbd4fda16ccb14793cc"
-      },
+      "claim": null,
       "needs": [
         "dlv2-00-decisions-adr"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Build the replacement site-deploy workflow for benchbox.dev and run it in shadow"
     },
     "dlv2-61-retire-docs-yml-pages-fallback": {
