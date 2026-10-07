@@ -21411,17 +21411,12 @@
       "title": "TPC-H throughput runs untranslated SQL on every platform; power translates to the target dialect"
     },
     "tpch-throughput-parameter-aware-rowcounts": {
-      "claim": {
-        "expires_at": "2026-10-08T11:28:41Z",
-        "generation": "fe45fdf3ac9d45cd86fb9a8fa5266f50",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:4c91b0dc8d7199ddf93ae735"
-      },
+      "claim": null,
       "needs": [
         "tpch-throughput-seed-validation-fix"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Parameter-aware expected row counts for TPC-H Q11/16/18/20 (validate instead of exclude)"
     },
     "tpch-throughput-rowcount-validation-range-mode": {
