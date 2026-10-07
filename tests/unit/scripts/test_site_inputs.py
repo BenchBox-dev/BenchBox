@@ -133,6 +133,34 @@ def test_build_refuses_foreign_core_sha(tmp_path: Path) -> None:
         site_inputs.cmd_build(args)
 
 
+def _gen_data(tmp_path: Path, payload: dict | None = None) -> Path:
+    data = tmp_path / "gen" / "data"
+    _write(data / "results.duckdb", "duckdb-bytes")
+    _write(data / "bundles" / "r1.json", '{"run": {"id": "x"}}\n')
+    if payload is not None:
+        _write(data / "fixture-ids.json", json.dumps(payload) + "\n")
+    return data
+
+
+def test_stage_fixtures_copies_db_bundles_and_role_keyed_ids(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    site_inputs._stage_fixtures(_gen_data(tmp_path, {"ids": {"duckdb": "r1"}, "shortIds": {"duckdb": "s1"}}), out)
+
+    assert (out / "results.duckdb").is_file()
+    assert (out / "r1.json").is_file()
+    assert json.loads((out / "fixture-ids.json").read_text(encoding="utf-8"))["ids"]["duckdb"] == "r1"
+
+
+def test_stage_fixtures_rejects_missing_ids_file(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="no fixture-ids.json"):
+        site_inputs._stage_fixtures(_gen_data(tmp_path), tmp_path / "out")
+
+
+def test_stage_fixtures_rejects_flat_id_map(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="role-keyed contract"):
+        site_inputs._stage_fixtures(_gen_data(tmp_path, {"r1": "s1"}), tmp_path / "out")
+
+
 def test_repo_files_lists_every_tracked_path_with_kinds(tmp_path: Path) -> None:
     out = tmp_path / "repo-files.json"
     site_inputs.build_repo_files(out, "abc123")

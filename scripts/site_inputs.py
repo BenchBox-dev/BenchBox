@@ -148,32 +148,52 @@ def build_contract(out: Path) -> None:
     out.write_text(json.dumps(contract, indent=2) + "\n", encoding="utf-8")
 
 
-def build_fixtures(out_fixtures: Path) -> None:
-    from _project.scripts.explorer_pipeline.browser_fixtures import short_ids
+def _read_fixture_ids(data: Path) -> dict:
+    fixture_ids = data / "fixture-ids.json"
+    if not fixture_ids.is_file():
+        raise RuntimeError("fixture generation produced no fixture-ids.json")
+    payload = json.loads(fixture_ids.read_text(encoding="utf-8"))
+    if sorted(payload) != ["ids", "shortIds"] or not payload["ids"]:
+        raise RuntimeError(f"fixture-ids.json breaks the role-keyed contract: {sorted(payload)}")
+    return payload
 
-    tmp = out_fixtures.parent / ".tmp-fixture-build"
-    if tmp.exists():
-        shutil.rmtree(tmp)
-    tmp.mkdir(parents=True)
-    must_run(
-        "uv",
-        "run",
-        "--",
-        "python",
-        "_project/scripts/explorer_publish.py",
-        "build",
-        "--data-dir",
-        "results-explorer/test-fixtures/source",
-        "--output",
-        str(tmp),
-    )
-    db = tmp / "results.duckdb"
-    (out_fixtures).mkdir(parents=True, exist_ok=True)
+
+def _stage_fixtures(data: Path, out_fixtures: Path) -> None:
+    db = data / "results.duckdb"
+    if not db.is_file() or db.stat().st_size == 0:
+        raise RuntimeError("fixture generation produced no results.duckdb")
+    _read_fixture_ids(data)
+    out_fixtures.mkdir(parents=True, exist_ok=True)
     shutil.copy2(db, out_fixtures / "results.duckdb")
-    for bundle in sorted((tmp / "bundles").glob("*.json")) if (tmp / "bundles").is_dir() else []:
-        shutil.copy2(bundle, out_fixtures / bundle.name)
-    (out_fixtures / "fixture-ids.json").write_text(json.dumps(short_ids(db), indent=2) + "\n", encoding="utf-8")
-    shutil.rmtree(tmp)
+    bundles = data / "bundles"
+    if bundles.is_dir():
+        for bundle in sorted(bundles.glob("*.json")):
+            shutil.copy2(bundle, out_fixtures / bundle.name)
+    shutil.copy2(data / "fixture-ids.json", out_fixtures / "fixture-ids.json")
+
+
+def build_fixtures(out_fixtures: Path) -> None:
+    import os
+    import tempfile
+
+    node = shutil.which("node")
+    if node is None:
+        raise RuntimeError("node is required to generate the browser fixture corpus")
+    with tempfile.TemporaryDirectory(prefix="benchbox-large-browser-fixture-") as tmp_root:
+        env = dict(os.environ, E2E_FIXTURE_OUTPUT_ROOT=tmp_root, E2E_FIXTURE_PROFILE="default")
+        proc = subprocess.run(
+            [node, "results-explorer/scripts/generate-browser-fixtures.mjs"],
+            cwd=str(ROOT),
+            env=env,
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"generate-browser-fixtures.mjs failed ({proc.returncode}): {(proc.stdout + proc.stderr)[-2000:]}"
+            )
+        _stage_fixtures(Path(tmp_root) / "data", out_fixtures)
 
 
 def build_parity(out_parity: Path) -> None:
