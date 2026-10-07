@@ -90,7 +90,8 @@ def finalize(
         body = "\n".join(
             [*_header(plan, PENDING), *_section("Result withheld: the run's artifacts failed validation", errors)]
         )
-        return Final(PENDING, "result withheld: artifacts failed validation", body, None, None, INTEGRITY)
+        review = _review_payload(plan, body, Placement((), ())) if plan.get("findings_delivery") == "review" else None
+        return Final(PENDING, "result withheld: artifacts failed validation", body, review, None, INTEGRITY)
     pending_cause = ALL_ABSENT
     if step.kind == selection.REVIEW:
         reason = f"{step.reviewer.name if step.reviewer else 'a reviewer'}: selected but did not report"
@@ -136,7 +137,7 @@ def finalize(
     lines += _section("Reviewers not available", _absences(attempts, step))
     body = "\n".join(lines).rstrip() + "\n"
     has_content = bool(placement.inline or placement.summary or state != SUCCESS)
-    review = _review_payload(plan, body, placement) if delivery == "review" and verdict is not None else None
+    review = _review_payload(plan, body, placement) if delivery == "review" else None
     cause = pending_cause if state == PENDING else None
     return Final(state, _clip(description), body if has_content else "", review, reviewer, cause)
 

@@ -409,3 +409,23 @@ def test_a_changed_file_missing_from_the_selected_diff_gives_a_full_review(
     state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40}, outcome="success")
     _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), TWO_FILES, state, diff=quoted))
     assert values["decision"] == "review" and plan["scope"] == "full"
+
+
+HELPER = "benchbox/utils/row_compare.py"
+
+
+def test_a_code_change_outside_soundness_paths_is_reviewed_not_carried(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    files = [*TWO_FILES, {"filename": HELPER, "additions": 3, "deletions": 1, "sha": "7" * 40}]
+    diff = (
+        TWO_FILE_DIFF
+        + f"diff --git a/{HELPER} b/{HELPER}\n--- a/{HELPER}\n+++ b/{HELPER}\n@@ -1,1 +1,2 @@\n a\n+helper change\n"
+    )
+    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40, HELPER: "6" * 40}, outcome="success")
+    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), files, state, diff=diff))
+    assert values["decision"] == "review" and plan["scope"] == "changed"
+    brief = (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
+    assert "helper change" in brief and "capture change" not in brief
+    unchanged = brief.split("identical since:", 1)[1].split("Review the first list", 1)[0]
+    assert CHECKER in unchanged and CAPTURE in unchanged and HELPER not in unchanged

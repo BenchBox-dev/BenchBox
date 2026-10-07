@@ -420,7 +420,7 @@ def test_cli_finalize_records_the_reviewed_files(
     }
 
 
-def test_a_pending_run_without_a_review_still_posts_its_diagnostics(
+def test_a_pending_run_posts_its_diagnostics_as_a_review(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     plan_path = tmp_path / "plan.json"
@@ -440,5 +440,16 @@ def test_a_pending_run_without_a_review_still_posts_its_diagnostics(
         "--out-dir",
         str(tmp_path / "o"),
     )
-    assert out["state"] == "pending" and out["review"] == "false" and out["comment"] == "true"
-    assert "sol: absent (auth)" in json.loads((tmp_path / "o" / "comment.json").read_text(encoding="utf-8"))["body"]
+    assert out["state"] == "pending" and out["review"] == "true" and out["comment"] == "false"
+    review = json.loads((tmp_path / "o" / "review.json").read_text(encoding="utf-8"))
+    assert review["body"].startswith(f"### oracle-review-shadow: pending for `{HEAD}`")
+    assert review["comments"] == [] and "sol: absent (auth)" in review["body"]
+
+
+def test_withheld_result_is_posted_as_a_pending_review(policy: Policy, tmp_path: Path) -> None:
+    plan = {**_plan(policy), "findings_delivery": "review"}
+    _write(tmp_path, 1, "sonnet", verdict={"summary": "", "findings": []}, run_id="1")
+    loaded, step, errors = _decide(policy, plan, tmp_path)
+    final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, {})
+    assert final.state == "pending" and final.review is not None
+    assert final.review["body"].startswith(f"### oracle-review-shadow: pending for `{HEAD}`")

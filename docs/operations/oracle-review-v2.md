@@ -54,19 +54,21 @@ Without the App secrets, the `post` job logs the result and succeeds.
    and posts the status and one pull request review on the head commit. Each
    finding on a diff line becomes its own review thread; the review body
    holds the summary and any finding outside the diff. A run with no verdict,
-   such as one where every reviewer was absent, posts its explanation as a
-   comment instead.
+   such as one where every reviewer was absent, still posts a review whose
+   body explains the pending result, so the latest review always reflects the
+   latest run.
 
 `plan` also limits spend to code that changed. The retry state records the
-blob SHA of each soundness file at the last success or failure, with the basis
+blob SHA of each changed file at the last success or failure, except prose
+files (`.md`, `.mdx`, `.rst`, `.txt`) outside soundness paths, with the basis
 of that result: the merge base of the head with `develop`, the tier, its
 blocking severities and reviewer settings, the excluded author families, and a
 hash of the policy file, brief template and verdict schema. When the basis is unchanged and the new
 head has exactly those files at those SHAs, the run posts the recorded result
-to the new head without running a reviewer, so a push of docs or tests costs
-nothing. When the last result was a success below the very-high tier and some
-of those files changed, the brief diffs only the changed files and asks the
-reviewer to check their effect on the others. Every other case gets a full
+to the new head without running a reviewer, so a push that changes only prose
+costs nothing. When the last result was a success below the very-high tier and some
+of those files changed, the brief diffs only the changed files, lists the
+others, and asks the reviewer to check the effect on them. Every other case gets a full
 review: after a failure, because a scoped review cannot re-check findings in
 files it does not read; at the very-high tier; and after a basis change, a
 file leaving the diff, a diff that cannot be split by file, or a missing state.

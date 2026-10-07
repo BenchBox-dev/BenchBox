@@ -64,10 +64,17 @@ have usage left.
 
 ## What shadow mode does and does not do
 
-The workflow posts a separate, non-required `oracle-review-shadow` status and,
-for failures, pending results and findings, one pull request comment. It posts
-findings as a comment rather than review threads, because the ruleset requires
-every review thread to be resolved and shadow findings must not block merges.
+The workflow posts a separate, non-required `oracle-review-shadow` status and
+one pull request review per result on the head commit, with a thread for each
+finding on a diff line.
+
+Superseded on 2026-10-07: this record first had findings posted as a comment
+rather than review threads, because the ruleset requires every review thread to
+be resolved and shadow findings were not to block merges. Review delivery was
+chosen to prepare the cut-over, which needs the oracle's review and threads on
+the head. Since then, an unresolved oracle thread blocks a merge the same way
+a connector thread does, so the shadow's status stays advisory but its threads
+do not. To restore advisory-only threads, set `findings_delivery: comment`.
 
 It does not change the required `oracle-review` check, the ruleset, the digest
 or the soundness manifest. It does not post a pending status when a run

@@ -32,6 +32,7 @@ FORK = "fork"
 SKIP = "skip"
 CARRY = "carry"
 SCOPELESS_TIER = "very-high"
+PROSE_SUFFIXES = (".md", ".mdx", ".rst", ".txt")
 
 
 def _now() -> datetime:
@@ -215,7 +216,9 @@ def command_plan(args: argparse.Namespace) -> int:
         return _finish_plan(out_dir, plan)
     tier = policy.tiers[classification.tier or "very-high"]
     in_scope = set(classification.soundness_paths)
-    scoped = [item for item in files if any(path in in_scope for path in item.paths)]
+    scoped = [
+        item for item in files if any(path in in_scope for path in item.paths) or not item.path.endswith(PROSE_SUFFIXES)
+    ]
     current = {item.path: item.sha for item in scoped}
     merge_base = _merge_base(repo, plan["base_sha"], plan["head_sha"])
     excluded = selection.excluded_families(labels, policy)
@@ -241,7 +244,7 @@ def command_plan(args: argparse.Namespace) -> int:
         plan.update(
             {
                 "decision": CARRY,
-                "decision_reason": f"no soundness file changed since head {reviewed.head_sha} was reviewed",
+                "decision_reason": f"only prose changed since head {reviewed.head_sha} was reviewed",
                 "reviewed_head": reviewed.head_sha,
                 "manual": manual,
                 "previous_state": previous_json,
@@ -266,6 +269,7 @@ def command_plan(args: argparse.Namespace) -> int:
         diff_text=diff_text,
         max_bytes=policy.brief_max_bytes,
         reviewed_head=reviewed.head_sha if partial and reviewed else None,
+        unchanged=[item for item in files if item not in changed] if partial else [],
     )
     write_private(out_dir / BRIEF_FILE, brief.text)
     write_private(out_dir / DIFF_FILE, full_diff or "")

@@ -57,6 +57,7 @@ def build_brief(
     diff_text: str | None,
     max_bytes: int,
     reviewed_head: str | None = None,
+    unchanged: list[ChangedFile] | None = None,
 ) -> Brief:
     header = BRIEF_TEMPLATE.format(
         pr=pr,
@@ -71,9 +72,10 @@ def build_brief(
     if reviewed_head is not None:
         listing = (
             f"\nFiles changed since head {reviewed_head} was reviewed:\n{_file_list(files)}\n"
-            "Review these files, and how their changes affect the pull request's other changed files. Those"
-            " other files were reviewed at that head and have not changed since; read them in the working"
-            " directory.\n"
+            f"\nOther files this pull request changes, reviewed at that head and identical since:\n"
+            f"{_file_list(unchanged or [])}\n"
+            "Review the first list, and how its changes affect the files in the second list; read those in the"
+            " working directory.\n"
         )
     if diff_text is not None:
         inline = f"{header}{listing}\nUnified diff of these files from base to head:\n{diff_text}"
