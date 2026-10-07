@@ -1919,3 +1919,31 @@ class TestClickHouseQueryTransformerSafeDivision:
         assert "mkt / NULLIF(SUM(volume) OVER (PARTITION BY o_year), 0)" in result
         # The OVER clause must NOT be stranded outside the NULLIF.
         assert "NULLIF(SUM(volume), 0) OVER" not in result
+
+
+class TestClickHouseQueryTransformerCaseNormalization:
+    def _transformer(self):
+        from benchbox.platforms.clickhouse.query_transformer import ClickHouseQueryTransformer
+
+        return ClickHouseQueryTransformer()
+
+    def test_q1_fee_column_lowercased(self):
+        t = self._transformer()
+        result = t.normalize_case("SELECT SUM(SR_FEE) AS ctr_total_return FROM store_returns")
+        assert "SUM(sr_fee)" in result
+        assert "SR_FEE" not in result
+
+    def test_q1_agg_field_variants_lowercased(self):
+        t = self._transformer()
+        for column in (
+            "SR_RETURN_AMT",
+            "SR_FEE",
+            "SR_REFUNDED_CASH",
+            "SR_RETURN_AMT_INC_TAX",
+            "SR_REVERSED_CHARGE",
+            "SR_STORE_CREDIT",
+            "SR_RETURN_TAX",
+        ):
+            result = t.normalize_case(f"SELECT SUM({column}) FROM store_returns")
+            assert f"SUM({column.lower()})" in result
+            assert column not in result
