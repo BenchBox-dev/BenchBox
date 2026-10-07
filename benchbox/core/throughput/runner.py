@@ -15,6 +15,7 @@ from .result import (
     ThroughputResult,
     ThroughputStreamResult,
     throughput_result_succeeded,
+    throughput_stream_ids,
     throughput_stream_succeeded,
 )
 
