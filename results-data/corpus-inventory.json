@@ -1,6 +1,6 @@
 {
   "schema_version": "2.3",
-  "generated_at": "2026-10-07T01:08:41.519323+00:00",
+  "generated_at": "2026-10-07T01:32:43.546405+00:00",
   "bundles": [
     {
       "file": "amplab_sf01_bigquery_sql_20260920_000055_35490af7.json",
@@ -4228,19 +4228,6 @@
       "bundle_sha256": "3a00d6605062472bddcd919daa1be6187ed3fd7f2ee6865a4948a617b9c0d85f"
     },
     {
-      "file": "tpch/polars-df/sf0.01/tpch_sf001_polars_df_20261001_142101_9eaac562.json",
-      "benchmark": "tpch",
-      "benchmark_name": "TPC-H",
-      "platform": "Polars",
-      "platform_version": "1.44.2",
-      "scale_factor": 0.01,
-      "timestamp": "2026-10-01T14:21:01.050147",
-      "query_count": 66,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "462e16bbf4bfe8dcb8b7551fc71116beecd2dffb3ca0cb7728a7c7a15da20373"
-    },
-    {
       "file": "tpch_sf01_polars_df_20260826_204211_f659fcbf.json",
       "benchmark": "tpch",
       "benchmark_name": "TPC-H",
@@ -4265,19 +4252,6 @@
       "trust_label": "maintainer-run",
       "funding": "unspecified",
       "bundle_sha256": "1eaa5467e018087972766e7192bb0a5b79b4a09cca9187a7b94042ab96acf811"
-    },
-    {
-      "file": "tpch/polars-df/sf0.1/tpch_sf01_polars_df_20261001_142058_bb61dc17.json",
-      "benchmark": "tpch",
-      "benchmark_name": "TPC-H",
-      "platform": "Polars",
-      "platform_version": "1.44.2",
-      "scale_factor": 0.1,
-      "timestamp": "2026-10-01T14:20:55.877254",
-      "query_count": 66,
-      "trust_label": "maintainer-run",
-      "funding": "unspecified",
-      "bundle_sha256": "7502711540d6cf45731234f8b94174cea286536f45392ec34d183e0f87bbe58e"
     },
     {
       "file": "tpch_sf1_polars_df_20260824_193005_54a9e53f.json",
@@ -5716,7 +5690,6 @@
       "LakeSail v4.1.1",
       "Pandas v2.3.3",
       "Polars v1.40.0",
-      "Polars v1.44.2",
       "PySpark v4.1.1",
       "SQLite v3.53.1",
       "Spark v4.1.1",
@@ -5732,7 +5705,6 @@
       "DuckDB v1.5.5",
       "Pandas v2.3.3",
       "Polars v1.40.0",
-      "Polars v1.44.2",
       "SQLite v3.53.1",
       "Snowflake v10.35.101",
       "Spark v4.1.1"
@@ -5868,7 +5840,7 @@
     ]
   },
   "summary": {
-    "total_bundles": 412,
+    "total_bundles": 410,
     "by_benchmark": {
       "amplab": 25,
       "clickbench": 23,
@@ -5884,7 +5856,7 @@
       "tpcdi": 18,
       "tpcds": 34,
       "tpcds_obt": 6,
-      "tpch": 61,
+      "tpch": 59,
       "tpch_skew": 24,
       "tpchavoc": 18,
       "transaction_primitives": 9,
@@ -5902,7 +5874,7 @@
       "DuckLake": 1,
       "LakeSail": 1,
       "Pandas": 17,
-      "Polars": 32,
+      "Polars": 30,
       "PySpark": 2,
       "SQLite": 23,
       "Snowflake": 50,
@@ -5910,10 +5882,10 @@
       "StarRocks": 1
     },
     "by_trust_label": {
-      "maintainer-run": 412
+      "maintainer-run": 410
     },
     "by_funding": {
-      "unspecified": 412
+      "unspecified": 410
     }
   }
 }
