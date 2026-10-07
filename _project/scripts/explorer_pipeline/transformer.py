@@ -33,9 +33,11 @@ from _project.scripts.explorer_pipeline.models import (
     QueryDisplayTiming,
     QueryTiming,
     _platform_id,
+    canonical_benchmark_slug,
     ranking_exclusion_reason,
     timing_eligibility,
 )
+from benchbox.core.benchmark_registry import get_benchmark_support_status
 from benchbox.core.cost.models import CostScope, CostStatus, DeploymentMetadata, NormalizedCost
 from benchbox.core.cost.pricing import PRICING_VERSION
 from benchbox.core.results.anonymization import AnonymizationManager, find_public_path_leaks
@@ -1131,6 +1133,21 @@ def _compliance_class(bundle: BundleDocument) -> str | None:
     return bundle.benchmark.compliance_class
 
 
+def _benchmark_support_status(benchmark_id: str) -> str | None:
+    """Return the registry-declared product support status for a benchmark.
+
+    Looks the canonical benchmark slug up in the benchmark registry
+    (``benchbox.core.benchmark_registry``). None when the slug is not a
+    registry benchmark -- a custom or legacy bundle the registry never
+    declared. Display-only; never a join/dedup key.
+    """
+    try:
+        status = get_benchmark_support_status(benchmark_id)
+    except (KeyError, ValueError):
+        return None
+    return status
+
+
 def _phase_durations(bundle: BundleDocument) -> dict[str, float] | None:
     """Extract per-phase durations (seconds) from a schema-v2 bundle phases block.
 
@@ -1589,6 +1606,7 @@ class BundleTransformer:
             test_type=_test_type(bundle),
             validation_status=_validation_status(bundle, bundle_data),
             failed_query_count=failed_query_count,
+            benchmark_support_status=_benchmark_support_status(canonical_benchmark_slug(str(benchmark))),
             cost_usd=_cost_usd_alias(normalized_cost),
             normalized_cost=normalized_cost,
             deployment_class=environment_facets["deployment_class"],

@@ -100,6 +100,25 @@ PHASE_DDL = "ddl"
 PHASE_POST_LOAD = "post_load"
 PHASE_SESSION = "session"
 
+#: Closed ledger phase set (D-6: tuning-adr-001 addendum "ledger outcome and
+#: phase vocabulary"). Every recorded statement lands in one of these; the
+#: aliases below exist only at the boundary and are normalized on entry.
+LEDGER_PHASES = frozenset({PHASE_DDL, PHASE_POST_LOAD, PHASE_SESSION})
+
+#: Legacy / producer phase spellings mapped to the closed set. ``pre_load``
+#: is the Databricks apply-time phase (schema/clustering statements run
+#: before the load); ``maintenance`` covers post-load upkeep spellings.
+PHASE_ALIASES = {
+    "pre_load": PHASE_DDL,
+    "preload": PHASE_DDL,
+    "pre-load": PHASE_DDL,
+    "schema": PHASE_DDL,
+    "create": PHASE_DDL,
+    "postload": PHASE_POST_LOAD,
+    "post-load": PHASE_POST_LOAD,
+    "maintenance": PHASE_POST_LOAD,
+}
+
 # Satisfied-intent marker for a requested state that already held in the
 # catalog, so no statement executed to realize it. Not an index into
 # ``statements`` -- there is no realizing statement to point at.
@@ -175,6 +194,26 @@ def _split_sql_script(script: Any) -> list[str]:
         return statements
     except Exception:  # pragma: no cover - defensive fallback for non-SQLite runtimes
         return [text]
+
+
+def normalize_ledger_phase(phase: Any) -> str:
+    """Map a producer phase onto the closed ledger phase set.
+
+    Known aliases fold per D-6; any other value coerces to ``ddl`` with a
+    warning so capture keeps a physical phase (and stays inside the
+    all-failed accounting) rather than leaking an unfiltered string. Never
+    raises: on any uncertainty the closed ``ddl`` member is returned.
+    """
+    try:
+        text = str(phase).strip().lower()
+        if text in LEDGER_PHASES:
+            return text
+        if text in PHASE_ALIASES:
+            return PHASE_ALIASES[text]
+        logger.warning("applied-ledger unknown phase %r; recording as %r", phase, PHASE_DDL)
+        return PHASE_DDL
+    except Exception:  # pragma: no cover - defensive; never break a run
+        return PHASE_DDL
 
 
 def _is_recordable_statement(statement: Any) -> bool:
@@ -273,7 +312,7 @@ class AppliedTuningLedger:
             self.statements.append(
                 AppliedStatement(
                     statement=str(statement),
-                    phase=phase,
+                    phase=normalize_ledger_phase(phase),
                     status=status,
                     mechanism=mechanism,
                     table=table,
