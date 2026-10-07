@@ -2,6 +2,7 @@
   "acceptance": [
     "Fallback output contains only user-facing assets"
   ],
+  "context": "2026-10-07: the site-repo split ADR (docs/development/adr/adr-site-repo-split.md, D11) retires Sphinx at cutover, and site-split-50 removes Sphinx from core. This only matters if a Sphinx-fallback deploy happens before then; otherwise drop it when site-split-50 lands.",
   "description": "With renderer auto falling back to Sphinx, all of landing/ (a11y checklist, catalog.yaml, console.log stubs in script.js) and docs/_static (pygments_cobalt2.py, IMAGE_REQUIREMENTS.md) publish.",
   "sessions": [
     {
@@ -11,6 +12,14 @@
       "op": "create",
       "op_id": "d8ecab0854394c5687e3128283638383",
       "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-07T22:54:32Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "2b322eba4d3446d7aef089802132b73e",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
     }
   ]
 }
