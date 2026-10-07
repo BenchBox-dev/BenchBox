@@ -12,12 +12,18 @@ This implementation is based on the TPC-DS specification.
 Licensed under the MIT License. See LICENSE file in the project root for details.
 """
 
+import contextlib
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 from benchbox.core.throughput.containment import check_phase_boundary
+from benchbox.core.throughput.entrypoints import (
+    require_adapter,
+    require_stream_minimum,
+    warn_legacy_throughput_api,
+)
 from benchbox.core.tpc_patterns import generate_official_benchmark_audit_trail
 from benchbox.core.tpcds.benchmark import TPCDSBenchmark
 from benchbox.utils.clock import elapsed_seconds, mono_time
@@ -74,11 +80,26 @@ def _extract_metric(result: Any, attr: str, default: float = 0.0) -> float:
     return default
 
 
+def _close_quietly(connection: Any) -> None:
+    close = getattr(connection, "close", None)
+    if callable(close):
+        with contextlib.suppress(Exception):
+            close()
+
+
 def _phase_succeeded(result: Any) -> bool:
     """Return a phase's explicit outcome for either mapping or object results."""
     if isinstance(result, dict):
         return result.get("success") is not False
     return getattr(result, "success", None) is not False
+
+
+def _power_phase_complete(result: Any) -> bool:
+    if not _phase_succeeded(result):
+        return False
+    return _extract_metric(result, "queries_successful", default=-1) == _extract_metric(
+        result, "queries_executed", default=-1
+    )
 
 
 class TPCDSOfficialBenchmark:
@@ -121,6 +142,8 @@ class TPCDSOfficialBenchmark:
         self,
         connection_factory: Callable[[], Any],
         config: Optional[TPCDSOfficialBenchmarkConfig] = None,
+        *,
+        adapter: Any = None,
     ) -> TPCDSOfficialBenchmarkResult:
         """Run the complete TPC-DS Official Benchmark.
 
@@ -142,6 +165,9 @@ class TPCDSOfficialBenchmark:
         if config is None:
             config = self.config
 
+        warn_legacy_throughput_api("TPCDSOfficialBenchmark.run_official_benchmark", "tpcds")
+        if config.throughput_test_enabled:
+            require_adapter("TPCDSOfficialBenchmark.run_official_benchmark", adapter)
         benchmark_start = mono_time()
 
         result = TPCDSOfficialBenchmarkResult(
@@ -167,13 +193,18 @@ class TPCDSOfficialBenchmark:
                     power_test = TPCDSPowerTest(
                         benchmark=self.benchmark,
                         connection_factory=connection_factory,
+                        scale_factor=config.scale_factor,
                         verbose=config.verbose,
                         dialect=self.dialect,
                     )
 
                     power_result = power_test.run()
                     result.power_test_result = power_result
-                    result.power_at_size = _extract_metric(power_result, "power_at_size")
+                    if _power_phase_complete(power_result):
+                        result.power_at_size = _extract_metric(power_result, "power_at_size")
+                    else:
+                        result.errors.append("Power Test failed: Power@Size withheld from results.")
+                        result.success = False
 
                 except Exception as e:
                     result.errors.append(f"Power Test failed: {e}")
@@ -182,17 +213,20 @@ class TPCDSOfficialBenchmark:
             # Phase 2: Throughput Test (concurrent streams)
             if config.throughput_test_enabled:
                 try:
-                    from benchbox.core.tpcds.throughput_test import TPCDSThroughputTest
-
-                    throughput_test = TPCDSThroughputTest(
-                        benchmark=self.benchmark,
-                        connection_factory=connection_factory,
-                        num_streams=config.num_streams,
-                        verbose=config.verbose,
-                        dialect=self.dialect,
-                    )
-
-                    throughput_result = throughput_test.run()
+                    require_stream_minimum(config.num_streams, "num_streams")
+                    shared_connection = connection_factory()
+                    try:
+                        throughput_result = adapter._run_routed_throughput(
+                            self.benchmark,
+                            shared_connection,
+                            {
+                                "num_streams": config.num_streams,
+                                "scale_factor": config.scale_factor,
+                                "verbose": config.verbose,
+                            },
+                        )
+                    finally:
+                        _close_quietly(shared_connection)
                     result.throughput_test_result = throughput_result
                     # Publish the metric only when the phase explicitly
                     # succeeded; a timed-out or otherwise failed phase must

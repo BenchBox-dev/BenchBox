@@ -124,14 +124,18 @@ benchbox/core/tpcds/
 
 ```
 TPCDSBenchmark
-├── run_official_benchmark()
+├── run_official_benchmark(connection, ..., adapter=)
 └── TPCDSOfficialBenchmark
-    ├── run_complete_benchmark()
-    ├── _run_power_test()
-    ├── _run_throughput_test()
-    ├── _run_maintenance_test()
-    └── _calculate_official_metrics()
+    └── run_official_benchmark(connection_factory, config, adapter=)
 ```
+
+Both `run_official_benchmark` methods are deprecated and require `adapter=` (a platform
+adapter) whenever the throughput test runs. The adapter supplies the stream capability
+gate and one session per stream; without it they raise `TypeError`. The connection factory
+must return a new connection on each call, because each phase closes its connection. They
+report Power@Size and Throughput@Size only. The throughput phase uses the adapter's target
+dialect; `dialect=` applies to the power and maintenance phases only. For supported runs use
+`benchbox run --phases throughput`.
 
 ## Usage
 
@@ -150,7 +154,8 @@ benchmark = TPCDSBenchmark(
 
 # Run complete benchmark
 result = benchmark.run_official_benchmark(
-    connection_string="postgresql://user:pass@host/db",
+    connection,
+    adapter=adapter,
     num_streams=4,
     power_test=True,
     throughput_test=True,

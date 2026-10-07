@@ -1,9 +1,10 @@
 """TPC-DS benchmark orchestrator implementation."""
 
-import concurrent.futures
+import dataclasses
 import logging
 import re
 import time
+import warnings
 from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
@@ -14,14 +15,17 @@ if TYPE_CHECKING:
 
 from benchbox.base import BaseBenchmark, GeneratorOutputDirMixin
 from benchbox.core.connection import DatabaseConnection as _DatabaseConnection
-from benchbox.core.results.metrics import TPCMetricsCalculator
-from benchbox.core.throughput.result import throughput_stream_ids
+from benchbox.core.throughput.containment import check_phase_boundary
+from benchbox.core.throughput.entrypoints import (
+    require_adapter,
+    require_stream_minimum,
+    warn_legacy_throughput_api,
+)
 from benchbox.core.validation import (
     DatabaseValidationEngine,
     DataValidationEngine,
     ValidationResult,
 )
-from benchbox.utils.clock import elapsed_seconds, mono_time
 from benchbox.utils.file_format import get_delimiter_for_file
 from benchbox.utils.printing import emit
 from benchbox.utils.sql_parsing import find_matching_parenthesis
@@ -40,23 +44,12 @@ from .results import (
 
 
 def _execute_single_stream(stream_id: int, stream_file: Path) -> dict[str, Any]:
-    """Execute a single TPC-DS stream file and return result metrics.
-
-    Raises:
-        NotImplementedError: Always. This function never executed SQL against
-            a database -- it only counted ``-- Query`` comment lines in
-            ``stream_file`` and reported every query as successful, regardless
-            of the file's actual contents or any database connection. Use
-            :meth:`TPCDSBenchmark.run_throughput_test` for the production,
-            spec-compliant TPC-DS Throughput Test, which executes real
-            concurrent query streams against a real connection.
-    """
     raise NotImplementedError(
         f"_execute_single_stream (stream {stream_id}, {stream_file}) does not "
         "execute SQL. It previously faked success by counting '-- Query' "
         "comment lines in the stream file without running anything against a "
-        "database. Use TPCDSBenchmark.run_throughput_test() for real TPC-DS "
-        "Throughput Test execution."
+        "database. Use `benchbox run --phases throughput` (TPCDSThroughputTest) "
+        "for real TPC-DS throughput execution."
     )
 
 
@@ -994,32 +987,12 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         concurrent: bool = True,
         dialect: str = "standard",
     ) -> dict[str, Any]:
-        """Run TPC-DS streams against a database.
-
-        Args:
-            connection: Database connection object
-            stream_files: Optional list of stream files to run
-            concurrent: Whether to run streams concurrently or sequentially
-            dialect: SQL dialect (standard, postgres, mysql, etc.)
-
-        Raises:
-            NotImplementedError: Always. This method never executed real SQL
-                against ``connection`` -- both its "concurrent" branch (via
-                ``ConcurrentQueryExecutor``, since removed; see
-                adr-concurrency-public-api-reconciliation) and its
-                sequential branch bottomed out in ``_execute_single_stream``,
-                which only counted ``-- Query`` comment lines in each stream
-                file and reported every stream as successful. Use
-                :meth:`run_throughput_test` for the production, spec-compliant
-                TPC-DS Throughput Test, which executes real concurrent query
-                streams against a real connection.
-        """
         raise NotImplementedError(
             "TPCDSBenchmark.run_streams does not execute SQL against "
             "`connection`. It previously faked success by counting "
             "'-- Query' comment lines in stream files without running "
-            "anything. Use TPCDSBenchmark.run_throughput_test() for the "
-            "production, spec-compliant TPC-DS Throughput Test."
+            "anything. Use `benchbox run --phases throughput` "
+            "(TPCDSThroughputTest) for TPC-DS throughput runs."
         )
 
     def _load_data(self, connection: _DatabaseConnection) -> None:
@@ -1183,6 +1156,8 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         result_validation: bool = True,
         dialect: str = "standard",
         output_dir: Optional[Union[str, Path]] = None,
+        *,
+        adapter: Any = None,
     ) -> dict[str, Any]:
         """Run the TPC-DS benchmark phases and report Power@Size and Throughput@Size.
 
@@ -1211,6 +1186,10 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         Raises:
             ValueError: If benchmark configuration is invalid
         """
+        warn_legacy_throughput_api("TPCDSBenchmark.run_official_benchmark", "tpcds")
+        if throughput_test:
+            require_adapter("TPCDSBenchmark.run_official_benchmark", adapter)
+
         logger = logging.getLogger(__name__)
         if self.verbose:
             logger.setLevel(logging.INFO)
@@ -1237,10 +1216,6 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "errors": [],
         }
 
-        def connection_factory() -> Any:
-            """Factory function to create database connections."""
-            return connection
-
         try:
             # Phase 1: Power Test
             if power_test:
@@ -1248,11 +1223,25 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
             # Phase 2: Throughput Test
             if throughput_test:
-                self._run_throughput_phase(connection_factory, num_streams, logger, result)
+                self._run_throughput_phase(num_streams, logger, result, adapter, connection, dialect)
 
-            # Phase 3: Maintenance Test
+            # Phase 3: Maintenance Test -- refused while throughput work is
+            # outstanding, so maintenance never overlaps leaked streams or
+            # reuses their still-owned resources for measured work.
             if maintenance_test:
-                self._run_maintenance_phase(connection, dialect, logger, result)
+                boundary = check_phase_boundary(result["throughput_test_result"])
+                if not boundary.proceed:
+                    refusal = f"Maintenance Test refused: {boundary.reason}"
+                    result["errors"].append(refusal)
+                    result["maintenance_test_result"] = {
+                        "success": False,
+                        "status": "contained",
+                        "reason": refusal,
+                        "outstanding_stream_ids": list(boundary.outstanding_stream_ids),
+                    }
+                    result["success"] = False
+                else:
+                    self._run_maintenance_phase(connection, dialect, logger, result)
 
             self._finalize_benchmark_result(result, benchmark_start_time, logger)
             return result
@@ -1281,10 +1270,13 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 verbose=self.verbose,
             )
             result["power_test_result"] = power_result
-            if power_result.get("total_time", 0) > 0:
+            if power_result.get("success", True) and power_result.get("total_time", 0) > 0:
                 result["power_at_size"] = power_result.get("power_at_size", 0.0)
-            if self.verbose:
-                logger.info(f"Power Test completed: Power@Size = {result['power_at_size']:.2f}")
+                if self.verbose:
+                    logger.info(f"Power Test completed: Power@Size = {result['power_at_size']:.2f}")
+            else:
+                result["errors"].append("Power Test failed: Power@Size withheld from results.")
+                result["success"] = False
         except Exception as e:
             error_msg = f"Power Test failed: {e}"
             result["errors"].append(error_msg)
@@ -1293,13 +1285,25 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
                 logger.error(error_msg)
 
     def _run_throughput_phase(
-        self, connection_factory: Any, num_streams: int, logger: logging.Logger, result: dict[str, Any]
+        self,
+        num_streams: int,
+        logger: logging.Logger,
+        result: dict[str, Any],
+        adapter: Any = None,
+        connection: Any = None,
+        dialect: str = "standard",
     ) -> None:
         """Execute the Throughput Test phase of the official benchmark."""
         if self.verbose:
             logger.info("Running Throughput Test...")
         try:
-            throughput_result = self.run_throughput_test(connection_factory=connection_factory, num_streams=num_streams)
+            throughput_result = self.run_throughput_test(
+                num_streams=num_streams,
+                dialect=dialect,
+                adapter=adapter,
+                connection=connection,
+                _warn_deprecated=False,
+            )
             result["throughput_test_result"] = throughput_result
             if throughput_result.throughput_at_size is None:
                 result["success"] = False
@@ -1359,7 +1363,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     def run_throughput_test(
         self,
-        connection_factory,
+        connection_factory=None,
         num_streams: int = 2,
         query_timeout: int = 300,
         stream_timeout: int = 3600,
@@ -1368,33 +1372,13 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         enable_validation: bool = True,
         output_dir: Optional[Union[str, Path]] = None,
         dialect: str = "standard",
+        *,
+        adapter: Any = None,
+        connection: Any = None,
+        _warn_deprecated: bool = True,
     ) -> ThroughputTestResult:
-        """Run the official TPC-DS Throughput Test.
-
-        This method implements the TPC-DS throughput test according to specification
-        section 5.3. It executes multiple concurrent query streams, each containing
-        all 99 TPC-DS queries with proper parameter substitution and permutation.
-
-        Args:
-            connection_factory: Callable that returns a database connection
-            num_streams: Number of concurrent query streams to execute
-            query_timeout: Timeout for individual queries in seconds
-            stream_timeout: Timeout for entire streams in seconds
-            base_seed: Base seed for random number generation
-            max_retries: Maximum number of retries for failed queries
-            enable_validation: Whether to validate results according to TPC-DS spec
-            output_dir: Directory to save test results and reports
-            dialect: SQL dialect (standard, postgres, mysql, etc.)
-
-        Returns:
-            ThroughputTestResult containing complete test results and metrics
-
-        Raises:
-            ValueError: If parameters are invalid
-            RuntimeError: If throughput test fails to execute
-        """
-
-        # Validate parameters
+        if _warn_deprecated:
+            warn_legacy_throughput_api("TPCDSBenchmark.run_throughput_test", "tpcds")
         if num_streams < 1:
             raise ValueError(f"num_streams must be positive, got {num_streams}")
         if query_timeout < 1:
@@ -1403,17 +1387,33 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             raise ValueError(f"stream_timeout must be positive, got {stream_timeout}")
         if max_retries < 0:
             raise ValueError(f"max_retries must be non-negative, got {max_retries}")
+        require_stream_minimum(num_streams, "num_streams")
+        require_adapter("TPCDSBenchmark.run_throughput_test", adapter)
+        if connection_factory is not None:
+            warnings.warn(
+                "connection_factory is ignored by TPCDSBenchmark.run_throughput_test; "
+                "per-stream sessions come from adapter.",
+                UserWarning,
+                stacklevel=2,
+            )
+        if connection is None:
+            raise ValueError("connection is required when adapter is given")
+        ignored = [
+            name
+            for name, differs in (
+                ("query_timeout", query_timeout != 300),
+                ("max_retries", max_retries != 3),
+                ("output_dir", output_dir is not None),
+            )
+            if differs
+        ]
+        if ignored:
+            warnings.warn(
+                f"{', '.join(ignored)} no longer has any effect on TPCDSBenchmark.run_throughput_test.",
+                UserWarning,
+                stacklevel=2,
+            )
 
-        # Set up output directory
-        test_output_dir = None
-        if output_dir:
-            test_output_dir = Path(output_dir)
-            test_output_dir.mkdir(parents=True, exist_ok=True)
-        elif self.output_dir:
-            test_output_dir = self.output_dir / "throughput_test"
-            test_output_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create throughput test configuration
         config = ThroughputTestConfig(
             num_streams=num_streams,
             scale_factor=self.scale_factor,
@@ -1422,195 +1422,33 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             stream_timeout=stream_timeout,
             max_retries=max_retries,
             enable_validation=enable_validation,
-            output_dir=test_output_dir,
+            output_dir=Path(output_dir) if output_dir else None,
         )
-
-        logger = logging.getLogger(__name__)
-        if self.verbose:
-            logger.setLevel(logging.INFO)
-            logger.info(f"Starting TPC-DS Throughput Test ({num_streams} streams)")
-
         test_start_time = time.time()
-        _perf_start = mono_time()
-        stream_results = []
-        successful_streams = 0
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=num_streams) as executor:
-            futures = [
-                executor.submit(
-                    self._execute_throughput_stream,
-                    i,
-                    connection_factory,
-                    base_seed,
-                    dialect,
-                    logger,
-                )
-                for i in throughput_stream_ids(num_streams)
-            ]
-            for future in concurrent.futures.as_completed(futures):
-                try:
-                    stream_result = future.result()
-                    stream_results.append(stream_result)
-                    if stream_result["success"]:
-                        successful_streams += 1
-                    if self.verbose:
-                        logger.info(
-                            f"Stream {stream_result['stream_id']}: "
-                            f"{stream_result['queries_successful']}/{stream_result['queries_executed']} successful"
-                        )
-                except Exception as e:
-                    if self.verbose:
-                        logger.error(f"Stream execution failed: {e}")
-
-        test_end_time = time.time()
-        windows = [
-            (sr["monotonic_start"], sr["monotonic_end"])
-            for sr in stream_results
-            if sr.get("monotonic_start") is not None
-        ]
-        if windows:
-            total_duration = max(end for _, end in windows) - min(start for start, _ in windows)
-        else:
-            total_duration = elapsed_seconds(_perf_start)
-
-        all_streams_succeeded = (
-            len(stream_results) == num_streams and successful_streams == num_streams and len(windows) == num_streams
+        routed = adapter._run_routed_throughput(
+            self,
+            connection,
+            {
+                "num_streams": num_streams,
+                "seed": base_seed,
+                "stream_timeout_seconds": stream_timeout,
+                "verbose": self.verbose,
+                **({} if enable_validation else {"validation_mode": "disabled"}),
+            },
         )
-        throughput_at_size = None
-        if all_streams_succeeded and total_duration > 0:
-            total_queries = sum(stream_result["queries_executed"] for stream_result in stream_results)
-            throughput_at_size = TPCMetricsCalculator.calculate_throughput_at_size(
-                total_queries=total_queries,
-                total_time_seconds=total_duration,
-                scale_factor=self.scale_factor,
-                num_streams=num_streams,
-            )
-
-        # Create result object
-        result = ThroughputTestResult(
+        return ThroughputTestResult(
             config=config,
             start_time=test_start_time,
-            end_time=test_end_time,
-            total_duration=total_duration,
-            streams_executed=len(stream_results),
-            streams_successful=successful_streams,
-            stream_results=stream_results,
-            throughput_at_size=throughput_at_size,
-            success=successful_streams == num_streams,
+            end_time=time.time(),
+            total_duration=routed.total_time,
+            streams_executed=routed.streams_executed,
+            streams_successful=routed.streams_successful,
+            stream_results=[dataclasses.asdict(stream) for stream in routed.stream_results],
+            throughput_at_size=routed.throughput_at_size,
+            success=routed.success,
+            error="; ".join(routed.errors) or None,
+            outstanding_stream_ids=list(getattr(routed, "outstanding_stream_ids", None) or []),
         )
-
-        if self.verbose:
-            logger.info(f"Throughput Test completed in {total_duration:.3f} seconds")
-            logger.info(
-                "Throughput@Size: withheld"
-                if throughput_at_size is None
-                else f"Throughput@Size: {throughput_at_size:.2f}"
-            )
-            logger.info(f"Successful streams: {successful_streams}/{num_streams}")
-
-        return result
-
-    def _execute_throughput_stream(
-        self,
-        stream_id: int,
-        connection_factory,
-        base_seed: int,
-        dialect: str,
-        logger,
-    ) -> dict[str, Any]:
-        """Execute one query stream for the throughput test; returns a stream-result dict."""
-        import random
-
-        stream_start = time.time()
-        stream_result: dict[str, Any] = {
-            "stream_id": stream_id,
-            "start_time": stream_start,
-            "end_time": 0.0,
-            "duration": 0.0,
-            "queries_executed": 0,
-            "queries_successful": 0,
-            "queries_failed": 0,
-            "query_results": [],
-            "monotonic_start": None,
-            "monotonic_end": None,
-            "success": False,
-            "error": None,
-        }
-        try:
-            connection = connection_factory()
-            stream_result["start_time"] = time.time()
-            stream_result["monotonic_start"] = mono_time()
-            query_ids = list(range(1, 100))
-            random.seed(base_seed + stream_id)
-            random.shuffle(query_ids)
-            if self.verbose:
-                logger.info(f"Stream {stream_id}: executing {len(query_ids)} queries")
-            for query_id in query_ids:
-                query_result = self._execute_throughput_query(
-                    connection, query_id, stream_id, base_seed, dialect, logger
-                )
-                stream_result["query_results"].append(query_result)
-                stream_result["queries_executed"] += 1
-                if query_result["success"]:
-                    stream_result["queries_successful"] += 1
-                else:
-                    stream_result["queries_failed"] += 1
-            stream_result["success"] = stream_result["queries_failed"] == 0
-        except Exception as e:
-            stream_result["error"] = str(e)
-            if self.verbose:
-                logger.error(f"Stream {stream_id} failed: {e}")
-        finally:
-            stream_result["end_time"] = time.time()
-            if stream_result["monotonic_start"] is not None:
-                stream_result["monotonic_end"] = mono_time()
-                stream_result["duration"] = elapsed_seconds(
-                    stream_result["monotonic_start"], stream_result["monotonic_end"]
-                )
-        return stream_result
-
-    def _execute_throughput_query(
-        self,
-        connection: Any,
-        query_id: int,
-        stream_id: int,
-        base_seed: int,
-        dialect: str,
-        logger,
-    ) -> dict[str, Any]:
-        """Execute one query within a throughput stream; returns a query-result dict."""
-        query_start = mono_time()
-        result: dict[str, Any] = {
-            "query_id": query_id,
-            "stream_id": stream_id,
-            "execution_time_seconds": 0.0,
-            "result_count": 0,
-            "success": False,
-            "error": None,
-        }
-        try:
-            query_text = self.get_query(
-                query_id, seed=base_seed + stream_id, scale_factor=self.scale_factor, dialect=dialect
-            )
-            connection.execute(query_text)
-            rows = connection.fetchall()
-            result.update(
-                {
-                    "execution_time_seconds": elapsed_seconds(query_start),
-                    "result_count": len(rows) if rows else 0,
-                    "success": True,
-                }
-            )
-        except Exception as e:
-            result.update(
-                {
-                    "execution_time_seconds": elapsed_seconds(query_start),
-                    "error": str(e),
-                }
-            )
-            if self.verbose:
-                logger.warning(f"Stream {stream_id} Query {query_id} failed: {e}")
-        return result
 
     def run_power_test(
         self,
@@ -1671,6 +1509,7 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             "scale_factor": self.scale_factor,
             "total_time": 0.0,
             "power_at_size": 0.0,
+            "success": False,
             "query_results": {},
             "start_time": datetime.now().isoformat(),
             "end_time": None,
@@ -1707,12 +1546,12 @@ class TPCDSBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             result["total_time"] = test_end_time - test_start_time
             result["end_time"] = datetime.now().isoformat()
 
-            # Calculate Power@Size metric: 3600 × Scale_Factor / Power_Test_Time
-            if result["total_time"] > 0:
-                result["power_at_size"] = (3600.0 * self.scale_factor) / result["total_time"]
-
-            # Count successful queries
             successful_queries = sum(1 for qr in result["query_results"].values() if qr["status"] == "success")
+            result["success"] = successful_queries == len(result["query_results"])
+
+            # Calculate Power@Size metric: 3600 × Scale_Factor / Power_Test_Time
+            if result["success"] and result["total_time"] > 0:
+                result["power_at_size"] = (3600.0 * self.scale_factor) / result["total_time"]
 
             if verbose:
                 logger.info(f"Power Test completed in {result['total_time']:.3f} seconds")

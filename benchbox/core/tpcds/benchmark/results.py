@@ -24,6 +24,7 @@ class ThroughputTestResult:
     success: bool
     error: Optional[str] = None
     stream_numbering: dict[str, Any] = field(default_factory=throughput_stream_numbering)
+    outstanding_stream_ids: list[int] = field(default_factory=list)
 
 
 @dataclass
