@@ -89,6 +89,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .github/oracle-reviewers.yml
+            .github/workflows/oracle-review-shadow.yml
             .github/soundness-paths.txt
             _project/scripts/oracle_reviewers
             _project/scripts/soundness_paths.py

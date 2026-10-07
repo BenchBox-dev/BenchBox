@@ -39,3 +39,14 @@ def commentable_lines(diff_text: str) -> dict[str, frozenset[int]]:
         elif line.startswith("\\"):
             continue
     return {name: frozenset(numbers) for name, numbers in lines_by_path.items()}
+
+
+def select_files(diff_text: str, paths: frozenset[str]) -> str:
+    sections = re.split(r"(?m)^(?=diff --git )", diff_text)
+    kept = []
+    for section in sections:
+        header = section.split("\n", 1)[0]
+        match = re.fullmatch(r"diff --git a/(?P<old>.+) b/(?P<new>.+)", header)
+        if match is not None and (match.group("new") in paths or match.group("old") in paths):
+            kept.append(section)
+    return "".join(kept)

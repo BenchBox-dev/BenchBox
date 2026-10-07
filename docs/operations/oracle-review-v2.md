@@ -51,7 +51,40 @@ Without the App secrets, the `post` job logs the result and succeeds.
    artifact with the run ID, head SHA, reviewer and either a validated verdict
    or an absence.
 4. `post` re-validates every artifact from this run, replays the selection,
-   and posts the status and, when there is something to say, one comment.
+   and posts the status and the findings. `findings_delivery` in
+   `.github/oracle-reviewers.yml` chooses how:
+   - `comment` (the shadow default) posts one pull request comment, so
+     findings never block a merge.
+   - `review` posts one pull request review per result on the head commit,
+     with a thread for each finding on a diff line and the summary and any
+     finding outside the diff in the body. A run with no verdict still posts
+     a review that explains the pending result, so the latest review always
+     reflects the latest run. The ruleset requires every thread to be
+     resolved, so these threads block merges like the connector's; switching
+     to `review` starts the parity period before the cut-over.
+
+`plan` also limits spend to code that changed. The retry state records the
+blob SHA and tree mode of each changed file at the last success or failure, except prose
+files (`.md`, `.mdx`, `.rst`) outside soundness paths, with the basis
+of that result: the merge base of the head with `develop`, the tier, its
+blocking severities and reviewer settings, the excluded author families, and a
+hash of the policy file, brief template, verdict schema, reviewer code and this
+workflow. When the basis is unchanged and the new
+head has exactly those files at those SHAs, the run posts the recorded result
+to the new head without running a reviewer, so a push that changes only prose
+costs nothing. When the last result was a success below the very-high tier and some
+of those files changed, the brief diffs only the changed files, lists the
+others and any changed prose separately, and asks the reviewer to check the
+effect on them. A file renamed between code and prose counts as code. Every other case gets a full
+review: after a failure, because a scoped review cannot re-check findings in
+files it does not read; at the very-high tier; and after a basis change, a
+file leaving the diff, a diff that cannot be split by file, or a missing state.
+
+Before posting, `post` drops any finding that matches an open review thread
+from this App, by file and normalized title, unless the new finding is more
+severe than the open thread. Each new thread carries a hidden `oracle-finding`
+marker with that fingerprint. A dropped finding still counts toward this run's
+result and is listed in the review body.
 
 A blocking finding fails the review even when its line is outside the diff.
 Such a finding cannot become a line comment, so it is listed under "Findings

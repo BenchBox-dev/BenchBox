@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -96,6 +97,7 @@ class Policy:
     mode: str
     status_context: str
     findings_delivery: str
+    bot_login: str
     brief_max_bytes: int
     max_attempts: int
     author_label_prefix: str
@@ -197,6 +199,7 @@ def parse_policy(data: Mapping[str, Any]) -> Policy:
         mode=data.get("mode", ""),
         status_context=data.get("status_context", ""),
         findings_delivery=data.get("findings_delivery", ""),
+        bot_login=data.get("bot_login", ""),
         brief_max_bytes=int(data.get("brief_max_bytes", 0)),
         max_attempts=int(data.get("max_attempts", 0)),
         author_label_prefix=data.get("author_label_prefix", ""),
@@ -224,6 +227,7 @@ def parse_policy(data: Mapping[str, Any]) -> Policy:
     _require(policy.mode in ("shadow", "enforce"), "mode must be shadow or enforce")
     _require(bool(policy.status_context), "status_context is required")
     _require(policy.findings_delivery in DELIVERIES, f"findings_delivery must be one of {DELIVERIES}")
+    _require(re.fullmatch(r"[a-z0-9][a-z0-9-]*", policy.bot_login) is not None, "bot_login must be an App slug")
     _require(0 < policy.brief_max_bytes <= 120_000, "brief_max_bytes must fit in one command-line argument")
     _require(
         policy.max_attempts >= policy.longest_enabled_chain(),
