@@ -51,16 +51,21 @@ Without the App secrets, the `post` job logs the result and succeeds.
    artifact with the run ID, head SHA, reviewer and either a validated verdict
    or an absence.
 4. `post` re-validates every artifact from this run, replays the selection,
-   and posts the status and one pull request review on the head commit. Each
-   finding on a diff line becomes its own review thread; the review body
-   holds the summary and any finding outside the diff. A run with no verdict,
-   such as one where every reviewer was absent, still posts a review whose
-   body explains the pending result, so the latest review always reflects the
-   latest run.
+   and posts the status and the findings. `findings_delivery` in
+   `.github/oracle-reviewers.yml` chooses how:
+   - `comment` (the shadow default) posts one pull request comment, so
+     findings never block a merge.
+   - `review` posts one pull request review per result on the head commit,
+     with a thread for each finding on a diff line and the summary and any
+     finding outside the diff in the body. A run with no verdict still posts
+     a review that explains the pending result, so the latest review always
+     reflects the latest run. The ruleset requires every thread to be
+     resolved, so these threads block merges like the connector's; switching
+     to `review` starts the parity period before the cut-over.
 
 `plan` also limits spend to code that changed. The retry state records the
 blob SHA and tree mode of each changed file at the last success or failure, except prose
-files (`.md`, `.mdx`, `.rst`, `.txt`) outside soundness paths, with the basis
+files (`.md`, `.mdx`, `.rst`) outside soundness paths, with the basis
 of that result: the merge base of the head with `develop`, the tier, its
 blocking severities and reviewer settings, the excluded author families, and a
 hash of the policy file, brief template, verdict schema, reviewer code and this

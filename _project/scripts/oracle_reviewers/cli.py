@@ -33,7 +33,7 @@ FORK = "fork"
 SKIP = "skip"
 CARRY = "carry"
 SCOPELESS_TIER = "very-high"
-PROSE_SUFFIXES = (".md", ".mdx", ".rst", ".txt")
+PROSE_SUFFIXES = (".md", ".mdx", ".rst")
 
 
 def _now() -> datetime:

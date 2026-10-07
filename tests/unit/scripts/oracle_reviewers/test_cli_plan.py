@@ -483,3 +483,11 @@ def test_a_changed_rename_source_is_reviewed_not_carried(monkeypatch: pytest.Mon
     state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40})
     _, values, _ = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), [TWO_FILES[0], moved], state, diff=TWO_FILE_DIFF))
     assert values["decision"] == "review"
+
+
+def test_a_text_data_file_is_tracked_like_code(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    data = {"filename": "_sources/tpc-ds/tools/column_list.txt", "additions": 1, "deletions": 0, "sha": "5" * 40}
+    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40})
+    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), [*TWO_FILES, data], state, diff=TWO_FILE_DIFF))
+    assert values["decision"] == "review"
+    assert "_sources/tpc-ds/tools/column_list.txt" in plan["reviewed_files"]
