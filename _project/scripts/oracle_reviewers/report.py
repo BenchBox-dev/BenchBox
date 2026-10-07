@@ -144,11 +144,12 @@ def finalize(
 
 def carried(plan: Mapping[str, Any], outcome: str) -> Final:
     reviewed_head = plan["reviewed_head"]
-    description = f"carried from {reviewed_head[:12]}: no soundness file changed"
+    description = f"carried from {reviewed_head[:12]}: only prose changed"
     lines = [
         *_header(plan, outcome),
-        f"No soundness file changed since head `{reviewed_head}` was reviewed, so its {outcome} result is"
-        " carried to this head without running a reviewer.",
+        f"Only prose files outside soundness paths changed since head `{reviewed_head}` was reviewed, so its"
+        f" {outcome} result is carried to this head without running a reviewer. Its open review threads still"
+        " apply.",
         "",
     ]
     body = "\n".join(lines).rstrip() + "\n"

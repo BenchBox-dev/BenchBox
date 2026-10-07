@@ -113,6 +113,24 @@ def _base_plan(policy: Policy, repo: str, pr: int, run_id: str) -> dict[str, Any
     }
 
 
+IMPLEMENTATION_DIGEST = hashlib.sha256(
+    b"".join(path.read_bytes() for path in sorted(Path(__file__).parent.glob("*.py")))
+).hexdigest()
+
+
+def _reusable(
+    reviewed: retry.Reviewed | None, basis: str | None, scoped: list[ChangedFile], tier: Tier
+) -> tuple[retry.Reviewed | None, list[ChangedFile]]:
+    current = {item.path: item.sha for item in scoped}
+    if reviewed is None or basis is None or reviewed.basis != basis or not all(current.values()):
+        return None, scoped
+    if current == reviewed.files:
+        return reviewed, []
+    if reviewed.outcome == retry.SUCCESS and tier.name != SCOPELESS_TIER and set(reviewed.files) <= set(current):
+        return reviewed, [item for item in scoped if reviewed.files.get(item.path) != item.sha]
+    return reviewed, scoped
+
+
 def _merge_base(repo: str, base_sha: str, head_sha: str) -> str | None:
     try:
         merge_base = github.get_json(f"repos/{repo}/compare/{base_sha}...{head_sha}")["merge_base_commit"]["sha"]
@@ -133,6 +151,7 @@ def review_basis(merge_base: str, tier: Tier, policy: Policy, excluded: Iterable
         "policy": policy_text,
         "brief": BRIEF_TEMPLATE,
         "schema": VERDICT_SCHEMA,
+        "implementation": IMPLEMENTATION_DIGEST,
     }
     digest = hashlib.sha256(json.dumps(material, sort_keys=True).encode("utf-8")).hexdigest()
     return f"{tier.name}:{merge_base}:{digest}"
@@ -183,6 +202,9 @@ def command_plan(args: argparse.Namespace) -> int:
         plan["decision_reason"] = "a newer head exists; its own run reviews it"
         return _finish_plan(out_dir, plan)
     files = [ChangedFile.from_api(item) for item in github.get_paginated(f"repos/{repo}/pulls/{pr}/files?per_page=100")]
+    if github.get_json(f"repos/{repo}/pulls/{pr}")["head"]["sha"] != plan["head_sha"]:
+        plan["decision_reason"] = "the head moved while the plan read it; its own run reviews it"
+        return _finish_plan(out_dir, plan)
     labels = [label["name"] for label in pull.get("labels", [])]
     classification = classify(files, labels, policy, _soundness_predicate())
     plan["tier"] = classification.tier
@@ -217,7 +239,7 @@ def command_plan(args: argparse.Namespace) -> int:
     tier = policy.tiers[classification.tier or "very-high"]
     in_scope = set(classification.soundness_paths)
     scoped = [
-        item for item in files if any(path in in_scope for path in item.paths) or not item.path.endswith(PROSE_SUFFIXES)
+        item for item in files if any(path in in_scope or not path.endswith(PROSE_SUFFIXES) for path in item.paths)
     ]
     current = {item.path: item.sha for item in scoped}
     merge_base = _merge_base(repo, plan["base_sha"], plan["head_sha"])
@@ -225,16 +247,9 @@ def command_plan(args: argparse.Namespace) -> int:
     policy_text = Path(args.policy).read_text(encoding="utf-8")
     basis = review_basis(merge_base, tier, policy, excluded, policy_text) if merge_base else None
     reviewed = previous.reviewed if previous and action != "edited" else None
-    if reviewed is None or basis is None or reviewed.basis != basis or not all(current.values()):
-        reviewed = None
+    reviewed, changed = _reusable(reviewed, basis, scoped, tier)
     plan["reviewed_files"] = current
     plan["review_basis"] = basis or ""
-    changed = scoped
-    scopable = tier.name != SCOPELESS_TIER and set(reviewed.files) <= set(current) if reviewed else False
-    if reviewed is not None and current == reviewed.files:
-        changed = []
-    elif reviewed is not None and reviewed.outcome == retry.SUCCESS and scopable:
-        changed = [item for item in scoped if reviewed.files.get(item.path) != item.sha]
     try:
         plan["open_findings"] = dedup.open_fingerprints(github.review_threads(repo, pr), policy.bot_login)
     except (github.GitHubError, KeyError, ValueError) as exc:
@@ -269,7 +284,8 @@ def command_plan(args: argparse.Namespace) -> int:
         diff_text=diff_text,
         max_bytes=policy.brief_max_bytes,
         reviewed_head=reviewed.head_sha if partial and reviewed else None,
-        unchanged=[item for item in files if item not in changed] if partial else [],
+        unchanged=[item for item in scoped if item not in changed] if partial else [],
+        untracked=[item for item in files if item not in scoped] if partial else [],
     )
     write_private(out_dir / BRIEF_FILE, brief.text)
     write_private(out_dir / DIFF_FILE, full_diff or "")

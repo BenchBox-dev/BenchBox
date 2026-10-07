@@ -63,12 +63,13 @@ blob SHA of each changed file at the last success or failure, except prose
 files (`.md`, `.mdx`, `.rst`, `.txt`) outside soundness paths, with the basis
 of that result: the merge base of the head with `develop`, the tier, its
 blocking severities and reviewer settings, the excluded author families, and a
-hash of the policy file, brief template and verdict schema. When the basis is unchanged and the new
+hash of the policy file, brief template, verdict schema and reviewer code. When the basis is unchanged and the new
 head has exactly those files at those SHAs, the run posts the recorded result
 to the new head without running a reviewer, so a push that changes only prose
 costs nothing. When the last result was a success below the very-high tier and some
 of those files changed, the brief diffs only the changed files, lists the
-others, and asks the reviewer to check the effect on them. Every other case gets a full
+others and any changed prose separately, and asks the reviewer to check the
+effect on them. A file renamed between code and prose counts as code. Every other case gets a full
 review: after a failure, because a scoped review cannot re-check findings in
 files it does not read; at the very-high tier; and after a basis change, a
 file leaving the diff, a diff that cannot be split by file, or a missing state.

@@ -429,3 +429,27 @@ def test_a_code_change_outside_soundness_paths_is_reviewed_not_carried(
     assert "helper change" in brief and "capture change" not in brief
     unchanged = brief.split("identical since:", 1)[1].split("Review the first list", 1)[0]
     assert CHECKER in unchanged and CAPTURE in unchanged and HELPER not in unchanged
+
+
+def test_a_head_that_moves_while_planning_is_left_to_its_own_run(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    fake = FakeGitHub(_pull(), SOUNDNESS)
+    reads = iter([_pull(), _pull(head={"sha": "d" * 40, "repo": {"full_name": REPO}})])
+    monkeypatch.setattr(fake, "_json", lambda path: next(reads))
+    _, values, plan = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "skip" and "head moved" in plan["decision_reason"]
+
+
+def test_prose_is_listed_apart_and_a_rename_from_code_stays_tracked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    renamed = {"filename": "notes/rules.md", "previous_filename": "benchbox/utils/rules.py", "sha": "8" * 40}
+    readme = {"filename": "README.md", "additions": 1, "deletions": 0, "sha": "9" * 40}
+    files = [*TWO_FILES, renamed, readme]
+    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40, "notes/rules.md": "8" * 40}, outcome="success")
+    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), files, state, diff=TWO_FILE_DIFF))
+    assert values["decision"] == "review" and plan["scope"] == "changed"
+    assert "notes/rules.md" in plan["reviewed_files"] and "README.md" not in plan["reviewed_files"]
+    brief = (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
+    assert "README.md" in brief.split("not compared with that review:", 1)[1]
