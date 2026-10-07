@@ -272,3 +272,49 @@ their own verification.
 
 The alternative, implementing partitioning as Hive-partitioned Parquet in
 external-table mode only, was considered and not chosen.
+
+## Addendum (2026-10-07): ClickHouse TPC-H tuned run slower than baseline
+
+At SF1 on ClickHouse 25.8, the curated TPC-H tuned run measured 1.6× to 4.5×
+slower than `notuning`. The regression was first attributed to the template's
+monthly `PARTITION BY`. Measurements on one loaded copy of the data, with the
+layouts and session settings varied separately and the 21 queries that run on
+the 5.25 GiB envelope timed in shuffled order, do not support that
+attribution:
+
+- Queries that never read `lineitem` or `orders` (Q2, Q11) regressed as much as
+  the rest, and slowed 14× in the monthly cell, so the layout was not the cause.
+- `join_algorithm=grace_hash` in the tuned session pack, on the unpartitioned
+  baseline layout, raised the geometric mean 2.2× and ran Q3 and Q5 out of
+  memory. The other pack settings were within noise (1.03× to 1.06×).
+- A partition adds no pruning beyond the sort key: rows read per query were
+  identical for sorted layouts with and without partitioning (Q6 0.15×, Q14
+  0.05×, Q15 0.04×), and a finer partition was never faster than a coarser one.
+- Sorting by ship and order date alone ran at 0.79× the baseline geometric mean
+  (21% faster). Its slowest queries were Q3 (1.49×) and Q5 (1.44×), because
+  `lineitem` is no longer ordered by order key.
+- After a partitioned load, 81 to 86 background merges overlapped the timed
+  queries and each query read about 200 parts instead of the settled 84.
+
+**Decision.**
+
+- Remove `join_algorithm` and `grace_hash_join_initial_buckets` from the tuned
+  ClickHouse session pack.
+- Remove partitioning from the ClickHouse TPC-H tuned template and its packaged
+  mirror, keeping the date sort keys. Scale-tiered partitioning was not built:
+  a partition has no pruning benefit at any scale for these tables, so there is
+  no tier to select.
+- Run TPC-H Q21 with a statement-level `join_algorithm = 'hash'` on tuned
+  server runs. With the date-first sort key its default parallel hash join
+  peaks above the 5.25 GiB envelope and fails; the single hash join peaks at
+  3.4 GiB. Setting `hash` for the whole session instead raised the geometric
+  mean 1.23× and Q13 4.2×, so it is limited to the one query that needs it.
+- Wait for background merges to settle after a server-mode load, so the first
+  timed query does not compete with merges. The wait is bounded and is not
+  counted as load time.
+- A test rejects any ClickHouse tuned template that partitions a table on the
+  column that already leads its sort key.
+
+The measurements are SF1 only. Larger scales were not run: SF100 does not fit
+the 16 GB measurement host, so the absence of a large-scale partitioning benefit
+is argued from the pruning result above, not measured there.

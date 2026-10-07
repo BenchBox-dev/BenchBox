@@ -1,5 +1,7 @@
 # ClickHouse TPC-H Tuned Configuration
-# Sort keys and partitions are rendered into MergeTree DDL at CREATE TABLE time.
+# Sort keys are rendered into MergeTree DDL at CREATE TABLE time. Partitioning is
+# omitted: the leading sort column already prunes date ranges, and partitions only
+# add parts to scan and merge.
 # Constraints are disabled: ClickHouse has no enforced constraints and the sort key
 # is the primary index, so nothing here needs a primary key that matches it.
 
@@ -27,10 +29,6 @@ platform_optimizations:
 table_tunings:
   LINEITEM:
     table_name: LINEITEM
-    partitioning:
-    - name: L_SHIPDATE
-      type: DATE
-      order: 1
     sorting:
     - name: L_SHIPDATE
       type: DATE
@@ -44,10 +42,6 @@ table_tunings:
 
   ORDERS:
     table_name: ORDERS
-    partitioning:
-    - name: O_ORDERDATE
-      type: DATE
-      order: 1
     sorting:
     - name: O_ORDERDATE
       type: DATE

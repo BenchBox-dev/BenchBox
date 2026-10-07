@@ -156,9 +156,6 @@ class ClickHouseTuningMixin:
                 "max_bytes_before_external_sort": int(
                     self._parse_memory_setting(self.max_memory_usage) * 0.5
                 ),  # Spill at 50% (reduced from 75%)
-                # Memory-efficient JOIN algorithm that spills to disk
-                "join_algorithm": "grace_hash",
-                "grace_hash_join_initial_buckets": 8,
             }
 
             settings.update(olap_settings)
