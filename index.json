@@ -11575,15 +11575,10 @@
       "title": "Retire or fix the legacy anonymization API that returns private paths verbatim"
     },
     "legacy-throughput-apis-bypass-compliant-driver": {
-      "claim": {
-        "expires_at": "2026-10-08T21:41:59Z",
-        "generation": "b81ae27e76d446f796c6cdb854e22d61",
-        "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:4c91b0dc8d7199ddf93ae735"
-      },
+      "claim": null,
       "needs": [],
       "priority": "medium-high",
-      "status": "active",
+      "status": "done",
       "title": "Public run_throughput_test paths bypass the dsqgen driver and the stream capability gate"
     },
     "legacy-tracker-snapshot-export-for-restore-legacy": {
