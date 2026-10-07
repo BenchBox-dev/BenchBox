@@ -15,6 +15,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 REPO = "BenchBox-dev/BenchBox"
 SHA = "d" * 40
+PR = 7
 
 
 def _run(**over: Any) -> dict[str, Any]:
@@ -36,11 +37,11 @@ def _never(repo: str, sha: str) -> bool:
     return False
 
 
-def _pull(base_ref: str) -> dict[str, Any]:
+def _pull(base_ref: str, number: int = PR) -> dict[str, Any]:
     return {
-        "id": 2001,
-        "number": 7,
-        "url": f"https://api.github.com/repos/{REPO}/pulls/7",
+        "id": 2000 + number,
+        "number": number,
+        "url": f"https://api.github.com/repos/{REPO}/pulls/{number}",
         "head": {"ref": "feature", "sha": SHA, "repo": {"id": 1, "name": "BenchBox"}},
         "base": {"ref": base_ref, "sha": "b" * 40, "repo": {"id": 1, "name": "BenchBox"}},
     }
@@ -51,35 +52,51 @@ def _target_run(base_ref: str = "develop", **over: Any) -> dict[str, Any]:
 
 
 def test_trusted_run_accepts_this_workflow_from_develop() -> None:
-    assert github.trusted_run(_run(), REPO, _always)
-    assert github.trusted_run(_target_run(), REPO, _never)
+    assert github.trusted_run(_run(), REPO, PR, _always)
+    assert github.trusted_run(_target_run(), REPO, PR, _never)
 
 
 def test_trusted_run_accepts_a_pull_request_target_run_whose_head_is_the_pr_head() -> None:
-    assert github.trusted_run(_target_run(), REPO, lambda repo, sha: False)
+    assert github.trusted_run(_target_run(), REPO, PR, lambda repo, sha: False)
 
 
 @pytest.mark.parametrize("event", ["issue_comment", "schedule", "workflow_dispatch"])
 def test_trusted_run_checks_develop_ancestry_for_other_events(event: str) -> None:
-    assert github.trusted_run(_run(event=event), REPO, _always)
-    assert not github.trusted_run(_run(event=event), REPO, _never)
+    assert github.trusted_run(_run(event=event), REPO, PR, _always)
+    assert not github.trusted_run(_run(event=event), REPO, PR, _never)
 
 
 @pytest.mark.parametrize("pull_requests", [None, [], [_pull("release/1.0")], [_pull("main"), _pull("feature")]])
 def test_trusted_run_rejects_a_pull_request_target_run_not_based_on_develop(pull_requests: Any) -> None:
     run = _run(event="pull_request_target", pull_requests=pull_requests)
-    assert not github.trusted_run(run, REPO, _always)
+    assert not github.trusted_run(run, REPO, PR, _always)
 
 
-def test_trusted_run_accepts_a_pull_request_target_run_with_any_develop_pull() -> None:
-    run = _run(event="pull_request_target", pull_requests=[_pull("main"), _pull("develop")])
-    assert github.trusted_run(run, REPO, _never)
+def test_trusted_run_accepts_a_pull_request_target_run_for_several_develop_pulls() -> None:
+    run = _run(event="pull_request_target", pull_requests=[_pull("develop", 3), _pull("develop")])
+    assert github.trusted_run(run, REPO, PR, _never)
+
+
+@pytest.mark.parametrize(
+    "pull_requests",
+    [[_pull("main"), _pull("develop")], [_pull("develop"), _pull("release/1.0")]],
+    ids=["main-first", "release-last"],
+)
+def test_trusted_run_rejects_a_pull_request_target_run_that_also_targets_another_base(pull_requests: Any) -> None:
+    run = _run(event="pull_request_target", pull_requests=pull_requests)
+    assert not github.trusted_run(run, REPO, PR, _always)
+
+
+def test_trusted_run_rejects_a_pull_request_target_run_for_another_pull_request() -> None:
+    assert not github.trusted_run(_target_run(), REPO, PR + 1, _always)
+    run = _run(event="pull_request_target", pull_requests=[_pull("develop", 3)])
+    assert not github.trusted_run(run, REPO, PR, _always)
 
 
 def test_trusted_run_rejects_a_pull_request_target_run_from_another_workflow() -> None:
-    assert not github.trusted_run(_target_run(path=".github/workflows/other.yml"), REPO, _always)
-    assert not github.trusted_run(_target_run(head_sha="not-a-sha"), REPO, _always)
-    assert not github.trusted_run(_target_run(repository={"full_name": "someone/BenchBox"}), REPO, _always)
+    assert not github.trusted_run(_target_run(path=".github/workflows/other.yml"), REPO, PR, _always)
+    assert not github.trusted_run(_target_run(head_sha="not-a-sha"), REPO, PR, _always)
+    assert not github.trusted_run(_target_run(repository={"full_name": "someone/BenchBox"}), REPO, PR, _always)
 
 
 @pytest.mark.parametrize(
@@ -93,11 +110,11 @@ def test_trusted_run_rejects_a_pull_request_target_run_from_another_workflow() -
     ],
 )
 def test_trusted_run_rejects_other_sources(run: dict[str, Any]) -> None:
-    assert not github.trusted_run(run, REPO, _always)
+    assert not github.trusted_run(run, REPO, PR, _always)
 
 
 def test_trusted_run_rejects_workflow_code_that_is_not_on_develop() -> None:
-    assert not github.trusted_run(_run(), REPO, _never)
+    assert not github.trusted_run(_run(), REPO, PR, _never)
 
 
 @pytest.mark.parametrize(

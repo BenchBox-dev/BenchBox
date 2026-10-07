@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -197,3 +198,29 @@ def test_excerpt_is_one_capped_line() -> None:
     assert len(text) <= absence.EXCERPT_LIMIT
     assert absence.excerpt("only stdout line\n", "") == "only stdout line"
     assert absence.excerpt("", "") == ""
+
+
+@pytest.mark.parametrize(
+    ("harness", "text"),
+    [
+        ("claude", CLAUDE_SESSION_LIMIT_ENVELOPE),
+        ("claude", CLAUDE_AUTH_ENVELOPE),
+        ("codex", CODEX_USAGE_LIMIT),
+        ("codex", CODEX_UNAUTHORIZED),
+        ("muse", MUSE_REJECTED_KEY),
+    ],
+)
+def test_calibrated_text_after_a_successful_exit_is_never_an_absence(harness: str, text: str) -> None:
+    assert _classify(harness, 0, stdout=text, stderr=text).kind == absence.OK
+
+
+def test_a_successful_claude_verdict_quoting_the_limit_text_keeps_its_verdict() -> None:
+    summary = json.dumps({"summary": f"the log says {CLAUDE_SESSION_LIMIT}", "findings": []})
+    envelope = json.dumps({"type": "result", "is_error": False, "result": summary})
+    assert _classify("claude", 0, stdout=envelope, stderr=envelope).kind == absence.OK
+
+
+@pytest.mark.parametrize("exit_code", [None, 0])
+def test_calibrated_text_without_a_failing_exit_is_not_quota_or_auth(exit_code: int | None) -> None:
+    result = _classify("codex", exit_code, stderr=CODEX_USAGE_LIMIT)
+    assert result.kind not in (absence.QUOTA, absence.AUTH)

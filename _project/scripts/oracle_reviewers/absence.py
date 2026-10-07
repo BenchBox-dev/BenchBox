@@ -82,10 +82,11 @@ def classify(
         return Absence(TIMEOUT, "the reviewer did not finish within its timeout")
     if _first(CALIBRATED_EMPTY_PATTERNS.get(harness, ()), combined) is not None:
         return Absence(EMPTY, "the reviewer produced no output because tool use was denied")
-    quota = _first(CALIBRATED_QUOTA_PATTERNS.get(harness, ()), combined)
+    failed = exit_code not in (0, None)
+    quota = _first(CALIBRATED_QUOTA_PATTERNS.get(harness, ()), combined) if failed else None
     if quota is not None:
         return Absence(QUOTA, quota.group(0), parse_reset(combined, now))
-    auth = _first(CALIBRATED_AUTH_PATTERNS.get(harness, ()), combined)
+    auth = _first(CALIBRATED_AUTH_PATTERNS.get(harness, ()), combined) if failed else None
     if auth is not None:
         return Absence(AUTH, auth.group(0))
     if exit_code is None:

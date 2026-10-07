@@ -103,15 +103,18 @@ def on_develop(repo: str, sha: str) -> bool:
     return comparison.get("status") in ("ahead", "identical")
 
 
-def _targets_develop(run: dict[str, Any]) -> bool:
-    return any(
-        ((pull.get("base") or {}).get("ref") == "develop")
-        for pull in run.get("pull_requests") or []
-        if isinstance(pull, dict)
+def _targets_develop(run: dict[str, Any], pr: int) -> bool:
+    pulls = [pull for pull in run.get("pull_requests") or [] if isinstance(pull, dict)]
+    return (
+        bool(pulls)
+        and all((pull.get("base") or {}).get("ref") == "develop" for pull in pulls)
+        and any(pull.get("number") == pr for pull in pulls)
     )
 
 
-def trusted_run(run: dict[str, Any], repo: str, is_on_develop: Callable[[str, str], bool] = on_develop) -> bool:
+def trusted_run(
+    run: dict[str, Any], repo: str, pr: int, is_on_develop: Callable[[str, str], bool] = on_develop
+) -> bool:
     head_sha = str(run.get("head_sha", ""))
     event = run.get("event")
     if not (
@@ -122,7 +125,7 @@ def trusted_run(run: dict[str, Any], repo: str, is_on_develop: Callable[[str, st
     ):
         return False
     if event == "pull_request_target":
-        return _targets_develop(run)
+        return _targets_develop(run, pr)
     return is_on_develop(repo, head_sha)
 
 
@@ -136,7 +139,7 @@ def latest_state(repo: str, pr: int) -> State | None:
     )
     for candidate in candidates:
         run_id = str(candidate["workflow_run"]["id"])
-        if not trusted_run(get_json(f"repos/{repo}/actions/runs/{run_id}"), repo):
+        if not trusted_run(get_json(f"repos/{repo}/actions/runs/{run_id}"), repo, pr):
             continue
         with tempfile.TemporaryDirectory() as directory:
             result = subprocess.run(
