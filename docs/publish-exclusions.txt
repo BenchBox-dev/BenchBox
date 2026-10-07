@@ -1,0 +1,89 @@
+# Paths under docs/ that are never published on the public site.
+#
+# Both doc builds read this file: the Astro converter
+# (website/src/converter/sources.ts) and Sphinx (docs/conf.py). It lives under
+# docs/ so the site build receives it with the pages it governs.
+#
+# A line ending in "/" excludes a whole top-level directory. Any other line
+# excludes one file, given relative to docs/. Prefer moving a maintainer page
+# into docs/internal/ over listing it here.
+#
+# Pages under docs/development/ and docs/operations/ are also unpublished unless
+# docs/publish-allowlist.txt lists them; every page there must appear on exactly
+# one of the two lists. tests/unit/docs/test_publish_policy.py checks both lists.
+
+_project/
+agent/
+internal/
+
+development/task-management-design.md
+development/dependency-audit-raw.md
+development/duplication-residuals.md
+development/unified_frame_any_survey.md
+development/comment-policy.md
+development/comment-cleanup-scope.md
+design/future-state/index.md
+design/future-state/contract-index.md
+design/future-state/formalize-mcp-internal-apis/README.md
+design/future-state/gate-monitoring-behind-optional-extra/README.md
+design/future-state/isolate-experimental-core-subsystems/README.md
+design/future-state/prune-publishing-subsystem/README.md
+design/future-state/remove-release-tooling-from-wheel/README.md
+design/future-state/benchmark-family-plugin-seam/README.md
+development/adapter-refactor-map.md
+development/browser-test-architecture.md
+development/benchbox-results-platform-strategy.md
+development/dependency-inventory.md
+development/dev-loop-property-ledger.md
+development/independent-publication-threat-model.md
+development/makefile-architecture.md
+development/perf-smoke.md
+development/pr-base-branch-policy.md
+development/quality-gate-policy.md
+development/result-validation-triage.md
+development/results-explorer-brand-ownership.md
+development/throughput-result-alignment.md
+development/transactional-benchmark-alignment.md
+development/adr/TEMPLATE-results-data-extraction.md
+development/adr/adr-dev-loop-v2.md
+development/adr/adr-duckdb-datasketches-vendoring.md
+development/adr/adr-explorer-cli-surface.md
+development/adr/adr-independent-publication-authorities.md
+development/adr/adr-published-results-history-retention.md
+development/adr/adr-published-results-slim-corpus-branch.md
+development/adr/adr-site-repo-split.md
+operations/agent-instruction-evaluation.md
+operations/branch-rename-runbook.md
+operations/browser-ci.md
+operations/corpus-refresh.md
+operations/dev-loop-worktrees.md
+operations/develop-post-merge-gaps.md
+operations/develop-push-drop-inventory.md
+operations/github-org-transfer.md
+operations/hosted-credentials.md
+operations/independent-publication-baseline.md
+operations/independent-publication-contract.md
+operations/mcp-conformance-baseline.md
+operations/mcp-production-readiness-evidence.md
+operations/mcp-production-readiness.md
+operations/merge-queue-canary-runbook.md
+operations/merge-queue-governance.md
+operations/nightly-t3.md
+operations/oracle-review-v2.md
+operations/public-site-visual-baseline.md
+operations/pr-triage.md
+operations/publication-deployer-soak-and-retirement.md
+operations/release-artifacts.md
+operations/release-guide.md
+operations/repo-admin-settings.md
+operations/results-explorer-qa.md
+operations/results-phase-2-runbook.md
+operations/results-phase-3-runbook.md
+operations/site-deploy.md
+operations/soundness-drain.md
+operations/todo-db-benchbox-extraction.md
+operations/tpc-binary-release.md
+operations/uat-release-campaign.md
+platforms/workaround-index.md
+reference/threat-model.md
+tpc-licensing-analysis.md

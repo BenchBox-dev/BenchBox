@@ -149,87 +149,21 @@ napoleon_use_rtype = True
 napoleon_type_aliases = None
 
 templates_path = ["_templates"]
-exclude_patterns = [
-    "_build",
-    "Thumbs.db",
-    ".DS_Store",
-    "_project",
-    "agent",
-    "internal",
-    "development/task-management-design.md",
-    "development/dependency-audit-raw.md",
-    "development/duplication-inventory.csv",
-    "development/duplication-residuals.md",
-    "development/unified_frame_any_survey.md",
-    "development/unified_frame_any_survey.csv",
-    "development/comment-policy.md",
-    "development/comment-cleanup-scope.md",
-    "design/future-state/index.md",
-    "design/future-state/contract-index.md",
-    "design/future-state/formalize-mcp-internal-apis/README.md",
-    "design/future-state/gate-monitoring-behind-optional-extra/README.md",
-    "design/future-state/isolate-experimental-core-subsystems/README.md",
-    "design/future-state/prune-publishing-subsystem/README.md",
-    "design/future-state/remove-release-tooling-from-wheel/README.md",
-    "design/future-state/benchmark-family-plugin-seam/README.md",
-    "development/adapter-refactor-map.md",
-    "development/browser-test-architecture.md",
-    "development/benchbox-results-platform-strategy.md",
-    "development/dependency-inventory.md",
-    "development/dev-loop-property-ledger.md",
-    "development/independent-publication-threat-model.md",
-    "development/makefile-architecture.md",
-    "development/perf-smoke.md",
-    "development/pr-base-branch-policy.md",
-    "development/quality-gate-policy.md",
-    "development/result-validation-triage.md",
-    "development/results-explorer-brand-ownership.md",
-    "development/throughput-result-alignment.md",
-    "development/transactional-benchmark-alignment.md",
-    "development/adr/TEMPLATE-results-data-extraction.md",
-    "development/adr/adr-dev-loop-v2.md",
-    "development/adr/adr-duckdb-datasketches-vendoring.md",
-    "development/adr/adr-explorer-cli-surface.md",
-    "development/adr/adr-independent-publication-authorities.md",
-    "development/adr/adr-published-results-history-retention.md",
-    "development/adr/adr-published-results-slim-corpus-branch.md",
-    "development/adr/adr-site-repo-split.md",
-    "operations/agent-instruction-evaluation.md",
-    "operations/branch-rename-runbook.md",
-    "operations/browser-ci.md",
-    "operations/corpus-refresh.md",
-    "operations/dev-loop-worktrees.md",
-    "operations/develop-post-merge-gaps.md",
-    "operations/develop-push-drop-inventory.md",
-    "operations/github-org-transfer.md",
-    "operations/hosted-credentials.md",
-    "operations/independent-publication-baseline.md",
-    "operations/independent-publication-contract.md",
-    "operations/mcp-conformance-baseline.md",
-    "operations/mcp-production-readiness-evidence.md",
-    "operations/mcp-production-readiness.md",
-    "operations/merge-queue-canary-runbook.md",
-    "operations/merge-queue-governance.md",
-    "operations/nightly-t3.md",
-    "operations/oracle-review-v2.md",
-    "operations/public-site-visual-baseline.md",
-    "operations/pr-triage.md",
-    "operations/publication-deployer-soak-and-retirement.md",
-    "operations/release-artifacts.md",
-    "operations/release-guide.md",
-    "operations/repo-admin-settings.md",
-    "operations/results-explorer-qa.md",
-    "operations/results-phase-2-runbook.md",
-    "operations/results-phase-3-runbook.md",
-    "operations/site-deploy.md",
-    "operations/soundness-drain.md",
-    "operations/todo-db-benchbox-extraction.md",
-    "operations/tpc-binary-release.md",
-    "operations/uat-release-campaign.md",
-    "platforms/workaround-index.md",
-    "reference/threat-model.md",
-    "tpc-licensing-analysis.md",
-]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+
+
+def _read_path_list(path: Path) -> list[str]:
+    lines = (line.strip() for line in path.read_text(encoding="utf-8").splitlines())
+    return [line for line in lines if line and not line.startswith("#")]
+
+
+# docs/publish-exclusions.txt is the shared list of unpublished paths; the Astro
+# converter reads the same file. A missing list would publish maintainer pages,
+# so the build stops instead.
+_publish_exclusions = DOCS_ROOT / "publish-exclusions.txt"
+if not _publish_exclusions.exists():
+    raise FileNotFoundError(f"{_publish_exclusions} is missing; it lists the paths that must not be published")
+exclude_patterns += [entry.rstrip("/") for entry in _read_path_list(_publish_exclusions)]
 
 # Pages under these directories are published only when publish-allowlist.txt
 # lists them, so a new maintainer document stays off the site until someone
@@ -239,10 +173,7 @@ PUBLISH_LIST_ROOTS = ("development", "operations")
 
 def _read_publish_list(docs_root: Path) -> set[str]:
     path = docs_root / "publish-allowlist.txt"
-    if not path.exists():
-        return set()
-    lines = (line.strip() for line in path.read_text(encoding="utf-8").splitlines())
-    return {line for line in lines if line and not line.startswith("#")}
+    return set(_read_path_list(path)) if path.exists() else set()
 
 
 def _unlisted_publish_list_pages(docs_root: Path) -> list[str]:

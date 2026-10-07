@@ -524,13 +524,13 @@ def test_development_agent_doc_fails(tmp_path: Path) -> None:
     assert any("docs/development/agent-extra.md" in error for error in errors)
 
 
-def test_missing_sphinx_agent_exclude_fails(tmp_path: Path) -> None:
+def test_missing_agent_publish_exclusion_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
-    conf = project / "docs/conf.py"
-    conf.parent.mkdir(parents=True, exist_ok=True)
-    conf.write_text('exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]\n')
+    exclusions = project / "docs/publish-exclusions.txt"
+    exclusions.parent.mkdir(parents=True, exist_ok=True)
+    exclusions.write_text("# comment\ninternal/\n")
     _, errors = audit(project, CORPUS)
-    assert any("must exclude the docs/agent/ tree from Sphinx" in error for error in errors)
+    assert any("must exclude the docs/agent/ tree from the published site" in error for error in errors)
 
 
 def _git_configured_repo(tmp_path: Path, name: str, email: str) -> Path:

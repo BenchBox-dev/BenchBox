@@ -682,12 +682,11 @@ def audit_docs_placement(project: Path) -> list[str]:
         leaked = sorted(path.relative_to(project).as_posix() for path in development.glob("agent-*.md"))
         if leaked:
             errors.append("agent governance files must live under docs/agent/, not " + ", ".join(leaked))
-    conf = project / "docs/conf.py"
-    if conf.exists():
-        match = re.search(r"exclude_patterns\s*=\s*\[(.*?)\]", conf.read_text(encoding="utf-8"), re.S)
-        excluded = match.group(1) if match else ""
-        if not re.search(r"[\"']agent[\"']", excluded):
-            errors.append("docs/conf.py must exclude the docs/agent/ tree from Sphinx")
+    exclusions = project / "docs/publish-exclusions.txt"
+    if exclusions.exists():
+        entries = {line.strip() for line in exclusions.read_text(encoding="utf-8").splitlines()}
+        if "agent/" not in entries:
+            errors.append("docs/publish-exclusions.txt must exclude the docs/agent/ tree from the published site")
     return errors
 
 
