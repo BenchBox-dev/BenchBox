@@ -53,15 +53,16 @@ Without the App secrets, the `post` job logs the result and succeeds.
 4. `post` re-validates every artifact from this run, replays the selection,
    and posts the status and the findings. `findings_delivery` in
    `.github/oracle-reviewers.yml` chooses how:
-   - `comment` (the shadow default) posts one pull request comment, so
-     findings never block a merge.
+   - `comment` posts one pull request comment, so findings never block a
+     merge.
    - `review` posts one pull request review per result on the head commit,
      with a thread for each finding on a diff line and the summary and any
      finding outside the diff in the body. A run with no verdict still posts
      a review that explains the pending result, so the latest review always
      reflects the latest run. The ruleset requires every thread to be
-     resolved, so these threads block merges like the connector's; switching
-     to `review` starts the parity period before the cut-over.
+     resolved, so these threads block merges like the connector's. The
+     policy uses `review` from the start of the parity period before the
+     cut-over.
 
 `plan` also limits spend to code that changed. The retry state records the
 blob SHA and tree mode of each changed file at the last success or failure, except prose
