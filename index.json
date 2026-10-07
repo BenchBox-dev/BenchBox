@@ -22315,10 +22315,10 @@
     },
     "tuning-portable-metadata-store-20261001": {
       "claim": {
-        "expires_at": "2026-10-07T12:17:42Z",
-        "generation": "de7c728c9de1406c87c5790b2e4e4bbc",
+        "expires_at": "2026-10-08T22:00:04Z",
+        "generation": "2c203258b3c44ac7aa2b5affb2e1c3bf",
         "renewals": 0,
-        "worker": "mcp:tbh:joe@joe-mac-mini.local:d90c17f1dbc58577e72c0803"
+        "worker": "mcp:tbh:joe@joe-mac-mini.local:154ae91a481281d11ac2019e"
       },
       "needs": [
         "tuning-no-midrun-destructive-db-handling-20261001"
