@@ -5,6 +5,7 @@ ADR = ROOT / "docs/development/adr/adr-independent-publication-authorities.md"
 THREAT_MODEL = ROOT / "docs/development/independent-publication-threat-model.md"
 OPERATIONS = ROOT / "docs/operations/independent-publication-contract.md"
 HOSTED_CONTRACT = ROOT / "docs/reference/hosted-results-contract.md"
+HOSTED_PLANNING = ROOT / "docs/internal/hosted-results-planning.md"
 PHASE3_THREAT_MODEL = ROOT / "docs/reference/threat-model.md"
 
 
@@ -79,6 +80,15 @@ def main() -> int:
     )
     failures.extend(
         _require(
+            HOSTED_PLANNING,
+            (
+                "Yes, except never-public `private` results",
+                "Yes for minted public IDs; no for never-public `private` results",
+            ),
+        )
+    )
+    failures.extend(
+        _require(
             HOSTED_CONTRACT,
             (
                 "No single `published` flag",
@@ -101,8 +111,6 @@ def main() -> int:
                 "Because no public URL ever existed, no public tombstone is created",
                 "A withdrawn result that previously had a",
                 "Withdraw a never-public private result",
-                "Yes, except never-public `private` results",
-                "Yes for minted public IDs; no for never-public `private` results",
                 "Tombstone only if a public ID existed; otherwise no public surface",
                 "For a never-public private result, no public tombstone exists",
                 "A never-public private result has no public route or frontend tombstone",
