@@ -12,11 +12,8 @@ The public anonymization boundary replaces machine-local strings with
 `<prefix>_<12 hex>` pseudonyms. Two facts about that scheme were established
 together and change the picture:
 
-**The pseudonyms did not prevent re-identification.** `machine_id_salt`
-defaults to empty and the hashing algorithm is documented in
-`docs/reference/result-formats.md`, so the published identifier fields allowed
-the original values to be re-identified. Hashing twice does not change this,
-because the second step is just as deterministic and public as the first.
+**The pseudonyms did not prevent re-identification.** The published identifier
+fields allowed the original values to be re-identified.
 
 The existing gate cannot see this. `find_public_path_leaks` detects *plaintext*
 absolute paths, so it reports the corpus clean even when its pseudonyms can be
@@ -87,8 +84,7 @@ repository-baked default salt. Do not one-time rehash retained fields.**
 
 Retained published identifiers (`endpoint`, `database_name`,
 `submission_path`) therefore remain a **residual confirmation oracle** under
-the empty default: anyone who knows the documented algorithm can hash a
-candidate and match corpus tokens with certainty. That residual is accepted for
+the empty default: a guessed value can be confirmed. That residual is accepted for
 the curated maintainer seed corpus and documented; it is **not** accepted as
 the right default for an operator who will publish other people's submissions.
 

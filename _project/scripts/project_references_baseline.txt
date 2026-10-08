@@ -22,7 +22,7 @@ docs/development/adr/adr-published-results-slim-corpus-branch.md::_project/DONE/
 docs/development/benchbox-results-platform-strategy.md::_project/_archive/specs/cli/config.md
 docs/development/browser-test-architecture.md::_project/_archive/handoffs/handoff-results-publishing-phase2.md
 docs/operations/release-guide.md::_project/TODO/main/active/release-recovery-v0-3-1.yaml
-docs/operations/uat-release-campaign.md::_project/release-evidence/uat-gate-summary.json
+docs/internal/uat-release-campaign.md::_project/release-evidence/uat-gate-summary.json
 make/monolith-baseline.json::_project/cross-surface-baseline-autodetect/summary.json
 scripts/release_readiness_check.py::_project/release-evidence/uat-gate-summary.json
 tests/uat/_cli.py::_project/release-evidence/uat-gate-summary.json

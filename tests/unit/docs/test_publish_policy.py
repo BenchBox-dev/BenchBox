@@ -82,3 +82,26 @@ def test_missing_publish_list_publishes_nothing_in_gated_directories(conf: dict,
     (tmp_path / "operations").mkdir()
     (tmp_path / "operations" / "runbook.md").write_text("# Runbook\n")
     assert conf["_unlisted_publish_list_pages"](tmp_path) == ["operations/runbook.md"]
+
+
+def sphinx_docnames(srcdir: Path, exclude_patterns: list[str]) -> set[str]:
+    from sphinx.project import Project
+
+    return Project(str(srcdir), [".md", ".rst"]).discover(exclude_paths=exclude_patterns)
+
+
+def test_sphinx_discovers_no_excluded_or_unlisted_page(conf: dict) -> None:
+    docnames = sphinx_docnames(DOCS, conf["exclude_patterns"])
+    assert docnames
+    assert sorted(name for name in docnames if name.split("/")[0] in EXCLUDED_ROOTS) == []
+    assert sorted(name for name in docnames if f"{name}.md" in EXCLUDED_FILES) == []
+    gated = {name for name in docnames if name.split("/")[0] in PUBLISH_LIST_ROOTS}
+    assert sorted(name for name in gated if f"{name}.md" not in ALLOWLIST) == []
+
+
+def test_sphinx_excludes_everything_under_a_listed_directory(tmp_path: Path) -> None:
+    for relative in ("kept.md", "agent/notes.md", "internal/deep/runbook.md", "guides/user.md"):
+        (tmp_path / relative).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / relative).write_text("# Page\n")
+    patterns = [entry.rstrip("/") for entry in ("agent/", "internal/")]
+    assert sphinx_docnames(tmp_path, patterns) == {"kept", "guides/user"}

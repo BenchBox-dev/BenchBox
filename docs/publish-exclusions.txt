@@ -70,7 +70,6 @@ operations/merge-queue-canary-runbook.md
 operations/merge-queue-governance.md
 operations/nightly-t3.md
 operations/oracle-review-v2.md
-operations/public-site-visual-baseline.md
 operations/pr-triage.md
 operations/publication-deployer-soak-and-retirement.md
 operations/release-artifacts.md
@@ -82,8 +81,6 @@ operations/results-phase-3-runbook.md
 operations/site-deploy.md
 operations/soundness-drain.md
 operations/todo-db-benchbox-extraction.md
-operations/tpc-binary-release.md
-operations/uat-release-campaign.md
 platforms/workaround-index.md
 reference/threat-model.md
 tpc-licensing-analysis.md

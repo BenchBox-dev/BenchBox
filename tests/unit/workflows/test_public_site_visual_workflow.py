@@ -19,7 +19,11 @@ CAPTURE_SPEC = REPO_ROOT / "results-explorer" / "e2e" / "captures" / "public-sit
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 CLASSIFY_STEP = "Classify site inputs and validate recovery source"
 GATE_STEP = "Require comparison for affected develop trees"
-RUNBOOK = REPO_ROOT / "docs" / "operations" / "public-site-visual-baseline.md"
+RUNBOOK = REPO_ROOT / "docs" / "internal" / "public-site-visual-baseline.md"
+
+
+def _run_sh(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(*args, **kwargs)
 
 
 def _workflow() -> dict[str, Any]:
@@ -153,7 +157,7 @@ def test_baseline_candidates_stop_at_the_first_site_input_change(tmp_path: Path)
         CURRENT_REF="refs/pull/1/merge",
         GITHUB_OUTPUT=str(output),
     )
-    result = subprocess.run(["bash", "-c", classifier], cwd=tmp_path, env=env, capture_output=True, text=True)
+    result = _run_sh(["bash", "-c", classifier], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     lines = dict(line.split("=", 1) for line in output.read_text().splitlines())
     assert lines["baseline_candidates"].split() == [base, quiet_one, site_change]
@@ -251,13 +255,13 @@ def test_required_gate_fails_closed_for_changed_inputs(
         EVENT_NAME=event,
         BASE_REF=base_ref,
     )
-    result = subprocess.run(["bash", "-c", step["run"]], env=env, capture_output=True, text=True, check=False)
+    result = _run_sh(["bash", "-c", step["run"]], env=env, capture_output=True, text=True, check=False)
     assert result.returncode == expected, result.stderr
 
 
 def test_required_gate_rejects_failed_input_classification() -> None:
     step = _step(_workflow()["jobs"]["public-site-visual-required"], GATE_STEP)
-    result = subprocess.run(
+    result = _run_sh(
         ["bash", "-c", step["run"]],
         env={
             **os.environ,
@@ -333,7 +337,7 @@ def test_input_classifier_uses_exact_base_diff(tmp_path: Path, event: str, chang
         CURRENT_REF="refs/heads/develop",
         GITHUB_OUTPUT=str(output),
     )
-    result = subprocess.run(["bash", "-c", classifier], cwd=tmp_path, env=env, capture_output=True, text=True)
+    result = _run_sh(["bash", "-c", classifier], cwd=tmp_path, env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     assert f"changed={expected}" in output.read_text()
     assert f"base_sha={base_sha}" in output.read_text()
