@@ -15144,12 +15144,17 @@
       "title": "Measure Polars SF10 memory, feasibility and run time on the 16 GB host, and capture reference row counts"
     },
     "pvm-s3a-generalize-matrix-tooling": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T05:13:53Z",
+        "generation": "30f3d51c37f74dd99a488cd900f6e20c",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1"
+      },
       "needs": [
         "pvm-d0-external-plan-review"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Generalize the DuckDB version-matrix runner and analyzer into engine-neutral tools without changing DuckDB output"
     },
     "pvm-s3b-polars-matrix-spec": {
