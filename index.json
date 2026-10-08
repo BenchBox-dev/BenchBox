@@ -22340,6 +22340,13 @@
       "status": "open",
       "title": "Build an internal harness that measures a tuned template against notuning with calibrated noise"
     },
+    "tuning-evidence-tuned-mode-promise-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Define what the tuned mode promises, and record the owner's decisions on per-query settings, merge-wait symmetry and unmeasured templates"
+    },
     "tuning-explorer-consume-bundle-hashes-20260716": {
       "claim": null,
       "needs": [],
