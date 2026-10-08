@@ -7577,7 +7577,7 @@
       "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "dropped",
       "title": "Replace the possibly real project label in the TimescaleDB example host"
     },
     "document-cli-comprehensively": {
