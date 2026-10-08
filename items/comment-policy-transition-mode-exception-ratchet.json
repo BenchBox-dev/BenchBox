@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "check_comment_policy.py allows new exception entries in quality/comment-policy.json when accompanied by new or modified files in the same change",
+    "Ratchet logic prevents re-adding exceptions to files in already completed scopes unless explicitly authorized",
+    "Test cases verify new exception addition in PR mode"
+  ],
+  "context": "Discovered during PR #2773 and PR #2785 where uat-throughput-cedardb-nightly.yaml required a special test bypass because its lifecycle header exception could not be registered on develop in the same PR.",
+  "description": "In scripts/check_comment_policy.py (transition mode), newly added entries in quality/comment-policy.json exceptions are filtered out against baseline_policy['exceptions']. This creates a circular blocker when a pull request introduces a new file that legitimately requires an exception (e.g., UAT configs requiring mandatory comment headers per spec): the PR cannot pass the check because the exception is not yet in develop, and the exception cannot be added to develop without a PR.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:2a10096285872d23ac8a3bfe",
+      "at": "2026-10-08T23:39:38Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "7cd0af5a3c1f487e853f101025f5ca37",
+      "session_id": "414237a6e56140ed97e26a248092ab35"
+    }
+  ]
+}

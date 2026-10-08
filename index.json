@@ -4501,6 +4501,13 @@
       "status": "open",
       "title": "comment-policy-strict can never pass: flags vendored, binary, and out-of-scope files"
     },
+    "comment-policy-transition-mode-exception-ratchet": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Support adding legitimate comment exceptions in PRs without base branch circular dependency"
+    },
     "comment-scanner-mdx-jsx-support": {
       "claim": null,
       "needs": [],
