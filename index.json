@@ -9263,10 +9263,15 @@
       "title": "Explorer: selection-oriented facets and coverage signals for large public corpus"
     },
     "explorer-site-small-defects": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T23:42:57Z",
+        "generation": "5fb11fb7e39b46a0b1be05330a532315",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:a9f51c620a99fea6b166f0af"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Fix the missing Explorer favicon, the drafts page in the sitemap, and a flaky pipeline test"
     },
     "explorer-surface-trust-tiers-as-badges": {
