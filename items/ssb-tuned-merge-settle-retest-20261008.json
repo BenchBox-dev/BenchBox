@@ -1,5 +1,5 @@
 {
-  "context": "Source: tuning-followups handoff decision D3 (owner 2026-10-08): keep SSB tuned template with documented negative verdict; retest once merge-settle exists. Predecessor evidence: post-merge ssb-tuned PASS but ~4.6x slower than notuning (bundles ssb_sf1_clickhouse_server_sql_20261007_183153_f2b246d4.json vs ..._182634_97178a0b.json); #2766 tier remediation (merge-settle wait) now merged.",
+  "context": "Source: tuning-followups handoff decision D3 (owner 2026-10-08): keep SSB tuned template with documented negative verdict; retest once merge-settle exists. Predecessor evidence: post-merge ssb-tuned PASS but ~4.6x slower than notuning (bundles ssb_sf1_clickhouse_server_sql_20261007_183153_f2b246d4.json vs ..._182634_97178a0b.json); #2766 tier remediation (merge-settle wait) now merged.\n\n2026-10-08 note from the tuning-evidence plan: the retest this item asks for appears to be done already. The ADR-3 ClickHouse addendum (merged in #2766) has an SSB row measured with the merge-settle wait: fresh server, three cells, no failures, 109.8 ms notuning vs 61.2 ms tuned (0.56x), 64.1 ms tuned with optimize_after_load, host load at most 8.3. Those are single sequential cells, which the tuning-evidence plan treats as provisional. The open questions moved to: clickhouse-ssb-session-pack-ablation-20261008 (pack on vs off, harness-grade) and tuning-evidence-adr3-clickhouse-corrections-20261008 (mark the decision provisional). Owner: decide whether to close this item as done or drop it as superseded.",
   "description": "Re-run SSB tuned cells with merge-settle from the merged tier remediation and decide the template's fate from measured numbers: keep, adjust, or disable. Report negative results as such; single-shot SF1 cells are sufficient for the verdict.",
   "sessions": [
     {
@@ -9,6 +9,14 @@
       "op": "create",
       "op_id": "88b787a371ca4bc282bed492d86b1bdc",
       "session_id": "0b049bb7b35344849c3bc1ea57ed95a2"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:34:15Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "5428224d56604176a4107a067d1e09a3",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
 }
