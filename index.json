@@ -15170,7 +15170,7 @@
         "pvm-s2-sf10-memory-time-probe"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "blocked",
       "title": "Run the Polars version matrix on the M4 host under controlled conditions"
     },
     "pvm-s5-analyze-polars-matrix": {
