@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "KNOWN_PLATFORMS is computed from the platform registry (no second hardcoded list).",
+    "A test fails before the change and passes after it: every registered platform name, including Apache Doris, validates as known.",
+    "A test proves a name absent from the registry is still rejected.",
+    "make comment-policy-check passes."
+  ],
+  "context": "Evidence at develop d2deb280e. Not part of the throughput remediation batch.",
+  "description": "benchbox/validation/bundle.py:401 hardcodes KNOWN_PLATFORMS, and the check at bundle.py:1428 rejects any platform not in it. The set lacks 13 or more registered platforms, including \"Apache Doris\", so a valid bundle from those engines is flagged as an unknown platform. Found while admitting the Apache Doris throughput bundle into the results corpus (2026-10-08). Replace the hardcoded set with a value derived from the platform registry so new platforms cannot drift out of it.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:2078d44d78bfbb5aca3865ea",
+      "at": "2026-10-08T13:38:24Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "3108ad6855e24c179dbfbba81cfaf604",
+      "session_id": "0bdbb5bb32cc4bd0b5505d2dcb0e488e"
+    }
+  ]
+}
