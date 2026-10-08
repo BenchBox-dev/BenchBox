@@ -4895,6 +4895,13 @@
       "status": "done",
       "title": "Surface vendor-supplied label + funding in the corpus inventory and DuckDB read model"
     },
+    "corpus-inventory-unknown-phase-test-vacuous": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Make test_unknown_phase_merges_with_power_cohort exercise an unknown phase"
+    },
     "corpus-migrate-reads-non-bundle-json": {
       "claim": null,
       "needs": [],

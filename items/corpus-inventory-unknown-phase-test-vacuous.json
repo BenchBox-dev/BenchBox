@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "The test builds a bundle whose test_type is an unrecognised value (and one with the field absent) and asserts it joins the power cohort.",
+    "Mutation check: changing the inventory logic to stop folding unknown phases into power makes the test fail.",
+    "_minimal_bundle accepts a test_type override without changing existing callers."
+  ],
+  "context": "Evidence at develop d2deb280e. Not part of the throughput remediation batch.",
+  "description": "tests/unit/scripts/test_generate_corpus_inventory.py:322 test_unknown_phase_merges_with_power_cohort cannot fail for its stated reason. _minimal_bundle (line 17) always writes benchmark.test_type \"power\" (line 29), so the test never presents an unknown phase to the inventory logic. A regression that stopped folding unknown phases into the power cohort would still pass.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:2078d44d78bfbb5aca3865ea",
+      "at": "2026-10-08T13:38:29Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "5e441c5ac0054568af4727692591cf15",
+      "session_id": "0bdbb5bb32cc4bd0b5505d2dcb0e488e"
+    }
+  ]
+}
