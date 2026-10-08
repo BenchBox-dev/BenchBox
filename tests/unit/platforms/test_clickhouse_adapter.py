@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from benchbox.platforms.clickhouse import ClickHouseAdapter
+from benchbox.platforms.clickhouse.merge_settle import MergeSettleResult
 from tests.utilities.optional_engines import chdb_skip_reason, chdb_usable
 
 pytestmark = [
@@ -217,7 +218,11 @@ class TestClickHouseAdapter:
             adapter = ClickHouseAdapter(deployment_mode="server")
             connection = adapter.create_connection()
 
-            table_stats, load_time, _ = adapter.load_data(mock_benchmark, connection, Path("/tmp"))
+            with patch(
+                "benchbox.platforms.clickhouse.workload.wait_for_merges_to_settle",
+                return_value=MergeSettleResult(True, 0.0, 1),
+            ):
+                table_stats, load_time, _ = adapter.load_data(mock_benchmark, connection, Path("/tmp"))
 
             assert isinstance(table_stats, dict)
             assert isinstance(load_time, float)
@@ -305,7 +310,7 @@ class TestClickHouseAdapter:
 
         assert mock_client.execute.call_count > 5
         executed_sql = " ".join(call[0][0] for call in mock_client.execute.call_args_list)
-        assert "grace_hash" in executed_sql
+        assert "grace_hash" not in executed_sql
         assert "optimize_aggregation_in_order" in executed_sql
 
         mock_client.reset_mock()
@@ -340,8 +345,7 @@ class TestClickHouseAdapter:
             f"max_bytes_in_join should be 50% of max_memory_usage ({expected_50pct}), got {join_limit}"
         )
 
-        grace_stmt = next((s for s in executed_statements if "grace_hash" in s), None)
-        assert grace_stmt is not None, "join_algorithm = grace_hash setting was not applied"
+        assert not any("join_algorithm" in s for s in executed_statements)
 
     @pytest.mark.skipif(not CHDB_AVAILABLE, reason=f"{CHDB_SKIP_REASON} (required for embedded mode test)")
     def test_configure_for_benchmark_embedded_mode(self):
@@ -1238,6 +1242,38 @@ class TestClickHouseWorkloadCoverage:
 
         statement = connection.execute.call_args.args[0]
         assert "join_algorithm" not in statement
+
+    @pytest.mark.parametrize("query_id", ["21", "Q21"])
+    def test_tuned_server_tpch_q21_uses_statement_level_hash_join(self, query_id):
+        adapter = self._adapter(deployment_mode="server")
+        adapter.tuning_enabled = True
+        connection = Mock()
+        connection.execute.return_value = [(1,)]
+
+        adapter.execute_query(connection, "SELECT 1", query_id, benchmark_type="tpch", validate_row_count=False)
+
+        assert "join_algorithm = 'hash'" in connection.execute.call_args.args[0]
+
+    @pytest.mark.parametrize(
+        ("deployment_mode", "tuning_enabled", "benchmark_type", "query_id"),
+        [
+            ("server", False, "tpch", "21"),
+            ("server", True, "tpch", "20"),
+            ("server", True, "tpcds", "21"),
+            ("local", True, "tpch", "21"),
+        ],
+    )
+    def test_statement_level_hash_join_is_limited_to_tuned_server_tpch_q21(
+        self, deployment_mode, tuning_enabled, benchmark_type, query_id
+    ):
+        adapter = self._adapter(deployment_mode=deployment_mode)
+        adapter.tuning_enabled = tuning_enabled
+        connection = Mock()
+        connection.execute.return_value = [(1,)]
+
+        adapter.execute_query(connection, "SELECT 1", query_id, benchmark_type=benchmark_type, validate_row_count=False)
+
+        assert "join_algorithm" not in connection.execute.call_args.args[0]
 
     def test_extract_primary_key_columns_handles_inline_and_composite_keys(self):
         adapter = self._adapter()

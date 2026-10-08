@@ -112,8 +112,6 @@ class ClickHouseTuningMixin:
                 "group_by_two_level_threshold": 100000,
                 "max_bytes_before_external_group_by": int(self._parse_memory_setting(self.max_memory_usage) * 0.5),
                 "max_bytes_before_external_sort": int(self._parse_memory_setting(self.max_memory_usage) * 0.5),
-                "join_algorithm": "grace_hash",
-                "grace_hash_join_initial_buckets": 8,
             }
 
             settings.update(olap_settings)
