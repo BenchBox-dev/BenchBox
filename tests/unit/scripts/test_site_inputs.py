@@ -211,35 +211,12 @@ def test_verify_rejects_compared_base_mismatch(tmp_path: Path) -> None:
     assert site_inputs.cmd_verify(out) == 1
 
 
-def test_is_validator_path_matches_exact_and_prefix() -> None:
-    assert site_inputs.is_validator_path("benchbox/validation/engines.py") is True
-    assert site_inputs.is_validator_path("scripts/validate_submission.py") is True
-    assert site_inputs.is_validator_path("scripts/publication/validator_parity.py") is True
-    assert site_inputs.is_validator_path("scripts/generate_corpus_inventory.py") is True
-    assert site_inputs.is_validator_path("benchbox/core/results/schema_policy.py") is True
-    assert site_inputs.is_validator_path("benchbox/core/results/provenance.py") is True
-    assert site_inputs.is_validator_path("benchbox/core/results/anonymization.py") is True
-    assert site_inputs.is_validator_path("pyproject.toml") is True
-    assert site_inputs.is_validator_path("uv.lock") is True
-    assert site_inputs.is_validator_path("benchbox/core/benchmark_registry.py") is True
-    assert site_inputs.is_validator_path("benchbox/__init__.py") is True
-    assert site_inputs.is_validator_path("benchbox/core/__init__.py") is True
-    assert site_inputs.is_validator_path("benchbox/core/validation/engines.py") is False
-    assert site_inputs.is_validator_path("scripts/validate_submission_test.py") is False
-    assert site_inputs.is_validator_path("_project/scripts/explorer_pipeline/transformer.py") is False
-
-
 def test_verify_rejects_compared_base_without_parent(tmp_path: Path) -> None:
     out = _bundle(tmp_path)
     manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
     del manifest["parent_core_sha"]
     (out / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
     assert site_inputs.cmd_verify(out) == 1
-
-
-def test_validator_changed_is_false_for_same_sha() -> None:
-    head = site_inputs.must_run("git", "-C", str(site_inputs.ROOT), "rev-parse", "HEAD").strip()
-    assert site_inputs.validator_changed(head, head) is False
 
 
 def test_member_digest_raises_on_missing_path(tmp_path: Path) -> None:
@@ -350,3 +327,27 @@ def test_verify_rejects_accepted_ref_other_than_core_sha(tmp_path: Path) -> None
     ]
     (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
     assert site_inputs.cmd_verify(out) == 1
+
+
+def test_validator_parity_skips_when_corpus_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    entries, commands = _captured_attestations(tmp_path, monkeypatch, corpus_changed=False)
+    parity = next(e for e in entries if e["name"] == "validator_parity")
+    assert parity["result"] == "skip"
+    assert parity["reason"] == "corpus unchanged"
+    assert parity["compared"] == {"base": "parent", "head": "core"}
+    assert not [c for c in commands if "scripts/publication/validator_parity.py" in c]
+
+
+def test_validator_parity_uses_the_mirror_form_when_corpus_changed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entries, commands = _captured_attestations(tmp_path, monkeypatch, corpus_changed=True)
+    command = _command(commands, "scripts/publication/validator_parity.py")
+    assert command[command.index("--base-sha") + 1] == "parent"
+    assert command[command.index("--merge-sha") + 1] == "core"
+    assert command[command.index("--head-sha") + 1] == "core"
+    assert "--allow-partial-validation" in command
+    assert "--require-manifest" not in command
+    parity = next(e for e in entries if e["name"] == "validator_parity")
+    assert parity["result"] == "pass"
+    assert parity["compared"] == {"base": "parent", "merge": "core", "head": "core"}
