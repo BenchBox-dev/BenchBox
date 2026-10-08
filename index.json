@@ -5656,6 +5656,13 @@
       "status": "done",
       "title": "Model Databricks TPC Liquid Clustering as a first-class reusable profile rendering"
     },
+    "databricks-tuned-templates-vendor-guidance-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Bring the Databricks tuned templates in line with Databricks partitioning and constraint guidance"
+    },
     "dataframe-adapter-ledger-instrumentation-20260724": {
       "claim": null,
       "needs": [],
