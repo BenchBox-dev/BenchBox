@@ -22242,6 +22242,13 @@
       "status": "done",
       "title": "Remove partitioning from DuckDB tuned templates (DuckDB always drops it)"
     },
+    "tuning-evidence-measurement-harness-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Build an internal harness that measures a tuned template against notuning with calibrated noise"
+    },
     "tuning-explorer-consume-bundle-hashes-20260716": {
       "claim": null,
       "needs": [],
