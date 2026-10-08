@@ -4455,6 +4455,13 @@
       "status": "open",
       "title": "Comment-policy exceptions keyed to a whole-file digest and read only from the base force a separate PR for any edit"
     },
+    "comment-policy-fixture-exception-wording-cleanup": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Update wording and consumer metadata for standardized test commands and release flow fixtures in comment-policy.json"
+    },
     "comment-policy-hook-saturates-shared-host": {
       "claim": null,
       "needs": [],
