@@ -3,6 +3,7 @@
     "Owner-approved wording on each page",
     "A recorded decision on the TPC downloads"
   ],
+  "context": "2026-10-08: a user TPC trademarks page (docs/benchmarks/tpc-trademarks.md, owner-approved wording) is ready to commit. Research found the TPC Fair Use Quick Reference v1.0.0 (2019) .docx at tpc.org (the PDF link 404s). Still to check: the current full TPC Policies document; whether Power@Size/Throughput@Size count as TPC Primary/Optional Metrics (owner chose to keep the names with the disclaimer); and the publication obligations in the licences of the bundled dbgen/dsdgen binaries (\"the TPC Copyright Notice and License Agreement must be maintained\"). Related: tpc-remove-certification-and-compliance-claims.",
   "description": "benchmarks/join-order.md states the IMDb data is used with permission and gives a redistribution position; benchmarks/tpc-standards.md, tpch-skew.md, tpc-h.md, tpc-ds.md and tpc-ds-obt.md make compliance claims. The site also serves TPC-DS templates and TPC-H query files under /docs/_downloads/. Decide the approved wording and whether those downloads fit the TPC EULA.",
   "sessions": [
     {
@@ -12,6 +13,14 @@
       "op": "create",
       "op_id": "5e546aa7d9bd4c54894c8d33640b6956",
       "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-08T12:45:17Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "6dc1596141de47129c03e2ccb3f6a19a",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
     }
   ]
 }
