@@ -1457,9 +1457,6 @@ def test_qualified_sort_column_needs_the_lone_source_to_match():
 
 
 def test_join_using_qualified_order_by_stays_unverifiable():
-    # An unqualified projection does not establish which relation supplies a
-    # qualified ORDER BY column: with t.a={1,2} and u.a={2}, the merged USING
-    # column orders [(2,), (1,)] while u.a alone would order [(1,), (2,)].
     columns = [("a", "INTEGER")]
     sql = "SELECT a FROM t LEFT JOIN u USING(a) ORDER BY u.a + 0"
     assert _plan_kind(sql, columns) == ORDER_UNVERIFIABLE
@@ -1467,8 +1464,6 @@ def test_join_using_qualified_order_by_stays_unverifiable():
 
 
 def test_collated_output_columns_stay_unverifiable():
-    # The check table carries declared types but not output collations, so it
-    # would validate NOCASE orderings against binary sorting semantics.
     assert _plan_kind("SELECT a COLLATE NOCASE AS x FROM t ORDER BY ALL", [("x", "VARCHAR")]) == ORDER_UNVERIFIABLE
     assert _plan_kind("SELECT a COLLATE NOCASE AS x FROM t ORDER BY x", [("x", "VARCHAR")]) == ORDER_UNVERIFIABLE
     assert _plan_kind("SELECT a FROM t ORDER BY ALL", [("a", "VARCHAR")]) == ORDER_UNVERIFIABLE

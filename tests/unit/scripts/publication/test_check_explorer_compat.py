@@ -26,8 +26,7 @@ def mock_artifact_dir(tmp_path: Path) -> Path:
     dist = tmp_path / "dist"
     dist.mkdir(parents=True)
     (dist / "index.html").write_text(
-        "<!DOCTYPE html><html><head><title>Results Explorer</title></head>"
-        "<body><div id='root'></div><script src='/assets/index.js'></script></body></html>",
+        "<!DOCTYPE html><html><head><title>Results Explorer</title></head><body><div id='root'></div><script src='/assets/index.js'></script></body></html>",
         encoding="utf-8",
     )
     assets = dist / "assets"

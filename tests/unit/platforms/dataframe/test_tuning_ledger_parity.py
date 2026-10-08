@@ -584,18 +584,7 @@ class TestRunBenchmarkCarriesLedger:
         assert result.applied_ledger_hash is None
 
 
-# ---------------------------------------------------------------------------
-# Gated-module delegation pins
-# ---------------------------------------------------------------------------
 class TestLedgerTrustDelegation:
-    """The mixin entry points must route through the gated module.
-
-    ``benchbox/platforms/dataframe/tuning_trust.py`` is a soundness-manifest
-    path; the mixin methods below are one-line delegates. Computing the status
-    or attach inline (ignoring the gated functions) leaves the patched
-    sentinels unobserved, so these fail if the mixin stops delegating.
-    """
-
     def _stub(self):
         from benchbox.platforms.dataframe.tuning_mixin import TuningConfigurableMixin
 

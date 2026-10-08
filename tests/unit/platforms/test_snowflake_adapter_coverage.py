@@ -1012,7 +1012,6 @@ class TestApplyTableTunings:
 
         all_sqls = [call.args[0] for call in mock_cursor.execute.call_args_list]
         assert not any("ALTER TABLE" in sql.upper() and "CLUSTER BY" in sql.upper() for sql in all_sqls)
-        # An already-present key counts as satisfied, not dropped (D10).
         assert [s.intent for s in adapter._applied_tuning_ledger.satisfied] == [
             "ALTER TABLE ORDERS CLUSTER BY (o_orderdate, o_custkey)"
         ]

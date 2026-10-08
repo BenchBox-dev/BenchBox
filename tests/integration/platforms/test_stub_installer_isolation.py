@@ -1,11 +1,3 @@
-"""Stub-installer isolation: every installer must restore adapter-module state.
-
-Each installer in ``common.py`` patches adapter modules only through
-``monkeypatch``. This module proves it by installing each stub, explicitly
-undoing the ``monkeypatch`` fixture, and asserting no adapter-module attribute
-is left changed. Stub-only coverage needs no credentials or services.
-"""
-
 import pytest
 
 from .common import (
@@ -65,7 +57,6 @@ _INSTALLERS = [
 @pytest.mark.platform_smoke
 @pytest.mark.parametrize("name,installer", _INSTALLERS, ids=[name for name, _ in _INSTALLERS])
 def test_stub_installer_restores_adapter_attrs(monkeypatch, name, installer):
-    """Installing then undoing a stub must leave adapter modules unchanged."""
     import_stub_patched_modules()
     before = snapshot_stub_adapter_attrs()
     installer(monkeypatch)
