@@ -72,7 +72,8 @@ Without the App secrets, the `post` job logs the result and succeeds.
 
 The oracle keeps its own history in its reviews. Each decisive review ends with
 a hidden marker, `<!-- oracle-protocol: v1 ... -->`, written by code after the
-sanitised model text, which cannot contain an HTML comment. It records the
+sanitised model text, which cannot contain an HTML comment; defect file paths
+are escaped the same way. It records the
 cycle and round, the kind of round, the decision, the head, the base branch,
 the reviewer, the tier, the strike count, the open defects with their ids, and
 a hash of each changed file's patch (an 8-hex path hash and a 16-hex patch hash;
@@ -100,7 +101,9 @@ every hash. Prose files outside soundness paths are left out.
 A move of the base commit alone does not restart a cycle. A diff that cannot be
 read, a file list that is truncated, or a file missing from the diff never
 carries a decision, and neither does a file leaving the pull request: each
-gives a follow-up on every file instead.
+gives a follow-up on every file instead. A decision carries only when the
+full-length digest matches; when it differs but the stored per-file hashes do
+not show which file changed, the follow-up covers every file.
 
 A follow-up brief lists the earlier defects with their ids (D1, D2, ...,
 numbered by code within a cycle) and asks the reviewer to mark each one fixed,

@@ -122,7 +122,9 @@ def file_patches(diff_text: str) -> dict[str, str]:
 
 
 def patch_map(patches: Mapping[str, str], paths: Iterable[str]) -> dict[str, str]:
-    return {_short(path): patches[path][:PATCH_HEX] if path in patches else MISSING for path in sorted(set(paths))}
+    wanted = sorted(set(paths))
+    collided = len({_short(path) for path in wanted}) < len(wanted)
+    return {_short(path): MISSING if collided or path not in patches else patches[path][:PATCH_HEX] for path in wanted}
 
 
 def patch_digest(patches: Mapping[str, str], paths: Iterable[str]) -> str | None:
@@ -272,11 +274,7 @@ def plan_round(
         )
     if latest["decision"] == DO_NOT_SHIP:
         return Round(FIRST, "the patch changed after DO NOT SHIP", restart, 1, latest)
-    changed = changed_paths(latest.get("patch_map"), patches, paths)
-    if not changed:
-        return Round(
-            CARRY, f"no reviewed file changed since head {latest['head_sha']}", latest["cycle"], latest["round"], latest
-        )
+    changed = changed_paths(latest.get("patch_map"), patches, paths) or frozenset(paths)
     return Round(
         FOLLOW_UP,
         f"the patch changed after {LABELS[latest['decision']]}",

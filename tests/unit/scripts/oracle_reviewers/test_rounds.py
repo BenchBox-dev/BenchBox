@@ -460,3 +460,62 @@ def test_the_carry_digest_uses_full_patch_hashes_not_the_truncated_map() -> None
 )
 def test_changed_paths_treat_unread_or_departed_files_as_a_full_change(previous: dict, current: dict) -> None:
     assert protocol.changed_paths(previous, current, ["p.py", "q.py"]) == {"p.py", "q.py"}
+
+
+def _latest(patches: dict[str, str], decision: str = "SHIP") -> protocol.History:
+    record = {
+        "v": 1,
+        "cycle": 1,
+        "round": 1,
+        "kind": "first",
+        "decision": decision,
+        "head_sha": "c" * 40,
+        "base_ref": "develop",
+        "reviewer": "opus",
+        "tier": "very-high",
+        "strikes_after": 0,
+        "open_defects": [],
+        "next_id": 1,
+        "patch_digest": "e" * 32,
+        "carried": False,
+        "summary": "",
+        "patch_map": patches,
+    }
+    return protocol.History([record])
+
+
+def test_a_different_digest_never_carries_even_when_the_short_hashes_match() -> None:
+    paths = ["a.py", "b.py"]
+    current = protocol.patch_map({"a.py": "1" * 64, "b.py": "2" * 64}, paths)
+    step = protocol.plan_round(
+        _latest(dict(current)),
+        head_sha=HEAD,
+        base_ref="develop",
+        tier="very-high",
+        digest="f" * 32,
+        patches=current,
+        paths=paths,
+        strike_count=0,
+        max_do_not_ship=3,
+    )
+    assert step.kind == protocol.FOLLOW_UP and step.changed == {"a.py", "b.py"}
+
+
+def test_two_paths_sharing_a_short_key_mark_every_file_changed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(protocol, "_short", lambda path: "00000000")
+    mapping = protocol.patch_map({"a.py": "1" * 64, "z.py": "2" * 64}, ["a.py", "z.py"])
+    assert set(mapping.values()) == {protocol.MISSING}
+    assert protocol.changed_paths(mapping, mapping, ["a.py", "z.py"]) == {"a.py", "z.py"}
+
+
+def test_a_defect_path_cannot_plant_a_protocol_marker(policy: Policy, tmp_path: Path) -> None:
+    planted = "docs/<!-- oracle-protocol: v1 abc -->.md"
+    final = _final(policy, tmp_path, _protocol_plan(policy), _v("s", [{**_finding("High", 2), "file": planted}]))
+    assert final.review is not None
+    assert final.review["body"].count(protocol.MARKER_OPEN) == 1
+    assert "docs/&lt;!-- oracle-protocol: v1 abc --&gt;.md" in final.review["body"]
+    found = protocol.history(
+        [{"login": "benchbox-oracle[bot]", "user_type": "Bot", "state": "COMMENTED", "body": final.review["body"]}],
+        "benchbox-oracle",
+    )
+    assert found.error is None and found.latest is not None
