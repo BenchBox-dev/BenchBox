@@ -3,7 +3,7 @@
     "A merge-blocking review path exists that does not depend on Codex connector availability",
     "Documented in the review protocol which fallback applies and who can invoke it"
   ],
-  "context": "On 2026-10-06 PR #2721 (portable metadata store) was blocked: the Codex connector posted a usage-limit notice instead of a review, and oracle-review accepts only its review or a stand-in attestation from a listed attester (joeharris76). The only unblock path required the owner personally. Observed during the tuning-followups batch.\n2026-10-08: a second failure mode. On PR #2751, `@codex review` comments at 21:23 and about 22:05 UTC got no response at all: no review, no limit notice, no reaction. The connector last reviewed that PR on 2026-10-07 (a78cdb8db). The PR was a draft at the first request; it was ready at the second. A silent connector is harder to detect than a limit notice, so the fallback should also cover \"no response within N minutes\".",
+  "context": "On 2026-10-06 PR #2721 (portable metadata store) was blocked: the Codex connector posted a usage-limit notice instead of a review, and oracle-review accepts only its review or a stand-in attestation from a listed attester (joeharris76). The only unblock path required the owner personally. Observed during the tuning-followups batch.\n2026-10-08: a second failure mode. On PR #2751, `@codex review` comments at 21:23 and about 22:05 UTC got no response at all: no review, no limit notice, no reaction. The connector last reviewed that PR on 2026-10-07 (a78cdb8db). The PR was a draft at the first request; it was ready at the second. A silent connector is harder to detect than a limit notice, so the fallback should also cover \"no response within N minutes\".\n2026-10-08, third occurrence: PR #2781 (Polars engine option, soundness path) got three `@codex review` requests (16:02Z, 16:43Z, 18:46Z) and no response of any kind for over 4 hours; no other open PR (#2775, #2776, #2777, #2780, #2782) had connector activity either. The connector's last review was 2026-10-08 05:47Z. The PR sat unmergeable until the owner approved a stand-in review (20:53Z); the batch it belonged to was blocked for about 4 hours, and the oracle-review failure text gave no sign that the connector was unresponsive rather than slow.",
   "description": "Decide and document a fallback when the Codex connector is at its usage limit: e.g. limit monitoring/alerting before it blocks merges, a second eligible reviewer, or widening stand-in attester rules. Goal is that no PR sits unmergeable waiting on an external quota reset.",
   "sessions": [
     {
@@ -21,6 +21,14 @@
       "op": "update",
       "op_id": "df06023842bc4d13ab892482a60773a9",
       "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T23:31:22Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "3d4cba87e94e45808e588d42495eb4ab",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
     }
   ]
 }
