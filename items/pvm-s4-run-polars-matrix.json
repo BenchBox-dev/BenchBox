@@ -8,6 +8,7 @@
     "After the run, the environment polars version equals the lock version (command output recorded in context)",
     "git status in the main checkout shows no changes from this item"
   ],
+  "context": "2026-10-08 BLOCKED: needs pvm-s3b (spec), which needs pvm-s1 and pvm-s2, which need pvm-s0b merged. pvm-s0b's PR #2781 waits on the Codex connector review; owner: Codex connector / repository owner.",
   "description": "Execute the full matrix defined by pvm-s3b, within the budget outcome recorded in pvm-s2 (handoff D2).\n\nProcedure:\n1. Use a new, empty output directory outside the checkout: ~/Developer/benchmark_runs/polars-version-matrix-<YYYYMMDD>.\n2. Run from the BenchBox commit pinned in the spec, in the separate worktree and environment.\n3. Prepare the machine: on mains power, under `caffeinate -dims`, with no other heavy processes (record the `top -l 1` header at start and end).\n4. Run the dry run and confirm the command count matches the spec's formula before starting.\n5. Run the matrix.\n6. Afterwards, restore the environment with `uv sync` and confirm the installed polars matches the lock.\n\nGuardrails:\n- No ad-hoc reruns of individual cells. If infrastructure fails (crash, sleep, power loss, disk full), the whole round is void: record the cause and rerun the complete round in a fresh shuffled order, with a new seed recorded. Query errors are recorded failures, not voids.\n- A cell classed resource-policy-exceeded, timeout or oom-killed under the pvm-s2 rules is recorded as such, not retried.\n- POLARS_TEMP_DIR spill directory is cleaned per cell; free disk is checked before each cell (stop the round as an infrastructure fault if under 80 GiB).\n- Nothing from this item is committed to the repository.",
   "sessions": [
     {
@@ -41,6 +42,14 @@
       "op": "update",
       "op_id": "12ac83c384f443e2bf854b9f1c314eb6",
       "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T18:47:14Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7d809c5db59d40069be59be87ac73563",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
     }
   ]
 }
