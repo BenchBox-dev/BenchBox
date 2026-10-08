@@ -13723,6 +13723,13 @@
       "status": "done",
       "title": "Optimize Benchmark Results JSON Output Format"
     },
+    "oracle-absence-classification-lows-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Oracle absence details are not redacted, and newer quota messages get no reset time"
+    },
     "oracle-coverage-independence-disclosure": {
       "claim": null,
       "needs": [],
