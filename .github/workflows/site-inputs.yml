@@ -45,9 +45,6 @@ jobs:
           ref: develop
           fetch-depth: 0
 
-      - name: Fetch accepted corpus ref
-        run: git fetch origin +refs/heads/published-results:refs/remotes/origin/published-results
-
       - name: Set up Python 3.12
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:

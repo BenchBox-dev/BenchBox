@@ -77,7 +77,7 @@ def _bundle(tmp_path: Path, schema: int = 1, attestations: str = "pass") -> Path
             "name": "corpus_bijection",
             "result": "pass",
             "inputs": {"snapshot": snapshot},
-            "compared": {"accepted_ref": "acc123"},
+            "compared": {"accepted_ref": "abc"},
         },
         {"name": "validator_parity", "result": "skip", "compared": {"base": "def", "head": "abc"}},
     ]
@@ -87,7 +87,6 @@ def _bundle(tmp_path: Path, schema: int = 1, attestations: str = "pass") -> Path
         "schema": schema,
         "core_sha": "abc",
         "parent_core_sha": "def",
-        "accepted_sha": "acc123",
         "members": digests,
     }
     _write(out / "manifest.json", json.dumps(manifest) + "\n")
@@ -202,14 +201,6 @@ def test_verify_rejects_compared_accepted_ref_mismatch(tmp_path: Path) -> None:
     assert site_inputs.cmd_verify(out) == 1
 
 
-def test_verify_rejects_compared_accepted_ref_without_manifest_key(tmp_path: Path) -> None:
-    out = _bundle(tmp_path)
-    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
-    del manifest["accepted_sha"]
-    (out / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
-    assert site_inputs.cmd_verify(out) == 1
-
-
 def test_verify_rejects_compared_base_mismatch(tmp_path: Path) -> None:
     out = _bundle(tmp_path)
     changed = [
@@ -236,19 +227,6 @@ def test_is_validator_path_matches_exact_and_prefix() -> None:
     assert site_inputs.is_validator_path("benchbox/core/validation/engines.py") is False
     assert site_inputs.is_validator_path("scripts/validate_submission_test.py") is False
     assert site_inputs.is_validator_path("_project/scripts/explorer_pipeline/transformer.py") is False
-
-
-def test_export_accepted_bundles_matches_ref_tree(tmp_path: Path) -> None:
-    dest = tmp_path / "export"
-    dest.mkdir()
-    head = site_inputs.must_run("git", "-C", str(site_inputs.ROOT), "rev-parse", "HEAD").strip()
-    site_inputs.export_accepted_bundles(head, dest)
-    exported = sorted(p.name for p in (dest / "results-data" / "bundles").rglob("*") if p.is_file())
-    assert exported, "export holds no bundles"
-    listed = site_inputs.must_run(
-        "git", "-C", str(site_inputs.ROOT), "ls-tree", "-r", "--name-only", head, "results-data/bundles"
-    ).splitlines()
-    assert exported == sorted(Path(p).name for p in listed)
 
 
 def test_verify_rejects_compared_base_without_parent(tmp_path: Path) -> None:
@@ -315,3 +293,60 @@ def test_repo_files_lists_every_tracked_path_with_kinds(tmp_path: Path) -> None:
     assert by_path["scripts/check_decision_records.py"] == "file"
     assert by_path["scripts"] == "tree"
     assert by_path["docs/development/adr/adr-site-repo-split.md"] == "file"
+
+
+def _captured_attestations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, corpus_changed: bool
+) -> tuple[list[dict], list[list[str]]]:
+    commands: list[list[str]] = []
+
+    def fake_run(*cmd: str, cwd: Path = site_inputs.ROOT) -> argparse.Namespace:
+        commands.append([str(c) for c in cmd])
+        return argparse.Namespace(returncode=0, stdout="ok", stderr="")
+
+    def fake_tree_sha(ref: str, subdir: str) -> str:
+        if subdir == "results-data" and corpus_changed:
+            return f"tree-{ref}"
+        return "tree"
+
+    monkeypatch.setattr(site_inputs, "run", fake_run)
+    monkeypatch.setattr(site_inputs, "tree_sha", fake_tree_sha)
+    bundle = tmp_path / "bundle"
+    _write(bundle / "explorer/results.duckdb", "duckdb-bytes")
+    out = tmp_path / "attestations.json"
+    site_inputs.build_attestations(out, bundle, "core", "parent")
+    return json.loads(out.read_text(encoding="utf-8")), commands
+
+
+def _command(commands: list[list[str]], script: str) -> list[str]:
+    matches = [c for c in commands if script in c]
+    assert len(matches) == 1, commands
+    return matches[0]
+
+
+def test_corpus_bijection_matches_the_deploy_gate_form(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    entries, commands = _captured_attestations(tmp_path, monkeypatch, corpus_changed=False)
+    command = _command(commands, "scripts/publication/check_corpus_bijection.py")
+    assert command[command.index("--accepted-ref") + 1] == "core"
+    assert command[command.index("--expect-source") + 1] == "core"
+    assert command[command.index("--bundles-dir") + 1] == str(site_inputs.ROOT / "results-data" / "bundles")
+    assert command[command.index("--ledger-seed") + 1] == str(site_inputs.ROOT / "publication/ledger-seed.json")
+    assert "--require-artifact" in command
+    bijection = next(e for e in entries if e["name"] == "corpus_bijection")
+    assert bijection["compared"] == {"accepted_ref": "core"}
+
+
+def test_build_refuses_missing_ledger_seed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(site_inputs, "ROOT", tmp_path)
+    with pytest.raises(RuntimeError, match="ledger seed missing"):
+        _captured_attestations(tmp_path, monkeypatch, corpus_changed=False)
+
+
+def test_verify_rejects_accepted_ref_other_than_core_sha(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, compared={"accepted_ref": "def"}) if e["name"] == "corpus_bijection" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
