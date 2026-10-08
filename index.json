@@ -15199,7 +15199,7 @@
         "pvm-d1-publication-scope-decision"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "blocked",
       "title": "Draft the blog post on Polars 2.0 performance across versions"
     },
     "pypi-environment-protection-drift-canary-20260805": {
