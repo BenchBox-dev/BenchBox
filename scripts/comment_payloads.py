@@ -982,7 +982,7 @@ UNMODELED_MARKERS = {
     "lua": re.compile(r"--"),
     "deno": re.compile(r"//|/\*"),
     "bun": re.compile(r"//|/\*"),
-    "php": re.compile(r"#|//|/\*"),
+    "php": re.compile(r"#|//|/\*|<!--"),
     "osascript": re.compile(r"--|#|\(\*|//|/\*"),
     "pwsh": re.compile(r"#|<#"),
     "powershell": re.compile(r"#|<#"),

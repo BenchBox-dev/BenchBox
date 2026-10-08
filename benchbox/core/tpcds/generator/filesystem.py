@@ -113,7 +113,7 @@ class FileArtifactMixin:
         compression = detect_compression(file_path)
         if compression == "zstd":
             return file_size > 9
-        elif compression == "gzip" or compression is not None:
+        elif compression is not None:
             return file_size > 20
         else:
             return file_size > 0

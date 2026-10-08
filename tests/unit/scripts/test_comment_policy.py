@@ -235,6 +235,43 @@ def test_policy_cannot_weaken_completed_or_external_scopes() -> None:
         check_ratchet(policy(external=[entry]), policy())
 
 
+def test_ratchet_allows_same_path_wheel_version_bump_without_expanding_exclusions() -> None:
+    base_entry = {
+        "path": "_project/scripts/vendor/todo_db-0.8.1-py3-none-any.whl",
+        "owner": "todo-db",
+        "provenance": "_project/scripts/pyproject.toml",
+    }
+    bumped_entry = {
+        "path": "_project/scripts/vendor/todo_db-0.9.1-py3-none-any.whl",
+        "owner": "todo-db",
+        "provenance": "_project/scripts/pyproject.toml",
+    }
+    check_ratchet(policy(external=[bumped_entry]), policy(external=[base_entry]))
+    with pytest.raises(ValueError, match="cannot add or expand external exclusions"):
+        check_ratchet(policy(external=[base_entry, bumped_entry]), policy(external=[base_entry]))
+    other_entry = {
+        "path": "_project/scripts/vendor/other_pkg-1.0.0-py3-none-any.whl",
+        "owner": "todo-db",
+        "provenance": "_project/scripts/pyproject.toml",
+    }
+    with pytest.raises(ValueError, match="cannot add or expand external exclusions"):
+        check_ratchet(policy(external=[other_entry]), policy(external=[base_entry]))
+    diff_dir_entry = {
+        "path": "_project/vendor/todo_db-0.9.1-py3-none-any.whl",
+        "owner": "todo-db",
+        "provenance": "_project/scripts/pyproject.toml",
+    }
+    with pytest.raises(ValueError, match="cannot add or expand external exclusions"):
+        check_ratchet(policy(external=[diff_dir_entry]), policy(external=[base_entry]))
+    diff_prov_entry = {
+        "path": "_project/scripts/vendor/todo_db-0.9.1-py3-none-any.whl",
+        "owner": "todo-db",
+        "provenance": "_project/scripts/other_pyproject.toml",
+    }
+    with pytest.raises(ValueError, match="cannot add or expand external exclusions"):
+        check_ratchet(policy(external=[diff_prov_entry]), policy(external=[base_entry]))
+
+
 def git_repo(tmp_path: Path, source: str) -> str:
     (tmp_path / "quality").mkdir()
     (tmp_path / "quality/comment-policy.json").write_text(json.dumps(policy()), encoding="utf-8")
@@ -3016,6 +3053,7 @@ def test_myst_eval_rst_content_is_scanned_like_an_rst_page() -> None:
         ("a.sh", "deno eval '// hi'\n", "bash"),
         ("a.sh", "bun -e '// hi'\n", "bash"),
         ("a.sh", "php -r '# hi'\n", "bash"),
+        ("a.sh", "php -r '?> <!-- hi -->'\n", "bash"),
         ("a.sh", "Rscript -e '# hi'\n", "bash"),
         ("a.sh", "powershell -c '# hi'\n", "bash"),
         ("a.py", 'from pathlib import Path\n(Path("d").joinpath("o.html")).write_text("<!-- hi -->")\n', "python"),
