@@ -89,6 +89,7 @@ const COMPARE_METADATA_COLUMNS = [
   "scale_factor",
   "test_type",
   "phase",
+  "stream_count",
   "primary_metric",
   "comparison_exclusion_reason",
 ];

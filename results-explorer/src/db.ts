@@ -45,7 +45,7 @@ async function createCspBoundWorker(workerPath: string): Promise<Worker> {
   return worker;
 }
 
-const EXPECTED_READ_MODEL_VERSION = 13;
+const EXPECTED_READ_MODEL_VERSION = 14;
 
 const SNAPSHOT_READY_SCANS = [
   {

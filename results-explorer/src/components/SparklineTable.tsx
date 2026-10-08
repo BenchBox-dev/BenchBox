@@ -1,7 +1,13 @@
 import type { BenchmarkSummary } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
 import { costModelDisclosure, costStatusLabel, normalizedCostValue } from "@/lib/costDisplay";
-import { isRankable, isTimingDisplayable, isValidTimingValue } from "@/lib/displayEligibility";
+import {
+  isRankable,
+  isTimingDisplayable,
+  isValidTimingValue,
+  normalizePrimaryMetric,
+  primaryMetricValue,
+} from "@/lib/displayEligibility";
 import { formatLatencyMs, formatPowerScore, formatUsd } from "@/lib/metricFormatters";
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
 
@@ -45,8 +51,11 @@ export function SparklineTable({ summary }: Props) {
   const { platforms } = summary;
   if (platforms.length === 0) return null;
 
-  const metric = summary.ranking?.primary_metric ?? "display_geomean_ms";
-  const showPower = metric === "power_score" && platforms.some((p) => isRankable(p) && p.power_score !== null);
+  const metric = normalizePrimaryMetric(summary.ranking?.primary_metric);
+  const scoreMetric = metric === "throughput_at_size" ? "throughput_at_size" : "power_score";
+  const scoreLabel = scoreMetric === "throughput_at_size" ? "Throughput@Size" : "Power@Size";
+  const showPower =
+    metric !== "display_geomean_ms" && platforms.some((p) => isRankable(p) && primaryMetricValue(p, scoreMetric) !== null);
   const showP99 = platforms.some((p) => isTimingDisplayable(p) && p.percentile_stats !== null);
   const showCost = platforms.some((p) => normalizedCostValue(p) !== null);
 
@@ -55,7 +64,10 @@ export function SparklineTable({ summary }: Props) {
     1,
   );
   const maxPower = Math.max(
-    ...platforms.map((p) => (isRankable(p) && isValidTimingValue(p.power_score) ? p.power_score : 0)),
+    ...platforms.map((p) => {
+      const value = primaryMetricValue(p, scoreMetric);
+      return isRankable(p) && isValidTimingValue(value) ? value : 0;
+    }),
     1,
   );
   const cohortLabels = formatRunIdentitiesForCohort(
@@ -78,7 +90,7 @@ export function SparklineTable({ summary }: Props) {
             </th>
             {showPower && (
               <th class="text-right px-2 py-1.5 text-[var(--bb-data-fg-muted)] font-normal whitespace-nowrap" colSpan={2}>
-                Power@Size
+                {scoreLabel}
               </th>
             )}
             {showP99 && (
@@ -96,7 +108,8 @@ export function SparklineTable({ summary }: Props) {
             const color = paletteColor(i);
             const geomeanValue =
               isTimingDisplayable(p) && isValidTimingValue(p.display_geomean_ms) ? p.display_geomean_ms : null;
-            const powerValue = isRankable(p) && isValidTimingValue(p.power_score) ? p.power_score : null;
+            const scoreValue = primaryMetricValue(p, scoreMetric);
+            const powerValue = isRankable(p) && isValidTimingValue(scoreValue) ? scoreValue : null;
             const p99Value = isTimingDisplayable(p) ? p.percentile_stats?.p99 ?? null : null;
             return (
               <tr key={p.result_id} class="border-b border-[var(--bb-data-border)] hover:bg-[var(--bb-surface-data-muted)]">

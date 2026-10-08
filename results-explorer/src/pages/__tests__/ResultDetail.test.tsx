@@ -169,7 +169,7 @@ describe("ResultDetail - median-first contract", () => {
     render(<ResultDetail resultId="r1" />);
     await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
 
-    expect(getPrimaryMetricForBenchmark).toHaveBeenCalledWith("tpch");
+    expect(getPrimaryMetricForBenchmark).toHaveBeenCalledWith("tpch", "unknown");
   });
 
   it("(c) expanding 'Individual samples' reveals raw queries table", async () => {
@@ -287,6 +287,22 @@ describe("ResultDetail - median-first contract", () => {
     expect(charts.compareDocumentPosition(receipt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(receipt).toHaveTextContent("Measurement samples");
     expect(receipt).toHaveTextContent("Download bundle");
+  });
+
+  it("shows Throughput@Size as the primary metric of a throughput result", async () => {
+    vi.mocked(getPrimaryMetricForBenchmark).mockResolvedValueOnce("throughput_at_size");
+    vi.mocked(getDetailResult).mockResolvedValue(
+      makeDetail({ power_score: null, throughput_at_size: 3741.26, stream_count: 3, test_type: "throughput" }),
+    );
+    render(<ResultDetail resultId="r1" />);
+    await waitFor(() => expect(screen.queryByText("Loading result...")).toBeNull());
+
+    const summary = screen.getByRole("region", { name: "Result summary" });
+    expect(getPrimaryMetricForBenchmark).toHaveBeenCalledWith("tpch", "throughput");
+    expect(summary).toHaveTextContent("Primary metric · higher is better");
+    expect(summary).toHaveTextContent("Throughput@Size");
+    expect(summary).toHaveTextContent("3,741");
+    expect(summary).not.toHaveTextContent("Power score");
   });
 
   it("suppresses absent primary metrics and empty timing surfaces", async () => {

@@ -5,12 +5,15 @@ import {
   compareEvidenceSummary,
   isComparable,
   isValidTimingValue,
+  primaryMetricHigherIsBetter,
+  primaryMetricLabel as labelForPrimaryMetric,
   primaryMetricValue,
   timingValueForQuery,
   validDisplayTimingValues,
+  type PrimaryMetric,
 } from "@/lib/displayEligibility";
 
-export type ComparePrimaryMetric = "power_score" | "display_geomean_ms";
+export type ComparePrimaryMetric = PrimaryMetric;
 
 export const COMPARE_TIE_THRESHOLD = 0.005;
 
@@ -84,8 +87,8 @@ export function buildCompareDecisionSummary(
   primaryMetric: ComparePrimaryMetric,
   options: CompareDecisionSummaryOptions = {},
 ): CompareDecisionSummary {
-  const higherIsBetter = primaryMetric === "power_score";
-  const primaryMetricLabel = higherIsBetter ? "Power score" : "Geomean query time";
+  const higherIsBetter = primaryMetricHigherIsBetter(primaryMetric);
+  const primaryMetricLabel = labelForPrimaryMetric(primaryMetric);
   const evidence = compareEvidenceSummary(results);
   const suppressWinnerClaims = options.suppressWinnerClaims === true || !evidence.comparable;
   const suppressionReason = options.suppressionReason ?? evidence.reason ?? null;
@@ -190,6 +193,9 @@ function buildHeadline(
   }
   if (primaryMetric === "power_score") {
     return `In these selected runs, ${winnerLabel}'s power score was ${formatRatio(comparisonRatio)} better than the lowest selected run.${caveatSuffix}`;
+  }
+  if (primaryMetric === "throughput_at_size") {
+    return `In these selected runs, ${winnerLabel}'s Throughput@Size was ${formatRatio(comparisonRatio)} better than the lowest selected run.${caveatSuffix}`;
   }
   return `In these selected runs, ${winnerLabel}'s geomean query time was ${formatRatio(comparisonRatio)} faster than the slowest selected run.${caveatSuffix}`;
 }
@@ -303,7 +309,7 @@ function buildCostSummary(
     resultId: entry.resultId,
     cost: entry.cost,
     costPerformance:
-      primaryMetric === "power_score"
+      primaryMetricHigherIsBetter(primaryMetric)
         ? entry.primaryValue / entry.cost
         : 1 / (entry.primaryValue * entry.cost),
   }));

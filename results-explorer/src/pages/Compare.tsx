@@ -11,6 +11,7 @@ import {
 } from "@/lib/duckdbQueries";
 import { errMsg, fmtGeomean } from "@/utils";
 import { canonicalBenchmarkSlug, canonicalPhase, formatBenchmarkLabel } from "@/lib/displayLabels";
+import { compareCohortSignatureForRow } from "@/lib/compareCohort";
 import { resultDetailHref, visibleResultIdForRow, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 import { CompareSummarySkeleton } from "@/components/LoadingSpinner";
@@ -59,8 +60,14 @@ import {
   resolveResultsForBasis,
   type PassSelection,
 } from "@/lib/measurementBasis";
-import { formatDurationSeconds, formatPowerScore, formatSpeedup } from "@/lib/metricFormatters";
-import { isValidTimingValue, timingValueForQuery } from "@/lib/displayEligibility";
+import { formatDurationSeconds, formatScoreMetric, formatSpeedup } from "@/lib/metricFormatters";
+import {
+  isValidTimingValue,
+  primaryMetricHigherIsBetter,
+  primaryMetricLabel,
+  primaryMetricValue,
+  timingValueForQuery,
+} from "@/lib/displayEligibility";
 import { formatWarningClassSummary, formatWarningCount } from "@/lib/copyFormatters";
 import { paletteColor } from "@/lib/chartTheme";
 import { ChartPanel } from "@/components/ChartPanel";
@@ -77,10 +84,9 @@ import {
   shouldPreserveMultiSelectionUrl,
 } from "@/lib/compareRecovery";
 
-type PrimaryMetric = "power_score" | "display_geomean_ms";
 interface CompareState {
   results: DetailResult[];
-  primaryMetric: PrimaryMetric;
+  primaryMetric: ComparePrimaryMetric;
 }
 
 const EMPTY_RESULTS: DetailResult[] = [];
@@ -319,7 +325,7 @@ export function Compare({ url }: CompareProps) {
           setCompareNotice(initialNotice);
         }
 
-        const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark);
+        const metric = await getPrimaryMetricForBenchmark(details[0]!.benchmark, canonicalPhase(details[0]!.test_type));
         if (cancelled) return;
         if (details.length === 1) {
           setShowBuilder(true);
@@ -445,15 +451,13 @@ export function Compare({ url }: CompareProps) {
   }, [resolvedResults]);
 
   const effectivePrimaryMetric: ComparePrimaryMetric =
-    primaryMetric === "power_score" && !isDefaultBasis(basis)
+    primaryMetric !== "display_geomean_ms" && !isDefaultBasis(basis)
       ? "display_geomean_ms"
       : (primaryMetric as ComparePrimaryMetric);
 
-  const higherIsBetter = effectivePrimaryMetric === "power_score";
+  const higherIsBetter = primaryMetricHigherIsBetter(effectivePrimaryMetric);
 
-  const primaries: (number | null)[] = resolvedResults.map((r) =>
-    effectivePrimaryMetric === "power_score" ? r.power_score : r.display_geomean_ms,
-  );
+  const primaries: (number | null)[] = resolvedResults.map((r) => primaryMetricValue(r, effectivePrimaryMetric));
   const summaryRunLabels: Record<string, string> = (() => {
     const labels = formatRunIdentitiesForCohort(
       results.map((r) => ({
@@ -516,7 +520,7 @@ export function Compare({ url }: CompareProps) {
     tuningValidationStatus: r.tuning_validation_status,
     executionMode: r.execution_mode,
     testType: r.test_type,
-    powerScore: r.power_score,
+    primaryScore: primaryMetricValue(r, effectivePrimaryMetric),
     displayGeomeanMs: r.display_geomean_ms,
     totalDurationS: r.total_duration_s,
     driverVersion: r.driver_version,
@@ -710,17 +714,17 @@ export function Compare({ url }: CompareProps) {
               <dl class="space-y-1 text-sm">
                 <div class="flex justify-between">
                   <dt class="text-[var(--bb-data-fg-muted)]">
-                    {effectivePrimaryMetric === "power_score" ? "Power score" : "Geomean query time"}
+                    {primaryMetricLabel(effectivePrimaryMetric)}
                   </dt>
                   <dd class="font-mono font-medium">
-                    {effectivePrimaryMetric === "power_score"
-                      ? r.powerScore !== null
-                        ? formatPowerScore(r.powerScore).valueText
+                    {effectivePrimaryMetric !== "display_geomean_ms"
+                      ? r.primaryScore !== null
+                        ? formatScoreMetric(effectivePrimaryMetric, r.primaryScore)
                         : "-"
                       : fmtGeomean(r.displayGeomeanMs)}
                   </dd>
                 </div>
-                {effectivePrimaryMetric === "power_score" && (
+                {effectivePrimaryMetric !== "display_geomean_ms" && (
                   <div class="flex justify-between">
                     <dt class="text-xs text-[var(--bb-data-fg-muted)]">Geomean</dt>
                     <dd class="font-mono text-xs text-[var(--bb-data-fg-muted)]">{fmtGeomean(r.displayGeomeanMs)}</dd>
@@ -939,6 +943,9 @@ function severeCohortMismatchReason(results: DetailResult[]) {
   }
   if (new Set(results.map((result) => canonicalPhase(result.test_type))).size > 1) {
     reasons.push("phases differ");
+  }
+  if (new Set(results.map((result) => compareCohortSignatureForRow(result).streamCount)).size > 1) {
+    reasons.push("stream counts differ");
   }
   return reasons.length > 0 ? reasons.join(" and ") : null;
 }

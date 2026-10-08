@@ -25,6 +25,7 @@ from _project.scripts.explorer_pipeline.models import (
     canonical_phase,
     get_ranking_config,
     is_ranking_eligible,
+    primary_metric_value,
     ranking_exclusion_reason,
 )
 from _project.scripts.explorer_pipeline.ranking import RankedCohort, rank_platforms
@@ -237,7 +238,7 @@ def _public_bundle_data(
     return public_bundle, _public_applied_receipt(bundle_path, bundle_data, anonymizer)
 
 
-_SummaryKey = tuple[str, float, str]
+_SummaryKey = tuple[str, float, str, int | None]
 _SummaryAccum = dict[_SummaryKey, list[tuple[ManifestEntry, DetailResult]]]
 
 
@@ -259,13 +260,13 @@ def _build_short_ids(result_ids: list[str]) -> dict[str, str]:
     raise RuntimeError(f"Could not build collision-free short IDs from {len(result_ids)} result_id(s) (duplicates?)")
 
 
-def _platform_row_sort_key(benchmark: str) -> Callable[[PlatformRow], tuple[bool, float]]:
-    cfg = get_ranking_config(benchmark)
+def _platform_row_sort_key(benchmark: str, phase: str) -> Callable[[PlatformRow], tuple[bool, float]]:
+    cfg = get_ranking_config(benchmark, phase)
     desc = cfg.primary_order == "desc"
 
     def _key(row: PlatformRow) -> tuple[bool, float]:
         ineligible = not row.is_ranking_eligible
-        primary_val = getattr(row, cfg.primary_metric, None)
+        primary_val = primary_metric_value(row, cfg.primary_metric)
         if primary_val is None:
             return (ineligible, float("inf"))
         metric = -primary_val if desc else primary_val
@@ -279,8 +280,8 @@ def _build_benchmark_summaries(
     full_to_short: dict[str, str],
 ) -> list[tuple[_SummaryKey, BenchmarkSummary]]:
     summaries = []
-    for key, pairs in sorted(accum.items()):
-        benchmark, scale_factor, phase = key
+    for key, pairs in sorted(accum.items(), key=lambda item: (*item[0][:3], item[0][3] or 0)):
+        benchmark, scale_factor, phase, stream_count = key
 
         all_query_ids = sorted(
             {dt.query_id for _, detail in pairs for dt in detail.display_timings},
@@ -322,6 +323,7 @@ def _build_benchmark_summaries(
                 is_ranking_eligible=is_ranking_eligible(entry) and row_ranking_reason is None,
                 ranking_exclusion_reason=row_ranking_reason,
                 power_score=entry.power_score,
+                throughput_at_size=entry.throughput_at_size,
                 display_geomean_ms=entry.display_geomean_ms,
                 sample_geomean_ms=entry.geomean_ms,
                 cost_usd=entry.cost_usd,
@@ -332,15 +334,16 @@ def _build_benchmark_summaries(
             )
             platform_rows.append(row)
 
-        platform_rows.sort(key=_platform_row_sort_key(benchmark))
+        platform_rows.sort(key=_platform_row_sort_key(benchmark, phase))
 
         summary = BenchmarkSummary(
             benchmark=benchmark,
             scale_factor=scale_factor,
             phase=phase,
+            stream_count=stream_count,
             query_ids=all_query_ids,
             platforms=platform_rows,
-            ranking=get_ranking_config(benchmark),
+            ranking=get_ranking_config(benchmark, phase),
         )
         summaries.append((key, summary))
     return summaries
@@ -376,6 +379,22 @@ _BENCHMARK_LABELS: dict[str, str] = {
 
 def _humanize_benchmark(benchmark: str) -> str:
     return _BENCHMARK_LABELS.get(benchmark, benchmark.upper())
+
+
+def _cohort_label(benchmark: str, sf: str, phase: str, stream_count: int | None) -> str:
+    label = f"{_humanize_benchmark(benchmark)} SF{sf}"
+    if phase == "power":
+        return label
+    label = f"{label} {phase.capitalize()}"
+    if stream_count is None:
+        return label
+    noun = "stream" if stream_count == 1 else "streams"
+    return f"{label} ({stream_count} {noun})"
+
+
+def _cohort_href(benchmark: str, scale_factor: float, phase: str, stream_count: int | None) -> str:
+    href = f"/results/{benchmark}/?sf={scale_factor}&phase={phase}"
+    return href if stream_count is None else f"{href}&streams={stream_count}"
 
 
 def _rank_platforms_in_cohort(
@@ -440,10 +459,11 @@ def _build_meta_leaderboard(
     cohort_records: list[dict[str, Any]] = []
     platform_agg: dict[str, dict[str, Any]] = {}
 
-    for (benchmark, scale_factor, phase), summary, ranked in eligible:
+    for (benchmark, scale_factor, phase, stream_count), summary, ranked in eligible:
         sf = _sf_str(scale_factor)
-        cohort_key = f"{benchmark}-sf{sf}-{phase}"
-        label = f"{_humanize_benchmark(benchmark)} SF{sf}"
+        streams_suffix = "" if stream_count is None else f"-{stream_count}streams"
+        cohort_key = f"{benchmark}-sf{sf}-{phase}{streams_suffix}"
+        label = _cohort_label(benchmark, sf, phase, stream_count)
 
         platform_entries, primary_metric, higher_is_better = _rank_platforms_in_cohort(
             summary, cohort_key, full_to_short, ranked
@@ -472,8 +492,9 @@ def _build_meta_leaderboard(
                 "benchmark": benchmark,
                 "scale_factor": scale_factor,
                 "phase": phase,
+                "stream_count": stream_count,
                 "label": label,
-                "href": f"/results/{benchmark}/?sf={scale_factor}&phase={phase}",
+                "href": _cohort_href(benchmark, scale_factor, phase, stream_count),
                 "platform_count": ranked.total_ranked,
                 "primary_metric": primary_metric,
                 "primary_order": "desc" if higher_is_better else "asc",
@@ -651,7 +672,12 @@ class ExplorerPipeline:
                     manifest_entries.append(entry)
 
                     phase = canonical_phase(detail.test_type)
-                    summary_key: _SummaryKey = (canonical_benchmark_slug(entry.benchmark), entry.scale_factor, phase)
+                    summary_key: _SummaryKey = (
+                        canonical_benchmark_slug(entry.benchmark),
+                        entry.scale_factor,
+                        phase,
+                        detail.stream_count,
+                    )
                     summary_accum[summary_key].append((entry, detail))
                     details_map[entry.result_id] = detail
 

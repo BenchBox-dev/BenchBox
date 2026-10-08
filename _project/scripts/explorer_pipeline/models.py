@@ -98,6 +98,8 @@ class ManifestEntry(BaseModel):
     driver_version: str | None
     run_date: str
     power_score: float | None
+    throughput_at_size: float | None = None
+    stream_count: int | None = None
     total_duration_s: float
     geomean_ms: float | None = None
     display_geomean_ms: float | None = None
@@ -318,6 +320,8 @@ class DetailResult(BaseModel):
     geomean_ms: float | None = None
     display_geomean_ms: float | None = None
     power_score: float | None
+    throughput_at_size: float | None = None
+    stream_count: int | None = None
     has_display_timing: bool = False
     valid_query_count: int = 0
     logical_query_count: int = 0
@@ -403,8 +407,8 @@ def ranking_exclusion_reason(entry: ManifestEntry, primary_metric: str | None = 
     if entry.comparison_exclusion_reason is not None:
         return entry.comparison_exclusion_reason
 
-    metric = primary_metric or get_ranking_config(entry.benchmark).primary_metric
-    value = entry.power_score if metric == "power_score" else entry.display_geomean_ms
+    metric = primary_metric or get_ranking_config(entry.benchmark, canonical_phase(entry.test_type)).primary_metric
+    value = primary_metric_value(entry, metric)
     if value is None:
         return "missing_primary_metric"
     if not math.isfinite(float(value)) or float(value) <= 0:
@@ -475,6 +479,23 @@ RANKING_METRIC_BY_FAMILY: dict[str, RankingConfig] = {
     ),
 }
 
+THROUGHPUT_PHASE = "throughput"
+
+RANKING_METRIC_BY_FAMILY_PHASE: dict[tuple[str, str], RankingConfig] = {
+    ("tpch", THROUGHPUT_PHASE): RankingConfig(
+        primary_metric="throughput_at_size",
+        secondary_metric="display_geomean_ms",
+        primary_order="desc",
+    ),
+    ("tpcds", THROUGHPUT_PHASE): RankingConfig(
+        primary_metric="throughput_at_size",
+        secondary_metric="display_geomean_ms",
+        primary_order="desc",
+    ),
+}
+
+SCALAR_PRIMARY_METRICS: frozenset[str] = frozenset({"power_score", "throughput_at_size"})
+
 _DEFAULT_RANKING = RankingConfig(
     primary_metric="display_geomean_ms",
     secondary_metric="power_score",
@@ -482,8 +503,17 @@ _DEFAULT_RANKING = RankingConfig(
 )
 
 
-def get_ranking_config(benchmark: str) -> RankingConfig:
+def get_ranking_config(benchmark: str, phase: str | None = None) -> RankingConfig:
+    if phase is not None:
+        phase_config = RANKING_METRIC_BY_FAMILY_PHASE.get((canonical_benchmark_slug(benchmark), phase))
+        if phase_config is not None:
+            return phase_config
     return RANKING_METRIC_BY_FAMILY.get(benchmark, _DEFAULT_RANKING)
+
+
+def primary_metric_value(source: Any, metric: str) -> float | None:
+    column = metric if metric in SCALAR_PRIMARY_METRICS else "display_geomean_ms"
+    return getattr(source, column)
 
 
 class PercentileStats(BaseModel):
@@ -514,6 +544,7 @@ class PlatformRow(BaseModel):
     comparison_exclusion_reason: str | None = None
     ranking_exclusion_reason: str | None = None
     power_score: float | None
+    throughput_at_size: float | None = None
     display_geomean_ms: float | None
     sample_geomean_ms: float | None
     cost_usd: float | None
@@ -527,6 +558,7 @@ class BenchmarkSummary(BaseModel):
     benchmark: str
     scale_factor: float
     phase: str
+    stream_count: int | None = None
     query_ids: list[str]
     platforms: list[PlatformRow]
     cell_reduction: str = "median_successful_measurement_ms"
@@ -712,6 +744,7 @@ class BundleSummaryQueries(_BundleBlock):
 
 class BundleTpcMetrics(_BundleBlock):
     power_at_size: Any = None
+    throughput_at_size: Any = None
     qphh_at_size: Any = None
     qphds_at_size: Any = None
 
@@ -724,6 +757,10 @@ class BundleSummaryBlock(_BundleBlock):
 
 class BundlePhaseBlock(_BundleBlock):
     duration_ms: Any = None
+    status: Any = None
+    stream_results: Any = None
+    errors: Any = None
+    outstanding_work: Any = None
 
 
 class BundleQueryRow(_BundleBlock):
@@ -851,6 +888,9 @@ __all__ = [
     "UNOFFICIAL_COMPLIANCE_CLASSES",
     "RANKING_ELIGIBLE_VISIBILITIES",
     "RANKING_METRIC_BY_FAMILY",
+    "RANKING_METRIC_BY_FAMILY_PHASE",
+    "THROUGHPUT_PHASE",
+    "primary_metric_value",
     "TimingEligibility",
     "display_timing_is_valid",
     "get_ranking_config",

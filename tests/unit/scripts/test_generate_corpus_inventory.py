@@ -66,6 +66,7 @@ class TestGenerateInventory:
             "by_platform": {},
             "by_trust_label": {},
             "by_funding": {},
+            "by_phase": {},
         }
 
     def test_sidecar_sets_community_trust_label(self, tmp_path: Path) -> None:
@@ -317,3 +318,34 @@ class TestMain:
 
         assert inventory["cohorts"]["tpch@sf1.0"] == ["DuckDB v1.0.0"]
         assert inventory["cohorts"]["tpch@sf1.0#throughput"] == ["DataFusion v1.0.0"]
+
+    def test_phase_is_recorded_per_bundle_and_summarised(self, tmp_path: Path) -> None:
+        power = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="DuckDB")
+        (tmp_path / "power.json").write_text(json.dumps(power), encoding="utf-8")
+        standard = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="Spark")
+        standard["benchmark"]["test_type"] = "Standard"
+        (tmp_path / "standard.json").write_text(json.dumps(standard), encoding="utf-8")
+        throughput = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="Doris")
+        throughput["benchmark"]["test_type"] = "throughput"
+        throughput["phases"] = {"throughput_test": {"status": "COMPLETED", "stream_results": [{}, {}, {}]}}
+        (tmp_path / "throughput.json").write_text(json.dumps(throughput), encoding="utf-8")
+        inferred = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="Polars")
+        del inferred["benchmark"]["test_type"]
+        inferred["phases"] = {"power_test": {"status": "NOT_RUN"}, "throughput_test": {"status": "COMPLETED"}}
+        (tmp_path / "inferred.json").write_text(json.dumps(inferred), encoding="utf-8")
+        undeclared = _minimal_bundle(benchmark_id="tpch", scale_factor=1.0, platform="SQLite")
+        undeclared["benchmark"]["test_type"] = None
+        (tmp_path / "undeclared.json").write_text(json.dumps(undeclared), encoding="utf-8")
+
+        inventory = script.generate_inventory(tmp_path)
+
+        phases = {entry["file"]: entry["phase"] for entry in inventory["bundles"]}
+        assert phases == {
+            "power.json": "power",
+            "standard.json": "power",
+            "throughput.json": "throughput",
+            "inferred.json": "throughput",
+            "undeclared.json": "unknown",
+        }
+        assert inventory["summary"]["by_phase"] == {"power": 2, "throughput": 2, "unknown": 1}
+        assert inventory["cohorts"]["tpch@sf1.0#throughput#3streams"] == ["Doris v1.0.0"]

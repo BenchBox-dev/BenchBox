@@ -1,3 +1,4 @@
+import { canonicalPhase } from "@/lib/displayLabels";
 import type {
   BenchmarkSummary,
   DetailResult,
@@ -9,7 +10,7 @@ import type {
 
 export type EligibilityRow = DetailResult | PlatformRow | MetaCohortPlatform;
 export type PrimaryMetricRow = DetailResult | PlatformRow;
-export type PrimaryMetric = "power_score" | "display_geomean_ms";
+export type PrimaryMetric = "power_score" | "throughput_at_size" | "display_geomean_ms";
 export type ChartDatasetEligibilityClass =
   | "display_safe"
   | "rank_safe"
@@ -201,8 +202,44 @@ export function summarizeChartDatasetExclusions(
     .sort((a, b) => b.count - a.count || a.reason.localeCompare(b.reason));
 }
 
+export function normalizePrimaryMetric(metric: string | null | undefined): PrimaryMetric {
+  if (metric === "power_score" || metric === "throughput_at_size") return metric;
+  return "display_geomean_ms";
+}
+
+export function primaryMetricHigherIsBetter(metric: PrimaryMetric): boolean {
+  return metric !== "display_geomean_ms";
+}
+
+export function primaryMetricLabel(metric: PrimaryMetric): string {
+  switch (metric) {
+    case "power_score":
+      return "Power score";
+    case "throughput_at_size":
+      return "Throughput@Size";
+    case "display_geomean_ms":
+      return "Geomean query time";
+  }
+}
+
+export function phaseScoreValue(row: {
+  test_type?: string | null;
+  phase?: string | null;
+  power_score: number | null;
+  throughput_at_size?: number | null;
+}): number | null {
+  return canonicalPhase(row.phase ?? row.test_type) === "throughput" ? (row.throughput_at_size ?? null) : row.power_score;
+}
+
 export function primaryMetricValue(row: PrimaryMetricRow, metric: PrimaryMetric): number | null {
-  return metric === "power_score" ? row.power_score : row.display_geomean_ms;
+  switch (metric) {
+    case "power_score":
+      return row.power_score;
+    case "throughput_at_size":
+      return row.throughput_at_size ?? null;
+    case "display_geomean_ms":
+      return row.display_geomean_ms;
+  }
 }
 
 export function validPrimaryMetricValue(row: PrimaryMetricRow, metric: PrimaryMetric): number | null {

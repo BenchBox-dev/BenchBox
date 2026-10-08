@@ -111,7 +111,7 @@ def test_mismatched_query_sets_are_not_ranked(tmp_path: Path) -> None:
         pairs.append((entry, transformer.to_detail_result(path, entry.result_id)))
     full_to_short = {entry.result_id: entry.result_id[-8:] for entry, _ in pairs}
 
-    summaries = _build_benchmark_summaries({("tpchavoc", 0.01, "power"): pairs}, full_to_short)
+    summaries = _build_benchmark_summaries({("tpchavoc", 0.01, "power", None): pairs}, full_to_short)
 
     rows = summaries[0][1].platforms
     assert {len({query_id for query_id, value in row.timings.items() if value is not None}) for row in rows} == {
@@ -158,7 +158,7 @@ def test_non_rankable_query_gap_does_not_exclude_rankable_peers(tmp_path: Path) 
     pairs = [(entry, detail), (peer_entry, peer_detail), (incomplete_entry, incomplete_detail)]
 
     summaries = _build_benchmark_summaries(
-        {("tpchavoc", 0.01, "power"): pairs},
+        {("tpchavoc", 0.01, "power", None): pairs},
         {candidate.result_id: candidate.result_id[-8:] for candidate, _ in pairs},
     )
 
@@ -188,7 +188,7 @@ def test_known_defective_entry_does_not_vote_in_canonical_query_set(tmp_path: Pa
     pairs = [(entry, detail), (defective_entry, defective_detail)]
 
     summaries = _build_benchmark_summaries(
-        {("tpchavoc", 0.01, "power"): pairs},
+        {("tpchavoc", 0.01, "power", None): pairs},
         {candidate.result_id: candidate.result_id[-8:] for candidate, _ in pairs},
     )
 
@@ -213,7 +213,7 @@ def test_partial_query_set_does_not_poison_complete_majority(tmp_path: Path) -> 
 
     summaries = _build_benchmark_summaries(
         {
-            ("tpchavoc", 0.01, "power"): [
+            ("tpchavoc", 0.01, "power", None): [
                 (entry, detail),
                 (peer_entry, peer_detail),
                 (partial_entry, partial_detail),

@@ -35,6 +35,8 @@ KNOWN_LOGICAL_QUERY_COUNTS = {
 CANONICAL_TUNING_MODES = frozenset({"tuned", "tuned-fallback", "notuning", "auto", "custom"})
 APPLIED_TUNING_STATUSES = frozenset({"applied_unverified", "applied_verified"})
 POWER_SCORE_BENCHMARKS = frozenset({"tpch", "tpcds"})
+THROUGHPUT_SCORE_BENCHMARKS = frozenset({"tpch", "tpcds"})
+THROUGHPUT_PHASE = "throughput"
 UTC = _dt.timezone.utc
 DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 TIMESTAMP_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$")
@@ -311,24 +313,51 @@ def _tuning_applied(payload: dict) -> bool:
     return bool(status) and str(status) in APPLIED_TUNING_STATUSES
 
 
-def _power_score(payload: dict) -> float | None:
+def _tpc_metric(payload: dict, name: str) -> float | None:
     metrics = _mapping(_mapping(payload.get("summary")).get("tpc_metrics"))
-    value = metrics.get("power_at_size")
-    if value is not None:
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
-    return None
+    value = metrics.get(name)
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _power_score(payload: dict) -> float | None:
+    return _tpc_metric(payload, "power_at_size")
+
+
+def _throughput_phase_clean(payload: dict) -> bool:
+    block = _mapping(_mapping(payload.get("phases")).get("throughput_test"))
+    if str(block.get("status") or "").upper() != "COMPLETED":
+        return False
+    streams = block.get("stream_results")
+    if not isinstance(streams, list) or not streams:
+        return False
+    if not all(isinstance(stream, dict) and stream.get("success") is True for stream in streams):
+        return False
+    return not block.get("errors") and not block.get("outstanding_work")
+
+
+def _throughput_score(payload: dict) -> float | None:
+    if not _throughput_phase_clean(payload):
+        return None
+    return _tpc_metric(payload, "throughput_at_size")
+
+
+def _primary_metric_value(payload: dict, display: list[tuple[str, float | None, int]]) -> float | None:
+    benchmark_id = str(_mapping(payload.get("benchmark")).get("id", "unknown"))
+    if bundle_phase(payload) == THROUGHPUT_PHASE and benchmark_id in THROUGHPUT_SCORE_BENCHMARKS:
+        return _throughput_score(payload)
+    if benchmark_id in POWER_SCORE_BENCHMARKS:
+        return _power_score(payload)
+    values = [value for _, value, _ in display if value is not None and value > 0]
+    return math.exp(sum(math.log(item) for item in values) / len(values)) if values else None
 
 
 def _primary_metric_reason(payload: dict, display: list[tuple[str, float | None, int]]) -> str | None:
-    benchmark_id = str(_mapping(payload.get("benchmark")).get("id", "unknown"))
-    if benchmark_id in POWER_SCORE_BENCHMARKS:
-        value = _power_score(payload)
-    else:
-        values = [value for _, value, _ in display if value is not None and value > 0]
-        value = math.exp(sum(math.log(item) for item in values) / len(values)) if values else None
+    value = _primary_metric_value(payload, display)
     if value is None:
         return "missing_primary_metric"
     if not math.isfinite(float(value)) or float(value) <= 0:

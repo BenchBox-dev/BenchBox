@@ -20,7 +20,19 @@ import { MethodologyDisclosure } from "@/components/MethodologyDisclosure";
 import { RunReceipt, planDownloadUrl } from "@/components/RunReceipt";
 import { ChartPanel } from "@/components/ChartPanel";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
-import { formatEnumLabel, formatTrustLabel, formatValidationStatus, parseOverrideRules } from "@/lib/displayLabels";
+import {
+  canonicalPhase,
+  formatEnumLabel,
+  formatTrustLabel,
+  formatValidationStatus,
+  parseOverrideRules,
+} from "@/lib/displayLabels";
+import {
+  primaryMetricHigherIsBetter,
+  primaryMetricLabel,
+  primaryMetricValue,
+  type PrimaryMetric,
+} from "@/lib/displayEligibility";
 import { formatDurationSeconds, formatLatencyMs } from "@/lib/metricFormatters";
 import { visibleResultIdForRow } from "@/lib/resultLinks";
 import { RunDateChip } from "@/components/RunAge";
@@ -37,7 +49,6 @@ const PASS_STRIP_DETAIL_LIMIT = 200;
 
 type MedianSortKey = "query_id" | "display_ms" | "sample_count";
 type RawSortKey = "query_id" | "duration_ms" | "status";
-type PrimaryMetric = "power_score" | "display_geomean_ms";
 type SortAriaValue = "ascending" | "descending" | "none";
 interface DetailState {
   detail: DetailResult;
@@ -112,7 +123,7 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
           setError(`No result found for "${resultId}".`);
           return;
         }
-        const metric = await getPrimaryMetricForBenchmark(data.benchmark);
+        const metric = await getPrimaryMetricForBenchmark(data.benchmark, canonicalPhase(data.test_type));
         if (cancelled) return;
         setDetailState({ detail: data, primaryMetric: metric });
       })
@@ -250,14 +261,13 @@ export function ResultDetail({ resultId = "", source = "public" }: ResultDetailP
   const plansUrl = planDownloadUrl(detail);
   const hasTimings = detail.display_timings.length > 0 || detail.queries.length > 0;
   const withinRunBases = selectComparableBasisPair(detail.queries, detail.display_timings);
-  const hasPrimaryMetric = primaryMetric === "power_score"
-    ? detail.power_score !== null && detail.power_score !== undefined
-    : detail.display_geomean_ms !== null && detail.display_geomean_ms !== undefined;
-  const primaryMetricDirection = primaryMetric === "power_score" ? "higher is better" : "lower is better";
-  const primaryMetricName = primaryMetric === "power_score" ? "Power score" : "Geomean query time";
+  const primaryMetricRaw = primaryMetricValue(detail, primaryMetric);
+  const hasPrimaryMetric = primaryMetricRaw !== null && primaryMetricRaw !== undefined;
+  const primaryMetricDirection = primaryMetricHigherIsBetter(primaryMetric) ? "higher is better" : "lower is better";
+  const primaryMetricName = primaryMetricLabel(primaryMetric);
   const primaryMetricExactTitle =
-    primaryMetric === "power_score" && detail.power_score !== null && detail.power_score !== undefined
-      ? `Exact power score: ${fmtScoreExact(detail.power_score)}`
+    primaryMetric !== "display_geomean_ms" && hasPrimaryMetric
+      ? `Exact ${primaryMetricName.toLowerCase()}: ${fmtScoreExact(primaryMetricRaw)}`
       : undefined;
 
   return (
@@ -612,8 +622,8 @@ function ResultMetricCard({
 }
 
 function formatPrimaryMetric(detail: DetailResult, primaryMetric: PrimaryMetric) {
-  if (primaryMetric === "power_score") return fmtScoreCompact(detail.power_score);
-  return fmtGeomean(detail.display_geomean_ms);
+  if (primaryMetric === "display_geomean_ms") return fmtGeomean(detail.display_geomean_ms);
+  return fmtScoreCompact(primaryMetricValue(detail, primaryMetric));
 }
 
 function isPassingValidationStatus(status: string | null | undefined): boolean {

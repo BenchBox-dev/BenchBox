@@ -26,7 +26,7 @@ from _project.scripts.explorer_pipeline.transformer import normalize_cpu_family
 
 logger = logging.getLogger(__name__)
 
-_SummaryKey = tuple[str, float, str]
+_SummaryKey = tuple[str, float, str, int | None]
 
 _COHORT_PLATFORM_REQUIRED_KEYS = frozenset({"platform_id", "platform", "result_id", "short_id", "trust_label"})
 
@@ -171,6 +171,8 @@ class DuckDBSnapshotBuilder:
         *_ENVIRONMENT_FACET_COLUMNS,
         *_LEGACY_COST_DEPLOYMENT_COLUMNS,
         ("benchmark_support_status", "VARCHAR"),
+        ("throughput_at_size", "DOUBLE"),
+        ("stream_count", "INTEGER"),
     ]
 
     def build(self, entries: list[ManifestEntry], output_path: Path) -> None:
@@ -387,7 +389,9 @@ class DuckDBSnapshotBuilder:
                 bundle_download_url  VARCHAR  NOT NULL,
                 physical_mechanisms   VARCHAR,
                 physical_rendering_id VARCHAR,
-                benchmark_support_status VARCHAR
+                benchmark_support_status VARCHAR,
+                throughput_at_size   DOUBLE,
+                stream_count         INTEGER
             )
         """)
         con.execute("""
@@ -457,6 +461,8 @@ class DuckDBSnapshotBuilder:
                 r.physical_mechanisms,
                 r.physical_rendering_id,
                 r.benchmark_support_status,
+                r.throughput_at_size,
+                r.stream_count,
                 e.os,
                 e.arch,
                 e.cpu_count,
@@ -507,6 +513,7 @@ class DuckDBSnapshotBuilder:
                 display_ms   DOUBLE,
                 is_valid_display_timing BOOLEAN NOT NULL,
                 timing_exclusion_reason VARCHAR,
+                stream_count INTEGER,
                 PRIMARY KEY (benchmark, scale_factor, phase, result_id, query_id)
             )
         """)
@@ -552,6 +559,8 @@ class DuckDBSnapshotBuilder:
                 percentile_p99               DOUBLE,
                 speedup_vs_best              DOUBLE,
                 speedup_vs_slowest_in_cohort DOUBLE,
+                throughput_at_size           DOUBLE,
+                stream_count                 INTEGER,
                 PRIMARY KEY (benchmark, scale_factor, phase, result_id)
             )
         """)
@@ -634,6 +643,7 @@ class DuckDBSnapshotBuilder:
                 rank             INTEGER,
                 metric_value     DOUBLE,
                 speedup_vs_best  DOUBLE,
+                stream_count     INTEGER,
                 PRIMARY KEY (cohort_key, result_id)
             )
         """)
@@ -808,6 +818,8 @@ class DuckDBSnapshotBuilder:
                     physical_mechanisms,
                     physical_rendering_id,
                     entry.benchmark_support_status,
+                    entry.throughput_at_size,
+                    entry.stream_count,
                 )
             )
         if rows:
@@ -906,7 +918,7 @@ class DuckDBSnapshotBuilder:
         summaries: list[tuple[_SummaryKey, BenchmarkSummary]],
     ) -> None:
         rows: list[tuple] = []
-        for (benchmark, scale_factor, phase), summary in summaries:
+        for (benchmark, scale_factor, phase, stream_count), summary in summaries:
             for platform_row in summary.platforms:
                 for query_id, display_ms in platform_row.timings.items():
                     rows.append(
@@ -920,10 +932,11 @@ class DuckDBSnapshotBuilder:
                             display_ms,
                             display_timing_is_valid(display_ms),
                             timing_exclusion_reason(display_ms),
+                            stream_count,
                         )
                     )
         if rows:
-            con.executemany("INSERT INTO benchmark_matrix_cells VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+            con.executemany("INSERT INTO benchmark_matrix_cells VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
 
     def _populate_benchmark_rankings(
         self,
@@ -933,7 +946,7 @@ class DuckDBSnapshotBuilder:
         entries_by_result: dict[str, ManifestEntry],
     ) -> None:
         rows: list[tuple] = []
-        for (benchmark, scale_factor, phase), summary in summaries:
+        for (benchmark, scale_factor, phase, stream_count), summary in summaries:
             ranked = rank_platforms(summary)
 
             for ranked_row in ranked.rows:
@@ -989,6 +1002,8 @@ class DuckDBSnapshotBuilder:
                         ps.p99 if ps else None,
                         ranked_row.speedup_vs_best,
                         ranked_row.speedup_vs_slowest,
+                        platform_row.throughput_at_size,
+                        stream_count,
                     )
                 )
         if rows:
@@ -1037,6 +1052,7 @@ class DuckDBSnapshotBuilder:
             )
             primary_metric = cohort["primary_metric"]
             primary_order = cohort["primary_order"]
+            stream_count = cohort.get("stream_count")
             for p in cohort.get("platforms", []):
                 timing_contract, row_ranking_reason, ranked_count, cohort_reason = ranking_context_by_result.get(
                     p["result_id"],
@@ -1091,6 +1107,7 @@ class DuckDBSnapshotBuilder:
                         p.get("rank"),
                         p.get("metric_value"),
                         p.get("speedup_vs_best"),
+                        stream_count,
                     )
                 )
 
@@ -1153,6 +1170,8 @@ class DuckDBSnapshotBuilder:
             *_environment_facet_column_values(entry),
             *_legacy_cost_deployment_column_values(entry),
             entry.benchmark_support_status,
+            entry.throughput_at_size,
+            entry.stream_count,
         )
 
 

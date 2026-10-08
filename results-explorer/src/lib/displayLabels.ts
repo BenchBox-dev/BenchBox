@@ -214,6 +214,11 @@ export function canonicalPhase(raw: string | null | undefined): string {
   return normalized === "standard" ? "power" : normalized;
 }
 
+export function formatPhaseWithStreams(phase: string, streamCount: number | null | undefined): string {
+  if (streamCount === null || streamCount === undefined) return phase;
+  return `${phase} (${streamCount} ${streamCount === 1 ? "stream" : "streams"})`;
+}
+
 export function formatBenchmarkLabel(slug: string): string {
   if (slug === "star_schema") return "SSB (historical source)";
   return humanizeBenchmark(slug);
