@@ -13491,6 +13491,13 @@
       "status": "done",
       "title": "Decide the next version and complete a verified BenchBox package release"
     },
+    "nightly-liveness-diagnose-harden-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Find why scheduled-workflow-liveness reports stale runs, harden its lookup, then lift the quarantine"
+    },
     "nightly-macos-dataframe-insufficient-memory-flake": {
       "claim": null,
       "needs": [],

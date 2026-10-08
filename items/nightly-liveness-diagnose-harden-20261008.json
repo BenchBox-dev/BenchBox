@@ -1,0 +1,24 @@
+{
+  "acceptance": [
+    "On a flagged workflow the job log shows the newest 10 scheduled runs with timestamps and status",
+    "The lookup no longer depends on the order of a one-row page, and a unit or fixture test covers a stale first row and a truly dead workflow",
+    "The cause of the earlier false alarms is recorded on issue #2570 with evidence from a failing night, or recorded as not reproduced",
+    "continue-on-error and the '(quarantine #2570)' name are removed only after seven consecutive nightlies pass, judged by step results",
+    "publication-canaries.yml's missing recent scheduled run is explained or fixed"
+  ],
+  "context": "Job conclusion is not evidence while continue-on-error is set. The job showed success with no failed steps on the 2026-10-08 nightly. nightly-v2.yml has no liveness job.",
+  "description": "The liveness job in .github/workflows/nightly.yml (about line 687) queries `runs?per_page=1&event=schedule` and reads runs[0]. It failed on 9 of 11 nightlies in late September and early October, each time naming a different workflow, although the reporter later listed daily scheduled runs for those workflows. The cause is not established: a stale first row from the API, and a real gap in scheduled runs that later caught up, both fit. A check on 2026-10-08 found per_page=1 and the newest of 20 rows agree for five workflows, so the stale row did not reproduce. Do not change the query on the assumption that it is the cause. First make the job print, for any workflow it flags, the newest 10 runs with id, created_at, run_started_at and status. Then harden the lookup (query with a `created=>=` bound of the cadence window plus a page of rows, and choose the newest by created_at) and keep failing for a workflow that has truly stopped. publication-canaries.yml had its latest scheduled run on 2026-10-04, so check its cadence in case that one is a real lapse.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2570"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-08T23:55:06Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "5e87c3fb49a044c7ad4141bb1f51fee1",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}
