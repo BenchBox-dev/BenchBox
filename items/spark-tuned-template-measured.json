@@ -6,7 +6,7 @@
     "OBT claims, if any, come from the real rendered query set.",
     "Template discovery tests pass for spark."
   ],
-  "context": "Origin: user-approved 2026-09-30; Opus finding C1. Requires live Spark and cannot be completed in a sandbox without it. Local PySpark 4.2.0 fails to start on this machine's JDK (ClassNotFoundException jdk.internal.ref.Cleaner), so use a supported JDK or a remote cluster.",
+  "context": "Origin: user-approved 2026-09-30; Opus finding C1. Requires live Spark and cannot be completed in a sandbox without it. Local PySpark 4.2.0 fails to start on this machine's JDK (ClassNotFoundException jdk.internal.ref.Cleaner), so use a supported JDK or a remote cluster. 2026-10-08: now waits for tuning-evidence-benefit-rule-20261008, so that 'a measurable, explainable effect' is judged by the same benefit rule as every other platform: harness-grade interleaved rounds, CIs from A/A noise, failures counted and load time reported.",
   "description": "Today `--tuning tuned` on Spark resolves to TuningSource.FALLBACK (benchbox/cli/tuning_resolver.py ~L454) and runs identically to notuning. Add curated templates (benchbox/core/tuning/templates/spark/ and examples/tunings/spark/, per-benchmark such as tpch_tuned.yaml and tpcds_tuned.yaml, following the databricks/duckdb layout) so `tuned` means something.\n\nConstraint from review: a template whose values already hold in a notuning run changes nothing and would be relabelled `tuned` (ADR-002). Every key in a shipped template must differ from the effective baseline established by spark-baseline-no-default-overrides and be confirmed by the preflight capture. Candidates (not decisions): shuffle partitions sized to scale factor, AQE coalesce/skew settings, broadcast threshold, CBO and join reorder (now tuned-only), codegen limits.\n\nMeasurement:\n- Run on live Spark; record baseline vs tuned for TPC-H and TPC-DS at stated scale factors and Spark version. A template ships only if it demonstrates a measurable, explainable effect.\n- OBT (TPC-DS One Big Table): prior probes used a synthetic 518-column table, not the real rendered queries. Do not cite them as OBT validation. Verified facts only: the OBT schema has 518 full / 424 minimal columns; the widest rendered projection is Q66 at 44 columns (sqlglot count over 89 queries). Test the actual rendered OBT queries and plans before making any codegen.maxFields or similar claim.\n- Decide platform-wide vs benchmark-specific templates from the results (both layouts exist for other platforms).",
   "links": [
     "item:spark-baseline-no-default-overrides",
@@ -38,6 +38,14 @@
       "op": "update",
       "op_id": "89c4c3477b45454dbf1e4daf595b369d",
       "session_id": "796d606672604f3d869b9c79926d482c"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:40:22Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "9f84147df123474fb18ad9c692696b05",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
 }

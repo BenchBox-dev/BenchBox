@@ -20000,7 +20000,8 @@
         "spark-effective-config-preflight-capture",
         "spark-tuning-discovery-cli",
         "tuning-ledger-capture-non-dbapi-drivers-20261001",
-        "tuning-requested-vs-rendered-reconciliation-20261001"
+        "tuning-requested-vs-rendered-reconciliation-20261001",
+        "tuning-evidence-benefit-rule-20261008"
       ],
       "priority": "medium",
       "status": "open",
