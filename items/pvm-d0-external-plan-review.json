@@ -6,7 +6,7 @@
     "Reviewers ran read-only: codex with --sandbox read-only; agy in a detached worktree created at the reviewed revision and removed afterwards; git status in the main checkout is unchanged",
     "The user's explicit approval to begin implementation (pvm-s0a onward) is recorded in context with date and wording; reviewing or creating items does not count as approval"
   ],
-  "context": "2026-10-07: codex usage limit resets 18:17 local time; agy quota reset roughly 2 hours after 15:40 local. Review packet format: role (findings only), goal, output contract (ID, severity, target, finding, evidence, recommended change; at most 15; ends \"No further findings.\").",
+  "context": "2026-10-07 (resumed batch session): both reviewers ran to completion against the revision-3 item set — codex gpt-6.1-sol (-c model_reasoning_effort=medium, --sandbox read-only) and agy gemini-3.8-flash-high (--mode plan, evidence inline). Both ran in a detached worktree ../BenchBox.wt-pvm-review at origin/develop 8c5104f4d, removed afterwards; main checkout git status unchanged (clean). No waiver needed.\nFacts verified before ruling (throwaway venvs outside repo): 1.0.0 collect has no engine param and silently ignores engine=; 1.12/1.22 reject in-memory/streaming; 1.31+ accept; 2.0 removes scan_csv missing_utf8_is_empty_string and reader rechunk=; empty_string_is_null exists only from 1.44.x; pl.Config.set_engine_affinity exists 1.31+.\nRulings (30 findings; full table in _project/handoffs/polars-version-matrix-d0-rulings-20261007.md, local-only): codex C1 accept, C2 partly, C3 accept, C4 partly, C5-C14 accept, C15 rebut (packet wording; handoff D4/D5 consistent). agy A1 accept, A2 accept, A3 partly, A4 accept, A5 accept, A6 accept, A7 partly, A8 partly, A9 accept, A10 rebut, A11 accept, A12 partly, A13 rebut, A14 rebut, A15 accept.\nAccepted findings applied with update_item to: pvm-s0a-polars2-compat-fixes, pvm-s0b-polars-engine-option, pvm-s3a-generalize-matrix-tooling, pvm-s1-version-correctness-probe, pvm-s2-sf10-memory-time-probe, pvm-s3b-polars-matrix-spec, pvm-s4-run-polars-matrix, pvm-s5-analyze-polars-matrix.\nDeferred scope-widening follow-up (not implemented, per handoff D0): SF10 value-level result comparison against a SQL reference (C2).\nAPPROVAL to begin implementation (pvm-s0a onward), 2026-10-07, user: \"write a handoff that instructs a new agent session to fully complete the new todos as a batch ... address all decisions required here ... so the agent can complete the implementation without stopping for clarifications\"; the session goal set by the user on 2026-10-07: \"complete the work defined in _project/handoffs/polars-version-matrix-batch-20261007.md\".",
   "description": "Decision gate before any implementation of the Polars version matrix. The plan (umbrella item pvm-polars-2-version-matrix) has had one complete external review (muse-spark-1.3) and one partial one: codex (gpt-6.1-sol) hit its usage limit after raising two leads, and agy (gemini-3.8-flash) never ran because of quota. Both leads were verified and are already in the plan (DataFrame validation cannot return a clean pass outside TPC-H SF1; Polars scalar() collects bypass the engine setting).\n\nWork: re-run codex (gpt-6.1-sol, medium effort, read-only sandbox) and agy (gemini-3.8-flash-high, plan mode, detached worktree, evidence inline because headless agy cannot run tools) against the current item set. Rule on every finding (accept / partly accept / rebut, with file:line evidence). Apply accepted findings with update_item to the affected pvm-* items.\n\nDecision gate: the user decides whether to wait for these reviews or to waive them. A waiver must be recorded in context with the date and the user's words.",
   "links": [
     "/Users/joe/.claude/skills/shared-agent-execution/references/external-harnesses.md",
@@ -37,6 +37,14 @@
       "generation": "fdd5c7b4da214a75b2dc329a156207ae",
       "op": "take",
       "op_id": "c267ecae2ab54bcd96bd4124f58b9d76",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-08T03:30:15Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "4a7b2557a0384fae99a68b3db11a81f4",
       "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
     }
   ]
