@@ -15189,7 +15189,7 @@
         "pvm-d0-external-plan-review"
       ],
       "priority": "medium-high",
-      "status": "blocked",
+      "status": "open",
       "title": "Generalize the DuckDB version-matrix runner and analyzer into engine-neutral tools without changing DuckDB output"
     },
     "pvm-s3b-polars-matrix-spec": {

@@ -5,7 +5,7 @@
     "Existing tests in tests/unit/scripts/test_duckdb_version_matrix.py pass unchanged, or each changed assertion is justified in the PR body",
     "Docs that name the old scripts are updated or still accurate"
   ],
-  "context": "2026-10-08 progress: PR #2772 (branch chore/engine-neutral-version-matrix, worktree ../BenchBox.wt-version-matrix, head b6fc325af). Evidence: golden dry-run fixture (tests/fixtures/version_matrix/duckdb_dry_run.txt, captured from the pre-change script at 8c5104f4d; behaviour identical to d076a974d) matches through both entry points — 123 commands (116 runs + 7 installs). Re-analysis of ~/Developer/benchmark_runs/duckdb-version-matrix-20260829-sf10-v2/matrix-manifest.json with --output-dir: analysis JSON and CSV byte-identical to archived; median bundles byte-identical to the pre-change analyzer's output from the same manifest (archived bundles predate the analyzer merged in #1946 — explained in PR). Existing test assertions kept; calls take the spec. make pr-preflight passed; tests/unit/scripts + tests/system (5138) pass.\nBLOCKER: same develop-wide comment-policy failure as pvm-s0a (required `tooling` context). Resume: once develop is fixed, rebase, confirm CI, make pr-arm, verify merge, finish.",
+  "context": "2026-10-08 progress: PR #2772 (branch chore/engine-neutral-version-matrix). Evidence: golden dry-run fixture (tests/fixtures/version_matrix/duckdb_dry_run.txt, captured from the pre-change script at 8c5104f4d; behaviour identical to d076a974d) matches through both entry points — 123 commands (116 runs + 7 installs). Re-analysis of ~/Developer/benchmark_runs/duckdb-version-matrix-20260829-sf10-v2/matrix-manifest.json with --output-dir: analysis JSON and CSV byte-identical to archived; median bundles byte-identical to the pre-change analyzer's output from the same manifest (archived bundles predate the analyzer merged in #1946 — explained in PR). Existing test assertions kept; calls take the spec. make pr-preflight passed; tests/unit/scripts + tests/system (5138) pass.\n2026-10-08 DONE: develop-wide comment-policy blocker cleared by #2773 (e4d99040f, other agent). #2772 updated to develop (merge head 86d755306), oracle-review passed without a stand-in, all required checks green; squash-merged as 82e521614 on develop. Worktree ../BenchBox.wt-version-matrix removed after merge.",
   "description": "scripts/run_duckdb_version_matrix.py and scripts/analyze_duckdb_version_matrix.py hard-code DuckDB versions, benchmarks, database clearing and the pre-release rule. A second engine needs the same machinery, so extend rather than copy: move the engine-specific parts into a per-engine spec (platform, versions, benchmarks with scale factors, per-cell setup and cleanup, pre-release handling, required validation status), and keep DuckDB as one spec.\n\nGuardrails:\n- DuckDB reproducibility is the blocking test: for the DuckDB spec, the new runner's --dry-run must emit exactly the same 116 commands, in the same order, as today's script at HEAD d076a974d.\n- The analyzer must give identical analysis JSON and CSV, and identical median bundles, when run on the archived DuckDB manifest at ~/Developer/benchmark_runs/duckdb-version-matrix-20260829-sf10-v2/matrix-manifest.json.\n- Keep the old script paths working (as thin wrappers or documented replacements), and update every reference to them: results-data/SEED_CORPUS_SPEC.md, results-data/CORPUS_NOTES.md, and tests/unit/scripts/test_duckdb_version_matrix.py.\n- No Polars-specific behaviour in this item; that belongs to pvm-s3b.",
   "links": [
     "scripts/run_duckdb_version_matrix.py",
@@ -64,6 +64,14 @@
       "op": "update",
       "op_id": "e62fe20677bb481793391290a5b37a7d",
       "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T15:36:16Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "5896e621b4b743388b6adf823447fa50",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
     }
   ]
 }
