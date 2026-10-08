@@ -829,9 +829,6 @@ SPECS: dict[str, Spec] = {
     "quanton": Spec(config={**AWS, "api_key": "key"}),
     "snowflake": Spec(
         config={"account": "acct"},
-        # The decision drops the database when validation fails, so the fake catalog must
-        # report no tables afterwards: otherwise create_schema skips the CREATE TABLE its
-        # load-time TRUNCATE allowance depends on.
         scripted={r"SHOW TABLES LIKE": []},
     ),
     "snowpark-connect": Spec(config={"account": "acct", "user": "user"}),
@@ -941,9 +938,6 @@ NO_FIRST_CONNECTION_CHECK: dict[str, str] = {
     "silently ignored, and create_schema only issues CREATE DATABASE and CREATE SCHEMA IF NOT EXISTS",
 }
 FORCE_RECREATE_FAIL_CLOSED: dict[str, str] = {
-    # Case id -> error fragment expected when force_recreate=True. These adapters have no docs-supported
-    # automatic drop, so they fail closed with a manual-drop error instead of silently reusing the database.
-    # The firebolt-cloud variant is absent: Cloud mode issues a real DROP DATABASE.
     "velox": "Velox does not support --force-recreate",
     "influxdb": "InfluxDB does not support --force-recreate",
     "firebolt": "Firebolt (Core) does not support --force-recreate",
@@ -951,9 +945,6 @@ FORCE_RECREATE_FAIL_CLOSED: dict[str, str] = {
     "motherduck": "MotherDuck does not support --force-recreate",
 }
 DEFAULT_MODE_REFUSALS: dict[str, str] = {
-    # Case id -> error fragment expected when force_recreate=False. The postgres-catalog variant
-    # refuses to reuse a populated catalog that carries no BenchBox run identity instead of
-    # running against tables another run wrote.
     "ducklake-postgres_catalog": "no BenchBox run identity",
 }
 FAKE_POLL = "the fake service never reports the remote job or session as finished, so the polling loop raises"
@@ -1198,10 +1189,6 @@ def instrument(adapter: Any, ledger: Ledger, outcome: Outcome) -> Callable[..., 
     original_handle = adapter.handle_existing_database
     depth = 0
 
-    # functools.wraps keeps signature introspection truthful through this
-    # closure: product code dispatches on create_connection's declared
-    # signature, and without __wrapped__ every adapter would look like
-    # (*args, **kwargs). Recorded calls and ledger behaviour are unchanged.
     @functools.wraps(original_create)
     def create_connection(*args: Any, **kwargs: Any) -> Any:
         nonlocal depth
@@ -1318,14 +1305,6 @@ def test_no_destructive_ops_after_first_connection_decision(case, world, ledger)
 
 @pytest.mark.parametrize("case", CASE_PARAMS)
 def test_no_destructive_ops_in_default_reuse_mode(case, world, ledger):
-    """The default reuse-or-recreate mode decides once, then stays clean mid-run.
-
-    The contract used to drive only ``force_recreate=True``. The default mode instead
-    validates the existing database for compatibility and recreates it only when
-    validation fails, so this runs the same lifecycle with ``force_recreate=False``
-    and applies the same post-decision assertions, including that every adapter that
-    can reach the existing-database check does reach it.
-    """
     refusal = DEFAULT_MODE_REFUSALS.get(case.id)
     if refusal is not None:
         with pytest.raises(RuntimeError, match=re.escape(refusal)):
@@ -1365,7 +1344,6 @@ def test_force_recreate_still_acts_at_the_first_connection(case, world, ledger):
 
 
 def test_pyspark_force_recreate_drops_existing_database_only_once(world, ledger):
-    """PySpark decides reuse/recreate against the live session catalog, once per run."""
     case = next(case for case in CASES if case.key == "pyspark" and not case.variant)
     adapter = make_adapter(case, world, ledger, force_recreate=True)
     outcome = Outcome()
@@ -1472,14 +1450,6 @@ def test_spec_coverage_rejects_stale_misspelled_and_missing_entries():
     ]
 
 
-# The once-per-run guard `_existing_db_decided` is set BEFORE the decision body runs, in
-# the shared lifecycle (connection_lifecycle.handle_existing_database) as well as DuckLake's
-# overrides (the local-catalog check and the post-ATTACH postgres `_resolve_postgres_catalog_reuse`,
-# which marks the decision before `_existing_lake_tables` / `_verify_run_identity` run). This is
-# deliberate: a decision that raises part-way is still marked as made, so a later connection never
-# retries it destructively. test_harness_flags_a_repeated_decision pins the guard itself (clearing
-# it must produce violations); the test below pins the ordering (a failed decision must not run
-# again).
 def test_failed_decision_is_not_retried(world, ledger, monkeypatch):
     case = next(case for case in CASES if case.key == "sqlite" and not case.variant)
     adapter = make_adapter(case, world, ledger, force_recreate=True)
@@ -1662,11 +1632,6 @@ def test_ledger_flags_destructive_driver_calls(call, tmp_path):
 
 @pytest.mark.parametrize("library", ["fsspec", "gcsfs", "s3fs"])
 def test_filesystem_library_removals_are_observed(library, ledger):
-    """Removals through fsspec/s3fs/gcsfs are observed because the harness fakes those libraries.
-
-    They are listed in DRIVER_ROOTS, so an adapter that deletes a staging prefix through one of
-    them records a destructive driver call instead of performing an unobserved real deletion.
-    """
     module = importlib.import_module(library)
     assert isinstance(module, FakeModule), f"{library} was not faked by the harness"
     ledger.phase = "post"

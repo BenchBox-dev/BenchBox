@@ -91,8 +91,8 @@ factory, and `PlatformRegistry.supports_deployment_mode` agree. Any other
 suffix is rejected with a "Remove the ':…' suffix" error.
 
 ```bash
-benchbox run --platform snowflake:local --benchmark tpch --scale 1.0  # same as --platform snowflake
-benchbox run --platform databricks:local --benchmark tpch --scale 1.0  # same as --platform databricks
+benchbox run --platform snowflake:local --benchmark tpch --scale 1.0
+benchbox run --platform databricks:local --benchmark tpch --scale 1.0
 ```
 
 ```{note}

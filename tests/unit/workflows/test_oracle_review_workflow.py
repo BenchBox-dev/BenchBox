@@ -185,7 +185,7 @@ def _environment(tmp_path: Path, pulls: list[Any], checker_exit: int, checker_me
 
 
 def _run_step(tmp_path: Path, step: dict[str, Any], env: dict[str, str]) -> subprocess.CompletedProcess[str]:
-    script = tmp_path / "workflow-step.sh"
+    script = Path(tmp_path).resolve() / "workflow-step.sh"
     script.write_text(step["run"], encoding="utf-8")
     return subprocess.run(["bash", str(script)], env=env, text=True, capture_output=True, timeout=10)
 

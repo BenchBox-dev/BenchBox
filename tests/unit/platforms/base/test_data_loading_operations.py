@@ -1626,8 +1626,6 @@ class TestEmptySourceFailsClosed:
         assert stats == {}
 
     def test_load_raises_when_every_table_maps_to_an_empty_file_list(self, tmp_path: Path) -> None:
-        """A source naming tables with no files must fail like a table-less
-        source instead of loading zero rows table by table."""
         from types import SimpleNamespace
 
         source = DataSource(source_type="benchmark_tables", tables={"customer": [], "orders": []})
@@ -1645,8 +1643,6 @@ class TestEmptySourceFailsClosed:
         assert stats == {}
 
     def test_load_with_empty_file_lists_does_not_silently_skip_for_mock_benchmark(self, tmp_path: Path) -> None:
-        """A Mock benchmark auto-creates SKIP_DATA_LOADING as truthy; the
-        shared helper must ignore it so the empty source still fails."""
         source = DataSource(source_type="benchmark_tables", tables={"customer": []})
         loader = self._loader(tmp_path, MagicMock(), source)
         with pytest.raises(ValueError, match="No data files found"):
