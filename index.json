@@ -13744,6 +13744,13 @@
       "status": "done",
       "title": "Define a recorded fallback reviewer for oracle-review when the Codex connector is unavailable"
     },
+    "oracle-review-stale-check-runs-block-merge-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Failed oracle-review runs from review events stay on the head and block merge after a stand-in"
+    },
     "oracle-review-thread-reply-run-churn-20261008": {
       "claim": null,
       "needs": [],
