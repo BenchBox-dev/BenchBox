@@ -4198,18 +4198,13 @@
       "title": "Remove comments and docstrings from security and credential services"
     },
     "comment-cleanup-shared-infrastructure": {
-      "claim": {
-        "expires_at": "2026-10-09T23:55:47Z",
-        "generation": "16e9fe518d6347d9acfdd1736ad19ac0",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-checker",
         "comment-cleanup-contracts-gate"
       ],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Migrate shared comment consumers and enforce policy in CI and build configuration"
     },
     "comment-cleanup-site-assets": {
