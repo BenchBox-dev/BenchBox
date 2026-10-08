@@ -68,6 +68,15 @@
       "op": "take",
       "op_id": "a4cc07fd2e794e64979f393148bdcb37",
       "session_id": "414237a6e56140ed97e26a248092ab35"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:2a10096285872d23ac8a3bfe",
+      "at": "2026-10-08T23:28:16Z",
+      "client": "antigravity-client",
+      "generation": "01224f4b446b43d7881408bfa931fc5d",
+      "op": "finish",
+      "op_id": "59ec97769efb4affb9eef1ad4ca50ead",
+      "session_id": "414237a6e56140ed97e26a248092ab35"
     }
   ]
 }
