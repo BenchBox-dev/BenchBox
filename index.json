@@ -19388,6 +19388,15 @@
       "status": "open",
       "title": "Archive and delete the publication branch, environment, secrets and App after the plane is retired"
     },
+    "site-split-55-attestation-tightening-decision": {
+      "claim": null,
+      "needs": [
+        "site-split-40-production-cutover"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Decide whether to tighten the site bundle's bijection and parity checks after cutover"
+    },
     "site-split-99-closeout": {
       "claim": null,
       "needs": [
