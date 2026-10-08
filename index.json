@@ -3833,13 +3833,18 @@
       "title": "Remove comments from documentation and site generators"
     },
     "comment-cleanup-h2odb": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T23:59:52Z",
+        "generation": "2cf0d35897944dbb82f06c57c421d7b0",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e"
+      },
       "needs": [
         "comment-cleanup-checker",
         "comment-cleanup-contracts-gate"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from H2O db benchmark modules"
     },
     "comment-cleanup-joinorder": {
