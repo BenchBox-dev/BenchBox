@@ -13,6 +13,7 @@ from typing import Any, NamedTuple
 
 BASELINE_SCHEMA_VERSION = 1
 DEFAULT_ROLLING_WINDOW = 10
+MIN_FLOOR_SAMPLES = 5
 
 
 class RollingMedian(NamedTuple):
@@ -81,6 +82,8 @@ def record_baseline(
         "cpu_count": cpu_count,
         "run_id": env.get("GITHUB_RUN_ID", ""),
         "run_attempt": env.get("GITHUB_RUN_ATTEMPT", ""),
+        "commit_sha": env.get("GITHUB_SHA", ""),
+        "runner_image": env.get("ImageVersion", ""),
         "recorded_at": (recorded_at or datetime.now(timezone.utc)).astimezone(timezone.utc).isoformat(),
     }
     directory.mkdir(parents=True, exist_ok=True)
@@ -92,16 +95,30 @@ def record_baseline(
     return path
 
 
-def load_baseline_records(directory: Path) -> list[dict[str, Any]]:
-    records = []
+def parse_not_before(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value) if value else datetime.min
+    except ValueError as exc:
+        raise ValueError(f"THROUGHPUT_BASELINE_MIN_RECORDED_AT {value!r} is not an ISO date or timestamp") from exc
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def load_baseline_records(directory: Path, *, not_before: str = "") -> list[dict[str, Any]]:
+    floor, now = parse_not_before(not_before), datetime.now(timezone.utc)
+    latest: dict[str, dict[str, Any]] = {}
     for path in sorted(directory.rglob("throughput-baseline-*.json")):
         try:
             record = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+            run_id, attempt = str(record["run_id"]), int(record["run_attempt"] or 1)
+            recorded_at = datetime.fromisoformat(record["recorded_at"])
+            in_window = floor <= recorded_at <= now
+        except (OSError, ValueError, KeyError, TypeError):
             continue
-        if isinstance(record, dict) and record.get("schema_version") == BASELINE_SCHEMA_VERSION:
-            records.append(record)
-    return records
+        if record.get("schema_version") != BASELINE_SCHEMA_VERSION or path.relative_to(directory).parts[0] != run_id:
+            continue
+        if in_window and attempt >= int(latest.get(run_id, {}).get("run_attempt", 0)):
+            latest[run_id] = record
+    return list(latest.values())
 
 
 def rolling_median(
@@ -111,14 +128,15 @@ def rolling_median(
     benchmark: str,
     scale: float,
     runner_class: str,
+    streams: int,
     window: int = DEFAULT_ROLLING_WINDOW,
 ) -> RollingMedian | None:
     matching = sorted(
         (
             record
             for record in records
-            if (record.get("platform"), record.get("benchmark"), record.get("runner_class"))
-            == (platform, benchmark, runner_class)
+            if (record.get("platform"), record.get("benchmark"), record.get("runner_class"), record.get("streams"))
+            == (platform, benchmark, runner_class, streams)
             and math.isclose(float(record.get("scale_factor", math.nan)), float(scale))
             and isinstance(record.get("throughput_at_size"), (int, float))
             and record["throughput_at_size"] > 0

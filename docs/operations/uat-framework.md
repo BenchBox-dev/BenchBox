@@ -581,8 +581,8 @@ count end to end via the production CLI (`run-official --streams 3`):
   `/dev/shm` breaks Q4 and Q21. The cell timeout is 600 seconds. The cell
   uses the DuckDB cell's seed, 20260709: some seeds give TPC-H Q13 41
   result rows where validation expects 42, on DuckDB and CedarDB alike. The
-  cell is not yet gating: its sweep and assert steps run with
-  `continue-on-error`.
+  cell gates like the DuckDB cell, and the job uploads logs and results so a
+  failure can be diagnosed.
 
 The DuckDB cell gates on the sweep exit code plus an independent assert
 step (`python -m tests.uat.throughput assert`, run under `if: !cancelled()`
@@ -604,6 +604,15 @@ An unreadable result JSON, a missing `result_path` or a result for another
 cell fails the cell. The runner applies the same checks to every
 `run-official` cell. PR fast-lane coverage stays with the focused
 session-isolation integration tests.
+
+Each nightly job uploads `throughput-uat-<run_id>-<attempt>` (cell logs,
+`cells.jsonl`, result JSON; 14 days) with `if: always()`, so a timed-out
+cell still leaves logs. A separate `throughput-uat-signal` job publishes the
+commit status `nightly/throughput-uat` from the job result, so a throughput
+failure is visible independent of the other red nightly jobs.
+`tests/unit/workflows/test_nightly_throughput_uat_contract.py` fails if any
+throughput step gains `continue-on-error` or a quarantine label, or if the
+sweep and assert steps lose `if: !cancelled()`.
 
 The throughput explorer sweep (`uat-throughput-explorer-smoke.yaml`) sets
 `explorer_smoke.require_throughput_streams: 3`. With that key a skipped
@@ -627,25 +636,95 @@ floor failure never masks or replaces a wiring failure.
 Retention. Every green DuckDB run writes
 `throughput-baseline-duckdb-tpch-sf1-<run_id>-<attempt>.json`. The record
 holds `throughput_at_size`, `streams`, `cpu_model`, `cpu_count`,
-`runner_class` (CPU model slug plus vCPU count), `run_id`, `run_attempt` and
+`runner_class` (CPU model slug plus vCPU count), `runner_image` (the
+runner's `ImageVersion`), `commit_sha`, `run_id`, `run_attempt` and
 `recorded_at`. Green means all of: the sweep step succeeded, the sweep's
 `cells.jsonl` row has `status: passed`, and the assert checks passed. The
 upload step runs only when the DuckDB sweep step's outcome is `success`, and
 the assert writes no record for a cell that did not pass.
 
 Median. `python -m tests.uat.throughput rolling-median --baseline-dir DIR
---platform duckdb --benchmark tpch --scale 1 [--runner-class C] [--window N]`
-reads downloaded records (nested artifact directories are fine) and prints
-the median of the latest N matching the runner class, defaulting to the
-current machine's class. The floor must never compare across classes.
+--platform duckdb --benchmark tpch --scale 1 --streams 3 [--runner-class C]
+[--window N]` reads downloaded records and prints the median of the latest N
+matching the runner class, defaulting to the current machine's class. The
+floor never compares across runner classes or stream counts. `DIR` must use
+the layout the nightly download produces, `DIR/<run_id>/.../throughput-baseline-*.json`,
+where the first directory is the record's own `run_id`; a record anywhere
+else is ignored. The `<run_id>` is the `run_id` field, which local runs leave
+empty unless `GITHUB_RUN_ID` is set, so a local record needs that variable
+and a matching directory.
 
-Status: observe-only. The per-class median is available through the manual
-`rolling-median` command; the nightly does not compute it. With
-`--evaluate-floor`, the assert applies a floor only when the
-`THROUGHPUT_FLOOR_MEDIAN` environment variable is set; otherwise it reports
-each observed value (`::notice::`). That value is a fixed
-absolute number, so it does not suit a mixed runner fleet: the floor must never
-compare across runner classes.
+Status: active per runner class. The nightly `throughput-uat` job runs a
+"Download retained Throughput@Size baselines" step before the DuckDB assert.
+It lists the last 30 scheduled `nightly.yml` runs on `develop` (excluding
+the current run) with `gh run list --event schedule` and fetches each run's
+baseline artifact (`throughput-baseline-duckdb-tpch-sf1-*`) with
+`gh run download` into
+`~/Developer/benchmark_runs/throughput-baseline-history/<run_id>/`. Only
+scheduled runs count: the branch filter matches a head branch name, which a
+fork pull request controls, and a `workflow_dispatch` run can come from any
+ref. The job's
+`GITHUB_TOKEN` carries `contents: read` and `actions: read`, nothing more. A
+run with no such artifact (its sweep or assert failed, or the 90 days have
+passed) is skipped. A failure to list runs prints a warning and leaves the
+floor observe-only; it never fails the job.
+
+The assert then runs with `--evaluate-floor --baseline-history DIR`. It
+computes the rolling median (window 10) of the downloaded records for the
+current runner class, and gates when at least 5 records match
+(`MIN_FLOOR_SAMPLES`). Five is half the window, and the median of five
+tolerates two outlier nights; the measured per-class spread (below) is 6 to
+8%, so five samples place the median well inside the 20% tolerance. With
+fewer matching records, including the first nights after the artifacts were
+introduced and a cold start with no artifacts at all, the assert prints
+`N of 5 required baseline samples for runner class ...; floor stays
+observe-only` and passes. The line is a `::notice::` when no record files
+were downloaded and a `::warning::` when some were but too few survived the
+checks, so a broken download or a rejected artifact shows up as an annotation. A run that fails the floor writes no record, so a
+regression cannot lower the baseline it is judged against.
+
+The loader also rejects records that do not belong to the run they came
+from, so a hostile or mislabeled artifact cannot supply the median:
+
+- a record is kept only when its `run_id` equals the first directory under
+  the history root, so a record nested deeper under another run's directory
+  does not count;
+- a record with a `recorded_at` in the future is dropped;
+- a run counts once: the record with the highest `run_attempt` wins, so a
+  re-run does not double its weight;
+- a record whose `streams` differs from the assert's stream count is not
+  compared.
+
+Recovery from a permanent slowdown. Only passing runs write records, so after
+a real, lasting slowdown on one runner class the median stays at the old
+level and the floor keeps failing. To accept the new level, set the
+repository variable `THROUGHPUT_BASELINE_MIN_RECORDED_AT` to a UTC date such
+as `2026-10-20` (or a full ISO timestamp; a value without an offset is read
+as UTC). A value that is not an ISO date or timestamp fails the assert with
+an error instead of being ignored. Records recorded
+before it are ignored, so the class returns to observe-only until 5 new
+records accumulate, then gates on the new median. Clear the variable
+afterward; it is harmless to leave set. Runner image changes need no reset:
+the 20% tolerance absorbs them, and each record carries `runner_image` and
+`commit_sha` to trace a step change.
+
+`THROUGHPUT_FLOOR_MEDIAN`, when set as a repository variable, overrides the
+history-derived median and gates even with fewer than 5 records. It is a
+fixed absolute number and must not be set for a mixed runner fleet.
+`THROUGHPUT_FLOOR_MAX_DROP_FRACTION` still sets X (default 20%).
+
+Window length decision. The ten annotated nightlies from 2026-09-25 to
+2026-10-04 (73583, 74389, 74835, 75285, 75789, 79385, 92632, 96272, 97537,
+98141) split into two runner groups: six runs with median 75060 and spread
+7.7% (population CV 2.5%), and four runs with median 96905 and spread 5.7%
+(CV 2.2%). The measured throughput window is only 2.4 to 3.2 seconds
+(2411 ms in a local SF1 run). Within one runner class the signal is stable
+enough to detect a drop of roughly 10% or more, so SF1 and a ~3 s window are
+acceptable for a coarse per-class regression floor and not for fine-grained
+performance tracking. Pooled across classes the spread is about 30%, so a
+fleet-wide median (77.6k, floor 62.1k) would let a fast-runner run lose
+about 36% unnoticed; a pooled floor is rejected. Revisit the window if the
+per-class CV rises above 5%.
 
 ## Compatibility Pruning
 

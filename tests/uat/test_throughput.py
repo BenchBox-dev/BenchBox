@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -522,6 +523,8 @@ def test_cli_assert_passes_and_records_baseline(tmp_path: Path, monkeypatch, cap
     record = json.loads(record_path.read_text(encoding="utf-8"))
     assert record["runner_class"] == "amd-epyc-7763-64-core-processor-4cpu"
     assert record["run_id"] == "555"
+    assert record["commit_sha"] == "abc123"
+    assert record["runner_image"] == "20260930.1"
 
 
 def test_cli_assert_fails_on_stream_count_and_records_no_baseline(tmp_path: Path, capsys):
@@ -588,3 +591,202 @@ def test_cli_assert_records_no_baseline_when_the_sweep_cell_did_not_pass(tmp_pat
 
     assert not out_dir.exists()
     assert load_cell_result(glob_pattern, platform="duckdb", benchmark="tpch", scale=1).passed is False
+
+
+SLOW_CPU = "AMD EPYC 7763 64-Core Processor"
+
+
+def _history(tmp_path: Path, values: list[float], *, cpu: str = SLOW_CPU) -> str:
+    history = tmp_path / "history"
+    for day, value in enumerate(values, start=1):
+        throughput_baseline.record_baseline(
+            history / str(day),
+            {"summary": {"tpc_metrics": {"throughput_at_size": value}}},
+            platform="duckdb",
+            benchmark="tpch",
+            scale=1,
+            streams=3,
+            env={"GITHUB_RUN_ID": str(day)},
+            cpu_model=cpu,
+            cpu_count=4,
+            recorded_at=datetime(2026, 10, day, 6, 0, tzinfo=timezone.utc),
+        )
+    return str(history)
+
+
+@pytest.fixture
+def slow_runner(monkeypatch):
+    monkeypatch.setattr(throughput_baseline, "detect_cpu_model", lambda: SLOW_CPU)
+    monkeypatch.setattr(throughput_baseline.os, "cpu_count", lambda: 4)
+    monkeypatch.delenv("THROUGHPUT_FLOOR_MEDIAN", raising=False)
+    monkeypatch.delenv("THROUGHPUT_FLOOR_MAX_DROP_FRACTION", raising=False)
+
+
+def _observed() -> float:
+    return _good_result()["summary"]["tpc_metrics"]["throughput_at_size"]
+
+
+def test_cli_assert_gates_on_the_rolling_median_of_the_runner_class(tmp_path: Path, slow_runner, capsys):
+    history = _history(tmp_path, [_observed() * 2] * 5)
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)) == 1
+
+    output = capsys.readouterr().out
+    assert "5 of 5 required baseline samples" in output
+    assert "rolling median" in output
+    assert "Throughput@Size regression" in output
+
+
+def test_cli_assert_passes_when_observed_clears_the_median_floor(tmp_path: Path, slow_runner, capsys):
+    history = _history(tmp_path, [_observed() * 1.1] * 5)
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)) == 0
+
+    assert "clears floor" in capsys.readouterr().out
+
+
+def test_cli_assert_median_uses_only_the_current_runner_class(tmp_path: Path, slow_runner, capsys):
+    history = _history(tmp_path, [_observed() * 100] * 5, cpu="Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz")
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)) == 0
+
+    output = capsys.readouterr().out
+    assert "0 of 5 required baseline samples" in output
+    assert "observe-only" in output
+
+
+def test_cli_assert_stays_observe_only_below_the_minimum_samples(tmp_path: Path, slow_runner, capsys):
+    history = _history(tmp_path, [_observed() * 100] * (throughput_baseline.MIN_FLOOR_SAMPLES - 1))
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)) == 0
+
+    output = capsys.readouterr().out
+    assert f"{throughput_baseline.MIN_FLOOR_SAMPLES - 1} of {throughput_baseline.MIN_FLOOR_SAMPLES} required" in output
+    assert "floor stays observe-only" in output
+
+
+def test_cli_assert_cold_start_without_any_history_is_observe_only(tmp_path: Path, slow_runner, capsys):
+    glob_pattern = _setup_cell(tmp_path)
+    missing = str(tmp_path / "never-downloaded")
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", missing)) == 0
+
+    assert "0 of 5 required baseline samples" in capsys.readouterr().out
+
+
+def test_cli_assert_median_override_takes_precedence_over_history(tmp_path: Path, slow_runner, monkeypatch, capsys):
+    history = _history(tmp_path, [_observed() * 0.5] * 5)
+    monkeypatch.setenv("THROUGHPUT_FLOOR_MEDIAN", str(_observed() * 2))
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)) == 1
+
+    output = capsys.readouterr().out
+    assert "Throughput@Size regression" in output
+    assert "rolling median" not in output
+
+
+def test_cli_assert_override_applies_even_when_history_is_too_short(tmp_path: Path, slow_runner, monkeypatch, capsys):
+    monkeypatch.setenv("THROUGHPUT_FLOOR_MEDIAN", str(_observed() * 2))
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", _history(tmp_path, [1.0]))) == 1
+
+    assert "Throughput@Size regression" in capsys.readouterr().out
+
+
+def test_cli_assert_median_floor_honors_the_max_drop_fraction(tmp_path: Path, slow_runner, monkeypatch):
+    history = _history(tmp_path, [_observed() * 1.5] * 5)
+    glob_pattern = _setup_cell(tmp_path)
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)) == 1
+
+    monkeypatch.setenv("THROUGHPUT_FLOOR_MAX_DROP_FRACTION", "0.4")
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)) == 0
+
+
+def test_cli_assert_ignores_history_unless_the_floor_is_requested(tmp_path: Path, slow_runner):
+    history = _history(tmp_path, [_observed() * 100] * 5)
+
+    assert main(_assert_argv(_setup_cell(tmp_path), "--baseline-history", history)) == 0
+
+
+def test_cli_assert_ignores_forged_history_records(tmp_path: Path, slow_runner, capsys):
+    history = tmp_path / "history"
+    for index in range(10):
+        throughput_baseline.record_baseline(
+            history / "300",
+            {"summary": {"tpc_metrics": {"throughput_at_size": _observed() * 100}}},
+            platform="duckdb",
+            benchmark="tpch",
+            scale=1,
+            streams=3,
+            env={"GITHUB_RUN_ID": f"forged-{index}", "GITHUB_RUN_ATTEMPT": "1"},
+            cpu_model=SLOW_CPU,
+            cpu_count=4,
+            recorded_at=datetime(9999, 1, 1, tzinfo=timezone.utc),
+        )
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", str(history))) == 0
+
+    assert "0 of 5 required baseline samples" in capsys.readouterr().out
+
+
+def test_cli_assert_min_recorded_at_resets_a_runner_class_baseline(tmp_path: Path, slow_runner, monkeypatch, capsys):
+    history = _history(tmp_path, [_observed() * 2] * 5)
+    glob_pattern = _setup_cell(tmp_path)
+    argv = _assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)
+    assert main(argv) == 1
+
+    monkeypatch.setenv("THROUGHPUT_BASELINE_MIN_RECORDED_AT", "2026-10-04")
+
+    assert main(argv) == 0
+    assert "2 of 5 required baseline samples" in capsys.readouterr().out
+    monkeypatch.setenv("THROUGHPUT_BASELINE_MIN_RECORDED_AT", "2026-10-06")
+    assert main(argv) == 0
+    assert "0 of 5 required baseline samples" in capsys.readouterr().out
+
+
+def test_cli_assert_fails_loudly_on_a_malformed_reset_date(tmp_path: Path, slow_runner, monkeypatch, capsys):
+    monkeypatch.setenv("THROUGHPUT_BASELINE_MIN_RECORDED_AT", "10/01/2026")
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", _history(tmp_path, [1.0]))) == 1
+
+    output = capsys.readouterr().out
+    assert "::error::THROUGHPUT_BASELINE_MIN_RECORDED_AT '10/01/2026' is not an ISO date" in output
+
+
+def test_cli_assert_warns_when_a_populated_history_still_leaves_the_floor_observe_only(
+    tmp_path: Path, slow_runner, capsys
+):
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", _history(tmp_path, [1.0]))) == 0
+
+    assert "::warning::1 of 5 required baseline samples" in capsys.readouterr().out
+
+
+def test_cli_assert_only_notices_when_the_history_is_empty(tmp_path: Path, slow_runner, capsys):
+    (tmp_path / "history").mkdir()
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", str(tmp_path / "history"))) == 0
+
+    output = capsys.readouterr().out
+    assert "::notice::0 of 5 required baseline samples" in output
+    assert "::warning::" not in output
+
+
+def test_cli_assert_notices_when_the_median_gates(tmp_path: Path, slow_runner, capsys):
+    history = _history(tmp_path, [_observed()] * 5)
+    glob_pattern = _setup_cell(tmp_path)
+
+    assert main(_assert_argv(glob_pattern, "--evaluate-floor", "--baseline-history", history)) == 0
+
+    assert "::notice::5 of 5 required baseline samples" in capsys.readouterr().out
