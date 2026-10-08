@@ -1,0 +1,29 @@
+{
+  "acceptance": [
+    "uv run -- python scripts/generate_cloud_tpc_templates.py --check passes on the PR branch.",
+    "The generated Snowflake TPC-H and TPC-DS templates define clustering only on fact tables (TPC-H: LINEITEM, ORDERS; TPC-DS: the sales, returns and inventory tables), with at most 3 keys (or a justified 4), ordered from lowest to highest cardinality.",
+    "A new generator unit test fails if a dimension table gets clustering, if the key cap is exceeded, or if the key order is wrong.",
+    "A fake-driver render shows ALTER TABLE ... CLUSTER BY only for fact tables.",
+    "The PR body cites https://docs.snowflake.com/en/user-guide/tables-clustering-keys.",
+    "The verification ladder passes."
+  ],
+  "context": "Source: tuning-evidence plan (2026-10-08), plan step 3. Covers muse F11. Vendor quotes checked on 2026-10-08. The muse claim that tpc.yaml has no consumer was rebutted: this generator consumes it (partitioning slot near lines 99-124). Measurement of clustering benefit, cost and clustering state belongs to cloud-tuned-benefit-measurement-20261008.",
+  "description": "## Problem\n`scripts/generate_cloud_tpc_templates.py` (`PLATFORMS = (\"snowflake\",)`) generates the Snowflake TPC-H and TPC-DS tuned templates from `benchbox/core/tuning/profiles/tpc.yaml`. The TPC-DS template clusters every table, including small dimensions such as `DATE_DIM` and `ITEM`, with up to 4 keys. Snowflake's guidance:\n- Clustering keys are typically for multi-terabyte tables, and \"Clustering keys are not intended for all tables\".\n- Use at most 3 or 4 columns, ordered from lowest to highest cardinality.\n- \"reclustering consumes credits\", and rows are \"not necessarily updated immediately\".\n\n## Change\n- Change the generator so Snowflake clusters fact tables only. Use at most 3 keys per table unless the profile justifies a fourth, ordered from lowest to highest cardinality. Take the cardinality order from the profile or from a fixed, cited table of TPC column cardinalities.\n- Regenerate with `--write`, for both the packaged templates and `examples/tunings`. `--check` must pass.\n- Add a generator unit test that enforces the fact-tables-only rule, the key cap and the key order.\n\n## Decision gate\n- If the profile cannot give a defensible cardinality order for a fact table's keys, stop and ask instead of guessing.\n\n## Guardrails (must preserve)\n- Never hand-edit generated templates; change the generator or the profile.\n- No live Snowflake runs. Verify by rendering through the adapter with a fake driver.\n- BigQuery and Redshift generation stays off.\n- Do not weaken the parity test.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`. Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit owner approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
+  "links": [
+    "scripts/generate_cloud_tpc_templates.py",
+    "benchbox/core/tuning/profiles/tpc.yaml",
+    "benchbox/core/tuning/templates/snowflake",
+    "examples/tunings",
+    "https://docs.snowflake.com/en/user-guide/tables-clustering-keys"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:30:58Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "dc603ca42d6d4c1392a70a050f343226",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    }
+  ]
+}
