@@ -15089,10 +15089,15 @@
       "title": "Gate: finish external adversarial review of the Polars version-matrix plan and fold in accepted findings"
     },
     "pvm-d1-publication-scope-decision": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T03:20:12Z",
+        "generation": "88785dd107a54408a985b4aa53a869db",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1"
+      },
       "needs": [],
       "priority": "high",
-      "status": "open",
+      "status": "active",
       "title": "Gate: user decides how Polars matrix results are published"
     },
     "pvm-polars-2-version-matrix": {
