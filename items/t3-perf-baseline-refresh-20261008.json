@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "The baseline is built from at least five retained nightly results on the current runner class, with the method and source run ids recorded next to the file",
+    "A dry comparison of the new baseline against those same runs passes the gate",
+    "Three consecutive scheduled nightlies pass the t3:perf job after both this item and the delta-floor item have merged"
+  ],
+  "context": "Run 37794806634 compared 0.686 s baseline total to 0.546 s current. Independent of the delta-floor item, but the issue should close only after both land.",
+  "description": "_project/baselines/perf_smoke_duckdb_tpch_001.json holds whole-millisecond values (8, 9, 10, 11, 12 ms) for every query, while current runs on the 4-CPU x86_64 runner land between 4.4 and 12.3 ms, so the baseline no longer describes the runner. Rebuild it from several retained t3-perf-result artifacts from the same runner class, not from a single run, and record how it was produced so the next refresh is repeatable. A single-run refresh would just move the noise problem.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2778"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-08T23:54:45Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "1a7d2d915e8046f982d97a97a81a7047",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}

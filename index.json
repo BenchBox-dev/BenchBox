@@ -20750,6 +20750,13 @@
       "status": "open",
       "title": "Review moved vendor prices and commit refreshed pricing evidence so t3:drift can pass"
     },
+    "t3-perf-baseline-refresh-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Refresh the DuckDB TPC-H SF=0.01 perf baseline from retained CI-runner results"
+    },
     "t3-perf-compare-delta-floor-20261008": {
       "claim": null,
       "needs": [],
