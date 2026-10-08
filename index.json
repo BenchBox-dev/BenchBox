@@ -3469,18 +3469,13 @@
       "title": "Remove comments and docstrings from CLI foundation and presentation"
     },
     "comment-cleanup-clickbench": {
-      "claim": {
-        "expires_at": "2026-10-09T23:58:28Z",
-        "generation": "85cfef2978464090a16d2ce701e8889e",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-checker",
         "comment-cleanup-contracts-gate"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from ClickBench modules"
     },
     "comment-cleanup-clickhouse-family": {
