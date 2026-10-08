@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the date sort keys stay, and they give the same date-range pruning, so the
   recorded tuning configuration of that template changes. TPC-H Q21 on tuned
   server runs now sets `join_algorithm = 'hash'` for that statement so it fits
-  the 5.25 GiB memory envelope. A server-mode load
+  the 5.25 GiB memory envelope. A tuned server-mode load
   now waits, up to 10 minutes, for background merges to finish before the first
   query, and the wait is not counted as load time. Don't compare tuned
   ClickHouse timings recorded before this change with results after it.

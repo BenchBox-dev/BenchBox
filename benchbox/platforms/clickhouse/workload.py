@@ -662,7 +662,7 @@ class ClickHouseWorkloadMixin:
             tuning_config=self.unified_tuning_configuration if self.tuning_enabled else None,
         )
         table_stats, loading_time = loader.load()
-        if self.deployment_mode == "server":
+        if self.deployment_mode == "server" and self.tuning_enabled:
             self._settle_background_merges(connection)
         return table_stats, loading_time, None
 

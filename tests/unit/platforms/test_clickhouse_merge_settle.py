@@ -69,9 +69,9 @@ def test_gives_up_at_the_timeout() -> None:
 
 
 class _Adapter(ClickHouseWorkloadMixin):
-    def __init__(self, deployment_mode: str) -> None:
+    def __init__(self, deployment_mode: str, tuning_enabled: bool = True) -> None:
         self.deployment_mode = deployment_mode
-        self.tuning_enabled = False
+        self.tuning_enabled = tuning_enabled
         self.unified_tuning_configuration = None
 
 
@@ -93,6 +93,15 @@ def test_server_load_waits_for_merges() -> None:
 
     wait.assert_called_once()
     assert loading_time == 1.5
+
+
+def test_untuned_server_load_does_not_wait_for_merges() -> None:
+    adapter = _Adapter("server", tuning_enabled=False)
+
+    with patch("benchbox.platforms.clickhouse.workload.wait_for_merges_to_settle") as wait:
+        _load(adapter)
+
+    wait.assert_not_called()
 
 
 def test_local_load_does_not_wait_for_merges() -> None:

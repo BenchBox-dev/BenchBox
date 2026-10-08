@@ -302,7 +302,7 @@ attribution:
   peaks above the 5.25 GiB envelope and fails; the single hash join peaks at
   3.4 GiB. Setting `hash` for the whole session instead raised the geometric
   mean 1.23× and Q13 4.2×, so it is limited to the one query that needs it.
-- Wait for background merges to settle after a server-mode load, so the first
+- Wait for background merges to settle after a tuned server-mode load, so the first
   timed query does not compete with merges. The wait is bounded and is not
   counted as load time.
 - A test rejects any ClickHouse tuned template that partitions a table on the
