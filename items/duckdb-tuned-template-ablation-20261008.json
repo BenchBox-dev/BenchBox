@@ -5,7 +5,7 @@
     "Evidence states and the ADR-3 DuckDB addendum are updated.",
     "The liveness gate and the verification ladder pass."
   ],
-  "context": "Source: tuning-evidence plan (2026-10-08), plan step 6. Covers muse F12 (narrowed: the load cost comes from DuckDB's docs, not a guess, and the FK strip exists at duckdb.py:829-831; query benefit is unmeasured). Vendor source: https://duckdb.org/docs/current/guides/performance/indexing.html (checked 2026-10-08). tuning-corpus-rerun-duckdb-tuned-bundles-20261001 should wait for this item, so the republished bundles use measured templates.",
+  "context": "Source: tuning-evidence plan (2026-10-08), plan step 6. Covers muse F12 (narrowed: the load cost comes from DuckDB's docs, not a guess, and the FK strip exists at duckdb.py:829-831; query benefit is unmeasured). Vendor source: https://duckdb.org/docs/current/guides/performance/indexing.html (checked 2026-10-08). tuning-corpus-rerun-duckdb-tuned-bundles-20261001 waits for this item. PRE-DECIDED GATES: ~/Developer/benchmark_runs/HANDOFF-tuning-evidence-batch-20261008.md section 7.4 (Item 13): scope is tpch/ssb/tpcds plus one follow-up item for the other six; constraint removal is allowed per the verdict, and tests switch to explicit custom configs. Follow it instead of stopping.",
   "description": "## Problem\nThe DuckDB TPC-H tuned template enables and enforces primary and foreign keys and sorts `lineitem` by `L_ORDERKEY`. The TPC-DS template sorts by item, and foreign keys are stripped for TPC-DS (`benchbox/platforms/duckdb.py:829-831`). DuckDB's own guidance:\n- Indexes added before loading, including those created by primary and foreign keys, are \"detrimental to load performance\".\n- \"Only use primary keys, foreign keys, or unique constraints, if these are necessary\".\n- Pre-ordering data helps zonemaps for selective filters.\n\nNo DuckDB template has ever been measured against `notuning`.\n\n## Change\n- With the harness, measure the TPC-H, SSB and TPC-DS DuckDB tuned templates at SF1 and SF10, in four arms: `notuning`, constraints only, sort only, and full tuned. Include load time.\n- Apply the benefit rule, record a verdict per template and tier, and adjust templates only as the verdicts direct.\n- Update each template's evidence state (`tuning-evidence-unmeasured-template-label-20261008`) and the ADR-3 DuckDB addendum.\n\n## Decision gates\n- Scope: the other DuckDB tuned templates (amplab, clickbench, h2odb, joinorder, read_primitives, tpchavoc) are out of scope unless the owner adds them. Ask once the first three are done.\n- The trust machinery corroborates declared constraints (`tuning-constraint-corroboration-20261001`). If removing constraints would break `applied_verified` or that corroboration, stop and ask before removing them.\n\n## Guardrails (must preserve)\n- The tuning liveness gate (`tuning-liveness-e2e-gates-20261001`) stays green.\n- Never edit published bundles.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`. Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
   "links": [
     "benchbox/core/tuning/templates/duckdb",
@@ -19,6 +19,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "86395212df5841779cfd2e7c5efc84b1",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:44:56Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "7029b8eff38547fc883b91e786144f20",
       "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
