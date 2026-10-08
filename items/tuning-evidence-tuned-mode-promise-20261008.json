@@ -2,6 +2,7 @@
   "acceptance": [
     "The owner's answers to D1, D2 and D3 are recorded in context with the date.",
     "A merged ADR-2 addendum contains: the definition of tuned, the three evidence states, the statement that the ratio is a diagnostic and not a ranking, and D1-D3 with the rejected options.",
+    "If the addendum cites a TPC rule on query modification, it quotes the clause from the current TPC-H specification (https://www.tpc.org/TPC_Documents_Current_Versions/doc/tpc-h_v3.0.1.docx) with its clause number. If the clause was not read, the addendum does not cite the TPC rule.",
     "Each dependent item named in the guardrails has been re-read and amended wherever an answer differs from the recommendation.",
     "git diff touches only docs; markdownlint passes."
   ],
@@ -27,6 +28,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "c6f738b506874354afc75e0ab4fa076d",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:35:38Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "75a7f62def814ca48fcd7417956d0535",
       "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
