@@ -22,6 +22,16 @@ def power_parameter_seed(seed: Optional[int], stream_id: int) -> int:
     return (seed or 1) + stream_id + 1000
 
 
+def _parse_tpcds_query_id(qid: object) -> int:
+    text = str(qid).strip()
+    if text[:1] in ("Q", "q"):
+        text = text[1:]
+    try:
+        return int(text)
+    except ValueError as exc:
+        raise ValueError(f"Invalid TPC-DS query id: {qid!r} (expected 1-99, optionally Q-prefixed)") from exc
+
+
 @dataclass
 class TPCDSPowerTestConfig:
     scale_factor: float = 1.0
@@ -176,7 +186,7 @@ class TPCDSPowerTest:
 
     def _build_queries_to_execute(self, available_query_ids: list[int]) -> list[tuple]:
         if self.config.query_subset:
-            queries = [(int(qid) if str(qid).isdigit() else qid, None) for qid in self.config.query_subset]
+            queries = [(_parse_tpcds_query_id(qid), None) for qid in self.config.query_subset]
             if self.config.verbose:
                 self.logger.info(f"Using user-specified query subset: {[q[0] for q in queries]}")
             self.logger.warning(
