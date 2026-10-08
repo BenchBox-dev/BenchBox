@@ -890,6 +890,14 @@ The only supported rung order is:
 | `candidate-8g` | 8 GiB | 8 GiB | 300 s | run only when the 5.25 GiB trace fails or cannot complete |
 | `candidate-12g` | 12 GiB | 12 GiB | 300 s | last resort; requires a trace-backed reason |
 
+### TPC-DS SF1 query-memory floor
+
+The rungs above calibrate the load path. The power path has its own floor:
+at SF1 on ClickHouse 25.8, Q10 needs more than 7.1 GiB (Code 241
+OvercommitTracker kills at 4.67 and 7.10 GiB usable caps) and passes with a
+12 GiB container cap; Q69 needs 4.7–7.1 GiB. Run TPC-DS SF1 power cells with
+a 12 GiB container limit. Measured October 2026, seed 42.
+
 Wrap the real ClickHouse server UAT command so sampling covers the whole load
 and query path (the wrapper writes an atomic JSON artifact even when the child
 fails):
