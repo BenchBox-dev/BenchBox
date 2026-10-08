@@ -15156,9 +15156,9 @@
     },
     "pvm-s0b-polars-engine-option": {
       "claim": {
-        "expires_at": "2026-10-09T15:37:13Z",
-        "generation": "1f6ea9ab63794b97b711e67357373819",
-        "renewals": 0,
+        "expires_at": "2026-10-09T18:45:36Z",
+        "generation": "470e4e4fb5524d2a8df0e21d9b8f488f",
+        "renewals": 1,
         "worker": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c"
       },
       "needs": [

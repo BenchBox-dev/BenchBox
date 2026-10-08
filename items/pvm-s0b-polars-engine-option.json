@@ -64,6 +64,15 @@
       "op": "take",
       "op_id": "03c89a8c3271428e8acd2f8ddfacd38d",
       "session_id": "1f74fac6df92445cbacc470514ed2645"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T18:45:36Z",
+      "client": "claude-code",
+      "generation": "470e4e4fb5524d2a8df0e21d9b8f488f",
+      "op": "take",
+      "op_id": "fbfe1295b98443589c8a36db87da05f3",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
     }
   ]
 }
