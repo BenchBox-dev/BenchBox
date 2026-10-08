@@ -3,7 +3,7 @@
     "Rerun green twice in a row on clickhouse-server (notuning, then tuned and notuning matrix as applicable)",
     "Regression test covering rerun-into-existing-tables for both tuned and notuning modes"
   ],
-  "context": "Reproduced 2026-10-07 against mocker-hosted ClickHouse 25.8 with CLICKHOUSE_MEMORY_LIMIT=5.25g. Full failing log: /tmp/ch-notuning-ctrl.log. Tuned rerun reference showing \"Dropped database\": /tmp/ch-benefit-sf1-tuned-rerun.log (ssb-tuned cell). Related code: run-connection/database lifecycle in benchbox/platforms/base + clickhouse setup.py create_connection/handle_existing_database.",
+  "context": "Reproduced 2026-10-07 against mocker-hosted ClickHouse 25.8 with CLICKHOUSE_MEMORY_LIMIT=5.25g. Full failing log: /tmp/ch-notuning-ctrl.log. Tuned rerun reference showing \"Dropped database\": /tmp/ch-benefit-sf1-tuned-rerun.log (ssb-tuned cell). Related code: run-connection/database lifecycle in benchbox/platforms/base + clickhouse setup.py create_connection/handle_existing_database.\n\nSecond finding (observed 2026-10-07, PR #2766 investigation): a notuning run, or a run with --phases power, against a server whose default database still holds a tuned layout prints \"Database being reused - skipping schema creation and data loading\" and measures the wrong layout without any error. It invalidated one benchmark cell. Workaround: start one fresh container per benchmark's three cells (notuning, tuned, tuned plus optimize_after_load). Deliberately not fixed in the PR #2766 effort; any refusal or drop behavior change needs owner review.",
   "description": "Rerun-hygiene inconsistency between tuning modes on clickhouse-server.\n\nRepro steps:\n1. BENCHBOX_OUTPUT_DIR=~/Developer/benchmark_runs benchbox run --platform clickhouse-server --benchmark tpch --scale 1 --seed 42 --tuning notuning --phases generate,load ...\n2. Run the exact same command a second time against the same server/database.\n3. Second run fails during schema creation with Code: 57. DB::Exception: Table default.region already exists (exits 1), because it issues plain CREATE TABLE without IF NOT EXISTS and without dropping first.\n\nContrast: a --tuning tuned run drops the pre-existing database/tables before recreating them (log shows \"Dropped database\").\n\nExpected behavior: notuning reruns are idempotent like tuned runs (recreate or reuse cleanly), or fail early with an actionable message before partial work.\n\nConstraint: any drop-behavior change is destructive and needs owner review before implementation.",
   "sessions": [
     {
@@ -22,6 +22,14 @@
       "op": "take",
       "op_id": "4f233213b2cb47ada8106702c1dbd2a4",
       "session_id": "0885d7ba433140acb23523a9d5a0abb4"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T13:45:36Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "2a47af52648a4c61867f214694c65ef7",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
 }
