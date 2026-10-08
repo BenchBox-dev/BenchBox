@@ -23312,6 +23312,13 @@
       "status": "done",
       "title": "UAT: harden per-cell timeout enforcement for process trees"
     },
+    "unattributed-update-branch-commits-block-merge-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "An automatic branch update adds an unattributed commit that leaves the pull request BLOCKED"
+    },
     "unified-adapter-interface": {
       "claim": null,
       "needs": [],

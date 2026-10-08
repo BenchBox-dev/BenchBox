@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The source of the automatic update-branch on #2769 is identified (workflow, app or setting)",
+    "Either that source no longer updates pull request branches, or its commits are attributed so they do not need extra approval",
+    "docs/operations/repo-admin-settings.md records the rule and the recovery"
+  ],
+  "description": "On #2769 a merge of develop was pushed at 14:02 UTC as commit 1e08adaa1 (committer web-flow, timeline actor \"GitHub\") right after a close/reopen. All required checks then passed and no thread was open, but the pull request stayed BLOCKED. The develop ruleset sets require_extra_approval_for_unattributed_changes, and the author cannot approve their own pull request. Rebuilding the same tree as an author-made merge commit unblocked it. Nobody knows what performed the update, and the update also invalidated a head-specific stand-in.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2769"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-08T23:28:22Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "f4727f6bcf70455083bf69f887006434",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
