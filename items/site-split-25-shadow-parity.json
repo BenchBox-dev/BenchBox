@@ -2,9 +2,11 @@
   "acceptance": [
     "Three consecutive certified bundles produce matching trees apart from the allowlist (run ids and digests recorded in context)",
     "shadow-allowlist.json committed with a reason per entry",
-    "No production change made"
+    "No production change made",
+    "No page outside docs/publish-allowlist.txt, or listed in docs/publish-exclusions.txt, is published",
+    "site-split-26 replay pass completed before this item starts (core range recorded)"
   ],
-  "context": "muse AR-20 (accepted in part): the allowlist is enumerated in a file. Dispatching core site-deploy in preview mode is allowed; mode=deploy is not. If a match cannot be reached after two fix attempts, record the diff and ask the owner.",
+  "context": "muse AR-20 (accepted in part): the allowlist is enumerated in a file. Dispatching core site-deploy in preview mode is allowed; mode=deploy is not. If a match cannot be reached after two fix attempts, record the diff and ask the owner.\n2026-10-08: acceptance gained the publish-list check (core #2763, #2768) and the D-Q seeded-path replay (site-split-26).",
   "description": "This item produces evidence in the tracker. Fix any mismatch in a small site PR; it may be stacked.\n\n1. Set the core repo variable SITE_BRIDGE_ENABLED=true, so every certified bundle dispatches to the site.\n2. For each certified bundle, compare the site build with a core `site-deploy.yml` preview (`-f mode=preview`) at the same core_sha. Use tree-digest.ts for the comparison.\n3. Allowed differences live in `inventory/shadow-allowlist.json`, each with a reason. Only these are allowed:\n   - the edit-link and GitHub source-link URL rewrites from site-split-22;\n   - the receipt file;\n   - files that embed those.\n   Fix anything else.\n\nCore site-deploy stays the production writer throughout. SITE_DEPLOY_TARGET stays unset in the site repo.",
   "sessions": [
     {
@@ -22,6 +24,14 @@
       "op": "update",
       "op_id": "4703146100cf47488e339751fbede18a",
       "session_id": "2d03f81d904c4b488222c4b6be81ba33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-08T23:25:39Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f27170354d844ba99ccabbe30a397c0f",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
     }
   ]
 }
