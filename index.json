@@ -13800,6 +13800,13 @@
       "status": "open",
       "title": "oracle-review starts a run for every review-thread reply"
     },
+    "oracle-strike-count-distinct-patches-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "The oracle's retry-state strike count rises on every DO NOT SHIP, not once per distinct patch"
+    },
     "oracle-swf-empty-defect-list-decision-20261008": {
       "claim": null,
       "needs": [],
