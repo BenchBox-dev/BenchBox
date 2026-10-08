@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "DuckDB TPC-H SF1 throughput bundle is regenerated with standard load timing and data_generation_hash",
+    "Corpus inventory and validator pass with the refreshed bundle"
+  ],
+  "context": "Opus review finding O3 on PR #2761 (feat/throughput-corpus-three-engines).",
+  "description": "The fresh DuckDB TPC-H SF1 throughput bundle in the seed corpus (tpch_sf1_duckdb_sql_20261007_155030_c3a60388.json) records 0 ms for load/schema duration and is missing data_generation_hash in its manifest and bundle metadata, unlike standard official bundles.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:2a10096285872d23ac8a3bfe",
+      "at": "2026-10-08T23:39:28Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "29243190f06f496d889f56936ffcaaf3",
+      "session_id": "414237a6e56140ed97e26a248092ab35"
+    }
+  ]
+}

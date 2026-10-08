@@ -7994,6 +7994,13 @@
       "status": "dropped",
       "title": "DuckDB thread_limit reaches a raw SQL f-string uncoerced, and #1514 made that path live"
     },
+    "duckdb-throughput-bundle-missing-hash-and-timing": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Regenerate DuckDB TPC-H SF1 throughput bundle with data_generation_hash and load timing"
+    },
     "duckdb-tpc-ds-and-tpc-h-example-updates-for-enhanced-tuning-completed": {
       "claim": null,
       "needs": [],
