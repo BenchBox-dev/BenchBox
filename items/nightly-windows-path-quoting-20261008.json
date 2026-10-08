@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "test_pr_arm.py, the corpus-allowlist test and test_ledger_coverage.py pass on windows-latest 3.12 or carry a Windows skip with a stated reason",
+    "No test builds a bash command string by interpolating a native Windows path",
+    "Ubuntu and macOS results are unchanged"
+  ],
+  "context": "Counts come from the issue (2026-10-03). Re-derive the current list from the latest legacy nightly before starting.",
+  "description": "The largest single Windows cluster is tests/unit/scripts/test_pr_arm.py (31 failures): the make wrapper's arguments are quoted differently on Windows (for example '--repo must be owner/name, got \"'7'\"'). Other clusters: a Windows interpreter path with backslashes interpolated into a `bash -c` script becomes 'D:aBenchBoxBenchBox.venvScriptspython.exe: command not found' (test_validate_submission_corpus_allowlist.py); and test_ledger_coverage.py compares paths using '\\\\' where the ledger uses '/'. Use POSIX-form paths (Path.as_posix()) for anything passed to bash or compared with ledger entries, and quote arguments with shlex or an argv list rather than a shell string. Where a test exercises a POSIX-only script, mark it skipped on Windows with the reason instead of emulating bash.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2568"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-08T23:55:17Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "176c0b4664fc43b9909049da7abce736",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}
