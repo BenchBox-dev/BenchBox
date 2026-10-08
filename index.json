@@ -13800,6 +13800,13 @@
       "status": "open",
       "title": "Check the first muse oracle attempt on muse-spark-1.3-contributor"
     },
+    "oracle-patch-hash-hunk-positions-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Oracle patch hashes drop hunk positions, so moving an edit can carry an earlier decision"
+    },
     "oracle-pull-request-target-retarget-race-20261008": {
       "claim": null,
       "needs": [],

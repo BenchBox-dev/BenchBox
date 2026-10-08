@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The hash keeps the hunk header's function context, or each hunk's position relative to the previous one, while still surviving a plain rebase",
+    "A test shows a moved edit gives a different digest, and a rebased identical patch the same one",
+    "The #2769 replay fixture still shows the rebase carried"
+  ],
+  "description": "protocol.file_patches replaces each hunk header with a bare \"@@\" so that rebases keep the hash. Moving an added or removed line to another place in the same file, where the three context lines match, therefore gives the same per-file hash and digest. The earlier SHIP is then carried to a semantically different head without review. Deferred from #2784 (Medium).",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2784"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-08T23:32:10Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "bd3a9623e39241f29f1b4c425f1c02c2",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
