@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import textwrap
 import types
 
 import pytest
@@ -319,25 +318,25 @@ def test_spark_fixture_restores_environment_on_skip_or_failure(monkeypatch, fail
 
 
 def test_importing_optional_helpers_does_not_load_engines_or_change_environment():
-    code = textwrap.dedent("""
-        import importlib.abc
-        import os
-        import sys
+    code = """
+import importlib.abc
+import os
+import sys
 
-        class BlockEngines(importlib.abc.MetaPathFinder):
-            def find_spec(self, fullname, path=None, target=None):
-                if fullname.split('.')[0] in {'chdb', 'pyspark'}:
-                    raise AssertionError('engine imported: ' + fullname)
+class BlockEngines(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split('.')[0] in {'chdb', 'pyspark'}:
+            raise AssertionError('engine imported: ' + fullname)
 
-        sys.meta_path.insert(0, BlockEngines())
-        before = dict(os.environ)
-        cwd = os.getcwd()
-        import tests.utilities.optional_engines
-        import tests.fixtures.utility_fixtures
-        assert dict(os.environ) == before
-        assert os.getcwd() == cwd
-        assert 'chdb' not in sys.modules
-        assert 'pyspark' not in sys.modules
-    """)
+sys.meta_path.insert(0, BlockEngines())
+before = dict(os.environ)
+cwd = os.getcwd()
+import tests.utilities.optional_engines
+import tests.fixtures.utility_fixtures
+assert dict(os.environ) == before
+assert os.getcwd() == cwd
+assert 'chdb' not in sys.modules
+assert 'pyspark' not in sys.modules
+"""
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr

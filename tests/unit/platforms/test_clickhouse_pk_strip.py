@@ -75,8 +75,9 @@ class TestLiteralsAndCommentsSurvive:
         assert strip(statement) == "CREATE TABLE t (a Int32, n String DEFAULT 'a PRIMARY KEY b')"
 
     def test_line_comment_with_comma_survives(self):
-        statement = "CREATE TABLE t (a Int32 /* pk, (x) */, PRIMARY KEY (a))"
-        assert strip(statement) == "CREATE TABLE t (a Int32 /* pk, (x) */)"
+        comment = "/" + "* pk, (x) *" + "/"
+        statement = f"CREATE TABLE t (a Int32 {comment}, PRIMARY KEY (a))"
+        assert strip(statement) == f"CREATE TABLE t (a Int32 {comment})"
 
     def test_nested_type_commas_do_not_split(self):
         statement = "CREATE TABLE t (d Decimal(10, 2), e Enum8('a', 'b'), PRIMARY KEY (d))"
