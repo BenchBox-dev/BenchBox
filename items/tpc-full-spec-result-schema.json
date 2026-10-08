@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "New bundles dual-write; all readers accept legacy and new fields",
+    "Old corpus bundles validate and render unchanged",
+    "Schema policy and contract docs record the change"
+  ],
+  "description": "Result JSON carries benchmark.compliance_class (official / unofficial_nonstandard / unofficial_subscale; core/tpch/compliance.py, core/tpcds/compliance.py) and execution.official (core/results/schema.py ~597), already persisted in the published corpus. New bundles write conformance_class (full_spec / nonstandard_scale / subscale) and execution.full_spec alongside the legacy fields; every reader accepts either (validation/bundle.py, core/results/database.py, scripts/validate_submission.py, Explorer duckdbQueries.ts, localResult.ts, utils.ts); stored corpus values stay readable. Rename the admission code unofficial_compliance (core/publishing/admission.py) and SubmitTerminalState.unofficial, keeping the old values accepted; Explorer \"Unofficial\" badge and \"(unofficial)\" suffix become \"Non-standard\"/\"(subscale)\". Record the change in schema_policy.py, hosted-results-contract.md and result-formats.md.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-08T12:45:06Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "3c2c7f975d9f4c6985139fdee775d67a",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
+    }
+  ]
+}
