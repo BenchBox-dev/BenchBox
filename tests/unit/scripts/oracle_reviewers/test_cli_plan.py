@@ -9,10 +9,9 @@ from typing import Any
 
 import pytest
 
-from _project.scripts.oracle_reviewers import cli, github
+from _project.scripts.oracle_reviewers import cli, github, protocol
 from _project.scripts.oracle_reviewers.dedup import fingerprint
-from _project.scripts.oracle_reviewers.policy import load_policy
-from _project.scripts.oracle_reviewers.retry import Reviewed, State
+from _project.scripts.oracle_reviewers.retry import State
 
 from .conftest import POLICY_PATH
 
@@ -57,6 +56,7 @@ class FakeGitHub:
         self.merge_base: str | None = MERGE_BASE
         self.modes: dict[str, str] = {}
         self.dispatched: list[int] = []
+        self.reviews: list[dict[str, Any]] | None = []
 
     def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(github, "get_json", self._json)
@@ -65,6 +65,12 @@ class FakeGitHub:
         monkeypatch.setattr(github, "review_threads", self._threads)
         monkeypatch.setattr(github, "latest_state", lambda repo, pr: self.state)
         monkeypatch.setattr(github, "dispatch", lambda repo, workflow, pr: self.dispatched.append(pr))
+        monkeypatch.setattr(github, "oracle_reviews", self._reviews)
+
+    def _reviews(self, repo: str, pr: int) -> list[dict[str, Any]]:
+        if self.reviews is None:
+            raise github.GitHubError("reviews unavailable")
+        return self.reviews
 
     def _json(self, path: str) -> dict[str, Any]:
         if "/compare/" in path:
@@ -283,227 +289,331 @@ TWO_FILE_DIFF = (
 OLD_HEAD = "c" * 40
 
 
-def _basis(tier: str = "medium-high", merge_base: str = MERGE_BASE, excluded: tuple[str, ...] = ("codex",)) -> str:
-    policy = load_policy(POLICY_PATH)
-    text = POLICY_PATH.read_text(encoding="utf-8")
-    return cli.review_basis(merge_base, policy.tiers[tier], policy, excluded, text)
+def _record(diff: str, decision: str, **over: Any) -> dict[str, Any]:
+    paths = over.pop("paths", None)
+    patches = protocol.file_patches(diff)
+    current = protocol.patch_map(patches, paths if paths is not None else sorted(patches))
+    record = {
+        "v": 1,
+        "cycle": 1,
+        "round": 1,
+        "kind": "first",
+        "decision": decision,
+        "head_sha": OLD_HEAD,
+        "base_ref": "develop",
+        "reviewer": "sol",
+        "tier": "medium-high",
+        "strikes_after": 1 if decision == "DO_NOT_SHIP" else 0,
+        "open_defects": [],
+        "next_id": 1,
+        "patch_digest": protocol.patch_digest(current),
+        "carried": False,
+        "summary": "",
+        **over,
+    }
+    return {**record, "patch_map": current}
 
 
-def _identity(path: str, sha: str) -> str:
-    return f"{MODE}:{sha}:{'benchbox/utils/rules.py' if path == 'notes/rules.md' else ''}"
+def _review(record: dict[str, Any] | None, **over: Any) -> dict[str, Any]:
+    body = f"### oracle-review-shadow: failure for `{OLD_HEAD}`\n\nDecision text.\n"
+    if record is not None:
+        patches = record.get("patch_map")
+        body += "\n" + protocol.encode_marker({k: v for k, v in record.items() if k != "patch_map"}, patches)
+    review = {
+        "id": 1,
+        "login": "benchbox-oracle[bot]",
+        "user_type": "Bot",
+        "state": "COMMENTED",
+        "body": body,
+        "submitted_at": "2026-10-08T10:00:00Z",
+        "commit_id": OLD_HEAD,
+    }
+    review.update(over)
+    return review
 
 
-def _reviewed_state(files: dict[str, str], basis: str = _basis(), outcome: str = "failure") -> State:
-    reviewed = Reviewed(OLD_HEAD, basis, outcome, {path: _identity(path, sha) for path, sha in files.items()})
-    return State(7, OLD_HEAD, outcome, datetime.now(UTC) - timedelta(hours=1), reviewed=reviewed)
+def _fake(*reviews: dict[str, Any], files: list[dict[str, Any]] | None = None, diff: str = TWO_FILE_DIFF, **pull: Any):
+    fake = FakeGitHub(_pull(**pull), files if files is not None else TWO_FILES, diff=diff)
+    fake.reviews = list(reviews)
+    return fake
 
 
-def test_push_without_soundness_change_carries_the_result_without_a_reviewer(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+DEFECT = {"id": "D1", "severity": "High", "file": CAPTURE, "line": 2, "end_line": None, "title": "Drops a row"}
+REBASED = TWO_FILE_DIFF.replace("@@ -1,1 +1,2 @@", "@@ -7,1 +7,2 @@").replace(
+    f"--- a/{CHECKER}", f"index 1111111..2222222 100644\n--- a/{CHECKER}"
+)
+CAPTURE_CHANGED = TWO_FILE_DIFF.replace("+capture change", "+capture fixed")
+
+
+def test_no_review_history_gives_a_first_full_review(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake())
+    assert values["decision"] == "review" and plan["scope"] == "full"
+    assert plan["protocol"]["kind"] == "first" and plan["protocol"]["cycle"] == 1
+    assert plan["protocol"]["prior"] == [] and plan["protocol"]["strikes"] == 0
+    assert "Leave prior_defects empty." in (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("diff", [TWO_FILE_DIFF, REBASED], ids=["identical", "rebased"])
+@pytest.mark.parametrize("decision", ["SHIP", "SHIP_WITH_FIXES", "DO_NOT_SHIP"])
+def test_an_unchanged_patch_carries_the_decision_without_a_reviewer(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, diff: str, decision: str
 ) -> None:
     files = [*TWO_FILES, {"filename": "README.md", "additions": 1, "deletions": 0, "sha": "9" * 40}]
-    fake = FakeGitHub(_pull(), files, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}))
+    readme = diff + "diff --git a/README.md b/README.md\n--- a/README.md\n+++ b/README.md\n@@ -1 +1 @@\n-a\n+b\n"
+    fake = _fake(
+        _review(_record(TWO_FILE_DIFF, decision)), files=files, diff=readme, base={"ref": "develop", "sha": "f" * 40}
+    )
     _, values, plan = _plan(monkeypatch, tmp_path, fake)
     assert values["decision"] == "carry" and values["post"] == "true"
-    assert plan["reviewed_head"] == OLD_HEAD
-    assert plan["chain"] == []
-    assert fake.diff_reads == 0
+    assert plan["reviewed_head"] == OLD_HEAD and plan["chain"] == []
+    assert plan["protocol"]["previous"]["decision"] == decision
     assert not (tmp_path / "plan" / "brief.md").exists()
 
 
-def test_push_touching_one_file_reviews_only_that_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40}, outcome="success")
-    fake = FakeGitHub(_pull(), TWO_FILES, state, diff=TWO_FILE_DIFF)
-    _, values, plan = _plan(monkeypatch, tmp_path, fake)
-    assert values["decision"] == "review"
-    assert plan["scope"] == "changed" and plan["reviewed_head"] == OLD_HEAD
-    assert plan["reviewed_files"] == {CHECKER: _identity(CHECKER, "1" * 40), CAPTURE: _identity(CAPTURE, "2" * 40)}
+def test_a_file_leaving_the_pull_request_carries_when_nothing_else_changed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    gone = "benchbox/core/equivalence/gone.py"
+    section = f"diff --git a/{gone} b/{gone}\n--- a/{gone}\n+++ b/{gone}\n@@ -1 +1 @@\n-a\n+b\n"
+    record = _record(TWO_FILE_DIFF + section, "SHIP_WITH_FIXES", open_defects=[DEFECT], next_id=2)
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake(_review(record)))
+    assert values["decision"] == "carry"
+    assert plan["protocol"]["patch_digest"] != record["patch_digest"]
+    assert "no reviewed file changed" in plan["decision_reason"]
+
+
+def test_a_follow_up_after_ship_with_fixes_reviews_only_the_changed_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    record = _record(TWO_FILE_DIFF, "SHIP_WITH_FIXES", open_defects=[DEFECT], next_id=2)
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake(_review(record), diff=CAPTURE_CHANGED))
+    assert values["decision"] == "review" and plan["scope"] == "changed"
+    rules = plan["protocol"]
+    assert (rules["kind"], rules["cycle"], rules["round"], rules["next_id"]) == ("follow-up", 1, 2, 2)
+    assert rules["prior"] == [DEFECT] and rules["changed"] == [CAPTURE]
+    assert plan["evidence_files"] == [CAPTURE]
     brief = (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
-    assert "capture change" in brief and "checker change" not in brief
-    assert f"since head {OLD_HEAD} was reviewed" in brief
-    assert (tmp_path / "plan" / "diff.patch").read_text(encoding="utf-8") == TWO_FILE_DIFF
+    assert "capture fixed" in brief and "checker change" not in brief
+    assert f"- D1 (High) {CAPTURE}:2: Drops a row" in brief
+    assert "Give each of them a status in prior_defects" in brief
+
+
+def test_a_follow_up_after_ship_is_scoped_even_at_the_very_high_tier(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    record = _record(TWO_FILE_DIFF, "SHIP", tier="very-high", reviewer="opus")
+    fake = _fake(_review(record), diff=CAPTURE_CHANGED, labels=[{"name": "oracle-tier:very-high"}])
+    _, values, plan = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "review" and plan["scope"] == "changed" and plan["tier"] == "very-high"
+    assert plan["protocol"]["kind"] == "follow-up" and plan["protocol"]["prior"] == []
+    assert "Leave prior_defects empty. An earlier review decided SHIP" in (tmp_path / "plan" / "brief.md").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_a_follow_up_tries_the_previous_reviewer_first(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    record = _record(TWO_FILE_DIFF, "SHIP_WITH_FIXES", open_defects=[DEFECT], next_id=2, reviewer="muse")
+    _, _, plan = _plan(monkeypatch, tmp_path, _fake(_review(record), diff=CAPTURE_CHANGED))
+    assert [item["name"] for item in plan["chain"]] == ["muse", "sonnet", "sol", "luna", "agy"]
+    (tmp_path / "x").mkdir()
+    _, _, first = _plan(monkeypatch, tmp_path / "x", _fake(diff=CAPTURE_CHANGED))
+    assert [item["name"] for item in first["chain"]] == ["sonnet", "sol", "luna", "muse", "agy"]
+
+
+def test_a_changed_patch_after_do_not_ship_restarts_with_the_previous_summary(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    record = _record(TWO_FILE_DIFF, "DO_NOT_SHIP", summary="The comparator ignores NULL ordering.")
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake(_review(record), diff=CAPTURE_CHANGED))
+    assert values["decision"] == "review" and plan["scope"] == "full"
+    assert (plan["protocol"]["kind"], plan["protocol"]["cycle"], plan["protocol"]["strikes"]) == ("first", 2, 1)
+    brief = (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
+    assert "decided DO NOT SHIP" in brief and "The comparator ignores NULL ordering." in brief
+    assert "checker change" in brief and "capture fixed" in brief
 
 
 @pytest.mark.parametrize(
-    ("state", "event"),
+    ("over", "pull", "reason"),
     [
-        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}, _basis("very-high")), {"action": "synchronize"}),
-        (
-            _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}, _basis(merge_base="f" * 40)),
-            {"action": "synchronize"},
-        ),
-        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}, "medium-high"), {"action": "synchronize"}),
-        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}, _basis(excluded=())), {"action": "synchronize"}),
-        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}), {"action": "edited", "changes": {"base": {}}}),
-        (None, {"action": "synchronize"}),
-        (_reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40}), {"action": "synchronize"}),
-        (_reviewed_state({CHECKER: "1" * 40, "gone.py": "3" * 40}, outcome="success"), {"action": "synchronize"}),
-    ],
-    ids=[
-        "tier-changed",
-        "merge-base-moved",
-        "older-state",
-        "author-family-changed",
-        "base-changed",
-        "no-state",
-        "after-failure",
-        "file-left-the-diff",
+        ({"base_ref": "release"}, {}, "the base changed from release to develop"),
+        ({"tier": "low-medium"}, {}, "the tier changed from low-medium to medium-high"),
     ],
 )
-def test_full_review_when_the_last_review_does_not_cover_this_change(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, state: State | None, event: dict[str, Any]
+def test_a_retarget_or_tier_change_restarts_and_keeps_strikes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, over: dict, pull: dict, reason: str
 ) -> None:
-    fake = FakeGitHub(_pull(), TWO_FILES, state, diff=TWO_FILE_DIFF)
-    _, values, plan = _plan(monkeypatch, tmp_path, fake, event=event)
-    assert values["decision"] == "review" and plan["scope"] == "full"
-    assert "checker change" in (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
-
-
-def test_open_oracle_threads_are_recorded_for_suppression(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    threads = [
-        {
-            "resolved": False,
-            "path": CHECKER,
-            "author": "benchbox-oracle",
-            "author_type": "Bot",
-            "body": "**High**: Drops a row",
-        },
-        {
-            "resolved": True,
-            "path": CHECKER,
-            "author": "benchbox-oracle",
-            "author_type": "Bot",
-            "body": "**High**: Fixed",
-        },
-        {
-            "resolved": False,
-            "path": CHECKER,
-            "author": "someone",
-            "author_type": "User",
-            "body": "**High**: Human note",
-        },
-    ]
-    _, _, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), SOUNDNESS, threads=threads))
-    assert plan["open_findings"] == {fingerprint(CHECKER, "Drops a row"): "High"}
-
-
-def test_unreadable_threads_suppress_nothing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), SOUNDNESS, threads=None))
-    assert values["decision"] == "review" and plan["open_findings"] == {}
-
-
-def test_failure_is_carried_only_while_the_reviewed_files_are_unchanged(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    exact = FakeGitHub(_pull(), TWO_FILES, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}))
-    (tmp_path / "exact").mkdir()
-    (tmp_path / "reverted").mkdir()
-    _, values, _ = _plan(monkeypatch, tmp_path / "exact", exact)
-    assert values["decision"] == "carry"
-    reverted = FakeGitHub(
-        _pull(), TWO_FILES[:1], _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}), diff=TWO_FILE_DIFF
-    )
-    _, values, plan = _plan(monkeypatch, tmp_path / "reverted", reverted)
-    assert values["decision"] == "review" and plan["scope"] == "full"
-
-
-def test_manual_carry_is_recorded_as_a_retry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    fake = FakeGitHub(_pull(), TWO_FILES, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}))
-    _, values, plan = _plan(monkeypatch, tmp_path, fake, event_name="issue_comment", event={})
-    assert values["decision"] == "carry" and plan["manual"] is True
-
-
-def test_unreadable_merge_base_gives_a_full_review(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    fake = FakeGitHub(_pull(), TWO_FILES, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}), diff=TWO_FILE_DIFF)
-    fake.merge_base = None
+    struck = _record(TWO_FILE_DIFF.replace("a\n+", "z\n+"), "DO_NOT_SHIP", head_sha="e" * 40)
+    latest = _record(TWO_FILE_DIFF, "SHIP", **over)
+    fake = _fake(_review(struck, id=1), _review(latest, id=2, submitted_at="2026-10-08T11:00:00Z"), **pull)
     _, values, plan = _plan(monkeypatch, tmp_path, fake)
-    assert values["decision"] == "review" and plan["scope"] == "full" and plan["review_basis"] == ""
-
-
-def test_very_high_tier_is_never_scoped(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    pull = _pull(labels=[{"name": "oracle-tier:very-high"}])
-    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40}, _basis("very-high"), outcome="success")
-    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(pull, TWO_FILES, state, diff=TWO_FILE_DIFF))
     assert values["decision"] == "review" and plan["scope"] == "full"
+    assert plan["protocol"]["kind"] == "first" and plan["protocol"]["cycle"] == 2
+    assert plan["protocol"]["reason"] == reason and plan["protocol"]["strikes"] == 1
 
 
-def test_a_changed_file_missing_from_the_selected_diff_gives_a_full_review(
+def test_a_head_that_already_has_a_decision_runs_no_reviewer(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    record = _record(TWO_FILE_DIFF, "SHIP_WITH_FIXES", head_sha=HEAD)
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake(_review(record)))
+    assert values["decision"] == "skip" and values["post"] == "false"
+    assert "already has a SHIP WITH FIXES decision" in plan["decision_reason"]
+
+
+def _strike(n: int, head: str = "e" * 40) -> dict[str, Any]:
+    diff = TWO_FILE_DIFF.replace("checker change", f"checker change {n}")
+    return _review(_record(diff, "DO_NOT_SHIP", head_sha=head, cycle=n), id=n, submitted_at=f"2026-10-08T0{n}:00:00Z")
+
+
+def test_the_third_do_not_ship_refuses_further_review(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake(_strike(1), _strike(2), _strike(3)))
+    assert values["decision"] == "refused" and values["post"] == "true"
+    assert plan["protocol"]["strikes"] == 3 and plan["chain"] == []
+    (tmp_path / "two").mkdir()
+    _, values, _ = _plan(monkeypatch, tmp_path / "two", _fake(_strike(1), _strike(2)))
+    assert values["decision"] == "review"
+
+
+def test_a_refusal_posts_once_per_head(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    refusal = _review(
+        _record(TWO_FILE_DIFF, "REFUSED", kind="refused", head_sha=HEAD, cycle=3, round=0, strikes_after=3),
+        id=9,
+        submitted_at="2026-10-08T09:00:00Z",
+    )
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake(_strike(1), _strike(2), _strike(3), refusal))
+    assert values["decision"] == "skip" and "already has the refusal" in plan["decision_reason"]
+
+
+def test_strikes_count_distinct_decisive_patches_and_never_carried_ones(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    quoted = TWO_FILE_DIFF.replace(f"diff --git a/{CAPTURE} b/{CAPTURE}", f'diff --git "a/{CAPTURE}" "b/{CAPTURE}"')
-    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40}, outcome="success")
-    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), TWO_FILES, state, diff=quoted))
-    assert values["decision"] == "review" and plan["scope"] == "full"
+    moved = TWO_FILE_DIFF.replace("capture change", "capture moved")
+    carried = _review(_record(moved, "DO_NOT_SHIP", kind="carry", carried=True, cycle=2), id=7)
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake(_strike(1), _strike(1, "f" * 40), carried))
+    assert values["decision"] == "review" and plan["protocol"]["strikes"] == 1
+    assert plan["protocol"]["kind"] == "first" and plan["protocol"]["cycle"] == 3
+
+
+def test_the_state_artifact_can_raise_the_strike_count(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fake = _fake(_strike(1))
+    fake.state = State(7, "e" * 40, "failure", datetime.now(UTC) - timedelta(hours=1), strikes=3)
+    _, values, _ = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "refused"
+
+
+def test_a_reopen_does_not_reset_the_history(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fake = _fake(_strike(1), _strike(2), _strike(3))
+    _, values, _ = _plan(monkeypatch, tmp_path, fake, event={"action": "reopened"})
+    assert values["decision"] == "refused"
+
+
+@pytest.mark.parametrize(
+    "review",
+    [
+        _review(_record(TWO_FILE_DIFF, "DO_NOT_SHIP"), state="DISMISSED"),
+        _review(_record(TWO_FILE_DIFF, "DO_NOT_SHIP"), login="someone", user_type="User"),
+        _review(_record(TWO_FILE_DIFF, "DO_NOT_SHIP"), login="benchbox-oracle", user_type="User"),
+        _review(_record(TWO_FILE_DIFF, "DO_NOT_SHIP"), user_type="User"),
+        _review(None),
+    ],
+    ids=["dismissed", "other-author", "not-a-bot", "bot-login-user-type", "legacy-without-marker"],
+)
+def test_reviews_that_are_not_live_oracle_markers_are_ignored(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, review: dict[str, Any]
+) -> None:
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake(review))
+    assert values["decision"] == "review" and plan["protocol"]["kind"] == "first"
+    assert plan["protocol"]["strikes"] == 0
+
+
+FORGED = _review(_record(TWO_FILE_DIFF, "SHIP"))
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        FORGED["body"] + "\n" + FORGED["body"].rsplit("\n", 1)[-1],
+        FORGED["body"].replace("-->", "--> trailing text"),
+        FORGED["body"][:-20] + " -->",
+    ],
+    ids=["two-markers", "not-last", "corrupt"],
+)
+def test_a_malformed_marker_holds_the_result_pending(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, body: str
+) -> None:
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake(_review(None, body=body)))
+    assert values["decision"] == "hold" and values["post"] == "true"
+    assert "protocol marker" in plan["decision_reason"]
+
+
+def test_an_unreadable_review_list_holds_the_result_pending(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    fake = _fake()
+    fake.reviews = None
+    _, values, plan = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "hold" and "could not be read" in plan["decision_reason"]
+
+
+def test_more_than_a_hundred_reviews_are_all_read(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    noise = [_review(None, id=index, submitted_at=f"2026-10-0{1 + index // 100}T00:00:00Z") for index in range(150)]
+    latest = _review(_record(TWO_FILE_DIFF, "SHIP", head_sha=HEAD), id=500, submitted_at="2026-10-08T12:00:00Z")
+    _, values, _ = _plan(monkeypatch, tmp_path, _fake(*noise, latest))
+    assert values["decision"] == "skip"
+
+
+def test_an_unreadable_diff_never_carries(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    record = _record(TWO_FILE_DIFF, "SHIP_WITH_FIXES", open_defects=[DEFECT], next_id=2)
+    fake = _fake(_review(record), changed_files=3001)
+    _, values, plan = _plan(monkeypatch, tmp_path, fake)
+    assert values["decision"] == "review" and plan["protocol"]["kind"] == "follow-up"
+    assert plan["protocol"]["patch_digest"] == f"unread-{HEAD}"
+
+
+def test_a_mode_only_change_is_a_changed_patch(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    moded = TWO_FILE_DIFF.replace(f"--- a/{CAPTURE}", f"old mode 100644\nnew mode 100755\n--- a/{CAPTURE}")
+    record = _record(TWO_FILE_DIFF, "SHIP")
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake(_review(record), diff=moded))
+    assert values["decision"] == "review" and plan["protocol"]["changed"] == [CAPTURE]
+
+
+def test_a_binary_change_is_never_mistaken_for_an_unchanged_patch() -> None:
+    def binary(blob: str) -> str:
+        return f"diff --git a/a.bin b/a.bin\nindex 111..{blob} 100644\nBinary files a/a.bin and b/a.bin differ\n"
+
+    assert protocol.file_patches(binary("222")) != protocol.file_patches(binary("333"))
+    text = "diff --git a/a.py b/a.py\nindex 111..{0} 100644\n--- a/a.py\n+++ b/a.py\n@@ -{1},1 +{1},2 @@\n a\n+b\n"
+    assert protocol.file_patches(text.format("222", 1)) == protocol.file_patches(text.format("333", 9))
 
 
 HELPER = "benchbox/utils/row_compare.py"
 
 
-def test_a_code_change_outside_soundness_paths_is_reviewed_not_carried(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_a_code_change_outside_soundness_paths_is_followed_up(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     files = [*TWO_FILES, {"filename": HELPER, "additions": 3, "deletions": 1, "sha": "7" * 40}]
-    diff = (
-        TWO_FILE_DIFF
-        + f"diff --git a/{HELPER} b/{HELPER}\n--- a/{HELPER}\n+++ b/{HELPER}\n@@ -1,1 +1,2 @@\n a\n+helper change\n"
-    )
-    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40, HELPER: "6" * 40}, outcome="success")
-    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), files, state, diff=diff))
+    helper = f"diff --git a/{HELPER} b/{HELPER}\n--- a/{HELPER}\n+++ b/{HELPER}\n@@ -1,1 +1,2 @@\n a\n+helper\n"
+    record = _record(TWO_FILE_DIFF + helper, "SHIP")
+    fake = _fake(_review(record), files=files, diff=TWO_FILE_DIFF + helper.replace("+helper", "+helper changed"))
+    _, values, plan = _plan(monkeypatch, tmp_path, fake)
     assert values["decision"] == "review" and plan["scope"] == "changed"
+    assert plan["protocol"]["changed"] == [HELPER] and plan["evidence_files"] == []
     brief = (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
-    assert "helper change" in brief and "capture change" not in brief
     unchanged = brief.split("identical since:", 1)[1].split("Review the first list", 1)[0]
     assert CHECKER in unchanged and CAPTURE in unchanged and HELPER not in unchanged
 
 
-def test_a_head_that_moves_while_planning_is_left_to_its_own_run(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    fake = FakeGitHub(_pull(), SOUNDNESS)
-    reads = iter([_pull(), _pull(head={"sha": "d" * 40, "repo": {"full_name": REPO}})])
-    monkeypatch.setattr(fake, "_json", lambda path: next(reads))
-    _, values, plan = _plan(monkeypatch, tmp_path, fake)
-    assert values["decision"] == "skip" and "head moved" in plan["decision_reason"]
-
-
-def test_prose_is_listed_apart_and_a_rename_from_code_stays_tracked(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    renamed = {"filename": "notes/rules.md", "previous_filename": "benchbox/utils/rules.py", "sha": "8" * 40}
+def test_prose_is_listed_apart_from_a_scoped_follow_up(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     readme = {"filename": "README.md", "additions": 1, "deletions": 0, "sha": "9" * 40}
-    files = [*TWO_FILES, renamed, readme]
-    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "0" * 40, "notes/rules.md": "8" * 40}, outcome="success")
-    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), files, state, diff=TWO_FILE_DIFF))
+    record = _record(TWO_FILE_DIFF, "SHIP")
+    _, values, plan = _plan(
+        monkeypatch, tmp_path, _fake(_review(record), files=[*TWO_FILES, readme], diff=CAPTURE_CHANGED)
+    )
     assert values["decision"] == "review" and plan["scope"] == "changed"
-    assert "notes/rules.md" in plan["reviewed_files"] and "README.md" not in plan["reviewed_files"]
     brief = (tmp_path / "plan" / "brief.md").read_text(encoding="utf-8")
     assert "README.md" in brief.split("not compared with that review:", 1)[1]
 
 
-def test_a_mode_only_change_is_reviewed_not_carried(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    fake = FakeGitHub(_pull(), TWO_FILES, _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40}), diff=TWO_FILE_DIFF)
-    fake.modes = {CHECKER: "100755"}
-    _, values, _ = _plan(monkeypatch, tmp_path, fake)
-    assert values["decision"] == "review"
-
-
-def test_a_truncated_file_list_gives_a_full_review(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40})
-    fake = FakeGitHub(_pull(changed_files=3001), TWO_FILES, state, diff=TWO_FILE_DIFF)
-    _, values, plan = _plan(monkeypatch, tmp_path, fake)
-    assert values["decision"] == "review" and plan["scope"] == "full"
-
-
-def test_a_changed_rename_source_is_reviewed_not_carried(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    moved = {"filename": CAPTURE, "previous_filename": "benchbox/core/expected_results/other.py", "sha": "2" * 40}
-    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40})
-    _, values, _ = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), [TWO_FILES[0], moved], state, diff=TWO_FILE_DIFF))
-    assert values["decision"] == "review"
-
-
 def test_a_text_data_file_is_tracked_like_code(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    data = {"filename": "_sources/tpc-ds/tools/column_list.txt", "additions": 1, "deletions": 0, "sha": "5" * 40}
-    state = _reviewed_state({CHECKER: "1" * 40, CAPTURE: "2" * 40})
-    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), [*TWO_FILES, data], state, diff=TWO_FILE_DIFF))
-    assert values["decision"] == "review"
-    assert "_sources/tpc-ds/tools/column_list.txt" in plan["reviewed_files"]
+    data = "_sources/tpc-ds/tools/column_list.txt"
+    files = [*TWO_FILES, {"filename": data, "additions": 1, "deletions": 0, "sha": "5" * 40}]
+    section = f"diff --git a/{data} b/{data}\n--- a/{data}\n+++ b/{data}\n@@ -1 +1 @@\n-a\n+b\n"
+    record = _record(TWO_FILE_DIFF + section, "SHIP")
+    changed = TWO_FILE_DIFF + section.replace("+b", "+c")
+    _, values, plan = _plan(monkeypatch, tmp_path, _fake(_review(record), files=files, diff=changed))
+    assert values["decision"] == "review" and plan["protocol"]["changed"] == [data]

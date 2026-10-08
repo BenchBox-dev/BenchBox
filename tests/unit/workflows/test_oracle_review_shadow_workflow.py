@@ -299,3 +299,15 @@ def test_reviewer_commands_keep_read_only_flags_and_model_pins(tmp_path: Path) -
         start = argv.index(flags[0])
         assert argv[start : start + len(flags)] == flags, name
         assert reviewer.model in argv or f"--model={reviewer.model}" in argv, name
+
+
+def test_the_post_job_rechecks_the_review_list_before_posting() -> None:
+    post = _jobs()["post"]
+    names = [step["name"] for step in post["steps"]]
+    guard = next(step for step in post["steps"] if step.get("id") == "guard")
+    assert names.index("Mint the App token") < names.index(guard["name"]) < names.index("Post the commit status")
+    assert guard["env"]["GH_TOKEN"] == "${{ steps.app.outputs.token }}"
+    assert "oracle_reviewers.cli guard --plan" in guard["run"]
+    for name in ("Post the commit status", "Post the findings comment", "Post the findings review"):
+        step = next(item for item in post["steps"] if item["name"] == name)
+        assert "steps.guard.outputs.skip != 'true'" in step["if"], name

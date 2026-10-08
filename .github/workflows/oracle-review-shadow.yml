@@ -1286,20 +1286,27 @@ jobs:
           permission-statuses: write
           permission-pull-requests: write
 
-      - name: Post the commit status
+      - name: Skip a result this head already has
+        id: guard
         if: env.HAS_APP == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: python3 -m _project.scripts.oracle_reviewers.cli guard --plan "$RUNNER_TEMP/oracle-plan/plan.json"
+
+      - name: Post the commit status
+        if: env.HAS_APP == 'true' && steps.guard.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: gh api --method POST "repos/$REPO/statuses/$HEAD_SHA" --input "$RUNNER_TEMP/oracle-final/status.json"
 
       - name: Post the findings comment
-        if: env.HAS_APP == 'true' && steps.finalize.outputs.comment == 'true'
+        if: env.HAS_APP == 'true' && steps.guard.outputs.skip != 'true' && steps.finalize.outputs.comment == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: gh api --method POST "repos/$REPO/issues/$PR_NUMBER/comments" --input "$RUNNER_TEMP/oracle-final/comment.json"
 
       - name: Post the findings review
-        if: env.HAS_APP == 'true' && steps.finalize.outputs.review == 'true'
+        if: env.HAS_APP == 'true' && steps.guard.outputs.skip != 'true' && steps.finalize.outputs.review == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: gh api --method POST "repos/$REPO/pulls/$PR_NUMBER/reviews" --input "$RUNNER_TEMP/oracle-final/review.json"

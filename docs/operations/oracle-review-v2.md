@@ -68,22 +68,61 @@ Without the App secrets, the `post` job logs the result and succeeds.
      policy uses `review` from the start of the parity period before the
      cut-over.
 
-`plan` also limits spend to code that changed. The retry state records the
-blob SHA and tree mode of each changed file at the last success or failure, except prose
-files (`.md`, `.mdx`, `.rst`) outside soundness paths, with the basis
-of that result: the merge base of the head with `develop`, the tier and its
-reviewer settings, the excluded author families, and a
-hash of the policy file, brief template, read rules, verdict schema, reviewer code and this
-workflow. When the basis is unchanged and the new
-head has exactly those files at those SHAs, the run posts the recorded result
-to the new head without running a reviewer, so a push that changes only prose
-costs nothing. When the last result was a success below the very-high tier and some
-of those files changed, the brief diffs only the changed files, lists the
-others and any changed prose separately, and asks the reviewer to check the
-effect on them. A file renamed between code and prose counts as code. Every other case gets a full
-review: after a failure, because a scoped review cannot re-check findings in
-files it does not read; at the very-high tier; and after a basis change, a
-file leaving the diff, a diff that cannot be split by file, or a missing state.
+## Rounds
+
+The oracle keeps its own history in its reviews. Each decisive review ends with
+a hidden marker, `<!-- oracle-protocol: v1 ... -->`, written by code after the
+sanitised model text, which cannot contain an HTML comment. It records the
+cycle and round, the kind of round, the decision, the head, the base branch,
+the reviewer, the tier, the strike count, the open defects with their ids, and
+a hash of each changed file's patch (path and patch hashes of 8 hex characters;
+a marker over 4 KB keeps only the aggregate digest). `plan` reads every review
+from the App's Bot account, page by page, and ignores dismissed reviews and
+reviews without a marker. A review with more than one marker, or a marker that
+does not decode, holds the result pending, as does a review list that cannot be
+read. Pending results write no marker.
+
+A file's patch hash ignores the `index` line and hunk line numbers, except for
+binary files, so a rebase that leaves the pull request's changes alone keeps
+every hash. Prose files outside soundness paths are left out.
+
+| Situation | Action |
+|---|---|
+| No marker yet | first round: a full review |
+| Three DO NOT SHIP decisions | refused: one review per head, no reviewer runs |
+| The latest decision is on this head | nothing runs |
+| Base branch or tier changed | new cycle with a full review; strikes are kept |
+| Patch unchanged (a rebase or a prose-only change) | the decision is carried to the new head |
+| Latest SHIP or SHIP WITH FIXES, patch changed | follow-up on the changed files |
+| Latest DO NOT SHIP, patch changed | new cycle with a full review that quotes the previous summary |
+
+A move of the base commit alone does not restart a cycle. A diff that cannot be
+read, or a file list that is truncated, never carries a decision.
+
+A follow-up brief lists the earlier defects with their ids (D1, D2, ...,
+numbered by code within a cycle) and asks the reviewer to mark each one fixed,
+not fixed or withdrawn, with evidence. An earlier defect left without a status
+counts as not fixed. Unfixed earlier defects stay open, and a new
+defect counts only in a file changed since the last review; new defects in
+other files are listed, collapsed and capped at five, as not counted. More
+than 10 open defects in total give DO NOT SHIP. The previous reviewer is tried
+first. A follow-up runs at every tier, including very high.
+
+The oracle never resolves a review thread. A follow-up lists the defects it
+verified as fixed, and the author resolves those threads. Each new thread
+carries a hidden `oracle-defect: c<cycle>-D<n>` marker before its
+`oracle-finding` fingerprint, which stays last.
+
+After three DO NOT SHIP decisions on distinct patches of one pull request, the
+oracle posts a refusal (`failure`, `Decision: **REFUSED**.`) once per head and
+reviews it no more. Carried and refused records do not count, and the strike
+count also never drops below the one in the retry state artifact. Reopening
+does not reset the count; a new pull request does, so the limit is friction
+against review loops, not a security control. The stand-in attestation still
+works on a refused pull request.
+
+Before it posts, the `post` job reads the review list again and posts nothing
+if the head already has a marker, so two runs for one head cannot both post.
 
 Before posting, `post` drops any finding that matches an open review thread
 from this App, by file and normalized title, unless the new finding is more

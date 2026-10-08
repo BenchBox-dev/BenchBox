@@ -19,21 +19,6 @@ WINDOW = timedelta(hours=24)
 
 
 @dataclass(frozen=True)
-class Reviewed:
-    head_sha: str
-    basis: str
-    outcome: str
-    files: Mapping[str, str]
-
-    def to_json(self) -> dict[str, Any]:
-        return {"head_sha": self.head_sha, "basis": self.basis, "outcome": self.outcome, "files": dict(self.files)}
-
-    @classmethod
-    def from_json(cls, data: Mapping[str, Any]) -> Reviewed:
-        return cls(str(data["head_sha"]), str(data.get("basis", "")), str(data["outcome"]), dict(data["files"]))
-
-
-@dataclass(frozen=True)
 class State:
     pr: int
     head_sha: str
@@ -42,7 +27,7 @@ class State:
     retries: tuple[datetime, ...] = ()
     pool_blocked_until: Mapping[str, datetime] = field(default_factory=dict)
     pending_cause: str | None = None
-    reviewed: Reviewed | None = None
+    strikes: int = 0
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -53,7 +38,7 @@ class State:
             "retries": [moment.isoformat() for moment in self.retries],
             "pool_blocked_until": {pool: moment.isoformat() for pool, moment in self.pool_blocked_until.items()},
             "pending_cause": self.pending_cause,
-            "reviewed": self.reviewed.to_json() if self.reviewed else None,
+            "strikes": self.strikes,
         }
 
     @classmethod
@@ -68,7 +53,7 @@ class State:
                 pool: datetime.fromisoformat(value) for pool, value in data.get("pool_blocked_until", {}).items()
             },
             pending_cause=data.get("pending_cause"),
-            reviewed=Reviewed.from_json(data["reviewed"]) if data.get("reviewed") else None,
+            strikes=int(data.get("strikes") or 0),
         )
 
 
@@ -125,13 +110,12 @@ def next_state(
     now: datetime,
     pool_blocked_until: Mapping[str, datetime],
     pending_cause: str | None = None,
-    reviewed: Reviewed | None = None,
+    strikes: int | None = None,
 ) -> State:
     retries = recent_retries(previous, now) + ((now,) if manual else ())
     cause = pending_cause if outcome == PENDING else None
-    if outcome not in DECISIVE or reviewed is None:
-        reviewed = previous.reviewed if previous else None
-    return State(pr, head_sha, outcome, now, retries, dict(pool_blocked_until), cause, reviewed)
+    kept = max(strikes or 0, previous.strikes if previous else 0)
+    return State(pr, head_sha, outcome, now, retries, dict(pool_blocked_until), cause, kept)
 
 
 def due_for_retry(state: State, current_head: str, now: datetime, rules: RetryRules) -> bool:

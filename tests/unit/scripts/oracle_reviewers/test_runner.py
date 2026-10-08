@@ -547,3 +547,14 @@ def test_a_do_not_ship_is_never_discarded_for_missing_read_evidence(
     outcome = _review(policy, tmp_path, workspace, head, reviewer=reviewer, brief_mode="file-list", required=("a.txt",))
     assert outcome.missing is None and outcome.verdict is not None
     assert outcome.verdict["decision"] == "DO_NOT_SHIP"
+
+
+def test_a_follow_up_missing_a_prior_status_is_recorded_for_the_judge(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    answered = [{"id": "D1", "status": "fixed", "evidence": "line 1"}]
+    _muse_says(tmp_path, monkeypatch, prior_defects=answered)
+    outcome = _review(policy, tmp_path, workspace, head)
+    assert outcome.missing is None and outcome.verdict is not None
+    assert [item["id"] for item in outcome.verdict["prior_defects"]] == ["D1"]

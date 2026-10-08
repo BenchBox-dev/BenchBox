@@ -58,7 +58,7 @@ def test_too_many_defects_become_do_not_ship_with_the_count_in_the_summary() -> 
     verdict = _verdict("SHIP_WITH_FIXES", [_defect(line) for line in range(1, 61)], summary="x" * 3000)
     judgement = judge(verdict, 10)
     assert judgement.decision == "DO_NOT_SHIP" and judgement.defects == ()
-    assert judgement.summary.endswith("The reviewer listed 60 defects, more than the 10 allowed.")
+    assert judgement.summary.endswith("The review left 60 defects open, more than the 10 allowed.")
     assert len(judgement.summary) <= DO_NOT_SHIP_SUMMARY
 
 

@@ -21,16 +21,63 @@ class Final:
     review: dict[str, Any] | None
     reviewer: str | None
     pending_cause: str | None = None
+    strikes: int | None = None
 
 
 def _clip(text: str, limit: int = DESCRIPTION_LIMIT) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def _finding_line(finding: Finding) -> str:
+def _finding_line(finding: Finding, defect_id: str | None = None) -> str:
     detail = f"\n  {finding.detail}" if finding.detail else ""
     span = f"{finding.line}-{finding.end_line}" if finding.end_line else str(finding.line)
-    return f"- **{finding.severity}** `{finding.file}:{span}`: {finding.title}{detail}"
+    named = f"{defect_id}: " if defect_id else ""
+    return f"- **{finding.severity}** `{finding.file}:{span}`: {named}{finding.title}{detail}"
+
+
+def _entry_line(entry: Mapping[str, Any]) -> str:
+    span = f"{entry['line']}-{entry['end_line']}" if entry.get("end_line") else str(entry["line"])
+    return f"- **{entry['severity']}** `{entry['file']}:{span}`: {entry['id']}: {entry['title']}"
+
+
+def _record(
+    plan: Mapping[str, Any],
+    *,
+    kind: str,
+    decision: str,
+    reviewer: str,
+    open_defects: list[dict[str, Any]],
+    next_id: int,
+    strikes_after: int,
+    summary: str = "",
+    carried: bool = False,
+) -> str:
+    rules = plan["protocol"]
+    record = {
+        "v": protocol.MARKER_VERSION,
+        "cycle": rules["cycle"],
+        "round": rules["round"],
+        "kind": kind,
+        "decision": decision,
+        "head_sha": plan["head_sha"],
+        "base_ref": rules["base_ref"],
+        "reviewer": reviewer,
+        "tier": plan.get("tier") or "",
+        "strikes_after": strikes_after,
+        "open_defects": open_defects,
+        "next_id": next_id,
+        "patch_digest": rules["patch_digest"],
+        "carried": carried,
+        "summary": summary if decision == protocol.DO_NOT_SHIP else "",
+    }
+    return protocol.encode_marker(record, rules.get("patch_map"))
+
+
+def _strike_line(plan: Mapping[str, Any], strikes: int) -> list[str]:
+    limit = (plan.get("protocol") or {}).get("max_do_not_ship")
+    if not strikes or not limit:
+        return []
+    return [f"DO NOT SHIP decisions on this pull request: {strikes} of {limit}.", ""]
 
 
 def _section(title: str, lines: list[str]) -> list[str]:
@@ -61,7 +108,9 @@ def _absences(attempts: list[Attempt], step: Step) -> list[str]:
     return lines
 
 
-def _review_comment(finding: Finding, commentable: Mapping[str, frozenset[int]]) -> dict[str, Any]:
+def _review_comment(
+    finding: Finding, commentable: Mapping[str, frozenset[int]], defect_marker: str = ""
+) -> dict[str, Any]:
     span = comment_span(finding, commentable)
     anchor: dict[str, Any] = {"line": finding.line, "side": "RIGHT"}
     if span is not None:
@@ -70,18 +119,25 @@ def _review_comment(finding: Finding, commentable: Mapping[str, frozenset[int]])
         "path": finding.file,
         **anchor,
         "body": f"**{finding.severity}**: {finding.title}\n\n{finding.detail}".rstrip()
+        + (f"\n\n{defect_marker}" if defect_marker else "")
         + f"\n\n{dedup.marker(finding)}",
     }
 
 
 def _review_payload(
-    plan: Mapping[str, Any], body: str, placement: Placement, commentable: Mapping[str, frozenset[int]]
+    plan: Mapping[str, Any],
+    body: str,
+    placement: Placement,
+    commentable: Mapping[str, frozenset[int]],
+    markers: Mapping[Finding, str] | None = None,
 ) -> dict[str, Any]:
     return {
         "commit_id": plan["head_sha"],
         "event": "COMMENT",
         "body": body,
-        "comments": [_review_comment(finding, commentable) for finding in placement.inline],
+        "comments": [
+            _review_comment(finding, commentable, (markers or {}).get(finding, "")) for finding in placement.inline
+        ],
     }
 
 
@@ -115,19 +171,27 @@ def finalize(
         None,
     )
     verdict = verdicts.get(terminal.slot) if terminal is not None else None
-    judgement = protocol.judge(verdict, int(plan["max_defects"])) if verdict is not None else None
+    judgement = protocol.judge_planned(verdict, plan) if verdict is not None else None
+    rules = plan.get("protocol") or {}
     defects = judgement.defects if judgement is not None else ()
+    next_id = int(rules.get("next_id", 1))
+    ids = {finding: f"D{next_id + index}" for index, finding in enumerate(defects)}
+    cycle = rules.get("cycle", 1)
+    markers = {finding: f"<!-- oracle-defect: c{cycle}-{defect_id} -->" for finding, defect_id in ids.items()}
     fresh, repeated = dedup.split(defects, plan.get("open_findings", ()))
     placement = place(fresh, commentable)
+    strikes = int(rules.get("strikes", 0))
+    if judgement is not None and judgement.decision == protocol.DO_NOT_SHIP:
+        strikes += 1
     if judgement is None:
         description = "pending: " + "; ".join(step.reasons or ("no reviewer available",))
     elif judgement.decision == protocol.SHIP_WITH_FIXES:
-        description = f"{reviewer}: {judgement.label}, {len(defects)} defect(s) to fix"
+        description = f"{reviewer}: {judgement.label}, {judgement.open_count} defect(s) to fix"
     else:
         description = f"{reviewer}: {judgement.label}"
     delivery = plan.get("findings_delivery", "comment")
-    findings_lines = [_finding_line(finding) for finding in placement.inline]
-    other_lines = [_finding_line(finding) for finding in placement.summary]
+    findings_lines = [_finding_line(finding, ids[finding]) for finding in placement.inline]
+    other_lines = [_finding_line(finding, ids[finding]) for finding in placement.summary]
     lines = [*_header(plan, state)]
     if judgement is not None:
         lines += [f"Decision: **{judgement.label}**.", ""]
@@ -136,6 +200,10 @@ def finalize(
         lines += [judgement.summary, ""]
     if judgement is not None and judgement.decision == protocol.DO_NOT_SHIP:
         lines += ["No defects are listed for this decision. Rework the change and push a new head.", ""]
+    if judgement is not None and judgement.fixed:
+        lines += [f"Verified fixed: {', '.join(judgement.fixed)}. Resolve their review threads.", ""]
+    if judgement is not None:
+        lines += _section("Still open from earlier reviews", [_entry_line(entry) for entry in judgement.carried])
     if delivery == "comment":
         lines += _section("Defects on diff lines", findings_lines)
     lines += _section(
@@ -145,31 +213,110 @@ def finalize(
         lines += ["Defects outside the diff count like the others: fix them before merge.", ""]
     lines += _section(
         "Defects already open as review threads, not posted again",
-        [f"- **{finding.severity}** `{finding.file}`: {finding.title}" for finding in repeated],
+        [f"- **{finding.severity}** `{finding.file}`: {ids[finding]}: {finding.title}" for finding in repeated],
     )
+    if judgement is not None and judgement.not_counted:
+        hidden = "\n".join(_finding_line(finding) for finding in judgement.not_counted)
+        lines += [
+            "<details><summary>Not counted: defects in files this follow-up did not review</summary>",
+            "",
+            hidden,
+            "",
+            "</details>",
+            "",
+        ]
     if plan.get("scope") == "changed":
         lines += [f"Scope: files changed since head `{plan['reviewed_head']}` was reviewed.", ""]
+    lines += _strike_line(plan, strikes if judgement is not None else int(rules.get("strikes", 0)))
     lines += _section("Reviewers not available", _absences(attempts, step))
     body = "\n".join(lines).rstrip() + "\n"
-    has_content = bool(defects or state != SUCCESS)
-    review = _review_payload(plan, body, placement, commentable) if delivery == "review" else None
+    if judgement is not None and rules:
+        open_defects = [*judgement.carried, *(protocol.defect_entry(ids[item], item) for item in defects)]
+        body += "\n" + _record(
+            plan,
+            kind=rules["kind"],
+            decision=judgement.decision,
+            reviewer=reviewer or "",
+            open_defects=open_defects,
+            next_id=next_id + len(defects),
+            strikes_after=strikes,
+            summary=judgement.summary,
+        )
+    has_content = bool(defects or judgement is None or judgement.decision != protocol.SHIP or state != SUCCESS)
+    review = _review_payload(plan, body, placement, commentable, markers) if delivery == "review" else None
     cause = pending_cause if state == PENDING else None
-    return Final(state, _clip(description), body if has_content else "", review, reviewer, cause)
+    final_strikes = strikes if judgement is not None else None
+    return Final(state, _clip(description), body if has_content else "", review, reviewer, cause, final_strikes)
 
 
-def carried(plan: Mapping[str, Any], outcome: str) -> Final:
+def carried(plan: Mapping[str, Any]) -> Final:
+    rules = plan["protocol"]
+    previous = rules["previous"]
+    decision = previous["decision"]
+    outcome = SUCCESS if decision == protocol.SHIP else FAILURE
     reviewed_head = plan["reviewed_head"]
-    description = f"carried from {reviewed_head[:12]}: only prose changed"
+    label = protocol.LABELS[decision]
+    description = f"carried from {reviewed_head[:12]}: {label}"
     lines = [
         *_header(plan, outcome),
-        f"Only prose files outside soundness paths changed since head `{reviewed_head}` was reviewed, so its"
-        f" {outcome} result is carried to this head without running a reviewer. Its open review threads still"
-        " apply.",
+        f"Decision: **{label}**, carried from head `{reviewed_head}`.",
         "",
+        f"The patch is unchanged since head `{reviewed_head}` was reviewed, so its decision is carried to this head"
+        " without running a reviewer. Its open review threads still apply.",
+        "",
+        *_section("Still open", [_entry_line(entry) for entry in previous["open_defects"]]),
+        *_strike_line(plan, int(previous["strikes_after"])),
     ]
-    body = "\n".join(lines).rstrip() + "\n"
+    body = (
+        "\n".join(lines).rstrip()
+        + "\n\n"
+        + _record(
+            plan,
+            kind=protocol.CARRY,
+            decision=decision,
+            reviewer=previous["reviewer"],
+            open_defects=list(previous["open_defects"]),
+            next_id=int(previous["next_id"]),
+            strikes_after=int(previous["strikes_after"]),
+            summary=previous["summary"],
+            carried=True,
+        )
+    )
     review = {"commit_id": plan["head_sha"], "event": "COMMENT", "body": body, "comments": []}
-    return Final(outcome, _clip(description), body, review if plan.get("findings_delivery") == "review" else None, None)
+    delivered = review if plan.get("findings_delivery") == "review" else None
+    return Final(outcome, _clip(description), body, delivered, None, None, int(previous["strikes_after"]))
+
+
+def refused(plan: Mapping[str, Any]) -> Final:
+    rules = plan["protocol"]
+    strikes = int(rules["strikes"])
+    lines = [
+        *_header(plan, FAILURE),
+        "Decision: **REFUSED**.",
+        "",
+        f"This pull request has received {strikes} DO NOT SHIP decisions, so the oracle will not review it again."
+        " Close this pull request and open a new one with the reworked change. The limit stops review loops; it is"
+        " not a security control, and a new pull request starts a new count.",
+        "",
+        *_strike_line(plan, strikes),
+    ]
+    body = (
+        "\n".join(lines).rstrip()
+        + "\n\n"
+        + _record(
+            plan,
+            kind=protocol.REFUSAL,
+            decision=protocol.REFUSED,
+            reviewer="",
+            open_defects=[],
+            next_id=int(rules.get("next_id", 1)),
+            strikes_after=strikes,
+        )
+    )
+    review = {"commit_id": plan["head_sha"], "event": "COMMENT", "body": body, "comments": []}
+    delivered = review if plan.get("findings_delivery") == "review" else None
+    description = f"refused after {strikes} DO NOT SHIP decisions: open a new pull request"
+    return Final(FAILURE, _clip(description), body, delivered, None, None, strikes)
 
 
 def fixed(state: str, description: str) -> Final:
