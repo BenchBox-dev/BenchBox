@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "The listed encoding failures no longer appear in a Windows 3.12 'Run fast tests' log",
+    "A lint rule or test fails on new open()/read_text() calls without an encoding in the affected directories, or a written reason explains why not",
+    "Ubuntu and macOS results are unchanged"
+  ],
+  "context": "Run 37776283388 (2026-10-08) still failed 'Run fast tests' on windows-latest 3.12; 3.11 was cancelled. The failing counts in the issue (78 on 3.12, 80 on 3.11) were taken on 2026-10-03.",
+  "description": "On Windows, tests that read workflow YAML or other repository text with the default code page raise UnicodeDecodeError ('charmap' codec), and non-ASCII file names are decoded with the wrong code page. Affected files in the 2026-10-03 failure list include tests/unit/workflows/test_public_site_visual_workflow.py (8), test_t2_partition_workflow.py (4), test_nightly_t3_workflow.py (4), test_release_canary_shard_evidence.py (3), test_binary_manifest_workflow.py (2) and the test_validate_submission_* files (6, including the 'café.manifest.json' case). Start by pulling the current failing list from the latest legacy nightly (run 37776283388 or newer), because earlier Windows fixes have merged since the issue was written. Fix by passing encoding='utf-8' (and decoding subprocess output explicitly), and consider enabling ruff's unspecified-encoding rule (PLW1514) for tests so the problem cannot return.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2568"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-08T23:55:11Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "2f49ac49b9344675ba220a2ff561fffd",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}
