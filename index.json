@@ -2993,6 +2993,15 @@
       "status": "done",
       "title": "ClickHouse hardening: `_has_tuned_sort_key` ignores `tuning_enabled`; `_strip_primary_key_constraints` on unusual DDL"
     },
+    "clickhouse-ssb-session-pack-ablation-20261008": {
+      "claim": null,
+      "needs": [
+        "tuning-evidence-benefit-rule-20261008"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Measure SSB on ClickHouse with and without the tuned session pack, and record the pack's benchmark scope"
+    },
     "clickhouse-tpcdi-dialect-overrides": {
       "claim": null,
       "needs": [],
