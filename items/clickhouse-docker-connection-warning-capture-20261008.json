@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "Identify the warning class, message text, and origin stack trace emitted during live ClickHouse connection setup under docker",
+    "Resolve or suppress the warning at its source if it is an upstream deprecation or expected parameter notice",
+    "Live ClickHouse tests run cleanly without triggering the warning in CI or local runs"
+  ],
+  "context": "Blamed tests in run 37638195854 and 37794806634 were test_connection and test_create_schema (the first test executed on each xdist worker). Requires Linux with docker compose running at -n 0 so warnings summary is captured.",
+  "description": "In the t3:docker nightly suite, live ClickHouse connection and schema creation emits a Python warning attributed to benchbox.platforms.clickhouse.setup. Because test teardowns failed with pytrace=False and CI emits no warnings summary, the underlying warning category and message text remain uncaptured. Reproduce on Linux with docker compose at -n 0, inspect the warning, and silence or resolve the source.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2729"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:9d5794dc0b1b02d1d2d635e2",
+      "at": "2026-10-08T23:36:32Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "08ff7e0b84a9452da4cf52cbdac34b46",
+      "session_id": "dd380b7ca8774be788adfc98150df8c1"
+    }
+  ]
+}
