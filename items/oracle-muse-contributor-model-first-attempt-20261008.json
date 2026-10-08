@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "The first muse attempt's artifact diagnostic is read",
+    "If muse is absent for an auth or model error, it moves to the end of the low-medium and medium-high orders and the error text becomes a calibrated pattern in absence.py"
+  ],
+  "description": "#2760 switched the muse reviewer to muse-spark-1.3-contributor and put luna first in the low-medium order. By the end of 2026-10-08 no shadow run had selected muse; every run since was very-high (opus). The model is unverified in CI with META_API_KEY.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2760"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-08T23:31:26Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "9a366929e13e4fb3861e8eddb87eeb78",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}
