@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Inventory of 530 strict-mode findings is classified.",
+    "Action plan or batches created to bring make comment-policy-strict to 0 findings."
+  ],
+  "context": "Decision 8 in comment cleanup completion handoff. Strict mode is currently a diagnostic tool reporting 530 findings; CI gate uses transition mode at 0 violations.",
+  "description": "make comment-policy-strict currently reports 530 findings across the repository because it runs over the full 5,700+ file inventory without baseline transition scoping. To eventually enable strict mode as an enforced gate rather than a diagnostic tool, triage the remaining findings (classifying whether they represent unexcepted directives/notices that should be registered, or first-party comments that should be removed) and establish a milestone plan.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e",
+      "at": "2026-10-08T23:36:08Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "f32794f2f3b14cf9b524991e59627a60",
+      "session_id": "2c188abafba54577ab5700a7c822554e"
+    }
+  ]
+}
