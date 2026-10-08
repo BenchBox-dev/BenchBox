@@ -5358,6 +5358,13 @@
       "status": "done",
       "title": "Cross-surface comparator: close the >=2 final-tie-group gap for a complete (non-truncated) final tie"
     },
+    "cross-surface-gate-no-engine-option": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "The cross-surface gate cannot select a Polars engine except through an environment variable that older Polars ignores"
+    },
     "cross-surface-gate-rollout-followups": {
       "claim": null,
       "needs": [
