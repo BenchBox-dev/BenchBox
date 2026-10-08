@@ -15102,7 +15102,7 @@
         "pvm-s6b-polars-2-blog-draft"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "blocked",
       "title": "Measure Polars performance across 1.x and 2.0 with a reproducible version matrix"
     },
     "pvm-s0a-polars2-compat-fixes": {
