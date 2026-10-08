@@ -13,7 +13,6 @@
     "tests/uat/runner.py",
     "benchbox/platforms/postgresql.py"
   ],
-  "not_before": "2026-10-10T14:00:00Z",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
@@ -72,6 +71,14 @@
       "op": "update",
       "op_id": "70c3cee12fb848bbb9306dd37b5da8ac",
       "session_id": "0bdbb5bb32cc4bd0b5505d2dcb0e488e"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:2a10096285872d23ac8a3bfe",
+      "at": "2026-10-08T23:19:25Z",
+      "client": "antigravity-client",
+      "op": "update",
+      "op_id": "9e7a984b073049628e7f0c49aa3f7e13",
+      "session_id": "414237a6e56140ed97e26a248092ab35"
     }
   ]
 }
