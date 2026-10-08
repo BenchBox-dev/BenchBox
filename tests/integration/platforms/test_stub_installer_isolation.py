@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 from .common import (
@@ -21,6 +23,7 @@ from .common import (
     install_trino_stub,
 )
 from .conftest import (
+    STUB_PATCHED_MODULES,
     find_stub_adapter_attr_leaks,
     import_stub_patched_modules,
     snapshot_stub_adapter_attrs,
@@ -61,4 +64,14 @@ def test_stub_installer_restores_adapter_attrs(monkeypatch, name, installer):
     before = snapshot_stub_adapter_attrs()
     installer(monkeypatch)
     monkeypatch.undo()
+    assert find_stub_adapter_attr_leaks(before) == []
+
+
+@pytest.mark.integration
+@pytest.mark.platform_smoke
+def test_stub_installer_ignores_warningregistry(monkeypatch):
+    import_stub_patched_modules()
+    before = snapshot_stub_adapter_attrs()
+    first_module = sys.modules[STUB_PATCHED_MODULES[0]]
+    monkeypatch.setattr(first_module, "__warningregistry__", {"test": 1}, raising=False)
     assert find_stub_adapter_attr_leaks(before) == []
