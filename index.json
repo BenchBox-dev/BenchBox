@@ -13744,6 +13744,13 @@
       "status": "done",
       "title": "Define a recorded fallback reviewer for oracle-review when the Codex connector is unavailable"
     },
+    "oracle-review-thread-reply-run-churn-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "oracle-review starts a run for every review-thread reply"
+    },
     "orphan-detector-freeze-branch-residual-20260804": {
       "claim": null,
       "needs": [],

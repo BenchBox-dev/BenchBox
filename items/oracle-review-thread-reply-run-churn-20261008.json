@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "Replying to several review threads starts no more than one full oracle-review evaluation, or the decision to keep the trigger is recorded with the reason",
+    "A connector review or stand-in approval still re-evaluates the required check (test or recorded run)"
+  ],
+  "context": "Observed on PR #2751: 14 thread replies between 21:23 and 21:24 UTC on 2026-10-08 started 17 oracle-review runs, of which 13 were cancelled.",
+  "description": "`.github/workflows/oracle-review.yml` triggers on `pull_request_review: [submitted, dismissed]`. A reply in a review thread is a submitted review, so replying to N threads starts N runs. Concurrency cancels all but the last, but each one still takes a runner slot. On 2026-10-08 the core repo had CI queued for over 25 minutes while this happened.\n\nOptions:\n- filter in a cheap first step: exit early unless the review is a connector review, or an approval by a listed attester;\n- or keep the trigger and accept the cost.\n\nCheck first that the required check still re-evaluates when a real reviewer approves.",
+  "links": [
+    ".github/workflows/oracle-review.yml"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:c1db6dc4ee5472210ba475de",
+      "at": "2026-10-08T23:25:19Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "249034d1bd4a4eb18bd708947a0ea447",
+      "session_id": "33bd3c37f6654182bd23ec8ba6d6c4d1"
+    }
+  ]
+}
