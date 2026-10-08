@@ -4494,15 +4494,10 @@
       "title": "Guard that whole-file pinned notices update their digest pin when modified on a branch"
     },
     "comment-policy-ratchet-wheel-upgrade": {
-      "claim": {
-        "expires_at": "2026-10-09T23:51:33Z",
-        "generation": "169324f4e5144d90820bd0dbd08a094f",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Comment-policy staged ratchet blocks all commits after legitimate vendored-wheel upgrade"
     },
     "comment-policy-strict-mode-reconciliation": {
