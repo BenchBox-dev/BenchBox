@@ -393,30 +393,13 @@ def test_dispatched_parent_is_resolved_to_a_full_commit_sha() -> None:
     assert 'grep -qxF "$DISPATCH_PARENT"' in workflow
 
 
-def test_build_resolves_the_parent_ref_to_a_full_commit_sha(tmp_path: Path) -> None:
+def test_parent_ref_resolves_to_a_full_commit_sha() -> None:
     head = site_inputs.must_run("git", "-C", str(site_inputs.ROOT), "rev-parse", "HEAD").strip()
-    args = argparse.Namespace(
-        out=str(tmp_path / "out"),
-        core_sha=head,
-        parent_core_sha="HEAD",
-        parent_source="local",
-        certified_by=None,
-        cmd="build",
-    )
-    with pytest.raises(RuntimeError) as raised:
-        site_inputs.cmd_build(args)
-    assert f"parent_core_sha {head} is not a strict ancestor" in str(raised.value)
+    assert site_inputs.resolve_parent(head, "HEAD") == head
+    assert site_inputs.resolve_parent(head, head[:12]) == head
 
 
-def test_build_rejects_a_parent_that_names_no_commit(tmp_path: Path) -> None:
+def test_parent_ref_that_names_no_commit_is_rejected() -> None:
     head = site_inputs.must_run("git", "-C", str(site_inputs.ROOT), "rev-parse", "HEAD").strip()
-    args = argparse.Namespace(
-        out=str(tmp_path / "out"),
-        core_sha=head,
-        parent_core_sha="no-such-ref-for-site-inputs",
-        parent_source="local",
-        certified_by=None,
-        cmd="build",
-    )
     with pytest.raises(RuntimeError, match="rev-parse"):
-        site_inputs.cmd_build(args)
+        site_inputs.resolve_parent(head, "no-such-ref-for-site-inputs")
