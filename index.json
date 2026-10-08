@@ -7842,6 +7842,13 @@
       "status": "done",
       "title": "Harden DuckDB SET-statement interpolation before more config keys reach it"
     },
+    "duckdb-sf10-tpch-defective-datagen-rerun": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Rerun the DuckDB TPC-H SF10 version-matrix cells whose data carries the macdbgen address defect"
+    },
     "duckdb-supports-acl-no-acl-set-fix": {
       "claim": null,
       "needs": [],
