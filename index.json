@@ -7954,6 +7954,15 @@
       "status": "done",
       "title": "Fix DuckDB TPC-DS loader regression: trailing delimiter detection and CLI exit code"
     },
+    "duckdb-tuned-template-ablation-20261008": {
+      "claim": null,
+      "needs": [
+        "tuning-evidence-benefit-rule-20261008"
+      ],
+      "priority": "medium-high",
+      "status": "open",
+      "title": "Measure the DuckDB tuned templates at SF1 and SF10, separating constraints from sort order and counting load time"
+    },
     "ducklake-beta-blocker-scale-runs-all-deployment-modes": {
       "claim": null,
       "needs": [],
