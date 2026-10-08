@@ -1,33 +1,7 @@
-"""Manually crafted OBT queries for complex cases that automated conversion cannot handle.
-
-ACTIVE MANUAL QUERIES (can run in pure OBT):
-- Q14: INTERSECT across channels -> COUNT(DISTINCT channel) = 3
-- Q49: Return ratio analysis with proper channel filtering
-
-BLOCKED QUERIES (require external dimension tables not in OBT):
-These queries need the customer's CURRENT address/demographics, which requires
-joining to dimension tables (customer, customer_address, household_demographics,
-income_band, date_dim) that don't exist in the pure OBT database.
-
-- Q46: Subquery with aggregates joined to customer's current address
-- Q64: Cross-channel self-join with customer's current demographics
-- Q68: Similar to Q46, subquery with aggregates joined to customer's current address
-- Q84: Income band filtering requiring customer's current hdemo and address
-
-The definitions below are preserved for documentation purposes, but Q46, Q64, Q68, Q84
-are excluded from MANUAL_QUERY_IDS and will not be executed in the OBT benchmark.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Q14: Cross-channel analysis with INTERSECT semantic
-# The original uses INTERSECT to find (brand_id, class_id, category_id) tuples
-# that exist in ALL THREE channels. We replicate this with COUNT(DISTINCT channel) = 3.
-#
-# Note: TPC-DS Q14 actually contains two separate queries in the template.
-# This is the first query (ROLLUP analysis).
 Q14_TEMPLATE = """\
 WITH cross_items AS (
   SELECT
@@ -81,12 +55,6 @@ ORDER BY channel, i_brand_id, i_class_id, i_category_id
 LIMIT 100
 """
 
-# Q46: Store sales aggregates joined to customer's current address
-# The original query aggregates store sales by ticket/customer/city, then joins
-# to customer and customer_address to compare purchase city with current city.
-#
-# The OBT has bill_addr_ca_city (purchase address) but we need customer_address
-# as a separate join for the customer's CURRENT address (c_current_addr_sk).
 Q46_TEMPLATE = """\
 SELECT
   c_last_name,
@@ -118,10 +86,6 @@ ORDER BY c_last_name, c_first_name, current_addr.ca_city, dn.bought_city, dn.ss_
 LIMIT 100
 """
 
-# Q49: Return ratio analysis across channels
-# The original LEFT OUTER JOINs sales to returns; in OBT the returns are already merged.
-# Key: filter WHERE return_amount > 10000 for items with significant returns,
-# then calculate return_ratio = SUM(return_quantity) / SUM(quantity).
 Q49_TEMPLATE = """\
 SELECT
   channel,
@@ -233,20 +197,6 @@ ORDER BY 1, 4, 5, 2
 LIMIT 100
 """
 
-# Q64: Cross-channel analysis with year-over-year comparison
-# This query uses a SELF-JOIN pattern on the OBT to correlate catalog and store channels.
-#
-# IMPORTANT: This query defeats the OBT's single-scan design philosophy.
-# It requires scanning the OBT twice (once for catalog, once for store) and joining.
-# Included for completeness but does not represent typical OBT query patterns.
-#
-# The query finds items that:
-# 1. Were returned in catalog channel with refunds < 50% of sales (cs_ui CTE)
-# 2. Were also sold AND returned in store channel
-# 3. Compares year-over-year sales metrics for these items
-#
-# External dimension joins required for customer's CURRENT demographics and
-# customer's first_sales_date/first_shipto_date attributes.
 Q64_TEMPLATE = """\
 WITH cs_ui AS (
   -- Items from catalog channel where total sales > 2x total refunds
@@ -345,8 +295,6 @@ WHERE cs1.syear = [YEAR]
 ORDER BY cs1.product_name, cs1.store_name, cs2.cnt, cs1.s1, cs2.s1
 """
 
-# Q68: Store sales aggregates joined to customer's current address
-# Very similar to Q46 but with different aggregated measures.
 Q68_TEMPLATE = """\
 SELECT
   c_last_name,
@@ -381,14 +329,6 @@ LIMIT 100
 """
 
 
-# Q84: Customer income band filtering
-# This query finds customers who:
-# 1. Live in a specified city (customer's CURRENT address)
-# 2. Fall within a specific income band range (customer's CURRENT hdemo)
-# 3. Have made store returns
-#
-# The original query uses customer's CURRENT demographics, not transaction-time.
-# We need to join to dimension tables for the current address and income band.
 Q84_TEMPLATE = """\
 SELECT DISTINCT
   obt.bill_customer_c_customer_id AS customer_id,
@@ -410,15 +350,12 @@ LIMIT 100
 
 @dataclass(frozen=True)
 class ManualQueryDefinition:
-    """Definition of a manually crafted OBT query."""
-
     query_id: int
     template_sql: str
-    parameters: dict[str, tuple[str, str]]  # name -> (default, kind)
+    parameters: dict[str, tuple[str, str]]
     description: str
 
 
-# Parameter definitions for each query
 MANUAL_QUERY_DEFS: dict[int, ManualQueryDefinition] = {
     14: ManualQueryDefinition(
         query_id=14,
@@ -491,24 +428,19 @@ MANUAL_QUERY_DEFS: dict[int, ManualQueryDefinition] = {
     ),
 }
 
-# Only include queries that can run in pure OBT (no external dimension tables)
-# Q46, Q64, Q68, Q84 require customer, customer_address, etc. which aren't in OBT
 MANUAL_QUERY_IDS = frozenset({14, 49})
 
 
 def get_manual_query(query_id: int) -> ManualQueryDefinition:
-    """Get the manual query definition for a query ID."""
     if query_id not in MANUAL_QUERY_DEFS:
         raise ValueError(f"No manual query defined for query {query_id}")
     return MANUAL_QUERY_DEFS[query_id]
 
 
 def render_manual_query(query_id: int, parameters: dict[str, str] | None = None) -> str:
-    """Render a manual query with parameter substitution."""
     defn = get_manual_query(query_id)
     sql = defn.template_sql
 
-    # Apply provided parameters or defaults
     params = parameters or {}
     for name, (default, _kind) in defn.parameters.items():
         value = params.get(name, default)

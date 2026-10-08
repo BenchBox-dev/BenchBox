@@ -1,5 +1,3 @@
-"""Conserve actual offline adapter semantics in a fresh process without vendor SDKs."""
-
 from __future__ import annotations
 
 import os
@@ -14,8 +12,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.medium]
 INVENTORY = Path(__file__).with_name("test_offline_adapter_inventory.py")
 SUCCESS_MESSAGE = "49 adapters, 94 real SQL assertions, 2 positive alternatives, no vendor SDK imports"
 
-# The child runs the inventory's plain `assert` statements, which Python -O or PYTHONOPTIMIZE
-# would strip, so it refuses to run with assertions disabled.
+
 CHILD_SCRIPT = r"""
 if not __debug__:
     raise SystemExit("assertions are disabled, so the inventory would pass without checking anything")
@@ -72,8 +69,7 @@ def _run_child(env: dict[str, str]) -> subprocess.CompletedProcess[str]:
 
 
 def test_all_adapter_semantics_with_vendor_sdk_imports_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Process startup and cold imports belong in T2, not the 0.5-second T1 lane.
-    # An optimizing parent must not make the child's assertions vanish.
+
     monkeypatch.setenv("PYTHONOPTIMIZE", "1")
     env = {key: value for key, value in os.environ.items() if key != "PYTHONOPTIMIZE"}
     result = _run_child(env)

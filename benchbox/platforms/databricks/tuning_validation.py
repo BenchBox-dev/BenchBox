@@ -1,20 +1,6 @@
-"""Databricks-specific effective-layout validation for tuning configurations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Moved out of `benchbox.core.tuning.interface.UnifiedTuningConfiguration`
-(where it lived as `_validate_databricks_effective_layout`) per the
-tuning-renderer-consolidation-and-baseline-policy-20260712 TODO's w4: Databricks
-is the only platform with cross-field validation that needs the *entire*
-tuning config (not just one tuning type against one platform's compatibility
-set), and interface.py is meant to slim toward a pure data model rather than
-carry platform-specific business rules. `interface.py` calls this module via
-a small dispatch hook (`_PLATFORM_EFFECTIVE_LAYOUT_VALIDATORS`) instead of
-importing it directly, keeping the dependency direction platform -> core
-tuning types, not core -> platform.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -25,15 +11,6 @@ if TYPE_CHECKING:
 
 
 def validate_effective_layout(config: UnifiedTuningConfiguration) -> list[str]:
-    """Validate Databricks layout combinations that require the full tuning config.
-
-    Args:
-        config: The unified tuning configuration being validated.
-
-    Returns:
-        List of validation error messages (empty if no Databricks-specific
-        layout conflicts were found).
-    """
     errors: list[str] = []
     try:
         config.platform_optimizations.__post_init__()

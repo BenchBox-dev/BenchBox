@@ -1,7 +1,4 @@
-"""Unit tests for AMPLab DataFrame query implementations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -19,8 +16,6 @@ ALL_QUERY_IDS = ["Q1", "Q1a", "Q2", "Q2a", "Q3", "Q3a", "Q4", "Q5"]
 
 
 class TestAMPLabQueryRegistry:
-    """Tests for AMPLab DataFrame query registry."""
-
     def test_registry_imports_successfully(self):
         from benchbox.core.amplab.dataframe_queries import AMPLAB_DATAFRAME_QUERIES
 
@@ -89,8 +84,6 @@ class TestAMPLabQueryRegistry:
 
 
 class TestAMPLabQueryCategories:
-    """Tests for AMPLab query category assignments."""
-
     def test_scan_queries_have_filter(self):
         from benchbox.core.amplab.dataframe_queries import get_amplab_query
 
@@ -116,8 +109,6 @@ class TestAMPLabQueryCategories:
 
 
 class TestAMPLabParameters:
-    """Tests for AMPLab query parameters."""
-
     def test_all_queries_have_parameters(self):
         from benchbox.core.amplab.dataframe_queries.parameters import AMPLAB_DEFAULT_PARAMS
 
@@ -144,8 +135,6 @@ class TestAMPLabParameters:
 
 
 class TestAMPLabBenchmarkRegistry:
-    """Tests for AMPLab DataFrame support in benchmark registry."""
-
     def test_amplab_supports_dataframe(self):
         from benchbox.core.benchmark_registry import get_benchmark_metadata
 

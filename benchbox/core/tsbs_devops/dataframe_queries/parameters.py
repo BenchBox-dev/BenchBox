@@ -1,12 +1,6 @@
-"""TSBS DevOps DataFrame query parameters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Default parameter values for TSBS DevOps queries. Uses static defaults
-for DataFrame execution (time ranges, hostname, region).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -42,18 +36,14 @@ for _params in TSBS_DEVOPS_DEFAULT_PARAMS.values():
 
 @dataclass
 class TSBSDevOpsParameters:
-    """Parameter container for a TSBS DevOps query."""
-
     query_id: str
     params: dict[str, Any]
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a parameter value with optional default."""
         return self.params.get(key, default)
 
 
 def get_parameters(query_id: str) -> TSBSDevOpsParameters:
-    """Get parameters for a TSBS DevOps query."""
     params = TSBS_DEVOPS_DEFAULT_PARAMS.get(query_id, {}).copy()
     if _parameter_overrides is not None and query_id in _parameter_overrides:
         params.update(_parameter_overrides[query_id])
@@ -64,11 +54,5 @@ _parameter_overrides: dict[str, dict[str, Any]] | None = None
 
 
 def set_parameter_overrides(overrides: dict[str, dict[str, Any]] | None) -> None:
-    """Inject seed-derived parameters for a gate run.
-
-    Called by the cross-surface builder before query execution so the DataFrame
-    surface reads the same windows the SQL surface rendered. Pass None to clear
-    and revert to static defaults.
-    """
     global _parameter_overrides
     _parameter_overrides = overrides

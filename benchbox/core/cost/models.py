@@ -1,9 +1,3 @@
-"""Cost data models for benchmark results.
-
-This module defines the data structures for representing costs at different
-levels of granularity: individual queries, benchmark phases, and complete benchmarks.
-"""
-
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -12,26 +6,15 @@ from typing import Any, Literal, Optional
 CostScope = Literal["compute_only", "compute_plus_storage"]
 CostStatus = Literal["normalized", "not_applicable_local", "unavailable"]
 
-#: Warning prefix emitted by the normalized-cost evaluator whenever a run
-#: cannot publish a total (defaulted metadata, fallback pricing, stale
-#: tables). Object-level consumers (TCO, optimizer) key their fail-closed
-#: gate on this prefix because ``BenchmarkCost`` carries warnings but no
-#: status field.
+
 COST_UNAVAILABLE_WARNING_PREFIX = "normalized cost unavailable"
 
-#: Statuses whose direct totals may satisfy the public cost contract.
+
 _PUBLISHABLE_COST_STATUSES = frozenset({"normalized", "not_applicable_local"})
 
 
 def normalized_cost_allows_direct_total(normalized_cost: Mapping[str, Any] | None) -> bool:
-    """Return True when a direct cost total may satisfy the public contract.
 
-    A genuinely missing normalized_cost block (legacy results produced before
-    the contract existed) means there is nothing to *reject* -- the direct
-    total is the only signal available, so allow it. Only an explicitly
-    rejected block (e.g. ``cost_status="unavailable"``, or a publishable
-    status with no amount) blocks the direct total.
-    """
     if normalized_cost is None:
         return True
     if not isinstance(normalized_cost, Mapping):
@@ -42,7 +25,7 @@ def normalized_cost_allows_direct_total(normalized_cost: Mapping[str, Any] | Non
 
 
 def cost_status_of(cost_summary: Mapping[str, Any] | None) -> str | None:
-    """Return the normalized cost_status for a cost summary, if any."""
+
     if not isinstance(cost_summary, Mapping):
         return None
     normalized = cost_summary.get("normalized_cost")
@@ -53,13 +36,7 @@ def cost_status_of(cost_summary: Mapping[str, Any] | None) -> str | None:
 
 
 def published_total_cost(cost_summary: Mapping[str, Any] | None) -> float | None:
-    """Return the total cost fit to publish, or None when gated.
 
-    An unavailable-status run yields None so no caller can rank, plot,
-    persist, or project from a fallback-priced number. Summaries without a
-    normalized block pass their direct total through for legacy results that
-    predate the contract.
-    """
     if not isinstance(cost_summary, Mapping):
         return None
     if not normalized_cost_allows_direct_total(cost_summary.get("normalized_cost")):
@@ -68,7 +45,7 @@ def published_total_cost(cost_summary: Mapping[str, Any] | None) -> float | None
 
 
 def unavailable_cost_warning(warnings: list[str] | tuple[str, ...] | None) -> str | None:
-    """Return the first warning marking a cost unavailable, if any."""
+
     for warning in warnings or []:
         if isinstance(warning, str) and warning.startswith(COST_UNAVAILABLE_WARNING_PREFIX):
             return warning
@@ -77,8 +54,6 @@ def unavailable_cost_warning(warnings: list[str] | tuple[str, ...] | None) -> st
 
 @dataclass(frozen=True)
 class DeploymentMetadata:
-    """Deployment context used to normalize and audit benchmark cost."""
-
     cloud_provider: str | None = None
     cloud_region: str | None = None
     instance_type: str | None = None
@@ -89,7 +64,7 @@ class DeploymentMetadata:
     storage_tier: str | None = None
 
     def to_dict(self) -> dict[str, str | int | None]:
-        """Convert to a stable dictionary shape for result serialization."""
+
         return {
             "cloud_provider": self.cloud_provider,
             "cloud_region": self.cloud_region,
@@ -104,20 +79,6 @@ class DeploymentMetadata:
 
 @dataclass(frozen=True)
 class NormalizedCost:
-    """BenchBox-normalized cost with explicit provenance and availability status.
-
-    `normalized_cost_usd` is `None` when `cost_status == "unavailable"` so
-    missing cloud pricing metadata cannot be misread as zero cost. Local or
-    self-hosted runs may use `cost_status == "not_applicable_local"` with
-    `normalized_cost_usd == Decimal("0")`, but consumers must still treat the
-    status as non-comparable with normalized cloud cost.
-
-    Compatibility: `cost_usd` remains available as a read-only deprecated alias
-    for legacy explorer consumers. The alias is populated only when
-    `cost_status == "normalized"` and `cost_scope == "compute_only"`; it is
-    `None` for storage-inclusive, local-not-applicable, and unavailable costs.
-    """
-
     normalized_cost_usd: Decimal | None
     cost_model_version: str
     cost_model_source: str
@@ -141,13 +102,13 @@ class NormalizedCost:
 
     @property
     def cost_usd(self) -> Decimal | None:
-        """Deprecated compute-only alias for legacy explorer cost consumers."""
+
         if self.cost_status == "normalized" and self.cost_scope == "compute_only":
             return self.normalized_cost_usd
         return None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to a serialization-ready dictionary without losing Decimal precision."""
+
         cost_usd = self.cost_usd
         return {
             "normalized_cost_usd": str(self.normalized_cost_usd) if self.normalized_cost_usd is not None else None,
@@ -164,21 +125,12 @@ class NormalizedCost:
 
 @dataclass
 class QueryCost:
-    """Cost information for a single query execution.
-
-    Attributes:
-        compute_cost: The compute cost in the specified currency
-        currency: Currency code (e.g., "USD")
-        pricing_details: Additional details about how the cost was calculated,
-                        platform-specific metrics, pricing tier, etc.
-    """
-
     compute_cost: float
     currency: str = "USD"
     pricing_details: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary representation."""
+
         return {
             "compute_cost": self.compute_cost,
             "currency": self.currency,
@@ -188,18 +140,6 @@ class QueryCost:
 
 @dataclass
 class PhaseCost:
-    """Aggregated cost information for a benchmark phase.
-
-    Attributes:
-        phase_name: Name of the phase (e.g., "power_test", "throughput_test")
-        total_cost: Total cost for all queries in this phase
-        query_count: Number of queries in this phase
-        currency: Currency code
-        query_costs: Individual query costs (optional, for detailed breakdowns)
-        wall_clock_duration_seconds: Actual wall clock time for the phase (optional)
-        concurrent_streams: Number of concurrent query streams (optional)
-    """
-
     phase_name: str
     total_cost: float
     query_count: int
@@ -209,7 +149,7 @@ class PhaseCost:
     concurrent_streams: Optional[int] = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary representation."""
+
         result: dict[str, Any] = {
             "phase_name": self.phase_name,
             "total_cost": self.total_cost,
@@ -218,7 +158,7 @@ class PhaseCost:
         }
         if self.wall_clock_duration_seconds is not None:
             result["wall_clock_duration_seconds"] = self.wall_clock_duration_seconds
-            # Calculate effective cost per hour
+
             if self.wall_clock_duration_seconds > 0:
                 result["effective_cost_per_hour"] = self.total_cost / (self.wall_clock_duration_seconds / 3600.0)
         if self.concurrent_streams is not None:
@@ -230,18 +170,6 @@ class PhaseCost:
 
 @dataclass
 class BenchmarkCost:
-    """Complete cost information for an entire benchmark run.
-
-    Attributes:
-        total_cost: Total cost across all phases
-        currency: Currency code
-        phase_costs: List of costs broken down by phase
-        platform_details: Platform-specific pricing context (region, tier, warehouse size, etc.)
-        cost_model: Type of cost calculation ("marginal", "actual", "estimated")
-        warnings: List of user-facing warnings about cost calculation limitations
-        storage_cost: Estimated storage cost (optional)
-    """
-
     total_cost: float
     currency: str = "USD"
     phase_costs: list[PhaseCost] = field(default_factory=list)
@@ -251,7 +179,7 @@ class BenchmarkCost:
     storage_cost: Optional[float] = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary representation."""
+
         result = {
             "total_cost": self.total_cost,
             "currency": self.currency,
@@ -273,16 +201,7 @@ class BenchmarkCost:
         platform_details: Optional[dict[str, Any]] = None,
         currency: str = "USD",
     ) -> "BenchmarkCost":
-        """Create a BenchmarkCost by aggregating phase costs.
 
-        Args:
-            phase_costs: List of phase costs to aggregate
-            platform_details: Platform-specific context information
-            currency: Currency code (all phase costs should use the same currency)
-
-        Returns:
-            BenchmarkCost with total calculated from phases
-        """
         total = sum(pc.total_cost for pc in phase_costs)
         return cls(
             total_cost=total,

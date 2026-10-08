@@ -1,13 +1,3 @@
-/**
- * Browse-page retheme post-fix re-audit captures.
- *
- * Records 390/768/1280/1600 screenshots for the four routes named by
- * `results-explorer-retheme-browse-pages` w1, on top of the
- * theme-system-foundation tokens. Skipped by default; opt in with
- * `RETHEME_CAPTURE=1` to refresh artifacts under
- * `_project/audits/screenshots/results-retheme-browse-pages-after-fix-<date>/`.
- */
-
 import { mkdirSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";

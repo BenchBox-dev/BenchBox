@@ -178,48 +178,33 @@ python features/performance_monitoring.py
 
 ### Quick Feature Test
 ```bash
-# Run a feature example to see it in action
 python features/query_subset.py
-
-# Most examples complete in < 1 minute
 ```
+
+Most examples complete in under a minute.
 
 ### Modify and Experiment
 ```bash
-# Copy an example to experiment
 cp features/tuning_comparison.py my_experiment.py
-
-# Modify parameters, scale factors, platforms
-# All examples are self-contained
 ```
+
+Then modify parameters, scale factors, and platforms. All examples are self-contained.
 
 ### Integration in Your Code
-```python
-# Feature examples show patterns you can use in your code
-# Copy the relevant sections into your scripts
-```
+
+Feature examples show patterns you can use in your own code. Copy the relevant
+sections into your scripts.
 
 ## Example Structure
 
 All feature examples follow a consistent structure:
 
-```python
-"""
-Brief description of the feature.
-
-Usage:
-    python features/example.py
-
-Key Concepts:
-    - Concept 1
-    - Concept 2
-"""
-
-# 1. Setup section with clear comments
-# 2. Feature demonstration with explanations
-# 3. Result display showing what to look for
-# 4. Tips section with best practices
-```
+- A module docstring with a brief description of the feature, a usage line
+  (`python features/example.py`), and a list of key concepts.
+- A setup section with clear comments.
+- A feature demonstration with explanations.
+- A result display that shows what to look for.
+- A tips section with best practices.
 
 ## Prerequisites
 

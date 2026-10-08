@@ -1,10 +1,3 @@
-"""TPC-Havoc DataFrame variants for Q1.
-
-Q1 is a single-table grouped aggregate. The variants below keep the existing
-filter timing, projection, grouping-order, and formula differences explicit
-while sharing the repeated aggregation scaffolding.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable

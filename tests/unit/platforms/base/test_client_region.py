@@ -1,5 +1,3 @@
-"""Unit tests for client region and cloud discovery."""
-
 from __future__ import annotations
 
 import json
@@ -165,7 +163,7 @@ def test_process_caching() -> None:
     with patch("benchbox.platforms.base.client_region._imds_open", side_effect=fake_urlopen):
         res1 = discover_client_region()
         assert call_count == 2
-        # Second call should use cache, not call urlopen again
+
         res2 = discover_client_region()
         assert call_count == 2
 
@@ -178,9 +176,6 @@ def test_imds_bypasses_proxy_environment() -> None:
 
     from benchbox.platforms.base import client_region as client_region_module
 
-    # No registered handler may route http(s) through a proxy: an empty
-    # ProxyHandler contributes no *_open methods, so it must simply be
-    # absent (rather than present-but-empty) here.
     for protocol in ("http", "https"):
         for handler in client_region_module._IMDS_OPENER.handle_open.get(protocol, []):
             assert not (isinstance(handler, urllib.request.ProxyHandler) and handler.proxies), (
@@ -196,9 +191,6 @@ def test_imds_bypasses_proxy_environment() -> None:
             return gcp_response
         raise urllib.error.URLError("AWS not available")
 
-    # Patch the opener itself (not the module seam): with a poisoned proxy
-    # environment, reaching the fake proves discovery goes through the
-    # no-proxy opener rather than urlopen-with-env-proxies.
     with (
         patch.dict(os.environ, {"HTTP_PROXY": "http://proxy.invalid:8080", "HTTPS_PROXY": "http://proxy.invalid:8080"}),
         patch.object(client_region_module._IMDS_OPENER, "open", side_effect=fake_opener_open),
@@ -284,8 +276,6 @@ def test_cli_cloud_only_drops_mismatched_observed_region() -> None:
     with patch("benchbox.platforms.base.client_region._imds_open", side_effect=fake_imds_open):
         result = discover_client_region({"client_cloud": "gcp"})
 
-    # The observed us-east-1 belongs to AWS; relabelling it gcp would
-    # fabricate a cross-cloud collocation signal.
     assert result == {
         "client_region": None,
         "client_cloud": "gcp",
@@ -332,7 +322,6 @@ def test_cli_cloud_unknown_keeps_observed_region() -> None:
     with patch("benchbox.platforms.base.client_region._imds_open", side_effect=fake_imds_open):
         result = discover_client_region({"client_cloud": "unknown"})
 
-    # "unknown" attests no cloud, so it must not discard the observed region.
     assert result == {
         "client_region": "us-east-1",
         "client_cloud": "unknown",

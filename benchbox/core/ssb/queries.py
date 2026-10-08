@@ -1,22 +1,8 @@
-"""Star Schema Benchmark (SSB) query management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
+# This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
 
-This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-
-Provides functionality to load and parameterize the 13 standard SSB queries, which are organized into 4 flights:
-
-Flight 1 (Q1.1-Q1.3): Drill-down queries
-Flight 2 (Q2.1-Q2.3): Drill-down queries with joins
-Flight 3 (Q3.1-Q3.4): Drill-down queries with multiple joins
-Flight 4 (Q4.1-Q4.3): Join queries with aggregation
-
-For more information see:
-- "Star Schema Benchmark" by O'Neil et al.
-- https://www.cs.umb.edu/~poneil/StarSchemaB.PDF
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from typing import Any
 
@@ -24,21 +10,12 @@ from benchbox.core.query_manager import ParameterizedQueryManager
 
 
 class SSBQueryManager(ParameterizedQueryManager):
-    """Manager for Star Schema Benchmark queries."""
-
     def __init__(self) -> None:
-        """Initialize SSB query manager."""
         self._queries = self._load_queries()
 
     def _load_queries(self) -> dict[str, str]:
-        """Load all SSB queries.
-
-        Returns:
-            Dictionary mapping query IDs to SQL text
-        """
         queries = {}
 
-        # Flight 1: Drill-down queries
         queries["Q1.1"] = """
 SELECT sum(lo_extendedprice*lo_discount) as revenue
 FROM lineorder, date
@@ -67,7 +44,6 @@ WHERE lo_orderdate = d_datekey
   AND lo_quantity between {quantity_min} and {quantity_max};
 """
 
-        # Flight 2: Drill-down queries with joins
         queries["Q2.1"] = """
 SELECT d_year, p_brand1, sum(lo_revenue) as revenue
 FROM lineorder, date, part, supplier
@@ -104,7 +80,6 @@ GROUP BY d_year, p_brand1
 ORDER BY d_year, p_brand1;
 """
 
-        # Flight 3: Drill-down queries with multiple joins
         queries["Q3.1"] = """
 SELECT c_nation, s_nation, d_year, sum(lo_revenue) as revenue
 FROM customer, lineorder, supplier, date
@@ -157,7 +132,6 @@ GROUP BY c_city, s_city, d_year
 ORDER BY d_year asc, revenue desc;
 """
 
-        # Flight 4: Join queries with aggregation
         queries["Q4.1"] = """
 SELECT d_year, c_nation, sum(lo_revenue - lo_supplycost) as profit
 FROM date, customer, supplier, part, lineorder
@@ -205,42 +179,28 @@ ORDER BY d_year, s_city, p_brand1;
         return queries
 
     def _generate_default_params(self, query_id: str) -> dict[str, Any]:
-        """Generate default parameters for a query.
-
-        Args:
-            query_id: Query identifier
-
-        Returns:
-            Dictionary of parameter names to default values
-        """
-        # Default parameters used in SSB specification
         defaults = {
-            # Years
             "year": 1993,
             "year_min": 1992,
             "year_max": 1997,
             "year1": 1997,
             "year2": 1998,
-            "year_month": 199401,  # January 1994
+            "year_month": 199401,
             "week": 6,
-            # Discounts and quantities
             "discount_min": 1,
             "discount_max": 3,
             "quantity": 25,
             "quantity_min": 26,
             "quantity_max": 35,
-            # Regions
             "region": "AMERICA",
             "c_region": "ASIA",
             "s_region": "ASIA",
-            # Nations and cities
             "c_nation": "UNITED STATES",
             "s_nation": "UNITED STATES",
             "c_city1": "UNITED KI1",
             "c_city2": "UNITED KI5",
             "s_city1": "UNITED KI1",
             "s_city2": "UNITED KI5",
-            # Parts and manufacturers
             "category": "MFGR#12",
             "brand": "MFGR#2221",
             "brand_min": "MFGR#2221",
@@ -249,11 +209,6 @@ ORDER BY d_year, s_city, p_brand1;
             "mfgr2": "MFGR#2",
         }
 
-        # The `year_month` placeholder is overloaded across two columns: Q1.2 filters
-        # the NUMERIC d_yearmonthnum (199401), while Q3.4 filters the STRING
-        # d_yearmonth column whose canonical SSB value is 'Dec1997' (e.g. month-name +
-        # year, as emitted by the generator). Substituting the numeric default into
-        # Q3.4 never matches a string yearmonth, so resolve it per query.
         if query_id == "Q3.4":
             defaults["year_month"] = "Dec1997"
 

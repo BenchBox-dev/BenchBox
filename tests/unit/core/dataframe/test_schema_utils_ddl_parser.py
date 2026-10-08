@@ -1,13 +1,3 @@
-"""Unit tests for the paren/quote/multi-word-aware DDL column parser.
-
-Covers ``benchbox.core.dataframe.schema_utils.column_name`` and
-``column_sql_type`` for the DDL-string column shapes used by benchmarks such as
-joinorder_synthetic (whose schema lists raw ``"name TYPE [constraints...]"``
-column definitions). The naive ``column.split()`` previously truncated
-``DECIMAL(10, 2)`` to ``DECIMAL(10,``, mishandled quoted names, and silently
-dropped multi-word types; these tests pin the hardened behavior.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -22,37 +12,27 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# (ddl_string, expected_name, expected_type)
+
 _DDL_CASES = [
-    # --- simple "name TYPE" (must stay byte-identical to old behavior) ---
     ("id INTEGER", "id", "INTEGER"),
     ("note TEXT", "note", "TEXT"),
     ("name VARCHAR", "name", "VARCHAR"),
-    # --- parenthesized precision/scale ---
     ("imdb_index VARCHAR(12)", "imdb_index", "VARCHAR(12)"),
     ("country_code VARCHAR(255)", "country_code", "VARCHAR(255)"),
-    # space after the comma must NOT truncate the type
     ("price DECIMAL(10, 2)", "price", "DECIMAL(10, 2)"),
     ("price2 DECIMAL(10,2)", "price2", "DECIMAL(10,2)"),
     ("amount NUMERIC(18, 4)", "amount", "NUMERIC(18, 4)"),
-    # --- multi-word types ---
     ("val DOUBLE PRECISION", "val", "DOUBLE PRECISION"),
     ("ts TIMESTAMP WITH TIME ZONE", "ts", "TIMESTAMP WITH TIME ZONE"),
     ("ts2 TIMESTAMP WITHOUT TIME ZONE", "ts2", "TIMESTAMP WITHOUT TIME ZONE"),
     ("cv CHARACTER VARYING", "cv", "CHARACTER VARYING"),
     ("cv2 CHARACTER VARYING(64)", "cv2", "CHARACTER VARYING(64)"),
-    # --- quoted / bracketed / backtick-quoted names with spaces ---
-    # The delimiters are SQL syntax, not part of the logical name: column_name
-    # must return the UNQUOTED identifier so it matches the SQL identifier that
-    # the DataFrame loaders key on (a quoted spelling breaks cross-surface lookups).
     ('"odd name" INTEGER', "odd name", "INTEGER"),
     ("[odd name] INT", "odd name", "INT"),
     ("`odd name` INT", "odd name", "INT"),
     ('"id" BIGINT', "id", "BIGINT"),
-    # doubled delimiter is an escaped literal inside the identifier
     ('"a""b" INT', 'a"b', "INT"),
     ("[a]]b] INT", "a]b", "INT"),
-    # --- trailing column constraints are stripped from the type ---
     ("id INTEGER PRIMARY KEY", "id", "INTEGER"),
     ("title TEXT NOT NULL", "title", "TEXT"),
     ("kind VARCHAR(15) NOT NULL", "kind", "VARCHAR(15)"),
@@ -86,7 +66,7 @@ def test_empty_string_falls_back_to_default_type() -> None:
 
 
 def test_name_only_falls_back_to_default_type() -> None:
-    # A bare identifier with no type yields the default type.
+
     assert column_name("just_name") == "just_name"
     assert column_sql_type("just_name") == "VARCHAR"
     assert column_sql_type("just_name", default="TEXT") == "TEXT"
@@ -108,13 +88,13 @@ def test_object_column_unaffected() -> None:
 
 
 def test_lowercase_constraints_are_stripped() -> None:
-    # Constraint detection is case-insensitive.
+
     assert column_sql_type("id integer primary key") == "integer"
     assert column_sql_type("title text not null") == "text"
 
 
 def test_real_joinorder_synthetic_shapes() -> None:
-    # The exact column strings used by the join-order schema specs.
+
     shapes = {
         "id INTEGER PRIMARY KEY": ("id", "INTEGER"),
         "title TEXT NOT NULL": ("title", "TEXT"),

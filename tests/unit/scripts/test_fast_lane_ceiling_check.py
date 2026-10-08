@@ -87,9 +87,6 @@ def test_forbidden_path_in_the_fast_lane_is_a_violation(monkeypatch: pytest.Monk
     assert "test_y.py" not in violations[0]
 
 
-# ------------------------------------------------------------------ #
-# Environment failure vs policy violation                             #
-# ------------------------------------------------------------------ #
 def test_collect_that_cannot_run_is_an_environment_error_not_a_violation(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         mod, "_run_pytest_collect", _fake_collect("ModuleNotFoundError: No module named 'pytest'", rc=1)

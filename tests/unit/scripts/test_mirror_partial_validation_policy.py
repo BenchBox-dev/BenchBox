@@ -1,11 +1,3 @@
-"""Trusted-mirror vs community partial-validation policy.
-
-The maintainer seed corpus includes ``summary.validation=partial`` cohorts.
-After #1573 the mirror path ran full community validation and rejected those
-bundles even when privacy was clean. The mirror workflow must pass
-``--allow-partial-validation``; community validate-submission must not.
-"""
-
 from __future__ import annotations
 
 import os
@@ -27,7 +19,7 @@ def test_mirror_workflow_allows_partial_validation() -> None:
     text = SYNC_WORKFLOW.read_text(encoding="utf-8")
     assert "--allow-partial-validation" in text
     assert "partial" in text.lower()
-    # Privacy and inventory still gate the mirror path.
+
     assert "validate_submission.py" in text
     assert "generate_corpus_inventory.py --check" in text
 
@@ -40,7 +32,7 @@ def _submission_validation_run() -> str:
 
 def _evaluate_trust_gate(*, is_fork: str, base_ref: str | None, head_ref: str, pr_author: str) -> tuple[str, str]:
     run = _submission_validation_run()
-    prefix = run.split("# Trusted bot-created same-repo mirrors", maxsplit=1)[0]
+    prefix = run.split('_BASE_SHA="${BASE_SHA:-HEAD}"', maxsplit=1)[0]
     env = os.environ.copy()
     env.update({"IS_FORK": is_fork, "HEAD_REF": head_ref, "PR_AUTHOR": pr_author})
     if base_ref is not None:

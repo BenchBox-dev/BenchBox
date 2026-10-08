@@ -1,12 +1,6 @@
-"""DataFrame tuning configuration loader.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides the DataFrameTuningLoader class for loading, saving,
-and managing DataFrame tuning configurations from YAML/JSON files.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -27,44 +21,19 @@ logger = logging.getLogger(__name__)
 
 
 class DataFrameTuningLoadError(Exception):
-    """Raised when a tuning configuration cannot be loaded."""
+    pass
 
 
 class DataFrameTuningSaveError(Exception):
-    """Raised when a tuning configuration cannot be saved."""
+    pass
 
 
 class DataFrameTuningLoader:
-    """Loader for DataFrame tuning configurations.
-
-    This class handles loading and saving DataFrame tuning configurations
-    from YAML and JSON files, with support for templates and merging.
-
-    Example:
-        >>> loader = DataFrameTuningLoader()
-        >>> config = loader.load_config("path/to/config.yaml", platform="polars")
-        >>> emit(config.execution.streaming_mode)
-        True
-    """
-
     def load_config(
         self,
         path: Path | str,
         platform: str | None = None,
     ) -> DataFrameTuningConfiguration:
-        """Load a tuning configuration from a file.
-
-        Args:
-            path: Path to the YAML or JSON configuration file
-            platform: Optional platform name for validation
-
-        Returns:
-            The loaded DataFrameTuningConfiguration
-
-        Raises:
-            DataFrameTuningLoadError: If the file cannot be loaded or parsed
-            FileNotFoundError: If the file does not exist
-        """
         path = Path(path)
 
         if not path.exists():
@@ -80,7 +49,6 @@ class DataFrameTuningLoader:
         except Exception as e:
             raise DataFrameTuningLoadError(f"Invalid configuration in {path}: {e}") from e
 
-        # Log platform validation warnings if platform specified
         if platform:
             enabled = config.get_enabled_settings()
 
@@ -91,17 +59,6 @@ class DataFrameTuningLoader:
         return config
 
     def _load_file(self, path: Path) -> dict[str, Any]:
-        """Load data from a YAML or JSON file.
-
-        Args:
-            path: Path to the file
-
-        Returns:
-            Parsed dictionary data
-
-        Raises:
-            ValueError: If the file format is not supported
-        """
         suffix = path.suffix.lower()
 
         with open(path, encoding="utf-8") as f:
@@ -122,21 +79,8 @@ class DataFrameTuningLoader:
         description: str | None = None,
         include_defaults: bool = False,
     ) -> None:
-        """Save a tuning configuration to a file.
-
-        Args:
-            config: The configuration to save
-            path: Path to save the file (extension determines format)
-            platform: Optional platform name to include in metadata
-            description: Optional description to include in metadata
-            include_defaults: If True, include all settings even if at defaults
-
-        Raises:
-            DataFrameTuningSaveError: If the file cannot be saved
-        """
         path = Path(path)
 
-        # Update metadata
         if config.metadata is None:
             config.metadata = TuningMetadata()
 
@@ -145,7 +89,6 @@ class DataFrameTuningLoader:
         config.metadata.created = datetime.now().strftime("%Y-%m-%d")
         config.metadata.generated_by = "benchbox"
 
-        # Serialize
         data = config.to_full_dict() if include_defaults else config.to_dict()
 
         try:
@@ -154,18 +97,8 @@ class DataFrameTuningLoader:
             raise DataFrameTuningSaveError(f"Failed to save to {path}: {e}") from e
 
     def _save_file(self, data: dict[str, Any], path: Path) -> None:
-        """Save data to a YAML or JSON file.
-
-        Args:
-            data: Data to save
-            path: Path to the file
-
-        Raises:
-            ValueError: If the file format is not supported
-        """
         suffix = path.suffix.lower()
 
-        # Ensure parent directory exists
         path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(path, "w", encoding="utf-8") as f:
@@ -177,17 +110,6 @@ class DataFrameTuningLoader:
                 raise ValueError(f"Unsupported file format: {suffix}. Use .yaml, .yml, or .json")
 
     def get_template(self, platform: str) -> DataFrameTuningConfiguration:
-        """Get a platform-specific template with recommended settings.
-
-        This returns a configuration with sensible defaults for the specified
-        platform, optimized for general-purpose workloads.
-
-        Args:
-            platform: The DataFrame platform name (e.g., 'polars', 'pandas')
-
-        Returns:
-            A DataFrameTuningConfiguration with recommended settings
-        """
         from benchbox.core.dataframe.tuning.interface import (
             DataTypeConfiguration,
             ExecutionConfiguration,
@@ -201,7 +123,6 @@ class DataFrameTuningLoader:
         if platform_lower.endswith("-df"):
             platform_lower = platform_lower[:-3]
 
-        # Base configuration
         config = DataFrameTuningConfiguration(
             metadata=TuningMetadata(
                 platform=platform_lower,
@@ -210,10 +131,9 @@ class DataFrameTuningLoader:
             )
         )
 
-        # Platform-specific settings
         if platform_lower == "polars":
             config.execution = ExecutionConfiguration(
-                streaming_mode=False,  # Default to in-memory for speed
+                streaming_mode=False,
                 engine_affinity="in-memory",
                 lazy_evaluation=True,
             )
@@ -221,12 +141,12 @@ class DataFrameTuningLoader:
                 rechunk_after_filter=True,
             )
             config.data_types = DataTypeConfiguration(
-                enable_string_cache=False,  # Only enable when needed
+                enable_string_cache=False,
             )
 
         elif platform_lower == "pandas":
             config.data_types = DataTypeConfiguration(
-                dtype_backend="numpy_nullable",  # Modern nullable types
+                dtype_backend="numpy_nullable",
                 enable_string_cache=False,
             )
             config.io = IOConfiguration(
@@ -236,36 +156,25 @@ class DataFrameTuningLoader:
 
         elif platform_lower == "dask":
             config.parallelism = ParallelismConfiguration(
-                threads_per_worker=2,  # Balance memory/CPU
+                threads_per_worker=2,
             )
             config.memory = MemoryConfiguration(
-                spill_to_disk=True,  # Enable for large datasets
+                spill_to_disk=True,
             )
             config.data_types = DataTypeConfiguration(
-                dtype_backend="pyarrow",  # Better Dask integration
+                dtype_backend="pyarrow",
             )
 
         elif platform_lower == "cudf":
             config.gpu = GPUConfiguration(
                 enabled=True,
                 device_id=0,
-                spill_to_host=True,  # Fallback for large data
+                spill_to_host=True,
             )
 
         return config
 
     def get_optimized_template(self, platform: str) -> DataFrameTuningConfiguration:
-        """Get a performance-optimized template for the platform.
-
-        This returns a configuration tuned for maximum performance,
-        potentially trading off memory efficiency.
-
-        Args:
-            platform: The DataFrame platform name
-
-        Returns:
-            A performance-optimized DataFrameTuningConfiguration
-        """
         from benchbox.core.dataframe.tuning.interface import (
             DataTypeConfiguration,
             ExecutionConfiguration,
@@ -281,28 +190,27 @@ class DataFrameTuningLoader:
         config.metadata.description = f"Performance-optimized template for {platform_lower}"
 
         if platform_lower == "polars":
-            # Use streaming only for very large datasets
             config.execution = ExecutionConfiguration(
                 streaming_mode=False,
                 engine_affinity="in-memory",
                 lazy_evaluation=True,
             )
             config.data_types = DataTypeConfiguration(
-                enable_string_cache=True,  # Faster categoricals
+                enable_string_cache=True,
             )
 
         elif platform_lower == "pandas":
             config.data_types = DataTypeConfiguration(
-                dtype_backend="pyarrow",  # Faster operations
+                dtype_backend="pyarrow",
                 enable_string_cache=True,
                 auto_categorize_strings=True,
                 categorical_threshold=0.3,
             )
-            config.io.memory_map = True  # Faster file reads
+            config.io.memory_map = True
 
         elif platform_lower == "dask":
             config.parallelism = ParallelismConfiguration(
-                threads_per_worker=4,  # More parallelism
+                threads_per_worker=4,
             )
             config.data_types = DataTypeConfiguration(
                 dtype_backend="pyarrow",
@@ -312,24 +220,13 @@ class DataFrameTuningLoader:
             config.gpu = GPUConfiguration(
                 enabled=True,
                 device_id=0,
-                spill_to_host=False,  # Keep everything on GPU
-                pool_type="pool",  # Faster allocations
+                spill_to_host=False,
+                pool_type="pool",
             )
 
         return config
 
     def get_memory_constrained_template(self, platform: str) -> DataFrameTuningConfiguration:
-        """Get a memory-efficient template for the platform.
-
-        This returns a configuration optimized for low memory environments,
-        potentially trading off performance.
-
-        Args:
-            platform: The DataFrame platform name
-
-        Returns:
-            A memory-efficient DataFrameTuningConfiguration
-        """
         from benchbox.core.dataframe.tuning.interface import (
             DataTypeConfiguration,
             ExecutionConfiguration,
@@ -347,28 +244,28 @@ class DataFrameTuningLoader:
 
         if platform_lower == "polars":
             config.execution = ExecutionConfiguration(
-                streaming_mode=True,  # Process in chunks
+                streaming_mode=True,
                 engine_affinity="streaming",
                 lazy_evaluation=True,
             )
             config.memory = MemoryConfiguration(
-                chunk_size=100_000,  # Smaller chunks
-                rechunk_after_filter=False,  # Save memory
+                chunk_size=100_000,
+                rechunk_after_filter=False,
             )
 
         elif platform_lower == "pandas":
             config.memory = MemoryConfiguration(
-                chunk_size=50_000,  # Small chunks
+                chunk_size=50_000,
             )
             config.data_types = DataTypeConfiguration(
-                dtype_backend="pyarrow",  # More efficient memory
+                dtype_backend="pyarrow",
                 auto_categorize_strings=True,
                 categorical_threshold=0.5,
             )
 
         elif platform_lower == "dask":
             config.parallelism = ParallelismConfiguration(
-                worker_count=2,  # Fewer workers
+                worker_count=2,
                 threads_per_worker=1,
             )
             config.memory = MemoryConfiguration(
@@ -381,7 +278,7 @@ class DataFrameTuningLoader:
             config.gpu = GPUConfiguration(
                 enabled=True,
                 device_id=0,
-                spill_to_host=True,  # Use host memory when needed
+                spill_to_host=True,
             )
 
         return config
@@ -393,37 +290,14 @@ class DataFrameTuningLoader:
         platform: str | None = None,
         validate: bool = True,
     ) -> DataFrameTuningConfiguration:
-        """Merge two configurations with override precedence.
-
-        Values from the override configuration take precedence over base
-        values. Only non-default values from override are applied.
-
-        Args:
-            base: The base configuration
-            override: The configuration with values to override
-            platform: Optional platform name for validation
-            validate: Whether to validate the merged configuration (default: True)
-
-        Returns:
-            A new merged DataFrameTuningConfiguration
-
-        Raises:
-            ValueError: If validate=True and the merged configuration is invalid
-        """
-        # Start with base as a dictionary
         base_dict = base.to_full_dict()
 
-        # Get override values (only non-defaults)
         override_dict = override.to_dict()
 
-        # Deep merge
         merged = self._deep_merge(base_dict, override_dict)
 
-        # Create the merged configuration (this validates field-level constraints
-        # via __post_init__ in each sub-configuration)
         merged_config = DataFrameTuningConfiguration.from_dict(merged)
 
-        # Optionally validate platform compatibility
         if validate and platform:
             from benchbox.core.dataframe.tuning.validation import (
                 ValidationLevel,
@@ -436,7 +310,6 @@ class DataFrameTuningLoader:
                 error_msgs = "; ".join(i.message for i in errors)
                 raise ValueError(f"Merged configuration validation failed: {error_msgs}")
 
-            # Log warnings
             for issue in issues:
                 if issue.level == ValidationLevel.WARNING:
                     logger.warning(f"Merged config: {issue}")
@@ -444,15 +317,6 @@ class DataFrameTuningLoader:
         return merged_config
 
     def _deep_merge(self, base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-        """Deep merge two dictionaries.
-
-        Args:
-            base: Base dictionary
-            override: Dictionary with override values
-
-        Returns:
-            Merged dictionary
-        """
         result = base.copy()
 
         for key, value in override.items():
@@ -464,22 +328,10 @@ class DataFrameTuningLoader:
         return result
 
 
-# Module-level convenience functions
 _default_loader = DataFrameTuningLoader()
 
 
 def load_dataframe_tuning(path: Path | str, platform: str | None = None) -> DataFrameTuningConfiguration:
-    """Load a DataFrame tuning configuration from a file.
-
-    Convenience function that uses the default loader.
-
-    Args:
-        path: Path to the configuration file
-        platform: Optional platform name for validation
-
-    Returns:
-        The loaded DataFrameTuningConfiguration
-    """
     return _default_loader.load_config(path, platform)
 
 
@@ -489,14 +341,4 @@ def save_dataframe_tuning(
     platform: str | None = None,
     description: str | None = None,
 ) -> None:
-    """Save a DataFrame tuning configuration to a file.
-
-    Convenience function that uses the default loader.
-
-    Args:
-        config: The configuration to save
-        path: Path to save the file
-        platform: Optional platform name for metadata
-        description: Optional description for metadata
-    """
     _default_loader.save_config(config, path, platform, description)

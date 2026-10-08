@@ -1,6 +1,3 @@
-# Dask DataFrame Tuning - Default Configuration
-# Balanced defaults for parallel processing
-
 parallelism:
   threads_per_worker: 2
 

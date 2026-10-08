@@ -1,23 +1,4 @@
 #!/usr/bin/env python3
-"""Probe pg_mooncake columnstore data type compatibility.
-
-Connects to a PostgreSQL instance with pg_mooncake installed and tests each
-standard SQL data type against columnstore table creation. Outputs a
-version-tagged compatibility matrix in JSON or YAML format.
-
-Exit codes:
-  0 - Probe completed successfully
-  1 - Connection error or other failure
-
-Usage:
-  uv run -- python scripts/probe_mooncake_types.py --host localhost --port 5432
-  uv run -- python scripts/probe_mooncake_types.py --output matrix.json
-  uv run -- python scripts/probe_mooncake_types.py --format yaml --output matrix.yaml
-  uv run -- python scripts/probe_mooncake_types.py --dry-run
-  uv run -- python scripts/probe_mooncake_types.py --generate-reference --format json
-
-Requires: psycopg (pip install psycopg[binary])
-"""
 
 from __future__ import annotations
 
@@ -29,12 +10,6 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Data structures
-# ---------------------------------------------------------------------------
-
-# Standard PostgreSQL types to probe, grouped by category.
-# Each entry: (type_name, example_ddl_fragment)
 TYPE_CATALOG: dict[str, list[tuple[str, str]]] = {
     "numeric": [
         ("SMALLINT", "col SMALLINT"),
@@ -101,11 +76,7 @@ TYPE_CATALOG: dict[str, list[tuple[str, str]]] = {
 }
 
 
-# Reference type support based on pg_mooncake's Parquet/DuckDB engine.
-# Used by --generate-reference to produce a baseline matrix without a live connection.
-# Sources: DuckDB type system + Parquet spec (no geometric, network, range, bit, monetary).
 REFERENCE_TYPE_SUPPORT: dict[str, bool] = {
-    # numeric - all supported (Parquet INT32/INT64/FLOAT/DOUBLE/DECIMAL)
     "SMALLINT": True,
     "INTEGER": True,
     "BIGINT": True,
@@ -115,43 +86,31 @@ REFERENCE_TYPE_SUPPORT: dict[str, bool] = {
     "DOUBLE PRECISION": True,
     "SERIAL": True,
     "BIGSERIAL": True,
-    # character - all supported (Parquet BYTE_ARRAY / UTF8)
     "CHAR(10)": True,
     "VARCHAR(255)": True,
     "TEXT": True,
-    # binary - supported (Parquet BYTE_ARRAY)
     "BYTEA": True,
-    # datetime - mostly supported; INTERVAL and TIME WITH TZ are not
     "DATE": True,
     "TIME": True,
     "TIME WITH TIME ZONE": False,
     "TIMESTAMP": True,
     "TIMESTAMP WITH TIME ZONE": True,
     "INTERVAL": False,
-    # boolean - supported (Parquet BOOLEAN)
     "BOOLEAN": True,
-    # uuid - supported (DuckDB UUID → Parquet fixed_len_byte_array)
     "UUID": True,
-    # json - JSONB supported via DuckDB; plain JSON is not
     "JSON": False,
     "JSONB": True,
-    # array - not supported in columnstore
     "INTEGER[]": False,
     "TEXT[]": False,
-    # geometric - not supported (no Parquet mapping)
     "POINT": False,
     "LINE": False,
     "BOX": False,
-    # network - not supported (no Parquet mapping)
     "INET": False,
     "CIDR": False,
     "MACADDR": False,
-    # monetary - not supported
     "MONEY": False,
-    # bit - not supported
     "BIT(8)": False,
     "BIT VARYING(64)": False,
-    # range - not supported
     "INT4RANGE": False,
     "DATERANGE": False,
 }
@@ -159,8 +118,6 @@ REFERENCE_TYPE_SUPPORT: dict[str, bool] = {
 
 @dataclass
 class TypeProbeResult:
-    """Result of probing a single data type."""
-
     type_name: str
     category: str
     supported: bool
@@ -169,8 +126,6 @@ class TypeProbeResult:
 
 @dataclass
 class CompatibilityMatrix:
-    """Complete compatibility matrix for a pg_mooncake version."""
-
     pg_mooncake_version: str
     postgresql_version: str
     probe_timestamp: str
@@ -180,15 +135,10 @@ class CompatibilityMatrix:
     results: list[TypeProbeResult] = field(default_factory=list)
 
 
-# ---------------------------------------------------------------------------
-# Probing logic
-# ---------------------------------------------------------------------------
-
 TEST_TABLE_NAME = "_benchbox_type_probe"
 
 
 def _get_versions(cursor) -> tuple[str, str]:
-    """Get pg_mooncake and PostgreSQL versions."""
     cursor.execute("SELECT extversion FROM pg_extension WHERE extname = 'pg_mooncake'")
     row = cursor.fetchone()
     mooncake_version = row[0] if row else "unknown"
@@ -200,11 +150,6 @@ def _get_versions(cursor) -> tuple[str, str]:
 
 
 def _probe_type(cursor, conn, type_name: str, ddl_fragment: str) -> tuple[bool, str | None]:
-    """Test if a single type is supported in columnstore tables.
-
-    Creates a temporary table with the given column type using USING columnstore,
-    then drops it. Returns (supported, error_message).
-    """
     ddl = f"CREATE TABLE {TEST_TABLE_NAME} ({ddl_fragment}) USING columnstore"
     drop = f"DROP TABLE IF EXISTS {TEST_TABLE_NAME}"
 
@@ -213,13 +158,11 @@ def _probe_type(cursor, conn, type_name: str, ddl_fragment: str) -> tuple[bool, 
         conn.commit()
         cursor.execute(ddl)
         conn.commit()
-        # Cleanup
         cursor.execute(drop)
         conn.commit()
         return True, None
     except Exception as e:
         conn.rollback()
-        # Cleanup after failure
         try:
             cursor.execute(drop)
             conn.commit()
@@ -229,7 +172,6 @@ def _probe_type(cursor, conn, type_name: str, ddl_fragment: str) -> tuple[bool, 
 
 
 def run_probe(conn) -> CompatibilityMatrix:
-    """Run the full type probe against a pg_mooncake connection."""
     cursor = conn.cursor()
 
     mooncake_version, pg_version = _get_versions(cursor)
@@ -259,18 +201,11 @@ def run_probe(conn) -> CompatibilityMatrix:
     return matrix
 
 
-# ---------------------------------------------------------------------------
-# Output formatting
-# ---------------------------------------------------------------------------
-
-
 def format_matrix_json(matrix: CompatibilityMatrix) -> str:
-    """Format matrix as JSON."""
     return json.dumps(asdict(matrix), indent=2)
 
 
 def format_matrix_yaml(matrix: CompatibilityMatrix) -> str:
-    """Format matrix as YAML (without PyYAML dependency)."""
     lines = [
         f'pg_mooncake_version: "{matrix.pg_mooncake_version}"',
         f'postgresql_version: "{matrix.postgresql_version}"',
@@ -286,14 +221,12 @@ def format_matrix_yaml(matrix: CompatibilityMatrix) -> str:
         lines.append(f'    category: "{r.category}"')
         lines.append(f"    supported: {str(r.supported).lower()}")
         if r.error_message:
-            # Escape quotes in error messages
             escaped = r.error_message.replace('"', '\\"')
             lines.append(f'    error_message: "{escaped}"')
     return "\n".join(lines) + "\n"
 
 
 def format_matrix_table(matrix: CompatibilityMatrix) -> str:
-    """Format matrix as a human-readable table for terminal output."""
     lines = [
         "pg_mooncake Type Compatibility Matrix",
         f"  pg_mooncake version: {matrix.pg_mooncake_version}",
@@ -315,11 +248,6 @@ def format_matrix_table(matrix: CompatibilityMatrix) -> str:
 
 
 def build_reference_matrix() -> CompatibilityMatrix:
-    """Build a compatibility matrix from the hardcoded REFERENCE_TYPE_SUPPORT dict.
-
-    Useful for generating a baseline matrix without a live pg_mooncake connection.
-    The reference data is based on DuckDB/Parquet type system documentation.
-    """
     matrix = CompatibilityMatrix(
         pg_mooncake_version="reference",
         postgresql_version="reference",
@@ -347,7 +275,6 @@ def build_reference_matrix() -> CompatibilityMatrix:
 
 
 def dry_run_output() -> str:
-    """Show what types would be probed without connecting."""
     lines = ["Types that would be probed:", ""]
     for category, types in TYPE_CATALOG.items():
         lines.append(f"  {category}:")
@@ -356,11 +283,6 @@ def dry_run_output() -> str:
     total = sum(len(types) for types in TYPE_CATALOG.values())
     lines.append(f"\nTotal: {total} types across {len(TYPE_CATALOG)} categories")
     return "\n".join(lines)
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

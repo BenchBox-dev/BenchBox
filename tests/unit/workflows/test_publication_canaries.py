@@ -1,5 +1,3 @@
-"""Contract tests for publication-canaries.yml workflow."""
-
 from __future__ import annotations
 
 import re
@@ -31,14 +29,11 @@ def test_publication_canaries_workflow_is_valid_yaml() -> None:
 
 def test_publication_canaries_permissions_are_least_privilege() -> None:
     wf = _workflow()
-    # Top-level permissions
     assert wf.get("permissions") == {"contents": "read"}
 
-    # Job permissions must not escalate
     job_perms = wf["jobs"]["canaries"].get("permissions")
     assert job_perms == {"contents": "read"}
 
-    # Raw content verification for strict no-write rule
     raw = WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "pages: write" not in raw
     assert "id-token: write" not in raw
@@ -70,8 +65,6 @@ def test_publication_canaries_upload_artifact_retention() -> None:
     assert len(upload_steps) >= 1
 
     upload = upload_steps[0]
-    # Diagnostic canary output is a transient build/test artifact: <= 7 days
-    # per the operational receipts retention taxonomy.
     assert upload.get("with", {}).get("retention-days") == 7
     assert upload.get("if") == "always()"
 
@@ -79,7 +72,6 @@ def test_publication_canaries_upload_artifact_retention() -> None:
 def test_publication_canaries_pipe_exit_codes_not_swallowed() -> None:
     wf = _workflow()
 
-    # Default shell must be bash so `set -o pipefail` is honoured.
     assert wf.get("defaults", {}).get("run", {}).get("shell") == "bash"
 
     steps = wf["jobs"]["canaries"]["steps"]
@@ -88,7 +80,6 @@ def test_publication_canaries_pipe_exit_codes_not_swallowed() -> None:
     for step in script_steps:
         run = step["run"]
         assert "set -o pipefail" in run
-        # Exit status is captured and re-raised, not lost to `tee`.
         assert "|| rc=$?" in run
         assert 'exit "$rc"' in run
         assert " | tee " not in run
@@ -96,7 +87,6 @@ def test_publication_canaries_pipe_exit_codes_not_swallowed() -> None:
 
 def test_publication_canaries_pass_real_evidence_paths() -> None:
     raw = WORKFLOW_PATH.read_text(encoding="utf-8")
-    # Each canary must be handed explicit evidence inputs, never run argument-free.
     assert "--manifest" in raw
     assert raw.count("--receipts-dir") >= 3
 
@@ -108,7 +98,6 @@ def test_publication_canaries_have_timeout_and_concurrency() -> None:
 
 
 def test_publication_canaries_scripts_fail_closed_without_evidence() -> None:
-    """The scripts, invoked as the workflow invokes them, exit nonzero with no evidence."""
     import subprocess
 
     for script in (

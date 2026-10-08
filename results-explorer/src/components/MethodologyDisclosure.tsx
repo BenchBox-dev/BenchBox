@@ -2,10 +2,6 @@ import { useState } from "preact/hooks";
 import type { DetailResult } from "@/types";
 import { TuningBadge } from "@/components/TuningBadge";
 
-// ---------------------------------------------------------------------------
-// MethodologyDisclosure - collapsible "How this was measured" panel
-// ---------------------------------------------------------------------------
-
 interface Props {
   detail: DetailResult;
 }

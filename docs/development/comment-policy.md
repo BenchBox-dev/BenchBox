@@ -13,8 +13,9 @@ assignments. A help string or protocol record needs an actual reader.
   native parser regressions. While enforcement is advisory it lists new
   violations without failing; once enforcement is blocking it rejects them. Set `BASE_REF` to an immutable
   commit SHA to reproduce a CI comparison.
-- `make comment-policy-strict` checks the whole inventory. It fails until
-  cleanup is complete.
+- `make comment-policy-strict` checks the whole inventory. It applies the
+  candidate's own exceptions, so it is a diagnostic, not a gate; CI runs the
+  comparison mode, which honours only exceptions already on the base.
 - `make comment-policy-report` lists remaining violations without rejecting
   legacy debt. Configuration and parser setup failures still fail.
 - The pre-commit hook checks staged content, with the same advisory or blocking
@@ -59,7 +60,9 @@ never left starting with `::`.
 
 Moving from `advisory` to `blocking` is a one-line change to the policy. It is
 checked against the base policy, so that change is not blocked by itself, and
-the next pull request is. A policy cannot be moved back from `blocking` to
+the next pull request is. The pull request that flips the mode is therefore
+exempt by construction: its findings are reported but cannot fail it, so check
+it with `make comment-policy-strict` before merging. A policy cannot be moved back from `blocking` to
 `advisory`. Flip it after the open pull requests have merged or been cleaned,
 so that no one meets the new rule on a branch that was started before it
 existed.
@@ -150,3 +153,30 @@ Make constructs need review and adapter work. Details are in
 `scripts/comment_syntax.py`, `comment_payloads.py` and `comment_execution.py`;
 add a regression fixture to `tests/unit/scripts/test_comment_policy.py` when
 extending an adapter.
+
+Known gaps, each a place where a comment can pass unreported:
+
+- TOML values and YAML or JSON keys other than the recognized command keys
+  (`run`, `command`, `entrypoint`, `entry`, `script`, SQL keys, and
+  `package.json` scripts) are not extracted as code.
+- A Python `open()` whose path cannot be resolved is not treated as an HTML
+  sink, so text written through it is not scanned.
+- A JavaScript wrapper that only passes its argument to a reviewed SQL wrapper
+  is accepted without checking its call sites.
+- A shell chunk that the parser cannot read is skipped when it holds no
+  comment marker for the interpreter it names; a program assembled from
+  variables at run time is not inspected in that case.
+- Unknown programs that take `-c` or `-e` as data are listed in
+  `DATA_FLAG_PROGRAMS` in `scripts/comment_execution.py`; any other program
+  given such a flag is reported.
+- Commands passed to a runner such as `ssh` or `watch` as one string are not
+  split, so an interpreter inside that string is not followed.
+- HTML comments and MyST `%` lines in Markdown prose are not scanned. In the
+  maintained docs they are copyright headers, generator start and end markers,
+  `<!-- content-ok -->` markers read by `scripts/blog_content_validation.py`,
+  and two `%` lines in `docs/blog/index.md` that keep a heading id stable.
+- Comments inside Python string values are not scanned unless the string
+  reaches a recognized SQL, shell or HTML sink. Generated SQL and scripts keep
+  such comments where they are part of the product's output, for example
+  maintenance SQL headers, dry-run DDL previews, stream-file headers, the Trino
+  tuning note and the AWS Glue job script.

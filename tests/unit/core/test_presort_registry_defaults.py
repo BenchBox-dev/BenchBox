@@ -1,12 +1,3 @@
-"""Presort sort keys live in the benchmark registry, not in the CLI.
-
-`one-engine-core-run-service` w5. `benchbox run --presort` used to carry a
-hardcoded `l_shipdate` for tpch and `ss_sold_date_sk` for tpcds inside
-benchbox/cli/commands/run.py. Which column a benchmark sorts on is benchmark
-knowledge; a CLI command file is the wrong owner, and it meant adding presort
-support to a third benchmark required a CLI edit.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -73,8 +64,6 @@ class TestCliNoLongerHardcodesSortKeys:
 
 
 class TestPresortPayloadResolution:
-    """The CLI resolver's behavior is unchanged apart from its data source."""
-
     @staticmethod
     def _resolve(benchmark, presort, tuning_payload=None):
         from benchbox.cli.commands.run import _resolve_data_organization_payload

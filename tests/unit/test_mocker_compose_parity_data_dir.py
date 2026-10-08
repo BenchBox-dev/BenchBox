@@ -1,22 +1,3 @@
-"""Coverage for `_project/scripts/mocker_compose_parity.sh`'s BENCHBOX_DATA_DIR wiring.
-
-`make test-docker-parity PARITY_PLATFORMS="lakesail velox"` is the only
-automated lifecycle exercise these two stacks get, and the script's
-DATA_DIR threading (computing an absolute default, then passing it through
-to every `make test-docker-up-%` / `make test-docker-down-%` invocation
-it drives, plus the INT/TERM interrupt-teardown trap) had zero coverage:
-mutation testing (reverting that wiring alone) survived the full suite.
-
-These tests run the REAL script, but stub out `make` on PATH so no real
-`docker`/`mocker` compose lifecycle -- and therefore no real container or
-volume -- is ever touched: the stub only records the argv it was invoked
-with and exits 0. The stub deliberately never writes a `<plat>.project`
-tracking file, so the script's own `[ -z "$proj" ]` branch takes the SKIP
-path for the fresh-state assertions that would otherwise shell out to the
-real `docker`/`mocker` CLI directly (`"$ENGINE" ps -a` / `"$ENGINE" volume
-ls`) -- keeping this test hermetic end to end.
-"""
-
 from __future__ import annotations
 
 import os
@@ -69,9 +50,6 @@ def _run_parity_script(
         env["BENCHBOX_DATA_DIR"] = benchmark_data_dir
     env["FAKE_MAKE_LOG"] = str(log_file)
     env["DOCKER_TEST_STATE_DIR"] = str(state_dir)
-    # Fake `make` first on PATH so the script's `make -C ...` calls never
-    # reach the real binary (and therefore never reach a real container
-    # engine).
     env["PATH"] = f"{bin_dir}:{env.get('PATH', '')}"
 
     result = subprocess.run(
@@ -130,8 +108,6 @@ def test_parity_script_forwards_an_explicit_absolute_data_dir_unchanged(tmp_path
 
 
 def test_parity_script_passes_data_dir_for_velox_too(tmp_path):
-    """Only lakesail/velox mount BENCHBOX_DATA_DIR -- pin that the wiring
-    is not accidentally lakesail-specific."""
     custom_data_dir = str(tmp_path / "custom-velox-data")
     result, log_file = _run_parity_script(tmp_path, platform="velox", benchmark_data_dir=custom_data_dir)
 

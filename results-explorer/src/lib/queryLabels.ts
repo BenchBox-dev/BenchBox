@@ -4,6 +4,7 @@ import {
   formatLatencyMs,
   formatPlainNumber,
   formatPowerScore,
+  formatThroughputScore,
   formatUsd,
 } from "@/lib/metricFormatters";
 import { humanizeBenchmark } from "@/utils";
@@ -26,19 +27,6 @@ export function compareQueryIds(a: string, b: string): number {
   return QUERY_ID_COLLATOR.compare(a, b) || a.localeCompare(b);
 }
 
-/**
- * Sort and deduplicate query identifiers.
- *
- * Dedup is defensive: callers (RankTable, QueryHeatmap, QueryHistogram) use
- * the result both for column ordering AND as React keys. A duplicate id in
- * the input would produce React key collisions and break reconciliation,
- * which is the bug class captured in
- * `_project/blind-spots/2026-04-29-143205-react-key-collision-class.md`.
- * Stable order on duplicates would not have helped there: only one of the
- * duplicates can ever survive as a column, so the right answer is to drop
- * the duplicates at the boundary rather than push composite-key gymnastics
- * into every column-iterating component.
- */
 export function sortQueryIds(queryIds: readonly string[]): string[] {
   const seen = new Set<string>();
   const unique: string[] = [];
@@ -61,6 +49,8 @@ const QUERY_COLUMN_LABELS: Record<string, string> = {
   scale_factor: "Scale",
   run_date: "Run date",
   power_score: "Power score (higher is better)",
+  throughput_at_size: "Throughput@Size (higher is better)",
+  stream_count: "Streams",
   total_duration_s: "Total duration",
   geomean_ms: "Geomean latency (lower is better)",
   display_geomean_ms: "Display geomean (lower is better)",
@@ -109,6 +99,7 @@ export function formatQueryFacetValue(key: string, value: string): string {
 export function formatQueryCell(column: string, value: unknown): string {
   if (value === null || value === undefined || value === "") {
     if (column === "power_score") return "No power score";
+    if (column === "throughput_at_size") return "No throughput score";
     if (column === "geomean_ms" || column === "display_geomean_ms") return "No timing recorded";
     if (column === "total_duration_s") return "No duration recorded";
     if (column === "cost_usd" || column === "normalized_cost_usd") return "No cost recorded";
@@ -116,6 +107,9 @@ export function formatQueryCell(column: string, value: unknown): string {
   }
   if (column === "run_date") return formatRunDateWithAge(typeof value === "string" ? value : null);
   if (column === "power_score") return typeof value === "number" ? formatPowerScore(value).valueText : String(value);
+  if (column === "throughput_at_size") {
+    return typeof value === "number" ? formatThroughputScore(value).valueText : String(value);
+  }
   if (column === "geomean_ms" || column === "display_geomean_ms") {
     return typeof value === "number" ? formatLatencyMs(value).valueText : String(value);
   }

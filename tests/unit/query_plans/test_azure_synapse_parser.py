@@ -1,9 +1,3 @@
-"""Unit tests for AzureSynapseQueryPlanParser.
-
-Driven by a recorded ``EXPLAIN`` XML fixture (DSQL distributed plan) under
-tests/fixtures/query_plans/ so they run with no live Synapse workspace.
-"""
-
 from pathlib import Path
 
 import pytest
@@ -46,9 +40,9 @@ class TestAzureSynapseParserBasics:
 
     def test_return_is_root_pipeline_ordered(self, parser):
         dag = parser.parse_explain_output("q1", _load("azure_synapse_explain_sample.xml"))
-        # RETURN delivers the result, so it is the pipeline root.
+
         assert dag.logical_root.operator_type == LogicalOperatorType.PROJECT
-        # The chain is linear: each step has at most one child.
+
         node = dag.logical_root
         while node.children:
             assert len(node.children) == 1

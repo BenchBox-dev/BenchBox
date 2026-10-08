@@ -1,5 +1,3 @@
-"""Regression tests for MCP benchmark stdout suppression boundaries."""
-
 from __future__ import annotations
 
 import io
@@ -17,7 +15,6 @@ pytestmark = [
 
 
 def test_run_benchmark_impl_suppresses_transitive_stdout() -> None:
-    """_run_benchmark_impl should suppress print() leakage from benchmark execution."""
     from benchbox.mcp.tools.benchmark import _run_benchmark_impl
 
     captured = io.StringIO()
@@ -46,7 +43,6 @@ def test_run_benchmark_impl_suppresses_transitive_stdout() -> None:
 
 
 def test_data_only_core_run_suppresses_transitive_stdout(tmp_path: Path) -> None:
-    """The shared core data-only execution must not leak stdout through MCP."""
     from benchbox.mcp.tools.benchmark import _run_benchmark_impl
 
     def build_dummy_benchmark(scale_factor: float, output_dir: Path) -> SimpleNamespace:
@@ -82,13 +78,6 @@ def test_data_only_core_run_suppresses_transitive_stdout(tmp_path: Path) -> None
 
 
 def test_silence_output_suppresses_emit_calls() -> None:
-    """silence_output() must suppress emit() calls, not just raw print().
-
-    Rich's Console() resolves sys.stdout at call time rather than construction
-    time, so emit() is effectively suppressed when silence_output() is active.
-    This test makes that contract explicit so any future change that breaks it
-    (e.g. constructing Console with an explicit file=) fails loudly.
-    """
     from benchbox.utils.printing import emit, silence_output
 
     captured = io.StringIO()

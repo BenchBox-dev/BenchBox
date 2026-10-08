@@ -1,5 +1,3 @@
-"""Fixture: own-edit-target freshness must stay named in the TODO-review binding."""
-
 from pathlib import Path
 
 import pytest

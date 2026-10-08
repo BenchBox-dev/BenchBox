@@ -1,5 +1,3 @@
-"""Unit tests for visualization utilities."""
-
 from __future__ import annotations
 
 import pytest
@@ -47,26 +45,26 @@ class TestExtractChartSubtitle:
         assert "SF=" in subtitle
 
     def test_version_appended_to_platform_name(self):
-        """When version is not in platform label, it gets appended."""
+
         r = make_normalized_result(platform="DuckDB", platform_version="1.4.3")
         subtitle = extract_chart_subtitle([r])
         assert "DuckDB 1.4.3" in subtitle
 
     def test_no_duplicate_when_version_already_in_label(self):
-        """After version disambiguation, platform label already contains version -- no duplication."""
+
         r = make_normalized_result(platform="DuckDB 1.4.3", platform_version="1.4.3")
         subtitle = extract_chart_subtitle([r])
         assert "DuckDB 1.4.3" in subtitle
         assert "DuckDB 1.4.3 1.4.3" not in subtitle
 
     def test_no_platform_version_when_no_raw_version(self):
-        """No raw version -- subtitle omits platform version segment."""
+
         r = make_normalized_result(platform="DuckDB")
         subtitle = extract_chart_subtitle([r])
-        assert "DuckDB" not in subtitle  # Only benchmark and scale factor present
+        assert "DuckDB" not in subtitle
 
     def test_uses_first_result_for_subtitle(self):
-        """Subtitle is extracted from results[0]."""
+
         r1 = make_normalized_result(platform="DuckDB", platform_version="1.0.0", scale_factor=1.0)
         r2 = make_normalized_result(platform="Polars", platform_version="0.19.0", benchmark="tpcds", scale_factor=10.0)
         subtitle = extract_chart_subtitle([r1, r2])
@@ -110,12 +108,12 @@ class TestSlugify:
         assert slugify("123test") == "123test"
 
     def test_unicode_characters(self):
-        # Unicode chars (é) are kept as-is since isalnum() returns True for them
+
         assert slugify("café") == "café"
 
     def test_platform_names(self):
         assert slugify("DuckDB") == "duckdb"
-        # Parentheses become hyphens, multiple hyphens collapsed, trailing stripped
+
         assert slugify("Snowflake (Enterprise)") == "snowflake-enterprise"
         assert slugify("BigQuery") == "bigquery"
 

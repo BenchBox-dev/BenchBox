@@ -12,16 +12,16 @@ platform identifiers:
 
 ## Quick Reference
 
+The commands run embedded ClickHouse (chDB, no server required), a self-hosted or Docker ClickHouse server, and managed
+ClickHouse Cloud.
+
 ```bash
-# Embedded ClickHouse (chDB) - no server required
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 
-# Self-hosted / Docker ClickHouse
 benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
   --platform-option host=localhost \
   --platform-option port=9000
 
-# Managed ClickHouse Cloud
 benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.01 \
   --platform-option host=abc123.us-east-2.aws.clickhouse.cloud \
   --platform-option password=my-password
@@ -29,16 +29,16 @@ benchbox run --platform clickhouse-cloud --benchmark tpch --scale 0.01 \
 
 ## Installation
 
+The extras are `clickhouse-local` (chDB embedded), `clickhouse-server` (self-hosted, via `clickhouse-driver`) and
+`clickhouse-cloud` (managed, via `clickhouse-connect`). `--extra clickhouse` is equivalent to `--extra
+clickhouse-server`.
+
 ```bash
-# clickhouse-local (chDB embedded)
 uv add benchbox --extra clickhouse-local
 
-# clickhouse-server (self-hosted via clickhouse-driver)
 uv add benchbox --extra clickhouse-server
-# or equivalently:
 uv add benchbox --extra clickhouse
 
-# clickhouse-cloud (managed via clickhouse-connect)
 uv add benchbox --extra clickhouse-cloud
 ```
 
@@ -72,21 +72,21 @@ first-class name).
 YAML configuration files that use bare `clickhouse` no longer resolve and must
 be updated to a first-class name:
 
+The first two lines are the old configuration, which was removed and now errors. The last line is the new one.
+
 ```yaml
-# Before (removed — now errors)
 platform: clickhouse
 deployment_mode: local
 
-# After
 platform: clickhouse-local
 ```
 
+Again, the first two lines are the removed configuration, and the last line is the replacement.
+
 ```yaml
-# Before (removed — now errors)
 platform: clickhouse
 deployment_mode: server
 
-# After
 platform: clickhouse-server
 ```
 

@@ -1,24 +1,3 @@
-/**
- * DuckDB-WASM data access layer.
- *
- * DuckDB-WASM is the sole browser store for every user-visible explorer
- * metric. Pages read results, rankings, matrix cells, detail timings, and
- * cohort summaries through `queryRows` or typed helpers in
- * `lib/duckdbQueries.ts`. Committed JSON bundles are source inputs - they
- * flow into `results.duckdb` via the Python pipeline and are not fetched at
- * runtime for metric rendering.
- *
- * The WASM bundle is large (~6 MB compressed). We initialise lazily, on
- * first `getDb()` call, so the app shell paints before DuckDB downloads.
- *
- * Usage:
- *   const rows = await queryRows<MyRow>("SELECT ... FROM bench.results");
- *
- * If `results.duckdb` cannot be attached (network failure, 404, corrupt
- * file), `getDb()` rejects - there is no JSON fallback. Pages surface the
- * error to the user rather than silently rendering empty state.
- */
-
 import * as duckdb from "@duckdb/duckdb-wasm";
 
 import { LOCAL_DUCKDB_BUNDLES } from "@/lib/duckdbBundles";
@@ -32,33 +11,17 @@ import {
 let dbInstance: duckdb.AsyncDuckDB | null = null;
 let initPromise: Promise<duckdb.AsyncDuckDB> | null = null;
 let initFailures = 0;
-// A fresh COI worker can repeat the same heap-view failure. Retain the
-// supported single-threaded runtime for this tab once COI cannot initialize.
 let excludeCoiBundle = false;
 const INIT_FAILURE_LIMIT = 3;
 const SNAPSHOT_READY_ATTEMPTS = 8;
 const SNAPSHOT_READY_DELAY_MS = 100;
-// Empty reads keep retrying for the warm-up window; this is a safety cap for
-// pathological clocks or zero-delay test timers rather than the normal stop.
 const QUERY_RETRY_ATTEMPTS = 100;
 const QUERY_ERROR_RETRY_ATTEMPTS = 3;
 const QUERY_RETRY_DELAY_MS = 100;
-// Keep a genuinely empty query bounded below the browser suite's shortest
-// data-wait attempt (8s). Linear backoff here previously held the page in its
-// loading skeleton for the full 15s cold window, so the recovery navigation
-// could never run. Frequent re-reads also do more useful work warming the
-// missing HTTP-backed row group than sleeping progressively longer.
 const QUERY_EMPTY_RETRY_DELAY_MS = 50;
-// How long after the snapshot is attached an EMPTY result is treated as a cold
-// read worth re-issuing rather than the truth. Cold init measures P95 ~1s, so
-// this is generous; outside it, empty returns immediately.
 const COLD_SNAPSHOT_EMPTY_RETRY_WINDOW_MS = 15_000;
-// Set when the snapshot is attached and validated; 0 until then.
 let snapshotReadyAt = 0;
 let initError: Error | null = null;
-// RUN_QUERY blocks the worker's message handler. Queue reads here so their
-// budgets start when the worker can process them, rather than while a longer
-// Workbench query occupies it. Rejected operations must release the queue.
 let queryQueue: Promise<void> = Promise.resolve();
 
 type DuckDBConnection = Awaited<ReturnType<duckdb.AsyncDuckDB["connect"]>>;
@@ -68,8 +31,6 @@ async function createCspBoundWorker(workerPath: string): Promise<Worker> {
   if (workerUrl.origin !== window.location.origin) {
     throw new Error(`DuckDB worker must be same-origin: ${workerUrl.origin}`);
   }
-  // Bound asset fetches as well as worker requests so initialization cannot
-  // remain pending indefinitely. An abort flows through the init failure path.
   const response = await fetch(workerUrl, { signal: AbortSignal.timeout(DUCKDB_INIT_TIMEOUT_MS) });
   if (!response.ok) {
     throw new Error(`DuckDB worker fetch failed: HTTP ${response.status}`);
@@ -84,19 +45,8 @@ async function createCspBoundWorker(workerPath: string): Promise<Worker> {
   return worker;
 }
 
-// Keep this value aligned with
-// `_project/scripts/explorer_pipeline/contract.py::EXPLORER_READ_MODEL_VERSION`.
-// `results-explorer/src/lib/__tests__/db-remediation-pin.test.ts` pins the
-// browser constant against an independently reviewed contract value and
-// exercises the older/equal/newer compatibility policy below.
-const EXPECTED_READ_MODEL_VERSION = 13;
+const EXPECTED_READ_MODEL_VERSION = 14;
 
-// Required scans must be queryable AND non-empty for the snapshot to be
-// considered ready. Optional scans must be queryable (so we know the table
-// is attached and the schema exists), but an empty result is acceptable —
-// the explorer's detail/query/short-id paths already handle missing data
-// gracefully, so blocking the entire UI on these is an over-strict gate
-// that produces an infinite spinner for valid snapshots.
 const SNAPSHOT_READY_SCANS = [
   {
     label: "results",
@@ -149,17 +99,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
 }
 
-// Page reads have a short execution budget; initialization and user SQL get
-// longer budgets. A timeout is a hard cutoff, not proof the worker is dead.
-// Terminating at that cutoff also releases queued readers to a fresh worker.
 const DUCKDB_QUERY_TIMEOUT_MS = 5_000;
 const DUCKDB_INIT_TIMEOUT_MS = 30_000;
 export const DUCKDB_USER_QUERY_TIMEOUT_MS = 30_000;
-// Cleanup must not hold the queue indefinitely if the worker stops answering.
 const DUCKDB_CLEANUP_TIMEOUT_MS = 300;
 
-// A multi-line Workbench query pasted verbatim into a user-facing error
-// message is unreadable and can be very large; truncate to a short label.
 const SQL_LABEL_MAX_LENGTH = 80;
 
 function sqlLabel(sql: string): string {
@@ -169,7 +113,6 @@ function sqlLabel(sql: string): string {
     : collapsed;
 }
 
-/** Distinguish our execution cutoff from errors returned by DuckDB itself. */
 class DuckDbTimeoutError extends Error {
   constructor(message: string) {
     super(message);
@@ -177,11 +120,6 @@ class DuckDbTimeoutError extends Error {
   }
 }
 
-/**
- * A detached bridge can resolve a request with undefined, which Arrow rejects
- * as a TypeError. Identify the detached instance so the read can retry on a
- * fresh worker without classifying arbitrary TypeErrors as transient.
- */
 class DuckDbTerminatedError extends Error {
   constructor(label: string) {
     super(`DuckDB ${label} failed; its worker was terminated while the query was in flight`);
@@ -189,16 +127,6 @@ class DuckDbTerminatedError extends Error {
   }
 }
 
-/**
- * Bound a single DuckDB-WASM call so a worker that stops answering (see
- * {@link DUCKDB_QUERY_TIMEOUT_MS}) produces a rejection instead of an
- * unresolved promise. The underlying call is not cancelled by this — nothing
- * upstream of `conn.query()` awaits the settlement of the original promise,
- * it is simply no longer awaited by the caller. duckdb-wasm 1.32.0 does
- * expose a cancellation primitive (`cancelSent()` / `CANCEL_PENDING_QUERY`),
- * but it isn't wired up to the `conn.query()` path this module uses, so it
- * doesn't apply here.
- */
 function withDuckDbTimeout<T>(
   promise: Promise<T>,
   label: string,
@@ -225,7 +153,6 @@ function withDuckDbTimeout<T>(
   });
 }
 
-/** `conn.query(sql)`, guarded by {@link withDuckDbTimeout}. */
 function queryWithTimeout(
   conn: DuckDBConnection,
   sql: string,
@@ -234,25 +161,18 @@ function queryWithTimeout(
   return withDuckDbTimeout(conn.query(sql), sqlLabel(sql), timeoutMs);
 }
 
-// Exported for unit-test coverage (optional snapshot tables must not
-// block readiness when empty). Not part of the public surface — call sites
-// outside this module should keep going through `getDb()`.
 export async function _waitForSnapshotRowsForTest(
   conn: DuckDBConnection,
 ): Promise<void> {
   return waitForSnapshotRows(conn);
 }
 
-// Exported for unit-test coverage of the read-model version guard.
 export async function _verifyReadModelVersionForTest(
   conn: DuckDBConnection,
 ): Promise<void> {
   return verifyReadModelVersion(conn);
 }
 
-// Exported for unit-test coverage of initialization ordering. The version
-// guard must run before schema-readiness probes so stale snapshots fail with
-// the actionable read-model message instead of a lower-level DuckDB error.
 export async function _validateAttachedSnapshotForTest(
   conn: DuckDBConnection,
 ): Promise<void> {
@@ -266,19 +186,10 @@ export const _DUCKDB_QUERY_TIMEOUT_MS_FOR_TEST = DUCKDB_QUERY_TIMEOUT_MS;
 export const _DUCKDB_INIT_TIMEOUT_MS_FOR_TEST = DUCKDB_INIT_TIMEOUT_MS;
 export const _DUCKDB_CLEANUP_TIMEOUT_MS_FOR_TEST = DUCKDB_CLEANUP_TIMEOUT_MS;
 
-// Exported for unit-test coverage of instance eviction and init-path
-// recovery. Not part of the public surface.
 export function _getInitFailuresForTest(): number {
   return initFailures;
 }
 
-// Resets this module's singleton state between tests. Necessary because
-// `dbInstance`/`initPromise`/`initFailures`/`initError`/`snapshotReadyAt` are
-// module-level and otherwise leak across test cases.
-//
-// Unlike the read-only test hooks above, this one mutates production state,
-// so it no-ops outside a test build rather than shipping a callable "wipe
-// the live database connection" function in the production bundle.
 export function _resetDbStateForTest(): void {
   if (import.meta.env.PROD) return;
   dbInstance = null;
@@ -338,9 +249,6 @@ function isMissingReadModelMetadataError(error: unknown): boolean {
 
 async function validateAttachedSnapshot(conn: DuckDBConnection): Promise<void> {
   await verifyReadModelVersion(conn);
-  // COUNT(*) can be satisfied from metadata for this projection view.
-  // Run the same projection PlatformIndex uses so a cold HTTP-backed
-  // snapshot is query-ready before the cached DB instance is exposed.
   await waitForSnapshotRows(conn);
 }
 
@@ -358,52 +266,8 @@ function quoteSqlLiteral(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-/**
- * Probe that a KEYED lookup works, not just an unkeyed scan.
- *
- * The `LIMIT 1` scans above prove a table is attached and has at least one
- * reachable row. They do NOT prove the snapshot is fully readable: on a cold
- * HTTP-backed `results.duckdb` those scans are satisfied by the first row group
- * while `WHERE result_id = ?` for a row further into the file still returns
- * zero. `queryRows` does not swallow that — it is a genuine empty read — so the
- * detail page renders "No result found" for a real id, and index surfaces
- * render a heading with missing rows. That is the flake the e2e suite kept
- * hitting (see docs/operations/browser-ci.md, 2026-07-29 correction).
- *
- * `ORDER BY result_id DESC LIMIT 1` forces the whole `result_id` column to be
- * materialized, so the id we probe with is deliberately NOT the one the cheap
- * scans already reached. `result_detail_metrics` is a LEFT JOIN projection over
- * `results`, so every id in `results` must resolve there — an empty answer
- * means the snapshot is still incomplete, never that the row legitimately
- * does not exist.
- */
-/**
- * Every snapshot table must be FULLY readable before the snapshot is exposed.
- *
- * Narrowing this list does not work: each time it covered only the tables one
- * failing surface read, the race simply moved to the next surface. A single-id
- * keyed probe left Compare failing on `short_ids`; adding `short_ids` left it
- * failing on the per-query evidence tables. The per-query tables are also the
- * largest, so they are the most likely to be partially readable, not the least.
- *
- * Optional tables are included for free: an empty table has COUNT(*) 0 and
- * materializes 0 rows, so it agrees trivially.
- */
 const SNAPSHOT_COMPLETENESS_TABLES = SNAPSHOT_READY_SCANS.map((scan) => scan.label);
 
-/**
- * Probe that every row is readable, not merely the first one.
- *
- * `COUNT(*)` is answered from the file's metadata without reading row groups,
- * so it reports the TRUE total even while the data pages are still arriving.
- * Materializing the `result_id` column forces those pages to be read. When the
- * two disagree the snapshot is only partially readable — the state in which a
- * keyed lookup for a row in a not-yet-readable group returns zero rows.
- *
- * This is what a single keyed probe cannot catch: proving one id resolves says
- * nothing about the other ids a page will ask for. Compare in particular reads
- * several specific ids at once, and kept failing under a single-id probe.
- */
 async function probeSnapshotCompleteness(conn: DuckDBConnection): Promise<string | null> {
   for (const table of SNAPSHOT_COMPLETENESS_TABLES) {
     const countRows = (await queryWithTimeout(conn, `SELECT COUNT(*) AS n FROM bench.${table}`)).toArray() as Array<{
@@ -448,8 +312,6 @@ async function waitForSnapshotRows(conn: DuckDBConnection): Promise<void> {
         if (scan.required) {
           requiredCounts.push([scan.label, result.toArray().length] as const);
         }
-        // Optional scans only need to be queryable; we don't track row counts
-        // because empty is acceptable.
       }
       const emptyRequired = requiredCounts
         .filter(([, rowCount]) => rowCount === 0)
@@ -472,27 +334,17 @@ async function waitForSnapshotRows(conn: DuckDBConnection): Promise<void> {
   throw lastError instanceof Error ? lastError : new Error("DuckDB snapshot did not become query-ready");
 }
 
-/** Allow an explicit reader retry after the automatic initialization budget is exhausted. */
 export function resetDuckDbInitializationFailures(): void {
   initFailures = 0;
   initError = null;
 }
 
-// Reset the retry counter when the browser reports a network recovery so a
-// transient same-origin asset or snapshot outage doesn't permanently disable
-// DuckDB for the tab.
 if (typeof window !== "undefined") {
   window.addEventListener("online", () => {
     resetDuckDbInitializationFailures();
   });
 }
 
-/**
- * Terminate an instance whose operation exceeded its execution budget.
- * Only clear singleton state when it still belongs to this instance, so a
- * stale reference cannot discard a replacement. terminate() does not require
- * a worker round-trip and remains usable when the worker stops answering.
- */
 function evictDb(deadInstance: duckdb.AsyncDuckDB): void {
   if (dbInstance === deadInstance) {
     dbInstance = null;
@@ -502,12 +354,6 @@ function evictDb(deadInstance: duckdb.AsyncDuckDB): void {
   void deadInstance.terminate();
 }
 
-/**
- * Initialise DuckDB-WASM and load the results database.
- * Calling this multiple times is safe - it returns the cached instance.
- * After {@link INIT_FAILURE_LIMIT} consecutive failures we stop retrying so a
- * persistently broken environment doesn't burn bandwidth.
- */
 export async function getDb(): Promise<duckdb.AsyncDuckDB> {
   if (dbInstance) return dbInstance;
   if (initPromise) return initPromise;
@@ -519,8 +365,6 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
 
   initPromise = (async () => {
     markExplorerPerformance(EXPLORER_PERFORMANCE_MARKS.DB_INIT_START, { once: true });
-    // Bound bundle selection as well, so any initialization rejection clears
-    // the shared promise and counts against the automatic retry budget.
     const bundles = excludeCoiBundle
       ? { mvp: LOCAL_DUCKDB_BUNDLES.mvp, eh: LOCAL_DUCKDB_BUNDLES.eh }
       : LOCAL_DUCKDB_BUNDLES;
@@ -528,38 +372,20 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
     const worker = await createCspBoundWorker(bundle.mainWorker!);
     const logger = new duckdb.ConsoleLogger(duckdb.LogLevel.WARNING);
     const db = new duckdb.AsyncDuckDB(logger, worker);
-    // Every worker round-trip needs a bound: the bridge can drop pending
-    // requests after a worker exception without settling their promises.
     try {
       const mainModule = new URL(bundle.mainModule, window.location.href).href;
       const pthreadWorker = bundle.pthreadWorker
         ? new URL(bundle.pthreadWorker, window.location.href).href
         : undefined;
-      // Downloading and compiling WASM needs the initialization budget.
       await withDuckDbTimeout(db.instantiate(mainModule, pthreadWorker), "instantiate", DUCKDB_INIT_TIMEOUT_MS);
 
       const dbUrl = new URL("/results/data/results.duckdb", window.location.origin).href;
-      // directIO=true signals to DuckDB-WASM's HTTP runtime that this file
-      // is a candidate for byte-range reads. In practice - with duckdb-wasm
-      // 1.32.0 and a registered URL - the runtime still falls back to a
-      // single whole-file GET on ATTACH. A March 2026 experiment also
-      // tried `db.open({filesystem: {reliableHeadRequests: true,
-      // forceFullHTTPReads: false}})` before registering: page loads
-      // succeed but the runtime still issues a single whole-file GET (the
-      // full DB size, not <=10% per RG-2). `allowFullHTTPReads: false`
-      // makes the runtime error on first attach (upstream issue
-      // duckdb/duckdb-wasm#1984: "If false, always error"). The buggy
-      // "Perform a full GET anyways" code path in runtime_browser.ts has
-      // not been removed in 1.32.0; tracked as
-      // `enable-duckdb-wasm-http-range-reads-for-registered-urls`.
       await withDuckDbTimeout(
         db.registerFileURL("results.duckdb", dbUrl, duckdb.DuckDBDataProtocol.HTTP, true),
         "registerFileURL",
       );
       const conn = await withDuckDbTimeout(db.connect(), "connect");
       try {
-        // See DUCKDB_INIT_TIMEOUT_MS above: this is a whole-file GET of
-        // results.duckdb, not an in-memory scan.
         await withDuckDbTimeout(
           conn.query("ATTACH 'results.duckdb' AS bench (READ_ONLY)"),
           "ATTACH",
@@ -569,26 +395,18 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
         await withDuckDbTimeout(conn.query("SET enable_external_access = false"), "SET enable_external_access");
         await withDuckDbTimeout(conn.query("SET lock_configuration = true"), "SET lock_configuration");
       } finally {
-        // Best-effort: a connection whose worker already dropped a request
-        // cannot be trusted to answer a close message either, and cleanup
-        // failing shouldn't mask (or block on) the substantive result above.
         await withDuckDbTimeout(conn.close(), "connection close", DUCKDB_CLEANUP_TIMEOUT_MS).catch(() => {});
       }
     } catch (error: unknown) {
       if (bundle.mainModule === LOCAL_DUCKDB_BUNDLES.coi?.mainModule && isDuckDbBufferBoundsError(error)) {
         excludeCoiBundle = true;
       }
-      // Initialization failed; release this worker before the next attempt.
       void db.terminate();
       throw error;
     }
 
     dbInstance = db;
-    // A resolved init promise must not retain an instance after eviction.
     initPromise = null;
-    // A successful init means the environment has recovered; don't let
-    // failures from earlier in the session count against a persistently
-    // broken environment we are no longer in (see INIT_FAILURE_LIMIT above).
     initFailures = 0;
     initError = null;
     snapshotReadyAt = Date.now();
@@ -610,10 +428,6 @@ export async function getDb(): Promise<duckdb.AsyncDuckDB> {
   return initPromise;
 }
 
-/**
- * Convenience: run a single SQL query and return rows as plain objects.
- * The caller is responsible for ensuring the database is attached.
- */
 export async function queryRows<T>(
   sql: string,
   params: unknown[] = [],
@@ -625,9 +439,6 @@ export async function queryRows<T>(
       queryQueue = pending.then(() => undefined, () => undefined);
       const rows = await pending;
       if (rows.length > 0 || !isColdEmptyRead(attempt)) return rows;
-      // Empty, and the snapshot is still warming: re-read rather than let a
-      // cold zero-row answer reach the UI as "no such result". See
-      // shouldRetryColdEmptyRead.
       await sleep(QUERY_EMPTY_RETRY_DELAY_MS);
       continue;
     } catch (error: unknown) {
@@ -639,26 +450,6 @@ export async function queryRows<T>(
   }
 }
 
-/**
- * Whether an empty result should be re-read rather than believed.
- *
- * A cold HTTP-backed snapshot answers a keyed lookup with ZERO ROWS — not an
- * error — while the row group holding that key is still unreadable. `queryRows`
- * does not swallow errors, so nothing else catches this: the detail page
- * renders "No result found" for a real id and index surfaces render a heading
- * with missing rows.
- *
- * Gating a readiness probe on it is not enough. Three progressively stricter
- * gates were measured (keyed probe, then per-table completeness, then
- * completeness across every table) and each time the race simply moved to
- * whichever surface read a range the gate had not forced. Readability is not
- * monotonic per query, so the retry has to live where the read happens.
- *
- * Bounded to a short window after init, because that is the only time the
- * snapshot is cold. Outside it an empty answer returns immediately, so a
- * genuinely missing id stays fast. Retrying can never invent a row: an empty
- * result that is really empty stays empty and is returned as such.
- */
 export function shouldRetryColdEmptyRead(
   attempt: number,
   now: number,
@@ -685,41 +476,28 @@ async function queryRowsOnce<T>(
   const db = await getDb();
   let conn: DuckDBConnection | null = null;
   let statement: duckdb.AsyncPreparedStatement | null = null;
-  // A terminated worker cannot process cleanup messages.
   let evicted = false;
   try {
-    // `db.connect()` is a worker round-trip too, and just as capable of
-    // hanging on a dead worker as the query itself (see
-    // DUCKDB_QUERY_TIMEOUT_MS above) - it used to run unguarded here.
     conn = await withDuckDbTimeout(db.connect(), "connect", timeoutMs);
     let result: Awaited<ReturnType<DuckDBConnection["query"]>>;
     if (params.length === 0) {
       result = await queryWithTimeout(conn, sql, timeoutMs);
     } else {
-      // `conn.prepare(sql)` is also a worker round-trip; only the `.query(...)`
-      // call that follows it used to be guarded.
       statement = await withDuckDbTimeout(conn.prepare(sql), "prepare", timeoutMs);
       result = await withDuckDbTimeout(statement.query(...params), sqlLabel(sql), timeoutMs);
     }
     return result.toArray().map((row) => row.toJSON() as T);
   } catch (error: unknown) {
-    // The operation exceeded its budget. The underlying synchronous query
-    // cannot be cancelled through conn.query(), so terminate the worker to
-    // release subsequent readers instead of probing behind the same query.
     if (isDuckDbTimeoutError(error)) {
       evictDb(db);
       evicted = true;
     } else if (db.isDetached()) {
-      // The bridge detached before returning a valid Arrow result. Recover
-      // on a fresh worker rather than exposing its incidental TypeError.
       evictDb(db);
       evicted = true;
       throw new DuckDbTerminatedError(sqlLabel(sql));
     }
     throw error;
   } finally {
-    // Cleanup is best-effort and bounded independently of the query. Skip it
-    // after termination, because that worker cannot answer close messages.
     if (!evicted) {
       if (statement) {
         await withDuckDbTimeout(statement.close(), "statement close", DUCKDB_CLEANUP_TIMEOUT_MS).catch(() => {});
@@ -735,16 +513,11 @@ function isDuckDbTimeoutError(error: unknown): boolean {
   return error instanceof DuckDbTimeoutError;
 }
 
-// COI memory growth can leave the worker's heap view stale. Repeating SQL on
-// that worker cannot reliably refresh it; initialization must terminate it and let the
-// existing bounded query recovery create a fresh instance.
 function isDuckDbBufferBoundsError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return /offset is out of bounds/i.test(message);
 }
 
-// Timeouts use the hard cutoff policy; the next independent read can recover
-// with a new worker. Retry only cheap, classified snapshot/detachment errors.
 function isTransientDuckDbSnapshotError(error: unknown): boolean {
   if (error instanceof DuckDbTimeoutError) return false;
   if (error instanceof DuckDbTerminatedError) return true;

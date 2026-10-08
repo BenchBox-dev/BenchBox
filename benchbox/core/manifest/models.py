@@ -1,5 +1,3 @@
-"""Data models for manifest v1 and v2."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -8,11 +6,6 @@ from typing import Any
 
 @dataclass
 class FileEntry:
-    """Single file entry (v1 format).
-
-    Represents a basic file in the original manifest format with minimal metadata.
-    """
-
     path: str
     size_bytes: int
     row_count: int
@@ -20,12 +13,6 @@ class FileEntry:
 
 @dataclass
 class ConvertedFileEntry:
-    """File entry with conversion metadata (v2).
-
-    Extends basic file metadata with information about format conversions,
-    including source format, conversion timestamp, and options used.
-    """
-
     path: str
     size_bytes: int
     row_count: int
@@ -40,23 +27,11 @@ class ConvertedFileEntry:
 
 @dataclass
 class TableFormats:
-    """v2: Multiple formats for a single table.
-
-    Groups all available formats for a table (e.g., tbl, parquet, delta, iceberg).
-    Each format contains a list of files that comprise that table in that format.
-    """
-
     formats: dict[str, list[ConvertedFileEntry]]
 
 
 @dataclass
 class ManifestV1:
-    """Original manifest format.
-
-    Legacy format that tracks a single format per table, typically TBL files.
-    Preserved for backward compatibility with existing benchmarks.
-    """
-
     benchmark: str
     scale_factor: float
     tables: dict[str, list[FileEntry]]
@@ -66,42 +41,21 @@ class ManifestV1:
     generator_version: str | None = None
 
 
-# PlanMetadata.normalization_scheme values. "literal" is the default,
-# literal-sensitive plan_fingerprint; "normalized" marks fingerprints recorded
-# via QueryPlanDAG.normalized_fingerprint (opt-in, seed-independent). Comparing
-# fingerprints recorded under different schemes is meaningless - see
-# update_plan_versions/merge_plan_metadata, which refuse to do so.
 PLAN_FINGERPRINT_SCHEME_LITERAL = "literal"
 PLAN_FINGERPRINT_SCHEME_NORMALIZED = "normalized"
 
 
 @dataclass
 class PlanMetadata:
-    """Query plan fingerprint and version tracking.
-
-    Tracks plan fingerprints and versions for each query executed during
-    a benchmark run. Used for cross-run comparison and regression detection.
-    """
-
-    plan_fingerprints: dict[str, str] = field(default_factory=dict)  # query_id → SHA256 fingerprint
-    plan_versions: dict[str, int] = field(default_factory=dict)  # query_id → version number
-    plan_capture_timestamp: dict[str, str] = field(default_factory=dict)  # query_id → ISO timestamp
+    plan_fingerprints: dict[str, str] = field(default_factory=dict)
+    plan_versions: dict[str, int] = field(default_factory=dict)
+    plan_capture_timestamp: dict[str, str] = field(default_factory=dict)
     platform: str | None = None
     platform_version: str | None = None
-    # Which fingerprint scheme plan_fingerprints was recorded under - "literal"
-    # (default) or "normalized". update_plan_versions/merge_plan_metadata compare
-    # this before diffing fingerprints across two PlanMetadata instances.
     normalization_scheme: str = PLAN_FINGERPRINT_SCHEME_LITERAL
-    # Which QueryPlanDAG.fingerprint_version encoding each plan_fingerprints[query_id]
-    # was recorded under (qpc-03 F2.1: a v1 flat-string and a v2 tree-JSON encoding of
-    # the same logical plan hash differently). update_plan_versions gates its
-    # string-equality diff on this so a pure encoding bump is never misread as a
-    # plan change. Missing entries (legacy metadata predating this field) are
-    # treated as version 1 by callers.
-    plan_fingerprint_versions: dict[str, int] = field(default_factory=dict)  # query_id → fingerprint_version
+    plan_fingerprint_versions: dict[str, int] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to JSON-serializable dictionary."""
         result: dict[str, Any] = {}
         if self.plan_fingerprints:
             result["plan_fingerprints"] = self.plan_fingerprints
@@ -121,7 +75,6 @@ class PlanMetadata:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PlanMetadata:
-        """Create PlanMetadata from dictionary."""
         return cls(
             plan_fingerprints=data.get("plan_fingerprints", {}),
             plan_versions=data.get("plan_versions", {}),
@@ -135,15 +88,6 @@ class PlanMetadata:
 
 @dataclass
 class ManifestV2:
-    """Enhanced manifest with multi-format support.
-
-    Tracks multiple formats per table, enabling format conversion workflows
-    and automatic format selection by platform adapters.
-
-    Format preference defines the order in which formats should be tried
-    when loading data (e.g., ["parquet", "delta", "tbl"]).
-    """
-
     version: int = 2
     benchmark: str | None = None
     scale_factor: float | None = None

@@ -1,5 +1,3 @@
-"""SSB registry-backed family plugin seam."""
-
 from __future__ import annotations
 
 import pytest

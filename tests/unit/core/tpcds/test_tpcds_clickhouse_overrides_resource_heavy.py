@@ -1,5 +1,3 @@
-"""Resource-heavy TPC-DS ClickHouse override tests."""
-
 from __future__ import annotations
 
 import re
@@ -38,7 +36,6 @@ def _extract_order_limit(query: str) -> tuple[str, str]:
 
 
 def test_clickhouse_target_queries_are_present_and_non_empty():
-    """ClickHouse get_queries() must include all targeted overrides."""
     clickhouse = _bench().get_queries(dialect="clickhouse")
 
     for query_id in TARGET_QUERY_IDS:
@@ -47,7 +44,6 @@ def test_clickhouse_target_queries_are_present_and_non_empty():
 
 
 def test_clickhouse_q47_q57_bulk_queries_drop_nested_avg_sum_but_keep_v2_shape():
-    """Bulk ClickHouse translation must rewrite Q47/Q57 without altering the v2 tail."""
     bench = _bench()
     base = bench.get_queries()
     clickhouse = bench.get_queries(dialect="clickhouse")
@@ -63,7 +59,6 @@ def test_clickhouse_q47_q57_bulk_queries_drop_nested_avg_sum_but_keep_v2_shape()
 
 
 def test_clickhouse_q66_bulk_query_uses_stable_channel_sales_relation():
-    """Bulk ClickHouse Q66 must aggregate from a stable intermediate relation."""
     bench = _bench()
     base = bench.get_queries()["66"]
     clickhouse = bench.get_queries(dialect="clickhouse")["66"]
@@ -77,7 +72,6 @@ def test_clickhouse_q66_bulk_query_uses_stable_channel_sales_relation():
 
 
 def test_clickhouse_overrides_compose_cleanly_with_generic_transformer():
-    """Benchmark-layer ClickHouse overrides must not break under the generic transformer pipeline."""
     from benchbox.platforms.clickhouse.query_transformer import ClickHouseQueryTransformer
 
     bench = _bench()

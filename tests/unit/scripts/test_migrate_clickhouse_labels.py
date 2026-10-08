@@ -1,5 +1,3 @@
-"""Tests for the bare-`clickhouse` bundle label migration script."""
-
 from __future__ import annotations
 
 import hashlib
@@ -129,7 +127,7 @@ def test_malformed_sidecar_aborts_without_writing(tmp_path: Path) -> None:
 
 
 def test_non_dict_sidecar_aborts_without_writing(tmp_path: Path) -> None:
-    """Valid JSON that is not an object must hit the malformed-sidecar branch."""
+
     import pytest
 
     old = _write_bundle(tmp_path, "tpch_sf1_clickhouse_sql_20200101_000000_abc123", "clickhouse")
@@ -170,7 +168,7 @@ def test_migrate_carries_companions_and_leaves_no_temp_files(tmp_path: Path) -> 
 
 
 def test_label_only_rewrite_is_atomic_and_keeps_companions(tmp_path: Path) -> None:
-    """A bare payload label without a bare slug rewrites in place, atomically."""
+
     stem = "tpch_sf1_duckdb_sql_20200101_000000_abc123"
     old = _write_bundle(tmp_path, stem, "clickhouse")
     companion = tmp_path / f"{stem}.tuning.json"

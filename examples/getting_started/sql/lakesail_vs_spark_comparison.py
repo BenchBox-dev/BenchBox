@@ -1,26 +1,6 @@
-"""Compare TPC-H performance between LakeSail Sail and Apache Spark.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This script runs the same TPC-H benchmark on both LakeSail Sail and Apache Spark,
-then displays a side-by-side comparison. Both platforms use the Spark Connect
-protocol, so results are directly comparable.
-
-Prerequisites:
-    1. A running LakeSail Sail server (sail-server start)
-    2. A running Apache Spark server with Spark Connect enabled
-    3. PySpark client library installed: uv add benchbox --extra spark
-
-Optional environment variables:
-    SAIL_ENDPOINT      LakeSail Spark Connect URL (default: sc://localhost:50051)
-    SPARK_ENDPOINT     Spark Connect URL (default: sc://localhost:15002)
-
-Usage:
-    python examples/getting_started/sql/lakesail_vs_spark_comparison.py
-    python examples/getting_started/sql/lakesail_vs_spark_comparison.py --scale 0.1
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -59,8 +39,6 @@ def _build_lakesail_config() -> DatabaseConfig:
             "driver_memory": "4g",
             "shuffle_partitions": 200,
             "adaptive_enabled": True,
-            # disable_cache defaults to True for LakeSail; session-level cache suppression is safe,
-            # and the adapter skips the unsupported Spark Connect clearCache() call.
         },
     )
 
@@ -81,14 +59,12 @@ def _build_spark_config() -> DatabaseConfig:
 
 
 def run_comparison(scale_factor: float = 0.01) -> None:
-    """Run TPC-H on both LakeSail Sail and Apache Spark, then compare."""
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     benchmark_config = _build_benchmark_config(scale_factor)
     profiler = SystemProfiler()
     system_profile = profiler.get_system_profile()
     phases = ["generate", "load", "power"]
 
-    # Run on LakeSail Sail
     print("=" * 60)
     print("Running TPC-H on LakeSail Sail...")
     print("=" * 60)
@@ -100,7 +76,6 @@ def run_comparison(scale_factor: float = 0.01) -> None:
         phases_to_run=phases,
     )
 
-    # Run on Apache Spark
     print()
     print("=" * 60)
     print("Running TPC-H on Apache Spark...")
@@ -113,7 +88,6 @@ def run_comparison(scale_factor: float = 0.01) -> None:
         phases_to_run=phases,
     )
 
-    # Display comparison
     print()
     print("=" * 60)
     print(f"TPC-H SF={scale_factor} Comparison: LakeSail Sail vs Apache Spark")

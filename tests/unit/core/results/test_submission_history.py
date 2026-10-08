@@ -1,5 +1,3 @@
-"""Tests for hosted submission history sidecars."""
-
 from __future__ import annotations
 
 import json

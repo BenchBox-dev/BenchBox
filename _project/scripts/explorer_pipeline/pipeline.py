@@ -1,12 +1,3 @@
-"""Top-level orchestration for the explorer static build pipeline.
-
-Scans a directory of schema-v2 result bundles, transforms each into the
-explorer read model, and writes a DuckDB snapshot to the output directory.
-DuckDB is the sole browser-facing store for user-visible metrics;
-`ManifestEntry` is an internal dataclass that seeds DuckDB, not a JSON
-artifact.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -34,6 +25,7 @@ from _project.scripts.explorer_pipeline.models import (
     canonical_phase,
     get_ranking_config,
     is_ranking_eligible,
+    primary_metric_value,
     ranking_exclusion_reason,
 )
 from _project.scripts.explorer_pipeline.ranking import RankedCohort, rank_platforms
@@ -55,60 +47,26 @@ from benchbox.validation.bundle import COMPANION_SUFFIXES, discover_bundles
 
 logger = logging.getLogger(__name__)
 
-# Companions the explorer republishes alongside a public bundle. Plans are the
-# only one left: the requested tuning and the applied ledger travel inside the
-# bundle's own `platform.tuning` block. `COMPANION_SUFFIXES` stays wider because
-# discovery and the content digest must still recognize the retired files on
-# bundles published before the move.
 PUBLISHED_COMPANION_SUFFIXES = (".plans.json",)
 
 
 class DuplicateResultIdError(Exception):
-    """Two distinct published bundles derived the same ``result_id``.
-
-    Intentionally not a ``ValueError``. The publication loop wraps each bundle
-    in ``except (json.JSONDecodeError, KeyError, ValueError, TypeError)`` and
-    downgrades anything it catches to a skip plus a warning, so a collision
-    raised as ``ValueError`` would let the build finish green having published
-    only one of the two results. A collision is a corpus problem for a human to
-    resolve, not a bundle to drop.
-    """
+    pass
 
 
 class PrivacyRejectionError(Exception):
-    """A bundle, receipt, or plans companion failed the public privacy check.
-
-    Intentionally not a ``ValueError``, for the same reason as
-    ``DuplicateResultIdError`` above: the publication loop downgrades everything
-    in its ``except`` tuple to a skip plus a warning, so a rejection raised as
-    ``ValueError`` let the build finish green having quietly dropped the result.
-
-    That inverts what the check is for. ``find_public_path_leaks`` firing means
-    the fail-closed boundary caught something a human needs to look at - a
-    bundle that was never run through the public boundary, or run through a
-    different one. Dropping it makes the corpus silently incomplete and leaves
-    the leaking bundle in the repository, still leaking.
-    """
+    pass
 
 
 SUBMISSION_MANIFEST_FILENAME = "submission-manifest.json"
 SUBMISSION_MANIFEST_SUFFIX = ".manifest.json"
 COMMUNITY_TRUST_LABEL = "community-submission"
-# Vendor-supplied results live under a maintainer-controlled top-level vendor/
-# subtree (gated by CODEOWNERS on the submission branch). See provenance.py.
 VENDOR_TRUST_LABEL = "vendor-supplied"
 VENDOR_VISIBILITY = "public-vendor-reported"
 VENDOR_SUBTREE_COMPONENT = "vendor"
 
 
 def _remove_published_wal(output_dir: Path) -> None:
-    """Remove the exact published DB WAL sibling after DB promotion.
-
-    The candidate has already passed ``check_snapshot`` before promotion. A
-    stale WAL beside the active DB is nevertheless part of the published
-    output and can change how another DuckDB reader opens that DB, so cleanup
-    must be visible if the exact path cannot be removed.
-    """
     wal_path = output_dir / "results.duckdb.wal"
     try:
         wal_path.unlink()
@@ -119,20 +77,8 @@ def _remove_published_wal(output_dir: Path) -> None:
 
 
 def _promote_staged_output(staged_dir: Path, output_dir: Path) -> None:
-    """Publish validated bundles then atomically replace the browser DB.
-
-    The existing DB remains the browser's source of truth until the final
-    ``os.replace``. Candidate bundle files are copied through exact temporary
-    paths first, so an interrupted build cannot expose a partial DB or a
-    half-written JSON file.
-    """
     output_dir.mkdir(parents=True, exist_ok=True)
     target_bundles = output_dir / "bundles"
-    # `mkdir(exist_ok=True)` accepts a symlink that resolves to a directory, and
-    # every copy below - plus the stale-file sweep after promotion - would then
-    # follow the link, overwriting matching files and unlinking unrelated
-    # `*.json` outside `output_dir`. The pre-staging `shutil.rmtree` path refused
-    # to operate on a directory symlink; keep that guarantee explicit here.
     if target_bundles.is_symlink():
         raise ValueError(f"published bundles path must be a real directory, not a symlink: {target_bundles}")
     target_bundles.mkdir(parents=True, exist_ok=True)
@@ -156,10 +102,6 @@ def _promote_staged_output(staged_dir: Path, output_dir: Path) -> None:
     candidate_db = staged_dir / "results.duckdb"
     os.replace(candidate_db, output_dir / "results.duckdb")
 
-    # Stale generated artifacts cannot affect the now-active DB, so cleanup is
-    # intentionally after the atomic DB promotion. The exact WAL cleanup is
-    # fail-visible because a leftover sidecar makes the published DB
-    # non-self-contained; unrelated legacy cleanup remains best effort.
     _remove_published_wal(output_dir)
     for child in list(target_bundles.iterdir()):
         if child.is_file() and child.name.endswith(".json") and child.name not in candidate_names:
@@ -175,40 +117,13 @@ def _promote_staged_output(staged_dir: Path, output_dir: Path) -> None:
         except FileNotFoundError:
             pass
         except OSError:
-            # The new DB is already live at this point, so a stubborn legacy
-            # path (a directory, a deletion-denying ACL) must not turn a
-            # successful publish into a reported failure and an ambiguous retry.
             logger.warning("Could not remove legacy artifact %s", output_dir / legacy_file)
 
 
-# Bounded read size for companion hashing; keeps memory flat regardless of
-# how large a corpus-controlled companion file is.
 _DIGEST_CHUNK_BYTES = 1024 * 1024
 
 
 def _publication_digest(bundle_path: Path, public_raw: bytes) -> str:
-    """Digest everything a result publishes under its ``result_id``.
-
-    The duplicate-id guard uses this to decide whether two bundles are the same
-    evidence twice or a genuine collision. Hashing only the primary bundle is
-    not enough: companions publish as ``{result_id}.plans.json``, keyed by the
-    same id, so two byte-identical primaries whose sidecars differ - one
-    carrying plans, the other not - would look identical here while actually
-    publishing different evidence. Skipping the second would silently drop its
-    sidecar, the same class of loss the guard exists to stop, one file over.
-
-    Companions are read raw. This digest is an identity check, never a published
-    artifact, so it needs no sanitizing - and reading raw means a companion
-    differing only in private, later-redacted content still marks the two
-    bundles distinct, which fails safe.
-
-    Companions are hashed **incrementally**. ``read_bytes()`` would materialize
-    a whole corpus-controlled file, which for an oversized legacy
-    ``.applied.json`` bypasses the ``APPLIED_COMPANION_MAX_BYTES`` guard in
-    ``_applied_receipt`` - that path deliberately stats the file and returns a
-    truncation marker without reading it, so slurping here could exhaust memory
-    on a corpus that previously built fine.
-    """
     hasher = hashlib.sha256()
     hasher.update(public_raw)
     for suffix in COMPANION_SUFFIXES:
@@ -219,19 +134,11 @@ def _publication_digest(bundle_path: Path, public_raw: bytes) -> str:
                 for chunk in iter(lambda handle=handle: handle.read(_DIGEST_CHUNK_BYTES), b""):
                     hasher.update(chunk)
         except OSError:
-            # Absent (or unreadable) is part of the identity: a bundle with no
-            # plans must not digest the same as one that has them.
             hasher.update(b"-")
     return hasher.hexdigest()
 
 
 def _is_vendor_subtree(bundle_path: Path, bundles_dir: Path) -> bool:
-    """True when the bundle sits directly under the top-level ``vendor/`` subtree.
-
-    Anchored to ``<bundles_dir>/vendor/...`` (the first path component under the
-    bundles root), not any nested directory merely named ``vendor`` - so the
-    label surface matches the CODEOWNERS prefix ``/results-data/bundles/vendor/``.
-    """
     try:
         rel = bundle_path.relative_to(bundles_dir)
     except ValueError:
@@ -240,12 +147,6 @@ def _is_vendor_subtree(bundle_path: Path, bundles_dir: Path) -> bool:
 
 
 def _find_submission_manifest(bundle_path: Path) -> Path | None:
-    """Locate the submission manifest sidecar for a bundle.
-
-    Prefers the per-bundle name (`<bundle_stem>.manifest.json`); falls
-    back to the legacy singleton (`submission-manifest.json`) for
-    bundles submitted before the per-bundle convention landed.
-    """
     per_bundle = bundle_path.parent / f"{bundle_path.stem}{SUBMISSION_MANIFEST_SUFFIX}"
     if per_bundle.is_file():
         return per_bundle
@@ -256,22 +157,6 @@ def _find_submission_manifest(bundle_path: Path) -> Path | None:
 
 
 def _manifest_trust_label(bundle_path: Path, default: str) -> str:
-    """Resolve a bundle's trust label from its recorded provenance.
-
-    Sidecar *presence* used to imply community provenance on its own. That was
-    wrong in the direction that mattered: ``benchbox submit`` writes a sidecar
-    unconditionally, including when a maintainer runs it, so 191 of 207
-    maintainer-generated bundles were labelled ``community-submission`` and,
-    because community submissions are not ranking-eligible, the public
-    leaderboard rendered 15 of 207 results.
-
-    The sidecar's ``result_source`` is authoritative. A sidecar that records no
-    source has unknown provenance and fails safe to ``community-submission`` --
-    never promoted by assumption. No sidecar at all means maintainer-committed.
-
-    This mirrors ``scripts/generate_corpus_inventory.py::_bundle_trust_label``;
-    the two derivations must stay in lockstep.
-    """
     manifest_path = _find_submission_manifest(bundle_path)
     if manifest_path is None:
         return default
@@ -292,13 +177,6 @@ def _public_applied_receipt(
     bundle_data: dict[str, Any] | None,
     anonymizer: AnonymizationManager,
 ) -> str | None:
-    """Return the bounded applied receipt after public-path sanitization.
-
-    The receipt is read from the bundle's own ``platform.tuning.applied`` block,
-    falling back to a retired ``{stem}.applied.json`` companion for bundles
-    published before the move. Sanitization is unchanged either way: the public
-    path re-scrubs whatever it finds.
-    """
     receipt_json = _applied_receipt(bundle_path, _parse_bundle(bundle_data) if bundle_data is not None else None)
     if receipt_json is None:
         return None
@@ -317,17 +195,6 @@ def _public_applied_receipt(
 def _public_override_display(
     bundle_path: Path,
 ) -> dict[str, Any]:
-    """Return the accepted-override badge data after the public-path privacy check.
-
-    The transformer reads the ``{stem}.override.json`` companion from disk
-    next to the *source* bundle even when the row is built from the
-    anonymized public bundle, so the raw evidence/approver strings would
-    otherwise bypass anonymization. These are human-authored audit strings
-    (evidence link, approver handle, expiry), public by design -- unlike the
-    applied receipt there is nothing to redact, only a leak to refuse. A
-    private local path in any free-text field fails the build rather than
-    publishing it.
-    """
     display = _override_display(bundle_path)
     leaks = find_public_path_leaks(display)
     if leaks:
@@ -342,12 +209,6 @@ def _public_bundle_data(
     bundle_data: dict[str, Any],
     anonymizer: AnonymizationManager,
 ) -> tuple[dict[str, Any], str | None]:
-    """Sanitize a bundle and its applied receipt before creating public rows.
-
-    The accepted-override badge data travels separately via
-    ``_public_override_display`` (leak-checked, never redacted): it is read
-    from the source-side companion even on this lane.
-    """
     public_bundle = anonymizer.anonymize_result_payload(bundle_data)
     public_platform = public_bundle.get("platform")
     if isinstance(public_platform, dict):
@@ -355,9 +216,6 @@ def _public_bundle_data(
         if isinstance(public_tuning, dict):
             requested = public_tuning.get("requested")
             if requested is None:
-                # Older bundles kept the requested configuration in a tuning
-                # sidecar. Inline its sanitized content so the public bundle
-                # remains self-contained after sidecars were retired.
                 legacy_bytes = _public_companion_bytes(bundle_path, ".tuning.json", anonymizer)
                 if legacy_bytes is not None:
                     legacy = json.loads(legacy_bytes)
@@ -374,69 +232,41 @@ def _public_bundle_data(
                     public_platform["tuning"] = anonymizer.anonymize_tuning_payload({"requested": legacy["requested"]})
     public_leaks = find_public_path_leaks(public_bundle)
     if public_leaks:
-        # The path is part of the message, not just the log line: this exception
-        # aborts the whole build, and `explorer_publish.py` prints only
-        # `str(exc)`. Without it a multi-bundle corpus reports which *fields*
-        # leaked but not which file to fix, forcing a binary search of the corpus.
         raise PrivacyRejectionError(
             f"{bundle_path}: public bundle privacy check failed for fields: " + ", ".join(sorted(set(public_leaks)))
         )
     return public_bundle, _public_applied_receipt(bundle_path, bundle_data, anonymizer)
 
 
-# Type alias for the summary accumulator: (benchmark, scale_factor, phase) → rows
-_SummaryKey = tuple[str, float, str]
+_SummaryKey = tuple[str, float, str, int | None]
 _SummaryAccum = dict[_SummaryKey, list[tuple[ManifestEntry, DetailResult]]]
 
 
 def _sf_str(scale_factor: float) -> str:
-    """Format scale factor for filenames, e.g. 0.01 → '0.01', 1.0 → '1'."""
     return f"{scale_factor:g}"
 
 
 def _natural_sort_key(s: str) -> list[int | str]:
-    """Sort key for strings with embedded numbers: Q1 < Q2 < Q10 < Q22."""
     return [int(c) if c.isdigit() else c.lower() for c in re.split(r"(\d+)", s) if c]
 
 
 def _build_short_ids(result_ids: list[str]) -> dict[str, str]:
-    """Build a short_id → result_id mapping using sha256 prefixes.
-
-    Default prefix length is 8 hex characters.  If any two result_ids share a
-    prefix at the current length, all short IDs are extended by 2 characters
-    and the process repeats until all prefixes are unique.  At sha256's 64-char
-    maximum, uniqueness is guaranteed for any realistic corpus size.
-    """
     if not result_ids:
         return {}
     for length in range(8, 65, 2):
         candidate: dict[str, str] = {hashlib.sha256(rid.encode()).hexdigest()[:length]: rid for rid in result_ids}
-        # If every entry is unique the dict has as many keys as inputs.
         if len(candidate) == len(result_ids):
             return candidate
-    # Unreachable for *distinct* inputs, which is the only kind that gets here:
-    # the publication loop rejects a repeated result_id via
-    # DuplicateResultIdError before this is called. That guard is what makes
-    # this branch dead. Passing a list containing the same id twice reaches it
-    # immediately - the dict collapses to one key and no length ever matches -
-    # and the message below then blames sha256 for what is really duplicate
-    # input, naming neither offending bundle.
     raise RuntimeError(f"Could not build collision-free short IDs from {len(result_ids)} result_id(s) (duplicates?)")
 
 
-def _platform_row_sort_key(benchmark: str) -> Callable[[PlatformRow], tuple[bool, float]]:
-    """Return a sort key function for PlatformRows using the benchmark's RankingConfig.
-
-    Eligible rows sort before ineligible ones; within eligible rows, the primary
-    metric direction is derived from the ranking config so future benchmark families
-    with non-standard metric directions sort correctly without touching this function.
-    """
-    cfg = get_ranking_config(benchmark)
+def _platform_row_sort_key(benchmark: str, phase: str) -> Callable[[PlatformRow], tuple[bool, float]]:
+    cfg = get_ranking_config(benchmark, phase)
     desc = cfg.primary_order == "desc"
 
     def _key(row: PlatformRow) -> tuple[bool, float]:
         ineligible = not row.is_ranking_eligible
-        primary_val = getattr(row, cfg.primary_metric, None)
+        primary_val = primary_metric_value(row, cfg.primary_metric)
         if primary_val is None:
             return (ineligible, float("inf"))
         metric = -primary_val if desc else primary_val
@@ -449,22 +279,14 @@ def _build_benchmark_summaries(
     accum: _SummaryAccum,
     full_to_short: dict[str, str],
 ) -> list[tuple[_SummaryKey, BenchmarkSummary]]:
-    """Build one BenchmarkSummary per (benchmark, scale_factor, phase) bucket."""
     summaries = []
-    for key, pairs in sorted(accum.items()):
-        benchmark, scale_factor, phase = key
+    for key, pairs in sorted(accum.items(), key=lambda item: (*item[0][:3], item[0][3] or 0)):
+        benchmark, scale_factor, phase, stream_count = key
 
-        # Union of all query IDs emitted by any platform for this key
         all_query_ids = sorted(
             {dt.query_id for _, detail in pairs for dt in detail.display_timings},
             key=_natural_sort_key,
         )
-        # A deliberately partial or otherwise outlier run must not poison the
-        # complete cohort.  Use a query set only when it has a strict majority
-        # among rows that are otherwise eligible for ranking; otherwise fail
-        # closed and mark every row as mismatched.  This preserves the old
-        # all-different behavior while allowing a single partial fixture to be
-        # shown as evidence without suppressing valid peer rankings.
         query_set_counts: dict[frozenset[str], int] = {}
         for entry, detail in pairs:
             if entry.ranking_exclusion_reason is None and ranking_exclusion_reason(entry) is None:
@@ -501,6 +323,7 @@ def _build_benchmark_summaries(
                 is_ranking_eligible=is_ranking_eligible(entry) and row_ranking_reason is None,
                 ranking_exclusion_reason=row_ranking_reason,
                 power_score=entry.power_score,
+                throughput_at_size=entry.throughput_at_size,
                 display_geomean_ms=entry.display_geomean_ms,
                 sample_geomean_ms=entry.geomean_ms,
                 cost_usd=entry.cost_usd,
@@ -511,21 +334,21 @@ def _build_benchmark_summaries(
             )
             platform_rows.append(row)
 
-        platform_rows.sort(key=_platform_row_sort_key(benchmark))
+        platform_rows.sort(key=_platform_row_sort_key(benchmark, phase))
 
         summary = BenchmarkSummary(
             benchmark=benchmark,
             scale_factor=scale_factor,
             phase=phase,
+            stream_count=stream_count,
             query_ids=all_query_ids,
             platforms=platform_rows,
-            ranking=get_ranking_config(benchmark),
+            ranking=get_ranking_config(benchmark, phase),
         )
         summaries.append((key, summary))
     return summaries
 
 
-# Human-readable labels for benchmark families (mirrors frontend BENCHMARK_LABELS).
 _BENCHMARK_LABELS: dict[str, str] = {
     "ai_primitives": "AI Primitives",
     "amplab": "AMPLab",
@@ -558,17 +381,28 @@ def _humanize_benchmark(benchmark: str) -> str:
     return _BENCHMARK_LABELS.get(benchmark, benchmark.upper())
 
 
+def _cohort_label(benchmark: str, sf: str, phase: str, stream_count: int | None) -> str:
+    label = f"{_humanize_benchmark(benchmark)} SF{sf}"
+    if phase == "power":
+        return label
+    label = f"{label} {phase.capitalize()}"
+    if stream_count is None:
+        return label
+    noun = "stream" if stream_count == 1 else "streams"
+    return f"{label} ({stream_count} {noun})"
+
+
+def _cohort_href(benchmark: str, scale_factor: float, phase: str, stream_count: int | None) -> str:
+    href = f"/results/{benchmark}/?sf={scale_factor}&phase={phase}"
+    return href if stream_count is None else f"{href}&streams={stream_count}"
+
+
 def _rank_platforms_in_cohort(
     summary: BenchmarkSummary,
     cohort_key: str,
     full_to_short: dict[str, str],
     ranked: RankedCohort | None = None,
 ) -> tuple[list[dict[str, Any]], str, bool]:
-    """Rank platforms within a single cohort and return (platform_entries, primary_metric, higher_is_better).
-
-    Platform entries include rank, speedup_vs_best, and all display fields needed
-    by both the cohort_platforms list and the platform_agg accumulator.
-    """
     if ranked is None:
         ranked = rank_platforms(summary)
 
@@ -593,15 +427,9 @@ def _rank_platforms_in_cohort(
 
 
 def _compute_average_ranks(platform_agg: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
-    """Convert per-platform cohort rank accumulator into sorted summary rows.
-
-    Platforms with equal avg_rank are ordered alphabetically by platform_id.
-    """
     records: list[dict[str, Any]] = []
     for pdata in platform_agg.values():
         ranks = pdata["ranks"]
-        # 1-decimal precision matches the frontend's `.toFixed(1)` display and
-        # Home.tsx's re-rounding when filters narrow the cohort set.
         avg_rank = round(sum(r["rank"] for r in ranks.values()) / len(ranks), 1) if ranks else None
         records.append(
             {
@@ -612,7 +440,6 @@ def _compute_average_ranks(platform_agg: dict[str, dict[str, Any]]) -> list[dict
                 "n_cohorts": len(ranks),
             }
         )
-    # Primary sort: avg_rank ascending (None last). Secondary: platform_id for stable ties.
     records.sort(key=lambda p: (p["avg_rank"] is None, p["avg_rank"] or float("inf"), p["platform_id"]))
     return records
 
@@ -622,23 +449,6 @@ def _build_meta_leaderboard(
     generated_at: str,
     full_to_short: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Build the cross-benchmark meta-leaderboard artifact.
-
-    Only cohorts with ≥2 ranking-eligible platforms are included. Platforms
-    are ranked 1-based by the cohort's primary metric within each cohort.
-    Platforms that are not ranking-eligible, or have a null primary metric,
-    are assigned no rank for that cohort. Per-platform average rank is computed
-    across cohorts in which the platform participated (N/A cohorts are excluded
-    from the average, not penalised).
-
-    When the same platform_id appears more than once in a cohort (different
-    tuning_mode or trust_label), cohort_platforms keeps every variant - the
-    cohort_metadata DuckDB table is lossless on publishable variants - but
-    platform_agg (the cross-cohort "avg rank per platform" summary on Home)
-    keeps only the BEST rank that platform achieved in the cohort. Otherwise
-    cross-cohort averages would depend on how many variants each platform
-    happened to publish, which is not a fair ranking signal.
-    """
     if full_to_short is None:
         full_to_short = {}
     ranked_summaries = [(key, s, rank_platforms(s)) for key, s in summaries]
@@ -647,13 +457,13 @@ def _build_meta_leaderboard(
         return {"generated_at": generated_at, "cohorts": [], "platforms": []}
 
     cohort_records: list[dict[str, Any]] = []
-    # platform_id → {"platform_id", "platform", "ranks": {cohort_key: {rank, total, ...}}}
     platform_agg: dict[str, dict[str, Any]] = {}
 
-    for (benchmark, scale_factor, phase), summary, ranked in eligible:
+    for (benchmark, scale_factor, phase, stream_count), summary, ranked in eligible:
         sf = _sf_str(scale_factor)
-        cohort_key = f"{benchmark}-sf{sf}-{phase}"
-        label = f"{_humanize_benchmark(benchmark)} SF{sf}"
+        streams_suffix = "" if stream_count is None else f"-{stream_count}streams"
+        cohort_key = f"{benchmark}-sf{sf}-{phase}{streams_suffix}"
+        label = _cohort_label(benchmark, sf, phase, stream_count)
 
         platform_entries, primary_metric, higher_is_better = _rank_platforms_in_cohort(
             summary, cohort_key, full_to_short, ranked
@@ -666,9 +476,6 @@ def _build_meta_leaderboard(
             pid = entry["platform_id"]
             if pid not in platform_agg:
                 platform_agg[pid] = {"platform_id": pid, "platform": entry["platform"], "ranks": {}}
-            # When the same platform ranks in this cohort more than once
-            # (variant rows), keep the best rank. Worse variants must not
-            # clobber better ones via last-write-wins.
             existing = platform_agg[pid]["ranks"].get(cohort_key)
             if existing is None or rank < existing["rank"]:
                 platform_agg[pid]["ranks"][cohort_key] = {
@@ -678,7 +485,6 @@ def _build_meta_leaderboard(
                     "speedup_vs_best": entry["speedup_vs_best"],
                 }
 
-        # Strip internal "total" field before storing in cohort record.
         cohort_platforms = [{k: v for k, v in e.items() if k != "total"} for e in platform_entries]
         cohort_records.append(
             {
@@ -686,8 +492,9 @@ def _build_meta_leaderboard(
                 "benchmark": benchmark,
                 "scale_factor": scale_factor,
                 "phase": phase,
+                "stream_count": stream_count,
                 "label": label,
-                "href": f"/results/{benchmark}/?sf={scale_factor}&phase={phase}",
+                "href": _cohort_href(benchmark, scale_factor, phase, stream_count),
                 "platform_count": ranked.total_ranked,
                 "primary_metric": primary_metric,
                 "primary_order": "desc" if higher_is_better else "asc",
@@ -704,8 +511,6 @@ def _build_meta_leaderboard(
 
 @dataclass(frozen=True)
 class BuildStats:
-    """Counts emitted by a successful pipeline run, for caller display."""
-
     processed: int
     skipped: int
     cohorts: int
@@ -713,8 +518,6 @@ class BuildStats:
 
 
 class ExplorerPipeline:
-    """Orchestrates the full static build pipeline for the results explorer."""
-
     def __init__(
         self,
         transformer: BundleTransformer | None = None,
@@ -731,26 +534,6 @@ class ExplorerPipeline:
         visibility: str = "public-curated",
         bundle_url_prefix: str = "/results/data/bundles",
     ) -> BuildStats:
-        """Execute the full pipeline.
-
-        Steps:
-        1. Scan ``data_dir/bundles/`` recursively for primary ``*.json`` bundle files.
-        2. Transform each bundle to ManifestEntry + DetailResult.
-        3. Sweep any legacy metric-bearing artifacts from earlier pipeline versions.
-        4. Write ``output_dir/results.duckdb`` (the ten canonical browser tables).
-        5. Copy bundles to ``output_dir/bundles/{result_id}.json`` as a read-only
-           download affordance - never fetched for user-visible metrics.
-
-        Args:
-            data_dir: Root data directory containing a ``bundles/`` sub-directory.
-            output_dir: Destination directory for all generated artifacts.
-            trust_label: Trust label to attach to every result.
-            visibility: Visibility label to attach to every result.
-            bundle_url_prefix: URL path prefix for bundle download links.
-                Joined with ``/{result_id}.json`` to form each detail's
-                ``bundle_download_url``.  Must match the path at which GitHub
-                Pages (or another host) serves the copied bundle files.
-        """
         bundles_dir = data_dir / "bundles"
         if not bundles_dir.exists():
             logger.warning("Bundles directory does not exist: %s", bundles_dir)
@@ -762,48 +545,22 @@ class ExplorerPipeline:
         output_dir = output_dir.resolve()
         output_dir.parent.mkdir(parents=True, exist_ok=True)
         staging_dir = Path(tempfile.mkdtemp(prefix=f".{output_dir.name}.", dir=output_dir.parent))
-        # The staging directory is populated from here through bundle processing,
-        # so the cleanup guard must start now: an uncaught I/O error before the DB
-        # build would otherwise strand a hidden `.out.*` tree next to the output,
-        # and repeated retries would accumulate stale copies of it.
         try:
-            # All copied public JSON passes through one manager so the same stable
-            # pseudonyms are used across a primary bundle and its companions.
             public_anonymizer = AnonymizationManager()
 
             out_bundles_dir = staging_dir / "bundles"
             out_bundles_dir.mkdir(parents=True)
 
-            # Drop derived directories and files from earlier pipeline versions
-            # that emitted per-cohort / per-result / manifest JSON artifacts. The
-            # DuckDB browser store replaces them; leaving them behind would mask
-            # stale data.
             manifest_entries: list[ManifestEntry] = []
-            # Accumulator for benchmark summary artifacts (zero extra I/O - reuses
-            # already-loaded bundle data from the single pass).
             summary_accum: _SummaryAccum = defaultdict(list)
-            # Keyed by result_id; populated alongside manifest_entries so build_full()
-            # has per-result detail data without a second I/O pass.
             details_map: dict[str, DetailResult] = {}
             skipped_bundles = 0
-            # result_id → (source bundle path, sha256 of the published bytes).
-            # The loop below writes `{result_id}.json` and assigns
-            # `details_map[result_id]`, so without this a second bundle deriving
-            # the same id would replace the first in both places: one result
-            # would vanish from the published corpus and the read model with no
-            # error and no count mismatch. `result_id` carries only 8 hex chars
-            # (32 bits) of sha256, so the birthday bound is far below what the
-            # id's length suggests.
             seen_result_ids: dict[str, tuple[Path, str]] = {}
 
             for bundle_path in bundle_files:
                 try:
                     bundle_data, bundle_raw = self._transformer.load_bundle_full(bundle_path)
 
-                    # Per-bundle trust label. Precedence: a bundle under the
-                    # maintainer-controlled top-level vendor/ subtree is
-                    # vendor-supplied; else a submission-manifest sidecar marks it
-                    # community-submitted; else the pipeline default.
                     effective_trust = trust_label
                     effective_visibility = visibility
                     if _is_vendor_subtree(bundle_path, bundles_dir):
@@ -822,10 +579,6 @@ class ExplorerPipeline:
                             )
 
                     public_bundle, public_receipt = _public_bundle_data(bundle_path, bundle_data, public_anonymizer)
-                    # Publication anonymization can change already-public values
-                    # (for example, an existing path hash).  Derive the result ID
-                    # from the exact bytes that will be published so filenames,
-                    # DuckDB rows, and download URLs remain reproducible.
                     public_raw = canonical_json_bytes(public_bundle)
                     result_id = self._transformer.result_id_from_bundle(bundle_path, data=public_bundle, raw=public_raw)
                     prefix = bundle_url_prefix.rstrip("/")
@@ -877,25 +630,11 @@ class ExplorerPipeline:
                         )
                         continue
 
-                    # Two bundles that derive the same id are either the same
-                    # evidence twice or a genuine collision, and the two need
-                    # opposite handling. Identical published bytes are a
-                    # redundant copy: publishing it once is correct, so skip it
-                    # and say so. Differing bytes mean two distinct results are
-                    # competing for one public URL - that is silent evidence
-                    # loss, and the corpus needs a human, so fail closed rather
-                    # than pick a winner.
                     public_digest = _publication_digest(bundle_path, public_raw)
                     previous = seen_result_ids.get(result_id)
                     if previous is not None:
                         previous_path, previous_digest = previous
                         if previous_digest != public_digest:
-                            # Deliberately NOT a ValueError. The per-bundle
-                            # handler below catches ValueError and downgrades it
-                            # to `skipped_bundles += 1` plus a warning, which is
-                            # precisely the silent drop this guard exists to
-                            # stop - the build would go green having published
-                            # one of the two colliding results.
                             raise DuplicateResultIdError(
                                 f"duplicate result_id {result_id!r} with differing published content: "
                                 f"{previous_path} and {bundle_path}"
@@ -912,15 +651,6 @@ class ExplorerPipeline:
 
                     dest_bundle.write_bytes(public_raw)
 
-                    # Publish only the validated, anonymized companions that
-                    # actually exist. Plans are the only companion still
-                    # published; the requested tuning travels inside the public
-                    # bundle, so ``has_tuning`` is preserved from the source-side
-                    # read rather than being gated on a sidecar that no longer
-                    # gets written. The retired ``.tuning.json`` /
-                    # ``.applied.json`` are deliberately not republished: their
-                    # content is in the bundle, and copying them forward would
-                    # recreate the split this retired.
                     detail.plans_published = False
                     for suffix in PUBLISHED_COMPANION_SUFFIXES:
                         try:
@@ -939,16 +669,15 @@ class ExplorerPipeline:
                         if suffix == ".plans.json":
                             detail.plans_published = True
 
-                    # Add the entry only after the public bundle has been copied
-                    # successfully.  A privacy rejection must not leave a
-                    # manifest row without its corresponding detail record.
                     manifest_entries.append(entry)
 
-                    # Accumulate for benchmark summary artifacts. Raw benchmark
-                    # slug and test_type stay on the result/detail rows; only the
-                    # derived cohort key uses the explicit canonical identity.
                     phase = canonical_phase(detail.test_type)
-                    summary_key: _SummaryKey = (canonical_benchmark_slug(entry.benchmark), entry.scale_factor, phase)
+                    summary_key: _SummaryKey = (
+                        canonical_benchmark_slug(entry.benchmark),
+                        entry.scale_factor,
+                        phase,
+                        detail.stream_count,
+                    )
                     summary_accum[summary_key].append((entry, detail))
                     details_map[entry.result_id] = detail
 
@@ -963,26 +692,16 @@ class ExplorerPipeline:
             if skipped_bundles:
                 logger.warning("Skipped %d bundle(s) due to processing errors", skipped_bundles)
 
-            # Build short ID lookup table (short → full result_id).
             all_result_ids = [e.result_id for e in manifest_entries]
-            short_id_map = _build_short_ids(all_result_ids)  # short → full
-            full_to_short = {v: k for k, v in short_id_map.items()}  # full → short
+            short_id_map = _build_short_ids(all_result_ids)
+            full_to_short = {v: k for k, v in short_id_map.items()}
 
-            # Build per-(benchmark, scale, phase) summaries for DuckDB population.
-            # The JSON emission was removed when BenchmarkIndex migrated to DuckDB
-            # (W4 slice 3); `_build_benchmark_summaries` still seeds the
-            # `benchmark_matrix_cells` and `benchmark_rankings` DuckDB tables via
-            # `_DuckDBBuilder`.
             summaries = _build_benchmark_summaries(summary_accum, full_to_short)
             logger.info(
                 "Built %d benchmark summary(ies) for DuckDB population",
                 len(summaries),
             )
 
-            # Build the cross-benchmark meta-leaderboard for DuckDB population.
-            # The JSON emission was removed when Home migrated to DuckDB (W4 slice 1);
-            # the `meta` dict below still seeds the `cohort_metadata` and
-            # `meta_leaderboard` DuckDB tables via `_DuckDBBuilder`.
             meta = _build_meta_leaderboard(summaries, generated_at, full_to_short)
             logger.info(
                 "Built meta-leaderboard (%d cohorts, %d platforms) for DuckDB population",

@@ -1,5 +1,3 @@
-"""Public pseudonym salt resolution for community publish and export soft-read."""
-
 from __future__ import annotations
 
 import json
@@ -59,7 +57,6 @@ _RAW_DATABASE = "analytics_db"
 
 
 def _minimal_result_with_endpoint() -> BenchmarkResults:
-    """Result carrying a retained identifier that is hashed (not dropped)."""
     return BenchmarkResults(
         benchmark_name="TPC-H",
         platform="duckdb",
@@ -92,7 +89,6 @@ def test_exporter_soft_reads_env_salt_for_public_hash(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """With BENCHBOX_MACHINE_ID_SALT set, default anonymized export uses it."""
     salt = "deployment-private-export-salt"
     monkeypatch.setenv(PUBLIC_PSEUDONYM_SALT_ENV, salt)
 
@@ -114,7 +110,6 @@ def test_exporter_soft_reads_env_salt_for_public_hash(
     with open(exported["json"], encoding="utf-8") as handle:
         payload = json.load(handle)
 
-    # platform.config.endpoint is a retained hashed identifier in public export.
     endpoint = payload["platform"]["config"]["endpoint"]
     assert endpoint == expected
     assert endpoint != empty_expected
@@ -124,7 +119,6 @@ def test_exporter_without_env_salt_still_exports_empty_default(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Unset salt must not block local/private anonymized export."""
     monkeypatch.delenv(PUBLIC_PSEUDONYM_SALT_ENV, raising=False)
 
     empty_expected = AnonymizationManager(AnonymizationConfig())._hash_public_identifier(

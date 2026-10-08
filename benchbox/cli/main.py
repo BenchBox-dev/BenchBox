@@ -1,5 +1,3 @@
-"""Lazy compatibility layer for the historic ``benchbox.cli.main`` path."""
-
 from __future__ import annotations
 
 import importlib
@@ -63,7 +61,6 @@ def __getattr__(name: str) -> Any:
 
 
 def get_config_manager() -> Any:
-    """Factory indirection so tests can patch ConfigManager via this module."""
     config_manager = globals().get("ConfigManager")
     if config_manager is None:
         config_manager = __getattr__("ConfigManager")
@@ -71,8 +68,6 @@ def get_config_manager() -> Any:
 
 
 class _CallableMainModule(ModuleType):
-    """Preserve the historic callable package export while remaining a module."""
-
     def __call__(self) -> None:
         self.main()
 

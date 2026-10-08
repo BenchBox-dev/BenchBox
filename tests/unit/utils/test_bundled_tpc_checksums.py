@@ -1,12 +1,3 @@
-"""Guard: every bundled TPC checksums.md5 entry must match its binary.
-
-This is the w2 fix for harden-tpc-binary-checksum-verification. Before the
-fix benchbox/utils/tpc_compilation.py::_verify_checksum split on whitespace
-(parts[0]=hash, parts[-1]=filename) which matches GNU manifests but for BSD
-manifests ('MD5 (dbgen) = hash') the filename never matches, so the entry is
-silently skipped and _verify_checksum returns True for every BSD platform.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -27,8 +18,6 @@ REPO_ROOT = Path(benchbox.__file__).resolve().parent.parent
 
 
 def _parse_like_fixed(raw: str) -> tuple[str, str] | None:
-    # Keep parity with the fixed _verify_checksum's parser without importing
-    # its private helper (we test the actual method path via TPCCompiler too).
     s = raw.strip()
     if not s:
         return None
@@ -50,9 +39,6 @@ def _parse_like_fixed(raw: str) -> tuple[str, str] | None:
 
 
 class TestVerifyChecksumParsesRealManifests:
-    """The fixed _verify_checksum must correctly parse every shipped manifest
-    format that actually exists in the repo."""
-
     @pytest.mark.parametrize(
         "raw,expected_hash,expected_name",
         [
@@ -77,12 +63,7 @@ class TestVerifyChecksumParsesRealManifests:
 
 
 class TestVerifyChecksumBSDLabeledBinary:
-    """A BSD-format manifest entry for a real binary must verify, and a
-    tampered binary with the same entry must fail. This is the no-op-on-BSD
-    class that the original parser missed."""
-
     def test_bsd_entry_verifies_when_bytes_match(self, tmp_path: Path):
-        # Simulate the tpc-h darwin-x86_64 BSD manifest content style.
         binary = tmp_path / "dbgen"
         binary.write_bytes(b"fake-dbgen-content")
         digest = hashlib.md5(binary.read_bytes()).hexdigest()
@@ -94,7 +75,6 @@ class TestVerifyChecksumBSDLabeledBinary:
     def test_bsd_entry_fails_when_bytes_mismatch(self, tmp_path: Path):
         binary = tmp_path / "dbgen"
         binary.write_bytes(b"real-content")
-        # Manifest claims a different hash
         fake_hash = "0" * 32
         assert fake_hash != hashlib.md5(binary.read_bytes()).hexdigest()
         (tmp_path / "checksums.md5").write_text(f"MD5 (dbgen) = {fake_hash}\n", encoding="utf-8")
@@ -134,11 +114,6 @@ class TestVerifyChecksumBSDLabeledBinary:
 
 
 class TestBundledChecksumsMatchBinaries:
-    """Every bundled checksums.md5 entry for a real binary matches its bytes.
-
-    This fails on a stale manifest instead of silently passing (the BSD hole).
-    """
-
     def test_bundled_checksums(self):
         binaries_root = REPO_ROOT / "_binaries"
         assert binaries_root.is_dir(), f"missing _binaries at {binaries_root}"

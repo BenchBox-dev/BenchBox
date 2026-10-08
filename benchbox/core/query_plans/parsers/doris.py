@@ -1,28 +1,3 @@
-"""Apache Doris query plan parser.
-
-Parses Doris ``EXPLAIN SHAPE PLAN <query>`` output into the harmonized
-``QueryPlanDAG``. The Nereids planner's SHAPE PLAN is a clean indentation tree
-where each level is prefixed by a run of ``-`` characters (two dashes per level)
-and every node is a ``Physical*`` operator, e.g.::
-
-    PhysicalResultSink
-    --PhysicalQuickSort[MERGE_SORT]
-    ----PhysicalDistribute[DistributionSpecGather]
-    ------PhysicalHashAggregate[GLOBAL]
-    --------PhysicalProject
-    ----------PhysicalHashJoin[INNER_JOIN]
-    ------------PhysicalProject
-    --------------PhysicalOlapScan[lineitem]
-    ------------PhysicalDistribute[DistributionSpecReplicated]
-    --------------PhysicalOlapScan[orders]
-
-``EXPLAIN SHAPE PLAN`` is used in preference to the default fragment-oriented
-``EXPLAIN`` because it is structurally stable and trivially nestable; the
-adapter selects it via ``DorisAdapter._explain_query_prefix()``. Operator depth
-is the number of leading dash pairs; the operator name is the token before any
-``[...]`` qualifier (which carries the join type or scanned table name).
-"""
-
 from __future__ import annotations
 
 import logging
@@ -41,11 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class DorisQueryPlanParser(QueryPlanParser):
-    """Parser for Apache Doris ``EXPLAIN SHAPE PLAN`` text output."""
-
-    # Ordered (substring, type) pairs; the first substring found in the
-    # lower-cased operator name wins, so more specific names precede the generic
-    # ones they contain.
     _OPERATOR_KEYWORDS: tuple[tuple[str, LogicalOperatorType], ...] = (
         ("physicalolapscan", LogicalOperatorType.SCAN),
         ("physicalfilescan", LogicalOperatorType.SCAN),
@@ -75,21 +45,16 @@ class DorisQueryPlanParser(QueryPlanParser):
         ("physicalfilter", LogicalOperatorType.FILTER),
         ("filter", LogicalOperatorType.FILTER),
         ("physicalcte", LogicalOperatorType.CTE),
-        # Distribute / exchange / sink wrappers have no dedicated logical type.
         ("physicaldistribute", LogicalOperatorType.OTHER),
         ("physicalresultsink", LogicalOperatorType.OTHER),
         ("sink", LogicalOperatorType.OTHER),
     )
 
-    # Leading dash run encodes depth (two dashes per level); the rest is the node.
     _LINE_RE = re.compile(r"^(?P<dashes>-*)(?P<content>.*)$")
 
     def __init__(self):
         super().__init__("doris")
 
-    # Error-channel cleanup: EXPLAIN-failure producers now return None (capture
-    # records explain_failed), so these prefixes should no longer arrive here.
-    # Both stay rejected as defense so stray error text can never parse as a plan.
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
         if not explain_output or not explain_output.strip():
             raise ValueError("Empty EXPLAIN output")
@@ -118,9 +83,6 @@ class DorisQueryPlanParser(QueryPlanParser):
                 continue
             match = self._LINE_RE.match(stripped)
             content = match.group("content").strip()
-            # Only treat Physical* (or any CamelCase operator) lines as nodes;
-            # skip stray annotation lines that SHAPE PLAN does not emit but a
-            # future/verbose mode might.
             if not content or not content[0].isalpha():
                 continue
             depth = len(match.group("dashes")) // 2
@@ -172,7 +134,6 @@ class DorisQueryPlanParser(QueryPlanParser):
 
     @staticmethod
     def _extract_qualifier(content: str) -> str | None:
-        """Return the text inside the first ``[...]`` qualifier, if any."""
         match = re.search(r"\[([^\]]*)\]", content)
         return match.group(1).strip() if match else None
 

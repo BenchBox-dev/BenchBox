@@ -1,14 +1,6 @@
-"""Unit tests for the untested presto_trino_utils shared helpers.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Pins the contract for validate_catalog_exists (auto-select, explicit match,
-both ConfigurationError branches) and execute_schema_statements (normal
-execution, normalize/optimize delegation, already-exists drop-and-recreate
-recovery, non-recoverable error propagation, cursor cleanup).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

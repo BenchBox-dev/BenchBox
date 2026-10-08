@@ -1,15 +1,3 @@
-"""Characterization of run orchestration, ahead of the core run service.
-
-`one-engine-core-run-service` extracts run orchestration into `benchbox.core`
-below both surfaces. This module pins the shared execution-type behavior so
-both surfaces remain reviewable and cannot silently diverge again.
-
-The CLI wrapper and MCP execution both derive a benchmark's execution type from
-`benchbox/core/run_service.py::map_phases_to_execution_type`. Mixed
-query-phase requests use `combined`, ensuring the runner executes every
-requested query phase.
-"""
-
 from __future__ import annotations
 
 import itertools
@@ -47,8 +35,6 @@ ALL_SUBSETS = _all_phase_subsets()
 
 
 class TestExecutionTypeAgreement:
-    """The cases both surfaces already get right. Extraction must keep these."""
-
     @pytest.mark.parametrize(
         ("phases", "expected"),
         [
@@ -70,7 +56,6 @@ class TestExecutionTypeAgreement:
         assert _mcp_derive(phases) == expected
 
     def test_the_default_phase_selection_agrees(self):
-        """`load,power` is the documented MCP default and the common CLI case."""
         assert _cli_derive(["load", "power"]) == _mcp_derive(["load", "power"]) == "power"
 
     @pytest.mark.parametrize("query_phase", QUERY_PHASES)
@@ -84,8 +69,6 @@ class TestExecutionTypeAgreement:
 
 
 class TestExecutionTypeParity:
-    """Mixed query-phase requests remain combined on both surfaces."""
-
     TWO_QUERY_PHASE_SUBSETS = [list(combo) for combo in itertools.combinations(QUERY_PHASES, 2)]
 
     @pytest.mark.parametrize("phases", TWO_QUERY_PHASE_SUBSETS)
@@ -97,7 +80,6 @@ class TestExecutionTypeParity:
         assert _mcp_derive(phases) == "combined"
 
     def test_no_phase_subset_diverges(self):
-        """All phase subsets agree across CLI and MCP."""
         diverging = [phases for phases in ALL_SUBSETS if _cli_derive(phases) != _mcp_derive(phases)]
 
         assert len(ALL_SUBSETS) == 127
@@ -110,8 +92,6 @@ class TestExecutionTypeParity:
 
 
 class TestPhaseParsingCharacterization:
-    """Phase admission, which the run service will own for both surfaces."""
-
     @pytest.mark.parametrize("phase", VALID_PHASES)
     def test_mcp_admits_every_valid_phase(self, phase: str):
         from benchbox.mcp.schemas import validate_phases
@@ -119,7 +99,6 @@ class TestPhaseParsingCharacterization:
         assert validate_phases(phase) == phase
 
     def test_derivation_is_order_independent(self):
-        """A run service must not depend on the order phases were typed in."""
         for phases in (["power", "load"], ["maintenance", "generate", "throughput"]):
             assert _cli_derive(phases) == _cli_derive(sorted(phases))
             assert _mcp_derive(phases) == _mcp_derive(sorted(phases))

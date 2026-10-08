@@ -1,11 +1,3 @@
-"""Unit tests for LivyStatementMixin.
-
-Pins the contract extracted from Fabric and Synapse adapters:
-  * _execute_statement accumulates time and increments query count;
-  * _wait_for_statement delegates to wait_for_livy_statement unchanged;
-  * _get_headers and _ensure_session are abstract interface hooks.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -19,8 +11,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 class _ConcreteAdapter(LivyStatementMixin):
-    """Minimal concrete subclass for testing."""
-
     livy_endpoint = "https://livy.example.com"
     timeout_minutes = 5
 

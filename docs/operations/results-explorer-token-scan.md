@@ -61,14 +61,14 @@ The following do **not** trip the gate:
 Append an inline marker on the same line as the literal:
 
 ```tsx
-// JS / TS / TSX / JSX
-<div class="text-gray-700" /> // allow-explorer-token-literal: third-party widget skin
+<div class="text-gray-700" />
 ```
 
 ```css
-/* CSS */
-.legacy-badge { color: theme('colors.gray.700'); } /* allow-explorer-token-literal: legacy alias retained for badge migration */
+.legacy-badge { color: theme('colors.gray.700'); }
 ```
+
+The marker is `allow-explorer-token-literal: <reason>`, written in a trailing comment in the file's own syntax: `//` for JS, TS, TSX and JSX, and `/* ... */` for CSS. In the examples above, the TSX line carries the reason `third-party widget skin` and the CSS line carries `legacy alias retained for badge migration`.
 
 The marker requires a non-empty reason. Lines without a reason still trip
 the gate.

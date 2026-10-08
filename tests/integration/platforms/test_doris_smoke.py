@@ -1,5 +1,3 @@
-"""Apache Doris integration smoke tests with stubbed pymysql."""
-
 import pytest
 
 from .common import create_smoke_benchmark, install_doris_stub, run_smoke_benchmark
@@ -13,7 +11,7 @@ pytestmark = [
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_doris_smoke_basic(monkeypatch, tmp_path):
-    """Test basic Doris adapter workflow: connect, get info, close."""
+
     state = install_doris_stub(monkeypatch)
 
     from benchbox.platforms.doris import DorisAdapter
@@ -36,7 +34,7 @@ def test_doris_smoke_basic(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_doris_smoke_schema_creation(monkeypatch, tmp_path):
-    """Test Doris schema creation (CREATE DATABASE, CREATE TABLE)."""
+
     state = install_doris_stub(monkeypatch)
 
     from benchbox.platforms.doris import DorisAdapter
@@ -54,7 +52,6 @@ def test_doris_smoke_schema_creation(monkeypatch, tmp_path):
         assert isinstance(schema_time, float)
         assert schema_time >= 0
 
-        # Verify DDL statements were issued
         ddl_statements = [s for s in state.statements if "CREATE" in s.upper()]
         assert len(ddl_statements) > 0, "Expected CREATE statements to be executed"
     finally:
@@ -64,7 +61,7 @@ def test_doris_smoke_schema_creation(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_doris_smoke_data_loading(monkeypatch, tmp_path):
-    """Test Doris data loading via INSERT batching (requests disabled in stub)."""
+
     state = install_doris_stub(monkeypatch)
 
     from benchbox.platforms.doris import DorisAdapter
@@ -84,9 +81,8 @@ def test_doris_smoke_data_loading(monkeypatch, tmp_path):
         assert isinstance(load_time, float)
         assert load_time >= 0
         assert "lineitem" in table_stats
-        assert table_stats["lineitem"] == 2  # Two rows in the smoke CSV
+        assert table_stats["lineitem"] == 2
 
-        # Verify INSERT statements were issued
         assert len(state.inserts) > 0, "Expected INSERT statements to be executed"
     finally:
         adapter.close_connection(connection)
@@ -95,7 +91,7 @@ def test_doris_smoke_data_loading(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_doris_smoke_query_execution(monkeypatch, tmp_path):
-    """Test Doris query execution with timing."""
+
     state = install_doris_stub(monkeypatch)
 
     from benchbox.platforms.doris import DorisAdapter
@@ -123,7 +119,7 @@ def test_doris_smoke_query_execution(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_doris_smoke_full_workflow(monkeypatch, tmp_path):
-    """Test full Doris workflow: schema, load, configure, query."""
+
     state = install_doris_stub(monkeypatch)
 
     from benchbox.platforms.doris import DorisAdapter
@@ -139,14 +135,14 @@ def test_doris_smoke_full_workflow(monkeypatch, tmp_path):
 
     assert metadata["platform_type"] == "doris"
     assert metadata["platform_name"] == "Apache Doris"
-    # Schema, load, and configure statements should have been executed
+
     assert len(state.statements) > 0
 
 
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_doris_smoke_cleanup(monkeypatch, tmp_path):
-    """Test Doris cleanup (DROP TABLE)."""
+
     state = install_doris_stub(monkeypatch)
 
     from benchbox.platforms.doris import DorisAdapter
@@ -171,12 +167,11 @@ def test_doris_smoke_cleanup(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_doris_smoke_config_validation(monkeypatch):
-    """Test that Doris adapter validates database identifier."""
+
     install_doris_stub(monkeypatch)
 
     from benchbox.platforms.doris import DorisAdapter
 
-    # Valid database name should work
     adapter = DorisAdapter(
         host="localhost",
         port=9030,
@@ -184,7 +179,6 @@ def test_doris_smoke_config_validation(monkeypatch):
     )
     assert adapter.database == "benchbox_smoke"
 
-    # Invalid database name should raise ValueError
     with pytest.raises(ValueError, match="Invalid database identifier"):
         DorisAdapter(
             host="localhost",

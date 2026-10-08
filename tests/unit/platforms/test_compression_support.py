@@ -1,9 +1,6 @@
-"""Tests for platform adapter compression support.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 from pathlib import Path
@@ -19,36 +16,32 @@ pytestmark = [
 
 
 class TestPlatformCompressionSupport:
-    """Test platform adapter support for compressed data."""
-
     def setup_method(self):
-        """Set up test fixtures."""
+
         self.compression_manager = CompressionManager()
 
     def create_test_data_file(self, path: Path, compressed: bool = False, compression_type: str = "gzip"):
-        """Create a test data file, optionally compressed."""
+
         test_data = "id|name|value\n1|test1|100\n2|test2|200\n3|test3|300\n"
 
         if not compressed:
             path.write_text(test_data, encoding="utf-8")
             return path
 
-        # Create compressed file
         compressor = self.compression_manager.get_compressor(compression_type)
         temp_uncompressed = path.parent / f"temp_{path.name}"
         temp_uncompressed.write_text(test_data)
 
         compressed_path = compressor.compress_file(temp_uncompressed, path)
-        temp_uncompressed.unlink()  # Clean up temporary file
+        temp_uncompressed.unlink()
 
         return compressed_path
 
     def test_compression_manager_detection_utility(self):
-        """Test utility function for detecting compressed files."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Test different file types
             test_cases = [
                 ("data.csv", "none"),
                 ("data.csv.gz", "gzip"),
@@ -65,18 +58,15 @@ class TestPlatformCompressionSupport:
                 )
 
     def test_transparent_decompression_gzip(self):
-        """Test transparent decompression for gzip files."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create compressed data file
             compressed_file = temp_path / "test_data.csv.gz"
             self.create_test_data_file(compressed_file, compressed=True, compression_type="gzip")
 
-            # Test decompression
             compressor = self.compression_manager.get_compressor("gzip")
 
-            # Read compressed file and verify content
             with compressor.open_for_read(compressed_file, "rt") as f:
                 content = f.read()
 
@@ -96,18 +86,15 @@ class TestPlatformCompressionSupport:
         reason="zstd not available",
     )
     def test_transparent_decompression_zstd(self):
-        """Test transparent decompression for zstd files."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create compressed data file
             compressed_file = temp_path / "test_data.csv.zst"
             self.create_test_data_file(compressed_file, compressed=True, compression_type="zstd")
 
-            # Test decompression
             compressor = self.compression_manager.get_compressor("zstd")
 
-            # Read compressed file and verify content
             with compressor.open_for_read(compressed_file, "rt") as f:
                 content = f.read()
 
@@ -122,21 +109,17 @@ class TestPlatformCompressionSupport:
             assert actual_lines == expected_lines
 
     def test_platform_adapter_compressed_file_detection(self):
-        """Test that platform adapters can detect compressed files."""
-        # This is a conceptual test - in a real implementation, platform adapters
-        # would use compression detection to handle files appropriately
 
         test_files = [
-            "customer.tbl",  # Uncompressed
-            "orders.tbl.gz",  # Gzip compressed
-            "lineitem.tbl.zst",  # Zstd compressed
+            "customer.tbl",
+            "orders.tbl.gz",
+            "lineitem.tbl.zst",
         ]
 
         for filename in test_files:
             path = Path(filename)
             compression_type = self.compression_manager.detect_compression(path)
 
-            # Verify detection works
             if filename.endswith(".gz"):
                 assert compression_type == "gzip"
             elif filename.endswith(".zst"):
@@ -145,12 +128,11 @@ class TestPlatformCompressionSupport:
                 assert compression_type == "none"
 
     def test_data_integrity_validation(self):
-        """Test data integrity through compression/decompression cycles."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             original_file = temp_path / "original.csv"
 
-            # Create test data with various characters to test encoding
             test_data = """id|name|description|value|timestamp
 1|Product A|High-quality product with "special" chars & symbols|99.99|2023-01-01 10:00:00
 2|Product B|Another product with unicode: café résumé|149.50|2023-01-02 11:30:00
@@ -159,7 +141,6 @@ class TestPlatformCompressionSupport:
 """
             original_file.write_text(test_data)
 
-            # Test compression and decompression cycles
             for compression_type in self.compression_manager.get_available_compressors():
                 if compression_type == "none":
                     continue
@@ -167,15 +148,12 @@ class TestPlatformCompressionSupport:
                 try:
                     compressor = self.compression_manager.get_compressor(compression_type)
 
-                    # Compress
                     compressed_file = temp_path / f"compressed_{compression_type}.csv{compressor.get_file_extension()}"
                     compressor.compress_file(original_file, compressed_file)
 
-                    # Decompress
                     decompressed_file = temp_path / f"decompressed_{compression_type}.csv"
                     compressor.decompress_file(compressed_file, decompressed_file)
 
-                    # Verify integrity
                     original_content = original_file.read_text()
                     decompressed_content = decompressed_file.read_text()
 
@@ -185,84 +163,72 @@ class TestPlatformCompressionSupport:
                     pytest.skip(f"Compression type {compression_type} not available: {e}")
 
     def test_compression_info_utility(self):
-        """Test compression information utility."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create original file
             original_file = temp_path / "test.csv"
-            test_data = "data,value\n" * 1000  # Repetitive data for good compression
+            test_data = "data,value\n" * 1000
             original_file.write_text(test_data)
 
-            # Compress with gzip
             gzip_compressor = self.compression_manager.get_compressor("gzip")
             compressed_file = gzip_compressor.compress_file(original_file)
 
-            # Get compression info
             info = self.compression_manager.get_compression_info(original_file, compressed_file)
 
-            # Verify info structure
             assert "original_size" in info
             assert "compressed_size" in info
             assert "compression_ratio" in info
             assert "space_savings_percent" in info
 
-            # Verify reasonable values
             assert info["original_size"] > 0
             assert info["compressed_size"] > 0
-            assert info["compressed_size"] < info["original_size"]  # Should be smaller
-            assert info["compression_ratio"] > 1.0  # Should be compressed
-            assert 0 < info["space_savings_percent"] < 100  # Should be between 0-100%
+            assert info["compressed_size"] < info["original_size"]
+            assert info["compression_ratio"] > 1.0
+            assert 0 < info["space_savings_percent"] < 100
 
     def test_error_handling_for_missing_files(self):
-        """Test error handling when files are missing."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             nonexistent_file = temp_path / "nonexistent.csv"
 
             compressor = self.compression_manager.get_compressor("gzip")
 
-            # Should raise appropriate errors for missing files
-            with pytest.raises(Exception):  # FileNotFoundError or similar
+            with pytest.raises(Exception):
                 compressor.compress_file(nonexistent_file)
 
     def test_compression_with_empty_files(self):
-        """Test compression behavior with empty files."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             empty_file = temp_path / "empty.csv"
-            empty_file.write_text("")  # Empty file
+            empty_file.write_text("")
 
             compressor = self.compression_manager.get_compressor("gzip")
 
-            # Compress empty file
             compressed_file = compressor.compress_file(empty_file)
             assert compressed_file.exists()
 
-            # Decompress and verify still empty
             decompressed_file = compressor.decompress_file(compressed_file)
             assert decompressed_file.read_text() == ""
 
     def test_large_file_handling(self):
-        """Test compression with larger files (but not too large for tests)."""
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             large_file = temp_path / "large.csv"
 
-            # Create a moderately large file (1MB of data)
-            large_data = "id,name,value,description\n" * 50000  # About 1MB
+            large_data = "id,name,value,description\n" * 50000
             large_file.write_text(large_data)
 
             compressor = self.compression_manager.get_compressor("gzip")
 
-            # Compress large file
             compressed_file = compressor.compress_file(large_file)
             assert compressed_file.exists()
 
-            # Verify compression is effective for repetitive data
             original_size = large_file.stat().st_size
             compressed_size = compressed_file.stat().st_size
 
-            # Should achieve good compression on repetitive data
             compression_ratio = original_size / compressed_size
-            assert compression_ratio > 10.0  # Should compress very well
+            assert compression_ratio > 10.0

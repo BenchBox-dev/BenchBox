@@ -1,8 +1,5 @@
-"""SQL dialect utilities for cross-database compatibility.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import hashlib
 import math
@@ -15,24 +12,13 @@ from dataclasses import asdict, dataclass
 from decimal import Context, Decimal, DecimalException, Inexact
 from typing import Callable
 
-#: Translation workload scopes. ``schema_ddl`` marks schema-creation DDL while
-#: ``workload_query`` marks benchmark query text (the default).
 SCHEMA_DDL_SCOPE = "schema_ddl"
 WORKLOAD_QUERY_SCOPE = "workload_query"
 
-#: Normalized sqlglot targets translated with ``identify=False``. These engines
-#: fold unquoted identifiers in a way that matches BenchBox's generated DDL,
-#: while quoting would preserve a case the engine-side unquoted SQL cannot
-#: find: ClickHouse is case-sensitive without folding, PostgreSQL/DataFusion
-#: fold to lowercase, Snowflake folds to UPPERCASE, and Exasol folds to
-#: UPPERCASE. Reserved words stay safe: each generator's RESERVED_KEYWORDS
-#: still quotes them. Shared with ``benchbox/platforms/base/dialect_translation.py``;
-#: keep both call sites on this constant instead of parallel literals.
 NO_IDENTIFY_DIALECTS = frozenset({"clickhouse", "postgres", "snowflake", "exasol"})
 
 
 def _resolve_translation_scope(scope: str | None) -> str:
-    """Return the effective workload scope, defaulting to benchmark queries."""
     if scope is None:
         return WORKLOAD_QUERY_SCOPE
     if scope not in (SCHEMA_DDL_SCOPE, WORKLOAD_QUERY_SCOPE):
@@ -41,11 +27,6 @@ def _resolve_translation_scope(scope: str | None) -> str:
 
 
 def _fingerprint_sql(sql: str) -> str:
-    """Return a stable content hash identifying one logical SQL statement.
-
-    Non-cryptographic dedup hash only (counting distinct statements per run),
-    never a security boundary; collision risk at benchmark scale is negligible.
-    """
     normalized: list[str] = []
     quote: str | None = None
     pending_space = False
@@ -86,14 +67,11 @@ def _fingerprint_sql(sql: str) -> str:
 
 
 def translation_collection_active() -> bool:
-    """Return True when a translation context is collecting outcomes."""
     return _SQL_TRANSLATION_OUTCOMES.get() is not None
 
 
 @dataclass(frozen=True)
 class SqlTranslationOutcome:
-    """Structured outcome for one SQL translation attempt."""
-
     source_dialect: str
     target_dialect: str
     translator: str
@@ -111,13 +89,10 @@ class SqlTranslationOutcome:
         _resolve_translation_scope(self.scope)
 
     def to_dict(self) -> dict[str, object]:
-        """Return a compact JSON-ready representation."""
         return {key: value for key, value in asdict(self).items() if value is not None and key != "query_fingerprint"}
 
 
 class SQLTranslationError(RuntimeError):
-    """Raised when strict SQL translation cannot produce target-dialect SQL."""
-
     def __init__(self, message: str, outcome: SqlTranslationOutcome):
         super().__init__(message)
         self.outcome = outcome
@@ -132,7 +107,6 @@ _SQL_TRANSLATION_OUTCOMES: ContextVar[list[SqlTranslationOutcome] | None] = Cont
 
 @contextmanager
 def sql_translation_context(strict: bool = False) -> Iterator[list[SqlTranslationOutcome]]:
-    """Collect SQL translation outcomes and optionally make fallback fatal."""
     outcomes: list[SqlTranslationOutcome] = []
     strict_token = _SQL_TRANSLATION_STRICT.set(strict)
     outcomes_token = _SQL_TRANSLATION_OUTCOMES.set(outcomes)
@@ -144,12 +118,10 @@ def sql_translation_context(strict: bool = False) -> Iterator[list[SqlTranslatio
 
 
 def current_sql_translation_strict_mode() -> bool:
-    """Return whether the active translation context is strict."""
     return _SQL_TRANSLATION_STRICT.get()
 
 
 def record_sql_translation_outcome(outcome: SqlTranslationOutcome) -> None:
-    """Record a translation outcome when a collection context is active."""
     outcomes = _SQL_TRANSLATION_OUTCOMES.get()
     if outcomes is not None:
         outcomes.append(outcome)
@@ -160,14 +132,6 @@ def summarize_sql_translation_outcomes(
     *,
     strict_mode: bool | None = None,
 ) -> dict[str, object] | None:
-    """Summarize translation outcomes for result-bundle execution metadata.
-
-    Uniqueness counts distinct source texts within each scope: repeated
-    translation of the same logical query (preflight, iterations, metadata
-    capture) counts once, regardless of target dialect. Schema granularity
-    follows the translation call: one fingerprint per multi-statement block
-    on the adapter path, one per statement for per-statement callers.
-    """
     if not outcomes:
         return None
 
@@ -260,13 +224,11 @@ def summarize_sql_translation_outcomes(
 
 
 def _query_has_group_or_order_by_all(query: str) -> bool:
-    """Return True when the original query explicitly uses GROUP BY ALL or ORDER BY ALL."""
 
     return bool(re.search(r"(?i)\b(?:GROUP|ORDER)\s+BY\s+ALL\b", query))
 
 
 def _restore_group_order_by_all_keyword(query: str) -> str:
-    """Restore ALL keyword when SQLGlot quoted it as an identifier."""
 
     return re.sub(
         r"(?i)\b((?:GROUP|ORDER)\s+BY)\s+(\"ALL\"|`ALL`|\[ALL\])",
@@ -276,25 +238,6 @@ def _restore_group_order_by_all_keyword(query: str) -> str:
 
 
 def _fold_sqlite_discount_bounds(query: str) -> str:
-    """Keep inclusive TPC-H discount boundaries exact before SQLite REAL arithmetic.
-
-    A bound is folded only when it is a ``+``/``-`` expression of at most four plain decimal
-    literals (``0.06 - 0.01``), each below 100 with at most six decimals. SQLite evaluates
-    those as REAL. At that size double rounding error is about 1e-14, so the exact decimal
-    result is computed in a trapped-inexact context and the bound is replaced only when the
-    double result is finite and within 1e-12 of it. Integer or mixed bounds, other operators,
-    larger or longer literals, scientific notation and negative results keep SQLite's
-    semantics and are left alone. The rewrite is scoped to queries that read a table named ``lineitem``, the TPC-H table
-    whose ``l_discount`` is ``DECIMAL(15,2)``, so a query over any other table is left alone;
-    the TPC-Havoc Q6 variants read ``lineitem`` and are folded.
-
-    The folded bound is the exact decimal endpoint, so the comparison follows exact decimal
-    semantics in both directions. SQLite's noisy endpoint can sit just below the exact value
-    (dropping an endpoint row, the Q6 defect) or just above it. A stored value inside that
-    noise band, about 1e-16 from the endpoint, is therefore decided by the exact endpoint.
-    TPC-H discounts are ``DECIMAL(15,2)``, so no stored value lies in that band.
-    """
-    # Most SQLite queries need no extra parse. The AST, not this hint, selects rewrites.
     if not re.search(r"\bl_discount\b", query, re.IGNORECASE) or not re.search(r"\bBETWEEN\b", query, re.IGNORECASE):
         return query
 
@@ -307,7 +250,6 @@ def _fold_sqlite_discount_bounds(query: str) -> str:
     leaves = 0
 
     def evaluate(node: "exp.Expression") -> "tuple[Decimal, float] | None":
-        """Return the exact decimal value and the IEEE-double value of a decimal +/- tree."""
         nonlocal leaves
         node = node.unnest()
         if isinstance(node, exp.Literal):
@@ -328,7 +270,6 @@ def _fold_sqlite_discount_bounds(query: str) -> str:
         return None
 
     tree = sqlglot.parse_one(query, read="sqlite")
-    # A string or comment that merely mentions the table must not count: look at table references.
     if not any(table.name.lower() == "lineitem" for table in tree.find_all(exp.Table)):
         return query
     changed = False
@@ -353,7 +294,6 @@ def _fold_sqlite_discount_bounds(query: str) -> str:
 
 
 def _fix_sqlite_unsupported_syntax(query: str) -> str:
-    """Rewrite SQLGlot output that SQLite cannot execute."""
 
     def replace_date_interval(match: re.Match[str]) -> str:
         date_literal = match.group("date")
@@ -417,44 +357,15 @@ def _fix_sqlite_unsupported_syntax(query: str) -> str:
 
 
 def normalize_dialect_for_sqlglot(dialect: str) -> str:
-    """Normalize dialect names for SQLGlot compatibility.
-
-    Some database dialects are not directly supported by SQLGlot but are
-    based on dialects that are supported. This function maps unsupported
-    dialects to their closest supported equivalent.
-
-    SQLGlot supports these dialects: 'athena', 'bigquery', 'clickhouse',
-    'databricks', 'doris', 'drill', 'druid', 'duckdb', 'dune', 'exasol',
-    'hive', 'materialize', 'mysql', 'oracle', 'postgres', 'presto', 'prql',
-    'redshift', 'risingwave', 'snowflake', 'spark', 'spark2', 'sqlite',
-    'starrocks', 'tableau', 'teradata', 'trino', 'tsql'.
-
-    Args:
-        dialect: The dialect name to normalize (case-insensitive)
-
-    Returns:
-        The normalized dialect name that SQLGlot can process
-
-    Examples:
-        >>> normalize_dialect_for_sqlglot("netezza")
-        'postgres'
-        >>> normalize_dialect_for_sqlglot("duckdb")
-        'duckdb'
-        >>> normalize_dialect_for_sqlglot("NETEZZA")
-        'postgres'
-    """
-    # Convert to lowercase for case-insensitive matching
     dialect_lower = dialect.lower() if dialect else ""
 
-    # Map unsupported dialects to their SQLGlot-compatible equivalents
     dialect_mapping = {
-        "netezza": "postgres",  # Netezza is based on PostgreSQL
-        "greenplum": "postgres",  # Greenplum is PostgreSQL-based
-        "vertica": "postgres",  # Vertica uses PostgreSQL-compatible SQL
-        "datafusion": "postgres",  # DataFusion uses PostgreSQL-compatible SQL
-        "ansi": "postgres",  # ANSI standard SQL parses with the PostgreSQL grammar
-        "standard": "postgres",  # Standard SQL (schema DDL) parses with the PostgreSQL grammar
-        # DuckDB, ClickHouse, BigQuery, Snowflake, Redshift already supported directly
+        "netezza": "postgres",
+        "greenplum": "postgres",
+        "vertica": "postgres",
+        "datafusion": "postgres",
+        "ansi": "postgres",
+        "standard": "postgres",
     }
 
     return dialect_mapping.get(dialect_lower, dialect_lower)
@@ -470,45 +381,6 @@ def translate_sql_query(
     strict: bool | None = None,
     scope: str | None = None,
 ) -> str:
-    """Translate SQL query from source dialect to target dialect using SQLGlot.
-
-    This is the centralized SQL translation function used by all benchmarks.
-    It follows the TPC-DS gold standard pattern with comprehensive error handling.
-
-    The default source dialect is "netezza" (Postgres-compatible), which provides
-    the best compatibility with modern SQL features across platforms. This can be
-    overridden for benchmarks that use platform-specific source queries (e.g.,
-    ClickBench uses "clickhouse" as the source dialect).
-
-    Args:
-        query: SQL query text to translate
-        target_dialect: Target SQL dialect (e.g., 'duckdb', 'bigquery', 'snowflake')
-        source_dialect: Source SQL dialect (default: 'netezza' for modern SQL compatibility)
-        identify: Whether to quote identifiers to prevent reserved keyword conflicts (default: True)
-        pre_processors: Optional list of functions to pre-process query before translation
-        post_processors: Optional list of functions to post-process query after translation
-        strict: When True, raise SQLTranslationError instead of returning the
-            original query on translator import or translation failure. When
-            omitted, the active sql_translation_context policy is used.
-        scope: Workload scope recorded on the outcome (``SCHEMA_DDL_SCOPE`` for
-            schema DDL, ``WORKLOAD_QUERY_SCOPE`` otherwise). Defaults to
-            benchmark queries.
-
-    Returns:
-        Translated SQL query text. Returns original query if translation fails.
-
-    Examples:
-        >>> translate_sql_query("SELECT * FROM orders", "duckdb")
-        'SELECT * FROM "orders"'
-
-        >>> translate_sql_query("SELECT * FROM orders", "bigquery", source_dialect="postgres")
-        'SELECT * FROM `orders`'
-
-        >>> # With custom pre-processor
-        >>> def fix_syntax(q): return q.replace("LIMIT", "FETCH FIRST")
-        >>> translate_sql_query("SELECT * FROM t LIMIT 10", "oracle", pre_processors=[fix_syntax])
-        'SELECT * FROM "t" FETCH FIRST 10 ROWS ONLY'
-    """
     import logging
 
     logger = logging.getLogger(__name__)
@@ -537,30 +409,22 @@ def translate_sql_query(
         return query
 
     try:
-        # Normalize both source and target dialects for SQLGlot compatibility
         src = normalize_dialect_for_sqlglot(source_dialect.lower())
         tgt = normalize_dialect_for_sqlglot(target_dialect.lower())
 
-        # Apply pre-processors (e.g., TPC-DS interval syntax normalization)
         processed_query = query
         if pre_processors:
             for pre_proc in pre_processors:
                 processed_query = pre_proc(processed_query)
 
-        # Translate using SQLGlot
-        # Targets in NO_IDENTIFY_DIALECTS skip identifier quoting (see constant).
         should_identify = identify and (tgt not in NO_IDENTIFY_DIALECTS)
         translated = sqlglot.transpile(processed_query, read=src, write=tgt, identify=should_identify)[0]
 
-        # Built-in optional post-fix:
-        # SQLGlot + identify=True can emit ORDER/GROUP BY "ALL" for DuckDB,
-        # but DuckDB expects ALL as a keyword in these clauses.
         if tgt == "duckdb" and _query_has_group_or_order_by_all(query):
             translated = _restore_group_order_by_all_keyword(translated)
         elif tgt == "sqlite":
             translated = _fix_sqlite_unsupported_syntax(translated)
 
-        # Apply post-processors (e.g., TPC-DS Query 58 ambiguity fix)
         if post_processors:
             for post_proc in post_processors:
                 translated = post_proc(translated)
@@ -608,22 +472,8 @@ def translate_sql_query(
 
 
 def fix_postgres_date_arithmetic(query: str) -> str:
-    """Convert integer date arithmetic to INTERVAL syntax for PostgreSQL/DataFusion.
-
-    PostgreSQL and DataFusion don't support `date + integer` directly.
-    This converts patterns like `d_date + 5` to `d_date + INTERVAL '5' DAY`.
-
-    Args:
-        query: SQL query with potential date arithmetic
-
-    Returns:
-        Query with date arithmetic converted to INTERVAL syntax
-    """
     import re
 
-    # Pattern: column_name + integer or column_name - integer
-    # where column_name contains 'date' (case-insensitive)
-    # Matches: d_date + 5, d1.d_date + 30, d_date - 7
     pattern = r"(\b\w*\.?\w*d_date\w*)\s*([+-])\s*(\d+)"
 
     def replace_with_interval(match: re.Match) -> str:

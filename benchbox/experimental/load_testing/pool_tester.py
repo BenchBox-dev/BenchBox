@@ -1,9 +1,6 @@
-"""Connection pool stress testing for database concurrency analysis.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -19,38 +16,25 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PoolTestConfig:
-    """Configuration for connection pool testing."""
-
     connection_factory: Callable[[], Any]
-    """Factory creating new database connections."""
 
     health_check_query: str = "SELECT 1"
-    """Simple query to verify connection health."""
 
     execute_query: Callable[[Any, str], bool] | None = None
-    """Optional function to execute query: (connection, sql) -> success."""
 
-    # Test parameters
     max_connections_to_test: int = 100
-    """Maximum connections to attempt acquiring."""
 
     connection_acquire_timeout: float = 30.0
-    """Timeout for acquiring a single connection."""
 
     hold_connection_seconds: float = 1.0
-    """How long to hold each connection during stress test."""
 
     ramp_step_size: int = 10
-    """Number of connections to add in each ramp step."""
 
     ramp_step_delay_seconds: float = 0.5
-    """Delay between ramp steps."""
 
 
 @dataclass
 class ConnectionAttempt:
-    """Record of a connection attempt."""
-
     attempt_id: int
     start_time: float
     end_time: float | None = None
@@ -61,50 +45,29 @@ class ConnectionAttempt:
 
 @dataclass
 class PoolTestResult:
-    """Results from connection pool testing."""
-
-    # Connection acquisition
     total_attempts: int
     successful_connections: int
     failed_connections: int
     success_rate: float
 
-    # Timing
     min_connect_time_ms: float
     max_connect_time_ms: float
     avg_connect_time_ms: float
     p95_connect_time_ms: float
     p99_connect_time_ms: float
 
-    # Pool characteristics
     max_concurrent_connections: int
     estimated_pool_size: int
     pool_exhaustion_detected: bool
-    exhaustion_threshold: int | None  # Connection count where pool exhaustion began
+    exhaustion_threshold: int | None
 
-    # Connection attempts by status
     attempts: list[ConnectionAttempt] = field(default_factory=list)
 
-    # Recommendations
     recommendations: list[str] = field(default_factory=list)
 
 
 class ConnectionPoolTester:
-    """Tests database connection pool behavior under load.
-
-    This tester helps identify:
-    - Actual pool size limits
-    - Connection acquisition times under load
-    - Pool exhaustion thresholds
-    - Connection timeout behavior
-    """
-
     def __init__(self, config: PoolTestConfig):
-        """Initialize pool tester.
-
-        Args:
-            config: Configuration for pool testing
-        """
         self._config = config
         self._lock = threading.Lock()
         self._active_connections: list[Any] = []
@@ -112,11 +75,6 @@ class ConnectionPoolTester:
         self._attempts: list[ConnectionAttempt] = []
 
     def test_pool_limits(self) -> PoolTestResult:
-        """Test connection pool limits by gradually acquiring connections.
-
-        Returns:
-            Pool test results with limit analysis
-        """
         logger.info(
             f"Starting pool limit test: max_to_test={self._config.max_connections_to_test}, "
             f"step_size={self._config.ramp_step_size}"
@@ -127,7 +85,6 @@ class ConnectionPoolTester:
         exhaustion_threshold = None
 
         try:
-            # Ramp up connections gradually
             for target in range(
                 self._config.ramp_step_size,
                 self._config.max_connections_to_test + 1,
@@ -149,40 +106,27 @@ class ConnectionPoolTester:
                             exhaustion_threshold = current_count + (to_acquire - failures_in_step)
                             logger.info(f"Pool exhaustion detected at ~{exhaustion_threshold} connections")
 
-                # Check if we should stop
                 if len(self._active_connections) == current_count and to_acquire > 0:
                     logger.info(f"No new connections acquired at target {target}, stopping")
                     break
 
                 time.sleep(self._config.ramp_step_delay_seconds)
 
-            # Hold connections briefly to verify stability
             time.sleep(self._config.hold_connection_seconds)
 
         finally:
-            # Release all connections
             self._release_all_connections()
 
         return self._build_result(exhaustion_threshold)
 
     def test_pool_under_load(self, concurrency: int = 50, duration_seconds: float = 30.0) -> PoolTestResult:
-        """Test connection pool under concurrent access load.
-
-        Args:
-            concurrency: Number of concurrent connection requesters
-            duration_seconds: Duration of the test
-
-        Returns:
-            Pool test results with load analysis
-        """
         logger.info(f"Starting pool load test: concurrency={concurrency}, duration={duration_seconds}s")
 
         start_time = time.time()
         end_time = start_time + duration_seconds
-        attempt_counter = [0]  # Use list for mutability in closure
+        attempt_counter = [0]
 
         def connection_worker(worker_id: int) -> None:
-            """Worker that repeatedly acquires and releases connections."""
             while time.time() < end_time:
                 with self._lock:
                     attempt_id = attempt_counter[0]
@@ -191,8 +135,7 @@ class ConnectionPoolTester:
                 attempt = self._acquire_connection(attempt_id)
 
                 if attempt.success:
-                    # Find and release the connection we acquired
-                    time.sleep(0.1)  # Brief hold
+                    time.sleep(0.1)
                     with self._lock:
                         if self._active_connections:
                             conn = self._active_connections.pop()
@@ -202,7 +145,6 @@ class ConnectionPoolTester:
                             except Exception:
                                 pass
 
-        # Run concurrent workers
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
             futures = [executor.submit(connection_worker, i) for i in range(concurrency)]
             for future in as_completed(futures):
@@ -211,7 +153,6 @@ class ConnectionPoolTester:
                 except Exception as e:
                     logger.debug(f"Worker error: {e}")
 
-        # Release any remaining connections
         self._release_all_connections()
 
         return self._build_result(None)
@@ -221,15 +162,6 @@ class ConnectionPoolTester:
         connections_per_second: float = 10.0,
         duration_seconds: float = 30.0,
     ) -> PoolTestResult:
-        """Test connection pool with high churn rate.
-
-        Args:
-            connections_per_second: Target rate of new connections
-            duration_seconds: Duration of the test
-
-        Returns:
-            Pool test results with churn analysis
-        """
         logger.info(f"Starting pool churn test: rate={connections_per_second}/s, duration={duration_seconds}s")
 
         start_time = time.time()
@@ -238,11 +170,9 @@ class ConnectionPoolTester:
         attempt_id = 0
 
         while time.time() < end_time:
-            # Acquire connection
             attempt = self._acquire_connection(attempt_id)
             attempt_id += 1
 
-            # Immediately release
             if attempt.success:
                 with self._lock:
                     if self._active_connections:
@@ -253,14 +183,12 @@ class ConnectionPoolTester:
                         except Exception:
                             pass
 
-            # Wait for next acquisition
             time.sleep(interval)
 
         self._release_all_connections()
         return self._build_result(None)
 
     def _acquire_connection(self, attempt_id: int) -> ConnectionAttempt:
-        """Attempt to acquire a single connection."""
         attempt = ConnectionAttempt(
             attempt_id=attempt_id,
             start_time=time.time(),
@@ -269,7 +197,6 @@ class ConnectionPoolTester:
         try:
             conn = self._config.connection_factory()
 
-            # Verify connection with health check
             if self._config.execute_query:
                 success = self._config.execute_query(conn, self._config.health_check_query)
                 if not success:
@@ -287,8 +214,6 @@ class ConnectionPoolTester:
         except Exception as e:
             attempt.end_time = time.time()
             attempt.success = False
-            # Defensive: some driver errors raise with empty str(e); fall back
-            # so the attempt record always has a non-empty error string.
             attempt.error = str(e) or repr(e) or type(e).__name__
             attempt.connection_time_ms = (attempt.end_time - attempt.start_time) * 1000
 
@@ -298,7 +223,6 @@ class ConnectionPoolTester:
         return attempt
 
     def _release_all_connections(self) -> None:
-        """Release all held connections."""
         with self._lock:
             connections = self._active_connections[:]
             self._active_connections.clear()
@@ -311,7 +235,6 @@ class ConnectionPoolTester:
                 logger.debug(f"Error closing connection: {e}")
 
     def _build_result(self, exhaustion_threshold: int | None) -> PoolTestResult:
-        """Build result object from collected data."""
         successful = [a for a in self._attempts if a.success]
         failed = [a for a in self._attempts if not a.success]
 
@@ -327,7 +250,6 @@ class ConnectionPoolTester:
         else:
             min_time = max_time = avg_time = p95_time = p99_time = 0
 
-        # Generate recommendations
         recommendations = []
         if exhaustion_threshold is not None:
             recommendations.append(
@@ -342,7 +264,6 @@ class ConnectionPoolTester:
                 f"High failure rate ({len(failed)}/{len(self._attempts)}) - review connection limits"
             )
 
-            # Analyze error types
             timeout_errors = sum(1 for a in failed if a.error and "timeout" in a.error.lower())
             if timeout_errors > len(failed) * 0.5:
                 recommendations.append("Most failures are timeouts - increase connection_acquire_timeout or pool size")

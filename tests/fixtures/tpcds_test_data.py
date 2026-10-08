@@ -1,23 +1,9 @@
-"""TPC-DS Test Data and Fixtures.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides comprehensive test data and fixtures for TPC-DS testing,
-including sample data generation, reference query results, and test scenarios.
+# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DS specification.
 
-Features:
-- Sample database schemas and data
-- Reference parameter sets
-- Expected query outputs for validation
-- Performance baseline data
-- Test scenario configurations
-- Mock database connections
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DS specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import random
 import sqlite3
@@ -34,16 +20,12 @@ from benchbox.core.tpcds.queries import TPCDSQueryManager
 
 
 class TPCDSTestDataGenerator:
-    """Generate test data for TPC-DS testing."""
-
     def __init__(self, scale_factor: float = 0.001):
-        """Initialize test data generator."""
         self.scale_factor = scale_factor
         self.base_year = 1998
         self.end_year = 2002
 
     def generate_date_dim_data(self, num_rows: int = 100) -> list[tuple]:
-        """Generate sample date dimension data."""
         data = []
         current_date = datetime(self.base_year, 1, 1)
 
@@ -52,18 +34,16 @@ class TPCDSTestDataGenerator:
             date_id = f"AAAAAAAA{chr(65 + (i % 26))}AAAAAAA"
             date_str = current_date.strftime("%Y-%m-%d")
 
-            # Calculate various date attributes
             month_seq = (current_date.year - self.base_year) * 12 + current_date.month
             week_seq = (current_date - datetime(self.base_year, 1, 1)).days // 7 + 1
             quarter_seq = (current_date.year - self.base_year) * 4 + ((current_date.month - 1) // 3) + 1
 
             year = current_date.year
-            dow = current_date.weekday()  # 0 = Monday
+            dow = current_date.weekday()
             moy = current_date.month
             dom = current_date.day
             qoy = ((current_date.month - 1) // 3) + 1
 
-            # Fiscal year calculations
             fy_year = year if current_date.month >= 3 else year - 1
             fy_quarter_seq = quarter_seq
             fy_week_seq = week_seq
@@ -71,12 +51,10 @@ class TPCDSTestDataGenerator:
             day_name = current_date.strftime("%A")
             quarter_name = f"{year}Q{qoy}"
 
-            # Simple holiday/weekend logic
             holiday = "Y" if current_date.month == 12 and current_date.day == 25 else "N"
-            weekend = "Y" if dow in [5, 6] else "N"  # Saturday, Sunday
-            following_holiday = "N"  # Simplified
+            weekend = "Y" if dow in [5, 6] else "N"
+            following_holiday = "N"
 
-            # First and last day of month
             first_dom = 1
             last_dom = (
                 (current_date.replace(month=current_date.month + 1, day=1) - timedelta(days=1)).day
@@ -84,11 +62,9 @@ class TPCDSTestDataGenerator:
                 else 31
             )
 
-            # Previous year/quarter calculations
             same_day_ly = date_sk - 365 if date_sk > 365 else 0
             same_day_lq = date_sk - 90 if date_sk > 90 else 0
 
-            # Current flags (simplified)
             current_day = "Y" if i == 0 else "N"
             current_week = "Y" if i < 7 else "N"
             current_month = "Y" if i < 31 else "N"
@@ -128,13 +104,11 @@ class TPCDSTestDataGenerator:
                 )
             )
 
-            # Advance to next day
-            current_date += timedelta(days=random.randint(1, 7))  # Variable spacing for testing
+            current_date += timedelta(days=random.randint(1, 7))
 
         return data
 
     def generate_customer_address_data(self, num_rows: int = 50) -> list[tuple]:
-        """Generate sample customer address data."""
         states = ["CA", "NY", "TX", "FL", "PA", "IL", "OH", "GA", "NC", "MI"]
         counties = {
             "CA": ["Los Angeles", "Orange", "San Diego", "Santa Clara"],
@@ -171,13 +145,11 @@ class TPCDSTestDataGenerator:
             ca_address_sk = i + 1
             ca_address_id = f"AAAAAAAA{chr(65 + (i % 26))}AAAAAAA"
 
-            # Random address components
             ca_street_number = str(random.randint(1, 9999))
             ca_street_name = random.choice(street_names)
             ca_street_type = random.choice(street_types)
             ca_suite_number = f"Suite {random.randint(100, 999)}" if random.random() > 0.5 else ""
 
-            # Geographic hierarchy
             ca_state = random.choice(states)
             ca_county = random.choice(counties.get(ca_state, ["Generic County"]))
             ca_city = random.choice(cities.get(ca_county, ["Generic City"]))
@@ -185,7 +157,6 @@ class TPCDSTestDataGenerator:
             ca_zip = f"{random.randint(10000, 99999)}"
             ca_country = "United States"
 
-            # GMT offset based on state
             gmt_offsets = {
                 "CA": -8.0,
                 "NY": -5.0,
@@ -223,7 +194,6 @@ class TPCDSTestDataGenerator:
         return data
 
     def generate_item_data(self, num_rows: int = 30) -> list[tuple]:
-        """Generate sample item data."""
         categories = ["Electronics", "Books", "Clothing", "Home", "Sports", "Toys"]
         brands = ["Brand#1", "Brand#2", "Brand#3", "Brand#4", "Brand#5"]
         classes = ["Economy", "Standard", "Premium"]
@@ -243,20 +213,17 @@ class TPCDSTestDataGenerator:
             i_item_sk = i + 1
             i_item_id = f"AAAAAAAA{chr(65 + (i % 26))}AAAAAAA"
 
-            # Date range for item validity
             start_date = datetime(self.base_year, 1, 1) + timedelta(days=random.randint(0, 365))
-            end_date = start_date + timedelta(days=random.randint(365, 1095))  # 1-3 years
+            end_date = start_date + timedelta(days=random.randint(365, 1095))
 
             i_rec_start_date = start_date.strftime("%Y-%m-%d")
             i_rec_end_date = end_date.strftime("%Y-%m-%d")
 
-            # Item attributes
             category = random.choice(categories)
             brand = random.choice(brands)
             item_class = random.choice(classes)
             manufacturer = random.choice(manufacturers)
 
-            # Generate descriptive name
             color = random.choice(colors)
             size = random.choice(sizes)
             adjectives = ["Premium", "Deluxe", "Standard", "Economy", "Professional"]
@@ -265,20 +232,17 @@ class TPCDSTestDataGenerator:
             i_item_desc = f"{adjective} {color} {category.lower()} item"
             i_product_name = i_item_desc
 
-            # Pricing
             wholesale_cost = round(random.uniform(1.0, 100.0), 2)
-            markup = random.uniform(1.5, 3.0)  # 50% to 200% markup
+            markup = random.uniform(1.5, 3.0)
             i_current_price = round(wholesale_cost * markup, 2)
             i_wholesale_cost = wholesale_cost
 
-            # IDs
             i_brand_id = hash(brand) % 10000
             i_class_id = hash(item_class) % 100
             i_category_id = hash(category) % 100
             i_manufact_id = hash(manufacturer) % 1000
             i_manager_id = random.randint(1, 100)
 
-            # Other attributes
             i_brand = brand
             i_class = item_class
             i_category = category
@@ -320,31 +284,24 @@ class TPCDSTestDataGenerator:
 
 
 class TPCDSTestDatabase:
-    """Create and manage test databases for TPC-DS testing."""
-
     def __init__(self, db_path: Optional[Path] = None):
-        """Initialize test database."""
         self.db_path = db_path or Path(tempfile.mktemp(suffix=".db"))
         self.connection = None
         self.data_generator = TPCDSTestDataGenerator()
 
     def __enter__(self):
-        """Context manager entry."""
         self.connection = sqlite3.connect(str(self.db_path))
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
         if self.connection:
             self.connection.close()
         if self.db_path.exists():
             self.db_path.unlink()
 
     def create_schema(self):
-        """Create basic TPC-DS schema for testing."""
         cursor = self.connection.cursor()
 
-        # Date dimension table
         cursor.execute("""
             CREATE TABLE date_dim (
                 d_date_sk INTEGER PRIMARY KEY,
@@ -378,7 +335,6 @@ class TPCDSTestDatabase:
             )
         """)
 
-        # Customer address table
         cursor.execute("""
             CREATE TABLE customer_address (
                 ca_address_sk INTEGER PRIMARY KEY,
@@ -397,7 +353,6 @@ class TPCDSTestDatabase:
             )
         """)
 
-        # Item table
         cursor.execute("""
             CREATE TABLE item (
                 i_item_sk INTEGER PRIMARY KEY,
@@ -428,10 +383,8 @@ class TPCDSTestDatabase:
         self.connection.commit()
 
     def populate_data(self):
-        """Populate tables with test data."""
         cursor = self.connection.cursor()
 
-        # Populate date_dim
         date_data = self.data_generator.generate_date_dim_data()
         cursor.executemany(
             """
@@ -440,7 +393,6 @@ class TPCDSTestDatabase:
             date_data,
         )
 
-        # Populate customer_address
         address_data = self.data_generator.generate_customer_address_data()
         cursor.executemany(
             """
@@ -449,7 +401,6 @@ class TPCDSTestDatabase:
             address_data,
         )
 
-        # Populate item
         item_data = self.data_generator.generate_item_data()
         cursor.executemany(
             """
@@ -461,23 +412,18 @@ class TPCDSTestDatabase:
         self.connection.commit()
 
     def get_sample_data(self, table_name: str, limit: int = 10) -> list[tuple]:
-        """Get sample data from a table."""
         cursor = self.connection.cursor()
         cursor.execute(f"SELECT * FROM {table_name} LIMIT ?", (limit,))
         return cursor.fetchall()
 
 
 class TPCDSReferenceData:
-    """Manage reference data for TPC-DS testing."""
-
     def __init__(self):
-        """Initialize reference data."""
         self.parameter_sets = self._create_parameter_sets()
         self.expected_results = self._create_expected_results()
         self.performance_baselines = self._create_performance_baselines()
 
     def _create_parameter_sets(self) -> dict[str, dict[str, Any]]:
-        """Create standard parameter sets for testing."""
         return {
             "baseline_2000": {
                 "YEAR": 2000,
@@ -537,7 +483,6 @@ class TPCDSReferenceData:
         }
 
     def _create_expected_results(self) -> dict[str, dict[str, Any]]:
-        """Create expected query results for validation."""
         return {
             "query_1_baseline_2000": {
                 "row_count": 100,
@@ -563,12 +508,11 @@ class TPCDSReferenceData:
         }
 
     def _create_performance_baselines(self) -> dict[str, dict[str, float]]:
-        """Create performance baselines for regression testing."""
         return {
             "query_generation": {
-                "raw_query_time": 0.001,  # 1ms
-                "parameterized_query_time": 0.005,  # 5ms
-                "enhanced_query_time": 0.01,  # 10ms
+                "raw_query_time": 0.001,
+                "parameterized_query_time": 0.005,
+                "enhanced_query_time": 0.01,
             },
             "memory_usage": {
                 "single_query_mb": 0.1,
@@ -583,24 +527,18 @@ class TPCDSReferenceData:
         }
 
     def get_parameter_set(self, name: str) -> dict[str, Any]:
-        """Get a parameter set by name."""
         return self.parameter_sets.get(name, {})
 
     def get_expected_result(self, test_case: str) -> dict[str, Any]:
-        """Get expected result for a test case."""
         return self.expected_results.get(test_case, {})
 
     def get_performance_baseline(self, category: str) -> dict[str, float]:
-        """Get performance baseline for a category."""
         return self.performance_baselines.get(category, {})
 
 
 class MockTPCDSComponents:
-    """Mock components for isolated testing."""
-
     @staticmethod
     def create_mock_database_introspector() -> Mock:
-        """Create a mock database introspector."""
         mock_introspector = Mock()
         mock_introspector.get_table_row_count.return_value = 1000
         mock_introspector.get_column_statistics.return_value = {
@@ -620,7 +558,6 @@ class MockTPCDSComponents:
 
     @staticmethod
     def create_mock_distribution_manager() -> Mock:
-        """Create a mock distribution manager."""
         mock_manager = Mock()
         mock_manager.get_random_value.return_value = "mock_value"
         mock_manager.get_distribution_info.return_value = {
@@ -632,7 +569,6 @@ class MockTPCDSComponents:
 
     @staticmethod
     def create_mock_parameter_functions() -> Mock:
-        """Create mock parameter functions."""
         mock_functions = Mock()
         mock_functions.uniform.return_value = 42
         mock_functions.date.return_value = "2000-06-15"
@@ -642,7 +578,6 @@ class MockTPCDSComponents:
 
     @staticmethod
     def create_mock_performance_monitor() -> Mock:
-        """Create a mock performance monitor."""
         mock_monitor = Mock()
         mock_monitor.record_timing = MagicMock()
         mock_monitor.increment_counter = MagicMock()
@@ -650,16 +585,13 @@ class MockTPCDSComponents:
         return mock_monitor
 
 
-# Pytest fixtures for easy use in tests
 @pytest.fixture
 def tpcds_test_data_generator():
-    """Fixture for TPC-DS test data generator."""
     return TPCDSTestDataGenerator()
 
 
 @pytest.fixture
 def tpcds_test_database():
-    """Fixture for TPC-DS test database."""
     with TPCDSTestDatabase() as db:
         db.create_schema()
         db.populate_data()
@@ -668,37 +600,31 @@ def tpcds_test_database():
 
 @pytest.fixture
 def tpcds_reference_data():
-    """Fixture for TPC-DS reference data."""
     return TPCDSReferenceData()
 
 
 @pytest.fixture
 def mock_database_introspector():
-    """Fixture for mock database introspector."""
     return MockTPCDSComponents.create_mock_database_introspector()
 
 
 @pytest.fixture
 def mock_distribution_manager():
-    """Fixture for mock distribution manager."""
     return MockTPCDSComponents.create_mock_distribution_manager()
 
 
 @pytest.fixture
 def mock_parameter_functions():
-    """Fixture for mock parameter functions."""
     return MockTPCDSComponents.create_mock_parameter_functions()
 
 
 @pytest.fixture
 def mock_performance_monitor():
-    """Fixture for mock performance monitor."""
     return MockTPCDSComponents.create_mock_performance_monitor()
 
 
 @pytest.fixture
 def sample_tpcds_benchmark():
-    """Fixture for sample TPC-DS benchmark instance."""
     return TPCDSBenchmark(
         scale_factor=0.001,
         use_enhanced_parsing=False,
@@ -709,27 +635,23 @@ def sample_tpcds_benchmark():
 
 @pytest.fixture
 def sample_query_manager():
-    """Fixture for sample query manager."""
     return TPCDSQueryManager(use_enhanced_parsing=False)
 
 
 @pytest.fixture(scope="session")
 def temp_test_directory():
-    """Session-scoped fixture for temporary test directory."""
     import shutil
     import tempfile
 
     temp_dir = Path(tempfile.mkdtemp(prefix="tpcds_test_"))
     yield temp_dir
 
-    # Cleanup
     if temp_dir.exists():
         shutil.rmtree(temp_dir)
 
 
 @pytest.fixture
 def test_parameters():
-    """Fixture providing various test parameter combinations."""
     reference = TPCDSReferenceData()
     return {
         "parameter_sets": reference.parameter_sets,
@@ -743,10 +665,8 @@ def test_parameters():
 
 
 if __name__ == "__main__":
-    # Example usage for testing the fixtures
     print("Testing TPC-DS test data generation...")
 
-    # Test data generator
     generator = TPCDSTestDataGenerator()
     date_data = generator.generate_date_dim_data(10)
     print(f"Generated {len(date_data)} date dimension rows")
@@ -757,7 +677,6 @@ if __name__ == "__main__":
     item_data = generator.generate_item_data(5)
     print(f"Generated {len(item_data)} item rows")
 
-    # Test database
     with TPCDSTestDatabase() as db:
         db.create_schema()
         db.populate_data()
@@ -768,7 +687,6 @@ if __name__ == "__main__":
         sample_addresses = db.get_sample_data("customer_address", 3)
         print(f"Sample addresses: {sample_addresses}")
 
-    # Test reference data
     ref_data = TPCDSReferenceData()
     baseline_params = ref_data.get_parameter_set("baseline_2000")
     print(f"Baseline parameters: {baseline_params}")

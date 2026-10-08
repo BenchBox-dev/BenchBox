@@ -1,5 +1,3 @@
-"""Shared result-aware chart render orchestration."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -13,22 +11,17 @@ from benchbox.core.visualization.utils import extract_chart_subtitle
 
 @dataclass(frozen=True)
 class RenderedChart:
-    """One rendered chart entry."""
-
     chart_type: str
     content: str
 
 
 @dataclass(frozen=True)
 class SkippedChart:
-    """One chart skipped or failed during a chart set render."""
-
     chart_type: str
     reason: str
     details: dict[str, Any] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
-        """Return an edge-serializable skip record."""
         result = {"chart_type": self.chart_type, "reason": self.reason}
         if self.details:
             result["details"] = self.details
@@ -37,16 +30,12 @@ class SkippedChart:
 
 @dataclass(frozen=True)
 class RenderValidationError:
-    """Validation error for an entire render request."""
-
     message: str
     details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class ChartRenderOutcome:
-    """Structured result of rendering a chart list or template."""
-
     rendered: list[RenderedChart]
     skipped: list[SkippedChart]
     template: ChartTemplate | None = None
@@ -66,7 +55,6 @@ def render_chart_set(
     options: Any | None = None,
     strict_pairwise_validation: bool = True,
 ) -> ChartRenderOutcome:
-    """Render a chart list or template into a structured outcome."""
     from benchbox.core.visualization.ascii_api import ChartOptions, render_ascii_chart_from_results
 
     template: ChartTemplate | None = None

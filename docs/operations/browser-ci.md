@@ -249,12 +249,12 @@ Correlation is not causation here — see the refuted hypotheses below.
 macOS WebKit is a different build and passes where CI fails, so a local macOS
 run is not evidence. Use a Linux container. Build the fixtures and `dist/` on
 the host first — fixture generation shells out to `uv`/Python, which the
-Playwright image does not carry:
+Playwright image does not carry. The build runs in a subshell so the `rsync`
+source below still resolves from the repository root. `mkdir -p` creates the
+mount point first, because `rsync` will not create several missing destination
+path components on a machine with no leftover state:
 
 ```bash
-# Build in a subshell so the rsync source below still resolves from the
-# repository root, and create the mount point first - rsync will not create
-# multiple missing destination components on a machine with no leftover state.
 (cd results-explorer && npm run test:e2e:fixtures && npm run build)
 mkdir -p /tmp/linux-wk
 rsync -a --exclude node_modules --exclude playwright-report \

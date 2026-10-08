@@ -1,5 +1,3 @@
-"""Regression tests for BenchBox pytest-xdist safety hooks."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -76,16 +74,10 @@ def test_rewrite_numprocesses_args_uses_last_numprocesses_occurrence() -> None:
 
 
 def test_suppress_xdist_worker_title_patches_only_exec_namespace(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verify the stack walk targets xdist's exec namespace, not any worker_title symbol.
-
-    On macOS, xdist's per-test setproctitle() calls trigger launchservicesd
-    to consume 200%+ CPU rebuilding its process registry. The conftest
-    patches the live xdist worker_title to a no-op via stack walking.
-    """
-    outer_title_fn = lambda title: "OUTER_FRAME"  # noqa: E731
+    outer_title_fn = lambda title: "OUTER_FRAME"
     monkeypatch.setitem(globals(), "worker_title", outer_title_fn)
 
-    original_title_fn = lambda title: "INNER_FRAME"  # noqa: E731
+    original_title_fn = lambda title: "INNER_FRAME"
     fake_remote_globals = {
         "__name__": "__channelexec__",
         "worker_title": original_title_fn,
@@ -105,19 +97,14 @@ def test_suppress_xdist_worker_title_patches_only_exec_namespace(monkeypatch: py
 def test_suppress_xdist_worker_title_ignores_non_exec_frames(monkeypatch: pytest.MonkeyPatch) -> None:
     from tests.conftest import _suppress_xdist_worker_title
 
-    original_title_fn = lambda title: "NOT_XDIST"  # noqa: E731
+    original_title_fn = lambda title: "NOT_XDIST"
     monkeypatch.setitem(globals(), "worker_title", original_title_fn)
 
-    # The return value depends on whether a real xdist __channelexec__ frame
-    # exists further up the stack (True when running under -n N, False under -n 0).
-    # The key invariant: THIS frame's worker_title must never be patched.
     _suppress_xdist_worker_title()
     assert globals()["worker_title"] is original_title_fn
 
 
 class _IniConfig:
-    """The slice of ``pytest.Config`` the faulthandler guard reads."""
-
     def __init__(self, ini: dict[str, object], *, worker: bool = False) -> None:
         self._ini = ini
         if worker:
@@ -143,8 +130,6 @@ def test_configure_refuses_faulthandler_timeout(value: object) -> None:
 def test_configure_allows_unset_or_unregistered_faulthandler_timeout(
     ini: dict[str, object], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # A controller run continues into the cap report, which pops these variables. Under a capped xdist
-    # run the worker inherits them from its controller, so the test owns them for its own duration.
     monkeypatch.delenv("BENCHBOX_XDIST_CAP_REQUESTED", raising=False)
     monkeypatch.delenv("BENCHBOX_XDIST_CAP_EFFECTIVE", raising=False)
 
@@ -156,7 +141,6 @@ def test_configure_leaves_the_refusal_to_the_controller() -> None:
 
 
 def test_pytest_run_with_faulthandler_timeout_exits_as_usage_error(tmp_path) -> None:
-    """The guard fires on a real run before any test starts, so the run cannot hang in the watchdog."""
     import subprocess
     import sys
     from pathlib import Path

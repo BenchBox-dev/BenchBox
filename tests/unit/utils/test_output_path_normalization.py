@@ -1,5 +1,3 @@
-"""Tests for output path normalization across local and remote URIs."""
-
 import pytest
 
 from benchbox.utils.output_path import normalize_output_root

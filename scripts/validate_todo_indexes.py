@@ -1,9 +1,3 @@
-"""Lightweight wrapper for timing policy validation in CI/local workflows.
-
-Runs the wall-clock allowlist scan and the fast-lane ceiling check, which
-live in separate scripts, and fails if either fails.
-"""
-
 from __future__ import annotations
 
 import subprocess

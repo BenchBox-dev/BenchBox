@@ -1,5 +1,3 @@
-"""Targeted tests for TPCH stale artifact pruning."""
-
 from pathlib import Path
 from unittest.mock import patch
 

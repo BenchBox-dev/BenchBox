@@ -148,8 +148,9 @@ Returns DDL for the 21-table JOB schema, with `PRIMARY KEY` on every `id` column
 benchmark = JoinOrder(scale_factor=1.0)
 ddl = benchmark.get_create_tables_sql(dialect="duckdb")
 print(ddl.count("CREATE TABLE"))
-# 21
 ```
+
+This prints `21`, the number of tables.
 
 ### `get_schema(dialect="sqlite") -> str`
 
@@ -161,8 +162,9 @@ Convenience wrapper that returns the same DDL string as `get_create_tables_sql()
 benchmark = JoinOrder(scale_factor=1.0)
 sqlite_ddl = benchmark.get_schema(dialect="sqlite")
 print(sqlite_ddl == benchmark.get_create_tables_sql())
-# True
 ```
+
+This prints `True`.
 
 ## Query Methods
 

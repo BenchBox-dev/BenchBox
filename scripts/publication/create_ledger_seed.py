@@ -1,26 +1,4 @@
 #!/usr/bin/env python3
-"""Generate a set-preserving corpus seed and disposition ledger (A9 w1, review follow-ups).
-
-The seed captures the *union* of the accepted ``published-results`` corpus and the
-main-line working corpus, pins the accepted snapshot to an immutable commit SHA,
-records a per-object ``sha256`` digest for every path (G1: "exact accepted-path
-union exported with per-object digest"), and derives each path's disposition from
-real set membership rather than manual CLI flags:
-
-  * ``accepted``        -- present in both the accepted ref and the main corpus
-  * ``published_only``  -- present only in the accepted ref (preservation obligation)
-  * ``legacy_overlay``  -- present only in the main corpus (main-only / not yet accepted)
-
-Usage:
-  uv run python scripts/publication/create_ledger_seed.py \
-    --accepted-ref origin/published-results --output publication/ledger-seed.json
-
-Reproduction and validation must additionally pass --expect-source with the
-seed's recorded ``source`` SHA so a moved mirror fails closed instead of
-silently switching inputs. Generation without --expect-source exists only
-for the cutover workflow's regen-and-diff freshness detector; freshness
-itself belongs to docs/operations/corpus-refresh.md, never to this tool.
-"""
 
 from __future__ import annotations
 
@@ -40,7 +18,7 @@ SCHEMA_VERSION = 2
 
 
 class LedgerSeedError(RuntimeError):
-    """Raised when the seed cannot be produced from real corpus state."""
+    pass
 
 
 def _git(args: list[str], repo_root: Path) -> str:
@@ -63,24 +41,21 @@ def _is_primary_bundle(path: str) -> bool:
 
 
 def resolve_ref(ref: str, repo_root: Path = ROOT) -> str:
-    """Resolve *ref* to an immutable commit SHA (M8: stable snapshot, not a branch)."""
     try:
         return _git(["rev-parse", "--verify", f"{ref}^{{commit}}"], repo_root).strip()
-    except subprocess.CalledProcessError as exc:  # M9: distinct, actionable message
+    except subprocess.CalledProcessError as exc:
         raise LedgerSeedError(f"git rev-parse failed on ref {ref!r}: {exc.stderr.strip() or exc}") from exc
 
 
 def list_bundles_at_ref(ref: str, repo_root: Path = ROOT) -> list[str]:
-    """List every primary JSON bundle path in the git tree at *ref*."""
     try:
         out = _git(["ls-tree", "-r", "--name-only", ref, "--", CORPUS_PREFIX], repo_root).strip()
-    except subprocess.CalledProcessError as exc:  # M9: never silently return []
+    except subprocess.CalledProcessError as exc:
         raise LedgerSeedError(f"git ls-tree failed on ref {ref!r}: {exc.stderr.strip() or exc}") from exc
     return sorted(p.strip() for p in out.splitlines() if _is_primary_bundle(p.strip()))
 
 
 def list_bundles_on_worktree(repo_root: Path = ROOT) -> list[str]:
-    """List every primary JSON bundle path on the working tree (recursively)."""
     base = repo_root / CORPUS_PREFIX
     if not base.is_dir():
         return []
@@ -93,12 +68,10 @@ def list_bundles_on_worktree(repo_root: Path = ROOT) -> list[str]:
 
 
 def blob_sha256_at_ref(ref: str, path: str, repo_root: Path = ROOT) -> str:
-    """SHA-256 of the exact blob bytes for *path* at *ref*."""
     return hashlib.sha256(blob_bytes_at_ref(ref, path, repo_root)).hexdigest()
 
 
 def blob_bytes_at_ref(ref: str, path: str, repo_root: Path = ROOT) -> bytes:
-    """Exact blob bytes for *path* at *ref*."""
     try:
         proc = subprocess.run(
             ["git", "cat-file", "blob", f"{ref}:{path}"],
@@ -117,7 +90,6 @@ def worktree_sha256(path: str, repo_root: Path = ROOT) -> str:
 
 
 def check_expect_source(resolved_sha: str, expect_source: str | None, where: str) -> None:
-    """Fail closed when a moving ref no longer resolves to the recorded input."""
     if expect_source and resolved_sha != expect_source:
         raise LedgerSeedError(
             f"{where} resolved to {resolved_sha}, expected recorded input {expect_source}: "
@@ -133,13 +105,6 @@ def materialize_union(
     repo_root: Path = ROOT,
     expect_source: str | None = None,
 ) -> int:
-    """Write every seed-union path's bytes into *dest*, verifying digests.
-
-    Paths whose worktree bytes match the seed digest are copied from the
-    worktree. ``published_only`` paths and digest mismatches are taken from
-    ``git show`` of the seed's recorded immutable ``source`` SHA, never from
-    the current tip of a moving ref. Returns the number of primary bundles written.
-    """
     if not ledger_seed.is_file():
         raise LedgerSeedError(f"ledger seed not found: {ledger_seed}")
     seed = json.loads(ledger_seed.read_text(encoding="utf-8"))
@@ -148,8 +113,6 @@ def materialize_union(
     if not union:
         raise LedgerSeedError(f"ledger seed {ledger_seed} has an empty union (no vacuous pass)")
 
-    # Reproducibility: bytes come from the recorded snapshot. Seeds predating
-    # provenance capture (no `source` SHA) must be regenerated, not guessed.
     accepted_sha = str(seed.get("source") or "")
     if not re.fullmatch(r"[0-9a-f]{40}", accepted_sha):
         raise LedgerSeedError(
@@ -157,7 +120,7 @@ def materialize_union(
             "with --accepted-ref resolved once, instead of materializing from a moving ref"
         )
     check_expect_source(accepted_sha, expect_source, f"ledger seed {ledger_seed}")
-    _ = accepted_ref  # retained for CLI compatibility; the recorded SHA is authoritative
+    _ = accepted_ref
     dispositions = seed.get("dispositions") or {}
     main_source = str(seed.get("main_source") or "")
     main_sha = main_source if re.fullmatch(r"[0-9a-f]{40}", main_source) else ""
@@ -201,14 +164,6 @@ def build_seed(
     legacy_overlay_override: list[str] | None = None,
     expect_source: str | None = None,
 ) -> dict:
-    """Build the full seed JSON structure from real two-sided set membership.
-
-    ``main_ref`` selects the main-line corpus source. When omitted the working
-    tree is used (so a fresh checkout still produces a correct union).
-    ``expect_source`` fails closed when the moving accepted ref no longer
-    resolves to the recorded snapshot: resolve the moving ref once before
-    generation, persist that provenance, and never silently switch inputs.
-    """
     accepted_sha = resolve_ref(accepted_ref, repo_root)
     check_expect_source(accepted_sha, expect_source, f"accepted ref {accepted_ref!r}")
     accepted_paths = set(list_bundles_at_ref(accepted_sha, repo_root))
@@ -234,7 +189,7 @@ def build_seed(
 
     po_override = set(published_only_override or [])
     lo_override = set(legacy_overlay_override or [])
-    for supplied in po_override | lo_override:  # M10: validate every supplied path
+    for supplied in po_override | lo_override:
         if supplied not in union:
             raise LedgerSeedError(f"disposition override path is not in the corpus union: {supplied}")
 
@@ -255,7 +210,6 @@ def build_seed(
         else:
             digests[p] = worktree_sha256(p, repo_root)
 
-    # N12: derived, not hardcoded -- true only when both sides hold the same set.
     bidirectional = not published_only and not legacy_overlay and not po_override and not lo_override
 
     now = datetime.now(UTC).isoformat()

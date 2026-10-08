@@ -1,5 +1,3 @@
-"""Repository timing inventory and classification report."""
-
 from __future__ import annotations
 
 import argparse

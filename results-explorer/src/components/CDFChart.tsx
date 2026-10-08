@@ -1,13 +1,3 @@
-// ---------------------------------------------------------------------------
-// CDFChart - empirical CDF of per-query latency per platform
-//
-// X axis: latency in ms (log2 scale), Y axis: cumulative percentage (0-100%).
-// One stepped line per platform, computed from BenchmarkSummary.platforms[i].timings.
-//
-// Math: sort per-platform timing values, assign cumulative fraction (i+1)/n.
-// Python reference: textcharts.cdf_chart ECDF computation.
-// ---------------------------------------------------------------------------
-
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
@@ -20,8 +10,6 @@ import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from 
 const Y_TICKS_PCT = [0, 25, 50, 75, 100];
 
 const LABEL_W = 36;
-// +12px over the tick-label row for the axis title (see the x-axis title
-// below, matching the "Normalized cost (USD)" convention in CostScatter).
 const AXIS_H = 40;
 const PADDING_TOP = 8;
 const PADDING_RIGHT = 12;
@@ -84,7 +72,6 @@ export function CDFChart({ summary }: Props) {
         role="img"
         aria-label="Cumulative distribution of per-query latency"
       >
-        {/* Y-axis grid lines + labels */}
         {Y_TICKS_PCT.map((pct) => {
           const y = yFor(pct);
           return (
@@ -97,14 +84,12 @@ export function CDFChart({ summary }: Props) {
           );
         })}
 
-        {/* CDF stepped lines - true ECDF: horizontal then vertical jumps */}
         {series.map((s) => {
           const d = s.points
             .map((p, i) => {
               const x = xFor(p.x).toFixed(1);
               const y = yFor(p.y).toFixed(1);
               if (i === 0) return `M${x},${y}`;
-              // Step: horizontal to new x (staying at prev y), then vertical to new y
               return `H${x} V${y}`;
             })
             .join(" ");
@@ -115,7 +100,6 @@ export function CDFChart({ summary }: Props) {
           );
         })}
 
-        {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + PLOT_H})`}>
           <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" stroke-width={1} />
           {xTicks.map((ms, index) => {
@@ -145,11 +129,6 @@ export function CDFChart({ summary }: Props) {
         </g>
       </svg>
 
-      {/* Legend. One SVG row at a fixed 130-unit stride silently drops every
-          entry past the drawing width, and the entries it drops are the slowest
-          runs - the ones a reader is most likely asking about. HTML wraps, so
-          the key always holds every series, matching StackedPhase and
-          TimeSeries. */}
       <ul class="mt-1.5 flex list-none flex-wrap gap-x-3 gap-y-1 p-0 text-xs text-[var(--bb-data-fg-muted)]">
         {series.map((s) => (
           <li key={s.label} class="flex items-center gap-1.5" title={s.fullLabel}>

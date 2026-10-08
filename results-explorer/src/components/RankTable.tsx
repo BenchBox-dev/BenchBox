@@ -1,15 +1,3 @@
-// ---------------------------------------------------------------------------
-// RankTable - per-query platform ranking table
-//
-// Rows = query IDs, columns = platforms.
-// Each cell shows the ordinal rank (1st = fastest) of that platform for
-// that query.  Ties receive equal rank.
-//
-// Summary footer: win-count (# times ranked 1st) per platform.
-//
-// Python reference: textcharts.rank_table.RankTable
-// ---------------------------------------------------------------------------
-
 import type { BenchmarkSummary, PlatformRow } from "@/types";
 import { paletteColor } from "@/lib/chartTheme";
 import { computeRankTable } from "@/lib/chartMath";
@@ -26,7 +14,6 @@ export { preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
 interface Props {
   summary: BenchmarkSummary;
-  /** When true, keeps query_ids in caller-provided order (e.g. limiter ranking). */
   preserveOrder?: boolean;
 }
 
@@ -63,13 +50,6 @@ export function RankTable({ summary, preserveOrder = false }: Props) {
   );
   const maxWins = Math.max(...winCounts);
 
-  // Cohort-aware column-header identities. When the same platform name
-  // appears more than once in the rank cohort (e.g., two DataFusion
-  // versions), append the shortest qualifier set that distinguishes
-  // them. Single occurrences keep the bare platform name. We pass the
-  // deployment fingerprint fields too so two same-platform/same-version
-  // runs that differ only by deployment can be disambiguated naturally
-  // instead of falling straight to a result_id tiebreaker.
   const headerIdentitySources: RunIdentitySource[] = platforms.map((p) => ({
     result_id: p.result_id,
     platform: p.platform,
@@ -81,15 +61,6 @@ export function RankTable({ summary, preserveOrder = false }: Props) {
   }));
   const headerIdentities = formatRunIdentitiesForCohort(headerIdentitySources, "compact");
   const headerTooltips = formatRunIdentitiesForCohort(headerIdentitySources, "tooltip");
-  // Visual truncation that preserves cohort uniqueness. The 16-char cap
-  // keeps headers narrow on small viewports, but a naive slice can
-  // re-introduce duplicates by cutting off the qualifier suffix that
-  // distinguished two same-platform runs (e.g., `DataFusion v1.40.0`
-  // vs `DataFusion v1.40.1` both → `DataFusion v1.4…`). Detect those
-  // collisions and keep the full identity for the affected rows so the
-  // disambiguation contract is preserved at the cost of slightly wider
-  // header cells. The tooltip variant remains attached for hover
-  // recovery in either case.
   const displayedHeaders = preserveUniqueAfterTruncation(headerIdentities, 16);
   const excludedPlatformCount = platforms.filter((platform) => !isRankable(platform)).length;
 
@@ -102,7 +73,6 @@ export function RankTable({ summary, preserveOrder = false }: Props) {
         >
         <thead>
           <tr>
-            {/* Keep row labels visible while timing columns scroll. */}
             <th class="text-left px-2 py-1.5 border-b border-[var(--bb-data-border)] text-[var(--bb-data-fg-muted)] font-normal sticky left-0 bg-[var(--bb-surface-data)] min-w-[4rem]">
               Query
             </th>

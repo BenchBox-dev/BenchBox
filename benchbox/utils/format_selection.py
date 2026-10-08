@@ -1,9 +1,3 @@
-"""Format selection logic for choosing the best format for a platform.
-
-This module implements the logic for selecting which format to use when loading
-data, based on platform capabilities, user preferences, and available formats.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,32 +8,16 @@ from benchbox.utils.iceberg_layout import is_iceberg_directory
 
 
 class FormatSelector:
-    """Handles format selection logic for data loading."""
-
     @staticmethod
     def select_format(
         platform_name: str,
         available_formats: list[str],
         user_preference: str | None = None,
     ) -> str:
-        """Select the best format for loading data.
 
-        Args:
-            platform_name: Name of the platform (e.g., 'duckdb', 'databricks')
-            available_formats: List of formats available for this table
-            user_preference: Optional user-specified format preference (CLI override)
-
-        Returns:
-            Selected format name
-
-        Raises:
-            ValueError: If user preference is not available or supported
-        """
         if not available_formats:
-            # No formats available, fallback to tbl
             return "tbl"
 
-        # If user specified a preference, validate and use it
         if user_preference:
             if user_preference not in available_formats:
                 raise ValueError(f"Preferred format '{user_preference}' not available. Available: {available_formats}")
@@ -52,32 +30,20 @@ class FormatSelector:
 
             return user_preference
 
-        # Otherwise, use platform's preferred format from available options
         return get_preferred_format(platform_name, available_formats)
 
     @staticmethod
     def get_fallback_chain(platform_name: str, available_formats: list[str]) -> list[str]:
-        """Get fallback chain of formats to try in order.
 
-        Args:
-            platform_name: Name of the platform
-            available_formats: List of available formats
-
-        Returns:
-            List of formats to try, in order of preference
-        """
-        # Get all supported formats in preference order
         from benchbox.platforms.base.format_capabilities import PLATFORM_FORMAT_PREFERENCES
 
         preference_order = PLATFORM_FORMAT_PREFERENCES.get(platform_name, [])
 
-        # Filter to only available and supported formats
         fallback_chain = []
         for fmt in preference_order:
             if fmt in available_formats and is_format_supported(platform_name, fmt):
                 fallback_chain.append(fmt)
 
-        # Add any remaining available formats not in preference order
         for fmt in available_formats:
             if fmt not in fallback_chain:
                 fallback_chain.append(fmt)
@@ -88,16 +54,7 @@ class FormatSelector:
     def detect_available_formats(
         data_dir: Path, table_name: str, manifest_data: dict[str, Any] | None = None
     ) -> list[str]:
-        """Detect which formats are available for a table.
 
-        Args:
-            data_dir: Data directory path
-            table_name: Name of the table
-            manifest_data: Optional manifest data (if available)
-
-        Returns:
-            List of available format names
-        """
         manifest_formats = FormatSelector._manifest_formats(table_name, manifest_data)
         if manifest_formats:
             return manifest_formats
@@ -107,7 +64,7 @@ class FormatSelector:
 
     @staticmethod
     def _manifest_formats(table_name: str, manifest_data: dict[str, Any] | None) -> list[str]:
-        """Collect available formats from manifest metadata, if present."""
+
         available: list[str] = []
         if not manifest_data:
             return available
@@ -125,7 +82,7 @@ class FormatSelector:
 
     @staticmethod
     def _filesystem_formats(data_dir: Path, table_name: str) -> list[str]:
-        """Detect available formats directly from files and table-format directories."""
+
         available: list[str] = []
         patterns = {
             "tbl": [f"{table_name}.tbl*", f"{table_name}.dat*"],

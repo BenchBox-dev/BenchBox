@@ -1,16 +1,6 @@
-"""Unit tests for file format detection utilities.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests for:
-- detect_data_format() with all format/compression combinations
-- detect_compression() with all compression extensions
-- strip_compression_suffix() with single and multi-suffix paths
-- is_compression_extension() with valid and invalid inputs
-- Edge cases: no suffix, unknown suffix, multiple compressions
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import gzip
 from pathlib import Path
@@ -43,40 +33,29 @@ pytestmark = [
 
 
 class TestCompressionExtensionsConstant:
-    """Tests for COMPRESSION_EXTENSIONS constant."""
-
     def test_contains_all_expected_extensions(self):
-        """Verify all expected compression extensions are present."""
         expected = {".zst", ".gz", ".bz2", ".xz", ".lz4", ".snappy"}
         assert expected == COMPRESSION_EXTENSIONS
 
     def test_is_frozenset(self):
-        """Verify constant is immutable."""
         assert isinstance(COMPRESSION_EXTENSIONS, frozenset)
 
 
 class TestDataFormatExtensionsConstant:
-    """Tests for DATA_FORMAT_EXTENSIONS constant."""
-
     def test_contains_all_expected_extensions(self):
-        """Verify all expected data format extensions are present."""
         expected = {".parquet", ".vortex", ".tbl", ".csv", ".dat"}
         assert expected == DATA_FORMAT_EXTENSIONS
 
     def test_is_frozenset(self):
-        """Verify constant is immutable."""
         assert isinstance(DATA_FORMAT_EXTENSIONS, frozenset)
 
 
 class TestIsCompressionExtension:
-    """Tests for is_compression_extension function."""
-
     @pytest.mark.parametrize(
         "suffix",
         [".zst", ".gz", ".bz2", ".xz", ".lz4", ".snappy"],
     )
     def test_valid_extensions_with_dot(self, suffix):
-        """Test valid compression extensions with leading dot."""
         assert is_compression_extension(suffix) is True
 
     @pytest.mark.parametrize(
@@ -84,7 +63,6 @@ class TestIsCompressionExtension:
         ["zst", "gz", "bz2", "xz", "lz4", "snappy"],
     )
     def test_valid_extensions_without_dot(self, suffix):
-        """Test valid compression extensions without leading dot."""
         assert is_compression_extension(suffix) is True
 
     @pytest.mark.parametrize(
@@ -92,7 +70,6 @@ class TestIsCompressionExtension:
         [".ZST", ".GZ", ".BZ2", ".XZ", ".LZ4", ".SNAPPY"],
     )
     def test_case_insensitive(self, suffix):
-        """Test that extension checking is case-insensitive."""
         assert is_compression_extension(suffix) is True
 
     @pytest.mark.parametrize(
@@ -100,19 +77,15 @@ class TestIsCompressionExtension:
         [".parquet", ".tbl", ".csv", ".txt", ".json", ""],
     )
     def test_non_compression_extensions(self, suffix):
-        """Test non-compression extensions return False."""
         assert is_compression_extension(suffix) is False
 
 
 class TestIsDataFormatExtension:
-    """Tests for is_data_format_extension function."""
-
     @pytest.mark.parametrize(
         "suffix",
         [".parquet", ".vortex", ".tbl", ".csv", ".dat"],
     )
     def test_valid_extensions_with_dot(self, suffix):
-        """Test valid data format extensions with leading dot."""
         assert is_data_format_extension(suffix) is True
 
     @pytest.mark.parametrize(
@@ -120,7 +93,6 @@ class TestIsDataFormatExtension:
         ["parquet", "vortex", "tbl", "csv", "dat"],
     )
     def test_valid_extensions_without_dot(self, suffix):
-        """Test valid data format extensions without leading dot."""
         assert is_data_format_extension(suffix) is True
 
     @pytest.mark.parametrize(
@@ -128,7 +100,6 @@ class TestIsDataFormatExtension:
         [".PARQUET", ".VORTEX", ".TBL", ".CSV", ".DAT"],
     )
     def test_case_insensitive(self, suffix):
-        """Test that extension checking is case-insensitive."""
         assert is_data_format_extension(suffix) is True
 
     @pytest.mark.parametrize(
@@ -136,13 +107,10 @@ class TestIsDataFormatExtension:
         [".zst", ".gz", ".txt", ".json", ""],
     )
     def test_non_format_extensions(self, suffix):
-        """Test non-format extensions return False."""
         assert is_data_format_extension(suffix) is False
 
 
 class TestDetectCompression:
-    """Tests for detect_compression function."""
-
     @pytest.mark.parametrize(
         ("filename", "expected"),
         [
@@ -155,7 +123,6 @@ class TestDetectCompression:
         ],
     )
     def test_compressed_files(self, filename, expected):
-        """Test detection of compressed files."""
         assert detect_compression(Path(filename)) == expected
 
     @pytest.mark.parametrize(
@@ -169,31 +136,24 @@ class TestDetectCompression:
         ],
     )
     def test_uncompressed_files(self, filename):
-        """Test uncompressed files return None."""
         assert detect_compression(Path(filename)) is None
 
     def test_accepts_string_path(self):
-        """Test function accepts string paths."""
         assert detect_compression("data.csv.gz") == "gzip"
 
     def test_case_insensitive(self):
-        """Test compression detection is case-insensitive."""
         assert detect_compression(Path("data.ZST")) == "zstd"
         assert detect_compression(Path("data.GZ")) == "gzip"
 
 
 class TestDetectDataFormat:
-    """Tests for detect_data_format function."""
-
     @pytest.mark.parametrize(
         ("filename", "expected"),
         [
-            # Uncompressed formats
             ("data.parquet", "parquet"),
             ("data.tbl", "tbl"),
             ("data.csv", "csv"),
-            ("customer.dat", "tbl"),  # .dat is TPC-DS format, same as .tbl
-            # Compressed formats
+            ("customer.dat", "tbl"),
             ("data.tbl.zst", "tbl"),
             ("data.csv.gz", "csv"),
             ("data.parquet.lz4", "parquet"),
@@ -203,34 +163,26 @@ class TestDetectDataFormat:
         ],
     )
     def test_format_detection(self, filename, expected):
-        """Test format detection for various file types."""
         assert detect_data_format(Path(filename)) == expected
 
     def test_unknown_format_defaults_to_csv(self):
-        """Test unknown formats default to csv."""
         assert detect_data_format(Path("data.txt")) == "csv"
         assert detect_data_format(Path("data.json")) == "csv"
         assert detect_data_format(Path("noextension")) == "csv"
 
     def test_accepts_string_path(self):
-        """Test function accepts string paths."""
         assert detect_data_format("data.tbl.zst") == "tbl"
 
     def test_case_insensitive(self):
-        """Test format detection is case-insensitive."""
         assert detect_data_format(Path("data.TBL.ZST")) == "tbl"
         assert detect_data_format(Path("DATA.PARQUET")) == "parquet"
 
     def test_multiple_suffixes(self):
-        """Test files with multiple non-compression suffixes."""
-        # First recognized format wins
         assert detect_data_format(Path("data.backup.tbl")) == "tbl"
         assert detect_data_format(Path("file.1.csv")) == "csv"
 
 
 class TestStripCompressionSuffix:
-    """Tests for strip_compression_suffix function."""
-
     @pytest.mark.parametrize(
         ("filename", "expected"),
         [
@@ -243,7 +195,6 @@ class TestStripCompressionSuffix:
         ],
     )
     def test_strips_compression_suffix(self, filename, expected):
-        """Test stripping compression suffixes."""
         result = strip_compression_suffix(Path(filename))
         assert result == Path(expected)
 
@@ -257,30 +208,24 @@ class TestStripCompressionSuffix:
         ],
     )
     def test_preserves_non_compressed_paths(self, filename):
-        """Test non-compressed paths are unchanged."""
         path = Path(filename)
         result = strip_compression_suffix(path)
         assert result == path
 
     def test_accepts_string_path(self):
-        """Test function accepts string paths."""
         result = strip_compression_suffix("data.tbl.zst")
         assert result == Path("data.tbl")
 
     def test_returns_path_object(self):
-        """Test function returns Path object."""
         result = strip_compression_suffix("data.tbl.zst")
         assert isinstance(result, Path)
 
     def test_case_insensitive(self):
-        """Test suffix stripping is case-insensitive."""
         result = strip_compression_suffix(Path("data.ZST"))
         assert result == Path("data")
 
 
 class TestGetBaseNameWithoutCompression:
-    """Tests for get_base_name_without_compression function."""
-
     @pytest.mark.parametrize(
         ("path", "expected"),
         [
@@ -291,99 +236,74 @@ class TestGetBaseNameWithoutCompression:
         ],
     )
     def test_extracts_base_name(self, path, expected):
-        """Test extracting base name without compression suffix."""
         assert get_base_name_without_compression(path) == expected
 
     def test_accepts_path_object(self):
-        """Test function accepts Path objects."""
         result = get_base_name_without_compression(Path("/data/file.tbl.zst"))
         assert result == "file.tbl"
 
 
 class TestNormalizeFormatExtension:
-    """Tests for normalize_format_extension function."""
-
     @pytest.mark.parametrize(
         ("suffix", "expected"),
         [
             (".parquet", "parquet"),
             (".tbl", "tbl"),
             (".csv", "csv"),
-            (".dat", "tbl"),  # Normalized to tbl
-            ("parquet", "parquet"),  # Without leading dot
-            ("TBL", "tbl"),  # Case-insensitive
+            (".dat", "tbl"),
+            ("parquet", "parquet"),
+            ("TBL", "tbl"),
         ],
     )
     def test_normalizes_extensions(self, suffix, expected):
-        """Test extension normalization."""
         assert normalize_format_extension(suffix) == expected
 
     def test_unknown_extension_defaults_to_csv(self):
-        """Test unknown extensions default to csv."""
         assert normalize_format_extension(".txt") == "csv"
         assert normalize_format_extension(".unknown") == "csv"
 
 
 class TestEdgeCases:
-    """Tests for edge cases and special scenarios."""
-
     def test_empty_path(self):
-        """Test handling of empty/minimal paths."""
         assert detect_data_format(Path("")) == "csv"
         assert detect_compression(Path("")) is None
         assert strip_compression_suffix(Path("")) == Path("")
 
     def test_only_compression_extension(self):
-        """Test file with only compression extension.
-
-        Note: Path(".zst") is treated as a hidden file named ".zst" with no extension,
-        so we use "file.zst" to test this edge case.
-        """
-        # A file with only compression extension (unusual but valid)
-        assert detect_data_format(Path("file.zst")) == "csv"  # Unknown format, defaults to csv
+        assert detect_data_format(Path("file.zst")) == "csv"
         assert detect_compression(Path("file.zst")) == "zstd"
         assert strip_compression_suffix(Path("file.zst")) == Path("file")
 
     def test_hidden_files(self):
-        """Test hidden files (starting with dot)."""
         assert detect_data_format(Path(".data.tbl.zst")) == "tbl"
         assert detect_compression(Path(".data.gz")) == "gzip"
 
     def test_deeply_nested_path(self):
-        """Test deeply nested file paths."""
         path = Path("/very/deep/nested/path/to/file.tbl.zst")
         assert detect_data_format(path) == "tbl"
         assert detect_compression(path) == "zstd"
         assert strip_compression_suffix(path) == Path("/very/deep/nested/path/to/file.tbl")
 
     def test_sharded_file_pattern(self):
-        """Test TPC sharded file patterns like customer.tbl.1.zst."""
         path = Path("customer.tbl.1.zst")
         assert detect_compression(path) == "zstd"
         assert detect_data_format(path) == "tbl"
         assert strip_compression_suffix(path) == Path("customer.tbl.1")
 
     def test_double_compression_extension(self):
-        """Test files with what looks like double compression."""
-        # Only the last suffix is considered for compression
         path = Path("data.gz.zst")
         assert detect_compression(path) == "zstd"
-        # After stripping, we get .gz which is also compression
         stripped = strip_compression_suffix(path)
         assert stripped == Path("data.gz")
 
 
 class TestIsTpcFormat:
-    """Tests for is_tpc_format function."""
-
     @pytest.mark.parametrize("path", ["data.tbl", Path("data.tbl")])
     def test_simple_tbl(self, path):
-        """Test simple .tbl files."""
         assert is_tpc_format(path) is True
 
     @pytest.mark.parametrize("path", ["data.dat", Path("data.dat")])
     def test_simple_dat(self, path):
-        """Test simple .dat files (TPC-DS format)."""
         assert is_tpc_format(path) is True
 
     @pytest.mark.parametrize(
@@ -391,36 +311,28 @@ class TestIsTpcFormat:
         ["data.tbl.zst", "data.tbl.gz", "data.tbl.bz2", "data.tbl.xz", "data.tbl.lz4"],
     )
     def test_compressed_tbl(self, path):
-        """Test compressed .tbl files."""
         assert is_tpc_format(path) is True
 
     @pytest.mark.parametrize("path", ["data.dat.zst", "data.dat.gz"])
     def test_compressed_dat(self, path):
-        """Test compressed .dat files."""
         assert is_tpc_format(path) is True
 
     @pytest.mark.parametrize("path", ["data.csv", "data.parquet", "data.json", "data.txt"])
     def test_non_tpc_formats(self, path):
-        """Test non-TPC formats return False."""
         assert is_tpc_format(path) is False
 
     def test_sharded_tpc_file(self):
-        """Test sharded TPC file pattern like customer.tbl.1."""
         assert is_tpc_format("customer.tbl.1") is True
         assert is_tpc_format("customer.tbl.1.zst") is True
 
     def test_case_insensitive(self):
-        """Test case-insensitive detection."""
         assert is_tpc_format("data.TBL") is True
         assert is_tpc_format("data.DAT.ZST") is True
 
 
 class TestIsParquetFormat:
-    """Tests for is_parquet_format function."""
-
     @pytest.mark.parametrize("path", ["data.parquet", Path("data.parquet")])
     def test_simple_parquet(self, path):
-        """Test simple .parquet files."""
         assert is_parquet_format(path) is True
 
     @pytest.mark.parametrize(
@@ -428,37 +340,28 @@ class TestIsParquetFormat:
         ["data.parquet.zst", "data.parquet.gz", "data.parquet.bz2", "data.parquet.lz4"],
     )
     def test_compressed_parquet(self, path):
-        """Test compressed .parquet files."""
         assert is_parquet_format(path) is True
 
     @pytest.mark.parametrize("path", ["data.csv", "data.tbl", "data.dat", "data.json"])
     def test_non_parquet_formats(self, path):
-        """Test non-parquet formats return False."""
         assert is_parquet_format(path) is False
 
     def test_sharded_parquet_file(self):
-        """Test sharded parquet file pattern like data.parquet.1."""
-        # Sharded files have numeric suffix after .parquet
         assert is_parquet_format("data.parquet.1") is True
         assert is_parquet_format("data.parquet.1.zst") is True
 
     def test_case_insensitive(self):
-        """Test case-insensitive detection."""
         assert is_parquet_format("data.PARQUET") is True
         assert is_parquet_format("data.Parquet.ZST") is True
 
     def test_empty_path(self):
-        """Test empty path returns False."""
         assert is_parquet_format("") is False
         assert is_parquet_format(Path("")) is False
 
 
 class TestIsCsvFormat:
-    """Tests for is_csv_format function."""
-
     @pytest.mark.parametrize("path", ["data.csv", Path("data.csv")])
     def test_simple_csv(self, path):
-        """Test simple .csv files."""
         assert is_csv_format(path) is True
 
     @pytest.mark.parametrize(
@@ -466,34 +369,27 @@ class TestIsCsvFormat:
         ["data.csv.gz", "data.csv.zst", "data.csv.bz2", "data.csv.xz"],
     )
     def test_compressed_csv(self, path):
-        """Test compressed .csv files."""
         assert is_csv_format(path) is True
 
     @pytest.mark.parametrize("path", ["data.parquet", "data.tbl", "data.dat", "data.json"])
     def test_non_csv_formats(self, path):
-        """Test non-csv formats return False."""
         assert is_csv_format(path) is False
 
     def test_case_insensitive(self):
-        """Test case-insensitive detection."""
         assert is_csv_format("data.CSV") is True
         assert is_csv_format("data.Csv.GZ") is True
 
     def test_empty_path(self):
-        """Test empty path returns False."""
         assert is_csv_format("") is False
         assert is_csv_format(Path("")) is False
 
 
 class TestGetDelimiterForFile:
-    """Tests for get_delimiter_for_file function."""
-
     @pytest.mark.parametrize(
         "path",
         ["lineitem.tbl", "store_sales.dat", "data.tbl.zst", "data.dat.gz"],
     )
     def test_tpc_format_returns_pipe(self, path):
-        """Test TPC formats return pipe delimiter."""
         assert get_delimiter_for_file(path) == "|"
 
     @pytest.mark.parametrize(
@@ -501,33 +397,26 @@ class TestGetDelimiterForFile:
         ["data.csv", "data.parquet", "data.csv.gz", "data.json", "unknown.txt"],
     )
     def test_non_tpc_format_returns_comma(self, path):
-        """Test non-TPC formats return comma delimiter."""
         assert get_delimiter_for_file(path) == ","
 
     def test_accepts_path_object(self):
-        """Test function accepts Path objects."""
         assert get_delimiter_for_file(Path("lineitem.tbl")) == "|"
         assert get_delimiter_for_file(Path("data.csv")) == ","
 
     def test_sharded_tpc_file(self):
-        """Test sharded TPC file returns pipe delimiter."""
         assert get_delimiter_for_file("customer.tbl.1") == "|"
         assert get_delimiter_for_file("customer.tbl.1.zst") == "|"
 
 
 class TestGetDataExtension:
-    """Tests for get_data_extension function."""
-
     @pytest.mark.parametrize(
         ("filename", "expected"),
         [
-            # Uncompressed formats
             ("lineitem.tbl", ".tbl"),
             ("store_sales.dat", ".dat"),
             ("data.csv", ".csv"),
             ("data.parquet", ".parquet"),
             ("data.vortex", ".vortex"),
-            # Compressed formats
             ("store_sales.dat.zst", ".dat"),
             ("lineitem.tbl.gz", ".tbl"),
             ("data.csv.bz2", ".csv"),
@@ -539,23 +428,18 @@ class TestGetDataExtension:
         assert get_data_extension(Path(filename)) == expected
 
     def test_numeric_shard_single_digit(self):
-        """Shard suffix (.7) is skipped to reveal the data extension."""
         assert get_data_extension(Path("customer.tbl.7.zst")) == ".tbl"
 
     def test_numeric_shard_multi_digit(self):
-        """Multi-digit shard suffix (.10) is skipped."""
         assert get_data_extension(Path("customer.tbl.10.zst")) == ".tbl"
 
     def test_numeric_shard_uncompressed(self):
-        """Shard without compression wrapper is handled."""
         assert get_data_extension(Path("customer.tbl.7")) == ".tbl"
 
     def test_multiple_compression_layers(self):
-        """Multiple compression suffixes are all skipped."""
         assert get_data_extension(Path("hits.csv.gz.bz2")) == ".csv"
 
     def test_unknown_suffix_skipped(self):
-        """Unrecognized suffixes (e.g. .bak) are skipped, not treated as a stop."""
         assert get_data_extension(Path("data.tbl.bak")) == ".tbl"
 
     def test_no_extension(self):
@@ -575,31 +459,11 @@ class TestGetDataExtension:
         assert get_data_extension(Path("store_sales.DAT.GZ")) == ".dat"
 
     def test_dat_not_collapsed_to_tbl(self):
-        """Critical: .dat must be returned as '.dat', not '.tbl' (unlike detect_data_format)."""
         assert get_data_extension(Path("store_sales.dat")) == ".dat"
         assert get_data_extension(Path("store_sales.dat")) != ".tbl"
 
 
 class TestHasTrailingDelimiterFraming:
-    r"""Row framing and line terminator are INDEPENDENT; all four cells pinned.
-
-    A TBL file written on Windows ends ``|\r\n``, not ``|\n``. PR #1332 fixed
-    Windows misdetection by routing the sorted-parquet reader through this
-    helper, and it is correct for a reason that is easy to lose: the read path
-    opens ``"rt"``, so universal newlines translate ``\r\n`` to ``\n`` before
-    either checker runs -- both only ``rstrip("\n")``.
-
-    Nothing else pins that. Switching either read to binary for throughput on
-    multi-GB TBL files would make ``line.rstrip("\n")`` raise on bytes, and the
-    blanket ``except Exception: return False`` would convert that into a
-    confident "no trailing delimiter" -- silently reviving the original Windows
-    bug across all ten platform callers. These cases are what fails if that
-    happens, so they are the invariant's enforcement, not just coverage.
-
-    Fixtures are written as explicit bytes so CRLF is exercised on every
-    platform rather than only on a Windows runner.
-    """
-
     FRAMING_CASES = [
         pytest.param(b"1|x|\r\n", True, id="crlf-trailing-delimiter"),
         pytest.param(b"1|x\r\n", False, id="crlf-clean"),
@@ -609,25 +473,17 @@ class TestHasTrailingDelimiterFraming:
 
     @pytest.mark.parametrize("raw,expected", FRAMING_CASES)
     def test_field_count_checker_handles_both_terminators(self, tmp_path, raw, expected):
-        # The column_names path: the checker every one of the ten platform
-        # callers actually uses.
         path = tmp_path / "region.tbl"
         path.write_bytes(raw)
         assert has_trailing_delimiter(path, "|", ["a", "b"]) is expected
 
     @pytest.mark.parametrize("raw,expected", FRAMING_CASES)
     def test_ends_with_checker_handles_both_terminators(self, tmp_path, raw, expected):
-        # The column_names=None fallback is a different checker (ends-with, not
-        # field-count) and is reachable, though no current caller takes it. It
-        # must agree with the field-count path on every framing.
         path = tmp_path / "region.tbl"
         path.write_bytes(raw)
         assert has_trailing_delimiter(path, "|") is expected
 
     def test_classification_is_taken_from_the_first_row_of_a_multi_row_file(self, tmp_path):
-        # Framing is uniform per file (dbgen/dsdgen decide once per run), so the
-        # helper reads only the first non-empty line. Pin that a realistic
-        # multi-row CRLF file still classifies correctly.
         path = tmp_path / "region.tbl"
         path.write_bytes(b"0|AFRICA|comment|\r\n1|AMERICA|comment|\r\n2|ASIA|comment|\r\n")
         assert has_trailing_delimiter(path, "|", ["r_regionkey", "r_name", "r_comment"]) is True
@@ -648,16 +504,6 @@ class TestHasTrailingDelimiterFraming:
 
 
 class TestHasTrailingDelimiterSurfacesReadFailures:
-    """A file we cannot read is not a file without a trailing delimiter.
-
-    The probe used to wrap everything in ``except Exception: return False``, so
-    a missing file or a permission error became a confident "no trailing
-    delimiter". For a file that does carry one, the caller then omitted the
-    synthetic column and PyArrow failed downstream with a column-count mismatch
-    naming neither the real cause nor the file. All eleven call sites pass a
-    path they are about to load, so the original error is strictly more useful.
-    """
-
     def test_missing_file_raises_rather_than_reporting_clean(self, tmp_path):
         with pytest.raises(OSError):
             has_trailing_delimiter(tmp_path / "does-not-exist.tbl", "|", ["a", "b"])
@@ -686,7 +532,6 @@ class TestHasTrailingDelimiterSurfacesReadFailures:
             has_trailing_delimiter(path, "|", ["a", "b"])
 
     def test_an_empty_file_still_answers_false(self, tmp_path):
-        # The one legitimate False: nothing to classify, not a failure to read.
         path = tmp_path / "empty.tbl"
         path.write_bytes(b"")
         assert has_trailing_delimiter(path, "|", ["a", "b"]) is False

@@ -1,8 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
-// Short IDs assigned deterministically by the pipeline to the fixture
-// corpus. Tests that round-trip long-form → short-form use these.
 const SHORT_DUCKDB = fixtureIds.shortIds.duckdb;
 const SHORT_DATAFUSION = fixtureIds.shortIds.datafusion;
 const LONG_DUCKDB = fixtureIds.ids.duckdb;
@@ -17,17 +15,12 @@ test.describe("Compare", () => {
     await page.goto(`/results/compare?ids=${SHORT_DUCKDB},${SHORT_DATAFUSION}`);
     await waitForShell(page);
 
-    // Heading appears once resolveShortId() + getDetailResult() have
-    // resolved for every ID in the URL.
     await waitForDataLoaded(page, /TPC-H Comparison/);
 
     const main = page.getByRole("main");
-    // Both platforms must render as comparison cards. We search inside
-    // the detail links to avoid matching hidden baseline <option> nodes.
     await expect(main.locator(`a[href="/results/r/${LONG_DUCKDB}"]`)).toBeVisible();
     await expect(main.locator(`a[href="/results/r/${LONG_DATAFUSION}"]`)).toBeVisible();
 
-    // Query-level differences is the stable landmark for the per-query evidence table.
     await expect(main.getByRole("heading", { name: /Query-level differences/ })).toBeVisible();
   });
 
@@ -48,8 +41,6 @@ test.describe("Compare", () => {
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Comparison/);
 
-    // The Compare page canonicalizes the URL via history.replaceState
-    // once toShortIds() resolves. Poll the location rather than the DOM.
     await expect
       .poll(() => new URL(page.url()).searchParams.get("ids"), { timeout: 15_000 })
       .toMatch(/^[0-9a-f]{8},[0-9a-f]{8}$/);
@@ -81,15 +72,12 @@ test.describe("Compare", () => {
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
 
-    // Checkboxes render on the matrix view by default, one per platform.
     const duckdb = page.getByRole("checkbox", { name: /Select DuckDB .* for comparison/i });
     const datafusion = page.getByRole("checkbox", { name: /Select DataFusion .* for comparison/i });
     await expect(duckdb.first()).toBeVisible();
     await duckdb.first().check();
     await datafusion.first().check();
 
-    // Sticky compare bar materializes once two platforms are selected. The
-    // page-level guidance slot offers the same link, so target the tray.
     const compareLink = page.getByTestId("compare-tray-compare-link");
     await expect(compareLink).toBeVisible();
     await compareLink.click();

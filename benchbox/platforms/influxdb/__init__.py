@@ -1,14 +1,6 @@
-"""InfluxDB platform package.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides InfluxDB 3.x support for time series benchmarking via FlightSQL.
-
-InfluxDB 3.x is built on Apache Arrow, DataFusion, and Parquet (FDAP stack),
-supporting native SQL queries through the FlightSQL protocol.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from benchbox.utils.dependencies import check_platform_dependencies, get_dependency_error_message
 
@@ -35,7 +27,6 @@ __all__ = [
     "get_dependency_error_message",
 ]
 
-# Register CLI platform options
 try:
     from benchbox.core.hooks.platform_hooks import PlatformHookRegistry, PlatformOptionSpec
 
@@ -77,5 +68,4 @@ try:
         ),
     )
 except ImportError:
-    # CLI module not available (e.g., when using core modules without CLI)
     pass

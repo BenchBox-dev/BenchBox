@@ -1,28 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""Live PostgreSQL execution coverage for the SCD Type 2 write-primitives ops.
-
-The three portable SCD2 operations (merge_scd_type2_basic / _no_change /
-_new_keys_only) are expressed as standard UPDATE + INSERT and are NOT in the
-PostgreSQL per-operation skip list, but until now no test, CI job, or UAT cell
-executed them against a real PostgreSQL server -- they only avoided the skip
-list. This module runs the full surface (population SQL, operation SQL,
-validation queries, cleanup) against a live PostgreSQL instance and asserts each
-op validates green and restores the seed exactly, closing audit finding C.
-
-Setup:
-    make test-docker-up-postgresql   # PostgreSQL reachable at localhost:5432
-
-The test skips cleanly when no PostgreSQL service is reachable.
-
-Protocol note: the SCD2 write SQL is multi-statement (UPDATE then INSERT in one
-string) and the stage population is three INSERTs in one string. psycopg3 sends
-these via the simple query protocol (no bound params, text format -- see
-psycopg Cursor._execute_send), which is what allows multiple statements per
-execute(); a bound-parameter/extended-protocol path would reject them.
-"""
 
 from __future__ import annotations
 
@@ -47,22 +25,11 @@ SCD2_OPS = (
     "merge_scd_type2_new_keys_only",
 )
 
-# pytest.ini's default -n auto runs this module's parametrized tests across
-# several pytest-xdist worker processes concurrently. A schema name shared by
-# every worker means one worker's `DROP SCHEMA ... CASCADE` can race another
-# worker's in-flight use of the same schema (#1154 review); suffixing with the
-# worker id gives each worker its own isolated schema.
 _SCHEMA_NAME = f"scd2_wp_test_{os.environ.get('PYTEST_XDIST_WORKER', 'master')}"
 
 
 @pytest.fixture
 def pg_scd2_env(temp_dir):
-    """Seed a 50-customer PostgreSQL fixture and set up the SCD2 staging tables.
-
-    Mirrors the DuckDB SCD2 fixture but against a live PostgreSQL connection. The
-    connection is autocommit so each staging DDL/DML lands immediately, matching
-    the harness's expectation of a plain execute()-and-fetch connection.
-    """
     skip_unless_docker_service("localhost", 5432, platform="PostgreSQL")
     psycopg = pytest.importorskip("psycopg")
 
@@ -71,11 +38,6 @@ def pg_scd2_env(temp_dir):
         autocommit=True,
         connect_timeout=5,
     )
-    # Isolate in a dedicated, worker-scoped schema so the generic table names
-    # (customer, orders, lineitem, scd2_ops_*) cannot collide with any other
-    # test sharing the benchbox_test database, and so concurrent xdist
-    # workers each get their own schema instead of racing DROP/CREATE against
-    # a name every worker shares (#1154 review).
     conn.execute(f"DROP SCHEMA IF EXISTS {_SCHEMA_NAME} CASCADE")
     conn.execute(f"CREATE SCHEMA {_SCHEMA_NAME}")
     conn.execute(f"SET search_path TO {_SCHEMA_NAME}")
@@ -101,9 +63,6 @@ def pg_scd2_env(temp_dir):
         "INSERT INTO lineitem VALUES (1, 1, 1, 1, 1.0, 1.0, 0.0, 0.0, 'N', 'O', "
         "DATE '2024-01-02', DATE '2024-01-01', DATE '2024-01-03', 'NONE', 'TRUCK', 'c')"
     )
-    # 50 customers so the change batch ranges (1-20 changed, 21-40 unchanged,
-    # offset-by-max new) all populate. generate_series is the PostgreSQL analogue
-    # of DuckDB's range().
     conn.execute(
         "INSERT INTO customer "
         "SELECT i, 'Customer#' || CAST(i AS VARCHAR), 'Addr ' || CAST(i AS VARCHAR), "
@@ -114,11 +73,6 @@ def pg_scd2_env(temp_dir):
     )
 
     write_bench = WritePrimitives(scale_factor=0.01, output_dir=temp_dir, quiet=True)
-    # WritePrimitives.setup() (the public wrapper) doesn't accept a dialect
-    # kwarg and always forwards the implementation's "standard" default, which
-    # clobbers any dialect pre-set directly on _impl -- call the
-    # implementation itself so the postgres BYTEA sketch-column mapping is
-    # actually applied (#1154 review).
     write_bench._impl.setup(conn, force=True, dialect="postgres")
     yield write_bench, conn
     conn.execute(f"DROP SCHEMA IF EXISTS {_SCHEMA_NAME} CASCADE")
@@ -135,8 +89,6 @@ def _current_state(conn):
 
 
 class TestWritePrimitivesSCD2PostgreSQL:
-    """End-to-end SCD Type 2 ops against a live PostgreSQL server."""
-
     def test_setup_seeds_dimension_and_stage(self, pg_scd2_env):
         _, conn = pg_scd2_env
         total, current, closed = _current_state(conn)
@@ -145,7 +97,6 @@ class TestWritePrimitivesSCD2PostgreSQL:
             conn.execute("SELECT change_type, COUNT(*) FROM scd2_ops_stage_customer GROUP BY change_type").fetchall()
         )
         assert stage == {"changed": 20, "unchanged": 20, "new": 20}
-        # Each change group carries its own effective date for validation.
         stamps = dict(
             conn.execute(
                 "SELECT change_type, MAX(effective_ts) FROM scd2_ops_stage_customer GROUP BY change_type"
@@ -156,8 +107,6 @@ class TestWritePrimitivesSCD2PostgreSQL:
             "2026-01-02",
             "2026-01-03",
         ]
-        # The || / CAST(... AS VARCHAR) fingerprint agrees between dim and the
-        # unchanged stage rows on PostgreSQL (setup portability).
         agree = conn.execute(
             "SELECT COUNT(*) FROM scd2_ops_stage_customer s "
             "JOIN scd2_ops_dim_customer d USING (c_custkey) "
@@ -167,7 +116,6 @@ class TestWritePrimitivesSCD2PostgreSQL:
 
     @pytest.mark.parametrize("op_id", SCD2_OPS)
     def test_scd2_op_not_skipped_on_postgres(self, pg_scd2_env, op_id):
-        """The three SCD2 ops are runnable (not skipped) on PostgreSQL."""
         write_bench, conn = pg_scd2_env
         op = write_bench.get_operation(op_id)
         effective_sql, skip_reason = write_bench._impl._get_effective_write_sql(
@@ -178,14 +126,12 @@ class TestWritePrimitivesSCD2PostgreSQL:
 
     @pytest.mark.parametrize("op_id", SCD2_OPS)
     def test_scd2_op_executes_validates_and_restores_seed(self, pg_scd2_env, op_id):
-        """Each op runs green and its cleanup restores the pristine seed."""
         write_bench, conn = pg_scd2_env
         before = _current_state(conn)
         result = write_bench.execute_operation(op_id, conn, platform_key="postgres")
         assert result.success is True, result.error
         assert result.validation_passed is True, result.error
         assert result.cleanup_success is True
-        # cleanup restores the seed, so each op is independently repeatable.
         assert _current_state(conn) == before == (50, 50, 0)
 
 

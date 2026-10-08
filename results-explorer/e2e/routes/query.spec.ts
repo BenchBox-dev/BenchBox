@@ -6,23 +6,16 @@ test.describe("Query workbench", () => {
     await page.goto("/results/query");
     await waitForShell(page);
 
-    // Same webkit cold-start DuckDB-WASM latency noted in
-    // benchmark-index.spec.ts (webkit-smoke-fix-or-demote-2): wait for the
-    // data-bound heading text before asserting its role.
     await waitForDataLoaded(page, /Find benchmark runs/i);
     await expect(page.getByRole("heading", { name: /Find benchmark runs/i })).toBeVisible();
 
-    // Match count text is the stable landmark that renders once both the
-    // facet queries and the main SELECT resolve.
     await waitForDataLoaded(page, /matching run/);
 
     const main = page.getByRole("main");
-    // The default table leads with public column labels rather than raw schema names.
     for (const column of ["Benchmark", "Platform", "Trust tier"]) {
       await expect(main.getByRole("columnheader", { name: new RegExp(`^${column}`) })).toBeVisible();
     }
 
-    // Schema-driven column configuration remains available, but subordinate.
     await page.locator("summary", { hasText: "Configure visible columns" }).click();
     await expect(main.getByRole("checkbox", { name: "Trust tier" })).toBeChecked();
     await expect(main.getByText("trust_label", { exact: true }).first()).toBeVisible();
@@ -85,8 +78,6 @@ test.describe("Query workbench", () => {
     await waitForShell(page);
 
     const emptyState = page.getByTestId("query-empty-state");
-    // Keep one navigation alive while the cold DuckDB page and facet queries settle.
-    // The shared retry helper re-navigates after 10s, which restarts this empty-result path.
     await expect(emptyState.getByRole("status")).toBeVisible({ timeout: 20_000 });
     await expect(emptyState).toContainText("No results match these filters");
     await expect(emptyState).toContainText("Benchmark: TPC-H");
@@ -111,10 +102,6 @@ test.describe("Query workbench", () => {
     await page.goto("/results/query");
     await waitForDataLoaded(page, /matching run/);
 
-    // Pick `benchmark` - not the default sort column (run_date desc) so
-    // the first click asserts the arrow appears rather than flips. Scope
-    // to the data table's thead so the column-toggle pills in the
-    // "Visible Columns" bar don't steal the locator.
     const header = page
       .locator("thead th")
       .filter({ hasText: /^Benchmark/ })
@@ -148,8 +135,6 @@ test.describe("Query workbench", () => {
     await page.goto("/results/query");
     await waitForDataLoaded(page, /matching run/);
 
-    // `trust_label` is in the default visible set; untoggle it and the
-    // matching columnheader must disappear.
     await page.locator("summary", { hasText: "Configure visible columns" }).click();
     const trustCheckbox = page.getByRole("checkbox", { name: "Trust tier" });
     await expect(trustCheckbox).toBeChecked();
@@ -161,9 +146,6 @@ test.describe("Query workbench", () => {
     await page.goto("/results/query");
     await waitForDataLoaded(page, /matching run/);
 
-    // Advanced SQL is a <details> element collapsed by default; click
-    // the summary to expand it before the textarea and starter-query
-    // pills become interactive.
     await page.locator("summary", { hasText: "Advanced SQL" }).click();
 
     const textarea = page.locator("textarea");
@@ -181,8 +163,6 @@ test.describe("Query workbench", () => {
     await page.locator("summary", { hasText: "Advanced SQL" }).click();
     const textarea = page.locator("textarea");
 
-    // Attempt to mutate the READ_ONLY-attached `bench` database. DuckDB
-    // must reject this with a binder/catalog error surfaced to the user.
     await textarea.fill("DELETE FROM bench.results");
     await page.getByRole("button", { name: /^Run SQL$/ }).click();
 
@@ -196,8 +176,6 @@ test.describe("Query workbench", () => {
     await page.goto("/results/query");
     await waitForDataLoaded(page, /matching run/);
 
-    // The button triggers an anchor.click() with a blob URL - Playwright's
-    // `page.waitForEvent('download')` captures it deterministically.
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: /Download JSON/ }).click();
     const download = await downloadPromise;
@@ -225,7 +203,6 @@ test.describe("Query workbench", () => {
     const chunks: Buffer[] = [];
     for await (const chunk of stream) chunks.push(chunk as Buffer);
     const body = Buffer.concat(chunks).toString("utf-8");
-    // First line must be a CSV header (no DuckDB error HTML).
     const header = body.split(/\r?\n/)[0] ?? "";
     expect(header.split(",").length).toBeGreaterThan(1);
     expect(body.split(/\r?\n/).length).toBeGreaterThan(1);
@@ -240,9 +217,6 @@ function facetSection(page: Page, label: string): Locator {
 }
 
 function facetCheckbox(page: Page, sectionLabel: string, optionValue: string): Locator {
-  // Display formatters in `lib/facetDisplay.ts` re-case some option values
-  // (e.g. cloud_provider "aws" → label "AWS"); match case-insensitively so
-  // the test contracts on the underlying option value, not the display label.
   return facetSection(page, sectionLabel).getByRole("checkbox", {
     name: new RegExp(`^${escapeRegExp(sectionLabel)}:\\s+${escapeRegExp(optionValue)}\\b`, "i"),
   });

@@ -1,14 +1,3 @@
-"""Unit coverage for the dtype-asserting cross-surface gate cell.
-
-Fast negative controls for
-:func:`benchbox.core.equivalence.cross_surface.find_cross_surface_dtype_divergences`:
-width mismatches, TEXT->null dtype corruption, and untyped frames must be
-reported as divergences (never silently passed), while skips and the
-decimal~float loader equivalence stay quiet. The positive path against the
-real gate lives in
-``tests/integration/test_read_primitives_cross_surface_equivalence.py``.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -108,7 +97,6 @@ def test_skips_are_honored(typed_conn):
 
 
 def test_value_divergence_key_is_checked_without_explicit_dtype_waiver(typed_conn):
-    """Value-level exceptions must not implicitly suppress dtype checking."""
     frame = pl.DataFrame({"a": [None, None], "b": [1, 2]})
     divergences, compared = _run(typed_conn, _query(frame), skip_keys=frozenset())
 

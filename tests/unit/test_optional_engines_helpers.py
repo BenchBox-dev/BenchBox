@@ -1,11 +1,8 @@
-"""Tests for the shared optional-engine usability helpers."""
-
 from __future__ import annotations
 
 import os
 import subprocess
 import sys
-import textwrap
 import types
 
 import pytest
@@ -35,9 +32,6 @@ def _patch_import_chdb(monkeypatch: pytest.MonkeyPatch, result: object) -> None:
     monkeypatch.setattr(clickhouse_dependencies, "import_chdb", fake)
 
 
-# --------------------------------------------------------------------------- #
-# chDB                                                                         #
-# --------------------------------------------------------------------------- #
 class ProbeConnection:
     def __init__(self, *, fail_on: str = "", result: str = "1\n", close_error: bool = False):
         self.fail_on = fail_on
@@ -132,18 +126,12 @@ def test_chdb_native_load_failure_is_reported_as_unusable(monkeypatch: pytest.Mo
     assert "installed but its native library cannot be loaded" in reason
     assert "mis-aligned LINKEDIT string pool" in reason
     assert "more detail" not in reason
-    # The reason must name the remedies, not echo the local venv path.
     assert "Linux CI" in reason
     assert "server backend" in reason
     assert "/x/chdb" not in reason
 
 
 def test_chdb_linkedit_diagnosis_survives_long_venv_paths(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A long install path must not truncate away the LINKEDIT diagnosis.
-
-    The reason text is capped at _MAX_REASON_CHARS, so matching the capped
-    first line misses the verdict when the path alone exceeds the cap.
-    """
     long_path = "/x/" + "y" * 300 + "/chdb/_chdb.abi3.so"
     error = ImportError(f"dlopen({long_path}, 0x0002): tried: '{long_path}' (mis-aligned LINKEDIT string pool)")
     _patch_import_chdb(monkeypatch, error)
@@ -183,9 +171,6 @@ def test_long_reasons_are_truncated(monkeypatch: pytest.MonkeyPatch) -> None:
     assert reason.endswith("...")
 
 
-# --------------------------------------------------------------------------- #
-# PySpark                                                                      #
-# --------------------------------------------------------------------------- #
 def _patch_pyspark(monkeypatch: pytest.MonkeyPatch, *, available: bool = True, java_reason: str = "") -> None:
     import benchbox.platforms.pyspark as pyspark_platform
 
@@ -304,7 +289,7 @@ def test_spark_fixture_restores_environment_on_skip_or_failure(monkeypatch, fail
     _patch_pyspark(monkeypatch)
     monkeypatch.delenv("JAVA_HOME", raising=False)
     monkeypatch.delenv("PYSPARK_PYTHON", raising=False)
-    # A previously cached successful probe does not own the later live selection.
+
     assert optional_engines.pyspark_skip_reason() is None
 
     def select_java():
@@ -333,25 +318,25 @@ def test_spark_fixture_restores_environment_on_skip_or_failure(monkeypatch, fail
 
 
 def test_importing_optional_helpers_does_not_load_engines_or_change_environment():
-    code = textwrap.dedent("""
-        import importlib.abc
-        import os
-        import sys
+    code = """
+import importlib.abc
+import os
+import sys
 
-        class BlockEngines(importlib.abc.MetaPathFinder):
-            def find_spec(self, fullname, path=None, target=None):
-                if fullname.split('.')[0] in {'chdb', 'pyspark'}:
-                    raise AssertionError('engine imported: ' + fullname)
+class BlockEngines(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split('.')[0] in {'chdb', 'pyspark'}:
+            raise AssertionError('engine imported: ' + fullname)
 
-        sys.meta_path.insert(0, BlockEngines())
-        before = dict(os.environ)
-        cwd = os.getcwd()
-        import tests.utilities.optional_engines
-        import tests.fixtures.utility_fixtures
-        assert dict(os.environ) == before
-        assert os.getcwd() == cwd
-        assert 'chdb' not in sys.modules
-        assert 'pyspark' not in sys.modules
-    """)
+sys.meta_path.insert(0, BlockEngines())
+before = dict(os.environ)
+cwd = os.getcwd()
+import tests.utilities.optional_engines
+import tests.fixtures.utility_fixtures
+assert dict(os.environ) == before
+assert os.getcwd() == cwd
+assert 'chdb' not in sys.modules
+assert 'pyspark' not in sys.modules
+"""
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr

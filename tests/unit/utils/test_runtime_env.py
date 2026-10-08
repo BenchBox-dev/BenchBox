@@ -129,23 +129,10 @@ def test_ensure_driver_version_prefers_isolated_runtime(monkeypatch, tmp_path):
     )
 
 
-# Synthetic driver name for isolated-runtime tests. Deliberately NOT a real
-# driver: load_driver_module's isolated branch purges the module tree before
-# importing, and evicting an already-loaded C extension so it is re-dlopen'd
-# later corrupts the interpreter (see the SIGSEGV note in runtime_env.py).
 ISOLATED_DRIVER_NAME = "benchbox_fake_isolated_driver"
 
 
 def test_load_driver_module_from_isolated_runtime(tmp_path):
-    """The isolated strategy imports the driver from its own site-packages.
-
-    Uses a synthetic package name, never a real driver: the isolated branch
-    calls _purge_module_tree() unconditionally, so naming a real C extension
-    here would evict an already-loaded one from this process and re-dlopen it
-    later -- the SIGSEGV hazard load_driver_module's own comment warns about.
-    Under xdist that poisoned the worker and crashed it at interpreter
-    finalization (gilstate_tss_set), failing unrelated tests that shared it.
-    """
     site_packages = tmp_path / "env" / "lib" / "python3.11" / "site-packages"
     package_dir = site_packages / ISOLATED_DRIVER_NAME
     package_dir.mkdir(parents=True)
@@ -195,7 +182,6 @@ def test_load_driver_module_strict_version_mismatch_raises(tmp_path):
 
 
 def test_autoinstall_invalidates_import_caches(monkeypatch):
-    """Fix A: importlib.invalidate_caches() is called after subprocess install."""
     installed_version = {"value": "1.0.0"}
 
     def fake_get_version(_):
@@ -221,19 +207,15 @@ def test_autoinstall_invalidates_import_caches(monkeypatch):
 
 
 def test_load_driver_module_purges_modules_after_autoinstall(tmp_path):
-    """Fix B: load_driver_module purges sys.modules for CURRENT_PROCESS when auto_install_used."""
-    # Create a fake package that load_driver_module will import
     package_dir = tmp_path / "fake_driver"
     package_dir.mkdir()
     (package_dir / "__init__.py").write_text("__version__ = '2.0.0'\n")
 
-    # Pre-populate sys.modules with a stale "old" module
     old_module = type(sys)("fake_driver")
     old_module.__version__ = "1.0.0"
     old_module.__file__ = str(package_dir / "__init__.py")
     sys.modules["fake_driver"] = old_module
 
-    # Add the tmp_path to sys.path so the new version can be imported
     sys.path.insert(0, str(tmp_path))
 
     resolution = DriverResolution(
@@ -249,7 +231,6 @@ def test_load_driver_module_purges_modules_after_autoinstall(tmp_path):
 
     try:
         module = load_driver_module(import_name="fake_driver", resolution=resolution)
-        # Should have purged the old 1.0.0 module and loaded 2.0.0 from disk
         assert getattr(module, "__version__", None) == "2.0.0"
     finally:
         sys.modules.pop("fake_driver", None)
@@ -257,8 +238,6 @@ def test_load_driver_module_purges_modules_after_autoinstall(tmp_path):
 
 
 def test_load_driver_module_no_purge_without_autoinstall(tmp_path):
-    """Without auto_install_used, load_driver_module uses cached sys.modules entry."""
-    # Pre-populate sys.modules with a module
     cached_module = type(sys)("fake_driver_cached")
     cached_module.__version__ = "1.0.0"
     cached_module.__file__ = "/some/path/__init__.py"
@@ -277,42 +256,24 @@ def test_load_driver_module_no_purge_without_autoinstall(tmp_path):
 
     try:
         module = load_driver_module(import_name="fake_driver_cached", resolution=resolution)
-        # Should return the cached module without purging
         assert module is cached_module
         assert getattr(module, "__version__", None) == "1.0.0"
     finally:
         sys.modules.pop("fake_driver_cached", None)
 
 
-# ---------------------------------------------------------------------------
-# Tests for driver_auto_install in pip-absent environments (e.g. uv tool envs)
-# ---------------------------------------------------------------------------
-
-
 def test_autoinstall_first_command_targets_current_interpreter(monkeypatch):
-    """The uv auto-install command must include --python sys.executable.
-
-    Regression test for the case where benchbox is installed as a uv tool:
-    the tool's venv has no pip, so `uv pip install` without --python installs
-    into whatever venv uv resolves by default (not the tool venv), causing the
-    post-install version check to fail and the fallback pip command to error
-    with "No module named pip".
-    """
     captured_commands: list[list[str]] = []
     installed_version = {"value": None}
 
     def fake_install(command: list[str]) -> None:
         captured_commands.append(command)
-        # Simulate a successful install only when the command correctly targets
-        # sys.executable (i.e. includes --python <path>).
         if "--python" in command and sys.executable in command:
             installed_version["value"] = "1.0.0"
-        # Without --python, uv installs to the wrong env; version stays None.
 
     monkeypatch.setattr(runtime_env, "_get_installed_version", lambda _: installed_version["value"])
     monkeypatch.setattr(runtime_env, "_run_install_command", fake_install)
     monkeypatch.setattr(runtime_env, "_should_auto_install", lambda _: True)
-    # Prevent discover_isolated_runtime from finding a real local env and short-circuiting.
     monkeypatch.setattr(runtime_env, "discover_isolated_runtime", lambda **_: None)
 
     resolution = ensure_driver_version(
@@ -324,7 +285,6 @@ def test_autoinstall_first_command_targets_current_interpreter(monkeypatch):
     assert resolution.auto_install_used is True
     assert resolution.resolved == "1.0.0"
 
-    # The first (and in the happy path, only) command must target sys.executable.
     assert len(captured_commands) >= 1
     first_cmd = captured_commands[0]
     assert "--python" in first_cmd, "uv command must include --python to target the running venv"
@@ -333,11 +293,6 @@ def test_autoinstall_first_command_targets_current_interpreter(monkeypatch):
 
 
 def test_autoinstall_succeeds_without_pip_when_uv_available(monkeypatch):
-    """Auto-install works in pip-absent environments (uv tool venvs) using uv.
-
-    In a uv tool environment, `python -m pip` raises 'No module named pip'.
-    The first command (uv pip install --python ...) must succeed standalone.
-    """
     installed_version = {"value": None}
     pip_was_called = {"value": False}
 
@@ -361,18 +316,15 @@ def test_autoinstall_succeeds_without_pip_when_uv_available(monkeypatch):
 
     assert resolution.auto_install_used is True
     assert resolution.resolved == "1.0.0"
-    # pip should never have been reached because uv succeeded first.
     assert not pip_was_called["value"], "pip fallback should not be reached when uv succeeds"
 
 
 def test_autoinstall_falls_back_to_pip_when_uv_absent(monkeypatch):
-    """When uv is not on PATH, auto-install falls back to python -m pip."""
     installed_version = {"value": None}
 
     def fake_install(command: list[str]) -> None:
         if command[0] == "uv":
             raise RuntimeError("uv: command not found")
-        # pip fallback succeeds
         installed_version["value"] = "1.0.0"
 
     monkeypatch.setattr(runtime_env, "_get_installed_version", lambda _: installed_version["value"])
@@ -391,7 +343,6 @@ def test_autoinstall_falls_back_to_pip_when_uv_absent(monkeypatch):
 
 
 def test_autoinstall_raises_when_both_installers_fail(monkeypatch):
-    """When all install commands fail, a clear RuntimeError is raised."""
 
     def fake_install(command: list[str]) -> None:
         if command[0] == "uv":
@@ -413,20 +364,10 @@ def test_autoinstall_raises_when_both_installers_fail(monkeypatch):
     error_text = str(excinfo.value)
     assert "duckdb" in error_text
     assert "1.0.0" in error_text
-    # The error should surface the last failure reason so the user can diagnose it.
     assert "No module named pip" in error_text
 
 
-# ---------------------------------------------------------------------------
-# Tests for ABI validation in isolated runtime discovery
-# ---------------------------------------------------------------------------
-
-
 def _make_isolated_env(root: Path, name: str, pkg: str, version: str, ext_files: list[str] | None = None) -> Path:
-    """Helper to create a fake isolated runtime environment for testing.
-
-    Returns the site-packages path.
-    """
     site_packages = root / name / "lib" / "python3.11" / "site-packages"
     site_packages.mkdir(parents=True)
     dist_info = site_packages / f"{pkg}-{version}.dist-info"
@@ -442,22 +383,19 @@ def _make_isolated_env(root: Path, name: str, pkg: str, version: str, ext_files:
 
 
 def _wrong_abi_filename() -> str:
-    """Return a filename with a cpython ABI tag that does NOT match the running Python."""
     major, minor = sys.version_info.major, sys.version_info.minor
-    wrong_minor = minor + 1  # guaranteed to differ
+    wrong_minor = minor + 1
     ext = ".pyd" if sys.platform == "win32" else ".so"
     return f"duckdb.cpython-{major}{wrong_minor}-platform{ext}"
 
 
 def _correct_abi_filename() -> str:
-    """Return a filename with a cpython ABI tag that matches the running Python."""
     major, minor = sys.version_info.major, sys.version_info.minor
     ext = ".pyd" if sys.platform == "win32" else ".so"
     return f"duckdb.cpython-{major}{minor}-platform{ext}"
 
 
 def test_validate_runtime_abi_wrong_suffix(tmp_path):
-    """Extension files with wrong ABI tag are rejected."""
     site_packages = _make_isolated_env(
         tmp_path,
         "env",
@@ -469,7 +407,6 @@ def test_validate_runtime_abi_wrong_suffix(tmp_path):
 
 
 def test_validate_runtime_abi_correct_suffix(tmp_path):
-    """Extension files matching the current interpreter's ABI tag are accepted."""
     site_packages = _make_isolated_env(
         tmp_path,
         "env",
@@ -481,19 +418,17 @@ def test_validate_runtime_abi_correct_suffix(tmp_path):
 
 
 def test_validate_runtime_abi_pure_python(tmp_path):
-    """Packages with no extension files (pure Python) are accepted."""
     site_packages = _make_isolated_env(
         tmp_path,
         "env",
         "sqlglot",
         "20.0.0",
-        ext_files=[],  # creates pkg dir but no .so files
+        ext_files=[],
     )
     assert _validate_runtime_abi(site_packages, "sqlglot")
 
 
 def test_validate_runtime_abi_stable_abi(tmp_path):
-    """Stable ABI extensions (.abi3.so) are accepted across Python versions."""
     site_packages = _make_isolated_env(
         tmp_path,
         "env",
@@ -505,7 +440,6 @@ def test_validate_runtime_abi_stable_abi(tmp_path):
 
 
 def test_validate_runtime_abi_mixed_tags_accepts_if_any_match(tmp_path):
-    """Package with both wrong-ABI and correct-ABI extensions is accepted."""
     site_packages = _make_isolated_env(
         tmp_path,
         "env",
@@ -517,14 +451,11 @@ def test_validate_runtime_abi_mixed_tags_accepts_if_any_match(tmp_path):
 
 
 def test_validate_runtime_abi_no_package_dir(tmp_path):
-    """When no package directory exists (single-file module), accepted."""
     site_packages = _make_isolated_env(tmp_path, "env", "duckdb", "1.2.2")
-    # No ext_files means no package dir created
     assert _validate_runtime_abi(site_packages, "duckdb")
 
 
 def test_discover_skips_abi_mismatch_candidate(tmp_path, monkeypatch, caplog):
-    """Discovery skips a candidate with wrong ABI and returns None."""
     _make_isolated_env(
         tmp_path / "envs",
         "duckdb-1.2.2",
@@ -543,10 +474,8 @@ def test_discover_skips_abi_mismatch_candidate(tmp_path, monkeypatch, caplog):
 
 
 def test_discover_skips_bad_candidate_returns_good_one(tmp_path, monkeypatch):
-    """When first candidate has wrong ABI, discovery falls through to the second."""
     envs = tmp_path / "envs"
 
-    # Bad candidate (wrong ABI)
     _make_isolated_env(
         envs,
         "bad-env",
@@ -554,7 +483,6 @@ def test_discover_skips_bad_candidate_returns_good_one(tmp_path, monkeypatch):
         "1.2.2",
         ext_files=[_wrong_abi_filename()],
     )
-    # Good candidate (correct ABI)
     good_sp = _make_isolated_env(
         envs,
         "good-env",
@@ -571,7 +499,6 @@ def test_discover_skips_bad_candidate_returns_good_one(tmp_path, monkeypatch):
 
 
 def test_corrupted_runtime_fallthrough_to_autoinstall(tmp_path, monkeypatch):
-    """ensure_driver_version() falls through to auto-install when isolated runtime has wrong ABI."""
     monkeypatch.setattr(runtime_env, "_get_installed_version", lambda _: "1.4.3")
 
     envs = tmp_path / "envs"
@@ -604,17 +531,10 @@ def test_corrupted_runtime_fallthrough_to_autoinstall(tmp_path, monkeypatch):
     assert resolution.runtime_strategy == DriverRuntimeStrategy.CURRENT_PROCESS.value
 
 
-# ---------------------------------------------------------------------------
-# Windows site-packages path resolution
-# ---------------------------------------------------------------------------
-from benchbox.utils.runtime_env import _iter_site_packages  # noqa: E402
+from benchbox.utils.runtime_env import _iter_site_packages
 
 
 class TestIterSitePackages:
-    """_iter_site_packages() must yield both Unix lib/pythonX.Y/site-packages
-    and the Windows Lib/site-packages layout when present.
-    """
-
     def test_yields_unix_site_packages(self, tmp_path):
         sp = tmp_path / "lib" / "python3.11" / "site-packages"
         sp.mkdir(parents=True)
@@ -622,20 +542,17 @@ class TestIterSitePackages:
         assert sp in result
 
     def test_yields_windows_site_packages_when_present(self, tmp_path):
-        """Windows venvs use Lib/site-packages (capital L, no python version)."""
         win_sp = tmp_path / "Lib" / "site-packages"
         win_sp.mkdir(parents=True)
         result = list(_iter_site_packages(tmp_path))
         assert win_sp in result
 
     def test_does_not_yield_missing_windows_path(self, tmp_path):
-        """If Lib/site-packages doesn't exist, it must not appear in results."""
         result = list(_iter_site_packages(tmp_path))
         win_sp = tmp_path / "Lib" / "site-packages"
         assert win_sp not in result
 
     def test_yields_both_when_both_exist(self, tmp_path):
-        """Environments that have both layouts (unusual but possible) surface both."""
         unix_sp = tmp_path / "lib" / "python3.12" / "site-packages"
         unix_sp.mkdir(parents=True)
         win_sp = tmp_path / "Lib" / "site-packages"

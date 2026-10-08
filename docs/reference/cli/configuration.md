@@ -17,7 +17,6 @@ BenchBox uses YAML configuration files. Default location: `~/.benchbox/config.ya
 
 Example configuration:
 ```yaml
-# Output settings
 output:
   compression:
     enabled: true
@@ -27,7 +26,6 @@ output:
     - json
     - csv
 
-# Platform settings
 platforms:
   databricks:
     enabled: true
@@ -37,7 +35,6 @@ platforms:
     enabled: true
     project_id: "my-project"
 
-# Tuning settings
 tuning:
   default_mode: notuning
   enable_constraints: false

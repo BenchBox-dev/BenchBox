@@ -1,14 +1,5 @@
 name: CI
 
-# One workflow, six always-reporting unit results: core, explorer, results-data,
-# docs, landing, and tooling. The classifier maps changed paths to units
-# (.github/ci-units.yml); an untouched unit reports success immediately, and a
-# touched unit must succeed in every job it required (a skipped required job
-# fails the unit). pull_request filters out only the release base, so a change
-# opened against any other base gets CI instead of an empty check list. A
-# release PR carries the curated release tree, which lacks the development
-# files these lanes read; validate-release-pr.yml (validate-base) and test.yml
-# (release-required-result) validate it.
 
 env:
   BENCHBOX_TEST_LOCK_WAIT_SECONDS: "0"
@@ -54,7 +45,8 @@ jobs:
           set -euo pipefail
           : "${BASE_REF:?BASE_REF is required}"
           installed="$(git ls-tree -r --name-only "$BASE_REF" -- \
-            scripts/check_comment_policy.py scripts/comment_syntax.py scripts/comment_syntax_js.cjs \
+            scripts/check_comment_policy.py scripts/check_comment_cleanup_scope.py \
+            scripts/comment_syntax.py scripts/comment_syntax_js.cjs \
             scripts/comment_payloads.py scripts/comment_execution.py scripts/comment_policy_entry.py \
             quality/comment-policy.json quality/comment-policy-requirements.txt \
             quality/comment-policy-package.json quality/comment-policy-package-lock.json)"
@@ -68,9 +60,6 @@ jobs:
           fi
           python -I "$RUNNER_TEMP/comment-policy-runner.py" --native-tests
 
-  # Base guard: stacked PRs get CI from this workflow (no branch filter),
-  # so an unsupported feature-branch base must fail loudly here instead of
-  # sliding into develop unvalidated under a parent PR.
   base-guard:
     name: PR base branch is an integration branch
     if: ${{ github.event_name == 'pull_request' }}
@@ -98,7 +87,6 @@ jobs:
               ;;
           esac
 
-  # Classifier: shared with the legacy path rules, plus the six-unit ownership map.
   ci-paths:
     name: ci-paths
     runs-on: ubuntu-latest
@@ -108,9 +96,9 @@ jobs:
       content-guard-needed: ${{ steps.classify.outputs.content-guard-needed }}
       skill-integrity-needed: ${{ steps.classify.outputs.skill-integrity-needed }}
       skill-integrity-only: ${{ steps.classify.outputs.skill-integrity-only }}
-      changed-paths: ${{ steps.classify.outputs.changed-paths }}
-      code-paths: ${{ steps.classify.outputs.code-paths }}
-      unknown-paths: ${{ steps.classify.outputs.unknown-paths }}
+      audit-paths-changed: ${{ steps.path-flags.outputs.audit-paths-changed }}
+      submission-validator-changed: ${{ steps.path-flags.outputs.submission-validator-changed }}
+      api-contract-changed: ${{ steps.path-flags.outputs.api-contract-changed }}
       estimated-runner-minutes-saved: ${{ steps.classify.outputs.estimated-runner-minutes-saved }}
       packaging-needed: ${{ steps.classify.outputs.packaging-needed }}
       framing-needed: ${{ steps.classify.outputs.framing-needed }}
@@ -131,13 +119,11 @@ jobs:
       code-tests-needed: ${{ steps.units.outputs.code-tests-needed }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Validate TODO JSON/Git state contract
-        # Bare python is intentional: this static guard is stdlib-only and
-        # must run for every PR without tracker credentials or dependencies.
         run: python _project/scripts/todo_state_contract_check.py
 
       - name: Select release candidate
@@ -152,7 +138,7 @@ jobs:
 
       - name: Install uv for release checks
         if: steps.release.outputs.release-check-needed == 'true'
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Check release content
         if: steps.release.outputs.release-check-needed == 'true'
@@ -166,12 +152,7 @@ jobs:
 
       - name: Classify changed paths
         id: classify
-        # Bare python is intentional: the classifier is stdlib-only so
-        # content-only PRs do not pay a dependency-sync cost before deciding.
         run: |
-          # Bind classification to the immutable pull-request event base. A
-          # later develop merge may make this PR BEHIND, but must not change
-          # the tree whose paths and manifest structure this run certifies.
           python scripts/path_filter_decision.py \
             --base-ref "${{ github.event.pull_request.base.sha }}" \
             --json-out ci-path-decision.json \
@@ -179,10 +160,23 @@ jobs:
             --github-output "$GITHUB_OUTPUT" \
             --summary "$GITHUB_STEP_SUMMARY"
 
+      - name: Flag changed paths read by later jobs
+        id: path-flags
+        run: |
+          set -euo pipefail
+          test -f .ci-paths/changed.txt
+          audit=false
+          validator=false
+          api=false
+          if grep -qE '^(_project/audits/|results-explorer/e2e/captures/)' .ci-paths/changed.txt; then audit=true; fi
+          if grep -qxE '\.github/workflows/validate-submission\.yml|scripts/check_submission_validator_sync\.py' .ci-paths/changed.txt; then validator=true; fi
+          if grep -qxE '_project/design/site-inventory/api-public-symbols\.json|scripts/check_api_contract_symbols\.py|scripts/api_contract_probe\.py' .ci-paths/changed.txt; then api=true; fi
+          echo "audit-paths-changed=$audit" >> "$GITHUB_OUTPUT"
+          echo "submission-validator-changed=$validator" >> "$GITHUB_OUTPUT"
+          echo "api-contract-changed=$api" >> "$GITHUB_OUTPUT"
+
       - name: Classify merge units
         id: units
-        # Bare python is intentional: stdlib-only, no dependency sync. The
-        # classifier fails closed: a diff error or an unowned path runs core.
         run: |
           python scripts/ci_units.py \
             --base-ref "${{ github.event.pull_request.base.sha }}" \
@@ -191,7 +185,7 @@ jobs:
             --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Upload path decision
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: ci-path-decision
           path: |
@@ -201,11 +195,6 @@ jobs:
 
       - name: Decide heavy-tier need
         id: heavy
-        # Bare python is intentional: stdlib-only, no dependency sync. The
-        # event gate lives in the script (not a step `if:`): downstream jobs
-        # read this output on every event, and references to a skipped
-        # step's outputs do not evaluate reliably. Fail-closed: any lookup
-        # error reports heavy-needed=true so the tier runs.
         run: |
           set -euo pipefail
           python scripts/heavy_tier_needed.py \
@@ -215,12 +204,6 @@ jobs:
             --github-output "$GITHUB_OUTPUT" \
             --summary "$GITHUB_STEP_SUMMARY"
 
-  # Cross-platform TPC-H binary framing: the only pre-merge macOS/Windows
-  # execution of the bundled dbgen framing guard. Pull requests run it when a
-  # carve-out applies (soundness or packaging paths via the heavy-needed
-  # output) or when the change touches test infrastructure or the bundled
-  # binaries (the framing-needed output). Nightly retains the complete
-  # three-platform matrix.
   tpch-binary-framing:
     name: TPC-H binary framing (${{ matrix.os }})
     needs: ci-paths
@@ -233,15 +216,15 @@ jobs:
         os: [macos-latest, windows-latest]
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Create virtual environment
         run: uv venv
@@ -259,7 +242,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
@@ -267,14 +250,13 @@ jobs:
         run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: |
           uv sync --group dev
 
       - name: Recreate path lists
-        # Bare python is intentional: the classifier is stdlib-only.
         run: |
           python scripts/path_filter_decision.py \
             --base-ref "${{ github.event.pull_request.base.sha }}" \
@@ -289,9 +271,6 @@ jobs:
             exit 0
           fi
           mapfile -t yaml_paths < .ci-paths/yaml.txt
-          # The changed-path lists include deletions; a deleted file path passed
-          # to check-yaml would fail the hook on a legitimate deletion-only PR
-          # (mirrors the TODO-graph step's deleted-path skip below).
           existing_yaml_paths=()
           for yaml_path in "${yaml_paths[@]}"; do
             if [ -e "$yaml_path" ]; then
@@ -317,8 +296,6 @@ jobs:
             exit 0
           fi
           mapfile -t markdown_paths < .ci-paths/markdown.txt
-          # Skip deleted paths so a deletion-only markdown PR doesn't fail the
-          # hook on a path that no longer exists (see the YAML step above).
           existing_markdown_paths=()
           for markdown_path in "${markdown_paths[@]}"; do
             if [ -e "$markdown_path" ]; then
@@ -438,21 +415,15 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Validate skill config, receipt, and tool pin
-        # Stdlib-only and offline: checks skill-sync.conf shape and skill
-        # selection, the committed receipt's approved source URLs, and the
-        # vendored tools/skill-sync bytes against the pinned tool revision.
         run: python3 scripts/skill_sync_ci_policy.py validate --manifest skill-sync.conf
 
       - name: Clone skill sources to the configured checkout paths
-        # The wrapper resolves every configured rev from these checkouts and
-        # fails closed when one is absent, so a transient local SHA can never
-        # pass: only published upstream commits survive this step.
         shell: bash
         run: |
           set -euo pipefail
@@ -474,9 +445,6 @@ jobs:
           echo "--- apply ---"
           sh tools/skill-sync apply
           echo "--- the committed snapshot must be untouched by apply ---"
-          # Apply may only write gitignored paths (the agents mirror and the
-          # curated-out blog skill). Any tracked modification means the PR's
-          # committed snapshot drifted from its own config.
           test -z "$(git status --porcelain)"
           echo "--- verify the payload offline against its manifest ---"
           sh tools/skill-sync verify
@@ -494,7 +462,7 @@ jobs:
           python3 _project/scripts/agent_instruction_audit.py --check-commit-range "$BASE_SHA"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install focused test dependencies
         run: uv sync --group dev
@@ -514,11 +482,11 @@ jobs:
   audit-sha:
     name: audit-sha
     needs: ci-paths
-    if: ${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }}
+    if: ${{ needs.ci-paths.outputs.audit-paths-changed == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
@@ -528,7 +496,7 @@ jobs:
         run: git fetch --no-tags origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Validate changed audit develop SHA stamps
         shell: bash
@@ -545,7 +513,6 @@ jobs:
             make audit-sha-check FILE="$audit_path" AUDIT_SHA_TARGET_REF="origin/${{ github.base_ref || 'develop' }}" AUDIT_SHA_ANCESTRY_REF="$ANCESTRY_REF"
           done < /tmp/changed-audits.txt
 
-  # Core: light tier.
   code-lint:
     name: lint
     needs: ci-paths
@@ -553,32 +520,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: |
           uv sync --group dev
 
-      # --- Lint guards ------------------------------------------------
-      # Every guard below is independent: `id: guard-*` (the naming
-      # convention the `lint-guard-summary` step and
-      # tests/system/test_ci_lint_parity.py both key off of) plus
-      # `continue-on-error: true` so one guard's failure doesn't hide the
-      # others' results behind a stopped job. The job as a whole still
-      # fails iff any guard failed -- see the `lint-guard-summary` step,
-      # which is what the `core` unit actually gates on. Setup steps
-      # above (checkout/setup-python/setup-uv/install deps) are not
-      # guards and carry neither `id: guard-*` nor `continue-on-error`.
       - name: Validate uv.lock revision against the PR base
         id: guard-uv-lock-revision
         continue-on-error: true
@@ -640,16 +597,6 @@ jobs:
         continue-on-error: true
         run: make agent-instructions-check
 
-      # There is deliberately no CI counterpart to `make agent-identity-check`
-      # (which ci-lint still runs locally). That target resolves identity from
-      # git config, and on an ephemeral runner the config is the runner's own,
-      # so the check can say nothing about what the branch carries. Supplying a
-      # known-good identity to make it runnable only made it incapable of
-      # failing, and a guard that cannot fail is worse than an absent one --
-      # lint-guard-summary reports it as coverage. The commit-range guard below
-      # is the real merge-time control: it reads the commits themselves.
-      # Locally the identity IS the developer's or the agent's, so ci-lint and
-      # the pre-commit hook keep enforcing it where the answer is meaningful.
       - name: Validate no agent authorship or attribution in PR commits
         id: guard-agent-commit-range
         continue-on-error: true
@@ -666,11 +613,6 @@ jobs:
         run: uv run -- python _project/scripts/fast_lane_ceiling_check.py --strict
 
       - name: UAT spec LOC table drift check
-        # Mirrors the release-branch Lint gate (.github/workflows/lint.yml). The
-        # develop PR path is the routine dev-flow gate, so without this a UAT
-        # LOC/table doc that drifts from source could merge through a normal
-        # develop PR, leaving the drift guard dependent on the local pre-commit
-        # hook alone.
         id: guard-uat-loc-table
         continue-on-error: true
         run: uv run --project _project/scripts --no-sync -- python _project/scripts/uat_loc_table.py --check
@@ -716,20 +658,11 @@ jobs:
         run: uv run -- python scripts/check_release_curation.py
 
       - name: Untracked skill-mirror drift guard (cloud parity)
-        # The agents mirror and the curated-out `blog` skill are deliberately
-        # untracked: cloud is Claude-only and `blog` is published separately.
-        # `skill-sync verify` checks payload bytes, not Git tracking state, so
-        # it cannot catch these being force-added. Fail the build if any
-        # become git-tracked.
-        # Rationale: _project/decisions/claude-settings-cloud-ownership-2026-06-29.md
         id: guard-skill-mirror-drift
         continue-on-error: true
         run: sh scripts/check_untracked_skill_mirrors.sh
 
       - name: Duplicate code delta vs PR base
-        # Fail only when this PR increases AST Type-2 duplicated lines vs the
-        # merge-base with the PR base (not an absolute repo-wide ceiling).
-        # Absolute ceiling remains `make duplicate-check` / pyproject threshold.
         id: guard-duplicate-delta
         continue-on-error: true
         env:
@@ -737,20 +670,10 @@ jobs:
         run: make duplicate-check-delta
 
       - name: Complexity policy and report
-        # Keeps CC >=12 visible and fails stale/expired exception metadata or
-        # unexcepted CC >20. Configured Ruff above remains the stricter
-        # production-scope C901 gate (it fails CC >18); the mechanisms do not
-        # share exceptions or silently weaken one another.
         id: guard-complexity-policy
         continue-on-error: true
         run: make complexity-check
 
-      # --- Aggregator ---------------------------------------------------
-      # Reports every guard's pass/fail in one CI cycle instead of stopping
-      # at the first failure. Derives the guard set programmatically from
-      # the `guard-*` id prefix (never hand-list ids here -- a guard added
-      # above without the prefix silently escapes aggregation, which is
-      # exactly what tests/system/test_ci_lint_parity.py now checks for).
       - name: lint-guard-summary
         id: lint-guard-summary
         if: always()
@@ -803,17 +726,17 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Create virtual environment
         run: uv venv
@@ -836,85 +759,42 @@ jobs:
 
       - name: Run cross-surface GATES Make/CI pinning guard
         run: |
-          # Medium-marked ratchet, so the fast-lane selection below skips it;
-          # invoke the node explicitly so a new GATES entry without its Make
-          # target + correctness-gate CI step fails required CI.
           uv run -- python -m pytest \
             tests/unit/test_standardized_test_commands.py::TestMakefileCommands::test_cross_surface_gates_are_pinned_in_make_and_ci \
             -m "medium" -n 0 --tb=short -q
 
       - name: Run promoted h2odb mutation-catch reproducer (#901)
         run: |
-          # #901's mutation-sensitivity catch assertions are slow-marked, so the
-          # fast-lane selection below skips them; invoke the h2odb cell (the gate
-          # whose scale fidelity #901 fixed: gate.scale_factor=0.01 matching
-          # production) explicitly so a regression in its mutation catch fails
-          # required CI instead of only at the main-release boundary (test.yml).
-          # Bounded: the single load-bearing gate cell, not the full slow matrix.
           uv run -- python -m pytest \
             tests/integration/test_cross_surface_mutation_sensitivity.py \
             -m "slow" -n 0 -k "h2odb" --tb=short -q
 
       - name: Run promoted plan-capture-phase reproducers (#909)
         run: |
-          # #909's connection-fencing and plan-identity reproducers are
-          # medium-marked and otherwise run only in test.yml; invoke them here so
-          # they execute in the required develop-PR gate, not one ring out.
           uv run -- python -m pytest \
             tests/integration/test_plan_capture_phase.py \
             -m "medium" -n 0 --tb=short -q
 
       - name: Run promoted TPC-DS power-test drain-before-commit reproducer
         run: |
-          # This file is 100% slow-marked and otherwise never runs in ANY CI
-          # workflow (make test-slow/test-stress are invoked by no workflow).
-          # The TPC-H side of this exact fix (#1137/#1144: draining a raw
-          # DB-API cursor must happen BEFORE commit(), some drivers reject/
-          # invalidate commit() on unread SELECT results) is already required
-          # via the fast-marked test_tpc_power_tests.py, but TPC-DS has a
-          # separate, parallel implementation (benchbox/core/tpcds/power_test.py
-          # _execute_one_query - the only call site TPCDSPowerTest.run() uses)
-          # with no coverage anywhere. Bounded: the single reproducer node.
           uv run -- python -m pytest \
             tests/integration/test_tpcds_power_test.py \
             -m "slow" -n 0 -k "test_execute_one_query_drains_raw_cursor_before_commit" --tb=short -q
 
       - name: Run DuckLake in-process adapter integration tests
         run: |
-          # Exercise cursor catalog scoping, ATTACH, catalog reuse, SQLite
-          # catalog operation, and representative write primitives. The
-          # service-dependent PostgreSQL and S3 cases remain live-only.
-          # Bounded: one file, 8 tests at SF=0.01.
           uv run -- python -m pytest \
             tests/integration/test_ducklake_integration.py \
             -m "slow and not live_integration" -n 0 --tb=short -q
 
       - name: Run promoted DuckDB FK tuning load-ordering reproducers
         run: |
-          # tuning-fk-load-ordering-fix-20260716: TPCHBenchmark.get_table_loading_order
-          # derives a FK-topological load order so a tuned run with
-          # foreign_keys.enabled really loads under real FK enforcement; without
-          # it, DataLoader falls back to alphabetical order, which zeros out
-          # every FK-dependent table under DuckDB constraint enforcement. This
-          # file is 100% slow-marked and otherwise never runs in ANY CI
-          # workflow. Bounded: one small (SF=0.01) file, 3 tests, ~5s.
           uv run -- python -m pytest \
             tests/integration/tuning/test_duckdb_fk_load_ordering.py \
             -m "slow" -n 0 --tb=short -q
 
       - name: Run promoted TPC-H power/throughput boundary-query (w0 defect) reproducers
         run: |
-          # The w0 defect: with a custom (non-reference) seed at SF=1.0, TPC-H's
-          # answer-set-boundary queries (Q11/16/18/20) came back falsely FAILED.
-          # The shared validator exclusion is already unit-tested in the
-          # required fast lane (test_validation_engine.py), but the
-          # set_reference_seed_context() WIRING at each call site
-          # (benchbox/core/tpch/power_test.py and .../throughput_test.py - two
-          # separate production code paths) is not: breaking either site's
-          # wiring is invisible to the unit test and only caught here. Both
-          # files are 100% slow-marked and otherwise never run in ANY CI
-          # workflow. Bounded: the single boundary_query reproducer node(s) in
-          # each file, not the surrounding slow suites.
           uv run -- python -m pytest \
             tests/integration/test_tpch_power_test.py \
             -m "slow" -n 0 -k "boundary_query" --tb=short -q
@@ -922,8 +802,6 @@ jobs:
             tests/integration/test_tpch_throughput_test.py \
             -m "slow" -n 0 -k "boundary_query" --tb=short -q
 
-      # A changed test that reads a path release-cut removes would fail the
-      # release PR's required test job; run changed tests on that tree now.
       - name: Run changed tests on the curated release tree
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -931,17 +809,15 @@ jobs:
 
       - name: Run fast tests
         run: |
-          # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
           uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac
         with:
           files: ./coverage.xml
-          fail_ci_if_error: false  # Don't fail CI if Codecov upload fails (token may not be configured)
+          fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  # Core: heavy tier (merge queue, plus soundness/packaging carve-outs from heavy_tier_needed.py).
   medium-collect:
     name: medium-collect
     needs: ci-paths
@@ -950,19 +826,17 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          # Full history: the canary live-tree tests diff historical
-          # regression commits, which a shallow checkout cannot resolve.
           fetch-depth: 0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -988,7 +862,7 @@ jobs:
 
       - name: Upload medium collection evidence
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: t2-medium-nodeids-${{ github.sha }}
           path: t2-artifacts/
@@ -1007,25 +881,23 @@ jobs:
         shard_index: [0, 1, 2, 3]
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          # Full history: the canary live-tree tests diff historical
-          # regression commits, which a shallow checkout cannot resolve.
           fetch-depth: 0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
 
       - name: Download medium collection evidence
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: t2-medium-nodeids-${{ github.sha }}
           path: t2-artifacts
@@ -1077,7 +949,7 @@ jobs:
 
       - name: Upload medium shard evidence
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: t2-medium-shard-${{ matrix.shard_index }}-${{ github.sha }}
           path: t2-artifacts/
@@ -1089,7 +961,6 @@ jobs:
     needs: ci-paths
     if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
     runs-on: ubuntu-latest
-    # Preserve every gate; split measured work across standard Linux runners.
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -1097,17 +968,17 @@ jobs:
         partition: [a, b]
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Create virtual environment
         run: uv venv
@@ -1187,6 +1058,38 @@ jobs:
         if: matrix.partition == 'a'
         run: make tpcds-pandas-cross-surface-equivalence-report
 
+  polars-2-compat:
+    name: polars-2-compat
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Install Polars 2.0.0 over the locked environment
+        run: uv pip install "polars==2.0.0"
+
+      - name: Run the polars-df smoke and cross-surface gates on Polars 2.0.0
+        run: make polars-df-compat-check
+
   required-local-cases:
     name: required-local-cases
     needs: ci-paths
@@ -1195,17 +1098,17 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Create virtual environment
         run: uv venv
@@ -1224,17 +1127,17 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Create virtual environment
         run: uv venv
@@ -1251,33 +1154,22 @@ jobs:
     if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Non-blocking: this is the THIRD-engine equivalence SAMPLE, not a gate.
-    # The DuckDB SQL gate (correctness-gate job) stays the hard blocker.
-    # DataFusion is in-process (no service container), and its execution gaps
-    # DIFFER from Postgres's, so this samples translation-induced divergence a
-    # third engine over. continue-on-error keeps it a sample, not a blocker.
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
 
-      # Third-engine equivalence SAMPLE plus the DataFusion .tbl trailing-delimiter
-      # load regression. Both canonical and variants are translated to the
-      # datafusion dialect and compared on the same in-process session (shared
-      # translation cancels out); DATAFUSION_TPCHAVOC_SKIPS variants are excluded,
-      # never marked equivalent. Both files are slow-marked, so -m "slow" selects
-      # them (overriding the default fast-lane deselect).
       - name: Run TPC-Havoc DataFusion variant-equivalence sample and .tbl load regression
         run: |
           uv run -- python -m pytest \
@@ -1288,23 +1180,19 @@ jobs:
   package-smoke:
     name: package-smoke
     needs: ci-paths
-    # Path-filtered: only runs when packaging metadata changed (pyproject.toml,
-    # MANIFEST.in, setup.py/cfg, benchbox/__init__.py, uv.lock). Steps below are
-    # copied from nightly.yml's test-package job (ubuntu/3.12 leg only - the
-    # full ubuntu+windows matrix stays nightly-only, see nightly.yml:261-311).
     if: ${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Build package
         run: |
@@ -1323,45 +1211,28 @@ jobs:
           wheel=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
           tmpdir=$(mktemp -d)
           cd "$tmpdir"
-          # Minimal-surface gate: a clean core install must import benchbox AND
-          # must not pull pandas (optional engine/DataFrame dep). This is the
-          # contract whose absence let v0.3.0 ship a broken clean install.
           uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
           uv run --isolated --no-project --with "$wheel" -- benchbox --help
-          # Wheel-truth gate for TPC-DS-OBT templates: the 0.4.1 wheel shipped
-          # without top-level _sources/, so the OBT template dir resolved into
-          # site-packages/_sources and get_queries() raised FileNotFoundError.
           uv run --isolated --no-project --with "$wheel" -- python -c "from benchbox import TPCDSOBT; benchmark = TPCDSOBT(scale_factor=1.0); queries = benchmark.get_queries(); assert queries, 'expected OBT queries from wheel install'; assert benchmark.get_query(next(iter(queries))); print(f'TPC-DS-OBT wheel smoke: {len(queries)} queries')"
 
   dependency-audit:
     name: dependency-audit
     needs: ci-paths
-    # Path-filtered on the same packaging group as package-smoke (pyproject.toml
-    # / uv.lock changes are the common case that shifts the dependency graph).
     if: ${{ needs.ci-paths.outputs.packaging-needed == 'true' }}
     runs-on: ubuntu-latest
     env:
-      # Comma-separated GHSA/CVE IDs for temporarily accepted false positives.
-      # Keep empty unless triage is documented in the TODO item.
-      # PYSEC-2026-3696..3699 and PYSEC-2026-3923 (sqlparse):
-      # firebolt-sdk==1.18.5 requires sqlparse<0.6.0.
-      # PYSEC-2026-3447 (setuptools MANIFEST.in exclusion bypass in sdist
-      # builds, macOS-only): torch==2.11.0 requires setuptools<82 while the
-      # fix needs >=83.0.0, so the lock cannot take the fix. Accepted because
-      # the flaw only affects building sdists from projects with a malicious
-      # MANIFEST.in on macOS; BenchBox builds its own project.
       PIP_AUDIT_IGNORE_VULNS: "PYSEC-2026-3696,PYSEC-2026-3697,PYSEC-2026-3698,PYSEC-2026-3699,PYSEC-2026-3923,PYSEC-2026-3447"
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: |
@@ -1369,11 +1240,6 @@ jobs:
 
       - name: Run security audit
         run: |
-          # `uvx pip-audit` runs pip-audit in its own isolated tool environment,
-          # auditing pip-audit's dependencies, not BenchBox's. `uv run --with` layers
-          # pip-audit onto the project environment `uv sync --group dev` just built,
-          # so the dependency graph actually audited is the one pyproject.toml/uv.lock
-          # produce.
           if [ -n "${PIP_AUDIT_IGNORE_VULNS}" ]; then
             IGNORE_ARGS=$(printf '%s' "${PIP_AUDIT_IGNORE_VULNS}" | tr ',' '\n' | sed '/^$/d;s/^[[:space:]]*//;s/[[:space:]]*$//;/^$/d;s/^/--ignore-vuln /' | tr '\n' ' ')
             uv run --with pip-audit -- pip-audit ${IGNORE_ARGS}
@@ -1381,7 +1247,6 @@ jobs:
             uv run --with pip-audit -- pip-audit
           fi
 
-  # Explorer.
   explorer-tokens:
     name: explorer-tokens
     needs: ci-paths
@@ -1389,7 +1254,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
@@ -1397,38 +1262,32 @@ jobs:
         run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Run explorer token scan
-        # Bare python is intentional: the scan is stdlib-only so this gate
-        # does not pay a dependency-sync cost before deciding.
         run: make lint-explorer-tokens
 
   explorer-vitest:
     name: explorer-vitest
     needs: ci-paths
-    # The Explorer contract includes frontend source/tests, package metadata,
-    # read-model/build-contract code, curated inputs, and the fixture/publish
-    # scripts. The path-filter group keeps unrelated Python-only PRs from
-    # installing Node while ensuring every input Vitest can exercise is gated.
     if: ${{ needs.ci-paths.outputs.explorer-vitest-needed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '20'
           cache: npm
           cache-dependency-path: results-explorer/package-lock.json
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install Python dependencies
         run: uv sync --group dev
@@ -1444,35 +1303,19 @@ jobs:
   parity-check:
     name: parity-check
     needs: ci-paths
-    # Path-filtered on results-explorer/viz source changes (see
-    # tracker item `parity-check-develop-ring`). `make parity-check`
-    # is Python-only (no npm/vitest install), measured at well under a second
-    # locally, so it is cheap enough to block develop PRs.
-    #
-    # PROMOTED TO THE REQUIRED LANE 2026-07-05 (parity-check-promotion): the
-    # job is now observed by the explorer unit via PARITY_CHECK_RESULT with
-    # the package-smoke skipped-counts-as-pass rule, and continue-on-error is
-    # dropped. Both promotion criteria met: (1) one green run on a real
-    # GitHub runner (PR #973, run 28742318825 job 85227174150 - the runner's
-    # `make parity-check` printed "fixtures match Python source"); (2) the
-    # geomean_ms 2e-13 last-bit drift seen locally did NOT reproduce on the
-    # runner, so it is a local libm transcendental-precision artifact, not a
-    # fixture error - exact comparison is kept and the drift is documented in
-    # tests/parity/README.md. Path-filtering stays: a non-viz PR skips this
-    # job and passes via skipped-counts-as-pass.
     if: ${{ needs.ci-paths.outputs.viz-needed == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -1488,21 +1331,21 @@ jobs:
     timeout-minutes: 25
 
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install Python dependencies
         run: uv sync --group dev
 
       - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '20'
           cache: 'npm'
@@ -1521,7 +1364,7 @@ jobs:
         working-directory: results-explorer
 
       - name: Cache Playwright browsers
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('results-explorer/package-lock.json') }}
@@ -1531,14 +1374,12 @@ jobs:
         working-directory: results-explorer
 
       - name: Run Chromium suite
-        # Shared deterministic entrypoint: regenerate fixtures, rebuild dist,
-        # then run the blocking Chromium project against the real server.
         run: npm run test:e2e:chromium
         working-directory: results-explorer
 
       - name: Upload failure artifacts
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: playwright-report-chromium
           path: |
@@ -1547,7 +1388,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 3
 
-  # Landing.
   site-theme-tokens:
     name: site-theme-tokens
     needs: ci-paths
@@ -1555,7 +1395,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
@@ -1563,11 +1403,8 @@ jobs:
         run: git fetch --no-tags origin "${{ github.base_ref || 'develop' }}:refs/remotes/origin/${{ github.base_ref || 'develop' }}"
 
       - name: Run public site theme token scan
-        # Bare python is intentional: the scan is stdlib-only so this gate
-        # does not pay a dependency-sync cost before deciding.
         run: make lint-site-theme-tokens
 
-  # Results data.
   results-data-check:
     name: results-data-check
     needs: ci-paths
@@ -1575,11 +1412,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
       - name: Install dependencies
         run: uv sync --group dev
       - name: Corpus inventory is current
@@ -1587,11 +1424,7 @@ jobs:
       - name: Corpus validation
         run: uv run -- python results-data/validate_corpus.py
       - name: Submission validator stays in sync
-        # Judges this change, not external branch state: fail only when the
-        # change touches the validator or its checker. Standing drift against
-        # published-results is reported by submission-validator-drift-check.yml
-        # (weekly and on develop pushes), so it cannot block unrelated changes.
-        if: ${{ contains(needs.ci-paths.outputs.changed-paths, '.github/workflows/validate-submission.yml') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/check_submission_validator_sync.py') }}
+        if: ${{ needs.ci-paths.outputs.submission-validator-changed == 'true' }}
         run: |
           git fetch --no-tags --depth=1 origin published-results
           git show FETCH_HEAD:.github/workflows/validate-submission.yml \
@@ -1609,7 +1442,6 @@ jobs:
             tests/unit/publication \
             tests/unit/explorer
 
-  # Docs and landing: the public-site build and exact-base visual comparison.
   visual-inputs:
     needs: ci-paths
     name: Public-site visual inputs
@@ -1621,7 +1453,7 @@ jobs:
       base_sha: ${{ steps.paths.outputs.base_sha }}
       baseline_candidates: ${{ steps.paths.outputs.baseline_candidates }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -1665,11 +1497,6 @@ jobs:
             echo "::error::Exact base commit is unavailable."
             exit 1
           }
-          # Preserve every former pull_request path-filter input. A change to
-          # this list must explain which rendered dependency is being removed.
-          # The build runs uv sync and npm ci, so the lockfiles pin the
-          # rendered output as much as any source file. uv.lock and
-          # results-explorer/package-lock.json must stay in this list.
           SITE_PATHS=(
             benchbox/ docs/ examples/ landing/ website/
             _project/scripts/explorer_pipeline/
@@ -1678,10 +1505,6 @@ jobs:
             results-data/ results-explorer/ scripts/
             .github/workflows/ci.yml .github/workflows/docs.yml Makefile README.md pyproject.toml uv.lock
           )
-          # The build (Sphinx warnings-as-errors, autodoc) keeps the broad list
-          # above. The visual comparison captures only the routes below, so it
-          # and the baseline ancestor walk use the narrow rendered-input list.
-          # Keep this a subset of SITE_PATHS.
           RENDER_PATHS=(
             docs/ landing/ examples/ results-data/ results-explorer/ website/
             _project/scripts/explorer_pipeline/
@@ -1705,13 +1528,6 @@ jobs:
           else
             echo 'render_changed=true' >> "$GITHUB_OUTPUT"
           fi
-          # Baselines bound to the exact base come first. A first-parent
-          # ancestor is also a valid baseline source when every public-site
-          # input is byte-identical to the base, because it renders the same
-          # site; this is the premise that lets unchanged trees skip the gate.
-          # The walk stops at the first ancestor whose site inputs differ, so a
-          # differently rendered tree is never used. This covers a base whose
-          # predecessor changed no site inputs and therefore published nothing.
           CANDIDATES="$BASE_SHA"
           ANCESTORS=$(git rev-list --first-parent --max-count=25 "$BASE_SHA^" 2>/dev/null || true)
           for ANCESTOR in $ANCESTORS; do
@@ -1726,23 +1542,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.visual-inputs.outputs.source_sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
 
       - name: Cache Sphinx build artifacts
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: |
             docs/_build
@@ -1754,19 +1570,10 @@ jobs:
         run: make docs-generate
 
       - name: Build documentation
-        # -W turns every Sphinx warning into a failure, including unknown
-        # :doc: targets, so a broken cross-reference fails the docs unit
-        # instead of shipping. --keep-going still reports every warning.
         run: |
           cd docs
           uv run sphinx-build -b html -W --keep-going . _build/html
 
-      # --- Results Explorer ---
-      # Steps gate on package.json as a sentinel so the workflow degrades
-      # gracefully if the explorer directory is ever removed or renamed.
-      # The curated release retains results-explorer/, results-data/, and the
-      # three publication helpers under _project/scripts/. A release that
-      # includes the application must carry the complete publication input set.
       - name: Validate results-explorer lockfile
         if: hashFiles('results-explorer/package.json') != ''
         run: |
@@ -1777,7 +1584,7 @@ jobs:
 
       - name: Set up Node.js
         if: hashFiles('results-explorer/package.json') != ''
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: "20"
           cache: "npm"
@@ -1805,7 +1612,6 @@ jobs:
         if: hashFiles('results-explorer/package.json') != ''
         run: uv run -- python _project/scripts/explorer_publish.py build --data-dir results-data/ --output results-explorer/public/data/
 
-      # Gate the built read model before it is bundled into the deployed site.
       - name: Validate explorer snapshot invariants
         if: hashFiles('results-explorer/package.json') != ''
         run: |
@@ -1824,15 +1630,13 @@ jobs:
         run: uv run python scripts/publication/check_artifact_privacy.py site
 
       - name: Upload HTML artifacts
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9
         with:
           path: site
           include-hidden-files: true
 
-      # The visual job consumes the exact assembled tree without rebuilding it.
-      # This is a short-lived transport artifact, not a publication baseline.
       - name: Upload assembled site for visual acceptance
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: public-site-assembled-${{ github.run_id }}
           path: site
@@ -1845,19 +1649,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ needs.visual-inputs.outputs.source_sha }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: "20"
           cache: "npm"
           cache-dependency-path: results-explorer/package-lock.json
 
       - name: Download assembled site
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: public-site-assembled-${{ github.run_id }}
           path: site
@@ -1880,8 +1684,6 @@ jobs:
         run: npm run test:e2e:public-site
         working-directory: results-explorer
 
-      # When no baseline is bound to the exact base, the lookup also accepts the
-      # nearest ancestor whose site inputs are byte-identical to the base.
       - name: Download visual baseline for base or site-equivalent ancestor
         id: baseline
         if: github.event_name == 'pull_request'
@@ -1915,7 +1717,7 @@ jobs:
         if: >-
           (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
           (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/develop')
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: public-site-visual-baseline-${{ needs.visual-inputs.outputs.source_sha }}
           path: ${{ runner.temp }}/public-site-visual-current
@@ -1923,7 +1725,7 @@ jobs:
 
       - name: Upload visual diagnostics
         if: failure()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: public-site-visual-diagnostics-${{ github.run_id }}
           path: |
@@ -1982,7 +1784,7 @@ jobs:
         run: make site-check site-build
 
       - name: Cache Playwright browsers
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('website/package-lock.json') }}
@@ -2141,7 +1943,7 @@ jobs:
   api-contract-check:
     name: api-contract-check
     needs: ci-paths
-    if: ${{ contains(needs.ci-paths.outputs.changed-paths, '_project/design/site-inventory/api-public-symbols.json') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/check_api_contract_symbols.py') || contains(needs.ci-paths.outputs.changed-paths, 'scripts/api_contract_probe.py') }}
+    if: ${{ needs.ci-paths.outputs.api-contract-changed == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -2162,15 +1964,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -2185,10 +1987,6 @@ jobs:
         run: uv run python scripts/validate_visualization_images.py
 
       - name: Check /prompts/ catalog is fresh
-        # Fails if landing/prompts/catalog.generated.js is stale or invalid.
-        # Must use the main project env (not --project _project/scripts) so
-        # benchbox is importable; see landing-prompts-catalog-generator
-        # decision and anti_patterns.
         run: uv run -- python scripts/generate_landing_quickstarts.py --check
 
       - name: Check for unsafe patch() string paths in tests
@@ -2201,30 +1999,26 @@ jobs:
     continue-on-error: true
 
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Run codespell
-        uses: codespell-project/actions-codespell@e3258cca84ce02b0bb36a3d41f2c18f719a0cc1a # v2.4.3
+        uses: codespell-project/actions-codespell@e3258cca84ce02b0bb36a3d41f2c18f719a0cc1a
         with:
           ignore_words_file: .codespell-ignore.txt
           skip: "*.pyc,_build,*.json,*.lock,*.svg,*.min.js,*.min.css,_binaries,*.tpl,*.dst,*.tbl,_sources,benchmark_runs,*.dat,*.pdf,_project,_blog,htmlcov,.venv"
 
-  # Unit result: core. Required by the merge ruleset; reports on every event and passes when untouched.
   core:
     name: core
-    needs: [ci-paths, code-lint, code-test, medium-collect, medium-test, correctness-gate, required-local-cases, plan-capture-gate, tpch-binary-framing, datafusion-integration, package-smoke, dependency-audit]
+    needs: [ci-paths, code-lint, code-test, medium-collect, medium-test, correctness-gate, polars-2-compat, required-local-cases, plan-capture-gate, tpch-binary-framing, datafusion-integration, package-smoke, dependency-audit]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read
     steps:
       - name: Checkout the result helper
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -2235,7 +2029,7 @@ jobs:
 
       - name: Download complete medium shard evidence
         if: needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true'
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           pattern: t2-medium-*-${{ github.sha }}
           path: t2-evidence
@@ -2260,6 +2054,7 @@ jobs:
             --expect medium-collect=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect medium-test=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect correctness-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
+            --expect polars-2-compat=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect required-local-cases=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect plan-capture-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' || needs.ci-paths.outputs.framing-needed == 'true' }} \
@@ -2279,31 +2074,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Exit 3 above means an upstream was cancelled by a newer run, not
-          # by a real failure. Cancelling this run makes this job conclude
-          # cancelled (grey) instead of failed (red). `|| true`: the run may
-          # already be fully cancelled. If cancellation never lands, this
-          # step exits 0 and the job still fails on the step above, so a
-          # real problem can never green through this path.
           gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
           sleep 90
 
-  # Unit result: explorer.
   explorer:
     name: explorer
     needs: [ci-paths, explorer-tokens, explorer-vitest, parity-check, explorer-e2e, visual-inputs]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read
     steps:
       - name: Checkout the result helper
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -2338,31 +2123,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Exit 3 above means an upstream was cancelled by a newer run, not
-          # by a real failure. Cancelling this run makes this job conclude
-          # cancelled (grey) instead of failed (red). `|| true`: the run may
-          # already be fully cancelled. If cancellation never lands, this
-          # step exits 0 and the job still fails on the step above, so a
-          # real problem can never green through this path.
           gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
           sleep 90
 
-  # Unit result: results-data.
   results-data:
     name: results-data
     needs: [ci-paths, results-data-check]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read
     steps:
       - name: Checkout the result helper
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -2393,31 +2168,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Exit 3 above means an upstream was cancelled by a newer run, not
-          # by a real failure. Cancelling this run makes this job conclude
-          # cancelled (grey) instead of failed (red). `|| true`: the run may
-          # already be fully cancelled. If cancellation never lands, this
-          # step exits 0 and the job still fails on the step above, so a
-          # real problem can never green through this path.
           gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
           sleep 90
 
-  # Unit result: docs.
   docs:
     name: docs
     needs: [ci-paths, visual-inputs, docs-build, example-validation, spellcheck]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read
     steps:
       - name: Checkout the result helper
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -2451,31 +2216,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Exit 3 above means an upstream was cancelled by a newer run, not
-          # by a real failure. Cancelling this run makes this job conclude
-          # cancelled (grey) instead of failed (red). `|| true`: the run may
-          # already be fully cancelled. If cancellation never lands, this
-          # step exits 0 and the job still fails on the step above, so a
-          # real problem can never green through this path.
           gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
           sleep 90
 
-  # Unit result: landing.
   landing:
     name: landing
     needs: [ci-paths, site-theme-tokens, visual-inputs, site-build]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read
     steps:
       - name: Checkout the result helper
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -2508,31 +2263,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Exit 3 above means an upstream was cancelled by a newer run, not
-          # by a real failure. Cancelling this run makes this job conclude
-          # cancelled (grey) instead of failed (red). `|| true`: the run may
-          # already be fully cancelled. If cancellation never lands, this
-          # step exits 0 and the job still fails on the step above, so a
-          # real problem can never green through this path.
           gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
           sleep 90
 
-  # Unit result: tooling.
   tooling:
     name: tooling
     needs: [ci-paths, base-guard, content-guard, skill-integrity, audit-sha, comment-policy]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read
     steps:
       - name: Checkout the result helper
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 1
           persist-credentials: false
@@ -2553,7 +2298,7 @@ jobs:
             --expect base-guard=${{ github.event_name == 'pull_request' }} \
             --expect content-guard=${{ needs.ci-paths.outputs.content-guard-needed == 'true' }} \
             --expect skill-integrity=${{ needs.ci-paths.outputs.skill-integrity-needed == 'true' }} \
-            --expect audit-sha=${{ contains(needs.ci-paths.outputs.changed-paths, '_project/audits/') || contains(needs.ci-paths.outputs.changed-paths, 'results-explorer/e2e/captures/') }} || {
+            --expect audit-sha=${{ needs.ci-paths.outputs.audit-paths-changed == 'true' }} || {
             rc=$?
             if [ "$rc" -eq 3 ]; then
               echo "superseded=true" >> "$GITHUB_OUTPUT"
@@ -2567,11 +2312,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Exit 3 above means an upstream was cancelled by a newer run, not
-          # by a real failure. Cancelling this run makes this job conclude
-          # cancelled (grey) instead of failed (red). `|| true`: the run may
-          # already be fully cancelled. If cancellation never lands, this
-          # step exits 0 and the job still fails on the step above, so a
-          # real problem can never green through this path.
           gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
           sleep 90

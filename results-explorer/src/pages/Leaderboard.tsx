@@ -82,11 +82,6 @@ interface TuningModeSummary {
 }
 
 interface LeaderboardProps extends RoutableProps {
-  /**
-   * Shown above the filters when the compare route redirected here — for
-   * example after a shared comparison URL failed to resolve. The picker is the
-   * compare page's own empty state, so its notices belong on it.
-   */
   notice?: string | null;
 }
 
@@ -99,14 +94,13 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
   const retriedEmptyResults = useRef(false);
   const [emptyResultsRetryFinished, setEmptyResultsRetryFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Bumped by the ErrorMessage retry button so a reader can re-issue this
-  // read after a DuckDB worker fault without reloading the page.
   const [resultsRetryToken, setResultsRetryToken] = useState(0);
   const { facets, where: facetWhere, setFacet, resetFacets } = useFacetState();
   const [modeRaw, setModeRaw] = useUrlState<string>("mode", "speedup", stringSerde);
   const benchmarkFilters = facets.benchmark;
   const scaleFilters = facets.scale_factor;
   const phaseFilter = singleFacetValue(facets.phase, "all");
+  const streamFilters = facets.stream_count;
   const tuningFilter = singleFacetValue(facets.tuning_mode, "all");
   const trustFilter = singleFacetValue(facets.trust_tier, "all");
   const dateWindow = facets.date_window;
@@ -127,6 +121,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
       facets.platform,
       facets.scale_factor,
       facets.storage_format,
+      facets.stream_count,
       facets.trust_tier,
       facets.tuning_mode,
       facets.validation_status,
@@ -195,15 +190,6 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
     };
   }, [resultsRetryToken]);
 
-  // Cold-load mitigation (N5 in pass-2 review): unfiltered listResults() can briefly
-  // resolve to [] on a cold DuckDB-WASM attach while the meta-leaderboard
-  // succeeds, which would otherwise paint "0 Results / 0 Benchmarks /
-  // 0 Platforms" before the real corpus arrives. Retrying once is a
-  // symptom-mitigation, not a root-cause fix; we have not pinned which of
-  // (a) WASM cold-cache partial read, (b) Preact effect-cleanup race, or
-  // (c) shared initPromise in db.ts is the trigger. The diagnostic log
-  // makes future investigation possible by surfacing the exact mismatch
-  // in browser DevTools without needing to re-run the audit setup.
   const hasInconsistentEmptySnapshot =
     facetWhere.sql === "" && results !== null && results.length === 0 && metaLeaderboard !== null;
   const hasPersistentInconsistentEmptySnapshot = hasInconsistentEmptySnapshot && emptyResultsRetryFinished;
@@ -272,6 +258,7 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
       ) return false;
       if (scaleFilters.length > 0 && !scaleFilters.includes(String(cohort.scale_factor))) return false;
       if (phaseFilter !== "all" && cohort.phase !== phaseFilter) return false;
+      if (streamFilters.length > 0 && !streamFilters.includes(String(cohort.stream_count ?? ""))) return false;
 
       return (cohort.platforms ?? []).length > 0;
     });
@@ -411,11 +398,6 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
   const visibleRankedLeaderboardPlatformCount =
     filteredMetaLeaderboard?.platforms.filter((platform) => platform.n_cohorts > 0).length ?? 0;
   const tuningSummary = summarizeTuningModes(results);
-  // An active tuning filter means `results` was already loaded with that
-  // predicate applied, so the summary necessarily collapses to one bucket.
-  // Dropping the selector then would strand the user on the filtered view with
-  // no control to return to "All tuning labels", so keep it whenever a filter
-  // is active regardless of the narrowed cardinality.
   const tuningOptions = tuningSummaryBucketCount(tuningSummary) > 1 || tuningFilter !== "all"
     ? [
         "all",
@@ -428,7 +410,10 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
     const params = new URLSearchParams();
     params.set("sf", String(cohort.scale_factor));
     params.set("phase", cohort.phase);
-    appendFacetParams(params, facets, new Set(["benchmark", "scale_factor", "phase"]));
+    if (cohort.stream_count !== null && cohort.stream_count !== undefined) {
+      params.set("streams", String(cohort.stream_count));
+    }
+    appendFacetParams(params, facets, new Set(["benchmark", "scale_factor", "phase", "stream_count"]));
     const query = params.toString();
     return `/results/${cohort.benchmark}/${query ? `?${query}` : ""}`;
   }
@@ -461,10 +446,6 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
         data-testid="home-hero-filter-band"
         data-surface="hero"
       >
-        {/* lg:py-4 trims hero vertical cost at desktop and wide only. Those two
-            viewports budget the fold at 900px, and the taller hero pushed the
-            second leaderboard row past it (see responsive.spec.ts). Tablet and
-            mobile keep the roomier padding; their fold budget is 1200px. */}
         <div class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroWrapper} data-testid="home-hero-wrapper">
           <div class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroIntro} data-testid="home-hero-intro">
             <PageHeader crumbs={[{ label: "Results", href: "/results/" }, { label: "Compare" }]} eyebrow="Compare" title="Compare benchmark results" subtitle="See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence." />
@@ -492,9 +473,6 @@ export function Leaderboard({ notice = null }: LeaderboardProps) {
               />
             )}
 
-          {/* Ranking selector renders above the matrix so users can change
-              benchmark/scale/phase context without scrolling past the
-              matrix to find the controls. */}
           {filteredMetaLeaderboard && (
             <section
               aria-label="Leaderboard ranking selector"
@@ -665,7 +643,6 @@ function LeaderboardLoadingSkeleton({
         data-testid="home-hero-filter-band"
         data-surface="hero"
       >
-        {/* Loaded/skeleton geometry is owned by LEADERBOARD_SHELL_GEOMETRY_CLASSES. */}
         <div class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroWrapper} data-testid="home-hero-wrapper">
           <div class={LEADERBOARD_SHELL_GEOMETRY_CLASSES.heroIntro} data-testid="home-hero-intro">
             <PageHeader crumbs={[{ label: "Results", href: "/results/" }, { label: "Compare" }]} eyebrow="Compare" title="Compare benchmark results" subtitle="See how published platform runs compare across BenchBox rankings. Open any result to inspect its evidence." />
@@ -754,27 +731,18 @@ function SkeletonSelect({ label }: { label: string }) {
 }
 
 interface ActiveFacetSummary {
-  // Widened to ExplorerFacetKey so the engine-version chip, which is a
-  // hardware facet key, can be summarized alongside the core ones.
   key: ExplorerFacetKey;
   label: string;
   value: string;
 }
 
-/**
- * Facets rendered as active chips on this page.
- *
- * Every URL-supported facet is summarized when active. Architecture and CPU
- * family do not need always-visible controls to be honest URL state: a shared
- * link that carries either filter must still show the reader what constrained
- * the results.
- */
 const RENDERED_FACET_KEYS = ALL_FACET_KEYS;
 
 const FACET_LABELS: Record<ExplorerFacetKey, string> = {
   benchmark: "Benchmark",
   scale_factor: "Scale factor",
   phase: "Phase",
+  stream_count: "Streams",
   platform: "Platform",
   execution_mode: "Execution",
   tuning_mode: "Tuning",
@@ -1171,11 +1139,9 @@ function CoverageSummary() {
     pickedIds = picking.pickedIds;
     compareHref = picking.compareHref;
   } catch {
-    // Unit tests may render Home without the provider; fall back to empty state.
   }
   const pickingLabel =
     pickedCount === 0 ? "Compare →" : pickedCount === 1 ? "Compare 1 selected →" : `Compare ${pickedCount} selected →`;
-  // At single pick, compareHref is null (needs 2 for comparison), but builder still benefits from ?ids=<one> pinned entry.
   if (!compareHref && pickedIds.length === 1) {
     compareHref = `/results/compare?ids=${encodeURIComponent(pickedIds[0]!)}`;
   }
@@ -1186,8 +1152,6 @@ function CoverageSummary() {
         <span class="rounded-full bg-[var(--bb-bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--bb-fg-muted)]">
           Ranked results only
         </span>
-        {/* Compare handles an empty selection and sends readers to the shared
-            run finder, so this entry point needs no prefilled IDs. */}
         <a
           href={compareHref ?? "/results/compare/"}
           data-testid="home-compare-entrypoint"

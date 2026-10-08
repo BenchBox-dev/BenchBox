@@ -1,12 +1,6 @@
-"""Tests for Snowflake SQL generation branches - coverage extension.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets: _optimize_table_definition CLUSTER BY injection, generate_tuning_clause
-variants, file format SQL, connection config params.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, Mock, patch
 
@@ -53,7 +47,7 @@ class TestSnowflakeOptimizeTableDefinition:
                 clustering_keys=["l_orderkey", "l_shipdate"],
             )
             result = adapter._optimize_table_definition("CREATE TABLE lineitem (l_orderkey BIGINT)")
-            # When clustering_keys are set, it should add CLUSTER BY
+
             assert isinstance(result, str)
 
     def test_returns_unchanged_if_no_cluster_keys(self):
@@ -70,7 +64,7 @@ class TestSnowflakeOptimizeTableDefinition:
             assert "CLUSTER BY" not in result
 
     def test_if_not_exists_kept_without_or_replace(self):
-        """CREATE OR REPLACE ... IF NOT EXISTS is a Snowflake syntax error."""
+
         from benchbox.platforms.snowflake import SnowflakeAdapter
 
         with patch("benchbox.platforms.snowflake.snowflake"):
@@ -85,7 +79,7 @@ class TestSnowflakeOptimizeTableDefinition:
             assert "IF NOT EXISTS" in result
 
     def test_quoted_identifiers_uppercased(self):
-        """Quoted lowercase DDL names become uppercase so folded references resolve."""
+
         from benchbox.platforms.snowflake import SnowflakeAdapter
 
         with patch("benchbox.platforms.snowflake.snowflake"):
@@ -102,10 +96,8 @@ class TestSnowflakeOptimizeTableDefinition:
 
 
 class TestSnowflakeSafeguardDivision:
-    """Test _safeguard_snowflake_division NULLIF normalization."""
-
     def test_division_routed_through_nullif(self):
-        """A zero divisor returns NULL instead of raising on Snowflake."""
+
         from benchbox.platforms.snowflake import SnowflakeAdapter
 
         with patch("benchbox.platforms.snowflake.snowflake"):
@@ -131,7 +123,7 @@ class TestSnowflakeSafeguardDivision:
             assert adapter._safeguard_snowflake_division(sql) == sql
 
     def test_realistic_multi_join_query_guarded(self):
-        """A realistic multi-join ratio query keeps its structure with guarded divisors."""
+
         from benchbox.platforms.snowflake import SnowflakeAdapter
 
         with patch("benchbox.platforms.snowflake.snowflake"):

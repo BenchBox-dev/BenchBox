@@ -1,9 +1,3 @@
-"""Unit tests for _project/scripts/timing_policy_check.py, the wall-clock allowlist policy.
-
-The fast-lane ceiling checks live in ``fast_lane_ceiling_check.py`` and are
-covered by ``test_fast_lane_ceiling_check.py``; nothing here may depend on them.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -13,16 +7,11 @@ from pathlib import Path
 
 import pytest
 
-# medium, not fast: keeps the fast-lane count unchanged (see
-# test_fast_lane_ceiling_check.py). Medium runs in the required pre-merge lane.
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 _ROOT = Path(__file__).resolve().parents[3]
 _PROJECT_SCRIPTS_DIR = str(_ROOT / "_project" / "scripts")
 if _PROJECT_SCRIPTS_DIR not in sys.path:
-    # timing_policy_check.py does `from timing_audit import collect_findings`
-    # and relies on being run as `__main__`, where Python adds the script's
-    # own directory to sys.path. Loading it by path skips that.
     sys.path.insert(0, _PROJECT_SCRIPTS_DIR)
 
 _SCRIPT = _ROOT / "_project" / "scripts" / "timing_policy_check.py"
@@ -54,7 +43,6 @@ def _tree(tmp_path: Path, source: str) -> Path:
 
 
 def _run_main(monkeypatch: pytest.MonkeyPatch, repo: Path, allowlist: Path, *extra: str) -> int:
-    """Run main() against a scratch tree instead of the real repository."""
     real_collect = audit.collect_findings
     monkeypatch.setattr(mod, "collect_findings", lambda _root, roots: real_collect(repo, roots))
     monkeypatch.setattr(
@@ -63,9 +51,6 @@ def _run_main(monkeypatch: pytest.MonkeyPatch, repo: Path, allowlist: Path, *ext
     return mod.main()
 
 
-# ------------------------------------------------------------------ #
-# Allowlist matching                                                   #
-# ------------------------------------------------------------------ #
 def test_is_allowed_matches_on_path_glob_only() -> None:
     entry = {"path_glob": "pkg/*.py"}
     assert mod._is_allowed("pkg/mod.py", "t = time.time() - s", "time.time", entry)
@@ -101,9 +86,6 @@ def test_load_allowlist_treats_missing_entries_as_empty(tmp_path: Path) -> None:
     assert mod._load_allowlist(empty) == []
 
 
-# ------------------------------------------------------------------ #
-# main(): violation accounting                                         #
-# ------------------------------------------------------------------ #
 def test_strict_fails_on_a_non_allowlisted_wall_clock_duration(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture
 ) -> None:
@@ -160,9 +142,6 @@ def test_unclassified_wall_clock_is_informational_only(
     assert "Violations: 0" in out
 
 
-# ------------------------------------------------------------------ #
-# Separation from the fast-lane ceiling                                #
-# ------------------------------------------------------------------ #
 @pytest.mark.parametrize("flag", ["--skip-fast-lane", "--only-fast-lane", "--emit-fast-count", "--delta-check"])
 def test_wall_clock_check_does_not_expose_fast_lane_flags(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, flag: str

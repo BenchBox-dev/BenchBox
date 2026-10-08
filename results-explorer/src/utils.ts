@@ -1,7 +1,3 @@
-// ---------------------------------------------------------------------------
-// Shared display utilities
-// ---------------------------------------------------------------------------
-
 import { formatLatencyMs, formatPowerScore, formatPowerScoreExact } from "./lib/metricFormatters";
 
 export const BENCHMARK_LABELS: Record<string, string> = {
@@ -35,8 +31,6 @@ export function humanizeBenchmark(benchmark: string): string {
   return BENCHMARK_LABELS[benchmark] ?? benchmark.toUpperCase();
 }
 
-/** True when the slug names a benchmark family the explorer knows about,
- *  even if no rows have been ingested yet. */
 export function isKnownBenchmark(benchmark: string): boolean {
   return Object.prototype.hasOwnProperty.call(BENCHMARK_LABELS, benchmark);
 }
@@ -53,12 +47,10 @@ export function fmtScoreExact(score: number | null | undefined): string {
   return formatPowerScoreExact(score).valueText;
 }
 
-/** Format a millisecond value for display. */
 export function fmtMs(ms: number): string {
   return formatLatencyMs(ms).valueText;
 }
 
-/** Format a geomean_ms value, returning "N/A" for null/undefined. */
 export function fmtGeomean(ms: number | null | undefined): string {
   return ms != null ? fmtMs(ms) : "N/A";
 }
@@ -67,21 +59,10 @@ export function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
-/**
- * Shorten a full-length identity hash (e.g. the ADR-1 requested-config /
- * applied-ledger SHA-256s, 64 hex chars) to a readable prefix for display.
- * Returns short hashes unchanged. Display-only helper: the full value is kept
- * elsewhere (e.g. a `title` tooltip) so nothing depends on the prefix for
- * identity.
- */
 export function shortHash(hash: string, length = 12): string {
   return hash.length > length ? hash.slice(0, length) : hash;
 }
 
-/**
- * Render the parenthetical compliance tag used next to benchmark titles.
- * Mirrors the `compliance_class` values written by the Python pipeline.
- */
 export function complianceLabel(complianceClass: string | null | undefined): string {
   switch (complianceClass) {
     case "unofficial_subscale":

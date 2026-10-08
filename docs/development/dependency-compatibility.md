@@ -12,9 +12,11 @@ Validate the lock against the manifest or generate the current compatibility
 summary directly from those files:
 
 ```bash
-make dependency-check            # Validate lock vs. pyproject specs
-make dependency-check ARGS=--matrix  # Also print compatibility summary
+make dependency-check
+make dependency-check ARGS=--matrix
 ```
+
+The first command validates the lock against the `pyproject.toml` specs. The second also prints the compatibility summary.
 
 The target calls `python -m benchbox.utils.dependency_validation`, which fails
 when a declared dependency has no matching locked version.

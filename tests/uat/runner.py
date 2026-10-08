@@ -1,14 +1,3 @@
-"""Single-cell `benchbox run` execution.
-
-Build the argv, capture output to a per-run log, and read the quiet
-result-JSON path on success.
-
-Sequential platform execution discipline (UAT W3 line 222 in
-_project/handoffs/results-explorer-uat-retrospective-20260502.md):
-this module exposes one-cell-at-a-time invocation only. Higher layers
-must iterate sequentially.
-"""
-
 from __future__ import annotations
 
 import datetime as _dt
@@ -31,10 +20,6 @@ from tests.uat.matrix import benchbox_run_argv, benchbox_run_official_argv
 from tests.uat.throughput import resolve_official_result_path, validate_throughput_result
 from tests.uat.timeouts import TimeoutResult, run_with_timeout
 
-# SubmitTerminalState is re-exported so existing UAT consumers
-# (tests/uat/_cli.py, phases/execute.py, phases/package.py) keep importing it
-# from tests.uat.runner. The classification *policy* now lives in
-# benchbox.core.results.submit_classification, shared with `benchbox submit`.
 __all__ = [
     "CellResult",
     "LOAD_FAILURE_MARKER",
@@ -48,27 +33,20 @@ LOAD_FAILURE_MARKER = "BENCHBOX_LOAD_FAILURE_JSON="
 
 @dataclass(frozen=True)
 class CellResult:
-    """Outcome of a single (platform, benchmark, scale) cell."""
-
     platform: str
     benchmark: str
     scale: float
-    status: str  # "passed" | "failed" | "timed-out"
+    status: str
     exit_code: int
     elapsed_s: float
     log_path: Path
     result_path: Path | None
     submit_terminal_state: str = SubmitTerminalState.submittable.value
-    # Set only for official/throughput cells (see tests.uat.throughput):
-    # "ok" on a clean pass, else the validation failure reason. None for
-    # every other (non-throughput) cell.
     throughput_check: str | None = None
-    # Durable ClickHouse load-failure sidecar written beside the cell log.
     load_failure_path: Path | None = None
 
 
 def last_nonempty_output_line(log_text: str) -> str | None:
-    """Return the final subprocess output line from a UAT cell log."""
     for line in reversed(log_text.splitlines()):
         stripped = line.strip()
         if stripped and not stripped.startswith("# "):
@@ -77,17 +55,10 @@ def last_nonempty_output_line(log_text: str) -> str | None:
 
 
 def classify_for_submit(result_json: Path | str | None) -> SubmitTerminalState:
-    """Classify a result JSON for submittability (thin adapter over shared policy).
-
-    Delegates to ``benchbox.core.results.submit_classification`` so UAT and
-    ``benchbox submit`` apply identical refusal policy; this wrapper only
-    preserves the UAT-facing call site and vocabulary.
-    """
     return classify_result_path(result_json)
 
 
 def submit_state_is_cell_failure(state: SubmitTerminalState | str) -> bool:
-    """Return True for submit states that should downgrade a passed cell to FAILED."""
     normalized = state.value if isinstance(state, SubmitTerminalState) else str(state)
     return normalized in {
         SubmitTerminalState.query_failure.value,
@@ -102,20 +73,10 @@ def _default_log_path(log_dir: Path, platform: str, benchmark: str, scale: float
     return log_dir / f"{platform}_{benchmark}_{scale}_{timestamp}.log"
 
 
-# Upper bound for the verbose diagnostic re-run triggered when a `--quiet`
-# cell exits non-zero without emitting any output. Failures surface fast, so a
-# tight cap keeps the re-run cheap while still capturing the real error.
 DIAGNOSTIC_RERUN_TIMEOUT_S = 180
 
 
 def _append_diagnostic_rerun(log_fh, argv: list[str], *, timeout_s: int, env: dict[str, str]) -> None:
-    """Re-run a failed cell verbosely and append its output to the log.
-
-    Invoked only when the original ``--quiet`` invocation exited non-zero
-    without emitting any output (``--quiet`` suppresses benchbox's own error
-    reporting). Output is written as plain lines so ``_cell_log_tail`` captures
-    it into ``failure_tail``. Best-effort: never raises into the caller.
-    """
     log_fh.write("[uat] verbose diagnostic re-run (--quiet suppressed the original error):\n")
     log_fh.flush()
     try:
@@ -130,12 +91,11 @@ def _append_diagnostic_rerun(log_fh, argv: list[str], *, timeout_s: int, env: di
         if text:
             log_fh.write(text if text.endswith("\n") else text + "\n")
         log_fh.write(f"[uat] diagnostic re-run exit_code={rerun.exit_code} timed_out={rerun.timed_out}\n")
-    except Exception as exc:  # noqa: BLE001 - diagnostics must never mask the original failure
+    except Exception as exc:
         log_fh.write(f"[uat] diagnostic re-run error {type(exc).__name__}: {exc}\n")
 
 
 def _extract_load_failure(log_text: str) -> dict[str, object] | None:
-    """Extract the canonical structured load-failure marker from a cell log."""
 
     for line in log_text.splitlines():
         if not line.startswith(LOAD_FAILURE_MARKER):
@@ -150,7 +110,6 @@ def _extract_load_failure(log_text: str) -> dict[str, object] | None:
 
 
 def _extract_load_failure_from_path(log_path: Path) -> dict[str, object] | None:
-    """Scan a cell log incrementally for its structured load-failure marker."""
 
     try:
         with log_path.open("r", encoding="utf-8") as handle:
@@ -176,7 +135,6 @@ def _write_load_failure_sidecar(
     scale: float,
     payload: dict[str, object],
 ) -> Path:
-    """Atomically persist the structured load failure next to its cell log."""
 
     sidecar = log_path.with_suffix(".load_failure.json")
     artifact = dict(payload)
@@ -211,7 +169,6 @@ def _materialize_load_failure_sidecar(
     runs_dir: Path,
     result_path: Path | None,
 ) -> tuple[Path | None, Path | None]:
-    """Persist a marker payload and return its optional result and sidecar paths."""
 
     payload = _extract_load_failure_from_path(log_path)
     if payload is None:
@@ -251,7 +208,6 @@ def _diagnostic_rerun_argv(
     streams: int | None,
     seed: int | None,
 ) -> list[str]:
-    """Return the verbose rerun argv for a quiet cell that failed silently."""
     output_args = ("--output", str(runs_dir / "datagen"), *extra_args)
     if official:
         return benchbox_run_official_argv(
@@ -283,7 +239,6 @@ def _resolve_cell_result_path(
     stdout_text: str,
     runs_dir: Path,
 ) -> Path | None:
-    """Resolve the exported result JSON for one cell from its stdout contract."""
     if official:
         result_path = resolve_official_result_path(
             runs_dir / "results",
@@ -317,13 +272,6 @@ def run_cell(
     seed: int | None = None,
     now: _dt.datetime | None = None,
 ) -> CellResult:
-    """Run a single cell end-to-end and return the cell result.
-
-    ``official``/``streams``/``seed`` route the cell through `benchbox
-    run-official --streams N` instead of the default `benchbox run` --
-    the only CLI surface that can request N>1 concurrent throughput streams
-    today (see `tests.uat.throughput`). `official=True` requires `streams`.
-    """
     if official and streams is None:
         raise ValueError("run_cell(official=True) requires `streams`")
     now = now or _dt.datetime.now()
@@ -331,10 +279,6 @@ def run_cell(
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = _default_log_path(log_dir, platform, benchmark, scale, now)
     runs_dir = _default_benchmark_runs_dir() if benchmark_runs_dir is None else Path(benchmark_runs_dir).expanduser()
-    # Pre-run artifact hygiene snapshot. When the run is configured for an
-    # external root (runs_dir resolves outside cwd), the worktree-local
-    # benchmark_runs/ must not grow — see tests.uat.artifact_hygiene and the
-    # 2026-06-01 datagen-leak incident. Default local runs leave this None.
     external_root = configured_external_root(output=runs_dir)
     local_snapshot = snapshot_local_runs() if external_root is not None else None
     if official:
@@ -385,11 +329,6 @@ def run_cell(
         if timeout_result.timed_out:
             log_fh.write(f"# UAT_TIMEOUT timeout_s={timeout_s} exit_code={timeout_result.exit_code}\n")
         elif timeout_result.exit_code != 0 and not stdout_text.strip() and not stderr_has_content:
-            # Both `benchbox run` and `run-official` now run quiet under UAT,
-            # so a nonzero empty-output failure may just mean the CLI
-            # suppressed its own diagnostic text before exiting. Re-run the
-            # SAME cell verbosely (preserving official/streams/seed wiring) and
-            # append that output to the log.
             rerun_argv = _diagnostic_rerun_argv(
                 official=official,
                 platform=platform,
@@ -411,14 +350,8 @@ def run_cell(
             )
 
     if external_root is not None and local_snapshot is not None:
-        # Fail loudly if datagen (or anything else) leaked into the local tree.
         assert_no_local_growth(local_snapshot, external_root)
 
-    # A failed query can still export a result bundle before the CLI exits
-    # nonzero. Preserve that path so reporting/classification can explain the
-    # query failure instead of misclassifying it as missing JSON. Official
-    # cells use the same helper, but read the backward-compatible emitted-path
-    # wrapper instead of globbing the results directory.
     result_path = _resolve_cell_result_path(
         official=official,
         stdout_text=stdout_text,
@@ -458,17 +391,10 @@ def run_cell(
                     scale=scale,
                 )
                 throughput_check = reason
-                # Only a passed cell can be downgraded here -- a cell that is
-                # already failed/timed-out must keep that status (mirrors the
-                # submit-classification guard above at `status == "passed"`).
                 if not ok and status == "passed":
                     status = "failed"
                     exit_code = exit_code or 1
         elif status == "timed-out":
-            # The cell timed out before exporting a result JSON; record why
-            # throughput validation was skipped instead of the generic
-            # "no result JSON resolved" reason so the artifact self-explains,
-            # and do not overwrite the timed-out status.
             throughput_check = "not validated: cell timed out"
         else:
             throughput_check = "no result JSON resolved for throughput validation"

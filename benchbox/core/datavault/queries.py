@@ -1,15 +1,6 @@
-"""Data Vault query definitions adapted from TPC-H.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides 22 queries adapted from TPC-H to work with
-the Data Vault 2.0 schema (Hub-Link-Satellite model).
-
-Query parameters follow TPC-H specification for reproducible benchmarking.
-Parameters can be generated deterministically based on seed and scale factor.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 import random
@@ -28,7 +19,6 @@ def _load_query_parameter_specs() -> dict[str, list[str]]:
         return yaml.safe_load(handle) or {}
 
 
-# TPC-H reference data for parameter generation
 _QUERY_PARAMETER_SPECS = _load_query_parameter_specs()
 REGIONS = _QUERY_PARAMETER_SPECS["regions"]
 NATIONS = _QUERY_PARAMETER_SPECS["nations"]
@@ -44,64 +34,35 @@ BRAND_NUMBERS = _QUERY_PARAMETER_SPECS["brand_numbers"]
 
 @dataclass
 class QueryParameters:
-    """Parameters for a specific query execution."""
-
     query_id: int
     params: dict[str, Any]
     seed: Optional[int] = None
     scale_factor: float = 1.0
 
     def as_dict(self) -> dict[str, Any]:
-        """Return the query parameters as a dictionary."""
         return self.params.copy()
 
 
 class DataVaultParameterGenerator:
-    """Generates TPC-H-compliant parameters for Data Vault queries.
-
-    Parameters are generated deterministically based on seed and scale factor,
-    following TPC-H specification 2.1.3 for substitution parameters.
-    """
-
     def __init__(self, seed: Optional[int] = None, scale_factor: float = 1.0) -> None:
-        """Initialize parameter generator.
-
-        Args:
-            seed: Random seed for reproducible parameter generation.
-                  If None, uses current time.
-            scale_factor: TPC-H scale factor (affects some parameter ranges).
-        """
         self.scale_factor = scale_factor
         self._seed = seed if seed is not None else int(random.random() * 100000)
         self._rng = random.Random(self._seed)
 
     @property
     def seed(self) -> int:
-        """Get the current seed."""
         return self._seed
 
     def _reset_rng(self, query_id: int, stream_id: int = 0) -> None:
-        """Reset RNG with query-specific seed for reproducibility."""
-        # Combine base seed, query_id, and stream_id for unique but reproducible params
         combined_seed = (self._seed * 7919 + query_id * 3037 + stream_id * 1009) % 2147483647
         self._rng.seed(combined_seed)
 
     def generate_parameters(self, query_id: int, stream_id: int = 0) -> QueryParameters:
-        """Generate parameters for a specific query.
-
-        Args:
-            query_id: Query number (1-22)
-            stream_id: Stream ID for multi-stream execution (affects randomization)
-
-        Returns:
-            QueryParameters containing all parameters for the query
-        """
         self._reset_rng(query_id, stream_id)
         params = self._generate_query_params(query_id)
         return QueryParameters(query_id=query_id, params=params, seed=self._seed, scale_factor=self.scale_factor)
 
     def _generate_query_params(self, query_id: int) -> dict[str, Any]:
-        """Generate parameters for a specific query ID."""
         generators = {
             1: self._q1_params,
             2: self._q2_params,
@@ -129,130 +90,104 @@ class DataVaultParameterGenerator:
         return generators.get(query_id, dict)()
 
     def _random_date(self, start_year: int, end_year: int) -> date:
-        """Generate a random date within range."""
         start = date(start_year, 1, 1)
         end = date(end_year, 12, 31)
         delta = (end - start).days
         return start + timedelta(days=self._rng.randint(0, delta))
 
     def _q1_params(self) -> dict[str, Any]:
-        """Q1: DELTA between 60 and 120 inclusive."""
         delta = self._rng.randint(60, 120)
         return {"delta": delta}
 
     def _q2_params(self) -> dict[str, Any]:
-        """Q2: SIZE (1-50), TYPE suffix, REGION."""
         size = self._rng.randint(1, 50)
         type_suffix = self._rng.choice(TYPES_SYLLABLE3)
         region = self._rng.choice(REGIONS)
         return {"size": size, "type_suffix": type_suffix, "region": region}
 
     def _q3_params(self) -> dict[str, Any]:
-        """Q3: SEGMENT, DATE (first 5 years of TPC-H data range)."""
         segment = self._rng.choice(SEGMENTS)
-        # TPC-H dates range from 1992-01-01 to 1998-12-31
-        # Q3 uses a date in 1995 (middle of range)
         dt = date(1995, self._rng.randint(1, 3), self._rng.randint(1, 28))
         return {"segment": segment, "date": dt.isoformat()}
 
     def _q4_params(self) -> dict[str, Any]:
-        """Q4: DATE (any month in 1993-1997)."""
         year = self._rng.randint(1993, 1997)
-        month = self._rng.randint(1, 10)  # Max month 10 to allow 3-month interval
+        month = self._rng.randint(1, 10)
         dt = date(year, month, 1)
         return {"date": dt.isoformat()}
 
     def _q5_params(self) -> dict[str, Any]:
-        """Q5: REGION, DATE (first day of year in 1993-1997)."""
         region = self._rng.choice(REGIONS)
         year = self._rng.randint(1993, 1997)
         return {"region": region, "date": date(year, 1, 1).isoformat()}
 
     def _q6_params(self) -> dict[str, Any]:
-        """Q6: DATE, DISCOUNT (0.02-0.09), QUANTITY (24-25)."""
         year = self._rng.randint(1993, 1997)
         discount = round(self._rng.uniform(0.02, 0.09), 2)
         quantity = self._rng.randint(24, 25)
         return {"date": date(year, 1, 1).isoformat(), "discount": discount, "quantity": quantity}
 
     def _q7_params(self) -> dict[str, Any]:
-        """Q7: Two nations from TPC-H nation list."""
         nations = self._rng.sample(NATIONS, 2)
         return {"nation1": nations[0], "nation2": nations[1]}
 
     def _q8_params(self) -> dict[str, Any]:
-        """Q8: NATION, REGION, TYPE (full type string)."""
         nation = self._rng.choice(NATIONS)
         region = self._rng.choice(REGIONS)
         part_type = f"{self._rng.choice(TYPES_SYLLABLE1)} {self._rng.choice(TYPES_SYLLABLE2)} {self._rng.choice(TYPES_SYLLABLE3)}"
         return {"nation": nation, "region": region, "type": part_type}
 
     def _q9_params(self) -> dict[str, Any]:
-        """Q9: COLOR (any color from P_NAME generation)."""
         color = self._rng.choice(COLORS)
         return {"color": color}
 
     def _q10_params(self) -> dict[str, Any]:
-        """Q10: DATE (first day of month in 1993-1995)."""
         year = self._rng.randint(1993, 1995)
-        month = self._rng.randint(1, 10)  # Max month 10 for 3-month interval
+        month = self._rng.randint(1, 10)
         return {"date": date(year, month, 1).isoformat()}
 
     def _q11_params(self) -> dict[str, Any]:
-        """Q11: NATION, FRACTION (0.0001/SF)."""
         nation = self._rng.choice(NATIONS)
-        # Fraction is always 0.0001/SF per TPC-H spec
         fraction = 0.0001 / self.scale_factor
         return {"nation": nation, "fraction": fraction}
 
     def _q12_params(self) -> dict[str, Any]:
-        """Q12: Two ship modes, DATE."""
         modes = self._rng.sample(SHIPMODES, 2)
         year = self._rng.randint(1993, 1997)
         return {"shipmode1": modes[0], "shipmode2": modes[1], "date": date(year, 1, 1).isoformat()}
 
     def _q13_params(self) -> dict[str, Any]:
-        """Q13: WORD1, WORD2 for comment filtering."""
         words = ["special", "pending", "unusual", "express", "furious", "sly", "careful", "unusual"]
         word1 = self._rng.choice(words)
         word2 = self._rng.choice(["requests", "packages", "accounts", "deposits"])
         return {"word1": word1, "word2": word2}
 
     def _q14_params(self) -> dict[str, Any]:
-        """Q14: DATE (first day of month in 1993-1997)."""
         year = self._rng.randint(1993, 1997)
         month = self._rng.randint(1, 12)
         return {"date": date(year, month, 1).isoformat()}
 
     def _q15_params(self) -> dict[str, Any]:
-        """Q15: DATE (first day of month, with 3-month interval)."""
         year = self._rng.randint(1993, 1997)
-        month = self._rng.randint(1, 10)  # Max month 10 for 3-month interval
+        month = self._rng.randint(1, 10)
         return {"date": date(year, month, 1).isoformat()}
 
     def _q16_params(self) -> dict[str, Any]:
-        """Q16: BRAND, TYPE, SIZE list (8 sizes)."""
-        # Brand to exclude (Brand#45 in default)
         brand = self._rng.choice(BRAND_NUMBERS)
-        # Type prefix to exclude
         type_prefix = f"{self._rng.choice(TYPES_SYLLABLE2[:3])} {self._rng.choice(TYPES_SYLLABLE2)}"
-        # 8 distinct sizes from 1-50
         sizes = sorted(self._rng.sample(range(1, 51), 8))
         return {"brand": brand, "type_prefix": type_prefix, "sizes": sizes}
 
     def _q17_params(self) -> dict[str, Any]:
-        """Q17: BRAND, CONTAINER."""
         brand = self._rng.choice(BRAND_NUMBERS)
         container = self._rng.choice(CONTAINERS)
         return {"brand": brand, "container": container}
 
     def _q18_params(self) -> dict[str, Any]:
-        """Q18: QUANTITY threshold (312-315)."""
         quantity = self._rng.randint(312, 315)
         return {"quantity": quantity}
 
     def _q19_params(self) -> dict[str, Any]:
-        """Q19: Three brands, three quantities."""
         brands = self._rng.sample(BRAND_NUMBERS, 3)
         quantities = [self._rng.randint(1, 10), self._rng.randint(10, 20), self._rng.randint(20, 30)]
         return {
@@ -265,40 +200,22 @@ class DataVaultParameterGenerator:
         }
 
     def _q20_params(self) -> dict[str, Any]:
-        """Q20: COLOR, DATE, NATION."""
         color = self._rng.choice(COLORS)
         year = self._rng.randint(1993, 1997)
         nation = self._rng.choice(NATIONS)
         return {"color": color, "date": date(year, 1, 1).isoformat(), "nation": nation}
 
     def _q21_params(self) -> dict[str, Any]:
-        """Q21: NATION."""
         nation = self._rng.choice(NATIONS)
         return {"nation": nation}
 
     def _q22_params(self) -> dict[str, Any]:
-        """Q22: 7 distinct country codes (2-digit phone prefixes)."""
-        # TPC-H uses country codes 10-34 (mapped to 25 nations)
         codes = sorted(self._rng.sample(range(10, 35), 7))
         return {"country_codes": [str(c) for c in codes]}
 
 
 class DataVaultQueryManager:
-    """Manages Data Vault queries adapted from TPC-H.
-
-    All 22 TPC-H queries are adapted to work with the Data Vault schema,
-    using Hub→Satellite→Link join patterns and filtering for current
-    records (LOAD_END_DTS IS NULL).
-
-    Queries support parameter substitution via :param_name placeholders.
-    Use get_parameterized_query() for parameterized execution.
-    """
-
-    # Query templates with :param_name placeholders
-    # Each query uses Hub-Link-Satellite joins with current record filtering
     QUERY_TEMPLATES: dict[int, str] = {
-        # Q1: Pricing Summary Report (LINEITEM aggregation)
-        # Parameters: :delta (days to subtract from 1998-12-01)
         1: """
 SELECT
     sl.l_returnflag,
@@ -318,8 +235,6 @@ WHERE sl.l_shipdate <= DATE '1998-12-01' - INTERVAL ':delta days'
 GROUP BY sl.l_returnflag, sl.l_linestatus
 ORDER BY sl.l_returnflag, sl.l_linestatus
         """,
-        # Q2: Minimum Cost Supplier
-        # Parameters: :size, :type_suffix, :region
         2: """
 SELECT
     ss.s_acctbal,
@@ -361,8 +276,6 @@ WHERE sp.p_size = :size
 ORDER BY ss.s_acctbal DESC, sn.n_name, ss.s_name, hp.p_partkey
 LIMIT 100
         """,
-        # Q3: Shipping Priority
-        # Parameters: :segment, :date
         3: """
 SELECT
     hl.l_orderkey,
@@ -384,8 +297,6 @@ GROUP BY hl.l_orderkey, so.o_orderdate, so.o_shippriority
 ORDER BY revenue DESC, so.o_orderdate
 LIMIT 10
         """,
-        # Q4: Order Priority Checking
-        # Parameters: :date
         4: """
 SELECT
     so.o_orderpriority,
@@ -404,8 +315,6 @@ WHERE so.o_orderdate >= DATE ':date'
 GROUP BY so.o_orderpriority
 ORDER BY so.o_orderpriority
         """,
-        # Q5: Local Supplier Volume
-        # Parameters: :region, :date
         5: """
 SELECT
     sn.n_name,
@@ -430,8 +339,6 @@ WHERE sr.r_name = ':region'
 GROUP BY sn.n_name
 ORDER BY revenue DESC
         """,
-        # Q6: Forecasting Revenue Change
-        # Parameters: :date, :discount, :quantity
         6: """
 SELECT
     SUM(sl.l_extendedprice * sl.l_discount) AS revenue
@@ -442,8 +349,6 @@ WHERE sl.l_shipdate >= DATE ':date'
   AND sl.l_discount BETWEEN :discount - 0.01 AND :discount + 0.01
   AND sl.l_quantity < :quantity
         """,
-        # Q7: Volume Shipping
-        # Parameters: :nation1, :nation2
         7: """
 SELECT
     supp_nation,
@@ -475,8 +380,6 @@ FROM (
 GROUP BY supp_nation, cust_nation, l_year
 ORDER BY supp_nation, cust_nation, l_year
         """,
-        # Q8: National Market Share
-        # Parameters: :nation, :region, :type
         8: """
 SELECT
     o_year,
@@ -510,8 +413,6 @@ FROM (
 GROUP BY o_year
 ORDER BY o_year
         """,
-        # Q9: Product Type Profit Measure
-        # Parameters: :color
         9: """
 SELECT
     nation,
@@ -539,8 +440,6 @@ FROM (
 GROUP BY nation, o_year
 ORDER BY nation, o_year DESC
         """,
-        # Q10: Returned Item Reporting
-        # Parameters: :date
         10: """
 WITH lineitem_revenue_by_order AS (
     SELECT
@@ -582,8 +481,6 @@ GROUP BY hc.c_custkey, sc.c_name, sc.c_acctbal, sc.c_phone, sn.n_name, sc.c_addr
 ORDER BY revenue DESC
 LIMIT 20
         """,
-        # Q11: Important Stock Identification
-        # Parameters: :nation, :fraction
         11: """
 SELECT
     hp.p_partkey,
@@ -609,8 +506,6 @@ HAVING SUM(sps.ps_supplycost * sps.ps_availqty) > (
 )
 ORDER BY value DESC
         """,
-        # Q12: Shipping Modes and Order Priority
-        # Parameters: :shipmode1, :shipmode2, :date
         12: """
 SELECT
     sl.l_shipmode,
@@ -631,8 +526,6 @@ WHERE sl.l_shipmode IN (':shipmode1', ':shipmode2')
 GROUP BY sl.l_shipmode
 ORDER BY sl.l_shipmode
         """,
-        # Q13: Customer Distribution
-        # Parameters: :word1, :word2
         13: """
 SELECT
     c_count,
@@ -651,8 +544,6 @@ FROM (
 GROUP BY c_count
 ORDER BY custdist DESC, c_count DESC
         """,
-        # Q14: Promotion Effect
-        # Parameters: :date
         14: """
 SELECT
     100.00 * SUM(CASE WHEN sp.p_type LIKE 'PROMO%'
@@ -665,8 +556,6 @@ JOIN sat_part sp ON hp.hk_part = sp.hk_part AND sp.load_end_dts IS NULL
 WHERE sl.l_shipdate >= DATE ':date'
   AND sl.l_shipdate < DATE ':date' + INTERVAL '1' MONTH
         """,
-        # Q15: Top Supplier (using CTE instead of VIEW)
-        # Parameters: :date
         15: """
 WITH revenue AS (
     SELECT
@@ -690,8 +579,6 @@ JOIN revenue r ON hs.hk_supplier = r.supplier_no
 WHERE r.total_revenue = (SELECT MAX(total_revenue) FROM revenue)
 ORDER BY hs.s_suppkey
         """,
-        # Q16: Parts/Supplier Relationship
-        # Parameters: :brand, :type_prefix, :sizes (list)
         16: """
 SELECT
     sp.p_brand,
@@ -710,8 +597,6 @@ WHERE sp.p_brand <> ':brand'
 GROUP BY sp.p_brand, sp.p_type, sp.p_size
 ORDER BY supplier_cnt DESC, sp.p_brand, sp.p_type, sp.p_size
         """,
-        # Q17: Small-Quantity-Order Revenue
-        # Parameters: :brand, :container
         17: """
 SELECT
     SUM(sl.l_extendedprice) / 7.0 AS avg_yearly
@@ -728,8 +613,6 @@ WHERE sp.p_brand = ':brand'
       WHERE ll2.hk_part = hp.hk_part
   )
         """,
-        # Q18: Large Volume Customer
-        # Parameters: :quantity
         18: """
 SELECT
     sc.c_name,
@@ -755,8 +638,6 @@ JOIN (
 ORDER BY so.o_totalprice DESC, so.o_orderdate
 LIMIT 100
         """,
-        # Q19: Discounted Revenue
-        # Parameters: :brand1, :brand2, :brand3, :quantity1, :quantity2, :quantity3
         19: """
 SELECT
     SUM(sl.l_extendedprice * (1 - sl.l_discount)) AS revenue
@@ -787,8 +668,6 @@ WHERE (
     AND sl.l_shipinstruct = 'DELIVER IN PERSON'
 )
         """,
-        # Q20: Potential Part Promotion
-        # Parameters: :color, :date, :nation
         20: """
 SELECT
     ss.s_name,
@@ -818,8 +697,6 @@ WHERE sn.n_name = ':nation'
   )
 ORDER BY ss.s_name
         """,
-        # Q21: Suppliers Who Kept Orders Waiting
-        # Parameters: :nation
         21: """
 SELECT
     ss.s_name,
@@ -852,8 +729,6 @@ GROUP BY ss.s_name
 ORDER BY numwait DESC, ss.s_name
 LIMIT 100
         """,
-        # Q22: Global Sales Opportunity
-        # Parameters: :country_codes (list of 7 codes)
         22: """
 SELECT
     cntrycode,
@@ -884,7 +759,6 @@ ORDER BY cntrycode
         """,
     }
 
-    # Default parameters for deterministic query generation.
     DEFAULT_PARAMS: dict[int, dict[str, Any]] = {
         1: {"delta": 90},
         2: {"size": 15, "type_suffix": "BRASS", "region": "EUROPE"},
@@ -918,110 +792,51 @@ ORDER BY cntrycode
     }
 
     def __init__(self, seed: Optional[int] = None, scale_factor: float = 1.0) -> None:
-        """Initialize the query manager.
-
-        Args:
-            seed: Random seed for parameter generation (for reproducibility)
-            scale_factor: Scale factor (affects some parameter ranges)
-        """
         self._param_generator = DataVaultParameterGenerator(seed=seed, scale_factor=scale_factor)
         self._query_cache: dict[tuple[int, int], str] = {}
 
     def _substitute_parameters(self, template: str, params: dict[str, Any]) -> str:
-        """Substitute parameters into a query template.
-
-        Args:
-            template: Query template with :param_name placeholders
-            params: Dictionary of parameter values
-
-        Returns:
-            SQL with parameters substituted
-        """
         result = template
 
         for name, value in params.items():
             if isinstance(value, list):
-                # Handle list parameters (e.g., sizes, country_codes)
                 if all(isinstance(v, str) for v in value):
-                    # String list: quote each value
                     list_str = ", ".join(f"'{v}'" for v in value)
                 else:
-                    # Numeric list: no quotes
                     list_str = ", ".join(str(v) for v in value)
                 result = result.replace(f":{name}", list_str)
             elif isinstance(value, (int, float)):
-                # Numeric values: no quotes (handle both quoted and unquoted contexts)
-                result = result.replace(f"':{name}'", str(value))  # For quoted context
+                result = result.replace(f"':{name}'", str(value))
                 result = result.replace(f":{name}", str(value))
             else:
-                # String values: already quoted in template for most cases
                 result = result.replace(f":{name}", str(value))
 
         return result
 
     def get_query(self, query_id: Union[int, str], params: Optional[dict[str, Any]] = None) -> str:
-        """Get a query by ID with parameter substitution.
-
-        Args:
-            query_id: Query identifier (1-22)
-            params: Optional parameter overrides. If None, uses DEFAULT_PARAMS.
-
-        Returns:
-            SQL query text with parameters substituted
-
-        Raises:
-            ValueError: If query_id is not valid
-        """
         qid = int(query_id) if isinstance(query_id, str) else query_id
 
         if qid not in self.QUERY_TEMPLATES:
             raise ValueError(f"Invalid query ID: {query_id}. Valid IDs: 1-22")
 
-        # Use default params if none provided
         if params is None:
             params = self.DEFAULT_PARAMS[qid]
 
         return self._substitute_parameters(self.QUERY_TEMPLATES[qid], params).strip()
 
     def get_parameterized_query(self, query_id: Union[int, str], stream_id: int = 0) -> tuple[str, QueryParameters]:
-        """Get a query with randomly generated parameters.
-
-        Uses the parameter generator with the configured seed to generate
-        TPC-H-compliant parameters deterministically.
-
-        Args:
-            query_id: Query identifier (1-22)
-            stream_id: Stream ID for multi-stream execution
-
-        Returns:
-            Tuple of (SQL query text, QueryParameters metadata)
-
-        Raises:
-            ValueError: If query_id is not valid
-        """
         qid = int(query_id) if isinstance(query_id, str) else query_id
 
         if qid not in self.QUERY_TEMPLATES:
             raise ValueError(f"Invalid query ID: {query_id}. Valid IDs: 1-22")
 
-        # Generate parameters
         query_params = self._param_generator.generate_parameters(qid, stream_id)
 
-        # Substitute into template
         sql = self._substitute_parameters(self.QUERY_TEMPLATES[qid], query_params.params).strip()
 
         return sql, query_params
 
     def get_all_queries(self, params: Optional[dict[int, dict[str, Any]]] = None) -> dict[Union[int, str], str]:
-        """Get all queries with parameter substitution.
-
-        Args:
-            params: Optional dict mapping query IDs to parameter dicts.
-                   If None, uses DEFAULT_PARAMS for all queries.
-
-        Returns:
-            Dictionary mapping query IDs to SQL text
-        """
         result: dict[Union[int, str], str] = {}
         for qid in self.QUERY_TEMPLATES:
             query_params = params.get(qid) if params else None
@@ -1029,39 +844,15 @@ ORDER BY cntrycode
         return result
 
     def get_all_parameterized_queries(self, stream_id: int = 0) -> dict[int, tuple[str, QueryParameters]]:
-        """Get all queries with randomly generated parameters.
-
-        Args:
-            stream_id: Stream ID for multi-stream execution
-
-        Returns:
-            Dictionary mapping query IDs to (SQL, QueryParameters) tuples
-        """
         result: dict[int, tuple[str, QueryParameters]] = {}
         for qid in self.QUERY_TEMPLATES:
             result[qid] = self.get_parameterized_query(qid, stream_id)
         return result
 
     def get_query_count(self) -> int:
-        """Get the total number of queries.
-
-        Returns:
-            Number of queries (22)
-        """
         return len(self.QUERY_TEMPLATES)
 
     def get_template(self, query_id: Union[int, str]) -> str:
-        """Get the raw query template without parameter substitution.
-
-        Args:
-            query_id: Query identifier (1-22)
-
-        Returns:
-            Query template with :param_name placeholders
-
-        Raises:
-            ValueError: If query_id is not valid
-        """
         qid = int(query_id) if isinstance(query_id, str) else query_id
 
         if qid not in self.QUERY_TEMPLATES:
@@ -1070,17 +861,6 @@ ORDER BY cntrycode
         return self.QUERY_TEMPLATES[qid].strip()
 
     def get_default_params(self, query_id: Union[int, str]) -> dict[str, Any]:
-        """Get the default parameters for a query.
-
-        Args:
-            query_id: Query identifier (1-22)
-
-        Returns:
-            Dictionary of default parameter values
-
-        Raises:
-            ValueError: If query_id is not valid
-        """
         qid = int(query_id) if isinstance(query_id, str) else query_id
 
         if qid not in self.DEFAULT_PARAMS:

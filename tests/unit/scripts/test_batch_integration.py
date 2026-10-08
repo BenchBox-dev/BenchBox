@@ -1,5 +1,3 @@
-"""Tests for feature-batch branch integration."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -100,7 +98,6 @@ def test_single_integrator_enforcement(tmp_path: Path) -> None:
 
 
 def test_receipt_resolves_head_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Committer, ancestry, and timestamp gates must evaluate one revision."""
     repo = _repo(tmp_path / "r")
     _start(repo, ["A"])
     member_head = _commit(repo, "member-a.txt")
@@ -199,7 +196,6 @@ def _head(path: Path) -> str:
 
 
 def test_late_member_after_readiness_requires_revalidation(tmp_path: Path) -> None:
-    """Replay: an unregistered late member cannot join an existing binding."""
     repo = _repo(tmp_path / "r")
     _start(repo, ["A"])
     member_a = _commit(repo, "member-a.txt")
@@ -285,7 +281,6 @@ def test_receipt_refuses_rogue_committer(tmp_path: Path) -> None:
 
 
 def test_member_merge_preserving_authorship_passes_integrator(tmp_path: Path) -> None:
-    """Legitimate member merges keep member authorship; committer decides."""
     repo = _repo(tmp_path / "r")
     _start(repo, ["A"])
     subprocess.run(["git", "checkout", "-qb", "member-a"], cwd=repo, check=True)

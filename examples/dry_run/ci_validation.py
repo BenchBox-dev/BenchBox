@@ -1,19 +1,6 @@
 #!/usr/bin/env python3
-"""CI/CD Integration with Dry Run
-
-Demonstrates how to validate benchmarks using dry-run mode in CI/CD pipelines.
-Validates that critical benchmarks can be generated and analyzed without
-executing queries.
-
-Useful for:
-- CI/CD quality gates
-- Automated benchmark validation
-- Pre-deployment checks
-- Configuration validation
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 import json
 import shutil
@@ -23,11 +10,6 @@ from pathlib import Path
 
 
 def validate_benchmark_changes():
-    """Validate critical benchmarks using dry run in CI/CD.
-
-    Returns:
-        bool: True if all validations pass, False otherwise
-    """
     critical_benchmarks = [
         {"name": "tpch", "scale": 0.001},
         {"name": "ssb", "scale": 0.001},
@@ -45,7 +27,6 @@ def validate_benchmark_changes():
         dry_run_dir = f"./ci_validation_{benchmark['name']}"
 
         try:
-            # Run dry run
             result = subprocess.run(
                 [
                     "benchbox",
@@ -64,7 +45,6 @@ def validate_benchmark_changes():
                 check=True,
             )
 
-            # Validate results
             summary_file = Path(dry_run_dir) / "summary.json"
             if not summary_file.exists():
                 print("  ❌ Summary file not found")
@@ -95,11 +75,9 @@ def validate_benchmark_changes():
             print(f"  ❌ Unexpected error: {e}")
 
         finally:
-            # Cleanup
             if Path(dry_run_dir).exists():
                 shutil.rmtree(dry_run_dir)
 
-    # Check results
     passed_count = sum(1 for r in validation_results if r["passed"])
     total_count = len(validation_results)
 

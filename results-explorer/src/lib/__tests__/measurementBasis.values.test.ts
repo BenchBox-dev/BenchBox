@@ -1,13 +1,3 @@
-/**
- * Value-resolution tests for the measurement-basis model.
- *
- * The fixture these assert against is not invented: it is the real committed
- * corpus, captured straight from a rebuilt read-model snapshot by work unit
- * w0. See _project/verification-logs/explorer-basis-frontend-model-and-invariant/
- * w0.log for provenance, for why these three results were chosen, and for the
- * measured CPython/V8 divergence that fixes the tolerances used below.
- */
-
 import { describe, expect, it } from "vitest";
 
 import baseline from "@/lib/__tests__/fixtures/measurementBasis.baseline.json";
@@ -35,10 +25,8 @@ const TPCDS_SPARK_SF10 = "tpcds-spark-sf10.0-20260823-5293ac3a";
 const TPCDS_DUCKDB_SF10 = "tpcds-duckdb-sf10.0-20260823-ab8df093";
 const TPCH_SKEW_DATAFUSION = "tpch_skew-datafusion-sf1.0-20260826-2a83322c";
 
-/** The one query in the fixture whose every execution failed, warmup included. */
 const TOTAL_FAILURE_QUERY = "18";
 
-/** The one query in the whole corpus whose measurement passes are uneven. */
 const UNEVEN_QUERY = "95";
 
 interface BaselineResult {
@@ -77,11 +65,8 @@ const MIN_ALL_WARM: MeasurementBasis = { passes: ALL_WARM, statistic: "min" };
 const WARMUP_BASIS: MeasurementBasis = { passes: WARMUP, statistic: "median" };
 const PASS_2: MeasurementBasis = { passes: warmPass(2), statistic: "median" };
 
-// ---------------------------------------------------------------------------
-
 describe("median", () => {
   it("is the mean of the two middle values for an even sample", () => {
-    // The anti-pattern this guards: returning sorted[len/2], the upper middle.
     expect(median([1, 2, 3, 4])).toBe(2.5);
     expect(median([4, 3, 2, 1])).toBe(2.5);
     expect(median([6364.9, 12946.0])).toBe(9655.45);
@@ -97,9 +82,6 @@ describe("median", () => {
 });
 
 describe("the default basis reproduces the published corpus exactly", () => {
-  // The item's decision gate: if this fails, do NOT adjust the fixture. The
-  // client and the publishing pipeline disagree about a published figure, and
-  // that divergence is the bug.
   for (const resultId of Object.keys(RESULTS)) {
     it(`matches every published display_ms for ${resultId}`, () => {
       const rows = executions(resultId);
@@ -121,17 +103,12 @@ describe("the default basis reproduces the published corpus exactly", () => {
           timing.display_ms,
         );
         if (timing.display_ms === null) {
-          // The pipeline published no value for this query, because every one
-          // of its executions failed. The model must say so rather than
-          // inventing one from the failed durations.
           expect(value.kind).toBe("unavailable");
           continue;
         }
         expect(value.kind).toBe("value");
         if (value.kind !== "value") continue;
         resolvedCount += 1;
-        // Strict equality, not a tolerance: per-query resolution is comparison
-        // and division only, so it is exact across runtimes.
         expect(value.ms).toBe(timing.display_ms);
         expect(value.sampleCount).toBe(timing.sample_count);
         expect(value.collapsed).toBe(false);
@@ -145,16 +122,9 @@ describe("the default basis reproduces the published corpus exactly", () => {
       const { series, sharedQueryIds } = sharedQueryGeomeans(DEFAULT_BASIS, [
         { key: resultId, executions: executions(resultId), displayTimings: displayTimings(resultId) },
       ]);
-      // valid_query_count, NOT logical_query_count: a published geomean is
-      // taken over the queries that produced a value, and six corpus results
-      // have queries where every execution failed.
       expect(sharedQueryIds.length).toBe(result.valid_query_count);
       const geomean = series[0]?.geomeanMs;
       expect(geomean).not.toBeNull();
-      // Relative tolerance, not strict equality: w0.log measures a last-ulp
-      // difference between CPython's libm and V8 on identical float64 inputs
-      // for tpcds-duckdb-sf10 (1.9e-15 relative). 1e-12 is three orders of
-      // magnitude tighter than that, so a real algorithmic error still fails.
       const published = result.published_display_geomean_ms;
       expect(Math.abs(geomean! - published) / published).toBeLessThan(1e-12);
     });
@@ -162,8 +132,6 @@ describe("the default basis reproduces the published corpus exactly", () => {
 });
 
 describe("the uneven corpus query", () => {
-  // tpcds-spark-sf10 query 95: three measurement executions, one of which
-  // FAILED, leaving two usable passes against three for its 102 siblings.
   const rows = () => executionsFor(TPCDS_SPARK_SF10, UNEVEN_QUERY);
 
   it("is genuinely uneven and genuinely even-sampled", () => {
@@ -179,16 +147,11 @@ describe("the uneven corpus query", () => {
   });
 
   it("excludes the failed execution rather than reducing over it", () => {
-    // The failed pass recorded 2236.8 ms -- faster than either passing pass.
-    // If it leaked into the sample, min would report it and this run would
-    // look 2.8x quicker on query 95 than it was.
     const computed = resolveQueryValue(MIN_ALL_WARM, rows());
     expect(computed).toEqual({ kind: "value", ms: 6364.9, sampleCount: 2, collapsed: false });
   });
 
   it("reports the published value as excluded when the pipeline published none", () => {
-    // Distinct from "this run recorded no warm passes": the passes exist, the
-    // published figure does not. Both are reported, neither is substituted.
     const value = resolveQueryValue(DEFAULT_BASIS, rows(), null);
     expect(value).toEqual({ kind: "unavailable", reason: "display_value_excluded" });
   });
@@ -211,7 +174,6 @@ describe("single-pass bases collapse the statistic", () => {
   });
 
   it("gives the same number for median and min over one execution", () => {
-    // The collapse flag is what stops a surface offering these as a choice.
     const asMedian = resolveQueryValue({ passes: warmPass(1), statistic: "median" }, rows());
     const asMin = resolveQueryValue({ passes: warmPass(1), statistic: "min" }, rows());
     expect(asMedian).toEqual(asMin);
@@ -243,8 +205,6 @@ describe("unavailable bases are reported, never substituted", () => {
   });
 
   it("never returns a value drawn from a different pass selection", () => {
-    // The failure mode this forbids: labelling a warm-pass-1 figure as a
-    // warmup figure, which is a fabricated comparison presented as real.
     const warmupValue = resolveQueryValue(WARMUP_BASIS, noWarmup);
     const warmValue = resolveQueryValue(DEFAULT_BASIS, noWarmup, 11);
     expect(warmupValue.kind).toBe("unavailable");
@@ -264,7 +224,6 @@ describe("unavailable bases are reported, never substituted", () => {
     const availability = basisAvailability(PASS_2, executions(TPCDS_SPARK_SF10));
     expect(availability.available).toBe(true);
     expect(availability.reason).toBeNull();
-    // Exactly the one query whose second pass failed.
     expect(availability.unansweredQueries).toEqual([UNEVEN_QUERY]);
   });
 
@@ -276,8 +235,6 @@ describe("unavailable bases are reported, never substituted", () => {
 });
 
 describe("compared geomeans share one query set", () => {
-  // The real corpus pair: same cohort (tpcds, sf10), and under warm_pass_2 the
-  // spark run cannot answer query 95 while the duckdb run can.
   const pair = () => [
     { key: "spark", executions: executions(TPCDS_SPARK_SF10) },
     { key: "duckdb", executions: executions(TPCDS_DUCKDB_SF10) },
@@ -300,9 +257,6 @@ describe("compared geomeans share one query set", () => {
   });
 
   it("changes the duckdb geomean when query 95 leaves the set", () => {
-    // The point of the invariant: the same run reports a different geomean
-    // depending on what its counterpart could answer, so the number is only
-    // meaningful next to the query-set size.
     const solo = sharedQueryGeomeans(PASS_2, [pair()[1]!]);
     const paired = sharedQueryGeomeans(PASS_2, pair());
     expect(paired.series[0]?.geomeanMs).not.toBe(solo.series[0]?.geomeanMs);
@@ -370,15 +324,10 @@ describe("compared geomeans share one query set", () => {
 });
 
 describe("read-model bridge", () => {
-  // The exact string every result in the committed corpus publishes, captured
-  // in w0. If the pipeline's vocabulary and this client's ever diverge, this
-  // is where it surfaces.
   const CORPUS_AVAILABLE_BASES = "default,warmup,all_warm,warm_pass_1,warm_pass_2,warm_pass_3";
 
   it("decodes every basis token the corpus actually publishes", () => {
     const bases = parseAvailableBases(CORPUS_AVAILABLE_BASES);
-    // `default` and `all_warm` denote the same basis, so six tokens collapse
-    // to five distinct bases -- the deduplication is the assertion.
     expect(bases).toHaveLength(5);
     expect(bases.map(encodeBasis)).toEqual([
       "default",
@@ -390,8 +339,6 @@ describe("read-model bridge", () => {
   });
 
   it("keeps the bases it understands when a snapshot names one it does not", () => {
-    // A newer pipeline may publish a basis this client cannot render yet.
-    // Blanking the control would be a worse answer than offering the rest.
     expect(parseAvailableBases("default,cold_pass,warm_pass_1").map(encodeBasis)).toEqual([
       "default",
       "warm_pass_1",
@@ -404,7 +351,6 @@ describe("read-model bridge", () => {
   });
 
   it("parses the corpus's one varying-pass run", () => {
-    // tpcds-spark-sf10 publishes {"95": 2}: query 95 has two usable passes.
     const varying = parseVaryingPassQueries('{"95": 2}');
     expect(varying.get(UNEVEN_QUERY)).toBe(2);
   });
@@ -421,8 +367,6 @@ describe("read-model bridge", () => {
 });
 
 describe("collapse reports the sample actually reduced", () => {
-  // Regression for a review finding: `collapsed` originally described the pass
-  // KIND, so it lied in both directions.
   const oneWarmPass: BasisExecution[] = [
     { query_id: "1", duration_ms: 10, status: "pass", run_type: "measurement", iter: 1 },
   ];
@@ -437,8 +381,6 @@ describe("collapse reports the sample actually reduced", () => {
   });
 
   it("does not collapse a single-pass basis that selected several executions", () => {
-    // A throughput run records one warmup execution per stream, so `warmup`
-    // can reduce more than one row and median vs min IS a real choice there.
     const asMedian = resolveQueryValue({ passes: WARMUP, statistic: "median" }, twoStreamWarmup);
     const asMin = resolveQueryValue({ passes: WARMUP, statistic: "min" }, twoStreamWarmup);
     expect(asMedian).toEqual({ kind: "value", ms: 40, sampleCount: 2, collapsed: false });
@@ -462,9 +404,6 @@ describe("collapse reports the sample actually reduced", () => {
 
 
 describe("the total-failure corpus query", () => {
-  // tpch_skew-datafusion query 18: all three measurement passes AND the warmup
-  // failed. The pipeline published display_ms NULL with a
-  // timing_exclusion_reason and took the result's geomean over 21 of 22.
   const rows = () => executionsFor(TPCH_SKEW_DATAFUSION, TOTAL_FAILURE_QUERY);
 
   it("has no passing execution of any kind", () => {
@@ -492,9 +431,6 @@ describe("the total-failure corpus query", () => {
   });
 
   it("never reports a failed duration as a value", () => {
-    // The failed durations (62.8, 63.0, 65.7, 62.8) are perfectly plausible
-    // numbers for this result. Nothing but the status distinguishes them from
-    // a real timing, which is exactly why status is checked first.
     const durations = rows().map((r) => r.duration_ms);
     expect(durations).toContain(62.8);
     for (const basis of [DEFAULT_BASIS, WARMUP_BASIS, PASS_2]) {
@@ -520,8 +456,6 @@ describe("the total-failure corpus query", () => {
   });
 
   it("reports the run as available for the default basis despite the gap", () => {
-    // One unanswerable query does not make the run unable to serve the basis;
-    // it makes the run partial, and names which query.
     const availability = basisAvailability(
       DEFAULT_BASIS,
       executions(TPCH_SKEW_DATAFUSION),

@@ -25,10 +25,8 @@ Google BigQuery is a serverless, highly scalable data warehouse with built-in ma
 ## Installation
 
 ```bash
-# Install BigQuery client
 pip install google-cloud-bigquery google-cloud-storage
 
-# Or via BenchBox extras
 pip install "benchbox[bigquery]"
 ```
 
@@ -37,7 +35,6 @@ pip install "benchbox[bigquery]"
 ### Service Account (Recommended)
 
 ```bash
-# Set credentials path
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 export BIGQUERY_PROJECT=your-project-id
 ```
@@ -45,10 +42,8 @@ export BIGQUERY_PROJECT=your-project-id
 ### Application Default Credentials
 
 ```bash
-# Login with gcloud
 gcloud auth application-default login
 
-# Set project
 export BIGQUERY_PROJECT=your-project-id
 ```
 
@@ -99,37 +94,32 @@ revert a manually-installed version and how to work around it.
 ### Service Account
 
 ```bash
-# Create service account
 gcloud iam service-accounts create benchbox-sa \
   --display-name="BenchBox Service Account"
 
-# Grant permissions
 gcloud projects add-iam-policy-binding your-project \
   --member="serviceAccount:benchbox-sa@your-project.iam.gserviceaccount.com" \
   --role="roles/bigquery.admin"
 
-# Create key
 gcloud iam service-accounts keys create benchbox-key.json \
   --iam-account=benchbox-sa@your-project.iam.gserviceaccount.com
 
-# Set credentials
 export GOOGLE_APPLICATION_CREDENTIALS=benchbox-key.json
 ```
 
 ### User Credentials
 
 ```bash
-# Interactive login
 gcloud auth application-default login
 
-# Set project
 gcloud config set project your-project-id
 ```
 
 ### Workload Identity (GKE)
 
+Use Workload Identity Federation:
+
 ```bash
-# Use with Workload Identity Federation
 benchbox run --platform bigquery --benchmark tpch \
   --platform-option use_workload_identity=true
 ```
@@ -139,7 +129,6 @@ benchbox run --platform bigquery --benchmark tpch \
 ### Basic Benchmark
 
 ```bash
-# TPC-H at scale factor 1
 benchbox run --platform bigquery --benchmark tpch --scale 1.0 \
   --platform-option project_id=your-project-id
 ```
@@ -147,17 +136,17 @@ benchbox run --platform bigquery --benchmark tpch --scale 1.0 \
 ### With Cloud Storage Staging
 
 ```bash
-# For large datasets, use GCS staging
 benchbox run --platform bigquery --benchmark tpch --scale 100.0 \
   --output gs://your-bucket/benchbox/
 ```
 
 ### With Cost Controls
 
+Limit query costs. `maximum_bytes_billed=10000000000` sets a 10 GB limit:
+
 ```bash
-# Limit query costs
 benchbox run --platform bigquery --benchmark tpch --scale 10.0 \
-  --platform-option maximum_bytes_billed=10000000000  # 10GB limit
+  --platform-option maximum_bytes_billed=10000000000
 ```
 
 ### Python API
@@ -193,7 +182,6 @@ results = adapter.run_benchmark(benchmark)
 For predictable costs, use slot reservations:
 
 ```bash
-# Use with reserved slots
 benchbox run --platform bigquery --benchmark tpch \
   --platform-option reservation_id=projects/proj/locations/US/reservations/benchbox
 ```
@@ -205,7 +193,6 @@ benchbox run --platform bigquery --benchmark tpch \
 BenchBox applies partitioning with `--tuning tuned`:
 
 ```sql
--- Date partitioning
 CREATE TABLE lineitem
 PARTITION BY DATE(l_shipdate)
 CLUSTER BY l_orderkey
@@ -217,7 +204,6 @@ AS SELECT * FROM staging.lineitem;
 Clustering improves query performance:
 
 ```sql
--- Clustering keys
 ALTER TABLE lineitem
 CLUSTER BY l_shipdate, l_orderkey;
 ```
@@ -240,7 +226,6 @@ job_config = bigquery.QueryJobConfig(
 For datasets under 10GB, direct loading via API:
 
 ```bash
-# Automatic for small scale factors
 benchbox run --platform bigquery --benchmark tpch --scale 0.1
 ```
 
@@ -249,7 +234,6 @@ benchbox run --platform bigquery --benchmark tpch --scale 0.1
 For large datasets, stage in GCS first:
 
 ```bash
-# Configure GCS staging
 benchbox run --platform bigquery --benchmark tpch --scale 100.0 \
   --output gs://your-bucket/benchbox/
 ```
@@ -257,7 +241,6 @@ benchbox run --platform bigquery --benchmark tpch --scale 100.0 \
 ### Load Job Configuration
 
 ```bash
-# Customize load behavior
 benchbox run --platform bigquery --benchmark tpch \
   --platform-option write_disposition=WRITE_TRUNCATE \
   --platform-option create_disposition=CREATE_IF_NEEDED
@@ -267,12 +250,11 @@ benchbox run --platform bigquery --benchmark tpch \
 
 ### Query Cost Limits
 
-Prevent runaway queries:
+Prevent runaway queries with a per-query limit. `maximum_bytes_billed=1000000000` sets a 1 GB limit:
 
 ```bash
-# Set per-query limit
 benchbox run --platform bigquery --benchmark tpch \
-  --platform-option maximum_bytes_billed=1000000000  # 1GB
+  --platform-option maximum_bytes_billed=1000000000
 ```
 
 ### Dry Run Estimates
@@ -280,7 +262,6 @@ benchbox run --platform bigquery --benchmark tpch \
 Preview query costs:
 
 ```bash
-# Dry run mode
 benchbox run --platform bigquery --benchmark tpch --dry-run ./estimate
 ```
 
@@ -289,7 +270,6 @@ benchbox run --platform bigquery --benchmark tpch --dry-run ./estimate
 Auto-delete test datasets:
 
 ```bash
-# Set dataset TTL
 benchbox run --platform bigquery --benchmark tpch \
   --platform-option dataset_expires_days=7
 ```
@@ -299,10 +279,8 @@ benchbox run --platform bigquery --benchmark tpch \
 ### Authentication Failed
 
 ```bash
-# Verify credentials
 gcloud auth application-default print-access-token
 
-# Check service account permissions
 gcloud projects get-iam-policy your-project \
   --filter="bindings.members:benchbox-sa"
 ```
@@ -310,42 +288,37 @@ gcloud projects get-iam-policy your-project \
 ### Project Not Found
 
 ```bash
-# Verify project ID
 gcloud projects list
 
-# Set default project
 gcloud config set project your-project-id
 ```
 
 ### Quota Exceeded
 
-```bash
-# Check quotas
-gcloud compute project-info describe --project your-project-id
+Check quotas, then request an increase in the Cloud Console under BigQuery > Quotas > Request Increase:
 
-# Request quota increase via Cloud Console
-# BigQuery > Quotas > Request Increase
+```bash
+gcloud compute project-info describe --project your-project-id
 ```
 
 ### Dataset Location Mismatch
 
+Datasets must be in the same location as the jobs that query them. Specify the location explicitly:
+
 ```bash
-# Datasets must be in same location as jobs
-# Specify location explicitly
 benchbox run --platform bigquery --benchmark tpch \
   --platform-option location=us-east1
 ```
 
 ### Permission Denied
 
-```sql
--- Required permissions
--- roles/bigquery.admin (full access)
--- Or specific roles:
--- - roles/bigquery.dataEditor
--- - roles/bigquery.jobUser
--- - roles/storage.objectAdmin (for GCS staging)
-```
+The account needs one of the following:
+
+- `roles/bigquery.admin` (full access)
+- Or the specific roles:
+  - `roles/bigquery.dataEditor`
+  - `roles/bigquery.jobUser`
+  - `roles/storage.objectAdmin` (for GCS staging)
 
 ## Related Documentation
 

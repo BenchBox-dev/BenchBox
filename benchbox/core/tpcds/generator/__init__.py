@@ -1,5 +1,3 @@
-"""Modular TPC-DS data generation package."""
-
 from .filesystem import FileArtifactMixin
 from .manager import TPCDSDataGenerator
 from .runner import DsdgenRunnerMixin

@@ -1,12 +1,6 @@
-"""Data compression utilities for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides compression support for data generation and storage,
-including streaming compression and decompression capabilities.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import gzip
 import shutil
@@ -25,82 +19,36 @@ except ImportError:
 
 
 class CompressionError(Exception):
-    """Exception raised for compression-related errors."""
+    pass
 
 
 class BaseCompressor(ABC):
-    """Base class for all compressors."""
-
     def __init__(self, level: Optional[int] = None):
-        """Initialize compressor with optional compression level.
-
-        Args:
-            level: Compression level (algorithm-specific range)
-        """
         self.level = level
 
     @abstractmethod
     def get_file_extension(self) -> str:
-        """Get the file extension for this compression format."""
+        pass
 
     @abstractmethod
     def compress_file(self, input_path: Path, output_path: Optional[Path] = None) -> Path:
-        """Compress a file.
-
-        Args:
-            input_path: Path to input file
-            output_path: Optional output path. If None, appends compression extension.
-
-        Returns:
-            Path to compressed file
-        """
+        pass
 
     @abstractmethod
     def decompress_file(self, input_path: Path, output_path: Optional[Path] = None) -> Path:
-        """Decompress a file.
-
-        Args:
-            input_path: Path to compressed file
-            output_path: Optional output path. If None, removes compression extension.
-
-        Returns:
-            Path to decompressed file
-        """
+        pass
 
     @abstractmethod
     def open_for_write(self, path: Path, mode: str = "wt") -> Union[TextIO, BinaryIO]:
-        """Open a file for compressed writing.
-
-        Args:
-            path: Path to output file
-            mode: File mode ('wt' for text, 'wb' for binary)
-
-        Returns:
-            File-like object for writing compressed data
-        """
+        pass
 
     @abstractmethod
     def open_for_read(self, path: Path, mode: str = "rt") -> Union[TextIO, BinaryIO]:
-        """Open a compressed file for reading.
-
-        Args:
-            path: Path to compressed file
-            mode: File mode ('rt' for text, 'rb' for binary)
-
-        Returns:
-            File-like object for reading decompressed data
-        """
+        pass
 
 
 class GzipCompressor(BaseCompressor):
-    """Gzip compression implementation."""
-
     def __init__(self, level: Optional[int] = None):
-        """Initialize Gzip compressor.
-
-        Args:
-            level: Compression level (1-9, default 6)
-        """
         if level is None:
             level = 6
         if level < 1 or level > 9:
@@ -111,7 +59,6 @@ class GzipCompressor(BaseCompressor):
         return ".gz"
 
     def compress_file(self, input_path: Path, output_path: Optional[Path] = None) -> Path:
-        """Compress a file with gzip."""
         if output_path is None:
             output_path = input_path.with_suffix(input_path.suffix + self.get_file_extension())
 
@@ -124,7 +71,6 @@ class GzipCompressor(BaseCompressor):
             raise CompressionError(f"Failed to compress {input_path}: {e}") from e
 
     def decompress_file(self, input_path: Path, output_path: Optional[Path] = None) -> Path:
-        """Decompress a gzip file."""
         if output_path is None:
             if input_path.suffix == self.get_file_extension():
                 output_path = input_path.with_suffix("")
@@ -139,7 +85,6 @@ class GzipCompressor(BaseCompressor):
             raise CompressionError(f"Failed to decompress {input_path}: {e}") from e
 
     def open_for_write(self, path: Path, mode: str = "wt") -> Union[TextIO, BinaryIO]:
-        """Open a file for gzip-compressed writing."""
         try:
             result: Union[TextIO, BinaryIO] = cast(
                 Union[TextIO, BinaryIO], gzip.open(path, mode, compresslevel=self.level)
@@ -149,7 +94,6 @@ class GzipCompressor(BaseCompressor):
             raise CompressionError(f"Failed to open {path} for compressed writing: {e}") from e
 
     def open_for_read(self, path: Path, mode: str = "rt") -> Union[TextIO, BinaryIO]:
-        """Open a gzip file for reading."""
         try:
             result: Union[TextIO, BinaryIO] = cast(Union[TextIO, BinaryIO], gzip.open(path, mode))
             return result
@@ -158,14 +102,7 @@ class GzipCompressor(BaseCompressor):
 
 
 class ZstdCompressor(BaseCompressor):
-    """Zstandard compression implementation."""
-
     def __init__(self, level: Optional[int] = None):
-        """Initialize Zstd compressor.
-
-        Args:
-            level: Compression level (1-22, default 3)
-        """
         if not ZSTD_AVAILABLE:
             raise CompressionError("zstandard library not available. Install with: pip install zstandard")
 
@@ -179,7 +116,6 @@ class ZstdCompressor(BaseCompressor):
         return ".zst"
 
     def compress_file(self, input_path: Path, output_path: Optional[Path] = None) -> Path:
-        """Compress a file with zstandard."""
         if output_path is None:
             output_path = input_path.with_suffix(input_path.suffix + self.get_file_extension())
 
@@ -192,7 +128,6 @@ class ZstdCompressor(BaseCompressor):
             raise CompressionError(f"Failed to compress {input_path}: {e}") from e
 
     def decompress_file(self, input_path: Path, output_path: Optional[Path] = None) -> Path:
-        """Decompress a zstd file."""
         if output_path is None:
             if input_path.suffix == self.get_file_extension():
                 output_path = input_path.with_suffix("")
@@ -208,11 +143,9 @@ class ZstdCompressor(BaseCompressor):
             raise CompressionError(f"Failed to decompress {input_path}: {e}") from e
 
     def open_for_write(self, path: Path, mode: str = "wt") -> Union[TextIO, BinaryIO]:
-        """Open a file for zstd-compressed writing."""
         try:
             cctx = zstd.ZstdCompressor(level=self.level)
             if "t" in mode:
-                # For text mode, use io.TextIOWrapper
                 import io
 
                 binary_writer = cctx.stream_writer(open(path, "wb"), closefd=True)
@@ -223,11 +156,9 @@ class ZstdCompressor(BaseCompressor):
             raise CompressionError(f"Failed to open {path} for compressed writing: {e}") from e
 
     def open_for_read(self, path: Path, mode: str = "rt") -> Union[TextIO, BinaryIO]:
-        """Open a zstd file for reading."""
         try:
             dctx = zstd.ZstdDecompressor()
             if "t" in mode:
-                # For text mode, use io.TextIOWrapper
                 import io
 
                 binary_reader = dctx.stream_reader(open(path, "rb"), closefd=True)
@@ -239,17 +170,13 @@ class ZstdCompressor(BaseCompressor):
 
 
 class NoCompressor(BaseCompressor):
-    """No compression (pass-through) implementation."""
-
     def __init__(self, level: Optional[int] = None):
-        """Initialize no compressor (level is ignored)."""
         super().__init__(None)
 
     def get_file_extension(self) -> str:
         return ""
 
     def compress_file(self, input_path: Path, output_path: Optional[Path] = None) -> Path:
-        """Copy file without compression."""
         if output_path is None:
             return input_path
 
@@ -260,7 +187,6 @@ class NoCompressor(BaseCompressor):
             raise CompressionError(f"Failed to copy {input_path}: {e}") from e
 
     def decompress_file(self, input_path: Path, output_path: Optional[Path] = None) -> Path:
-        """Copy file without decompression."""
         if output_path is None:
             return input_path
 
@@ -271,14 +197,12 @@ class NoCompressor(BaseCompressor):
             raise CompressionError(f"Failed to copy {input_path}: {e}") from e
 
     def open_for_write(self, path: Path, mode: str = "wt") -> Union[TextIO, BinaryIO]:
-        """Open a file for uncompressed writing."""
         try:
             return cast(Union[TextIO, BinaryIO], open(path, mode))
         except Exception as e:
             raise CompressionError(f"Failed to open {path} for writing: {e}") from e
 
     def open_for_read(self, path: Path, mode: str = "rt") -> Union[TextIO, BinaryIO]:
-        """Open a file for uncompressed reading."""
         try:
             return cast(Union[TextIO, BinaryIO], open(path, mode))
         except Exception as e:
@@ -286,73 +210,35 @@ class NoCompressor(BaseCompressor):
 
 
 class CompressionManager:
-    """Manager for compression operations."""
-
     def __init__(self):
-        """Initialize compression manager."""
         self._compressors: dict[str, BaseCompressor] = {}
         self._register_default_compressors()
 
     def _register_default_compressors(self):
-        """Register default compressors."""
         self._compressors["none"] = NoCompressor()
         self._compressors["gzip"] = GzipCompressor()
         if ZSTD_AVAILABLE:
             self._compressors["zstd"] = ZstdCompressor()
 
     def get_compressor(self, compression_type: str, level: Optional[int] = None) -> BaseCompressor:
-        """Get a compressor by type.
-
-        Args:
-            compression_type: Type of compression ('none', 'gzip', 'zstd')
-            level: Optional compression level
-
-        Returns:
-            Compressor instance
-
-        Raises:
-            CompressionError: If compression type is not supported
-        """
         if compression_type not in self._compressors:
             available = list(self._compressors.keys())
             raise CompressionError(f"Unsupported compression type '{compression_type}'. Available: {available}")
 
         if level is not None:
-            # Create new instance with specific level
             compressor_class = type(self._compressors[compression_type])
             return compressor_class(level=level)
         else:
             return self._compressors[compression_type]
 
     def get_available_compressors(self) -> list[str]:
-        """Get list of available compression types."""
         return list(self._compressors.keys())
 
     def detect_compression(self, path: Path) -> Optional[str]:
-        """Detect compression type from file extension.
-
-        Uses centralized detection from benchbox.utils.file_format which
-        recognizes all compression extensions (.zst, .gz, .bz2, .xz, .lz4, .snappy).
-
-        Args:
-            path: File path to analyze
-
-        Returns:
-            Detected compression type or "none" if uncompressed
-        """
         compression_type = _detect_compression_from_path(path)
         return compression_type if compression_type is not None else "none"
 
     def get_compression_info(self, input_path: Path, output_path: Path) -> dict[str, Union[int, float]]:
-        """Get compression information comparing two files.
-
-        Args:
-            input_path: Original file path
-            output_path: Compressed file path
-
-        Returns:
-            Dictionary with compression statistics
-        """
         try:
             input_size = input_path.stat().st_size
             output_size = output_path.stat().st_size

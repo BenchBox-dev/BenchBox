@@ -129,7 +129,6 @@ def test_shadow_site_verifier(tmp_path: Path):
     errors = verify_site_directory(site)
     assert errors == []
 
-    # Inject broken link
     (site / "broken.html").write_text('<a href="missing.html">Link</a>', encoding="utf-8")
     errors = verify_site_directory(site)
     assert any("missing.html" in e for e in errors)
@@ -144,7 +143,7 @@ def test_shadow_site_missing_directory_fails_closed(tmp_path: Path) -> None:
 
 
 def test_privacy_scanner_exempts_aws_example_tokens(tmp_path: Path) -> None:
-    """AWS-documented example keys are prose, not leaks (CI: docs build)."""
+
     doc = tmp_path / "redshift.html"
     doc.write_text(
         "export AWS_ACCESS_KEY_ID=[REDACTED]\nexport AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n",
@@ -160,7 +159,7 @@ def test_privacy_scanner_exempts_aws_example_tokens(tmp_path: Path) -> None:
 
 
 def test_privacy_scanner_exempts_placeholder_passwords(tmp_path: Path) -> None:
-    """Docs connection strings with literal placeholder passwords pass (CI: guides)."""
+
     for url in (
         "postgres://username:password@hostname:port/database?sslmode=require",
         "postgresql://user:pass@host/db",
@@ -178,7 +177,7 @@ def test_privacy_scanner_exempts_placeholder_passwords(tmp_path: Path) -> None:
 
 
 def test_privacy_scanner_connection_pattern_does_not_slurp_prose(tmp_path: Path) -> None:
-    """A bare scheme mention plus a distant '@' is not credentials (tpc-di docs)."""
+
     doc = tmp_path / "guide.html"
     doc.write_text(
         "if db_url.startswith('postgresql://'):\n"
@@ -209,7 +208,7 @@ def test_privacy_scan_missing_directory_fails_closed(tmp_path: Path) -> None:
 
 
 def test_check_published_only_missing_from_dir_is_ok(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """published_only accepted paths may be absent from --bundles-dir."""
+
     bundles = tmp_path / "bundles"
     present = _write_bundle(bundles / "present.json", stamp="present")
     accepted = [
@@ -240,7 +239,7 @@ def test_check_published_only_missing_from_dir_is_ok(tmp_path: Path, monkeypatch
 
 
 def test_check_extra_artifact_id_without_overlay_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """An artifact result_id with no accepted path and no legacy_overlay disposition fails."""
+
     bundles = tmp_path / "bundles"
     _write_bundle(bundles / "b1.json", stamp="b1")
     accepted = ["results-data/bundles/b1.json"]
@@ -260,7 +259,7 @@ def test_check_extra_artifact_id_without_overlay_fails(tmp_path: Path, monkeypat
 
 
 def test_check_legacy_overlay_extra_matched_by_recomputed_rid(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """legacy_overlay extras are allowed when their recomputed result_id matches the artifact."""
+
     bundles = tmp_path / "bundles"
     _write_bundle(bundles / "accepted.json", stamp="acc")
     overlay = _write_bundle(bundles / "overlay.json", stamp="ovl", platform="clickhouse")

@@ -1,14 +1,3 @@
-"""Tests for validation_query.platform_overrides (W1 of architecture-fixes).
-
-Covers:
-- Loader: `_parse_validation_platform_overrides` parsing + validation
-- Model: `ValidationQuery.platform_overrides` default and acceptance
-- Runtime: `_resolve_validation_sql` resolution semantics (default, override,
-  null skip)
-- Integration: `_run_operation_validation` honors overrides and records
-  skip metadata in validation_results
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -35,9 +24,6 @@ def wp(tmp_path: Path) -> WritePrimitivesBenchmark:
     return WritePrimitivesBenchmark(output_dir=tmp_path)
 
 
-# ---------------------------------------------------------------------------
-# Model: ValidationQuery default
-# ---------------------------------------------------------------------------
 class TestValidationQueryDefault:
     def test_platform_overrides_defaults_to_empty_dict(self):
         vq = ValidationQuery(id="v1", sql="SELECT 1")
@@ -52,9 +38,6 @@ class TestValidationQueryDefault:
         assert vq.platform_overrides == {"clickhouse": "SELECT 2", "redshift": None}
 
 
-# ---------------------------------------------------------------------------
-# Loader: _parse_validation_platform_overrides
-# ---------------------------------------------------------------------------
 class TestParseValidationPlatformOverrides:
     def test_missing_returns_empty(self):
         assert _parse_validation_platform_overrides("op", "v1", {}) == {}
@@ -105,9 +88,6 @@ class TestParseValidationPlatformOverrides:
             _parse_validation_platform_overrides("op", "v1", {"platform_overrides": {"clickhouse": 123}})
 
 
-# ---------------------------------------------------------------------------
-# Runtime: _resolve_validation_sql
-# ---------------------------------------------------------------------------
 class TestResolveValidationSql:
     def _make_vq(self, overrides=None):
         return SimpleNamespace(id="v1", sql="DEFAULT SQL", platform_overrides=overrides or {})
@@ -139,9 +119,6 @@ class TestResolveValidationSql:
         assert "v1" in skip
 
 
-# ---------------------------------------------------------------------------
-# Integration: _run_operation_validation
-# ---------------------------------------------------------------------------
 class TestRunOperationValidationOverrides:
     def _make_val_query(self, sql="DEFAULT", overrides=None):
         return SimpleNamespace(
@@ -162,7 +139,7 @@ class TestRunOperationValidationOverrides:
         conn.execute.return_value.fetchall.return_value = [(1,)]
         passed, results, _ = wp._run_operation_validation(operation, conn, "OP_1")
         assert passed is True
-        # Default sql was sent
+
         conn.execute.assert_called_once_with("SELECT DEFAULT")
         assert results[0]["sql"] == "SELECT DEFAULT"
         assert results[0].get("skipped") is None
@@ -215,13 +192,10 @@ class TestRunOperationValidationOverrides:
         assert results[0]["skipped"] is True
         assert results[1]["query_id"] == "v_active"
         assert results[1].get("skipped") is None
-        # Only the active validation hit the connection
+
         conn.execute.assert_called_once_with("SELECT ACTIVE")
 
 
-# ---------------------------------------------------------------------------
-# _resolve_validation_sql fallback key
-# ---------------------------------------------------------------------------
 class TestValidationFallbackResolution:
     def _vq(self, overrides):
         return SimpleNamespace(id="v1", sql="SELECT DEFAULT", platform_overrides=overrides)

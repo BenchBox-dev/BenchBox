@@ -1,5 +1,3 @@
-"""Tests for shared visualization suggestions and render orchestration."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace

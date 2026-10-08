@@ -12,11 +12,6 @@ import {
 } from "@/lib/facetModel";
 import { canonicalBenchmarkSlug, canonicalPhase } from "@/lib/displayLabels";
 
-// Re-exported so existing consumers (TuningBadge, tests) keep importing the
-// not-recorded/legacy tuning tokens from here - facetModel.ts is the single
-// source of truth (see NULL_TUNING_MODE_SENTINELS, shared with the SQL-side
-// facetsToWhereClause/queryFilters filters so in-memory matching here can't
-// drift from what the DuckDB-backed pages actually query for).
 export { LEGACY_UNLABELLED_TUNING_MODE, NOT_RECORDED_TUNING_MODE };
 
 export interface FacetMatchRow {
@@ -24,6 +19,7 @@ export interface FacetMatchRow {
   scale_factor?: string | number | null;
   phase?: string | null;
   test_type?: string | null;
+  stream_count?: number | null;
   platform?: string | null;
   platform_id?: string | null;
   execution_mode?: string | null;
@@ -37,7 +33,6 @@ export interface FacetMatchRow {
   storage_format?: string | null;
   cost_status?: string | null;
   run_date?: string | null;
-  /** ADR-2 §3 secondary facet (TPC benchmarks): physical rendering strategy. */
   physical_rendering_id?: string | null;
   platform_version?: string | null;
   arch?: string | null;
@@ -109,6 +104,8 @@ function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: ExplorerFa
       return matchesRequired(row.scale_factor === undefined || row.scale_factor === null ? null : String(row.scale_factor), facets.scale_factor);
     case "phase":
       return matchesOptional(canonicalPhase(row.test_type ?? row.phase), facets.phase);
+    case "stream_count":
+      return matchesOptional(row.stream_count == null ? null : String(row.stream_count), facets.stream_count);
     case "platform":
       return matchesPlatform(row, facets.platform);
     case "execution_mode":
@@ -147,27 +144,11 @@ function matchesFacetKey(row: FacetMatchRow, facets: FacetState, key: ExplorerFa
 function matchesTuningMode(value: string | null | undefined, selected: readonly string[]): boolean {
   if (selected.length === 0) return true;
   if (value === null || value === undefined) {
-    // Not-recorded rows match only an explicit not-recorded selection --
-    // never a real mode. The legacy "untuned" token keeps existing chip
-    // values and bookmarked URLs matching the same rows as before.
     return NULL_TUNING_MODE_SENTINELS.some((sentinel) => selected.includes(sentinel));
   }
   return selected.includes(value);
 }
 
-/**
- * ADR-2 §3: `physical_rendering_id` is a secondary, independently matchable
- * facet for TPC benchmarks -- narrower than the coarse `tuning_mode` facet,
- * and never a reason two rows fail the *coarse* match on its own. Matching
- * semantics: absent on either side means "not part of the match" (both rows
- * pass); present on both sides means they must be equal.
- *
- * This does not plug into `matchesFacetKey`/`FACET_KEYS` as a first-class,
- * URL-persisted facet chip -- ADR-2 frames it as an on-demand narrowing tool,
- * not a change to the default coarse facet's semantics. Callers that want to
- * narrow a comparison/selection to a specific physical rendering call this
- * directly (e.g. when building a TPC comparison cohort).
- */
 export function physicalRenderingIdsMatch(
   a: Pick<FacetMatchRow, "physical_rendering_id"> | null | undefined,
   b: Pick<FacetMatchRow, "physical_rendering_id"> | null | undefined,

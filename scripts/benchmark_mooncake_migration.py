@@ -1,37 +1,4 @@
 #!/usr/bin/env python3
-"""Benchmark heap-to-columnstore migration for pg_mooncake.
-
-Measures the overhead of converting existing PostgreSQL heap tables to
-pg_mooncake's columnstore format, including:
-- Conversion time per table (ALTER TABLE ... SET ACCESS METHOD columnstore)
-- Storage size before and after conversion (via pg_total_relation_size)
-- Query performance delta: heap baseline vs columnstore comparison
-
-Outputs results in BenchmarkResults v2.0 JSON format compatible with
-PlatformComparison.from_files() for cross-run analysis.
-
-Exit codes:
-  0 - Benchmark completed successfully
-  1 - Connection error or other failure
-
-Usage:
-  # Run against a local pg_mooncake instance with TPC-H SF=0.01
-  uv run -- python scripts/benchmark_mooncake_migration.py \\
-    --host localhost --port 5432
-
-  # Custom scale factor and queries
-  uv run -- python scripts/benchmark_mooncake_migration.py \\
-    --scale-factor 1.0 --queries Q1,Q6,Q14
-
-  # Use pre-existing result files (skip live run)
-  uv run -- python scripts/benchmark_mooncake_migration.py \\
-    --heap-results heap_run.json --columnstore-results cs_run.json
-
-  # Dry run (show execution plan)
-  uv run -- python scripts/benchmark_mooncake_migration.py --dry-run
-
-Requires: psycopg (pip install psycopg[binary])
-"""
 
 from __future__ import annotations
 
@@ -46,14 +13,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Data structures
-# ---------------------------------------------------------------------------
-
-# Default TPC-H tables to migrate
 TPCH_TABLES = ["nation", "region", "customer", "orders", "lineitem", "part", "partsupp", "supplier"]
 
-# Simple TPC-H queries for heap vs columnstore comparison
 DEFAULT_QUERIES: dict[str, str] = {
     "Q1": """
         SELECT l_returnflag, l_linestatus,
@@ -85,19 +46,15 @@ DEFAULT_QUERIES: dict[str, str] = {
 
 @dataclass
 class TableMigrationResult:
-    """Result of migrating a single table."""
-
     table_name: str
     heap_size_bytes: int
     columnstore_size_bytes: int
     conversion_time_ms: float
-    size_ratio: float  # columnstore/heap (< 1 means compression)
+    size_ratio: float
 
 
 @dataclass
 class QueryTimingResult:
-    """Timing for a single query execution."""
-
     query_id: str
     execution_time_ms: float
     rows_returned: int
@@ -106,8 +63,6 @@ class QueryTimingResult:
 
 @dataclass
 class MigrationBenchmarkResult:
-    """Complete migration benchmark result."""
-
     scale_factor: float
     pg_mooncake_version: str
     postgresql_version: str
@@ -120,13 +75,7 @@ class MigrationBenchmarkResult:
     total_columnstore_size_bytes: int = 0
 
 
-# ---------------------------------------------------------------------------
-# Database operations
-# ---------------------------------------------------------------------------
-
-
 def _get_versions(cursor) -> tuple[str, str]:
-    """Get pg_mooncake and PostgreSQL versions."""
     cursor.execute("SELECT extversion FROM pg_extension WHERE extname = 'pg_mooncake'")
     row = cursor.fetchone()
     mooncake_version = row[0] if row else "unknown"
@@ -138,14 +87,12 @@ def _get_versions(cursor) -> tuple[str, str]:
 
 
 def _get_table_size(cursor, table_name: str) -> int:
-    """Get total relation size in bytes."""
     cursor.execute("SELECT pg_total_relation_size(%s)", (table_name,))
     row = cursor.fetchone()
     return row[0] if row else 0
 
 
 def _run_query(cursor, query_id: str, sql: str) -> QueryTimingResult:
-    """Execute a query and return timing."""
     start = time.monotonic()
     try:
         cursor.execute(sql)
@@ -171,20 +118,16 @@ _SAFE_TABLE_NAME_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
 def _validate_table_name(table_name: str) -> str:
-    """Validate table name is a safe SQL identifier (alphanumeric + underscore only)."""
     if not _SAFE_TABLE_NAME_RE.match(table_name):
         raise ValueError(f"Invalid table name: {table_name!r} - must be alphanumeric/underscore only")
     return table_name
 
 
 def _convert_table_to_columnstore(cursor, conn, table_name: str) -> TableMigrationResult:
-    """Convert a single table from heap to columnstore and measure overhead."""
     table_name = _validate_table_name(table_name)
 
-    # Measure heap size before conversion
     heap_size = _get_table_size(cursor, table_name)
 
-    # Convert to columnstore - table_name is validated above as a safe identifier
     start = time.monotonic()
     from psycopg import sql
 
@@ -192,7 +135,6 @@ def _convert_table_to_columnstore(cursor, conn, table_name: str) -> TableMigrati
     conn.commit()
     conversion_time_ms = (time.monotonic() - start) * 1000
 
-    # Measure columnstore size after conversion
     columnstore_size = _get_table_size(cursor, table_name)
 
     size_ratio = columnstore_size / heap_size if heap_size > 0 else 0.0
@@ -212,15 +154,6 @@ def run_migration_benchmark(
     queries: dict[str, str],
     scale_factor: float,
 ) -> MigrationBenchmarkResult:
-    """Run the full migration benchmark.
-
-    Assumes tables are already loaded as heap tables (standard PostgreSQL).
-    Steps:
-      1. Measure heap table sizes
-      2. Run queries on heap tables (baseline)
-      3. Convert each table to columnstore
-      4. Run queries on columnstore tables (comparison)
-    """
     cursor = conn.cursor()
     mooncake_ver, pg_ver = _get_versions(cursor)
 
@@ -231,14 +164,12 @@ def run_migration_benchmark(
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
-    # Phase 1: Run queries on heap tables
     print("Phase 1: Running queries on heap tables...", file=sys.stderr)
     for qid, sql in queries.items():
         timing = _run_query(cursor, qid, sql)
         result.heap_query_results.append(timing)
         print(f"  {qid}: {timing.execution_time_ms:.1f}ms ({timing.rows_returned} rows)", file=sys.stderr)
 
-    # Phase 2: Convert tables to columnstore
     print("\nPhase 2: Converting tables to columnstore...", file=sys.stderr)
     for table_name in tables:
         try:
@@ -256,7 +187,6 @@ def run_migration_benchmark(
         except Exception as e:
             print(f"  {table_name}: FAILED ({e})", file=sys.stderr)
 
-    # Phase 3: Run queries on columnstore tables
     print("\nPhase 3: Running queries on columnstore tables...", file=sys.stderr)
     for qid, sql in queries.items():
         timing = _run_query(cursor, qid, sql)
@@ -267,26 +197,11 @@ def run_migration_benchmark(
     return result
 
 
-# ---------------------------------------------------------------------------
-# BenchmarkResults v2.0 output
-# ---------------------------------------------------------------------------
-
-
 def to_benchmark_results_v2(
     result: MigrationBenchmarkResult,
     phase: str,
     platform_name: str,
 ) -> dict:
-    """Convert migration results to BenchmarkResults v2.0 JSON schema.
-
-    Creates a separate result file for heap and columnstore phases so
-    PlatformComparison.from_files() can compare them directly.
-
-    Args:
-        result: Migration benchmark result
-        phase: "heap" or "columnstore"
-        platform_name: Platform name for the result file
-    """
     query_results = result.heap_query_results if phase == "heap" else result.columnstore_query_results
 
     queries_list = []
@@ -340,7 +255,6 @@ def to_benchmark_results_v2(
         "queries": queries_list,
     }
 
-    # Add migration metadata for columnstore phase
     if phase == "columnstore":
         payload["migration"] = {
             "total_conversion_time_ms": round(result.total_conversion_time_ms, 1),
@@ -355,13 +269,7 @@ def to_benchmark_results_v2(
     return payload
 
 
-# ---------------------------------------------------------------------------
-# Report formatting
-# ---------------------------------------------------------------------------
-
-
 def format_summary_report(result: MigrationBenchmarkResult) -> str:
-    """Format a human-readable summary report."""
     lines = [
         "pg_mooncake Heap-to-Columnstore Migration Benchmark",
         f"  pg_mooncake version: {result.pg_mooncake_version}",
@@ -409,7 +317,6 @@ def format_summary_report(result: MigrationBenchmarkResult) -> str:
 
 
 def format_dry_run(tables: list[str], queries: dict[str, str], scale_factor: float) -> str:
-    """Show execution plan without running."""
     lines = [
         "Migration Benchmark Dry Run",
         f"  Scale factor: {scale_factor}",
@@ -430,11 +337,6 @@ def format_dry_run(tables: list[str], queries: dict[str, str], scale_factor: flo
     lines.append("  4. Run queries on columnstore tables (comparison)")
     lines.append("  5. Output BenchmarkResults v2.0 JSON files")
     return "\n".join(lines)
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -512,7 +414,6 @@ examples:
 
 
 def _write_result_file(output_dir: Path, filename: str, payload: dict) -> Path:
-    """Write a result payload to a JSON file."""
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / filename
     path.write_text(json.dumps(payload, indent=2))
@@ -538,7 +439,6 @@ def main(argv: list[str] | None = None) -> int:
         print(format_dry_run(tables, queries, args.scale_factor))
         return 0
 
-    # Compare pre-existing results if provided
     if args.heap_results and args.columnstore_results:
         try:
             from benchbox.core.analysis.comparison import PlatformComparison
@@ -555,7 +455,6 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         return 0
 
-    # Live benchmark run
     try:
         import psycopg
     except ImportError:
@@ -583,10 +482,8 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         conn.close()
 
-    # Print summary
     print("\n" + format_summary_report(result))
 
-    # Write BenchmarkResults v2.0 files
     output_dir = args.output_dir or Path(".")
     heap_payload = to_benchmark_results_v2(result, "heap", "pg_mooncake_heap")
     cs_payload = to_benchmark_results_v2(result, "columnstore", "pg_mooncake_columnstore")

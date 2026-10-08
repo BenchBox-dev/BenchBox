@@ -1,11 +1,3 @@
-"""Rows tied up to float noise must pair the same way on both sides of a comparison.
-
-A ``ROLLUP`` produces a detail row and a subtotal row with the same total. Two engines can
-sum the same values in a different order and differ in the last digit of that total. The
-comparator accepts the difference, but if it sorted on the exact float the two rows could
-land in opposite orders on the two sides and be paired with the wrong partner.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -50,7 +42,6 @@ def test_rows_with_no_float_cells_order_as_before():
 
 
 def test_the_value_digest_still_sorts_on_the_exact_float():
-    """Reference digests are committed, so the digest's sort must not change."""
     low, high = TOTAL, TOTAL + ULP_NOISE
     rows = [(high, 1), (low, 0)]
 
@@ -58,7 +49,6 @@ def test_the_value_digest_still_sorts_on_the_exact_float():
 
 
 def test_pairing_respects_configured_tolerance():
-    """Pairing aligns with self.tolerance rather than a fixed decimal bucket."""
     original = [(100.0, 0), (100.0, 1)]
     variant = [(100.00005, 0), (100.0, 1)]
 
@@ -66,7 +56,6 @@ def test_pairing_respects_configured_tolerance():
 
 
 def test_pairing_handles_values_straddling_decimal_rounding_boundary():
-    """Values differing by float noise across a decimal boundary still pair correctly."""
     val1 = 1.0000000049999999
     val2 = 1.0000000050000001
     original = [(val1, 0), (val1, 1)]

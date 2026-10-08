@@ -1,30 +1,6 @@
-"""Dask DataFrame adapter for Pandas-family benchmarking.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides the DaskDataFrameAdapter that implements the
-PandasFamilyAdapter interface for Dask.
-
-Dask is a parallel computing library that enables:
-- Lazy evaluation with task graph optimization
-- Out-of-core processing for datasets larger than memory
-- Distributed computing across clusters
-- Pandas-like API with .compute() to materialize results
-
-Usage:
-    from benchbox.platforms.dataframe.dask_df import DaskDataFrameAdapter
-
-    adapter = DaskDataFrameAdapter()
-    ctx = adapter.create_context()
-
-    # Load data
-    adapter.load_table(ctx, "orders", [Path("orders.parquet")])
-
-    # Execute query
-    result = adapter.execute_query(ctx, query)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -42,18 +18,17 @@ try:
 
     DASK_AVAILABLE = True
 except ImportError:
-    dd = None  # type: ignore[assignment]
-    Client = None  # type: ignore[assignment,misc]
-    LocalCluster = None  # type: ignore[assignment,misc]
+    dd = None
+    Client = None
+    LocalCluster = None
     DASK_AVAILABLE = False
 
-# Import pandas for type conversions
 try:
     import pandas as pd
 
     PANDAS_AVAILABLE = True
 except ImportError:
-    pd = None  # type: ignore[assignment]
+    pd = None
     PANDAS_AVAILABLE = False
 
 from benchbox.core.dataframe.tuning import DataFrameTuningConfiguration
@@ -66,7 +41,6 @@ from benchbox.utils.file_format import TRAILING_DUMMY_COLUMN, has_trailing_delim
 
 logger = logging.getLogger(__name__)
 
-# Type alias for Dask DataFrame (when available)
 DaskDF = dd.DataFrame if DASK_AVAILABLE else Any
 
 _RESOURCE_ENVELOPE_PATTERNS = (
@@ -79,10 +53,6 @@ _RESOURCE_ENVELOPE_PATTERNS = (
     "killedworker",
     "worker was killed",
     "worker died",
-    # Scheduler-side phrasing observed in UAT, e.g. "Task ... marked as failed
-    # because 4 workers died while trying to run it". The KilledWorker exception
-    # type name already matches above, but the plural message form can also
-    # surface wrapped in other exception types, so match it explicitly.
     "workers died",
     "exceeded memory",
     "memory budget",
@@ -94,11 +64,10 @@ _DEFAULT_LOCAL_THREADS_PER_WORKER_CAP = 2
 
 
 class DaskResourceEnvelopeError(RuntimeError):
-    """Raised when Dask reports a local resource-envelope failure."""
+    pass
 
 
 def _cap_default_memory_limit(memory_limit: str) -> str:
-    """Cap implicit local worker memory while preserving explicit user limits."""
     match = re.match(r"^\s*(\d+(?:\.\d+)?)\s*(gib|gb)\s*$", memory_limit, re.IGNORECASE)
     if match is None:
         return memory_limit
@@ -112,25 +81,6 @@ def _cap_default_memory_limit(memory_limit: str) -> str:
 
 
 class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
-    """Dask adapter for Pandas-family DataFrame benchmarking.
-
-    This adapter provides lazy, distributed DataFrame operations
-    using Dask. Unlike other Pandas-family adapters, Dask uses
-    lazy evaluation - operations build a task graph that is only
-    executed when .compute() is called.
-
-    Features:
-    - Lazy evaluation with task graph optimization
-    - Out-of-core support for datasets larger than memory
-    - Distributed computing with optional cluster
-    - Pandas-like API
-
-    Attributes:
-        n_workers: Number of worker processes
-        threads_per_worker: Threads per worker process
-        use_distributed: Use distributed scheduler
-    """
-
     def __init__(
         self,
         working_dir: str | Path | None = None,
@@ -144,23 +94,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         spill_directory: str | Path | None = None,
         tuning_config: DataFrameTuningConfiguration | None = None,
     ) -> None:
-        """Initialize the Dask adapter.
-
-        Args:
-            working_dir: Working directory for data files
-            verbose: Enable verbose logging
-            very_verbose: Enable very verbose logging
-            n_workers: Number of worker processes (default: CPU count)
-            threads_per_worker: Threads per worker (default: conservative local envelope)
-            use_distributed: Use distributed scheduler (default: local resource envelope)
-            scheduler_address: Connect to existing scheduler (e.g., 'tcp://...')
-            memory_limit: Memory limit per local worker (e.g., '4GB')
-            spill_directory: Directory for Dask spill files. Explicit directories are not deleted by close().
-            tuning_config: Optional tuning configuration for performance optimization
-
-        Raises:
-            ImportError: If Dask is not installed
-        """
         if not DASK_AVAILABLE:
             raise ImportError("Dask not installed. Install with: pip install dask[distributed]")
 
@@ -174,7 +107,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             tuning_config=tuning_config,
         )
 
-        # Default values (may be overridden by tuning config)
         self.n_workers = n_workers
         self.threads_per_worker = threads_per_worker if threads_per_worker is not None else 1
         self.use_distributed = use_distributed
@@ -191,7 +123,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         self._client: Client | None = None
         self._cluster: LocalCluster | None = None
 
-        # Validate and apply tuning configuration (before setting up cluster)
         self._validate_and_apply_tuning()
         self._apply_local_resource_envelope_defaults()
 
@@ -200,36 +131,23 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             self._record_distributed_tuning()
 
     def _apply_tuning(self) -> None:
-        """Apply Dask-specific tuning configuration.
-
-        This method applies tuning settings from the configuration to the Dask
-        runtime environment. Settings include:
-        - worker_count for distributed computing
-        - threads_per_worker for thread-based parallelism
-        - memory_limit per worker
-        - spill_to_disk for out-of-core computation
-        """
         config = self._tuning_config
 
-        # Apply worker count setting
         if config.parallelism.worker_count is not None:
             self.n_workers = config.parallelism.worker_count
             self._n_workers_configured = True
             self._log_verbose(f"Set n_workers={self.n_workers} from tuning configuration")
 
-        # Apply threads per worker setting
         if config.parallelism.threads_per_worker is not None:
             self.threads_per_worker = config.parallelism.threads_per_worker
             self._threads_per_worker_configured = True
             self._log_verbose(f"Set threads_per_worker={self.threads_per_worker} from tuning configuration")
 
-        # Apply memory limit setting
         if config.memory.memory_limit is not None:
             self._memory_limit = config.memory.memory_limit
             self._memory_limit_configured = True
             self._log_verbose(f"Set memory_limit={self._memory_limit} from tuning configuration")
 
-        # Apply spill to disk setting
         if config.memory.spill_to_disk:
             self._spill_to_disk = True
             self._log_verbose("Enabled spill to disk from tuning configuration")
@@ -239,7 +157,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             self._configured_spill_directory = Path(spill_directory).expanduser()
 
     def _record_distributed_tuning(self) -> None:
-        """Record settings consumed by a newly created local Dask cluster."""
         if not self.use_distributed or self.scheduler_address:
             return
 
@@ -252,16 +169,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             self._record_runtime_tuning(f"memory_limit={self._memory_limit}")
         if config.memory.spill_to_disk:
             self._record_runtime_tuning("spill_to_disk=on")
-        # The spill directory is recorded on effective consumption, not on the
-        # spill_to_disk flag: the local resource envelope may enable spilling
-        # by default after _apply_tuning ran, in which case a user-configured
-        # directory still reaches the cluster (local_directory) and must be
-        # claimed. An auto-created temp dir is never a tuned setting, so only
-        # a configured directory that setup actually resolved is recorded.
-        # Like every other entry here, the directory must come from the tuning
-        # configuration: a bare constructor/platform-option spill directory
-        # with no tuning config is infrastructure, not tuning, and claiming it
-        # would flip an untuned baseline from noop to applied_unverified.
         if (
             getattr(config.memory, "spill_directory", None) is not None
             and self._configured_spill_directory is not None
@@ -270,7 +177,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             self._record_runtime_tuning(f"spill_directory={self._configured_spill_directory}")
 
     def _apply_local_resource_envelope_defaults(self) -> None:
-        """Apply conservative defaults for local distributed Dask runs."""
         if not self.use_distributed or self.scheduler_address:
             return
 
@@ -294,7 +200,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             self._spill_to_disk = True
 
     def _configure_spill_to_disk(self) -> None:
-        """Configure Dask spill thresholds and local directory."""
         if not self._spill_to_disk:
             return
 
@@ -310,7 +215,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         )
 
     def _resolve_spill_directory(self) -> Path:
-        """Return the Dask spill directory, creating an owned temp dir if needed."""
         spill_directory = getattr(self, "_spill_directory", None)
         if spill_directory is not None:
             return spill_directory
@@ -328,24 +232,20 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         return self._spill_directory
 
     def _setup_distributed(self) -> None:
-        """Set up the Dask distributed scheduler."""
         try:
             if self.scheduler_address:
-                # Connect to existing scheduler
                 self._client = Client(self.scheduler_address)
                 if self.verbose:
                     logger.info(f"Connected to Dask scheduler at {self.scheduler_address}")
             else:
                 self._configure_spill_to_disk()
 
-                # Create local cluster with tuning settings
                 cluster_kwargs: dict[str, Any] = {
                     "n_workers": self.n_workers,
                     "threads_per_worker": self.threads_per_worker,
                     "silence_logs": logging.INFO if self.verbose else logging.ERROR,
                 }
 
-                # Apply memory limit from tuning configuration
                 if self._memory_limit is not None:
                     cluster_kwargs["memory_limit"] = self._memory_limit
 
@@ -373,11 +273,9 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             ) from e
 
     def __del__(self) -> None:
-        """Clean up distributed resources."""
         self.close()
 
     def close(self) -> None:
-        """Close the Dask client and cluster."""
         if not hasattr(self, "_client"):
             return
         if self._client is not None:
@@ -397,7 +295,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         self._cleanup_owned_spill_directory()
 
     def _cleanup_owned_spill_directory(self) -> None:
-        """Remove only spill directories created by this adapter instance."""
         if not getattr(self, "_owns_spill_directory", False):
             return
 
@@ -419,12 +316,7 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
 
     @property
     def platform_name(self) -> str:
-        """Return the platform name."""
         return "Dask"
-
-    # =========================================================================
-    # Data Loading Methods
-    # =========================================================================
 
     def read_csv(
         self,
@@ -436,181 +328,66 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         null_marker: str | None = None,
         column_types: list[str] | None = None,
     ) -> DaskDF:
-        """Read a CSV file into a Dask DataFrame.
-
-        This creates a lazy DataFrame - the actual reading happens
-        when .compute() is called.
-
-        Args:
-            path: Path to the CSV file
-            delimiter: Field delimiter
-            header: Row to use as header (None for no header)
-            names: Column names (if header is None)
-            null_marker: When not None, enables trailing-delimiter probing (TPC-style rows end with a spurious delimiter).
-
-        Returns:
-            Dask DataFrame (lazy)
-        """
         read_kwargs: dict[str, Any] = {
             "sep": delimiter,
             "header": header if header is not None else "infer",
             "on_bad_lines": "skip",
         }
 
-        # Dask uses header='infer' for first row as header
         if header is None:
             read_kwargs["header"] = None
 
-        # Add column names if provided
         string_columns: list[str] = []
         if names:
             read_kwargs["names"] = names
-            # Read declared text columns as object so a numeric-looking string is
-            # not inferred as a number, and (below) restore '' for empty fields -
-            # mirroring the pandas adapter so the empty-string contract holds on the
-            # raw-CSV path too (see _pandas_string_columns).
             string_columns = _pandas_string_columns(names, column_types, set())
             if string_columns:
                 read_kwargs["dtype"] = dict.fromkeys(string_columns, "object")
 
-        # Trailing-delimiter probing only for TPC-style sources (null_marker is not None).
         if null_marker is not None and names and has_trailing_delimiter(path, delimiter, names):
             extended_names = names + [TRAILING_DUMMY_COLUMN]
             read_kwargs["names"] = extended_names
 
         df = dd.read_csv(path, **read_kwargs)
 
-        # Match the SQL dialect's empty-field semantics (null_marker None -> keep '';
-        # '' -> NULL), as the pandas adapter does, so an empty text field does not
-        # surface as None where the SQL reference emits ''. Shared step: see
-        # coerce_empty_string_columns.
         df = coerce_empty_string_columns(df, string_columns, null_marker)
 
-        # Drop trailing column if present (lazy operation)
         if TRAILING_DUMMY_COLUMN in df.columns:
             df = df.drop(columns=[TRAILING_DUMMY_COLUMN])
 
         return df
 
     def read_parquet(self, path: Path) -> DaskDF:
-        """Read a Parquet file into a Dask DataFrame.
-
-        This creates a lazy DataFrame - the actual reading happens
-        when .compute() is called.
-
-        Args:
-            path: Path to the Parquet file
-
-        Returns:
-            Dask DataFrame (lazy)
-        """
-        # Dask can read Parquet files efficiently with partition pruning
         return dd.read_parquet(path)
 
     def to_datetime(self, series: Any) -> Any:
-        """Convert a Series to datetime type.
-
-        For Dask, this uses pandas' to_datetime which works
-        with Dask Series.
-
-        Args:
-            series: The Series to convert
-
-        Returns:
-            Datetime Series
-        """
         return pd.to_datetime(series)
 
     def timedelta_days(self, days: int) -> timedelta:
-        """Create a timedelta representing the given number of days.
-
-        Args:
-            days: Number of days
-
-        Returns:
-            Pandas Timedelta object
-        """
         return pd.Timedelta(days=days)
 
     def concat(self, dfs: list[DaskDF]) -> DaskDF:
-        """Concatenate multiple DataFrames.
-
-        Args:
-            dfs: List of DataFrames to concatenate
-
-        Returns:
-            Combined DataFrame (lazy)
-        """
         if len(dfs) == 1:
             return dfs[0]
         return dd.concat(dfs, ignore_index=True)
 
     def get_row_count(self, df: DaskDF) -> int:
-        """Get the number of rows in a DataFrame.
-
-        Note: This triggers computation for lazy DataFrames.
-
-        Args:
-            df: The DataFrame
-
-        Returns:
-            Number of rows
-        """
-        # For Dask, len() triggers computation
         return self._run_with_resource_diagnostics("row count", lambda: len(df))
 
     def _get_first_row(self, df: DaskDF) -> tuple | None:
-        """Get the first row of a Dask DataFrame.
-
-        Note: This triggers computation to get the first row.
-
-        Args:
-            df: The DataFrame
-
-        Returns:
-            First row as tuple, or None if empty
-        """
-        # Compute just the first row to avoid loading entire dataset
         head_df = self._run_with_resource_diagnostics("first row", lambda: df.head(1))
         if len(head_df) == 0:
             return None
 
         return tuple(head_df.iloc[0])
 
-    # =========================================================================
-    # Dask-Specific Methods
-    # =========================================================================
-
     def compute(self, df: DaskDF) -> Any:
-        """Materialize a lazy Dask DataFrame.
-
-        Triggers computation of the task graph and returns
-        a Pandas DataFrame.
-
-        Args:
-            df: Dask DataFrame (lazy)
-
-        Returns:
-            Pandas DataFrame (materialized)
-        """
         return self._run_with_resource_diagnostics("compute", df.compute)
 
     def persist(self, df: DaskDF) -> DaskDF:
-        """Persist a Dask DataFrame in memory.
-
-        Triggers computation but keeps result as Dask DataFrame
-        distributed across workers.
-
-        Args:
-            df: Dask DataFrame
-
-        Returns:
-            Persisted Dask DataFrame
-        """
         return self._run_with_resource_diagnostics("persist", df.persist)
 
     def _run_with_resource_diagnostics(self, operation: str, func: Any) -> Any:
-        """Run a Dask operation and classify resource-envelope failures."""
         try:
             return func()
         except Exception as exc:
@@ -620,7 +397,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
             raise
 
     def _resource_envelope_diagnostic(self, operation: str, exc: Exception) -> str | None:
-        """Return a user-facing diagnostic for Dask worker/process kills."""
         error_text = f"{type(exc).__name__}: {exc}"
         normalized = error_text.lower()
 
@@ -635,7 +411,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         )
 
     def _resource_envelope_settings(self) -> str:
-        """Return the Dask resource envelope used in diagnostics."""
         return (
             f"use_distributed={self.use_distributed}, "
             f"n_workers={self.n_workers}, "
@@ -647,11 +422,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         )
 
     def get_platform_info(self) -> dict[str, Any]:
-        """Get platform information for reporting.
-
-        Returns:
-            Dictionary with platform details
-        """
         info = {
             "platform": self.platform_name,
             "family": self.family,
@@ -671,7 +441,7 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
 
         if self._client is not None:
             try:
-                info["scheduler_address"] = self._client.scheduler.address  # type: ignore[union-attr]
+                info["scheduler_address"] = self._client.scheduler.address
                 info["n_active_workers"] = len(self._client.scheduler_info()["workers"])
             except Exception as e:
                 logger.debug(f"Failed to get scheduler info: {e}")
@@ -688,7 +458,6 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         right_on: str | list[str] | None,
         how: str,
     ) -> DaskDF:
-        """Use Dask's lazy merge implementation."""
         return dd.merge(
             left,
             right,
@@ -706,29 +475,8 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         as_index: bool = False,
         **kwargs: Any,
     ) -> DaskDF:
-        """Perform grouped aggregation with Dask-specific handling.
-
-        Dask differences from Pandas:
-        - Does not support as_index parameter in groupby()
-        - Uses reset_index() to achieve same result as as_index=False
-        - Does not support 'nunique' in agg() - must handle separately
-
-        Note: This is a lazy operation.
-
-        Args:
-            df: Input DataFrame
-            by: Column(s) to group by
-            agg_spec: Aggregation specification. Supports:
-                - Named aggs: {"sum_qty": ("qty", "sum"), "avg_price": ("price", "mean")}
-                - Direct aggs: {"qty": "sum", "price": "mean"}
-            as_index: Whether to use group columns as index (ignored for Dask, always False behavior)
-
-        Returns:
-            Aggregated DataFrame (lazy)
-        """
         by_list = [by] if isinstance(by, str) else list(by)
 
-        # Check for nunique aggregations (not supported in Dask agg)
         nunique_aggs = {}
         regular_aggs = {}
 
@@ -743,19 +491,13 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         if nunique_aggs:
             return self._groupby_agg_with_nunique(df, by_list, regular_aggs, nunique_aggs, **kwargs)
 
-        # Detect if this is named aggregation (tuples) or direct style
-        # Named: {"sum_qty": ("qty", "sum")} -> use **agg_spec
-        # Direct: {"qty": "sum"} -> use agg(dict) without unpacking
         is_named_agg = any(isinstance(v, tuple) for v in regular_aggs.values())
 
-        # Standard case: groupby().agg().reset_index()
-        # Keep if/else for clarity: **aggs vs aggs is a subtle but important API difference
-        if is_named_agg:  # noqa: SIM108
+        if is_named_agg:
             result = df.groupby(by_list, **kwargs).agg(**regular_aggs)
         else:
             result = df.groupby(by_list, **kwargs).agg(regular_aggs)
 
-        # Reset index to match as_index=False behavior
         if not as_index:
             result = result.reset_index()
 
@@ -769,37 +511,15 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         nunique_aggs: dict[str, tuple[str, str]],
         **kwargs: Any,
     ) -> DaskDF:
-        """Handle groupby with nunique aggregations separately.
-
-        Dask does not support 'nunique' in .agg(). We compute nunique
-        separately and merge the results.
-
-        Args:
-            df: Input DataFrame
-            by: Group by columns
-            regular_aggs: Standard aggregations
-            nunique_aggs: Nunique aggregations to handle separately
-            **kwargs: Extra native groupby options (e.g. dropna=False)
-
-        Returns:
-            Combined aggregation result
-        """
-        # Compute regular aggregations if any
         if regular_aggs:
             result = df.groupby(by, **kwargs).agg(**regular_aggs).reset_index()
         else:
-            # No regular aggs, just create a frame with group keys
-            # Dask reset_index() doesn't support 'name' parameter
             size_result = df.groupby(by, **kwargs).size().reset_index()
-            # Rename the size column (default name is 0 or 'size') and drop it
             size_cols = [c for c in size_result.columns if c not in by]
             result = size_result.drop(columns=size_cols) if size_cols else size_result
 
-        # Add nunique columns separately
         for col_name, (source_col, _) in nunique_aggs.items():
-            # Dask reset_index() doesn't support 'name' parameter
             nunique_result = df.groupby(by, **kwargs)[source_col].nunique().reset_index()
-            # Rename the nunique column (will be named after source_col)
             nunique_result = nunique_result.rename(columns={source_col: col_name})
             result = result.merge(nunique_result, on=by)
 
@@ -811,47 +531,15 @@ class DaskDataFrameAdapter(PandasFamilyAdapter[DaskDF]):
         by: str | list[str],
         name: str = "size",
     ) -> DaskDF:
-        """Group by columns and count rows per group (Dask-specific).
-
-        Dask doesn't support reset_index(name='...'), so we use a different approach.
-
-        Args:
-            df: Input DataFrame
-            by: Column(s) to group by
-            name: Name for the count column (default 'size')
-
-        Returns:
-            DataFrame with group columns and count column
-        """
         by_list = [by] if isinstance(by, str) else list(by)
-        # size() returns a Series, reset_index() makes it a DataFrame with default column name
         result = df.groupby(by_list).size().reset_index()
-        # Rename the count column (it will be named after a number or 'size')
-        # The count column is the last one that's not in by_list
         count_col = [c for c in result.columns if c not in by_list][0]
         if count_col != name:
             result = result.rename(columns={count_col: name})
         return result
 
     def repartition(self, df: DaskDF, npartitions: int) -> DaskDF:
-        """Repartition a Dask DataFrame.
-
-        Args:
-            df: Dask DataFrame
-            npartitions: Target number of partitions
-
-        Returns:
-            Repartitioned DataFrame
-        """
         return df.repartition(npartitions=npartitions)
 
     def get_npartitions(self, df: DaskDF) -> int:
-        """Get the number of partitions in a Dask DataFrame.
-
-        Args:
-            df: Dask DataFrame
-
-        Returns:
-            Number of partitions
-        """
         return df.npartitions

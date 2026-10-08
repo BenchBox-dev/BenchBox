@@ -1,5 +1,3 @@
-"""Integration tests for ExplorerPipeline."""
-
 from __future__ import annotations
 
 import hashlib
@@ -30,11 +28,6 @@ from benchbox.validation.bundle import COMPANION_SUFFIXES
 from tests.unit.scripts.explorer_pipeline.conftest import MINIMAL_BUNDLE
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
-
-
-# ---------------------------------------------------------------------------
-# Unit tests for _build_short_ids
-# ---------------------------------------------------------------------------
 
 
 class TestBuildShortIds:
@@ -69,9 +62,6 @@ class TestBuildShortIds:
         assert len(result) == len(rids), "Every input must get a unique short ID"
 
     def test_collision_extends_to_longer_prefix(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """When 8-char prefixes collide, the function extends until unique."""
-        # Force a collision by patching hexdigest to return the same prefix for
-        # the first two IDs at length 8 but different prefixes at length 10.
         rid_a = "tpch-duckdb-sf1-20260101-aaa"
         rid_b = "tpch-sqlite-sf1-20260101-bbb"
         real_sha256 = hashlib.sha256
@@ -79,11 +69,10 @@ class TestBuildShortIds:
         digest_a = real_sha256(rid_a.encode()).hexdigest()
         digest_b = real_sha256(rid_b.encode()).hexdigest()
 
-        # Build a fake digest that shares the first 8 chars between rid_a and rid_b.
-        shared_prefix = "deadbeef"  # 8 chars, injected for both
+        shared_prefix = "deadbeef"
         fake_digests = {
             rid_a.encode(): shared_prefix + digest_a[8:],
-            rid_b.encode(): shared_prefix + digest_b[8:],  # same 8-char prefix, different from 10+
+            rid_b.encode(): shared_prefix + digest_b[8:],
         }
 
         class _FakeHash:
@@ -96,11 +85,9 @@ class TestBuildShortIds:
         monkeypatch.setattr(hashlib, "sha256", _FakeHash)
 
         result = _build_short_ids([rid_a, rid_b])
-        # All short IDs must be ≥ 8 chars and unique
         assert len(result) == 2
         for short_id in result:
             assert len(short_id) >= 8
-        # Because the 8-char prefixes were identical, the result must use > 8 chars
         assert all(len(k) > 8 for k in result)
 
 
@@ -124,7 +111,7 @@ def test_mismatched_query_sets_are_not_ranked(tmp_path: Path) -> None:
         pairs.append((entry, transformer.to_detail_result(path, entry.result_id)))
     full_to_short = {entry.result_id: entry.result_id[-8:] for entry, _ in pairs}
 
-    summaries = _build_benchmark_summaries({("tpchavoc", 0.01, "power"): pairs}, full_to_short)
+    summaries = _build_benchmark_summaries({("tpchavoc", 0.01, "power", None): pairs}, full_to_short)
 
     rows = summaries[0][1].platforms
     assert {len({query_id for query_id, value in row.timings.items() if value is not None}) for row in rows} == {
@@ -171,7 +158,7 @@ def test_non_rankable_query_gap_does_not_exclude_rankable_peers(tmp_path: Path) 
     pairs = [(entry, detail), (peer_entry, peer_detail), (incomplete_entry, incomplete_detail)]
 
     summaries = _build_benchmark_summaries(
-        {("tpchavoc", 0.01, "power"): pairs},
+        {("tpchavoc", 0.01, "power", None): pairs},
         {candidate.result_id: candidate.result_id[-8:] for candidate, _ in pairs},
     )
 
@@ -201,7 +188,7 @@ def test_known_defective_entry_does_not_vote_in_canonical_query_set(tmp_path: Pa
     pairs = [(entry, detail), (defective_entry, defective_detail)]
 
     summaries = _build_benchmark_summaries(
-        {("tpchavoc", 0.01, "power"): pairs},
+        {("tpchavoc", 0.01, "power", None): pairs},
         {candidate.result_id: candidate.result_id[-8:] for candidate, _ in pairs},
     )
 
@@ -226,7 +213,7 @@ def test_partial_query_set_does_not_poison_complete_majority(tmp_path: Path) -> 
 
     summaries = _build_benchmark_summaries(
         {
-            ("tpchavoc", 0.01, "power"): [
+            ("tpchavoc", 0.01, "power", None): [
                 (entry, detail),
                 (peer_entry, peer_detail),
                 (partial_entry, partial_detail),
@@ -250,7 +237,6 @@ def test_partial_query_set_does_not_poison_complete_majority(tmp_path: Path) -> 
 
 
 def test_partial_query_set_exclusion_reaches_every_read_model_consumer(tmp_path: Path) -> None:
-    """A partial producer result stays visible but is excluded in every persisted consumer."""
 
     class CohortFixtureTransformer(BundleTransformer):
         def result_id_from_bundle(
@@ -317,7 +303,6 @@ def test_partial_query_set_exclusion_reaches_every_read_model_consumer(tmp_path:
 
 
 def _duckdb_results(output: Path) -> list[dict]:
-    """Return results rows as dicts for assertions."""
     with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
         rows = con.execute("SELECT * FROM results").fetchall()
         description = con.description
@@ -368,7 +353,6 @@ class TestExplorerPipelineRun:
         assert entry["visibility"] == "public-curated"
 
     def test_does_not_emit_details_dir(self, data_dir: Path, tmp_path: Path) -> None:
-        """details/*.json was retired when Compare migrated to DuckDB (W4 slice 5)."""
         output = tmp_path / "out"
         ExplorerPipeline().run(data_dir, output)
 
@@ -420,7 +404,6 @@ class TestExplorerPipelineRun:
         result_id = _duckdb_results(output)[0]["result_id"]
         published = (output / "bundles" / f"{result_id}.json").read_text(encoding="utf-8")
         assert "/Users/alice" not in published
-        # working_dir is dropped at the public boundary (not path-hashed).
         assert "working_dir" not in published
         assert "private-run" not in published
 
@@ -486,14 +469,6 @@ class TestExplorerPipelineRun:
         assert json.loads(projected[0]) == expected
 
     def test_publishes_plans_sidecar_when_present(self, tmp_path: Path) -> None:
-        """w1 wire-up: when a ``*.plans.json`` sidecar exists alongside a
-        bundle, the pipeline must copy it to ``out/bundles/<result_id>.plans.json``
-        AND set ``plans_published=true`` on the result row.
-
-        Pre-wire-up (PR #179 added ``plans_published`` only to the consumer
-        side), the field was never set anywhere → always falsy → the explorer
-        UI never rendered a download link even for bundles that genuinely had
-        plans. This test confirms the producer side now fills the field."""
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         bundle_path = bundles_dir / "with_plans.json"
@@ -513,9 +488,6 @@ class TestExplorerPipelineRun:
         assert (output / "bundles" / f"{result_id}.plans.json").exists()
 
     def test_plans_published_false_when_no_sidecar(self, data_dir: Path, tmp_path: Path) -> None:
-        """w1 wire-up (negative side): without a ``*.plans.json`` sidecar,
-        ``plans_published`` must remain false and no plans file should be
-        written to the published bundles directory."""
         output = tmp_path / "out"
         ExplorerPipeline().run(data_dir, output)
 
@@ -524,12 +496,6 @@ class TestExplorerPipelineRun:
         assert not list((output / "bundles").glob("*.plans.json"))
 
     def test_inline_requested_tuning_sets_has_tuning_without_a_sidecar(self, tmp_path: Path) -> None:
-        """The requested tuning rides in the bundle, so no sidecar is published.
-
-        ``has_tuning`` used to be gated on committing a public ``.tuning.json``
-        because the browser derived the sidecar URL from that flag. The browser
-        now reads the bundle it already has, so the flag comes from the bundle.
-        """
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         bundle_path = bundles_dir / "with_tuning.json"
@@ -552,12 +518,6 @@ class TestExplorerPipelineRun:
         assert published_bundle["platform"]["tuning"]["requested"]
 
     def test_retired_tuning_companion_is_recognized_but_not_republished(self, tmp_path: Path) -> None:
-        """A bundle published before the move still advertises its tuning.
-
-        Its companion is read for the flag, but never copied forward: the
-        content belongs in the bundle now, and republishing would recreate the
-        split this retired.
-        """
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         bundle_path = bundles_dir / "legacy_tuning.json"
@@ -580,13 +540,11 @@ class TestExplorerPipelineRun:
         row = _duckdb_results(output)[0]
         assert row["has_tuning"] is True
         assert not list((output / "bundles").glob("*.tuning.json"))
-        # Nothing from the private companion may reach the published tree.
         published = (output / "bundles" / f"{row['result_id']}.json").read_text(encoding="utf-8")
         assert "/Users/alice" not in published
         assert "lineitem" not in published
 
     def test_inline_applied_receipt_reaches_the_read_model(self, tmp_path: Path) -> None:
-        """The receipt is ingested from the bundle, and no sidecar is published."""
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         bundle_path = bundles_dir / "with_applied.json"
@@ -610,7 +568,6 @@ class TestExplorerPipelineRun:
         assert not list((output / "bundles").glob("*.applied.json"))
 
     def test_retired_applied_companion_is_read_but_not_republished(self, tmp_path: Path) -> None:
-        """Legacy bundles keep their receipt, and its private text stays private."""
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         bundle_path = bundles_dir / "with_applied.json"
@@ -640,7 +597,6 @@ class TestExplorerPipelineRun:
 
     @pytest.mark.parametrize("suffix", [".tuning.json", ".applied.json"])
     def test_malformed_retired_companion_is_ignored(self, data_dir: Path, tmp_path: Path, suffix: str) -> None:
-        """A corrupt legacy companion must not advertise tuning or fail the build."""
         bundle = next(data_dir.joinpath("bundles").rglob("*.json"))
         bundle.with_name(f"{bundle.stem}{suffix}").write_text("{not json", encoding="utf-8")
 
@@ -649,9 +605,6 @@ class TestExplorerPipelineRun:
 
         row = _duckdb_results(output)[0]
         if suffix == ".tuning.json":
-            # A companion that cannot be parsed is still a companion: its mere
-            # presence is what the legacy flag reads, and the pipeline must not
-            # crash on it. What it must never do is publish the broken file.
             assert row["has_tuning"] is True
         assert not list((output / "bundles").glob(f"*{suffix}"))
 
@@ -711,7 +664,6 @@ class TestExplorerPipelineRun:
     def test_empty_data_dir_is_rejected_before_promotion(self, tmp_path: Path) -> None:
         data_dir = tmp_path / "empty_data"
         data_dir.mkdir()
-        # No bundles/ sub-directory at all
         output = tmp_path / "out"
         with pytest.raises(ValueError, match="required browser scan"):
             ExplorerPipeline().run(data_dir, output)
@@ -756,12 +708,10 @@ class TestExplorerPipelineRun:
         assert sorted(path.name for path in (output / "bundles").iterdir()) == before_bundles
 
     def test_submission_manifest_sidecar_overrides_trust_label(self, tmp_path: Path) -> None:
-        """A bundle with a submission-manifest.json sidecar gets community-submission trust."""
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         bundle_path = bundles_dir / "community_result.json"
         bundle_path.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
-        # Place sidecar manifest alongside the bundle
         (bundles_dir / SUBMISSION_MANIFEST_FILENAME).write_text(
             json.dumps({"bundle_hash": "abc123", "bundle_file": "community_result.json"}),
             encoding="utf-8",
@@ -773,7 +723,6 @@ class TestExplorerPipelineRun:
         entry = _duckdb_results(output)[0]
         assert entry["trust_label"] == COMMUNITY_TRUST_LABEL
 
-        # result_detail_metrics row carries the same override
         with duckdb.connect(str(output / "results.duckdb"), read_only=True) as con:
             row = con.execute(
                 "SELECT trust_label FROM result_detail_metrics WHERE result_id = ?",
@@ -782,14 +731,12 @@ class TestExplorerPipelineRun:
         assert row is not None and row[0] == COMMUNITY_TRUST_LABEL
 
     def test_no_sidecar_keeps_default_trust_label(self, data_dir: Path, tmp_path: Path) -> None:
-        """Without a submission-manifest.json, the pipeline-level trust_label is used."""
         output = tmp_path / "out"
         ExplorerPipeline().run(data_dir, output, trust_label="maintainer-run")
 
         assert _duckdb_results(output)[0]["trust_label"] == "maintainer-run"
 
     def test_top_level_vendor_subtree_sets_vendor_label_and_visibility(self, tmp_path: Path) -> None:
-        """A bundle under the top-level vendor/ subtree is vendor-supplied + public-vendor-reported."""
         vendor_dir = tmp_path / "data" / "bundles" / "vendor"
         vendor_dir.mkdir(parents=True)
         (vendor_dir / "vendor_result.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
@@ -802,7 +749,6 @@ class TestExplorerPipelineRun:
         assert entry["visibility"] == "public-vendor-reported"
 
     def test_nested_vendor_dir_does_not_grant_vendor_label(self, tmp_path: Path) -> None:
-        """A nested directory merely named 'vendor' must NOT self-grant the vendor label."""
         nested = tmp_path / "data" / "bundles" / "community" / "vendor"
         nested.mkdir(parents=True)
         (nested / "result.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
@@ -830,12 +776,10 @@ class TestExplorerPipelineRun:
         assert _duckdb_results(output)[0]["funding"] == "unspecified"
 
     def test_per_bundle_manifest_sidecar_overrides_trust_label(self, tmp_path: Path) -> None:
-        """The new `<stem>.manifest.json` naming triggers the community trust label."""
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         bundle_path = bundles_dir / "community_result.json"
         bundle_path.write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
-        # Per-bundle manifest naming: <stem>.manifest.json next to the bundle.
         (bundles_dir / "community_result.manifest.json").write_text(
             json.dumps({"bundle_hash": "abc123", "bundle_file": "community_result.json"}),
             encoding="utf-8",
@@ -847,7 +791,6 @@ class TestExplorerPipelineRun:
         assert _duckdb_results(output)[0]["trust_label"] == COMMUNITY_TRUST_LABEL
 
     def test_per_bundle_manifest_excluded_from_bundle_discovery(self, tmp_path: Path) -> None:
-        """`<stem>.manifest.json` files are not picked up as bundles."""
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         (bundles_dir / "real_bundle.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
@@ -857,11 +800,9 @@ class TestExplorerPipelineRun:
         output = tmp_path / "out"
         ExplorerPipeline().run(tmp_path / "data", output)
 
-        # Only the real bundle, not either manifest sidecar.
         assert len(_duckdb_results(output)) == 1
 
     def test_submission_manifest_excluded_from_bundle_discovery(self, tmp_path: Path) -> None:
-        """submission-manifest.json should not be treated as a bundle file."""
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         bundle_path = bundles_dir / "real_bundle.json"
@@ -871,18 +812,9 @@ class TestExplorerPipelineRun:
         output = tmp_path / "out"
         ExplorerPipeline().run(tmp_path / "data", output)
 
-        # Only the real bundle, not the sidecar
         assert len(_duckdb_results(output)) == 1
 
     def test_applied_companion_excluded_from_bundle_discovery(self, tmp_path: Path) -> None:
-        """Regression: `<stem>.applied.json` is a companion, never a bundle.
-
-        ``bundle_publisher`` copies every entry of ``COMPANION_SUFFIXES`` next
-        to the published bundle, so an ``.applied.json`` sits in the bundles
-        dir for every tuned run. Discovery previously excluded only the
-        plans/tuning companions, so the applied ledger was picked up and
-        transformed as if it were a result bundle.
-        """
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         bundle_path = bundles_dir / "real_bundle.json"
@@ -902,7 +834,6 @@ class TestExplorerPipelineRun:
         output = tmp_path / "out"
         ExplorerPipeline().run(tmp_path / "data", output)
 
-        # Only the real bundle, not the applied-ledger companion.
         assert len(_duckdb_results(output)) == 1
 
     def test_discovery_ignores_json_named_directories_and_mixed_case_companions(self, tmp_path: Path) -> None:
@@ -918,12 +849,6 @@ class TestExplorerPipelineRun:
         assert len(_duckdb_results(output)) == 1
 
     def test_applied_receipt_reaches_results_table_and_detail_view(self, tmp_path: Path) -> None:
-        """End-to-end: the companion's sanitized receipt lands in DuckDB.
-
-        Pins the DDL / positional-INSERT / ``result_detail_metrics`` projection
-        alignment for the ``applied_receipt`` column -- a mismatch there would
-        silently store the receipt in the wrong column.
-        """
         receipt = {
             "platform": "duckdb",
             "corroborated": True,
@@ -954,7 +879,6 @@ class TestExplorerPipelineRun:
         assert json.loads(projected[0][0]) == expected
 
     def test_applied_receipt_null_when_no_companion(self, tmp_path: Path) -> None:
-        """A run with no receipt stores SQL NULL, not an empty string."""
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         (bundles_dir / "plain.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
@@ -965,11 +889,6 @@ class TestExplorerPipelineRun:
         assert _duckdb_results(output)[0]["applied_receipt"] is None
 
     def test_discovery_excludes_every_canonical_companion_suffix(self, tmp_path: Path) -> None:
-        """Pin discovery against the canonical companion tuple.
-
-        A newly added companion kind must not silently start being transformed
-        as a bundle -- that is exactly how ``.applied.json`` slipped through.
-        """
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         (bundles_dir / "real_bundle.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
@@ -982,13 +901,10 @@ class TestExplorerPipelineRun:
         assert len(_duckdb_results(output)) == 1
 
     def test_mixed_bundles_with_and_without_sidecar(self, tmp_path: Path) -> None:
-        """Bundles in different dirs get independent trust labels based on sidecar presence."""
         data_dir = tmp_path / "data" / "bundles"
-        # Maintainer bundle - no sidecar
         maintainer_dir = data_dir / "tpch" / "duckdb" / "sf0.1"
         maintainer_dir.mkdir(parents=True)
         (maintainer_dir / "maintainer.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
-        # Community bundle - with sidecar
         community_dir = data_dir / "tpch" / "sqlite" / "sf0.1"
         community_dir.mkdir(parents=True)
         community_bundle = {**MINIMAL_BUNDLE, "platform": {"name": "sqlite", "version": "3.45"}}
@@ -1007,11 +923,9 @@ class TestExplorerPipelineRun:
         assert entries["sqlite"] == COMMUNITY_TRUST_LABEL
 
     def test_malformed_sidecar_still_triggers_community_trust(self, tmp_path: Path) -> None:
-        """Presence-only contract: even a malformed sidecar triggers the override."""
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         (bundles_dir / "result.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
-        # Malformed JSON - pipeline should not parse it, only check existence
         (bundles_dir / SUBMISSION_MANIFEST_FILENAME).write_text("NOT VALID JSON", encoding="utf-8")
 
         output = tmp_path / "out"
@@ -1020,13 +934,10 @@ class TestExplorerPipelineRun:
         assert _duckdb_results(output)[0]["trust_label"] == COMMUNITY_TRUST_LABEL
 
     def test_duckdb_snapshot_reflects_overridden_trust_label(self, tmp_path: Path) -> None:
-        """DuckDB snapshot must contain community-submission for sidecar bundles."""
         data_dir = tmp_path / "data" / "bundles"
-        # Maintainer bundle
         maintainer_dir = data_dir / "tpch" / "duckdb" / "sf0.1"
         maintainer_dir.mkdir(parents=True)
         (maintainer_dir / "m.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
-        # Community bundle with sidecar
         community_dir = data_dir / "tpch" / "sqlite" / "sf0.1"
         community_dir.mkdir(parents=True)
         community_bundle = {**MINIMAL_BUNDLE, "platform": {"name": "sqlite", "version": "3.45"}}
@@ -1046,11 +957,6 @@ class TestExplorerPipelineRun:
     def test_sidecar_without_recorded_source_fails_safe_to_community(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """A sidecar recording no result_source has unknown provenance.
-
-        Unknown provenance takes the less-trusted label; it is never promoted
-        by assumption.
-        """
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         (bundles_dir / "result.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
@@ -1073,14 +979,6 @@ class TestExplorerPipelineRun:
     def test_recorded_result_source_decides_the_trust_label(
         self, tmp_path: Path, result_source: str, expected: str
     ) -> None:
-        """The sidecar's recorded source is authoritative, not its mere existence.
-
-        `benchbox submit` writes a sidecar unconditionally, including for a
-        maintainer run. Treating presence alone as proof of community
-        provenance labelled 191 of 207 maintainer-generated bundles
-        `community-submission`, and because those are not ranking-eligible the
-        public leaderboard rendered 15 of 207 results.
-        """
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         (bundles_dir / "result.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
@@ -1112,17 +1010,11 @@ class TestExplorerPipelineRun:
         )
 
     def test_sidecar_in_root_bundles_dir_overrides_all_flat_bundles(self, tmp_path: Path) -> None:
-        """A sidecar in the top-level bundles/ dir affects all bundles in that directory.
-
-        This is intentional: the directory-locality rule means all bundles sharing
-        a directory share the same trust label.
-        """
         bundles_dir = tmp_path / "data" / "bundles"
         bundles_dir.mkdir(parents=True)
         (bundles_dir / "a.json").write_text(json.dumps(MINIMAL_BUNDLE), encoding="utf-8")
         bundle_b = {**MINIMAL_BUNDLE, "platform": {"name": "sqlite", "version": "3.45"}}
         (bundles_dir / "b.json").write_text(json.dumps(bundle_b), encoding="utf-8")
-        # Sidecar at root level - both bundles in this dir become community
         (bundles_dir / SUBMISSION_MANIFEST_FILENAME).write_text("{}", encoding="utf-8")
 
         output = tmp_path / "out"
@@ -1173,7 +1065,6 @@ class TestExplorerPipelineRun:
         assert row[0] == f"/cdn/bundles/{result_id}.json"
 
     def test_permission_error_propagates(self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        """System-level errors must not be silently swallowed."""
         transformer = BundleTransformer()
         monkeypatch.setattr(
             transformer,
@@ -1225,7 +1116,6 @@ class TestExplorerPipelineRun:
         assert short_id == expected, "Short ID must be a sha256 prefix of the full result_id"
 
     def test_benchmark_rankings_short_id_matches_short_ids_table(self, data_dir: Path, tmp_path: Path) -> None:
-        """Each benchmark_rankings row's short_id must round-trip through short_ids."""
         import duckdb
 
         output = tmp_path / "out"
@@ -1244,11 +1134,6 @@ class TestExplorerPipelineRun:
                 assert resolved == result_id, (
                     f"short_id {short_id!r} in benchmark_rankings must resolve to {result_id!r}"
                 )
-
-
-# ---------------------------------------------------------------------------
-# Staged-output publication guards (PR #1483 review follow-ups)
-# ---------------------------------------------------------------------------
 
 
 class TestStagedOutputGuards:
@@ -1293,12 +1178,6 @@ class TestStagedOutputGuards:
         assert stale_wal.is_file(), "Cleanup failure must leave the cause visible"
 
     def test_symlinked_bundles_destination_is_rejected(self, data_dir: Path, tmp_path: Path) -> None:
-        """A symlinked `bundles/` must not be published into.
-
-        `mkdir(exist_ok=True)` accepts a symlink to a directory, so without an
-        explicit check every copy and the post-promotion stale sweep would
-        follow the link and delete unrelated `*.json` in the target.
-        """
         output = tmp_path / "out"
         output.mkdir()
         unrelated = tmp_path / "unrelated"
@@ -1315,7 +1194,6 @@ class TestStagedOutputGuards:
     def test_staging_dir_is_removed_when_a_pre_build_step_fails(
         self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """An uncaught error before the DB build must not strand the staging tree."""
         output = tmp_path / "out"
 
         def _boom(*_args: object, **_kwargs: object) -> None:
@@ -1332,7 +1210,6 @@ class TestStagedOutputGuards:
     def test_staging_dir_is_removed_when_staged_bundle_copy_fails(
         self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A failure while copying a validated bundle does not strand staging."""
         output = tmp_path / "out"
         real_write_bytes = Path.write_bytes
 
@@ -1351,7 +1228,6 @@ class TestStagedOutputGuards:
     def test_staging_dir_is_removed_when_bundle_transform_fails(
         self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """An uncaught transformer error preserves its message and cleans staging."""
         output = tmp_path / "out"
         transformer = BundleTransformer()
 
@@ -1368,7 +1244,6 @@ class TestStagedOutputGuards:
     def test_staging_dir_is_removed_when_summary_build_fails(
         self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A summary-construction error does not strand the partially built candidate."""
         output = tmp_path / "out"
 
         def _summary_boom(*_args: object, **_kwargs: object) -> list:
@@ -1384,7 +1259,6 @@ class TestStagedOutputGuards:
     def test_staging_dir_is_removed_when_promotion_fails(
         self, data_dir: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A failed atomic promotion cleans the candidate but leaves no retry debris."""
         output = tmp_path / "out"
 
         def _promotion_boom(*_args: object, **_kwargs: object) -> None:

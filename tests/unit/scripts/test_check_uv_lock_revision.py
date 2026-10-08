@@ -1,10 +1,3 @@
-"""Tests for the uv.lock revision downgrade guard.
-
-The guard rejects a lockfile schema-revision DECREASE (an older local uv
-rewrites revision 3 back to 2 as a silent side effect); unchanged and
-increased revisions pass so legitimate lock updates need no ceremony.
-"""
-
 from __future__ import annotations
 
 import importlib.util

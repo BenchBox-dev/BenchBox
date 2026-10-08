@@ -1,14 +1,6 @@
-"""Unit tests for StarRocks workload type conversion and DDL assembly.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Pins _convert_types mappings (integer promotion, TIMESTAMP case-sensitivity,
-bare VARCHAR sizing, ClickBench uint16 promotion) and _extract_first_column
-extraction/validation, plus the composed _optimize_table_definition baseline:
-DUPLICATE KEY plus engine-mandatory DISTRIBUTED BY HASH on the first column.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

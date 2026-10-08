@@ -37,13 +37,13 @@ cuDF is NVIDIA's GPU-accelerated DataFrame library, part of the RAPIDS ecosystem
 cuDF is not available on standard PyPI. Install via NVIDIA's pip index:
 
 ```bash
-# Install cuDF for CUDA 12.x
 pip install --extra-index-url=https://pypi.nvidia.com cudf-cu12
 
-# Or use conda (recommended)
 conda install -c rapidsai -c conda-forge -c nvidia \
     cudf=25.02 python=3.11 cuda-version=12.0
 ```
+
+The first command installs cuDF for CUDA 12.x. Conda is the recommended alternative.
 
 ### Verify Installation
 
@@ -54,17 +54,16 @@ python -c "import cudf; print(f'cuDF {cudf.__version__}')"
 ## Quick Start
 
 ```bash
-# Run TPC-H on cuDF DataFrame platform
 benchbox run --platform cudf-df --benchmark tpch --scale 0.1
 
-# Specify GPU device
 benchbox run --platform cudf-df --benchmark tpch --scale 1 \
   --platform-option device_id=0
 
-# Enable spill to host memory for large datasets
 benchbox run --platform cudf-df --benchmark tpch --scale 10 \
   --platform-option spill_to_host=true
 ```
+
+The commands run, in order: the default setup, a specific GPU device, and spilling to host memory for large datasets.
 
 ## Configuration Options
 
@@ -80,12 +79,13 @@ cuDF uses RAPIDS Memory Manager (RMM) for GPU memory:
 ```python
 import rmm
 
-# Initialize memory pool for better allocation performance
 rmm.reinitialize(
     pool_allocator=True,
-    initial_pool_size=8 * 1024**3,  # 8 GB
+    initial_pool_size=8 * 1024**3,
 )
 ```
+
+Initialize the memory pool for better allocation performance. `initial_pool_size` is 8 GB here.
 
 ## Scale Factor Guidelines
 
@@ -132,10 +132,11 @@ Not all operations benefit equally from GPU acceleration. Run benchmarks with yo
 
 cuDF queries use Pandas-compatible API:
 
+This is TPC-H Q1, the Pricing Summary Report, for cuDF. `lineitem` is a cuDF DataFrame.
+
 ```python
-# TPC-H Q1: Pricing Summary Report (cuDF)
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    lineitem = ctx.get_table("lineitem")  # cuDF DataFrame
+    lineitem = ctx.get_table("lineitem")
 
     cutoff = date(1998, 12, 1) - timedelta(days=90)
     filtered = lineitem[lineitem["l_shipdate"] <= cutoff]
@@ -179,18 +180,15 @@ The queries that apply this conversion to numeric result columns are Q12, Q20 an
 ```python
 from benchbox.platforms.dataframe import CuDFDataFrameAdapter
 
-# Create adapter with custom configuration
 adapter = CuDFDataFrameAdapter(
     working_dir="./benchmark_data",
     device_id=0,
     spill_to_host=True
 )
 
-# Create context and load tables
 ctx = adapter.create_context()
 adapter.load_tables(ctx, data_dir="./tpch_data")
 
-# Execute query
 from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
 query = TPCH_DATAFRAME_QUERIES.get_query("Q1")
 result = adapter.execute_query(ctx, query)
@@ -202,14 +200,14 @@ print(result)
 ### CUDA Not Found
 
 ```bash
-# Verify CUDA installation
 nvidia-smi
 nvcc --version
 
-# Set CUDA path
 export CUDA_HOME=/usr/local/cuda
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 ```
+
+Verify the CUDA installation, then set the CUDA path.
 
 ### Out of GPU Memory
 
@@ -225,24 +223,22 @@ cudf.errors.MemoryError: std::bad_alloc: out of memory
 ### cuDF Import Error
 
 ```bash
-# Verify installation
 python -c "import cudf; print(cudf.__version__)"
 
-# Check CUDA compatibility
-python -c "import cudf; cudf.Series([1,2,3]).sum()"  # Basic test
+python -c "import cudf; cudf.Series([1,2,3]).sum()"
 ```
+
+The first command verifies the installation and the second checks CUDA compatibility with a basic test.
 
 ### Multi-GPU Setup
 
 ```bash
-# Verify all GPUs visible
 nvidia-smi -L
 
-# Set visible devices
 export CUDA_VISIBLE_DEVICES=0,1,2,3
-
-# For multi-GPU, use Dask-cuDF (not cudf-df directly)
 ```
+
+Verify that all GPUs are visible, then set the visible devices. For multi-GPU, use Dask-cuDF rather than `cudf-df` directly.
 
 ## Comparison: cuDF vs Other DataFrame Platforms
 

@@ -1,9 +1,3 @@
-/**
- * Shown in place of a rank table when a cohort is excluded from ranking
- * (see `formatCohortExclusion` in `@/lib/displayEligibility`). Timing
- * evidence and receipts remain reachable elsewhere on the page; only the
- * ranked leaderboard view is withheld.
- */
 export function RankGateNotice({
   reason,
   benchmark,

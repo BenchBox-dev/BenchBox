@@ -82,13 +82,11 @@ Parquet works on every platform, has well-understood performance characteristics
 
 If you're benchmarking Databricks, use Delta Lake. If you're on Trino or Starburst, consider Iceberg. This tests the platform under realistic conditions.
 
-**For format comparison benchmarks**: Run both and compare using the CLI:
+**For format comparison benchmarks**: Run both and compare using the CLI. The default run uses Parquet. The second command converts to Vortex inline, then benchmarks:
 
 ```bash
-# Default run uses Parquet
 benchbox run --platform duckdb --benchmark tpch
 
-# Convert to Vortex inline, then benchmark
 benchbox run --platform duckdb --benchmark tpch --table-format vortex
 ```
 

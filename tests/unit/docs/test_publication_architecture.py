@@ -1,5 +1,3 @@
-"""Keep independent-publication authority documents aligned."""
-
 import json
 import re
 from pathlib import Path

@@ -1,9 +1,6 @@
-"""Tests for BigQuery platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 import tempfile
@@ -25,14 +22,12 @@ pytestmark = [
 
 @pytest.fixture
 def dependencies_available():
-    """Mock BigQuery dependency check to simulate installed extras."""
 
     with patch("benchbox.platforms.bigquery.check_platform_dependencies", return_value=(True, [])):
         yield
 
 
 def _make_real_iceberg_table(table_dir: Path) -> None:
-    """Build a minimal real Iceberg table with one data file."""
     pytest.importorskip("pyiceberg", reason="iceberg staging tests need pyiceberg")
     pa = pytest.importorskip("pyarrow", reason="iceberg staging tests need pyarrow")
     from pyiceberg.catalog.sql import SqlCatalog
@@ -52,10 +47,7 @@ def _make_real_iceberg_table(table_dir: Path) -> None:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestBigQueryAdapter:
-    """Test BigQuery platform adapter functionality."""
-
     def test_initialization_success(self, dependencies_available):
-        """Test successful adapter initialization."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(
                 project_id="test-project",
@@ -70,22 +62,19 @@ class TestBigQueryAdapter:
             assert adapter.location == "US"
 
     def test_initialization_with_defaults(self, dependencies_available):
-        """Test initialization with default configuration."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
             assert adapter.location == "US"
             assert adapter.maximum_bytes_billed is None
-            assert adapter.query_cache is False  # Cache disabled by default for accurate benchmarking
+            assert adapter.query_cache is False
             assert adapter.dry_run is False
 
     def test_external_table_capability_declared(self, dependencies_available):
-        """BigQuery should explicitly declare external-table support."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
             assert adapter.supports_external_tables is True
 
     def test_initialization_missing_driver(self):
-        """Test initialization when BigQuery client library is not available."""
         with (
             patch(
                 "benchbox.platforms.bigquery.check_platform_dependencies",
@@ -102,19 +91,17 @@ class TestBigQueryAdapter:
             BigQueryAdapter()
 
     def test_initialization_missing_required_config(self, dependencies_available):
-        """Test initialization with missing required configuration."""
         from benchbox.core.exceptions import ConfigurationError
 
         with patch("benchbox.platforms.bigquery.bigquery"):
             with pytest.raises(ConfigurationError, match="BigQuery configuration requires"):
-                BigQueryAdapter()  # Missing required fields
+                BigQueryAdapter()
 
     @patch("benchbox.platforms.bigquery.service_account")
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_admin_client_with_credentials_path(
         self, mock_bigquery, mock_service_account, dependencies_available
     ):
-        """Test admin client creation with credentials path."""
         mock_client = Mock()
         mock_bigquery.Client.return_value = mock_client
         mock_credentials = Mock()
@@ -138,14 +125,12 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_admin_client_with_default_credentials(self, mock_bigquery, dependencies_available):
-        """Test admin client creation with default credentials."""
         mock_client = Mock()
         mock_bigquery.Client.return_value = mock_client
         mock_credentials = Mock()
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Mock _load_credentials to return mock credentials
         with patch.object(adapter, "_load_credentials", return_value=mock_credentials):
             client = adapter._create_admin_client()
 
@@ -156,7 +141,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_check_server_database_exists_true(self, mock_bigquery, dependencies_available):
-        """Test dataset existence check when dataset exists."""
         mock_client = Mock()
         mock_dataset = Mock()
         mock_dataset.dataset_id = "test_dataset"
@@ -173,7 +157,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_check_server_database_exists_false(self, mock_bigquery, dependencies_available):
-        """Test dataset existence check when dataset doesn't exist."""
         mock_client = Mock()
         mock_other_dataset = Mock()
         mock_other_dataset.dataset_id = "other_dataset"
@@ -189,7 +172,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_drop_database(self, mock_bigquery, dependencies_available):
-        """Test dataset dropping."""
         mock_client = Mock()
         mock_dataset_ref = Mock()
         mock_client.dataset.return_value = mock_dataset_ref
@@ -206,21 +188,18 @@ class TestBigQueryAdapter:
     @patch("benchbox.platforms.bigquery.bigquery")
     @patch("benchbox.platforms.bigquery.storage")
     def test_create_connection_success(self, mock_storage, mock_bigquery, dependencies_available):
-        """Test successful connection creation."""
         mock_client = Mock()
         mock_storage_client = Mock()
         mock_bigquery.Client.return_value = mock_client
         mock_storage.Client.return_value = mock_storage_client
         mock_credentials = Mock()
 
-        # Mock query execution
         mock_query_job = Mock()
         mock_query_job.result.return_value = [(1,)]
         mock_client.query.return_value = mock_query_job
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Mock handle_existing_database and _load_credentials
         with (
             patch.object(adapter, "handle_existing_database"),
             patch.object(adapter, "_load_credentials", return_value=mock_credentials),
@@ -229,12 +208,10 @@ class TestBigQueryAdapter:
 
         assert connection == mock_client
 
-        # Should test connection
         mock_client.query.assert_called_once_with("SELECT 1 as test")
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_connection_failure(self, mock_bigquery, dependencies_available):
-        """Test connection creation failure."""
         mock_credentials = Mock()
         mock_bigquery.Client.side_effect = Exception("Authentication failed")
 
@@ -249,11 +226,9 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_schema(self, mock_bigquery, dependencies_available):
-        """Test schema creation with BigQuery tables."""
         mock_client = Mock()
         mock_bigquery.Client.return_value = mock_client
 
-        # Mock table creation
         mock_table = Mock()
         mock_client.create_table.return_value = mock_table
 
@@ -267,7 +242,6 @@ class TestBigQueryAdapter:
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Mock translate_sql method
         with patch.object(adapter, "translate_sql") as mock_translate:
             mock_translate.return_value = (
                 "CREATE TABLE table1 (id INT64, name STRING);\n"
@@ -281,7 +255,6 @@ class TestBigQueryAdapter:
         assert isinstance(schema_time, float)
         assert schema_time >= 0
 
-        # Should create tables via DDL execution
         query_calls = list(mock_client.query.call_args_list)
         assert len(query_calls) == 3
         executed_ddl = [call.args[0] for call in query_calls]
@@ -291,24 +264,20 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_load_data_with_csv_upload(self, mock_bigquery, dependencies_available):
-        """Test data loading using BigQuery load jobs."""
         mock_client = Mock()
         mock_bigquery.Client.return_value = mock_client
 
-        # Mock load job
         mock_load_job = Mock()
         mock_load_job.result.return_value = None
         mock_load_job.output_rows = 100
         mock_client.load_table_from_file.return_value = mock_load_job
 
-        # Mock row count query
         mock_query_job = Mock()
         mock_query_job.result.return_value = [(100,)]
         mock_client.query.return_value = mock_query_job
 
         mock_benchmark = Mock()
 
-        # Create temporary test file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("id,name\n1,test1\n2,test2\n")
             temp_path = Path(f.name)
@@ -326,7 +295,6 @@ class TestBigQueryAdapter:
             assert "TEST_TABLE" in table_stats
             assert table_stats["TEST_TABLE"] == 100
 
-            # Should execute load job
             mock_client.load_table_from_file.assert_called_once()
             job_config_kwargs = mock_bigquery.LoadJobConfig.call_args.kwargs
             assert job_config_kwargs["source_format"] == mock_bigquery.SourceFormat.CSV
@@ -337,7 +305,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_load_data_with_direct_parquet_upload(self, mock_bigquery, dependencies_available):
-        """Native local loads should use Parquet load jobs for parquet inputs."""
         mock_client = Mock()
         mock_bigquery.Client.return_value = mock_client
 
@@ -352,7 +319,7 @@ class TestBigQueryAdapter:
         mock_benchmark = Mock()
 
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".parquet", delete=False) as f:
-            f.write(b"PAR1")  # content irrelevant - format detected from .parquet suffix
+            f.write(b"PAR1")
             temp_path = Path(f.name)
 
         try:
@@ -374,7 +341,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_load_data_with_compressed_parquet_upload(self, mock_bigquery, dependencies_available):
-        """Compressed parquet (.parquet.gz) should still produce PARQUET source format, not CSV."""
         mock_client = Mock()
         mock_bigquery.Client.return_value = mock_client
 
@@ -389,7 +355,7 @@ class TestBigQueryAdapter:
         mock_benchmark = Mock()
 
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".parquet.gz", delete=False) as f:
-            f.write(b"\x1f\x8b")  # gzip magic bytes
+            f.write(b"\x1f\x8b")
             temp_path = Path(f.name)
 
         try:
@@ -409,7 +375,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_load_data_with_gcs_parquet_upload(self, mock_bigquery, dependencies_available):
-        """Native GCS-staged loads should keep parquet as parquet."""
         mock_client = Mock()
         mock_bigquery.Client.return_value = mock_client
 
@@ -425,7 +390,7 @@ class TestBigQueryAdapter:
         mock_bucket = Mock()
 
         with tempfile.NamedTemporaryFile(mode="wb", suffix=".parquet", delete=False) as f:
-            f.write(b"PAR1")  # content irrelevant - format detected from .parquet suffix
+            f.write(b"PAR1")
             temp_path = Path(f.name)
 
         try:
@@ -453,11 +418,8 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_build_load_job_config_warns_on_unrecognized_format(self, mock_bigquery, dependencies_available):
-        """Unrecognized format should warn and fall back to CSV load job config."""
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # .vortex is a recognized format that is neither parquet nor delimited text -
-        # detect_data_format returns "vortex", which is not in _DELIMITED_FORMATS
         with tempfile.NamedTemporaryFile(suffix=".vortex", delete=False) as f:
             temp_path = Path(f.name)
 
@@ -479,7 +441,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_validate_external_table_requirements_requires_bucket(self, mock_bigquery, dependencies_available):
-        """External mode should require GCS staging configuration."""
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
         with pytest.raises(ValueError, match="requires a GCS bucket"):
@@ -487,7 +448,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_external_tables_generates_external_table_sql(self, mock_bigquery, dependencies_available):
-        """External mode should create BigQuery external table SQL with GCS URIs."""
         adapter = BigQueryAdapter(
             project_id="test-project",
             dataset_id="test_dataset",
@@ -526,7 +486,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_external_tables_generates_delta_biglake_sql(self, mock_bigquery, dependencies_available):
-        """Delta external mode should create BigLake SQL with DELTA_LAKE format."""
         adapter = BigQueryAdapter(
             project_id="test-project",
             dataset_id="test_dataset",
@@ -561,7 +520,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_external_tables_generates_iceberg_biglake_sql(self, mock_bigquery, dependencies_available):
-        """Iceberg external mode should create BigLake SQL with ICEBERG format."""
         adapter = BigQueryAdapter(
             project_id="test-project",
             dataset_id="test_dataset",
@@ -596,7 +554,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_external_tables_iceberg_requires_biglake_connection(self, mock_bigquery, dependencies_available):
-        """Iceberg external mode should reject runs without BigLake connection config."""
         adapter = BigQueryAdapter(
             project_id="test-project",
             dataset_id="test_dataset",
@@ -614,7 +571,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_prepare_iceberg_uris_points_at_metadata_file(self, mock_bigquery, dependencies_available):
-        """Iceberg uris must reference the current metadata file, not the table root."""
         adapter = BigQueryAdapter(
             project_id="test-project",
             dataset_id="test_dataset",
@@ -633,7 +589,6 @@ class TestBigQueryAdapter:
         assert len(uris) == 1
         assert uris[0].startswith("gs://benchbox-bucket/benchbox-data/lineitem/metadata/")
         assert uris[0].endswith(".metadata.json")
-        # Data files and the rewritten graph were all uploaded.
         uploaded = {call.args[0] for call in mock_bucket.blob.call_args_list}
         assert any(name.endswith(".parquet") for name in uploaded)
         assert any(name.endswith(".metadata.json") for name in uploaded)
@@ -641,7 +596,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_prepare_iceberg_uris_accepts_cloud_metadata_file(self, mock_bigquery, dependencies_available):
-        """Cloud inputs must already reference a metadata file; roots are skipped."""
         adapter = BigQueryAdapter(
             project_id="test-project",
             dataset_id="test_dataset",
@@ -659,7 +613,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_prepare_iceberg_uris_rejects_metadata_dir_without_file(self, mock_bigquery, dependencies_available):
-        """A metadata directory without a file URI must fail specifically, not fall through."""
         adapter = BigQueryAdapter(
             project_id="test-project",
             dataset_id="test_dataset",
@@ -673,7 +626,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_create_external_tables_delta_requires_biglake_connection(self, mock_bigquery, dependencies_available):
-        """Delta external mode should reject runs without BigLake connection config."""
         adapter = BigQueryAdapter(
             project_id="test-project",
             dataset_id="test_dataset",
@@ -695,7 +647,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_configure_for_benchmark_olap(self, mock_bigquery, dependencies_available):
-        """Test OLAP benchmark configuration."""
         mock_client = Mock()
         mock_bigquery.Client.return_value = mock_client
 
@@ -707,7 +658,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_dry_run_disable_resets_cached_connection_job_config(self, mock_bigquery, dependencies_available):
-        """Test that disabling dry-run mode clears cached dry_run flag on configured connection."""
         mock_client = Mock()
         mock_job_config = Mock()
         mock_job_config.dry_run = False
@@ -716,19 +666,16 @@ class TestBigQueryAdapter:
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Enable dry run, then configure connection
         adapter.enable_dry_run()
         adapter.configure_for_benchmark(mock_client, "olap")
         assert mock_job_config.dry_run is True
 
-        # Disable dry run without passing connection explicitly - tracked connection should be updated
         adapter.disable_dry_run()
         assert adapter.dry_run is False
         assert mock_job_config.dry_run is False
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_execute_query_success(self, mock_bigquery, dependencies_available):
-        """Test successful query execution."""
         mock_client = Mock()
         mock_query_job = Mock()
         mock_query_job.result.return_value = [(1, "test"), (2, "test2")]
@@ -749,7 +696,6 @@ class TestBigQueryAdapter:
         assert result["first_row"] == (1, "test")
         assert isinstance(result["execution_time_seconds"], float)
 
-        # Should include BigQuery-specific statistics
         assert result["job_id"] == "job_123"
         assert result["job_statistics"]["bytes_processed"] == 1024
         assert result["job_statistics"]["bytes_billed"] == 512
@@ -759,7 +705,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_execute_query_with_job_config(self, mock_bigquery, dependencies_available):
-        """Test query execution with job configuration."""
         mock_client = Mock()
         mock_query_job = Mock()
         mock_query_job.result.return_value = [(1, "test")]
@@ -784,12 +729,10 @@ class TestBigQueryAdapter:
         assert result["status"] == "SUCCESS"
         assert result["job_statistics"]["bytes_processed"] == 1024
 
-        # Should call query with job config
         mock_client.query.assert_called_once()
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_execute_query_failure(self, mock_bigquery, dependencies_available):
-        """Test query execution failure."""
         mock_client = Mock()
         mock_client.query.side_effect = Exception("Query failed")
         mock_bigquery.Client.return_value = mock_client
@@ -807,17 +750,14 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_get_platform_metadata(self, mock_bigquery, dependencies_available):
-        """Test platform metadata collection."""
         mock_client = Mock()
         mock_client.project = "test-project"
         mock_client.location = "US"
 
-        # Mock dataset info query
         mock_query_job = Mock()
         mock_query_job.result.return_value = [("test_dataset", "US", "2024-01-01 00:00:00", "BenchBox test dataset")]
         mock_client.query.return_value = mock_query_job
 
-        # Mock tables info
         mock_tables = [Mock(), Mock()]
         mock_tables[0].table_id = "table1"
         mock_tables[0].num_rows = 1000
@@ -843,7 +783,6 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_close_connection(self, mock_bigquery, dependencies_available):
-        """Test connection closing."""
         mock_client = Mock()
         mock_bigquery.Client.return_value = mock_client
 
@@ -853,11 +792,9 @@ class TestBigQueryAdapter:
         mock_client.close.assert_called_once()
 
     def test_supports_tuning_type(self, dependencies_available):
-        """Test tuning type support checking."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-            # Mock TuningType import
             with patch("benchbox.core.tuning.interface.TuningType") as mock_tuning_type:
                 mock_tuning_type.PARTITIONING = "partitioning"
                 mock_tuning_type.CLUSTERING = "clustering"
@@ -868,15 +805,12 @@ class TestBigQueryAdapter:
                 assert adapter.supports_tuning_type(mock_tuning_type.SORTING) is False
 
     def test_generate_tuning_clause_with_partitioning(self, dependencies_available):
-        """Test tuning clause generation with partitioning."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-            # Mock table tuning with partitioning
             mock_tuning = Mock()
             mock_tuning.has_any_tuning.return_value = True
 
-            # Mock partitioning column
             mock_column = Mock()
             mock_column.name = "partition_date"
             mock_column.order = 1
@@ -898,15 +832,12 @@ class TestBigQueryAdapter:
                 assert "PARTITION BY partition_date" in clause
 
     def test_generate_tuning_clause_with_clustering(self, dependencies_available):
-        """Test tuning clause generation with clustering."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-            # Mock table tuning with clustering
             mock_tuning = Mock()
             mock_tuning.has_any_tuning.return_value = True
 
-            # Mock clustering columns
             mock_column1 = Mock()
             mock_column1.name = "cluster_key1"
             mock_column1.order = 1
@@ -930,7 +861,6 @@ class TestBigQueryAdapter:
                 assert "CLUSTER BY cluster_key1, cluster_key2" in clause
 
     def test_generate_tuning_clause_none(self, dependencies_available):
-        """Test tuning clause generation with None input."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
@@ -939,18 +869,15 @@ class TestBigQueryAdapter:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_apply_table_tunings_with_partitioning(self, mock_bigquery, dependencies_available):
-        """Test applying table tunings with partitioning."""
         mock_client = Mock()
         mock_bigquery.Client.return_value = mock_client
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Mock table tuning
         mock_tuning = Mock()
         mock_tuning.table_name = "test_table"
         mock_tuning.has_any_tuning.return_value = True
 
-        # Mock partitioning column
         mock_column = Mock()
         mock_column.name = "partition_date"
         mock_column.order = 1
@@ -972,7 +899,6 @@ class TestBigQueryAdapter:
             mock_client.get_table.assert_called_once()
 
     def test_apply_unified_tuning(self, dependencies_available):
-        """Test unified tuning configuration application."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
@@ -992,7 +918,6 @@ class TestBigQueryAdapter:
                 mock_platform.assert_called_once()
 
     def test_apply_constraint_configuration(self, dependencies_available):
-        """Test constraint configuration application."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
@@ -1008,12 +933,11 @@ class TestBigQueryAdapter:
                 assert "Primary key" in mock_info.call_args[0][0]
 
     def test_cost_control_features(self, dependencies_available):
-        """Test BigQuery cost control features."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(
                 project_id="test-project",
                 dataset_id="test_dataset",
-                maximum_bytes_billed=1000000,  # 1MB limit
+                maximum_bytes_billed=1000000,
                 query_cache=True,
                 dry_run=True,
             )
@@ -1023,9 +947,7 @@ class TestBigQueryAdapter:
             assert adapter.dry_run is True
 
     def test_authentication_methods(self, dependencies_available):
-        """Test different authentication methods."""
         with patch("benchbox.platforms.bigquery.bigquery"):
-            # Test service account file authentication
             adapter1 = BigQueryAdapter(
                 project_id="test-project",
                 dataset_id="test_dataset",
@@ -1033,13 +955,11 @@ class TestBigQueryAdapter:
             )
             assert adapter1.credentials_path == "/path/to/key.json"
 
-            # Test default credentials (ADC)
             adapter2 = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
             assert adapter2.credentials_path is None
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_job_configuration_options(self, mock_bigquery, dependencies_available):
-        """Test BigQuery job configuration options."""
         mock_client = Mock()
         mock_query_job = Mock()
         mock_query_job.result.return_value = [(1,)]
@@ -1058,17 +978,13 @@ class TestBigQueryAdapter:
 
         assert result["status"] == "SUCCESS"
 
-        # Should configure query job with specified options
-        # Note: timeout handling varies by BigQuery client version
         mock_client.query.assert_called_once()
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_data_location_and_regional_settings(self, mock_bigquery, dependencies_available):
-        """Test BigQuery data location and regional settings."""
         mock_client = Mock()
         mock_bigquery.Client.return_value = mock_client
 
-        # Test different regions
         adapter_us = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset", location="US")
         assert adapter_us.location == "US"
 
@@ -1083,11 +999,6 @@ class TestBigQueryAdapter:
         assert adapter_asia.location == "asia-northeast1"
 
     def test_file_format_detection_for_chunked_files(self, dependencies_available):
-        """Test that chunked TPC-H data files (.tbl.1, .tbl.2, etc.) are detected as pipe-delimited.
-
-        This verifies the fix for the bug where chunked files like customer.tbl.1 were treated
-        as CSV (comma-delimited) instead of TBL (pipe-delimited), causing data loading failures.
-        """
         from pathlib import Path
 
         test_cases = [
@@ -1109,25 +1020,17 @@ class TestBigQueryAdapter:
             assert is_tbl == should_be_tbl, f"Failed for {description}: {file_path.name}"
 
     def test_validate_data_integrity_with_client_api(self, dependencies_available):
-        """Test that data integrity validation uses BigQuery Client API instead of cursor pattern.
-
-        This verifies the fix for "'Client' object has no attribute 'cursor'" errors
-        during database compatibility validation.
-        """
         from unittest.mock import Mock
 
-        # Mock BigQuery client and query results
         mock_client = Mock()
         mock_query_job = Mock()
-        mock_query_job.result.return_value = [(1,)]  # Mock query result
+        mock_query_job.result.return_value = [(1,)]
         mock_client.query.return_value = mock_query_job
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Create mock benchmark
         mock_benchmark = Mock()
 
-        # Table stats from validation
         table_stats = {
             "customer": 150,
             "lineitem": 6005,
@@ -1135,29 +1038,23 @@ class TestBigQueryAdapter:
             "region": 5,
         }
 
-        # Call validation method
         status, details = adapter._validate_data_integrity(mock_benchmark, mock_client, table_stats)
 
-        # Verify it uses query() not cursor()
         assert mock_client.query.called, "Should use client.query() not client.cursor()"
         assert not hasattr(mock_client, "cursor") or not mock_client.cursor.called
 
-        # Verify status is PASSED when all tables accessible
         assert status == "PASSED"
         assert "accessible_tables" in details
         assert len(details["accessible_tables"]) == 4
 
     def test_validate_data_integrity_handles_inaccessible_tables(self, dependencies_available):
-        """Test that validation correctly detects inaccessible tables."""
         from unittest.mock import Mock
 
         mock_client = Mock()
 
-        # Mock query to fail for some tables
         def query_side_effect(sql):
             mock_job = Mock()
             if "CUSTOMER" in sql or "LINEITEM" in sql:
-                # Simulate table not found or inaccessible
                 mock_job.result.side_effect = Exception("404 Table not found")
             else:
                 mock_job.result.return_value = [(1,)]
@@ -1172,39 +1069,29 @@ class TestBigQueryAdapter:
 
         status, details = adapter._validate_data_integrity(mock_benchmark, mock_client, table_stats)
 
-        # Should fail when tables are inaccessible
         assert status == "FAILED"
         assert "inaccessible_tables" in details
         assert "customer" in details["inaccessible_tables"]
         assert "lineitem" in details["inaccessible_tables"]
 
     def test_get_table_row_count_uses_query_api(self, dependencies_available):
-        """Test that get_table_row_count uses BigQuery Client API instead of cursor pattern.
-
-        This verifies the fix for validation framework cursor errors during
-        database compatibility checks.
-        """
         from unittest.mock import Mock
 
         mock_client = Mock()
         mock_query_job = Mock()
-        mock_query_job.result.return_value = [(150,)]  # Mock COUNT(*) result
+        mock_query_job.result.return_value = [(150,)]
         mock_client.query.return_value = mock_query_job
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Get row count for customer table
         row_count = adapter.get_table_row_count(mock_client, "customer")
 
-        # Verify it uses query() not cursor()
         assert mock_client.query.called, "Should use client.query() not client.cursor()"
         assert not hasattr(mock_client, "cursor") or not mock_client.cursor.called
 
-        # Verify row count is correct
         assert row_count == 150
 
     def test_get_table_row_count_handles_errors(self, dependencies_available):
-        """Test that get_table_row_count returns 0 on errors."""
         from unittest.mock import Mock
 
         mock_client = Mock()
@@ -1212,85 +1099,63 @@ class TestBigQueryAdapter:
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Should return 0 on error, not raise exception
         row_count = adapter.get_table_row_count(mock_client, "nonexistent_table")
         assert row_count == 0
 
     def test_storage_client_not_created_in_connection(self, dependencies_available):
-        """Test that Storage client is NOT created during create_connection (lazy creation).
-
-        Previously, create_connection would always create a Storage client and attach it
-        to the connection object. This test verifies the new behavior where Storage client
-        is only created on-demand when actually needed (during load_data with storage_bucket).
-        """
         from unittest.mock import Mock, patch
 
-        # Mock BigQuery and Storage clients
         with (
             patch("benchbox.platforms.bigquery.bigquery") as mock_bigquery,
             patch("benchbox.platforms.bigquery.storage") as mock_storage,
         ):
-            mock_client = Mock(spec=["query", "close"])  # Strict spec prevents arbitrary attributes
+            mock_client = Mock(spec=["query", "close"])
             mock_bigquery.Client.return_value = mock_client
 
-            # Mock successful connection test
             mock_query_job = Mock()
             mock_query_job.result.return_value = []
             mock_client.query.return_value = mock_query_job
 
             adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-            # Create connection with mocked _load_credentials
             with patch.object(adapter, "_load_credentials", return_value=Mock()):
                 adapter.create_connection()
 
-            # Verify Storage client was NOT created during connection
-            # This is the key behavior change - Storage client creation is now lazy
             assert not mock_storage.Client.called, "Storage client should not be created in create_connection"
 
     def test_close_connection_handles_credential_errors(self, dependencies_available):
-        """Test that close_connection gracefully handles credential refresh errors."""
         from unittest.mock import Mock
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Create mock connection that raises credential error on close
         mock_client = Mock()
         mock_client.close.side_effect = Exception("Anonymous credentials cannot be refreshed")
 
-        # Should not raise exception - error should be suppressed
         adapter.close_connection(mock_client)
 
-        # Verify close was attempted
         assert mock_client.close.called
 
     def test_close_connection_warns_on_other_errors(self, dependencies_available):
-        """Test that close_connection warns on non-credential errors."""
         from unittest.mock import Mock
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Create mock connection that raises non-credential error
         mock_client = Mock()
         mock_client.close.side_effect = Exception("Network timeout")
 
-        # Should log warning but not raise
         with patch.object(adapter.logger, "warning") as mock_warning:
             adapter.close_connection(mock_client)
             assert mock_warning.called
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_direct_loading_with_chunked_files(self, mock_bigquery, dependencies_available):
-        """Test that direct loading handles chunked files (TPC-DS style) correctly."""
         import tempfile
         from pathlib import Path
         from unittest.mock import MagicMock, Mock
 
-        # Mock WriteDisposition enum
         mock_bigquery.WriteDisposition.WRITE_TRUNCATE = "WRITE_TRUNCATE"
         mock_bigquery.WriteDisposition.WRITE_APPEND = "WRITE_APPEND"
 
-        # Track job configs to verify write dispositions
         job_configs = []
 
         def create_job_config(**kwargs):
@@ -1304,149 +1169,118 @@ class TestBigQueryAdapter:
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Create temporary test files
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Create chunked files (like TPC-DS generates)
             chunk1 = tmpdir / "customer_1.dat"
             chunk2 = tmpdir / "customer_2.dat"
             chunk1.write_text("1|John|100\n2|Jane|200\n")
             chunk2.write_text("3|Bob|300\n4|Alice|400\n")
 
-            # Single file (like TPC-H)
             single = tmpdir / "nation.dat"
             single.write_text("1|USA\n2|Canada\n")
 
-            # Create mock benchmark with tables as lists (TPC-DS style)
             mock_benchmark = Mock()
             mock_benchmark.tables = {
-                "customer": [chunk1, chunk2],  # Multiple chunks
-                "nation": [single],  # Single chunk in list
+                "customer": [chunk1, chunk2],
+                "nation": [single],
             }
 
-            # Create mock BigQuery connection
             mock_connection = MagicMock()
             mock_dataset = Mock()
             mock_table_ref = Mock()
             mock_connection.dataset.return_value = mock_dataset
             mock_dataset.table.return_value = mock_table_ref
 
-            # Mock load_table_from_file
             mock_load_job = Mock()
             mock_load_job.result.return_value = None
             mock_connection.load_table_from_file.return_value = mock_load_job
 
-            # Mock query for row counts
             mock_query_job = Mock()
             mock_connection.query.return_value = mock_query_job
 
-            # Return different row counts for different tables
             def mock_result():
-                # First call is for customer (after all chunks), second is for nation
                 if not hasattr(mock_result, "call_count"):
                     mock_result.call_count = 0
                 mock_result.call_count += 1
                 if mock_result.call_count == 1:
-                    return [(4,)]  # customer: 4 rows (2 + 2)
+                    return [(4,)]
                 else:
-                    return [(2,)]  # nation: 2 rows
+                    return [(2,)]
 
             mock_query_job.result.side_effect = [mock_result(), mock_result()]
 
-            # Call load_data
             table_stats, total_time, per_table_timings = adapter.load_data(mock_benchmark, mock_connection, tmpdir)
 
-            # Verify both tables were loaded
             assert "CUSTOMER" in table_stats
             assert "NATION" in table_stats
 
-            # Per-table timings should cover every loaded table with total_ms
             assert set(per_table_timings) == set(table_stats)
             assert per_table_timings["CUSTOMER"]["total_ms"] >= 0
             assert per_table_timings["NATION"]["total_ms"] >= 0
 
-            # Verify load_table_from_file was called for each chunk (2 for customer, 1 for nation)
             assert mock_connection.load_table_from_file.call_count == 3
 
-            # Verify WRITE_TRUNCATE for first chunk, WRITE_APPEND for subsequent chunks
-            # First job config (customer chunk 1): WRITE_TRUNCATE
             assert job_configs[0].write_disposition == "WRITE_TRUNCATE"
-            # Second job config (customer chunk 2): WRITE_APPEND
             assert job_configs[1].write_disposition == "WRITE_APPEND"
-            # Third job config (nation, single file): WRITE_TRUNCATE
             assert job_configs[2].write_disposition == "WRITE_TRUNCATE"
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_direct_loading_with_single_paths(self, mock_bigquery, dependencies_available):
-        """Test that direct loading still works with single paths (TPC-H style)."""
         import tempfile
         from pathlib import Path
         from unittest.mock import MagicMock, Mock
 
-        # Mock WriteDisposition enum
         mock_bigquery.WriteDisposition.WRITE_TRUNCATE = "WRITE_TRUNCATE"
         mock_bigquery.WriteDisposition.WRITE_APPEND = "WRITE_APPEND"
 
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
 
-        # Create temporary test file
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
             test_file = tmpdir / "nation.dat"
             test_file.write_text("1|USA\n2|Canada\n")
 
-            # Create mock benchmark with tables as single paths (TPC-H style)
             mock_benchmark = Mock()
             mock_benchmark.tables = {
-                "nation": test_file,  # Single path, not a list
+                "nation": test_file,
             }
 
-            # Create mock BigQuery connection
             mock_connection = MagicMock()
             mock_dataset = Mock()
             mock_table_ref = Mock()
             mock_connection.dataset.return_value = mock_dataset
             mock_dataset.table.return_value = mock_table_ref
 
-            # Mock load_table_from_file
             mock_load_job = Mock()
             mock_load_job.result.return_value = None
             mock_connection.load_table_from_file.return_value = mock_load_job
 
-            # Mock query for row count
             mock_query_job = Mock()
             mock_query_job.result.return_value = [(2,)]
             mock_connection.query.return_value = mock_query_job
 
-            # Call load_data
             table_stats, total_time, per_table_timings = adapter.load_data(mock_benchmark, mock_connection, tmpdir)
 
-            # Verify table was loaded
             assert "NATION" in table_stats
             assert table_stats["NATION"] == 2
 
-            # Verify load_table_from_file was called once
             assert mock_connection.load_table_from_file.call_count == 1
 
-            # Direct loads should report per-table wall-clock timings keyed by table
             assert set(per_table_timings) == set(table_stats)
             assert per_table_timings["NATION"]["total_ms"] >= 0
 
     def test_validate_database_compatibility_detects_empty_tables(self, dependencies_available):
-        """Test that validation detects when more than half the tables are empty."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(
                 project_id="test-project",
                 dataset_id="test_dataset",
             )
 
-            # Mock the admin client
             mock_client = Mock()
             mock_dataset_ref = Mock()
             mock_client.dataset.return_value = mock_dataset_ref
 
-            # Create mock tables - 3 out of 4 are empty (> 50%)
             mock_table_info1 = Mock()
             mock_table_info1.reference = Mock()
             mock_table_info2 = Mock()
@@ -1463,7 +1297,6 @@ class TestBigQueryAdapter:
                 mock_table_info4,
             ]
 
-            # Mock table objects - 3 empty, 1 with data
             mock_table1 = Mock()
             mock_table1.num_rows = 0
             mock_table1.table_id = "table1"
@@ -1482,9 +1315,7 @@ class TestBigQueryAdapter:
 
             mock_client.get_table.side_effect = [mock_table1, mock_table2, mock_table3, mock_table4]
 
-            # Mock _create_admin_client to return our mock client
             with patch.object(adapter, "_create_admin_client", return_value=mock_client):
-                # Mock the base validation to return valid result
                 mock_base_result = Mock()
                 mock_base_result.is_valid = True
                 mock_base_result.can_reuse = True
@@ -1495,10 +1326,8 @@ class TestBigQueryAdapter:
                     "benchbox.platforms.base.validation.DatabaseValidator.validate",
                     return_value=mock_base_result,
                 ):
-                    # Call validation
                     result = adapter._validate_database_compatibility()
 
-                    # Verify that validation failed due to empty tables
                     assert result.is_valid is False
                     assert result.can_reuse is False
                     assert len(result.issues) == 1
@@ -1506,19 +1335,16 @@ class TestBigQueryAdapter:
                     assert "indicates failed previous load" in result.issues[0]
 
     def test_validate_database_compatibility_allows_few_empty_tables(self, dependencies_available):
-        """Test that validation passes when less than half the tables are empty."""
         with patch("benchbox.platforms.bigquery.bigquery"):
             adapter = BigQueryAdapter(
                 project_id="test-project",
                 dataset_id="test_dataset",
             )
 
-            # Mock the admin client
             mock_client = Mock()
             mock_dataset_ref = Mock()
             mock_client.dataset.return_value = mock_dataset_ref
 
-            # Create mock tables - 1 out of 4 is empty (< 50%)
             mock_table_info1 = Mock()
             mock_table_info1.reference = Mock()
             mock_table_info2 = Mock()
@@ -1535,7 +1361,6 @@ class TestBigQueryAdapter:
                 mock_table_info4,
             ]
 
-            # Mock table objects - 1 empty, 3 with data
             mock_table1 = Mock()
             mock_table1.num_rows = 0
             mock_table1.table_id = "table1"
@@ -1554,9 +1379,7 @@ class TestBigQueryAdapter:
 
             mock_client.get_table.side_effect = [mock_table1, mock_table2, mock_table3, mock_table4]
 
-            # Mock _create_admin_client to return our mock client
             with patch.object(adapter, "_create_admin_client", return_value=mock_client):
-                # Mock the base validation to return valid result
                 mock_base_result = Mock()
                 mock_base_result.is_valid = True
                 mock_base_result.can_reuse = True
@@ -1567,32 +1390,21 @@ class TestBigQueryAdapter:
                     "benchbox.platforms.base.validation.DatabaseValidator.validate",
                     return_value=mock_base_result,
                 ):
-                    # Call validation
                     result = adapter._validate_database_compatibility()
 
-                    # Verify that validation passed (few empty tables are acceptable)
                     assert result.is_valid is True
                     assert result.can_reuse is True
                     assert len(result.issues) == 0
 
 
-# ===================================================================
-# Additional coverage tests (merged from test_bigquery_case_normalization.py)
-# ===================================================================
-
-
 class TestBigQueryCaseNormalization:
-    """Test BigQuery table name case normalization for TPC-DS compatibility."""
-
     def test_normalize_single_table(self):
-        """Test normalization of a single lowercase table name."""
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
         result = adapter._normalize_table_names_case("SELECT * FROM `customer`")
         assert "`CUSTOMER`" in result
         assert "`customer`" not in result
 
     def test_normalize_multiple_tables(self):
-        """Test normalization of multiple lowercase table names."""
         adapter = BigQueryAdapter(project_id="test-project", dataset_id="test_dataset")
         query = "SELECT * FROM `customer` JOIN `store_sales` ON `customer`.c_id = `store_sales`.c_id"
         result = adapter._normalize_table_names_case(query)
@@ -1643,12 +1455,7 @@ class TestBigQueryCaseNormalization:
         assert "`DATE_DIM`" in result
 
 
-# ===================================================================
-# Additional coverage tests (merged from test_bigquery_staging_root.py)
-# ===================================================================
 class TestBigQueryStagingRoot:
-    """Test BigQuery staging_root parsing for CloudStagingPath support."""
-
     def test_staging_root_parsing_simple(self):
         adapter = BigQueryAdapter(
             project_id="test-project", dataset_id="test_dataset", staging_root="gs://test-bucket/"
@@ -1703,8 +1510,6 @@ class TestBigQueryStagingRoot:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestBigQuerySqlGenerationHelpers:
-    """Exercise helper-heavy BigQuery SQL generation and load-job branches."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_configure_for_benchmark_sets_default_dataset_and_olap_flags(self, mock_bigquery, dependencies_available):
         mock_connection = Mock()
@@ -1769,7 +1574,6 @@ class TestBigQuerySqlGenerationHelpers:
 
         assert qualified.startswith("MERGE INTO `test-project.test_dataset.MERGE_OPS_TARGET` AS target")
         assert "FROM `test-project.test_dataset.ORDERS`" in qualified
-        # USING (subquery) and the VALUES list are not table positions.
         assert "USING (" in qualified
 
     def test_prepare_external_parquet_uris_uploads_local_and_preserves_cloud(self, dependencies_available):
@@ -1982,10 +1786,6 @@ class TestBigQuerySqlGenerationHelpers:
         assert row_count == 1
         assert mock_connection.load_table_from_uri.call_count == 3
         succeeding_job.result.assert_called_once()
-        # time.sleep is patched at its process-global home, so a busy CI runner's
-        # own machinery (e.g. pytest-timeout's watchdog thread) can add unrelated
-        # calls; assert the retry-specific durations occurred rather than an exact
-        # total count.
         mock_sleep.assert_any_call(2.5)
         mock_sleep.assert_any_call(5.0)
 
@@ -2027,8 +1827,6 @@ class TestBigQuerySqlGenerationHelpers:
                 row_count = adapter._load_table_via_cloud_storage(mock_connection, bucket, "customer", [chunk])
 
         assert row_count == 1
-        # The accepted job may already be running server-side: exactly one
-        # submission, with retries re-polling it instead of appending a duplicate.
         assert mock_connection.load_table_from_uri.call_count == 1
         assert accepted_job.result.call_count == 3
 
@@ -2063,7 +1861,6 @@ class TestBigQuerySqlGenerationHelpers:
                 adapter._load_table_via_cloud_storage(mock_connection, bucket, "customer", [chunk])
 
         assert mock_connection.load_table_from_uri.call_count == 5
-        # See the comment in the retry-then-succeed test above re: exact call_count.
         mock_sleep.assert_any_call(2.5)
         mock_sleep.assert_any_call(5.0)
         mock_sleep.assert_any_call(10.0)
@@ -2097,25 +1894,16 @@ class TestBigQuerySqlGenerationHelpers:
         assert mock_connection.load_table_from_uri.call_count == 1
 
 
-# ===================================================================
-# SQL generation, config validation, and type mapping tests
-# ===================================================================
-
-
 @pytest.mark.usefixtures("dependencies_available")
 class TestConvertToBigqueryTable:
-    """Test _convert_to_bigquery_table SQL transformation."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_non_create_table_passes_through(self, mock_bigquery):
-        """Non-CREATE TABLE statements pass through unchanged."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table("INSERT INTO t VALUES (1)")
         assert result == "INSERT INTO t VALUES (1)"
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_adds_or_replace(self, mock_bigquery):
-        """Converts CREATE TABLE to CREATE OR REPLACE TABLE."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE orders (id INT64)")
         assert "CREATE OR REPLACE TABLE" in result
@@ -2123,37 +1911,30 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_preserves_existing_or_replace(self, mock_bigquery):
-        """If already OR REPLACE, don't double-add it."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table("CREATE OR REPLACE TABLE orders (id INT64)")
         assert result.count("OR REPLACE") == 1
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_with_project_and_dataset(self, mock_bigquery):
-        """Table name is qualified with project.dataset in backticks."""
         adapter = BigQueryAdapter(project_id="my-project", dataset_id="my_dataset")
         result = adapter._convert_to_bigquery_table("CREATE TABLE lineitem (l_orderkey INT64)")
         assert "`my-project.my_dataset." in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_no_partitioning_when_field_not_set(self, mock_bigquery):
-        """No PARTITION BY when partitioning_field is not configured."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE t (id INT64)")
         assert "PARTITION BY" not in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_no_clustering_when_fields_not_set(self, mock_bigquery):
-        """No CLUSTER BY when clustering_fields is empty."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE t (id INT64)")
         assert "CLUSTER BY" not in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_ctas_without_pk_returns_promptly_and_qualified(self, mock_bigquery):
-        """CTAS has no PRIMARY KEY: the inline-key scan must not run (it
-        backtracked catastrophically and hung the run pre-submit), and the
-        bare target still gets dataset-qualified."""
         import time
 
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
@@ -2168,14 +1949,12 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_table_primary_key_marked_not_enforced(self, mock_bigquery):
-        """Statements carrying a table-level key keep the NOT ENFORCED rewrite."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE t (id INT64, PRIMARY KEY (id))")
         assert "PRIMARY KEY (id) NOT ENFORCED" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_foreign_key_reference_qualified_and_not_enforced(self, mock_bigquery):
-        """BigQuery rejects an unqualified REFERENCES target and enforced foreign keys."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table(
             "CREATE TABLE `link_nation_region` (`hk_nation` STRING(64) NOT NULL, `hk_region` STRING(64) NOT NULL, "
@@ -2196,7 +1975,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_foreign_key_rewrite_ignores_string_literals(self, mock_bigquery):
-        """REFERENCES text inside a string default is data, not a constraint."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         sql = "CREATE TABLE t (note STRING DEFAULT 'REFERENCES parent(id)', a INT64, FOREIGN KEY (a) REFERENCES p (a))"
         result = adapter._convert_to_bigquery_table(sql)
@@ -2205,7 +1983,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_extract_unqualified_tables_skips_earlier_sibling_ctes(self, mock_bigquery):
-        """A CTE body that reads an earlier CTE must not qualify that name as a base table."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         query = (
             "WITH first_cte AS (SELECT a FROM base_one), "
@@ -2216,7 +1993,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualify_aliases_table_referenced_with_backticked_prefix(self, mock_bigquery):
-        """Translated queries write `lineitem`.`col`; qualifying must keep that name resolvable."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         query = "SELECT SUM(`l_quantity`) FROM `lineitem`, `part` WHERE `p_partkey` = `lineitem`.`l_partkey`"
         result = adapter._qualify_single_statement(query)
@@ -2225,14 +2001,12 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_extract_unqualified_tables_keeps_self_shadowed_base_table(self, mock_bigquery):
-        """A CTE named like the base table it reads still qualifies the base table."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         query = "WITH orders AS (SELECT * FROM orders WHERE a > 1) SELECT * FROM orders"
         assert adapter._extract_unqualified_tables(query) == ["ORDERS"]
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_inline_pk_survives_parameterized_types(self, mock_bigquery):
-        """Commas inside DECIMAL(10, 2) must not split the column definition."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table(
             "CREATE TABLE t (id INT, price DECIMAL(10, 2) PRIMARY KEY, col3 STRING)"
@@ -2241,7 +2015,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_inline_pk_ignores_parens_in_comments(self, mock_bigquery):
-        """A closing paren inside a comment must not end the column list."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table(
             "CREATE TABLE t (id INT PRIMARY KEY, val INT /* note ) */, name STRING)"
@@ -2251,7 +2024,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_numeric_decimal_literals_skip_strings_and_identifiers(self, mock_bigquery):
-        """FLOAT64 literals cannot be inserted into NUMERIC columns (verified live)."""
         sql = "UPDATE t SET p = p * 1.05, c = 'v1.5', q = 1000.0 * n WHERE k2 = 3 AND x = 0.02"
         result = BigQueryAdapter._numeric_decimal_literals(sql)
         assert result == (
@@ -2261,7 +2033,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualify_leaves_script_temp_tables_bare(self, mock_bigquery):
-        """Script temp tables live outside the dataset; qualifying them fails with Not found."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         sql = (
             "BEGIN TRANSACTION;\n"
@@ -2279,7 +2050,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_preprocess_operation_sql_rewrites_bq_gaps(self, mock_bigquery):
-        """CAST AS VARCHAR and quoted INTERVAL literals fail server-side."""
         from types import SimpleNamespace
 
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
@@ -2293,7 +2063,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_preprocess_operation_sql_respects_overrides(self, mock_bigquery):
-        """A catalog bigquery override is the rewrite input; skip stays a skip."""
         from types import SimpleNamespace
 
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
@@ -2304,7 +2073,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_comment_prefixed_create_still_qualified(self, mock_bigquery):
-        """Schema chunks with "--" headers must still get dataset-qualified."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         chunk = "-- Generated staging load tables\nCREATE TABLE orders_stage (id INT64)"
         result = adapter._convert_to_bigquery_table(chunk)
@@ -2314,21 +2082,18 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_adds_partitioning_clause(self, mock_bigquery):
-        """Adds PARTITION BY DATE(field) when partitioning_field configured."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds", partitioning_field="created_at")
         result = adapter._convert_to_bigquery_table("CREATE TABLE t (id INT64)")
         assert "PARTITION BY DATE(created_at)" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_adds_clustering_clause(self, mock_bigquery):
-        """Adds CLUSTER BY when clustering_fields configured."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds", clustering_fields=["a", "b", "c"])
         result = adapter._convert_to_bigquery_table("CREATE TABLE t (id INT64)")
         assert "CLUSTER BY a, b, c" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_skips_partition_if_already_present(self, mock_bigquery):
-        """Does not add PARTITION BY if statement already contains it."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds", partitioning_field="ts")
         sql = "CREATE TABLE t (id INT64) PARTITION BY DATE(ts)"
         result = adapter._convert_to_bigquery_table(sql)
@@ -2336,7 +2101,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_skips_cluster_if_already_present(self, mock_bigquery):
-        """Does not add CLUSTER BY if statement already contains it."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds", clustering_fields=["x"])
         sql = "CREATE TABLE t (id INT64) CLUSTER BY x"
         result = adapter._convert_to_bigquery_table(sql)
@@ -2344,7 +2108,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_varchar_mapped_to_string(self, mock_bigquery):
-        """VARCHAR(n) staging columns become BigQuery STRING."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._convert_to_bigquery_table(
             "CREATE TABLE update_ops_orders (o_orderkey INT64, o_comment VARCHAR(79), flag VARCHAR)"
@@ -2356,35 +2119,30 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_backticked_table_name_qualified(self, mock_bigquery):
-        """Table name in backticks is correctly parsed and qualified without double backticks."""
         adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE `orders` (id INT64)")
         assert result == "CREATE OR REPLACE TABLE `my-proj.my_ds.ORDERS` (id INT64)"
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_already_qualified_table_name(self, mock_bigquery):
-        """Table name already containing dataset qualification is not double-qualified."""
         adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE `my_ds.orders` (id INT64)")
         assert result == "CREATE OR REPLACE TABLE `my_ds.ORDERS` (id INT64)"
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_table_level_primary_key_not_enforced(self, mock_bigquery):
-        """Table-level PRIMARY KEY constraints become NOT ENFORCED."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE trips (\n    id INT64,\n    PRIMARY KEY (id)\n)")
         assert "PRIMARY KEY (id) NOT ENFORCED" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_not_enforced_not_duplicated(self, mock_bigquery):
-        """An already NOT ENFORCED key is left untouched."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE t (id INT64,\n    PRIMARY KEY (id) NOT ENFORCED)")
         assert result.count("NOT ENFORCED") == 1
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_preserves_if_not_exists(self, mock_bigquery):
-        """Preserves IF NOT EXISTS semantics and qualifies the target."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE IF NOT EXISTS orders (id INT64)")
         assert result == "CREATE TABLE IF NOT EXISTS `proj.ds.ORDERS` (id INT64)"
@@ -2392,7 +2150,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_preserves_if_not_exists_ctas(self, mock_bigquery):
-        """Preserves IF NOT EXISTS semantics on CTAS and qualifies the target."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         sql = (
             "CREATE TABLE IF NOT EXISTS orders_1995 AS\nSELECT *\nFROM orders\nWHERE o_orderdate >= DATE '1995-01-01'\n"
@@ -2403,7 +2160,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_preserves_if_not_exists_with_comment_prefix(self, mock_bigquery):
-        """Preserves IF NOT EXISTS on comment-prefixed schema chunks."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         chunk = "-- Generated staging table\nCREATE TABLE IF NOT EXISTS orders_stage (id INT64)"
         result = adapter._convert_to_bigquery_table(chunk)
@@ -2413,7 +2169,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_preserves_if_not_exists_ctas_with_comment_prefix(self, mock_bigquery):
-        """Preserves IF NOT EXISTS on comment-prefixed CTAS chunks."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         chunk = "-- Generated staging CTAS\nCREATE TABLE IF NOT EXISTS orders_stage AS SELECT 1"
         result = adapter._convert_to_bigquery_table(chunk)
@@ -2423,7 +2178,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_preserves_if_not_exists_already_qualified(self, mock_bigquery):
-        """Table name already containing dataset qualification preserves IF NOT EXISTS without double qualification."""
         adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
         result = adapter._convert_to_bigquery_table("CREATE TABLE IF NOT EXISTS `my_ds.orders` (id INT64)")
         assert result == "CREATE TABLE IF NOT EXISTS `my_ds.ORDERS` (id INT64)"
@@ -2431,7 +2185,6 @@ class TestConvertToBigqueryTable:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_staging_manifest_ddl_preserves_if_not_exists(self, mock_bigquery):
-        """Staging manifest DDL preserves IF NOT EXISTS and maps VARCHAR to STRING."""
         adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
         manifest_ddl = (
             "CREATE TABLE IF NOT EXISTS benchbox_staging_manifest ("
@@ -2450,17 +2203,7 @@ class TestConvertToBigqueryTable:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestBigQueryCreateSemanticsStagingAndManifest:
-    """Test that BigQuery DDL conversion preserves staging data and shared provenance manifests.
-
-    Adversarial finding Critical-1: Converting IF NOT EXISTS into CREATE OR REPLACE
-    wipes out populated staging tables during setup reuse, and drops the shared
-    benchbox_staging_manifest table when a second benchmark runs, erasing the first
-    benchmark's provenance row.
-    """
-
     class _SimulatedBigQueryConnection:
-        """Simulate BigQuery table storage executing statements through _convert_to_bigquery_table."""
-
         def __init__(self, adapter: BigQueryAdapter):
             self.adapter = adapter
             self.tables: dict[str, list[tuple]] = {}
@@ -2476,7 +2219,6 @@ class TestBigQueryCreateSemanticsStagingAndManifest:
             def _target(name: str) -> str:
                 return name.split(".")[-1].strip("`").upper()
 
-            # CREATE OR REPLACE TABLE: drops existing table and resets rows
             or_replace = re.match(
                 r"^CREATE\s+OR\s+REPLACE\s+TABLE\s+(`?[a-zA-Z0-9_.]+`?)",
                 clean,
@@ -2486,7 +2228,6 @@ class TestBigQueryCreateSemanticsStagingAndManifest:
                 self.tables[_target(or_replace.group(1))] = []
                 return self._cursor([])
 
-            # CREATE TABLE IF NOT EXISTS: preserves existing table and rows
             if_not_exists = re.match(
                 r"^CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(`?[a-zA-Z0-9_.]+`?)",
                 clean,
@@ -2498,7 +2239,6 @@ class TestBigQueryCreateSemanticsStagingAndManifest:
                     self.tables[table] = []
                 return self._cursor([])
 
-            # INSERT INTO: parses row values
             insert = re.match(
                 r"^INSERT\s+INTO\s+(`?[a-zA-Z0-9_.]+`?)\s*(?:\([^)]*\))?\s*VALUES\s*(.*)",
                 clean,
@@ -2512,7 +2252,6 @@ class TestBigQueryCreateSemanticsStagingAndManifest:
                 self.tables[table].append(values)
                 return self._cursor([])
 
-            # DELETE FROM: filters out matching benchmark rows
             delete = re.match(
                 r"^DELETE\s+FROM\s+(`?[a-zA-Z0-9_.]+`?)(?:\s+WHERE\s+(.*))?",
                 clean,
@@ -2530,7 +2269,6 @@ class TestBigQueryCreateSemanticsStagingAndManifest:
                         self.tables[table] = []
                 return self._cursor([])
 
-            # SELECT COUNT(*):
             count = re.match(
                 r"^SELECT\s+COUNT\(\*\)\s+FROM\s+(`?[a-zA-Z0-9_.]+`?)(?:\s+WHERE\s+(.*))?",
                 clean,
@@ -2564,40 +2302,33 @@ class TestBigQueryCreateSemanticsStagingAndManifest:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_reuse_of_populated_staging_tables_keeps_rows(self, mock_bigquery):
-        """Reusing populated staging tables through BigQuery convert path preserves row data."""
         from benchbox.core.write_primitives.benchmark import get_create_table_sql
 
         adapter = BigQueryAdapter(project_id="my-project", dataset_id="my_ds")
         conn = self._SimulatedBigQueryConnection(adapter)
 
-        # Pre-populate staging table
         target_table = "UPDATE_OPS_ORDERS"
         initial_rows = [("1", "comment 1"), ("2", "comment 2"), ("3", "comment 3")]
         conn.tables[target_table] = list(initial_rows)
 
-        # Execute setup DDL with if_not_exists=True as done during reuse
         create_sql = get_create_table_sql("update_ops_orders", dialect="bigquery", if_not_exists=True)
         conn.execute(create_sql)
 
-        # Confirm executed query preserved IF NOT EXISTS
         last_query = conn.executed_queries[-1]
         assert "CREATE TABLE IF NOT EXISTS `my-project.my_ds.UPDATE_OPS_ORDERS`" in last_query
         assert "OR REPLACE" not in last_query
 
-        # Rows must be preserved, not wiped
         assert len(conn.tables[target_table]) == 3
         assert conn.tables[target_table] == initial_rows
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_shared_manifest_keeps_both_benchmarks_provenance_rows(self, mock_bigquery):
-        """Shared provenance manifest keeps both benchmarks' rows across consecutive setup writes."""
         from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark
         from benchbox.core.write_primitives.benchmark import WritePrimitivesBenchmark
 
         adapter = BigQueryAdapter(project_id="my-project", dataset_id="my_ds")
         conn = self._SimulatedBigQueryConnection(adapter)
 
-        # Seed source tables so _staging_source_digest can calculate digest
         conn.tables["ORDERS"] = [(1,)]
         conn.tables["LINEITEM"] = [(1,)]
         conn.tables["CUSTOMER"] = [(1,)]
@@ -2609,7 +2340,6 @@ class TestBigQueryCreateSemanticsStagingAndManifest:
 
         source_tables = ["orders", "lineitem", "customer"]
 
-        # First benchmark writes its staging manifest
         bench1._write_staging_manifest(conn, source_tables)
         assert bench1._staging_manifest_matches(conn, source_tables) is True
 
@@ -2617,11 +2347,9 @@ class TestBigQueryCreateSemanticsStagingAndManifest:
         assert len(conn.tables[manifest_table]) == 1
         assert conn.tables[manifest_table][0][0] == "Transaction Primitives"
 
-        # Second benchmark writes its staging manifest on the same database
         bench2._write_staging_manifest(conn, source_tables)
         assert bench2._staging_manifest_matches(conn, source_tables) is True
 
-        # CRITICAL: bench1's provenance row must STILL be preserved in the shared manifest
         assert bench1._staging_manifest_matches(conn, source_tables) is True
         assert len(conn.tables[manifest_table]) == 2
         benchmarks_in_manifest = {r[0] for r in conn.tables[manifest_table]}
@@ -2630,11 +2358,8 @@ class TestBigQueryCreateSemanticsStagingAndManifest:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestQualifyTableNames:
-    """Test _qualify_table_names for all TPC-H tables."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_all_tpch_tables(self, mock_bigquery):
-        """All 8 TPC-H table names are qualified with project.dataset."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         tpch_tables = ["REGION", "NATION", "CUSTOMER", "SUPPLIER", "PART", "PARTSUPP", "ORDERS", "LINEITEM"]
         for table in tpch_tables:
@@ -2643,14 +2368,12 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_case_insensitive(self, mock_bigquery):
-        """Qualification works for lowercase table names."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("SELECT * FROM customer")
         assert "`p1.d1.CUSTOMER`" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_multiple_references_in_join(self, mock_bigquery):
-        """Multiple table references in a JOIN are all qualified."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         sql = "SELECT * FROM lineitem l JOIN orders o ON l.l_orderkey = o.o_orderkey"
         result = adapter._qualify_table_names(sql)
@@ -2659,19 +2382,12 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_non_tpch_tables(self, mock_bigquery):
-        """Non-TPC-H table names are qualified and uppercased like TPC-H ones.
-
-        Contract change: leaving unknown tables unqualified 404s on BigQuery
-        (case-sensitive identifiers, no implicit dataset for the load
-        convention), so parser-extracted names resolve for every benchmark.
-        """
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("SELECT * FROM my_custom_table")
         assert result == "SELECT * FROM `p1.d1.MY_CUSTOM_TABLE`"
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_insert_into_target(self, mock_bigquery):
-        """INSERT INTO targets (not just FROM/JOIN) resolve to created tables."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("INSERT INTO insert_ops_lineitem SELECT * FROM lineitem")
         assert "INSERT INTO `p1.d1.INSERT_OPS_LINEITEM`" in result
@@ -2679,7 +2395,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_update_and_drop_targets(self, mock_bigquery):
-        """UPDATE and DROP TABLE targets resolve to created tables."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("UPDATE update_ops_orders SET o_comment = 'x'")
         assert "UPDATE `p1.d1.UPDATE_OPS_ORDERS`" in result
@@ -2688,7 +2403,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_backtick_quoted_names(self, mock_bigquery):
-        """Backtick-quoted setup probes resolve without a default dataset."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("SELECT COUNT(*) FROM `ORDERS`")
         assert result == "SELECT COUNT(*) FROM `p1.d1.ORDERS`"
@@ -2700,7 +2414,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_backtick_columns_not_qualified(self, mock_bigquery):
-        """Backticked column references are left alone; only tables qualify."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("SELECT `o_orderkey`, `o_custkey` FROM `orders`")
         assert "`o_orderkey`" in result
@@ -2710,13 +2423,11 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_no_fallback_rewrite_when_disallowed(self, mock_bigquery):
-        """Unparseable backtick queries pass through when fallback is off."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         assert adapter._qualify_table_names("", allow_fallback=False) == ""
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_comma_identifiers_outside_from_are_not_tables(self, mock_bigquery):
-        """Projection columns, function args, and INSERT columns keep their names."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names(
             "SELECT count(*) AS total, customer FROM lineitem JOIN customer ON lineitem.l_custkey = customer.c_custkey"
@@ -2730,7 +2441,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_join_predicate_commas_are_not_table_separators(self, mock_bigquery):
-        """Commas inside ON/USING predicates leave function args unchanged."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names(
             "SELECT customer.c_name FROM customer JOIN lineitem ON COALESCE(lineitem.x, customer) IS NOT NULL"
@@ -2739,7 +2449,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_backtick_and_commented_aliases_are_not_duplicated(self, mock_bigquery):
-        """Existing backtick aliases and aliases past comments suppress synthesis."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("SELECT orders.o_orderkey FROM orders `o`")
         assert result.count("`o`") == 1
@@ -2750,7 +2459,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_view_targets_are_qualified(self, mock_bigquery):
-        """CREATE VIEW and DROP VIEW targets resolve on a dataset-less connection."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("CREATE VIEW orders_view AS SELECT * FROM orders")
         assert "CREATE VIEW `p1.d1.ORDERS_VIEW` AS" in result
@@ -2759,7 +2467,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_materialized_view_targets_are_qualified(self, mock_bigquery):
-        """Materialized views are dataset objects: targets must qualify."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("CREATE MATERIALIZED VIEW mv AS SELECT * FROM orders")
         assert "CREATE MATERIALIZED VIEW `p1.d1.MV` AS" in result
@@ -2768,7 +2475,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_parenthesized_join_tables_are_qualified(self, mock_bigquery):
-        """Tables led by a paren in FROM (... JOIN ...) still qualify."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names(
             "SELECT * FROM (customer JOIN orders ON customer.c_custkey = 1) JOIN nation ON 1=1"
@@ -2778,7 +2484,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_keyword_spelled_backtick_aliases_are_not_duplicated(self, mock_bigquery):
-        """Quoted aliases are identifiers even when they spell keywords."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("SELECT orders.o_orderkey FROM orders `order` WHERE 1=1")
         assert result.count("`order`") == 1
@@ -2786,7 +2491,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_subquery_and_mixed_join_commas_qualify(self, mock_bigquery):
-        """Commas after subqueries and explicit JOINs still separate tables."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("SELECT * FROM (SELECT 1 FROM lineitem) sub, customer WHERE 1=1")
         assert ", `p1.d1.CUSTOMER`" in result
@@ -2799,7 +2503,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_later_from_commas_qualify_after_earlier_commas(self, mock_bigquery):
-        """A projection or predicate comma never ends the FROM-list scan."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         result = adapter._qualify_table_names("SELECT a, b FROM customer, orders")
         assert "FROM `p1.d1.CUSTOMER`, `p1.d1.ORDERS`" in result
@@ -2813,7 +2516,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_qualifies_multistatement_batch_with_later_statement_table(self, mock_bigquery):
-        """Per-statement qualification qualifies tables appearing only in later statements."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         batch_sql = (
             "CREATE TABLE stage_1 AS SELECT * FROM source_early;\nINSERT INTO target_late SELECT * FROM source_late;\n"
@@ -2824,7 +2526,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_withholds_alias_on_insert_target_with_same_named_references(self, mock_bigquery):
-        """INSERT target tables never gain synthesized AS aliases even if same-named references exist."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         sql = "INSERT INTO target (c1) SELECT target.c1 FROM source AS target"
         result = adapter._qualify_table_names(sql)
@@ -2834,7 +2535,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_withholds_alias_on_create_target_with_same_named_references(self, mock_bigquery):
-        """CREATE TABLE target tables never gain synthesized AS aliases."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         sql = "CREATE TABLE target AS SELECT target.c1 FROM source AS target"
         result = adapter._qualify_table_names(sql)
@@ -2843,7 +2543,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_withholds_alias_on_drop_alter_truncate_targets(self, mock_bigquery):
-        """DROP, ALTER, and TRUNCATE targets never gain synthesized AS aliases."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
 
         drop_sql = "DROP TABLE IF EXISTS target"
@@ -2857,7 +2556,6 @@ class TestQualifyTableNames:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_permits_alias_on_update_target_with_same_named_references(self, mock_bigquery):
-        """UPDATE targets gain synthesized AS alias when table.col references exist."""
         adapter = BigQueryAdapter(project_id="p1", dataset_id="d1")
         sql = "UPDATE target SET target.c = 1"
         result = adapter._qualify_table_names(sql)
@@ -2866,11 +2564,8 @@ class TestQualifyTableNames:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestNormalizeTableNamesCase:
-    """Test _normalize_table_names_case edge cases."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_normalizes_mixed_case_identifiers(self, mock_bigquery):
-        """Only lowercase backtick-quoted identifiers are uppercased."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         query = "SELECT `col_a`, `COL_B` FROM `my_table`"
         result = adapter._normalize_table_names_case(query)
@@ -2880,36 +2575,29 @@ class TestNormalizeTableNamesCase:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_preserves_numeric_suffixes(self, mock_bigquery):
-        """Identifiers with numeric parts are normalized correctly."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._normalize_table_names_case("SELECT * FROM `table123`")
         assert "`TABLE123`" in result
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_normalizes_mixed_case_tpcdi_identifiers(self, mock_bigquery):
-        """Mixed-case TPC-DI names resolve to the UPPERCASE schema tables."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._normalize_table_names_case("SELECT * FROM `DimCustomer` WHERE `BatchID` = 1")
         assert result == "SELECT * FROM `DIMCUSTOMER` WHERE `BATCHID` = 1"
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_no_change_for_already_uppercase(self, mock_bigquery):
-        """Already-uppercase identifiers remain unchanged."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         query = "SELECT * FROM `CUSTOMER` WHERE `CUSTOMER`.`C_ID` = 1"
         result = adapter._normalize_table_names_case(query)
         assert "`CUSTOMER`" in result
-        # uppercase identifiers don't match the lowercase-only regex
         assert result == query
 
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestApplyTpcdiBigqueryRewrites:
-    """Test _apply_tpcdi_bigquery_rewrites dialect normalization."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_flag_literals_become_boolean(self, mock_bigquery):
-        """BIT flag comparisons use TRUE/FALSE; integer columns untouched."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._apply_tpcdi_bigquery_rewrites("SELECT * FROM DimCustomer WHERE IsCurrent = 1 AND BatchID = 1")
         assert "IsCurrent = TRUE" in result
@@ -2917,14 +2605,12 @@ class TestApplyTpcdiBigqueryRewrites:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_quoted_flag_literals_become_boolean(self, mock_bigquery):
-        """Backtick-quoted flags (post-sqlglot) rewrite with quotes intact."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._apply_tpcdi_bigquery_rewrites("SELECT * FROM `DIMCUSTOMER` WHERE `ISCURRENT` = 1")
         assert result == "SELECT * FROM `DIMCUSTOMER` WHERE `ISCURRENT` = TRUE"
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_julianday_and_now_rewritten(self, mock_bigquery):
-        """SQLite date idioms map to BigQuery equivalents."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._apply_tpcdi_bigquery_rewrites("SELECT JULIANDAY(DATE('now')) - JULIANDAY(MIN(d.DateValue))")
         assert "JULIANDAY" not in result
@@ -2933,7 +2619,6 @@ class TestApplyTpcdiBigqueryRewrites:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_relative_date_uses_bigquery_interval_syntax(self, mock_bigquery):
-        """AQ7's SQLite relative date becomes parseable BigQuery SQL."""
         import sqlglot
 
         from benchbox.core.tpcdi.query_analytics import TPCDIAnalyticalQueries
@@ -2946,7 +2631,6 @@ class TestApplyTpcdiBigqueryRewrites:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_relative_now_uses_interval(self, mock_bigquery):
-        """DATE('now', '-N days') needs BigQuery's INTERVAL expression."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._apply_tpcdi_bigquery_rewrites("SELECT * FROM t WHERE d.DateValue >= DATE('now', '-90 days')")
         assert "DATE_SUB(CURRENT_DATE(), INTERVAL 90 DAY)" in result
@@ -2955,11 +2639,8 @@ class TestApplyTpcdiBigqueryRewrites:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestSafeguardDivisionByZero:
-    """Test _safeguard_division_by_zero SAFE_DIVIDE normalization."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_division_routed_through_safe_divide(self, mock_bigquery):
-        """A zero divisor returns NULL instead of raising on BigQuery."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._safeguard_division_by_zero("SELECT a / b FROM `T`")
         assert "SAFE_DIVIDE" in result
@@ -2967,7 +2648,6 @@ class TestSafeguardDivisionByZero:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_query_without_division_unchanged(self, mock_bigquery):
-        """Division-free queries pass through byte-identical."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         query = "SELECT a FROM `T` WHERE b = 1"
         assert adapter._safeguard_division_by_zero(query) == query
@@ -2975,11 +2655,8 @@ class TestSafeguardDivisionByZero:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestGenerateTuningClause:
-    """Test generate_tuning_clause with different column types."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_timestamp_partitioning_uses_date_wrapper(self, mock_bigquery):
-        """TIMESTAMP columns get PARTITION BY DATE(col)."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_tuning = Mock()
         mock_tuning.has_any_tuning.return_value = True
@@ -3002,7 +2679,6 @@ class TestGenerateTuningClause:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_date_partitioning_uses_direct_column(self, mock_bigquery):
-        """DATE columns get PARTITION BY col (no DATE wrapper)."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_tuning = Mock()
         mock_tuning.has_any_tuning.return_value = True
@@ -3025,7 +2701,6 @@ class TestGenerateTuningClause:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_integer_partitioning_uses_range_bucket(self, mock_bigquery):
-        """INTEGER columns get PARTITION BY RANGE_BUCKET(...)."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_tuning = Mock()
         mock_tuning.has_any_tuning.return_value = True
@@ -3048,7 +2723,6 @@ class TestGenerateTuningClause:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_clustering_limited_to_four_columns(self, mock_bigquery):
-        """BigQuery enforces a max of 4 clustering columns."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_tuning = Mock()
         mock_tuning.has_any_tuning.return_value = True
@@ -3074,7 +2748,6 @@ class TestGenerateTuningClause:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_combined_partitioning_and_clustering(self, mock_bigquery):
-        """Both PARTITION BY and CLUSTER BY in one clause."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_tuning = Mock()
         mock_tuning.has_any_tuning.return_value = True
@@ -3104,7 +2777,6 @@ class TestGenerateTuningClause:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_no_tuning_returns_empty(self, mock_bigquery):
-        """has_any_tuning() == False returns empty string."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_tuning = Mock()
         mock_tuning.has_any_tuning.return_value = False
@@ -3112,7 +2784,6 @@ class TestGenerateTuningClause:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_default_partitioning_for_unknown_type(self, mock_bigquery):
-        """Unknown column type defaults to DATE() wrapper partitioning."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_tuning = Mock()
         mock_tuning.has_any_tuning.return_value = True
@@ -3136,46 +2807,36 @@ class TestGenerateTuningClause:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestQueryCacheConfig:
-    """Test query_cache configuration logic."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_query_cache_explicit_true(self, mock_bigquery):
-        """Explicit query_cache=True overrides default."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds", query_cache=True)
         assert adapter.query_cache is True
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_query_cache_explicit_false(self, mock_bigquery):
-        """Explicit query_cache=False is respected."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds", query_cache=False)
         assert adapter.query_cache is False
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_disable_result_cache_true_sets_query_cache_false(self, mock_bigquery):
-        """disable_result_cache=True maps to query_cache=False."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds", disable_result_cache=True)
         assert adapter.query_cache is False
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_disable_result_cache_false_sets_query_cache_true(self, mock_bigquery):
-        """disable_result_cache=False maps to query_cache=True."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds", disable_result_cache=False)
         assert adapter.query_cache is True
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_default_query_cache_is_disabled(self, mock_bigquery):
-        """Default is cache disabled for accurate benchmarking."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         assert adapter.query_cache is False
 
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestGetPlatformInfo:
-    """Test get_platform_info structure and content."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_basic_info_without_connection(self, mock_bigquery):
-        """Platform info without connection returns base fields."""
         adapter = BigQueryAdapter(
             project_id="my-project",
             dataset_id="bench_ds",
@@ -3201,23 +2862,18 @@ class TestGetPlatformInfo:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_info_with_connection_metadata_error(self, mock_bigquery):
-        """If connection metadata queries fail, info still returned gracefully."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_conn.get_dataset.side_effect = Exception("access denied")
         info = adapter.get_platform_info(connection=mock_conn)
-        # Should still return basic info even if connection queries fail
         assert info["platform_type"] == "bigquery"
         assert info["configuration"]["project_id"] == "proj"
 
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestExecuteQuerySqlTransformation:
-    """Test execute_query SQL transformation branches."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_backtick_query_normalizes_case(self, mock_bigquery):
-        """Queries with backticks normalize case and qualify tables."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_job = Mock()
@@ -3234,15 +2890,11 @@ class TestExecuteQuerySqlTransformation:
         result = adapter.execute_query(mock_conn, "SELECT * FROM `customer`", "q1")
 
         assert result["status"] == "SUCCESS"
-        # Verify the query was uppercase-normalized and qualified: the
-        # query-time connection carries no default dataset, so a bare
-        # backtick name would fail with "must be qualified with a dataset".
         called_sql = mock_conn.query.call_args[0][0]
         assert "`proj.ds.CUSTOMER`" in called_sql
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_setup_create_uses_uppercase_convention(self, mock_bigquery):
-        """setup() CREATEs are converted: uppercase + qualified like create_schema."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_job = Mock()
@@ -3269,7 +2921,6 @@ class TestExecuteQuerySqlTransformation:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_non_backtick_query_qualifies_tables(self, mock_bigquery):
-        """Queries without backticks use _qualify_table_names."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_job = Mock()
@@ -3291,7 +2942,6 @@ class TestExecuteQuerySqlTransformation:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_translated_query_stored_when_different(self, mock_bigquery):
-        """translated_query field set when SQL was transformed."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_job = Mock()
@@ -3308,13 +2958,11 @@ class TestExecuteQuerySqlTransformation:
         original_sql = "SELECT * FROM REGION"
         result = adapter.execute_query(mock_conn, original_sql, "q1")
 
-        # The query gets qualified, so translated_query should be set
         assert result["translated_query"] is not None
         assert "`proj.ds.REGION`" in result["translated_query"]
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_job_statistics_in_result(self, mock_bigquery):
-        """Result includes BigQuery job statistics."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_job = Mock()
@@ -3338,7 +2986,6 @@ class TestExecuteQuerySqlTransformation:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_execute_query_error_returns_error_dict(self, mock_bigquery):
-        """Failed queries return structured error dict."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_conn.query.side_effect = RuntimeError("Quota exceeded")
@@ -3354,11 +3001,8 @@ class TestExecuteQuerySqlTransformation:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestCloseConnectionEdgeCases:
-    """Test close_connection edge cases."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_close_none_connection(self, mock_bigquery):
-        """close_connection(None) does nothing."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         with patch.object(adapter.logger, "warning") as mock_warn:
             adapter.close_connection(None)
@@ -3366,7 +3010,6 @@ class TestCloseConnectionEdgeCases:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_close_suppresses_token_error(self, mock_bigquery):
-        """Token-related errors are silently suppressed."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_conn.close.side_effect = Exception("token expired during refresh")
@@ -3380,7 +3023,6 @@ class TestCloseConnectionEdgeCases:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_close_suppresses_auth_error(self, mock_bigquery):
-        """Auth-related errors are silently suppressed."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_conn.close.side_effect = Exception("auth credentials invalid")
@@ -3394,7 +3036,6 @@ class TestCloseConnectionEdgeCases:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_close_transport_cleanup(self, mock_bigquery):
-        """Transport cleanup runs even if close() fails."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_conn.close.side_effect = Exception("Network error")
@@ -3409,11 +3050,8 @@ class TestCloseConnectionEdgeCases:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestValidateCompressionSupport:
-    """Test _validate_compression_support for zstd rejection."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_zstd_file_raises_error(self, mock_bigquery):
-        """Zstd-compressed files raise descriptive error."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_benchmark = Mock()
         mock_benchmark.name = "tpch"
@@ -3428,7 +3066,6 @@ class TestValidateCompressionSupport:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_zstd_file_raises_with_output_dir(self, mock_bigquery):
-        """Zstd error message formatting works when benchmark has output_dir instead of data_dir."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_benchmark = Mock(spec=["name", "scale_factor", "output_dir"])
         mock_benchmark.name = "tpch"
@@ -3443,7 +3080,6 @@ class TestValidateCompressionSupport:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_gzip_file_passes(self, mock_bigquery):
-        """Gzip files do not raise."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_benchmark = Mock()
 
@@ -3453,7 +3089,6 @@ class TestValidateCompressionSupport:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_uncompressed_file_passes(self, mock_bigquery):
-        """Uncompressed files do not raise."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_benchmark = Mock()
 
@@ -3464,38 +3099,31 @@ class TestValidateCompressionSupport:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestEnsureFileListAndFilterValidFiles:
-    """Test _ensure_file_list and _filter_valid_files helpers."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_ensure_file_list_wraps_single(self, mock_bigquery):
-        """Single path becomes a one-element list."""
         result = BigQueryAdapter._ensure_file_list(Path("/tmp/file.csv"))
         assert result == [Path("/tmp/file.csv")]
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_ensure_file_list_preserves_list(self, mock_bigquery):
-        """Already-list input passes through."""
         paths = [Path("/tmp/a.csv"), Path("/tmp/b.csv")]
         result = BigQueryAdapter._ensure_file_list(paths)
         assert result == paths
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_filter_valid_files_rejects_nonexistent(self, mock_bigquery):
-        """Non-existent local files are filtered out."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._filter_valid_files([Path("/nonexistent/file.csv")], allow_cloud=False)
         assert result == []
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_filter_valid_files_accepts_cloud_paths(self, mock_bigquery):
-        """Cloud paths are accepted when allow_cloud=True."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._filter_valid_files(["gs://bucket/file.parquet"], allow_cloud=True)
         assert result == ["gs://bucket/file.parquet"]
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_filter_valid_files_rejects_cloud_when_not_allowed(self, mock_bigquery):
-        """Cloud paths are rejected when allow_cloud=False."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         result = adapter._filter_valid_files(["gs://bucket/file.parquet"], allow_cloud=False)
         assert result == []
@@ -3503,11 +3131,8 @@ class TestEnsureFileListAndFilterValidFiles:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestGetExistingTables:
-    """Test _get_existing_tables normalization."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_returns_lowercase_table_names(self, mock_bigquery):
-        """Table names are normalized to lowercase."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_t1 = Mock()
@@ -3522,11 +3147,9 @@ class TestGetExistingTables:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_returns_empty_on_error(self, mock_bigquery):
-        """Returns empty list when list_tables fails."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_conn.list_tables.side_effect = Exception("dataset not found")
-        # Ensure dataset() doesn't cause issues
         mock_conn.dataset.side_effect = Exception("dataset not found")
 
         result = adapter._get_existing_tables(mock_conn)
@@ -3535,11 +3158,8 @@ class TestGetExistingTables:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestBuildCtasSortSql:
-    """Test _build_ctas_sort_sql behavior."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_returns_none_when_off(self, mock_bigquery):
-        """Returns None when sorted ingestion is off."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         with patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("off", "none")):
             result = adapter._build_ctas_sort_sql("orders", [])
@@ -3547,7 +3167,6 @@ class TestBuildCtasSortSql:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_raises_when_not_off(self, mock_bigquery):
-        """Raises ValueError when sorted ingestion is requested but not supported."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         with (
             patch.object(adapter, "resolve_sorted_ingestion_strategy", return_value=("auto", "ctas")),
@@ -3558,11 +3177,8 @@ class TestBuildCtasSortSql:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestGetTableRowCount:
-    """Test get_table_row_count SQL generation."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_generates_correct_count_sql(self, mock_bigquery):
-        """Verify the COUNT(*) SQL uses project.dataset.TABLE format."""
         adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
         mock_conn = Mock()
         mock_job = Mock()
@@ -3578,11 +3194,8 @@ class TestGetTableRowCount:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestValidateDataIntegritySql:
-    """Test _validate_data_integrity SQL generation."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_generates_correct_accessibility_sql(self, mock_bigquery):
-        """Verify the SELECT 1 SQL uses project.dataset.TABLE format."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_conn = Mock()
         mock_job = Mock()
@@ -3598,10 +3211,7 @@ class TestValidateDataIntegritySql:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestBuildBigqueryConfig:
-    """Test _build_bigquery_config config builder function."""
-
     def test_basic_config_construction(self):
-        """Config built from options produces correct DatabaseConfig fields."""
         from benchbox.platforms.bigquery import _build_bigquery_config
 
         mock_info = Mock()
@@ -3624,7 +3234,6 @@ class TestBuildBigqueryConfig:
         assert config.location == "EU"
 
     def test_staging_root_extracts_bucket_and_prefix(self):
-        """staging_root in overrides is parsed into storage_bucket and storage_prefix."""
         from benchbox.platforms.bigquery import _build_bigquery_config
 
         mock_info = Mock()
@@ -3646,7 +3255,6 @@ class TestBuildBigqueryConfig:
         assert config.staging_root == "gs://my-bucket/my-prefix"
 
     def test_saved_creds_merged_with_options(self):
-        """Saved credentials are merged, with saved creds taking precedence over registered defaults."""
         from benchbox.platforms.bigquery import _build_bigquery_config
 
         mock_info = Mock()
@@ -3666,13 +3274,10 @@ class TestBuildBigqueryConfig:
                 info=mock_info,
             )
 
-        # Saved credentials override registered defaults (options)
         assert config.project_id == "saved-proj"
-        # Saved location should be preserved
         assert config.location == "US"
 
     def test_default_output_location_used_as_staging_fallback(self):
-        """default_output_location from creds is used as staging_root if gs://."""
         from benchbox.platforms.bigquery import _build_bigquery_config
 
         mock_info = Mock()
@@ -3696,7 +3301,6 @@ class TestBuildBigqueryConfig:
         assert config.storage_bucket == "default-bucket"
 
     def test_overrides_take_precedence_over_options(self):
-        """Overrides win over both saved_creds and options."""
         from benchbox.platforms.bigquery import _build_bigquery_config
 
         mock_info = Mock()
@@ -3719,7 +3323,6 @@ class TestBuildBigqueryConfig:
         assert config.driver_version == "3.25.0"
 
     def test_none_info_uses_defaults(self):
-        """When info is None, defaults are used for display name and driver package."""
         from benchbox.platforms.bigquery import _build_bigquery_config
 
         with patch("benchbox.security.credentials.CredentialManager") as mock_cm_cls:
@@ -3738,11 +3341,8 @@ class TestBuildBigqueryConfig:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestConnectionParams:
-    """Test _get_connection_params."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_returns_adapter_defaults(self, mock_bigquery):
-        """Default params from adapter config."""
         adapter = BigQueryAdapter(
             project_id="proj",
             dataset_id="ds",
@@ -3756,7 +3356,6 @@ class TestConnectionParams:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_overrides_from_connection_config(self, mock_bigquery):
-        """Connection config overrides adapter defaults."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds", location="US")
         params = adapter._get_connection_params(project_id="other-proj", location="asia-northeast1")
         assert params["project_id"] == "other-proj"
@@ -3765,21 +3364,16 @@ class TestConnectionParams:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestCleanupEmptyTables:
-    """Test _cleanup_empty_tables_if_needed defense-in-depth logic."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_no_tables_does_nothing(self, mock_bigquery):
-        """No tables means nothing to clean up."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         mock_client = Mock()
         mock_client.list_tables.return_value = []
         adapter._cleanup_empty_tables_if_needed(mock_client)
-        # Should not attempt to delete anything
         mock_client.delete_table.assert_not_called()
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_majority_empty_triggers_cleanup(self, mock_bigquery):
-        """When >50% tables empty, they are dropped and database_was_reused = False."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         adapter.database_was_reused = True
 
@@ -3787,7 +3381,6 @@ class TestCleanupEmptyTables:
         mock_dataset_ref = Mock()
         mock_client.dataset.return_value = mock_dataset_ref
 
-        # 3 out of 4 tables are empty
         table_infos = []
         table_objs = []
         for i in range(4):
@@ -3806,12 +3399,10 @@ class TestCleanupEmptyTables:
         adapter._cleanup_empty_tables_if_needed(mock_client)
 
         assert adapter.database_was_reused is False
-        # 3 empty tables should be deleted
         assert mock_client.delete_table.call_count == 3
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_minority_empty_does_not_cleanup(self, mock_bigquery):
-        """When <50% tables empty, no cleanup happens."""
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
         adapter.database_was_reused = True
 
@@ -3819,7 +3410,6 @@ class TestCleanupEmptyTables:
         mock_dataset_ref = Mock()
         mock_client.dataset.return_value = mock_dataset_ref
 
-        # 1 out of 4 tables is empty
         table_infos = []
         table_objs = []
         for i in range(4):
@@ -3843,11 +3433,8 @@ class TestCleanupEmptyTables:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestPrepareExternalDeltaUris:
-    """Test _prepare_external_delta_uris cloud path handling."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_cloud_delta_log_path_extracts_root(self, mock_bigquery):
-        """Cloud path with /_delta_log extracts the root URI."""
         adapter = BigQueryAdapter(
             project_id="proj",
             dataset_id="ds",
@@ -3866,7 +3453,6 @@ class TestPrepareExternalDeltaUris:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_non_delta_local_dir_ignored(self, mock_bigquery):
-        """Local dir without _delta_log is skipped."""
         adapter = BigQueryAdapter(
             project_id="proj",
             dataset_id="ds",
@@ -3880,7 +3466,6 @@ class TestPrepareExternalDeltaUris:
         with tempfile.TemporaryDirectory() as tmpdir:
             regular_dir = Path(tmpdir) / "orders"
             regular_dir.mkdir()
-            # No _delta_log subdir
 
             uris = adapter._prepare_external_delta_uris(bucket, "orders", [regular_dir])
 
@@ -3888,7 +3473,6 @@ class TestPrepareExternalDeltaUris:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_cloud_path_without_delta_log_ignored(self, mock_bigquery):
-        """Cloud path without /_delta_log is skipped."""
         adapter = BigQueryAdapter(
             project_id="proj",
             dataset_id="ds",
@@ -3908,16 +3492,12 @@ class TestPrepareExternalDeltaUris:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestAddCliArguments:
-    """Test add_cli_arguments registers expected arguments."""
-
     def test_adds_bigquery_arguments(self):
-        """Verify all BQ-specific CLI arguments are registered."""
         import argparse
 
         parser = argparse.ArgumentParser()
         BigQueryAdapter.add_cli_arguments(parser)
 
-        # Parse known args to check they exist
         args = parser.parse_args(
             [
                 "--project-id",
@@ -3942,8 +3522,6 @@ class TestAddCliArguments:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestGetTargetDialect:
-    """Test get_target_dialect returns correct value."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_returns_bigquery(self, mock_bigquery):
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
@@ -3952,8 +3530,6 @@ class TestGetTargetDialect:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestPlatformNameAndProperties:
-    """Test basic platform property values."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_platform_name_is_bigquery(self, mock_bigquery):
         adapter = BigQueryAdapter(project_id="proj", dataset_id="ds")
@@ -3977,8 +3553,6 @@ class TestPlatformNameAndProperties:
 
 @pytest.mark.usefixtures("dependencies_available")
 class TestBigQueryTableResolution:
-    """Test BigQuery table casing resolution and uppercase conversion."""
-
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_convert_to_bigquery_table_uppercase_flag(self, mock_bigquery):
         adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")
@@ -4020,7 +3594,6 @@ class TestBigQueryTableResolution:
 
     @patch("benchbox.platforms.bigquery.bigquery")
     def test_resolve_target_table_propagates_non_not_found_errors(self, mock_bigquery):
-        """A permission/network error must surface, not be mistaken for a missing table."""
         from google.api_core.exceptions import Forbidden
 
         adapter = BigQueryAdapter(project_id="my-proj", dataset_id="my_ds")

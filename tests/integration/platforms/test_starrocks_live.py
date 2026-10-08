@@ -1,17 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""
-Docker live integration tests for StarRocks.
-
-Setup:
-    make test-docker-up-starrocks
-    # or: docker compose -f docker/starrocks/docker-compose.yml up -d --wait
-
-These tests require a running StarRocks instance accessible at localhost:19030 by default.
-Set STARROCKS_HOST_PORT and STARROCKS_HTTP_PORT to target different host ports.
-"""
 
 import os
 
@@ -32,7 +21,6 @@ pytestmark = [
 
 @pytest.fixture(scope="module", autouse=True)
 def ensure_database():
-    """Pre-create the test database (StarRocks adapter expects it to exist)."""
     port = int(os.getenv("STARROCKS_HOST_PORT", "19030"))
     try:
         conn = pymysql.connect(host="localhost", port=port, user="root", password="", autocommit=True)
@@ -46,7 +34,6 @@ def ensure_database():
 
 @pytest.fixture
 def starrocks_adapter():
-    """Create a StarRocks adapter connected to a local Docker instance."""
     port = int(os.getenv("STARROCKS_HOST_PORT", "19030"))
     http_port = int(os.getenv("STARROCKS_HTTP_PORT", "18040"))
     skip_unless_docker_service("localhost", port, platform="StarRocks")
@@ -63,10 +50,8 @@ def starrocks_adapter():
 
 
 class TestLiveStarRocksConnection:
-    """Test basic StarRocks connectivity via Docker."""
-
     def test_connection(self, starrocks_adapter):
-        """Verify we can connect to StarRocks and run a trivial query."""
+
         connection = starrocks_adapter.create_connection()
         try:
             assert connection is not None
@@ -74,17 +59,15 @@ class TestLiveStarRocksConnection:
             starrocks_adapter.close_connection(connection)
 
     def test_platform_info(self, starrocks_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = starrocks_adapter.get_platform_info()
         assert info is not None
         assert info["platform_type"] == "starrocks"
 
 
 class TestLiveStarRocksQueryExecution:
-    """Test query execution against a live StarRocks instance."""
-
     def test_create_schema(self, starrocks_adapter):
-        """Verify we can create a database."""
+
         connection = starrocks_adapter.create_connection()
         try:
             starrocks_adapter.execute_query(
@@ -104,7 +87,6 @@ class TestLiveStarRocksQueryExecution:
             starrocks_adapter.close_connection(connection)
 
     def test_execute_query(self, starrocks_adapter):
-        """Verify basic query execution with SELECT 1."""
         connection = starrocks_adapter.create_connection()
         try:
             result = starrocks_adapter.execute_query(

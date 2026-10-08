@@ -1,5 +1,3 @@
-"""Contract: semantically required producer keys cannot be silently dropped."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -24,12 +22,6 @@ def test_from_config_required_keys_are_forwarded_by_shared_helper() -> None:
 
 
 def test_from_config_required_key_missing_from_helper_fails_the_contract(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Negative control: a required key dropped from the forwarding set is silently lost.
-
-    Simulates the exact break this contract guards against: if a required key
-    were ever removed from ``TUNING_FORWARD_KEYS``, ``build_adapter_config``
-    would stop forwarding it with no error, rather than raising.
-    """
     key = next(iter(REQUIRED_FROM_CONFIG_KEYS))
     reduced_keys = tuple(k for k in TUNING_FORWARD_KEYS if k != key)
     monkeypatch.setattr("benchbox.platforms.base.config_utils.TUNING_FORWARD_KEYS", reduced_keys)

@@ -6,6 +6,7 @@ export const CORE_FACET_KEYS = [
   "benchmark",
   "scale_factor",
   "phase",
+  "stream_count",
   "platform",
   "execution_mode",
   "tuning_mode",
@@ -35,42 +36,24 @@ export type HardwareFacetKey = (typeof HARDWARE_FACET_KEYS)[number];
 export type ExplorerFacetKey = FacetKey | HardwareFacetKey;
 export type DateWindowFacet = "all" | "30d" | "90d" | "365d";
 
-/**
- * Explicit facet token for rows whose bundle never recorded a tuning mode.
- *
- * No producer emits this value as a real mode; it exists so "not recorded"
- * is a first-class state instead of a null silently coalesced into a
- * real-looking mode. Defined here (not in facetMatching.ts, which imports
- * from this module) so every SQL- and in-memory-filtering consumer shares
- * one source of truth instead of drifting.
- */
 export const NOT_RECORDED_TUNING_MODE = "not-recorded";
 
-/** Legacy unlabelled-tuning facet token; kept so existing chips and URLs keep matching. */
 export const LEGACY_UNLABELLED_TUNING_MODE = "untuned";
 
-/** Every facet token that must match a NULL tuning_mode row, in SQL and in-memory alike. */
 export const NULL_TUNING_MODE_SENTINELS = [
   NOT_RECORDED_TUNING_MODE,
   LEGACY_UNLABELLED_TUNING_MODE,
 ] as const;
 
-/**
- * The token `buildFacetCountQuery` emits for a NULL value in any facet column
- * (`CASE WHEN <col> IS NULL THEN 'unknown'`). Exported so the count query that
- * *produces* the bucket and the WHERE builder that *consumes* it share one
- * literal: a filter that sends this token through a plain `IN (...)` predicate
- * matches no rows, silently returning nothing for a bucket the UI advertised.
- */
 export const UNKNOWN_FACET_VALUE = "unknown";
 
-/** Facet tokens that must match a NULL physical_rendering_id row (ADR-2 secondary facet). */
 export const NULL_PHYSICAL_RENDERING_SENTINELS = [UNKNOWN_FACET_VALUE] as const;
 
 export interface FacetState {
   benchmark: string[];
   scale_factor: string[];
   phase: string[];
+  stream_count: string[];
   platform: string[];
   execution_mode: string[];
   tuning_mode: string[];
@@ -86,7 +69,6 @@ export interface FacetState {
   platform_version: string[];
   arch: string[];
   cpu_family: string[];
-  /** Stringified GB values (result_environment.memory_gb), same encoding as scale_factor. */
   memory_gb: string[];
 }
 
@@ -110,6 +92,7 @@ export const DEFAULT_FACETS: FacetState = {
   benchmark: [],
   scale_factor: [],
   phase: [],
+  stream_count: [],
   platform: [],
   execution_mode: [],
   tuning_mode: [],
@@ -132,6 +115,7 @@ export const FACET_URL_KEYS: Record<ExplorerFacetKey, string> = {
   benchmark: "benchmark",
   scale_factor: "sf",
   phase: "phase",
+  stream_count: "streams",
   platform: "platform",
   execution_mode: "execution",
   tuning_mode: "tuning",
@@ -195,6 +179,7 @@ export const FACET_URL_SERDES = {
   benchmark: multiValueSerde,
   scale_factor: multiValueSerde,
   phase: multiValueSerde,
+  stream_count: multiValueSerde,
   platform: multiValueSerde,
   execution_mode: multiValueSerde,
   tuning_mode: multiValueSerde,
@@ -218,6 +203,7 @@ export function normalizeFacetState(input: PartialFacetState = {}): FacetState {
     benchmark: normalizeFacetList("benchmark", input.benchmark ?? DEFAULT_FACETS.benchmark),
     scale_factor: normalizeFacetList("scale_factor", input.scale_factor ?? DEFAULT_FACETS.scale_factor),
     phase: normalizeFacetList("phase", input.phase ?? DEFAULT_FACETS.phase),
+    stream_count: normalizeFacetList("stream_count", input.stream_count ?? DEFAULT_FACETS.stream_count),
     platform: normalizeFacetList("platform", input.platform ?? DEFAULT_FACETS.platform),
     execution_mode: normalizeFacetList("execution_mode", input.execution_mode ?? DEFAULT_FACETS.execution_mode),
     tuning_mode: normalizeFacetList("tuning_mode", input.tuning_mode ?? DEFAULT_FACETS.tuning_mode),
@@ -260,11 +246,6 @@ export function readFacetParam<K extends ExplorerFacetKey>(
   const canonicalKey = FACET_URL_KEYS[key];
   const aliases = FACET_URL_ALIASES[key] ?? [];
 
-  // w16: when the canonical URL key is absent and multiple legacy aliases
-  // are present, merge their values into the canonical list rather than
-  // keeping only the first hit. Example: `?instance_type=foo&warehouse_size=bar`
-  // for `instance_or_warehouse` previously kept just one and silently dropped
-  // the other on the next mount; now both flow through.
   if (params.get(canonicalKey) === null && aliases.length > 0) {
     const aliasRaws = aliases
       .map((alias) => params.get(alias))
@@ -274,10 +255,6 @@ export function readFacetParam<K extends ExplorerFacetKey>(
         .map((raw) => serde.decode(raw))
         .filter((value): value is FacetState[K] => value !== null);
       if (decodedValues.length === 0) return fallback;
-      // For array-valued facets, concatenate then dedupe; for scalar facets
-      // (e.g. date_window) the first decoded value wins, matching the
-      // pre-w16 single-source behavior since they don't have multi-alias
-      // arrays in practice.
       const first = decodedValues[0]!;
       if (Array.isArray(first)) {
         const merged: string[] = [];
@@ -306,6 +283,7 @@ export function useFacetState(): UseFacetStateResult {
   const [benchmark, setBenchmark] = useFacetUrlState("benchmark");
   const [scaleFactor, setScaleFactor] = useFacetUrlState("scale_factor");
   const [phase, setPhase] = useFacetUrlState("phase");
+  const [streamCount, setStreamCount] = useFacetUrlState("stream_count");
   const [platform, setPlatform] = useFacetUrlState("platform");
   const [executionMode, setExecutionMode] = useFacetUrlState("execution_mode");
   const [tuningMode, setTuningMode] = useFacetUrlState("tuning_mode");
@@ -328,6 +306,7 @@ export function useFacetState(): UseFacetStateResult {
       benchmark,
       scale_factor: scaleFactor,
       phase,
+      stream_count: streamCount,
       platform,
       execution_mode: executionMode,
       tuning_mode: tuningMode,
@@ -362,6 +341,7 @@ export function useFacetState(): UseFacetStateResult {
       platformVersion,
       scaleFactor,
       storageFormat,
+      streamCount,
       trustTier,
       tuningMode,
       validationStatus,
@@ -374,6 +354,7 @@ export function useFacetState(): UseFacetStateResult {
       benchmark: setBenchmark,
       scale_factor: setScaleFactor,
       phase: setPhase,
+      stream_count: setStreamCount,
       platform: setPlatform,
       execution_mode: setExecutionMode,
       tuning_mode: setTuningMode,
@@ -418,6 +399,7 @@ export function facetsToWhereClause(
   addCanonicalBenchmarkClause(facets.benchmark, clauses, params);
   addNumericListClause("scale_factor", facets.scale_factor, clauses, params);
   addCanonicalPhaseClause(facets.phase, clauses, params);
+  addNumericListClause("stream_count", facets.stream_count, clauses, params);
   addPlatformClause(facets.platform, clauses, params);
   addListClause("execution_mode", facets.execution_mode, clauses, params);
   addNullableSentinelClause("tuning_mode", facets.tuning_mode, NULL_TUNING_MODE_SENTINELS, clauses, params);
@@ -479,14 +461,6 @@ function addCanonicalBenchmarkClause(values: readonly string[], clauses: string[
   params.push(...canonicalValues);
 }
 
-/**
- * SQL mirror of `canonicalPhase()`: trim + lowercase, with null/blank folded
- * into the `unknown` token. `matchesFacetKey` canonicalizes `test_type` in
- * memory, so a raw `test_type IN (?)` predicate here would silently disagree -
- * selecting the exposed `unknown` cohort would match no null-phase row, and a
- * `POWER`/`power` casing difference would drop rows the matcher accepts,
- * leaving the leaderboard empty or inconsistent with its own facet counts.
- */
 export function canonicalPhaseSql(column: string): string {
   return (
     `CASE WHEN trim(lower(coalesce(${column}, ''))) = '' THEN 'unknown' ` +

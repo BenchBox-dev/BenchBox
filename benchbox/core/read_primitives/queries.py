@@ -1,12 +1,3 @@
-"""Read Primitives benchmark query management.
-
-Provides functionality to load and manage primitive database read operation queries that test fundamental database capabilities
-including aggregations, joins, filters, window functions, and advanced analytical operations.
-
-All queries are defined in ``benchbox/core/read_primitives/catalog/queries.yaml`` and loaded at runtime to keep this module focused on
-query orchestration.
-"""
-
 from __future__ import annotations
 
 from benchbox.core.query_catalog_base import BaseQueryCatalogMixin
@@ -14,8 +5,6 @@ from benchbox.core.read_primitives.catalog import PrimitiveQuery, load_primitive
 
 
 class ReadPrimitivesQueryManager(BaseQueryCatalogMixin):
-    """Manager for Read Primitives benchmark queries backed by the catalog file."""
-
     def __init__(self) -> None:
         catalog = load_primitives_catalog()
         self._catalog_version = catalog.version
@@ -33,66 +22,31 @@ class ReadPrimitivesQueryManager(BaseQueryCatalogMixin):
 
     @property
     def catalog_version(self) -> int:
-        """Return the version declared in the catalog file."""
 
         return self._catalog_version
 
     def get_query(self, query_id: str, dialect: str | None = None) -> str:
-        """Return a catalog query, applying ClickHouse's case-sensitive lag spelling."""
 
         query = super().get_query(query_id, dialect)
         if query_id == "timeseries_trend_analysis" and dialect and dialect.lower().strip() == "clickhouse":
-            # ClickHouse 25.8 resolves the window function only when the
-            # identifier is lowercase; keep the canonical catalog SQL portable.
             return query.replace("LAG(monthly_revenue, 1)", "lag(monthly_revenue, 1)")
         return query
 
-    # has_variant() is inherited from BaseQueryCatalogMixin
-
     def get_all_queries(self) -> dict[str, str]:
-        """Get all Read Primitives queries.
-
-        Returns:
-            Dictionary mapping query IDs to SQL text
-        """
 
         return self._queries.copy()
 
     def get_queries_by_category(self, category: str) -> dict[str, str]:
-        """Get queries filtered by category.
-
-        Args:
-            category: Category name (e.g., 'aggregation', 'window', 'join')
-
-        Returns:
-            Dictionary mapping query IDs to SQL text for the category
-        """
 
         normalized = category.lower()
         query_ids = self._category_index.get(normalized, [])
         return {query_id: self._queries[query_id] for query_id in query_ids}
 
     def get_query_categories(self) -> list[str]:
-        """Get list of available query categories.
-
-        Returns:
-            List of category names
-        """
 
         return sorted(self._category_index.keys())
 
     def get_query_category(self, query_id: str) -> str:
-        """Get the category for a specific query.
-
-        Args:
-            query_id: Query identifier
-
-        Returns:
-            Category name for the query
-
-        Raises:
-            ValueError: If query_id is invalid
-        """
         try:
             entry = self._entries[query_id]
             return entry.category.lower()

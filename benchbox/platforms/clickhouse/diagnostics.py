@@ -1,5 +1,3 @@
-"""Diagnostics helpers for ClickHouse."""
-
 from __future__ import annotations
 
 import logging
@@ -10,10 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class ClickHouseDiagnosticsMixin:
-    """Provide diagnostic and metadata utilities for ClickHouse."""
-
     def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:
-        """Get ClickHouse-specific metadata and system information."""
         metadata = {
             "platform": self.platform_name,
             "deployment_mode": self.deployment_mode,
@@ -21,18 +16,15 @@ class ClickHouseDiagnosticsMixin:
             "result_cache_enabled": not getattr(self, "disable_result_cache", True),
         }
 
-        # Include mode-specific metadata
         if self.deployment_mode == "server":
             metadata.update({"host": self.host, "port": self.port, "database": self.database})
         elif self.deployment_mode == "local":
             metadata.update({"data_path": getattr(self, "data_path", None)})
 
         try:
-            # Get ClickHouse version
             version_result = connection.execute("SELECT version()")
             metadata["clickhouse_version"] = version_result[0][0] if version_result else "unknown"
 
-            # Get system settings
             settings_result = connection.execute("""
                 SELECT name, value
                 FROM system.settings
@@ -40,7 +32,6 @@ class ClickHouseDiagnosticsMixin:
             """)
             metadata["current_settings"] = dict(settings_result)
 
-            # Get database size information
             size_result = connection.execute("""
                 SELECT
                     database,
@@ -64,8 +55,6 @@ class ClickHouseDiagnosticsMixin:
         return metadata
 
     def check_server_database_exists(self, **connection_config) -> bool:
-        """Check if database exists on ClickHouse server."""
-        # In local mode, check if persistent database directory exists
         if self.deployment_mode == "local":
             db_path = self.get_database_path(**connection_config)
             if db_path:
@@ -82,16 +71,11 @@ class ClickHouseDiagnosticsMixin:
             return db_name in databases
 
         except AttributeError:
-            # A missing attribute is a programming error, not a missing
-            # database: surface it instead of reporting "no database".
             raise
         except Exception:
-            # If we can't connect or check, assume database doesn't exist
             return False
 
     def drop_database(self, **connection_config) -> None:
-        """Drop database on ClickHouse server."""
-        # In local mode, there's no separate database server to drop from
         if self.deployment_mode == "local":
             return
 
@@ -104,9 +88,7 @@ class ClickHouseDiagnosticsMixin:
             raise RuntimeError(f"Failed to drop ClickHouse database: {e}") from e
 
     def get_table_info(self, connection: Any, table_name: str) -> dict[str, Any]:
-        """Get detailed table information."""
         try:
-            # Get table schema
             schema_result = connection.execute(f"""
                 SELECT name, type
                 FROM system.columns
@@ -114,7 +96,6 @@ class ClickHouseDiagnosticsMixin:
                 ORDER BY position
             """)
 
-            # Get table statistics
             stats_result = connection.execute(f"""
                 SELECT
                     count() as row_count,
@@ -135,7 +116,6 @@ class ClickHouseDiagnosticsMixin:
             return {"error": str(e)}
 
     def optimize_table(self, connection: Any, table_name: str) -> bool:
-        """Optimize table for better query performance; return False if the engine refused."""
         try:
             connection.execute(f"OPTIMIZE TABLE {table_name} FINAL")
             self.logger.info(f"Optimized table {table_name}")

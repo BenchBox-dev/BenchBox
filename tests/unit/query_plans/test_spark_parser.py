@@ -1,9 +1,3 @@
-"""Unit tests for SparkQueryPlanParser.
-
-Driven by a recorded ``EXPLAIN EXTENDED`` fixture under tests/fixtures/query_plans/
-so they run with no live Spark/Databricks cluster.
-"""
-
 from pathlib import Path
 
 import pytest
@@ -45,8 +39,6 @@ class TestSparkPhysicalPlan:
         assert dag.platform == "spark"
 
     def test_only_physical_section_parsed(self, parser):
-        # The root must be the physical-plan HashAggregate, NOT the parsed logical
-        # 'Aggregate at the top of EXPLAIN EXTENDED output.
         dag = parser.parse_explain_output("q2", _load("spark_explain_sample.txt"))
         assert dag.logical_root.operator_type == LogicalOperatorType.AGGREGATE
         assert dag.logical_root.physical_operator.operator_type == "HashAggregate"
@@ -61,7 +53,6 @@ class TestSparkPhysicalPlan:
         assert tables == {"default.lineitem", "default.orders"}
 
     def test_bare_physical_plan_without_header(self, parser):
-        # Bare EXPLAIN returns only the physical plan with no "== Physical Plan ==".
         bare = "*(1) Filter isnotnull(x#1)\n+- FileScan parquet default.t[x#1]\n"
         dag = parser.parse_explain_output("q4", bare)
         assert dag is not None
@@ -112,13 +103,9 @@ class TestSparkErrorRecovery:
         assert result is None or result.logical_root is not None
 
     def test_error_sentinel_returns_none(self, parser):
-        # qpc-13: EXPLAIN-failure producers return None instead of an error
-        # string; the remaining "Failed to get query plan" prefix must still
-        # be rejected so it is never accepted as a one-node "Other" plan.
         assert parser.parse_explain_output("q", "Failed to get query plan: connection reset") is None
 
     def test_none_input_returns_none(self, parser):
-        # qpc-13: get_query_plan returns None on EXPLAIN failure.
         assert parser.parse_explain_output("q", None) is None
 
 

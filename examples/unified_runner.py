@@ -1,51 +1,7 @@
 #!/usr/bin/env python3
-"""
-Copyright 2026 Joe Harris / BenchBox Project
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Licensed under the MIT License. See LICENSE file in the project root for details.
-
-Unified Multi-Platform Benchmark Runner
-
-SCOPE: This script provides a simplified programmatic interface for running benchmarks
-across platforms. It's designed for scripting, testing, and automation scenarios where
-you want direct control without interactive prompts or heavy abstractions.
-
-For full CLI features (interactive tuning wizard, progress bars, monitoring, persistent
-preferences), use the main CLI: `benchbox run`
-
-KEY DIFFERENCES FROM MAIN CLI:
-- Defaults to tuned mode (main CLI defaults to notuning)
-- Built-in comparison mode via --compare-baseline/--compare-current
-- No interactive prompts or wizards
-- Simpler error handling
-- Direct core integration without manager abstractions
-
-Usage:
-    # Run TPC-H power test on DuckDB with reproducible seed
-    python examples/unified_runner.py --platform duckdb --benchmark tpch --phases power --scale 0.1 --seed 42
-
-    # Run TPC-DS on Databricks with cloud storage and force upload
-    python examples/unified_runner.py --platform databricks --benchmark tpcds --scale 1.0 \
-        --output s3://my-bucket/data --force-upload
-
-    # Run with custom tuning (note: defaults to tuned, unlike main CLI)
-    python examples/unified_runner.py --platform duckdb --benchmark tpch --scale 0.1 --tuning notuning
-
-    # Generate data only (no database required)
-    python examples/unified_runner.py --benchmark tpch --scale 1 --phases generate
-
-    # Compare two benchmark results
-    python examples/unified_runner.py --compare-baseline results/baseline.json \
-        --compare-current results/current.json --comparison-output report.html
-
-    # List available platforms and benchmarks
-    python examples/unified_runner.py --list-platforms
-    python examples/unified_runner.py --list-benchmarks
-
-    # Dry run to preview configuration
-    python examples/unified_runner.py --platform duckdb --benchmark tpch --scale 0.1 \
-        --dry-run /tmp/preview
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import argparse
 import sys
@@ -82,48 +38,6 @@ from benchbox.utils.printing import (
     set_quiet as set_global_quiet,
 )
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# DESIGN PHILOSOPHY
-# ═══════════════════════════════════════════════════════════════════════════════
-# This unified runner provides a simplified programmatic interface for scripting
-# and testing. It intentionally omits some CLI features to remain lightweight and
-# easy to integrate into automated workflows.
-#
-# KEY ARCHITECTURAL DECISIONS:
-#
-# 1. DIRECT CORE INTEGRATION
-#    - Uses benchbox.core modules directly without CLI manager abstractions
-#    - No DatabaseManager, BenchmarkOrchestrator, or ConfigManager layers
-#    - Simpler call chains, easier to understand and debug
-#
-# 2. NO INTERACTIVE PROMPTS
-#    - All configuration via arguments or config files
-#    - No tuning wizard or credential prompts
-#    - Suitable for CI/CD and non-interactive environments
-#
-# 3. DEFAULTS TO TUNED MODE
-#    - Opposite of main CLI (which defaults to notuning)
-#    - Optimization-first approach for programmatic use
-#    - Users can opt-out with --tuning notuning
-#
-# 4. BUILT-IN COMPARISON MODE
-#    - Convenience feature for quick result comparisons
-#    - Main CLI delegates to separate 'benchbox export' command
-#    - Useful for scripting regression detection
-#
-# 5. SIMPLIFIED ERROR HANDLING
-#    - Basic try/catch with simple error messages
-#    - No ErrorContext or structured error handlers
-#    - Sufficient for scripting where errors are terminal
-#
-# 6. NO PROGRESS/MONITORING UI
-#    - No progress bars, spinners, or resource monitors
-#    - Reduces dependencies and complexity
-#    - Output is quieter and more machine-readable
-#
-# For full-featured interactive usage, use: benchbox run
-# ═══════════════════════════════════════════════════════════════════════════════
-
 _BENCHMARK_NAMES = [
     "TPCH",
     "TPCDS",
@@ -141,7 +55,6 @@ _BENCHMARK_NAMES = [
 
 
 def _get_benchmark_name_map() -> dict[str, Any]:
-    """Return mapping of benchmark CLI names to their classes when available."""
 
     mapping: dict[str, Any] = {}
     for name in _BENCHMARK_NAMES:
@@ -155,8 +68,6 @@ def _get_benchmark_name_map() -> dict[str, Any]:
 
 @dataclass(frozen=True)
 class _PhaseExecutionPlan:
-    """Represents a single lifecycle invocation for the unified runner."""
-
     name: str
     execution_type: str
     lifecycle: LifecyclePhases
@@ -164,7 +75,6 @@ class _PhaseExecutionPlan:
 
 
 def extract_platform_from_argv() -> Optional[str]:
-    """Extract platform name from command line arguments for preliminary parsing."""
 
     for idx, token in enumerate(sys.argv):
         if token == "--platform":
@@ -179,17 +89,12 @@ def extract_platform_from_argv() -> Optional[str]:
 
 
 def list_available_platforms() -> dict[str, bool]:
-    """Return platform availability mapping (name -> available)."""
     return PlatformRegistry.get_platform_availability()
 
 
 def get_platform_adapter_config(
     platform: str, args, system_profile=None, benchmark_name: str = None, scale_factor: float = None
 ) -> dict[str, Any]:
-    """Build platform adapter configuration dict from CLI args.
-
-    Only maps a small subset used by tests for duckdb/databricks/clickhouse.
-    """
     return build_platform_adapter_config(
         platform=platform,
         args_or_config=args,
@@ -200,11 +105,9 @@ def get_platform_adapter_config(
 
 
 def create_base_parser() -> argparse.ArgumentParser:
-    """Create base argument parser with common arguments."""
     parser = argparse.ArgumentParser(description="Unified Multi-Platform Benchmark Runner", add_help=False)
     benchmark_choices = list(_get_benchmark_name_map().keys())
 
-    # Core arguments
     core_group = parser.add_argument_group("Core Arguments")
     core_group.add_argument(
         "--list-platforms",
@@ -235,7 +138,6 @@ def create_base_parser() -> argparse.ArgumentParser:
     )
     core_group.add_argument("--phases", type=str, default="power", help="Benchmark phases to run")
 
-    # Execution arguments
     exec_group = parser.add_argument_group("Execution Arguments")
     exec_group.add_argument("--streams", type=int, default=2, help="Number of streams for throughput test")
     exec_group.add_argument(
@@ -270,7 +172,6 @@ def create_base_parser() -> argparse.ArgumentParser:
         help="Force re-upload of data to cloud storage (for cloud platforms)",
     )
 
-    # Output arguments
     out_group = parser.add_argument_group("Output Arguments")
     out_group.add_argument(
         "--output",
@@ -317,7 +218,6 @@ def create_base_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Anonymize system metadata in exported results",
     )
-    # Comparison/report options
     out_group.add_argument(
         "--compare-baseline",
         type=str,
@@ -342,15 +242,10 @@ def create_base_parser() -> argparse.ArgumentParser:
 
 
 def get_benchmark_config(args_or_config, platform: str = None) -> dict[str, Any]:
-    """Build benchmark configuration dict.
-
-    Supports both the old signature (args, platform) and new (config dict).
-    """
     return build_benchmark_config(args_or_config, platform)
 
 
 def _make_console_summary(results, config):
-    """Create a concise dict for console display only."""
     data = {
         "benchmark": config.get("benchmark"),
         "scale_factor": config.get("scale_factor"),
@@ -368,14 +263,12 @@ def _make_console_summary(results, config):
         data["schema_creation_time"] = results.schema_creation_time
     if hasattr(results, "data_loading_time"):
         data["data_loading_time"] = results.data_loading_time
-    # Optional: total_duration if present
     if hasattr(results, "duration_seconds"):
         data["total_duration"] = results.duration_seconds
     return data
 
 
 def prepare_result_data(results, args) -> dict[str, Any]:
-    """Legacy helper used by tests to build a minimal result dict."""
     return {
         "benchmark": getattr(args, "benchmark", None),
         "scale_factor": getattr(args, "scale", None),
@@ -391,12 +284,10 @@ def prepare_result_data(results, args) -> dict[str, Any]:
 
 
 def _display_results(result_data: dict[str, Any], verbosity: int = 0) -> None:
-    """Legacy wrapper to display results using the core display helper."""
     display_results(result_data, verbosity)
 
 
 def _determine_test_execution_type(phases: list[str]) -> str:
-    """Map requested phases to a canonical test execution type for previews."""
 
     normalized = [phase.lower() for phase in phases]
     query_phases = {"warmup", "power", "throughput", "maintenance"}
@@ -424,7 +315,6 @@ def _determine_test_execution_type(phases: list[str]) -> str:
 
 
 def _normalize_query_subset(value) -> Optional[list[str]]:
-    """Convert various query subset representations into a clean list."""
 
     if value is None:
         return None
@@ -438,7 +328,6 @@ def _normalize_query_subset(value) -> Optional[list[str]]:
 
 
 def _build_phase_execution_plan(phases: list[str]) -> list[_PhaseExecutionPlan]:
-    """Construct the ordered lifecycle execution plan for the requested phases."""
 
     plan: list[_PhaseExecutionPlan] = []
 
@@ -478,7 +367,6 @@ def _build_phase_execution_plan(phases: list[str]) -> list[_PhaseExecutionPlan]:
 
 
 def _safe_int(value: Any) -> int:
-    """Best-effort conversion to integer for success detection."""
 
     try:
         if value is None:
@@ -493,7 +381,6 @@ def _safe_int(value: Any) -> int:
 
 
 def _phase_succeeded(plan_item: _PhaseExecutionPlan, result: Any) -> bool:
-    """Determine whether a lifecycle result should be treated as successful."""
 
     status_text = str(getattr(result, "validation_status", "") or "").lower()
     if "fail" in status_text:
@@ -515,7 +402,6 @@ def _phase_succeeded(plan_item: _PhaseExecutionPlan, result: Any) -> bool:
 
 
 def _handle_compare_only(args) -> int:
-    """Run comparison-only export when both baseline and current files are provided."""
     results_dir = (
         Path(getattr(args, "output_dir", None))
         if getattr(args, "output_dir", None)
@@ -531,7 +417,6 @@ def _handle_compare_only(args) -> int:
 
 
 def _validate_phases_and_scale(args, parser) -> list[str]:
-    """Parse/validate --phases and --scale. parser.error or return [] on fatal issues."""
     phase_choices = ["generate", "load", "warmup", "power", "throughput", "maintenance"]
     user_phases = [p.strip() for p in args.phases.split(",") if p.strip()]
     if any(p not in phase_choices for p in user_phases):
@@ -545,7 +430,6 @@ def _validate_phases_and_scale(args, parser) -> list[str]:
 
 
 def _validate_output_path(args) -> bool:
-    """Return True when --output is absent or valid; False (and report) otherwise."""
     if not args.output:
         return True
     try:
@@ -560,7 +444,6 @@ def _validate_output_path(args) -> bool:
 
 
 def _execute_dry_run(args, config: dict, phases_to_run: list[str]) -> int:
-    """Preview a run without executing - writes dry-run artifacts to ``--dry-run`` directory."""
     dry_run_dir = ensure_output_directory(Path(args.dry_run))
     if not args.quiet:
         pinfo(" Running dry run preview...")
@@ -640,7 +523,6 @@ def _run_phase_plan(
     exporter: ResultExporter,
     formats: list[str],
 ) -> bool:
-    """Drive the per-phase execution loop and export each result. Returns overall success."""
     phase_results: list[tuple[Any, Any]] = []
     for plan_item in phase_plan:
         phase_config = benchmark_config.model_copy(update={"test_execution_type": plan_item.execution_type})
@@ -685,7 +567,6 @@ def _run_phase_plan(
 
 
 def _handle_list_commands_main() -> int | None:
-    """Return exit code if a list-command short-circuit applied, else None."""
     if "--list-platforms" in sys.argv:
         display_platform_list(
             PlatformRegistry.get_platform_availability(),
@@ -699,14 +580,12 @@ def _handle_list_commands_main() -> int | None:
 
 
 def _parse_main_args() -> tuple[argparse.Namespace, argparse.ArgumentParser]:
-    """Build the parser (injecting platform-specific args) and parse argv."""
     platform = extract_platform_from_argv()
     parser = create_base_parser()
     if platform:
         try:
             PlatformRegistry.add_platform_arguments(parser, platform)
         except ValueError:
-            # Platform not registered, will be caught later
             pass
     args = parser.parse_args()
 
@@ -731,7 +610,6 @@ def _parse_main_args() -> tuple[argparse.Namespace, argparse.ArgumentParser]:
 def _validate_main_preconditions(
     args: argparse.Namespace, parser: argparse.ArgumentParser
 ) -> tuple[int | None, list[str]]:
-    """Run platform/scale/output-path checks; return (exit_code_or_None, phases_to_run)."""
     availability_map = list_available_platforms()
     is_available = availability_map.get(args.platform, PlatformRegistry.is_platform_available(args.platform))
     if not is_available:
@@ -761,7 +639,6 @@ def _build_main_benchmark_config(
     verbosity_settings: Any,
     phases_to_run: list[str],
 ) -> tuple[BenchmarkConfig, dict[str, Any], str | None]:
-    """Assemble BenchmarkConfig + benchmark_options from merged config."""
     benchmark_config_raw = get_benchmark_config(config)
     output_root = benchmark_config_raw.get("output_dir")
     query_subset = _normalize_query_subset(config.get("query_subset") or config.get("queries"))
@@ -805,7 +682,6 @@ def _build_main_adapter_and_db(
     platform_options: dict[str, Any],
     needs_adapter: bool,
 ) -> tuple[Any | None, Optional[DatabaseConfig]]:
-    """Create platform adapter + DatabaseConfig when any phase needs them."""
     if not needs_adapter:
         return None, None
 
@@ -833,7 +709,6 @@ def _execute_main_benchmark(
     verbosity_settings: Any,
     needs_adapter: bool,
 ) -> int:
-    """Run the full benchmark flow (the original try-body); returns exit code."""
     if args.dry_run:
         return _execute_dry_run(args, config, phases_to_run)
 
@@ -894,14 +769,12 @@ def _execute_main_benchmark(
 
 
 def main() -> int:
-    """Main execution function."""
     listing = _handle_list_commands_main()
     if listing is not None:
         return listing
 
     args, parser = _parse_main_args()
 
-    # Optional: perform comparison-only export if both files provided
     if (
         hasattr(args, "compare_baseline")
         and hasattr(args, "compare_current")

@@ -24,12 +24,12 @@ Onehouse Quanton is a serverless managed Spark compute runtime that delivers 2-3
 ## Installation
 
 ```bash
-# Install required dependencies
 pip install requests boto3
 
-# Or via BenchBox extras
 pip install "benchbox[quanton]"
 ```
+
+Install the required dependencies directly, or through the BenchBox extra.
 
 ## Configuration
 
@@ -83,13 +83,14 @@ benchbox run --platform quanton --benchmark tpch --scale 1.0 \
 ### Hudi
 
 ```bash
-# Hudi requires record_key for write operations
 benchbox run --platform quanton --benchmark tpch --scale 1.0 \
   --platform-option s3_staging_dir=s3://bucket/data \
   --platform-option table_format=hudi \
   --platform-option record_key=l_orderkey \
   --platform-option precombine_field=l_shipdate
 ```
+
+Hudi requires `record_key` for write operations.
 
 ### Delta Lake
 
@@ -104,7 +105,6 @@ benchbox run --platform quanton --benchmark tpch --scale 1.0 \
 ### Basic Benchmark
 
 ```bash
-# TPC-H with Iceberg (default)
 benchbox run --platform quanton --benchmark tpch --scale 1.0 \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox
 ```
@@ -112,7 +112,6 @@ benchbox run --platform quanton --benchmark tpch --scale 1.0 \
 ### Production Benchmark
 
 ```bash
-# Larger scale with medium cluster
 benchbox run --platform quanton --benchmark tpch --scale 10.0 \
   --platform-option s3_staging_dir=s3://my-bucket/benchbox \
   --platform-option cluster_size=medium \
@@ -122,7 +121,6 @@ benchbox run --platform quanton --benchmark tpch --scale 10.0 \
 ### Cross-Format Comparison
 
 ```bash
-# Compare performance across table formats
 for format in iceberg hudi delta; do
   benchbox run --platform quanton --benchmark tpch --scale 1.0 \
     --platform-option s3_staging_dir=s3://my-bucket/benchbox \
@@ -130,6 +128,8 @@ for format in iceberg hudi delta; do
     --output results/quanton_${format}.json
 done
 ```
+
+The loop compares performance across table formats.
 
 ### Python API
 
@@ -169,33 +169,34 @@ When using Hudi table format, additional configuration is required:
 The record key uniquely identifies each record for ACID operations:
 
 ```bash
-# TPC-H lineitem: use composite key
 --platform-option record_key=l_orderkey,l_linenumber
 
-# TPC-H orders: use primary key
 --platform-option record_key=o_orderkey
 ```
+
+For the TPC-H `lineitem` table use a composite key, and for `orders` use its primary key.
 
 ### Precombine Field
 
 The precombine field orders records during deduplication:
 
 ```bash
-# Use date field for ordering
 --platform-option precombine_field=l_shipdate
 ```
+
+This example uses a date field for ordering.
 
 ### Table Type
 
 Choose between COPY_ON_WRITE (faster reads) or MERGE_ON_READ (faster writes):
 
 ```bash
-# Analytics workload (default)
 --platform-option hudi_table_type=COPY_ON_WRITE
 
-# Write-heavy workload
 --platform-option hudi_table_type=MERGE_ON_READ
 ```
+
+`COPY_ON_WRITE` is the default and suits analytics workloads. `MERGE_ON_READ` suits write-heavy workloads.
 
 ## Cost Optimization
 
@@ -214,21 +215,22 @@ Clusters automatically terminate after idle timeout (default: 15 minutes).
 Data staged to S3 is reused across runs:
 
 ```bash
-# First run uploads data
 benchbox run --platform quanton --benchmark tpch --scale 1.0 \
   --platform-option s3_staging_dir=s3://bucket/data
 
-# Subsequent runs skip upload
 benchbox run --platform quanton --benchmark tpch --scale 1.0 \
   --platform-option s3_staging_dir=s3://bucket/data
 ```
+
+The first run uploads the data. Subsequent runs skip the upload.
 
 ## Troubleshooting
 
 ### Authentication Failed
 
+Verify that the API key is valid:
+
 ```bash
-# Verify API key is valid
 curl -H "Authorization: Bearer $ONEHOUSE_API_KEY" \
   https://api.onehouse.ai/v1/health
 ```
@@ -238,7 +240,6 @@ curl -H "Authorization: Bearer $ONEHOUSE_API_KEY" \
 Ensure your AWS credentials have access to the S3 staging bucket:
 
 ```bash
-# Test S3 access
 aws s3 ls s3://your-bucket/benchbox-data/
 ```
 
@@ -253,11 +254,9 @@ benchbox run --platform quanton --benchmark tpch --scale 100.0 \
 
 ### Hudi Write Failures
 
-Ensure record_key is specified for Hudi format:
+Ensure record_key is specified for Hudi format. Without it, the run fails with a "No record_key configured" error. Fix it by adding the `record_key` parameter:
 
 ```bash
-# Error: No record_key configured
-# Fix: Add record_key parameter
 --platform-option record_key=primary_key_column
 ```
 

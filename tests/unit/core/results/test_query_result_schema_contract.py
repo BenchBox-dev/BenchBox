@@ -1,5 +1,3 @@
-"""Tests for QueryResult and compact query serialization contracts."""
-
 from __future__ import annotations
 
 from datetime import datetime

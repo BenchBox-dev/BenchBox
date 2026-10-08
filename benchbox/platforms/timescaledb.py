@@ -1,23 +1,6 @@
-"""TimescaleDB platform adapter for BenchBox benchmarking.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Extends PostgreSQL adapter with TimescaleDB-specific functionality:
-- Automatic hypertable creation for time-series tables
-- Compression policies for historical data
-- Chunk interval configuration
-- TimescaleDB-optimized query execution
-
-Deployment modes:
-- self-hosted: Self-hosted TimescaleDB server (default)
-- cloud: TigerData managed service (requires SSL)
-
-TimescaleDB is a PostgreSQL extension that transforms PostgreSQL into a
-time-series database with automatic time-based partitioning (hypertables),
-compression, and continuous aggregates.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -49,11 +32,9 @@ try:
     from psycopg import sql as psql
 except ImportError:
     psycopg = None
-    psql = None  # type: ignore[assignment]
+    psql = None
 
 
-# Valid PostgreSQL interval pattern: number + unit (e.g., "1 day", "7 days", "2 weeks")
-# Supports: microsecond(s), millisecond(s), second(s), minute(s), hour(s), day(s), week(s), month(s), year(s)
 _INTERVAL_PATTERN = re.compile(
     r"^\s*\d+\s+"
     r"(microseconds?|milliseconds?|seconds?|minutes?|hours?|days?|weeks?|months?|years?)"
@@ -63,16 +44,6 @@ _INTERVAL_PATTERN = re.compile(
 
 
 class TimescaleDBAdapter(PostgreSQLAdapter):
-    """TimescaleDB platform adapter with hypertable and compression support.
-
-    Extends PostgreSQLAdapter with TimescaleDB-specific features:
-    - Automatic hypertable creation for tables with time columns
-    - Compression policies for historical data optimization
-    - Configurable chunk intervals for time-based partitioning
-
-    Requires PostgreSQL 12+ with TimescaleDB 2.x extension installed.
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
@@ -82,12 +53,10 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         return "TimescaleDB"
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for TimescaleDB (PostgreSQL-compatible)."""
         return POSTGRES_DIALECT
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add TimescaleDB-specific CLI arguments."""
         if not hasattr(parser, "add_argument"):
             return
         try:
@@ -96,7 +65,6 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
                 prefix="timescale",
                 platform_label="TimescaleDB",
             )
-            # TimescaleDB-specific options
             parser.add_argument(
                 "--timescale-chunk-interval",
                 dest="chunk_interval",
@@ -120,7 +88,6 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> TimescaleDBAdapter:
-        """Create TimescaleDB adapter from unified configuration."""
         adapter_config = _build_postgres_connection_kwargs(config)
         adapter_config["chunk_interval"] = config.get("chunk_interval", "1 day")
         adapter_config["compression_enabled"] = config.get("compression_enabled", False)
@@ -128,13 +95,9 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         return cls(**adapter_config)
 
     def __init__(self, **config):
-        # Determine deployment mode with priority:
-        # 1. deployment_mode (from factory via colon syntax: timescaledb:cloud)
-        # 2. Default to 'self-hosted' (standard self-hosted TimescaleDB)
         deployment_mode = config.get("deployment_mode", "self-hosted")
         self.deployment_mode = deployment_mode.lower()
 
-        # Validate deployment mode
         valid_modes = {"self-hosted", "cloud"}
         if self.deployment_mode not in valid_modes:
             raise ValueError(
@@ -142,39 +105,23 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
                 f"Valid modes: {', '.join(sorted(valid_modes))}"
             )
 
-        # Configure for cloud mode if specified
         if self.deployment_mode == "cloud":
             self._configure_cloud_mode(config)
 
-        # Set enable_timescale=True for parent class
         config["enable_timescale"] = True
         super().__init__(**config)
 
-        # TimescaleDB-specific configuration with validation
         self.chunk_interval = self._validate_interval(config.get("chunk_interval", "1 day"), "chunk_interval")
         self.compression_enabled = config.get("compression_enabled", False)
         self.compression_after = self._validate_interval(config.get("compression_after", "7 days"), "compression_after")
 
-        # Track which tables are hypertables
         self._hypertables: set[str] = set()
 
-        # Set skip_database_management for cloud mode (can't DROP/CREATE managed databases)
         if self.deployment_mode == "cloud":
             self.skip_database_management = config.get("skip_database_management", True)
             logger.info(f"TigerData adapter initialized for host: {config.get('host')}")
 
     def _configure_cloud_mode(self, config: dict) -> None:
-        """Configure adapter for TigerData cloud mode.
-
-        TigerData uses SSL and has specific connection requirements.
-        Credentials can be provided via:
-        - Config parameters: host, password, username, port, database
-        - Environment variables: TIGERDATA_HOST, TIGERDATA_PASSWORD, etc.
-          (TIMESCALE_* variables are supported as backward-compatible fallback)
-        - Service URL: TIGERDATA_SERVICE_URL (or TIMESCALE_SERVICE_URL fallback)
-          (postgres://user:pass@host:port/db)
-        """
-        # Check for service URL first (most convenient)
         service_url = (
             config.get("service_url")
             or os.environ.get("TIGERDATA_SERVICE_URL")
@@ -184,7 +131,6 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
             self._parse_service_url(config, service_url)
             return
 
-        # Otherwise use individual parameters
         config["host"] = config.get("host") or os.environ.get("TIGERDATA_HOST") or os.environ.get("TIMESCALE_HOST")
         config["password"] = (
             config.get("password")
@@ -192,8 +138,6 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
             or os.environ.get("TIMESCALE_PASSWORD")
             or os.environ.get("PGPASSWORD")
         )
-        # For cloud mode, default to "tsdbadmin" - don't use PGUSER as it may be set to
-        # something else (e.g., "postgres") by system PostgreSQL installations
         config["username"] = (
             config.get("username")
             or os.environ.get("TIGERDATA_USER")
@@ -210,7 +154,6 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
             or os.environ.get("PGDATABASE", "tsdb")
         )
 
-        # Validate required credentials
         if not config.get("host"):
             raise ValueError(
                 "TigerData requires host configuration.\n"
@@ -228,19 +171,12 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
                 "(TIMESCALE_PASSWORD supported as fallback)."
             )
 
-        # Cloud always requires SSL
         config["sslmode"] = config.get("sslmode", "require")
 
-        # For cloud, disable database recreation (we can't drop managed databases)
-        # Users should create a separate database for benchmarks if needed
         config["force_recreate"] = False
-        config["skip_database_management"] = True  # New flag to skip DROP/CREATE database
+        config["skip_database_management"] = True
 
     def _parse_service_url(self, config: dict, service_url: str) -> None:
-        """Parse TigerData service URL into connection parameters.
-
-        Service URL format: postgres://user:pass@host:port/database?sslmode=require
-        """
         import urllib.parse
 
         try:
@@ -255,12 +191,11 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
             config["password"] = urllib.parse.unquote(parsed.password) if parsed.password else None
             config["database"] = parsed.path.lstrip("/") or "tsdb"
 
-            # Parse query parameters for sslmode
             query_params = urllib.parse.parse_qs(parsed.query)
             if "sslmode" in query_params:
                 config["sslmode"] = query_params["sslmode"][0]
             else:
-                config["sslmode"] = "require"  # Default for cloud
+                config["sslmode"] = "require"
 
             logger.debug(
                 f"Parsed service URL: host={config['host']}, port={config['port']}, database={config['database']}"
@@ -271,18 +206,6 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
 
     @staticmethod
     def _validate_interval(value: str, param_name: str) -> str:
-        """Validate that a value is a valid PostgreSQL interval format.
-
-        Args:
-            value: The interval string to validate (e.g., "1 day", "7 days")
-            param_name: The parameter name for error messages
-
-        Returns:
-            The validated interval string (stripped of leading/trailing whitespace)
-
-        Raises:
-            ValueError: If the interval format is invalid
-        """
         if not isinstance(value, str):
             raise ValueError(f"{param_name} must be a string, got {type(value).__name__}")
 
@@ -297,10 +220,8 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         return value
 
     def create_connection(self, **connection_config) -> Any:
-        """Create TimescaleDB connection and verify extension is available."""
         conn = super().create_connection(**connection_config)
 
-        # Verify TimescaleDB extension is installed
         cursor = conn.cursor()
         try:
             cursor.execute("SELECT extversion FROM pg_extension WHERE extname = 'timescaledb'")
@@ -308,7 +229,6 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
             if result:
                 self.logger.info(f"TimescaleDB extension version: {result[0]}")
             else:
-                # Try to create the extension
                 self.logger.info("TimescaleDB extension not found, attempting to create...")
                 cursor.execute("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE")
                 conn.commit()
@@ -329,44 +249,26 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         return conn
 
     def _apply_stream_session_state(self, connection: Any) -> None:
-        """Delegate per-stream session state to the PostgreSQL parent path.
-
-        ``create_connection`` adds only extension verification/creation above
-        the parent implementation - one-time database setup that must NOT be
-        repeated per stream - and no additional session-scoped GUCs, so there
-        is no TimescaleDB-specific state to reapply. The explicit delegation
-        (rather than an inherited silent no-op) records that equivalence was
-        checked for this subclass: the base ``new_stream_connection`` GUCs
-        plus the virtual ``configure_for_benchmark`` call (which dispatches
-        to ``TimescaleDB.configure_for_benchmark`` for the chunk-skipping
-        deltas) reproduce the setup session exactly. See
-        ``StreamConnectionCapability`` equivalence dimensions.
-        """
         super()._apply_stream_session_state(connection)
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema with automatic hypertable conversion for time-series tables."""
         start_time = mono_time()
         self.log_operation_start("Schema creation", f"benchmark: {benchmark.__class__.__name__}")
 
-        # Get schema SQL and translate to PostgreSQL dialect
         schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
         self.log_very_verbose(f"Executing schema creation script ({len(schema_sql)} characters)")
 
         cursor = connection.cursor()
 
-        # Execute each statement separately
         statements = [s.strip() for s in schema_sql.split(";") if s.strip()]
         tables_created = []
 
         for stmt in statements:
             try:
                 cursor.execute(stmt)
-                # Track created tables for potential hypertable conversion
                 stmt_upper = stmt.upper()
                 if "CREATE TABLE" in stmt_upper:
-                    # Extract table name
                     match = re.search(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)", stmt, re.IGNORECASE)
                     if match:
                         table_name = match.group(1).strip('"').lower()
@@ -374,11 +276,9 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
             except Exception as e:
                 connection.rollback()
                 self.logger.warning(f"Schema statement failed: {e}")
-                # Continue with other statements
 
         connection.commit()
 
-        # Convert time-series tables to hypertables
         self._convert_to_hypertables(connection, tables_created, benchmark)
 
         cursor.close()
@@ -397,25 +297,17 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         tables: list[str],
         benchmark,
     ) -> None:
-        """Convert eligible tables to TimescaleDB hypertables.
-
-        Tables with a 'time' column are converted to hypertables for
-        time-series optimized storage and querying.
-        """
         cursor = connection.cursor()
 
-        # Get tables that have a time column
         time_column_tables = self._get_tables_with_time_column(connection, tables)
 
         for table_name in time_column_tables:
             try:
-                # Build qualified table identifier safely using psycopg.sql
                 if self.schema != "public":
                     table_identifier = psql.Identifier(self.schema, table_name)
                 else:
                     table_identifier = psql.Identifier(table_name)
 
-                # Check if already a hypertable
                 cursor.execute(
                     """
                     SELECT 1 FROM timescaledb_information.hypertables
@@ -428,9 +320,6 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
                     self._hypertables.add(table_name)
                     continue
 
-                # Convert to hypertable using safe SQL composition
-                # Note: create_hypertable() takes the table name as a regclass string,
-                # so we use sql.Literal for safe string escaping
                 self.log_verbose(f"Converting {table_name} to hypertable with chunk_interval={self.chunk_interval}")
                 cursor.execute(
                     psql.SQL(
@@ -452,7 +341,6 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
                 self._hypertables.add(table_name)
                 self.logger.info(f"Created hypertable: {table_name}")
 
-                # Add compression policy if enabled
                 if self.compression_enabled:
                     self._add_compression_policy(connection, table_name)
 
@@ -463,7 +351,6 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         cursor.close()
 
     def _get_tables_with_time_column(self, connection: Any, tables: list[str]) -> list[str]:
-        """Get list of tables that have a 'time' column (candidates for hypertables)."""
         if not tables:
             return []
 
@@ -490,17 +377,14 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         return time_tables
 
     def _add_compression_policy(self, connection: Any, table_name: str) -> None:
-        """Add compression policy to a hypertable."""
         cursor = connection.cursor()
 
         try:
-            # Build qualified table identifier safely using psycopg.sql
             if self.schema != "public":
                 table_identifier = psql.Identifier(self.schema, table_name)
             else:
                 table_identifier = psql.Identifier(table_name)
 
-            # Enable compression on the hypertable using safe SQL composition
             cursor.execute(
                 psql.SQL(
                     """
@@ -512,7 +396,6 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
                 ).format(table_identifier)
             )
 
-            # Add compression policy using safe SQL composition
             cursor.execute(
                 psql.SQL(
                     """
@@ -542,18 +425,11 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         connection: Any,
         data_dir: Path,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load benchmark data with TimescaleDB optimizations.
-
-        Uses PostgreSQL COPY for efficient loading, with hypertable-aware handling.
-        """
-        # Use parent's load_data implementation (COPY-based)
         table_stats, loading_time, extra_info = super().load_data(benchmark, connection, data_dir)
 
-        # Run ANALYZE on hypertables for updated statistics
         cursor = connection.cursor()
         for table_name in self._hypertables:
             try:
-                # Build qualified table identifier safely using psycopg.sql
                 if self.schema != "public":
                     table_identifier = psql.Identifier(self.schema, table_name)
                 else:
@@ -567,15 +443,11 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         return table_stats, loading_time, extra_info
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get TimescaleDB platform information."""
-        # Get base PostgreSQL info
         platform_info = super().get_platform_info(connection)
 
-        # Override platform type and name
         platform_info["platform_type"] = "timescaledb"
         platform_info["platform_name"] = "TimescaleDB"
 
-        # Add TimescaleDB-specific configuration
         platform_info["configuration"]["chunk_interval"] = self.chunk_interval
         platform_info["configuration"]["compression_enabled"] = self.compression_enabled
         if self.compression_enabled:
@@ -585,19 +457,16 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
             try:
                 cursor = connection.cursor()
 
-                # Get TimescaleDB version
                 cursor.execute("SELECT extversion FROM pg_extension WHERE extname = 'timescaledb'")
                 result = cursor.fetchone()
                 if result:
                     platform_info["timescaledb_version"] = result[0]
 
-                # Get hypertable count
                 cursor.execute("SELECT COUNT(*) FROM timescaledb_information.hypertables")
                 result = cursor.fetchone()
                 if result:
                     platform_info["configuration"]["hypertable_count"] = result[0]
 
-                # Get chunk count
                 cursor.execute("SELECT COUNT(*) FROM timescaledb_information.chunks")
                 result = cursor.fetchone()
                 if result:
@@ -611,19 +480,12 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
         return platform_info
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply TimescaleDB optimizations for benchmark type."""
-        # Apply PostgreSQL optimizations first
         super().configure_for_benchmark(connection, benchmark_type)
 
-        # Add TimescaleDB-specific optimizations
         cursor = connection.cursor()
 
         try:
-            if benchmark_type == "olap":
-                # Enable parallel chunk processing
-                cursor.execute("SET timescaledb.enable_chunk_skipping = on")
-            elif benchmark_type == "timeseries":
-                # Optimize for time-series workloads
+            if benchmark_type == "olap" or benchmark_type == "timeseries":
                 cursor.execute("SET timescaledb.enable_chunk_skipping = on")
 
             connection.commit()
@@ -633,18 +495,17 @@ class TimescaleDBAdapter(PostgreSQLAdapter):
             cursor.close()
 
     def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check if TimescaleDB supports a specific tuning type."""
         try:
             from benchbox.core.tuning.interface import TuningType
 
             supported = {
-                TuningType.PARTITIONING: True,  # Hypertables provide automatic partitioning
-                TuningType.SORTING: False,  # No native sort keys
-                TuningType.DISTRIBUTION: False,  # Not distributed (unless using TimescaleDB multi-node)
-                TuningType.CLUSTERING: True,  # CLUSTER command available
-                TuningType.PRIMARY_KEYS: True,  # Full constraint support
-                TuningType.FOREIGN_KEYS: True,  # Full constraint support
-                TuningType.AUTO_COMPACT: True,  # TimescaleDB compression is a form of compaction
+                TuningType.PARTITIONING: True,
+                TuningType.SORTING: False,
+                TuningType.DISTRIBUTION: False,
+                TuningType.CLUSTERING: True,
+                TuningType.PRIMARY_KEYS: True,
+                TuningType.FOREIGN_KEYS: True,
+                TuningType.AUTO_COMPACT: True,
             }
             return supported.get(tuning_type, False)
         except ImportError:

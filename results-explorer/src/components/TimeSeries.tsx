@@ -1,21 +1,9 @@
-// ---------------------------------------------------------------------------
-// TimeSeries - line chart of performance metric over time
-//
-// Shows geomean_ms or power_score (depending on benchmark) over run_date.
-// One line per platform_id group.  Requires ≥2 data points per series.
-//
-// Input: ChartHistoricalEntry[] (all entries for one or more platforms,
-//        sorted by platform_id + run_date internally). Both ChartHistoricalEntry
-//        and DuckDB row shapes satisfy the narrow interface.
-//
-// Python reference: textcharts.line_chart.LineChart
-// ---------------------------------------------------------------------------
-
 import type { ChartHistoricalEntry } from "@/lib/chartRegistry";
 import { useElementSize } from "@/lib/useElementSize";
 import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
 import { timeSeriesColor } from "@/lib/chartTheme";
-import { formatLatencyMs, formatPowerScore, formatLatencyAxisLabels } from "@/lib/metricFormatters";
+import { primaryMetricHigherIsBetter, type PrimaryMetric } from "@/lib/displayEligibility";
+import { formatLatencyMs, formatScoreMetric, formatLatencyAxisLabels } from "@/lib/metricFormatters";
 import { formatRunDateWithAge } from "@/lib/runAge";
 import {
   resultDetailHref,
@@ -34,18 +22,10 @@ const CHART_H = 160;
 
 interface Props {
   entries: ChartHistoricalEntry[];
-  /**
-   * Primary metric to chart - `"power_score"` (higher-is-better) or
-   * `"display_geomean_ms"` (lower-is-better). The caller resolves this from
-   * the canonical `benchmark_rankings.primary_metric` column; omitted means
-   * geomean.
-   */
-  primaryMetric?: "power_score" | "display_geomean_ms";
+  primaryMetric?: PrimaryMetric;
 }
 
 interface SeriesPoint {
-  /** Stable per-run identifier; used as the React key so two runs on the
-   *  same `date` (common for batch runs) don't collide on `key={date}`. */
   resultId: string;
   date: string;
   value: number;
@@ -67,11 +47,8 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
   const w = frame.width;
 
   const metric = primaryMetric ?? "display_geomean_ms";
-  const higherIsBetter = metric === "power_score";
+  const higherIsBetter = primaryMetricHigherIsBetter(metric);
 
-  // Defensive dedup on result_id: TimeSeries trusts the caller, but if any
-  // upstream JOIN regression ever produces duplicate entries the chart
-  // would silently render stacked points. Drop the second copy.
   const seenIds = new Set<string>();
   const dedupedEntries: ChartHistoricalEntry[] = [];
   for (const e of entries) {
@@ -85,7 +62,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
     duplicateDayGroups.flatMap((group) => group.runs.map(({ entry }) => entry.platform_id)),
   );
 
-  // Group by platform_id, sort by run_date within each group
   const byPlatform = new Map<string, ChartHistoricalEntry[]>();
   for (const e of dedupedEntries) {
     const arr = byPlatform.get(e.platform_id) ?? [];
@@ -93,13 +69,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
     byPlatform.set(e.platform_id, arr);
   }
 
-  // Build the per-platform series first, then disambiguate series labels
-  // when two platform_ids share a display name (e.g. two DataFusion
-  // tracks differing only by platform_id). RunIdentity natural qualifiers
-  // (driver_version, deployment, etc.) aren't carried on
-  // ChartHistoricalEntry, so the cohort-aware formatter falls through to
-  // its short result_id tiebreaker — better than two indistinguishable
-  // "DataFusion" entries in the legend.
   let colorIdx = 0;
   const seriesDescriptors: { pid: string; firstEntry: ChartHistoricalEntry; points: SeriesPoint[] }[] = [];
   for (const [pid, platformEntries] of byPlatform) {
@@ -183,12 +152,11 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
 
   function yFor(val: number): number {
     const normalized = (val - yMin) / yRange;
-    // Higher value → top of chart for power_score; bottom for latency
     const pos = higherIsBetter ? normalized : 1 - normalized;
     return PADDING_TOP + CHART_H * (1 - pos);
   }
 
-  const metricLabel = metric === "power_score" ? "Power score" : "Geomean latency";
+  const metricLabel = trendMetricLabel(metric);
   const yTicks = [yMin, (yMin + yMax) / 2, yMax];
   const latencyLabels = formatLatencyAxisLabels(yTicks);
   const duplicateDayState =
@@ -200,7 +168,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
       />
     ) : null;
 
-  // Show at most 7 x-axis labels when there are many dates
   const step = Math.ceil(allDates.length / 7);
   const shownDates = allDates.filter((_, i) => i % step === 0 || i === allDates.length - 1);
 
@@ -216,13 +183,9 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
           role="img"
           aria-label={`${metricLabel} trend over time`}
         >
-          {/* Y-axis grid + labels */}
           {yTicks.map((val, index) => {
             const y = yFor(val);
-            const label =
-              metric === "power_score"
-                ? formatPowerScore(val).valueText
-                : latencyLabels[index];
+            const label = higherIsBetter ? formatScoreMetric(metric, val) : latencyLabels[index];
             return (
               <g key={val}>
                 <line
@@ -245,7 +208,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
             );
           })}
 
-        {/* Series lines + dots */}
         {allSeries.map((s) => {
           const d = s.points
             .map(
@@ -274,7 +236,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
           );
         })}
 
-        {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + CHART_H})`}>
           <line x1={LABEL_W} y1={0} x2={w - PADDING_RIGHT} y2={0} stroke="var(--bb-chart-grid)" stroke-width={1} />
           {shownDates.map((date) => {
@@ -298,7 +259,6 @@ export function TimeSeries({ entries, primaryMetric }: Props) {
         </g>
         </svg>
 
-        {/* Legend */}
         {allSeries.length > 1 && (
           <div class="flex flex-wrap gap-4 text-xs text-[var(--bb-data-fg-muted)] mt-1">
             {allSeries.map((s) => (
@@ -331,12 +291,22 @@ function runIdentitySourceForEntry(entry: ChartHistoricalEntry): RunIdentitySour
   };
 }
 
+function trendMetricLabel(metric: Props["primaryMetric"]): string {
+  if (metric === "power_score") return "Power score";
+  if (metric === "throughput_at_size") return "Throughput@Size";
+  return "Geomean latency";
+}
+
 function trendValue(entry: ChartHistoricalEntry, metric: Props["primaryMetric"]): number | null {
-  return metric === "power_score" ? entry.power_score : entry.display_geomean_ms;
+  if (metric === "power_score") return entry.power_score;
+  if (metric === "throughput_at_size") return entry.throughput_at_size ?? null;
+  return entry.display_geomean_ms;
 }
 
 function formatMetricValue(value: number, metric: Props["primaryMetric"]): string {
-  return metric === "power_score" ? formatPowerScore(value).valueText : formatLatencyMs(value).valueText;
+  return metric === "power_score" || metric === "throughput_at_size"
+    ? formatScoreMetric(metric, value)
+    : formatLatencyMs(value).valueText;
 }
 
 function countTrendableEntries(entries: ChartHistoricalEntry[], metric: Props["primaryMetric"]): number {
@@ -402,7 +372,7 @@ function DuplicateDayTrendState({
               <th class="pr-4 pb-1 font-medium">Date</th>
               <th class="pr-4 pb-1 font-medium">Platform</th>
               <th class="pr-4 pb-1 font-medium">Public ID</th>
-              <th class="pr-4 pb-1 font-medium">{metric === "power_score" ? "Power score" : "Geomean latency"}</th>
+              <th class="pr-4 pb-1 font-medium">{trendMetricLabel(metric)}</th>
               <th class="pr-4 pb-1 font-medium">Details</th>
               <th class="pb-1 font-medium">Receipt</th>
             </tr>

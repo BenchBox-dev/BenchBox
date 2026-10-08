@@ -1,9 +1,3 @@
-/**
- * Tests for the shared Analysis card grid shell (AnalysisCardGrid + AnalysisCard):
- * the expandable card used by the benchmark page's "More views" grid and the
- * platform page's "Analysis" grid alike.
- */
-
 import { render, screen, fireEvent } from "@testing-library/preact";
 import { useState } from "preact/hooks";
 import { describe, it, expect } from "vitest";

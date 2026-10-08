@@ -1,5 +1,3 @@
-"""PySpark SQL adapter that shares SparkSession state with DataFrame mode."""
-
 from __future__ import annotations
 
 import logging
@@ -14,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class PySparkSQLAdapter(SparkAdapter):
-    """Spark SQL adapter that uses the shared SparkSessionManager singleton."""
-
     plan_capture_phase_eligible = True
 
     def __init__(self, **config: Any) -> None:
@@ -27,11 +23,9 @@ class PySparkSQLAdapter(SparkAdapter):
 
     @property
     def platform_name(self) -> str:
-        """Return human-friendly platform name."""
         return "PySpark SQL"
 
     def create_connection(self, **connection_config: Any) -> Any:
-        """Create or reuse the shared SparkSession via SparkSessionManager."""
         self.log_operation_start("PySpark SQL session")
 
         extra_configs = self._get_spark_conf()
@@ -50,9 +44,6 @@ class PySparkSQLAdapter(SparkAdapter):
             self._session_claimed = True
             self._spark_session = spark
 
-            # Decide reuse/recreate after the session exists: the check queries the
-            # session catalog, so running it earlier always reports no database and
-            # force_recreate never acts.
             self.handle_existing_database(**connection_config)
 
             target_database = connection_config.get("database", self.database)
@@ -69,12 +60,11 @@ class PySparkSQLAdapter(SparkAdapter):
             )
 
             return spark
-        except Exception as exc:  # pragma: no cover - defensive logging
+        except Exception as exc:  # pragma: no cover
             logger.error("Failed to create PySpark SQL session: %s", exc)
             raise
 
-    def close_connection(self, connection: Any) -> None:  # type: ignore[override]
-        """Release the shared SparkSession reference without stopping Spark."""
+    def close_connection(self, connection: Any) -> None:
         try:
             if self._session_claimed:
                 SparkSessionManager.release()
@@ -83,5 +73,4 @@ class PySparkSQLAdapter(SparkAdapter):
             self._spark_session = None
 
     def close(self) -> None:
-        """Close adapter resources."""
         self.close_connection(self._spark_session)

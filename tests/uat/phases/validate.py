@@ -1,5 +1,3 @@
-"""Validate phase: run public bundle validation in-process for a UAT sweep."""
-
 from __future__ import annotations
 
 import json
@@ -66,7 +64,6 @@ def run_validate(
     output_tsv: Path,
     floor: float = 0.80,
 ) -> ValidateResult:
-    """Validate result bundles and write the rollup TSV consumed by report."""
     output_tsv.parent.mkdir(parents=True, exist_ok=True)
     bundle_paths = _bundle_paths(results_dir)
     if bundle_paths is None:
@@ -278,11 +275,6 @@ def _aborted_validate_result(
 
 
 def parse_validator_status_by_path(rollup_tsv: Path) -> dict[Path, str]:
-    """Extract result_path -> validator_status from a rollup TSV.
-
-    Used by the report phase so cross_scale_clean_pair_count can apply
-    the validator-clean dimension. Missing or short rows are skipped.
-    """
     out: dict[Path, str] = {}
     with rollup_tsv.open("r", encoding="utf-8") as fh:
         header = fh.readline().rstrip("\n").split("\t")

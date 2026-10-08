@@ -1,12 +1,5 @@
-"""Behavioral tests for timeout_manager module.
-
-Supplements test_timeout_manager.py with scenario-oriented tests
-focusing on real timeout behavior, nesting, callbacks, and the
-convenience API surface.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -26,16 +19,8 @@ from benchbox.utils.timeout_manager import (
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-# ---------------------------------------------------------------------------
-# run_with_timeout: actual timeout of a slow function
-# ---------------------------------------------------------------------------
-
-
 class TestRunWithTimeoutBehavior:
-    """Behavioral tests for run_with_timeout()."""
-
     def test_slow_function_actually_times_out(self):
-        """A function sleeping longer than the budget returns (None, True)."""
 
         def slow():
             time.sleep(2.0)
@@ -46,7 +31,6 @@ class TestRunWithTimeoutBehavior:
         assert result is None
 
     def test_fast_function_returns_result(self):
-        """A function completing within budget returns its value."""
 
         def fast():
             return "hello"
@@ -56,7 +40,6 @@ class TestRunWithTimeoutBehavior:
         assert result == "hello"
 
     def test_function_returning_none_distinguished_from_timeout(self):
-        """A function that returns None explicitly should NOT report timed_out."""
 
         def returns_none():
             return None
@@ -66,7 +49,6 @@ class TestRunWithTimeoutBehavior:
         assert result is None
 
     def test_exception_propagated_not_swallowed(self):
-        """Exceptions raised inside the function propagate to the caller."""
 
         def raises():
             raise RuntimeError("boom")
@@ -75,7 +57,6 @@ class TestRunWithTimeoutBehavior:
             run_with_timeout(raises, 1.0, "error_test")
 
     def test_args_and_kwargs_forwarded(self):
-        """Positional and keyword arguments are forwarded to the function."""
 
         def concat(a, b, sep="-"):
             return f"{a}{sep}{b}"
@@ -85,14 +66,7 @@ class TestRunWithTimeoutBehavior:
         assert result == "foo:bar"
 
 
-# ---------------------------------------------------------------------------
-# timeout() convenience context manager
-# ---------------------------------------------------------------------------
-
-
 class TestTimeoutContextManagerConvenience:
-    """Behavioral tests for the module-level timeout() context manager."""
-
     def test_no_timeout_when_work_is_fast(self):
         with timeout(1.0, "fast_work") as ctx:
             x = 1 + 1
@@ -112,23 +86,14 @@ class TestTimeoutContextManagerConvenience:
         assert exc_info.value.operation == "should_raise"
 
     def test_raise_on_timeout_false_returns_context(self):
-        """When raise_on_timeout=False the context manager does not raise."""
         with timeout(0.1, "no_raise", raise_on_timeout=False) as ctx:
             time.sleep(0.3)
-        # We get here without an exception
         assert ctx.timed_out is True
         assert ctx.triggered_at is not None
         assert ctx.triggered_at > 0
 
 
-# ---------------------------------------------------------------------------
-# TimeoutManager singleton via get_timeout_manager()
-# ---------------------------------------------------------------------------
-
-
 class TestTimeoutManagerSingleton:
-    """Tests for the global singleton accessor."""
-
     def test_returns_timeout_manager_instance(self):
         mgr = get_timeout_manager()
         assert isinstance(mgr, TimeoutManager)
@@ -140,30 +105,21 @@ class TestTimeoutManagerSingleton:
 
     def test_singleton_has_default_timeout(self):
         mgr = get_timeout_manager()
-        assert mgr.default_timeout_seconds == 300  # 5 minutes default
-
-
-# ---------------------------------------------------------------------------
-# Nested timeout contexts
-# ---------------------------------------------------------------------------
+        assert mgr.default_timeout_seconds == 300
 
 
 class TestNestedTimeoutContexts:
-    """Tests for nested timeout contexts where inner is shorter than outer."""
-
     def test_inner_timeout_fires_before_outer(self):
-        """Inner (shorter) timeout fires while outer (longer) does not."""
         manager = TimeoutManager(default_timeout_seconds=300)
 
         with manager.timeout_context(2.0, "outer", raise_on_timeout=False) as outer_ctx:
             with manager.timeout_context(0.1, "inner", raise_on_timeout=False) as inner_ctx:
-                time.sleep(0.3)  # exceed inner but not outer
+                time.sleep(0.3)
 
         assert inner_ctx.timed_out is True
         assert outer_ctx.timed_out is False
 
     def test_inner_timeout_raises_without_affecting_outer(self):
-        """Inner timeout raises TimeoutError; outer context remains valid."""
         manager = TimeoutManager(default_timeout_seconds=300)
 
         with manager.timeout_context(2.0, "outer", raise_on_timeout=False) as outer_ctx:
@@ -174,25 +130,17 @@ class TestNestedTimeoutContexts:
         assert outer_ctx.timed_out is False
 
     def test_both_contexts_complete_without_timeout(self):
-        """Neither inner nor outer times out when work is fast."""
         manager = TimeoutManager(default_timeout_seconds=300)
 
         with manager.timeout_context(1.0, "outer") as outer_ctx:
             with manager.timeout_context(0.5, "inner") as inner_ctx:
-                pass  # instant
+                pass
 
         assert inner_ctx.timed_out is False
         assert outer_ctx.timed_out is False
 
 
-# ---------------------------------------------------------------------------
-# TimeoutConfig: on_timeout callback
-# ---------------------------------------------------------------------------
-
-
 class TestTimeoutConfigCallback:
-    """Tests for TimeoutConfig with on_timeout callback."""
-
     def test_callback_stored_on_config(self):
         called = []
 
@@ -201,7 +149,6 @@ class TestTimeoutConfigCallback:
 
         config = TimeoutConfig(timeout_seconds=1.0, operation_name="cb_test", on_timeout=on_timeout)
         assert config.on_timeout is on_timeout
-        # Invoke to verify it's callable
         config.on_timeout()
         assert called == [True]
 
@@ -218,14 +165,7 @@ class TestTimeoutConfigCallback:
         assert config.raise_on_timeout is False
 
 
-# ---------------------------------------------------------------------------
-# timeout_context() context manager usage patterns
-# ---------------------------------------------------------------------------
-
-
 class TestTimeoutContextUsagePatterns:
-    """Tests exercising various usage patterns of TimeoutManager.timeout_context()."""
-
     def test_context_reports_operation_name(self):
         manager = TimeoutManager()
         with manager.timeout_context(1.0, "my_query") as ctx:
@@ -243,7 +183,6 @@ class TestTimeoutContextUsagePatterns:
         manager = TimeoutManager()
         with manager.timeout_context(1.0, "cleanup_test"):
             pass
-        # No active timers should remain
         assert len(manager._active_timers) == 0
 
     def test_timer_cleaned_up_after_timeout(self):
@@ -261,18 +200,10 @@ class TestTimeoutContextUsagePatterns:
         manager.cancel_all_timers()
         assert len(manager._active_timers) == 0
 
-        # Clean up context manager
         ctx_mgr.__exit__(None, None, None)
 
 
-# ---------------------------------------------------------------------------
-# TimeoutError attributes
-# ---------------------------------------------------------------------------
-
-
 class TestTimeoutErrorAttributes:
-    """Tests for TimeoutError exception constructed by the timeout machinery."""
-
     def test_error_from_context_has_correct_fields(self):
         manager = TimeoutManager()
         with pytest.raises(TimeoutError) as exc_info:
@@ -285,21 +216,12 @@ class TestTimeoutErrorAttributes:
         assert "0.1" in str(err)
 
     def test_error_is_catchable_as_exception(self):
-        """TimeoutError from this module is a subclass of Exception (not builtins.TimeoutError)."""
         err = TimeoutError("test", timeout_seconds=1.0)
         assert isinstance(err, Exception)
 
 
-# ---------------------------------------------------------------------------
-# Edge cases
-# ---------------------------------------------------------------------------
-
-
 class TestEdgeCases:
-    """Edge-case tests for timeout utilities."""
-
     def test_very_short_timeout_does_not_crash(self):
-        """Even a very short timeout produces a clean result."""
         result, timed_out = run_with_timeout(lambda: time.sleep(0.5), 0.01, "tiny_timeout")
         assert timed_out is True
         assert result is None
@@ -313,7 +235,6 @@ class TestEdgeCases:
             TimeoutConfig(timeout_seconds=-1.0)
 
     def test_run_with_timeout_passes_complex_return(self):
-        """Functions returning complex objects are handled correctly."""
 
         def complex_return():
             return {"key": [1, 2, 3], "nested": {"a": True}}

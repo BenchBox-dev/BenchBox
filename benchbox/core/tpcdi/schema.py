@@ -1,5 +1,3 @@
-"""TPC-DI (Data Integration) benchmark schema definitions."""
-
 import logging
 from pathlib import Path
 from typing import Any, Optional, cast
@@ -32,8 +30,6 @@ def _column_type_for_dialect(column: dict[str, Any], dialect: str) -> str:
     if column_type == "TIME" and dialect.lower() in _SPARK_FAMILY_DIALECTS:
         return "STRING"
     if column_type == "TIME" and dialect.lower() == "clickhouse":
-        # ClickHouse TIME requires enable_time_time64_type=1 (experimental).
-        # Prefer portable remap to String ("HH:MM:SS") for bench stability.
         return "String"
     return column_type
 
@@ -44,7 +40,6 @@ def get_create_table_sql(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True,
 ) -> str:
-    """Generate CREATE TABLE SQL for a given table."""
     if table_name not in TABLES:
         raise ValueError(f"Unknown table: {table_name}")
 
@@ -68,7 +63,6 @@ def get_all_create_table_sql(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True,
 ) -> str:
-    """Generate CREATE TABLE SQL for all TPC-DI tables."""
     full_table_order = CORE_TABLE_ORDER + get_extended_table_order()
     return "\n\n".join(
         get_create_table_sql(table_name, dialect, enable_primary_keys, enable_foreign_keys)
@@ -77,8 +71,6 @@ def get_all_create_table_sql(
 
 
 class TPCDISchemaManager:
-    """Database-agnostic TPC-DI schema management with SQLGlot translation."""
-
     def __init__(self, include_extensions: bool = True):
         self.include_extensions = include_extensions
         self.tables = TABLES
@@ -88,7 +80,6 @@ class TPCDISchemaManager:
         )
 
     def create_schema(self, connection: Any, dialect: str = "duckdb") -> None:
-        """Create the complete TPC-DI schema in the target database."""
         logger.info(f"Creating TPC-DI schema for {dialect} dialect")
         ddl_statements = self.get_create_table_ddl(dialect)
 
@@ -108,7 +99,6 @@ class TPCDISchemaManager:
         logger.info(f"Successfully created {len(ddl_statements)} tables")
 
     def get_create_table_ddl(self, dialect: str = "standard") -> list[str]:
-        """Generate CREATE TABLE DDL statements for all tables."""
         statements = []
 
         for table_name in self.table_order:
@@ -126,7 +116,6 @@ class TPCDISchemaManager:
         return statements
 
     def translate_schema(self, from_dialect: str, to_dialect: str) -> list[str]:
-        """Translate schema from one SQL dialect to another."""
         translated = []
 
         for sql in self.get_create_table_ddl(from_dialect):
@@ -139,18 +128,15 @@ class TPCDISchemaManager:
         return translated
 
     def get_table_schema(self, table_name: str) -> dict[str, Any]:
-        """Get schema definition for a specific table."""
         if table_name not in self.tables:
             raise ValueError(f"Unknown table: {table_name}")
         return self.tables[table_name]
 
     def get_column_names(self, table_name: str) -> list[str]:
-        """Get column names for a table."""
         schema = self.get_table_schema(table_name)
         return [col["name"] for col in schema["columns"]]
 
     def get_primary_key(self, table_name: str) -> Optional[str]:
-        """Get primary key column for a table."""
         schema = self.get_table_schema(table_name)
         for col in schema["columns"]:
             if col.get("primary_key"):
@@ -158,7 +144,6 @@ class TPCDISchemaManager:
         return None
 
     def create_foreign_key_constraints(self, connection: Any, dialect: str = "duckdb") -> None:
-        """Create foreign key constraints for TPC-DI tables."""
         if not self.include_extensions:
             logger.info("Skipping foreign key constraints - extensions not included")
             return
@@ -192,21 +177,17 @@ class TPCDISchemaManager:
         logger.info(f"Successfully created {constraint_count} foreign key constraints")
 
     def get_table_count(self) -> int:
-        """Get the total number of tables in the schema."""
         return len(self.table_order)
 
     def get_core_tables(self) -> list[str]:
-        """Get list of core TPC-DI table names."""
         return self.core_table_order.copy()
 
     def get_extended_tables(self) -> list[str]:
-        """Get list of extended TPC-DI table names."""
         if self.include_extensions:
             return get_extended_table_order()
         return []
 
     def drop_schema(self, connection: Any, if_exists: bool = True) -> None:
-        """Drop all TPC-DI tables from the database."""
         for table_name in reversed(self.table_order):
             if_exists_clause = "IF EXISTS " if if_exists else ""
             drop_sql = f"DROP TABLE {if_exists_clause}{table_name}"

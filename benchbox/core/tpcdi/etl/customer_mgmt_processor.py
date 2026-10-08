@@ -1,41 +1,9 @@
-"""TPC-DI Customer Management data processing system.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module processes various customer-related data sources including:
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-1. Customer Demographics (CustomerMgmt.xml):
-   - Customer profile information
-   - Address and contact details
-   - Account relationships and attributes
-   - Demographic segmentation data
-
-2. Account Management (Account.txt):
-   - Account opening and closing events
-   - Account status changes and updates
-   - Account type and attribute modifications
-   - Broker assignments and changes
-
-3. Customer Relationship Data:
-   - Household relationships and linking
-   - Beneficial ownership structures
-   - Customer hierarchy and dependencies
-   - Joint account relationships
-
-4. Prospect Management:
-   - Marketing campaign data
-   - Lead generation and tracking
-   - Conversion events and outcomes
-   - Customer acquisition analytics
-
-The system handles multiple data formats (CSV, XML, pipe-delimited)
-and implements sophisticated data integration and validation logic.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import csv
 import logging
@@ -52,20 +20,16 @@ logger = logging.getLogger(__name__)
 
 
 class CustomerAction(Enum):
-    """Enumeration of customer management actions."""
-
     NEW = "NEW"
     ADDACCT = "ADDACCT"
     UPDCUST = "UPDCUST"
-    UPDP = "UPDP"  # Update prospect/customer (alias for UPDCUST)
+    UPDP = "UPDP"
     UPDACCT = "UPDACCT"
     CLOSEACCT = "CLOSEACCT"
     INACT = "INACT"
 
 
 class AccountStatus(Enum):
-    """Enumeration of account status values."""
-
     ACTIVE = "Active"
     INACTIVE = "Inactive"
     CLOSED = "Closed"
@@ -74,8 +38,6 @@ class AccountStatus(Enum):
 
 @dataclass
 class CustomerDemographic:
-    """Customer demographic information."""
-
     customer_id: int
     tax_id: str
     status: str
@@ -84,13 +46,13 @@ class CustomerDemographic:
     middle_initial: Optional[str] = None
     gender: Optional[str] = None
     tier: Optional[int] = None
-    dob: Optional[date] = None  # Date of birth
+    dob: Optional[date] = None
     address_line1: Optional[str] = None
     address_line2: Optional[str] = None
     postal_code: Optional[str] = None
     city: Optional[str] = None
     state_province: Optional[str] = None
-    state_prov: Optional[str] = None  # Alias for compatibility
+    state_prov: Optional[str] = None
     country: Optional[str] = None
     phone1: Optional[str] = None
     phone2: Optional[str] = None
@@ -100,17 +62,14 @@ class CustomerDemographic:
     lcl_tx_id: Optional[str] = None
     nat_tx_id: Optional[str] = None
 
-    # Financial attributes
     credit_rating: Optional[int] = None
     net_worth: Optional[Decimal] = None
     income: Optional[Decimal] = None
 
-    # Relationship attributes
     num_children: Optional[int] = None
     num_credit_cards: Optional[int] = None
     num_dependents: Optional[int] = None
 
-    # Marketing attributes
     age_bracket: Optional[str] = None
     marital_status: Optional[str] = None
     buy_potential: Optional[str] = None
@@ -119,8 +78,6 @@ class CustomerDemographic:
 
 @dataclass
 class AccountManagement:
-    """Account management record."""
-
     account_id: int
     customer_id: int
     account_desc: str
@@ -128,27 +85,22 @@ class AccountManagement:
     broker_id: int
     status: AccountStatus
 
-    # Action tracking (must come before fields with defaults)
     action: CustomerAction
     action_ts: datetime
 
-    # Dates
     open_date: Optional[date] = None
     close_date: Optional[date] = None
 
-    # Additional attributes
-    ca_id: Optional[int] = None  # Customer Account ID
-    ca_b_id: Optional[int] = None  # Broker ID
+    ca_id: Optional[int] = None
+    ca_b_id: Optional[int] = None
     ca_name: Optional[str] = None
 
 
 @dataclass
 class CustomerRelationship:
-    """Customer relationship and household linking data."""
-
     primary_customer_id: int
     related_customer_id: int
-    relationship_type: str  # 'Household', 'Beneficial Owner', 'Joint Account', etc.
+    relationship_type: str
     relationship_desc: Optional[str] = None
     effective_date: Optional[date] = None
     end_date: Optional[date] = None
@@ -157,8 +109,6 @@ class CustomerRelationship:
 
 @dataclass
 class ProspectRecord:
-    """Prospect management and marketing data."""
-
     agency_id: str
     last_name: str
     first_name: str
@@ -184,35 +134,21 @@ class ProspectRecord:
 
 
 class CustomerManagementXMLParser:
-    """Parser for CustomerMgmt.xml files."""
-
     def __init__(self):
-        """Initialize the XML parser."""
         self.current_action = None
         self.current_timestamp = None
 
     def parse_file(self, file_path: Path) -> Iterator[tuple[CustomerAction, datetime, Any]]:
-        """Parse CustomerMgmt.xml file and yield customer events.
-
-        Args:
-            file_path: Path to the CustomerMgmt.xml file
-
-        Yields:
-            Tuples of (action, timestamp, customer_data)
-        """
         logger.info(f"Parsing CustomerMgmt.xml file: {file_path}")
 
         try:
             tree = ET.parse(file_path)
             root = tree.getroot()
 
-            # Process each action element (handle both namespaced and non-namespaced)
-            action_elements = root.findall(".//Action")  # Try without namespace first
+            action_elements = root.findall(".//Action")
             if not action_elements:
-                # Try with namespace
                 action_elements = root.findall(".//{http://www.tpc.org/tpc-di}Action")
             if not action_elements:
-                # Try alternative approach - get all elements with ActionType attribute
                 action_elements = [elem for elem in root.iter() if elem.get("ActionType")]
 
             for action_elem in action_elements:
@@ -223,21 +159,18 @@ class CustomerManagementXMLParser:
                     logger.warning("Skipping action with missing type or timestamp")
                     continue
 
-                # Parse timestamp
                 try:
                     timestamp = datetime.fromisoformat(action_ts.replace("T", " "))
                 except ValueError:
                     logger.warning(f"Invalid timestamp format: {action_ts}")
                     continue
 
-                # Parse based on action type
                 try:
                     action_enum = CustomerAction(action_type)
                 except ValueError:
                     logger.warning(f"Unknown action type: {action_type}")
                     continue
 
-                # Extract customer/account data based on action type
                 if action_type in ["NEW", "UPDCUST", "UPDP"]:
                     customer_data = self._parse_customer_element(action_elem)
                     yield (action_enum, timestamp, customer_data)
@@ -258,12 +191,10 @@ class CustomerManagementXMLParser:
             raise
 
     def _parse_customer_element(self, action_elem: ET.Element) -> CustomerDemographic:
-        """Parse customer information from action element."""
         customer_elem = action_elem.find("Customer")
         if customer_elem is None:
             raise ValueError("Missing Customer element in action")
 
-        # Extract customer attributes
         customer_id = int(customer_elem.get("C_ID"))
         tax_id = customer_elem.get("C_TAX_ID", "")
         status = customer_elem.get("C_ST_ID", "")
@@ -273,7 +204,6 @@ class CustomerManagementXMLParser:
         gender = customer_elem.get("C_GNDR")
         tier = self._safe_int(customer_elem.get("C_TIER"))
 
-        # Parse date of birth
         dob = None
         dob_str = customer_elem.get("C_DOB")
         if dob_str:
@@ -282,7 +212,6 @@ class CustomerManagementXMLParser:
             except ValueError:
                 logger.warning(f"Invalid date of birth: {dob_str}")
 
-        # Address information
         address_line1 = customer_elem.get("C_ADLINE1")
         address_line2 = customer_elem.get("C_ADLINE2")
         postal_code = customer_elem.get("C_ZIPCODE")
@@ -290,13 +219,11 @@ class CustomerManagementXMLParser:
         state_province = customer_elem.get("C_STATE_PROV")
         country = customer_elem.get("C_CTRY")
 
-        # Contact information
         phone1 = customer_elem.get("C_PRIM_EMAIL")
         phone2 = customer_elem.get("C_ALT_EMAIL")
         email1 = customer_elem.get("C_PHONE_1")
         email2 = customer_elem.get("C_PHONE_2")
 
-        # Financial attributes
         credit_rating = self._safe_int(customer_elem.get("C_CRDT_RTG"))
         net_worth = self._safe_decimal(customer_elem.get("C_NET_WORTH"))
         income = self._safe_decimal(customer_elem.get("C_INCOME"))
@@ -327,19 +254,16 @@ class CustomerManagementXMLParser:
         )
 
     def _parse_account_element(self, action_elem: ET.Element) -> AccountManagement:
-        """Parse account information from action element."""
         account_elem = action_elem.find("Account")
         if account_elem is None:
             raise ValueError("Missing Account element in action")
 
-        # Extract account attributes
         account_id = int(account_elem.get("CA_ID"))
         customer_id = int(account_elem.get("CA_C_ID"))
         account_desc = account_elem.get("CA_NAME", "")
         tax_status = int(account_elem.get("CA_TAX_ST", "0"))
         broker_id = int(account_elem.get("CA_B_ID"))
 
-        # Parse status
         status_str = account_elem.get("CA_ST_ID", "Active")
         try:
             status = AccountStatus(status_str)
@@ -347,7 +271,6 @@ class CustomerManagementXMLParser:
             logger.warning(f"Unknown account status: {status_str}, defaulting to Active")
             status = AccountStatus.ACTIVE
 
-        # Get action info from parent
         action_type = action_elem.get("ActionType")
         action_ts_str = action_elem.get("ActionTS")
         if action_ts_str is None:
@@ -366,7 +289,6 @@ class CustomerManagementXMLParser:
         )
 
     def _parse_inact_element(self, action_elem: ET.Element) -> dict[str, Any]:
-        """Parse customer inactivation information."""
         inact_elem = action_elem.find("Inactivate")
         if inact_elem is None:
             raise ValueError("Missing Inactivate element in INACT action")
@@ -382,7 +304,6 @@ class CustomerManagementXMLParser:
         }
 
     def _safe_int(self, value: Optional[str]) -> Optional[int]:
-        """Safely convert string to integer."""
         if not value or not value.strip():
             return None
         try:
@@ -391,7 +312,6 @@ class CustomerManagementXMLParser:
             return None
 
     def _safe_decimal(self, value: Optional[str]) -> Optional[Decimal]:
-        """Safely convert string to Decimal."""
         if not value or not value.strip():
             return None
         try:
@@ -401,17 +321,7 @@ class CustomerManagementXMLParser:
 
 
 class ProspectCSVParser:
-    """Parser for Prospect.csv files."""
-
     def parse_file(self, file_path: Path) -> Iterator[ProspectRecord]:
-        """Parse Prospect.csv file and yield prospect records.
-
-        Args:
-            file_path: Path to the Prospect.csv file
-
-        Yields:
-            ProspectRecord objects
-        """
         logger.info(f"Parsing Prospect.csv file: {file_path}")
 
         try:
@@ -456,7 +366,6 @@ class ProspectCSVParser:
             raise
 
     def _safe_int(self, value: Optional[str]) -> Optional[int]:
-        """Safely convert string to integer."""
         if not value or not value.strip():
             return None
         try:
@@ -466,15 +375,7 @@ class ProspectCSVParser:
 
 
 class CustomerManagementProcessor:
-    """High-level processor for Customer Management data integration."""
-
     def __init__(self, connection: Any = None, dialect: str = "duckdb"):
-        """Initialize the Customer Management processor.
-
-        Args:
-            connection: Database connection object (optional for testing)
-            dialect: SQL dialect for query generation
-        """
         self.connection = connection
         self.dialect = dialect
         self.xml_parser = CustomerManagementXMLParser()
@@ -483,16 +384,6 @@ class CustomerManagementProcessor:
     def process_customer_management_file(
         self, file_path: Path, batch_id: int = 1, validate_data: bool = True
     ) -> dict[str, Any]:
-        """Process a CustomerMgmt.xml file and load data into warehouse tables.
-
-        Args:
-            file_path: Path to the CustomerMgmt.xml file
-            batch_id: ETL batch identifier
-            validate_data: Whether to perform data quality validation
-
-        Returns:
-            Dictionary containing processing results and statistics
-        """
         logger.info(f"Processing CustomerMgmt file: {file_path}")
 
         start_time = datetime.now()
@@ -509,7 +400,6 @@ class CustomerManagementProcessor:
         }
 
         try:
-            # Process customer management events
             for action, timestamp, data in self.xml_parser.parse_file(file_path):
                 stats["records_processed"] += 1
 
@@ -558,15 +448,6 @@ class CustomerManagementProcessor:
             return stats
 
     def process_prospect_file(self, file_path: Path, batch_id: int = 1) -> dict[str, Any]:
-        """Process a Prospect.csv file and load data into prospect tables.
-
-        Args:
-            file_path: Path to the Prospect.csv file
-            batch_id: ETL batch identifier
-
-        Returns:
-            Dictionary containing processing results and statistics
-        """
         logger.info(f"Processing Prospect file: {file_path}")
 
         start_time = datetime.now()
@@ -603,42 +484,27 @@ class CustomerManagementProcessor:
             return stats
 
     def _process_new_customer(self, customer: CustomerDemographic, timestamp: datetime, batch_id: int) -> None:
-        """Process a new customer record into DimCustomer."""
-        # Implementation would insert into DimCustomer table
         logger.debug(f"Processing new customer: {customer.customer_id}")
 
     def _process_customer_update(self, customer: CustomerDemographic, timestamp: datetime, batch_id: int) -> None:
-        """Process a customer update with SCD Type 2 logic."""
-        # Implementation would handle SCD Type 2 updates
         logger.debug(f"Processing customer update: {customer.customer_id}")
 
     def _process_new_account(self, account: AccountManagement, timestamp: datetime, batch_id: int) -> None:
-        """Process a new account record into DimAccount."""
-        # Implementation would insert into DimAccount table
         logger.debug(f"Processing new account: {account.account_id}")
 
     def _process_account_update(self, account: AccountManagement, timestamp: datetime, batch_id: int) -> None:
-        """Process an account update with SCD Type 2 logic."""
-        # Implementation would handle SCD Type 2 updates
         logger.debug(f"Processing account update: {account.account_id}")
 
     def _process_account_closure(self, account: AccountManagement, timestamp: datetime, batch_id: int) -> None:
-        """Process an account closure event."""
-        # Implementation would close account in DimAccount table
         logger.debug(f"Processing account closure: {account.account_id}")
 
     def _process_customer_inactivation(self, inact_data: dict[str, Any], timestamp: datetime, batch_id: int) -> None:
-        """Process a customer inactivation event."""
-        # Implementation would inactivate customer and associated accounts
         logger.debug(f"Processing customer inactivation: {inact_data['customer_id']}")
 
     def _process_prospect_record(self, prospect: ProspectRecord, batch_id: int) -> None:
-        """Process a prospect record into prospect management tables."""
-        # Implementation would insert into prospect tables
         logger.debug(f"Processing prospect: {prospect.agency_id}")
 
     def get_processing_statistics(self) -> dict[str, Any]:
-        """Get comprehensive statistics about Customer Management processing."""
         return {
             "supported_actions": [action.value for action in CustomerAction],
             "supported_account_statuses": [status.value for status in AccountStatus],
@@ -648,14 +514,6 @@ class CustomerManagementProcessor:
         }
 
     def process_xml_file(self, file_path: Path) -> dict[str, Any]:
-        """Process XML file and return summary metrics.
-
-        Args:
-            file_path: Path to the XML file
-
-        Returns:
-            Dictionary with processing results
-        """
         logger.info(f"Processing XML file: {file_path}")
 
         total_actions = 0
@@ -664,7 +522,6 @@ class CustomerManagementProcessor:
         errors = []
 
         try:
-            # Use the existing XML parser
             for action, _timestamp, _data in self.xml_parser.parse_file(file_path):
                 total_actions += 1
 
@@ -693,21 +550,12 @@ class CustomerManagementProcessor:
             }
 
     def process_csv_file(self, file_path: Path) -> dict[str, Any]:
-        """Process CSV file and return summary metrics.
-
-        Args:
-            file_path: Path to the CSV file
-
-        Returns:
-            Dictionary with processing results
-        """
         logger.info(f"Processing CSV file: {file_path}")
 
         prospects = []
         errors = []
 
         try:
-            # Use the existing prospect parser
             for prospect in self.prospect_parser.parse_file(file_path):
                 prospects.append(prospect)
 
@@ -729,21 +577,12 @@ class CustomerManagementProcessor:
             }
 
     def _process_customer_action(self, action_data: dict[str, Any]) -> dict[str, Any]:
-        """Process a customer action into a normalized result payload.
-
-        Args:
-            action_data: Dictionary containing action information
-
-        Returns:
-            Dictionary with processing results
-        """
         try:
             action = action_data.get("action")
             customer_id = action_data.get("customer_id")
             timestamp = action_data.get("timestamp")
             data = action_data.get("data", {})
 
-            # Process the action
             if action == CustomerAction.NEW:
                 action_type = "NEW"
             elif action == CustomerAction.UPDCUST:
@@ -771,17 +610,8 @@ class CustomerManagementProcessor:
             }
 
     def _validate_demographic_data(self, demo_data: CustomerDemographic) -> dict[str, Any]:
-        """Validate customer demographic data.
-
-        Args:
-            demo_data: CustomerDemographic object to validate
-
-        Returns:
-            Dictionary with validation results
-        """
         errors = []
 
-        # Basic validation rules
         if not demo_data.customer_id:
             errors.append("Customer ID is required")
 
@@ -800,7 +630,6 @@ class CustomerManagementProcessor:
         ):
             errors.append("Invalid phone number format")
 
-        # Check state_province or state_prov (aliases)
         state = demo_data.state_province or demo_data.state_prov
         if state and len(state.strip()) < 2:
             errors.append("Invalid state/province format")
@@ -818,14 +647,6 @@ class CustomerManagementProcessor:
         }
 
     def process_batch(self, file_paths: list[Path]) -> dict[str, Any]:
-        """Process a batch of mixed XML and CSV files.
-
-        Args:
-            file_paths: List of file paths to process
-
-        Returns:
-            Dictionary with batch processing results
-        """
         logger.info(f"Processing batch of {len(file_paths)} files")
 
         xml_files = 0

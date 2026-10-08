@@ -52,9 +52,7 @@ describe("activeResultsNavSection", () => {
       platforms: "platforms",
       compare: "compare",
       query: "query",
-      // Bare route prefixes inherit their family's matcher, as before.
       p: "platforms",
-      // Route prefixes without a section of their own stay unclaimed.
       r: null,
       local: null,
     };

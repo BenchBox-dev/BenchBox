@@ -1,9 +1,3 @@
-"""Wiring tests for ClickHouse plan capture across local, server, and cloud modes.
-
-Uses a fake connection whose ``execute()`` returns the recorded EXPLAIN PLAN
-fixture for EXPLAIN statements, so no live ClickHouse instance is required.
-"""
-
 from pathlib import Path
 
 import pytest
@@ -13,18 +7,15 @@ from benchbox.core.query_plans.parsers.clickhouse import ClickHouseQueryPlanPars
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
-    # Constructs local-mode adapters; chDB has no Windows wheels. See the fixture.
     pytest.mark.usefixtures("chdb_probe_satisfied"),
 ]
 
 _FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "query_plans"
-# Explicit encoding: the default is locale-dependent (cp1252 on Windows).
+
 _PLAN_TEXT = (_FIXTURES / "clickhouse_explain_plan_sample.txt").read_text(encoding="utf-8")
 
 
 class _FakeConn:
-    """Returns the EXPLAIN PLAN fixture for EXPLAIN, one row otherwise."""
-
     def __init__(self, explain_rows=None):
         self._explain_rows = _PLAN_TEXT.splitlines() if explain_rows is None else explain_rows
         self.executed = []
@@ -86,11 +77,11 @@ class TestClickHouseExecuteQueryCapture:
         conn = _FakeConn()
         result = adapter.execute_query(connection=conn, query="SELECT 1", query_id="cq2", validate_row_count=False)
         assert "query_plan" not in result or result.get("query_plan") is None
-        # must_preserve: EXPLAIN PLAN must not be issued when capture_plans=False.
+
         assert not any("EXPLAIN" in sql.upper() for sql in conn.executed)
 
     def test_graceful_when_explain_empty(self):
-        # Old ClickHouse (< 20.6) / empty EXPLAIN: capture yields no plan, query still SUCCESS.
+
         adapter = _make("local", capture_plans=True)
         result = adapter.execute_query(
             connection=_FakeConn(explain_rows=[]), query="SELECT 1", query_id="cq3", validate_row_count=False

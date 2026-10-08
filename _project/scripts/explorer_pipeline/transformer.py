@@ -1,9 +1,3 @@
-"""Bundle-to-read-model transformer for the explorer static build pipeline.
-
-Reads schema-v2 result bundle JSON files and converts them into the
-ManifestEntry and DetailResult shapes consumed by the explorer frontend.
-"""
-
 from __future__ import annotations
 
 import copy
@@ -20,6 +14,7 @@ from typing import Any, cast
 
 from _project.scripts.explorer_pipeline.models import (
     KNOWN_DEFECT_RANKING_EXCLUSION,
+    THROUGHPUT_PHASE,
     BasisAvailability,
     BundleContainerBlock,
     BundleDocument,
@@ -34,6 +29,7 @@ from _project.scripts.explorer_pipeline.models import (
     QueryTiming,
     _platform_id,
     canonical_benchmark_slug,
+    canonical_phase,
     ranking_exclusion_reason,
     timing_eligibility,
 )
@@ -59,9 +55,6 @@ _UTC = _dt.timezone.utc
 _DATE_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})$")
 _TIMESTAMP_RE = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$")
 
-# ---------------------------------------------------------------------------
-# Closed CPU-family vocabulary and normalization rules
-# ---------------------------------------------------------------------------
 
 CLOSED_CPU_FAMILIES: frozenset[str] = frozenset(
     {
@@ -78,32 +71,18 @@ CLOSED_CPU_FAMILIES: frozenset[str] = frozenset(
 )
 
 _CPU_FAMILY_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    # Apple Silicon: Apple M1/M2/M3/M4, Apple A-series
     (re.compile(r"\bapple\s+(?:m\d|a\d)", re.IGNORECASE), "apple_silicon"),
-    # AWS Graviton
     (re.compile(r"\bgraviton", re.IGNORECASE), "graviton"),
-    # Intel Xeon
     (re.compile(r"\bxeon\b", re.IGNORECASE), "intel_xeon"),
-    # Intel Core
     (re.compile(r"\b(?:intel.*core|core\(tm\))\b", re.IGNORECASE), "intel_core"),
-    # AMD EPYC
     (re.compile(r"\bepyc\b", re.IGNORECASE), "amd_epyc"),
-    # AMD Ryzen / Threadripper
     (re.compile(r"\b(?:ryzen|threadripper)\b", re.IGNORECASE), "amd_ryzen"),
-    # Ampere Altra
     (re.compile(r"\b(?:ampere|altra)\b", re.IGNORECASE), "ampere_altra"),
-    # ARM Neoverse
     (re.compile(r"\bneoverse\b", re.IGNORECASE), "arm_neoverse"),
 )
 
 
 def normalize_cpu_family(raw_model: str | None) -> str | None:
-    """Normalize a raw CPU model string to the closed CPU family vocabulary.
-
-    Returns None if raw_model is None or empty ('not recorded').
-    Returns 'unknown' if raw_model is populated but does not match any known family.
-    Never guesses based on architecture.
-    """
     if raw_model is None:
         return None
     cleaned = raw_model.strip()
@@ -116,11 +95,10 @@ def normalize_cpu_family(raw_model: str | None) -> str | None:
 
 
 class CompanionPrivacyError(Exception):
-    """A companion remained private after the public anonymization boundary."""
+    pass
 
 
 def _companion_path(bundle_path: Path, suffix: str) -> Path:
-    """Return the exact same-stem companion path for a primary bundle."""
     return bundle_path.with_name(f"{bundle_path.stem}{suffix}")
 
 
@@ -143,9 +121,6 @@ def _sanitize_applied_drift_check(drift_check: Any) -> None:
         drift_check["drift_redacted"] = True
 
 
-# Stand-in for a receipt container whose shape none of the redaction rules
-# below can reach. Publishing such a value verbatim is the failure this marker
-# exists to prevent, so it carries no payload from the source document.
 _REDACTED_APPLIED_SHAPE: dict[str, Any] = {"redacted": True, "reason": "unexpected_shape"}
 
 
@@ -165,12 +140,6 @@ def _sanitize_applied_observed(observed: dict[str, Any]) -> None:
 
 
 def _sanitized_applied_container(value: Any, sanitize_item: Any) -> Any:
-    """Sanitize a receipt sub-list, failing closed on an unexpected shape.
-
-    A non-list here (or a non-object inside it) is free text no redaction rule
-    matches. Iterating it would silently pass the original through - a string
-    yields characters, none of which are dicts - so replace it with a marker.
-    """
     if value is None:
         return None
     if not isinstance(value, list):
@@ -186,13 +155,6 @@ def _sanitized_applied_container(value: Any, sanitize_item: Any) -> Any:
 
 
 def _sanitize_applied_receipt(receipt: Any) -> Any:
-    """Sanitize the introspection receipt, redacting shapes it cannot inspect.
-
-    Returning an unexpected shape untouched published it verbatim: a companion
-    such as ``{"receipt": "private_customer_catalog"}`` parses, survives the
-    generic anonymizer, and carries no absolute path for the leak detector to
-    catch, so the free text reached the public sidecar intact.
-    """
     if receipt is None:
         return None
     if not isinstance(receipt, dict):
@@ -200,7 +162,6 @@ def _sanitize_applied_receipt(receipt: Any) -> Any:
     if "error" in receipt:
         receipt.pop("error", None)
         receipt["error_redacted"] = True
-    # Keyed on presence, not truthiness, so an absent key is never introduced.
     if "entries" in receipt:
         receipt["entries"] = _sanitized_applied_container(receipt["entries"], _sanitize_applied_entry)
     if "observed" in receipt:
@@ -210,13 +171,6 @@ def _sanitize_applied_receipt(receipt: Any) -> Any:
 
 
 def _sanitize_applied_companion(payload: dict[str, Any]) -> dict[str, Any]:
-    """Remove free-text and user identifiers from an applied-ledger payload.
-
-    Applied statements, dropped-intent reasons, and introspection evidence are
-    execution-path text and may contain paths, DSNs, or user-chosen catalog
-    names. Preserve only the structural/status evidence needed by the public
-    companion; this mirrors the exporter boundary for already-exported inputs.
-    """
     sanitized = copy.deepcopy(payload)
     statements = sanitized.get("statements")
     if isinstance(statements, list):
@@ -239,14 +193,6 @@ def _public_companion_bytes(
     suffix: str,
     anonymizer: AnonymizationManager,
 ) -> bytes | None:
-    """Load, validate, anonymize, and canonicalize one optional companion.
-
-    Missing, malformed, oversized, or non-regular companions are ignored so a
-    bad sidecar cannot be advertised or copied. A companion that still contains
-    a private path after anonymization is different: that is a publication
-    boundary violation and must fail the build rather than silently publish a
-    partial public artifact.
-    """
     if suffix not in COMPANION_SUFFIXES:
         raise ValueError(f"unsupported explorer companion suffix: {suffix}")
 
@@ -285,11 +231,7 @@ def _public_companion_bytes(
     return canonical_json_bytes(public_payload)
 
 
-# Status values that are considered passing for the query timing status field.
 _PASS_STATUSES = {"SUCCESS", "PASS", "pass", "success"}
-# Allowed run_type values for query execution rows ingested into query_executions.
-# Narrows the ingest filter to execution timings only (measurement + warmup),
-# explicitly excluding metadata and summary pseudo-rows.
 _ALLOWED_EXECUTION_RUN_TYPES: frozenset[str] = frozenset({"measurement", "warmup"})
 _COST_MODEL_SOURCE = "benchbox.core.cost.pricing"
 _COST_SCOPES: frozenset[str] = frozenset({"compute_only", "compute_plus_storage"})
@@ -306,11 +248,6 @@ _KNOWN_LOGICAL_QUERY_COUNTS: dict[str, int] = {
 
 
 def _load_bundle(bundle_path: Path) -> tuple[dict[str, Any], bytes]:
-    """Load and parse a bundle JSON file.
-
-    Returns both the parsed dict and the raw bytes so callers can compute
-    a content hash without a second file read.
-    """
     raw = bundle_path.read_bytes()
     data = json.loads(raw)
     _ensure_explorer_input_schema(data)
@@ -318,36 +255,20 @@ def _load_bundle(bundle_path: Path) -> tuple[dict[str, Any], bytes]:
 
 
 def _parse_bundle(data: dict[str, Any]) -> BundleDocument:
-    """Parse validated bundle data into the typed ingest document.
-
-    Callers pass the raw bundle mapping (source or anonymized public lane);
-    the schema gate must already have accepted it via
-    ``_ensure_explorer_input_schema``. All field extractors below take the
-    resulting document, never raw mappings.
-    """
     return BundleDocument.model_validate(data)
 
 
 def _ensure_explorer_input_schema(data: dict[str, Any]) -> None:
-    """Reject unsupported bundles before explorer field projection starts."""
     decision = EXPLORER_INPUT_SCHEMA_POLICY.evaluate(result_schema_version_value(data))
     if not decision.accepted:
         raise ValueError(decision.error_message())
 
 
 def _sha256_prefix(raw: bytes, length: int = 8) -> str:
-    """Return the first *length* hex chars of the SHA-256 of *raw* bytes."""
     return hashlib.sha256(raw).hexdigest()[:length]
 
 
 def _utc_run_date_from_timestamp(timestamp: object) -> str:
-    """Return the strict UTC calendar date for a bundle ``run.timestamp``.
-
-    ``YYYY-MM-DD`` is already an explicit UTC calendar date. Complete ISO
-    timestamps with ``Z`` or an offset are converted to UTC; complete legacy
-    timestamps without an offset are interpreted as UTC. Invalid, partial,
-    and trailing forms fail ingestion rather than being silently tokenized.
-    """
     if not isinstance(timestamp, str):
         raise ValueError(f"run.timestamp must be a string, got {timestamp!r}")
     if _DATE_RE.fullmatch(timestamp):
@@ -367,21 +288,12 @@ def _utc_run_date_from_timestamp(timestamp: object) -> str:
 
 
 def _run_date_from_timestamp(timestamp: object) -> str:
-    """Return the stable source-date token used in public result IDs."""
     _utc_run_date_from_timestamp(timestamp)
     assert isinstance(timestamp, str)
     return timestamp[:10].replace("-", "")
 
 
 def _driver_version(bundle: BundleDocument) -> str | None:
-    """Extract the package version used to identify a DuckDB run.
-
-    DuckDB development wheels can report an internal engine build string from
-    ``SELECT version()`` that is unrelated to the wheel version (for example,
-    ``1.6.0.dev365`` reports ``2.0.0-alpha...``). The resolved package version
-    is the stable comparison identity; the raw bundle still retains the actual
-    engine string for auditability.
-    """
     execution = bundle.execution
     is_duckdb = str(bundle.platform.name).lower() == "duckdb"
     if is_duckdb:
@@ -411,24 +323,46 @@ def _driver_version(bundle: BundleDocument) -> str | None:
     return None
 
 
+def _tpc_metric(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _power_score(bundle: BundleDocument) -> float | None:
-    """Extract TPC power@size metric from a schema-v2 bundle."""
-    tpc = bundle.summary.tpc_metrics
-    val = tpc.power_at_size
-    if val is not None:
-        try:
-            return float(val)
-        except (TypeError, ValueError):
-            pass
-    return None
+    return _tpc_metric(bundle.summary.tpc_metrics.power_at_size)
+
+
+def _throughput_phase_clean(bundle: BundleDocument) -> bool:
+    block = bundle.phases.get("throughput_test")
+    if block is None or str(block.status or "").upper() != "COMPLETED":
+        return False
+    streams = block.stream_results
+    if not isinstance(streams, list) or not streams:
+        return False
+    if not all(isinstance(stream, dict) and stream.get("success") is True for stream in streams):
+        return False
+    return not block.errors and not block.outstanding_work
+
+
+def _throughput_at_size(bundle: BundleDocument) -> float | None:
+    if not _throughput_phase_clean(bundle):
+        return None
+    return _tpc_metric(bundle.summary.tpc_metrics.throughput_at_size)
+
+
+def _stream_count(bundle: BundleDocument, test_type: str | None) -> int | None:
+    if canonical_phase(test_type) != THROUGHPUT_PHASE:
+        return None
+    block = bundle.phases.get("throughput_test")
+    streams = block.stream_results if block is not None else None
+    return len(streams) if isinstance(streams, list) and streams else None
 
 
 def _geomean_ms(bundle: BundleDocument) -> float | None:
-    """Compute geometric mean of measurement-query execution times in milliseconds.
-
-    Uses only queries with run_type="measurement" (or all when run_type is absent).
-    Returns None if no valid positive timings exist.
-    """
     values: list[float] = []
     for q in bundle.queries:
         if q.run_type is not None and q.run_type != "measurement":
@@ -451,55 +385,19 @@ _FUNDING_SOURCES = ("employer", "personal", "free-trial", "vendor-sponsored", "g
 
 
 def _funding(bundle: BundleDocument) -> str:
-    """Extract the funding disclosure from a bundle's provenance block.
-
-    Returns the normalized funding value, defaulting to "unspecified" when the
-    bundle declares no provenance or an unrecognized value. Kept in lockstep with
-    benchbox/core/results/provenance.py::FUNDING_SOURCES.
-    """
     token = str(bundle.provenance.funding or "").strip().lower()
     return token if token in _FUNDING_SOURCES else "unspecified"
 
 
 def _platform_version(bundle: BundleDocument) -> str | None:
-    """Extract platform version from schema-v2 bundle."""
     val = bundle.platform.version
     return str(val) if val and val != "unknown" else None
 
 
-#: Values a bundle may legitimately carry for execution mode.
 _EXECUTION_MODES = frozenset({"sql", "dataframe"})
-
-#: Documented lookup order for a bundle's SQL-vs-DataFrame execution mode, kept
-#: in lockstep with the candidate list in :func:`_execution_mode`:
-#: ``config.execution_mode``, ``platform.config.execution_mode``,
-#: ``config.mode``, ``execution.execution_mode``.
-#:
-#: Measured against all 207 published bundles on 2026-08-23:
-#:   - ``config.execution_mode`` and ``execution.execution_mode`` are the
-#:     documented schema locations but NO bundle writes either, which is why
-#:     the facet was NULL for 207 of 207 rows.
-#:   - ``platform.config.execution_mode`` is populated on every bundle,
-#:     including ones produced by current develop.
-#:   - ``config.mode`` agrees with it on all 207.
-#:   - Both agree with the filename suffix (``_df_`` / ``_sql_``) wherever one
-#:     exists: 105 df, 95 sql, 7 without a suffix.
-#:
-#: ``execution.mode`` is deliberately NOT consulted: it reads "sql" for 105
-#: DataFrame runs, so using it would label more than half the corpus wrongly.
 
 
 def _execution_mode(bundle: BundleDocument) -> str | None:
-    """Extract execution mode (sql/dataframe) from a schema-v2 bundle.
-
-    Consults the documented locations in order and returns the first
-    recognized value. A bundle that records no mode, or records something
-    outside the known vocabulary, stays ``None`` rather than being guessed --
-    an invented mode would label a DataFrame result as SQL, which is worse
-    than an honestly empty facet.
-    """
-    # Lookup order (see the module comment above): config.execution_mode,
-    # platform.config.execution_mode, config.mode, execution.execution_mode.
     candidates: list[Any] = [
         bundle.config.execution_mode,
         bundle.platform.config.execution_mode,
@@ -513,25 +411,6 @@ def _execution_mode(bundle: BundleDocument) -> str | None:
 
 
 def _tuning_mode(bundle: BundleDocument) -> str | None:
-    """Extract tuning mode from a schema-v2 bundle.
-
-    Reads ``config.tuning_mode`` first (the current schema location), falling
-    back to ``execution.tuning_mode`` for the seed-corpus generation that
-    wrote the value there instead. When neither location carries a value the
-    result stays ``None`` -- callers must not invent a mode for bundles that
-    never recorded one (see explorer ingest tuning-mode-extraction TODO).
-
-    ADR-2 (docs/development/tuning-adr-002-mode-vocabulary-fallback-facets.md)
-    §2 pins the legal ``tuning_mode`` vocabulary to exactly
-    ``{tuned, tuned-fallback, notuning, auto, custom}``. Older bundles
-    predating that pin may carry a raw local tuning-file path (from before
-    ``--tuning <path>`` runs were required to record ``custom``) or the
-    wizard's old ``"balanced"`` flavor string. Per the ADR's consequences
-    section, ingest does not guess which of the five buckets an
-    unrecognized legacy value belongs in -- it is treated as not-recorded
-    (``None`` here; the explorer surfaces that as the "Not Recorded" state)
-    rather than silently reclassified.
-    """
     config = bundle.config
     if config.tuning_mode and is_canonical_mode(str(config.tuning_mode)):
         return str(config.tuning_mode)
@@ -542,26 +421,12 @@ def _tuning_mode(bundle: BundleDocument) -> str | None:
 
 
 def _tuning_hash(bundle: BundleDocument) -> str | None:
-    """Compute a stable 8-char hash of the tuning configuration.
-
-    Only machine-readable tuning detail is hashed: a dict is hashed
-    canonically (``json.dumps(..., sort_keys=True)``), but a string value
-    (e.g. a Python ``repr()`` of a dataclass, which is not canonical and
-    varies cosmetically between otherwise-identical configs) is dropped
-    rather than hashed. The resolved tuning mode (see ``_tuning_mode``, which
-    includes the ``execution.tuning_mode`` fallback) may still be hashed on
-    its own when no machine-readable detail is present. Returns None when
-    there is neither a mode nor machine-readable detail to hash.
-    """
     mode = _tuning_mode(bundle)
     config = bundle.config
     tuning_detail: dict[str, Any] | None = None
     raw_detail = config.tuning_config or config.tuning
     if isinstance(raw_detail, dict):
         tuning_detail = raw_detail
-        # Non-dict detail (e.g. a repr() string) is intentionally not hashed:
-        # it is not canonical, so cosmetic differences would change the hash
-        # even when the underlying tuning configuration is identical.
     if mode is None and tuning_detail is None:
         return None
     payload = json.dumps({"mode": mode, "detail": tuning_detail}, sort_keys=True)
@@ -569,80 +434,37 @@ def _tuning_hash(bundle: BundleDocument) -> str | None:
 
 
 def _tuning_summary(bundle: BundleDocument) -> BundleTuningBlock:
-    """Return the ``platform.tuning`` summary block.
-
-    This is the per-platform tuning summary emitted by
-    ``benchbox/core/results/schema.py::_build_tuning_summary`` -- the same
-    block that carries ``logical_profile`` (see ``_logical_profile``). The
-    document always carries a (possibly empty) block; extractors read
-    ``None`` fields off it for legacy bundles that never recorded a summary.
-    """
     return bundle.platform.tuning
 
 
 def _requested_config_hash(bundle: BundleDocument) -> str | None:
-    """Ingest the ADR-1 canonical requested-config hash from the bundle.
-
-    Read verbatim from ``platform.tuning.requested_config_hash`` (emitted by
-    ``_build_tuning_summary``); never recomputed here. None for legacy bundles
-    that predate the field. Display-only, like ``tuning_hash`` -- never a
-    join/dedup/grouping key.
-    """
     summary = _tuning_summary(bundle)
     return summary.requested_config_hash
 
 
 def _applied_ledger_hash(bundle: BundleDocument) -> str | None:
-    """Ingest the ADR-1 physical applied-ledger hash from the bundle.
-
-    Read verbatim from ``platform.tuning.applied_ledger_hash`` (emitted by
-    ``_build_tuning_summary`` from the execution-path applied ledger); never
-    recomputed here. None for legacy bundles, or new-generation bundles whose
-    applied ledger recorded no executed statements. Display-only.
-    """
     summary = _tuning_summary(bundle)
     return summary.applied_ledger_hash
 
 
 def _tuning_validation_status(bundle: BundleDocument) -> str | None:
-    """Ingest the ADR-1 tuning verified-state from the bundle.
-
-    Read verbatim from ``platform.tuning.validation_status`` (emitted by
-    ``_build_tuning_summary`` from the execution-path applied ledger's honest
-    ``tuning_validation_status``: not_applicable / noop / applied_unverified /
-    applied_verified / failed). ``applied_verified`` means the post-load
-    introspection receipt corroborated the applied ledger against the live
-    catalog. ``None`` for legacy bundles predating the field -- the explorer
-    treats absence as "unknown". Display-only; never a join/match key.
-    """
     summary = _tuning_summary(bundle)
     return summary.validation_status
 
 
 def _has_requested_tuning(bundle: BundleDocument | None) -> bool:
-    """Return True when the bundle carries a requested-tuning block of its own."""
     if bundle is None:
         return False
     return bool(bundle.platform.tuning.requested)
 
 
 def _inline_applied_receipt(bundle: BundleDocument | None) -> Any:
-    """Return the receipt carried inside the bundle, or None when it has none."""
     if bundle is None:
         return None
     return bundle.platform.tuning.applied.receipt
 
 
 def _companion_applied_receipt(bundle_path: Path) -> tuple[Any, bool]:
-    """Return the receipt from a retired ``{stem}.applied.json`` companion.
-
-    Only bundles published before the ledger moved into ``platform.tuning``
-    still have one. Returns ``(value, already_serialized)``. The flag is what
-    distinguishes the byte-cap truncation marker, which this function serializes
-    itself so an oversized companion is never read into memory, from a receipt
-    that merely happens to be a JSON string -- an unexpected shape the caller
-    must redact rather than store verbatim.
-    """
     companion = bundle_path.with_name(f"{bundle_path.stem}.applied.json")
     try:
         companion_size = companion.stat().st_size
@@ -670,15 +492,6 @@ def _companion_applied_receipt(bundle_path: Path) -> tuple[Any, bool]:
 
 
 def _override_display(bundle_path: Path) -> dict[str, Any]:
-    """Accepted plausibility overrides for badge display.
-
-    Reads the ``{stem}.override.json`` companion and returns the accepted
-    rule ids plus the audit fields (evidence link, approver, expiry).
-    Anything invalid, expired, or unreadable yields empty values — the
-    submission validator (not the explorer) owns refusal, so display
-    never invents an override and never shows a rejected one. Empty
-    values also cover the common case: no companion, no override.
-    """
     empty: dict[str, Any] = {
         "override_rules": [],
         "override_evidence": None,
@@ -717,25 +530,6 @@ def _sidecar_known_defects(bundle_path: Path) -> list[str]:
 
 
 def _applied_receipt(bundle_path: Path, bundle: BundleDocument | None = None) -> str | None:
-    """Ingest the per-statement introspection receipt for a run.
-
-    The receipt is the post-load introspection record that earns the
-    ``applied_verified`` state: platform, corroboration verdict, summary, and one
-    entry per applied statement. It rides in the bundle at
-    ``platform.tuning.applied.receipt``. Bundles published before that block
-    existed carry it in a ``{stem}.applied.json`` companion instead, which is
-    still read when the bundle has none. It is taken **verbatim** and
-    re-serialized canonically (``sort_keys``, compact separators) so the stored
-    string is deterministic; nothing here is recomputed or derived, and the
-    explorer renders it read-only.
-
-    ``None`` whenever no receipt is available -- the common case, where
-    introspection did not run -- or when the source is unreadable, malformed, or
-    carries no ``receipt``. A broken input must never fail the build, so every
-    failure degrades to ``None``. Inputs beyond the public submission caps are
-    the exception: already-published legacy data is bounded defensively and
-    stored with an explicit truncation marker rather than being silently dropped.
-    """
     receipt = _inline_applied_receipt(bundle)
     if receipt is None:
         receipt, already_serialized = _companion_applied_receipt(bundle_path)
@@ -760,50 +554,20 @@ def _applied_receipt(bundle_path: Path, bundle: BundleDocument | None = None) ->
 
 
 def _tuning_policy_generation(bundle: BundleDocument) -> str | None:
-    """Ingest the ADR-3 explicit tuning-policy generation marker from the bundle.
-
-    Read verbatim from ``platform.tuning.tuning_policy_generation`` (emitted by
-    ``_build_tuning_summary``); never derived from ``benchbox_version`` or
-    recomputed here. ``None`` for legacy bundles that predate the field -- the
-    explorer treats that absence as the "pre-seam" generation. Display-only,
-    like the tuning hashes: never a join/dedup/grouping/match key.
-    """
     summary = _tuning_summary(bundle)
     return summary.tuning_policy_generation
 
 
 def _logical_profile(bundle: BundleDocument) -> BundleLogicalProfile | None:
-    """Extract the `platform.tuning.logical_profile` block (ADR-2 §3).
-
-    Returns `None` when no logical profile was recorded at all (unknown --
-    e.g. a legacy bundle predating this field), distinct from an empty `{}`
-    profile object, which -- were a bundle ever to emit one -- would mean a
-    profile WAS recorded. Callers use this `None` vs "object present" split
-    to distinguish "unknown" from "recorded, just empty" for fields like
-    physical_mechanisms (see `_physical_mechanisms`).
-    """
     return bundle.platform.tuning.logical_profile
 
 
 def _physical_mechanisms(bundle: BundleDocument) -> list[str] | None:
-    """Extract the platform-rendered physical tuning mechanisms.
-
-    Tri-state (see `DetailResult.physical_mechanisms`): `None` when no
-    logical_profile was recorded at all (unknown), `[]` when a
-    logical_profile IS present but recorded zero mechanisms (a genuine,
-    comparable value -- the ADR-2 motivating case of a platform rendering
-    zero mechanisms for a tuned template). Collapsing these would make an
-    unknown/legacy bundle compared against a genuinely zero-mechanism bundle
-    look like a real mismatch instead of "nothing to compare".
-    """
     profile = _logical_profile(bundle)
     if profile is None:
         return None
     mechanisms = profile.physical_mechanisms
     if mechanisms is None:
-        # No mechanisms key recorded at all: the profile exists but says
-        # nothing about mechanisms. Treat like an empty recording -- a
-        # genuine, comparable value -- rather than unknown.
         return []
     if not isinstance(mechanisms, list):
         return []
@@ -811,7 +575,6 @@ def _physical_mechanisms(bundle: BundleDocument) -> list[str] | None:
 
 
 def _physical_rendering_id(bundle: BundleDocument) -> str | None:
-    """Extract the physical rendering strategy id (ADR-2 §3 secondary facet)."""
     profile = _logical_profile(bundle)
     if profile is None:
         return None
@@ -827,12 +590,8 @@ def _phase_executed(phase: Any) -> bool:
 
 
 def _test_type(bundle: BundleDocument) -> str | None:
-    """Extract test type (power/throughput) from schema-v2 bundle."""
     if bundle.benchmark.test_type:
         return bundle.benchmark.test_type
-    # A present-but-empty phase block carries no evidence the phase ran;
-    # truthiness on the unset-excluded dump matches the historical
-    # raw-mapping check.
     if _phase_executed(bundle.phases.get("power_test")):
         return "power"
     if _phase_executed(bundle.phases.get("throughput_test")):
@@ -841,18 +600,10 @@ def _test_type(bundle: BundleDocument) -> str | None:
 
 
 def _validation_status(bundle: BundleDocument, raw: dict[str, Any]) -> str | None:
-    """Extract validation status from schema-v2 bundle summary.
-
-    Handles both string (``"passed"``) and dict (``{"status": "passed", ...}``)
-    forms of ``summary.validation``. ``raw`` is the original bundle mapping
-    for the shared ``benchbox.core.results.status`` helpers, which still take
-    raw mappings.
-    """
     val = bundle.summary.validation
     failed_queries = bundle_failed_query_count(raw)
     raw_summary = raw.get("summary")
     if raw_summary is not None and not isinstance(raw_summary, dict):
-        # A non-object summary carries no validation evidence at all.
         return None
     if isinstance(val, str):
         normalized = normalize_validation_status(val)
@@ -882,7 +633,6 @@ def _translation_uncertain(data: dict[str, Any], validation_status: str | None) 
 
 
 def _unavailable_normalized_cost() -> NormalizedCost:
-    """Return explicit normalized-cost-unavailable metadata for old bundles."""
     return NormalizedCost(
         normalized_cost_usd=None,
         cost_model_version=PRICING_VERSION,
@@ -895,14 +645,6 @@ def _unavailable_normalized_cost() -> NormalizedCost:
 
 
 def _raw_normalized_cost_block(bundle: BundleDocument) -> dict[str, Any] | None:
-    """Find a normalized cost block in current or near-future bundle shapes.
-
-    Presence is keyed on the field being set, not on the mapping being
-    non-empty: an explicitly empty ``"normalized_cost": {}`` block is
-    malformed submitted cost evidence and must reach strict validation
-    (which rejects it for missing provenance fields) rather than degrade
-    to synthetic unavailable metadata.
-    """
     if bundle.normalized_cost is not None:
         return bundle.normalized_cost
 
@@ -969,7 +711,6 @@ def _require_cost_string(raw: dict[str, Any], key: str) -> str:
 
 
 def _normalized_cost_from_block(raw: dict[str, Any]) -> NormalizedCost:
-    """Build a validated NormalizedCost from a bundle payload."""
     return NormalizedCost(
         normalized_cost_usd=_decimal_or_none(raw.get("normalized_cost_usd")),
         cost_model_version=_require_cost_string(raw, "cost_model_version"),
@@ -983,7 +724,6 @@ def _normalized_cost_from_block(raw: dict[str, Any]) -> NormalizedCost:
 
 
 def _normalized_cost(bundle: BundleDocument) -> NormalizedCost:
-    """Extract normalized BenchBox cost or explicit unavailable metadata."""
     raw = _raw_normalized_cost_block(bundle)
     if raw is None:
         return _unavailable_normalized_cost()
@@ -991,7 +731,6 @@ def _normalized_cost(bundle: BundleDocument) -> NormalizedCost:
 
 
 def _cost_usd_alias(cost: NormalizedCost) -> float | None:
-    """Return the legacy compute-only cost alias for read-model compatibility."""
     if cost.cost_usd is None:
         return None
     return float(cost.cost_usd)
@@ -1013,7 +752,6 @@ def _first_string(*values: Any) -> str | None:
 
 
 def _deployment_class_from_contract(bundle: BundleDocument) -> str | None:
-    """Classify deployment from normalized runtime/deployment metadata only."""
     environment = bundle.environment
     runtime = environment.platform_runtime
     deployment = bundle.platform.deployment
@@ -1035,9 +773,6 @@ def _deployment_class_from_contract(bundle: BundleDocument) -> str | None:
     if deployment_key == "embedded" or endpoint_key in {"embedded_process", "localhost_port"}:
         return "local"
     if endpoint_key == "remote_host":
-        # Self-hosted remote server: not local, but no cloud region either.
-        # The compare view expects this vocabulary ("remote"); without it
-        # remote self-hosted runs render as "Local".
         return "remote"
     if runtime_key == "unknown" or deployment_key == "unknown" or endpoint_key == "unknown":
         return "unavailable"
@@ -1047,15 +782,8 @@ def _deployment_class_from_contract(bundle: BundleDocument) -> str | None:
 
 
 def _has_normalized_environment_contract(bundle: BundleDocument) -> bool:
-    """Return true when the bundle carries normalized environment/platform facets."""
     environment = bundle.environment
     platform = bundle.platform
-    # Content-based presence: a block counts when it carries at least one
-    # key. This deliberately narrows the historical isinstance check, under
-    # which an explicitly empty mapping (``"deployment": {}``) counted as a
-    # contract block and routed facet extraction away from the legacy cost
-    # fallback. An empty mapping carries no facets, so treating it as absent
-    # is the more correct routing; no corpus bundle hits the old branch.
     runtime_present = environment.platform_runtime != BundlePlatformRuntime()
     container_present = environment.container != BundleContainerBlock()
     platform_present = any(
@@ -1066,7 +794,6 @@ def _has_normalized_environment_contract(bundle: BundleDocument) -> bool:
 
 
 def _legacy_environment_facets_from_cost(normalized_cost: NormalizedCost) -> dict[str, str | None]:
-    """Recover explorer facets from pre-environment-contract normalized cost metadata."""
     deployment = normalized_cost.deployment
     cloud_provider = _string_or_none(deployment.cloud_provider)
     cloud_region = _string_or_none(deployment.cloud_region)
@@ -1100,7 +827,6 @@ def _environment_facets(
     *,
     normalized_cost: NormalizedCost | None = None,
 ) -> dict[str, str | None]:
-    """Flatten normalized execution-environment facets for the browser store."""
     platform = bundle.platform
     cloud = platform.cloud
     compute = platform.compute
@@ -1129,18 +855,10 @@ def _environment_facets(
 
 
 def _compliance_class(bundle: BundleDocument) -> str | None:
-    """Extract compliance class from the benchmark block of a schema-v2 bundle."""
     return bundle.benchmark.compliance_class
 
 
 def _benchmark_support_status(benchmark_id: str) -> str | None:
-    """Return the registry-declared product support status for a benchmark.
-
-    Looks the canonical benchmark slug up in the benchmark registry
-    (``benchbox.core.benchmark_registry``). None when the slug is not a
-    registry benchmark -- a custom or legacy bundle the registry never
-    declared. Display-only; never a join/dedup key.
-    """
     try:
         status = get_benchmark_support_status(benchmark_id)
     except (KeyError, ValueError):
@@ -1149,11 +867,6 @@ def _benchmark_support_status(benchmark_id: str) -> str | None:
 
 
 def _phase_durations(bundle: BundleDocument) -> dict[str, float] | None:
-    """Extract per-phase durations (seconds) from a schema-v2 bundle phases block.
-
-    Returns a dict keyed by phase name (e.g. "data_loading", "power_test") with
-    values in seconds.  Returns None when no phase data is present.
-    """
     result: dict[str, float] = {}
     for phase_name, phase_data in bundle.phases.items():
         duration_ms = phase_data.duration_ms
@@ -1166,16 +879,6 @@ def _phase_durations(bundle: BundleDocument) -> dict[str, float] | None:
 
 
 def _compute_percentile(values: list[float], p: float) -> float:
-    """Compute the p-th percentile using linear interpolation.
-
-    Mirrors ``textcharts.percentile_ladder.compute_percentile`` exactly so
-    that pipeline-emitted values match CLI chart output within floating-point
-    precision.
-
-    Args:
-        values: Non-empty list of numeric values (will be sorted internally).
-        p:      Percentile in range [0, 100].
-    """
     sorted_vals = sorted(values)
     n = len(sorted_vals)
     if n == 1:
@@ -1189,13 +892,6 @@ def _compute_percentile(values: list[float], p: float) -> float:
 
 
 def _platform_percentile_stats(display_timings: list[QueryDisplayTiming]) -> PercentileStats | None:
-    """Compute P50/P90/P95/P99 over the per-query display_ms medians.
-
-    Returns None when fewer than 1 non-null display_ms value is available.
-    """
-    # Exclude zero values: sub-millisecond queries round to 0 in some runners
-    # and 0ms is not a valid timing (would skew percentiles); genuine sub-ms
-    # timings appear as a small non-zero display_ms from the rounding formula.
     values = [dt.display_ms for dt in display_timings if dt.display_ms is not None and dt.display_ms > 0]
     if not values:
         return None
@@ -1208,18 +904,8 @@ def _platform_percentile_stats(display_timings: list[QueryDisplayTiming]) -> Per
 
 
 def _query_timings(bundle: BundleDocument) -> list[QueryTiming]:
-    """Extract per-query timings from the queries list in a schema-v2 bundle.
-
-    Includes measurement and warmup execution queries (or those without a run_type).
-    Explicitly filters out non-execution pseudo-rows (metadata, summary).
-    Preserves run_type, iter, and stream fields for provenance.
-    """
     timings: list[QueryTiming] = []
     for q in bundle.queries:
-        # Ingest both measurement and warmup executions. Narrow the filter to an
-        # explicit allow-list; do not remove the check entirely, because the corpus
-        # carries "metadata" and "summary" pseudo-rows (ms=0, status=SKIPPED) that
-        # are not execution timings.
         if q.run_type is not None and q.run_type not in _ALLOWED_EXECUTION_RUN_TYPES:
             continue
         duration_ms_raw = q.ms if q.ms is not None else (q.execution_time_ms or 0.0)
@@ -1242,33 +928,10 @@ def _query_timings(bundle: BundleDocument) -> list[QueryTiming]:
 
 
 def _query_display_ms(query_timings: list[QueryTiming]) -> tuple[float | None, int]:
-    """Compute canonical display value and sample count for a single logical query.
-
-    ``query_timings`` must be pre-filtered to a single query_id.
-
-    ``query_timings`` is expected to be pre-filtered to a single query_id by
-    the caller (as ``_build_display_timings`` does via ``_query_timings``).
-
-    Algorithm:
-      1. Filter to passing (status == "pass") rows.
-      2. Prefer run_type == "measurement" rows; fall back to unlabelled legacy rows
-         (run_type is None) when no explicit measurement rows exist. Warmup rows
-         (run_type == "warmup") are NEVER used for display_ms or sample_count.
-      3. Return (median duration_ms, sample_count).
-      4. Return (None, 0) when no passing rows exist.
-
-    Median is chosen over mean so that a single cold-cache outlier (common in
-    power-test runs that include one warmup iteration) does not dominate.
-    """
     passing = [t for t in query_timings if t.status == "pass"]
     if not passing:
         return None, 0
     measurement = [t for t in passing if t.run_type == "measurement"]
-    # DECISION: Fall back to unlabelled legacy rows (run_type is None) only when
-    # no explicit measurement rows exist. Warmup rows (run_type == "warmup")
-    # must NEVER be picked up by the fallback branch; doing so would let warmup
-    # rows feed display_ms for bundles that recorded warmup without measurement
-    # or whose measurement executions failed.
     legacy_unlabelled = [t for t in passing if t.run_type is None]
     candidates = measurement if measurement else legacy_unlabelled
     if not candidates:
@@ -1281,7 +944,6 @@ def _query_display_ms(query_timings: list[QueryTiming]) -> tuple[float | None, i
 
 
 def _build_display_timings(timings: list[QueryTiming]) -> list[QueryDisplayTiming]:
-    """Build per-query canonical display timings from all QueryTiming rows."""
     seen: dict[str, list[QueryTiming]] = {}
     for t in timings:
         seen.setdefault(t.query_id, []).append(t)
@@ -1293,17 +955,10 @@ def _build_display_timings(timings: list[QueryTiming]) -> list[QueryDisplayTimin
 
 
 def _compute_basis_availability(queries: list[QueryTiming]) -> BasisAvailability:
-    """Derive basis availability from query timings for a result bundle.
-
-    Surfaces whether warmup exists, measurement pass count, available bases,
-    and per-query pass count where it varies.
-    """
     warmup_passing = [q for q in queries if q.run_type == "warmup" and q.status == "pass"]
     has_warmup = len(warmup_passing) > 0
     warmup_status = "available" if has_warmup else "no_warmup_recorded"
 
-    # Pre-initialize every attempted measurement query with 0 so completely failed queries
-    # are not silently dropped from varying_pass_queries
     measurement_queries = [q for q in queries if q.run_type == "measurement" or q.run_type is None]
     query_pass_counts: dict[str, int] = {q.query_id: 0 for q in measurement_queries}
     for q in measurement_queries:
@@ -1346,7 +1001,6 @@ def _compute_basis_availability(queries: list[QueryTiming]) -> BasisAvailability
 
 
 def _display_geomean_ms(display_timings: list[QueryDisplayTiming]) -> float | None:
-    """Compute geometric mean of non-None display_ms values across all queries."""
     values = [dt.display_ms for dt in display_timings if dt.display_ms is not None and dt.display_ms > 0]
     if not values:
         return None
@@ -1362,12 +1016,6 @@ def _summary_query_count(bundle: BundleDocument) -> int:
 
 
 def _logical_query_count(bundle: BundleDocument, display_timings: list[QueryDisplayTiming]) -> int:
-    """Infer the logical query denominator without treating repeats as misses.
-
-    ``summary.queries.total`` is retained as the raw sample count. For repeated
-    benchmark runs it can be 3x/4x the logical benchmark query count, while
-    ``display_timings`` has one row per logical query ID.
-    """
     dataframe_skip_total = _dataframe_skip_logical_query_count(bundle)
     if dataframe_skip_total is not None:
         return dataframe_skip_total
@@ -1391,7 +1039,6 @@ def _logical_query_count(bundle: BundleDocument, display_timings: list[QueryDisp
 
 
 def _dataframe_skip_logical_query_count(bundle: BundleDocument) -> int | None:
-    """Return executed+skipped logical query count for DataFrame partial runs."""
     best_total: int | None = None
     for query in bundle.queries:
         summary = query.dataframe_skip_summary
@@ -1423,7 +1070,6 @@ def _int_or_none(value: Any) -> int | None:
 
 
 def _to_finite_float_or_none(value: Any) -> float | None:
-    """Coerce a value to a finite float, or None when absent/invalid."""
     if value is None:
         return None
     try:
@@ -1434,20 +1080,11 @@ def _to_finite_float_or_none(value: Any) -> float | None:
 
 
 def _detail_environment(bundle: BundleDocument) -> ExplorerEnvironment:
-    """Build the detail environment model from the typed environment block.
-
-    Starts from the bundle's own environment keys verbatim, then normalizes
-    the CPU identity and projects the producer ``client_link`` shape
-    (``benchbox/platforms/base/adapter.py``) into flat derived fields.
-    """
     env = bundle.environment
     provided = dict(env.model_extra or {})
     for key in ("os", "arch", "cpu_count", "memory_gb", "python", "cpu_model", "cpu_identity_provenance"):
         if key in env.model_fields_set:
             provided[key] = getattr(env, key)
-    # Nested contract blocks travel verbatim: exclude_unset reproduces the raw
-    # mapping exactly (declared fields were only defaults otherwise), so the
-    # environment copy keeps keys the typed projections never read.
     for key in ("platform_runtime", "container", "client_link"):
         if key in env.model_fields_set:
             provided[key] = getattr(env, key).model_dump(exclude_unset=True)
@@ -1461,11 +1098,6 @@ def _detail_environment(bundle: BundleDocument) -> ExplorerEnvironment:
             provided["cpu_model"] = None
             provided["cpu_family"] = None
 
-    # Producer shape (benchbox/platforms/base/adapter.py): the bundle
-    # carries client_link:{collection_status, client_region,
-    # client_cloud, statement_overhead_ms:{samples,min,median}}. Read
-    # exactly that shape: earlier flattened fallbacks matched no
-    # producer and silently projected NULLs.
     link = env.client_link
     overhead = link.statement_overhead_ms
     provided["client_region"] = _string_or_none(link.client_region)
@@ -1477,19 +1109,11 @@ def _detail_environment(bundle: BundleDocument) -> ExplorerEnvironment:
 
 
 class BundleTransformer:
-    """Transforms a schema-v2 result bundle into explorer read model artifacts."""
-
     def load_bundle(self, bundle_path: Path) -> dict[str, Any]:
-        """Load a schema-v2 bundle from disk, returning parsed data only."""
         data, _ = _load_bundle(bundle_path)
         return data
 
     def load_bundle_full(self, bundle_path: Path) -> tuple[dict[str, Any], bytes]:
-        """Load a bundle and return ``(parsed_data, raw_bytes)``.
-
-        Use this in pipelines that need both the parsed data and a content
-        hash without incurring a second file read.
-        """
         return _load_bundle(bundle_path)
 
     def result_id_from_bundle(
@@ -1499,16 +1123,6 @@ class BundleTransformer:
         *,
         raw: bytes | None = None,
     ) -> str:
-        """Generate a stable result_id from bundle content.
-
-        Format: ``{benchmark}-{platform}-sf{scale_factor}-{yyyymmdd}-{sha8}``
-
-        Args:
-            bundle_path: Path to the bundle file (used to load data/raw if not provided).
-            data: Pre-loaded parsed bundle dict.  If omitted, the file is read.
-            raw: Pre-read raw file bytes for SHA computation.  When both *data*
-                and *raw* are supplied, no file I/O occurs (zero disk reads).
-        """
         if data is not None and raw is not None:
             _ensure_explorer_input_schema(data)
             bundle_data, file_raw = data, raw
@@ -1519,8 +1133,6 @@ class BundleTransformer:
             bundle_data, file_raw = _load_bundle(bundle_path)
         bundle = _parse_bundle(bundle_data)
 
-        # The id embeds the raw scale_factor rendering (int ``1`` stays
-        # ``sf1``); the typed float is only for the read-model fields below.
         raw_benchmark = bundle_data.get("benchmark", {})
         raw_benchmark = raw_benchmark if isinstance(raw_benchmark, dict) else {}
         benchmark = bundle.benchmark.id
@@ -1539,7 +1151,6 @@ class BundleTransformer:
         result_id: str | None = None,
         data: dict[str, Any] | None = None,
     ) -> ManifestEntry:
-        """Extract manifest entry from a result bundle JSON file."""
         bundle_data = data if data is not None else self.load_bundle(bundle_path)
         _ensure_explorer_input_schema(bundle_data)
         bundle = _parse_bundle(bundle_data)
@@ -1554,9 +1165,6 @@ class BundleTransformer:
         query_count = _summary_query_count(bundle)
         failed_query_count = bundle_failed_query_count(bundle_data)
 
-        # Same _query_timings → _build_display_timings pass also runs in
-        # to_detail_result; a shared intermediate could halve the work for
-        # large bundles (≤99 queries makes this negligible today).
         timings = _query_timings(bundle)
         display_timings = _build_display_timings(timings)
         logical_query_count = _logical_query_count(bundle, display_timings)
@@ -1567,6 +1175,7 @@ class BundleTransformer:
             normalized_cost=normalized_cost if _raw_normalized_cost_block(bundle) is not None else None,
         )
         override = _override_display(bundle_path)
+        test_type = _test_type(bundle)
         entry = ManifestEntry(
             result_id=rid,
             benchmark=benchmark,
@@ -1576,6 +1185,8 @@ class BundleTransformer:
             driver_version=_driver_version(bundle),
             run_date=run_date,
             power_score=_power_score(bundle),
+            throughput_at_size=_throughput_at_size(bundle),
+            stream_count=_stream_count(bundle, test_type),
             total_duration_s=total_duration_s,
             geomean_ms=_geomean_ms(bundle),
             display_geomean_ms=_display_geomean_ms(display_timings),
@@ -1603,7 +1214,7 @@ class BundleTransformer:
             override_approver=override["override_approver"],
             override_expires=override["override_expires"],
             tuning_policy_generation=_tuning_policy_generation(bundle),
-            test_type=_test_type(bundle),
+            test_type=test_type,
             validation_status=_validation_status(bundle, bundle_data),
             failed_query_count=failed_query_count,
             benchmark_support_status=_benchmark_support_status(canonical_benchmark_slug(str(benchmark))),
@@ -1632,7 +1243,6 @@ class BundleTransformer:
         bundle_download_url: str = "",
         data: dict[str, Any] | None = None,
     ) -> DetailResult:
-        """Extract full detail from a result bundle JSON file."""
         bundle_data = data if data is not None else self.load_bundle(bundle_path)
         _ensure_explorer_input_schema(bundle_data)
         bundle = _parse_bundle(bundle_data)
@@ -1645,9 +1255,6 @@ class BundleTransformer:
 
         environment = _detail_environment(bundle)
 
-        # Plans are still a companion file; the requested tuning is not. It rides
-        # in `platform.tuning.requested`, with a retired `{stem}.tuning.json`
-        # companion recognized for bundles published before the move.
         stem = bundle_path.stem
         has_plans = bundle_path.with_name(f"{stem}.plans.json").exists()
         has_tuning = _has_requested_tuning(bundle) or bundle_path.with_name(f"{stem}.tuning.json").exists()
@@ -1659,6 +1266,7 @@ class BundleTransformer:
         logical_query_count = _logical_query_count(bundle, display_timings)
         timing_contract = timing_eligibility(display_timings, logical_query_count)
         normalized_cost = _normalized_cost(bundle)
+        test_type = _test_type(bundle)
         detail = DetailResult(
             result_id=result_id,
             benchmark=benchmark,
@@ -1671,6 +1279,8 @@ class BundleTransformer:
             geomean_ms=_geomean_ms(bundle),
             display_geomean_ms=_display_geomean_ms(display_timings),
             power_score=_power_score(bundle),
+            throughput_at_size=_throughput_at_size(bundle),
+            stream_count=_stream_count(bundle, test_type),
             has_display_timing=timing_contract.has_display_timing,
             logical_query_count=logical_query_count,
             valid_query_count=timing_contract.valid_query_count,
@@ -1699,7 +1309,7 @@ class BundleTransformer:
             override_approver=override["override_approver"],
             override_expires=override["override_expires"],
             tuning_policy_generation=_tuning_policy_generation(bundle),
-            test_type=_test_type(bundle),
+            test_type=test_type,
             validation_status=_validation_status(bundle, bundle_data),
             failed_query_count=bundle_failed_query_count(bundle_data),
             cost_usd=_cost_usd_alias(normalized_cost),
@@ -1719,6 +1329,9 @@ class BundleTransformer:
             driver_version=_driver_version(bundle),
             run_date=run_date,
             power_score=detail.power_score,
+            throughput_at_size=detail.throughput_at_size,
+            stream_count=detail.stream_count,
+            test_type=detail.test_type,
             total_duration_s=total_duration_s,
             geomean_ms=detail.geomean_ms,
             display_geomean_ms=detail.display_geomean_ms,

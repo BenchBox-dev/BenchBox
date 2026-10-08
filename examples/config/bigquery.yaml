@@ -8,5 +8,5 @@ connection:
 settings:
   job_priority: "INTERACTIVE"
   query_cache: true
-  storage_bucket: "your-bucket-name"  # For efficient data loading
-  maximum_bytes_billed: 1073741824  # 1GB limit
+  storage_bucket: "your-bucket-name"
+  maximum_bytes_billed: 1073741824

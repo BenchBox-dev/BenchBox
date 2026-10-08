@@ -1,10 +1,3 @@
-"""LakeSail Sail DataFrame adapter for expression-family benchmarking.
-
-LakeSail uses the standard PySpark client via Spark Connect, so the DataFrame
-and expression API is shared with :class:`PySparkDataFrameAdapter`. This module
-keeps the LakeSail-specific session wiring and reporting local.
-"""
-
 from __future__ import annotations
 
 import os
@@ -36,8 +29,6 @@ else:
 
 
 class LakeSailDataFrameAdapter(PySparkDataFrameAdapter):
-    """LakeSail Sail adapter using PySpark-compatible DataFrame operations."""
-
     def __init__(
         self,
         working_dir: str | Path | None = None,
@@ -93,10 +84,6 @@ class LakeSailDataFrameAdapter(PySparkDataFrameAdapter):
             builder = SparkSession.builder.remote(self._endpoint)
             builder = builder.config("spark.app.name", self._app_name)
             builder = builder.config("spark.sql.shuffle.partitions", str(self._shuffle_partitions))
-            # Set every AQE key explicitly in both directions: Spark enables
-            # AQE by default since 3.2.0, so an omitted key would silently
-            # stay on even when enable_aqe is False. User spark_config is
-            # applied next, so an explicit override there still wins.
             for aqe_key, aqe_value in spark_aqe_conf_entries(self._enable_aqe).items():
                 builder = builder.config(aqe_key, aqe_value)
             for key, value in self._spark_config.items():

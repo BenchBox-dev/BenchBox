@@ -1,5 +1,3 @@
-"""Unit tests for SparkSessionManager behavior."""
-
 from __future__ import annotations
 
 import logging
@@ -25,20 +23,18 @@ pytestmark = [
 
 
 def _patch_classmethod(monkeypatch: pytest.MonkeyPatch, attr: str, func):
-    """Helper to patch classmethods on SparkSessionManager."""
     monkeypatch.setattr(SparkSessionManager, attr, classmethod(func))
 
 
 @pytest.fixture(autouse=True)
 def reset_manager():
-    """Ensure manager state is clean between tests."""
     SparkSessionManager.close()
     yield
     SparkSessionManager.close()
 
 
 def test_get_or_create_returns_singleton(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verify manager creates one session per process configuration."""
+
     fake_session = SimpleNamespace(stop=lambda: None)
 
     monkeypatch.setattr(session_module, "PYSPARK_AVAILABLE", True)
@@ -68,7 +64,6 @@ def test_get_or_create_redacts_azure_sas_config_in_debug_log(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """Azure Hadoop SAS values are bearer credentials and must not reach logs."""
     fake_session = SimpleNamespace(stop=lambda: None)
     sas_key = "spark.hadoop.fs.azure.sas.container.account.blob.core.windows.net"
 
@@ -94,7 +89,7 @@ def test_get_or_create_redacts_azure_sas_config_in_debug_log(
 
 
 def test_configuration_mismatch_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verify requesting a different configuration raises SparkConfigurationError."""
+
     fake_session = SimpleNamespace(stop=lambda: None)
 
     monkeypatch.setattr(session_module, "PYSPARK_AVAILABLE", True)
@@ -125,7 +120,6 @@ def test_configuration_mismatch_raises(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_release_stops_session_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ensure release stops the shared session when refcount hits zero."""
     fake_session = SimpleNamespace()
     stop_called = {"count": 0}
 
@@ -154,24 +148,18 @@ def test_release_stops_session_once(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_java_home_auto_switch(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ensure Java validation attempts to switch JAVA_HOME when unsupported."""
     monkeypatch.setattr(session_module, "PYSPARK_AVAILABLE", True)
 
-    # Reset Java validation state to ensure fresh validation runs
     SparkSessionManager._java_validated = False
 
-    # Simulate: first check returns 25 (incompatible), after switch returns 17 (compatible)
     call_count = {"n": 0}
 
     def fake_detect(java_home: str | None = None) -> int | None:
         call_count["n"] += 1
-        # If java_home is set to our fake path, return compatible version
         if java_home == "/fake/jdk17":
             return 17
-        # Otherwise return incompatible version
         return 25
 
-    # Mock find_supported_java_home to return our fake Java installation
     def fake_find_supported():
         return ("/fake/jdk17", 17)
 
@@ -181,7 +169,6 @@ def test_java_home_auto_switch(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_session = SimpleNamespace(stop=lambda: None)
     _patch_classmethod(monkeypatch, "_create_session", lambda cls, config: fake_session)
 
-    # Clear JAVA_HOME to trigger auto-switch
     monkeypatch.delenv("JAVA_HOME", raising=False)
     monkeypatch.delenv("BENCHBOX_JAVA_HOME", raising=False)
 
@@ -199,14 +186,8 @@ def test_java_home_auto_switch(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 class TestSuppressWindowExecWarning:
-    """Tests for the shared suppress_window_exec_warning function.
-
-    This function is the single implementation used by both SparkAdapter
-    and SparkSessionManager to suppress WindowExec partition warnings.
-    """
-
     def test_calls_configurator_with_logger_object(self) -> None:
-        """Verify suppress uses logger-object Configurator.setLevel overload."""
+
         mock_spark = SimpleNamespace(sparkContext=SimpleNamespace(_jvm=MagicMock()))
         mock_jvm = mock_spark.sparkContext._jvm
         mock_logger = MagicMock()
@@ -223,26 +204,20 @@ class TestSuppressWindowExecWarning:
         )
 
     def test_does_not_raise_on_jvm_error(self) -> None:
-        """Verify suppression silently passes when JVM gateway fails."""
         mock_spark = SimpleNamespace(sparkContext=SimpleNamespace(_jvm=MagicMock()))
         mock_spark.sparkContext._jvm.org.apache.logging.log4j.core.config.Configurator.setLevel.side_effect = (
             RuntimeError("JVM not available")
         )
 
-        # Should not raise
         suppress_window_exec_warning(mock_spark)
 
     def test_does_not_raise_when_jvm_is_none(self) -> None:
-        """Verify suppression handles missing JVM gateway gracefully."""
         mock_spark = SimpleNamespace(sparkContext=SimpleNamespace(_jvm=None))
 
-        # Should not raise
         suppress_window_exec_warning(mock_spark)
 
 
 class _RecordingBuilder:
-    """Stand-in for the chained SparkSession.builder calls."""
-
     def __init__(self) -> None:
         self.entries: dict[str, str] = {}
         self.session = MagicMock()
@@ -262,7 +237,6 @@ class _RecordingBuilder:
 
 
 def _create_session_with_fake_builder(monkeypatch: pytest.MonkeyPatch, config: SparkSessionConfig) -> dict[str, str]:
-    """Run _create_session against a recording builder; return its entries."""
     builder = _RecordingBuilder()
     fake_spark_session = SimpleNamespace(builder=builder)
     monkeypatch.setattr(session_module, "SparkSession", fake_spark_session)
@@ -282,12 +256,10 @@ def _session_config(**overrides) -> SparkSessionConfig:
         "extra_configs": (),
     }
     params.update(overrides)
-    return SparkSessionConfig(**params)  # type: ignore[arg-type]
+    return SparkSessionConfig(**params)
 
 
 class TestCreateSessionAqeKeys:
-    """_create_session() must set every AQE key explicitly in both directions."""
-
     def test_aqe_enabled_sets_all_keys_true(self, monkeypatch: pytest.MonkeyPatch) -> None:
         entries = _create_session_with_fake_builder(monkeypatch, _session_config(enable_aqe=True))
 
@@ -296,8 +268,6 @@ class TestCreateSessionAqeKeys:
         assert entries["spark.sql.adaptive.skewJoin.enabled"] == "true"
 
     def test_aqe_disabled_sets_all_keys_false(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Spark enables AQE by default since 3.2.0: an omitted key would
-        # silently stay on, so disabling must write "false" explicitly.
         entries = _create_session_with_fake_builder(monkeypatch, _session_config(enable_aqe=False))
 
         assert entries["spark.sql.adaptive.enabled"] == "false"

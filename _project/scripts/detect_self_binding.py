@@ -1,45 +1,6 @@
-"""Static detector for correlated-subquery self-binding in benchmark SQL.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-PR #756 fixed three TPC-Havoc SQL variants where a correlated subquery's
-UNQUALIFIED correlation column silently bound to the INNER relation instead of
-the intended outer table, degenerating a per-row correlation into an
-uncorrelated scan (wrong results, but execution stays "green"). Example::
-
-    -- intended: correlate inner ps2 to the OUTER partsupp row
-    where ps2.ps_partkey = ps_partkey      -- BUG: ps_partkey binds to inner ps2
-    where ps2.ps_partkey = partsupp.ps_partkey   -- FIX: qualified to the outer
-
-This module is a conservative, catalog-aware lint that surfaces such cases as
-*candidates for human review* (it is advisory, not a hard gate - see
-``_project/TODO/main/planning/correlated-subquery-self-binding-cross-surface-audit.yaml``).
-
-Heuristic
----------
-Inside a subquery, an unqualified column in a comparison predicate is flagged
-when ALL of the following hold:
-
-* the predicate's *other* operand is a column qualified by one of the subquery's
-  own (inner) source aliases - i.e. the predicate is correlation-shaped, pairing
-  an inner column with a bare column (a bare-column-vs-literal filter is ignored);
-* the bare column is provided by an inner source (so it silently binds inner);
-* the bare column is also provided by an enclosing (outer) source (so the author
-  plausibly meant the outer relation - the binding is *ambiguous*, which is what
-  makes the defect silent rather than an error).
-
-Inner/outer "provided" columns include base-table columns (from the benchmark's
-own DDL) AND the output columns of derived-table / CTE sources, so a correlation
-target that is a CTE (as in the #756 Q17 fix) is covered. Plain filters,
-fully-qualified correlations, and unambiguous (inner-only or outer-only) columns
-are not flagged, which keeps false positives low.
-
-The column->tables index is built by parsing the benchmark's own
-``CREATE TABLE`` DDL, so the detector is benchmark-agnostic: hand it any DDL and
-any SQL.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -52,18 +13,59 @@ import sqlglot
 from sqlglot import exp
 from sqlglot.optimizer.scope import Scope, build_scope
 
+CLI_DESCRIPTION = (
+    "Static detector for correlated-subquery self-binding in benchmark SQL.\n"
+    "\n"
+    "PR #756 fixed three TPC-Havoc SQL variants where a correlated subquery's\n"
+    "UNQUALIFIED correlation column silently bound to the INNER relation instead of\n"
+    "the intended outer table, degenerating a per-row correlation into an\n"
+    'uncorrelated scan (wrong results, but execution stays "green"). Example::\n'
+    "\n"
+    "    -- intended: correlate inner ps2 to the OUTER partsupp row\n"
+    "    where ps2.ps_partkey = ps_partkey      -- BUG: ps_partkey binds to inner ps2\n"
+    "    where ps2.ps_partkey = partsupp.ps_partkey   -- FIX: qualified to the outer\n"
+    "\n"
+    "This module is a conservative, catalog-aware lint that surfaces such cases as\n"
+    "*candidates for human review* (it is advisory, not a hard gate - see\n"
+    "``_project/TODO/main/planning/correlated-subquery-self-binding-cross-surface-audit.yaml``).\n"
+    "\n"
+    "Heuristic\n"
+    "---------\n"
+    "Inside a subquery, an unqualified column in a comparison predicate is flagged\n"
+    "when ALL of the following hold:\n"
+    "\n"
+    "* the predicate's *other* operand is a column qualified by one of the subquery's\n"
+    "  own (inner) source aliases - i.e. the predicate is correlation-shaped, pairing\n"
+    "  an inner column with a bare column (a bare-column-vs-literal filter is ignored);\n"
+    "* the bare column is provided by an inner source (so it silently binds inner);\n"
+    "* the bare column is also provided by an enclosing (outer) source (so the author\n"
+    "  plausibly meant the outer relation - the binding is *ambiguous*, which is what\n"
+    "  makes the defect silent rather than an error).\n"
+    "\n"
+    'Inner/outer "provided" columns include base-table columns (from the benchmark\'s\n'
+    "own DDL) AND the output columns of derived-table / CTE sources, so a correlation\n"
+    "target that is a CTE (as in the #756 Q17 fix) is covered. Plain filters,\n"
+    "fully-qualified correlations, and unambiguous (inner-only or outer-only) columns\n"
+    "are not flagged, which keeps false positives low.\n"
+    "\n"
+    "The column->tables index is built by parsing the benchmark's own\n"
+    "``CREATE TABLE`` DDL, so the detector is benchmark-agnostic: hand it any DDL and\n"
+    "any SQL.\n"
+    "\n"
+    "Copyright 2026 Joe Harris / BenchBox Project\n"
+    "\n"
+    "Licensed under the MIT License. See LICENSE file in the project root for details.\n"
+)
+
 
 @dataclass(frozen=True)
 class SelfBindingCandidate:
-    """A predicate whose unqualified column may silently bind to the inner relation."""
-
     column: str
     predicate: str
     inner_tables: tuple[str, ...]
     ambiguous_tables: tuple[str, ...]
 
     def describe(self) -> str:
-        """One-line human-readable description."""
         return (
             f"unqualified `{self.column}` in `{self.predicate}` silently binds to an "
             f"inner source {list(self.inner_tables)} though `{self.column}` is also "
@@ -73,7 +75,6 @@ class SelfBindingCandidate:
 
 
 def build_column_table_index(create_table_sql: str, *, dialect: str = "duckdb") -> dict[str, set[str]]:
-    """Map each column name to the set of tables that define it, from CREATE TABLE DDL."""
     index: dict[str, set[str]] = defaultdict(set)
     for statement in sqlglot.parse(create_table_sql, read=dialect):
         if not isinstance(statement, exp.Create):
@@ -89,12 +90,6 @@ def build_column_table_index(create_table_sql: str, *, dialect: str = "duckdb") 
 
 
 def _provided_columns(scope: Scope, column_index: dict[str, set[str]]) -> set[str]:
-    """Lower-cased column names this scope's own sources expose.
-
-    Base tables contribute their DDL columns; derived-table / CTE sources
-    contribute the output names of their SELECT (so CTE correlation targets,
-    as in the #756 Q17 fix, are recognized).
-    """
     provided: set[str] = set()
     for source in scope.sources.values():
         if isinstance(source, exp.Table):
@@ -106,12 +101,10 @@ def _provided_columns(scope: Scope, column_index: dict[str, set[str]]) -> set[st
 
 
 def _inner_alias_qualified(operand: exp.Expression | None, inner_aliases: set[str]) -> bool:
-    """True if operand is a column qualified by one of this subquery's own source aliases."""
     return isinstance(operand, exp.Column) and bool(operand.table) and operand.table.lower() in inner_aliases
 
 
 def _comparison_predicates(scope: Scope) -> Iterable[exp.Binary]:
-    """Comparison predicates in WHERE/HAVING/JOIN-ON of this scope's own SELECT."""
     select = scope.expression
     if not isinstance(select, exp.Select):
         return []
@@ -131,13 +124,6 @@ def _comparison_predicates(scope: Scope) -> Iterable[exp.Binary]:
 
 
 def _dml_outer_columns(tree: exp.Expression, column_index: dict[str, set[str]]) -> set[str]:
-    """Columns exposed by an UPDATE/DELETE target (and USING/FROM) tables.
-
-    These tables are the outermost correlation source for a subquery inside the
-    DML statement, but they are not modeled as a parent scope, so they are
-    collected directly. Tables nested inside a subquery (which have a SELECT
-    ancestor) are excluded - those are inner sources, not the DML outer.
-    """
     if not isinstance(tree, (exp.Update, exp.Delete)):
         return set()
     outer_tables: set[str] = set()
@@ -152,28 +138,11 @@ def _dml_outer_columns(tree: exp.Expression, column_index: dict[str, set[str]]) 
 def find_self_binding_candidates(
     sql: str, column_index: dict[str, set[str]], *, dialect: str = "duckdb"
 ) -> list[SelfBindingCandidate]:
-    """Flag unqualified subquery columns that may self-bind to the inner relation.
-
-    Args:
-        sql: The query to analyze.
-        column_index: column name -> defining tables, e.g. from build_column_table_index.
-        dialect: SQL dialect for parsing.
-
-    Returns:
-        Candidates ordered by appearance. Conservative: only a bare column compared
-        against an inner-alias-qualified column, where the bare column is provided by
-        BOTH an inner and an outer source, is flagged.
-    """
     tree = sqlglot.parse_one(sql, read=dialect)
     root = build_scope(tree)
     if root is None:
         return []
 
-    # For UPDATE/DELETE the target (and USING/FROM) tables are the outermost
-    # correlation source, but sqlglot does not expose them as a parent scope of
-    # the subquery, so collect their columns explicitly. Otherwise a correlated
-    # subquery in DML would never see an "outer" relation and self-binds there
-    # would be silently missed.
     dml_outer_provided = _dml_outer_columns(tree, column_index)
 
     candidates: list[SelfBindingCandidate] = []
@@ -183,9 +152,6 @@ def find_self_binding_candidates(
         inner_provided = _provided_columns(scope, column_index)
         if not inner_provided:
             continue
-        # A column must be providable by an OUTER relation to be a self-bind; the
-        # top-level query scope has no outer source, so it never flags (no explicit
-        # parentless skip needed).
         outer_provided: set[str] = set(dml_outer_provided)
         ancestor = scope.parent
         while ancestor is not None:
@@ -196,12 +162,12 @@ def find_self_binding_candidates(
             left, right = predicate.left, predicate.right
             for bare, other in ((left, right), (right, left)):
                 if not isinstance(bare, exp.Column) or bare.table:
-                    continue  # need an UNqualified column on this side
+                    continue
                 name = bare.name.lower()
                 if name not in inner_provided or name not in outer_provided:
-                    continue  # unambiguous (inner-only or outer-only): not a self-bind
+                    continue
                 if not _inner_alias_qualified(other, inner_aliases):
-                    continue  # other side must be an inner-qualified column (correlation shape)
+                    continue
                 text = predicate.sql(dialect=dialect)
                 key = (name, text)
                 if key in seen:
@@ -219,10 +185,6 @@ def find_self_binding_candidates(
 
 
 def _scan_tpchavoc() -> int:
-    """Scan all TPC-Havoc SQL variants and print self-binding candidates.
-
-    Returns the number of variants flagged (advisory; the CLI always exits 0).
-    """
     from benchbox.core.tpchavoc.benchmark import TPCHavocBenchmark
 
     benchmark = TPCHavocBenchmark(scale_factor=1.0)
@@ -235,7 +197,7 @@ def _scan_tpchavoc() -> int:
             try:
                 sql = benchmark.get_query(key)
                 found = find_self_binding_candidates(sql, index)
-            except Exception as exc:  # noqa: BLE001 - advisory tool must not crash on one query
+            except Exception as exc:
                 print(f"  {key}: SKIP ({type(exc).__name__}: {exc})")
                 continue
             if found:
@@ -248,13 +210,12 @@ def _scan_tpchavoc() -> int:
 
 
 def main() -> int:
-    """CLI: scan a benchmark's SQL for self-binding candidates (advisory, always exits 0)."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--benchmark", default="tpchavoc", choices=["tpchavoc"], help="benchmark to scan")
     parser.parse_args()
     _scan_tpchavoc()
     return 0
 
 
-if __name__ == "__main__":  # pragma: no cover - CLI entry point
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

@@ -1,19 +1,6 @@
-"""Regression tests for the test-suite POSIX shell resolver.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-The Windows nightly failed ~14 tests because ``subprocess.run(["bash", ...])``
-resolved to ``C:\\Windows\\System32\\bash.exe`` — the WSL launcher stub, which
-precedes Git Bash on the runner's PATH. With no distro installed it emits its usage
-text in UTF-16LE and exits 1, so assertions compared expected substrings against
-mojibake. These tests pin the two properties that fix relies on, using a fake stub
-so they reproduce on any platform:
-
-1. a stub that exits non-zero is rejected even when it is first on PATH, and
-2. the search continues past it to a real bash further along PATH.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -35,10 +22,8 @@ pytestmark = [
 
 
 def _write_wsl_stub(directory: Path) -> Path:
-    """Write an executable that behaves like the WSL launcher with no distro."""
     directory.mkdir(parents=True, exist_ok=True)
     stub = directory / ("bash.exe" if os.name == "nt" else "bash")
-    # Emit UTF-16LE bytes on stdout and exit 1, exactly as the real stub does.
     stub.write_text(
         f"#!{sys.executable}\n"
         "import sys\n"
@@ -53,8 +38,6 @@ def _write_wsl_stub(directory: Path) -> Path:
 
 @pytest.fixture(autouse=True)
 def _clear_resolver_cache():
-    """posix_shell() is lru_cached; each test needs a fresh probe, and must not
-    leave a PATH-specific answer cached for whatever runs next."""
     cached_resolver = posix_shell_module.posix_shell
     cached_resolver.cache_clear()
     yield
@@ -63,7 +46,6 @@ def _clear_resolver_cache():
 
 @pytest.mark.skipif(os.name == "nt", reason="stub uses a POSIX shebang")
 def test_stub_first_on_path_is_rejected_and_real_bash_is_found(tmp_path, monkeypatch):
-    """A failing stub earlier on PATH must not hide a working bash later on it."""
     real_bash = shutil.which("bash")
     if real_bash is None:
         pytest.skip("no system bash to fall through to")
@@ -77,7 +59,6 @@ def test_stub_first_on_path_is_rejected_and_real_bash_is_found(tmp_path, monkeyp
 
     assert resolved is not None, "resolver gave up instead of continuing past the stub"
     assert Path(resolved).parent != stub_dir, f"resolver returned the stub: {resolved}"
-    # And the shell it picked really runs the bashisms our workflow fragments use.
     completed = subprocess.run(
         [resolved, "-c", 'set -euo pipefail\nread -r v <<< "ok"\nprintf "%s" "$v"'],
         check=False,
@@ -89,8 +70,6 @@ def test_stub_first_on_path_is_rejected_and_real_bash_is_found(tmp_path, monkeyp
 
 @pytest.mark.skipif(os.name == "nt", reason="stub uses a POSIX shebang")
 def test_resolver_returns_none_when_only_a_stub_is_available(tmp_path, monkeypatch):
-    """With nothing but a stub reachable, the resolver reports no shell rather than
-    handing back something that will produce mojibake."""
     stub_dir = tmp_path / "onlystub"
     _write_wsl_stub(stub_dir)
     monkeypatch.setenv("PATH", str(stub_dir))
@@ -101,7 +80,6 @@ def test_resolver_returns_none_when_only_a_stub_is_available(tmp_path, monkeypat
 
 @pytest.mark.skipif(os.name == "nt", reason="stub uses a POSIX shebang")
 def test_env_override_is_probed_not_trusted(tmp_path, monkeypatch):
-    """An explicitly configured shell still has to pass the probe."""
     stub_dir = tmp_path / "override"
     stub = _write_wsl_stub(stub_dir)
     monkeypatch.setenv("BENCHBOX_TEST_POSIX_SHELL", str(stub))

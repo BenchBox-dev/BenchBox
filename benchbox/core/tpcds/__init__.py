@@ -1,13 +1,9 @@
-"""Minimal TPC-DS benchmark implementation.
-Hard requirement on compiled C tools.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
+# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DS specification.
 
-TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DS specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from pathlib import Path
 
@@ -19,24 +15,11 @@ from .queries import TPCDSQueryManager
 
 
 def _validate_c_tools() -> None:
-    """Validate C tools at import time - warn if missing but allow import.
-
-    This allows users to import the module even if they don't have TPC-DS
-    templates installed, which is useful when:
-    - Only using other benchmarks (TPC-H, etc.)
-    - Installing via pip (templates should be bundled but may be missing)
-    - Running in restricted environments like Databricks notebooks
-
-    If tools are missing, users will get a clear error when they try to
-    actually use TPC-DS functionality.
-    """
     import warnings
 
     try:
-        # Try to initialize dsqgen binary
         dsqgen = DSQGenBinary()
 
-        # Validate key tools exist
         if not dsqgen.templates_dir.exists():
             warnings.warn(
                 f"TPC-DS query templates not found at {dsqgen.templates_dir}. "
@@ -48,7 +31,6 @@ def _validate_c_tools() -> None:
             )
 
     except (TPCDSError, RuntimeError) as e:
-        # Warn but don't fail - let users import even if tools unavailable
         tools_path = Path(__file__).parent.parent.parent.parent / "_sources/tpc-ds/tools"
         warnings.warn(
             f"TPC-DS tools unavailable: {e}\n"
@@ -60,7 +42,6 @@ def _validate_c_tools() -> None:
         )
 
 
-# Validate at import - warn if tools unavailable but allow import
 _validate_c_tools()
 
 __all__ = [

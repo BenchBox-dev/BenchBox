@@ -1,10 +1,3 @@
-"""Unit tests for DataFrame BenchmarkExecutionMixin behavior.
-
-Covers:
-- Missing data detection with adapter path
-- Fail-fast on load errors (no query execution)
-"""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -61,12 +54,11 @@ class DummyAdapter(BenchmarkExecutionMixin):
 class DummyPandasProfiledAdapter(DummyAdapter):
     family = "pandas"
 
-    def __init__(self, *, query_plan=None) -> None:  # noqa: ANN001
+    def __init__(self, *, query_plan=None) -> None:
         super().__init__()
         self._query_plan = query_plan
         self.profiled_called = False
 
-    # Intentionally no `capture_plan` parameter: this matches PandasFamilyAdapter.
     def execute_query_profiled(self, ctx, query, query_id=None):
         _ = (ctx, query, query_id)
         self.profiled_called = True
@@ -91,8 +83,6 @@ class DummyDataFusionAdapter(DummyAdapter):
 
 
 class TpchRowCountAdapter(DummyAdapter):
-    """Adapter stub whose Q1 row count matches the SF1 TPC-H answer set."""
-
     def __init__(self, rows_returned: int = 4) -> None:
         super().__init__()
         self.rows_returned = rows_returned
@@ -104,8 +94,6 @@ class TpchRowCountAdapter(DummyAdapter):
 
 
 class DummyBenchmarkWithPlatformSkips:
-    """Benchmark that vends platform-specific skip lists via get_platform_skip_queries."""
-
     def get_platform_skip_queries(self, platform_name: str) -> list[str]:
         if platform_name.lower() == "datafusion":
             return ["list_filter", "list_transform"]
@@ -478,10 +466,6 @@ def test_capture_plans_counts_missing_plan_as_failure(tmp_path):
 
 
 class _RecordingCaptureFailureAdapter(DummyPandasProfiledAdapter):
-    """Mirrors ExpressionFamilyAdapter's real capture-failure recording: the
-    real exception cause is set on the row dict (plan_capture_error) and
-    appended to the per-run self.plan_capture_errors list."""
-
     def execute_query_profiled(self, ctx, query, query_id=None):
         result, profile = super().execute_query_profiled(ctx, query, query_id)
         result["plan_capture_error"] = "TypeError: unsupported operand"
@@ -490,10 +474,6 @@ class _RecordingCaptureFailureAdapter(DummyPandasProfiledAdapter):
 
 
 def test_capture_plans_preserves_real_capture_error_cause(tmp_path):
-    """qpc-05/#1032 review (F4.4): the real capture-failure cause recorded on
-    self.plan_capture_errors during execution must reach the companion
-    errors list via existing_errors=, and plan_capture_error must reach the
-    persisted main query row - not the generic "Query plan not captured"."""
     adapter = _RecordingCaptureFailureAdapter(query_plan=None)
     tbl_path = tmp_path / "customer.tbl"
     tbl_path.write_text("1|Alice|\n")
@@ -520,8 +500,6 @@ def test_capture_plans_preserves_real_capture_error_cause(tmp_path):
 
 
 def test_run_benchmark_resets_plan_capture_errors_between_runs(tmp_path):
-    """A reused adapter instance must not leak plan_capture_errors from a
-    prior run into the next run's companion errors list (qpc-15 F4.4)."""
     adapter = _RecordingCaptureFailureAdapter(query_plan=None)
     tbl_path = tmp_path / "customer.tbl"
     tbl_path.write_text("1|Alice|\n")
@@ -543,12 +521,10 @@ def test_run_benchmark_resets_plan_capture_errors_between_runs(tmp_path):
     second = adapter.run_benchmark(benchmark, **run_kwargs)
 
     assert len(first.plan_capture_errors) == 1
-    # Not 2: the second run's errors must not be appended to the first run's.
     assert len(second.plan_capture_errors) == 1
 
 
 def test_collect_skip_query_ids_routes_through_get_platform_skip_queries():
-    """Platform-specific skips flow through get_platform_skip_queries, not a hardcoded check."""
     adapter = DummyDataFusionAdapter()
     benchmark = DummyBenchmarkWithPlatformSkips()
 
@@ -559,9 +535,8 @@ def test_collect_skip_query_ids_routes_through_get_platform_skip_queries():
 
 
 def test_collect_skip_query_ids_platform_dispatch_is_parameterized():
-    """Different platforms get different skip lists from the same dispatch point."""
     datafusion_adapter = DummyDataFusionAdapter()
-    polars_adapter = DummyAdapter()  # platform_name = "Polars"
+    polars_adapter = DummyAdapter()
     benchmark = DummyBenchmarkWithPlatformSkips()
 
     datafusion_skips = datafusion_adapter._collect_skip_query_ids(benchmark)
@@ -572,9 +547,8 @@ def test_collect_skip_query_ids_platform_dispatch_is_parameterized():
 
 
 def test_collect_skip_query_ids_no_platform_skips_method():
-    """Benchmarks without get_platform_skip_queries silently produce no platform skips."""
     adapter = DummyDataFusionAdapter()
-    benchmark = DummyBenchmark(tables={})  # no get_platform_skip_queries
+    benchmark = DummyBenchmark(tables={})
 
     skip_ids = adapter._collect_skip_query_ids(benchmark)
 
@@ -583,7 +557,7 @@ def test_collect_skip_query_ids_no_platform_skips_method():
 
 
 class _StubTPCDSQueryManager:
-    def get_query(self, query_id, seed=None, variant=None):  # noqa: ANN001
+    def get_query(self, query_id, seed=None, variant=None):
         _ = (query_id, seed, variant)
         return "SELECT 1"
 
@@ -612,10 +586,6 @@ def test_tpcds_dataframe_requires_variant_parity_in_mixin(monkeypatch):
 
 
 class TestStructureDataFramePlan:
-    """qpc-06 w4 / F3.2: DataFrame text plans are promoted to QueryPlanDAGs via
-    a registered parser, with a text-only fallback when no parser exists or
-    parsing fails."""
-
     def test_datafusion_text_plan_promoted_to_dag_preserving_raw_output(self):
         from benchbox.core.dataframe.profiling import QueryPlan
         from benchbox.core.results.query_plan_models import QueryPlanDAG
@@ -631,19 +601,17 @@ class TestStructureDataFramePlan:
         structured = adapter._structure_dataframe_plan(captured, "q1")
 
         assert isinstance(structured, QueryPlanDAG)
-        assert structured.plan_fingerprint  # real structural fingerprint computed
-        # Original plan text preserved for debugging.
+        assert structured.plan_fingerprint
         assert structured.raw_explain_output == plan_text
 
     def test_platform_without_parser_falls_back_to_text_plan(self):
         from benchbox.core.dataframe.profiling import QueryPlan
 
-        adapter = DummyAdapter()  # platform_name "Polars" (no registered parser)
+        adapter = DummyAdapter()
         captured = QueryPlan(platform="polars", plan_type="logical", plan_text="FILTER\n  SCAN lineitem")
 
         structured = adapter._structure_dataframe_plan(captured, "q1")
 
-        # Returned unchanged (still the text-only QueryPlan), not a DAG.
         assert structured is captured
 
     def test_parser_failure_falls_back_to_text_plan(self, monkeypatch):
@@ -714,8 +682,6 @@ class TestStructureDataFramePlan:
             "benchbox.core.query_plans.parsers.registry.get_parser_for_platform",
             _fail_if_called,
         )
-        # plan_type stays "logical" on this path (see capture_datafusion_plan);
-        # only the sentinel text signals capture was unavailable.
         captured = QueryPlan(platform="datafusion", plan_type="logical", plan_text="Plan capture not available")
 
         structured = adapter._structure_dataframe_plan(captured, "q1")
@@ -724,8 +690,6 @@ class TestStructureDataFramePlan:
 
 
 class TestHandleNoQueries:
-    """An empty resolution must not be survivable on the production path."""
-
     def test_empty_resolution_raises_configuration_error(self):
         from benchbox.core.exceptions import ConfigurationError
 
@@ -741,19 +705,15 @@ class TestHandleNoQueries:
 
 
 class TestResolveColumnNamesAndDelimiter:
-    """The csv_delimiter override must be a real string, never Mock pollution."""
-
     def _config(self):
         return BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
 
     def test_mock_benchmark_delimiter_is_ignored(self):
-        """getattr on a Mock fabricates a child mock; it must not become the delimiter."""
         adapter = DummyAdapter()
         _, delimiter = adapter._resolve_column_names_and_delimiter(self._config(), MagicMock())
         assert delimiter is None
 
     def test_string_benchmark_delimiter_is_kept(self):
-        """A real benchmark-declared delimiter still flows through."""
         adapter = DummyAdapter()
         benchmark = SimpleNamespace(csv_delimiter=";", tables={})
         _, delimiter = adapter._resolve_column_names_and_delimiter(self._config(), benchmark)

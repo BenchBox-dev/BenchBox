@@ -1,5 +1,3 @@
-"""Tests for typed ``benchbox run`` request and plan contracts."""
-
 import os
 import sys
 from copy import copy
@@ -372,7 +370,6 @@ def _live_state(concurrency):
 
 
 def test_current_request_rejects_zero_concurrency():
-    """Explicit concurrency=0 must be rejected, not promoted to the default of 1."""
     with pytest.raises(ValueError, match="at least one"):
         _run_module._current_run_request(_live_state(0))
 
@@ -497,7 +494,6 @@ def test_invalid_saved_request_fails_closed(saved):
 
 @pytest.mark.parametrize("existing_non_interactive", [None, "owner-value"])
 def test_failed_quick_restart_resolution_restores_state_and_environment(monkeypatch, existing_non_interactive):
-    """Atomicity negative control: partial resolver writes never escape failure."""
     ctx = Mock()
     ctx.get_parameter_source.return_value = click.core.ParameterSource.DEFAULT
     state = SimpleNamespace(ctx=ctx, run_request=_request(), non_interactive=False, marker="pre-restart")
@@ -591,7 +587,6 @@ def test_normal_interactive_finalization_refreshes_plan_when_selectors_and_phase
     wizard_compression,
     expected_compression,
 ):
-    """Every wizard result is finalized even when the old selector tuple still matches."""
     old_compression = namespace_compression
     old_unified_config = object()
     state = SimpleNamespace(
@@ -739,14 +734,6 @@ def test_normal_interactive_finalization_refreshes_plan_when_selectors_and_phase
 
 
 def test_finalization_propagates_the_wizard_official_choice_into_the_config() -> None:
-    """The wizard's official-mode answer must reach `benchmark_config.official`.
-
-    `select_benchmark()` builds the config before the prompt runs, so it starts
-    `official=False` and `_interactive_collect_flags` updates only `s.official`.
-    Without the copy, `compliance_mode_kwargs()` reads the stale config value and
-    the run classifies as `unofficial_nonstandard`, which `benchbox submit`
-    refuses - even though the wizard reported official mode as enabled.
-    """
     compression = CompressionConfig(enabled=False, type="none", level=None)
     state = SimpleNamespace(
         official=True,

@@ -1,5 +1,3 @@
-"""I/O operations for manifest v1 and v2."""
-
 import json
 from pathlib import Path
 from typing import Any
@@ -18,19 +16,9 @@ from benchbox.utils.file_format import is_csv_format, is_parquet_format, is_tpc_
 
 
 def detect_version(manifest_dict: dict[str, Any]) -> int:
-    """Detect manifest version (1 or 2).
-
-    Args:
-        manifest_dict: Parsed JSON manifest data
-
-    Returns:
-        1 for v1 format, 2 for v2 format
-    """
     if "version" in manifest_dict:
         return manifest_dict["version"]
 
-    # v1: tables -> {table_name: [files]}
-    # v2: tables -> {table_name: {formats: {format: [files]}}}
     tables = manifest_dict.get("tables", {})
     if not tables:
         return 1
@@ -43,14 +31,6 @@ def detect_version(manifest_dict: dict[str, Any]) -> int:
 
 
 def load_manifest(manifest_path: Path) -> ManifestV1 | ManifestV2:
-    """Load manifest, auto-detecting version.
-
-    Args:
-        manifest_path: Path to JSON manifest file
-
-    Returns:
-        ManifestV1 or ManifestV2 instance based on detected version
-    """
     with open(manifest_path, encoding="utf-8") as f:
         data = json.load(f)
 
@@ -63,14 +43,6 @@ def load_manifest(manifest_path: Path) -> ManifestV1 | ManifestV2:
 
 
 def _parse_v1(data: dict) -> ManifestV1:
-    """Parse v1 manifest.
-
-    Args:
-        data: Raw JSON data
-
-    Returns:
-        ManifestV1 instance
-    """
     tables = {}
     for table_name, files in data.get("tables", {}).items():
         tables[table_name] = [
@@ -89,14 +61,6 @@ def _parse_v1(data: dict) -> ManifestV1:
 
 
 def _parse_v2(data: dict) -> ManifestV2:
-    """Parse v2 manifest.
-
-    Args:
-        data: Raw JSON data
-
-    Returns:
-        ManifestV2 instance
-    """
     tables = {}
     for table_name, table_data in data.get("tables", {}).items():
         formats_dict = {}
@@ -118,7 +82,6 @@ def _parse_v2(data: dict) -> ManifestV2:
             ]
         tables[table_name] = TableFormats(formats=formats_dict)
 
-    # Parse plan metadata if present
     plan_metadata = None
     if "plan_metadata" in data:
         plan_metadata = PlanMetadata.from_dict(data["plan_metadata"])
@@ -138,18 +101,9 @@ def _parse_v2(data: dict) -> ManifestV2:
 
 
 def upgrade_v1_to_v2(v1: ManifestV1) -> ManifestV2:
-    """Migrate v1 manifest to v2 structure.
-
-    Args:
-        v1: ManifestV1 instance to upgrade
-
-    Returns:
-        ManifestV2 instance with tables nested under formats
-    """
     tables = {}
-    format_name = "tbl"  # Default format if no tables present
+    format_name = "tbl"
     for table_name, files in v1.tables.items():
-        # Detect format from file extension
         format_name = _detect_format_from_files(files)
 
         converted_files = [
@@ -168,7 +122,7 @@ def upgrade_v1_to_v2(v1: ManifestV1) -> ManifestV2:
         benchmark=v1.benchmark,
         scale_factor=v1.scale_factor,
         tables=tables,
-        format_preference=[format_name, "tbl", "csv"],  # Prefer detected format
+        format_preference=[format_name, "tbl", "csv"],
         compression=v1.compression,
         parallel=v1.parallel,
         created_at=v1.created_at,
@@ -177,14 +131,6 @@ def upgrade_v1_to_v2(v1: ManifestV1) -> ManifestV2:
 
 
 def _detect_format_from_files(files: list[FileEntry]) -> str:
-    """Detect format from file extensions.
-
-    Args:
-        files: List of file entries
-
-    Returns:
-        Format name (tbl, parquet, csv, etc.)
-    """
     if not files:
         return "tbl"
 
@@ -200,17 +146,9 @@ def _detect_format_from_files(files: list[FileEntry]) -> str:
 
 
 def write_manifest(manifest: ManifestV1 | ManifestV2, path: Path) -> None:
-    """Write manifest to JSON file.
-
-    Args:
-        manifest: Manifest instance to write
-        path: Output path for JSON file
-    """
     if isinstance(manifest, ManifestV1):
-        # Convert v1 to dict
         data = _manifest_v1_to_dict(manifest)
     else:
-        # Convert v2 to dict
         data = _manifest_v2_to_dict(manifest)
 
     with open(path, "w", encoding="utf-8") as f:
@@ -218,14 +156,6 @@ def write_manifest(manifest: ManifestV1 | ManifestV2, path: Path) -> None:
 
 
 def _manifest_v1_to_dict(manifest: ManifestV1) -> dict:
-    """Convert ManifestV1 to dict.
-
-    Args:
-        manifest: ManifestV1 instance
-
-    Returns:
-        Dictionary suitable for JSON serialization
-    """
     tables = {}
     for table_name, files in manifest.tables.items():
         tables[table_name] = [{"path": f.path, "size_bytes": f.size_bytes, "row_count": f.row_count} for f in files]
@@ -236,7 +166,6 @@ def _manifest_v1_to_dict(manifest: ManifestV1) -> dict:
         "tables": tables,
     }
 
-    # Add optional fields only if they have values
     if manifest.compression is not None:
         result["compression"] = manifest.compression
     if manifest.parallel is not None:
@@ -260,14 +189,6 @@ _MANIFEST_OPTIONAL_FIELDS = _IO_SPECS["manifest_optional_fields"]
 
 
 def _manifest_v2_to_dict(manifest: ManifestV2) -> dict:
-    """Convert ManifestV2 to dict.
-
-    Args:
-        manifest: ManifestV2 instance
-
-    Returns:
-        Dictionary suitable for JSON serialization
-    """
     tables = {}
     for table_name, table_formats in manifest.tables.items():
         formats_dict = {}

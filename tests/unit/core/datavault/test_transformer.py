@@ -1,5 +1,3 @@
-"""Tests for the Data Vault ETL transformer."""
-
 from datetime import datetime
 from unittest.mock import MagicMock
 
@@ -14,10 +12,7 @@ pytestmark = [
 
 
 class TestDataVaultTransformer:
-    """Tests for transformation helpers."""
-
     def test_required_sources_subset(self):
-        """Only required TPCH sources should be loaded for selected tables."""
         transformer = DataVaultETLTransformer()
 
         required = transformer._get_required_sources(["sat_customer", "hub_region"])
@@ -25,16 +20,14 @@ class TestDataVaultTransformer:
         assert required == {"customer", "region"}
 
     def test_link_lineitem_hash_key_alias(self):
-        """Link lineitem hash key should use hk_lineitem_link alias."""
         transformer = DataVaultETLTransformer()
         sql = transformer._get_link_sql("link_lineitem", "2025-01-01 00:00:00")
 
         assert "AS hk_lineitem_link" in sql
-        # Ensure the composite link hash is based on the four FK components
+
         assert "md5(CAST(l_orderkey AS VARCHAR) || '|' || CAST(l_linenumber AS VARCHAR) || '|' ||" in sql
 
     def test_generate_dv_table_respects_output_format(self, tmp_path):
-        """Exported file extension and delimiter should align with requested format."""
         transformer = DataVaultETLTransformer()
         mock_conn = MagicMock()
         from datetime import datetime
@@ -47,15 +40,13 @@ class TestDataVaultTransformer:
             output_format="csv",
         )
 
-        # COPY should use comma delimiter for CSV
         copy_call = mock_conn.execute.call_args_list[-1][0][0]
         assert "DELIMITER ','" in copy_call
         assert output_path.suffix == ".csv"
 
     def test_write_manifest(self, tmp_path):
-        """Manifest should include table paths, sizes, and row counts."""
         transformer = DataVaultETLTransformer()
-        # Create dummy table file
+
         table_path = tmp_path / "hub_region.tbl"
         table_path.write_text("a\nb\n")
 
@@ -80,7 +71,6 @@ class TestDataVaultTransformer:
         assert entry["size_bytes"] == table_path.stat().st_size
 
     def test_end_to_end_transform_minimal_tpch(self, tmp_path):
-        """Transformer should produce all tables and a manifest from minimal TPCH inputs."""
         tpch_dir = tmp_path / "tpch"
         output_dir = tmp_path / "out"
         tpch_dir.mkdir()
@@ -131,7 +121,6 @@ class TestDataVaultTransformer:
         transformer = DataVaultETLTransformer(scale_factor=0.01)
         outputs = transformer.transform(tpch_dir=tpch_dir, output_dir=output_dir)
 
-        # Should produce all 21 tables
         assert len(outputs) == 21
         assert (output_dir / "_datagen_manifest.json").exists()
 
@@ -139,19 +128,16 @@ class TestDataVaultTransformer:
 
         manifest = json.loads((output_dir / "_datagen_manifest.json").read_text())
         assert manifest["version"] == 2
-        # All generated tables should have at least one entry
+
         for table_name in ("hub_customer", "link_lineitem", "sat_lineitem"):
             entries = manifest["tables"][table_name]["formats"]["tbl"]
             assert entries, f"{table_name} missing manifest entries"
 
 
 class TestDataVaultTransformerCompression:
-    """Tests for compression support in the transformer."""
-
     @pytest.mark.parametrize("suffix", ["", ".gz", ".zst"])
     @pytest.mark.parametrize("sharded", [False, True])
     def test_source_read_parallelism_and_identity(self, tmp_path, suffix, sharded):
-        """Compressed sources use sequential scans without changing rows or hashes."""
         import gzip
 
         import duckdb
@@ -188,7 +174,6 @@ class TestDataVaultTransformerCompression:
             assert conn.execute("SELECT current_setting('threads')").fetchone() == threads
 
     def test_invalid_compressed_source_is_rejected(self, tmp_path):
-        """The scanner workaround must not suppress invalid compressed input."""
         import duckdb
 
         (tmp_path / "region.tbl.gz").write_bytes(b"not a gzip stream")
@@ -196,25 +181,21 @@ class TestDataVaultTransformerCompression:
             DataVaultETLTransformer()._load_tpch_tables(conn, tmp_path, tables=["hub_region"])
 
     def test_compression_mixin_inherited(self):
-        """Transformer should inherit from CompressionMixin."""
         from benchbox.utils.compression_mixin import CompressionMixin
 
         assert issubclass(DataVaultETLTransformer, CompressionMixin)
 
     def test_compression_defaults_to_disabled(self):
-        """By default, compression should be disabled."""
         transformer = DataVaultETLTransformer()
         assert not transformer.should_use_compression()
 
     def test_compression_enabled_with_flag(self):
-        """Compression should be enabled when compress_data=True."""
         transformer = DataVaultETLTransformer(compress_data=True)
         assert transformer.should_use_compression()
-        # Default to zstd when no type specified
+
         assert transformer.compression_type == "zstd"
 
     def test_compression_type_configurable(self):
-        """Compression type should be configurable."""
         transformer = DataVaultETLTransformer(
             compress_data=True,
             compression_type="gzip",
@@ -222,10 +203,8 @@ class TestDataVaultTransformerCompression:
         assert transformer.compression_type == "gzip"
 
     def test_manifest_includes_compression_metadata(self, tmp_path):
-        """Manifest should record compression settings."""
         transformer = DataVaultETLTransformer(compress_data=True, compression_type="zstd")
 
-        # Create dummy file
         table_path = tmp_path / "hub_region.tbl"
         table_path.write_text("test\n")
 

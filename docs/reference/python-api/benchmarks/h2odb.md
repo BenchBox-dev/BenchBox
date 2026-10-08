@@ -26,11 +26,9 @@ The H2O.ai Database Benchmark tests analytical database performance using real-w
 from benchbox import H2ODB
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark
 benchmark = H2ODB(scale_factor=0.1)
 benchmark.generate_data()
 
-# Run benchmark
 adapter = DuckDBAdapter()
 results = adapter.run_benchmark(benchmark)
 print(results.total_queries)
@@ -116,8 +114,9 @@ At scale factor 0.01 the file is pipe-delimited, has no header row, 100,000 rows
 ```python
 schema_sql = benchmark.get_create_tables_sql(dialect="duckdb")
 print(schema_sql.splitlines()[:3])
-# ['CREATE TABLE trips (', '  vendor_id INTEGER,', '  pickup_datetime TIMESTAMP,']
 ```
+
+This prints the first three lines of the script: `CREATE TABLE trips (`, `  vendor_id INTEGER,` and `  pickup_datetime TIMESTAMP,`.
 
 #### `H2ODB.get_schema`
 
@@ -141,9 +140,11 @@ print(schema_sql.splitlines()[:3])
 Raises `ValueError` for an unknown id (`Invalid query ID: 1. Available: Q1, Q10, Q2, ...`) and for any non-`None` `params` (`H2O DB queries are static and don't accept parameters`).
 
 ```python
-count_query = benchmark.get_query("Q1")   # SELECT COUNT(*) as count FROM trips;
+count_query = benchmark.get_query("Q1")
 hourly_query = benchmark.get_query("Q7")
 ```
+
+`Q1` is `SELECT COUNT(*) as count FROM trips;`.
 
 #### `H2ODB.get_queries`
 
@@ -156,8 +157,9 @@ With a `dialect`, each query is translated with SQLGlot. DuckDB output for Q9 us
 ```python
 queries = benchmark.get_queries()
 print(f"Available queries: {list(queries.keys())}")
-# Available queries: ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8', 'Q9', 'Q10']
 ```
+
+This prints the ten ids, `Q1` to `Q10`, in order.
 
 ### Query Categories
 
@@ -244,11 +246,9 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 from benchbox import H2ODB
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Initialize with testing scale
 benchmark = H2ODB(scale_factor=0.1)
 data_files = benchmark.generate_data()
 
-# Run with DuckDB
 adapter = DuckDBAdapter(memory_limit="4GB")
 results = adapter.run_benchmark(benchmark)
 
@@ -271,7 +271,6 @@ conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Test query groups
 query_groups = {
     'Basic': ['Q1', 'Q2'],
     'Grouping': ['Q3', 'Q4', 'Q5', 'Q6'],
@@ -299,7 +298,6 @@ from benchbox.platforms.duckdb import DuckDBAdapter
 import time
 from statistics import mean
 
-# Test aggregation performance across scales
 scale_factors = [0.01, 0.1, 1.0]
 
 for sf in scale_factors:
@@ -313,7 +311,6 @@ for sf in scale_factors:
     adapter.create_schema(benchmark, conn)
     adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-    # Test different aggregation patterns
     aggregation_tests = [
         ('Q1', 'Simple count'),
         ('Q2', 'Sum and avg'),
@@ -325,7 +322,6 @@ for sf in scale_factors:
     for query_id, description in aggregation_tests:
         query = benchmark.get_query(query_id)
 
-        # Run 3 times for stability
         times = []
         for _ in range(3):
             start = time.time()
@@ -344,17 +340,14 @@ from benchbox import H2ODB
 import pandas as pd
 import time
 
-# Generate data for ML preprocessing simulation
 benchmark = H2ODB(scale_factor=0.01)
 files = benchmark.generate_data()
 
-# Load into pandas for data science operations; the file is pipe-delimited with no header
 columns = [column["name"] for column in benchmark.get_schema()["trips"]["columns"]]
 trips_df = pd.read_csv(files["trips"], sep="|", header=None, names=columns)
 
 print("Data Science Operations Performance:")
 
-# Feature engineering
 start = time.time()
 trips_df['hour'] = pd.to_datetime(trips_df['pickup_datetime']).dt.hour
 trips_df['day_of_week'] = pd.to_datetime(trips_df['pickup_datetime']).dt.dayofweek
@@ -364,7 +357,6 @@ trips_df['trip_duration'] = (
 ).dt.total_seconds()
 print(f"Feature engineering: {time.time() - start:.3f}s")
 
-# Aggregation operations (similar to H2O queries)
 start = time.time()
 hourly_stats = trips_df.groupby('hour').agg({
     'fare_amount': ['sum', 'mean', 'std', 'count'],
@@ -373,7 +365,6 @@ hourly_stats = trips_df.groupby('hour').agg({
 })
 print(f"GroupBy aggregation: {time.time() - start:.3f}s")
 
-# Statistical analysis
 start = time.time()
 vendor_stats = trips_df.groupby('vendor_id').agg({
     'fare_amount': ['count', 'sum', 'mean', 'std', 'min', 'max'],
@@ -382,36 +373,30 @@ vendor_stats = trips_df.groupby('vendor_id').agg({
 print(f"Statistical analysis: {time.time() - start:.3f}s")
 ```
 
+The script generates data for a machine-learning preprocessing simulation and loads it into pandas. It then times feature engineering, an aggregation similar to the H2O queries, and a statistical analysis. The data file has no header row, so the script reads the column names from `get_schema()`.
+
 ## Best Practices
 
 1. **Use Appropriate Scale Factors**
 
    ```python
-   # Development and testing
-   dev = H2ODB(scale_factor=0.01)  # 100,000 rows, about 14 MB
-
-   # Standard benchmark
-   test = H2ODB(scale_factor=0.1)  # 1,000,000 rows, about 140 MB
-
-   # Large-scale testing
-   prod = H2ODB(scale_factor=1.0)  # 10,000,000 rows, about 1.4 GB
+   dev = H2ODB(scale_factor=0.01)
+   test = H2ODB(scale_factor=0.1)
+   prod = H2ODB(scale_factor=1.0)
    ```
+
+   Use `0.01` for development and testing (100,000 rows, about 14 MB), `0.1` for the standard benchmark (1,000,000 rows, about 140 MB), and `1.0` for large-scale testing (10,000,000 rows, about 1.4 GB).
 
 2. **Test Query Groups Separately**
 
    ```python
-   # Test basic aggregation performance
    basic_queries = ['Q1', 'Q2']
-
-   # Test grouping performance
    grouping_queries = ['Q3', 'Q4', 'Q5', 'Q6']
-
-   # Test temporal analysis performance
    temporal_queries = ['Q7', 'Q8']
-
-   # Test advanced analytics performance
    advanced_queries = ['Q9', 'Q10']
    ```
+
+   Test basic aggregation (`Q1`, `Q2`), grouping (`Q3` to `Q6`), temporal analysis (`Q7`, `Q8`), and advanced analytics (`Q9`, `Q10`) performance separately.
 
 3. **Keep Query Text Unchanged**
 
@@ -424,9 +409,10 @@ print(f"Statistical analysis: {time.time() - start:.3f}s")
 4. **Monitor Memory for Large Grouping Operations**
 
    ```python
-   # Large scale factors may require memory configuration
    adapter = DuckDBAdapter(memory_limit="8GB")
    ```
+
+   Large scale factors may require memory configuration.
 
 5. **Use Multiple Iterations for Timing**
 

@@ -1,12 +1,6 @@
-"""Tests for release infrastructure.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Validates release-related configurations, workflows, and files to ensure
-proper project release setup.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import itertools
 import os
@@ -66,21 +60,16 @@ import tomllib
 
 
 class TestReleaseInfrastructure:
-    """Test release infrastructure configuration and files."""
-
     def test_changelog_exists(self):
-        """Test that CHANGELOG.md exists."""
         changelog_path = REPO_ROOT / "CHANGELOG.md"
         assert changelog_path.exists(), "CHANGELOG.md file must exist"
 
     def test_pyproject_toml_release_config(self):
-        """Test that pyproject.toml has correct release configuration."""
         pyproject_path = REPO_ROOT / "pyproject.toml"
 
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
 
-        # Check project metadata
         project = config["project"]
         assert "name" in project
         assert project["name"] == "benchbox"
@@ -90,7 +79,6 @@ class TestReleaseInfrastructure:
         assert "license" in project
         assert "authors" in project
 
-        # Check URLs point to correct repository
         urls = project["urls"]
         expected_repo = "https://github.com/BenchBox-dev/benchbox"
         assert urls["Homepage"] == expected_repo
@@ -98,13 +86,11 @@ class TestReleaseInfrastructure:
         assert urls["Bug Tracker"] == f"{expected_repo}/issues"
         assert urls["Changelog"] == f"{expected_repo}/blob/release/CHANGELOG.md"
 
-        # No incorrect repository references
         for url in urls.values():
             assert "anthropics/claude-code" not in url
             assert "anthropic" not in url
 
     def test_supported_python_range_matches_release_policy(self):
-        """Package metadata must expose the reviewed minimum and upper bound."""
         with (REPO_ROOT / "pyproject.toml").open("rb") as handle:
             project = tomllib.load(handle)["project"]
 
@@ -114,17 +100,7 @@ class TestReleaseInfrastructure:
             assert f"Programming Language :: Python :: {version}" in project["classifiers"]
 
     def test_import_benchbox_succeeds_without_pandas(self):
-        """`import benchbox` must work on a clean core install even when pandas is absent.
-
-        This is the real contract behind the v0.3.0 clean-install failure: the
-        base import surface must not require an optional engine/DataFrame
-        dependency. Run in a fresh interpreter with pandas made unimportable.
-        """
-        code = (
-            "import sys; sys.modules['pandas'] = None; "  # any `import pandas` now raises ImportError
-            "import benchbox; "
-            "print(benchbox.__version__)"
-        )
+        code = "import sys; sys.modules['pandas'] = None; import benchbox; print(benchbox.__version__)"
         result = subprocess.run(
             [sys.executable, "-c", code],
             capture_output=True,
@@ -133,11 +109,6 @@ class TestReleaseInfrastructure:
         assert result.returncode == 0, f"import benchbox failed without pandas:\n{result.stderr}"
 
     def test_import_benchbox_does_not_pull_pandas(self):
-        """Importing benchbox must not eagerly import pandas onto the base surface.
-
-        Guards against a future top-level `import pandas` silently re-entering the
-        import path and forcing pandas back into the core dependency set.
-        """
         code = "import benchbox, sys; assert 'pandas' not in sys.modules, sorted(m for m in sys.modules if m == 'pandas' or m.startswith('pandas.'))"
         result = subprocess.run(
             [sys.executable, "-c", code],
@@ -147,46 +118,37 @@ class TestReleaseInfrastructure:
         assert result.returncode == 0, f"import benchbox eagerly imported pandas:\n{result.stdout}{result.stderr}"
 
     def test_github_issue_url_fix(self):
-        """Test that exceptions.py has correct GitHub issue URL."""
         exceptions_path = REPO_ROOT / "benchbox" / "cli" / "exceptions.py"
 
         with open(exceptions_path, encoding="utf-8") as f:
             content = f.read()
 
-        # Should have correct repository URL
         assert "https://github.com/BenchBox-dev/benchbox/issues" in content
-        # Should not have incorrect URLs
         assert "anthropics/claude-code" not in content
 
     def test_github_workflows_exist(self):
-        """Test that GitHub workflows exist and are properly configured."""
         workflows_dir = REPO_ROOT / ".github" / "workflows"
         assert workflows_dir.exists(), "GitHub workflows directory must exist"
 
-        # Required workflows
         required_workflows = ["test.yml", "lint.yml", "release.yml"]
         for workflow in required_workflows:
             workflow_path = workflows_dir / workflow
             assert workflow_path.exists(), f"{workflow} workflow must exist"
 
     def test_test_workflow_configuration(self):
-        """Test that test workflow is properly configured."""
         test_workflow_path = REPO_ROOT / ".github" / "workflows" / "test.yml"
 
         with open(test_workflow_path, encoding="utf-8") as f:
             workflow = yaml.safe_load(f)
 
-        # Check basic structure
         assert "name" in workflow
-        assert True in workflow  # YAML parses "on" as boolean True
+        assert True in workflow
         assert "jobs" in workflow
 
-        # Check trigger events (YAML parses 'on' as True)
-        on_events = workflow[True]  # YAML parses "on" as boolean True
+        on_events = workflow[True]
         assert "push" in on_events
         assert "pull_request" in on_events
 
-        # Check jobs
         jobs = workflow["jobs"]
         assert "test" in jobs
 
@@ -204,7 +166,6 @@ class TestReleaseInfrastructure:
         assert "--cov-fail-under=70" in workflow_text
 
     def test_required_fast_marker_expression_is_consistent(self):
-        """Pin required PR fast-test marker selection across local and CI surfaces."""
         makefile_content = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
         develop_pr_run_text = _workflow_job_run_text("ci.yml", "code-test")
         main_pr_run_text = _workflow_job_run_text("test.yml", "test")
@@ -219,26 +180,22 @@ class TestReleaseInfrastructure:
         assert "coverage remains CI-only" in makefile_content
 
     def test_release_workflow_configuration(self):
-        """Test that release workflow is properly configured."""
         release_workflow_path = REPO_ROOT / ".github" / "workflows" / "release.yml"
 
         with open(release_workflow_path, encoding="utf-8") as f:
             workflow = yaml.safe_load(f)
 
-        # Check basic structure
         assert "name" in workflow
         assert workflow["name"] == "Release"
-        assert True in workflow  # YAML parses "on" as boolean True
+        assert True in workflow
         assert "jobs" in workflow
 
-        # Check trigger events (YAML parses 'on' as True)
-        on_events = workflow[True]  # YAML parses "on" as boolean True
+        on_events = workflow[True]
         assert "push" in on_events
         assert "tags" in on_events["push"]
         assert "v*" in on_events["push"]["tags"]
         assert "workflow_dispatch" in on_events
 
-        # Check jobs exist
         jobs = workflow["jobs"]
         required_jobs = ["dependency-bounds", "build", "publish", "github-release", "test-installation"]
         for job in required_jobs:
@@ -266,14 +223,12 @@ class TestReleaseInfrastructure:
         assert "--notes-file release-notes.md" in release_step
         assert "--generate-notes" not in release_step
 
-        # Check that publish job uses trusted publishing
         publish_job = jobs["publish"]
         assert "permissions" in publish_job
         assert "id-token" in publish_job["permissions"]
         assert publish_job["permissions"]["id-token"] == "write"
 
     def test_release_smoke_test_runs_before_publication_from_built_wheel(self):
-        """Installation validation must gate publication using the built wheel."""
         jobs = _workflow("release.yml")["jobs"]
         test_installation_job = jobs["test-installation"]
 
@@ -299,7 +254,6 @@ class TestReleaseInfrastructure:
             )
 
     def test_release_tag_must_match_package_version_before_build_or_publish(self):
-        """A v* ref must bind to pyproject metadata before any release artifact is built."""
         jobs = _workflow("release.yml")["jobs"]
         verify_steps = jobs["verify-tag-on-release"]["steps"]
         step_names = [step.get("name") for step in verify_steps]
@@ -322,7 +276,6 @@ class TestReleaseInfrastructure:
         assert "verify-tag-on-release" in build_needs
 
     def test_release_tag_version_assertion_accepts_match_and_rejects_mismatch(self):
-        """Execute the workflow guard to prove mismatch is fail-closed."""
         workflow = _workflow("release.yml")
         assertion = next(
             step
@@ -353,7 +306,6 @@ class TestReleaseInfrastructure:
         assert "::error::Release tag" in mismatched.stdout
 
     def test_test_pypi_workflow_dispatch_remains_available_from_branch_refs(self):
-        """The tag assertion must not block the intentional branch-dispatch TestPyPI path."""
         jobs = _workflow("release.yml")["jobs"]
         verify_steps = jobs["verify-tag-on-release"]["steps"]
         assertion = next(step for step in verify_steps if step.get("name") == "Assert tag matches package version")
@@ -366,7 +318,6 @@ class TestReleaseInfrastructure:
         assert pypi["if"] == "github.event.inputs.test_pypi != 'true' && startsWith(github.ref, 'refs/tags/v')"
 
     def test_release_required_result_contract(self):
-        """Test the main-PR release-required umbrella check shape."""
         jobs = _workflow("test.yml")["jobs"]
 
         assert jobs["integration"]["if"] == (
@@ -435,7 +386,6 @@ class TestReleaseInfrastructure:
             assert expected in aggregate_run_text
 
     def test_release_docs_name_required_contexts(self):
-        """Release docs must name the same stable required contexts."""
         docs_paths = [
             REPO_ROOT / "docs" / "operations" / "release-guide.md",
             REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md",
@@ -448,7 +398,6 @@ class TestReleaseInfrastructure:
                 assert context in content
 
     def test_release_canary_workflow_contract(self):
-        """Release canary must produce scheduled non-fast and ruleset drift evidence."""
         workflow = _workflow("release-canary.yml")
         on_events = workflow[True]
         assert "workflow_dispatch" in on_events
@@ -469,16 +418,11 @@ class TestReleaseInfrastructure:
         collection_job = jobs["collect-credential-free-non-fast"]
         assert collection_job["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
         assert jobs["ruleset-drift"]["steps"][0]["with"]["ref"] == "${{ env.RELEASE_CANARY_REF }}"
-        # Each shard is deliberately single-threaded; process-level sharding
-        # keeps the timeout bounded without enabling unsafe xdist concurrency.
         non_fast_job = jobs["credential-free-non-fast"]
         assert non_fast_job["timeout-minutes"] == 75
         assert non_fast_job["strategy"]["fail-fast"] is False
         assert len(non_fast_job["strategy"]["matrix"]["include"]) == 6
 
-        # pypi-latest-installability must not gate on (or be gated by) the
-        # other canary jobs, and must not check out the repo (it installs
-        # the published PyPI artifact, not local source).
         pypi_latest_job = jobs["pypi-latest-installability"]
         assert "needs" not in pypi_latest_job
         assert not any(step.get("uses", "").startswith("actions/checkout") for step in pypi_latest_job["steps"])
@@ -504,22 +448,14 @@ class TestReleaseInfrastructure:
         assert "-n 0" in non_fast_text
         assert "--maxfail=5" in non_fast_text
         assert 'exit "$rc"' in non_fast_text
-        # Each shard publishes per-test durations (JUnit XML) and records
-        # setup time separately from test time, without changing the marker
-        # expression, shard count, --maxfail, selection, timeouts, or the
-        # release-canary-result aggregation.
         assert "release-canary-artifacts/shard-${SHARD_INDEX}-junit.xml" in non_fast_text
         assert ".canary-setup-start-mono" in non_fast_text
         assert '"setup_seconds": "${setup_seconds}"' in non_fast_text
         assert '"test_seconds": "${test_seconds}"' in non_fast_text
         assert '"junit_present": ${junit_present}' in non_fast_text
-        # Durations derive from monotonic stamps, never wall-clock subtraction,
-        # and errexit must not abort the step before the evidence is written.
         assert "/proc/uptime" in non_fast_text
         assert "date +%s" not in non_fast_text
         assert "set +e" in non_fast_text
-        # Capture state is reported separately from file presence, because the
-        # fallback report is present yet carries no durations.
         assert '"junit_captured": ${junit_captured}' in non_fast_text
         assert ".canary-junit-captured" in non_fast_text
 
@@ -546,14 +482,10 @@ class TestReleaseInfrastructure:
         assert '"freshness_contract_hours": 48' in result_text
         assert "Release canary passed." in result_text
 
-        # A red canary must reach an owner: the incident job runs after every
-        # non-cancelled run, is the only job allowed to write issues, and
-        # closes the incident on green.
         assert "issues" not in workflow["permissions"]
         incident_job = jobs["release-canary-incident"]
         assert incident_job["if"] == "${{ always() && !cancelled() }}"
         assert incident_job["permissions"]["issues"] == "write"
-        # Readiness reads the run conclusion; the alert must not be able to block a release.
         assert incident_job["continue-on-error"] is True
         assert {
             "collect-credential-free-non-fast",
@@ -567,11 +499,9 @@ class TestReleaseInfrastructure:
         assert "gh issue close" in incident_text
 
     def test_canary_collect_count_regex_matches_pytest_deselect_format(self):
-        """The canary collect-step grep regex must match the actual pytest --collect-only output format."""
         collect_text = _workflow_job_run_text("release-canary.yml", "collect-credential-free-non-fast")
         assert "'^[0-9]+/[0-9]+ tests collected'" in collect_text
 
-        # Verify the regex semantics using Python re (same logic as the grep ERE pattern).
         pattern = re.compile(r"^\d+/\d+ tests collected")
         assert pattern.match("92/24795 tests collected (24703 deselected) in 16.98s")
         assert pattern.match("1/100 tests collected")
@@ -579,7 +509,6 @@ class TestReleaseInfrastructure:
         assert not pattern.match("0 tests collected")
 
     def test_validate_main_pr_checks_release_canary_freshness(self):
-        """The required validate-base context must include release canary freshness."""
         workflow = _workflow("validate-release-pr.yml")
         assert workflow["permissions"]["actions"] == "read"
         assert workflow["permissions"]["contents"] == "read"
@@ -629,7 +558,6 @@ class TestReleaseInfrastructure:
         assert "origin/develop" in restore_step["run"]
 
     def test_release_docs_name_canary_and_ruleset_drift(self):
-        """Release docs must name freshness, ruleset drift, and the override contract."""
         docs_paths = [
             REPO_ROOT / "docs" / "operations" / "release-guide.md",
             REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md",
@@ -644,7 +572,6 @@ class TestReleaseInfrastructure:
             assert "RELEASE_READINESS_OVERRIDE_SHA" in content
 
     def test_release_finalize_checks_required_context_before_merge_and_tag(self):
-        """release-finalize must hard-stop unless required release contexts are required and green."""
         makefile_content = _makefile_text()
         recipe = _make_target_recipe("release-finalize")
         finalize = (REPO_ROOT / "scripts" / "release_finalize.py").read_text(encoding="utf-8")
@@ -662,14 +589,12 @@ class TestReleaseInfrastructure:
         assert '"git", "checkout", "release"' not in finalize
 
     def test_release_finalize_blocks_pending_required_check_exit_code(self):
-        """gh pr checks exit 8 means at least one required check is still pending."""
         finalize = (REPO_ROOT / "scripts" / "release_finalize.py").read_text(encoding="utf-8")
 
         assert "result.returncode == 8" in finalize
         assert "Required PR checks are pending. Wait for GitHub Actions, then rerun" in finalize
 
     def test_release_finalize_failure_modes_are_explicit(self):
-        """The one-shot release-finalize precondition must fail closed for drift and non-green states."""
         finalize = (REPO_ROOT / "scripts" / "release_finalize.py").read_text(encoding="utf-8")
 
         for expected in [
@@ -686,7 +611,6 @@ class TestReleaseInfrastructure:
         assert "merge_method=squash" in finalize
 
     def test_release_finalize_docs_separate_premerge_and_postmerge_signals(self):
-        """Release docs must not imply post-merge push checks are pre-publish blockers."""
         makefile_content = _makefile_text()
         release_guide = (REPO_ROOT / "docs" / "operations" / "release-guide.md").read_text(encoding="utf-8")
         release_template = (REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md").read_text(encoding="utf-8")
@@ -709,7 +633,6 @@ class TestReleaseInfrastructure:
         assert "non-curated portions of `_project/`" in release_template
 
     def test_release_cut_generates_changelog_from_main_delta(self):
-        """The release branch changelog boundary is the main patch delta, not tag ancestry."""
         recipe = _make_target_recipe("release-cut")
         release_guide = (REPO_ROOT / "docs" / "operations" / "release-guide.md").read_text(encoding="utf-8")
         release_template = (REPO_ROOT / ".github" / "RELEASE_PR_TEMPLATE.md").read_text(encoding="utf-8")
@@ -721,12 +644,6 @@ class TestReleaseInfrastructure:
         assert "intentionally does not replay release commits onto" in release_guide
 
     def test_release_cut_gates_on_changelog_curation_not_on_editor(self):
-        """`EDITOR=true` must not wave a raw commit dump into a release.
-
-        The old gate refused to skip curation only when EDITOR was unset AND
-        there was no TTY, so setting EDITOR to any no-op binary defeated it.
-        The gate is now the drafted section's own text.
-        """
         recipe = _make_target_recipe("release-cut")
 
         assert "scripts/generate_changelog_entry.py --check-curation --version $(VERSION)" in recipe
@@ -737,12 +654,6 @@ class TestReleaseInfrastructure:
         assert gen_idx < check_idx < rm_idx, "curation check must gate between changelog draft and `git rm`"
 
     def test_release_cut_takes_a_curated_section_in_one_pass_without_skipping_gates(self):
-        """A non-interactive cut supplies curated text up front instead of resuming later.
-
-        Resume refuses once origin/develop moves, so a two-pass agent cut aborted
-        three times in four during v0.4.2. CHANGELOG_SECTION writes the curated
-        body during the first pass; the start check and the curation gate still run.
-        """
         recipe = _make_target_recipe("release-cut")
 
         assert '$(if $(CHANGELOG_SECTION),--section-file "$(CHANGELOG_SECTION)")' in recipe
@@ -752,12 +663,6 @@ class TestReleaseInfrastructure:
         assert recipe.count("CHANGELOG_SECTION") == 5, "CHANGELOG_SECTION must not gate anything else"
 
     def test_release_cut_is_resumable_and_has_an_abort_target(self):
-        """An interrupted cut must be resumable or discardable, not a manual cleanup.
-
-        The v0.3.1 cut died at the changelog step twice, each time leaving the
-        vX.Y.Z branch created, versions bumped and uv.lock rewritten with no
-        commit.
-        """
         recipe = _make_target_recipe("release-cut")
         assert "release-cut: .release-cut-tree-required" in _makefile_text()
         development_only = (
@@ -792,13 +697,6 @@ class TestReleaseInfrastructure:
             assert f".PHONY: {target}" in phony_lines
 
     def test_release_cut_curation_survives_untracked_paths(self):
-        """Curation `git rm` lines must use --ignore-unmatch and abort on real failures.
-
-        Without --ignore-unmatch, one untracked pathspec aborts the entire
-        `git rm`, and the old `-` prefix hid that — the v0.3.1 cut shipped an
-        uncurated release branch because .codex/.gemini/todo.config.yaml were
-        untracked at cut time.
-        """
         recipe = _make_target_recipe("release-cut")
         rm_lines = [line.strip() for line in recipe.splitlines() if re.search(r"git rm (?:-rf|-f) ", line)]
         assert rm_lines, "expected git rm curation lines in release-cut"
@@ -807,7 +705,6 @@ class TestReleaseInfrastructure:
             assert not line.startswith("-"), f"real git rm failures must abort the cut (drop `-` prefix): {line}"
 
     def test_release_cut_post_curation_guard_covers_every_curated_path(self):
-        """The git ls-files guard must re-check every path the git rm lines curate."""
         recipe = _make_target_recipe("release-cut")
         rm_paths: set[str] = set()
         for line in recipe.splitlines():
@@ -830,7 +727,6 @@ class TestReleaseInfrastructure:
         )
 
     def test_release_cut_covers_v040_release_pr_test_curation(self):
-        """The next cut must curate every development-only test found by the v0.4.0 release PR."""
         recipe = _make_target_recipe("release-cut")
         curated_paths: set[str] = set()
         for line in recipe.splitlines():
@@ -858,7 +754,6 @@ class TestReleaseInfrastructure:
             "tests/unit/scripts/test_results_explorer_snapshot_invariants.py",
             "tests/unit/scripts/test_skill_sync_ci_policy.py",
             "tests/unit/scripts/test_soundness_drain_report.py",
-            # test_timing_policy_modes.py was split into these two project-dependent tests.
             "tests/unit/scripts/test_fast_lane_ceiling_check.py",
             "tests/unit/scripts/test_timing_policy_check.py",
             "tests/unit/scripts/test_todo_db_shadow.py",
@@ -885,11 +780,6 @@ class TestReleaseInfrastructure:
         )
 
     def test_release_cut_refreshes_and_stages_uv_lock(self):
-        """release-cut must regenerate uv.lock after the version bump and stage it.
-
-        The v0.3.1 cut aborted mid-commit because the tracked uv.lock was stale
-        and the pre-commit uv-lock hook rewrote it during `git commit`.
-        """
         recipe = _make_target_recipe("release-cut")
         lock_match = re.search(r"^\tuv lock\s*$", recipe, re.MULTILINE)
         assert lock_match, "release-cut must run `uv lock` to refresh the lockfile"
@@ -900,11 +790,6 @@ class TestReleaseInfrastructure:
         assert "uv.lock" in add_match.group(1).split(), "uv.lock must be staged with the release commit"
 
     def test_release_cut_commit_skips_hooks_after_curation_removes_them(self):
-        """The curation `git rm` lines delete .pre-commit-config.yaml and
-        _project/scripts/ (the repo:local hook entrypoints) from the working
-        tree before the release commit. The installed pre-commit git hook
-        would otherwise run against a now-missing config/entrypoints and
-        abort the commit, breaking every release cut."""
         recipe = _make_target_recipe("release-cut")
         commit_match = re.search(r"^\tgit commit (.+?)$", recipe, re.MULTILINE)
         assert commit_match, "expected a git commit line in release-cut"
@@ -913,7 +798,6 @@ class TestReleaseInfrastructure:
         )
 
     def test_release_pushes_allow_the_intentionally_missing_precommit_config(self):
-        """Every post-curation push must allow the release tree's intentionally absent hook config."""
         recipe = _make_target_recipe("release-cut")
         push_lines = [
             line.strip()
@@ -929,27 +813,11 @@ class TestReleaseInfrastructure:
         assert 'command("git", "push", "origin", f"refs/tags/{tag}:refs/tags/{tag}", env=push_env)' in finalize
 
     def test_release_cut_aligns_release_histories_before_pushing(self):
-        """release-cut must merge `origin/release` with `-s ours` before it pushes.
-
-        `main` and `develop` have unrelated roots (Phase 4 filter-merge) and
-        diverge permanently — `main` gains one squash commit per release that
-        `develop` never sees, and A4 step 6 (rebase develop onto main) was
-        removed by the 2026-04-27 amendment. A `vX.Y.Z` branch cut cleanly from
-        `develop` is therefore not mergeable into `main`: GitHub cannot compute
-        a merge ref, the PR sits at CONFLICTING, and *no CI runs at all* —
-        neither `validate-base` nor `release-required-result` ever trigger.
-        Every cut before v0.3.1 fixed this by hand (#711/#712/#1029/#1043/#1072).
-        """
         recipe = _make_target_recipe("release-cut")
-        # `\t@?git merge`, not `\t.*git merge`: recipe comments are `\t@# ...` lines
-        # that precede the command, so a loose anchor would match a comment first.
         merge_match = re.search(r"^\t@?git merge (.+?)$", recipe, re.MULTILINE)
         assert merge_match, "release-cut must merge origin/release to make the release PR mergeable"
 
         merge_args = merge_match.group(1).split()
-        # `-s ours` keeps the curated release tree byte-for-byte and only records
-        # origin/release as a second parent; any other strategy drags main-only
-        # content back into the release tree, silently un-curating the release.
         assert "-s" in merge_args and merge_args[merge_args.index("-s") + 1] == "ours", (
             f"alignment merge must use `-s ours` to preserve the curated tree: {merge_match.group(1)}"
         )
@@ -958,15 +826,10 @@ class TestReleaseInfrastructure:
         )
         assert "origin/release" in merge_args, "the alignment merge must target the fetched origin/release"
 
-        # A `-s ours` merge cannot change the tree by construction, so the guard is
-        # really an assertion that the strategy above is still `ours`. It must stay.
         assert "alignment merge changed the curated release tree" in recipe, (
             "expected a post-merge guard asserting the curated release tree is unchanged"
         )
 
-        # Ordering: changelog (--since-ref origin/release) needs main to still be a
-        # non-ancestor; the merge must land on top of the release commit; and the
-        # push must carry the merge, or the PR is born CONFLICTING again.
         commit_match = re.search(r"^\tgit commit .*Release v\$\(VERSION\)", recipe, re.MULTILINE)
         push_match = re.search(
             r"^\tPRE_COMMIT_ALLOW_NO_CONFIG=1 git push -u origin v\$\(VERSION\)", recipe, re.MULTILINE
@@ -979,15 +842,6 @@ class TestReleaseInfrastructure:
         )
 
     def test_release_cut_branch_sweep_matches_only_release_branches(self):
-        """The Option-c stale-branch sweep must filter full refs, not `ls-remote 'v*'` alone.
-
-        `git ls-remote --heads origin 'v*'` matches the LAST path component of a ref,
-        so it also matches non-release branches like `fix/validate-submission-...`
-        (last component starts with "v") — the 2026-07-08 v0.3.1 re-cut deleted exactly
-        such a branch. The sweep must additionally filter the full `refs/heads/...` path
-        against the release-branch shape, mirroring `_RELEASE_BRANCH_RE` in
-        scripts/generate_changelog_entry.py.
-        """
         recipe = _make_target_recipe("release-cut")
         sweep_match = re.search(r"^\t@?for br in \$\$\((.+?)\); do", recipe, re.MULTILINE)
         assert sweep_match, "expected the stale release-branch sweep `for br in $$(...)` in release-cut"
@@ -997,15 +851,11 @@ class TestReleaseInfrastructure:
         awk_match = re.search(r"awk '(.+?)'", pipeline)
         assert awk_match, "expected an awk filter in the sweep pipeline"
         awk_program = awk_match.group(1)
-        # $2 is `refs/heads/<name>` per `git ls-remote --heads` output.
         assert re.search(r"\$2\s*~", awk_program), "awk filter must match against the full ref ($2), not $1/$NF"
         assert r"refs\/heads\/" in awk_program or "refs/heads/" in awk_program, (
             "awk filter must anchor to refs/heads/ to avoid matching bare tag-ish names"
         )
 
-        # Simulate `git ls-remote --heads` output for a realistic mix of refs and confirm
-        # the sweep pipeline (minus the trailing version-exclusion) keeps only true
-        # release branches, dropping the branch that caused the 2026-07-08 incident.
         sample_refs = [
             "refs/heads/v0.3.0",
             "refs/heads/v0.3.1",
@@ -1015,9 +865,6 @@ class TestReleaseInfrastructure:
             "refs/heads/vendor/foo",
         ]
         sample_input = "\n".join(f"deadbeef\t{ref}" for ref in sample_refs)
-        # Isolate the ref-filtering stages (awk + sed) from `ls-remote` (replaced by
-        # piped-in sample data) and the trailing `grep -Fxv "v$(VERSION)"` (a Make
-        # variable this test doesn't expand, and unrelated to the ref-shape bug).
         pipeline_without_ls_remote = re.sub(r"^git ls-remote --heads origin 'v\*'\s*\|\s*", "", pipeline)
         pipeline_without_version_grep = re.sub(
             r'\s*\|\s*grep -Fxv "v\$\(VERSION\)"\s*$', "", pipeline_without_ls_remote
@@ -1025,8 +872,6 @@ class TestReleaseInfrastructure:
         assert pipeline_without_version_grep != pipeline_without_ls_remote, (
             "expected to isolate the awk/sed stages from the trailing version-exclusion grep"
         )
-        # Make collapses `$$` to a literal `$` in recipes before the shell ever sees it;
-        # emulate that here since this test runs the extracted text via bash directly.
         shell_pipeline = pipeline_without_version_grep.replace("$$", "$")
         skip_without_posix_shell()
         result = run_posix_shell(
@@ -1042,19 +887,6 @@ class TestReleaseInfrastructure:
         )
 
     def test_worktree_and_pr_guards_still_block_stale_main(self):
-        """#1114 review: the main->release rename must not drop `main` from the
-        protected-branch guards.
-
-        The rename commit (c194f2d2) did a blanket `develop|main` ->
-        `develop|release` text replace across every one of these guards,
-        which silently un-blocked `main` instead of adding `release`
-        alongside it. A developer clone/worktree can still have a local
-        `main` branch after the GitHub-side rename; without this guard,
-        `make pr-open` from a stale `main` would push and open a `develop`
-        PR from release-only history. All five sites use the identical
-        `develop|main|release` shape so a future rename can't repeat the
-        mistake with a targeted single-site fix.
-        """
         recipe = _make_target_recipe("pr-open")
         assert 'develop|main|release) echo "Refusing to open PR from $$CURRENT' in recipe
 
@@ -1065,12 +897,6 @@ class TestReleaseInfrastructure:
         assert 'develop|main|release|"") echo "Refusing to refresh $$CURRENT' in recipe
 
     def test_pr_open_publishes_behind_branches_without_a_queue_check(self):
-        """A behind but conflict-free branch is published as is.
-
-        Required checks and auto-merge gate the merge, so pr-open verifies no
-        queue state. It still refuses a genuine base conflict and must not merge
-        develop itself, or pr-fanout becomes a refresh storm.
-        """
         recipe = _make_target_recipe("pr-open")
         assert "git merge-base --is-ancestor origin/develop HEAD" in recipe
         assert "git merge-tree --write-tree origin/develop HEAD" in recipe
@@ -1143,11 +969,9 @@ class TestReleaseInfrastructure:
         assert trace.read_text(encoding="utf-8").split() == ["pr-preflight"]
 
     def test_issue_templates_exist(self):
-        """Test that GitHub issue templates exist."""
         templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
         assert templates_dir.exists(), "Issue templates directory must exist"
 
-        # Required templates
         required_templates = ["bug_report.yml", "feature_request.yml", "platform_support.yml", "config.yml"]
 
         for template in required_templates:
@@ -1155,14 +979,12 @@ class TestReleaseInfrastructure:
             assert template_path.exists(), f"{template} template must exist"
 
     def test_pr_template_exists(self):
-        """Test that pull request template exists."""
         pr_template_path = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md"
         assert pr_template_path.exists(), "Pull request template must exist"
 
         with open(pr_template_path, encoding="utf-8") as f:
             content = f.read()
 
-        # Should have key sections
         required_sections = [
             "## Description",
             "## Type of Change",
@@ -1177,24 +999,20 @@ class TestReleaseInfrastructure:
 
     @pytest.mark.slow
     def test_package_build_succeeds(self):
-        """Test that the package can be built successfully."""
         import subprocess
         import tempfile
         from pathlib import Path
 
         project_root = REPO_ROOT
 
-        # Run uv build in a temporary directory to avoid conflicts
         with tempfile.TemporaryDirectory() as tmpdir:
             result = subprocess.run(
                 ["uv", "build", "--out-dir", tmpdir], cwd=project_root, capture_output=True, text=True
             )
 
-            # Build should succeed (exit code 0)
             if result.returncode != 0:
                 pytest.fail(f"Package build failed: {result.stderr}")
 
-            # Should create both wheel and source distribution
             built_files = list(Path(tmpdir).glob("*"))
             wheel_files = [f for f in built_files if f.suffix == ".whl"]
             sdist_files = [f for f in built_files if f.suffix == ".gz"]
@@ -1203,13 +1021,11 @@ class TestReleaseInfrastructure:
             assert len(sdist_files) > 0, "Build should create source distribution"
 
     def test_cli_entry_point_works(self):
-        """Test that CLI entry point is properly configured."""
         import subprocess
         from pathlib import Path
 
         project_root = REPO_ROOT
 
-        # Test that benchbox command works
         result = subprocess.run(["uv", "run", "benchbox", "--help"], cwd=project_root, capture_output=True, text=True)
 
         assert result.returncode == 0, "CLI entry point should work"
@@ -1217,12 +1033,10 @@ class TestReleaseInfrastructure:
         assert "database benchmark" in result.stdout.lower()
 
     def test_no_incorrect_repository_references(self):
-        """Test that no files contain incorrect repository references."""
         from pathlib import Path
 
         project_root = REPO_ROOT
 
-        # Directories to search (explicitly avoid large cache/build directories)
         search_dirs = [
             "benchbox",
             "tests",
@@ -1230,7 +1044,6 @@ class TestReleaseInfrastructure:
             ".github",
         ]
 
-        # Files to search in project root
         root_files = [
             "README.md",
             "CHANGELOG.md",
@@ -1241,7 +1054,6 @@ class TestReleaseInfrastructure:
 
         problematic_files = []
 
-        # Search in specified directories
         for search_dir in search_dirs:
             dir_path = project_root / search_dir
             if not dir_path.exists():
@@ -1251,14 +1063,12 @@ class TestReleaseInfrastructure:
                 if not file_path.is_file():
                     continue
 
-                # Skip binary and cache files
                 if (
                     any(skip in str(file_path) for skip in ["__pycache__", ".egg-info", ".pytest_cache", ".mypy_cache"])
                     or file_path.suffix == ".pyc"
                 ):
                     continue
 
-                # Skip this test file itself
                 if file_path.name == "test_release_infrastructure.py":
                     continue
 
@@ -1267,10 +1077,8 @@ class TestReleaseInfrastructure:
                     if "anthropics/claude-code" in content:
                         problematic_files.append(str(file_path.relative_to(project_root)))
                 except (UnicodeDecodeError, OSError):
-                    # Skip files that can't be read as text
                     pass
 
-        # Search root files
         for root_file in root_files:
             file_path = project_root / root_file
             if not file_path.exists():
@@ -1283,7 +1091,6 @@ class TestReleaseInfrastructure:
             except (UnicodeDecodeError, OSError):
                 pass
 
-        # Filter out acceptable references
         problematic_files = [
             f for f in problematic_files if not any(acceptable in f for acceptable in ["_project/PROJECT_TODO.md"])
         ]
@@ -1293,10 +1100,7 @@ class TestReleaseInfrastructure:
 
 
 class TestVersionConsistency:
-    """Test version consistency across different files."""
-
     def test_version_in_pyproject_toml(self):
-        """Test that version is properly defined in pyproject.toml."""
         pyproject_path = REPO_ROOT / "pyproject.toml"
 
         with open(pyproject_path, "rb") as f:
@@ -1307,14 +1111,12 @@ class TestVersionConsistency:
         assert isinstance(version, str)
         assert len(version) > 0
 
-        # Should be semantic version format
         import re
 
         semver_pattern = r"^\d+\.\d+\.\d+(-\w+)?$"
         assert re.match(semver_pattern, version), f"Version {version} should follow semantic versioning"
 
     def test_version_in_init_file(self):
-        """Test that version is defined in __init__.py."""
         init_path = REPO_ROOT / "benchbox" / "__init__.py"
 
         with open(init_path, encoding="utf-8") as f:
@@ -1323,19 +1125,15 @@ class TestVersionConsistency:
         assert "__version__" in content, "__init__.py should define __version__"
 
     def test_version_consistency(self):
-        """Test that version is consistent between pyproject.toml and __init__.py."""
-        # Get version from pyproject.toml
         pyproject_path = REPO_ROOT / "pyproject.toml"
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
         pyproject_version = config["project"]["version"]
 
-        # Get version from __init__.py
         init_path = REPO_ROOT / "benchbox" / "__init__.py"
         with open(init_path, encoding="utf-8") as f:
             content = f.read()
 
-        # Extract version from __init__.py
         import re
 
         version_match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', content)
@@ -1348,10 +1146,7 @@ class TestVersionConsistency:
 
 
 class TestReleaseWorkflowValidation:
-    """Test that release workflows are valid YAML and properly structured."""
-
     def test_workflows_are_valid_yaml(self):
-        """Test that all workflow files are valid YAML."""
         workflows_dir = REPO_ROOT / ".github" / "workflows"
 
         for workflow_file in workflows_dir.glob("*.yml"):
@@ -1362,7 +1157,6 @@ class TestReleaseWorkflowValidation:
                     pytest.fail(f"Invalid YAML in {workflow_file}: {e}")
 
     def test_issue_templates_are_valid_yaml(self):
-        """Test that issue templates are valid YAML."""
         templates_dir = REPO_ROOT / ".github" / "ISSUE_TEMPLATE"
 
         for template_file in templates_dir.glob("*.yml"):
@@ -1374,32 +1168,25 @@ class TestReleaseWorkflowValidation:
 
 
 class TestPackageMetadata:
-    """Test package metadata and configuration."""
-
     def test_license_file_exists(self):
-        """Test that LICENSE file exists."""
         license_path = REPO_ROOT / "LICENSE"
         assert license_path.exists(), "LICENSE file must exist"
 
     def test_readme_file_exists(self):
-        """Test that README.md exists."""
         readme_path = REPO_ROOT / "README.md"
         assert readme_path.exists(), "README.md file must exist"
 
     def test_pyproject_toml_build_config(self):
-        """Test that pyproject.toml has proper build configuration."""
         pyproject_path = REPO_ROOT / "pyproject.toml"
 
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
 
-        # Should have build system configuration
         assert "build-system" in config
         build_system = config["build-system"]
         assert "requires" in build_system
         assert "build-backend" in build_system
 
-        # Should have entry points
         assert "project" in config
         project = config["project"]
         assert "scripts" in project
@@ -1407,21 +1194,13 @@ class TestPackageMetadata:
 
 
 class TestBetaReleaseSurface:
-    """Ratchet tests for Beta release-surface coherence.
-
-    These assertions prevent the status/install/packaging drift that was
-    found in the 2026-04-01 pre-Beta review from recurring silently.
-    """
-
     REPO_ROOT = Path(__file__).parent.parent.parent
 
-    # Canonical current-state entry-point docs where release status must be Beta.
     STATUS_DOCS = [
         "README.md",
         "docs/usage/faq.md",
     ]
 
-    # Canonical install docs that must not claim DuckDB ships with the plain install.
     INSTALL_DOCS = [
         "README.md",
         "docs/usage/installation.md",
@@ -1430,7 +1209,6 @@ class TestBetaReleaseSurface:
         "docs/usage/faq.md",
     ]
 
-    # Stale phrases that must not appear in canonical install docs.
     DUCKDB_DEFAULT_PHRASES = [
         "DuckDB is included with BenchBox by default",
         "included by default with BenchBox",
@@ -1440,7 +1218,6 @@ class TestBetaReleaseSurface:
     ]
 
     def test_pyproject_has_beta_classifier(self):
-        """pyproject.toml must carry the Beta Development Status classifier."""
         pyproject_path = self.REPO_ROOT / "pyproject.toml"
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
@@ -1452,7 +1229,6 @@ class TestBetaReleaseSurface:
         )
 
     def test_canonical_docs_say_beta_not_alpha(self):
-        """README and FAQ must describe Beta status, not Alpha."""
         alpha_pattern = re.compile(
             r"\b(alpha software|is ALPHA software|Status-Alpha|## Alpha Software)\b",
             re.IGNORECASE,
@@ -1469,7 +1245,6 @@ class TestBetaReleaseSurface:
             )
 
     def test_install_docs_do_not_claim_duckdb_is_default(self):
-        """Install docs must not claim DuckDB ships with the plain base install."""
         for rel_path in self.INSTALL_DOCS:
             path = self.REPO_ROOT / rel_path
             if not path.exists():
@@ -1483,7 +1258,6 @@ class TestBetaReleaseSurface:
                 )
 
     def test_duckdb_is_optional_in_pyproject(self):
-        """DuckDB must be listed as an optional extra, not a core dependency."""
         pyproject_path = self.REPO_ROOT / "pyproject.toml"
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
@@ -1501,7 +1275,6 @@ class TestBetaReleaseSurface:
         )
 
     def test_duckdb_runtime_floor_supports_constrained_sorted_ingestion(self):
-        """Package and platform metadata must reject DuckDB's stale-index releases."""
         pyproject_path = self.REPO_ROOT / "pyproject.toml"
         with open(pyproject_path, "rb") as f:
             config = tomllib.load(f)
@@ -1519,7 +1292,6 @@ class TestBetaReleaseSurface:
         assert get_platform_manifest_entry("duckdb").metadata["requirements"] == (expected,)
 
     def test_experimental_not_in_benchbox_all(self):
-        """benchbox.experimental must not be re-exported via benchbox.__all__."""
         import benchbox
 
         public_exports = getattr(benchbox, "__all__", [])
@@ -1528,25 +1300,19 @@ class TestBetaReleaseSurface:
             experimental_exports
         )
 
-    def test_experimental_namespace_has_unsupported_docstring(self):
-        """benchbox/experimental/__init__.py must document that it is unsupported."""
+    def test_experimental_namespace_support_boundary_is_documented(self):
         exp_init = self.REPO_ROOT / "benchbox" / "experimental" / "__init__.py"
         assert exp_init.exists(), "benchbox/experimental/__init__.py must exist"
-        content = exp_init.read_text(encoding="utf-8")
-        assert "unsupported" in content.lower(), (
-            "benchbox/experimental/__init__.py must contain the word 'unsupported' "
-            "to document the Beta support boundary. "
-            "Do not silently expand the supported product surface."
+        contracts = (self.REPO_ROOT / "docs" / "reference" / "public-contracts.md").read_text(encoding="utf-8")
+        row = next((line for line in contracts.splitlines() if "`benchbox.experimental` namespace" in line), "")
+        assert "| `experimental` |" in row
+        assert "outside the supported beta product surface" in row, (
+            "docs/reference/public-contracts.md must document benchbox.experimental as outside "
+            "the supported beta product surface. Do not silently expand the supported product surface."
         )
 
     @pytest.mark.slow
     def test_ty_clean_on_beta_critical_entrypoints(self):
-        """Release-critical entrypoints must produce zero ty diagnostics.
-
-        Keeps the targeted typecheck gate durable without expanding to the
-        full repository backlog.  Mark @slow so it only runs in CI and on
-        explicit slow-test invocations, not on every fast-test pass.
-        """
         import subprocess
 
         beta_critical = [
@@ -1571,10 +1337,8 @@ def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess:
 
 
 def _init_repo(root: Path) -> None:
-    """Init a scratch repo insulated from the developer's ambient git config."""
     root.mkdir(parents=True, exist_ok=True)
     _git("init", "-q", ".", cwd=root)
-    # A global commit.gpgsign or core.hooksPath would otherwise break _commit_all.
     for key, value in (
         ("user.email", "test@benchbox.invalid"),
         ("user.name", "BenchBox Test"),
@@ -1596,7 +1360,6 @@ def _default_branch(root: Path) -> str:
 
 
 def _probe(root: Path, theirs: str) -> subprocess.CompletedProcess:
-    """Run the exact merge probe `pr-conflict-scan` uses, HEAD vs `theirs`."""
     return _git("merge-tree", "--write-tree", "--name-only", "HEAD", theirs, cwd=root)
 
 
@@ -1607,7 +1370,6 @@ def _git_version() -> tuple[int, ...]:
     return tuple(int(part) for part in match.groups())
 
 
-# `git merge-tree --write-tree` landed in git 2.38.
 requires_modern_merge_tree = pytest.mark.skipif(
     _git_version() < (2, 38, 0),
     reason="pr-conflict-scan requires git >= 2.38 for `merge-tree --write-tree`",
@@ -1615,41 +1377,22 @@ requires_modern_merge_tree = pytest.mark.skipif(
 
 
 class TestPrConflictScan:
-    """`pr-conflict-scan` must warn on real conflicts and stay silent otherwise.
-
-    Regression guard for the false-positive storm caused by parsing the
-    deprecated three-arg `git merge-tree <base> <ours> <theirs>` output: its
-    `changed in both` / `added in both` / `removed in {local,remote}` lines are
-    informational trivial-merge headers emitted for any file both sides touched,
-    not conflicts. Because nearly every PR edits CHANGELOG.md, the old probe
-    warned on almost every pair.
-    """
-
     def test_probe_uses_modern_write_tree_form(self):
-        """The recipe must use the modern form and gate on a verified ref."""
         recipe = _make_target_recipe("pr-conflict-scan")
 
         assert 'git merge-tree --write-tree --name-only HEAD "origin/$$branch"' in recipe
-        # A bad ref also exits 1, indistinguishable from a conflict, so the ref
-        # must be verified before the probe runs.
         assert 'git rev-parse --verify --quiet "origin/$$branch^{commit}"' in recipe
         assert recipe.index("rev-parse --verify") < recipe.index("merge-tree")
-        # Only exit status 1 means conflict; >1 is an error and must not warn.
         assert "[ $$? -eq 1 ] || continue" in recipe
 
     def test_probe_does_not_parse_legacy_informational_headers(self):
-        """The legacy trivial-merge headers must never be treated as conflicts."""
-        # _make_target_recipe returns recipe lines only, so the explanatory
-        # comment above the target -- which names these headers -- is excluded.
         recipe = _make_target_recipe("pr-conflict-scan")
 
         for header in ("changed in both", "added in both", "removed in local", "removed in remote"):
             assert header not in recipe, f"{header!r} is an informational header, not a conflict"
-        # The legacy three-arg form takes an explicit merge base as $1.
         assert 'git merge-tree "$$base"' not in recipe
 
     def test_scan_is_warn_only(self):
-        """The probe reports; it must never fail the caller's `pr-open`."""
         recipe = _make_target_recipe("pr-conflict-scan")
         assert recipe.rstrip().endswith("done; true")
 
@@ -1674,7 +1417,6 @@ class TestPrConflictScan:
 
     @requires_modern_merge_tree
     def test_probe_is_silent_when_both_sides_edit_one_file_cleanly(self, tmp_path: Path):
-        """The exact false positive: both sides edit one file, far-apart hunks."""
         repo = tmp_path / "same_file_clean"
         _init_repo(repo)
         (repo / "CHANGELOG.md").write_text("".join(f"line{i}\n" for i in range(1, 21)))
@@ -1695,7 +1437,6 @@ class TestPrConflictScan:
 
         assert _probe(repo, "feature").returncode == 0, "clean auto-merge must not warn"
 
-        # The legacy probe the recipe used to run would have warned here.
         merge_base = _git("merge-base", "HEAD", "feature", cwd=repo).stdout.strip()
         legacy = _git("merge-tree", merge_base, "HEAD", "feature", cwd=repo).stdout
         assert "changed in both" in legacy, "the legacy false-positive trigger is still reproducible"
@@ -1718,19 +1459,11 @@ class TestPrConflictScan:
 
         result = _probe(repo, "feature")
         assert result.returncode == 1, "a same-line conflict must be detected"
-        # Line 1 is the tree OID; conflicted names follow, terminated by a blank line.
         conflicted = list(itertools.takewhile(bool, result.stdout.splitlines()[1:]))
         assert conflicted == ["Makefile"]
 
     @requires_modern_merge_tree
     def test_legacy_conflict_marker_is_diff_prefixed(self, tmp_path: Path):
-        """`^<<<<<<<` can never match legacy output, so that fallback is unsafe.
-
-        Guards against "just anchor the grep to `<<<<<<<`" — in the legacy
-        format the marker is emitted inside a diff body as `+<<<<<<< .our`,
-        so an anchored grep matches nothing and the scan goes permanently
-        silent: a false negative on every real conflict.
-        """
         repo = tmp_path / "legacy_marker"
         _init_repo(repo)
         (repo / "f.txt").write_text("base\nkeep\n")
@@ -1753,8 +1486,6 @@ class TestPrConflictScan:
 
 
 class TestUATGateReleaseEvidence:
-    """UAT evidence is evaluated for campaign reporting, not release readiness."""
-
     @staticmethod
     def _payload(**overrides) -> dict:
         payload = {
@@ -1843,18 +1574,11 @@ class TestUATGateReleaseEvidence:
 
     @pytest.mark.skipif(not hasattr(__import__("time"), "tzset"), reason="time.tzset() is POSIX-only")
     def test_naive_completed_at_treated_as_utc_regardless_of_local_timezone(self, monkeypatch):
-        """#1162 review: a naive completed_at must evaluate identically no
-        matter what timezone the evaluating process happens to be running in.
-        `.astimezone()` previously reinterpreted a naive timestamp against
-        *this process's* local timezone (the CI runner's, not the operator's
-        who produced the evidence) -- so evidence near the max-age cutoff
-        could read stale or fresh purely based on where the check ran.
-        """
         import os
         import time
         from datetime import datetime, timezone
 
-        payload = self._payload(completed_at="2026-07-09T10:00:00")  # naive, no offset
+        payload = self._payload(completed_at="2026-07-09T10:00:00")
         now = datetime(2026, 7, 10, 12, tzinfo=timezone.utc)
 
         def _age_line(result):
@@ -1880,7 +1604,6 @@ class TestUATGateReleaseEvidence:
         assert len(set(ages.values())) == 1, ages
 
     def test_missing_uat_is_advisory_after_green_canary(self, monkeypatch, capsys):
-        """A green canary passes even when the optional UAT report is absent."""
         from datetime import datetime, timezone
 
         from scripts import release_readiness_check
@@ -1915,7 +1638,6 @@ class TestUATGateReleaseEvidence:
         assert "UAT evidence advisory: No committed UAT gate evidence" in capsys.readouterr().out
 
     def test_red_uat_is_advisory_after_green_canary(self, monkeypatch, capsys):
-        """A green canary still exits 0 when committed UAT evidence is red."""
         from datetime import datetime, timedelta, timezone
 
         from scripts import release_readiness_check
@@ -2026,14 +1748,13 @@ class TestUATGateReleaseEvidence:
         assert "Latest release canary is failure" in capsys.readouterr().err
 
     def test_override_bypasses_uat_check_too(self, monkeypatch):
-        """The existing admin override short-circuits the advisory UAT report as well."""
         from scripts import release_readiness_check
 
         monkeypatch.setenv("RELEASE_READINESS_OVERRIDE_SHA", "release-head")
         monkeypatch.setenv("RELEASE_READINESS_OVERRIDE_REASON", "INC-999 approved")
         monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
 
-        def _boom(*_args, **_kwargs):  # pragma: no cover - must never be called
+        def _boom(*_args, **_kwargs):  # pragma: no cover
             raise AssertionError("override must short-circuit before any evidence lookup")
 
         monkeypatch.setattr(release_readiness_check, "_load_uat_gate_evidence", _boom)
@@ -2044,7 +1765,6 @@ class TestUATGateReleaseEvidence:
         assert rc == 0
 
     def test_gate_check_make_target_is_wired(self):
-        """`make uat-gate-check` must dispatch to the gate-check subcommand."""
         recipe = _make_target_recipe("uat-gate-check")
         assert "tests.uat._cli gate-check" in recipe
         assert "--stage1" in recipe and "--stage2" in recipe and "--stage3" in recipe

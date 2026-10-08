@@ -1,5 +1,3 @@
-"""SSB cross-surface gate builder."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +6,6 @@ from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duck
 
 
 def build_ssb_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate SSB data, load it into in-memory DuckDB, and wire both surfaces."""
     from benchbox.core.ssb.benchmark import SSBBenchmark
     from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
     from benchbox.core.ssb.generator import SSBDataGenerator

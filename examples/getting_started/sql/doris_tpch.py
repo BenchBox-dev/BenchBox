@@ -1,52 +1,3 @@
-"""Run TPC-H on Apache Doris (self-hosted cluster).
-
-Apache Doris is a high-performance real-time analytical database based on MPP
-(Massively Parallel Processing) architecture. Originally developed at Baidu as
-Palo, it graduated as an Apache Top-Level Project in 2022. Doris connects via
-the MySQL protocol (port 9030) and uses Stream Load for high-throughput data
-ingestion over HTTP (port 8030). It supports multiple table models (Duplicate,
-Aggregate, Unique, Primary Key) and provides a vectorized execution engine
-for analytical workloads.
-
-Prerequisites:
-    1. Running Apache Doris cluster with Frontend (FE) and Backend (BE) nodes
-    2. FE MySQL protocol port accessible (default: 9030)
-    3. FE HTTP port accessible for Stream Load (default: 8030)
-    4. Database user with CREATE/DROP/INSERT/SELECT privileges
-
-Required environment variables:
-    DORIS_HOST               Doris FE hostname or IP address
-
-Optional environment variables:
-    DORIS_PORT               MySQL protocol port (default: 9030)
-    DORIS_USER               Database username (default: root)
-    DORIS_PASSWORD           Database password (default: "")
-    DORIS_DATABASE           Target database name (default: benchbox)
-    DORIS_HTTP_PORT          FE HTTP port for Stream Load (default: 8030)
-
-Installation:
-    uv add benchbox --extra doris
-
-Docker quick-start:
-    docker run -p 9030:9030 -p 8030:8030 -p 8040:8040 \\
-        apache/doris:doris-all-in-one-2.1
-
-    mysql -h 127.0.0.1 -P 9030 -u root -e "SELECT 1"
-
-Managed cloud options:
-    - VeloDB Cloud (velodb.io) - fully managed Doris by core contributors
-    - SelectDB Cloud (selectdb.com) - enterprise managed Doris
-    - ApsaraDB for SelectDB - managed Doris on Alibaba Cloud
-
-Usage:
-    export DORIS_HOST=192.168.1.100
-
-    python examples/getting_started/sql/doris_tpch.py
-
-    # Preview without execution
-    python examples/getting_started/sql/doris_tpch.py --dry-run ./preview
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -63,11 +14,6 @@ _OUTPUT_DIR = _PROJECT_ROOT / "benchmark_runs" / "getting_started" / "doris"
 
 
 def _require_env(var_name: str) -> str:
-    """Require a Doris environment variable.
-
-    Doris connection details should be provided via environment variables,
-    especially passwords. Never hardcode credentials in scripts.
-    """
     value = os.getenv(var_name)
     if not value:
         raise RuntimeError(
@@ -77,32 +23,6 @@ def _require_env(var_name: str) -> str:
 
 
 def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig]:
-    """Build benchmark and database configurations for Apache Doris.
-
-    Apache Doris Concepts:
-
-    1. MYSQL PROTOCOL
-       - Doris FE exposes a MySQL-compatible wire protocol on port 9030
-       - Standard MySQL clients and drivers (PyMySQL) connect directly
-       - SQL syntax is largely MySQL-compatible with OLAP extensions
-
-    2. STREAM LOAD
-       - High-throughput data ingestion via HTTP PUT to the FE node
-       - Sends CSV data to the FE HTTP port (default: 8030)
-       - FE routes data to the appropriate BE nodes for ingestion
-       - BenchBox uses Stream Load automatically when requests is installed
-
-    3. TABLE MODELS
-       - Duplicate Key: all rows preserved (used for benchmarks)
-       - Aggregate: rows merged by aggregate functions
-       - Unique Key: last write wins deduplication
-       - Primary Key: real-time updates with merge-on-read
-
-    4. DISTRIBUTED EXECUTION
-       - Queries distributed across Backend (BE) nodes via MPP engine
-       - Hash partitioning distributes data for parallel scans
-       - Vectorized execution engine (Doris 2.0+) for columnar processing
-    """
     benchmark_config = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -115,16 +35,11 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
         type="doris",
         name="doris_tpch",
         options={
-            # FE host (required) - Frontend node hostname
             "host": _require_env("DORIS_HOST"),
-            # MySQL protocol port (optional, default: 9030)
             "port": int(os.getenv("DORIS_PORT", "9030")),
-            # Authentication (optional, Doris defaults to root with no password)
             "username": os.getenv("DORIS_USER", "root"),
             "password": os.getenv("DORIS_PASSWORD", ""),
-            # Target database (optional, default: benchbox)
             "database": os.getenv("DORIS_DATABASE", "benchbox"),
-            # FE HTTP port for Stream Load ingestion (optional, default: 8030)
             "http_port": int(os.getenv("DORIS_HTTP_PORT", "8030")),
         },
     )
@@ -133,14 +48,6 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
 
 
 def run_example(scale_factor: float = 0.01, *, dry_run_output: Path | None = None) -> None:
-    """Execute TPC-H benchmark on Apache Doris.
-
-    Apache Doris provides:
-    - Sub-second OLAP query latency via vectorized execution engine
-    - MPP distributed query engine across multiple BE nodes
-    - MySQL protocol compatibility for standard tooling
-    - Stream Load for high-throughput data ingestion via FE HTTP API
-    """
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     benchmark_config, database_config = _build_configs(scale_factor)
 

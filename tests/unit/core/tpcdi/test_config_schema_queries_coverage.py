@@ -62,7 +62,7 @@ def test_config_post_init_and_profiles(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert dev.get_performance_profile() == "single_threaded"
     assert prod.enable_parallel is False
     prod.create_directories()
-    assert (prod.output_dir / "logs").exists()  # type: ignore[operator]
+    assert (prod.output_dir / "logs").exists()
 
     perf = TPCDIConfig.for_performance_testing(1.0)
     assert perf.enable_validation is False
@@ -138,8 +138,8 @@ def test_query_manager_core_accessors_and_order(monkeypatch: pytest.MonkeyPatch)
     with pytest.raises(ValueError, match="Invalid query type"):
         manager.get_queries_by_type("bad")
 
-    manager._all_metadata = {"Q1": {"relies_on": ["Q2"]}, "Q2": {"relies_on": ["Q1"]}}  # type: ignore[assignment]
-    manager._all_queries = {"Q1": "select 1", "Q2": "select 2"}  # type: ignore[assignment]
+    manager._all_metadata = {"Q1": {"relies_on": ["Q2"]}, "Q2": {"relies_on": ["Q1"]}}
+    manager._all_queries = {"Q1": "select 1", "Q2": "select 2"}
     with pytest.raises(ValueError, match="Circular dependency"):
         manager.resolve_query_order(["Q1", "Q2"])
 

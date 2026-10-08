@@ -209,7 +209,7 @@ def test_convert_prefers_duckdb_writer_when_available(monkeypatch, tmp_path):
 
 
 def test_require_duckdb_writer_raises_when_extension_unavailable(monkeypatch, tmp_path):
-    """When require_duckdb_writer is True, failing DuckDB write should raise ConversionError."""
+
     converter = VortexConverter()
 
     source_file = tmp_path / "part.tbl"
@@ -233,7 +233,7 @@ def test_require_duckdb_writer_raises_when_extension_unavailable(monkeypatch, tm
 
 
 def test_duckdb_write_failure_logs_warning(monkeypatch, tmp_path, caplog):
-    """DuckDB vortex extension write failure should log a WARNING with error detail."""
+
     converter = VortexConverter()
 
     import logging
@@ -241,7 +241,6 @@ def test_duckdb_write_failure_logs_warning(monkeypatch, tmp_path, caplog):
     with caplog.at_level(logging.WARNING, logger="benchbox.utils.format_converters.vortex_converter"):
         ok, err = converter._write_with_duckdb_vortex(None, tmp_path / "test.vortex")
 
-    # DuckDB may or may not be installed in test env; either way the method should not raise.
     assert isinstance(ok, bool)
     if not ok:
         assert err is not None

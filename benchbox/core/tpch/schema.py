@@ -1,5 +1,3 @@
-"""TPC-H schema definition."""
-
 from enum import Enum
 from pathlib import Path
 from typing import Any, NamedTuple, Optional
@@ -11,8 +9,6 @@ from benchbox.core.tuning import BenchmarkTunings, TableTuning, TuningColumn
 
 
 class DataType(Enum):
-    """Enumeration of SQL data types used in TPC-H."""
-
     INTEGER = "INTEGER"
     DECIMAL = "DECIMAL(15,2)"
     VARCHAR = "VARCHAR"
@@ -21,25 +17,20 @@ class DataType(Enum):
 
 
 class Column(NamedTuple):
-    """Represents a column in a database table."""
-
     name: str
     data_type: DataType
-    size: Optional[int] = None  # For VARCHAR and CHAR types
+    size: Optional[int] = None
     nullable: bool = False
     primary_key: bool = False
-    foreign_key: Optional[tuple[str, str]] = None  # (table_name, column_name)
+    foreign_key: Optional[tuple[str, str]] = None
 
     def get_sql_type(self) -> str:
-        """Get the SQL data type string for this column."""
         if self.data_type in (DataType.VARCHAR, DataType.CHAR) and self.size is not None:
             return f"{self.data_type.value}({self.size})"
         return self.data_type.value
 
 
 class Table(BaseSchemaTable):
-    """Represents a TPC-H table with its columns and constraints."""
-
     def __init__(self, name: str, columns: list[Column]) -> None:
         super().__init__(name, columns)
 
@@ -78,7 +69,6 @@ ORDERS = _TABLE_DEFS["ORDERS"]
 LINEITEM = _TABLE_DEFS["LINEITEM"]
 
 
-# Collection of all tables in the TPC-H schema
 TABLES = [
     REGION,
     NATION,
@@ -90,22 +80,10 @@ TABLES = [
     LINEITEM,
 ]
 
-# Map of table names to Table objects
 TABLES_BY_NAME = {table.name: table for table in TABLES}
 
 
 def get_table(name: str) -> Table:
-    """Get a table by name (case-insensitive lookup).
-
-    Args:
-        name: The name of the table to retrieve
-
-    Returns:
-        The requested Table object
-
-    Raises:
-        ValueError: If the table name is invalid
-    """
     name_lower = name.lower()
     if name_lower not in TABLES_BY_NAME:
         raise ValueError(f"Invalid table name: {name}")
@@ -113,30 +91,10 @@ def get_table(name: str) -> Table:
 
 
 def get_table_loading_order() -> list[str]:
-    """Get the FK-safe table load order for the full TPC-H schema.
-
-    Derived from the schema's own foreign-key metadata (``Column.foreign_key``
-    on each ``Table`` in ``TABLES``) via a stable topological sort, rather
-    than a hand-maintained constant, so it stays correct if the schema
-    definitions ever change.
-
-    Returns:
-        All TPC-H table names (lowercase), ordered so a table referenced by
-        a foreign key always precedes the table that references it.
-    """
     return get_fk_ordered_table_names(TABLES)
 
 
 def get_create_all_tables_sql(enable_primary_keys: bool = True, enable_foreign_keys: bool = True) -> str:
-    """Generate SQL to create all TPC-H tables.
-
-    Args:
-        enable_primary_keys: Whether to include primary key constraints
-        enable_foreign_keys: Whether to include foreign key constraints
-
-    Returns:
-        SQL script for creating all tables
-    """
     import logging
 
     logger = logging.getLogger(__name__)
@@ -166,17 +124,8 @@ def get_create_all_tables_sql(enable_primary_keys: bool = True, enable_foreign_k
 
 
 def get_tunings() -> BenchmarkTunings:
-    """Get the default tuning configurations for TPC-H tables.
-
-    These tunings are based on TPC-H query patterns and provide optimal
-    performance for analytical workloads across different platforms.
-
-    Returns:
-        BenchmarkTunings containing tuning configurations for all TPC-H tables
-    """
     tunings = BenchmarkTunings("tpch")
 
-    # LineItem table - largest fact table, partitioned by ship date, clustered by order key
     lineitem_tuning = TableTuning(
         table_name="lineitem",
         partitioning=[TuningColumn("l_shipdate", "DATE", 1)],
@@ -188,7 +137,6 @@ def get_tunings() -> BenchmarkTunings:
     )
     tunings.add_table_tuning(lineitem_tuning)
 
-    # Orders table - partitioned by order date, clustered by customer key
     orders_tuning = TableTuning(
         table_name="orders",
         partitioning=[TuningColumn("o_orderdate", "DATE", 1)],
@@ -197,7 +145,6 @@ def get_tunings() -> BenchmarkTunings:
     )
     tunings.add_table_tuning(orders_tuning)
 
-    # PartSupp table - distribute by part key, sort by supplier key and availability
     partsupp_tuning = TableTuning(
         table_name="partsupp",
         distribution=[TuningColumn("ps_partkey", "INTEGER", 1)],
@@ -208,7 +155,6 @@ def get_tunings() -> BenchmarkTunings:
     )
     tunings.add_table_tuning(partsupp_tuning)
 
-    # Customer table - distribute by customer key, sort by market segment
     customer_tuning = TableTuning(
         table_name="customer",
         distribution=[TuningColumn("c_custkey", "INTEGER", 1)],
@@ -216,7 +162,6 @@ def get_tunings() -> BenchmarkTunings:
     )
     tunings.add_table_tuning(customer_tuning)
 
-    # Supplier table - distribute by supplier key, sort by nation
     supplier_tuning = TableTuning(
         table_name="supplier",
         distribution=[TuningColumn("s_suppkey", "INTEGER", 1)],
@@ -224,7 +169,6 @@ def get_tunings() -> BenchmarkTunings:
     )
     tunings.add_table_tuning(supplier_tuning)
 
-    # Part table - distribute by part key, sort by type and size
     part_tuning = TableTuning(
         table_name="part",
         distribution=[TuningColumn("p_partkey", "INTEGER", 1)],
@@ -235,11 +179,9 @@ def get_tunings() -> BenchmarkTunings:
     )
     tunings.add_table_tuning(part_tuning)
 
-    # Nation table - sort by nation key (small dimension table)
     nation_tuning = TableTuning(table_name="nation", sorting=[TuningColumn("n_nationkey", "INTEGER", 1)])
     tunings.add_table_tuning(nation_tuning)
 
-    # Region table - sort by region key (small dimension table)
     region_tuning = TableTuning(table_name="region", sorting=[TuningColumn("r_regionkey", "INTEGER", 1)])
     tunings.add_table_tuning(region_tuning)
 

@@ -8,15 +8,9 @@ test.describe("BenchmarkIndex", () => {
     await page.goto("/results/tpch/");
     await waitForShell(page);
 
-    // The heading text only resolves once the corpus query completes.
-    // WebKit's cold-start DuckDB-WASM attach regularly exceeds the default
-    // 10s expect timeout even at --workers=1 (webkit-smoke-fix-or-demote-2).
     await waitForDataLoaded(page, /TPC-H Results/);
     await expect(page.getByRole("heading", { name: /TPC-H Results/ })).toBeVisible();
 
-    // Scale-factor selector writes to the `sf` query parameter. The
-    // fixture corpus only carries SF 0.01, so the selector should
-    // default to that and the URL should persist it on navigation.
     await expect(page).toHaveURL(/\/results\/tpch\//);
     const sfValue = await page.evaluate(() => new URL(window.location.href).searchParams.get("sf"));
     expect(sfValue === null || sfValue === "0.01").toBeTruthy();
@@ -41,17 +35,10 @@ test.describe("BenchmarkIndex", () => {
     await waitForShell(page);
 
     const switcher = page.getByTestId("benchmark-switcher");
-    // Wait for the switcher to populate. The corpus-aware option list is
-    // filled from `listBenchmarksWithPublicResults()`, which resolves after
-    // the snapshot attaches.
     await expect(switcher).toBeVisible();
     await expect.poll(async () => (await switcher.locator("option").count())).toBeGreaterThan(0);
 
     const labels = (await switcher.locator("option").allTextContents()).map((label) => label.trim());
-    // The fixture corpus carries a defined set of benchmarks; the switcher
-    // must list exactly those (Contract A from the corpus-aware-switcher
-    // TODO) and must not surface catalog-only benchmarks with no public
-    // result pages such as AMPLab or TPC-DI.
     expect(labels).toContain("TPC-H");
     expect(labels).toContain("SSB");
     expect(labels).not.toContain("AMPLab");
@@ -63,10 +50,6 @@ test.describe("BenchmarkIndex", () => {
     await page.goto("/results/amplab/");
     await waitForShell(page);
 
-    // `amplab` is in BENCHMARK_LABELS but the fixture corpus has no AMPLab
-    // results, so the page renders the dedicated empty benchmark detail
-    // layout (not 404). The TODO contract requires that this direct route
-    // still resolves to a useful page with a route back to Results.
     await expect(page.getByRole("heading", { name: "AMPLab", level: 1 })).toBeVisible();
     await expect(page.getByText("No published results yet for AMPLab.")).toBeVisible();
     await expect(page.getByRole("link", { name: "Back to Results" })).toBeVisible();

@@ -1,19 +1,6 @@
-"""Result-equivalence regression test for the joinorder_synthetic cross-surface gate.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-The fast, default-lane companion to the full joinorder_synthetic cross-surface
-gate in ``benchbox/core/equivalence/cross_surface.py`` (run via
-``make joinorder-synthetic-cross-surface-equivalence-report``, wired into the
-``correctness-gate`` CI job), mirroring
-``tests/integration/test_ssb_cross_surface_equivalence.py``. It executes every
-joinorder_synthetic query's DataFrame surface (both backends) against its OWN SQL
-surface on a bounded SF=0.1 DuckDB cell and asserts they agree - SQL is the
-trusted reference for its own DataFrame surface, so no hand-curated answer key is
-needed. The baseline is empty (every cell must match).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -41,7 +28,6 @@ pytestmark = [
 
 
 def test_joinorder_synthetic_dataframe_surface_equivalent_to_sql(tmp_path):
-    """Every joinorder_synthetic DataFrame query (both backends) must match its own SQL surface."""
     gate = GATES["joinorder_synthetic"]
     data = gate.build(EQUIVALENCE_SCALE, tmp_path)
     connection = data.connection
@@ -60,13 +46,10 @@ def test_joinorder_synthetic_dataframe_surface_equivalent_to_sql(tmp_path):
     finally:
         connection.close()
 
-    # A partial registry must not turn the full benchmark green by comparing
-    # only its implemented subset.
     assert set(data.query_ids) == set(CANONICAL_JOINORDER_QUERIES)
     expected_coverage = {backend: len(CANONICAL_JOINORDER_QUERIES) for backend in gate.backends}
     assert coverage == expected_coverage, f"joinorder_synthetic backend coverage shrank: {coverage}"
 
-    # Empty baseline: every query/backend cell must match.
     unexpected = {d.key for d in divergences} - set(gate.known_divergences)
     assert not unexpected, "joinorder_synthetic DataFrame surface diverges from SQL: " + ", ".join(
         f"{d.key} ({d.detail})" for d in divergences if d.key in unexpected

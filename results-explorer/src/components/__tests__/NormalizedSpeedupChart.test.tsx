@@ -1,13 +1,3 @@
-/**
- * Tests for NormalizedSpeedupChart component.
- *
- * Cases:
- *   (a) Renders without error for valid 2-platform input
- *   (b) Returns null when fewer than 2 results or no queries
- *   (c) viewBox width tracks container offsetWidth (responsive layout)
- *   (d) Null timing entries render em-dash placeholder
- */
-
 import { fireEvent, render, screen, waitFor } from "@testing-library/preact";
 import { describe, it, expect, afterEach } from "vitest";
 import { NormalizedSpeedupChart } from "@/components/NormalizedSpeedupChart";
@@ -53,12 +43,7 @@ describe("NormalizedSpeedupChart", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  // -----------------------------------------------------------------------
-  // (c) viewBox width tracks container offsetWidth
-  // -----------------------------------------------------------------------
-
   afterEach(() => {
-    // Restore offsetWidth after any test that overrides it
     Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
       configurable: true,
       get: () => 0,
@@ -73,17 +58,12 @@ describe("NormalizedSpeedupChart", () => {
 
     const { container } = render(<NormalizedSpeedupChart queries={QUERIES} results={RESULTS} baselineIdx={0} />);
 
-    // useElementSize reads offsetWidth in a useEffect; wait for the re-render
     await waitFor(() => {
       const svg = container.querySelector("svg");
       const viewBox = svg?.getAttribute("viewBox") ?? "";
       expect(viewBox).toMatch(new RegExp(`^0 0 ${testWidth} `));
     });
   });
-
-  // -----------------------------------------------------------------------
-  // (d) Null timing entries render em-dash
-  // -----------------------------------------------------------------------
 
   it("renders a compact parity state when all query speedups are equal", () => {
     const equalQueries = [
@@ -100,18 +80,8 @@ describe("NormalizedSpeedupChart", () => {
   it("null timing entry renders em-dash placeholder", () => {
     const queriesWithNull = [{ queryId: "Q1", timings: [{ ms: 100, status: "pass" }, null] }];
     render(<NormalizedSpeedupChart queries={queriesWithNull} results={RESULTS} baselineIdx={0} />);
-    // em-dash rendered for the null timing slot
     expect(screen.getByText("-")).toBeTruthy();
   });
-
-  // -----------------------------------------------------------------------
-  // Duplicate-queryId guard (blind-spot
-  //   _project/blind-spots/2026-04-29-143205-react-key-collision-class.md)
-  //
-  // The `queries` prop is not deduped at the boundary, so a caller passing
-  // variant rows for the same queryId could collide on key={queryId}. The
-  // composite key `${queryId}-${rowIdx}` keeps reconciliation stable.
-  // -----------------------------------------------------------------------
 
   it("hides queries with missing speedups by default and toggles them back via the comparable-only checkbox", () => {
     const sparseQueries = [
@@ -123,14 +93,12 @@ describe("NormalizedSpeedupChart", () => {
       <NormalizedSpeedupChart queries={sparseQueries} results={RESULTS} baselineIdx={0} />,
     );
 
-    // Default: only the fully-comparable Q1 row renders.
     const queryLabelsAfterDefault = Array.from(container.querySelectorAll("text"))
       .map((el) => el.textContent ?? "")
       .filter((label) => /^Q[123]$/.test(label));
     expect(queryLabelsAfterDefault).toEqual(["Q1"]);
     expect(screen.getByText(/2 hidden/)).toBeTruthy();
 
-    // Toggle off the comparable-only filter; Q2 + Q3 should render alongside Q1.
     const toggle = screen.getByTestId("normalized-speedup-comparable-only-toggle") as HTMLInputElement;
     fireEvent.change(toggle, { target: { checked: false } });
     const queryLabelsAfterToggle = Array.from(container.querySelectorAll("text"))
@@ -164,8 +132,6 @@ describe("NormalizedSpeedupChart", () => {
     const { container } = render(
       <NormalizedSpeedupChart queries={queriesWithDuplicate} results={RESULTS} baselineIdx={0} />,
     );
-    // Two distinct row groups should render — both Q1 entries plus the
-    // grid axis group. Per-row count: 2 query rows.
     const queryRows = Array.from(container.querySelectorAll("text")).filter(
       (el) => el.textContent === "Q1",
     );

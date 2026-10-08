@@ -49,7 +49,10 @@ import {
   isRankable,
   isTimingDisplayable,
   isValidTimingValue,
+  normalizePrimaryMetric,
   platformTimingValue,
+  primaryMetricLabel,
+  primaryMetricValue,
   summarizeChartDatasetExclusions,
   validPrimaryMetricValue,
   type ChartDatasetEligibilityClass,
@@ -57,28 +60,19 @@ import {
 
 interface ChartPanelProps {
   context: ChartContext;
-  /** Use the long summary layout when the page already owns the matrix view. */
   summaryLayout?: "tabs" | "long";
   baselineIndex?: number;
   onBaselineIndexChange?: (baselineIndex: number) => void;
-  // Suppress winner language when the page-level comparison boundary is not
-  // suitable for a sound winner claim.
   suppressWinnerClaims?: boolean;
   suppressionReason?: string;
-  // Hosts that render a chart at page level can exclude its duplicate from
-  // the panel's chart navigation.
   excludeChartIds?: readonly string[];
   queryFilter?: readonly string[];
-  /** Long layout only: maps a chart id to a DOM id placed on its card, for deep links. */
   cardAnchors?: Readonly<Record<string, string>>;
-  /** Long layout only: chart id to open (and keep open) on mount / when it changes. */
   forceOpenChartId?: string | null;
-  /** Long layout only: see `SummaryChartOverview`'s prop of the same name. */
   rankGateReason?: string | null;
   rankGateContext?: { benchmark: string; scaleFactor: string; phase: string };
 }
 
-/** URL parameter carrying the open chart. */
 const CHART_URL_KEY = "chart";
 
 interface CompareQueryRow {
@@ -139,7 +133,6 @@ function buildChartSummary(
   const base = filterSummaryForChartDataset(summary, eligibilityClass);
   if (!queryFilter) return base;
   const filteredQueryIds = queryFilter.filter((q) => base.query_ids.includes(q));
-  // Invariant: compute aggregate geomeans over the query IDs valid across every platform in the cohort
   const sharedValidQueryIds = filteredQueryIds.filter((q) =>
     base.platforms.every((p) => {
       const v = p.timings[q];
@@ -163,12 +156,13 @@ function buildChartSummary(
       display_geomean_ms: geomean,
       sample_geomean_ms: geomean,
       power_score: null,
+      throughput_at_size: null,
       normalized_cost_usd: null,
       cost_status: "unavailable" as const,
     };
   });
   const ranking: RankingConfig | null =
-    queryFilter && base.ranking && base.ranking.primary_metric === "power_score"
+    queryFilter && base.ranking && normalizePrimaryMetric(base.ranking.primary_metric) !== "display_geomean_ms"
       ? {
           primary_metric: "display_geomean_ms",
           secondary_metric: base.ranking.secondary_metric,
@@ -226,11 +220,6 @@ function ChartPanelTabs({
     [summary],
   );
   const preferredId = useMemo(() => preferredChartId(context, charts), [context, charts]);
-  // The open chart belongs in the URL: a reader who finds the view that answers
-  // their question should be able to send that view, not an address that lands
-  // the recipient back on the default. An unknown or no-longer-applicable id is
-  // canonicalised to the preferred chart by the effect below, which rewrites
-  // the parameter as it goes.
   const [activeId, setActiveId] = useUrlState<string>(CHART_URL_KEY, preferredId, stringSerde);
   const [localBaselineIdx, setLocalBaselineIdx] = useState(0);
   const groupTabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -247,16 +236,8 @@ function ChartPanelTabs({
     }
   }, [activeId, charts, preferredId]);
 
-  // Router navigation between two routes that both host this panel uses
-  // pushState, which fires no popstate, so the panel stays mounted with the
-  // chart the reader chose while the destination URL says nothing about it.
-  // The parameter has to describe what is on screen, or a shared link does not
-  // reproduce the view it was copied from.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    // Only an id this cohort can actually show belongs in the URL. Without this
-    // guard the effect races the canonicalisation above and writes back the
-    // very id that was just rejected.
     if (!charts.some((chart) => chart.id === activeId)) return;
     const inUrl = new URLSearchParams(window.location.search).get(CHART_URL_KEY);
     const expected = activeId === preferredId ? null : activeId;
@@ -486,9 +467,6 @@ function chartButtonLabel(chart: ChartRegistryEntry): string {
   return chart.shortTitle;
 }
 
-// The open layout renders every applicable chart group and chart at once,
-// with no tab or disclosure gating: a reader who lands on the page sees the
-// charts, not the controls that would reveal them.
 function ChartPanelLong({
   context,
   baselineIndex,
@@ -781,9 +759,6 @@ function preferredChartId(
     if (ids.has("summary_box")) return "summary_box";
   }
 
-  // A section headed "Charts" should open on a chart. The sparkline table is an
-  // HTML metrics table; it stays available in the Overview group, but leading
-  // with it meant a reader who never touched the controls saw no chart at all.
   if (context.kind === "summary") {
     if (ids.has("performance_bar")) return "performance_bar";
     if (ids.has("sparkline_table")) return "sparkline_table";
@@ -839,9 +814,7 @@ function renderChart(
       return historical && historical.length > 1 ? (
         <TimeSeries
           entries={historical}
-          primaryMetric={
-            (summary?.ranking?.primary_metric as "power_score" | "display_geomean_ms" | undefined)
-          }
+          primaryMetric={normalizePrimaryMetric(summary?.ranking?.primary_metric)}
         />
       ) : (
         <p class="text-sm italic text-[var(--bb-data-fg-subtle)]">
@@ -999,9 +972,6 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
   if (scale === null) return null;
 
   const ticks = latencyScaleTicks(scale);
-  // The full caption is wider than a phone column, so a compact drawing names
-  // the scale and the direction and leaves the metric to the chart's heading
-  // and accessible name, which already say "geomean performance".
   const scaleLabel = layout.labelAbove
     ? scale.mode === "log"
       ? "Log scale - lower is better"
@@ -1029,9 +999,6 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
           const barWidth = fraction * plotWidth;
           const renderedBarWidth = Math.max(2, barWidth);
           const valueLabel = fmtGeomean(row.display_geomean_ms);
-          // A compact row has no gutter to place the value in: it shares the
-          // label line, at the opposite end, where no bar length can displace
-          // it. Wide rows keep the measured three-way placement.
           const valueLabelPlacement: ValueLabelPlacement = layout.labelAbove
             ? { x: width, textAnchor: "end", fill: "var(--bb-chart-label)", placement: "outside" }
             : placePerformanceValueLabel({
@@ -1125,8 +1092,6 @@ function PerformanceBar({ summary }: { summary: BenchmarkSummary }) {
               </g>
             );
           })}
-          {/* Centred, this caption is wider than a phone column and would spill
-              from both ends. A compact drawing anchors it at the left instead. */}
           <text
             x={layout.labelAbove ? 0 : layout.plotX + plotWidth / 2}
             y={axisHeight - 2}
@@ -1211,12 +1176,7 @@ function SummaryBoxPanel({
 
   if (!summary) return null;
 
-  // summary.ranking.primary_metric is authoritative - it is either the
-  // DuckDB-persisted value (summary loaded via getBenchmarkSummaryFromDuckDB)
-  // or the page-resolved primaryMetric threaded through ChartContext. The
-  // geomean fallback is reached only when ranking is null, which happens for
-  // a single-result detail with no matching benchmark_rankings row yet.
-  const primaryMetric = summary.ranking?.primary_metric === "power_score" ? "power_score" : "display_geomean_ms";
+  const primaryMetric = normalizePrimaryMetric(summary.ranking?.primary_metric);
   const higherIsBetter = summary.ranking?.primary_order === "desc";
   const best = [...summary.platforms]
     .filter((platform) => {
@@ -1246,17 +1206,21 @@ function SummaryBoxPanel({
       <SummaryStat
         label={
           suppressWinnerClaims
-            ? primaryMetric === "power_score"
-              ? "Highest power score in ranking"
-              : "Lowest geomean in ranking"
+            ? primaryMetric === "display_geomean_ms"
+              ? "Lowest geomean in ranking"
+              : `Highest ${primaryMetricLabel(primaryMetric).toLowerCase()} in ranking`
             : primaryMetric === "power_score"
               ? "Best power"
-              : "Best geomean"
+              : primaryMetric === "throughput_at_size"
+                ? "Best throughput"
+                : "Best geomean"
         }
         value={
           best
             ? `${summaryLabelByResultId.get(best.result_id) ?? best.platform} · ${
-                primaryMetric === "power_score" ? fmtScore(best.power_score) : fmtGeomean(best.display_geomean_ms)
+                primaryMetric === "display_geomean_ms"
+                  ? fmtGeomean(best.display_geomean_ms)
+                  : fmtScore(primaryMetricValue(best, primaryMetric))
               }${suppressWinnerClaims ? " (ranking mismatch — not comparable)" : ""}`
             : "-"
         }

@@ -1,5 +1,3 @@
-"""Cache hygiene tests for DataFrameDataLoader conversion paths."""
-
 from pathlib import Path
 from unittest.mock import patch
 

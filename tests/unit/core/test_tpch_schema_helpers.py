@@ -53,7 +53,7 @@ def test_create_table_sql_with_and_without_constraints():
 
 
 def test_get_table_and_invalid():
-    # Valid retrieval is case-insensitive via .lower in get_table
+
     t = tpch_schema.get_table("nation")
     assert t.name == "nation"
     with pytest.raises(ValueError):
@@ -72,33 +72,24 @@ def test_get_create_all_tables_sql_toggles_constraints():
 
 def test_get_tunings_contains_expected_tables_and_columns():
     tunings = tpch_schema.get_tunings()
-    # Has expected table tunings (lowercase per TPC spec)
+
     lt = tunings.get_table_tuning("lineitem")
     assert lt is not None and lt.partitioning and lt.clustering
-    # Verify a sample column (lowercase)
+
     names = [c.name for c in lt.partitioning]
     assert "l_shipdate" in names
-    # orders tuning exists with partitioning by o_orderdate
+
     ot = tunings.get_table_tuning("orders")
     assert ot is not None and ot.partitioning
     assert any(c.name == "o_orderdate" for c in ot.partitioning)
 
 
 def test_get_table_loading_order_respects_fk_dependencies():
-    """Regression test for the FK load-ordering defect (2026-07 tuning batch).
-
-    Reproduced: with FK enforcement on, loading tables in the previous
-    fallback order (alphabetical) violated FK references -- e.g. lineitem
-    (references orders/part/supplier) sorts before orders, part loads fine
-    but partsupp (references part+supplier) sorts before supplier, etc.
-    Every referenced table must precede every table that references it.
-    """
     order = tpch_schema.get_table_loading_order()
     assert set(order) == {t.name for t in tpch_schema.TABLES}
 
     position = {name: i for i, name in enumerate(order)}
 
-    # Verify every FK edge points backward (dependency before dependent).
     for table in tpch_schema.TABLES:
         for ref_table, _ref_col in table.get_foreign_keys().values():
             assert position[ref_table] < position[table.name], (
@@ -106,7 +97,6 @@ def test_get_table_loading_order_respects_fk_dependencies():
                 f"dependency {ref_table} (pos {position[ref_table]})"
             )
 
-    # The historically problematic pair must be correctly ordered.
     assert position["orders"] < position["lineitem"]
     assert position["part"] < position["lineitem"]
     assert position["supplier"] < position["lineitem"]
@@ -114,13 +104,10 @@ def test_get_table_loading_order_respects_fk_dependencies():
     assert position["nation"] < position["customer"]
     assert position["region"] < position["nation"]
 
-    # Alphabetical order (the previous fallback) is NOT FK-safe, confirming
-    # this is a real fix and not a no-op re-derivation of the old behavior.
     assert order != sorted(order)
 
 
 def test_get_fk_ordered_table_names_is_stable_for_independent_tables():
-    """Tables with no FK relationship keep their input relative order."""
     from benchbox.core.schema_primitives import get_fk_ordered_table_names
 
     Column = tpch_schema.Column
@@ -133,7 +120,6 @@ def test_get_fk_ordered_table_names_is_stable_for_independent_tables():
 
 
 def test_get_fk_ordered_table_names_handles_cycles_without_raising():
-    """A cyclic FK graph must not raise; leftover tables append in input order."""
     from benchbox.core.schema_primitives import get_fk_ordered_table_names
 
     Column = tpch_schema.Column

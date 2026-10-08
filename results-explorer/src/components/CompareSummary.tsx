@@ -88,8 +88,6 @@ export function CompareSummary({ summary }: CompareSummaryProps) {
           )}
         </SummaryCard>
 
-        {/* The card label already names the run and the question, so the
-            value says the number and nothing else. */}
         <SummaryCard label={summary.winnerLabel ? `Where ${summary.winnerLabel} wins` : "Query comparison"}>
           {summary.claimSuppressed ? (
             <>
@@ -169,8 +167,8 @@ function SummaryCard({
 }
 
 function formatPrimaryValue(value: number | null, primaryMetric: CompareDecisionSummary["primaryMetric"]) {
-  if (primaryMetric === "power_score") return fmtScore(value);
-  return fmtGeomean(value);
+  if (primaryMetric === "display_geomean_ms") return fmtGeomean(value);
+  return fmtScore(value);
 }
 
 function formatCostSummary(cost: NonNullable<CompareDecisionSummary["cost"]>) {

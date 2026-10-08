@@ -1,13 +1,3 @@
-"""Parity tests for W11 query_source variant rules - NYC Taxi and TPC-DI.
-
-Verifies that:
-1. nyctaxi_variants.py registers exactly 8 rules (4 StarRocks + 4 ClickHouse).
-2. tpcdi_variants.py registers exactly 13 rules (five ClickHouse + three DataFusion + StarRocks/Doris/BigQuery/Databricks/Snowflake EQ7).
-3. Each rule has SELECT_VARIANT action and a SelectVariantPayload.
-4. Shadow-mode: no divergence (legacy already selects the variant SQL).
-5. Registry is silent for platforms with no rule (duckdb).
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -21,14 +11,9 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# Load rule modules to populate REGISTRY
-import benchbox.sql_compat.rules.query_source.nyctaxi_variants  # noqa: F401
-import benchbox.sql_compat.rules.query_source.tpcdi_variants  # noqa: F401
+import benchbox.sql_compat.rules.query_source.nyctaxi_variants
+import benchbox.sql_compat.rules.query_source.tpcdi_variants
 from benchbox.sql_compat.registry import REGISTRY
-
-# ---------------------------------------------------------------------------
-# Registration: nyctaxi
-# ---------------------------------------------------------------------------
 
 _NYCTAXI_STARROCKS_RULES = [
     ("query_source.starrocks.nyctaxi.trips_by_dow_dayofweek_variant", "trips-by-day-of-week"),
@@ -47,7 +32,6 @@ _NYCTAXI_CLICKHOUSE_RULES = [
 
 
 def test_nyctaxi_variant_rules_registered():
-    """Exactly 10 query_source rules registered for nyctaxi (5 StarRocks + 5 ClickHouse)."""
     rules = [
         (key, entry) for key, entry in REGISTRY.all_rules() if key[0] is Phase.QUERY_SOURCE and key[2] == "nyctaxi"
     ]
@@ -91,7 +75,6 @@ def test_nyctaxi_rule_action_and_payload(platform: str, query_id: str, expected_
 
 @pytest.mark.parametrize("query_id", ["trips-by-day-of-week", "rush-hour-analysis"])
 def test_nyctaxi_duckdb_has_no_rule(query_id: str):
-    """duckdb has no nyctaxi variant rules - registry returns None for all query IDs."""
     ctx = CompatibilityContext(
         platform="duckdb",
         platform_version=None,
@@ -105,7 +88,6 @@ def test_nyctaxi_duckdb_has_no_rule(query_id: str):
 
 
 def test_nyctaxi_clickhouse_has_trip_duration_variant():
-    """ClickHouse needs a native duration expression for trip-duration-analysis."""
     ctx = CompatibilityContext(
         platform="clickhouse",
         platform_version=None,
@@ -120,13 +102,7 @@ def test_nyctaxi_clickhouse_has_trip_duration_variant():
     assert "dateDiff('second'" in decision.payload.variant_sql
 
 
-# ---------------------------------------------------------------------------
-# Registration: tpcdi
-# ---------------------------------------------------------------------------
-
-
 def test_tpcdi_variant_rules_registered():
-    """TPC-DI query-source rules cover ClickHouse, DataFusion, StarRocks, Doris, BigQuery, Databricks, and Snowflake."""
     rules = [(key, entry) for key, entry in REGISTRY.all_rules() if key[0] is Phase.QUERY_SOURCE and key[2] == "tpcdi"]
     assert len(rules) == 13, f"Expected 13 tpcdi rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
     rule_ids = {entry.rule_id for _, entry in rules}
@@ -184,7 +160,6 @@ def test_tpcdi_rule_action_and_payload(platform: str, query_id: str, expected_sn
 
 @pytest.mark.parametrize("query_id", ["AQ6", "AQ9", "EQ7", "VQ6"])
 def test_tpcdi_duckdb_has_no_rule(query_id: str):
-    """duckdb has no tpcdi variant rules."""
     ctx = CompatibilityContext(
         platform="duckdb",
         platform_version=None,
@@ -198,7 +173,6 @@ def test_tpcdi_duckdb_has_no_rule(query_id: str):
 
 
 def test_tpcdi_eq7_sql_has_no_format_placeholders():
-    """EQ7 variant SQL is complete for DataFusion, StarRocks, and Doris."""
     from benchbox.sql_compat.rules.query_source.tpcdi_variants import (
         DATAFUSION_AQ9_SQL,
         DATAFUSION_EQ7_SQL,
@@ -217,16 +191,10 @@ def test_tpcdi_eq7_sql_has_no_format_placeholders():
 
 
 def test_tpcdi_aq6_sql_has_format_placeholders():
-    """CLICKHOUSE_AQ6_SQL must contain format placeholders for params."""
     from benchbox.sql_compat.rules.query_source.tpcdi_variants import CLICKHOUSE_AQ6_SQL
 
     assert "{start_year}" in CLICKHOUSE_AQ6_SQL
     assert "{end_year}" in CLICKHOUSE_AQ6_SQL
-
-
-# ---------------------------------------------------------------------------
-# Registry parity: nyctaxi
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -243,7 +211,6 @@ def test_tpcdi_aq6_sql_has_format_placeholders():
     ],
 )
 def test_nyctaxi_registry_returns_variant(platform: str, query_id: str):
-    """Registry returns SELECT_VARIANT for covered platform/nyctaxi combos."""
     ctx = CompatibilityContext(
         platform=platform,
         platform_version=None,

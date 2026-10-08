@@ -1,5 +1,3 @@
-"""Verbose logging configuration for the BenchBox CLI."""
-
 from __future__ import annotations
 
 import logging
@@ -12,20 +10,6 @@ def setup_verbose_logging(
     verbose: int | bool | VerbositySettings = 0,
     quiet: bool = False,
 ) -> tuple[logging.Logger | None, VerbositySettings]:
-    """Configure logging according to verbosity settings.
-
-    Args:
-        verbose: Verbosity level or :class:`VerbositySettings` instance. When an
-            integer/bool is provided, ``0`` disables verbose logging, ``1``
-            enables info-level output, and ``2`` or greater enables debug-level
-            output.
-        quiet: When True, overrides verbosity and silences non-critical logs.
-
-    Returns:
-        A tuple of ``(logger, settings)`` where ``logger`` is the configured
-        BenchBox CLI logger (or ``None`` when verbosity is disabled) and
-        ``settings`` is the normalized :class:`VerbositySettings` instance.
-    """
     settings = _resolve_verbosity_settings(verbose, quiet)
     log_level = _determine_log_level(settings)
 
@@ -45,7 +29,6 @@ def setup_verbose_logging(
 
 
 def _resolve_verbosity_settings(verbose: int | bool | VerbositySettings, quiet: bool) -> VerbositySettings:
-    """Normalize verbose parameter into VerbositySettings."""
     if isinstance(verbose, VerbositySettings):
         if quiet and not verbose.quiet:
             return VerbositySettings.from_flags(verbose.level, True)
@@ -54,7 +37,6 @@ def _resolve_verbosity_settings(verbose: int | bool | VerbositySettings, quiet: 
 
 
 def _determine_log_level(settings: VerbositySettings) -> int:
-    """Map verbosity settings to a logging level."""
     if settings.quiet:
         return logging.CRITICAL
     if settings.very_verbose:
@@ -65,7 +47,6 @@ def _determine_log_level(settings: VerbositySettings) -> int:
 
 
 def _configure_root_logger(log_level: int, settings: VerbositySettings) -> logging.Logger:
-    """Configure the root logger with appropriate handler and formatter."""
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
 
@@ -86,7 +67,6 @@ def _configure_root_logger(log_level: int, settings: VerbositySettings) -> loggi
     console_handler.setFormatter(formatter)
     root_logger.addHandler(console_handler)
 
-    # Keep BenchBox namespace loggers inheriting from root
     for logger_name in ["benchbox", "benchbox.cli", "benchbox.platforms", "benchbox.core", "benchbox.utils"]:
         logging.getLogger(logger_name).setLevel(logging.NOTSET)
 
@@ -94,12 +74,9 @@ def _configure_root_logger(log_level: int, settings: VerbositySettings) -> loggi
 
 
 def _configure_third_party_loggers(settings: VerbositySettings) -> None:
-    """Configure third-party library loggers to appropriate levels."""
-    # Always suppress noisy libraries at WARNING
     _always_warn = ["urllib3", "requests", "py4j", "py4j.java_gateway", "py4j.clientserver", "pyspark", "pyspark.sql"]
     for name in _always_warn:
         logging.getLogger(name).setLevel(logging.WARNING)
 
-    # SQLAlchemy gets INFO only in very-verbose mode
     sa_level = logging.INFO if (settings.very_verbose and not settings.quiet) else logging.WARNING
     logging.getLogger("sqlalchemy").setLevel(sa_level)

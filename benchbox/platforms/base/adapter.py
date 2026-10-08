@@ -1,13 +1,3 @@
-"""Base platform adapter interface.
-
-Defines the interface for database platform adapters.
-Provides database-specific optimizations with consistent API.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -35,14 +25,14 @@ from benchbox.platforms.base.client_region import discover_client_region
 from benchbox.platforms.base.connection_lifecycle import ConnectionLifecycleMixin
 from benchbox.platforms.base.connection_wrappers import (
     DriverIsolationCapability,
-    PlatformAdapterConnection,  # noqa: F401 - re-exported for external imports
-    PlatformAdapterCursor,  # noqa: F401 - re-exported for external imports
+    PlatformAdapterConnection,  # noqa: F401
+    PlatformAdapterCursor,  # noqa: F401
     StreamConnectionCapability,
     _make_stream_cursor,
-    _NoCloseProxy,  # noqa: F401 - re-exported for external imports
-    check_isolation_capability,  # noqa: F401 - re-exported for external imports
-    require_throughput_stream_capability,  # noqa: F401 - re-exported for execution drivers
-    resolve_stream_connection_capability,  # noqa: F401 - re-exported for manifest sweep
+    _NoCloseProxy,  # noqa: F401
+    check_isolation_capability,  # noqa: F401
+    require_throughput_stream_capability,  # noqa: F401
+    resolve_stream_connection_capability,  # noqa: F401
 )
 from benchbox.platforms.base.data_loading import SchemaHelpersMixin
 from benchbox.platforms.base.dialect_translation import DialectTranslationMixin
@@ -54,8 +44,8 @@ from benchbox.platforms.base.models import (
 )
 from benchbox.platforms.base.phase_tracking import (
     PhaseTrackingMixin,
-    _extract_table_names,  # noqa: F401 - re-exported for backward compat
-    _resolve_benchmark_table_names,  # noqa: F401 - re-exported for backward compat
+    _extract_table_names,  # noqa: F401
+    _resolve_benchmark_table_names,
 )
 from benchbox.platforms.base.result_capture import ResultCaptureMixin
 from benchbox.platforms.base.sorted_ingestion import SortedIngestionMixin
@@ -66,19 +56,17 @@ from benchbox.utils.printing import quiet_console
 from benchbox.utils.toggles import is_probe_requested
 from benchbox.utils.verbosity import VerbosityMixin, VerbositySettings
 
-# Import result models for type hints and re-export alias
 try:
     from benchbox.core.results.models import (
         BenchmarkResults,
-        ExecutionPhases,  # noqa: F401 - re-exported via __init__.py
-        QueryDefinition,  # noqa: F401 - re-exported via __init__.py
+        ExecutionPhases,
+        QueryDefinition,
     )
 except ImportError:
     BenchmarkResults = None
     ExecutionPhases = None
     QueryDefinition = None
 
-# Import tuning interface classes used in abstract method signatures
 try:
     from benchbox.core.tuning.interface import (
         ForeignKeyConfiguration,
@@ -90,24 +78,15 @@ except ImportError:
     ForeignKeyConfiguration = None
     PlatformOptimizationConfiguration = None
 
-# Import validation classes
 try:
     from benchbox.core.validation import ValidationResult
 except ImportError:
-    # Handle case where validation module is not available
     ValidationResult = None
 
-# Re-export alias for existing imports/tests
 EnhancedBenchmarkResults = BenchmarkResults
 
 
 def exclude_probe_wall_time(total_seconds: float, probe_seconds: float) -> float:
-    """Return a run duration with post-benchmark probe wall time removed.
-
-    The statement overhead probe issues live statements after the workload
-    succeeded; its time is measurement overhead, not benchmark time, and the
-    published ``total_duration`` must not include it.
-    """
     return max(0.0, total_seconds - probe_seconds)
 
 
@@ -130,43 +109,13 @@ class PlatformAdapter(
     VerbosityMixin,
     ABC,
 ):
-    """Abstract base class for database platform adapters.
-
-    This interface defines the contract that all platform adapters must implement
-    to provide database-specific optimizations for benchmark execution.
-    """
-
-    # Explicit capability declaration for driver version isolation.
-    # Subclasses should override this class variable to declare their capability.
-    # Default is NOT_APPLICABLE - adapters that support isolation must opt in.
     driver_isolation_capability: DriverIsolationCapability = DriverIsolationCapability.NOT_APPLICABLE
     stream_connection_capability = _ManifestStreamCapability()
-    # Default in-container service port the adapter connects to in the reference
-    # docker deployment (the container side of the compose `ports:` mapping).
-    # UAT derives its reachability table from these declarations instead of
-    # hardcoding them. None means the platform has no single default (embedded
-    # engines, cloud services with per-deployment endpoints).
     default_service_port: int | None = None
-    # External table mode capability declaration.
-    # Subclasses that implement external table/view registration should set this to True.
     supports_external_tables: bool = False
-    # Plan-capture style. When True, the generic query pipeline captures plans in
-    # an isolated post-measurement phase (a single EXPLAIN pass after all timed
-    # queries on the same connection) instead of inline inside each timed
-    # execute_query(). This is the canonical default for EVERY EXPLAIN-based
-    # engine: a standalone EXPLAIN on the measurement connection reproduces the
-    # plan with no loss, so capture is fully isolatable from measurement.
-    # The ONLY exceptions are engines whose plan/stats are obtainable solely as a
-    # side effect of running the workload query (BigQuery-class): they set this
-    # False explicitly and keep their inline/job-harvest capture path.
     plan_capture_phase_eligible: bool = True
 
     def __init__(self, **config):
-        """Initialize the platform adapter with configuration.
-
-        Args:
-            **config: Platform-specific configuration options
-        """
         self.platform_config = config
         self.connection = None
         self.connection_pool = None
@@ -175,48 +124,19 @@ class PlatformAdapter(
         self.force_recreate = config.get("force_recreate", False)
         self.show_query_plans = config.get("show_query_plans", False)
         self.capture_plans = config.get("capture_plans", False)
-        # When False (default), plan capture uses plain EXPLAIN (FORMAT JSON) for
-        # estimated-plan-only capture with no re-execution overhead: fingerprints are
-        # structure-only, so estimated plans lose nothing for structural comparison.
-        # Set to True to opt into EXPLAIN (ANALYZE, FORMAT JSON), which re-executes
-        # every captured SELECT once to include actual per-operator timing and
-        # cardinality -- roughly 2x wall-clock for a --capture-plans run and
-        # perturbed cache state. A one-time run-level notice is printed the first
-        # time a plan is actually captured with this enabled (see
-        # ResultCaptureMixin.capture_query_plan).
         self.analyze_plans: bool = config.get("analyze_plans", False)
         self.strict_plan_capture = config.get("strict_plan_capture", False)
-        # When True, also record a literal-normalized plan fingerprint alongside
-        # the default fingerprint during plan capture (see --normalize-plan-literals).
         self.normalize_plan_literals = config.get("normalize_plan_literals", False)
         self.plan_capture_timeout_seconds = int(config.get("plan_capture_timeout_seconds", 30))
-        # Maximum logical-tree depth serialized when a captured plan is written to
-        # the results bundle / size-checked. Nodes deeper than this become a
-        # truncation marker instead of dropping the whole plan (see
-        # query_plan_models.DEFAULT_PLAN_MAX_DEPTH). The structural fingerprint is
-        # computed over the full in-memory tree, so it is unaffected by this cap.
         self.plan_max_depth = int(config.get("plan_max_depth", DEFAULT_PLAN_MAX_DEPTH))
-        # Plan capture query selection. plan_query_filter restricts capture to an
-        # explicit set of query ids; it is orthogonal to the retired per-iteration /
-        # per-stream sampling machinery (plan_first_n / plan_sampling_rate), which the
-        # canonical capture-once-per-query model made obsolete and which is gone.
         plan_queries_str = config.get("plan_queries")
         self.plan_query_filter: set[str] | None = (
             {q.strip() for q in plan_queries_str.split(",") if q.strip()} if plan_queries_str else None
         )
-        # Guards concurrent writes to _phase_recorded_queries from throughput streams.
         self._plan_capture_lock = threading.Lock()
-        # Isolated-phase plan capture (see TestDriversMixin._execute_queries_by_type).
-        # When ``_plan_capture_phase_active`` is True, the inline capture chokepoint
-        # (_merge_plan_capture_into_result) records each executed query into
-        # ``_phase_recorded_queries`` instead of running EXPLAIN inline, so capture is
-        # fully isolated from the timed run for every test type. The plans are captured
-        # once, post-measurement, by the isolated phase. The buffer is written from
-        # concurrent throughput streams, so writes are guarded by _plan_capture_lock.
         self._plan_capture_phase_active: bool = False
         self._phase_recorded_queries: dict[str, str] = {}
         self.tuning_enabled = config.get("tuning_enabled", False)
-        # Driver runtime contract metadata (set by adapter factory / runtime resolution).
         self.driver_package = config.get("driver_package")
         self.driver_version_requested = config.get("driver_version") or config.get("driver_version_requested")
         self.driver_version_resolved = config.get("driver_version_resolved")
@@ -226,43 +146,23 @@ class PlatformAdapter(
         self.driver_runtime_python_executable = config.get("driver_runtime_python_executable")
         self.driver_auto_install_used = bool(config.get("driver_auto_install_used", False))
 
-        # Unified tuning configuration support. ``tuning_config`` is the reliable
-        # channel: get_platform_config() always passes it through as a live object
-        # reference (never round-tripped through DatabaseConfig.model_dump(), which
-        # would serialize a dataclass-valued extra field to a plain dict). Prefer it,
-        # falling back to ``unified_tuning_configuration`` only when that key already
-        # holds a real object rather than such a serialized dict.
         _legacy_tuning_config = config.get("unified_tuning_configuration")
         if isinstance(_legacy_tuning_config, dict):
             _legacy_tuning_config = None
         self.unified_tuning_configuration = config.get("tuning_config") or _legacy_tuning_config
-        # Provenance for the requested tuning config: raw TuningSource enum value
-        # (e.g. "auto_discovered") and a repo-relative/content-hash template
-        # reference (never a raw local path). Threaded from run.py through the
-        # DatabaseConfig/platform_config channel; see _promote_tuning_to_database_config.
         self.tuning_source: str | None = config.get("tuning_source")
         self.tuning_source_file: str | None = config.get("tuning_source_file")
-        # Applied-tuning ledger: populated BY the execution path (schema/data +
-        # session phases) during run_enhanced_benchmark, read back once at result
-        # construction for the honest status, the physical-identity hash, and the
-        # .applied.json companion. Reset per run; None-safe on non-tuned paths.
         self._applied_tuning_ledger: AppliedTuningLedger | None = None
         self._tuning_marker_save_failed = False
 
-        # Verbose logging configuration
         self.apply_verbosity(VerbositySettings.from_mapping(config))
 
-        # Track whether existing database was reused (vs recreated)
         self.database_was_reused = False
 
-        # Table mode: "native" (default) or "external" (external table/view references)
         self.table_mode: str = "native"
-        # External format detected during external table creation (e.g., "parquet", "delta", "tbl")
         self.external_format: str | None = None
-        # Explicit --table-format from CLI; overrides platform defaults for this run only
         self.requested_table_format: str | None = None
 
-        # Dry-run mode support
         self._initial_dry_run = bool(config.get("dry_run", False))
         self.dry_run = self._initial_dry_run
         self.dry_run_mode = False
@@ -271,10 +171,8 @@ class PlatformAdapter(
 
         self.enable_validation = config.get("enable_validation", False)
 
-        # Track latest throughput metrics for phase construction
         self._last_throughput_test_result = None
         self._last_power_workload_timing: tuple[str, str, int] | None = None
-        # Latest per-table load timings for result construction (reset per run)
         self._last_per_table_timings: dict[str, Any] | None = None
         self._sorted_ingestion_applied_tables: list[str] = []
         self._sorted_ingestion_total_apply_seconds: float = 0.0
@@ -289,7 +187,6 @@ class PlatformAdapter(
         self._contained_throughput_result: Any = None
 
     def _reset_run_scoped_state(self) -> None:
-        """Reset mutable state that belongs to one benchmark execution."""
         self.database_was_reused = False
         self._existing_db_decided = False
         self._last_power_test_result = None
@@ -314,67 +211,25 @@ class PlatformAdapter(
     @staticmethod
     @abstractmethod
     def add_cli_arguments(parser) -> None:
-        """Add platform-specific CLI arguments to the argument parser.
 
-        Args:
-            parser: argparse.ArgumentParser instance to add arguments to
-        """
+        pass
 
     @classmethod
     @abstractmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create platform adapter instance from unified configuration.
 
-        Args:
-            config: Unified configuration dictionary
-
-        Returns:
-            Platform adapter instance
-        """
+        pass
 
     @property
     def is_dry_run(self) -> bool:
-        """Return True if dry run is active via configuration or execution mode."""
         return bool(getattr(self, "dry_run", False) or getattr(self, "dry_run_mode", False))
 
     @property
     def platform_name(self) -> str:
-        """Return the name of this database platform.
-
-        Default implementation returns the class name. Concrete adapters may
-        override to provide a user-friendly display name. Lightweight adapters
-        can rely on this default when no custom name is required.
-        """
         return self.__class__.__name__
 
     @property
     def canonical_platform_type(self) -> str:
-        """Return the canonical, machine-readable platform type key.
-
-        Tuning-capability lookups and metadata persistence must key off a
-        stable identifier (e.g. ``"clickhouse-local"``, ``"duckdb"``) -- not
-        `platform_name`, which is a human-facing display string (e.g.
-        ``"ClickHouse Local"``, ``"StarRocks"``) that varies by adapter and is
-        never guaranteed to match the lowercase, single-word keys used by
-        capability maps such as `TuningType`'s compatibility map.
-
-        Sourced from the ``type`` key in `platform_config` when present.
-        Upstream config plumbing (core/platform_config.py) strips ``type``
-        from DatabaseConfig before adapter construction, so the key does NOT
-        survive that path on its own -- ``get_platform_adapter`` in
-        `benchbox.platforms` re-injects the resolved canonical registry name
-        (`PlatformRegistry.resolve_platform_name`) into the constructor
-        config, which is what this property reads on every factory-built
-        adapter.
-
-        Falls back to a normalized form of `platform_name` (lowercased,
-        spaces collapsed to hyphens) when no config type is available -- e.g.
-        an adapter constructed directly, bypassing the factory, as many unit
-        tests do. This fallback is best-effort only: it does not guarantee a
-        match against any capability map key (a parenthesized display name
-        like ``"ClickHouse (Local)"`` normalizes to ``"clickhouse-(local)"``),
-        it just avoids crashing on multi-word display strings.
-        """
         platform_config = getattr(self, "platform_config", None)
         config_type = platform_config.get("type") if isinstance(platform_config, dict) else None
         if config_type:
@@ -382,26 +237,9 @@ class PlatformAdapter(
         return self.platform_name.strip().lower().replace(" ", "-")
 
     def get_tuning_introspector(self) -> Introspector | None:
-        """Return a post-load schema introspector for this platform, or None.
-
-        An introspector corroborates the applied-tuning ledger against the real
-        database catalog, letting an ``applied_unverified`` run be upgraded to
-        ``applied_verified`` -- but only when every catalog-backed tuning
-        statement is corroborated (see
-        ``benchbox.core.tuning.introspection``). The admitted set is exactly
-        DuckDB, ClickHouse, and Snowflake (see the ADR-001 verification-reach
-        addendum); those platforms override this, and the base returns None, so
-        a platform without an introspector keeps the honest ledger-derived status.
-        """
         return None
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get platform information for results traceability.
-
-        Default implementation returns minimal generic info. Platform adapters
-        should override to provide richer details, but tests may instantiate
-        lightweight adapters without implementing this method.
-        """
         platform_info = {
             "platform_type": self.platform_name.lower(),
             "platform_name": self.platform_name,
@@ -427,35 +265,18 @@ class PlatformAdapter(
 
     @abstractmethod
     def create_connection(self, **connection_config) -> Any:
-        """Create and return a database connection.
 
-        Args:
-            **connection_config: Connection-specific parameters
-
-        Returns:
-            Database connection object
-        """
+        pass
 
     @abstractmethod
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create database schema for the benchmark.
 
-        Args:
-            benchmark: Benchmark instance with schema definitions
-            connection: Database connection
-
-        Returns:
-            Time taken to create schema in seconds
-        """
+        pass
 
     @abstractmethod
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
-        """Apply platform-specific optimizations.
 
-        Args:
-            platform_config: Platform optimization configuration
-            connection: Database connection
-        """
+        pass
 
     @abstractmethod
     def apply_constraint_configuration(
@@ -464,103 +285,35 @@ class PlatformAdapter(
         foreign_key_config: ForeignKeyConfiguration,
         connection: Any,
     ) -> None:
-        """Apply constraint configurations to the database.
 
-        Args:
-            primary_key_config: Primary key constraint configuration
-            foreign_key_config: Foreign key constraint configuration
-            connection: Database connection
-        """
+        pass
 
     @abstractmethod
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load benchmark data into database using platform-specific methods.
 
-        Args:
-            benchmark: Benchmark instance
-            connection: Database connection
-            data_dir: Directory containing data files
-
-        Returns:
-            Tuple of (table_statistics, loading_time_seconds, per_table_timings)
-            where per_table_timings is optional dict with detailed timing per table
-        """
+        pass
 
     def materialize_schema_only_tables(self, benchmark, connection: Any) -> dict[str, int]:
-        """Materialize catalog objects for schema-only benchmarks.
-
-        The ``SKIP_DATA_LOADING`` path bypasses ``load_data()``, but some
-        adapters only create catalog objects there (DataFusion builds empty
-        tables from the schema recorded by ``create_schema()``). Overrides
-        must create empty tables without loading files; the default is a
-        no-op for adapters whose ``create_schema()`` already materializes.
-
-        Args:
-            benchmark: Benchmark instance with schema definitions
-            connection: Database connection
-
-        Returns:
-            Mapping of table name to row count (zeros for empty tables)
-        """
-        # Default: no-op. The debug statement keeps this hook structurally
-        # distinct from bare dict-returning helpers for clone detection.
         self.logger.debug(f"materialize_schema_only_tables not implemented for {self.__class__.__name__}")
         return {}
 
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Register benchmark tables as external references instead of loading native tables.
-
-        Platforms that support external-table mode should override this method and
-        return the same tuple shape as ``load_data``.
-
-        Args:
-            benchmark: Benchmark instance
-            connection: Database connection
-            data_dir: Directory containing source data files or external data roots
-
-        Returns:
-            Tuple of (table_statistics, loading_time_seconds, per_table_timings)
-            where per_table_timings is optional dict with detailed timing per table
-        """
         raise NotImplementedError(f"{self.platform_name} does not support external table mode")
 
     def upload_manifest(self, manifest_path: Path, remote_path: str) -> bool:
-        """Upload manifest to remote storage. Override in subclasses if supported.
-
-        Args:
-            manifest_path: Local manifest file path
-            remote_path: Remote directory path/URI where manifest should be uploaded
-
-        Returns:
-            True if upload succeeded, False if unsupported or not uploaded
-        """
-        # Default: no-op
         self.logger.debug(f"upload_manifest not implemented for {self.__class__.__name__} (remote_path={remote_path})")
         return False
 
     @abstractmethod
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply platform-specific optimizations for the benchmark type.
 
-        Args:
-            connection: Database connection
-            benchmark_type: Type of benchmark (e.g., "olap", "oltp", "analytics")
-        """
+        pass
 
     def gather_statistics(self, connection: Any, table_names: list[str]) -> tuple[str, int]:
-        """Run the platform's explicit statistics build for the statistics phase.
-
-        Returns (stats_mode, tables_analyzed). The default resolves the
-        adapter's existing analyze surface: whole-database ``analyze_tables``
-        when available, else per-table ``analyze_table``, else
-        ``("unsupported", 0)``. Engines whose statistics are built during load
-        (e.g. Redshift with auto_analyze) override this to report
-        ``("auto-on-load", 0)`` instead of double-building.
-        """
         analyze_tables = getattr(self, "analyze_tables", None)
         if callable(analyze_tables):
             analyze_tables(connection)
@@ -573,24 +326,6 @@ class PlatformAdapter(
         return "unsupported", 0
 
     def reset_statistics(self, connection: Any, table_names: list[str]) -> str:
-        """Reset (drop/invalidate) optimizer statistics ahead of a cold-stats rebuild.
-
-        Sibling of ``gather_statistics`` for the reset/persist control (opt-in
-        via the statistics phase's ``reset=True``). Returns a stats_lifecycle
-        marker: ``"reset"`` when statistics were actually cleared, or
-        ``"unsupported"`` when this adapter has no generic drop-stats
-        primitive it's safe to run generically.
-
-        The base default is a documented no-op that always returns
-        ``"unsupported"``: engines must never have this method force an
-        operation that could fail or corrupt state on a platform it wasn't
-        vetted for. This is a safe fallback rather than a regression - the
-        statistics phase's subsequent ``gather_statistics()`` call still runs
-        a full ANALYZE/rebuild that reflects current data, so a cold-stats
-        study remains meaningful even without an explicit reset step.
-        Platform adapters that support a real drop-stats operation should
-        override this method.
-        """
         self.logger.debug(
             f"reset_statistics not implemented for {self.__class__.__name__}; "
             "no generic drop-stats primitive, deferring to the gather_statistics rebuild"
@@ -607,27 +342,6 @@ class PlatformAdapter(
         reset: bool | None = None,
         collect_per_table_timing: bool = False,
     ) -> StatisticsGatheringPhase | None:
-        """Run the opt-in statistics phase between load and query execution.
-
-        Returns None (phase not run) when the benchmark has not opted in via
-        the registry's ``supports_statistics_phase`` flag, so legacy
-        benchmarks keep load-includes-stats semantics and their historical
-        bundles stay comparable. Failures are recorded on the phase rather
-        than aborting the run - queries remain meaningful on unanalyzed data.
-
-        Args:
-            reset: Cold-stats vs warm-stats control. None (default) leaves
-                statistics untouched and records no stats_lifecycle marker,
-                exactly matching the PR #980 shipped behavior. True resets
-                statistics via ``reset_statistics()`` before rebuilding
-                (cold-stats). False explicitly records a "persist" marker
-                (warm-stats) without changing behavior.
-            collect_per_table_timing: When True and this adapter's statistics
-                build falls back to a per-table ANALYZE loop (no whole-database
-                analyze hook, and gather_statistics is not overridden with
-                platform-specific routing), record a per-table wall-clock
-                breakdown on the returned phase. Left None otherwise.
-        """
         from benchbox.core.benchmark_registry import get_benchmark_metadata
 
         slug = (benchmark_name or "").lower()
@@ -651,15 +365,8 @@ class PlatformAdapter(
                 self.logger.warning(f"Statistics reset failed, continuing with rebuild: {exc}")
                 stats_lifecycle = "unsupported"
         elif reset is False:
-            # The control was explicitly exercised in persist mode (warm-stats
-            # study): record the marker even though behavior matches default.
             stats_lifecycle = "persist"
 
-        # Per-table timing is only safe to collect by looping analyze_table()
-        # ourselves when gather_statistics() is the unmodified base
-        # implementation - platform overrides (e.g. Redshift's auto-on-load
-        # routing) must keep deciding stats_mode themselves, so we defer to
-        # gather_statistics() and leave per_table_ms unset for those adapters.
         per_table_ms: dict[str, int] | None = None
         use_per_table_loop = (
             collect_per_table_timing
@@ -670,7 +377,7 @@ class PlatformAdapter(
         try:
             if use_per_table_loop:
                 per_table_ms = {}
-                analyze_table = self.analyze_table  # type: ignore[attr-defined]
+                analyze_table = self.analyze_table
                 for table_name in names:
                     table_start = mono_time()
                     analyze_table(connection, table_name)
@@ -708,31 +415,10 @@ class PlatformAdapter(
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a single query and return detailed results.
 
-        Args:
-            connection: Database connection
-            query: SQL query text
-            query_id: Query identifier
-            benchmark_type: Type of benchmark (e.g., "tpch", "tpcds") for row count validation
-            scale_factor: Scale factor used for the query (for row count validation)
-            validate_row_count: Whether to validate row count against expected results
-            stream_id: Stream identifier for multi-stream benchmarks (e.g., 0, 1, 2...)
-                      Used to select stream-specific expected results. None indicates stream 0
-                      or single-stream execution.
-
-        Returns:
-            Dictionary with execution results including query_id, status
-            ("SUCCESS", "FAILED", or "DRY_RUN"), execution_time_seconds,
-            rows_returned, and optional row_count_validation fields.
-        """
+        pass
 
     def close_connection(self, connection: Any) -> None:
-        """Close database connection and cleanup resources.
-
-        Args:
-            connection: Database connection to close
-        """
         if connection and hasattr(connection, "close"):
             connection.close()
 
@@ -740,68 +426,7 @@ class PlatformAdapter(
         return None
 
     def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
-        """Return a per-stream execution handle for one concurrent throughput
-        (or connection-pool test) stream.
-
-        This is the capability seam for ``throughput-independent-sessions-per-stream``:
-        the throughput drivers' ``connection_factory`` closures
-        (``benchbox/platforms/base/execution.py``,
-        ``_execute_tpch_throughput_test`` / ``_execute_tpcds_throughput_test``)
-        call this once per stream instead of unconditionally sharing one
-        cursor, so the behavior is now a declared, overridable platform
-        capability rather than an implicit one-size-fits-all default. The
-        ``benchmark_type`` keyword (``"olap"`` for the TPC-H/TPC-DS throughput
-        drivers unless the caller overrides it via run config) lets
-        ``INDEPENDENT_CONNECTION`` overrides reproduce the benchmark-type
-        session tuning the shared connection carries - see equivalence
-        dimension 4 in ``StreamConnectionCapability``. The keyword is optional
-        so pre-existing overrides and test doubles keep working unchanged.
-
-        Dispatches on ``stream_connection_capability``:
-
-        - ``SHARED_CURSOR`` (default): returns ``_make_stream_cursor(connection)``
-          - a cursor of (or ``_NoCloseProxy`` over) the single shared
-          ``connection`` passed in. This is the existing, unchanged fast path:
-          correct for embedded engines whose client is documented thread-safe
-          at cursor level against one process-local database (e.g. DuckDB -
-          see docs/benchmarks/tpc-h.md). No new connections are opened, and
-          closing the returned handle never closes the shared connection
-          (``_NoCloseProxy.close()`` is a no-op; a real cursor's ``close()``
-          only closes the cursor). ``benchmark_type`` is ignored: the shared
-          connection already carries its tuning.
-        - ``INDEPENDENT_CONNECTION``: server-style adapters (client/server
-          engines whose driver does not support true concurrent statement
-          execution across cursors of one connection) MUST override this
-          method to open and return a brand-new connection/session, typically
-          ignoring the ``connection`` argument entirely. The base
-          implementation deliberately raises ``NotImplementedError`` for this
-          capability value instead of falling back to cursor sharing, so a
-          subclass that declares ``INDEPENDENT_CONNECTION`` without overriding
-          fails loudly rather than silently reproducing the shared-session bug
-          this capability exists to fix. Overrides should apply
-          ``configure_for_benchmark(stream_conn, benchmark_type or "olap")``
-          (plus the ``_apply_stream_session_state`` hook for
-          connection-establishment state) so the stream session measures the
-          same tuning as the setup session.
-        - ``UNSUPPORTED``: never reaches this method - the throughput entry
-          points refuse via ``require_throughput_stream_capability`` before
-          any stream is submitted.
-
-        Args:
-            connection: The adapter's shared platform connection (as created by
-                ``create_connection``). Used as-is for ``SHARED_CURSOR``;
-                available for reference (e.g. to read connection parameters)
-                but not required for ``INDEPENDENT_CONNECTION`` overrides.
-            benchmark_type: Benchmark tuning vocabulary (e.g. ``"olap"``) for
-                per-stream session parity. Optional; overrides replay tuning
-                only when it is supplied, so callers that pass nothing keep
-                their previous behavior.
-
-        Returns:
-            A connection-like object suitable for one stream: either a cursor/
-            proxy over the shared connection, or an independent connection.
-        """
-        del benchmark_type  # SHARED_CURSOR reuses the already-tuned shared connection
+        del benchmark_type
         if self.stream_connection_capability is StreamConnectionCapability.INDEPENDENT_CONNECTION:
             raise NotImplementedError(
                 f"{self.platform_name} declares stream_connection_capability="
@@ -811,25 +436,15 @@ class PlatformAdapter(
         return _make_stream_cursor(connection)
 
     def validate_platform_capabilities(self, benchmark_type: str) -> ValidationResult:
-        """Validate platform-specific capabilities for the benchmark.
-
-        Args:
-            benchmark_type: Type of benchmark (e.g., 'tpcds', 'tpch')
-
-        Returns:
-            ValidationResult with platform capability validation status
-        """
         errors = []
         warnings = []
 
-        # Base validation - can be overridden by specific platforms
         platform_info = {
             "platform": self.platform_name,
             "benchmark_type": benchmark_type,
             "dry_run_mode": self.dry_run_mode,
         }
 
-        # Check if platform supports the benchmark
         if benchmark_type.lower() not in ["tpcds", "tpch"]:
             warnings.append(f"Benchmark type '{benchmark_type}' may not be fully supported")
 
@@ -841,17 +456,6 @@ class PlatformAdapter(
         )
 
     def _apply_run_plan_flags(self, run_config: Mapping[str, Any]) -> dict[str, Any]:
-        """Snapshot run-scoped plan flags, then apply the run's values.
-
-        Returns the snapshot so the caller can restore it in a finally block;
-        adapters are reused across runs and these flags must not leak.
-        `show_query_plans` (--show-plans) is display-only: it stays in
-        run-input provenance and never enters plan-capture metadata.
-
-        Application is atomic: every value is read and coerced into locals
-        before any attribute is assigned, so a bad value raises before
-        partial mutation (the caller then has nothing to restore).
-        """
         snapshot = {
             "capture_plans": self.capture_plans,
             "show_query_plans": self.show_query_plans,
@@ -861,17 +465,11 @@ class PlatformAdapter(
             "plan_capture_timeout_seconds": self.plan_capture_timeout_seconds,
         }
         new_capture_plans = bool(run_config["capture_plans"]) if "capture_plans" in run_config else self.capture_plans
-        # show_query_plans is tri-state in RunConfig: only override the
-        # adapter's value when the database option was explicitly set
-        # (non-None); None leaves the adapter default (e.g. from
-        # platform_config or a preconfigured adapter).
         new_show_query_plans = (
             bool(run_config["show_query_plans"])
             if run_config.get("show_query_plans") is not None
             else self.show_query_plans
         )
-        # analyze_plans is tri-state in RunConfig: only override the adapter's value
-        # when the first-class flag was set (non-None); None leaves the adapter default.
         new_analyze_plans = (
             bool(run_config["analyze_plans"]) if run_config.get("analyze_plans") is not None else self.analyze_plans
         )
@@ -883,8 +481,6 @@ class PlatformAdapter(
             if "normalize_plan_literals" in run_config
             else self.normalize_plan_literals
         )
-        # None means unset: fall back to the adapter default instead of
-        # crashing int(None).
         new_plan_capture_timeout_seconds = (
             int(run_config["plan_capture_timeout_seconds"])
             if run_config.get("plan_capture_timeout_seconds") is not None
@@ -899,35 +495,22 @@ class PlatformAdapter(
         return snapshot
 
     def run_enhanced_benchmark(self, benchmark, **run_config) -> EnhancedBenchmarkResults:
-        """Run complete benchmark with enhanced phase tracking."""
         start_time = mono_time()
         execution_id = str(uuid.uuid4())[:8]
         self._reset_run_scoped_state()
         plan_capture_config = self._apply_run_plan_flags(run_config)
 
         try:
-            # Step 1: Data generation phase (handled by run_benchmark_lifecycle before this call)
             data_generation_phase = self._create_enhanced_data_generation_phase(benchmark)
 
             quiet_console.print(f"Connecting to {self.platform_name}...")
             self.log_very_verbose(f"database_was_reused flag BEFORE connection: {self.database_was_reused}")
-            self.benchmark = benchmark  # Store for handle_existing_database() to access
-            # Reset the rerun drift-validation stash BEFORE connecting. For a reused
-            # database the drift check is captured *during* create_connection() ->
-            # handle_existing_database() -> DatabaseValidator/TuningValidator ->
-            # _validate_database_tunings, NOT during the later validation phase
-            # (_create_enhanced_validation_phase only runs row-count/schema/integrity
-            # checks). The reset must therefore precede that capture: resetting it
-            # afterwards discards the only captured result before
-            # _build_drift_check_payload() can route it into the .applied.json
-            # companion. Resetting here still clears any prior run's drift on a
-            # reused adapter instance (ADR-001 addendum).
+            self.benchmark = benchmark
             self._drift_validation_result = None
             connection = self.create_connection(**run_config.get("connection", {}))
             self.connection = connection
             self.log_very_verbose(f"database_was_reused flag AFTER connection: {self.database_was_reused}")
 
-            # Step 3: Validate tuning configuration if enabled
             effective_tuning_config = self.get_effective_tuning_configuration()
             if self.tuning_enabled and effective_tuning_config:
                 quiet_console.print("Validating unified tuning configuration...")
@@ -940,17 +523,7 @@ class PlatformAdapter(
                     raise ValueError(f"Invalid tuning configuration: {'; '.join(tuning_errors)}")
                 quiet_console.print("✅ Unified tuning configuration validated")
 
-            # Step 4: Schema creation and data loading
-            # Fresh applied-tuning ledger for this run. Populated as the schema/
-            # data phases (DDL, post-load) and the session-configuration phase
-            # actually execute tuning-relevant statements against the wrapped
-            # connection; read back once at result construction. Reset here so a
-            # reused adapter instance never carries a prior run's statements.
             self._applied_tuning_ledger = AppliedTuningLedger()
-            # Fresh post-load layout-op accumulator for the same reason: adapters
-            # that record post-load layout statements here (DuckDB sort-index
-            # re-creation, ClickHouse tuned sort-key DDL, Databricks OPTIMIZE/
-            # ZORDER) must not fold a prior run's ops into this run's ledger.
             self._applied_layout_operations = []
 
             self.log_verbose(f"Checking database_was_reused flag before schema creation: {self.database_was_reused}")
@@ -976,19 +549,12 @@ class PlatformAdapter(
             quiet_console.print("Validating benchmark data...")
             validation_phase = self._create_enhanced_validation_phase(benchmark, connection, table_stats)
 
-            # Requested-config export is unchanged (ADR-1 additive contract): the
-            # requested tunings + requested_config_hash still come straight from
-            # the effective configuration, independent of what actually executed.
             tunings_applied_dict = None
             requested_config_hash = None
             if self.tuning_enabled and effective_tuning_config:
                 tunings_applied_dict = effective_tuning_config.to_dict()
-                # requested_config_hash (ADR-1): canonical hash of the requested
-                # config, independent of whether every clause actually applied.
                 requested_config_hash = effective_tuning_config.get_configuration_hash()
 
-            # Surface requested-but-not-rendered intents at run time (w4) so the
-            # author sees them; they are also carried in the ledger payload.
             for _dropped in self._applied_tuning_ledger.dropped:
                 self.logger.warning(
                     "Requested tuning intent not applied: %s (%s)",
@@ -996,19 +562,9 @@ class PlatformAdapter(
                     _dropped.reason,
                 )
 
-            # Honest tuning_validation_status derived from what the execution
-            # path actually ran (apply-phase statements only at this point;
-            # session SETs at line ~827 run later and are folded in before the
-            # success result is built). tuning_metadata_saved is a separate
-            # persistence note, fully decoupled from this status.
             tuning_validation_status = tuning_trust.apply_phase_status(self, bool(effective_tuning_config))
 
             if self._check_validation_failure(validation_phase):
-                # Data validation failed before session SETs ran, so the ledger
-                # holds only apply-phase statements. _create_failed_benchmark_result
-                # lives in the CODEOWNERS-locked result_capture.py, so the ledger
-                # payload/hash are attached here (adapter-side) rather than by
-                # extending that method's signature.
                 failed_result = self._create_failed_benchmark_result(
                     benchmark,
                     validation_phase,
@@ -1027,39 +583,18 @@ class PlatformAdapter(
 
             quiet_console.print("✅ Data validation passed")
 
-            # Fold post-load layout ops (e.g. Databricks OPTIMIZE/ZORDER recorded
-            # on self._applied_layout_operations) into the ledger HERE: they
-            # physically execute during data loading, so recording them before the
-            # session SETs below keeps the ledger - and the order-sensitive
-            # applied_ledger_hash - in true execution chronology (ddl -> post_load
-            # -> session). Internally guarded; a no-op when the attribute is empty.
             self._fold_layout_operations_into_ledger()
             if self.tuning_enabled and effective_tuning_config and not self.database_was_reused:
                 quiet_console.print(self._applied_tuning_ledger.describe_outcome())
 
             benchmark_type = run_config.get("benchmark_type", "olap")
-            # Wrap the connection so session-configuration SETs are captured into
-            # the ledger (PHASE_SESSION) for every mode, including baseline. Only
-            # the argument handed to configure_for_benchmark is wrapped; the raw
-            # connection continues to drive statistics/query execution so timed
-            # query statements are never recorded. recording_connection degrades
-            # to the raw connection if the ledger is missing or wrapping fails.
             self.configure_for_benchmark(
                 recording_connection(connection, self._applied_tuning_ledger, PHASE_SESSION),
                 benchmark_type,
             )
 
-            # Opt-in statistics phase: load -> statistics -> query, so
-            # stats-build wall-clock is attributed to neither load nor query.
             statistics_phase = None
             if run_config.get("gather_statistics"):
-                # Prefer a dedicated statistics-only slug over "benchmark_name"
-                # when the caller set one. Some callers (the MCP run_benchmark
-                # tool) need the registry gate to resolve correctly without also
-                # setting "benchmark_name" itself, which _resolve_benchmark_slug
-                # reads to route power/throughput/maintenance/combined tests to
-                # TPC-specialized harnesses vs the generic handler - requesting
-                # the statistics phase must not also change which harness runs.
                 statistics_phase = self.run_statistics_phase(
                     benchmark,
                     connection,
@@ -1073,14 +608,8 @@ class PlatformAdapter(
             quiet_console.print(f"Executing benchmark queries ({test_execution_type} mode)...")
             self._last_throughput_test_result = None
             query_results = self._execute_queries_by_type(benchmark, connection, run_config)
-            # The overhead probe issues live statements after the workload
-            # succeeded. Its wall time is excluded from the published run
-            # duration below so the probe never inflates the number it
-            # exists to contextualise.
             probe_elapsed_s = self._collect_post_measurement_metadata(connection, run_config)
 
-            # Get queries for definitions - pass canonical slug so dialect selection
-            # doesn't have to infer benchmark family from object internals.
             queries = self._get_dialect_queries(
                 benchmark,
                 benchmark_slug=run_config.get("benchmark_name", ""),
@@ -1090,7 +619,6 @@ class PlatformAdapter(
             self._extract_query_definitions(benchmark, queries, stream_id)
             query_executions = self._create_standard_execution_phase(query_results, stream_id)
 
-            # Step 7: Compile enhanced results
             total_duration = exclude_probe_wall_time(elapsed_seconds(start_time), probe_elapsed_s)
 
             setup_phase = SetupPhase(
@@ -1137,14 +665,6 @@ class PlatformAdapter(
                 existing_errors=list(self.plan_capture_errors),
             )
 
-            # Final honest status now includes the session SETs captured at the
-            # configure_for_benchmark wrap above (post-load layout ops were folded
-            # before it). The ledger payload + physical-identity hash are the
-            # ADR-1 additive companion; the requested-config export
-            # (tunings_applied / requested_config_hash) is unchanged. Guarded
-            # end-to-end: capture must never break an otherwise-successful run, so
-            # any derive/serialize failure degrades the companion to None and the
-            # status falls back to the apply-phase value computed above.
             (
                 final_tuning_status,
                 applied_ledger_payload,
@@ -1202,7 +722,6 @@ class PlatformAdapter(
                 self._close_run_connection()
 
     def _defer_connection_close_until_quiescent(self, connection: Any, throughput_result: Any) -> None:
-        """Close a measurement connection only after timed-out work terminates."""
         if throughput_result is None:
             self.close_connection(connection)
             return
@@ -1212,7 +731,7 @@ class PlatformAdapter(
                 pass
             try:
                 self.close_connection(connection)
-            except Exception as exc:  # noqa: BLE001 - deferred cleanup must not crash a worker
+            except Exception as exc:
                 self.logger.warning("Deferred benchmark connection cleanup failed: %r", exc)
 
         threading.Thread(
@@ -1222,7 +741,6 @@ class PlatformAdapter(
         ).start()
 
     def _collect_post_measurement_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> float:
-        """Collect link metadata unless throughput work still owns the connection."""
         if self._post_measurement_contained:
             self._client_link_metadata = {
                 "collection_status": "unavailable",
@@ -1244,7 +762,6 @@ class PlatformAdapter(
         return elapsed_seconds(probe_start)
 
     def _close_run_connection(self) -> None:
-        """Close or defer the run connection according to containment state."""
         connection = self.connection
         if self._post_measurement_contained:
             self._defer_connection_close_until_quiescent(connection, self._contained_throughput_result)
@@ -1253,18 +770,12 @@ class PlatformAdapter(
         self.connection = None
 
     def _collect_client_link_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> None:
-        """Probe statement overhead and discover client region post-benchmark.
-
-        Collection must never fail a benchmark run that already succeeded, so
-        unexpected errors degrade to an ``unavailable`` block (same rule as
-        the applied-tuning ledger guard).
-        """
         try:
             self._client_link_metadata = self._build_client_link_metadata(connection, run_config)
             self._link_probe_timed_out = bool(
                 (self._client_link_metadata or {}).get("collection_error_class") == "TimeoutError"
             )
-        except Exception as exc:  # noqa: BLE001 - collection must never break a run
+        except Exception as exc:
             self.logger.warning("Client-link metadata collection failed: %r", exc)
             self._link_probe_timed_out = False
             self._client_link_metadata = {
@@ -1278,16 +789,12 @@ class PlatformAdapter(
             }
 
     def _build_client_link_metadata(self, connection: Any, run_config: Mapping[str, Any]) -> dict[str, Any]:
-        """Assemble the ``client_link`` block from probe and region discovery."""
         dry_run = bool(getattr(self, "dry_run_mode", False) or run_config.get("dry_run_mode", False))
         probe_requested = is_probe_requested(run_config.get("link_probe", True)) and not dry_run
         probe_result: dict[str, Any] | None = None
         if probe_requested:
             probe_result = probe_statement_overhead(connection)
 
-        # run_config always carries client_region/client_cloud keys (None by
-        # default), which would shadow platform-config values: merge only
-        # explicitly set entries.
         merged_config = {
             **self.platform_config,
             **{key: value for key, value in run_config.items() if value is not None},
@@ -1320,13 +827,6 @@ class PlatformAdapter(
         }
 
     def _collect_platform_metadata(self, connection: Any) -> tuple[dict[str, Any], dict[str, Any]]:
-        """Collect platform info and normalized metadata for a finished run.
-
-        When the statement overhead probe timed out, its abandoned worker may
-        still hold the connection: any further use (even driver-level locks)
-        can hang or crash this completed run, so collect nothing more from it
-        and retain only safely cached evidence without touching the connection.
-        """
         if self._link_probe_timed_out:
             self.logger.warning(
                 "Statement overhead probe timed out; skipping live platform "
@@ -1337,12 +837,6 @@ class PlatformAdapter(
         return platform_info, self._resolve_normalized_metadata(connection, platform_info)
 
     def _client_link_only_metadata(self) -> dict[str, Any]:
-        """Degraded normalized metadata for a probe-tainted connection.
-
-        Retains safely cached client-link and cache-control evidence without
-        driver calls. Failed cache receipts must survive degradation so they
-        cannot become legacy receiptless evidence during bundle validation.
-        """
         from benchbox.platforms.cloud_shared import empty_cache_control_receipt, sanitize_cache_control_receipt
 
         metadata: dict[str, Any] = {}
@@ -1358,7 +852,6 @@ class PlatformAdapter(
         return metadata
 
     def _resolve_normalized_metadata(self, connection: Any, platform_info: Mapping[str, Any] | None) -> dict[str, Any]:
-        """Obtain normalized metadata and ensure run-scoped client_link metadata is included."""
         metadata = self.get_normalized_result_metadata(
             connection=connection,
             platform_info=platform_info,
@@ -1382,19 +875,6 @@ class PlatformAdapter(
         tuning_trust.fold_layout_operations_into_ledger(self)
 
     def _setup_fresh_database_phases(self, benchmark, connection: Any, effective_tuning_config) -> tuple:
-        """Run fresh-database setup while capturing schema-phase tuning DDL.
-
-        The adapter owns the setup implementation because schema creation is an
-        adapter lifecycle seam: platform adapters render
-        tuning clauses while creating tables. Keep the wrapper limited to that
-        call so data loading and the subsequent tuning/session wrappers retain
-        their existing ledger boundaries.
-
-        ClickHouse and StarRocks already record their rendered schema clauses at
-        their platform-specific render points. Passing those adapters another
-        recording connection would append the same physical DDL twice and change
-        the order-sensitive ledger hash.
-        """
         data_dir = Path(benchmark.output_dir) if hasattr(benchmark, "output_dir") else Path(".")
 
         if self.table_mode == "external":
@@ -1466,9 +946,6 @@ class PlatformAdapter(
 
         if is_data_loading_skipped(benchmark):
             quiet_console.print("Benchmark uses schema only; skipping data loading")
-            # Some adapters only materialize catalog objects inside load_data()
-            # (e.g. DataFusion creates empty tables from the recorded schema),
-            # so give them a hook to retain that step without loading files.
             schema_only_stats = self.materialize_schema_only_tables(benchmark, connection)
             data_loading_phase = self._create_enhanced_data_loading_phase(schema_only_stats, 0.0, {})
             data_loading_phase.status = "SKIPPED"
@@ -1485,13 +962,4 @@ class PlatformAdapter(
         return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved
 
     def run_benchmark(self, benchmark, **run_config) -> EnhancedBenchmarkResults:
-        """Run complete benchmark with enhanced phase tracking.
-
-        Args:
-            benchmark: Benchmark instance to execute
-            **run_config: Runtime configuration options
-
-        Returns:
-            Enhanced benchmark results with detailed phase tracking
-        """
         return self.run_enhanced_benchmark(benchmark, **run_config)

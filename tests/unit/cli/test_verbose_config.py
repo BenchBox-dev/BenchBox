@@ -1,8 +1,6 @@
-"""
-Copyright 2026 Joe Harris / BenchBox Project
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import unittest
 from argparse import Namespace
@@ -18,31 +16,29 @@ pytestmark = [
 
 
 class TestVerboseConfig(unittest.TestCase):
-    """Tests that CLI verbosity flags are correctly propagated to the adapter config."""
-
     def test_no_verbosity_flag(self):
-        """Test that no flags result in verbosity being disabled."""
+
         args = Namespace(verbose=0)
         config = merge_all_configs("duckdb", "tpch", args)
         self.assertFalse(config["verbose_enabled"])
         self.assertFalse(config["very_verbose"])
 
     def test_v_flag(self):
-        """Test that -v enables verbose_enabled but not very_verbose."""
+
         args = Namespace(verbose=1)
         config = merge_all_configs("duckdb", "tpch", args)
         self.assertTrue(config["verbose_enabled"])
         self.assertFalse(config["very_verbose"])
 
     def test_vv_flag(self):
-        """Test that -vv enables both verbose_enabled and very_verbose."""
+
         args = Namespace(verbose=2)
         config = merge_all_configs("duckdb", "tpch", args)
         self.assertTrue(config["verbose_enabled"])
         self.assertTrue(config["very_verbose"])
 
     def test_vvv_flag(self):
-        """Test that -vvv (and more) still enables both flags."""
+
         args_3 = Namespace(verbose=3)
         config_3 = merge_all_configs("duckdb", "tpch", args_3)
         self.assertTrue(config_3["verbose_enabled"])

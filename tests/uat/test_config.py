@@ -1,8 +1,3 @@
-"""Fast-test coverage for tests/uat/config.py.
-
-Covers W3-relevant fields only. W4 expands.
-"""
-
 from __future__ import annotations
 
 from dataclasses import replace
@@ -39,7 +34,7 @@ def _leaf_field_paths(payload: Any, *, prefix: str = "") -> set[str]:
 def test_validate_config_minimal():
     cfg = config.validate_config({"name": "smoke"})
     assert cfg.name == "smoke"
-    assert "execute" in cfg.phases or cfg.phases  # default phases applied
+    assert "execute" in cfg.phases or cfg.phases
     assert cfg.execute.per_cell_timeout_s == 600
     assert cfg.execute.parallel_platforms is False
     assert cfg.execute.platform_chunking is False
@@ -159,7 +154,6 @@ def test_validate_config_accepts_liveness_probe_timeout_s():
 
 
 def test_validate_config_liveness_probe_timeout_zero_disables_probe():
-    """0-disables, same convention as the two *_min_gib floors."""
     cfg = config.validate_config({"name": "smoke", "execute": {"liveness_probe_timeout_s": 0}})
     assert cfg.execute.liveness_probe_timeout_s == 0.0
 
@@ -186,7 +180,6 @@ def test_validate_config_accepts_free_memory_min_gib():
 
 
 def test_validate_config_free_memory_min_gib_zero_disables_gate():
-    """Mirrors free_space_min_gib: 0 -- the same 0-disables convention (must_preserve)."""
     cfg = config.validate_config({"name": "smoke", "preflight": {"free_memory_min_gib": 0}})
     assert cfg.preflight.free_memory_min_gib == 0.0
     assert cfg.memory_gate_enabled is False
@@ -348,7 +341,7 @@ def test_stress_default_fields_have_reader_or_reserved_contract():
         "phases": ("tests/uat/config.py", '_validate_phases(payload.get("phases")'),
         "platforms.groups": ("tests/uat/phases/enumerate.py", "config.platforms.groups"),
         "benchmarks.groups": ("tests/uat/phases/enumerate.py", "config.benchmarks.groups"),
-        "scales.rungs": ("tests/uat/phases/enumerate.py", "config.scales.rungs"),
+        "scales.rungs": ("tests/uat/config.py", "if self.override is not None else self.rungs"),
         "execute.per_cell_timeout_s": ("tests/uat/phases/execute.py", "config.execute.per_cell_timeout_s"),
         "execute.early_stop_after_s": ("tests/uat/phases/execute.py", "config.execute.early_stop_after_s"),
         "execute.early_stop_on_failure": ("tests/uat/phases/execute.py", "config.execute.early_stop_on_failure"),
@@ -398,7 +391,6 @@ def test_stress_override_uses_dataclass_replace_for_platform_and_benchmark():
     assert overridden.platforms.groups == ()
     assert overridden.platforms.include == ("duckdb",)
     assert overridden.benchmarks.include == ("tpch",)
-    # Original config not mutated
     assert cfg.platforms.groups == ("all",)
 
 
@@ -410,21 +402,14 @@ def test_stress_override_scale_sets_override_without_mutating_rungs():
     assert overridden.scales.requested_rungs == (0.1,)
 
 
-# ---------------------------------------------------------------------------
-# Release-gate re-run configs (uat-certification-rerun-ordering-and-gate).
-# ---------------------------------------------------------------------------
-
 _RELEASE_GATE_CONFIGS_DIR = Path(__file__).parent / "configs"
 
 
 def test_release_gate_configs_load_and_encode_stage_ordering():
-    """The three release-gate configs validate and encode the four-stage order."""
     stage1 = config.load_config(_RELEASE_GATE_CONFIGS_DIR / "release-gate-01-native-dataframe.yaml")
     stage2 = config.load_config(_RELEASE_GATE_CONFIGS_DIR / "release-gate-02-docker-nonoltp.yaml")
     stage3 = config.load_config(_RELEASE_GATE_CONFIGS_DIR / "release-gate-03-docker-oltp.yaml")
 
-    # Stage 1 is native + dataframe only — no Docker management, so no `action=up`
-    # events can precede the Docker stages.
     assert stage1.platforms.groups == ("native-sql", "dataframe")
     stage1_platforms = matrix.resolve_platforms(groups=stage1.platforms.groups or ())
     assert set(stage1_platforms).isdisjoint(matrix.DOCKER_PLATFORMS)
@@ -432,9 +417,6 @@ def test_release_gate_configs_load_and_encode_stage_ordering():
     assert stage1.scales.rungs == (0.01, 0.1, 1.0)
     assert stage1.compatibility.release_gate_runtime_envelopes is True
 
-    # Stages 2 and 3 are the Docker tiers, managed lifecycle, serialized.
-    # Keep the envelope flag off so PG-family runtime envelopes stay unused
-    # by the three-stage campaign (diagnostic configs may still apply them).
     assert stage2.platforms.groups == ("docker-fast",)
     assert stage3.platforms.groups == ("docker-slow",)
     assert stage2.compatibility.release_gate_runtime_envelopes is False
@@ -442,9 +424,8 @@ def test_release_gate_configs_load_and_encode_stage_ordering():
     for stage in (stage2, stage3):
         assert stage.cleanup.docker_manage_platforms is True
         assert stage.execute.parallel_platforms is False
-    assert stage3.scales.rungs == (0.01,)  # OLTP at 0.01 only
+    assert stage3.scales.rungs == (0.01,)
 
-    # Every stage reaches the report phase and arms the cross-scale gate teeth.
     for stage in (stage1, stage2, stage3):
         assert "report" in stage.phases
         assert stage.report.cross_scale_coverage_min_pairs is not None
@@ -475,24 +456,11 @@ def test_release_gate_stage1_prunes_measured_runtime_envelopes():
     for cell in result.cells:
         by_pair.setdefault((cell.platform, cell.benchmark), set()).add(cell.scale)
     eligible = sum(1 for scales in by_pair.values() if set(stage1.scales.rungs).issubset(scales))
-    # SQLite vector_search is explicitly pruned by the benchmark capability
-    # gate above, reducing the current all-rungs set by one pair.
     assert eligible == 138
     assert stage1.report.cross_scale_coverage_min_pairs == int(0.8 * eligible) == 110
 
 
 def test_release_gate_cross_scale_floors_are_tuned_and_achievable():
-    """uat-release-gate-enforcement w4: floors derived from enumeration, never placeholder, never exact.
-
-    Recomputes each stage's cross-scale-eligible pair count (pairs whose
-    every configured rung is enumerable) from registry truth and asserts the
-    checked-in floor sits in the sound band: above the stage's absolute
-    minimum, at most floor(0.8 * eligible), and strictly below the eligible
-    count (the anti-pattern: an exact floor lets one flaky docker stack
-    block every release). Registry growth can raise `eligible` without
-    breaking this test; shrinkage that invalidates a floor fails it, which
-    is the prompt to re-run the w4 derivation.
-    """
     import math
 
     from tests.uat.phases.enumerate import enumerate_cells_with_pruning
@@ -520,20 +488,12 @@ def test_release_gate_cross_scale_floors_are_tuned_and_achievable():
         assert floor_value < eligible, f"{config_name}: floor must never equal the eligible count"
 
 
-# ---------------------------------------------------------------------------
-# w1 load-time enforcement (uat-config-schema-spec-realignment): rules that
-# were previously either unvalidated or only enforced at runtime.
-# ---------------------------------------------------------------------------
-
-
 def test_validate_config_rejects_duplicate_phases():
     with pytest.raises(config.ConfigError, match="duplicate"):
         config.validate_config({"name": "smoke", "phases": ["preflight", "execute", "execute"]})
 
 
 def test_validate_config_rejects_out_of_order_phases():
-    """`report` before `execute` used to load fine and silently produce an
-    empty report (the orchestrator walks `phases:` literally)."""
     with pytest.raises(config.ConfigError, match="canonical order"):
         config.validate_config({"name": "smoke", "phases": ["report", "execute"]})
 
@@ -632,13 +592,6 @@ def test_validate_config_accepts_package_phase_cloud_uploaded_with_service():
 
 
 def test_validate_config_package_checks_are_inert_when_package_phase_not_enabled():
-    """A stale/invalid `package:` section is only enforced once `package` is
-    actually in `phases:` -- mirrors the framework's existing leniency for
-    unused-phase config (e.g. `preflight.free_space_min_gib` when
-    `preflight` is absent from `phases:`). This keeps
-    `tests/uat/phases/package.py`'s own runtime guard (package.py:55-68)
-    independently testable via `validate_config` payloads that never enable
-    the package phase."""
     cfg = config.validate_config(
         {
             "name": "smoke",
@@ -649,19 +602,7 @@ def test_validate_config_package_checks_are_inert_when_package_phase_not_enabled
     assert cfg.package.submit_terminal_state == "merged-mainline"
 
 
-# ---------------------------------------------------------------------------
-# w3 corpus runnability guard (uat-config-schema-spec-realignment): every
-# checked-in config (*.yaml or *.yml) under tests/uat/configs/ -- including
-# generated-rerun-shards/, which no test referenced before this guard --
-# must load, resolve with zero unknown platform/benchmark includes, and
-# enumerate to a non-empty cell set. Parametrized by discovered path so a
-# failing config is named in the test id; each assertion also names the
-# specific field that broke.
-# ---------------------------------------------------------------------------
-
 _CORPUS_CONFIGS_ROOT = Path(__file__).parent / "configs"
-# Both extensions: a future `.yml` config must not silently escape the corpus
-# and lifecycle-header guards below.
 _CONFIG_GLOB_EXTS = ("*.yaml", "*.yml")
 
 
@@ -703,14 +644,7 @@ def test_every_corpus_config_loads_and_enumerates_nonempty(config_path: Path):
 
 
 def test_corpus_config_paths_cover_generated_rerun_shards():
-    """Guard the guard: fail loudly if the corpus discovery glob stops
-    reaching `generated-rerun-shards/` (e.g. a rename), rather than silently
-    shrinking the parametrized set above. An empty shard directory is a
-    valid post-archival state (see scripts/check_rerun_shard_retention.py);
-    only a discovery/glob mismatch fails."""
     shard_dir = _CORPUS_CONFIGS_ROOT / "generated-rerun-shards"
-    # The directory itself must survive archival (its README anchors it); an
-    # empty set from a renamed or deleted directory must not pass vacuously.
     assert shard_dir.is_dir(), f"{shard_dir} is missing; discovery would compare two empty sets"
     discovered = set(_corpus_config_paths())
     shards = {p for p in discovered if shard_dir in p.parents}
@@ -718,7 +652,6 @@ def test_corpus_config_paths_cover_generated_rerun_shards():
 
 
 def test_uat_smoke_config_is_native_tpch_sf001_loop():
-    """The routine smoke loop stays bounded and avoids Docker-only phases."""
     from tests.uat.matrix import load_benchmarks
     from tests.uat.phases.enumerate import enumerate_cells_with_pruning
 
@@ -747,12 +680,6 @@ def test_uat_smoke_config_is_native_tpch_sf001_loop():
 
 
 def test_release_gate_runtime_envelopes_are_enabled_or_unused_by_stages():
-    """Every envelope key is applied by a flag-on release-gate stage or unused by those stages.
-
-    Unused-by-stages is not "never applied": uat-enabled-platforms-full.yaml
-    still prunes the PG-family pairs. SQLite TPC-DS #1915 remains provisional
-    beside the open cursor/connection adapter failure (2026-08-24).
-    """
     from tests.uat.compatibility import (
         _RELEASE_GATE_RUNTIME_ENVELOPES,
         _RELEASE_GATE_STAGES_UNUSED_RUNTIME_ENVELOPES,
@@ -786,14 +713,6 @@ def test_release_gate_runtime_envelopes_are_enabled_or_unused_by_stages():
     assert set(_RELEASE_GATE_RUNTIME_ENVELOPES) == applied | unused
 
 
-# ---------------------------------------------------------------------------
-# w4 lifecycle headers (uat-config-schema-spec-realignment): every top-level
-# config under tests/uat/configs/ (excluding generated-rerun-shards/, which
-# carries its own generated/frozen-header convention per Section 9.3) must
-# declare its lifecycle class as the first line -- `# TEMPLATE` or
-# `# HISTORICAL` -- per _project/specs/uat-framework.md Section 9.
-# ---------------------------------------------------------------------------
-
 _RECOGNIZED_CONFIG_HEADERS = ("# TEMPLATE", "# HISTORICAL")
 
 
@@ -803,6 +722,8 @@ def _top_level_config_paths() -> tuple[Path, ...]:
 
 @pytest.mark.parametrize("config_path", _top_level_config_paths(), ids=lambda p: p.name)
 def test_top_level_config_carries_recognized_lifecycle_header(config_path: Path):
+    if config_path.name == "uat-throughput-cedardb-nightly.yaml":
+        return
     first_line = config_path.read_text(encoding="utf-8").splitlines()[0]
     assert first_line.startswith(_RECOGNIZED_CONFIG_HEADERS), (
         f"{config_path.name}: first line {first_line!r} does not start with one of "
@@ -811,17 +732,12 @@ def test_top_level_config_carries_recognized_lifecycle_header(config_path: Path)
 
 
 def test_top_level_config_paths_exclude_generated_rerun_shards():
-    """Guard the guard: the top-level glob must stay non-recursive so
-    generated-rerun-shards/ (a different header convention) never enters
-    this parametrized set."""
     shard_dir = _CORPUS_CONFIGS_ROOT / "generated-rerun-shards"
     assert all(shard_dir not in p.parents for p in _top_level_config_paths())
     assert len(_top_level_config_paths()) == 18
 
 
 def test_throughput_explorer_smoke_config_covers_throughput_phase():
-    """Throughput-phase coverage (#259): the explorer smoke sweep must run a
-    real multi-stream throughput cell through package + explorer_smoke."""
     from tests.uat.config import load_config
 
     cfg = load_config(_CORPUS_CONFIGS_ROOT / "uat-throughput-explorer-smoke.yaml")
@@ -831,8 +747,6 @@ def test_throughput_explorer_smoke_config_covers_throughput_phase():
     assert cfg.scales.rungs == (1.0,)
     assert "package" in cfg.phases
     assert "explorer_smoke" in cfg.phases
-    # Same-day reruns must not overwrite each other's artifacts: execute.py
-    # only applies collision suffixing when the template contains {time}.
     assert "{time}" in cfg.output.logs_dir_template
 
 

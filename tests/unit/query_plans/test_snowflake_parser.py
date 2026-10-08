@@ -1,9 +1,3 @@
-"""Unit tests for SnowflakeQueryPlanParser.
-
-Driven by a recorded ``EXPLAIN USING JSON`` fixture under
-tests/fixtures/query_plans/ so they run with no live Snowflake account.
-"""
-
 import json
 from pathlib import Path
 
@@ -93,8 +87,7 @@ class TestSnowflakeParserOperatorMapping:
 
 class TestSnowflakeParserMultipleRoots:
     def test_main_subtree_kept_when_multiple_parentless_nodes(self, parser):
-        # A second parentless node with no subtree must not be chosen as root
-        # over the real Result node, which would drop the plan's operators.
+
         payload = json.dumps(
             {
                 "Operations": [
@@ -102,7 +95,6 @@ class TestSnowflakeParserMultipleRoots:
                         {"id": 0, "operation": "Result"},
                         {"id": 1, "operation": "Aggregate", "parentOperators": [0]},
                         {"id": 2, "operation": "TableScan", "parentOperators": [1], "objects": ["DB.T"]},
-                        # Stray parentless node with the larger id and no children.
                         {"id": 9, "operation": "WithReference"},
                     ]
                 ]

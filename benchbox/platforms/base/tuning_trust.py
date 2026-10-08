@@ -66,13 +66,6 @@ def build_drift_check_payload(adapter: PlatformAdapter) -> dict[str, Any] | None
 
 
 def _fold_one_layout_op(ledger: Any, op: dict[str, Any]) -> str:
-    """Fold one layout op into *ledger*; return the fold outcome.
-
-    Outcomes: ``executed`` (applied), ``failed`` (a real failure: an
-    attempted statement that errored, or an unrecognized status), or
-    ``dropped`` (a deliberate skip, recorded with its ``skipped:`` reason so
-    it still blocks ``applied_verified`` without producing ``failed``).
-    """
     status = op.get("status")
     if status == "applied":
         ledger.record(
@@ -119,14 +112,6 @@ def fold_layout_operations_into_ledger(adapter: PlatformAdapter) -> None:
 
 
 def apply_phase_status(adapter: PlatformAdapter, has_config: bool) -> str:
-    """Derive the honest apply-phase tuning status from the execution ledger.
-
-    This is the status the run carries when corroboration cannot run (no
-    introspector, degraded read-back) or when validation fails before the
-    read-back. Moved here from ``PlatformAdapter.run_enhanced_benchmark`` so
-    the status-deciding call lives in this gated module; the behavior is
-    unchanged.
-    """
     return adapter._applied_tuning_ledger.overall_status(
         tuning_enabled=adapter.tuning_enabled,
         has_config=has_config,
@@ -134,27 +119,18 @@ def apply_phase_status(adapter: PlatformAdapter, has_config: bool) -> str:
 
 
 def duckdb_tuning_introspector() -> Any:
-    """Build the DuckDB catalog introspector (``duckdb_indexes()`` reads).
-
-    The admitted verdict-producing set is exactly DuckDB, ClickHouse, and
-    Snowflake (``docs/development/tuning-adr-001-trust-and-hash-semantics.md``
-    addendum "verification reach beyond DuckDB and ClickHouse"); no new
-    introspector is constructed here.
-    """
     from benchbox.platforms.duckdb_introspection import DuckDBTuningIntrospector
 
     return DuckDBTuningIntrospector()
 
 
 def clickhouse_tuning_introspector() -> Any:
-    """Build the ClickHouse catalog introspector (``system.tables`` reads)."""
     from benchbox.platforms.clickhouse.introspection import ClickHouseTuningIntrospector
 
     return ClickHouseTuningIntrospector()
 
 
 def snowflake_tuning_introspector(schema: str | None) -> Any:
-    """Build the Snowflake catalog introspector (clustering-key reads)."""
     from benchbox.platforms.snowflake_introspection import SnowflakeTuningIntrospector
 
     return SnowflakeTuningIntrospector(schema=schema)

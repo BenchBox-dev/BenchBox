@@ -4,8 +4,6 @@ dist/
 *.local
 public/data/
 
-# Browser-functional test artifacts
-# See docs/development/browser-test-architecture.md
 test-fixtures/.generated/
 test-results/
 playwright-report/

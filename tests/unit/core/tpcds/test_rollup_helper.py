@@ -56,13 +56,13 @@ class _FakeFrame:
     def group_by(self, *cols):
         return _FakeFrame(list(cols))
 
-    def agg(self, *exprs):  # noqa: ARG002
+    def agg(self, *exprs):
         return _FakeFrame(self.cols.copy())
 
     def select(self, *cols):
         return _FakeFrame(list(cols))
 
-    def with_columns(self, expr):  # noqa: ARG002
+    def with_columns(self, expr):
         return self
 
 
@@ -121,7 +121,7 @@ class _FakeOtherwise:
 
 
 class _PandasAdapter:
-    def groupby_agg(self, df, group_cols, agg_spec, as_index=False, dropna=True):  # noqa: ARG002
+    def groupby_agg(self, df, group_cols, agg_spec, as_index=False, dropna=True):
         return df.groupby(group_cols, as_index=False).agg(**agg_spec)
 
 
@@ -140,7 +140,7 @@ def test_expand_rollup_expression_returns_all_levels():
 
     out = expand_rollup_expression(df, group_cols=["a", "b"], agg_exprs=agg_exprs, ctx=ctx)
 
-    assert len(out) == 3  # 2 cols -> 3 levels
+    assert len(out) == 3
 
 
 def test_expand_rollup_pandas_includes_grouping_id_and_null_levels():

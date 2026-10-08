@@ -1,15 +1,4 @@
-"""Unit tests for DataFrame Validation Framework.
-
-Tests for:
-- ValidationResult dataclass
-- Row count validation
-- Column name validation
-- Fuzzy float comparison
-- DataFrame comparison
-- DataFrameValidator class
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -37,10 +26,7 @@ pytestmark = [
 
 
 class TestValidationResult:
-    """Tests for ValidationResult dataclass."""
-
     def test_success_creates_valid_result(self):
-        """Test that success() creates a valid result."""
         result = ValidationResult.success()
 
         assert result.is_valid is True
@@ -49,7 +35,6 @@ class TestValidationResult:
         assert result.warnings == []
 
     def test_success_with_metrics(self):
-        """Test success() with metrics."""
         metrics = {"rows": 100, "columns": 5}
         result = ValidationResult.success(metrics)
 
@@ -57,7 +42,6 @@ class TestValidationResult:
         assert result.metrics == metrics
 
     def test_failure_creates_invalid_result(self):
-        """Test that failure() creates an invalid result."""
         result = ValidationResult.failure("Row count mismatch")
 
         assert result.is_valid is False
@@ -65,7 +49,6 @@ class TestValidationResult:
         assert "Row count mismatch" in result.errors
 
     def test_error_creates_error_result(self):
-        """Test that error() creates an error result."""
         result = ValidationResult.error("Cannot compare DataFrames")
 
         assert result.is_valid is False
@@ -73,7 +56,6 @@ class TestValidationResult:
         assert "Cannot compare DataFrames" in result.errors
 
     def test_add_error_marks_invalid(self):
-        """Test that add_error() marks result as invalid."""
         result = ValidationResult.success()
         result.add_error("Something went wrong")
 
@@ -82,7 +64,6 @@ class TestValidationResult:
         assert "Something went wrong" in result.errors
 
     def test_add_warning_keeps_valid(self):
-        """Test that add_warning() keeps result valid."""
         result = ValidationResult.success()
         result.add_warning("Minor issue")
 
@@ -91,7 +72,7 @@ class TestValidationResult:
         assert "Minor issue" in result.warnings
 
     def test_bool_conversion(self):
-        """Test boolean conversion."""
+
         valid = ValidationResult.success()
         invalid = ValidationResult.failure("Error")
 
@@ -99,7 +80,6 @@ class TestValidationResult:
         assert bool(invalid) is False
 
     def test_merge_combines_results(self):
-        """Test that merge() combines two results."""
         result1 = ValidationResult.success({"rows": 100})
         result1.add_warning("Warning 1")
 
@@ -114,7 +94,6 @@ class TestValidationResult:
         assert len(merged.warnings) == 2
 
     def test_merge_propagates_failure(self):
-        """Test that merge() propagates failure."""
         result1 = ValidationResult.success()
         result2 = ValidationResult.failure("Error")
 
@@ -125,10 +104,8 @@ class TestValidationResult:
 
 
 class TestValidateRowCount:
-    """Tests for validate_row_count function."""
-
     def test_exact_match(self):
-        """Test exact row count match."""
+
         result = validate_row_count(100, 100)
 
         assert result.is_valid is True
@@ -136,14 +113,14 @@ class TestValidateRowCount:
         assert result.metrics["expected_rows"] == 100
 
     def test_mismatch(self):
-        """Test row count mismatch."""
+
         result = validate_row_count(100, 200)
 
         assert result.is_valid is False
         assert "mismatch" in result.errors[0].lower()
 
     def test_within_tolerance(self):
-        """Test row count within tolerance."""
+
         result = validate_row_count(105, 100, tolerance_percent=10)
 
         assert result.is_valid is True
@@ -151,58 +128,55 @@ class TestValidateRowCount:
         assert "5.00%" in result.warnings[0]
 
     def test_outside_tolerance(self):
-        """Test row count outside tolerance."""
+
         result = validate_row_count(120, 100, tolerance_percent=10)
 
         assert result.is_valid is False
 
     def test_zero_expected_with_tolerance(self):
-        """Test zero expected rows with tolerance."""
+
         result = validate_row_count(0, 0, tolerance_percent=10)
 
         assert result.is_valid is True
 
 
 class TestValidateColumnNames:
-    """Tests for validate_column_names function."""
-
     def test_exact_match(self):
-        """Test exact column match."""
+
         result = validate_column_names(["a", "b", "c"], ["a", "b", "c"])
 
         assert result.is_valid is True
 
     def test_different_order_allowed(self):
-        """Test different order is allowed by default."""
+
         result = validate_column_names(["c", "b", "a"], ["a", "b", "c"])
 
         assert result.is_valid is True
 
     def test_different_order_not_allowed(self):
-        """Test different order with strict config."""
+
         config = ValidationConfig(ignore_column_order=False)
         result = validate_column_names(["c", "b", "a"], ["a", "b", "c"], config=config)
 
-        # Should still be valid but with warning
         assert result.is_valid is True
         assert len(result.warnings) == 1
 
     def test_missing_columns(self):
-        """Test missing columns."""
+
         result = validate_column_names(["a", "b"], ["a", "b", "c"])
 
         assert result.is_valid is False
         assert "Missing columns" in result.errors[0]
 
     def test_extra_columns(self):
-        """Test extra columns."""
+
         result = validate_column_names(["a", "b", "c", "d"], ["a", "b", "c"])
 
         assert result.is_valid is False
         assert "Extra columns" in result.errors[0]
 
     def test_case_insensitive(self):
-        """Test case insensitive comparison."""
+
         config = ValidationConfig(ignore_case=True)
         result = validate_column_names(["A", "B", "C"], ["a", "b", "c"], config=config)
 
@@ -210,43 +184,39 @@ class TestValidateColumnNames:
 
 
 class TestFuzzyFloatCompare:
-    """Tests for fuzzy_float_compare function."""
-
     def test_exact_match(self):
-        """Test exact float match."""
+
         assert fuzzy_float_compare(1.0, 1.0) is True
 
     def test_within_relative_tolerance(self):
-        """Test within relative tolerance."""
+
         assert fuzzy_float_compare(1.0000001, 1.0) is True
 
     def test_outside_tolerance(self):
-        """Test outside tolerance."""
+
         assert fuzzy_float_compare(1.1, 1.0, rel_tolerance=1e-3) is False
 
     def test_nan_handling(self):
-        """Test NaN handling."""
+
         assert fuzzy_float_compare(float("nan"), float("nan")) is True
         assert fuzzy_float_compare(float("nan"), 1.0) is False
 
     def test_infinity_handling(self):
-        """Test infinity handling."""
+
         assert fuzzy_float_compare(float("inf"), float("inf")) is True
         assert fuzzy_float_compare(float("-inf"), float("-inf")) is True
         assert fuzzy_float_compare(float("inf"), float("-inf")) is False
         assert fuzzy_float_compare(float("inf"), 1e308) is False
 
     def test_near_zero(self):
-        """Test near-zero values use absolute tolerance."""
+
         assert fuzzy_float_compare(1e-12, 0.0, abs_tolerance=1e-10) is True
         assert fuzzy_float_compare(1e-8, 0.0, abs_tolerance=1e-10) is False
 
 
 class TestCompareDataframes:
-    """Tests for compare_dataframes function."""
-
     def test_identical_dataframes(self):
-        """Test identical DataFrames."""
+
         df1 = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
         df2 = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
 
@@ -255,7 +225,7 @@ class TestCompareDataframes:
         assert result.is_valid is True
 
     def test_different_row_count(self):
-        """Test different row counts."""
+
         df1 = pl.DataFrame({"a": [1, 2, 3]})
         df2 = pl.DataFrame({"a": [1, 2]})
 
@@ -265,7 +235,7 @@ class TestCompareDataframes:
         assert "Row count mismatch" in result.errors[0]
 
     def test_different_column_names(self):
-        """Test different column names."""
+
         df1 = pl.DataFrame({"a": [1, 2, 3]})
         df2 = pl.DataFrame({"b": [1, 2, 3]})
 
@@ -275,7 +245,7 @@ class TestCompareDataframes:
         assert "Missing columns" in result.errors[0] or "Extra columns" in result.errors[0]
 
     def test_different_values(self):
-        """Test different values."""
+
         df1 = pl.DataFrame({"a": [1, 2, 3]})
         df2 = pl.DataFrame({"a": [1, 2, 4]})
 
@@ -285,7 +255,7 @@ class TestCompareDataframes:
         assert "value mismatches" in result.errors[0]
 
     def test_float_tolerance(self):
-        """Test float comparison with tolerance."""
+
         df1 = pl.DataFrame({"a": [1.0, 2.0, 3.0]})
         df2 = pl.DataFrame({"a": [1.0000001, 2.0, 3.0]})
 
@@ -294,7 +264,6 @@ class TestCompareDataframes:
         assert result.is_valid is True
 
     def test_sort_invariant(self):
-        """Test sort-invariant comparison."""
         df1 = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
         df2 = pl.DataFrame({"a": [3, 1, 2], "b": [6, 4, 5]})
 
@@ -303,7 +272,7 @@ class TestCompareDataframes:
         assert result.is_valid is True
 
     def test_null_handling(self):
-        """Test null value handling."""
+
         df1 = pl.DataFrame({"a": [1, None, 3]})
         df2 = pl.DataFrame({"a": [1, None, 3]})
 
@@ -312,19 +281,18 @@ class TestCompareDataframes:
         assert result.is_valid is True
 
     def test_loose_validation(self):
-        """Test loose validation only checks row count."""
+
         config = ValidationConfig(level=ValidationLevel.LOOSE)
         df1 = pl.DataFrame({"a": [1, 2, 3]})
-        df2 = pl.DataFrame({"b": [4, 5, 6]})  # Different column name and values
+        df2 = pl.DataFrame({"b": [4, 5, 6]})
 
         result = compare_dataframes(df1, df2, config=config)
 
-        # Loose validation fails on column mismatch, but would pass row count
         assert result.metrics["actual_rows"] == 3
         assert result.metrics["expected_rows"] == 3
 
     def test_pandas_dataframe(self):
-        """Test comparison with Pandas DataFrame."""
+
         pd = pytest.importorskip("pandas")
 
         df1 = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
@@ -335,7 +303,7 @@ class TestCompareDataframes:
         assert result.is_valid is True
 
     def test_dict_input(self):
-        """Test comparison with dict input."""
+
         df1 = {"a": [1, 2, 3], "b": [4, 5, 6]}
         df2 = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
 
@@ -345,10 +313,8 @@ class TestCompareDataframes:
 
 
 class TestCompareWithSql:
-    """Tests for compare_with_sql function."""
-
     def test_adds_query_context(self):
-        """Test that query_id is added to result."""
+
         df1 = pl.DataFrame({"a": [1, 2, 3]})
         df2 = pl.DataFrame({"a": [1, 2, 3]})
 
@@ -357,7 +323,7 @@ class TestCompareWithSql:
         assert result.details["query_id"] == "Q1"
 
     def test_error_includes_query_id(self):
-        """Test that errors include query_id."""
+
         df1 = pl.DataFrame({"a": [1, 2, 3]})
         df2 = pl.DataFrame({"a": [1, 2, 4]})
 
@@ -368,10 +334,8 @@ class TestCompareWithSql:
 
 
 class TestValidateQueryResult:
-    """Tests for validate_query_result function."""
-
     def test_row_count_only(self):
-        """Test validation with only row count."""
+
         df = pl.DataFrame({"a": [1, 2, 3]})
 
         result = validate_query_result(df, expected_rows=3)
@@ -379,7 +343,7 @@ class TestValidateQueryResult:
         assert result.is_valid is True
 
     def test_columns_only(self):
-        """Test validation with only columns."""
+
         df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
 
         result = validate_query_result(df, expected_columns=["a", "b"])
@@ -387,7 +351,7 @@ class TestValidateQueryResult:
         assert result.is_valid is True
 
     def test_both_validations(self):
-        """Test validation with both row count and columns."""
+
         df = pl.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
 
         result = validate_query_result(df, expected_rows=3, expected_columns=["a", "b"])
@@ -395,7 +359,7 @@ class TestValidateQueryResult:
         assert result.is_valid is True
 
     def test_adds_query_id(self):
-        """Test that query_id is added to result."""
+
         df = pl.DataFrame({"a": [1, 2, 3]})
 
         result = validate_query_result(df, expected_rows=3, query_id="Q1")
@@ -404,10 +368,7 @@ class TestValidateQueryResult:
 
 
 class TestDataFrameValidator:
-    """Tests for DataFrameValidator class."""
-
     def test_validate_stores_results(self):
-        """Test that validate() stores results."""
         validator = DataFrameValidator()
         df1 = pl.DataFrame({"a": [1, 2, 3]})
         df2 = pl.DataFrame({"a": [1, 2, 3]})
@@ -418,7 +379,7 @@ class TestDataFrameValidator:
         assert len(validator.results) == 2
 
     def test_validate_row_count(self):
-        """Test validate_row_count method."""
+
         validator = DataFrameValidator()
         df = pl.DataFrame({"a": [1, 2, 3]})
 
@@ -428,11 +389,10 @@ class TestDataFrameValidator:
         assert len(validator.results) == 1
 
     def test_summary(self):
-        """Test summary() method."""
         validator = DataFrameValidator()
         df1 = pl.DataFrame({"a": [1, 2, 3]})
         df2 = pl.DataFrame({"a": [1, 2, 3]})
-        df3 = pl.DataFrame({"a": [1, 2, 4]})  # Different
+        df3 = pl.DataFrame({"a": [1, 2, 4]})
 
         validator.validate(df1, df2, query_id="Q1")
         validator.validate(df1, df3, query_id="Q2")
@@ -446,7 +406,6 @@ class TestDataFrameValidator:
         assert summary["is_valid"] is False
 
     def test_reset(self):
-        """Test reset() clears results."""
         validator = DataFrameValidator()
         df = pl.DataFrame({"a": [1, 2, 3]})
 
@@ -457,12 +416,12 @@ class TestDataFrameValidator:
         assert len(validator.results) == 0
 
     def test_custom_config(self):
-        """Test validator with custom config."""
+
         config = ValidationConfig(float_tolerance=1e-3)
         validator = DataFrameValidator(config=config)
 
         df1 = pl.DataFrame({"a": [1.0]})
-        df2 = pl.DataFrame({"a": [1.0005]})  # Within 1e-3 tolerance
+        df2 = pl.DataFrame({"a": [1.0005]})
 
         result = validator.validate(df1, df2)
 
@@ -470,10 +429,8 @@ class TestDataFrameValidator:
 
 
 class TestValidationConfig:
-    """Tests for ValidationConfig dataclass."""
-
     def test_default_values(self):
-        """Test default configuration values."""
+
         config = ValidationConfig()
 
         assert config.level == ValidationLevel.STANDARD
@@ -482,7 +439,7 @@ class TestValidationConfig:
         assert config.ignore_row_order is True
 
     def test_custom_values(self):
-        """Test custom configuration values."""
+
         config = ValidationConfig(
             level=ValidationLevel.STRICT,
             float_tolerance=1e-10,
@@ -495,20 +452,16 @@ class TestValidationConfig:
 
 
 class TestValidationLevel:
-    """Tests for ValidationLevel enum."""
-
     def test_levels(self):
-        """Test validation levels."""
+
         assert ValidationLevel.STRICT.value == "strict"
         assert ValidationLevel.STANDARD.value == "standard"
         assert ValidationLevel.LOOSE.value == "loose"
 
 
 class TestComparisonStatus:
-    """Tests for ComparisonStatus enum."""
-
     def test_statuses(self):
-        """Test comparison statuses."""
+
         assert ComparisonStatus.MATCH.value == "match"
         assert ComparisonStatus.MISMATCH.value == "mismatch"
         assert ComparisonStatus.PARTIAL_MATCH.value == "partial_match"

@@ -1,22 +1,10 @@
-// ---------------------------------------------------------------------------
-// CostScatter - scatter plot of normalized cost vs performance metric
-//
-// X axis: normalized_cost_usd (USD).  Y axis: power_score (higher=better) or
-// display_geomean_ms (lower=better) depending on the benchmark family.
-// One point per platform with cost_status=normalized.
-//
-// Anti-pattern prevented: never plots legacy submitter-supplied cost_usd or
-// local not-applicable zeroes as comparable cloud cost.
-//
-// Python reference: textcharts.scatter_plot.ScatterPlot
-// ---------------------------------------------------------------------------
-
 import type { BenchmarkSummary, PlatformRow } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { axisLabelAnchor, chartFrame } from "@/lib/chartFrame";
 import { paletteColor } from "@/lib/chartTheme";
 import { costModelDisclosure, normalizedCostValue } from "@/lib/costDisplay";
-import { formatLatencyMs, formatPowerScore, formatUsd } from "@/lib/metricFormatters";
+import { normalizePrimaryMetric, primaryMetricHigherIsBetter, primaryMetricLabel, primaryMetricValue } from "@/lib/displayEligibility";
+import { formatLatencyMs, formatScoreMetric, formatUsd } from "@/lib/metricFormatters";
 
 const AXIS_W = 54;
 const AXIS_H = 32;
@@ -45,10 +33,8 @@ export function CostScatter({ summary }: Props) {
   const frame = chartFrame(containerWidth);
   const w = frame.width;
 
-  // Primary metric comes from the canonical DuckDB-persisted ranking row.
-  // Fallback is safe: every result has a display_geomean_ms.
-  const metric = summary.ranking?.primary_metric ?? "display_geomean_ms";
-  const higherIsBetter = metric === "power_score";
+  const metric = normalizePrimaryMetric(summary.ranking?.primary_metric);
+  const higherIsBetter = primaryMetricHigherIsBetter(metric);
 
   const pts: ScatterPoint[] = summary.platforms
     .map((p, i) => {
@@ -57,7 +43,7 @@ export function CostScatter({ summary }: Props) {
         result_id: p.result_id,
         platform: p.platform,
         cost,
-        perf: metric === "power_score" ? p.power_score : p.display_geomean_ms,
+        perf: primaryMetricValue(p, metric),
         modelVersion: p.cost_model_version,
         scope: p.cost_scope,
         provider: p.cloud_provider,
@@ -101,13 +87,13 @@ export function CostScatter({ summary }: Props) {
 
   function yFor(perf: number): number {
     const normalized = (perf - yMin) / yRange;
-    // Higher perf → top of chart when higher-is-better
     const pos = higherIsBetter ? normalized : 1 - normalized;
     return PADDING_TOP + CHART_H * (1 - pos);
   }
 
-  const metricLabel =
-    metric === "power_score" ? "Power score (higher is better)" : "Geomean latency (lower is better)";
+  const metricLabel = higherIsBetter
+    ? `${primaryMetricLabel(metric)} (higher is better)`
+    : "Geomean latency (lower is better)";
   const modelDisclosure = costModelDisclosure(summary.platforms);
 
   return (
@@ -120,15 +106,12 @@ export function CostScatter({ summary }: Props) {
         role="img"
         aria-label={`Normalized cost vs ${metricLabel} scatter plot (${modelDisclosure})`}
       >
-        {/* Grid - label orientation flips with higherIsBetter so the top
-            of the chart always shows the better-performance value. */}
         {[0, 0.25, 0.5, 0.75, 1].map((f) => {
           const y = PADDING_TOP + f * CHART_H;
           const val = higherIsBetter ? yMax - f * yRange : yMin + f * yRange;
-          const label =
-            metric === "power_score"
-              ? formatPowerScore(val).valueText
-              : formatLatencyMs(val, { subMillisecond: "compact" }).valueText;
+          const label = higherIsBetter
+            ? formatScoreMetric(metric, val)
+            : formatLatencyMs(val, { subMillisecond: "compact" }).valueText;
           return (
             <g key={f}>
               <line
@@ -151,7 +134,6 @@ export function CostScatter({ summary }: Props) {
           );
         })}
 
-        {/* Scatter points */}
         {pts.map((p) => {
           const cx = xFor(p.cost);
           const cy = yFor(p.perf);
@@ -162,12 +144,10 @@ export function CostScatter({ summary }: Props) {
               <circle cx={cx} cy={cy} r={7} fill={p.color} fill-opacity={0.85}>
                 <title>
                   {`${p.platform}: normalized ${formatUsd(p.cost).valueText} / ${
-                    metric === "power_score" ? formatPowerScore(p.perf).valueText : formatLatencyMs(p.perf).valueText
+                    higherIsBetter ? formatScoreMetric(metric, p.perf) : formatLatencyMs(p.perf).valueText
                   } (${p.modelVersion ?? "model unknown"}${regionLabel ? `, ${regionLabel}` : ""})`}
                 </title>
               </circle>
-              {/* A point near either edge cannot carry a centred label: half of
-                  it would fall outside the drawing and be cropped. */}
               <text
                 x={cx}
                 y={cy - 11}
@@ -180,7 +160,6 @@ export function CostScatter({ summary }: Props) {
           );
         })}
 
-        {/* Axes */}
         <line
           x1={AXIS_W}
           y1={PADDING_TOP}
@@ -198,7 +177,6 @@ export function CostScatter({ summary }: Props) {
           stroke-width={1}
         />
 
-        {/* X-axis labels */}
         {[0, 0.5, 1].map((f) => {
           const x = AXIS_W + f * plotW;
           const cost = xMin + f * xRange;
@@ -232,7 +210,6 @@ export function CostScatter({ summary }: Props) {
           Normalized cost (USD)
         </text>
 
-        {/* Y-axis label */}
         <text
           x={0}
           y={0}

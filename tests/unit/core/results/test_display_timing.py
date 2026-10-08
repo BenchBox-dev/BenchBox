@@ -1,5 +1,3 @@
-"""Coverage-focused tests for results display and timing modules."""
-
 from __future__ import annotations
 
 import time
@@ -58,6 +56,33 @@ def test_display_results_success_and_failure(capsys):
     out = capsys.readouterr().out
     assert "Benchmark Status: FAILED" in out
     assert "benchmark failed" in out
+
+
+def test_display_benchmark_list_uses_registry_without_class_docstring(capsys):
+    class NoDocMeta(type):
+        def __getattribute__(cls, name):
+            if name == "__doc__":
+                raise AssertionError("benchmark display must not read class docstrings")
+            return super().__getattribute__(name)
+
+    class NoDoc(metaclass=NoDocMeta):
+        pass
+
+    display_benchmark_list({"tpch": NoDoc})
+
+    assert "  tpch: Decision Support Benchmark" in capsys.readouterr().out
+
+
+def test_display_benchmark_list_supports_custom_description_and_fallback(capsys):
+    class CustomBenchmark:
+        description = "Custom benchmark"
+
+    display_benchmark_list({"custom": CustomBenchmark, "unknown": object})
+
+    output = capsys.readouterr().out
+    assert "  custom: Custom benchmark" in output
+    assert "  unknown: No description available" in output
+    assert output.index("custom:") < output.index("unknown:")
 
 
 def test_display_helpers_and_phase_printers(capsys):
@@ -153,12 +178,10 @@ def test_query_timing_and_collector(monkeypatch):
     assert completed[0].parse_time == pytest.approx(200.0 - 101.0)
     assert completed[0].rows_returned == 42
 
-    # detailed timing disabled/missing query paths
     collector_no_detail = TimingCollector(enable_detailed_timing=False)
     with collector_no_detail.time_phase("missing", "parse"):
         pass
 
-    # error path in context manager still records
     with pytest.raises(RuntimeError, match="boom"):
         with collector.time_query("QERR"):
             raise RuntimeError("boom")
@@ -181,7 +204,7 @@ def test_timing_collector_isolates_concurrent_repeated_query_ids():
             with collector.time_query("Q1"):
                 barrier.wait(timeout=5)
                 collector.record_metric("Q1", "thread_id", label)
-        except Exception as exc:  # pragma: no cover - assertion below reports failures
+        except Exception as exc:  # pragma: no cover
             errors.append((label, exc))
 
     threads = [Thread(target=worker, args=(label,)) for label in ("first", "second")]

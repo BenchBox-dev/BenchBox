@@ -1,5 +1,3 @@
-"""Static comparability checks for read_primitives query variants."""
-
 from __future__ import annotations
 
 import pytest
@@ -24,7 +22,6 @@ pytestmark = [
 
 
 def test_extract_projection_names_resolves_simple_select_star_wrapper():
-    """SELECT * wrapper variants should compare against the wrapped projection."""
     sql = """
     SELECT *
     FROM (
@@ -41,7 +38,6 @@ def test_extract_projection_names_resolves_simple_select_star_wrapper():
 
 
 def test_extract_projection_names_keeps_unrelated_select_star_as_unknown():
-    """SELECT * should not be resolved from an unrelated nested subquery."""
     sql = """
     SELECT *
     FROM orders
@@ -56,7 +52,6 @@ def test_extract_projection_names_keeps_unrelated_select_star_as_unknown():
 
 
 def test_linter_detects_variant_column_mismatch():
-    """Static lint catches variants that project a different top-level shape."""
     catalog = PrimitiveCatalog(
         version=1,
         queries={
@@ -91,7 +86,6 @@ def test_linter_detects_variant_column_mismatch():
 
 
 def test_linter_compares_variants_to_declared_contract_columns():
-    """A variant matching the declared contract should not be blamed for base SQL drift."""
     catalog = PrimitiveCatalog(
         version=1,
         queries={
@@ -122,7 +116,6 @@ def test_linter_compares_variants_to_declared_contract_columns():
 
 
 def test_linter_requires_contract_for_any_variant_query():
-    """Every active variant needs explicit shape and capability metadata."""
     catalog = PrimitiveCatalog(
         version=1,
         queries={
@@ -151,7 +144,6 @@ def test_linter_requires_contract_for_any_variant_query():
 
 
 def test_linter_detects_contract_column_mismatch_and_missing_capability():
-    """Contract metadata must match base projection names and declare capability."""
     catalog = PrimitiveCatalog(
         version=1,
         queries={
@@ -195,19 +187,6 @@ def test_linter_detects_contract_column_mismatch_and_missing_capability():
 
 
 def test_actual_catalog_static_linter_reports_no_variant_contract_issues():
-    """Every active catalog variant must declare and satisfy a comparability contract.
-
-    Allowlist: sqlglot's Redshift dialect parser doesn't recognise the
-    APPROXIMATE qualifier on aggregates other than COUNT(DISTINCT) (verified
-    against sqlglot 30.6.0). The Redshift variant for approx_quantile_groupby
-    uses APPROXIMATE PERCENTILE_DISC, which is correct Redshift syntax but
-    sqlglot reports as variant_parse_error. The runtime path on the Redshift
-    adapter sends the SQL as-is, so the parse failure does not block actual
-    execution — only the static linter. Upstream sqlglot PR #7585
-    (https://github.com/tobymao/sqlglot/pull/7585) adds Redshift
-    APPROXIMATE PERCENTILE_DISC parsing; keep this allowlist only until
-    BenchBox's sqlglot cap is bumped to a release containing that fix.
-    """
     issues = collect_variant_contract_issues(load_primitives_catalog(), require_contracts=True)
     allowlisted = {
         VariantContractIssue(
@@ -221,7 +200,6 @@ def test_actual_catalog_static_linter_reports_no_variant_contract_issues():
 
 
 def test_summarize_variant_comparability_is_json_serializable():
-    """Summary must survive a JSON round-trip for CLI output and artifacts."""
     import json
 
     from benchbox.core.read_primitives.variant_contracts import summarize_variant_comparability

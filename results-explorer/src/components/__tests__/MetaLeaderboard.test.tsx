@@ -363,6 +363,50 @@ describe("MetaLeaderboard", () => {
     expect(screen.getByText("Native: 2,500")).toBeTruthy();
   });
 
+  it("labels throughput cohorts with Throughput@Size and their stream count", () => {
+    const throughputCohort = {
+      ...DATA.cohorts[0]!,
+      key: "tpch-sf1-throughput-3streams",
+      benchmark: "tpch",
+      scale_factor: 1,
+      phase: "throughput",
+      stream_count: 3,
+      label: "TPC-H SF1 Throughput (3 streams)",
+      primary_metric: "throughput_at_size",
+      primary_order: "desc" as const,
+      platforms: [
+        {
+          ...DATA.cohorts[0]!.platforms![0]!,
+          result_id: "r-throughput",
+          metric_value: 3741.26,
+          primary_metric: "throughput_at_size",
+          primary_order: "desc" as const,
+        },
+      ],
+    };
+    const data: MetaLeaderboardData = {
+      ...DATA,
+      cohorts: [throughputCohort],
+      platforms: [
+        {
+          ...DATA.platforms[0]!,
+          n_cohorts: 1,
+          ranks: { [throughputCohort.key]: { rank: 1, total: 1, metric_value: 3741.26, speedup_vs_best: 1 } },
+        },
+      ],
+    };
+
+    render(<MetaLeaderboard data={data} mode="times" onModeChange={vi.fn()} />);
+
+    const header = screen.getByRole("columnheader", { name: /TPC-H SF1 Throughput \(3 streams\)/ });
+    expect(header.textContent).toContain("throughput (3 streams) · Throughput@Size · higher is better");
+    expect(screen.getByText("3,741")).toBeTruthy();
+    const cell = screen.getByRole("gridcell", {
+      name: "DuckDB times for TPC-H SF1 Throughput (3 streams): 3,741",
+    });
+    expect(cell.getAttribute("title")).toContain("Exact Throughput@Size: 3,741.26");
+  });
+
   it("does not focus the first leaderboard cell on initial render", () => {
     render(<MetaLeaderboard data={DATA} mode="times" onModeChange={vi.fn()} />);
 
@@ -476,8 +520,6 @@ describe("MetaLeaderboard", () => {
       ],
     };
     render(<MetaLeaderboard data={dataWithNa} mode="ranks" onModeChange={vi.fn()} />);
-    // "No run" appears both in a missing-cell and in the legend caption; assert
-    // both surfaces are present rather than relying on a single-match query.
     expect(screen.getAllByText("No run").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("0/1 rankings")).toBeTruthy();
     expect(screen.getByText("No score")).toBeTruthy();
@@ -573,8 +615,6 @@ describe("MetaLeaderboard", () => {
     fireEvent.keyDown(firstRowCell, { key: " " });
     expect(routeMock).toHaveBeenLastCalledWith("/results/p/duckdb/");
 
-    // Arrow down into SQLite row, Enter should navigate to sqlite - matches
-    // the row's mouse-click destination.
     fireEvent.keyDown(firstRowCell, { key: "ArrowDown" });
     const activeCell = document.querySelector<HTMLElement>('[data-cell="1-0"]');
     expect(activeCell).not.toBeNull();
@@ -772,9 +812,6 @@ describe("MetaLeaderboard", () => {
       }),
     );
     const cell = screen.getByRole("gridcell", { name: /Polars has published evidence for TPC-H SF0\.1/ });
-    // Unranked (never a "ranked" cellState), so trust/funding stay hidden here -
-    // but the validation badge, the one signal that flags a non-clean result,
-    // must still surface.
     expect(cell.querySelector('[data-role="trust"]')).toBeNull();
     const badge = cell.querySelector('[data-role="validation"]');
     expect(badge?.textContent).toBe("no validation");
@@ -877,7 +914,7 @@ describe("MetaLeaderboard", () => {
         {
           platform_id: "polars",
           platform: "Polars",
-          ranks: {}, // <- the contradiction: result exists, ranks map is empty
+          ranks: {},
           avg_rank: 0,
           n_cohorts: 0,
         },

@@ -89,6 +89,7 @@ const COMPARE_METADATA_COLUMNS = [
   "scale_factor",
   "test_type",
   "phase",
+  "stream_count",
   "primary_metric",
   "comparison_exclusion_reason",
 ];
@@ -122,11 +123,6 @@ export function Query({ url }: QueryProps) {
   const [cloudRegions, setCloudRegions] = useFacetField("cloud_region");
   const [instanceOrWarehouses, setInstanceOrWarehouses] = useFacetField("instance_or_warehouse");
   const [storageFormats, setStorageFormats] = useFacetField("storage_format");
-  // ADR-2 §3: `physical_rendering_id` is a *secondary*, on-demand narrowing
-  // facet — deliberately page-local (like `cost_model`) rather than part of
-  // the shared FACET_KEYS coarse-comparability set, which the comparison
-  // matcher iterates. Registering it there would silently fold it into the
-  // coarse facet match; ADR-2 rejects that. See `physicalRenderingIdsMatch`.
   const [physicalRenderingIds, setPhysicalRenderingIds] = useUrlState<string[]>(
     "physical_rendering_id",
     EMPTY_STRING_ARRAY,
@@ -146,8 +142,6 @@ export function Query({ url }: QueryProps) {
   const [sort, setSort] = useState<QuerySort>({ column: "run_date", direction: "desc" });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Bumped by the ErrorMessage retry button so a reader can re-issue the
-  // schema/facet/page reads after a DuckDB worker fault without reloading.
   const [resultsRetryToken, setResultsRetryToken] = useState(0);
   const [sqlText, setSqlText] = useState("SELECT * FROM bench.results ORDER BY run_date DESC");
   const [sqlRows, setSqlRows] = useState<ResultRow[]>([]);
@@ -155,10 +149,6 @@ export function Query({ url }: QueryProps) {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [visibleSqlLimit, setVisibleSqlLimit] = useState(SQL_TABLE_RENDER_LIMIT);
-  // w4 (compare-flow-entrypoints): select-for-compare state. The first
-  // pick locks the cohort signature; subsequent rows that don't match
-  // render disabled. The Compare tray below the result count surfaces
-  // the active cohort and the launch button.
   const [compareSelectedRows, setCompareSelectedRows] = useState<Map<string, ResultRow>>(new Map());
   const [compareHandoffError, setCompareHandoffError] = useState<string | null>(null);
   const [pinnedCompareResultId, setPinnedCompareResultId] = useState<string | null>(null);
@@ -194,8 +184,6 @@ export function Query({ url }: QueryProps) {
     clearPinnedCompareParam();
     setCompareSelectedRows(new Map());
   };
-  // Default compatible-only on once the cohort signature locks; users can
-  // disable to inspect (still-disabled) incompatible rows. See finding #3.
   const [compareCompatibleOnly, setCompareCompatibleOnly] = useState(true);
 
   useEffect(() => {
@@ -304,9 +292,6 @@ export function Query({ url }: QueryProps) {
         : buildQueryResultPageQueries(baseSelectQuery, searchText, pageOffset),
     [baseSelectQuery, pageOffset, searchText],
   );
-  // Cohort lock signature for compare-selection. Computed at the top of the
-  // component so visibleRows can re-partition compatible rows above
-  // incompatibles after the first selection (finding #3).
   const compareCohortSignature = useMemo(() => {
     const firstId = [...compareSelectedIds][0];
     if (firstId === undefined) return null;
@@ -586,13 +571,6 @@ export function Query({ url }: QueryProps) {
     });
   }
 
-  // Bulk visible-column actions for the disclosure header.
-  // "Reset to default" restores the DEFAULT_COLUMNS subset (those present
-  // in the snapshot schema). "Select all" / "Clear optional" exist so
-  // power users don't have to toggle 20+ checkboxes one by one.
-  // We keep at least one identifying/result column visible at all times
-  // (`result_id` if present, else first available); otherwise the table
-  // would render with no data columns and only View links.
   function resetVisibleColumnsToDefault() {
     setVisibleColumns(DEFAULT_COLUMNS.filter((column) => columnNames.includes(column)));
   }
@@ -697,8 +675,6 @@ export function Query({ url }: QueryProps) {
         buildSelectQuery(activeFilters, visibleColumns, sort, rowLimit),
         searchText,
       );
-      // A full result-set export has no stated performance budget and can
-      // legitimately take longer than the default per-page query bound.
       const exportRows = await queryRows<ResultRow>(query.sql, query.params, DUCKDB_USER_QUERY_TIMEOUT_MS);
       const exportName = `benchbox-query-export-${Date.now()}.json`;
       const blob = new Blob(
@@ -731,7 +707,6 @@ export function Query({ url }: QueryProps) {
 
     setDownloadError(null);
     try {
-      // Same rationale as downloadJson: a full export can run long.
       const exportRows = await queryRows<ResultRow>(selectQuery.sql, selectQuery.params, DUCKDB_USER_QUERY_TIMEOUT_MS);
       const blob = new Blob([serializeCsv(exportRows, visibleColumns)], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -748,9 +723,6 @@ export function Query({ url }: QueryProps) {
   async function runSql() {
     setSqlError(null);
     try {
-      // Workbench SQL is user-authored and arbitrary; give it the same
-      // generous budget as the exports above instead of the default bound
-      // meant for the app's own bounded, index-shaped page reads.
       const nextRows = await queryRows<ResultRow>(sqlText, [], DUCKDB_USER_QUERY_TIMEOUT_MS);
       setSqlRows(nextRows);
     } catch (err: unknown) {
@@ -1038,7 +1010,6 @@ export function Query({ url }: QueryProps) {
                         <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)]">
                           <thead class="bg-[var(--bb-surface-data-muted)]">
                             <tr>
-                              {/* Keep selection controls reachable while result columns scroll. */}
                               <th
                                 scope="col"
                                 class="table-th sticky left-0 z-10 w-12 min-w-12 bg-[var(--bb-surface-data-muted)] text-left"
@@ -1385,14 +1356,6 @@ function serializeCsvCell(value: unknown): string {
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-// Cell formatter that intercepts known enum columns (trust_label,
-// validation_status, visibility, cost_status) before falling back to
-// `formatQueryCell`. Without this wrapper the raw enum values flow
-// through `readableToken` (underscore-only), which leaves dashed values
-// like "maintainer-run" unchanged. PR #277 addressed the trust_label
-// case by aligning the test fixture; this wrapper centralizes the
-// formatting so future call sites (Result Detail, exports, tooltips)
-// share one humanization rule.
 function formatQueryRowCell(column: string, value: unknown): string {
   if (typeof value === "string" && value !== "") {
     if (column === "trust_label") return formatTrustLabel(value);

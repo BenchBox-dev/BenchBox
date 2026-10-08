@@ -1,10 +1,3 @@
-/**
- * Tests for PlatformIndex sortable table headers.
- *
- * The default sort leads with the newest runs. Click-driven sort switches
- * direction on repeated clicks of the same key.
- */
-
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PlatformIndexRowRow } from "@/lib/duckdbQueries";
@@ -106,18 +99,11 @@ const ROWS: PlatformIndexRowRow[] = [
 ];
 
 function getRowOrder(container: ParentNode): string[] {
-  // PlatformRow exposes the result_id via data-testid on its <tr>. Walking
-  // that selector is more stable than parsing aria-label substrings.
   return Array.from(container.querySelectorAll("tbody tr[data-testid]")).map(
     (tr) => tr.getAttribute("data-testid") ?? "",
   );
 }
 
-/**
- * The Performance trends card lives in the Analysis card grid now, collapsed
- * by default like every other analysis card. Specs asserting on its expanded
- * content (trend-cohort-*, trend-sparse-*) must open it first.
- */
 function openTrendsCard(): void {
   const details = screen.getByTestId("summary-chart-preview-trends") as HTMLDetailsElement;
   details.open = true;
@@ -487,8 +473,6 @@ describe("PlatformIndex - sortable table headers", () => {
   });
 
   it("shows the platform filter strip even when the cohort has fewer than 25 rows", async () => {
-    // Filters used to hide below a 25-row threshold; they now stay mounted
-    // at all times, matching the Benchmark page's cohort filter panel.
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
     expect(screen.getByTestId("platform-detail-filters")).toBeTruthy();
@@ -503,8 +487,6 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(status).toHaveAttribute("aria-atomic", "true");
     expect(status?.textContent).toContain("0 results selected");
     expect(guidance.textContent).toContain("Select two or more DuckDB results");
-    // No dead button: the pending state is status text, and the real
-    // affordance appears in the same slot once it can be used.
     expect(screen.queryByRole("button", { name: /Select 2 / })).toBeNull();
     expect(screen.getByTestId("platform-compare-cta-pending").textContent).toBe(
       "Select 2 results to compare",
@@ -544,11 +526,6 @@ describe("PlatformIndex - sortable table headers", () => {
     const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
     const benchmarkBtn = screen.getByRole("button", { name: /Benchmark/ });
-    // Browsers fire a click on Enter for <button>, but jsdom does not unless
-    // the keyDown explicitly bubbles to a click. fireEvent.click is the
-    // semantic equivalent here (jsdom + RTL contract); to actually exercise
-    // keyDown we use it explicitly and confirm the button is focusable +
-    // wired with an onClick that runs on activation.
     benchmarkBtn.focus();
     expect(document.activeElement).toBe(benchmarkBtn);
     fireEvent.keyDown(benchmarkBtn, { key: "Enter" });
@@ -559,7 +536,6 @@ describe("PlatformIndex - sortable table headers", () => {
   it("aria-sort reflects the active column and direction", async () => {
     const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
-    // Default state: Date is sorted descending; others report none.
     const headerCells = container.querySelectorAll("th[aria-sort]");
     const geoTh = Array.from(headerCells).find((th) => th.textContent?.includes("Geomean"));
     const benchTh = Array.from(headerCells).find((th) => th.textContent?.includes("Benchmark"));
@@ -567,11 +543,9 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(dateTh?.getAttribute("aria-sort")).toBe("descending");
     expect(geoTh?.getAttribute("aria-sort")).toBe("none");
     expect(benchTh?.getAttribute("aria-sort")).toBe("none");
-    // Click Benchmark; it becomes the active column at asc.
     fireEvent.click(screen.getByRole("button", { name: /Benchmark/ }));
     expect(benchTh?.getAttribute("aria-sort")).toBe("ascending");
     expect(geoTh?.getAttribute("aria-sort")).toBe("none");
-    // Click again; direction flips.
     fireEvent.click(screen.getByRole("button", { name: /Benchmark/ }));
     expect(benchTh?.getAttribute("aria-sort")).toBe("descending");
   });
@@ -593,19 +567,16 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(within(table).getByText("Intel Xeon")).toBeTruthy();
     expect(within(table).getByText("AMD EPYC")).toBeTruthy();
 
-    // Arch sort asc (arm64, then x86_64, null last)
     fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
     let order = getRowOrder(container);
     expect(order[0]).toBe("r-arm");
     expect(order[3]).toBe("r-no-hw");
 
-    // Arch sort desc (x86_64, then arm64, null last)
     fireEvent.click(screen.getByRole("button", { name: /^Arch/ }));
     order = getRowOrder(container);
     expect(order[2]).toBe("r-arm");
     expect(order[3]).toBe("r-no-hw");
 
-    // CPU sort asc (amd_epyc, apple_silicon, intel_xeon, null last)
     fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
     order = getRowOrder(container);
     expect(order[0]).toBe("r-x86-amd");
@@ -613,7 +584,6 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(order[2]).toBe("r-x86-intel");
     expect(order[3]).toBe("r-no-hw");
 
-    // CPU sort desc (intel_xeon, apple_silicon, amd_epyc, null last)
     fireEvent.click(screen.getByRole("button", { name: /^CPU/ }));
     order = getRowOrder(container);
     expect(order[0]).toBe("r-x86-intel");
@@ -814,6 +784,40 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(ssb.querySelector('[data-result-id="r-ssb-b"]')).toBeTruthy();
     expect(ssb.querySelector('[data-result-id="r-ssb-c"]')).toBeTruthy();
     expect(ssb.querySelector('[data-result-id="r-tpch-a"]')).toBeNull();
+  });
+
+  it("keeps throughput runs with different stream counts on separate trend lines", async () => {
+    const throughputRow = (resultId: string, streams: number, runDate: string, score: number) =>
+      makeRow({
+        result_id: resultId,
+        benchmark: "tpch",
+        scale_factor: 1,
+        phase: "throughput",
+        stream_count: streams,
+        run_date: runDate,
+        power_score: null,
+        throughput_at_size: score,
+        primary_metric: "throughput_at_size",
+      });
+    vi.mocked(getPlatformIndexRows).mockResolvedValue([
+      throughputRow("r-t3-a", 3, "2026-04-01", 1000),
+      throughputRow("r-t3-b", 3, "2026-04-02", 1100),
+      throughputRow("r-t3-c", 3, "2026-04-03", 1050),
+      throughputRow("r-t2-a", 2, "2026-04-01", 900),
+      throughputRow("r-t2-b", 2, "2026-04-02", 950),
+      throughputRow("r-t2-c", 2, "2026-04-03", 930),
+    ]);
+
+    render(<PlatformIndex platform="duckdb" />);
+    await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
+    openTrendsCard();
+
+    const three = screen.getByTestId("trend-cohort-tpch-sf1-throughput-3streams-throughput_at_size");
+    const two = screen.getByTestId("trend-cohort-tpch-sf1-throughput-2streams-throughput_at_size");
+    expect(three.querySelector('[data-result-id="r-t3-a"]')).toBeTruthy();
+    expect(three.querySelector('[data-result-id="r-t2-a"]')).toBeNull();
+    expect(two.querySelector('[data-result-id="r-t2-b"]')).toBeTruthy();
+    expect(three.textContent).toContain("throughput (3 streams)");
   });
 
   it("shows public-ID receipt links and validation status for each platform result", async () => {
@@ -1035,8 +1039,6 @@ describe("PlatformIndex - sortable table headers", () => {
     expect(plural.textContent).toContain("Geomean latency (lower is better)");
   });
 
-  // w5: funding is projected into the card surfaces. The chip is additive to
-  // TrustBadge and appears only for a disclosed value.
   it("renders a funding chip on a row that discloses funding, and none otherwise", async () => {
     vi.mocked(getPlatformIndexRows).mockResolvedValue([
       makeRow({ result_id: "r-funded", short_id: "funded01", funding: "employer" }),
@@ -1046,15 +1048,11 @@ describe("PlatformIndex - sortable table headers", () => {
     const { container } = render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
-    // Two rows, one disclosure: exactly one chip, carrying the compact label.
     const fundingChips = container.querySelectorAll('[data-role="funding"]');
     expect(fundingChips.length).toBe(1);
     expect(fundingChips[0]?.textContent).toContain("Employer");
   });
 
-  // Non-clean validation status (e.g. never-run DataFrame-mode results) must
-  // read as non-validated in the default column set - no horizontal scroll
-  // to the Source column required.
   it("surfaces a not_run validation flag in the default (unscrolled) column set", async () => {
     vi.mocked(getPlatformIndexRows).mockResolvedValue([
       makeRow({ result_id: "r-not-run", short_id: "notrun01", validation_status: "not_run" }),
@@ -1065,9 +1063,6 @@ describe("PlatformIndex - sortable table headers", () => {
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
     const notRunFlag = screen.getByTestId("platform-validation-flag-r-not-run");
-    // The flag lives in the "Run" cell (compare, compare_state, run are the
-    // first default-visible columns) rather than the scroll-gated Source
-    // column, so it renders without scrolling the table.
     const runCell = notRunFlag.closest("td");
     expect(runCell?.querySelector('[data-testid="run-identity-label"]')).not.toBeNull();
     expect(within(notRunFlag).getByText("no validation")).toBeTruthy();
@@ -1207,7 +1202,7 @@ describe("PlatformIndex - Analysis card grid", () => {
 
     openCoverageCard();
     const full = screen.getByTestId("summary-chart-full-coverage");
-    expect(within(full).getAllByRole("row")).toHaveLength(2); // header + one benchmark
+    expect(within(full).getAllByRole("row")).toHaveLength(2);
     expect(within(full).queryByText("SSB")).toBeNull();
   });
 
@@ -1341,12 +1336,9 @@ describe("PlatformIndex - accepted-override validation badges", () => {
     render(<PlatformIndex platform="duckdb" />);
     await waitFor(() => expect(screen.getByText("DuckDB Results")).toBeTruthy());
 
-    // The overridden pass keeps its version-cell flag (a clean status alone
-    // would hide it) while the clean pass stays unflagged.
     expect(screen.getByTestId("platform-validation-flag-r-over")).toBeTruthy();
     expect(screen.queryByTestId("platform-validation-flag-r-clean")).toBeNull();
 
-    // Both the version-cell flag and the source-column badge warn.
     const row = screen.getByTestId("r-over");
     expect(within(row).getAllByText("Overridden: timing-plateau")).toHaveLength(2);
   });

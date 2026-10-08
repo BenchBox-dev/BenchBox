@@ -16,6 +16,7 @@ import {
   getBenchmarkMatrixCells,
   getBenchmarkRanking,
   getBenchmarkSummaryFromDuckDB,
+  getPrimaryMetricForBenchmark,
   getPlatformIndexRows,
   getCohort,
   getMetaLeaderboard,
@@ -234,16 +235,10 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     }
 
     it("fetches wide rows, display timings, and executions for all cohort IDs in one query each and groups them into DetailResult objects", async () => {
-      // getCohortBasisDetails Promise.all()s the wide-row query,
-      // getQueryDisplayTimings, and getQueryExecutions, in that order.
       mockedQueryRows.mockResolvedValueOnce([
         makeCohortWideRow({ result_id: "r1" }),
         makeCohortWideRow({
           result_id: "r2",
-          // Visibility/compliance exclusions are the kind of business-rule
-          // reason that must survive the bulk read path -- a hidden or
-          // non-compliant result must stay excluded from comparison even
-          // after a user switches measurement basis.
           comparison_exclusion_reason: "hidden_result",
           ranking_exclusion_reason: "hidden_result",
           visibility: "hidden",
@@ -285,11 +280,6 @@ describe("duckdbQueries - SQL targets and parameters", () => {
       expect(r2?.queries).toEqual([
         { query_id: "Q1", duration_ms: 50, status: "pass", run_type: "measurement", iter: 1, stream: null },
       ]);
-      // Regression: a bulk accessor that reimplements DetailResult shape
-      // independently of getDetailResult (rather than sharing its mapping)
-      // can silently hardcode these to null, which lets a hidden/excluded
-      // result reappear as comparable/rankable once a non-default basis is
-      // selected. See platformMeasurementBasis.ts / measurementBasis.ts.
       expect(r2?.comparison_exclusion_reason).toBe("hidden_result");
       expect(r2?.ranking_exclusion_reason).toBe("hidden_result");
       expect(r2?.visibility).toBe("hidden");
@@ -297,10 +287,6 @@ describe("duckdbQueries - SQL targets and parameters", () => {
   });
 
   describe("getDetailResult - physical_mechanisms unknown vs recorded-empty (ADR-2 §3)", () => {
-    // A "wide row" shaped exactly as the real result_detail_metrics view
-    // would hand back to getResultDetailMetrics: NULL becomes `null` here,
-    // and a recorded-but-empty mechanism list becomes duckdb_builder.py's
-    // "" (comma-join of []), not NULL.
     function makeWideRow(overrides: Partial<ResultDetailMetricsRow>): ResultDetailMetricsRow {
       return {
         result_id: "r1",
@@ -356,8 +342,6 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     }
 
     async function fetchDetail(resultId: string, wideRow: ResultDetailMetricsRow) {
-      // getDetailResult() Promise.all()s getResultDetailMetrics,
-      // getQueryDisplayTimings, and getQueryExecutions, in that order.
       mockedQueryRows.mockResolvedValueOnce([wideRow]);
       mockedQueryRows.mockResolvedValueOnce([]);
       mockedQueryRows.mockResolvedValueOnce([]);
@@ -365,10 +349,6 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     }
 
     it("carries CPU identity from the wide row through to the environment", async () => {
-      // Regression: the wide-row type declared cpu_model/cpu_family optional
-      // and RESULT_DETAIL_METRICS_COLUMNS never selected them, so both were
-      // undefined for every result and RunReceipt / ComparabilityReceipt
-      // reported the CPU as not recorded even on snapshots that had it.
       const detail = await fetchDetail(
         "with-cpu",
         makeWideRow({
@@ -390,9 +370,6 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     });
 
     it("selects the CPU columns it reads", async () => {
-      // The defect above was invisible to every behavioural test that built
-      // its own wide row: the projection and the reads drifted apart with
-      // nothing comparing them. This asserts the actual SQL.
       await fetchDetail("sql-check", makeWideRow({ result_id: "sql-check" }));
       const detailSql = String(mockedQueryRows.mock.calls[0]?.[0] ?? "");
       expect(detailSql).toContain("result_detail_metrics");
@@ -670,8 +647,8 @@ describe("getMetaLeaderboardData", () => {
 
   it("returns null when cohort_metadata is empty", async () => {
     mockedQueryRows
-      .mockResolvedValueOnce([]) // meta_leaderboard
-      .mockResolvedValueOnce([]); // cohort_metadata
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
     await expect(getMetaLeaderboardData()).resolves.toBeNull();
   });
 
@@ -740,7 +717,6 @@ describe("getMetaLeaderboardData", () => {
     const data = await getMetaLeaderboardData();
     const duckdb = data!.platforms.find((p) => p.platform_id === "duckdb")!;
     expect(duckdb.ranks["clickbench-sf0.1-power"]?.rank).toBe(1);
-    // All variants are preserved in the per-cohort platforms[] list.
     expect(data!.cohorts[0]!.platforms).toHaveLength(2);
   });
 
@@ -794,7 +770,6 @@ describe("resolveShortId", () => {
   });
 
   it("returns the input unchanged when it is not a short-id-shaped string", async () => {
-    // Full result_ids contain hyphens and are never 8+ contiguous hex chars.
     const fullId = "tpch-duckdb-abcdef12";
     await expect(resolveShortId(fullId)).resolves.toBe(fullId);
     expect(mockedQueryRows).not.toHaveBeenCalled();
@@ -829,8 +804,165 @@ describe("toShortIds", () => {
     const out = await toShortIds(["id-a", "id-b", "id-c"]);
     expect(out).toEqual(["aaaaaaaa", "id-b", "cccccccc"]);
     const [sql, params] = mockedQueryRows.mock.calls[0]!;
-    // 3 inputs → 3 ? placeholders
     expect(sql).toMatch(/IN \(\?, \?, \?\)/);
     expect(params).toEqual(["id-a", "id-b", "id-c"]);
+  });
+});
+
+describe("throughput cohorts split by stream count", () => {
+  it("scopes matrix cells and rankings by stream_count when one is given", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await getBenchmarkMatrixCells("tpch", 1, "throughput", 3);
+    await getBenchmarkRanking("tpch", 1, "throughput", 3);
+
+    const [cellsSql, cellsParams] = mockedQueryRows.mock.calls[0]!;
+    expect(cellsSql).toContain("AND stream_count = ?");
+    expect(cellsParams).toEqual(["tpch", 1, "throughput", 3]);
+    const [rankingSql, rankingParams] = mockedQueryRows.mock.calls[1]!;
+    expect(rankingSql).toContain("AND br.stream_count = ?");
+    expect(rankingSql).toMatch(/br\.throughput_at_size/);
+    expect(rankingParams).toEqual(["tpch", 1, "throughput", 3]);
+  });
+
+  it("matches only rows without a stream_count when none is given", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    await getBenchmarkMatrixCells("tpch", 1, "power");
+    await getBenchmarkRanking("tpch", 1, "power");
+
+    expect(mockedQueryRows.mock.calls[0]![0]).toContain("AND stream_count IS NULL");
+    expect(mockedQueryRows.mock.calls[1]![0]).toContain("AND br.stream_count IS NULL");
+  });
+
+  it("keeps separate cached summaries per stream count", async () => {
+    mockedQueryRows.mockResolvedValue([]);
+
+    await getBenchmarkSummaryFromDuckDB("tpch", 1, "throughput", 2);
+    await getBenchmarkSummaryFromDuckDB("tpch", 1, "throughput", 3);
+    await getBenchmarkSummaryFromDuckDB("tpch", 1, "throughput", 3);
+
+    const rankingCalls = mockedQueryRows.mock.calls.filter(([sql]) => String(sql).includes("benchmark_rankings"));
+    expect(rankingCalls.map(([, params]) => params)).toEqual([
+      ["tpch", 1, "throughput", 2],
+      ["tpch", 1, "throughput", 3],
+    ]);
+  });
+
+  it("builds a throughput summary ranked on Throughput@Size", async () => {
+    mockedQueryRows
+      .mockResolvedValueOnce([
+        {
+          benchmark: "tpch",
+          scale_factor: 1,
+          phase: "throughput",
+          result_id: "r1",
+          platform_id: "spark",
+          platform: "Spark",
+          short_id: "r1",
+          trust_label: "maintainer-run",
+          run_date: "2026-10-03",
+          is_ranking_eligible: true,
+          has_display_timing: true,
+          valid_query_count: 22,
+          missing_query_count: 0,
+          zero_timing_count: 0,
+          display_exclusion_reason: null,
+          comparison_exclusion_reason: null,
+          ranking_exclusion_reason: null,
+          power_score: null,
+          throughput_at_size: 3741.26,
+          stream_count: 3,
+          display_geomean_ms: 2509.5,
+          sample_geomean_ms: 2509.5,
+          cost_usd: null,
+          compliance_class: "official",
+          primary_metric: "throughput_at_size",
+          primary_order: "desc",
+          rank: 1,
+          percentile_p50: null,
+          percentile_p90: null,
+          percentile_p95: null,
+          percentile_p99: null,
+        },
+      ])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+
+    const summary = await getBenchmarkSummaryFromDuckDB("tpch", 1, "throughput", 3);
+
+    expect(summary?.stream_count).toBe(3);
+    expect(summary?.ranking).toEqual({
+      primary_metric: "throughput_at_size",
+      secondary_metric: "display_geomean_ms",
+      primary_order: "desc",
+    });
+    expect(summary?.platforms[0]?.throughput_at_size).toBe(3741.26);
+  });
+
+  it("reads the primary metric for a benchmark phase in a single query on the canonical slug", async () => {
+    mockedQueryRows.mockResolvedValueOnce([
+      { phase: "power", primary_metric: "power_score" },
+      { phase: "throughput", primary_metric: "throughput_at_size" },
+    ]);
+
+    await expect(getPrimaryMetricForBenchmark("tpch", "throughput")).resolves.toBe("throughput_at_size");
+
+    expect(mockedQueryRows).toHaveBeenCalledTimes(1);
+    expect(mockedQueryRows.mock.calls[0]![0]).toContain("FROM bench.benchmark_rankings WHERE benchmark = ?");
+    expect(mockedQueryRows.mock.calls[0]![1]).toEqual(["tpch"]);
+  });
+
+  it("looks up star_schema results under the canonical ssb ranking rows without a second query", async () => {
+    mockedQueryRows.mockResolvedValueOnce([{ phase: "power", primary_metric: "display_geomean_ms" }]);
+
+    await expect(getPrimaryMetricForBenchmark("star_schema", "power")).resolves.toBe("display_geomean_ms");
+
+    expect(mockedQueryRows).toHaveBeenCalledTimes(1);
+    expect(mockedQueryRows.mock.calls[0]![1]).toEqual(["ssb"]);
+  });
+
+  it("falls back to the benchmark's first ranking row when the phase has none, and to geomean when it has no rows", async () => {
+    mockedQueryRows.mockResolvedValueOnce([{ phase: "power", primary_metric: "power_score" }]);
+    await expect(getPrimaryMetricForBenchmark("tpch", "unknown")).resolves.toBe("power_score");
+
+    mockedQueryRows.mockResolvedValueOnce([{ phase: "power", primary_metric: "power_score" }]);
+    await expect(getPrimaryMetricForBenchmark("tpch")).resolves.toBe("power_score");
+
+    mockedQueryRows.mockResolvedValueOnce([]);
+    await expect(getPrimaryMetricForBenchmark("tpch", "power")).resolves.toBe("display_geomean_ms");
+    expect(mockedQueryRows).toHaveBeenCalledTimes(3);
+  });
+
+  it("carries stream_count from cohort_metadata onto the cohort", async () => {
+    mockedQueryRows.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        cohort_key: "tpch-sf1-throughput-3streams",
+        benchmark: "tpch",
+        scale_factor: 1,
+        phase: "throughput",
+        stream_count: 3,
+        cohort_label: "TPC-H SF1 Throughput (3 streams)",
+        cohort_href: "/results/tpch/?sf=1&phase=throughput&streams=3",
+        platform_count: 3,
+        cohort_ranked_count: 3,
+        cohort_ranking_exclusion_reason: null,
+        primary_metric: "throughput_at_size",
+        primary_order: "desc",
+        platform_id: "spark",
+        platform: "Spark",
+        result_id: "r1",
+        short_id: "",
+        tuning_mode: "notuning",
+        trust_label: "maintainer-run",
+        rank: 1,
+        metric_value: 3741.26,
+        speedup_vs_best: 1,
+      },
+    ]);
+
+    const data = await getMetaLeaderboardData();
+
+    expect(data!.cohorts[0]).toMatchObject({ stream_count: 3, primary_metric: "throughput_at_size" });
   });
 });

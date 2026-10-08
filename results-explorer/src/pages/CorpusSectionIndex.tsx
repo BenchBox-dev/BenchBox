@@ -29,8 +29,6 @@ interface SectionEntry {
   coverageCount: number;
   latestRun: string;
   runDates: string[];
-  // Registry support status for benchmark entries; null for platforms and
-  // for benchmark slugs the registry never declared.
   supportStatus: string | null;
 }
 
@@ -47,8 +45,6 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
   const [error, setError] = useState<string | null>(null);
   const retriedEmpty = useRef(false);
   const [sort, setSort] = useUrlState<SectionSort>("sort", "name", sectionSortSerde);
-  // Bumped by the ErrorMessage retry button so a reader can re-issue this
-  // read after a DuckDB worker fault without reloading the page.
   const [rowsRetryToken, setRowsRetryToken] = useState(0);
   useDocumentTitle(`${title} · BenchBox Results`);
 
@@ -76,9 +72,6 @@ export function CorpusSectionIndex({ kind }: { kind: SectionKind }) {
   }, [rowsRetryToken]);
 
   const entries = useMemo(() => sortEntries(buildEntries(rows ?? [], kind), sort), [kind, rows, sort]);
-  // Benchmarks group by product support status (Stable first, unclassified
-  // last); the current sort orders entries within each group. Platforms
-  // render as one ungrouped list.
   const groups = useMemo(() => groupEntries(entries, kind), [entries, kind]);
 
   return (
@@ -191,10 +184,6 @@ function buildEntries(rows: ResultRow[], kind: SectionKind): SectionEntry[] {
     const existing = grouped.get(id);
     if (existing) {
       existing.rows.push(row);
-      // Rows for one benchmark can carry mixed statuses (a legacy run with
-      // NULL alongside newer runs with a registry status). A later non-null
-      // status wins over an earlier null so the card groups and badges on
-      // the known status instead of falling back to Other.
       if (existing.supportStatus === null && supportStatus !== null) {
         existing.supportStatus = supportStatus;
       }
@@ -220,7 +209,6 @@ function buildEntries(rows: ResultRow[], kind: SectionKind): SectionEntry[] {
 
 interface EntryGroup {
   key: string;
-  /** Null for the single ungrouped platforms list. */
   heading: string | null;
   entries: SectionEntry[];
 }
@@ -231,10 +219,6 @@ function groupEntries(entries: SectionEntry[], kind: SectionKind): EntryGroup[] 
   }
   const byStatus = new Map<string, SectionEntry[]>();
   for (const entry of entries) {
-    // Forward-compatible snapshots can carry statuses this UI never declared.
-    // Every unrecognized status shares the "other" key so they render as one
-    // "Other benchmarks" section, matching the benchmarkSupportGroupLabel
-    // fallback contract instead of one section per unknown value.
     const key = isBenchmarkSupportStatus(entry.supportStatus) ? entry.supportStatus : "";
     const group = byStatus.get(key);
     if (group) {

@@ -1,5 +1,3 @@
-"""Best-effort Docker runtime metadata discovery for local platform adapters."""
-
 from __future__ import annotations
 
 import json
@@ -14,8 +12,6 @@ from benchbox.core.results.environment import ContainerEnvironment, PlatformRunt
 
 @dataclass(frozen=True)
 class DockerRuntimeDiscoveryRequest:
-    """Hints used to find a container-backed localhost runtime."""
-
     platform_name: str
     host: str | None = None
     port: int | str | None = None
@@ -27,8 +23,6 @@ class DockerRuntimeDiscoveryRequest:
 
 @dataclass(frozen=True)
 class DockerCommandResult:
-    """Small command-result protocol for injectable Docker command runners."""
-
     returncode: int
     stdout: str = ""
     stderr: str = ""
@@ -55,7 +49,6 @@ def discover_docker_runtime(
     *,
     runner: DockerCommandRunner | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Discover normalized Docker runtime metadata without failing benchmark execution."""
     if request.host and not _is_localhost(request.host):
         return _unavailable_result("not_localhost", f"Host {request.host!r} is not local to the BenchBox client")
 
@@ -104,7 +97,6 @@ def docker_request_from_config(
     platform_name: str,
     config: Mapping[str, Any] | None,
 ) -> DockerRuntimeDiscoveryRequest:
-    """Build Docker discovery hints from a platform adapter config mapping."""
     config = config or {}
     platform_key = platform_name.lower().replace(" ", "-")
     hints = _PLATFORM_HINTS.get(platform_key, {})
@@ -123,7 +115,7 @@ def docker_request_from_config(
 
 
 def _default_docker_runner(args: Sequence[str]) -> DockerCommandResult:
-    completed = subprocess.run(  # noqa: S603 - args are fixed Docker CLI tokens assembled internally.
+    completed = subprocess.run(
         list(args),
         check=False,
         capture_output=True,
@@ -146,7 +138,7 @@ def _run_docker_command(runner: DockerCommandRunner, args: Sequence[str]) -> dic
         return {"stdout": "", "error": "docker_timeout", "message": "Docker CLI command timed out"}
     except PermissionError as exc:
         return {"stdout": "", "error": "permission_denied", "message": str(exc)}
-    except Exception as exc:  # pragma: no cover - defensive boundary around optional metadata collection
+    except Exception as exc:  # pragma: no cover
         return {"stdout": "", "error": type(exc).__name__, "message": str(exc)}
 
     if result.returncode != 0:

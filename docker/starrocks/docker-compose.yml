@@ -1,25 +1,6 @@
-# StarRocks Docker Compose
-# All-in-one StarRocks instance for integration testing
-#
-# Usage:
-#   docker compose -f docker-compose.yml up -d
-#   benchbox run --platform starrocks --benchmark tpch --scale 0.01 \
-#     --platform-option host=localhost --platform-option port=19030
-#
-# Ports:
-#   19030 (default host) -> 9030 - MySQL protocol (query interface)
-#   18040 (default host) -> 8040 - HTTP API (Stream Load)
-#
-# Default credentials:
-#   Username: root
-#   Password: (empty)
-
 services:
   starrocks:
     image: starrocks/allin1-ubuntu:3.5.16
-    # StarRocks' all-in-one FE+BE image needs the measured 4 GB Docker
-    # envelope for the SF0.01 managed-UAT smoke. Keep the request explicit so
-    # Docker and the UAT Mocker adapter cannot silently fall back to 1 GB.
     mem_limit: ${STARROCKS_MEMORY_LIMIT:-4g}
     ports:
       - "${STARROCKS_HOST_PORT:-19030}:9030"

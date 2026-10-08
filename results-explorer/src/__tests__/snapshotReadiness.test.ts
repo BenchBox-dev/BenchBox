@@ -25,13 +25,9 @@ function fakeConnection(
   return {
     query: async (sql: string) => {
       log.push(sql);
-      // Match by table name in the SQL — readiness scans are
-      // `SELECT result_id FROM bench.<table> LIMIT 1`.
       const tableMatch = sql.match(/FROM bench\.(\w+)/);
       const table = tableMatch?.[1] ?? "";
       const rows = rowsByLabelOrSql[table] ?? [];
-      // The completeness probe asks COUNT(*) (metadata-satisfied) and then
-      // materializes the column; a healthy snapshot agrees on both.
       if (/COUNT\(\*\)/i.test(sql)) return { toArray: () => [{ n: rows.length }] };
       return { toArray: () => rows };
     },
@@ -40,8 +36,6 @@ function fakeConnection(
 
 describe("waitForSnapshotRows / SNAPSHOT_READY_SCANS (w5)", () => {
   it("resolves when required scans return rows even if optional scans are empty", async () => {
-    // Required scans get 1 row; optional scans (query_executions,
-    // query_display_timings, short_ids) return [].
     const log: string[] = [];
     const conn = fakeConnection(
       {
@@ -50,7 +44,6 @@ describe("waitForSnapshotRows / SNAPSHOT_READY_SCANS (w5)", () => {
         benchmark_rankings: [{ result_id: "r1" }],
         benchmark_matrix_cells: [{ result_id: "r1" }],
         result_detail_metrics: [{ result_id: "r1" }],
-        // Optional tables intentionally empty.
         query_executions: [],
         query_display_timings: [],
         short_ids: [],
@@ -59,8 +52,6 @@ describe("waitForSnapshotRows / SNAPSHOT_READY_SCANS (w5)", () => {
     );
 
     await expect(_waitForSnapshotRowsForTest(conn as unknown as never)).resolves.toBeUndefined();
-    // All scans were probed (we still want to know the table is queryable
-    // even if it's optional).
     expect(log.some((sql) => sql.includes("query_executions"))).toBe(true);
     expect(log.some((sql) => sql.includes("short_ids"))).toBe(true);
   });
@@ -69,7 +60,7 @@ describe("waitForSnapshotRows / SNAPSHOT_READY_SCANS (w5)", () => {
     const log: string[] = [];
     const conn = fakeConnection(
       {
-        results: [], // required: empty → must fail readiness
+        results: [],
         platform_index_rows: [{ result_id: "r1" }],
         benchmark_rankings: [{ result_id: "r1" }],
         benchmark_matrix_cells: [{ result_id: "r1" }],
@@ -87,14 +78,6 @@ describe("waitForSnapshotRows / SNAPSHOT_READY_SCANS (w5)", () => {
   }, 10000);
 });
 
-// ---------------------------------------------------------------------------
-// Cold-snapshot zero-row race: an unkeyed `LIMIT 1` scan is satisfied by the
-// first reachable row group while `WHERE result_id = ?` for a row further into
-// the file still returns nothing. Readiness used to pass on the scans alone and
-// hand the UI a snapshot whose keyed lookups render "No result found" for real
-// ids. See docs/operations/browser-ci.md (2026-07-29 correction).
-// ---------------------------------------------------------------------------
-
 const READY_TABLES = [
   "results",
   "platform_index_rows",
@@ -106,10 +89,6 @@ const READY_TABLES = [
   "short_ids",
 ] as const;
 
-/**
- * Models a cold snapshot: every unkeyed scan answers, but keyed lookups stay
- * empty until `keyedReadyOnAttempt` keyed probes have been issued.
- */
 function coldSnapshotConnection(
   options: { keyedReadyOnAttempt: number; probeId?: string },
   log: string[],
@@ -127,7 +106,6 @@ function coldSnapshotConnection(
       }
       const table = sql.match(/FROM bench\.(\w+)/)?.[1] ?? "";
       const known = READY_TABLES.includes(table as (typeof READY_TABLES)[number]);
-      // Rows are fully readable here; these cases isolate the KEYED failure.
       if (/COUNT\(\*\)/i.test(sql)) return { toArray: () => [{ n: known ? 1 : 0 }] };
       if (!known) return { toArray: () => [] };
       return { toArray: () => [{ result_id: probeId }] };
@@ -135,11 +113,6 @@ function coldSnapshotConnection(
   };
 }
 
-/**
- * Models the partial-readability shape the completeness probe exists for:
- * COUNT(*) reports the true total from file metadata while the column
- * materializes fewer rows, until `readyOnAttempt` passes have been made.
- */
 function partiallyReadableConnection(
   options: { total: number; visible: number; readyOnAttempt: number },
   log: string[],
@@ -154,9 +127,6 @@ function partiallyReadableConnection(
       if (/WHERE result_id =/.test(sql)) return { toArray: () => [{ result_id: "r0" }] };
       if (/ORDER BY result_id DESC/.test(sql)) return { toArray: () => [{ result_id: "r0" }] };
       if (/LIMIT 1/.test(sql)) return { toArray: () => rows(1) };
-      // Full column materialization: short until the snapshot finishes
-      // arriving. The probe returns on the FIRST mismatch, so one short read
-      // happens per readiness attempt.
       passes += 1;
       const healed = passes > options.readyOnAttempt;
       return { toArray: () => rows(healed ? options.total : options.visible) };
@@ -166,7 +136,6 @@ function partiallyReadableConnection(
 
 describe("waitForSnapshotRows keyed probe (cold-snapshot zero-row race)", () => {
   it("rejects when unkeyed scans pass but keyed lookups stay empty", async () => {
-    // The exact shape that used to slip through: every LIMIT 1 scan answers.
     const log: string[] = [];
     const conn = coldSnapshotConnection({ keyedReadyOnAttempt: Number.MAX_SAFE_INTEGER }, log);
 
@@ -177,7 +146,6 @@ describe("waitForSnapshotRows keyed probe (cold-snapshot zero-row race)", () => 
   }, 10000);
 
   it("resolves once the keyed lookup starts answering", async () => {
-    // The snapshot warms up between attempts; readiness must retry, not fail.
     const log: string[] = [];
     const conn = coldSnapshotConnection({ keyedReadyOnAttempt: 2 }, log);
 
@@ -209,7 +177,6 @@ describe("waitForSnapshotRows keyed probe (cold-snapshot zero-row race)", () => 
     const conn = {
       query: async (sql: string) => {
         log.push(sql);
-        // Every scan answers except the ordered probe, which comes back empty.
         if (/COUNT\(\*\)/i.test(sql)) return { toArray: () => [{ n: 1 }] };
         if (/ORDER BY result_id DESC/.test(sql)) return { toArray: () => [] };
         return { toArray: () => [{ result_id: "r1" }] };
@@ -224,8 +191,6 @@ describe("waitForSnapshotRows keyed probe (cold-snapshot zero-row race)", () => 
 
 describe("waitForSnapshotRows completeness probe (partially readable snapshot)", () => {
   it("rejects while a table materializes fewer rows than COUNT(*) reports", async () => {
-    // The state that made Compare fail: unkeyed scans and a single keyed probe
-    // both succeed, but most rows are still unreadable.
     const log: string[] = [];
     const conn = partiallyReadableConnection(
       { total: 10, visible: 3, readyOnAttempt: Number.MAX_SAFE_INTEGER },
@@ -245,12 +210,6 @@ describe("waitForSnapshotRows completeness probe (partially readable snapshot)",
   }, 10000);
 });
 
-// ---------------------------------------------------------------------------
-// Cold empty-read retry. Readiness gating alone cannot close this race:
-// readability is not monotonic per query, so a surface that reads a range no
-// probe forced still gets zero rows. The retry therefore lives at the read.
-// ---------------------------------------------------------------------------
-
 describe("shouldRetryColdEmptyRead", () => {
   const READY_AT = 1_000_000;
 
@@ -259,7 +218,6 @@ describe("shouldRetryColdEmptyRead", () => {
   });
 
   it("believes an empty read once the window has passed", () => {
-    // A genuinely missing id must stay fast — no retry cost on not-found.
     expect(shouldRetryColdEmptyRead(1, READY_AT + 60_000, READY_AT)).toBe(false);
   });
 
@@ -295,28 +253,10 @@ describe("shouldRetryTransientQueryError", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// duckdb-wasm's `AsyncDuckDB` bridge (`onError` in
-// `@duckdb/duckdb-wasm/dist/duckdb-browser.mjs`) responds to an uncaught
-// worker exception — e.g. the `RangeError: offset is out of bounds` this
-// module already classifies as transient — by clearing its pending-request
-// map without ever resolving or rejecting the promises in it. A `conn.query`
-// call caught by that never settles, so anything built on `await`ing it
-// (this readiness ladder included) hangs forever: no rejection ever reaches
-// the retry loop's `catch`, so the retry budget below never runs and the
-// page's loading state never clears, even across re-navigation.
-//
-// This is exactly the failure e2e/failures/compare-hard-block.spec.ts hit in
-// CI: the page stayed on its loading skeleton through three full
-// re-navigations because nothing in this module could time out a query that
-// duckdb-wasm had silently abandoned.
-// ---------------------------------------------------------------------------
 describe("a query the worker never answers (dropped-pending-request hang)", () => {
   it("times out instead of hanging forever, and the timeout is classified as retryable", async () => {
     vi.useFakeTimers();
     try {
-      // Simulates duckdb-wasm's onError: the query's promise is never
-      // resolved or rejected.
       const hungConn = { query: () => new Promise<never>(() => {}) };
 
       let settled = false;
@@ -331,7 +271,6 @@ describe("a query the worker never answers (dropped-pending-request hang)", () =
         },
       );
 
-      // Comfortably past 8 attempts of (query timeout + backoff).
       await vi.advanceTimersByTimeAsync(60_000);
 
       expect(settled).toBe(true);

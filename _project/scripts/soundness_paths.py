@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Data-backed soundness-path predicate shared by CI and local tooling."""
 
 from __future__ import annotations
 
@@ -19,6 +18,9 @@ DATA_PATH = Path(
     )
 )
 _VALID_KINDS = {"file", "glob", "prefix", "regex"}
+
+
+CLI_DESCRIPTION = "Data-backed soundness-path predicate shared by CI and local tooling."
 
 
 @dataclass(frozen=True)
@@ -64,12 +66,10 @@ OVERRIDE_FILES_GLOB = next(
 
 
 def normalize_path(path: str) -> str:
-    """Normalize a git path for predicate checks."""
     return path.strip().replace("\\", "/")
 
 
 def surface_invariant_violations() -> list[str]:
-    """Name malformed soundness-surface entries, if any."""
     return [
         f"SOUNDNESS_PREFIXES entry {prefix!r} must end with '/' (exact files belong in SOUNDNESS_FILES)"
         for prefix in SOUNDNESS_PREFIXES
@@ -78,7 +78,6 @@ def surface_invariant_violations() -> list[str]:
 
 
 def is_soundness_path(path: str) -> bool:
-    """Return True when *path* needs external review before auto-merge."""
     normalized = normalize_path(path)
     if not normalized:
         return False
@@ -91,19 +90,17 @@ def is_soundness_path(path: str) -> bool:
 
 
 def _glob_matches(path: str, pattern: str) -> bool:
-    """Match CODEOWNERS-style ``**/`` globs with zero or more directories."""
     return fnmatch.fnmatchcase(path, pattern) or (
         "/**/" in pattern and fnmatch.fnmatchcase(path, pattern.replace("/**/", "/"))
     )
 
 
 def any_soundness_path(paths: Iterable[str]) -> bool:
-    """Return True if any path intersects the review-required soundness surface."""
     return any(is_soundness_path(path) for path in paths)
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--stdin", action="store_true", help="Read newline-delimited paths from stdin.")
     parser.add_argument("--paths-file", help="Read newline-delimited paths from a file.")
     parser.add_argument(

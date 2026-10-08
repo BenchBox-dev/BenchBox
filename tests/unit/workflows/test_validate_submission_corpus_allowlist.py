@@ -1,12 +1,3 @@
-"""The submission workflow must reject non-data corpus paths via the allowlist.
-
-A2 corpus trust isolation adds a positive data-only allowlist gate
-(``corpus_permit_rejections`` in scripts/validate_submission.py) that refuses
-any changed corpus file that is not a supported ``.json`` data file. This suite
-pins the workflow step that feeds the PR's changed file set through the gate and
-executes the real ``run:`` block under a real shell to prove it fails closed.
-"""
-
 from __future__ import annotations
 
 import re
@@ -38,13 +29,13 @@ def test_corpus_allowlist_step_present_and_feeds_changed_paths() -> None:
 
     run = _collapse(step.get("run", ""))
     assert "--corpus-changed-paths" in run
-    assert "/tmp/corpus_changed_paths.txt" in run
+    assert '"$CORPUS_CHANGED_PATHS_FILE"' in run
+    assert "CORPUS_CHANGED_PATHS_FILE=/tmp/corpus_changed_paths.txt" in WORKFLOW_PATH.read_text(encoding="utf-8")
     assert "scripts/validate_submission.py" in run
     assert "results-data/bundles/**" in step["run"]
 
 
 def test_corpus_allowlist_step_fails_closed_on_disallowed_path(tmp_path: Path) -> None:
-    """A PR that only smuggles a non-data file under the corpus tree fails."""
     skip_without_posix_shell()
 
     script = _corpus_step()["run"]
@@ -74,7 +65,6 @@ def test_corpus_allowlist_step_fails_closed_on_disallowed_path(tmp_path: Path) -
 
 
 def test_corpus_allowlist_step_passes_for_only_supported_data(tmp_path: Path) -> None:
-    """A submission of only supported .json data files must not be blocked."""
     skip_without_posix_shell()
 
     script = _corpus_step()["run"]

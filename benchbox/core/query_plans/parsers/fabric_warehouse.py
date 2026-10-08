@@ -1,23 +1,3 @@
-"""Microsoft Fabric Warehouse query plan parser.
-
-The :class:`benchbox.platforms.fabric_warehouse.FabricWarehouseAdapter` captures
-plans with ``SET SHOWPLAN_TEXT ON``, which returns the T-SQL textual showplan: a
-``|--`` connector tree where nesting is encoded by the column at which each
-``|--Operator(arguments)`` begins::
-
-    SELECT ...
-      |--Compute Scalar(DEFINE:(...))
-           |--Hash Match(Aggregate, HASH:([l_orderkey]))
-                |--Nested Loops(Inner Join, OUTER REFERENCES:(...))
-                     |--Clustered Index Scan(OBJECT:([db].[dbo].[orders]))
-                     |--Index Seek(OBJECT:([db].[dbo].[lineitem]))
-
-This format is structurally distinct from Azure Synapse Dedicated SQL pool's
-``EXPLAIN`` XML (DSQL distributed plan), so Fabric uses this dedicated parser
-rather than reusing :class:`AzureSynapseQueryPlanParser`. ``Hash Match`` is
-disambiguated from its first argument (``Aggregate`` vs ``... Join``).
-"""
-
 from __future__ import annotations
 
 import logging
@@ -39,11 +19,6 @@ _OBJECT_RE = re.compile(r"OBJECT:\(([^)]+)\)", re.IGNORECASE)
 
 
 class FabricWarehouseQueryPlanParser(QueryPlanParser):
-    """Parser for Fabric Warehouse ``SHOWPLAN_TEXT`` ``|--`` operator trees."""
-
-    # Ordered (substring, type) pairs matched against the lower-cased operator
-    # name; first match wins. ``Hash Match`` is handled separately because its
-    # type depends on the first argument (Aggregate vs Join).
     _OPERATOR_KEYWORDS: tuple[tuple[str, LogicalOperatorType], ...] = (
         ("indexseek", LogicalOperatorType.SCAN),
         ("indexscan", LogicalOperatorType.SCAN),
@@ -90,8 +65,6 @@ class FabricWarehouseQueryPlanParser(QueryPlanParser):
         for raw in explain_output.splitlines():
             idx = raw.find(_CONNECTOR)
             if idx < 0:
-                # The leading statement-text row (and any blank rows) carry no
-                # connector; they are not plan operators.
                 continue
             content = raw[idx + len(_CONNECTOR) :].strip()
             if not content:
@@ -149,7 +122,6 @@ class FabricWarehouseQueryPlanParser(QueryPlanParser):
     @classmethod
     def _map_operator_type(cls, operator: str, args: str) -> LogicalOperatorType:
         normalized = operator.lower().replace(" ", "").replace("_", "")
-        # Hash Match is an aggregate or a join depending on its first argument.
         if "hashmatch" in normalized:
             first_arg = args.split(",", 1)[0].lower()
             if "join" in first_arg or "semi" in first_arg or "anti" in first_arg:
@@ -165,12 +137,9 @@ class FabricWarehouseQueryPlanParser(QueryPlanParser):
         match = _OBJECT_RE.search(args)
         if not match:
             return None
-        # OBJECT:([db].[schema].[table].[index]) — take the bracketed parts and
-        # drop a trailing index name, returning the schema-qualified table.
         parts = re.findall(r"\[([^\]]+)\]", match.group(1))
         if not parts:
             return match.group(1).strip()
-        # Heuristic: db.schema.table[.index] -> keep up to the table component.
         if len(parts) >= 3:
             return ".".join(parts[1:3])
         return ".".join(parts)

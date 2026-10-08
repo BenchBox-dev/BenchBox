@@ -1,37 +1,6 @@
-"""Microsoft Fabric Warehouse platform adapter with OneLake integration.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-IMPORTANT LIMITATIONS:
-    This adapter ONLY supports Microsoft Fabric **Warehouse** items.
-    It does NOT support Fabric Lakehouse (which requires Spark for data loading).
-
-    Fabric has two primary data storage items:
-    - **Warehouse**: Full T-SQL DDL/DML support (this adapter)
-    - **Lakehouse**: SQL Analytics Endpoint is READ-ONLY (not supported)
-
-    For Lakehouse benchmarking, you would need Spark integration via Livy API,
-    which is not currently implemented.
-
-Key differences from Azure Synapse:
-    - Entra ID authentication only (no SQL auth)
-    - OneLake as unified storage layer (not Azure Blob directly)
-    - Automatic distribution management (no user-specified distribution keys)
-    - Delta Lake native format
-    - Same-region connections required (cross-region not supported)
-
-Billing Model:
-    Fabric uses Capacity Units (CUs) for billing. This adapter does not
-    currently integrate with Fabric's capacity management APIs for:
-    - CU consumption monitoring
-    - Pause/Resume capacity (cost optimization)
-    - Cost estimation
-
-    For cost optimization, consider using Azure Automation or Logic Apps
-    to pause capacity during non-benchmark periods.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -55,10 +24,8 @@ from ..utils.file_format import is_parquet_format
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import NO_BENCHMARK, DataSource, resolve_csv_dialect
 
-# Microsoft Fabric uses T-SQL dialect (subset of SQL Server T-SQL)
 FABRIC_DIALECT = "tsql"
 
-# ODBC constant for access token authentication
 _SQL_COPT_SS_ACCESS_TOKEN = 1256
 
 try:
@@ -68,44 +35,16 @@ except ImportError:
 
 
 class FabricWarehouseAdapter(PlatformAdapter):
-    """Microsoft Fabric Warehouse platform adapter with OneLake integration.
-
-    IMPORTANT: This adapter ONLY supports Fabric Warehouse items.
-    Fabric Lakehouse uses a READ-ONLY SQL Analytics Endpoint and requires
-    Spark for data loading, which is not supported by this adapter.
-
-    Supports Microsoft Fabric Warehouse with:
-        - Entra ID authentication (service principal or default credential)
-        - OneLake integration for data staging and loading
-        - COPY INTO for bulk data ingestion
-        - T-SQL dialect with Fabric-specific limitations
-
-    Known Limitations:
-        - Lakehouse not supported (requires Spark)
-        - Cross-region connections not supported
-        - No capacity/billing integration
-        - No V-Order optimization (Spark-only feature)
-
-    Example:
-        >>> adapter = FabricWarehouseAdapter(
-        ...     workspace="my-workspace-guid",
-        ...     warehouse="my_warehouse",
-        ...     auth_method="default_credential",
-        ... )
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
-    # Fabric item type this adapter supports
     SUPPORTED_ITEM_TYPE = "Warehouse"
     UNSUPPORTED_ITEM_TYPES = ["Lakehouse", "KQL Database", "Mirrored Database"]
 
     def __init__(self, **config):
         super().__init__(**config)
 
-        # Check dependencies with improved error message
         available, missing = check_platform_dependencies("fabric_dw")
         if not available:
             error_msg = get_dependency_error_message("fabric_dw", missing)
@@ -113,15 +52,12 @@ class FabricWarehouseAdapter(PlatformAdapter):
 
         self._dialect = FABRIC_DIALECT
 
-        # Microsoft Fabric connection configuration
-        # Endpoint format: {workspace-guid}.datawarehouse.fabric.microsoft.com
         self.server = config.get("server")
-        self.workspace = config.get("workspace")  # Workspace name or GUID
-        self.warehouse = config.get("warehouse")  # Warehouse item name
-        self.database = config.get("database")  # Alias for warehouse
+        self.workspace = config.get("workspace")
+        self.warehouse = config.get("warehouse")
+        self.database = config.get("database")
         self.port = config.get("port") if config.get("port") is not None else 1433
 
-        # Fabric item type - only Warehouse is supported
         self.item_type = config.get("item_type", "Warehouse")
         if self.item_type != "Warehouse":
             warnings.warn(
@@ -133,39 +69,28 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 stacklevel=2,
             )
 
-        # Use warehouse as database if database not specified
         if not self.database and self.warehouse:
             self.database = self.warehouse
 
-        # Authentication - Fabric ONLY supports Entra ID
-        # Options: "service_principal", "default_credential", "interactive"
         self.auth_method = config.get("auth_method") or "default_credential"
         self.tenant_id = config.get("tenant_id")
         self.client_id = config.get("client_id")
         self.client_secret = config.get("client_secret")
 
-        # ODBC driver configuration - MUST be version 18+
         self.driver = config.get("driver") or "ODBC Driver 18 for SQL Server"
 
-        # Schema configuration
         self.schema = config.get("schema") or "dbo"
 
-        # Connection settings
         self.connect_timeout = config.get("connect_timeout") if config.get("connect_timeout") is not None else 30
         self.query_timeout = config.get("query_timeout") if config.get("query_timeout") is not None else 0
 
-        # OneLake storage configuration for data loading
-        # OneLake URI: https://onelake.dfs.fabric.microsoft.com/{workspace}/{item}.Warehouse/Files/
         self.onelake_workspace = config.get("onelake_workspace") or self.workspace
         self.staging_path = config.get("staging_path") or "benchbox-staging"
 
-        # Result cache control - disable by default for accurate benchmarking
         self.disable_result_cache = config.get("disable_result_cache", True)
 
-        # Validation strictness
         self.strict_validation = config.get("strict_validation", True)
 
-        # Validate configuration
         if not self.server and not self.workspace:
             from benchbox.core.exceptions import ConfigurationError
 
@@ -199,8 +124,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 "Alternative: Use --platform-option auth_method=default_credential for Azure CLI/managed identity."
             )
 
-        # Build server endpoint if only workspace provided
-        # Note: This pattern is ONLY valid for Warehouse items
         if not self.server and self.workspace:
             self.server = f"{self.workspace}.datawarehouse.fabric.microsoft.com"
             self.logger.debug(
@@ -220,7 +143,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 "Find your warehouse name in the Fabric portal under your workspace."
             )
 
-        # Log important limitations
         self.logger.info(
             "FabricWarehouseAdapter initialized. Note: Only Warehouse items supported. "
             "Lakehouse (requires Spark) and cross-region connections are NOT supported."
@@ -231,12 +153,10 @@ class FabricWarehouseAdapter(PlatformAdapter):
         return "Fabric Warehouse"
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Microsoft Fabric (T-SQL subset)."""
         return FABRIC_DIALECT
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add Fabric Warehouse-specific CLI arguments."""
         fabric_group = parser.add_argument_group("Fabric Warehouse Arguments")
         fabric_group.add_argument(
             "--server",
@@ -264,7 +184,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create Fabric Warehouse adapter from unified configuration."""
         from benchbox.platforms.base.config_utils import build_adapter_config
 
         adapter_source = config
@@ -298,11 +217,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
         )
 
     def _get_access_token(self) -> str:
-        """Acquire Entra ID access token for SQL connection.
-
-        Returns:
-            Access token string for database authentication.
-        """
         try:
             from azure.identity import (
                 ClientSecretCredential,
@@ -316,7 +230,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 )
             ) from err
 
-        # SQL Database scope for Fabric
         scope = "https://database.windows.net/.default"
 
         if self.auth_method == "service_principal":
@@ -327,24 +240,15 @@ class FabricWarehouseAdapter(PlatformAdapter):
             )
         elif self.auth_method == "interactive":
             credential = InteractiveBrowserCredential()
-        else:  # default_credential
+        else:
             credential = DefaultAzureCredential()
 
         token = credential.get_token(scope)
         return token.token
 
     def _get_connection_string(self, db: str | None = None) -> str:
-        """Generate ODBC connection string for Fabric Warehouse.
-
-        Args:
-            db: Optional database name override.
-
-        Returns:
-            ODBC connection string.
-        """
         database = db or self.database
 
-        # Base connection string - Fabric requires encrypted connections
         conn_str = (
             f"DRIVER={{{self.driver}}};"
             f"SERVER={self.server},{self.port};"
@@ -357,42 +261,16 @@ class FabricWarehouseAdapter(PlatformAdapter):
         return conn_str
 
     def _create_token_struct(self, token: str) -> bytes:
-        """Create token struct for pyodbc SQL_COPT_SS_ACCESS_TOKEN.
-
-        Args:
-            token: Access token string.
-
-        Returns:
-            Bytes struct for ODBC driver.
-        """
-        # Encode token as UTF-16-LE for SQL Server ODBC driver
         token_bytes = token.encode("UTF-16-LE")
-        # Create struct: length (4 bytes) + token bytes
         return struct.pack(f"<I{len(token_bytes)}s", len(token_bytes), token_bytes)
 
     def create_connection(self, **connection_config) -> Any:
-        """Create a connection to Fabric Warehouse.
-
-        Note: This only works with Warehouse items. Lakehouse SQL Analytics
-        Endpoints are READ-ONLY and will fail on DDL/DML operations.
-
-        Args:
-            **connection_config: Optional connection overrides.
-
-        Returns:
-            Active database connection.
-
-        Raises:
-            ConnectionError: If connection fails.
-        """
         db = connection_config.get("database", self.database)
 
         try:
-            # Get access token
             access_token = self._get_access_token()
             token_struct = self._create_token_struct(access_token)
 
-            # Create connection with token
             conn_str = self._get_connection_string(db)
 
             connection = pyodbc.connect(
@@ -401,7 +279,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 autocommit=True,
             )
 
-            # Test connection
             cursor = connection.cursor()
             cursor.execute("SELECT @@VERSION")
             version = cursor.fetchone()[0]
@@ -414,7 +291,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
             error_msg = str(e)
             self.logger.error(f"Failed to connect to Fabric Warehouse: {error_msg}")
 
-            # Check for common errors and provide helpful messages
             if "cross-region" in error_msg.lower() or "region" in error_msg.lower():
                 self.logger.error(
                     "HINT: Fabric requires same-region connections. "
@@ -429,24 +305,16 @@ class FabricWarehouseAdapter(PlatformAdapter):
             raise ConnectionError(f"Failed to connect to Fabric Warehouse: {error_msg}") from e
 
     def test_connection(self) -> dict[str, Any]:
-        """Test connection to Fabric Warehouse.
-
-        Returns:
-            Dict with connection status and info.
-        """
         try:
             connection = self.create_connection()
             cursor = connection.cursor()
 
-            # Get version info
             cursor.execute("SELECT @@VERSION")
             version = cursor.fetchone()[0]
 
-            # Test basic query capability
             cursor.execute("SELECT 1 AS test")
             cursor.fetchone()
 
-            # Test write capability (critical for Warehouse vs Lakehouse distinction)
             try:
                 cursor.execute("CREATE TABLE #benchbox_test_temp (id INT)")
                 cursor.execute("DROP TABLE #benchbox_test_temp")
@@ -479,14 +347,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
             }
 
     def check_server_database_exists(self) -> bool:
-        """Check if the Fabric Warehouse exists.
-
-        Note: In Fabric, warehouses are created through the Fabric portal,
-        not via T-SQL. This checks if we can connect to the specified warehouse.
-
-        Returns:
-            True if connection successful, False otherwise.
-        """
         try:
             connection = self.create_connection()
             connection.close()
@@ -496,11 +356,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
             return False
 
     def get_platform_info(self) -> dict[str, Any]:
-        """Get Fabric Warehouse platform information.
-
-        Returns:
-            Dict with platform details.
-        """
         info = {
             "platform": "Fabric Warehouse",
             "dialect": FABRIC_DIALECT,
@@ -522,7 +377,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
             connection = self.create_connection()
             cursor = connection.cursor()
 
-            # Get version
             cursor.execute("SELECT @@VERSION")
             info["version"] = cursor.fetchone()[0]
 
@@ -534,25 +388,12 @@ class FabricWarehouseAdapter(PlatformAdapter):
         return info
 
     def create_schema(self, benchmark: Any, connection: Any) -> float:
-        """Create schema using Fabric Warehouse table definitions.
-
-        Note: This uses T-SQL DDL which ONLY works on Fabric Warehouse items.
-        Lakehouse SQL Analytics Endpoints are READ-ONLY and this will fail.
-
-        Args:
-            benchmark: Benchmark instance with schema definitions.
-            connection: Active database connection.
-
-        Returns:
-            Time taken for schema creation in seconds.
-        """
         self.log_operation_start("Fabric Warehouse schema creation")
         start_time = mono_time()
 
         cursor = connection.cursor()
 
         try:
-            # Create schema if needed (non-dbo schemas)
             if self.schema and self.schema.lower() != "dbo":
                 self.log_verbose(f"Creating schema: {self.schema}")
                 cursor.execute(
@@ -564,28 +405,22 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 """
                 )
 
-            # Use common schema creation helper
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
-            # Split schema into individual statements and execute
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
             for statement in statements:
                 if not statement.upper().startswith("CREATE TABLE"):
                     continue
 
-                # Extract table name
                 table_name = self._extract_table_name(statement)
                 if not table_name:
                     continue
 
-                # Optimize for Fabric
                 optimized_sql = self._optimize_table_definition(statement)
 
-                # Drop existing table if needed
                 self.drop_table(connection, table_name)
 
-                # Create table
                 self.log_verbose(f"Creating table: {table_name}")
                 cursor.execute(optimized_sql)
 
@@ -607,26 +442,17 @@ class FabricWarehouseAdapter(PlatformAdapter):
         return elapsed
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str = "olap") -> None:
-        """Configure Fabric Warehouse for benchmark execution.
-
-        Args:
-            connection: Database connection.
-            benchmark_type: Type of benchmark (olap, analytics, tpch, tpcds).
-        """
         if benchmark_type.lower() in ["olap", "analytics", "tpch", "tpcds"]:
             try:
                 cursor = connection.cursor()
 
-                # Disable result set caching for accurate benchmarking
                 if self.disable_result_cache:
                     try:
                         cursor.execute("ALTER DATABASE SCOPED CONFIGURATION SET QUERY_STORE CLEAR")
                         self.logger.info("Cleared query store for accurate benchmarking")
                     except pyodbc.Error:
-                        # Query store control may not be available in Fabric
                         self.logger.debug("Query store control not available")
 
-                # Set ANSI standards
                 cursor.execute("SET ANSI_NULLS ON")
                 cursor.execute("SET ANSI_PADDING ON")
                 cursor.execute("SET ANSI_WARNINGS ON")
@@ -645,25 +471,12 @@ class FabricWarehouseAdapter(PlatformAdapter):
         stream_id: int | None = None,
         iteration: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a query and return timing/results.
-
-        Args:
-            connection: Active database connection.
-            query: SQL query to execute.
-            query_id: Optional query identifier.
-            stream_id: Optional stream ID for throughput testing.
-            iteration: Optional iteration number.
-
-        Returns:
-            Dict with execution results.
-        """
         cursor = connection.cursor()
         start_time = mono_time()
 
         try:
             cursor.execute(query)
 
-            # Fetch results to ensure query completes
             rows = cursor.fetchall()
             row_count = len(rows)
 
@@ -693,22 +506,11 @@ class FabricWarehouseAdapter(PlatformAdapter):
         finally:
             cursor.close()
 
-        # Capture and merge the structured query plan (SUCCESS-guarded in the
-        # helper). Outside the try so a strict-mode PlanCaptureError propagates
-        # rather than being masked as a query failure.
         self._merge_plan_capture_into_result(result_dict, connection, query, query_id)
 
         return result_dict
 
     def get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables in the schema.
-
-        Args:
-            connection: Active database connection.
-
-        Returns:
-            List of table names.
-        """
         cursor = connection.cursor()
         try:
             cursor.execute(
@@ -727,12 +529,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
             cursor.close()
 
     def drop_table(self, connection: Any, table_name: str) -> None:
-        """Drop a table if it exists.
-
-        Args:
-            connection: Active database connection.
-            table_name: Name of table to drop.
-        """
         qualified_name = f"[{self.schema}].[{table_name}]"
         cursor = connection.cursor()
         try:
@@ -742,15 +538,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
             cursor.close()
 
     def _upload_to_onelake(self, local_path: Path, table_name: str) -> str:
-        """Upload file to OneLake for COPY INTO.
-
-        Args:
-            local_path: Path to local data file.
-            table_name: Target table name (used for staging path).
-
-        Returns:
-            OneLake URI for the uploaded file.
-        """
         try:
             from azure.identity import ClientSecretCredential, DefaultAzureCredential
             from azure.storage.filedatalake import DataLakeServiceClient
@@ -762,7 +549,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 )
             ) from err
 
-        # Create credential
         if self.auth_method == "service_principal":
             credential = ClientSecretCredential(
                 tenant_id=self.tenant_id,
@@ -772,23 +558,17 @@ class FabricWarehouseAdapter(PlatformAdapter):
         else:
             credential = DefaultAzureCredential()
 
-        # Connect to OneLake
         account_url = "https://onelake.dfs.fabric.microsoft.com"
         service_client = DataLakeServiceClient(account_url, credential=credential)
 
-        # Get file system client for workspace
         file_system_client = service_client.get_file_system_client(self.onelake_workspace)
 
-        # Build path: {warehouse}.Warehouse/Files/{staging_path}/{table}/{filename}
-        # Note: Warehouse uses .Warehouse suffix; Lakehouse would use .Lakehouse
         warehouse_path = f"{self.database}.Warehouse/Files/{self.staging_path}/{table_name}"
         directory_client = file_system_client.get_directory_client(warehouse_path)
 
-        # Create directory if needed (may already exist)
         with contextlib.suppress(Exception):
             directory_client.create_directory()
 
-        # Upload file
         file_name = local_path.name
         file_client = directory_client.get_file_client(file_name)
 
@@ -797,13 +577,10 @@ class FabricWarehouseAdapter(PlatformAdapter):
 
         self.logger.debug(f"Uploaded {file_name} to OneLake: {warehouse_path}/{file_name}")
 
-        # Return OneLake URI for COPY INTO
-        # Format: https://onelake.dfs.fabric.microsoft.com/{workspace}/{warehouse}.Warehouse/Files/...
         onelake_uri = f"https://onelake.dfs.fabric.microsoft.com/{self.onelake_workspace}/{warehouse_path}/{file_name}"
         return onelake_uri
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> DataSource:
-        """Resolve benchmark data files via DataSourceResolver."""
         from benchbox.platforms.base.data_loading import DataSourceResolver
 
         resolver = DataSourceResolver(
@@ -819,7 +596,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
 
     @staticmethod
     def _normalize_existing_files(file_paths: Any) -> list[Path]:
-        """Normalize table file inputs to existing, non-empty local paths."""
         normalized_paths = file_paths if isinstance(file_paths, list) else [file_paths]
         valid_files: list[Path] = []
         for file_path in normalized_paths:
@@ -834,28 +610,11 @@ class FabricWarehouseAdapter(PlatformAdapter):
         connection: Any,
         data_dir: Path,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load benchmark data into Fabric Warehouse.
-
-        Uses OneLake + COPY INTO for optimal performance, with fallback to
-        direct INSERT for smaller datasets or when OneLake is unavailable.
-
-        Note: This uses T-SQL DML which ONLY works on Fabric Warehouse items.
-        Lakehouse requires Spark for data loading.
-
-        Args:
-            benchmark: Benchmark instance with table definitions.
-            connection: Active database connection.
-            data_dir: Directory containing data files.
-
-        Returns:
-            Tuple of (table_stats, elapsed_time, metadata).
-        """
         self.log_operation_start("Fabric Warehouse data loading")
         start_time = mono_time()
         table_stats: dict[str, int] = {}
         data_source = self._resolve_data_files(benchmark, data_dir)
 
-        # Try OneLake + COPY INTO first (can be disabled via config)
         use_onelake = getattr(self, "use_onelake", True)
 
         for table_name, file_paths in data_source.tables.items():
@@ -887,7 +646,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
 
                 self.logger.error(f"Failed to load {table_name}: {str(e)[:100]}...")
                 if use_onelake:
-                    # Fallback to direct INSERT
                     try:
                         self.logger.info(f"Falling back to direct INSERT for {table_name}")
                         row_count = self._load_data_direct(connection, table_name, data_files, data_source, benchmark)
@@ -905,7 +663,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
         elapsed = elapsed_seconds(start_time)
         self.log_operation_complete(f"Data loading completed in {elapsed:.2f}s")
 
-        # Return tuple matching abstract method signature
         return table_stats, elapsed, None
 
     def _load_data_via_onelake(
@@ -916,16 +673,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
         data_source: DataSource | None = None,
         benchmark: Any = None,
     ) -> int:
-        """Load data via OneLake and COPY INTO.
-
-        Args:
-            connection: Active database connection.
-            table_name: Target table name.
-            data_files: List of data files to load.
-
-        Returns:
-            Number of rows loaded.
-        """
         total_rows = 0
         qualified_table = f"[{self.schema}].[{table_name}]"
         cursor = connection.cursor()
@@ -937,10 +684,8 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 if data_file.stat().st_size == 0:
                     continue
 
-                # Upload to OneLake
                 onelake_uri = self._upload_to_onelake(data_file, table_name)
 
-                # Determine file format and delimiter via resolver
                 if is_parquet_format(data_file):
                     file_type = "PARQUET"
                     field_terminator = None
@@ -949,7 +694,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
                     file_type = "CSV"
                     field_terminator = dialect.delimiter
 
-                # Build COPY INTO command
                 if file_type == "PARQUET":
                     copy_sql = f"""
                         COPY INTO {qualified_table}
@@ -975,7 +719,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 cursor.execute(copy_sql)
                 load_time = elapsed_seconds(start_time)
 
-                # Get row count
                 cursor.execute(f"SELECT COUNT(*) FROM {qualified_table}")
                 current_count = cursor.fetchone()[0]
                 rows_added = current_count - total_rows
@@ -998,18 +741,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
         data_source: DataSource | None = None,
         benchmark: Any = None,
     ) -> int:
-        """Load data via direct INSERT statements.
-
-        Fallback method when OneLake is not available.
-
-        Args:
-            connection: Active database connection.
-            table_name: Target table name.
-            data_files: List of data files to load.
-
-        Returns:
-            Number of rows loaded.
-        """
         import csv
 
         total_rows = 0
@@ -1024,7 +755,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 if data_file.stat().st_size == 0:
                     continue
 
-                # Determine delimiter via resolver
                 dialect = resolve_csv_dialect(ds, table_name, data_file, bm)
                 delimiter = dialect.delimiter
 
@@ -1033,11 +763,9 @@ class FabricWarehouseAdapter(PlatformAdapter):
                     batch = []
 
                     for row in reader:
-                        # Skip empty rows
                         if not row or (len(row) == 1 and not row[0].strip()):
                             continue
 
-                        # Clean values and handle trailing delimiter
                         values = [v.strip() for v in row if v.strip() or row.index(v) < len(row) - 1]
                         if values:
                             batch.append(values)
@@ -1047,7 +775,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
                             total_rows += len(batch)
                             batch = []
 
-                    # Insert remaining rows
                     if batch:
                         self._insert_batch(cursor, qualified_table, batch)
                         total_rows += len(batch)
@@ -1058,17 +785,9 @@ class FabricWarehouseAdapter(PlatformAdapter):
         return total_rows
 
     def _insert_batch(self, cursor: Any, table_name: str, batch: list[list[str]]) -> None:
-        """Insert a batch of rows using INSERT VALUES.
-
-        Args:
-            cursor: Database cursor.
-            table_name: Qualified table name.
-            batch: List of row value lists.
-        """
         if not batch:
             return
 
-        # Build multi-row INSERT
         value_rows = []
         for row in batch:
             escaped_values = []
@@ -1076,7 +795,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 if v == "" or v.upper() == "NULL":
                     escaped_values.append("NULL")
                 else:
-                    # Escape single quotes
                     escaped = v.replace("'", "''")
                     escaped_values.append(f"'{escaped}'")
             value_rows.append(f"({', '.join(escaped_values)})")
@@ -1085,15 +803,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
         cursor.execute(insert_sql)
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get query execution plan.
-
-        Args:
-            connection: Active database connection.
-            query: SQL query to analyze.
-
-        Returns:
-            Query plan as string, or None when EXPLAIN fails.
-        """
         cursor = connection.cursor()
         try:
             cursor.execute("SET SHOWPLAN_TEXT ON")
@@ -1102,8 +811,6 @@ class FabricWarehouseAdapter(PlatformAdapter):
                 plan_rows = cursor.fetchall()
                 return "\n".join([str(row[0]) for row in plan_rows])
             finally:
-                # Always turn SHOWPLAN off, even on failure, so subsequent
-                # benchmark statements execute normally rather than returning plans.
                 try:
                     cursor.execute("SET SHOWPLAN_TEXT OFF")
                 except Exception:
@@ -1115,22 +822,11 @@ class FabricWarehouseAdapter(PlatformAdapter):
             cursor.close()
 
     def get_query_plan_parser(self):
-        """Get Fabric Warehouse query plan parser."""
         from benchbox.core.query_plans.parsers.fabric_warehouse import FabricWarehouseQueryPlanParser
 
         return FabricWarehouseQueryPlanParser()
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Update table statistics.
-
-        Args:
-            connection: Active database connection.
-            table_name: Name of table to analyze.
-
-        Raises on failure (does not swallow) so the opt-in statistics phase's
-        gather_statistics() -> run_statistics_phase() caller can detect and
-        record a real failure as status=FAILED.
-        """
         cursor = connection.cursor()
         try:
             cursor.execute(f"UPDATE STATISTICS [{self.schema}].[{table_name}]")
@@ -1139,22 +835,11 @@ class FabricWarehouseAdapter(PlatformAdapter):
             cursor.close()
 
     def close_connection(self, connection: Any) -> None:
-        """Close database connection.
-
-        Args:
-            connection: Connection to close.
-        """
         if connection:
             with contextlib.suppress(Exception):
                 connection.close()
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
-        """Apply Fabric Warehouse-specific platform optimizations.
-
-        Args:
-            platform_config: Platform optimization configuration.
-            connection: Active database connection.
-        """
         if not platform_config:
             return
 
@@ -1172,33 +857,9 @@ class FabricWarehouseAdapter(PlatformAdapter):
         table_tuning: Any,
         _constraint_configs: tuple[Any, Any, Any] | None = None,
     ) -> str:
-        """Generate tuning clause for CREATE TABLE.
-
-        In Fabric Warehouse, distribution is automatic. Only clustered
-        columnstore index is relevant.
-
-        Args:
-            table_tuning: TableTuning configuration.
-            constraint_configs: Optional constraint configurations.
-
-        Returns:
-            WITH clause for CREATE TABLE.
-        """
-        # Fabric uses clustered columnstore index by default
-        # No explicit WITH clause needed for most cases
         return ""
 
     def _optimize_table_definition(self, table_sql: str, table_tuning: Any = None) -> str:
-        """Optimize table definition for Fabric Warehouse.
-
-        Args:
-            table_sql: Original CREATE TABLE statement.
-            table_tuning: Optional tuning configuration.
-
-        Returns:
-            Optimized CREATE TABLE statement.
-        """
-        # Add schema prefix if not present
         if "[" not in table_sql and self.schema:
             schema = self.schema
 
@@ -1218,21 +879,9 @@ class FabricWarehouseAdapter(PlatformAdapter):
         return table_sql
 
     def _extract_table_name(self, create_statement: str) -> str | None:
-        """Extract table name from CREATE TABLE statement.
-
-        Args:
-            create_statement: SQL CREATE TABLE statement.
-
-        Returns:
-            Table name or None.
-        """
         match = re.search(
             r"CREATE\s+TABLE\s+(?:\[?\w+\]?\.)?\[?(\w+)\]?",
             create_statement,
             re.IGNORECASE,
         )
         return match.group(1) if match else None
-
-
-# Note: Adapter registration is handled centrally in benchbox/core/platform_registry.py
-# The canonical platform name is "fabric-warehouse"

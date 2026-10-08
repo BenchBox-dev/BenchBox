@@ -1,9 +1,6 @@
-"""Tests for benchbox.cli.commands.tuning_group CLI commands via CliRunner.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -17,11 +14,6 @@ from click.testing import CliRunner
 from benchbox.cli.commands.tuning_group import tuning_group
 from benchbox.cli.config import ConfigManager
 
-# benchbox.cli.commands.__init__ re-exports `tuning_group` (a Click Command)
-# under the same name as the tuning_group submodule.  On Python 3.10 mock's
-# string-based patch() resolves via getattr(benchbox.cli.commands,
-# "tuning_group"), returning the Command, not the submodule.  Seeding
-# sys.modules here avoids the ambiguity on all Python versions.
 __import__("benchbox.cli.commands.tuning_group")
 _tuning_group_module = _sys.modules["benchbox.cli.commands.tuning_group"]
 
@@ -436,7 +428,7 @@ class TestTuningShow:
         config_file.write_text("platform: duckdb\n")
         runner = CliRunner()
         mock_resolution = MagicMock()
-        mock_resolution.config_file = None  # no file to load
+        mock_resolution.config_file = None
         with (
             patch.object(_tuning_group_module, "console"),
             patch.object(_tuning_group_module, "display_tuning_show") as mock_show,

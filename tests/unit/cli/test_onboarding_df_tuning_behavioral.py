@@ -1,5 +1,3 @@
-"""Behavioral tests for onboarding and the DataFrame tuning profile helper."""
-
 from __future__ import annotations
 
 import sys
@@ -38,10 +36,7 @@ pytestmark = [
 
 
 class TestFirstRunOnboarding:
-    """Tests for first-run onboarding behavior."""
-
     def test_non_interactive_terminal_skips_onboarding(self):
-        """Onboarding should not run in non-interactive contexts."""
         with (
             patch.object(sys.stdin, "isatty", return_value=False),
             patch.object(sys.stdout, "isatty", return_value=False),
@@ -49,7 +44,6 @@ class TestFirstRunOnboarding:
             assert check_and_run_first_time_setup() is False
 
     def test_first_run_creates_marker_and_runs_tour(self, tmp_path: Path):
-        """First interactive run should create marker and offer the tour."""
         marker_path = tmp_path / "first_run_complete"
 
         with (
@@ -67,7 +61,6 @@ class TestFirstRunOnboarding:
         mock_tour.assert_called_once()
 
     def test_existing_marker_skips_first_run_flow(self, tmp_path: Path):
-        """Existing marker should short-circuit the onboarding flow."""
         marker_path = tmp_path / "first_run_complete"
         marker_path.parent.mkdir(parents=True, exist_ok=True)
         marker_path.write_text("done\n", encoding="utf-8")
@@ -83,7 +76,6 @@ class TestFirstRunOnboarding:
         mock_welcome.assert_not_called()
 
     def test_interactive_tour_stops_when_user_declines_next_step(self):
-        """The tour should stop at the first declined continuation prompt."""
         with (
             patch("benchbox.cli.onboarding._show_key_concepts") as show_key,
             patch("benchbox.cli.onboarding._show_benchmarks_overview") as show_benchmarks,
@@ -99,7 +91,6 @@ class TestFirstRunOnboarding:
         show_scale.assert_not_called()
 
     def test_interactive_tour_stops_after_benchmarks_overview_when_second_prompt_declined(self):
-        """Declining after the benchmarks overview should stop before tuning mode guidance."""
         with (
             patch("benchbox.cli.onboarding._show_key_concepts") as show_key,
             patch("benchbox.cli.onboarding._show_benchmarks_overview") as show_benchmarks,
@@ -115,7 +106,6 @@ class TestFirstRunOnboarding:
         show_scale.assert_not_called()
 
     def test_interactive_tour_stops_after_tuning_modes_when_third_prompt_declined(self):
-        """Declining before the scale factor step should still execute the tuning mode panel."""
         with (
             patch("benchbox.cli.onboarding._show_key_concepts") as show_key,
             patch("benchbox.cli.onboarding._show_benchmarks_overview") as show_benchmarks,
@@ -131,7 +121,6 @@ class TestFirstRunOnboarding:
         show_scale.assert_not_called()
 
     def test_contextual_help_known_and_unknown_contexts(self):
-        """Known contexts render help; unknown ones remain quiet."""
         with patch("benchbox.cli.onboarding.console.print") as mock_print:
             show_contextual_help("benchmark_selection")
 
@@ -145,14 +134,12 @@ class TestFirstRunOnboarding:
         mock_print.assert_not_called()
 
     def test_first_run_marker_path_uses_home_directory(self):
-        """The first-run marker should live in ~/.benchbox."""
         with patch("benchbox.cli.onboarding.Path.home", return_value=Path("/tmp/home")):
             marker = _get_first_run_marker_path()
 
         assert marker == Path("/tmp/home/.benchbox/first_run_complete")
 
     def test_show_welcome_message_renders_getting_started_panel(self):
-        """Welcome message should render the Getting Started panel."""
         with patch("benchbox.cli.onboarding.console.print") as mock_print:
             _show_welcome_message()
 
@@ -171,7 +158,6 @@ class TestFirstRunOnboarding:
         ],
     )
     def test_onboarding_panels_render_expected_titles(self, helper, expected_title):
-        """Each onboarding helper should render its expected panel title."""
         with patch("benchbox.cli.onboarding.console.print") as mock_print:
             helper()
 
@@ -182,7 +168,6 @@ class TestFirstRunOnboarding:
         assert expected_title in panel.title
 
     def test_interactive_tour_runs_all_steps_and_completion_message(self):
-        """Accepting all prompts should run the full tour and print completion output."""
         with (
             patch("benchbox.cli.onboarding.console.print") as mock_print,
             patch("benchbox.cli.onboarding.Confirm.ask", side_effect=[True, True, True]),
@@ -203,21 +188,18 @@ class TestFirstRunOnboarding:
         ],
     )
     def test_help_content_helpers_return_expected_text(self, context: str, expected_text: str):
-        """Help text lookup should return the matching explanatory content."""
         help_text = _get_help_content(context)
 
         assert help_text is not None
         assert expected_text in help_text.plain
 
     def test_help_content_factory_functions_include_key_guidance(self):
-        """The individual help text factories should include their core guidance."""
         assert "TPC-H" in _create_benchmark_help().plain
         assert "0.01" in _create_scale_factor_help().plain
         assert "notuning" in _create_tuning_help().plain
         assert "1 stream" in _create_concurrency_help().plain
 
     def test_show_contextual_help_wraps_known_context_in_panel(self):
-        """Known help contexts should render a titled Panel."""
         with patch("benchbox.cli.onboarding.console.print") as mock_print:
             show_contextual_help("tuning_mode")
 
@@ -227,15 +209,7 @@ class TestFirstRunOnboarding:
 
 
 class TestCreateProfileConfigHelper:
-    """Tests for tuning_group._create_profile_config, used by `tuning init --mode dataframe`.
-
-    The deprecated `df-tuning` command group (which used to re-export this
-    helper) was retired by the tuning-renderer-consolidation-and-baseline-policy
-    TODO's w5; this helper itself is not deprecated and stays covered here.
-    """
-
     def test_create_profile_config_for_polars_optimized(self):
-        """Optimized Polars profile should enable lazy in-memory execution."""
         config = _create_profile_config("polars", "optimized")
 
         assert isinstance(config, DataFrameTuningConfiguration)
@@ -243,7 +217,6 @@ class TestCreateProfileConfigHelper:
         assert config.execution.engine_affinity == "in-memory"
 
     def test_create_profile_config_memory_constrained_dask(self):
-        """Memory-constrained Dask profile should spill and limit memory."""
         config = _create_profile_config("dask", "memory-constrained")
 
         assert config.execution.streaming_mode is True
@@ -256,7 +229,6 @@ class TestCreateProfileConfigHelper:
         assert config.parallelism.thread_count == 4
 
     def test_create_profile_config_gpu_warns_for_non_cudf(self):
-        """GPU profile should still enable GPU config and warn for non-cuDF platforms."""
         with patch.object(_tuning_group_module.console, "print") as mock_print:
             config = _create_profile_config("polars", "gpu")
 

@@ -1,9 +1,3 @@
-"""Coverage tests for dataframe query and operations modules (w7).
-
-Tests representative query builder behaviour using PolarsDataFrameAdapter for
-expression queries, and verifies AI/Metadata primitives APIs.
-"""
-
 from __future__ import annotations
 
 import time
@@ -19,10 +13,6 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Polars-backed context helpers
-# ---------------------------------------------------------------------------
-
 try:
     import polars as pl
 
@@ -36,7 +26,6 @@ needs_polars = pytest.mark.skipif(not HAS_POLARS, reason="polars not installed")
 
 
 def _make_ctx(tables: dict[str, Any]) -> Any:
-    """Build an ExpressionFamilyContext via PolarsDataFrameAdapter."""
     adapter = PolarsDataFrameAdapter()
     ctx = adapter.create_context()
     for name, df in tables.items():
@@ -45,15 +34,8 @@ def _make_ctx(tables: dict[str, Any]) -> Any:
     return ctx
 
 
-# ===================================================================
-# AMPLab DataFrame Queries
-# ===================================================================
-
-
 @needs_polars
 class TestAMPLabDataFrameQueriesExecution:
-    """Call every AMPLab query expression_impl to cover function bodies."""
-
     @pytest.fixture()
     def ctx(self):
         rankings = pl.DataFrame(
@@ -67,8 +49,6 @@ class TestAMPLabDataFrameQueriesExecution:
             {
                 "sourceIP": ["1.2.3.4", "5.6.7.8", "9.10.11.12"],
                 "destURL": ["http://a.com/1", "http://b.com/2", "http://c.com/3"],
-                # Date-typed to mirror the production loader's date32 visitDate column;
-                # the AMPLab DataFrame impls compare it against datetime.date params.
                 "visitDate": [date(2000, 1, 15), date(2000, 2, 10), date(2000, 3, 20)],
                 "adRevenue": [1.50, 0.00, 3.20],
                 "userAgent": ["Mozilla/5.0", "Mozilla/5.0", "Chrome"],
@@ -103,6 +83,26 @@ class TestAMPLabDataFrameQueriesExecution:
 
         result = q2_expression_impl(ctx)
         assert result.columns == ["sourceIP", "totalRevenue", "avgPageRank"]
+
+    @pytest.mark.parametrize("visit_dtype", ["date", "string"])
+    def test_q2_expression_filters_visit_dates_of_either_dtype(self, visit_dtype):
+        from benchbox.core.amplab.dataframe_queries.queries import q2_expression_impl
+
+        visits = pl.DataFrame(
+            {
+                "sourceIP": ["1.1.1.1", "2.2.2.2", "3.3.3.3"],
+                "destURL": ["u1", "u2", "u1"],
+                "visitDate": [date(2000, 1, 2), date(2000, 1, 2), date(2000, 2, 1)],
+                "adRevenue": [1.5, 2.5, 9.0],
+            }
+        )
+        if visit_dtype == "string":
+            visits = visits.with_columns(pl.col("visitDate").cast(pl.String))
+        rankings = pl.DataFrame({"pageURL": ["u1", "u2"], "pageRank": [10, 20]})
+
+        result = q2_expression_impl(_make_ctx({"uservisits": visits, "rankings": rankings}))
+
+        assert sorted(result.collect()["sourceIP"].to_list()) == ["1.1.1.1", "2.2.2.2"]
 
     def test_q2a_expression(self, ctx):
         from benchbox.core.amplab.dataframe_queries.queries import q2a_expression_impl
@@ -149,7 +149,6 @@ class TestAMPLabDataFrameQueriesExecution:
         ]
 
     def test_q1_pandas(self, ctx):
-        """AMPLab Q1 pandas - use pandas DataFrames via a simple context."""
         import pandas as pd
 
         from benchbox.core.amplab.dataframe_queries.queries import q1_pandas_impl
@@ -178,11 +177,6 @@ class TestAMPLabDataFrameQueriesExecution:
 
         result = q1a_pandas_impl(PdCtx())
         assert hasattr(result, "columns"), "Q1a pandas should return a DataFrame"
-
-
-# ===================================================================
-# SSB DataFrame Queries
-# ===================================================================
 
 
 @needs_polars
@@ -356,11 +350,6 @@ class TestSSBDataFrameQueriesExecution:
         assert result.columns == ["d_year", "s_city", "p_brand1", "profit"]
 
 
-# ===================================================================
-# CoffeeShop DataFrame Queries
-# ===================================================================
-
-
 @needs_polars
 class TestCoffeeShopDataFrameQueriesExecution:
     @pytest.fixture()
@@ -398,8 +387,6 @@ class TestCoffeeShopDataFrameQueriesExecution:
             {
                 "record_id": [1, 2],
                 "product_id": [101, 102],
-                # Production dim_products exposes the raw column as "name"; SA2's SQL
-                # aliases it to product_name in its output.
                 "name": ["Latte", "Espresso"],
                 "category": ["Hot Drinks", "Hot Drinks"],
                 "subcategory": ["Coffee", "Coffee"],
@@ -485,11 +472,6 @@ class TestCoffeeShopDataFrameQueriesExecution:
         assert result.columns == ["region", "season", "revenue", "orders"]
 
 
-# ===================================================================
-# AI Primitives DataFrame Operations
-# ===================================================================
-
-
 class TestAIPrimitivesDataFrameOperations:
     def test_operation_type_enum(self):
         from benchbox.core.ai_primitives.dataframe_operations import AIOperationType
@@ -518,7 +500,7 @@ class TestAIPrimitivesDataFrameOperations:
         )
         assert caps.can_run_embeddings() is False
         assert caps.can_run_sentiment() is True
-        assert caps.can_run_entity_extraction() is True  # textblob fallback
+        assert caps.can_run_entity_extraction() is True
         assert caps.has_numpy is True
 
     def test_ai_model_capabilities_detect(self):
@@ -583,7 +565,7 @@ class TestAIPrimitivesDataFrameOperations:
         from benchbox.core.ai_primitives.dataframe_operations import AIOperationType, DataFrameAIOperationsManager
 
         mgr = DataFrameAIOperationsManager("polars-df")
-        # supports_operation returns bool regardless of dependencies
+
         result = mgr.supports_operation(AIOperationType.COSINE_SIMILARITY)
         assert isinstance(result, bool)
 
@@ -606,14 +588,14 @@ class TestAIPrimitivesDataFrameOperations:
 
         assert classify_segment("car parts and motor oil") == "AUTOMOBILE"
         assert classify_segment("building materials") == "BUILDING"
-        assert classify_segment("random text") == "AUTOMOBILE"  # default first
+        assert classify_segment("random text") == "AUTOMOBILE"
 
     def test_extract_entities_regex_fallback(self):
         from benchbox.core.ai_primitives.dataframe_operations import extract_entities
 
         result = extract_entities("A large red steel chair")
         assert isinstance(result, dict)
-        # regex fallback should find color and size
+
         assert "color" in result
         assert "size" in result
 
@@ -636,14 +618,9 @@ class TestAIPrimitivesDataFrameOperations:
         vectors = [[1.0, 0.0], [0.0, 1.0], [0.7, 0.7]]
         results = top_k_similarity([1.0, 0.0], vectors, k=2)
         assert len(results) == 2
-        assert results[0][0] == 0  # first vector is most similar
-        # zero query returns empty
+        assert results[0][0] == 0
+
         assert top_k_similarity([0.0, 0.0], vectors, k=2) == []
-
-
-# ===================================================================
-# Metadata Primitives DataFrame Operations
-# ===================================================================
 
 
 class TestMetadataPrimitivesDataFrameOperations:

@@ -70,7 +70,6 @@ REAL_DEPS = {
 
 
 def _with_expected_externals(deps: dict[str, list[str]]) -> dict[str, list[str]]:
-    """Merge pinned freeze-transferred external predecessors into in-set deps."""
     out = {item_id: list(values) for item_id, values in deps.items()}
     for item_id, externals in reconciliation.EXPECTED_EXTERNAL_DEPS.items():
         merged = list(out.get(item_id, []))
@@ -93,9 +92,6 @@ def _prefixed_argv(monkeypatch) -> None:
     import sys
 
     monkeypatch.setattr(sys, "argv", ["check_plan_reconciliation", "--todo-prefix", PREFIX])
-
-
-# --- planned/live ordering helpers (unchanged surface) -----------------------
 
 
 def test_all_controlling_surfaces_and_gates_are_named() -> None:
@@ -183,9 +179,6 @@ def test_load_tracker_snapshot_parses_git_state_index(monkeypatch) -> None:
         "states": {"x": "active"},
         "deps": {"x": ["y"]},
     }
-
-
-# --- main() fail-closed / success behaviour --------------------------------
 
 
 def test_main_fails_closed_when_snapshot_unavailable(monkeypatch) -> None:
@@ -281,9 +274,6 @@ def test_main_fails_when_pinned_phase_missing_from_live(monkeypatch) -> None:
     assert reconciliation.main() == 1
 
 
-# --- dependency_violations (pure) ------------------------------------------
-
-
 def test_dependency_violations_passes_for_real_dag() -> None:
     assert reconciliation.dependency_violations(LIVE_A0_A11, _with_expected_externals(REAL_DEPS)) == []
 
@@ -299,7 +289,6 @@ def test_dependency_violations_accepts_pinned_a10_external_predecessor() -> None
 
 
 def test_dependency_violations_fails_when_pinned_a10_external_missing() -> None:
-    # In-set REAL_DEPS alone omit the freeze-transferred deployer predecessor.
     violations = reconciliation.dependency_violations(LIVE_A0_A11, REAL_DEPS)
 
     assert any(

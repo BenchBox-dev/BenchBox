@@ -1,5 +1,3 @@
-"""Shared logging helpers for validation workflows."""
-
 from __future__ import annotations
 
 import logging
@@ -11,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 def log_row_count_summary(result, *, log=logger) -> None:
-    """Log a consistent summary for row count validation results."""
     summary = result.get_summary()
 
     if result.is_valid:
@@ -32,7 +29,6 @@ def log_row_count_summary(result, *, log=logger) -> None:
 
 
 def _log_significant_discrepancies(discrepancies: Iterable[RowCountDiscrepancy], *, log=logger) -> None:
-    """Emit log entries for the discrepancies that exceeded tolerances."""
     discrepancies = list(discrepancies)
     if not discrepancies:
         return

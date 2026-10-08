@@ -1,5 +1,3 @@
-"""Sanitized platform-option capture for result metadata."""
-
 from __future__ import annotations
 
 import re
@@ -10,39 +8,19 @@ REDACTED_VALUE = "<redacted>"
 
 _NON_ALNUM_RE = re.compile(r"[^a-z0-9]")
 
-# Azure storage URIs put the CONTAINER (or Fabric workspace) in the userinfo
-# position -- abfss://container@account.dfs.core.windows.net/path -- so the text
-# before "@" is provenance, not a credential. Redacting it would strip a useful
-# identifier out of exported results (Databricks `staging_root`, Fabric
-# lakehouse paths) while protecting nothing: these schemes keep their secret in
-# a SEPARATE option (account_key, sas), which _SECRET_KEY_PARTS already redacts
-# by key name.
 _AUTHORITY_USERINFO_SCHEMES = frozenset({"abfs", "abfss", "wasb", "wasbs"})
 
-# The userinfo run is matched greedily up to the LAST "@" in the authority: a
-# password may legally contain an unescaped "@" (urlparse reads
-# postgres://user:pa@ss@host/db as password "pa@ss"), and a pattern that stopped
-# at the FIRST "@" left the remainder of the credential in the exported value.
-# The authority ends at "/", "?" or "#" per RFC 3986, so those terminators bound
-# the run and keep a later "@" in a path or query string from over-redacting.
 _URI_USERINFO_RE = re.compile(
     r"(?P<scheme>[a-z][a-z0-9+.-]*)(?P<sep>://)(?P<userinfo>[^/?#\s]+)@",
     flags=re.IGNORECASE,
 )
 
-# Query and fragment parameters. Separators cover the first query ("?"), later
-# query pairs ("&"), the fragment start ("#"), and fragment pairs ("&" after
-# "#"). Credential-named params (access_token, sslpassword, password, ...) are
-# masked; ordinary params (x=1, region=...) are left intact. Name matching
-# reuses is_secret_option_key so key-level and URI-component rules stay aligned.
 _URI_QUERY_OR_FRAGMENT_PARAM_RE = re.compile(
     r"(?P<sep>[?&#])(?P<name>[^=?#&]+)=(?P<value>[^?#&]*)",
 )
 
 
 def _normalize_secret_key(key: str) -> str:
-    """Lowercase ``key`` and strip non-alphanumerics so ``sessionToken``,
-    ``session-token`` and ``session_token`` all collapse to ``sessiontoken``."""
     return _NON_ALNUM_RE.sub("", key.lower())
 
 
@@ -53,46 +31,18 @@ _SECRET_KEY_PARTS = tuple(
         "token",
         "secret",
         "access_key",
-        # Normalizes to "keyid", which "access_key" does not cover: an
-        # ``accessKeyId`` matched only because it also contains "accesskey", so
-        # the shorter provider-prefixed spellings (``s3_key_id``, ``kms_key_id``)
-        # were exported verbatim. Matches only key-id-shaped names - ordinary
-        # data-modelling keys (sort_key, partition_key, primary_key) do not
-        # contain "keyid" and keep exporting their real values.
         "key_id",
         "private_key",
         "session_token",
         "connection_string",
         "credential",
-        # DSNs can embed URI userinfo (for example, user:password@host), and
-        # Azure Hadoop ``fs.azure.sas.*`` configuration values are bearer
-        # credentials. Redact the whole option rather than trying to preserve
-        # a partially parsed value across provider-specific formats.
         "dsn",
         "sas",
-        # Found by the 2026-07-31 sentinel sweep leaking through BOTH layers:
-        # api_key/onehouse_api_key (quanton's only credential) and Azure's
-        # storage_account_key matched none of the parts above. Deliberately
-        # narrow - a bare "key" part would redact sort_key/partition_key-class
-        # data-modelling options.
         "api_key",
         "account_key",
     )
 )
-# These provider/CLI aliases are credential names only when used as the whole
-# option key. In particular, ``pat`` must not be a substring rule because it
-# would classify legitimate ``path`` options as secrets.
 _EXACT_SECRET_KEYS = frozenset({"passwd", "pwd", "pat"})
-# Connection usernames are identity, not secrets, so they are NOT in
-# _SECRET_KEY_PARTS (the public anonymization path shares that list and must
-# keep PSEUDONYMIZING usernames for grouping, not redacting them). But the
-# internal capture path has no pseudonymizer, so before this set existed a
-# username rode into every internal bundle verbatim. Exact normalized match
-# only - a substring rule on "user" would nuke user_agent/num_users-class
-# options.
-# serviceaccount: an IAM principal email (dataproc) - identity, not a secret,
-# but it names the project and operator, so internal export redacts it like
-# every other username spelling.
 _USERNAME_KEYS = frozenset({"user", "username", "userid", "pguser", "dbuser", "serviceaccount"})
 
 
@@ -101,35 +51,21 @@ def _is_username_key(key: str) -> bool:
 
 
 def _redact_uri_userinfo_match(match: re.Match[str]) -> str:
-    """Redact credential-bearing userinfo; keep username-only and Azure authorities.
-
-    Userinfo with a password uses ``user:password`` form (colon present). A bare
-    username (``https://public-user@host/path``) is identity, not a secret, and
-    must survive export so provenance is not replaced with a generic mask.
-    """
     if match.group("scheme").lower() in _AUTHORITY_USERINFO_SCHEMES:
         return match.group(0)
     userinfo = match.group("userinfo")
-    # Colon marks a password component (including empty password ``user:``).
     if ":" not in userinfo:
         return match.group(0)
     return f"{match.group('scheme')}{match.group('sep')}****@"
 
 
 def _redact_uri_query_or_fragment_param(match: re.Match[str]) -> str:
-    """Mask one query/fragment parameter value when its name is credential-like."""
     if is_secret_option_key(match.group("name")):
         return f"{match.group('sep')}{match.group('name')}=****"
     return match.group(0)
 
 
 def _scrub_uri_credentials(value: str) -> str:
-    """Scrub URI userinfo passwords and credential-named query/fragment params.
-
-    Component-aware: ordinary hosts, paths, ports, non-secret query params, and
-    username-only userinfo are preserved. Does not stack independent broken
-    matchers — one pass for userinfo precision, one for query/fragment names.
-    """
     scrubbed = _URI_USERINFO_RE.sub(_redact_uri_userinfo_match, value)
     return _URI_QUERY_OR_FRAGMENT_PARAM_RE.sub(_redact_uri_query_or_fragment_param, scrubbed)
 
@@ -175,14 +111,6 @@ def sanitize_platform_options(
     exclude_internal: bool = False,
     redact_usernames: bool = True,
 ) -> dict[str, Any]:
-    """Return a JSON-friendly platform-options dict with secret-like values redacted.
-
-    ``exclude_internal`` drops keys in ``_INTERNAL_OPTION_KEYS`` and
-    underscore-prefixed keys, mirroring ``_iter_public_options`` semantics.
-    Set it for any payload that is exported/persisted (bundle metadata,
-    result payloads) so internal bookkeeping options (e.g. the full
-    ``tuning_config`` object) never leak into published data.
-    """
     if not options:
         return {}
 
@@ -208,14 +136,6 @@ def build_platform_options_capture(
     requested_sources: Mapping[str, str] | None = None,
     database_options: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, str]]:
-    """Merge platform options for run metadata and return sanitized values plus sources.
-
-    ``requested_options`` are options explicitly carried by the CLI/orchestrator
-    and may include registered defaults. ``database_options`` are the resolved
-    options from ``DatabaseConfig`` after credentials/config builders have run.
-    CLI-provided options override resolved config values; registered defaults do
-    not override saved/config-derived values, including their provenance.
-    """
     values: dict[str, Any] = {}
     sources: dict[str, str] = {}
     source_map = {str(key): str(value) for key, value in (requested_sources or {}).items()}
@@ -227,16 +147,10 @@ def build_platform_options_capture(
     for key, value in _iter_public_options(requested_options):
         requested_source = source_map.get(key, "requested")
         if requested_source == "registered_default" and key in values:
-            # Saved config already populated this key; preserve its provenance
-            # rather than rewriting the source to "registered_default" just
-            # because the values happen to match.
             continue
         values[key] = value
         sources[key] = requested_source
 
-    # Keep usernames available to the public anonymizer so distinct connection
-    # identities receive distinct stable pseudonyms. The non-anonymized exporter
-    # redacts these keys at the final internal-export boundary.
     sanitized_values = sanitize_platform_options(values, exclude_internal=True, redact_usernames=False)
     return sanitized_values, {key: sources[key] for key in sanitized_values if key in sources}
 
@@ -300,10 +214,6 @@ def _sanitize_option_value(value: Any, *, exclude_internal: bool = False, redact
             exclude_internal=exclude_internal,
             redact_usernames=redact_usernames,
         )
-    # No canonical serialization available. Never fall back to str()/repr()
-    # here: that would silently publish opaque Python repr text into
-    # exported bundles/payloads. Leave an explicit marker instead so gaps
-    # in capture stay visible rather than masquerading as real data.
     return f"<unserializable:{type(value).__name__}>"
 
 

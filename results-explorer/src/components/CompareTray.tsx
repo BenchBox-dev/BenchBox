@@ -34,7 +34,6 @@ export function CompareTray({ summary, items, compareHref, compareLabel, onClear
 
   const collapsed = isMobile && !expanded;
 
-  // Focus must not be stolen when the tray appears; only Escape return-focus.
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;

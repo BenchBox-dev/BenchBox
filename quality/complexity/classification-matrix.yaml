@@ -1,14 +1,3 @@
-# Complexity Classification Matrix
-# Generated: 2026-02-20, updated 2026-03-12 (wave 4 + wave 4b CC=12 classification)
-# Baseline from: scripts/check_complexity.py --no-fail --top 200
-# Thresholds: warn >= 15, fail > 20 at baseline; warn >= 12 current
-# Pre-existing excludes from pyproject.toml are omitted (already triaged)
-# Classification completed: 2026-02-20 (w3/w4/w5/w6), 2026-03-12 (wave 4 and wave 4b)
-# Metadata below keeps the original scan totals; classification_summary reflects current matrix rows.
-# Historical planning artifact: these totals and classifications are not a live
-# gate. Run `make complexity-check` for the current scan and enforcement result.
-# Do not use this matrix to infer present complexity ownership or status.
-
 metadata:
   generated_date: "2026-02-20"
   updated_date: "2026-03-12"
@@ -25,11 +14,6 @@ metadata:
     ignore_with_rationale: 116
     defer_with_owner: 3
     pending: 106
-
-# Classification actions:
-#   simplify_now     - Accidental complexity; refactor to reduce score
-#   ignore_with_rationale - Irreducible complexity; add narrow exclude
-#   defer_with_owner - Valid reduction but blocked by larger work
 
 functions:
 
@@ -2145,8 +2129,6 @@ functions:
   refactor_strategy: ""
   re_review_trigger: ""
 
-# --- Required complexity at CC=13 (2026-03-12 evaluation, wave 3) ---
-
 - key: "benchbox/cli/benchmarks.py:prompt_table_format"
   file: "benchbox/cli/benchmarks.py"
   line: 1292
@@ -2711,13 +2693,6 @@ functions:
   refactor_strategy: "N/A - this is the natural coordinator for power-run management."
   re_review_trigger: "When power-run lifecycle stages move into separate reusable executors."
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Wave 4: CC=12 classification (2026-03-12)
-# 20 functions at CC=12 after waves 1-3. Classification: 12 inherent, 8 refactorable.
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# --- INHERENT (12 functions, excluded in pyproject.toml) ---
-
 - key: "benchbox/cli/commands/run_official.py:run_official"
   file: "benchbox/cli/commands/run_official.py"
   line: 75
@@ -2838,8 +2813,6 @@ functions:
   classification: ignore_with_rationale
   rationale: "XML action type dispatch (NEW/UPDCUST → customer, ADDACCT → account, INACT → inactivate). Each action type extracts different data from different XML elements. Namespace resilience adds unavoidable branching."
 
-# --- REFACTORABLE (8 functions, targeted for reduction to CC ≤ 11) ---
-
 - key: "benchbox/cli/commands/compare_plans.py:_output_summary_text"
   file: "benchbox/cli/commands/compare_plans.py"
   line: 338
@@ -2927,8 +2900,6 @@ functions:
   classification: simplify_now
   rationale: "Repetitive range checks (scale factor min/max, total time min/max, per-query time min/max) with identical check-and-append-error pattern."
   refactor_strategy: "Define _VALIDATION_RULES list of (attr, min_val, max_val, label) tuples. Replace repeated range checks with a single validation loop."
-
-# --- WAVE 4B FOLLOW-UP (2026-03-12; additional CC=12 functions from --top 200 scan) ---
 
 - key: "benchbox/core/tpcds/c_tools.py:_clean_sql"
   file: "benchbox/core/tpcds/c_tools.py"

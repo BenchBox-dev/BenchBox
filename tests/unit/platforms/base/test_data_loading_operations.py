@@ -1,15 +1,3 @@
-"""Tests for data loading operations: validation, escaping, data sources, and providers.
-
-Covers validate_sql_identifier, escape_sql_string_literal, DataSource,
-FileFormatRegistry (extensions, handlers, compression), DataSourceProvider
-chain (BenchmarkTablesSource, BenchmarkImplTablesSource, ManifestFileSource),
-DataSourceResolver, RowBatchProcessor, SchemaInspector, and
-NoCompressionHandler/GzipHandler.
-
-Does NOT duplicate the handler detection tests already in
-tests/unit/platforms/test_data_loading_registry.py.
-"""
-
 from __future__ import annotations
 
 import gzip
@@ -46,8 +34,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 class TestDataLoaderClickHouseFailurePropagation:
-    """Server-mode loader failures must not be swallowed as zero-row success."""
-
     @staticmethod
     def _loader(tmp_path: Path, handler: object) -> DataLoader:
         data_file = tmp_path / "events.tbl"
@@ -82,8 +68,6 @@ class TestDataLoaderClickHouseFailurePropagation:
 
 
 class TestDeltaTableDirDispatch:
-    """Delta Lake table directories must load as one unit, never shredded into part-files."""
-
     @staticmethod
     def _loader(tmp_path: Path, seen: list) -> DataLoader:
         loader = DataLoader.__new__(DataLoader)
@@ -110,7 +94,7 @@ class TestDeltaTableDirDispatch:
         loader = self._loader(tmp_path, seen)
 
         assert loader._load_sharded_table("orders", [table_dir]) == 3
-        # The factory saw the table directory itself, not the part-file shard.
+
         assert seen == [table_dir]
 
     def test_plain_dir_still_expands_to_shards(self, tmp_path):
@@ -170,14 +154,7 @@ def test_clickhouse_parquet_loader_uses_logical_nested_names(tmp_path: Path) -> 
     assert connection.rows == [([1, 2], 1)]
 
 
-# ---------------------------------------------------------------------------
-# validate_sql_identifier
-# ---------------------------------------------------------------------------
-
-
 class TestValidateSqlIdentifier:
-    """Tests for validate_sql_identifier."""
-
     def test_simple_valid_name(self):
         assert validate_sql_identifier("customer") == "customer"
 
@@ -202,7 +179,7 @@ class TestValidateSqlIdentifier:
             validate_sql_identifier("")
 
     def test_none_like_empty_raises(self):
-        """Empty string is the falsy path; None would be a type error upstream."""
+
         with pytest.raises(DataLoadingError, match="Empty"):
             validate_sql_identifier("")
 
@@ -252,19 +229,12 @@ class TestValidateSqlIdentifier:
             validate_sql_identifier("tbl\ttbl")
 
     def test_returns_validated_value(self):
-        """Confirm the return value is the same object when valid."""
+
         result = validate_sql_identifier("orders", "table name")
         assert result == "orders"
 
 
-# ---------------------------------------------------------------------------
-# escape_sql_string_literal
-# ---------------------------------------------------------------------------
-
-
 class TestEscapeSqlStringLiteral:
-    """Tests for escape_sql_string_literal."""
-
     def test_no_special_characters(self):
         assert escape_sql_string_literal("hello") == "hello"
 
@@ -293,14 +263,7 @@ class TestEscapeSqlStringLiteral:
         assert escape_sql_string_literal("line1\nline2") == "line1\nline2"
 
 
-# ---------------------------------------------------------------------------
-# DataSource
-# ---------------------------------------------------------------------------
-
-
 class TestDataSource:
-    """Tests for the DataSource dataclass."""
-
     def test_creation(self):
         ds = DataSource(source_type="benchmark_tables", tables={"t1": [Path("/a")]})
         assert ds.source_type == "benchmark_tables"
@@ -326,7 +289,7 @@ class TestDataSource:
         assert a == b
 
     def test_table_formats_defaults_to_empty_dict_when_none(self):
-        """__post_init__ converts table_formats=None to {} so callers never see None."""
+
         ds = DataSource(source_type="benchmark_tables", tables={})
         assert ds.table_formats == {}
         assert ds.table_formats is not None
@@ -340,15 +303,7 @@ class TestDataSource:
         assert ds.table_formats == {}
 
 
-# ---------------------------------------------------------------------------
-# FileFormatRegistry.get_base_data_extension - additional cases
-# (basic .tbl.1.zst already covered in test_data_loading_registry.py)
-# ---------------------------------------------------------------------------
-
-
 class TestFileFormatRegistryExtensions:
-    """Extension detection edge-cases not in test_data_loading_registry.py."""
-
     def test_csv_extension(self):
         assert FileFormatRegistry.get_base_data_extension(Path("/d/file.csv")) == ".csv"
 
@@ -377,26 +332,18 @@ class TestFileFormatRegistryExtensions:
         assert FileFormatRegistry.get_base_data_extension(Path("/d/file.zst")) is None
 
     def test_double_compression_stripped(self):
-        """Files like foo.csv.gz.zst - both compression suffixes stripped."""
+
         assert FileFormatRegistry.get_base_data_extension(Path("/d/foo.csv.gz.zst")) == ".csv"
 
     def test_numeric_shard_suffix_with_compression(self):
-        """customer.tbl.5.gz still finds .tbl."""
+
         assert FileFormatRegistry.get_base_data_extension(Path("/d/customer.tbl.5.gz")) == ".tbl"
 
     def test_parquet_zst(self):
         assert FileFormatRegistry.get_base_data_extension(Path("/d/data.parquet.zst")) == ".parquet"
 
 
-# ---------------------------------------------------------------------------
-# FileFormatRegistry.get_handler - additional edge-cases
-# (Delta, Iceberg, Parquet, multi-suffix .tbl already tested elsewhere)
-# ---------------------------------------------------------------------------
-
-
 class TestFileFormatRegistryHandlers:
-    """Handler resolution edge-cases."""
-
     def test_csv_handler_returns_comma_delimiter(self):
         handler = FileFormatRegistry.get_handler(Path("/d/data.csv"))
         assert handler is not None
@@ -416,7 +363,7 @@ class TestFileFormatRegistryHandlers:
         assert handler is None
 
     def test_csv_gz_handler(self):
-        """Compressed CSV should still resolve to CSV handler."""
+
         handler = FileFormatRegistry.get_handler(Path("/d/data.csv.gz"))
         assert handler is not None
         assert handler.get_delimiter() == ","
@@ -427,7 +374,7 @@ class TestFileFormatRegistryHandlers:
         assert handler.get_delimiter() == "|"
 
     def test_ducklake_directory(self, tmp_path):
-        """DuckLake directory (metadata.ducklake file) gets DuckLakeFileHandler."""
+
         from benchbox.platforms.base.data_loading import DuckLakeFileHandler
 
         tbl_dir = tmp_path / "orders"
@@ -437,14 +384,7 @@ class TestFileFormatRegistryHandlers:
         assert isinstance(handler, DuckLakeFileHandler)
 
 
-# ---------------------------------------------------------------------------
-# FileFormatRegistry.get_compression_handler
-# ---------------------------------------------------------------------------
-
-
 class TestFileFormatRegistryCompression:
-    """Compression handler resolution."""
-
     def test_zst_returns_zstd_handler(self):
         handler = FileFormatRegistry.get_compression_handler(Path("/d/file.zst"))
         assert isinstance(handler, ZstdHandler)
@@ -462,14 +402,7 @@ class TestFileFormatRegistryCompression:
         assert isinstance(handler, NoCompressionHandler)
 
 
-# ---------------------------------------------------------------------------
-# NoCompressionHandler
-# ---------------------------------------------------------------------------
-
-
 class TestNoCompressionHandler:
-    """NoCompressionHandler opens plain files."""
-
     def test_reads_plain_file(self, tmp_path):
         f = tmp_path / "data.csv"
         f.write_text("a,b,c\n1,2,3\n")
@@ -479,14 +412,7 @@ class TestNoCompressionHandler:
         assert "a,b,c" in content
 
 
-# ---------------------------------------------------------------------------
-# GzipHandler
-# ---------------------------------------------------------------------------
-
-
 class TestGzipHandler:
-    """GzipHandler decompresses .gz files."""
-
     def test_reads_gzip_file(self, tmp_path):
         gz_file = tmp_path / "data.csv.gz"
         with gzip.open(gz_file, "wt") as f:
@@ -498,14 +424,7 @@ class TestGzipHandler:
         assert "10,20" in content
 
 
-# ---------------------------------------------------------------------------
-# SchemaInspector
-# ---------------------------------------------------------------------------
-
-
 class TestSchemaInspector:
-    """Tests for SchemaInspector.get_column_count."""
-
     def test_from_schema(self):
         benchmark = MagicMock()
         benchmark.get_schema.return_value = {"t1": {"columns": ["a", "b", "c"]}}
@@ -519,12 +438,12 @@ class TestSchemaInspector:
         fh = io.StringIO("a|b|c|d\n1|2|3|4\n")
         count = SchemaInspector.get_column_count(benchmark, "t1", fh, "|")
         assert count == 4
-        # File pointer should be reset
+
         assert fh.tell() == 0
 
     def test_no_schema_method(self):
-        """Benchmark without get_schema falls back to file inspection."""
-        benchmark = MagicMock(spec=[])  # no get_schema
+
+        benchmark = MagicMock(spec=[])
         fh = io.StringIO("a,b\n1,2\n")
         count = SchemaInspector.get_column_count(benchmark, "t1", fh, ",")
         assert count == 2
@@ -537,14 +456,7 @@ class TestSchemaInspector:
         assert count is None
 
 
-# ---------------------------------------------------------------------------
-# RowBatchProcessor
-# ---------------------------------------------------------------------------
-
-
 class TestRowBatchProcessor:
-    """Tests for RowBatchProcessor."""
-
     def test_single_batch(self):
         proc = RowBatchProcessor(batch_size=100)
         fh = io.StringIO("a|b\n1|2\n3|4\n")
@@ -559,9 +471,9 @@ class TestRowBatchProcessor:
         fh = io.StringIO("a|b\n1|2\n3|4\n5|6\n")
         batches = list(proc.process_file(fh, "|", 2))
         assert len(batches) == 2
-        # First batch of 2 rows
+
         assert len(batches[0][0]) == 2
-        # Remaining 2 rows (header + 1 data)
+
         assert len(batches[1][0]) == 2
 
     def test_empty_lines_skipped(self):
@@ -570,21 +482,21 @@ class TestRowBatchProcessor:
         batches = list(proc.process_file(fh, "|", 2))
         assert len(batches) == 1
         data, count = batches[0]
-        assert count == 2  # header + 1 data row
+        assert count == 2
 
     def test_pads_short_rows(self):
         proc = RowBatchProcessor(batch_size=100)
         fh = io.StringIO("a\n")
         batches = list(proc.process_file(fh, "|", 3))
         data, _ = batches[0]
-        assert len(data[0]) == 3  # padded to 3
+        assert len(data[0]) == 3
 
     def test_truncates_long_rows(self):
         proc = RowBatchProcessor(batch_size=100)
         fh = io.StringIO("a|b|c|d|e\n")
         batches = list(proc.process_file(fh, "|", 2))
         data, _ = batches[0]
-        assert len(data[0]) == 2  # truncated to 2
+        assert len(data[0]) == 2
 
     def test_empty_file(self):
         proc = RowBatchProcessor(batch_size=100)
@@ -593,14 +505,7 @@ class TestRowBatchProcessor:
         assert batches == []
 
 
-# ---------------------------------------------------------------------------
-# BenchmarkTablesSource
-# ---------------------------------------------------------------------------
-
-
 class TestBenchmarkTablesSource:
-    """Tests for BenchmarkTablesSource provider."""
-
     def test_can_provide_with_tables(self):
         benchmark = MagicMock()
         benchmark.tables = {"t1": Path("/a")}
@@ -608,7 +513,7 @@ class TestBenchmarkTablesSource:
         assert src.can_provide(benchmark, Path("/data")) is True
 
     def test_cannot_provide_without_tables_attr(self):
-        benchmark = MagicMock(spec=[])  # no tables attribute
+        benchmark = MagicMock(spec=[])
         src = BenchmarkTablesSource()
         assert src.can_provide(benchmark, Path("/data")) is False
 
@@ -631,7 +536,7 @@ class TestBenchmarkTablesSource:
         ds = src.get_data_source(benchmark, Path("/data"))
         assert ds is not None
         assert ds.source_type == "benchmark_tables"
-        # Single path should be wrapped in a list
+
         assert ds.tables["customer"] == [Path("/data/customer.tbl")]
 
     def test_get_data_source_preserves_list(self):
@@ -648,10 +553,10 @@ class TestBenchmarkTablesSource:
         assert ds is None
 
     def test_get_data_source_does_not_populate_table_formats(self, tmp_path):
-        """Provider returns empty table_formats - format injection is the resolver's job."""
+
         benchmark = MagicMock()
         benchmark.tables = {"lineitem": tmp_path / "lineitem.csv.zst"}
-        # Write a v2 manifest so we can confirm the provider does NOT read it
+
         manifest_data = {
             "version": 2,
             "benchmark": "clickbench",
@@ -671,18 +576,11 @@ class TestBenchmarkTablesSource:
         ds = src.get_data_source(benchmark, tmp_path)
 
         assert ds is not None
-        # Provider must not touch the manifest - table_formats is empty here
+
         assert ds.table_formats == {}
 
 
-# ---------------------------------------------------------------------------
-# BenchmarkImplTablesSource
-# ---------------------------------------------------------------------------
-
-
 class TestBenchmarkImplTablesSource:
-    """Tests for BenchmarkImplTablesSource provider."""
-
     def test_can_provide_with_impl_tables(self):
         impl = MagicMock()
         impl.tables = {"t1": Path("/a")}
@@ -697,7 +595,7 @@ class TestBenchmarkImplTablesSource:
         assert src.can_provide(benchmark, Path("/data")) is False
 
     def test_cannot_provide_with_no_impl_tables(self):
-        impl = MagicMock(spec=[])  # no tables attribute on _impl
+        impl = MagicMock(spec=[])
         benchmark = MagicMock()
         benchmark._impl = impl
         src = BenchmarkImplTablesSource()
@@ -715,14 +613,7 @@ class TestBenchmarkImplTablesSource:
         assert ds.tables["orders"] == [Path("/data/orders.tbl")]
 
 
-# ---------------------------------------------------------------------------
-# ManifestFileSource - v1
-# ---------------------------------------------------------------------------
-
-
 class TestManifestFileSource:
-    """Tests for ManifestFileSource (v1 manifest)."""
-
     def test_can_provide_when_manifest_exists(self, tmp_path):
         manifest = tmp_path / "_datagen_manifest.json"
         manifest.write_text("{}")
@@ -763,7 +654,7 @@ class TestManifestFileSource:
         assert ds is None
 
     def test_v1_manifest_skips_entries_without_path(self, tmp_path):
-        """Entries missing 'path' key are skipped by the v1 fallback parser."""
+
         manifest_data = {
             "benchmark": "tpch",
             "scale_factor": 0.01,
@@ -788,10 +679,8 @@ class TestManifestFileSource:
 
 
 class TestManifestFileSourceV2:
-    """Tests for ManifestFileSource using manifest v2 format selection."""
-
     def test_manifest_v2_native_mode_prefers_platform_defaults(self, tmp_path):
-        """Native-mode platforms use PLATFORM_FORMAT_PREFERENCES, not manifest order."""
+
         manifest_data = {
             "version": 2,
             "benchmark": "tpch",
@@ -815,7 +704,7 @@ class TestManifestFileSourceV2:
 
         assert ds is not None
         assert ds.source_type == "manifest_v2"
-        # DuckDB's PLATFORM_FORMAT_PREFERENCES has tbl first
+
         assert ds.tables["customer"] == [tmp_path / "customer.tbl"]
 
     def test_manifest_v2_redshift_native_prefers_platform_default(self, tmp_path):
@@ -1002,7 +891,7 @@ class TestManifestFileSourceV2:
         assert ds is None
 
     def test_manifest_v2_defaults_to_duckdb_when_platform_name_unset(self, tmp_path):
-        """When _platform_name is not set, format selection uses 'duckdb' platform defaults."""
+
         manifest_data = {
             "version": 2,
             "benchmark": "tpch",
@@ -1020,21 +909,16 @@ class TestManifestFileSourceV2:
         (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest_data))
 
         src = ManifestFileSource()
-        # _platform_name intentionally NOT set - defaults to "duckdb" which prefers tbl
+
         ds = src.get_data_source(MagicMock(spec=[]), tmp_path)
 
         assert ds is not None
         assert ds.source_type == "manifest_v2"
-        # DuckDB's PLATFORM_FORMAT_PREFERENCES has tbl first
+
         assert ds.tables["customer"] == [tmp_path / "customer.tbl"]
 
     def test_manifest_v2_non_import_error_falls_back_to_v1(self, tmp_path, monkeypatch):
-        """Non-ImportError exceptions in _try_manifest_v2 are caught and v1 fallback runs.
 
-        Previously _try_manifest_v2 only caught ImportError, so RuntimeError etc. would
-        propagate and bypass the v1 path. The fix added a separate except Exception handler
-        that logs at DEBUG before falling through to v1.
-        """
         manifest_data = {
             "benchmark": "tpch",
             "scale_factor": 0.01,
@@ -1052,28 +936,19 @@ class TestManifestFileSourceV2:
         src = ManifestFileSource()
         ds = src.get_data_source(MagicMock(spec=[]), tmp_path)
 
-        # v1 fallback must have run since _try_manifest_v2 swallowed the RuntimeError
         assert ds is not None
         assert ds.source_type == "manifest"
         assert "customer" in ds.tables
 
 
-# ---------------------------------------------------------------------------
-# ManifestFileSource.read_format_hints
-# ---------------------------------------------------------------------------
-
-
 class TestManifestFileSourceReadFormatHints:
-    """Tests for ManifestFileSource.read_format_hints() - the shared helper used by
-    DataSourceResolver to inject format metadata after a non-manifest provider wins."""
-
     def test_returns_empty_when_manifest_missing(self, tmp_path):
         src = ManifestFileSource()
         result = src.read_format_hints(tmp_path / "_datagen_manifest.json", MagicMock(spec=[]), ["t1"])
         assert result == {}
 
     def test_returns_empty_for_v1_manifest(self, tmp_path):
-        """v1 manifests have no per-table format declaration - hints are always empty."""
+
         manifest_data = {
             "benchmark": "tpch",
             "tables": {"lineitem": [{"path": "lineitem.tbl", "size_bytes": 100, "row_count": 10}]},
@@ -1084,7 +959,7 @@ class TestManifestFileSourceReadFormatHints:
         assert result == {}
 
     def test_returns_format_for_v2_manifest(self, tmp_path):
-        """v2 manifest with tbl format → read_format_hints returns {"lineitem": "tbl"}."""
+
         manifest_data = {
             "version": 2,
             "benchmark": "clickbench",
@@ -1104,7 +979,7 @@ class TestManifestFileSourceReadFormatHints:
         assert result == {"lineitem": "tbl"}
 
     def test_read_format_hints_defaults_platform_name_to_duckdb(self, tmp_path):
-        """read_format_hints uses 'duckdb' platform defaults when _platform_name is not set."""
+
         manifest_data = {
             "version": 2,
             "benchmark": "tpch",
@@ -1121,12 +996,12 @@ class TestManifestFileSourceReadFormatHints:
         }
         (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest_data))
         src = ManifestFileSource()
-        # _platform_name not set → defaults to "duckdb", which prefers tbl via PLATFORM_FORMAT_PREFERENCES
+
         result = src.read_format_hints(tmp_path / "_datagen_manifest.json", MagicMock(spec=[]), ["customer"])
         assert result == {"customer": "tbl"}
 
     def test_uses_platform_name_for_format_selection(self, tmp_path):
-        """Explicit _platform_name on ManifestFileSource is used, not inferred from benchmark."""
+
         manifest_data = {
             "version": 2,
             "benchmark": "tpch",
@@ -1143,14 +1018,14 @@ class TestManifestFileSourceReadFormatHints:
         }
         (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest_data))
         src = ManifestFileSource()
-        src._platform_name = "bigquery"  # explicitly set - should NOT fall through to benchmark mock
+        src._platform_name = "bigquery"
         src._table_mode = "native"
         result = src.read_format_hints(tmp_path / "_datagen_manifest.json", MagicMock(spec=[]), ["customer"])
-        # Manifest format_preference is ["parquet", "tbl"] - parquet wins for any platform
+
         assert result.get("customer") == "parquet"
 
     def test_only_returns_hints_for_requested_tables(self, tmp_path):
-        """Only tables in the table_names argument are returned."""
+
         manifest_data = {
             "version": 2,
             "benchmark": "tpch",
@@ -1168,9 +1043,9 @@ class TestManifestFileSourceReadFormatHints:
         assert "orders" not in result
 
     def test_returns_empty_on_exception(self, tmp_path, monkeypatch):
-        """Errors in format resolution are swallowed - caller falls back to extension-based detection."""
+
         manifest_path = tmp_path / "_datagen_manifest.json"
-        manifest_path.write_text("{}")  # invalid but parseable JSON
+        manifest_path.write_text("{}")
 
         def bad_load(_path):
             raise RuntimeError("simulated error")
@@ -1181,7 +1056,7 @@ class TestManifestFileSourceReadFormatHints:
         assert result == {}
 
     def test_skips_requested_tables_without_resolved_format(self, tmp_path, monkeypatch):
-        """Tables without a resolved preferred format are omitted from the injected hint map."""
+
         manifest_data = {
             "version": 2,
             "benchmark": "tpcdi",
@@ -1213,19 +1088,12 @@ class TestManifestFileSourceReadFormatHints:
         assert result == {"dimcustomer": "csv"}
 
 
-# ---------------------------------------------------------------------------
-# DataSourceResolver
-# ---------------------------------------------------------------------------
-
-
 class TestDataSourceResolver:
-    """Tests for DataSourceResolver chain-of-responsibility."""
-
     def test_prefers_benchmark_tables_first(self, tmp_path):
-        """BenchmarkTablesSource has higher priority than manifest."""
+
         benchmark = MagicMock()
         benchmark.tables = {"t1": Path("/x")}
-        # Also create a manifest so we can verify it was NOT used
+
         manifest_data = {
             "benchmark": "tpch",
             "scale_factor": 0.01,
@@ -1239,8 +1107,8 @@ class TestDataSourceResolver:
         assert ds.source_type == "benchmark_tables"
 
     def test_falls_through_to_manifest(self, tmp_path):
-        """When benchmark has no tables, resolver uses manifest."""
-        benchmark = MagicMock(spec=[])  # no tables attribute
+
+        benchmark = MagicMock(spec=[])
         manifest_data = {
             "benchmark": "tpch",
             "scale_factor": 0.01,
@@ -1273,8 +1141,7 @@ class TestDataSourceResolver:
         assert getattr(resolver._manifest_source, "_platform_config", None) is cfg
 
     def test_format_hints_injected_for_benchmark_tables_source(self, tmp_path):
-        """Resolver injects table_formats from manifest when BenchmarkTablesSource wins."""
-        # benchmark.tables provides file paths (bypasses ManifestFileSource)
+
         benchmark = MagicMock()
         benchmark.tables = {"lineitem": tmp_path / "lineitem.csv.zst"}
 
@@ -1301,7 +1168,7 @@ class TestDataSourceResolver:
         assert ds.table_formats.get("lineitem") == "tbl"
 
     def test_bigquery_native_uses_all_manifest_tbl_shards(self, tmp_path):
-        """A one-file benchmark mapping must not hide additional manifest shards."""
+
         first = tmp_path / "lineitem_000.tbl.gz"
         second = tmp_path / "lineitem_001.tbl.gz"
         first.write_bytes(b"a")
@@ -1339,7 +1206,7 @@ class TestDataSourceResolver:
         assert source.tables["lineitem"] == [external]
 
     def test_bigquery_native_infers_tbl_format_for_v1_manifest(self, tmp_path):
-        """A v1 manifest carries no table_formats; the format is inferred from paths."""
+
         first = tmp_path / "lineitem_000.tbl.gz"
         second = tmp_path / "lineitem_001.tbl.gz"
         first.write_bytes(b"a")
@@ -1362,7 +1229,7 @@ class TestDataSourceResolver:
         assert source.table_formats["lineitem"] == "tbl"
 
     def test_format_hints_injected_for_mixed_case_benchmark_tables_source(self, tmp_path):
-        """Resolver normalizes mixed-case format hints so downstream lowercase lookups succeed."""
+
         benchmark = MagicMock()
         benchmark.tables = {"DimCustomer": tmp_path / "DimCustomer.csv"}
 
@@ -1389,7 +1256,7 @@ class TestDataSourceResolver:
         assert ds.table_formats == {"dimcustomer": "csv"}
 
     def test_format_hints_injected_for_impl_tables_source(self, tmp_path):
-        """Resolver injects table_formats from manifest when BenchmarkImplTablesSource wins."""
+
         impl = MagicMock()
         impl.tables = {"hits": tmp_path / "hits.csv.zst"}
         benchmark = MagicMock(spec=["_impl"])
@@ -1418,8 +1285,8 @@ class TestDataSourceResolver:
         assert ds.table_formats.get("hits") == "tbl"
 
     def test_manifest_source_table_formats_not_overwritten(self, tmp_path):
-        """When ManifestFileSource wins, its table_formats are preserved (no double-read)."""
-        benchmark = MagicMock(spec=[])  # no tables attribute - falls through to manifest
+
+        benchmark = MagicMock(spec=[])
 
         manifest_data = {
             "version": 2,
@@ -1442,14 +1309,13 @@ class TestDataSourceResolver:
 
         assert ds is not None
         assert ds.source_type == "manifest_v2"
-        # ManifestFileSource already populated table_formats - resolver must not overwrite
+
         assert ds.table_formats.get("customer") == "parquet"
 
     def test_format_hints_empty_when_no_manifest(self, tmp_path):
-        """When benchmark.tables wins and no manifest exists, table_formats stays empty."""
+
         benchmark = MagicMock()
         benchmark.tables = {"orders": tmp_path / "orders.tbl"}
-        # No _datagen_manifest.json written
 
         resolver = DataSourceResolver(platform_name="datafusion")
         ds = resolver.resolve(benchmark, tmp_path)
@@ -1459,7 +1325,7 @@ class TestDataSourceResolver:
         assert ds.table_formats == {}
 
     def test_format_hints_empty_for_v1_manifest(self, tmp_path):
-        """When benchmark.tables wins and the manifest is v1, table_formats stays empty."""
+
         benchmark = MagicMock()
         benchmark.tables = {"lineitem": tmp_path / "lineitem.tbl"}
         manifest_data = {
@@ -1473,16 +1339,16 @@ class TestDataSourceResolver:
 
         assert ds is not None
         assert ds.source_type == "benchmark_tables"
-        # v1 manifests carry no format metadata
+
         assert ds.table_formats == {}
 
     def test_manifest_source_is_shared_with_providers(self):
-        """_manifest_source must be the same object as providers[2] so platform_name is injected once."""
+
         resolver = DataSourceResolver(platform_name="snowflake")
         assert resolver._manifest_source is resolver.providers[2]
 
     def test_athena_external_replaces_non_parquet_benchmark_tables_with_manifest_selection(self, tmp_path):
-        """Athena external mode should replace benchmark text files with manifest-selected Parquet files centrally."""
+
         benchmark = MagicMock()
         tbl_file = tmp_path / "lineitem.tbl"
         parquet_file = tmp_path / "lineitem.parquet"
@@ -1515,7 +1381,7 @@ class TestDataSourceResolver:
         assert ds.table_formats.get("lineitem") == "parquet"
 
     def test_redshift_native_replaces_directory_benchmark_tables_with_manifest_selection(self, tmp_path):
-        """Redshift native mode should replace directory-valued benchmark tables with manifest-selected files."""
+
         benchmark = MagicMock()
         table_dir = tmp_path / "orders"
         table_dir.mkdir()
@@ -1563,7 +1429,7 @@ class TestDataSourceResolver:
         assert ds.table_formats.get("orders") == "tbl"
 
     def test_impl_tables_source_format_hints_empty_when_no_manifest(self, tmp_path):
-        """BenchmarkImplTablesSource wins, no manifest → table_formats stays empty."""
+
         impl = MagicMock()
         impl.tables = {"hits": tmp_path / "hits.csv.zst"}
         benchmark = MagicMock(spec=["_impl"])
@@ -1577,14 +1443,7 @@ class TestDataSourceResolver:
         assert ds.table_formats == {}
 
 
-# ---------------------------------------------------------------------------
-# InMemoryDataHandler
-# ---------------------------------------------------------------------------
-
-
 class TestInMemoryDataHandler:
-    """Tests for InMemoryDataHandler."""
-
     def test_load_dict_rows(self):
         from benchbox.platforms.base.data_loading import InMemoryDataHandler
 
@@ -1610,7 +1469,7 @@ class TestInMemoryDataHandler:
         assert count == 0
 
     def test_load_string_returns_zero(self):
-        """Strings are iterable but should be rejected."""
+
         from benchbox.platforms.base.data_loading import InMemoryDataHandler
 
         conn = MagicMock()
@@ -1618,18 +1477,7 @@ class TestInMemoryDataHandler:
         assert count == 0
 
 
-# ---------------------------------------------------------------------------
-# prepare_local_load_file
-# ---------------------------------------------------------------------------
-
-
 class TestPrepareLocalLoadFile:
-    """Unit tests for prepare_local_load_file() file-transformation logic.
-
-    Verifies the actual file content produced by the context manager, independent
-    of any adapter (SingleStore, QuestDB, PostgreSQL) that calls it.
-    """
-
     def _dialect(self, delimiter=",", null_marker=None, normalize_booleans=False):
         from benchbox.platforms.base.data_loading import CsvDialect
 
@@ -1642,7 +1490,7 @@ class TestPrepareLocalLoadFile:
         )
 
     def test_no_transform_yields_original_path(self, tmp_path):
-        """No-op case: plain CSV with no stripping or boolean normalisation yields the original file."""
+
         from benchbox.platforms.base.data_loading import prepare_local_load_file
 
         data_file = tmp_path / "data.csv"
@@ -1650,14 +1498,10 @@ class TestPrepareLocalLoadFile:
 
         dialect = self._dialect(delimiter=",")
         with prepare_local_load_file(data_file, dialect=dialect, strip_trailing_delim=False) as load_path:
-            assert load_path == data_file  # no temp file written
+            assert load_path == data_file
 
     def test_strip_trailing_delim_removes_trailing_pipe(self, tmp_path):
-        """strip_trailing_delim=True removes the trailing delimiter from each line.
 
-        TPC-H dbgen emits "field1|field2|field3|\\n" — the trailing pipe must be
-        stripped before LOAD DATA / COPY so the column count matches the schema.
-        """
         from benchbox.platforms.base.data_loading import prepare_local_load_file
 
         data_file = tmp_path / "lineitem.tbl"
@@ -1670,15 +1514,9 @@ class TestPrepareLocalLoadFile:
         assert content == "1|hello|world\n2|foo|bar\n"
 
     def test_no_strip_preserves_trailing_delimiter(self, tmp_path):
-        """strip_trailing_delim=False keeps trailing delimiters intact.
 
-        A trailing comma in a CSV line is an empty (NULL) last field, not a
-        spurious terminator.  Stripping it would drop the column and cause a
-        column-count error on load.
-        """
         from benchbox.platforms.base.data_loading import prepare_local_load_file
 
-        # JoinOrder-style line: trailing commas are NULL fields (episode_of_id etc.)
         data_file = tmp_path / "title.csv"
         data_file.write_text("1,Comedy Adventure,,4,1957,,,,,,,\n", encoding="utf-8")
 
@@ -1689,12 +1527,7 @@ class TestPrepareLocalLoadFile:
         assert content == "1,Comedy Adventure,,4,1957,,,,,,,\n"
 
     def test_strip_trailing_delim_also_works_for_dat_files(self, tmp_path):
-        """TPC-DS .dat files also carry a trailing pipe that must be stripped.
 
-        dsdgen emits the same spurious trailing pipe as dbgen. The gate
-        ``get_data_extension(path) in (".tbl", ".dat")`` covers both; this test
-        locks the .dat case so a future narrowing of the gate is caught.
-        """
         from benchbox.platforms.base.data_loading import prepare_local_load_file
 
         data_file = tmp_path / "customer.dat"
@@ -1707,15 +1540,11 @@ class TestPrepareLocalLoadFile:
         assert content == "1|Smith|Jane|24525083\n2|Jones|Bob|99887766\n"
 
     def test_strip_only_strips_final_delimiter_not_embedded(self, tmp_path):
-        """Stripping removes only the last character when it equals the delimiter.
 
-        A line like "a|b|c|" becomes "a|b|c".  A line like "a|b|c" (no trailing
-        delimiter) is left unchanged — the check is conditional on line.endswith(delim).
-        """
         from benchbox.platforms.base.data_loading import prepare_local_load_file
 
         data_file = tmp_path / "mixed.tbl"
-        # First line has trailing pipe; second does not (edge case for partial files)
+
         data_file.write_text("a|b|c|\nd|e|f\n", encoding="utf-8")
 
         dialect = self._dialect(delimiter="|", null_marker="")
@@ -1725,7 +1554,7 @@ class TestPrepareLocalLoadFile:
         assert content == "a|b|c\nd|e|f\n"
 
     def test_boolean_normalisation_rewrites_true_false(self, tmp_path):
-        """normalize_booleans=True rewrites True→1, False→0 in each field."""
+
         from benchbox.platforms.base.data_loading import prepare_local_load_file
 
         data_file = tmp_path / "data.csv"
@@ -1738,7 +1567,7 @@ class TestPrepareLocalLoadFile:
         assert content == "1,hello,0\n0,world,1\n"
 
     def test_temp_file_cleaned_up_after_context(self, tmp_path):
-        """The temp file is deleted when the context manager exits."""
+
         from benchbox.platforms.base.data_loading import prepare_local_load_file
 
         data_file = tmp_path / "lineitem.tbl"
@@ -1747,10 +1576,10 @@ class TestPrepareLocalLoadFile:
         dialect = self._dialect(delimiter="|", null_marker="")
         captured: list[Path] = []
         with prepare_local_load_file(data_file, dialect=dialect, strip_trailing_delim=True) as load_path:
-            assert load_path != data_file  # temp file was created
+            assert load_path != data_file
             captured.append(load_path)
 
-        assert not captured[0].exists()  # temp file cleaned up on exit
+        assert not captured[0].exists()
 
     def test_load_none_returns_zero(self):
         from benchbox.platforms.base.data_loading import InMemoryDataHandler
@@ -1761,9 +1590,6 @@ class TestPrepareLocalLoadFile:
 
 
 class TestEmptySourceFailsClosed:
-    """An unresolvable or table-less data source must fail the run for
-    benchmarks that expect data -- never load nothing and validate vacuously."""
-
     @staticmethod
     def _loader(tmp_path: Path, benchmark: object, resolved: object) -> DataLoader:
         loader = DataLoader.__new__(DataLoader)
@@ -1800,8 +1626,6 @@ class TestEmptySourceFailsClosed:
         assert stats == {}
 
     def test_load_raises_when_every_table_maps_to_an_empty_file_list(self, tmp_path: Path) -> None:
-        """A source naming tables with no files must fail like a table-less
-        source instead of loading zero rows table by table."""
         from types import SimpleNamespace
 
         source = DataSource(source_type="benchmark_tables", tables={"customer": [], "orders": []})
@@ -1819,8 +1643,6 @@ class TestEmptySourceFailsClosed:
         assert stats == {}
 
     def test_load_with_empty_file_lists_does_not_silently_skip_for_mock_benchmark(self, tmp_path: Path) -> None:
-        """A Mock benchmark auto-creates SKIP_DATA_LOADING as truthy; the
-        shared helper must ignore it so the empty source still fails."""
         source = DataSource(source_type="benchmark_tables", tables={"customer": []})
         loader = self._loader(tmp_path, MagicMock(), source)
         with pytest.raises(ValueError, match="No data files found"):
@@ -1828,8 +1650,6 @@ class TestEmptySourceFailsClosed:
 
 
 class TestManifestMissingFiles:
-    """Manifest entries whose files are gone must not shadow regeneration."""
-
     @staticmethod
     def _write_manifest(data_dir: Path, tables: dict) -> None:
         (data_dir / "_datagen_manifest.json").write_text(json.dumps({"tables": tables}), encoding="utf-8")
@@ -1843,10 +1663,6 @@ class TestManifestMissingFiles:
 
 
 class TestZstdToolProbe:
-    """Opening a .zst file through the system-command handler without the zstd
-    CLI fails with an actionable error instead of loading nothing, while choosing
-    the handler needs no CLI (adapters that decompress in-process rely on that)."""
-
     def test_missing_zstd_cli_raises_actionable_error_on_open(self, tmp_path: Path, monkeypatch) -> None:
         from benchbox.platforms.base import data_loading
 

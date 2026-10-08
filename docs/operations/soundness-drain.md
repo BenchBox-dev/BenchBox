@@ -82,11 +82,14 @@ re-measure references this field rather than recomputing it).
 
 ## Running locally
 
+The first command prints the human digest and is read-only. `--json` is machine-readable and read-only. `--apply` also
+syncs the label and the pinned issue. `--self-test` is fixture-only and uses no network.
+
 ```bash
-uv run -- python _project/scripts/soundness_drain_report.py            # human digest, read-only
-uv run -- python _project/scripts/soundness_drain_report.py --json      # machine-readable, read-only
-uv run -- python _project/scripts/soundness_drain_report.py --apply     # also syncs the label + pinned issue
-uv run -- python _project/scripts/soundness_drain_report.py --self-test # fixture-only, no network
+uv run -- python _project/scripts/soundness_drain_report.py
+uv run -- python _project/scripts/soundness_drain_report.py --json
+uv run -- python _project/scripts/soundness_drain_report.py --apply
+uv run -- python _project/scripts/soundness_drain_report.py --self-test
 ```
 
 Auth is a short token-source chain, never a long-lived PAT: `GITHUB_TOKEN`

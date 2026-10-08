@@ -1,5 +1,3 @@
-"""Unit tests for TPC-DS ClickHouse dialect overrides."""
-
 from __future__ import annotations
 
 import re
@@ -44,7 +42,6 @@ def _extract_q66_filters(query: str) -> tuple[list[str], list[str]]:
 
 
 def test_clickhouse_q35_rewrites_correlated_exists_to_semijoins_across_seeds():
-    """Q35's existence predicates must use ClickHouse's bounded semi-join plan."""
     bench = _bench()
 
     for seed in SEEDS:
@@ -59,7 +56,6 @@ def test_clickhouse_q35_rewrites_correlated_exists_to_semijoins_across_seeds():
 
 
 def test_clickhouse_q35_rewrite_fails_closed_on_unexpected_shape():
-    """A changed generator shape must not silently restore Q35's high-memory plan."""
     with pytest.raises(ValueError, match="expected 3 semi-join predicates"):
         from benchbox.core.tpcds.benchmark.clickhouse_overrides import rewrite_q35_for_clickhouse
 
@@ -67,7 +63,6 @@ def test_clickhouse_q35_rewrite_fails_closed_on_unexpected_shape():
 
 
 def test_non_clickhouse_q35_keeps_original_exists_shape():
-    """The memory-safe rendering is ClickHouse-specific."""
     bench = _bench()
 
     query = bench.get_query(35, seed=SEEDS[0])
@@ -77,7 +72,6 @@ def test_non_clickhouse_q35_keeps_original_exists_shape():
 
 
 def test_clickhouse_q35a_keeps_supported_variant_shape():
-    """Q35a is already bounded and must not enter the base-Q35 shape rewrite."""
     bench = _bench()
 
     query = bench.get_query(35, variant="a", seed=SEEDS[0], dialect="clickhouse")
@@ -89,7 +83,6 @@ def test_clickhouse_q35a_keeps_supported_variant_shape():
 
 
 def test_clickhouse_q47_q57_seeded_queries_preserve_dsqgen_tail_across_seeds():
-    """Seeded ClickHouse Q47/Q57 rewrites must preserve the dsqgen-selected v2 tail."""
     bench = _bench()
 
     for seed in SEEDS:
@@ -106,7 +99,6 @@ def test_clickhouse_q47_q57_seeded_queries_preserve_dsqgen_tail_across_seeds():
 
 
 def test_clickhouse_q66_seeded_queries_preserve_filters_without_old_analyzer_fallback():
-    """Seeded ClickHouse Q66 rewrites must preserve dsqgen filters while avoiding alias aggregation."""
     bench = _bench()
 
     for seed in SEEDS:
@@ -131,7 +123,6 @@ def test_clickhouse_q66_seeded_queries_preserve_filters_without_old_analyzer_fal
 
 
 def test_clickhouse_q47_rewrite_rejects_unexpected_cte_shape():
-    """Monthly avg rewrite must raise ValueError when the v1 CTE shape is unexpected."""
     bench = _bench()
     malformed = "SELECT AVG(SUM(x)) OVER () FROM t"
     with pytest.raises(ValueError, match="expected leading v1 CTE"):
@@ -139,7 +130,6 @@ def test_clickhouse_q47_rewrite_rejects_unexpected_cte_shape():
 
 
 def test_clickhouse_q47_rewrite_rejects_unexpected_aggregate_shape():
-    """Monthly avg rewrite must raise ValueError when the inner structure is unexpected."""
     bench = _bench()
     malformed = "WITH v1 AS (SELECT AVG(SUM(x)) FROM t)"
     with pytest.raises(ValueError, match="monthly aggregate shape"):
@@ -147,7 +137,6 @@ def test_clickhouse_q47_rewrite_rejects_unexpected_aggregate_shape():
 
 
 def test_clickhouse_q66_rewrite_rejects_missing_derived_table():
-    """Q66 rewrite must raise ValueError when the derived table is absent."""
     bench = _bench()
     malformed = "SELECT SUM(jan_sales) AS jan_sales FROM t"
     with pytest.raises(ValueError, match="missing derived table"):
@@ -155,7 +144,6 @@ def test_clickhouse_q66_rewrite_rejects_missing_derived_table():
 
 
 def test_clickhouse_q66_rewrite_rejects_missing_group_by():
-    """Q66 rewrite must raise ValueError when GROUP BY / ORDER BY / LIMIT is absent."""
     bench = _bench()
     malformed = (
         "SELECT w_warehouse_name, SUM(jan_sales) AS jan_sales "
@@ -166,7 +154,6 @@ def test_clickhouse_q66_rewrite_rejects_missing_group_by():
 
 
 def test_base_tpcds_queries_retain_original_dsqgen_shapes():
-    """Base TPC-DS generation must remain unchanged by the ClickHouse overrides."""
     bench = _bench()
 
     for seed in SEEDS:

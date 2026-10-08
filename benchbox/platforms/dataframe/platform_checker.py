@@ -1,19 +1,6 @@
-"""DataFrame Platform Availability Detection and Error Handling.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides runtime platform availability detection with graceful error handling
-when platforms are not installed. Offers helpful error messages with
-installation instructions.
-
-Features:
-- Detect which DataFrame platforms are installed
-- Provide version information for installed platforms
-- Generate helpful installation guidance
-- Validate platform compatibility
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -29,16 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class DataFrameFamily(Enum):
-    """DataFrame library family classification."""
-
     PANDAS = "pandas"
     EXPRESSION = "expression"
 
 
 @dataclass
 class PlatformInfo:
-    """Information about a DataFrame platform."""
-
     name: str
     family: DataFrameFamily
     import_name: str
@@ -49,7 +32,6 @@ class PlatformInfo:
     max_version: str | None = None
 
 
-# Registry of DataFrame platforms
 DATAFRAME_PLATFORMS: dict[str, PlatformInfo] = {
     "pandas": PlatformInfo(
         name="Pandas",
@@ -65,7 +47,7 @@ DATAFRAME_PLATFORMS: dict[str, PlatformInfo] = {
         family=DataFrameFamily.EXPRESSION,
         import_name="polars",
         version_attr="__version__",
-        extra_name="",  # Core dependency
+        extra_name="",
         description="Fast expression-based DataFrame library",
         min_version="1.0.0",
     ),
@@ -110,8 +92,6 @@ DATAFRAME_PLATFORMS: dict[str, PlatformInfo] = {
 
 @dataclass
 class PlatformStatus:
-    """Status of a DataFrame platform."""
-
     platform: str
     available: bool
     version: str | None
@@ -121,18 +101,8 @@ class PlatformStatus:
 
 
 class DataFramePlatformChecker:
-    """Check availability and status of DataFrame platforms."""
-
     @staticmethod
     def is_available(platform: str) -> bool:
-        """Check if a DataFrame platform is available.
-
-        Args:
-            platform: Platform name (e.g., 'pandas', 'polars')
-
-        Returns:
-            True if the platform can be imported
-        """
         platform_lower = platform.lower()
         if platform_lower not in DATAFRAME_PLATFORMS:
             return False
@@ -142,14 +112,6 @@ class DataFramePlatformChecker:
 
     @staticmethod
     def get_version(platform: str) -> str | None:
-        """Get the installed version of a DataFrame platform.
-
-        Args:
-            platform: Platform name
-
-        Returns:
-            Version string or None if not installed
-        """
         platform_lower = platform.lower()
         if platform_lower not in DATAFRAME_PLATFORMS:
             return None
@@ -164,14 +126,6 @@ class DataFramePlatformChecker:
 
     @staticmethod
     def check_platform(platform: str) -> PlatformStatus:
-        """Check the status of a DataFrame platform.
-
-        Args:
-            platform: Platform name
-
-        Returns:
-            PlatformStatus with availability and version information
-        """
         platform_lower = platform.lower()
 
         if platform_lower not in DATAFRAME_PLATFORMS:
@@ -194,9 +148,6 @@ class DataFramePlatformChecker:
         version = DataFramePlatformChecker.get_version(platform)
         available = version is not None
 
-        # Check version compatibility: below-minimum installs report
-        # unavailable so callers fail fast instead of crashing on
-        # version-gated API calls later.
         version_warning = None
         error = None
         if available and version and info.min_version:
@@ -225,23 +176,10 @@ class DataFramePlatformChecker:
 
     @staticmethod
     def get_available_platforms() -> list[str]:
-        """Get list of all available DataFrame platforms.
-
-        Returns:
-            List of platform names that are installed
-        """
         return [name for name in DATAFRAME_PLATFORMS if DataFramePlatformChecker.is_available(name)]
 
     @staticmethod
     def get_available_by_family(family: DataFrameFamily) -> list[str]:
-        """Get available platforms for a specific family.
-
-        Args:
-            family: The DataFrame family
-
-        Returns:
-            List of available platform names in that family
-        """
         return [
             name
             for name, info in DATAFRAME_PLATFORMS.items()
@@ -250,32 +188,14 @@ class DataFramePlatformChecker:
 
     @staticmethod
     def get_all_platforms() -> dict[str, PlatformInfo]:
-        """Get information about all DataFrame platforms.
-
-        Returns:
-            Dictionary mapping platform name to PlatformInfo
-        """
         return DATAFRAME_PLATFORMS.copy()
 
     @staticmethod
     def check_all_platforms() -> dict[str, PlatformStatus]:
-        """Check status of all DataFrame platforms.
-
-        Returns:
-            Dictionary mapping platform name to PlatformStatus
-        """
         return {name: DataFramePlatformChecker.check_platform(name) for name in DATAFRAME_PLATFORMS}
 
 
 def get_installation_suggestion(platform: str) -> str:
-    """Generate installation suggestion for a DataFrame platform.
-
-    Args:
-        platform: Platform name
-
-    Returns:
-        Formatted installation instructions
-    """
     platform_lower = platform.lower()
 
     if platform_lower not in DATAFRAME_PLATFORMS:
@@ -284,7 +204,6 @@ def get_installation_suggestion(platform: str) -> str:
     info = DATAFRAME_PLATFORMS[platform_lower]
 
     if not info.extra_name:
-        # Core dependency (polars)
         return f"{info.name} is a core dependency and should already be installed."
 
     message = f"Platform '{info.name}' is not available.\n\n{get_extra_install_message(info.extra_name)}"
@@ -299,15 +218,6 @@ def get_installation_suggestion(platform: str) -> str:
 
 
 def get_platform_error_message(platform: str, error: Exception | None = None) -> str:
-    """Generate a helpful error message when a platform is unavailable.
-
-    Args:
-        platform: Platform name
-        error: Optional exception that occurred
-
-    Returns:
-        Formatted error message with installation guidance
-    """
     platform_lower = platform.lower()
 
     if platform_lower not in DATAFRAME_PLATFORMS:
@@ -343,7 +253,6 @@ def get_platform_error_message(platform: str, error: Exception | None = None) ->
             ]
         )
 
-    # Add family group suggestions
     if info.family == DataFrameFamily.PANDAS:
         lines.append("")
         lines.append(get_extra_install_message("dataframe-pandas-family", "For all Pandas-family platforms:"))
@@ -358,17 +267,6 @@ def get_platform_error_message(platform: str, error: Exception | None = None) ->
 
 
 def require_platform(platform: str) -> Any:
-    """Import and return a DataFrame platform module, raising helpful error if unavailable.
-
-    Args:
-        platform: Platform name
-
-    Returns:
-        The imported module
-
-    Raises:
-        ImportError: If the platform is not available, with helpful message
-    """
     platform_lower = platform.lower()
 
     if platform_lower not in DATAFRAME_PLATFORMS:
@@ -383,11 +281,6 @@ def require_platform(platform: str) -> Any:
 
 
 def format_platform_status_table() -> str:
-    """Format a table showing all platform statuses.
-
-    Returns:
-        Formatted table string
-    """
     statuses = DataFramePlatformChecker.check_all_platforms()
 
     lines = [
@@ -405,7 +298,6 @@ def format_platform_status_table() -> str:
 
     lines.append("-" * 60)
 
-    # Count available
     available_count = sum(1 for s in statuses.values() if s.available)
     lines.append(f"Available: {available_count}/{len(statuses)} platforms")
 

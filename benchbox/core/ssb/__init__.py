@@ -1,26 +1,8 @@
-"""Star Schema Benchmark (SSB) package.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This package provides a complete implementation of the Star Schema Benchmark,
-a simplified OLAP benchmark based on TPC-H. The SSB features:
+# This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-This implementation is derived from TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-
-1. A denormalized star schema with 1 fact table and 4 dimension tables
-2. 13 standard queries organized into 4 flights
-3. Data generation based on TPC-H but simplified for OLAP workloads
-4. Query execution and performance measurement
-
-The Star Schema Benchmark was originally designed by Patrick O'Neil and others
-to provide a more focused benchmark for data warehouse and OLAP systems.
-
-For more information, see:
-- "Star Schema Benchmark" by O'Neil et al.
-- https://www.cs.umb.edu/~poneil/StarSchemaB.PDF
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from .benchmark import SSBBenchmark
 from .family import SSBFamily

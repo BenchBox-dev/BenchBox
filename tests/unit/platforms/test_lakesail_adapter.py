@@ -1,5 +1,3 @@
-"""Unit tests for LakeSail Sail platform adapter."""
-
 from __future__ import annotations
 
 import argparse
@@ -14,11 +12,9 @@ pytestmark = [
 
 
 class TestLakeSailAdapter:
-    """Tests for LakeSailAdapter class."""
-
     @pytest.fixture
     def mock_pyspark(self):
-        """Mock pyspark module for LakeSail adapter tests."""
+
         mock_spark_session = MagicMock()
         mock_builder = MagicMock()
         mock_builder.remote.return_value = mock_builder
@@ -52,7 +48,7 @@ class TestLakeSailAdapter:
             yield mock_session_class, mock_spark_session
 
     def test_initialization_success(self, mock_pyspark):
-        """Test successful adapter initialization."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         config = {
@@ -71,7 +67,7 @@ class TestLakeSailAdapter:
         assert adapter.driver_memory == "8g"
 
     def test_csv_compression_codecs_includes_zstd(self, mock_pyspark):
-        """Sail's CSV reader accepts zstd but doesn't auto-detect from extensions."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
@@ -79,7 +75,7 @@ class TestLakeSailAdapter:
         assert isinstance(adapter._csv_compression_codecs, frozenset)
 
     def test_initialization_with_defaults(self, mock_pyspark):
-        """Test initialization with default values."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
@@ -96,7 +92,7 @@ class TestLakeSailAdapter:
         assert adapter.disable_cache is True
 
     def test_initialization_with_distributed_mode(self, mock_pyspark):
-        """Test initialization with distributed deployment mode."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         config = {
@@ -112,14 +108,14 @@ class TestLakeSailAdapter:
         assert adapter.sail_workers == 8
 
     def test_get_target_dialect(self, mock_pyspark):
-        """Test that target dialect returns spark."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
         assert adapter.get_target_dialect() == "spark"
 
     def test_vector_search_queries_use_lakesail_compat_key(self, mock_pyspark):
-        """Vector search needs LakeSail-specific skips, not generic Spark variants."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
@@ -132,7 +128,7 @@ class TestLakeSailAdapter:
         benchmark.get_queries.assert_called_once_with(dialect="lakesail", platform_version=None)
 
     def test_unsupported_lakesail_benchmarks_are_gated(self, mock_pyspark):
-        """LakeSail benchmark gates are exposed through PlatformRegistry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("lakesail")
@@ -146,7 +142,7 @@ class TestLakeSailAdapter:
         assert "write_primitives" in caps.unsupported_benchmarks
 
     def test_platform_info(self, mock_pyspark):
-        """Test platform info collection."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         config = {
@@ -170,7 +166,7 @@ class TestLakeSailAdapter:
         assert info["configuration"]["sail_workers"] == 4
 
     def test_platform_info_local_mode(self, mock_pyspark):
-        """Test platform info in local mode."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
@@ -179,7 +175,7 @@ class TestLakeSailAdapter:
         assert info["connection_mode"] == "local"
 
     def test_from_config(self, mock_pyspark):
-        """Test adapter creation from config."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         config = {
@@ -193,11 +189,11 @@ class TestLakeSailAdapter:
 
         assert adapter.driver_memory == "8g"
         assert adapter.endpoint == "sc://sail:50051"
-        # Database name should be auto-generated
+
         assert "tpch" in adapter.database.lower() or "benchmark" in adapter.database.lower()
 
     def test_from_config_adaptive_enabled_false_propagates(self, mock_pyspark):
-        """Explicit adaptive_enabled=False must survive from_config."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter.from_config({"benchmark": "TPC-H", "scale_factor": 1.0, "adaptive_enabled": False})
@@ -205,7 +201,7 @@ class TestLakeSailAdapter:
         assert adapter.adaptive_enabled is False
 
     def test_get_spark_conf(self, mock_pyspark):
-        """Test Spark Connect configuration generation."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter(
@@ -222,21 +218,19 @@ class TestLakeSailAdapter:
         assert conf["spark.sql.inMemoryColumnarStorage.enabled"] == "false"
 
     def test_get_spark_conf_no_adaptive(self, mock_pyspark):
-        """Test configuration with AQE disabled."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter(adaptive_enabled=False)
 
         conf = adapter._get_spark_conf()
 
-        # Spark enables AQE by default since 3.2.0, so disabling must set the
-        # keys to "false" explicitly rather than omitting them.
         assert conf["spark.sql.adaptive.enabled"] == "false"
         assert conf["spark.sql.adaptive.coalescePartitions.enabled"] == "false"
         assert conf["spark.sql.adaptive.skewJoin.enabled"] == "false"
 
     def test_get_spark_conf_aqe_disabled_spark_config_still_wins(self, mock_pyspark):
-        """An explicit spark_config AQE entry wins over adaptive_enabled=False."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter(
@@ -249,7 +243,7 @@ class TestLakeSailAdapter:
         assert conf["spark.sql.adaptive.enabled"] == "true"
 
     def test_add_cli_arguments_supports_disabling_adaptive(self, mock_pyspark):
-        """CLI args should allow disabling AQE via --no-adaptive-enabled."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         parser = argparse.ArgumentParser()
@@ -262,7 +256,7 @@ class TestLakeSailAdapter:
         assert disabled_args.adaptive_enabled is False
 
     def test_normalize_table_name(self, mock_pyspark):
-        """Test table name normalization (delegates to shared helper)."""
+
         from benchbox.platforms._spark_helpers import normalize_spark_table_name_in_sql
 
         sql = 'CREATE TABLE "CUSTOMER" (id INT)'
@@ -271,7 +265,7 @@ class TestLakeSailAdapter:
         assert "customer" in normalized.lower()
 
     def test_optimize_table_definition_parquet(self, mock_pyspark):
-        """LakeSail uses the shared optimize_spark_table_definition helper."""
+
         from benchbox.platforms._spark_helpers import optimize_spark_table_definition
 
         sql = "CREATE TABLE orders (id INT, amount DECIMAL)"
@@ -279,7 +273,7 @@ class TestLakeSailAdapter:
         assert "USING PARQUET" in optimized.upper()
 
     def test_optimize_table_definition_orc(self, mock_pyspark):
-        """LakeSail uses the shared optimize_spark_table_definition helper."""
+
         from benchbox.platforms._spark_helpers import optimize_spark_table_definition
 
         sql = "CREATE TABLE orders (id INT, amount DECIMAL)"
@@ -287,22 +281,20 @@ class TestLakeSailAdapter:
         assert "USING ORC" in optimized.upper()
 
     def test_validate_identifier(self, mock_pyspark):
-        """Test SQL identifier validation (delegates to shared helper)."""
+
         from benchbox.platforms._spark_helpers import validate_spark_identifier
 
-        # Valid identifiers
         assert validate_spark_identifier("my_table") is True
         assert validate_spark_identifier("_private") is True
         assert validate_spark_identifier("Table123") is True
 
-        # Invalid identifiers
         assert validate_spark_identifier("") is False
         assert validate_spark_identifier("123table") is False
         assert validate_spark_identifier("table-name") is False
         assert validate_spark_identifier("table; DROP TABLE users") is False
 
     def test_supports_tuning_type(self, mock_pyspark):
-        """Test tuning type support."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
@@ -317,14 +309,14 @@ class TestLakeSailAdapter:
             pass
 
     def test_extract_table_name(self, mock_pyspark):
-        """Test extracting table name from CREATE TABLE (shared helper)."""
+
         from benchbox.platforms._spark_helpers import extract_spark_table_name
 
         assert extract_spark_table_name("CREATE TABLE orders (id INT)") == "orders"
         assert extract_spark_table_name("CREATE TABLE IF NOT EXISTS lineitem (id INT)") == "lineitem"
 
     def test_create_connection_initializes_session_before_existing_db_handling(self, mock_pyspark):
-        """Existing-database handling should run after Spark session is available."""
+
         import benchbox.platforms.lakesail as lakesail_module
         from benchbox.platforms.lakesail import LakeSailAdapter
 
@@ -346,11 +338,9 @@ class TestLakeSailAdapter:
 
 
 class TestLakeSailAdapterExecution:
-    """Tests for LakeSail query execution and connection lifecycle."""
-
     @pytest.fixture
     def mock_pyspark(self):
-        """Mock pyspark module."""
+
         mock_spark_session = MagicMock()
         mock_builder = MagicMock()
         mock_builder.remote.return_value = mock_builder
@@ -384,7 +374,7 @@ class TestLakeSailAdapterExecution:
             yield mock_session_class, mock_spark_session
 
     def test_execute_query_success(self, mock_pyspark):
-        """Test successful query execution."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -403,7 +393,7 @@ class TestLakeSailAdapterExecution:
         assert result["rows_returned"] == 2
 
     def test_execute_query_disable_cache_skips_unsupported_clear_cache(self, mock_pyspark):
-        """LakeSail must not call clearCache() even when disable_cache=True."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -420,7 +410,7 @@ class TestLakeSailAdapterExecution:
         mock_spark_session.catalog.clearCache.assert_not_called()
 
     def test_execute_query_failure(self, mock_pyspark):
-        """Test query execution failure."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -435,7 +425,7 @@ class TestLakeSailAdapterExecution:
         assert "Query failed" in result.get("error", "")
 
     def test_close_connection(self, mock_pyspark):
-        """Test connection (SparkSession) closing."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -446,27 +436,25 @@ class TestLakeSailAdapterExecution:
         mock_spark_session.stop.assert_called_once()
 
     def test_close_connection_handles_none(self, mock_pyspark):
-        """Test connection closing handles None gracefully."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
 
-        # Should not raise
         adapter.close_connection(None)
 
     def test_configure_for_benchmark_olap(self, mock_pyspark):
-        """Test OLAP benchmark configuration."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         _, mock_spark_session = mock_pyspark
 
         adapter = LakeSailAdapter()
 
-        # Should not raise
         adapter.configure_for_benchmark(mock_spark_session, "olap")
 
     def test_configure_for_benchmark_olap_respects_adaptive_disabled(self, mock_pyspark):
-        """OLAP run-time config must honor adaptive_enabled=False."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -479,7 +467,7 @@ class TestLakeSailAdapterExecution:
         mock_spark_session.conf.set.assert_any_call("spark.sql.adaptive.skewJoin.enabled", "false")
 
     def test_configure_for_benchmark_olap_respects_spark_config_override(self, mock_pyspark):
-        """An explicit spark_config AQE entry must survive run-time config."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -487,13 +475,12 @@ class TestLakeSailAdapterExecution:
         adapter = LakeSailAdapter(spark_config={"spark.sql.adaptive.enabled": "false"})
         adapter.configure_for_benchmark(mock_spark_session, "olap")
 
-        # The explicit spark_config entry must not be clobbered at run time.
         mock_spark_session.conf.set.assert_any_call("spark.sql.adaptive.enabled", "false")
-        # Keys without an override still follow adaptive_enabled (default True).
+
         mock_spark_session.conf.set.assert_any_call("spark.sql.adaptive.skewJoin.enabled", "true")
 
     def test_get_query_plan(self, mock_pyspark):
-        """Test query plan retrieval."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -508,7 +495,7 @@ class TestLakeSailAdapterExecution:
         assert isinstance(plan, str)
 
     def test_get_query_plan_failure_returns_none(self, mock_pyspark):
-        """EXPLAIN failure returns None, not an error string as plan text (qpc-13)."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -519,18 +506,17 @@ class TestLakeSailAdapterExecution:
         assert adapter.get_query_plan(mock_spark_session, "SELECT * FROM test") is None
 
     def test_analyze_table(self, mock_pyspark):
-        """Test table analysis for query optimization."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         _, mock_spark_session = mock_pyspark
 
         adapter = LakeSailAdapter(database="test_db")
 
-        # Should not raise
         adapter.analyze_table(mock_spark_session, "orders")
 
     def test_generate_tuning_clause_partitioning(self, mock_pyspark):
-        """Test tuning clause generation with partitioning."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
@@ -555,7 +541,7 @@ class TestLakeSailAdapterExecution:
             assert "date_col" in clause
 
     def test_generate_tuning_clause_empty(self, mock_pyspark):
-        """Test tuning clause generation with no tuning."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
@@ -568,24 +554,22 @@ class TestLakeSailAdapterExecution:
 
 
 class TestLakeSailAdapterRegistration:
-    """Tests for platform registration."""
-
     def test_lakesail_in_platform_list(self):
-        """Test that LakeSail is listed in available platforms."""
+
         from benchbox.platforms import list_available_platforms
 
         platforms = list_available_platforms()
         assert "lakesail" in platforms
 
     def test_lakesail_requirements(self):
-        """Test that LakeSail requirements are correct."""
+
         from benchbox.platforms import get_platform_requirements
 
         requirements = get_platform_requirements("lakesail")
         assert "pyspark" in requirements
 
     def test_lakesail_dependency_group(self):
-        """Test that LakeSail dependency group is defined."""
+
         from benchbox.utils.dependencies import DEPENDENCY_GROUPS
 
         assert "lakesail" in DEPENDENCY_GROUPS
@@ -593,13 +577,13 @@ class TestLakeSailAdapterRegistration:
         assert "pyspark" in lakesail_deps.packages
 
     def test_lakesail_df_is_dataframe_platform(self):
-        """Test that lakesail-df is recognized as a DataFrame platform."""
+
         from benchbox.platforms import is_dataframe_platform
 
         assert is_dataframe_platform("lakesail-df") is True
 
     def test_lakesail_platform_info_from_registry(self):
-        """Test that LakeSail platform info is accessible from registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         info = PlatformRegistry.get_platform_info("lakesail")
@@ -608,11 +592,9 @@ class TestLakeSailAdapterRegistration:
 
 
 class TestLakeSailIdentifierValidation:
-    """Tests for SQL injection prevention via identifier validation."""
-
     @pytest.fixture
     def mock_pyspark(self):
-        """Mock pyspark module for LakeSail adapter tests."""
+
         mock_spark_session = MagicMock()
         mock_builder = MagicMock()
         mock_builder.remote.return_value = mock_builder
@@ -637,7 +619,7 @@ class TestLakeSailIdentifierValidation:
             yield mock_session_class, mock_spark_session
 
     def test_create_connection_rejects_invalid_database(self, mock_pyspark):
-        """create_connection should reject databases with SQL injection characters."""
+
         import benchbox.platforms.lakesail as lakesail_module
         from benchbox.platforms.lakesail import LakeSailAdapter
 
@@ -653,7 +635,7 @@ class TestLakeSailIdentifierValidation:
                 adapter.create_connection(database="DROP TABLE; --")
 
     def test_normalize_table_name_preserves_if_not_exists(self, mock_pyspark):
-        """_normalize_table_name_in_sql should preserve IF NOT EXISTS clause."""
+
         from benchbox.platforms._spark_helpers import normalize_spark_table_name_in_sql
         from benchbox.platforms.lakesail import LakeSailAdapter
 
@@ -663,7 +645,7 @@ class TestLakeSailIdentifierValidation:
         assert "lineitem" in result
 
     def test_normalize_table_name_works_without_if_not_exists(self, mock_pyspark):
-        """normalize_spark_table_name_in_sql should work when IF NOT EXISTS is absent."""
+
         from benchbox.platforms._spark_helpers import normalize_spark_table_name_in_sql
 
         result = normalize_spark_table_name_in_sql("CREATE TABLE ORDERS (id INT)")
@@ -673,11 +655,9 @@ class TestLakeSailIdentifierValidation:
 
 
 class TestLakeSailServerLifecycle:
-    """Tests for server readiness, auto-start, and cleanup methods."""
-
     @pytest.fixture
     def mock_pyspark(self):
-        """Mock pyspark module for LakeSail adapter tests."""
+
         mock_spark_session = MagicMock()
         mock_builder = MagicMock()
         mock_builder.remote.return_value = mock_builder
@@ -701,49 +681,45 @@ class TestLakeSailServerLifecycle:
         ):
             yield mock_session_class, mock_spark_session
 
-    # --- parse_spark_connect_endpoint (shared helper) ---
-
     def test_parse_endpoint_standard(self, mock_pyspark):
-        """Parse standard sc://host:port endpoint."""
+
         from benchbox.platforms._spark_helpers import parse_spark_connect_endpoint
 
         assert parse_spark_connect_endpoint("sc://myhost:9999") == ("myhost", 9999)
 
     def test_parse_endpoint_default_port(self, mock_pyspark):
-        """Default port 50051 when no port in endpoint."""
+
         from benchbox.platforms._spark_helpers import parse_spark_connect_endpoint
 
         assert parse_spark_connect_endpoint("sc://myhost") == ("myhost", 50051)
 
     def test_parse_endpoint_no_scheme(self, mock_pyspark):
-        """Handle endpoint without sc:// prefix."""
+
         from benchbox.platforms._spark_helpers import parse_spark_connect_endpoint
 
         assert parse_spark_connect_endpoint("myhost:8080") == ("myhost", 8080)
 
     def test_parse_endpoint_invalid_port(self, mock_pyspark):
-        """Invalid port string falls back to 50051."""
+
         from benchbox.platforms._spark_helpers import parse_spark_connect_endpoint
 
         assert parse_spark_connect_endpoint("sc://myhost:notaport") == ("myhost", 50051)
 
     def test_parse_endpoint_empty_host(self, mock_pyspark):
-        """Empty host defaults to localhost."""
+
         from benchbox.platforms._spark_helpers import parse_spark_connect_endpoint
 
         assert parse_spark_connect_endpoint("sc://:50051") == ("localhost", 50051)
 
-    # --- is_spark_connect_reachable (shared helper) ---
-
     def test_is_server_reachable_true(self, mock_pyspark):
-        """Returns True when socket connects."""
+
         from benchbox.platforms._spark_helpers import is_spark_connect_reachable
 
         with patch("benchbox.platforms._spark_helpers.socket.create_connection"):
             assert is_spark_connect_reachable("sc://localhost:50051") is True
 
     def test_is_server_reachable_false(self, mock_pyspark):
-        """Returns False when socket fails."""
+
         from benchbox.platforms._spark_helpers import is_spark_connect_reachable
 
         with patch(
@@ -752,18 +728,16 @@ class TestLakeSailServerLifecycle:
         ):
             assert is_spark_connect_reachable("sc://localhost:50051") is False
 
-    # --- _ensure_server_ready ---
-
     def test_ensure_server_ready_already_reachable(self, mock_pyspark):
-        """No-op when server is already reachable."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
         with patch("benchbox.platforms.lakesail.is_spark_connect_reachable", return_value=True):
-            adapter._ensure_server_ready()  # should not raise
+            adapter._ensure_server_ready()
 
     def test_ensure_server_ready_distributed_unreachable(self, mock_pyspark):
-        """Raises RuntimeError immediately for unreachable distributed server."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter(sail_mode="distributed", endpoint="sc://cluster:50051")
@@ -772,7 +746,7 @@ class TestLakeSailServerLifecycle:
                 adapter._ensure_server_ready()
 
     def test_ensure_server_ready_local_no_pysail(self, mock_pyspark):
-        """Raises RuntimeError with install instructions when pysail is missing."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter(sail_mode="local")
@@ -784,7 +758,7 @@ class TestLakeSailServerLifecycle:
             adapter._ensure_server_ready()
 
     def test_ensure_server_ready_local_auto_starts(self, mock_pyspark):
-        """Delegates to _auto_start_local_server when pysail is available."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter(sail_mode="local")
@@ -796,16 +770,14 @@ class TestLakeSailServerLifecycle:
             adapter._ensure_server_ready()
             mock_auto.assert_called_once()
 
-    # --- _auto_start_local_server ---
-
     def test_auto_start_server_success(self, mock_pyspark):
-        """Successful auto-start: process stays running, server becomes reachable."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
 
         mock_proc = MagicMock()
-        mock_proc.poll.return_value = None  # process still running
+        mock_proc.poll.return_value = None
 
         reachable_calls = iter([False, True])
 
@@ -822,13 +794,13 @@ class TestLakeSailServerLifecycle:
         assert adapter._managed_server_process is mock_proc
 
     def test_auto_start_server_process_crashes(self, mock_pyspark):
-        """Raises RuntimeError with stderr when pysail exits immediately."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         adapter = LakeSailAdapter()
 
         mock_proc = MagicMock()
-        mock_proc.poll.return_value = 1  # exited with error
+        mock_proc.poll.return_value = 1
         mock_proc.returncode = 1
         mock_proc.stderr.read.return_value = b"Address already in use"
 
@@ -840,7 +812,7 @@ class TestLakeSailServerLifecycle:
             adapter._auto_start_local_server()
 
     def test_auto_start_server_timeout(self, mock_pyspark):
-        """Raises RuntimeError with stderr after 10s timeout, terminates process."""
+
         import time
 
         from benchbox.platforms.lakesail import LakeSailAdapter
@@ -848,10 +820,9 @@ class TestLakeSailServerLifecycle:
         adapter = LakeSailAdapter()
 
         mock_proc = MagicMock()
-        mock_proc.poll.return_value = None  # still running
+        mock_proc.poll.return_value = None
         mock_proc.stderr.read.return_value = b"some debug output"
 
-        # Make time.monotonic advance past deadline immediately
         start = 1000.0
         with (
             patch("subprocess.Popen", return_value=mock_proc),
@@ -866,10 +837,8 @@ class TestLakeSailServerLifecycle:
         mock_proc.terminate.assert_called_once()
         mock_proc.wait.assert_called_once_with(timeout=5)
 
-    # --- close_connection: managed server cleanup ---
-
     def test_close_connection_stops_managed_server(self, mock_pyspark):
-        """close_connection terminates and waits on managed server process."""
+
         from benchbox.platforms.lakesail import LakeSailAdapter
 
         _, mock_spark_session = mock_pyspark
@@ -889,7 +858,7 @@ class TestLakeSailServerLifecycle:
         mock_unregister.assert_called_once_with(cleanup_fn)
 
     def test_close_connection_kills_on_timeout(self, mock_pyspark):
-        """close_connection escalates to kill if terminate+wait times out."""
+
         import subprocess
 
         from benchbox.platforms.lakesail import LakeSailAdapter

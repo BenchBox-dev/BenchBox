@@ -105,7 +105,7 @@ def _bundle(tmp_path: Path) -> tuple[Path, dict, dict, dict]:
     root = tmp_path / "bundle"
     root.mkdir()
     (root / "site").symlink_to(site, target_is_directory=True)
-    # The validator reads an extracted archive, so package real files.
+
     (root / "site").unlink()
     import shutil
 
@@ -217,7 +217,7 @@ def test_candidate_rejects_route_metadata_substitution(tmp_path: Path) -> None:
 
 
 def test_main_create_writes_output_without_summary_flag(tmp_path: Path) -> None:
-    """`create` defines no --output-summary; main must not touch that attribute."""
+
     from scripts.publication.candidate import main
 
     site = tmp_path / "site"
@@ -261,7 +261,7 @@ def test_main_create_writes_output_without_summary_flag(tmp_path: Path) -> None:
 
 
 def _linear_repo(path: Path, commits: int) -> list[str]:
-    """Create a linear git repo; returns oldest-first commit SHAs."""
+
     path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-q"], cwd=path, check=True)
     subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=path, check=True)
@@ -327,7 +327,7 @@ def test_develop_max_behind_default_is_bounded() -> None:
 
 
 def _bundle_with_parent(tmp_path: Path) -> tuple[Path, dict, dict, dict]:
-    """Generation-2 bundle bound to a durable parent."""
+
     root, artifact_metadata, run_metadata, manifest = _bundle(tmp_path)
     manifest = dict(manifest)
     manifest["generation"] = 2

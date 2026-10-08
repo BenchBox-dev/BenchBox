@@ -1,5 +1,3 @@
-"""Regression checks for Redshift write_primitives sketch overrides."""
-
 from __future__ import annotations
 
 import pytest
@@ -22,7 +20,6 @@ REDSHIFT_HLL_OPS = (
 
 
 def test_redshift_hll_overrides_parse_with_sqlglot() -> None:
-    """The hand-authored Redshift HLL overrides should remain syntactically parseable."""
     operations = load_write_primitives_catalog().operations
 
     for operation_id in REDSHIFT_HLL_OPS:
@@ -33,7 +30,6 @@ def test_redshift_hll_overrides_parse_with_sqlglot() -> None:
 
 
 def test_redshift_hll_distinct_bounds_are_tightened_from_initial_theta_bounds() -> None:
-    """SF=0.01 HLL logm=15 should not need the old ±1000 distinct-count envelope."""
     operation = load_write_primitives_catalog().operations["sketch_query_theta_union_merge"]
     validation = operation.validation_queries[0]
 
@@ -42,7 +38,6 @@ def test_redshift_hll_distinct_bounds_are_tightened_from_initial_theta_bounds() 
 
 
 def test_redshift_hll_distinct_validation_uses_redshift_hll_functions() -> None:
-    """Redshift should not inherit DuckDB/DataSketches validation SQL for the HLL substitute."""
     operation = load_write_primitives_catalog().operations["sketch_query_theta_union_merge"]
     validation_sql = operation.validation_queries[0].platform_overrides["redshift"]
     parsed = sqlglot.parse(validation_sql, read="redshift")
@@ -53,7 +48,6 @@ def test_redshift_hll_distinct_validation_uses_redshift_hll_functions() -> None:
 
 
 def test_redshift_hll_overrides_avoid_hllsketch_key_and_grouping_clauses() -> None:
-    """HLLSKETCH columns cannot be dist/sort keys or grouping/order/distinct keys."""
     operations = load_write_primitives_catalog().operations
 
     for operation_id in REDSHIFT_HLL_OPS:

@@ -92,15 +92,14 @@ uv run -- benchbox run --platform duckdb --benchmark tpch --scale 0.01
 Run these commands to verify:
 
 ```bash
-# Check BenchBox version
 benchbox --version
 
-# Profile your environment
 benchbox profile
 
-# Check platform dependencies
 benchbox check-deps --matrix
 ```
+
+The first command checks the BenchBox version. The second profiles your environment. The third checks platform dependencies.
 
 ## Running Benchmarks
 
@@ -349,9 +348,10 @@ Yes! BenchBox provides APIs for creating custom benchmarks:
 from benchbox.base import BaseBenchmark
 
 class MyCustomBenchmark(BaseBenchmark):
-    # Implement required methods
     pass
 ```
+
+Implement the required methods in the subclass body.
 
 See [Custom Benchmarks Guide](../advanced/custom-benchmarks.md) for complete instructions.
 

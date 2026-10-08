@@ -1,9 +1,6 @@
-"""System-profile CLI display helpers.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -15,18 +12,14 @@ from benchbox.utils.printing import quiet_console
 
 
 class StandardDisplays:
-    """Standardized display components for CLI."""
-
     def __init__(self, console: Console | None = None):
         self.console = console or quiet_console
 
     def show_system_profile(self, profile: SystemProfile, detailed: bool = False) -> None:
-        """Display system profile in standardized format."""
         table = Table(title="System Information", show_header=True, header_style="bold magenta")
         table.add_column("Property", style="cyan", width=25)
         table.add_column("Value", style="white")
 
-        # Basic information
         table.add_row("OS", f"{profile.os_name} {profile.os_version}")
         table.add_row("Architecture", profile.architecture)
         table.add_row("CPU", profile.cpu_model or "Not recorded")
@@ -50,11 +43,9 @@ class StandardDisplays:
 
 
 def create_display_manager(console: Console | None = None) -> StandardDisplays:
-    """Factory function to create display manager."""
     return StandardDisplays(console)
 
 
 def show_system_info(profile: SystemProfile, console: Console | None = None, detailed: bool = False) -> None:
-    """Convenience function to show system information."""
     display = create_display_manager(console)
     display.show_system_profile(profile, detailed)

@@ -1,5 +1,3 @@
-"""Deprecated compare-plans compatibility command."""
-
 import json
 from pathlib import Path
 
@@ -12,7 +10,12 @@ from benchbox.core.results.loader import iter_query_results, load_result_file
 from benchbox.core.results.query_normalizer import normalize_query_id
 
 
-@click.command("compare-plans", hidden=True, deprecated=True)
+@click.command(
+    "compare-plans",
+    hidden=True,
+    deprecated=True,
+    help=("Compare query plans between benchmark runs. Deprecated; use `benchbox compare --include-plans`."),
+)
 @click.option("--run1", "run1_path", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--run2", "run2_path", required=True, type=click.Path(exists=True, dir_okay=False, path_type=Path))
 @click.option("--query-id", help="Query ID to compare")
@@ -27,7 +30,6 @@ from benchbox.core.results.query_normalizer import normalize_query_id
 def compare_plans(
     ctx, run1_path, run2_path, query_id, output_format, output_file, threshold, show_summary, regression_threshold
 ):
-    """Compare query plans between benchmark runs. Deprecated; use `benchbox compare --include-plans`."""
     try:
         results1, _ = load_result_file(run1_path)
         results2, _ = load_result_file(run2_path)
@@ -100,9 +102,6 @@ def _build_comparisons(
         plan1 = exec1.get("query_plan")
         plan2 = exec2.get("query_plan")
         if not plan1 or not plan2:
-            # Distinguish a missing plan from a .plans.json that exists but
-            # failed to load, so the user knows whether to re-capture or to
-            # investigate a corrupt companion file (qpc-05 / F4.3).
             load_errors = [
                 err
                 for err in (
@@ -120,10 +119,6 @@ def _build_comparisons(
                 _warn_if_explicit(explicit_query_id, f"Query '{qid}' missing plan in one or both runs")
             continue
         comparison = compare_query_plans(plan1, plan2)
-        # An explicitly requested query is always reported: --threshold filters
-        # the multi-query sweep, it must not suppress a single-query request
-        # (at the default threshold 0.0 the old condition dropped it and the
-        # command exited 0 with "No plans available for comparison").
         if explicit_query_id or comparison.similarity.overall_similarity < threshold or threshold == 0.0:
             comparisons.append((qid, comparison))
     return comparisons
@@ -147,13 +142,6 @@ def _emit_comparisons(comparisons, output_format, output_file, explicit_query_id
 
 
 def _find_query_execution(results, query_id: str):
-    """Find a query result whose ID matches after normalization.
-
-    ``load_result_file`` returns already-normalized IDs from a real bundle's
-    compact ``queries[].id`` field (e.g. ``q05``/``Q05`` -> ``05``), so a raw
-    string comparison against the CLI's documented ``--query-id q05`` input
-    would report "not found" even when the plan is present.
-    """
     normalized_target = normalize_query_id(query_id)
     return next(
         (qr for qr in iter_query_results(results) if normalize_query_id(qr.get("query_id", "")) == normalized_target),

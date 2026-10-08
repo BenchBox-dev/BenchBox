@@ -15,7 +15,7 @@ import { formatAverageRank, formatCoverage, formatRank, formatSpeedup } from "@/
 import { fmtGeomean, fmtScoreCompact, fmtScoreExact } from "@/utils";
 import { TrustBadge, ValidationBadge } from "@/components/TrustBadge";
 import { FundingChip } from "@/components/FundingChip";
-import { parseOverrideRules } from "@/lib/displayLabels";
+import { formatPhaseWithStreams, parseOverrideRules } from "@/lib/displayLabels";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { formatRunAge } from "@/lib/runAge";
@@ -33,7 +33,6 @@ interface MetaResultMetadata {
   trust_label: string;
   funding?: string | null;
   validation_status?: string | null;
-  /** Accepted-override rule ids (canonical JSON array string). Optional for callers predating v11. */
   override_rules?: string | null;
   run_date?: string | null;
 }
@@ -72,7 +71,6 @@ const SORT_TITLES: Record<MetaLeaderboardSort, string> = {
   recent_activity: "Sort by the most recent visible run date.",
 };
 const MISSING_COHORT_TITLE = `No published run for this ranking. ${COVERAGE_POLICY_COPY}`;
-// Keep the initial ranking readable; further rows remain explicitly reachable.
 const PLATFORM_RENDER_LIMIT = 25;
 const PLATFORM_RENDER_INCREMENT = 200;
 
@@ -164,7 +162,6 @@ export function MetaLeaderboard({
   if (platforms.length === 0 || cohorts.length === 0) return null;
 
   function handleCellKey(event: KeyboardEvent, rowIdx: number, colIdx: number) {
-    // Nested links and date buttons keep their own keyboard behavior.
     if (event.target !== event.currentTarget) return;
     let nextRow = rowIdx;
     let nextCol = colIdx;
@@ -196,9 +193,6 @@ export function MetaLeaderboard({
       case "Enter":
       case " ": {
         event.preventDefault();
-        // Activation matches the row's mouse-click target (platform page), so
-        // keyboard and pointer paths navigate to the same destination. The
-        // column's cohort link is reachable via Tab on the header row.
         const platform = visiblePlatforms[rowIdx];
         if (platform) route(platformHref(platform.platform_id));
         return;
@@ -317,7 +311,6 @@ export function MetaLeaderboard({
           >
             <thead class="bg-[var(--bb-surface-data-muted)]">
               <tr role="row">
-                {/* Keep row labels visible while timing columns scroll. */}
                 <th scope="col" class="table-th sticky left-0 z-10 min-w-40 bg-[var(--bb-surface-data-muted)] py-2">
                   Platform
                 </th>
@@ -471,9 +464,6 @@ export function MetaLeaderboard({
                               </>
                             )}
                             {(() => {
-                              // An accepted override always badges — even when
-                              // the recorded status is a clean "passed", which
-                              // otherwise hides the badge on this surface.
                               const overrideRules = parseOverrideRules(metadata.override_rules);
                               const isCleanPass =
                                 metadata.validation_status?.trim().toLowerCase() === "passed";
@@ -562,22 +552,19 @@ export function MetaLeaderboard({
   );
 }
 
-/**
- * Human-readable metric/unit/direction sublabel for a cohort header.
- * Surfaces the audit's required "every cohort must clearly state metric, unit,
- * and direction" without relying on tooltip-only disclosure.
- */
 function cohortMetricSublabel(cohort: MetaCohort): string {
   const metric = cohort.primary_metric;
   const direction = cohort.primary_order === "desc" ? "higher is better" : "lower is better";
   const metricLabel = metric === "power_score"
     ? "Power score"
-    : metric === "display_geomean_ms" || metric === "geomean_ms"
-      ? "Geomean latency"
-      : metric === "total_duration_s"
-        ? "Total duration"
-        : metric;
-  return `${cohort.phase} · ${metricLabel} · ${direction}`;
+    : metric === "throughput_at_size"
+      ? "Throughput@Size"
+      : metric === "display_geomean_ms" || metric === "geomean_ms"
+        ? "Geomean latency"
+        : metric === "total_duration_s"
+          ? "Total duration"
+          : metric;
+  return `${formatPhaseWithStreams(cohort.phase, cohort.stream_count)} · ${metricLabel} · ${direction}`;
 }
 
 function cellText(rank: MetaRank, cohort: MetaCohort, mode: MetaLeaderboardMode): string {
@@ -601,6 +588,9 @@ function exactMetricTitle(rank: MetaRank | undefined, cohort: MetaCohort): strin
   if (!rank || rank.metric_value === null || rank.metric_value === undefined) return null;
   if (cohort.primary_metric === "power_score") {
     return `Exact power score: ${fmtScoreExact(rank.metric_value)}`;
+  }
+  if (cohort.primary_metric === "throughput_at_size") {
+    return `Exact Throughput@Size: ${fmtScoreExact(rank.metric_value)}`;
   }
   return null;
 }

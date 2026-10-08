@@ -1,12 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { COHORT_GROUP_BY_LABELS, type CohortGroupBy } from "@/lib/queryFilters";
 
-/**
- * Toolbar row shared by the Results card on the Benchmark and Platform
- * pages: a left slot (empty on the Benchmark page, the measurement basis
- * control on the Platform page) and a right slot (the Group by control on
- * both).
- */
 export function ResultsCardToolbar({ left, right }: { left?: ComponentChildren; right: ComponentChildren }) {
   return (
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--bb-data-border)] bg-[var(--bb-surface-data)] px-4 py-3 text-sm text-[var(--bb-data-fg-muted)]">
@@ -46,7 +40,6 @@ export function GroupBySelect({
   );
 }
 
-/** The basis-statement strip: identical wrapper classes on both pages, different wording. */
 export function ResultsBasisStatement({ children }: { children: ComponentChildren }) {
   return (
     <p class="mb-3 px-4 pt-3 text-xs text-[var(--bb-data-fg-muted)]" data-testid="basis-statement">

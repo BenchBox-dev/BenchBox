@@ -1,5 +1,3 @@
-"""Focused tests for shared read-primitives aggregation helpers."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace

@@ -1,59 +1,3 @@
-"""Run TPC-H on Snowpark Connect (PySpark-compatible API on Snowflake).
-
-Snowpark Connect provides a PySpark DataFrame API that executes natively on
-Snowflake. This is NOT Apache Spark - DataFrame operations are translated to
-Snowflake SQL, providing a familiar API without requiring a Spark cluster.
-
-Key Features:
-    - PySpark DataFrame API compatibility
-    - Native Snowflake query execution
-    - No Spark cluster required
-    - Instant "startup" (no cluster provisioning)
-    - Snowflake's query optimization
-
-Limitations (compared to Apache Spark):
-    - RDD APIs not supported
-    - DataFrame.hint() is a no-op
-    - DataFrame.repartition() is a no-op
-
-Prerequisites:
-    1. Snowflake account with warehouse configured
-    2. Snowflake credentials (user/password or key-pair)
-    3. snowflake-snowpark-python package installed
-
-Required environment variables:
-    SNOWFLAKE_ACCOUNT        Account identifier (e.g., xy12345.us-east-1)
-    SNOWFLAKE_USER           Username
-    SNOWFLAKE_PASSWORD       Password (or use key-pair auth)
-
-Optional environment variables:
-    SNOWFLAKE_WAREHOUSE      Warehouse name (default: COMPUTE_WH)
-    SNOWFLAKE_DATABASE       Database name (default: BENCHBOX)
-    SNOWFLAKE_ROLE           Role to use
-
-Installation:
-    uv add benchbox --extra snowpark-connect
-
-Usage:
-    export SNOWFLAKE_ACCOUNT=xy12345.us-east-1
-    export SNOWFLAKE_USER=my_user
-    export SNOWFLAKE_PASSWORD=my_password
-
-    python examples/getting_started/cloud/snowpark_connect_tpch.py
-
-    # Preview without execution
-    python examples/getting_started/cloud/snowpark_connect_tpch.py --dry-run ./preview
-
-Cost Estimation:
-    Snowpark uses standard Snowflake credit consumption:
-    - Warehouse credit rates depend on size
-    - X-Small: 1 credit/hour, Medium: 4 credits/hour
-    - Credits typically ~$2-4 depending on contract
-
-    TPC-H SF=0.01 (~10MB): ~0.01 credits ($0.02-0.04)
-    TPC-H SF=1.0 (~1GB): ~0.05 credits ($0.10-0.20)
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -70,10 +14,6 @@ _OUTPUT_DIR = _PROJECT_ROOT / "benchmark_runs" / "getting_started" / "snowpark_c
 
 
 def _require_env(var_name: str) -> str:
-    """Require a Snowflake environment variable.
-
-    Snowflake credentials should be configured via environment variables.
-    """
     value = os.getenv(var_name)
     if not value:
         raise RuntimeError(
@@ -83,30 +23,6 @@ def _require_env(var_name: str) -> str:
 
 
 def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig]:
-    """Build benchmark and database configurations for Snowpark Connect.
-
-    Snowpark Connect Concepts:
-
-    1. SESSION
-       - Snowpark session connects to Snowflake
-       - No Spark cluster required
-       - Instant startup
-
-    2. DATAFRAME API
-       - PySpark-compatible DataFrame operations
-       - Translated to Snowflake SQL
-       - Some operations are no-ops (hint, repartition)
-
-    3. WAREHOUSE
-       - Standard Snowflake virtual warehouse
-       - Credit consumption based on warehouse size
-       - Auto-suspend and auto-resume supported
-
-    4. AUTHENTICATION
-       - Password or key-pair authentication
-       - Role-based access control
-       - Multi-factor authentication supported
-    """
     benchmark_config = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -123,11 +39,9 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
         type="snowpark-connect",
         name="snowpark_connect_tpch",
         options={
-            # Required configuration
             "account": account,
             "user": user,
             "password": password,
-            # Optional configuration
             "warehouse": os.getenv("SNOWFLAKE_WAREHOUSE", "COMPUTE_WH"),
             "database": os.getenv("SNOWFLAKE_DATABASE", "BENCHBOX"),
             "role": os.getenv("SNOWFLAKE_ROLE"),
@@ -138,14 +52,6 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
 
 
 def run_example(scale_factor: float = 0.01, *, dry_run_output: Path | None = None) -> None:
-    """Execute TPC-H benchmark on Snowpark Connect.
-
-    Snowpark Connect is ideal for:
-    - Teams familiar with PySpark who use Snowflake
-    - DataFrame-based analytics on Snowflake
-    - No Spark cluster management needed
-    - Existing Snowflake warehouse investments
-    """
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     benchmark_config, database_config = _build_configs(scale_factor)
 
@@ -161,12 +67,10 @@ def run_example(scale_factor: float = 0.01, *, dry_run_output: Path | None = Non
         print()
         print("Cost estimation (Snowflake credit pricing):")
         print(f"- TPC-H SF={scale_factor}:")
-        # Rough estimate based on warehouse credits
-        # Medium warehouse = 4 credits/hour, ~$3/credit
         credits_per_hour = 4.0 if scale_factor >= 1.0 else 1.0
         minutes = 30 if scale_factor >= 1.0 else 5
         credits_used = (minutes / 60) * credits_per_hour
-        cost = credits_used * 3.0  # ~$3/credit estimate
+        cost = credits_used * 3.0
         print(f"  - Estimated: ~${cost:.2f} for full benchmark (22 queries)")
         print()
         print("Before running:")

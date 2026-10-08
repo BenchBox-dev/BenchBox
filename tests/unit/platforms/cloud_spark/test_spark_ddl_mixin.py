@@ -1,14 +1,6 @@
-"""Unit tests for SparkDDLGeneratorMixin.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the SparkDDLGeneratorMixin for:
-- Format routing (Delta, Iceberg, Parquet, Hive)
-- Integration with platform adapters
-- DDL generation via mixin
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -31,34 +23,24 @@ pytestmark = [
 
 
 class MockSparkAdapter(SparkDDLGeneratorMixin):
-    """Mock adapter for testing SparkDDLGeneratorMixin."""
-
     table_format: ClassVar[SparkTableFormat] = SparkTableFormat.DELTA
 
 
 class MockParquetAdapter(SparkDDLGeneratorMixin):
-    """Mock adapter using Parquet format."""
-
     table_format: ClassVar[SparkTableFormat] = SparkTableFormat.PARQUET
 
 
 class MockIcebergAdapter(SparkDDLGeneratorMixin):
-    """Mock adapter using Iceberg format."""
-
     table_format: ClassVar[SparkTableFormat] = SparkTableFormat.ICEBERG
 
 
 class MockHiveAdapter(SparkDDLGeneratorMixin):
-    """Mock adapter using Hive format."""
-
     table_format: ClassVar[SparkTableFormat] = SparkTableFormat.HIVE
 
 
 class TestSparkTableFormatEnum:
-    """Tests for SparkTableFormat enum."""
-
     def test_enum_values(self) -> None:
-        """Test enum values."""
+
         assert SparkTableFormat.DELTA.value == "delta"
         assert SparkTableFormat.ICEBERG.value == "iceberg"
         assert SparkTableFormat.PARQUET.value == "parquet"
@@ -66,24 +48,19 @@ class TestSparkTableFormatEnum:
 
 
 class TestGetTableFormat:
-    """Tests for get_table_format method."""
-
     def test_default_format(self) -> None:
-        """Test default table format from class variable."""
+
         adapter = MockSparkAdapter()
         assert adapter.get_table_format() == SparkTableFormat.DELTA
 
     def test_parquet_default(self) -> None:
-        """Test Parquet default format."""
+
         adapter = MockParquetAdapter()
         assert adapter.get_table_format() == SparkTableFormat.PARQUET
 
 
 class TestMixinSupportsTuningTypes:
-    """Tests for supported tuning types."""
-
     def test_supports_all_tuning_types(self) -> None:
-        """Test that mixin supports all required tuning types."""
         adapter = MockSparkAdapter()
         assert adapter.supports_tuning_type("partitioning")
         assert adapter.supports_tuning_type("clustering")
@@ -92,10 +69,8 @@ class TestMixinSupportsTuningTypes:
 
 
 class TestMixinDeltaTuning:
-    """Tests for Delta tuning via mixin."""
-
     def test_delta_partitioning(self) -> None:
-        """Test Delta PARTITIONED BY generation."""
+
         adapter = MockSparkAdapter()
         table_tuning = TableTuning(
             table_name="orders",
@@ -106,7 +81,7 @@ class TestMixinDeltaTuning:
         assert clauses.partition_by == "PARTITIONED BY (o_orderdate)"
 
     def test_delta_clustering(self) -> None:
-        """Test Delta CLUSTER BY generation."""
+
         adapter = MockSparkAdapter()
         table_tuning = TableTuning(
             table_name="orders",
@@ -117,10 +92,8 @@ class TestMixinDeltaTuning:
 
 
 class TestMixinIcebergTuning:
-    """Tests for Iceberg tuning via mixin."""
-
     def test_iceberg_partitioning(self) -> None:
-        """Test Iceberg partition transform generation."""
+
         adapter = MockIcebergAdapter()
         table_tuning = TableTuning(
             table_name="orders",
@@ -132,10 +105,8 @@ class TestMixinIcebergTuning:
 
 
 class TestMixinParquetTuning:
-    """Tests for Parquet tuning via mixin."""
-
     def test_parquet_distribution(self) -> None:
-        """Test Parquet CLUSTERED BY generation."""
+
         adapter = MockParquetAdapter()
         table_tuning = TableTuning(
             table_name="lineitem",
@@ -147,10 +118,8 @@ class TestMixinParquetTuning:
 
 
 class TestMixinHiveTuning:
-    """Tests for Hive tuning via mixin."""
-
     def test_hive_storage_format(self) -> None:
-        """Test Hive STORED AS generation."""
+
         adapter = MockHiveAdapter()
         table_tuning = TableTuning(table_name="orders")
         clauses = adapter.generate_tuning_clauses(table_tuning)
@@ -158,10 +127,8 @@ class TestMixinHiveTuning:
 
 
 class TestMixinCreateTableDDL:
-    """Tests for CREATE TABLE DDL generation via mixin."""
-
     def test_delta_create_table(self) -> None:
-        """Test Delta CREATE TABLE generation."""
+
         adapter = MockSparkAdapter()
         columns = [
             ColumnDefinition("o_orderkey", "BIGINT"),
@@ -180,7 +147,7 @@ class TestMixinCreateTableDDL:
         assert ddl.endswith(";")
 
     def test_iceberg_create_table(self) -> None:
-        """Test Iceberg CREATE TABLE generation."""
+
         adapter = MockIcebergAdapter()
         columns = [
             ColumnDefinition("l_orderkey", "BIGINT"),
@@ -198,14 +165,14 @@ class TestMixinCreateTableDDL:
         assert "PARTITIONED BY (months(l_shipdate))" in ddl
 
     def test_create_table_with_schema(self) -> None:
-        """Test schema prefix in CREATE TABLE."""
+
         adapter = MockSparkAdapter()
         columns = [ColumnDefinition("id", "BIGINT")]
         ddl = adapter.generate_create_table_ddl("orders", columns, schema="tpch")
         assert "CREATE TABLE tpch.orders" in ddl
 
     def test_create_table_if_not_exists(self) -> None:
-        """Test IF NOT EXISTS clause."""
+
         adapter = MockSparkAdapter()
         columns = [ColumnDefinition("id", "BIGINT")]
         ddl = adapter.generate_create_table_ddl("test", columns, if_not_exists=True)
@@ -213,10 +180,8 @@ class TestMixinCreateTableDDL:
 
 
 class TestMixinPostLoadStatements:
-    """Tests for post-load statement generation via mixin."""
-
     def test_delta_zorder(self) -> None:
-        """Test Delta Z-ORDER post-load statements."""
+
         adapter = MockSparkAdapter()
         table_tuning = TableTuning(
             table_name="lineitem",
@@ -229,7 +194,7 @@ class TestMixinPostLoadStatements:
         assert "OPTIMIZE lineitem ZORDER BY (l_orderkey)" in statements[0]
 
     def test_post_load_with_schema(self) -> None:
-        """Test post-load statements with schema prefix."""
+
         adapter = MockSparkAdapter()
         table_tuning = TableTuning(
             table_name="lineitem",
@@ -243,16 +208,14 @@ class TestMixinPostLoadStatements:
 
 
 class TestMixinNullHandling:
-    """Tests for null tuning handling."""
-
     def test_null_tuning_returns_format(self) -> None:
-        """Test that null tuning still returns format clause."""
+
         adapter = MockSparkAdapter()
         clauses = adapter.generate_tuning_clauses(None)
         assert "USING DELTA" in clauses.additional_clauses
 
     def test_null_tuning_empty_partitioning(self) -> None:
-        """Test null tuning has no partitioning."""
+
         adapter = MockSparkAdapter()
         clauses = adapter.generate_tuning_clauses(None)
         assert clauses.partition_by is None

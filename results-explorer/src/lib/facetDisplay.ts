@@ -68,6 +68,10 @@ export function formatFacetDisplayValue(
     return `${trimmed} GB`;
   }
 
+  if (key === "stream_count") {
+    return `${trimmed} ${trimmed === "1" ? "stream" : "streams"}`;
+  }
+
   if (key === "date_window") {
     return trimmed === "all" ? "All time" : `Last ${trimmed}`;
   }

@@ -1,9 +1,3 @@
-"""Coverage tests for remaining benchmark orchestrator modules (w6).
-
-Covers: AMPLab, ClickBench, H2O, SSB, NYC Taxi benchmark/downloader/generator,
-write_primitives, transaction_primitives, metadata_primitives benchmark/generator.
-"""
-
 from __future__ import annotations
 
 import csv
@@ -19,14 +13,7 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 class FakeConn:
-    """Connection with direct execute()."""
-
     def __init__(self, rows=None, fail_on: str | None = None):
         self._rows = rows or [("ok",)]
         self._fail_on = fail_on
@@ -48,8 +35,6 @@ class FakeConn:
 
 
 class CursorConn:
-    """Connection with cursor() pattern (no direct execute)."""
-
     def __init__(self, rows=None):
         self._rows = rows or [("ok",)]
 
@@ -61,12 +46,7 @@ class CursorConn:
 
 
 class UnsupportedConn:
-    """Connection with neither execute nor cursor."""
-
-
-# ===================================================================
-# AMPLab Benchmark
-# ===================================================================
+    pass
 
 
 class TestAMPLabBenchmark:
@@ -182,11 +162,6 @@ class TestAMPLabBenchmark:
         assert "1" in translated
 
 
-# ===================================================================
-# AMPLab Generator
-# ===================================================================
-
-
 class TestAMPLabGenerator:
     def test_generate_data_small(self, tmp_path: Path):
         from benchbox.core.amplab.generator import AMPLabDataGenerator
@@ -207,11 +182,6 @@ class TestAMPLabGenerator:
         assert ip.count(".") == 3
         content = gen._generate_content(5, 10)
         assert len(content.split()) >= 5
-
-
-# ===================================================================
-# ClickBench Benchmark
-# ===================================================================
 
 
 class TestClickBenchBenchmark:
@@ -290,11 +260,6 @@ class TestClickBenchBenchmark:
             b.load_data_to_database(FakeConn())
 
 
-# ===================================================================
-# H2O Benchmark
-# ===================================================================
-
-
 class TestH2OBenchmark:
     def test_init_and_metadata(self, tmp_path: Path):
         from benchbox.core.h2odb.benchmark import H2OBenchmark
@@ -345,11 +310,6 @@ class TestH2OBenchmark:
         assert len(schema) > 0
         sql = b.get_create_tables_sql()
         assert "CREATE TABLE" in sql.upper()
-
-
-# ===================================================================
-# SSB Benchmark
-# ===================================================================
 
 
 class TestSSBBenchmark:
@@ -509,11 +469,6 @@ class TestSSBBenchmark:
         assert conn.commits >= 2
 
 
-# ===================================================================
-# SSB Generator
-# ===================================================================
-
-
 class TestSSBGenerator:
     def test_generate_small_dataset(self, tmp_path: Path):
         from benchbox.core.ssb.generator import SSBDataGenerator
@@ -524,11 +479,6 @@ class TestSSBGenerator:
         assert "customer" in result
         for path in result.values():
             assert Path(path).exists()
-
-
-# ===================================================================
-# NYC Taxi Benchmark
-# ===================================================================
 
 
 class TestNYCTaxiBenchmark:
@@ -632,11 +582,6 @@ class TestNYCTaxiBenchmark:
         assert conn.commits >= 2
 
 
-# ===================================================================
-# NYC Taxi Downloader
-# ===================================================================
-
-
 class TestNYCTaxiDownloader:
     def test_init_defaults(self, tmp_path: Path):
         from benchbox.core.nyctaxi.downloader import NYCTaxiDataDownloader
@@ -686,12 +631,10 @@ class TestNYCTaxiDownloader:
         assert stats["seed"] == 42
 
     def test_download_uses_synthetic_fallback(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-        """Download falls back to synthetic data when pyarrow not available."""
         from benchbox.core.nyctaxi.downloader import NYCTaxiDataDownloader
 
         d = NYCTaxiDataDownloader(scale_factor=0.01, output_dir=tmp_path, months=[1])
 
-        # Mock _process_parquet_file to use synthetic fallback
         def fake_process(url, writer, start_id):
             return d._generate_synthetic_month(writer, start_id)
 
@@ -700,11 +643,6 @@ class TestNYCTaxiDownloader:
         assert "taxi_zones" in result
         assert "trips" in result
         assert result["trips"].exists()
-
-
-# ===================================================================
-# Write Primitives Benchmark
-# ===================================================================
 
 
 class TestWritePrimitivesBenchmark:
@@ -735,11 +673,6 @@ class TestWritePrimitivesBenchmark:
         assert str(b.output_dir).endswith("new_out")
 
 
-# ===================================================================
-# Transaction Primitives Benchmark
-# ===================================================================
-
-
 class TestTransactionPrimitivesBenchmark:
     def test_init_and_metadata(self):
         from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark
@@ -747,7 +680,7 @@ class TestTransactionPrimitivesBenchmark:
         b = TransactionPrimitivesBenchmark(scale_factor=0.01)
         assert b._name == "Transaction Primitives Benchmark"
         assert b.get_data_source_benchmark() == "tpch"
-        # duckdb is not a transaction-capable DataFrame platform
+
         assert b.supports_dataframe_mode("delta-lake") is True or b.supports_dataframe_mode("duckdb") is False
 
     def test_get_operations(self):
@@ -768,11 +701,6 @@ class TestTransactionPrimitivesBenchmark:
         assert str(b.output_dir).endswith("txn_out")
 
 
-# ===================================================================
-# Metadata Primitives Benchmark
-# ===================================================================
-
-
 class TestMetadataPrimitivesBenchmark:
     def test_init_and_metadata(self, tmp_path: Path):
         from benchbox.core.metadata_primitives.benchmark import MetadataPrimitivesBenchmark
@@ -786,7 +714,7 @@ class TestMetadataPrimitivesBenchmark:
 
         b = MetadataPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
         result = b.generate_data()
-        # Metadata benchmark has no data to generate
+
         assert isinstance(result, (dict, list))
 
     def test_get_queries_and_schema(self, tmp_path: Path):
@@ -915,11 +843,6 @@ class TestMetadataPrimitivesBenchmark:
         )
         assert summary["total_operations"] == 3
         assert summary["by_operation"]["GRANT"]["count"] == 2
-
-
-# ===================================================================
-# Metadata Primitives Generator
-# ===================================================================
 
 
 class TestMetadataGenerator:

@@ -1,5 +1,3 @@
-"""Regression checks for retained Results Explorer audit evidence."""
-
 from __future__ import annotations
 
 from pathlib import Path

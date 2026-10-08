@@ -1,5 +1,3 @@
-"""Shared authenticated HTTP fixtures for MCP security integration tests."""
-
 from __future__ import annotations
 
 import json
@@ -23,7 +21,7 @@ def write_security_config(
     admission: dict[str, object] | None = None,
     jobs: dict[str, object] | None = None,
 ) -> Path:
-    """Write a digest-only test policy and return its path."""
+
     policy = {
         "issuer_url": "https://auth.example.test",
         "resource_server_url": "https://mcp.example.test/mcp",
@@ -57,7 +55,7 @@ def write_security_config(
 async def authenticated_http_client(
     config_path: Path, token: str
 ) -> AsyncIterator[tuple[Client, RemoteSecurityRuntime]]:
-    """Yield an SDK client authenticated to an in-process server."""
+
     runtime = RemoteSecurityRuntime.from_file(config_path)
     server = create_server(remote_security=runtime)
     app = server.streamable_http_app(

@@ -1,20 +1,4 @@
 #!/usr/bin/env python3
-"""Decide which merge units a change touches.
-
-Reads ``.github/ci-units.yml`` and a newline-delimited list of changed paths
-(or a diff against a base ref) and reports which of the six units
-(``core``, ``explorer``, ``results-data``, ``docs``, ``landing``, ``tooling``)
-have work to do.
-
-Rules:
-
-* A path belongs to every unit whose patterns match it.
-* A path that matches no unit belongs to ``core`` (fail closed).
-* A path matching ``all-units`` runs every unit.
-* An empty change set runs every unit (fail closed).
-
-The script is stdlib-only so the classifier job needs no dependency sync.
-"""
 
 from __future__ import annotations
 
@@ -27,13 +11,30 @@ from typing import Iterable
 
 from path_filter_decision import matches_any, normalize_path, unquote_yaml_scalar
 
+CLI_DESCRIPTION = (
+    "Decide which merge units a change touches.\n"
+    "\n"
+    "Reads ``.github/ci-units.yml`` and a newline-delimited list of changed paths\n"
+    "(or a diff against a base ref) and reports which of the six units\n"
+    "(``core``, ``explorer``, ``results-data``, ``docs``, ``landing``, ``tooling``)\n"
+    "have work to do.\n"
+    "\n"
+    "Rules:\n"
+    "\n"
+    "* A path belongs to every unit whose patterns match it.\n"
+    "* A path that matches no unit belongs to ``core`` (fail closed).\n"
+    "* A path matching ``all-units`` runs every unit.\n"
+    "* An empty change set runs every unit (fail closed).\n"
+    "\n"
+    "The script is stdlib-only so the classifier job needs no dependency sync.\n"
+)
+
 UNITS: tuple[str, ...] = ("core", "explorer", "results-data", "docs", "landing", "tooling")
 ALL_UNITS_KEY = "all-units"
 DEFAULT_RULES = Path(__file__).resolve().parents[1] / ".github" / "ci-units.yml"
 
 
 def load_unit_rules(path: Path) -> dict[str, list[str]]:
-    """Load the simple ``key:`` / ``- "pattern"`` shape without PyYAML."""
     rules: dict[str, list[str]] = {}
     current: str | None = None
     for raw_line in path.read_text(encoding="utf-8").splitlines():
@@ -56,7 +57,6 @@ def load_unit_rules(path: Path) -> dict[str, list[str]]:
 
 
 def classify_units(changed_paths: Iterable[str], rules: dict[str, list[str]]) -> dict[str, object]:
-    """Return per-unit needs plus the paths that selected each unit."""
     paths = [normalize_path(p) for p in changed_paths if normalize_path(p)]
     unit_paths: dict[str, list[str]] = {unit: [] for unit in UNITS}
     unowned: list[str] = []
@@ -78,8 +78,6 @@ def classify_units(changed_paths: Iterable[str], rules: dict[str, list[str]]) ->
         "unowned_paths": unowned,
         "units": needed,
         "unit_paths": unit_paths,
-        # Lint and the unit-test tier also cover the scripts and workflow
-        # tests that live under tooling, so either unit needs them.
         "code_tests_needed": needed["core"] or needed["tooling"],
     }
 
@@ -95,7 +93,7 @@ def git_changed_paths(base_ref: str) -> list[str]:
 
 
 def write_github_output(path: Path, decision: dict[str, object]) -> None:
-    units: dict[str, bool] = decision["units"]  # type: ignore[assignment]
+    units: dict[str, bool] = decision["units"]
     lines = [f"unit-{unit}={'true' if units[unit] else 'false'}" for unit in UNITS]
     lines.append(f"code-tests-needed={'true' if decision['code_tests_needed'] else 'false'}")
     lines.append(f"run-all-units={'true' if decision['run_all'] else 'false'}")
@@ -104,8 +102,8 @@ def write_github_output(path: Path, decision: dict[str, object]) -> None:
 
 
 def write_summary(path: Path, decision: dict[str, object]) -> None:
-    units: dict[str, bool] = decision["units"]  # type: ignore[assignment]
-    unit_paths: dict[str, list[str]] = decision["unit_paths"]  # type: ignore[assignment]
+    units: dict[str, bool] = decision["units"]
+    unit_paths: dict[str, list[str]] = decision["unit_paths"]
     rows = ["### CI units", "", "| unit | runs | changed paths |", "| --- | --- | ---: |"]
     for unit in UNITS:
         rows.append(f"| {unit} | {'yes' if units[unit] else 'no'} | {len(unit_paths[unit])} |")
@@ -114,13 +112,13 @@ def write_summary(path: Path, decision: dict[str, object]) -> None:
         rows.append("All units run (self-protection path or empty change set).")
     if decision["unowned_paths"]:
         rows.append("")
-        rows.append("Unowned paths routed to core: " + ", ".join(f"`{p}`" for p in decision["unowned_paths"][:20]))  # type: ignore[index]
+        rows.append("Unowned paths routed to core: " + ", ".join(f"`{p}`" for p in decision["unowned_paths"][:20]))
     with path.open("a", encoding="utf-8") as handle:
         handle.write("\n".join(rows) + "\n")
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--rules", type=Path, default=DEFAULT_RULES)
     parser.add_argument("--base-ref", help="Git ref to diff against, for example a base SHA")
     parser.add_argument("--changed-file", type=Path, help="Read changed paths from a newline-delimited file")
@@ -136,7 +134,6 @@ def main(argv: list[str] | None = None) -> int:
         try:
             paths = git_changed_paths(args.base_ref)
         except (subprocess.CalledProcessError, OSError) as exc:
-            # Fail closed: a lookup error must run every unit, never none.
             print(f"ci_units: diff failed ({exc}); running every unit", file=sys.stderr)
             paths = []
     else:

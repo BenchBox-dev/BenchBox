@@ -1,5 +1,3 @@
-"""CoffeeShop cross-surface gate builder."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +6,6 @@ from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duck
 
 
 def build_coffeeshop_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate CoffeeShop data, load it into in-memory DuckDB, and wire both surfaces."""
     from benchbox.core.coffeeshop.benchmark import CoffeeShopBenchmark
     from benchbox.core.coffeeshop.dataframe_queries import COFFEESHOP_DATAFRAME_QUERIES
     from benchbox.core.coffeeshop.generator import CoffeeShopDataGenerator

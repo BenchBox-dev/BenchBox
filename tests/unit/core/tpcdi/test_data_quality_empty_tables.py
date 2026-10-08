@@ -1,5 +1,3 @@
-"""Empty TPC-DI tables must yield quality results, not arithmetic errors."""
-
 import re
 import sqlite3
 

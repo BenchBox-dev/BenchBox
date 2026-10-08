@@ -1,9 +1,6 @@
-"""Tests for shared cloud platform adapter utilities.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import Mock
 
@@ -19,7 +16,7 @@ pytestmark = [
 
 
 def test_validate_session_cache_control_success():
-    """Validates session cache setting successfully with default value column index 0."""
+
     mock_conn = Mock()
     mock_cursor = Mock()
     mock_conn.cursor.return_value = mock_cursor
@@ -45,11 +42,11 @@ def test_validate_session_cache_control_success():
 
 
 def test_validate_session_cache_control_with_value_column_index():
-    """Validates session cache setting when value is at a non-zero column index (e.g. Snowflake SHOW PARAMETERS)."""
+
     mock_conn = Mock()
     mock_cursor = Mock()
     mock_conn.cursor.return_value = mock_cursor
-    # Snowflake SHOW PARAMETERS returns (key, value, default, ...)
+
     mock_cursor.fetchone.return_value = ("USE_CACHED_RESULT", "FALSE", "TRUE", "BOOLEAN")
 
     result = validate_session_cache_control(
@@ -72,7 +69,7 @@ def test_validate_session_cache_control_with_value_column_index():
 
 
 def test_validate_session_cache_control_mismatch_strict():
-    """Raises ConfigurationError when cache setting does not match expected and strict=True."""
+
     mock_conn = Mock()
     mock_cursor = Mock()
     mock_conn.cursor.return_value = mock_cursor
@@ -95,7 +92,7 @@ def test_validate_session_cache_control_mismatch_strict():
 
 
 def test_validate_session_cache_control_no_row():
-    """Adds a warning when fetchone returns None."""
+
     mock_conn = Mock()
     mock_cursor = Mock()
     mock_conn.cursor.return_value = mock_cursor
@@ -119,8 +116,6 @@ def test_validate_session_cache_control_no_row():
 
 
 class TestSanitizeCacheControlReceipt:
-    """Tests for bundle-safe receipt copies."""
-
     def test_happy_path_passes_through(self):
         from benchbox.platforms.cloud_shared import sanitize_cache_control_receipt
 
@@ -132,7 +127,7 @@ class TestSanitizeCacheControlReceipt:
             "errors": [],
         }
         assert sanitize_cache_control_receipt(receipt) == receipt
-        # Caller keeps ownership: mutating the copy must not alias internals.
+
         assert sanitize_cache_control_receipt(receipt) is not receipt
 
     def test_truthy_strings_never_read_as_disabled(self):
@@ -171,8 +166,6 @@ class TestSanitizeCacheControlReceipt:
 
 
 class TestExplicitCacheEnabledReceipt:
-    """Receipt recorded when the operator leaves the result cache enabled."""
-
     def test_records_confirmed_enabled_state(self):
         from benchbox.platforms.cloud_shared import (
             explicit_cache_enabled_receipt,
@@ -185,13 +178,11 @@ class TestExplicitCacheEnabledReceipt:
         assert receipt["settings"] == {"USE_CACHED_RESULT": "TRUE"}
         assert receipt["errors"] == []
         assert any("explicitly left enabled" in w for w in receipt["warnings"])
-        # The deterministic receipt must survive sanitization intact.
+
         assert sanitize_cache_control_receipt(receipt) == receipt
 
 
 class TestSplitLeadingSqlComments:
-    """Schema chunks can start with decorative "--" header lines."""
-
     def test_plain_statement_has_empty_prefix(self):
         from benchbox.platforms.cloud_shared import split_leading_sql_comments
 

@@ -1,5 +1,3 @@
-"""Tests for DataFrame row-count validation evidence."""
-
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -74,7 +72,7 @@ def test_tpch_mismatch_marks_the_query_and_run_failed() -> None:
     assert summary.status == "FAILED"
     assert summary.details["failed"] == 1
     assert measurement["status"] == "FAILED"
-    assert measurement["row_count_validation"]["status"] == "FAILED"  # type: ignore[index]
+    assert measurement["row_count_validation"]["status"] == "FAILED"
 
 
 def test_tpcds_is_uncertain_until_its_parameters_are_seed_aligned() -> None:
@@ -90,7 +88,7 @@ def test_tpcds_is_uncertain_until_its_parameters_are_seed_aligned() -> None:
     assert summary.details["checked"] == 0
     assert summary.details["skipped"] == 1
     assert measurement["status"] == "SUCCESS"
-    assert measurement["row_count_validation"]["status"] == "SKIPPED"  # type: ignore[index]
+    assert measurement["row_count_validation"]["status"] == "SKIPPED"
 
 
 @pytest.mark.parametrize(
@@ -144,7 +142,7 @@ def test_unsupported_validation_mode_is_uncertain() -> None:
     )
 
     assert summary.status == "UNCERTAIN"
-    assert measurement["row_count_validation"]["status"] == "SKIPPED"  # type: ignore[index]
+    assert measurement["row_count_validation"]["status"] == "SKIPPED"
 
 
 def test_missing_row_count_is_a_failed_success_contract() -> None:
@@ -159,7 +157,7 @@ def test_missing_row_count_is_a_failed_success_contract() -> None:
     assert summary.status == "FAILED"
     assert summary.details["errors"] == 1
     assert measurement["status"] == "FAILED"
-    assert measurement["row_count_validation"]["status"] == "ERROR"  # type: ignore[index]
+    assert measurement["row_count_validation"]["status"] == "ERROR"
 
 
 def test_oracle_error_makes_the_run_uncertain_without_condemning_the_result() -> None:
@@ -178,7 +176,7 @@ def test_oracle_error_makes_the_run_uncertain_without_condemning_the_result() ->
     assert summary.status == "UNCERTAIN"
     assert summary.details["errors"] == 1
     assert measurement["status"] == "SUCCESS"
-    assert measurement["row_count_validation"]["status"] == "ERROR"  # type: ignore[index]
+    assert measurement["row_count_validation"]["status"] == "ERROR"
 
 
 def test_oracle_error_evidence_is_bounded() -> None:
@@ -194,7 +192,7 @@ def test_oracle_error_evidence_is_bounded() -> None:
             scale_factor=1.0,
         )
 
-    error = measurement["row_count_validation"]["error"]  # type: ignore[index]
+    error = measurement["row_count_validation"]["error"]
     assert len(error) == 500
     assert error.endswith("...")
 
@@ -212,7 +210,7 @@ def test_oracle_initialization_error_is_uncertain() -> None:
     assert summary.status == "UNCERTAIN"
     assert summary.details["errors"] == 1
     assert measurement["status"] == "SUCCESS"
-    assert measurement["row_count_validation"]["status"] == "ERROR"  # type: ignore[index]
+    assert measurement["row_count_validation"]["status"] == "ERROR"
 
 
 def test_execution_failure_keeps_an_unvalidated_run_partial() -> None:

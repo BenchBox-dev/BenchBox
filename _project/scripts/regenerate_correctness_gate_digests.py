@@ -13,8 +13,6 @@ from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# The gate exports this; it is the ONE source of the gate query-id set (defined once
-# in the Makefile and shared between test-correctness-gate and the regen target).
 CORRECTNESS_GATE_QUERY_IDS_ENV = "BENCHBOX_CORRECTNESS_GATE_QUERY_IDS"
 EMIT_RESULT_DIGEST_ENV = "BENCHBOX_EMIT_RESULT_DIGEST"
 CLI_MODULE = "benchbox.cli.main"
@@ -39,7 +37,6 @@ _PROVENANCE_NOTE = (
 
 
 def _query_ids() -> list[str]:
-    """The gate query-id list, in gate order, from the shared env var."""
     raw = os.environ.get(CORRECTNESS_GATE_QUERY_IDS_ENV, "").strip()
     if not raw:
         raise SystemExit(
@@ -50,7 +47,6 @@ def _query_ids() -> list[str]:
 
 
 def _run_gate(work_dir: Path, query_ids: list[str], seed: int | None) -> dict:
-    """Run the DuckDB TPC-H SF=1 gate slice with digest emission and return the payload."""
     from benchbox.core.results.loader import find_latest_result
 
     command = [
@@ -76,11 +72,6 @@ def _run_gate(work_dir: Path, query_ids: list[str], seed: int | None) -> dict:
     env = os.environ.copy()
     env["PYTHONUTF8"] = "1"
     env[EMIT_RESULT_DIGEST_ENV] = "1"
-    # Pin the child's output root to the temp work dir. Otherwise a caller that has
-    # BENCHBOX_OUTPUT_DIR set (a supported configuration -- it relocates the
-    # benchmark_runs root, see benchbox.utils.path_utils.resolve_benchmark_runs_dir)
-    # would make `benchbox run` write its result under that configured root while we
-    # search work_dir, and the run would complete but then fail with "no result JSON".
     runs_root = work_dir / "benchmark_runs"
     env["BENCHBOX_OUTPUT_DIR"] = str(runs_root)
 
@@ -110,7 +101,6 @@ def _run_gate(work_dir: Path, query_ids: list[str], seed: int | None) -> dict:
 
 
 def _extract_stream0_digests(payload: dict, query_ids: list[str]) -> dict[str, str]:
-    """Map each gate query id -> its emitted stream-0 value digest, in gate order."""
     emitted: dict[str, str] = {}
     for query in payload.get("queries", []):
         if int(query.get("stream") or 0) != 0:
@@ -138,7 +128,6 @@ def _extract_stream0_digests(payload: dict, query_ids: list[str]) -> dict[str, s
 
 
 def build_reference(digests: dict[str, str], seed: int | None, duckdb_version: str) -> dict:
-    """Assemble the reference JSON payload in the committed key order (deterministic)."""
     return {
         "benchmark": "tpch",
         "scale_factor": 1.0,
@@ -162,7 +151,6 @@ def build_reference(digests: dict[str, str], seed: int | None, duckdb_version: s
 
 
 def render(reference: dict) -> str:
-    """Serialize deterministically (2-space indent, insertion order, trailing newline)."""
     return json.dumps(reference, indent=2) + "\n"
 
 

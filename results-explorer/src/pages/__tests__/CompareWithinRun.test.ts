@@ -1,11 +1,3 @@
-/**
- * Within-run comparison: grid construction and the same-query-set rule.
- *
- * This route is the only place a statistic may vary between series, because
- * engine and hardware are fixed by construction. For the same reason its
- * figures are not platform results.
- */
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -37,17 +29,11 @@ const PASS_2: MeasurementBasis = { passes: warmPass(2), statistic: "median" };
 
 describe("structural exclusion from ranking", () => {
   it("declares its figures unrankable", () => {
-    // A number here says "this run reads X% faster one way than another",
-    // which is a statement about methodology, not about an engine.
     expect(WITHIN_RUN_FIGURES_ARE_RANKABLE).toBe(false);
   });
 });
 
 describe("the same-query-set rule across columns", () => {
-  // Q2's pass 2 failed, so the warm_pass_2 column cannot answer it while the
-  // all-warm columns can. This is the shape that produced a wrong 1.18x
-  // reading in the design prototype, where each column averaged over whichever
-  // queries it happened to have.
   const executions: BasisExecution[] = [
     exec("Q1", 10, "measurement", 1),
     exec("Q1", 20, "measurement", 2),
@@ -80,7 +66,6 @@ describe("the same-query-set rule across columns", () => {
     const perColumn = [0, 1].map((i) =>
       rows.filter((r) => shared.has(r.queryId)).map((r) => r.cells[i]!.ms),
     );
-    // Same denominator in both columns, and it is the shared count.
     expect(perColumn[0]!.length).toBe(sharedQueryIds.length);
     expect(perColumn[1]!.length).toBe(sharedQueryIds.length);
     expect(perColumn[0]!.every((v) => v !== null)).toBe(true);
@@ -126,8 +111,6 @@ describe("the same-query-set rule across columns", () => {
 
 describe("a column whose basis the run cannot answer", () => {
   it("reports unavailable rather than substituting another basis", () => {
-    // Silently serving the nearest available basis would label a warm figure
-    // as a warmup figure -- a fabricated comparison presented as real.
     const noWarmup: BasisExecution[] = [
       exec("Q1", 10, "measurement", 1),
       exec("Q1", 20, "measurement", 2),
@@ -143,8 +126,6 @@ describe("a column whose basis the run cannot answer", () => {
 
 describe("the reference column", () => {
   it("stays valid as columns are removed", () => {
-    // Clamping rather than resetting to 0 preserves the reader's choice
-    // wherever it still exists.
     expect(clampReferenceIndex(3, 2)).toBe(1);
     expect(clampReferenceIndex(1, 4)).toBe(1);
   });
@@ -172,8 +153,6 @@ describe("the route URL", () => {
   });
 
   it("is a separate path from the cross-run compare route", () => {
-    // Sharing a path would put both rule sets on one page and invite the
-    // cross-run one-basis invariant to be relaxed "just for this case".
     expect(withinRunCompareHref("r1", ["default", "warmup"])).toContain("/results/r/r1/passes");
     expect(withinRunCompareHref("r1", ["default", "warmup"])).not.toContain("/results/compare");
   });
@@ -240,7 +219,6 @@ describe("available bases discovery", () => {
       { query_id: "Q1", duration_ms: 12, status: "pass", run_type: "measurement", iter: 2 } as any,
     ];
     const available = availableBasesForQueries(queries);
-    // Should include default, all_warm:min, warmup:median, warmup:min, warm_pass_1, warm_pass_2
     expect(available.some((b) => b.passes.kind === "warmup")).toBe(true);
     expect(available.some((b) => b.passes.kind === "warm_pass" && b.passes.pass === 1)).toBe(true);
     expect(available.some((b) => b.passes.kind === "warm_pass" && b.passes.pass === 2)).toBe(true);
@@ -324,9 +302,7 @@ describe("column geometric means over shared queries", () => {
     const sharedQueryIds = ["Q1", "Q2"];
     const geomeans = calculateColumnGeomeans(rows, sharedQueryIds);
     expect(geomeans).toHaveLength(2);
-    // Col 0: geomean(10, 40) = 20
     expect(geomeans[0]).toBeCloseTo(20, 5);
-    // Col 1: geomean(20, 80) = 40
     expect(geomeans[1]).toBeCloseTo(40, 5);
   });
 });
@@ -354,10 +330,8 @@ describe("statistic selection based on sample counts", () => {
       { query_id: "q2", duration_ms: 40, status: "pass", run_type: "measurement", iter: 1 },
     ];
     const available = availableBasesForQueries(singleExecQueries as any);
-    // warmup has 1 execution per query -> only warmup median
     expect(available.some((b) => b.passes.kind === "warmup" && b.statistic === "median")).toBe(true);
     expect(available.some((b) => b.passes.kind === "warmup" && b.statistic === "min")).toBe(false);
-    // warm_pass 1 has 1 execution per query -> only pass 1 median
     expect(available.some((b) => b.passes.kind === "warm_pass" && b.statistic === "median")).toBe(true);
     expect(available.some((b) => b.passes.kind === "warm_pass" && b.statistic === "min")).toBe(false);
   });
@@ -370,10 +344,8 @@ describe("statistic selection based on sample counts", () => {
       { query_id: "q1", duration_ms: 25, status: "pass", run_type: "measurement", iter: 1 },
     ];
     const available = availableBasesForQueries(multiExecQueries as any);
-    // warmup has >1 execution -> both median and min
     expect(available.some((b) => b.passes.kind === "warmup" && b.statistic === "median")).toBe(true);
     expect(available.some((b) => b.passes.kind === "warmup" && b.statistic === "min")).toBe(true);
-    // warm_pass 1 has >1 execution -> both median and min
     expect(available.some((b) => b.passes.kind === "warm_pass" && b.statistic === "median")).toBe(true);
     expect(available.some((b) => b.passes.kind === "warm_pass" && b.statistic === "min")).toBe(true);
   });

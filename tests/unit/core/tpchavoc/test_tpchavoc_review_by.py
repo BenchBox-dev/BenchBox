@@ -1,15 +1,6 @@
-"""Unit tests for the optional waiver review_by policy on TPC-Havoc's shared ``_report``.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Locks the behavior described in
-``_project/TODO/main/planning/equivalence-waiver-expiry-policy.yaml``: a
-past-due ``review_by`` date on a known-divergence baseline entry WARNS (prints a
-"WAIVER REVIEW DUE" line) but never fails the gate, and is independent of the
-existing stale-baseline (``resolved``) failure.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -23,7 +14,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 def test_review_by_past_due_warns_but_does_not_fail_the_report(capsys):
-    """A past-due review_by entry warns; the still-live divergence keeps the report green."""
     exit_code = _report(
         [],
         total=10,
@@ -34,13 +24,11 @@ def test_review_by_past_due_warns_but_does_not_fail_the_report(capsys):
     )
 
     out = capsys.readouterr().out
-    assert exit_code == 1  # NOTE: "resolved" fires here because divergences=[] and the key is baselined;
-    # see the companion test below for the review_by signal in isolation from `resolved`.
+    assert exit_code == 1
     assert "WAIVER REVIEW DUE - 1_v1: review_by 2020-01-01 has passed" in out
 
 
 def test_review_by_past_due_warns_on_a_still_reproducing_divergence(capsys):
-    """A past-due review_by on a LIVE (still-reproducing) divergence warns without failing."""
     from benchbox.core.tpchavoc.equivalence import Divergence
 
     exit_code = _report(
@@ -53,12 +41,11 @@ def test_review_by_past_due_warns_on_a_still_reproducing_divergence(capsys):
     )
 
     out = capsys.readouterr().out
-    assert exit_code == 0  # the divergence is still classified and still reproduces - not resolved, not new
+    assert exit_code == 0
     assert "WAIVER REVIEW DUE - 1_v1: review_by 2020-01-01 has passed - a documented, still-live" in out
 
 
 def test_review_by_future_date_does_not_warn(capsys):
-    """A future review_by date produces no warning."""
     from benchbox.core.tpchavoc.equivalence import Divergence
 
     exit_code = _report(
@@ -76,7 +63,6 @@ def test_review_by_future_date_does_not_warn(capsys):
 
 
 def test_review_by_absent_by_default_produces_no_warning(capsys):
-    """No review_by side-table at all (the default) never warns - opt-in only."""
     from benchbox.core.tpchavoc.equivalence import Divergence
 
     exit_code = _report(
@@ -93,13 +79,6 @@ def test_review_by_absent_by_default_produces_no_warning(capsys):
 
 
 def test_clickhouse_review_by_worked_example_is_not_yet_due():
-    """The committed worked example (1_v4) must not be past-due on a healthy tree.
-
-    Regression guard: an accidentally-past-due review_by on a real baseline would
-    make every ClickHouse sample run print a review warning - not a gate failure,
-    but a signal this test catches immediately rather than leaving it to be
-    noticed only when someone reads CI output.
-    """
     from benchbox.core.tpchavoc.equivalence import CLICKHOUSE_KNOWN_DIVERGENCES_REVIEW_BY
 
     for key, review_by in CLICKHOUSE_KNOWN_DIVERGENCES_REVIEW_BY.items():

@@ -1,5 +1,3 @@
-"""Tests for the Results Explorer compatibility and artifact check script."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -23,19 +21,12 @@ checker = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(checker)
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture
 def mock_artifact_dir(tmp_path: Path) -> Path:
-    """Create a minimal valid Results Explorer artifact dist directory."""
     dist = tmp_path / "dist"
     dist.mkdir(parents=True)
     (dist / "index.html").write_text(
-        "<!DOCTYPE html><html><head><title>Results Explorer</title></head>"
-        "<body><div id='root'></div><script src='/assets/index.js'></script></body></html>",
+        "<!DOCTYPE html><html><head><title>Results Explorer</title></head><body><div id='root'></div><script src='/assets/index.js'></script></body></html>",
         encoding="utf-8",
     )
     assets = dist / "assets"
@@ -43,11 +34,6 @@ def mock_artifact_dir(tmp_path: Path) -> Path:
     (assets / "index.js").write_text("console.log('explorer');", encoding="utf-8")
     (assets / "style.css").write_text("body { margin: 0; }", encoding="utf-8")
     return dist
-
-
-# ---------------------------------------------------------------------------
-# Schema Definitions & Normalization Tests
-# ---------------------------------------------------------------------------
 
 
 def test_normalize_type() -> None:
@@ -60,16 +46,14 @@ def test_normalize_type() -> None:
 
 
 def test_schema_versions_definitions() -> None:
-    # Only v13 is supported; contract import should match
-    assert checker.SUPPORTED_SCHEMA_VERSIONS == (13,)
-    assert checker.CURRENT_SCHEMA_VERSION == 13
-    # Check that contract version is consistent
+    assert checker.SUPPORTED_SCHEMA_VERSIONS == (14,)
+    assert checker.CURRENT_SCHEMA_VERSION == 14
     from _project.scripts.explorer_pipeline.contract import EXPLORER_READ_MODEL_VERSION
 
     assert checker.CURRENT_SCHEMA_VERSION == EXPLORER_READ_MODEL_VERSION
     assert checker.SUPPORTED_SCHEMA_VERSIONS == (EXPLORER_READ_MODEL_VERSION,)
 
-    cols = checker.get_table_columns_for_version(13)
+    cols = checker.get_table_columns_for_version(14)
     assert "results" in cols
     assert "metadata" in cols
     assert "result_environment" in cols
@@ -84,6 +68,11 @@ def test_schema_versions_definitions() -> None:
     assert "override_approver" in cols["results"]
     assert "override_expires" in cols["results"]
     assert "benchmark_support_status" in cols["results"]
+    assert "throughput_at_size" in cols["results"]
+    assert "stream_count" in cols["results"]
+    assert "throughput_at_size" in cols["benchmark_rankings"]
+    for table in ("benchmark_rankings", "benchmark_matrix_cells", "cohort_metadata"):
+        assert "stream_count" in cols[table]
 
 
 def test_invalid_schema_version_raises() -> None:
@@ -97,11 +86,6 @@ def test_invalid_schema_version_raises() -> None:
         checker.get_views_for_version(7)
     with pytest.raises(ValueError, match="Unsupported schema version"):
         checker.get_indexes_for_version(8)
-
-
-# ---------------------------------------------------------------------------
-# In-Memory Database & Query Verification Tests
-# ---------------------------------------------------------------------------
 
 
 def test_in_memory_schema_creation_and_validation() -> None:
@@ -125,43 +109,40 @@ def test_check_schema_compatibility_all_supported() -> None:
 
 
 def test_validate_database_schema_detects_missing_table() -> None:
-    con = checker.create_in_memory_schema(13)
+    con = checker.create_in_memory_schema(14)
     try:
         con.execute("DROP TABLE cohort_metadata")
-        errors = checker.validate_database_schema(con, expected_version=13)
-        assert any("missing required tables for v13: cohort_metadata" in err for err in errors)
+        errors = checker.validate_database_schema(con, expected_version=14)
+        assert any("missing required tables for v14: cohort_metadata" in err for err in errors)
     finally:
         con.close()
 
 
 def test_validate_database_schema_detects_missing_column() -> None:
-    con = checker.create_in_memory_schema(13)
+    con = checker.create_in_memory_schema(14)
     try:
         con.execute("ALTER TABLE results DROP COLUMN funding")
-        errors = checker.validate_database_schema(con, expected_version=13)
+        errors = checker.validate_database_schema(con, expected_version=14)
         assert any("table 'results' missing required columns: funding" in err for err in errors)
     finally:
         con.close()
 
 
 def test_validate_database_schema_detects_missing_view() -> None:
-    con = checker.create_in_memory_schema(13)
+    con = checker.create_in_memory_schema(14)
     try:
         con.execute("DROP VIEW result_detail_metrics")
-        errors = checker.validate_database_schema(con, expected_version=13)
-        assert any("missing required views for v13: result_detail_metrics" in err for err in errors)
+        errors = checker.validate_database_schema(con, expected_version=14)
+        assert any("missing required views for v14: result_detail_metrics" in err for err in errors)
     finally:
         con.close()
 
 
 def test_validate_database_schema_detects_missing_view_column() -> None:
-    con = checker.create_in_memory_schema(13)
+    con = checker.create_in_memory_schema(14)
     try:
-        # Table keeps the override columns but the view drops them: the
-        # table and view-existence checks pass, yet every result-detail
-        # load would fail with a binder error.
         con.execute("CREATE OR REPLACE VIEW result_detail_metrics AS SELECT result_id FROM results")
-        errors = checker.validate_database_schema(con, expected_version=13)
+        errors = checker.validate_database_schema(con, expected_version=14)
         assert any(
             "view 'result_detail_metrics' missing required columns:" in err and "override_rules" in err
             for err in errors
@@ -170,24 +151,24 @@ def test_validate_database_schema_detects_missing_view_column() -> None:
             "view 'result_detail_metrics' missing required columns:" in err and "benchmark_support_status" in err
             for err in errors
         )
+        assert any(
+            "view 'result_detail_metrics' missing required columns:" in err
+            and "throughput_at_size" in err
+            and "stream_count" in err
+            for err in errors
+        )
     finally:
         con.close()
 
 
 def test_validate_database_schema_version_mismatch() -> None:
-    con = checker.create_in_memory_schema(13)
+    con = checker.create_in_memory_schema(14)
     try:
-        # Tamper metadata to simulate version mismatch
         con.execute("UPDATE metadata SET read_model_version = 8")
-        errors = checker.validate_database_schema(con, expected_version=13)
-        assert any("read_model_version mismatch: expected 13, got 8" in err for err in errors)
+        errors = checker.validate_database_schema(con, expected_version=14)
+        assert any("read_model_version mismatch: expected 14, got 8" in err for err in errors)
     finally:
         con.close()
-
-
-# ---------------------------------------------------------------------------
-# Artifact Bundle Verification Tests
-# ---------------------------------------------------------------------------
 
 
 def test_compute_file_and_directory_checksums(mock_artifact_dir: Path) -> None:
@@ -202,14 +183,11 @@ def test_compute_file_and_directory_checksums(mock_artifact_dir: Path) -> None:
 
 
 def test_compute_directory_checksums_anchored_exclude(mock_artifact_dir: Path) -> None:
-    # Nested manifest.json should be included in checksums (anchored to root)
     nested = mock_artifact_dir / "assets" / "manifest.json"
     nested.write_text('{"fake": true}', encoding="utf-8")
     checksums = checker.compute_directory_checksums(mock_artifact_dir)
-    # Root manifest.json is excluded, nested one is not
     assert "assets/manifest.json" in checksums
     assert "manifest.json" not in checksums
-    # Same for SHA256SUMS
     nested_sums = mock_artifact_dir / "assets" / "SHA256SUMS"
     nested_sums.write_text("fake", encoding="utf-8")
     checksums2 = checker.compute_directory_checksums(mock_artifact_dir)
@@ -223,13 +201,11 @@ def test_generate_artifact_manifest(mock_artifact_dir: Path) -> None:
     assert manifest["file_count"] == 3
     assert (mock_artifact_dir / "manifest.json").is_file()
     assert (mock_artifact_dir / "SHA256SUMS").is_file()
-    # Provenance fields
     assert manifest["read_model_version"] == checker.CURRENT_SCHEMA_VERSION
     assert manifest["supported_versions"] == list(checker.SUPPORTED_SCHEMA_VERSIONS)
     assert "github_sha" in manifest
     assert "contract_version" in manifest
 
-    # Validating bundle after manifest generation succeeds cleanly
     errors, info = checker.validate_artifact_bundle(mock_artifact_dir)
     assert errors == []
     assert info is not None
@@ -256,7 +232,6 @@ def test_validate_artifact_bundle_valid_directory(mock_artifact_dir: Path) -> No
 
 
 def test_validate_artifact_bundle_require_manifest_missing(mock_artifact_dir: Path) -> None:
-    # Without manifest, require_manifest=False passes; with True fails
     errors_ok, _ = checker.validate_artifact_bundle(mock_artifact_dir, require_manifest=False)
     assert errors_ok == []
     errors_req, _ = checker.validate_artifact_bundle(mock_artifact_dir, require_manifest=True)
@@ -294,7 +269,6 @@ def test_validate_artifact_bundle_empty_file(mock_artifact_dir: Path) -> None:
 def test_validate_artifact_bundle_manifest_checksum_mismatch(mock_artifact_dir: Path) -> None:
     checker.generate_artifact_manifest(mock_artifact_dir, write=True)
 
-    # Tamper with a file
     (mock_artifact_dir / "index.html").write_text("TAMPERED", encoding="utf-8")
 
     errors, _ = checker.validate_artifact_bundle(mock_artifact_dir)
@@ -303,7 +277,6 @@ def test_validate_artifact_bundle_manifest_checksum_mismatch(mock_artifact_dir: 
 
 def test_validate_artifact_bundle_malformed_sha256sums(mock_artifact_dir: Path) -> None:
     checker.generate_artifact_manifest(mock_artifact_dir, write=True)
-    # Overwrite with malformed single token
     (mock_artifact_dir / "SHA256SUMS").write_text("garbage_token\n", encoding="utf-8")
     errors, _ = checker.validate_artifact_bundle(mock_artifact_dir)
     assert any("malformed SHA256SUMS" in err for err in errors)
@@ -345,11 +318,6 @@ def test_validate_artifact_bundle_tar_archive(mock_artifact_dir: Path, tmp_path:
     assert info["file_count"] == 3
 
 
-# ---------------------------------------------------------------------------
-# CLI Execution Tests
-# ---------------------------------------------------------------------------
-
-
 def test_cli_no_args_requires_schema_only_or_inputs(capsys: pytest.CaptureFixture[str]) -> None:
     exit_code = checker.main([])
     assert exit_code == 2
@@ -362,7 +330,7 @@ def test_cli_default_schema_checks(capsys: pytest.CaptureFixture[str]) -> None:
     assert exit_code == 0
     captured = capsys.readouterr()
     assert "Results Explorer Compatibility" in captured.out
-    assert "Schema v13" in captured.out
+    assert "Schema v14" in captured.out
     assert "Schema v12" not in captured.out
     assert "Schema v11" not in captured.out
     assert "Schema v10" not in captured.out
@@ -376,18 +344,18 @@ def test_cli_json_mode(capsys: pytest.CaptureFixture[str]) -> None:
     captured = capsys.readouterr()
     data = json.loads(captured.out)
     assert data["status"] == "passed"
-    assert data["current_version"] == 13
-    assert "v13" in data["schema_checks"]
+    assert data["current_version"] == 14
+    assert "v14" in data["schema_checks"]
     assert "v12" not in data["schema_checks"]
     assert "v11" not in data["schema_checks"]
     assert "v10" not in data["schema_checks"]
 
 
 def test_cli_specific_schema_version(capsys: pytest.CaptureFixture[str]) -> None:
-    exit_code = checker.main(["--schema-only", "--schema-versions", "13"])
+    exit_code = checker.main(["--schema-only", "--schema-versions", "14"])
     assert exit_code == 0
     captured = capsys.readouterr()
-    assert "Schema v13" in captured.out
+    assert "Schema v14" in captured.out
     assert "Schema v12" not in captured.out
     assert "Schema v11" not in captured.out
     assert "Schema v10" not in captured.out
@@ -424,13 +392,11 @@ def test_cli_artifact_check(mock_artifact_dir: Path, capsys: pytest.CaptureFixtu
 
 
 def test_cli_artifact_verify_requires_manifest(mock_artifact_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    # Without manifest, --require-manifest should fail
     exit_code = checker.main(["--artifact", str(mock_artifact_dir), "--require-manifest"])
     assert exit_code == 1
     captured = capsys.readouterr()
     assert "FAILED" in captured.err or "manifest.json is missing" in captured.out or "FAILED" in captured.out
 
-    # After generating manifest, require should pass
     checker.generate_artifact_manifest(mock_artifact_dir, write=True)
     exit_code2 = checker.main(["--artifact", str(mock_artifact_dir), "--require-manifest"])
     assert exit_code2 == 0
@@ -457,9 +423,9 @@ def test_cli_db_path_check(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -
 
     db_file = tmp_path / "test.duckdb"
     with duckdb.connect(str(db_file)) as con:
-        for stmt in checker.generate_schema_ddl(13):
+        for stmt in checker.generate_schema_ddl(14):
             con.execute(stmt)
-        con.execute("INSERT INTO metadata VALUES (13)")
+        con.execute("INSERT INTO metadata VALUES (14)")
 
     exit_code = checker.main(["--db-path", str(db_file)])
     assert exit_code == 0

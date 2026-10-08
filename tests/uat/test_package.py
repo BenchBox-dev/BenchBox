@@ -1,5 +1,3 @@
-"""Fast-test coverage for tests/uat/phases/package.py."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,7 +12,6 @@ pytestmark = pytest.mark.fast
 
 
 def _fake_runner_factory(returncodes: list[int]):
-    """Stub for subprocess.run that returns the given returncodes per invocation."""
     iterator = iter(returncodes)
 
     def runner(argv, check=False):
@@ -108,7 +105,6 @@ def test_package_counts_failures(tmp_path: Path):
         result_paths=[tmp_path / f"r{i}.json" for i in range(3)],
         submissions_dir=tmp_path / "subs",
         runner=runner,
-        # Missing paths skip classification; exercise submit-runner failure counts.
         classify_results=False,
     )
     assert result.success_count == 2
@@ -137,7 +133,6 @@ def _write_minimal_result(path: Path, *, validation: str = "passed", compliance_
 
 
 def test_package_skips_unvalidated_without_counting_failure(tmp_path: Path):
-    """Unvalidated (never-validated) results soft-skip like unofficial; not package failures."""
     cfg = validate_config({"name": "x", "package": {"submit_terminal_state": "local-stage"}})
     clean = tmp_path / "clean.json"
     unvalidated = tmp_path / "unvalidated.json"

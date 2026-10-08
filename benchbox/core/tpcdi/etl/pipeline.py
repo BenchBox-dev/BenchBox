@@ -1,5 +1,3 @@
-"""TPC-DI ETL pipeline implementation."""
-
 from __future__ import annotations
 
 import logging
@@ -13,31 +11,17 @@ logger = logging.getLogger(__name__)
 
 
 class TPCDIETLPipeline:
-    """TPC-DI ETL pipeline implementation with SCD processing."""
-
     def __init__(self, connection: Any, benchmark: Any, dialect: str = "duckdb"):
         self.connection = connection
         self.benchmark = benchmark
         self.dialect = dialect
 
     def run_historical_load(self, scale_factor: float = 1.0) -> ETLPhaseResult:
-        """Execute the historical load phase.
-
-        The historical load populates the data warehouse with initial data,
-        typically representing several years of historical information.
-
-        Args:
-            scale_factor: Data scale factor (1.0 = 1GB)
-
-        Returns:
-            ETL phase result with execution metrics
-        """
         logger.info(f"Starting TPC-DI historical load (scale factor: {scale_factor})")
 
         phase_result = ETLPhaseResult(phase_name="Historical Load", start_time=datetime.now())
 
         try:
-            # Create batch for historical load
             batch_result = ETLBatchResult(
                 batch_id=1,
                 batch_date=date(2023, 1, 1),
@@ -46,19 +30,15 @@ class TPCDIETLPipeline:
                 execution_time=0.0,
             )
 
-            # Step 1: Load dimension data
             logger.info("Loading dimension tables...")
             dim_records = self._load_dimension_tables(batch_result, scale_factor)
 
-            # Step 2: Load fact data
             logger.info("Loading fact tables...")
             fact_records = self._load_fact_tables(batch_result, scale_factor)
 
-            # Step 3: Create indexes for performance
             logger.info("Creating indexes...")
             self._create_performance_indexes()
 
-            # Step 4: Update batch statistics
             batch_result.end_time = datetime.now()
             batch_result.execution_time = (batch_result.end_time - batch_result.start_time).total_seconds()
             batch_result.records_processed = dim_records + fact_records
@@ -84,24 +64,11 @@ class TPCDIETLPipeline:
         return phase_result
 
     def run_incremental_load(self, batch_id: int, scale_factor: float = 1.0) -> ETLPhaseResult:
-        """Execute an incremental load batch.
-
-        Incremental loads process daily changes including new records,
-        updates to existing records, and SCD Type 2 processing.
-
-        Args:
-            batch_id: Unique batch identifier
-            scale_factor: Data scale factor
-
-        Returns:
-            ETL phase result with execution metrics
-        """
         logger.info(f"Starting TPC-DI incremental load batch {batch_id}")
 
         phase_result = ETLPhaseResult(phase_name=f"Incremental Load {batch_id}", start_time=datetime.now())
 
         try:
-            # Calculate batch date (incremental loads are daily)
             base_date = date(2023, 1, 1)
             batch_date = base_date + timedelta(days=batch_id)
 
@@ -113,15 +80,12 @@ class TPCDIETLPipeline:
                 execution_time=0.0,
             )
 
-            # Step 1: Process dimension changes (SCD Type 2)
             logger.info("Processing dimension changes...")
             dim_changes = self._process_dimension_changes(batch_result, batch_date, scale_factor)
 
-            # Step 2: Process fact table increments
             logger.info("Processing fact increments...")
             fact_changes = self._process_fact_increments(batch_result, batch_date, scale_factor)
 
-            # Step 3: Update batch statistics
             batch_result.end_time = datetime.now()
             batch_result.execution_time = (batch_result.end_time - batch_result.start_time).total_seconds()
             batch_result.records_processed = dim_changes + fact_changes
@@ -144,26 +108,9 @@ class TPCDIETLPipeline:
         return phase_result
 
     def run_scd_processing(self, connection: Any, table_name: str, batch_id: int) -> int:
-        """Process Slowly Changing Dimensions Type 2.
-
-        Args:
-            connection: Database connection
-            table_name: Name of dimension table to process
-            batch_id: Current batch ID
-
-        Returns:
-            Number of records processed
-        """
         logger.info(f"Processing SCD Type 2 for {table_name}")
 
         try:
-            # This is a simplified SCD Type 2 implementation
-            # In a real implementation, this would:
-            # 1. Identify changed records by comparing source to target
-            # 2. Close current records (set EndDate, IsCurrent=FALSE)
-            # 3. Insert new records with current data (IsCurrent=TRUE)
-
-            # Simulate SCD processing by updating some existing records
             update_sql = f"""
                 UPDATE {table_name}
                 SET EndDate = CURRENT_DATE - 1,
@@ -172,13 +119,11 @@ class TPCDIETLPipeline:
                 AND RANDOM() < 0.1
             """
 
-            # Execute update
             if hasattr(connection, "execute"):
                 connection.execute(update_sql)
             else:
                 connection.query(update_sql)
 
-            # Get count of updated records
             count_sql = f"SELECT COUNT(*) FROM {table_name} WHERE BatchID = {batch_id}"
             count_result = connection.execute(count_sql).fetchone()
             return count_result[0] if count_result else 0
@@ -188,12 +133,9 @@ class TPCDIETLPipeline:
             return 0
 
     def _load_dimension_tables(self, batch_result: ETLBatchResult, scale_factor: float) -> int:
-        """Load dimension tables during historical load."""
         total_records = 0
 
         try:
-            # For now, use synthetic data generation since the benchmark's generate_data
-            # method returns file paths, not actual data objects
             total_records = self._generate_synthetic_dimension_data(scale_factor)
 
         except Exception as e:
@@ -203,12 +145,9 @@ class TPCDIETLPipeline:
         return total_records
 
     def _load_fact_tables(self, batch_result: ETLBatchResult, scale_factor: float) -> int:
-        """Load fact tables during historical load."""
         total_records = 0
 
         try:
-            # For now, use synthetic data generation since the benchmark's generate_data
-            # method returns file paths, not actual data objects
             total_records = self._generate_synthetic_fact_data(scale_factor)
 
         except Exception as e:
@@ -218,11 +157,9 @@ class TPCDIETLPipeline:
         return total_records
 
     def _process_dimension_changes(self, batch_result: ETLBatchResult, batch_date: date, scale_factor: float) -> int:
-        """Process dimension changes for incremental load."""
         total_changes = 0
 
         try:
-            # Process SCD Type 2 changes for dimension tables
             dimension_tables = [
                 "DimCustomer",
                 "DimAccount",
@@ -245,18 +182,14 @@ class TPCDIETLPipeline:
         return total_changes
 
     def _process_fact_increments(self, batch_result: ETLBatchResult, batch_date: date, scale_factor: float) -> int:
-        """Process fact table increments for incremental load."""
         total_increments = 0
 
         try:
-            # Generate incremental fact data (typically much smaller than historical load)
-            increment_factor = scale_factor * 0.1  # 10% of historical load per day
+            increment_factor = scale_factor * 0.1
 
-            # Simulate incremental trade data
             num_trades = int(1000 * increment_factor)
 
             if num_trades > 0:
-                # Insert new trades using fast SQL generation with valid foreign keys
                 insert_sql = f"""
                     INSERT INTO FactTrade (
                         TradeID, SK_BrokerID, SK_CreateDateID, SK_CreateTimeID,
@@ -312,7 +245,6 @@ class TPCDIETLPipeline:
         return total_increments
 
     def _create_performance_indexes(self) -> None:
-        """Create indexes for query performance."""
         try:
             index_sqls = [
                 "CREATE INDEX IF NOT EXISTS idx_customer_id ON DimCustomer(CustomerID)",
@@ -333,31 +265,24 @@ class TPCDIETLPipeline:
             logger.error(f"Index creation failed: {e}")
 
     def _generate_synthetic_dimension_data(self, scale_factor: float) -> int:
-        """Generate synthetic dimension data as fallback."""
         total_records = 0
 
         try:
-            # Generate DimDate data
             date_records = self._generate_date_dimension()
             total_records += date_records
 
-            # Generate DimTime data
             time_records = self._generate_time_dimension()
             total_records += time_records
 
-            # Generate DimCustomer data
             customer_records = self._generate_customer_dimension(max(1, int(100 * scale_factor)))
             total_records += customer_records
 
-            # Generate DimCompany data
             company_records = self._generate_company_dimension(max(1, int(20 * scale_factor)))
             total_records += company_records
 
-            # Generate DimSecurity data
             security_records = self._generate_security_dimension(max(1, int(50 * scale_factor)))
             total_records += security_records
 
-            # Generate DimAccount data
             account_records = self._generate_account_dimension(max(1, int(150 * scale_factor)))
             total_records += account_records
 
@@ -369,9 +294,7 @@ class TPCDIETLPipeline:
         return total_records
 
     def _generate_synthetic_fact_data(self, scale_factor: float) -> int:
-        """Generate synthetic fact data as fallback."""
         try:
-            # Generate FactTrade data
             trade_records = self._generate_trade_fact(max(1, int(1000 * scale_factor)))
             logger.info(f"Generated synthetic fact data: {trade_records:,} records")
             return trade_records
@@ -380,9 +303,7 @@ class TPCDIETLPipeline:
             return 0
 
     def _generate_date_dimension(self) -> int:
-        """Generate DimDate dimension data."""
         try:
-            # Generate basic date dimension data for 2023
             insert_sql = """
                 INSERT INTO DimDate (
                     SK_DateID, DateValue, DateDesc, CalendarYearID, CalendarYearDesc,
@@ -393,7 +314,6 @@ class TPCDIETLPipeline:
             """
 
             records = []
-            # Generate first 30 days of 2023 to avoid date calculation issues
             for day in range(1, 31):
                 records.append(
                     (
@@ -425,9 +345,7 @@ class TPCDIETLPipeline:
             return 0
 
     def _generate_time_dimension(self) -> int:
-        """Generate DimTime dimension data."""
         try:
-            # Generate basic time dimension data
             insert_sql = """
                 INSERT INTO DimTime (
                     SK_TimeID, TimeValue, HourID, HourDesc, MinuteID, MinuteDesc,
@@ -437,7 +355,7 @@ class TPCDIETLPipeline:
 
             records = []
             for hour in range(24):
-                for minute in [0, 30]:  # Every 30 minutes
+                for minute in [0, 30]:
                     time_id = hour * 100 + minute
                     records.append(
                         (
@@ -449,8 +367,8 @@ class TPCDIETLPipeline:
                             f"Minute {minute}",
                             0,
                             "Second 0",
-                            9 <= hour <= 16,  # Market hours
-                            8 <= hour <= 17,  # Office hours
+                            9 <= hour <= 16,
+                            8 <= hour <= 17,
                         )
                     )
 
@@ -461,7 +379,6 @@ class TPCDIETLPipeline:
             return 0
 
     def _generate_customer_dimension(self, count: int) -> int:
-        """Generate DimCustomer dimension data."""
         try:
             insert_sql = """
                 INSERT INTO DimCustomer (
@@ -522,7 +439,6 @@ class TPCDIETLPipeline:
             return 0
 
     def _generate_company_dimension(self, count: int) -> int:
-        """Generate DimCompany dimension data."""
         try:
             insert_sql = """
                 INSERT INTO DimCompany (
@@ -573,7 +489,6 @@ class TPCDIETLPipeline:
             return 0
 
     def _generate_security_dimension(self, count: int) -> int:
-        """Generate DimSecurity dimension data."""
         try:
             insert_sql = """
                 INSERT INTO DimSecurity (
@@ -593,7 +508,7 @@ class TPCDIETLPipeline:
                         "ACTIVE",
                         f"Security {i}",
                         "NYSE",
-                        ((i - 1) % 20) + 1,  # Reference to company
+                        ((i - 1) % 20) + 1,
                         1000000,
                         "2020-01-01",
                         "2020-01-01",
@@ -612,7 +527,6 @@ class TPCDIETLPipeline:
             return 0
 
     def _generate_account_dimension(self, count: int) -> int:
-        """Generate DimAccount dimension data."""
         try:
             insert_sql = """
                 INSERT INTO DimAccount (
@@ -628,7 +542,7 @@ class TPCDIETLPipeline:
                         i,
                         i,
                         1,
-                        ((i - 1) % 100) + 1,  # Reference to customer
+                        ((i - 1) % 100) + 1,
                         "ACTIVE",
                         f"Account {i}",
                         1,
@@ -646,11 +560,8 @@ class TPCDIETLPipeline:
             return 0
 
     def _generate_trade_fact(self, count: int) -> int:
-        """Generate FactTrade fact data with valid foreign key references."""
         try:
-            # First, get the actual key ranges from dimension tables to ensure referential integrity
             try:
-                # Get valid dimension keys from the actual tables
                 customer_keys = self.connection.execute(
                     "SELECT SK_CustomerID FROM DimCustomer WHERE IsCurrent = TRUE"
                 ).fetchall()
@@ -666,7 +577,6 @@ class TPCDIETLPipeline:
                 date_keys = self.connection.execute("SELECT SK_DateID FROM DimDate").fetchall()
                 time_keys = self.connection.execute("SELECT SK_TimeID FROM DimTime").fetchall()
 
-                # Convert to simple lists
                 customer_ids = [row[0] for row in customer_keys] if customer_keys else [1]
                 account_ids = [row[0] for row in account_keys] if account_keys else [1]
                 security_ids = [row[0] for row in security_keys] if security_keys else [1]
@@ -676,7 +586,6 @@ class TPCDIETLPipeline:
 
             except Exception as e:
                 logger.warning(f"Could not retrieve dimension keys, using defaults: {e}")
-                # Fallback to reasonable defaults if dimension lookup fails
                 customer_ids = list(range(1, 11))
                 account_ids = list(range(1, 11))
                 security_ids = list(range(1, 6))
@@ -712,7 +621,6 @@ class TPCDIETLPipeline:
 
             records = []
             for i in range(1, count + 1):
-                # Use valid keys from dimension tables
                 create_date_id = random.choice(date_ids)
                 create_time_id = random.choice(time_ids)
                 close_date_id = random.choice(date_ids)

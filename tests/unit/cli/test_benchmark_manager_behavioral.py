@@ -1,5 +1,3 @@
-"""Behavioral tests for BenchmarkManager selection and configuration helpers."""
-
 from __future__ import annotations
 
 from io import StringIO
@@ -206,7 +204,7 @@ def test_show_sample_queries_handles_empty_query_registry(monkeypatch: pytest.Mo
     console, stream = _capture_console()
     monkeypatch.setattr(bench_mod, "console", console)
 
-    class _Benchmark:  # noqa: B903 - test stub, not domain model
+    class _Benchmark:  # noqa: B903
         queries: dict[str, str] = {}
 
         def __init__(self, scale_factor: float):
@@ -223,7 +221,7 @@ def test_show_sample_queries_truncates_long_sql(monkeypatch: pytest.MonkeyPatch,
     console, stream = _capture_console()
     monkeypatch.setattr(bench_mod, "console", console)
 
-    class _Benchmark:  # noqa: B903 - test stub, not domain model
+    class _Benchmark:  # noqa: B903
         queries = {"Q1": "SELECT 1\n" * 200}
 
         def __init__(self, scale_factor: float):
@@ -315,8 +313,6 @@ def test_configure_benchmark_builds_config_from_prompted_values(
     assert config.compress_data is True
     assert config.compression_type == "gzip"
     assert config.compression_level == 6
-    # test_execution_type is now derived from phases in run.py, not the wizard;
-    # the BenchmarkConfig default ("standard") is expected here.
     assert config.test_execution_type == "standard"
     assert config.options["recommended_scale"] == 0.1
 
@@ -397,12 +393,6 @@ def test_prompt_compression_gzip_prompts_for_level(monkeypatch: pytest.MonkeyPat
 
 
 def test_prompt_execution_type_method_removed(manager: BenchmarkManager):
-    """The dead 'Test Execution Type' wizard step has been removed.
-
-    Execution type is derived from phases in the CLI flow (see run.py
-    `_derive_execution_type`); the BenchmarkManager no longer exposes a
-    prompt for it.
-    """
     assert not hasattr(manager, "_prompt_execution_type")
     assert not hasattr(type(manager), "TPC_EXECUTION_TYPES")
 
@@ -429,7 +419,6 @@ def test_display_configuration_summary_includes_subset_and_compression(
     assert "2 of 22 (subset)" in output
     assert "zstd (level 3)" in output
     assert "~0.1GB" in output
-    # Execution type is no longer displayed here - derived later from phases.
     assert "Execution Type" not in output
 
 
@@ -462,7 +451,6 @@ def test_get_recommended_scale_uses_memory_tiers(manager: BenchmarkManager, memo
 
 @pytest.mark.parametrize("memory_gb", [8, 16, 24, 64])
 def test_get_recommended_scale_returns_value_in_options(manager: BenchmarkManager, memory_gb: int):
-    """Recommendation must always be a member of scale_options, even when min scale > 0.1 (e.g. TPC-DS)."""
     benchmark_info = {"scale_options": [1.0, 10.0, 100.0]}
     recommended = manager._get_recommended_scale(benchmark_info, {"memory_gb": memory_gb})
     assert recommended in benchmark_info["scale_options"]
@@ -532,7 +520,6 @@ def _future_status_benchmark(name: str, support_status: str, surface: str) -> di
 
 @pytest.fixture
 def future_status_manager() -> BenchmarkManager:
-    """Manager whose benchmarks span every public support tier plus an internal one."""
     mgr = BenchmarkManager()
     mgr.benchmarks = {
         "f_stable": _future_status_benchmark("F Stable", "stable", "public"),
@@ -548,7 +535,6 @@ def future_status_manager() -> BenchmarkManager:
 def test_cli_labels_every_public_support_status(
     monkeypatch: pytest.MonkeyPatch, future_status_manager: BenchmarkManager
 ):
-    """The interactive listing labels each public benchmark with its support tier."""
     console, stream = _capture_console()
     monkeypatch.setattr(bench_mod, "console", console)
 
@@ -565,7 +551,6 @@ def test_cli_labels_every_public_support_status(
 def test_cli_hides_internal_benchmark_regardless_of_support_status(
     monkeypatch: pytest.MonkeyPatch, future_status_manager: BenchmarkManager
 ):
-    """`surface: internal` hides a benchmark even when its status would otherwise show."""
     console, stream = _capture_console()
     monkeypatch.setattr(bench_mod, "console", console)
 

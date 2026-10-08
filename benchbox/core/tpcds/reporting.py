@@ -1,24 +1,3 @@
-"""TPC-DS Benchmark Reporting Module
-
-This module provides comprehensive reporting functionality for TPC-DS benchmark results,
-including official metric calculations, detailed analysis, and various output formats.
-
-The reporting system generates:
-- Executive summary with Power@Size and Throughput@Size metrics
-- Detailed phase-by-phase analysis
-- Query-level performance breakdown
-- Compliance and validation reports
-- Performance trend analysis
-- Audit trail for certification
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DS specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 import csv
 import json
 from dataclasses import asdict
@@ -35,69 +14,35 @@ from .benchmark import (
 
 
 class TPCDSReportGenerator:
-    """
-    Generates comprehensive TPC-DS benchmark reports in multiple formats.
-
-    This class creates detailed reports that include all metrics required for
-    TPC-DS compliance and certification, formatted for both human consumption
-    and automated processing.
-    """
-
     def __init__(self, output_dir: Path, verbose: bool = False) -> None:
-        """
-        Initialize the report generator.
-
-        Args:
-            output_dir: Directory to write report files
-            verbose: Enable verbose logging
-        """
         self.output_dir = Path(output_dir)
         self.verbose = verbose
 
-        # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create reports subdirectory
         self.reports_dir = self.output_dir / "reports"
         self.reports_dir.mkdir(parents=True, exist_ok=True)
 
     def generate_complete_report(self, result: BenchmarkResult) -> dict[str, Path]:
-        """
-        Generate a complete set of TPC-DS benchmark reports.
-
-        Args:
-            result: Benchmark result to report
-
-        Returns:
-            Dictionary mapping report types to file paths
-        """
         if self.verbose:
             emit(f"Generating TPC-DS benchmark reports in {self.reports_dir}")
 
         reports = {}
 
-        # Generate executive summary
         reports["executive_summary"] = self._generate_executive_summary(result)
 
-        # Generate detailed analysis
         reports["detailed_analysis"] = self._generate_detailed_analysis(result)
 
-        # Generate query-level report
         reports["query_analysis"] = self._generate_query_analysis(result)
 
-        # Generate JSON report (machine readable)
         reports["json_report"] = self._generate_json_report(result)
 
-        # Generate CSV data export
         reports["csv_export"] = self._generate_csv_export(result)
 
-        # Generate HTML report
         reports["html_report"] = self._generate_html_report(result)
 
-        # Generate compliance report
         reports["compliance_report"] = self._generate_compliance_report(result)
 
-        # Generate performance summary
         reports["performance_summary"] = self._generate_performance_summary(result)
 
         if self.verbose:
@@ -108,20 +53,17 @@ class TPCDSReportGenerator:
         return reports
 
     def _generate_executive_summary(self, result: BenchmarkResult) -> Path:
-        """Generate executive summary report."""
         report_path = self.reports_dir / "executive_summary.txt"
 
         with open(report_path, "w", encoding="utf-8") as f:
             f.write("TPC-DS BENCHMARK EXECUTIVE SUMMARY\n")
             f.write("=" * 50 + "\n\n")
 
-            # Basic information
             if result.benchmark_start_time:
                 f.write(f"Benchmark Date: {result.benchmark_start_time.strftime('%Y-%m-%d %H:%M:%S')}\n")
             f.write(f"Scale Factor: {result.scale_factor}\n")
             f.write(f"Total Execution Time: {result.total_benchmark_time:.2f} seconds\n\n")
 
-            # Official TPC-DS Metrics
             f.write("OFFICIAL TPC-DS METRICS\n")
             f.write("-" * 25 + "\n")
 
@@ -137,7 +79,6 @@ class TPCDSReportGenerator:
 
             f.write("\n")
 
-            # Phase Results Summary
             f.write("PHASE RESULTS SUMMARY\n")
             f.write("-" * 25 + "\n")
 
@@ -155,7 +96,6 @@ class TPCDSReportGenerator:
 
             f.write("\n")
 
-            # Validation Results
             if result.validation_results:
                 f.write("VALIDATION RESULTS\n")
                 f.write("-" * 18 + "\n")
@@ -170,7 +110,6 @@ class TPCDSReportGenerator:
 
                 f.write("\n")
 
-            # Configuration
             f.write("CONFIGURATION\n")
             f.write("-" * 13 + "\n")
             f.write(f"scale_factor: {result.scale_factor}\n")
@@ -179,35 +118,30 @@ class TPCDSReportGenerator:
         return report_path
 
     def _generate_detailed_analysis(self, result: BenchmarkResult) -> Path:
-        """Generate detailed analysis report."""
         report_path = self.reports_dir / "detailed_analysis.txt"
 
         with open(report_path, "w", encoding="utf-8") as f:
             f.write("TPC-DS BENCHMARK DETAILED ANALYSIS\n")
             f.write("=" * 50 + "\n\n")
 
-            # Power Test Analysis
             if result.power_test:
                 f.write("POWER TEST ANALYSIS\n")
                 f.write("-" * 20 + "\n")
                 self._write_phase_analysis(f, result.power_test)
                 f.write("\n")
 
-            # Throughput Test Analysis
             if result.throughput_test:
                 f.write("THROUGHPUT TEST ANALYSIS\n")
                 f.write("-" * 24 + "\n")
                 self._write_phase_analysis(f, result.throughput_test)
                 f.write("\n")
 
-            # Maintenance Test Analysis
             if result.maintenance_test:
                 f.write("MAINTENANCE TEST ANALYSIS\n")
                 f.write("-" * 25 + "\n")
                 self._write_phase_analysis(f, result.maintenance_test)
                 f.write("\n")
 
-            # Metric Calculations
             f.write("METRIC CALCULATIONS\n")
             f.write("-" * 19 + "\n")
 
@@ -227,14 +161,12 @@ class TPCDSReportGenerator:
         return report_path
 
     def _generate_query_analysis(self, result: BenchmarkResult) -> Path:
-        """Generate query-level analysis report."""
         report_path = self.reports_dir / "query_analysis.txt"
 
         with open(report_path, "w", encoding="utf-8") as f:
             f.write("TPC-DS QUERY-LEVEL ANALYSIS\n")
             f.write("=" * 50 + "\n\n")
 
-            # Analyze each phase
             for phase_name, phase_result in [
                 ("Power Test", result.power_test),
                 ("Throughput Test", result.throughput_test),
@@ -244,7 +176,6 @@ class TPCDSReportGenerator:
                     f.write(f"{phase_name.upper()}\n")
                     f.write("-" * len(phase_name) + "\n")
 
-                    # Sort queries by execution time
                     sorted_queries = sorted(
                         phase_result.queries,
                         key=lambda q: q.execution_time or 0,
@@ -264,7 +195,6 @@ class TPCDSReportGenerator:
 
                     f.write("\n")
 
-                    # Query statistics
                     successful_queries = [q for q in phase_result.queries if q.success]
                     if successful_queries:
                         times = [q.execution_time for q in successful_queries if q.execution_time]
@@ -281,10 +211,8 @@ class TPCDSReportGenerator:
         return report_path
 
     def _generate_json_report(self, result: BenchmarkResult) -> Path:
-        """Generate machine-readable JSON report."""
         report_path = self.reports_dir / "benchmark_results.json"
 
-        # Convert result to JSON-serializable format
         def convert_datetime(obj: Any) -> Any:
             if isinstance(obj, datetime):
                 return obj.isoformat()
@@ -292,7 +220,6 @@ class TPCDSReportGenerator:
 
         result_dict = asdict(result)
 
-        # Convert datetime objects
         def process_dict(d: Any) -> Any:
             if isinstance(d, dict):
                 return {k: process_dict(v) for k, v in d.items()}
@@ -309,13 +236,11 @@ class TPCDSReportGenerator:
         return report_path
 
     def _generate_csv_export(self, result: BenchmarkResult) -> Path:
-        """Generate CSV export of query results."""
         report_path = self.reports_dir / "query_results.csv"
 
         with open(report_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
 
-            # Write header
             writer.writerow(
                 [
                     "Phase",
@@ -330,7 +255,6 @@ class TPCDSReportGenerator:
                 ]
             )
 
-            # Write data for each phase
             for phase_name, phase_result in [
                 ("Power Test", result.power_test),
                 ("Throughput Test", result.throughput_test),
@@ -355,7 +279,6 @@ class TPCDSReportGenerator:
         return report_path
 
     def _generate_html_report(self, result: BenchmarkResult) -> Path:
-        """Generate HTML report."""
         report_path = self.reports_dir / "benchmark_report.html"
 
         with open(report_path, "w", encoding="utf-8") as f:
@@ -364,14 +287,12 @@ class TPCDSReportGenerator:
         return report_path
 
     def _generate_compliance_report(self, result: BenchmarkResult) -> Path:
-        """Generate TPC-DS compliance report."""
         report_path = self.reports_dir / "compliance_report.txt"
 
         with open(report_path, "w", encoding="utf-8") as f:
             f.write("TPC-DS COMPLIANCE REPORT\n")
             f.write("=" * 50 + "\n\n")
 
-            # Compliance checklist
             f.write("COMPLIANCE CHECKLIST\n")
             f.write("-" * 19 + "\n")
 
@@ -388,7 +309,7 @@ class TPCDSReportGenerator:
                     result.throughput_test and result.num_streams > 1,
                 ),
                 ("No query failures", self._check_no_failures(result)),
-                ("Proper parameter generation", True),  # Would need actual validation
+                ("Proper parameter generation", True),
                 (
                     "Result validation passed",
                     result.validation_results.get("overall_valid", False) if result.validation_results else False,
@@ -401,12 +322,10 @@ class TPCDSReportGenerator:
 
             f.write("\n")
 
-            # Overall compliance
             overall_compliance = all(passed for _, passed in checks)
             compliance_status = "COMPLIANT" if overall_compliance else "NON-COMPLIANT"
             f.write(f"Overall Compliance Status: {compliance_status}\n\n")
 
-            # Detailed validation results
             if result.validation_results:
                 f.write("DETAILED VALIDATION RESULTS\n")
                 f.write("-" * 27 + "\n")
@@ -422,21 +341,18 @@ class TPCDSReportGenerator:
         return report_path
 
     def _generate_performance_summary(self, result: BenchmarkResult) -> Path:
-        """Generate performance summary report."""
         report_path = self.reports_dir / "performance_summary.txt"
 
         with open(report_path, "w", encoding="utf-8") as f:
             f.write("TPC-DS PERFORMANCE SUMMARY\n")
             f.write("=" * 50 + "\n\n")
 
-            # Overall performance
             f.write("OVERALL PERFORMANCE\n")
             f.write("-" * 18 + "\n")
             f.write(f"Scale Factor: {result.scale_factor}\n")
             f.write(f"Total Execution Time: {result.total_benchmark_time:.2f} seconds\n")
             f.write("\n")
 
-            # Phase performance
             for phase_name, phase_result in [
                 ("Power Test", result.power_test),
                 ("Throughput Test", result.throughput_test),
@@ -450,7 +366,6 @@ class TPCDSReportGenerator:
                     f.write(f"Success Rate: {self._calculate_success_rate(phase_result):.1f}%\n")
                     f.write("\n")
 
-            # Performance recommendations
             f.write("PERFORMANCE RECOMMENDATIONS\n")
             f.write("-" * 26 + "\n")
             self._write_performance_recommendations(f, result)
@@ -458,7 +373,6 @@ class TPCDSReportGenerator:
         return report_path
 
     def _write_phase_analysis(self, f: Any, phase_result: PhaseResult) -> None:
-        """Write detailed phase analysis to file."""
         if phase_result.start_time:
             f.write(f"Start Time: {phase_result.start_time}\n")
         if phase_result.end_time:
@@ -475,7 +389,6 @@ class TPCDSReportGenerator:
             f.write(f"Error Message: {phase_result.error_message}\n")
 
     def _generate_html_content(self, result: BenchmarkResult) -> str:
-        """Generate HTML content for the report."""
         html_content = f"""
 <!DOCTYPE html>
 <html>
@@ -508,7 +421,6 @@ class TPCDSReportGenerator:
     </div>
 """
 
-        # Add phase results
         for phase_name, phase_result in [
             ("Power Test", result.power_test),
             ("Throughput Test", result.throughput_test),
@@ -532,7 +444,6 @@ class TPCDSReportGenerator:
         return html_content
 
     def _calculate_success_rate(self, phase_result: PhaseResult) -> float:
-        """Calculate success rate for a phase."""
         if not phase_result.queries:
             return 0.0
 
@@ -540,7 +451,6 @@ class TPCDSReportGenerator:
         return (successful / len(phase_result.queries)) * 100.0
 
     def _check_no_failures(self, result: BenchmarkResult) -> bool:
-        """Check if there are no query failures."""
         all_queries = []
 
         for phase_result in [
@@ -554,10 +464,8 @@ class TPCDSReportGenerator:
         return all(q.success for q in all_queries)
 
     def _write_performance_recommendations(self, f: Any, result: BenchmarkResult) -> None:
-        """Write performance recommendations."""
         recommendations = []
 
-        # Analyze performance patterns
         if result.throughput_test:
             success_rate = self._calculate_success_rate(result.throughput_test)
             if success_rate < 95:

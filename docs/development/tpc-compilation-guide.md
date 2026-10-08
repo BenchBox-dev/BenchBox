@@ -52,11 +52,11 @@ The auto-compilation system supports the following TPC binary tools:
 ## Installation Instructions
 
 ### macOS
+Install the Xcode Command Line Tools, or install the tools through Homebrew.
+
 ```bash
-# Install Xcode Command Line Tools
 xcode-select --install
 
-# OR install via Homebrew
 brew install make gcc bison
 ```
 
@@ -68,32 +68,28 @@ sudo apt install build-essential bison flex
 
 ### CentOS/RHEL/Fedora Linux
 ```bash
-# CentOS/RHEL
 sudo yum groupinstall "Development Tools"
 sudo yum install bison flex
 
-# Fedora
 sudo dnf groupinstall "Development Tools"
 sudo dnf install bison flex
 ```
 
+The first two commands are for CentOS/RHEL and the last two are for Fedora.
+
 ### Windows
 ```bash
-# Pre-compiled binaries available via Docker cross-compilation
-# No manual installation required for TPC-H (dbgen, qgen)
 
-# For development/custom builds using WSL (recommended)
 sudo apt update
 sudo apt install build-essential bison flex
 
-# For development/custom builds using MSYS2
 pacman -S make gcc bison flex
 
-# Docker-based compilation (automatic)
-# Windows binaries are auto-compiled using MinGW cross-compilation
-# TPC-H: Full support (dbgen.exe, qgen.exe)
-# TPC-DS: Limited support due to cross-compilation constraints
 ```
+
+Pre-compiled binaries are available through Docker cross-compilation, so TPC-H (`dbgen`, `qgen`) needs no manual installation. Windows binaries are compiled automatically in Docker with MinGW cross-compilation. TPC-H has full support (`dbgen.exe`, `qgen.exe`). TPC-DS has limited support because of cross-compilation constraints.
+
+For development or custom builds, the `apt` commands above are for WSL (recommended), and the `pacman` command is for MSYS2.
 
 ## Configuration
 
@@ -104,12 +100,12 @@ Auto-compilation can be controlled programmatically:
 ```python
 from benchbox.utils.tpc_compilation import get_tpc_compiler
 
-# Enable auto-compilation (default)
 compiler = get_tpc_compiler(auto_compile=True)
 
-# Disable auto-compilation
 compiler = get_tpc_compiler(auto_compile=False)
 ```
+
+The first call enables auto-compilation (the default). The second disables it.
 
 ### Environment Variables
 
@@ -125,7 +121,6 @@ The system respects standard build environment variables:
 ```python
 from benchbox.utils.tpc_compilation import ensure_tpc_binaries
 
-# Ensure specific binaries are available
 results = ensure_tpc_binaries(["dbgen", "qgen"])
 
 for binary, result in results.items():
@@ -305,14 +300,14 @@ TPC source code must be obtained directly from the TPC organization:
 BenchBox includes patches that enable stdout streaming and fix Linux compatibility:
 
 ```bash
-# TPC-H: Add -z flag for stdout output
 cd _sources/tpc-h
 patch -p1 < stdout-support.patch
 
-# TPC-DS: Fix FILTER flag and Linux/GCC 10+ compatibility
 cd _sources/tpc-ds
 patch -p1 < stdout-support.patch
 ```
+
+The TPC-H patch adds a `-z` flag for stdout output. The TPC-DS patch fixes the `FILTER` flag and Linux/GCC 10+ compatibility.
 
 ### Building for other platforms
 
@@ -389,11 +384,9 @@ Get TPC compiler instance with specified configuration.
 
 ### Integration Example
 ```python
-# In your benchmark code
 from benchbox.utils.tpc_compilation import ensure_tpc_binaries
 
 def initialize_tpc_h():
-    # Ensure TPC-H binaries are available
     results = ensure_tpc_binaries(["dbgen", "qgen"])
 
     for binary, result in results.items():
@@ -416,7 +409,6 @@ def check_tpc_status():
     if not compiler.tpc_ds_source:
         print("TPC-DS source not found")
 
-    # Check each binary
     for binary in ["dbgen", "qgen", "dsdgen", "dsqgen"]:
         if binary in compiler.binaries:
             available = compiler.is_binary_available(binary)

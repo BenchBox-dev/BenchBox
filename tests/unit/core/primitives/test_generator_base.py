@@ -1,10 +1,3 @@
-"""Tests for PrimitivesDataGeneratorBase.
-
-Verifies row count calculation, TBL file writing/reading, filename validation,
-CSV writing, file compression, lock mechanism, bulk load file checks, and
-special test file generation.
-"""
-
 from __future__ import annotations
 
 import csv
@@ -26,8 +19,6 @@ pytestmark = [
 
 
 class _TestableGenerator(PrimitivesDataGeneratorBase):
-    """Concrete subclass for testing the abstract base."""
-
     _benchmark_name = "test_primitives"
     _display_name = "Test Primitives"
     _auxiliary_dir = "test_primitives_auxiliary"
@@ -35,12 +26,10 @@ class _TestableGenerator(PrimitivesDataGeneratorBase):
 
 
 def _make_gen(tmp_path: Path) -> _TestableGenerator:
-    """Create a testable generator with TPC-H data dir pre-populated."""
     return _TestableGenerator(scale_factor=0.01, output_dir=tmp_path, quiet=True)
 
 
 def _write_orders_tbl(output_dir: Path, rows: list[tuple] | None = None) -> Path:
-    """Write a minimal orders.tbl file."""
     if rows is None:
         rows = [
             ("1", "370", "O", "172799.49", "1996-01-02", "5-LOW", "Clerk#000000951", "0", "comment"),
@@ -54,9 +43,6 @@ def _write_orders_tbl(output_dir: Path, rows: list[tuple] | None = None) -> Path
     return path
 
 
-# ---------------------------------------------------------------------------
-# Row count calculation
-# ---------------------------------------------------------------------------
 class TestGetTpchRowCount:
     def test_region_fixed(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -81,9 +67,6 @@ class TestGetTpchRowCount:
         assert gen._get_tpch_row_count("lineitem") == expected
 
 
-# ---------------------------------------------------------------------------
-# TBL file writing
-# ---------------------------------------------------------------------------
 class TestWriteTblFile:
     def test_writes_pipe_delimited(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -99,9 +82,6 @@ class TestWriteTblFile:
         assert path.read_text() == ""
 
 
-# ---------------------------------------------------------------------------
-# TBL file reading
-# ---------------------------------------------------------------------------
 class TestReadTblFile:
     def test_reads_rows(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -118,16 +98,13 @@ class TestReadTblFile:
 
     def test_strips_trailing_empty(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
-        # Write with trailing delimiter (standard TPC-H format)
+
         path = tmp_path / "trailing.tbl"
         path.write_text("1|hello|\n2|world|\n")
         rows = gen._read_tbl_file(path)
         assert rows[0] == ("1", "hello")
 
 
-# ---------------------------------------------------------------------------
-# TBL file reading with glob patterns
-# ---------------------------------------------------------------------------
 class TestReadTblFiles:
     def test_reads_single_file(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -152,9 +129,6 @@ class TestReadTblFiles:
         assert len(rows) == 1
 
 
-# ---------------------------------------------------------------------------
-# Parse TBL stream
-# ---------------------------------------------------------------------------
 class TestParseTblStream:
     def test_parses_pipe_delimited(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -170,9 +144,6 @@ class TestParseTblStream:
         assert len(rows) == 2
 
 
-# ---------------------------------------------------------------------------
-# Filename validation
-# ---------------------------------------------------------------------------
 class TestValidateFilename:
     def test_valid_filename(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -207,9 +178,6 @@ class TestValidateFilename:
         assert gen._validate_filename("data.csv.gz") == "data.csv.gz"
 
 
-# ---------------------------------------------------------------------------
-# CSV writing
-# ---------------------------------------------------------------------------
 class TestWriteCsv:
     def test_writes_header_and_data(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -217,8 +185,8 @@ class TestWriteCsv:
         rows = [("1", "370", "O", "172799.49", "1996-01-02", "5-LOW", "Clerk", "0", "comment")]
         path = gen._write_csv("test.csv", rows)
         content = path.read_text()
-        assert "o_orderkey" in content  # header
-        assert "172799.49" in content  # data
+        assert "o_orderkey" in content
+        assert "172799.49" in content
 
     def test_validates_filename(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -227,9 +195,6 @@ class TestWriteCsv:
             gen._write_csv("", [])
 
 
-# ---------------------------------------------------------------------------
-# File compression
-# ---------------------------------------------------------------------------
 class TestCompressFile:
     def test_gzip_compression(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -255,9 +220,6 @@ class TestCompressFile:
             gen._compress_file(source, "lz4")
 
 
-# ---------------------------------------------------------------------------
-# Bulk load file existence check
-# ---------------------------------------------------------------------------
 class TestCheckBulkLoadFilesExist:
     def test_returns_false_when_missing(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -266,7 +228,7 @@ class TestCheckBulkLoadFilesExist:
     def test_returns_false_when_scale_factor_mismatch(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
         gen.files_dir.mkdir(parents=True, exist_ok=True)
-        # Create all expected files
+
         expected_files = [
             "csv_small_1k.csv",
             "csv_medium_100k.csv",
@@ -283,7 +245,7 @@ class TestCheckBulkLoadFilesExist:
         ]
         for f in expected_files:
             (gen.files_dir / f).write_text("data")
-        # Write metadata with different scale factor
+
         metadata = {"scale_factor": 999.0}
         with open(gen.files_dir / ".bulk_load_metadata.json", "w", encoding="utf-8") as f:
             json.dump(metadata, f)
@@ -308,16 +270,13 @@ class TestCheckBulkLoadFilesExist:
         ]
         for f in expected_files:
             (gen.files_dir / f).write_text("data")
-        # Write matching metadata
+
         metadata = {"scale_factor": 0.01}
         with open(gen.files_dir / ".bulk_load_metadata.json", "w", encoding="utf-8") as f:
             json.dump(metadata, f)
         assert gen.check_bulk_load_files_exist() is True
 
 
-# ---------------------------------------------------------------------------
-# Lock mechanism
-# ---------------------------------------------------------------------------
 class TestLockMechanism:
     def test_acquire_and_release_lock(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -330,7 +289,7 @@ class TestLockMechanism:
 
     def test_release_without_acquire_is_noop(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
-        gen._release_bulk_load_lock()  # Should not raise
+        gen._release_bulk_load_lock()
 
     def test_is_process_running_current_pid(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -341,9 +300,6 @@ class TestLockMechanism:
         assert gen._is_process_running(99999999) is False
 
 
-# ---------------------------------------------------------------------------
-# Special test files
-# ---------------------------------------------------------------------------
 class TestSpecialTestFiles:
     @pytest.fixture()
     def gen_with_files_dir(self, tmp_path: Path) -> _TestableGenerator:
@@ -381,18 +337,12 @@ class TestSpecialTestFiles:
             assert key in files
 
 
-# ---------------------------------------------------------------------------
-# get_data_source_benchmark
-# ---------------------------------------------------------------------------
 class TestGetDataSourceBenchmark:
     def test_returns_tpch(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
         assert gen.get_data_source_benchmark() == "tpch"
 
 
-# ---------------------------------------------------------------------------
-# Staging table file generation
-# ---------------------------------------------------------------------------
 class TestStagingTableFileGeneration:
     def test_generates_from_orders_data(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
@@ -404,7 +354,7 @@ class TestStagingTableFileGeneration:
     def test_generates_lineitem_stage(self, tmp_path: Path):
         gen = _make_gen(tmp_path)
         _write_orders_tbl(tmp_path)
-        # Write lineitem.tbl
+
         lineitem = tmp_path / "lineitem.tbl"
         lineitem.write_text(
             "1|1|155190|1|17|21168.23|0.04|0.02|N|O|1996-03-13|1996-02-12|1996-03-22|DELIVER IN PERSON|TRUCK|comment\n"
@@ -418,9 +368,6 @@ class TestStagingTableFileGeneration:
         assert "orders_stage" not in result
 
 
-# ---------------------------------------------------------------------------
-# Bulk load metadata
-# ---------------------------------------------------------------------------
 class TestBulkLoadMetadata:
     def test_writes_metadata_json(self, tmp_path: Path):
         gen = _make_gen(tmp_path)

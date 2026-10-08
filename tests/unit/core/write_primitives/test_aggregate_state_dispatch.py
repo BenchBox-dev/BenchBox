@@ -1,12 +1,3 @@
-"""Unit tests for ``WritePrimitivesBenchmark._execute_aggregate_state_op``.
-
-Closes blind-spot 2026-05-05-010706 -- the dispatch fork that branches
-catalog ops into "aggregate-state vs SQL parity" was previously
-exercised only by the live-Spark CLI command. These tests stub the
-DataFrameWriteOperationsManager via the helper in ``_mock_manager.py``
-so dispatch behavior is verifiable without a JVM.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -28,11 +19,6 @@ from benchbox.core.write_primitives.dataframe_operations import (
 from ._mock_manager import MockDataFrameWriteOperationsManager, make_result
 
 pytestmark = [pytest.mark.fast, pytest.mark.unit]
-
-
-# ---------------------------------------------------------------------------
-# Fixtures and helpers
-# ---------------------------------------------------------------------------
 
 
 def _make_op(
@@ -80,7 +66,6 @@ def adapter_with_spark() -> SimpleNamespace:
 
 @pytest.fixture()
 def wp_benchmark(tmp_path: Path) -> WritePrimitivesBenchmark:
-    """Avoid the name `benchmark` -- pytest-benchmark owns that fixture."""
     return WritePrimitivesBenchmark(output_dir=tmp_path)
 
 
@@ -92,7 +77,6 @@ def _patch_dispatch_dependencies(
     persist_builder_returns: Any = "stub_persist_builder",
     merge_extract_returns: Any = "stub_merge_extract",
 ) -> None:
-    """Patch the lazily-imported dispatch deps in dataframe_operations."""
     import benchbox.core.write_primitives.dataframe_operations as dfo
 
     monkeypatch.setattr(dfo, "get_dataframe_write_manager", lambda *a, **kw: manager)
@@ -110,7 +94,6 @@ def _stub_get_operation(
 
 
 def _stub_source_path(monkeypatch: pytest.MonkeyPatch, wp_benchmark: WritePrimitivesBenchmark, tmp_path: Path) -> Path:
-    """Avoid resolving real TBL fixtures for dispatch tests; return a stub path."""
     stub = tmp_path / "stub_source"
     stub.mkdir(exist_ok=True)
     monkeypatch.setattr(
@@ -119,11 +102,6 @@ def _stub_source_path(monkeypatch: pytest.MonkeyPatch, wp_benchmark: WritePrimit
         lambda *args, **kwargs: stub,
     )
     return stub
-
-
-# ---------------------------------------------------------------------------
-# w2 -- success path
-# ---------------------------------------------------------------------------
 
 
 def test_dispatch_success_with_bound_passing_aggregate_value(
@@ -153,11 +131,6 @@ def test_dispatch_success_with_bound_passing_aggregate_value(
     assert result["execution_time_seconds"] >= 0.0
 
 
-# ---------------------------------------------------------------------------
-# w3 -- failure paths
-# ---------------------------------------------------------------------------
-
-
 def test_dispatch_persist_failure_returns_failed_envelope(
     monkeypatch: pytest.MonkeyPatch,
     wp_benchmark: WritePrimitivesBenchmark,
@@ -180,7 +153,7 @@ def test_dispatch_persist_failure_returns_failed_envelope(
     result = wp_benchmark._execute_aggregate_state_op(op.id, adapter=adapter_with_spark)
 
     assert result["status"] == "FAILED", result
-    # rows_returned stays at 0 on persist failure -- dispatch never reaches merge.
+
     assert result["rows_returned"] == 0
     assert manager.last_merge_path is None, "merge should not run after persist failure"
     assert result["error"] == "AGGREGATE_PERSIST failed: mock persist boom"
@@ -227,7 +200,7 @@ def test_dispatch_bound_violation_returns_failed_envelope_with_diagnostic(
         persist_result=make_result(operation_type=WriteOperationType.AGGREGATE_PERSIST, rows_affected=33),
         merge_result=make_result(
             operation_type=WriteOperationType.AGGREGATE_MERGE,
-            metrics={"aggregate_value": 999.0},  # outside [0, 10]
+            metrics={"aggregate_value": 999.0},
         ),
     )
     _patch_dispatch_dependencies(monkeypatch, manager=manager)
@@ -240,24 +213,19 @@ def test_dispatch_bound_violation_returns_failed_envelope_with_diagnostic(
     assert "999" in result["error"]
 
 
-# ---------------------------------------------------------------------------
-# w4 -- skip paths
-# ---------------------------------------------------------------------------
-
-
 def test_dispatch_skipped_on_unsupported_platform(
     monkeypatch: pytest.MonkeyPatch,
     wp_benchmark: WritePrimitivesBenchmark,
 ) -> None:
     op = _make_op(supported_platforms=("pyspark",))
     _stub_get_operation(monkeypatch, wp_benchmark, op)
-    # Adapter advertises platform that's not in supported_platforms.
+
     adapter = SimpleNamespace(platform_name="duckdb", spark=None)
 
     result = wp_benchmark._execute_aggregate_state_op(op.id, adapter=adapter)
 
     assert result["status"] == "SKIPPED", result
-    # Reason names the missing capability (the platform).
+
     assert "duckdb" in result["error"]
     assert "supports" in result["error"]
 
@@ -276,17 +244,12 @@ def test_dispatch_skipped_on_spark_version_for_topk(
     result = wp_benchmark._execute_aggregate_state_op(op.id, adapter=adapter)
 
     assert result["status"] == "SKIPPED", result
-    # Reason names the missing capability (Spark 4.1+ for approx_top_k).
+
     assert "Spark 4.1" in result["error"]
     assert "3.4.1" in result["error"]
-    # Dispatch must not have invoked persist/merge after the version guard fired.
+
     assert manager.last_persist_path is None
     assert manager.last_merge_path is None
-
-
-# ---------------------------------------------------------------------------
-# w5 -- _resolve_aggregate_source_path cache-hit
-# ---------------------------------------------------------------------------
 
 
 def test_resolve_aggregate_source_path_short_circuits_on_cached_dir(
@@ -305,5 +268,5 @@ def test_resolve_aggregate_source_path_short_circuits_on_cached_dir(
     )
 
     assert resolved == cache_dir
-    # The cached file should be untouched (no re-conversion ran).
+
     assert (cache_dir / "data.parquet").read_bytes() == b"PAR1\x00\x00"

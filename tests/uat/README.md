@@ -50,12 +50,12 @@ tests/uat/
 ## Running tests
 
 ```bash
-# Fast tests only (default for `make test-fast`).
 uv run -- python -m pytest tests/uat -q -m fast
 
-# All tests including the slow-marked replay assertion.
 uv run -- python -m pytest tests/uat -q -m "fast or slow"
 ```
+
+The first command runs only the fast tests, which is the default for `make test-fast`. The second runs all tests, including the slow-marked replay assertion.
 
 ## Matrix And Connection Sources Of Truth
 
@@ -115,9 +115,11 @@ with other local runs. Keep fast tests for this mapping in sync with
 Interrupted-run recovery is explicit:
 
 ```bash
-make uat-docker-cleanup        # dry-run inventory + commands
+make uat-docker-cleanup
 make uat-docker-cleanup APPLY=1
 ```
+
+The first command is a dry run that prints an inventory and the commands it would run. The second applies the cleanup.
 
 The recovery command removes only compose-labelled projects whose name
 starts with the UAT prefix (`benchbox-uat` by default). It also reports

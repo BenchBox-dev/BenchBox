@@ -1,5 +1,3 @@
-"""Tests for benchbox.platforms.base.spark_logging."""
-
 from __future__ import annotations
 
 import logging
@@ -13,10 +11,8 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 class TestSuppressWindowExecWarning:
-    """Tests for suppress_window_exec_warning()."""
-
     def test_suppresses_via_logger_object_call_shape(self):
-        """Verify the logger-object Configurator.setLevel overload is used."""
+
         mock_spark = MagicMock()
         mock_jvm = mock_spark.sparkContext._jvm
         mock_logger = MagicMock()
@@ -33,17 +29,14 @@ class TestSuppressWindowExecWarning:
         )
 
     def test_does_not_raise_on_jvm_error(self):
-        """Suppression failure must not propagate - worst case warnings still appear."""
         mock_spark = MagicMock()
         mock_spark.sparkContext._jvm.org.apache.logging.log4j.LogManager.getLogger.side_effect = RuntimeError(
             "JVM gateway unavailable"
         )
 
-        # Should not raise
         suppress_window_exec_warning(mock_spark)
 
     def test_logs_debug_on_failure(self, caplog):
-        """On failure, a debug message is emitted for diagnosability."""
         mock_spark = MagicMock()
         mock_spark.sparkContext._jvm.org.apache.logging.log4j.LogManager.getLogger.side_effect = RuntimeError(
             "JVM gateway unavailable"

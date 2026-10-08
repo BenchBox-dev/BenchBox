@@ -1,13 +1,3 @@
-"""Parity tests for W10 query_source variant rules under shadow mode.
-
-Verifies that:
-1. h2odb_variants.py registers exactly 5 rules (SQLite + ClickHouse + StarRocks + MySQL + BigQuery for Q9).
-2. coffeeshop_variants.py registers exactly 2 rules (clickhouse SA4 + TM1).
-3. Each rule has SELECT_VARIANT action and a SelectVariantPayload.
-4. Shadow-mode: no divergence for covered platforms (legacy already selects variant).
-5. Registry is silent for platforms with no rule (duckdb, starrocks/coffeeshop).
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -21,18 +11,12 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# Load rule modules to populate REGISTRY
-import benchbox.sql_compat.rules.query_source.coffeeshop_variants  # noqa: F401
-import benchbox.sql_compat.rules.query_source.h2odb_variants  # noqa: F401
+import benchbox.sql_compat.rules.query_source.coffeeshop_variants
+import benchbox.sql_compat.rules.query_source.h2odb_variants
 from benchbox.sql_compat.registry import REGISTRY
-
-# ---------------------------------------------------------------------------
-# Registration: h2odb
-# ---------------------------------------------------------------------------
 
 
 def test_h2odb_variant_rules_registered():
-    """Exactly 5 query_source rules registered for h2odb (SQLite + ClickHouse + StarRocks + MySQL + BigQuery Q9)."""
     rules = [(key, entry) for key, entry in REGISTRY.all_rules() if key[0] is Phase.QUERY_SOURCE and key[2] == "h2odb"]
     assert len(rules) == 5, f"Expected 5 h2odb rules, got {len(rules)}: {[e.rule_id for _, e in rules]}"
     rule_ids = [entry.rule_id for _, entry in rules]
@@ -68,7 +52,6 @@ def test_h2odb_rule_action_and_payload(platform: str, expected_snippet: str):
 
 
 def test_h2odb_duckdb_has_no_rule():
-    """duckdb is not in the h2odb variant table - registry should return None."""
     ctx = CompatibilityContext(
         platform="duckdb",
         platform_version=None,
@@ -81,13 +64,7 @@ def test_h2odb_duckdb_has_no_rule():
     assert REGISTRY.resolve(ctx) is None
 
 
-# ---------------------------------------------------------------------------
-# Registration: coffeeshop
-# ---------------------------------------------------------------------------
-
-
 def test_coffeeshop_variant_rules_registered():
-    """Exactly 2 query_source rules registered for coffeeshop (clickhouse SA4 + TM1)."""
     rules = [
         (key, entry) for key, entry in REGISTRY.all_rules() if key[0] is Phase.QUERY_SOURCE and key[2] == "coffeeshop"
     ]
@@ -123,7 +100,6 @@ def test_coffeeshop_rule_action_and_payload(query_id: str, expected_snippet: str
 
 @pytest.mark.parametrize("query_id", ["SA4", "TM1"])
 def test_coffeeshop_starrocks_has_no_rule(query_id: str):
-    """starrocks has no coffeeshop SA4/TM1 variant - registry should return None."""
     ctx = CompatibilityContext(
         platform="starrocks",
         platform_version=None,

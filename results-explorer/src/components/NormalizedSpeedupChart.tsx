@@ -1,14 +1,3 @@
-// ---------------------------------------------------------------------------
-// NormalizedSpeedupChart - log-scale horizontal speedup bars per query
-//
-// speedup = baseline_ms / this_ms
-//   > 1: faster than baseline (green)
-//   < 1: slower than baseline (red)
-//   = 1: same (neutral)
-//
-// Log2 scale with grid lines at 0.25×, 0.5×, 1×, 2×, 4×.
-// ---------------------------------------------------------------------------
-
 import { useState } from "preact/hooks";
 import { speedupRatio } from "@/lib/chartMath";
 import { isValidTimingValue } from "@/lib/displayEligibility";
@@ -31,7 +20,7 @@ function toX(speedup: number, width: number): number {
 
 interface SpeedupEntry {
   queryId: string;
-  speedups: (number | null)[]; // one per non-baseline result; null = query absent
+  speedups: (number | null)[];
 }
 
 interface Props {
@@ -42,13 +31,8 @@ interface Props {
 
 export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props) {
   const [containerRef, { width: containerWidth }] = useElementSize();
-  // Use measured width; fall back to 600 if not yet observed (before first paint).
   const drawWidth = chartFrame(containerWidth, { minWidth: 300 }).width;
 
-  // w6 (chart-panel-scope-and-labeling): default to "comparable only"
-  // so cohorts with hundreds of queries (e.g. read_primitives' ~149)
-  // don't dominate the chart with mostly-missing rows. Toggling
-  // exposes the partials when the user wants the wider context.
   const [showComparableOnly, setShowComparableOnly] = useState(true);
 
   if (queries.length === 0 || results.length < 2) return null;
@@ -59,8 +43,6 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
   const AXIS_H = 24;
   const PADDING = 8;
 
-  // Compute speedup entries (full set first, then filter for the visible
-  // chart). Counts let the toggle disclose how many rows are hidden.
   const allEntries: SpeedupEntry[] = queries.map(({ queryId, timings }) => {
     const baselineT = timings[baselineIdx];
     const baselineMs = isValidTimingValue(baselineT?.ms) ? baselineT.ms : null;
@@ -133,7 +115,6 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
         aria-label="Per-query results relative to the selected baseline"
         aria-describedby="normalized-speedup-description"
       >
-        {/* Grid lines and axis labels */}
         {SPEEDUP_GRID_STOPS.map((stop) => {
           const x = LABEL_W + toX(stop, drawWidth - LABEL_W - PADDING);
           return (
@@ -158,16 +139,11 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
           );
         })}
 
-        {/* Bars */}
         {entries.map(({ queryId, speedups }, rowIdx) => {
           const y0 = rowIdx * rowHeight;
           const barAreaW = drawWidth - LABEL_W - PADDING;
           const centerX = LABEL_W + toX(1, barAreaW);
 
-          // Composite key: the `queries` prop is not deduped at the boundary
-          // (unlike sortQueryIds), so a caller passing variant rows for the
-          // same queryId would collide on key={queryId}. The row index
-          // disambiguates within this iteration.
           return (
             <g key={`${queryId}-${rowIdx}`} transform={`translate(0, ${y0})`}>
               <text
@@ -205,9 +181,6 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
                       fill={isSlower ? SLOWER_FILL : FASTER_FILL}
                       opacity={0.75}
                     />
-                    {/* A speedup at the clamp reaches the end of the plot, so a
-                        label started past the bar would be drawn outside the
-                        viewBox and cropped. */}
                     <text
                       x={
                         edgeSafeValueLabel(isSlower ? barX : sx, drawWidth, isSlower ? "left" : "right")
@@ -249,7 +222,6 @@ export function NormalizedSpeedupChart({ queries, results, baselineIdx }: Props)
         </tbody>
       </table>
 
-      {/* Legend */}
       <div class="mt-2 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">
         <span>Baseline: <strong>{results[baselineIdx]?.platform}</strong></span>
         {nonBaselineResults.map((r, i) => {

@@ -1,5 +1,3 @@
-"""Unit tests for explorer cohort ranking helpers."""
-
 from __future__ import annotations
 
 import pytest
@@ -18,7 +16,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 def _rankable_entry(**overrides) -> ManifestEntry:
-    """A ManifestEntry that is ranking-eligible unless an override breaks it."""
+
     base = {
         "result_id": "r1",
         "benchmark": "tpch",
@@ -61,9 +59,7 @@ def test_custom_tuning_with_applied_evidence_remains_rankable(status: str) -> No
 
 @pytest.mark.parametrize("compliance", ["unofficial_nonstandard", "unofficial_subscale"])
 def test_unofficial_compliance_is_never_ranked(compliance: str) -> None:
-    # Even with a ranking-eligible trust label, an unofficial-compliance result
-    # must be excluded from official rankings (fail-closed on the bundle's own
-    # compliance signal, independent of the sidecar-derived trust label).
+
     entry = _rankable_entry(compliance_class=compliance)
     assert not is_ranking_eligible(entry)
     assert ranking_exclusion_reason(entry) == "unofficial_compliance"

@@ -103,7 +103,6 @@ describe("Leaderboard", () => {
 
     await waitFor(() => expect(resultCalls).toBe(1));
     await waitFor(() => expect(screen.getByText("Initializing static DuckDB snapshot...")).toBeTruthy());
-    // Headline stability is enforced by LEADERBOARD_SHELL_GEOMETRY_CLASSES.
     expect(screen.getByRole("heading", { level: 1, name: "Compare benchmark results" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Cross-benchmark leaderboard loading" })).toHaveAttribute(
       "aria-busy",
@@ -216,10 +215,6 @@ describe("Leaderboard", () => {
 
 
   it("carries the provenance legend at the bottom of the data surface, since Leaderboard is /results/compare's empty-selection state", async () => {
-    // Home no longer renders this legend (it moved here); Compare's loaded-
-    // comparison branch still renders its own copy. Leaderboard is the
-    // component Compare falls back to when nothing is selected, so
-    // /results/compare needs the legend in both states.
     render(<Leaderboard />);
     await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
 
@@ -596,6 +591,124 @@ describe("Leaderboard", () => {
     expect(cohortLink.getAttribute("href")).toContain("tuning=auto");
   });
 
+  it("lists throughput cohorts per stream count and links each to its own stream count", async () => {
+    const throughputResult = (resultId: string, platform: string, streams: number) => ({
+      ...RESULT_ROWS[0]!,
+      result_id: resultId,
+      benchmark: "tpch",
+      scale_factor: 1,
+      platform,
+      platform_id: platform.toLowerCase(),
+      test_type: "throughput",
+      power_score: null,
+      throughput_at_size: 1000 + streams,
+      stream_count: streams,
+    });
+    const throughputCohort = (resultId: string, platform: string, streams: number, rank: number) => ({
+      ...COHORT_ROWS[2]!,
+      cohort_key: `tpch-sf1-throughput-${streams}streams`,
+      phase: "throughput",
+      stream_count: streams,
+      cohort_label: `TPC-H SF1 Throughput (${streams} streams)`,
+      cohort_href: `/results/tpch/?sf=1&phase=throughput&streams=${streams}`,
+      platform_count: 2,
+      cohort_ranked_count: 2,
+      primary_metric: "throughput_at_size",
+      platform_id: platform.toLowerCase(),
+      platform,
+      result_id: resultId,
+      rank,
+      metric_value: 1000 + streams,
+    });
+    const results = [
+      throughputResult("t3-spark", "Spark", 3),
+      throughputResult("t3-duck", "DuckDB", 3),
+      throughputResult("t2-spark", "Spark", 2),
+      throughputResult("t2-duck", "DuckDB", 2),
+    ];
+    const cohorts = [
+      throughputCohort("t3-spark", "Spark", 3, 1),
+      throughputCohort("t3-duck", "DuckDB", 3, 2),
+      throughputCohort("t2-spark", "Spark", 2, 1),
+      throughputCohort("t2-duck", "DuckDB", 2, 2),
+    ];
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) return results;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return cohorts;
+      return [];
+    });
+
+    render(<Leaderboard />);
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
+
+    const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
+    const threeStreams = within(grid).getByRole("link", { name: /^TPC-H SF1 Throughput \(3 streams\)/ });
+    const twoStreams = within(grid).getByRole("link", { name: /^TPC-H SF1 Throughput \(2 streams\)/ });
+    expect(new URL((threeStreams as HTMLAnchorElement).href).searchParams.get("streams")).toBe("3");
+    expect(new URL((twoStreams as HTMLAnchorElement).href).searchParams.get("streams")).toBe("2");
+    expect(new URL((threeStreams as HTMLAnchorElement).href).searchParams.get("phase")).toBe("throughput");
+  });
+
+  it("narrows throughput cohorts to the streams URL value", async () => {
+    window.history.replaceState(null, "", "/results/?streams=3");
+    const results = [3, 2].flatMap((streams) => [
+      {
+        ...RESULT_ROWS[0]!,
+        result_id: `t${streams}-spark`,
+        benchmark: "tpch",
+        scale_factor: 1,
+        platform: "Spark",
+        platform_id: "spark",
+        test_type: "throughput",
+        stream_count: streams,
+      },
+      {
+        ...RESULT_ROWS[0]!,
+        result_id: `t${streams}-duck`,
+        benchmark: "tpch",
+        scale_factor: 1,
+        platform: "DuckDB",
+        platform_id: "duckdb",
+        test_type: "throughput",
+        stream_count: streams,
+      },
+    ]);
+    const cohorts = results.map((result, index) => ({
+      ...COHORT_ROWS[2]!,
+      cohort_key: `tpch-sf1-throughput-${result.stream_count}streams`,
+      phase: "throughput",
+      stream_count: result.stream_count,
+      cohort_label: `TPC-H SF1 Throughput (${result.stream_count} streams)`,
+      platform_count: 2,
+      cohort_ranked_count: 2,
+      primary_metric: "throughput_at_size",
+      platform_id: result.platform_id,
+      platform: result.platform,
+      result_id: result.result_id,
+      rank: (index % 2) + 1,
+    }));
+    vi.mocked(queryRows).mockImplementation(async (sql: string) => {
+      const s = String(sql).replace(/\s+/g, " ").trim();
+      if (s.includes("FROM bench.results")) return results;
+      if (s.startsWith("SELECT platform_id, platform, avg_rank, n_cohorts FROM bench.meta_leaderboard")) {
+        return META_LEADERBOARD_ROWS;
+      }
+      if (s.includes("FROM bench.cohort_metadata")) return cohorts;
+      return [];
+    });
+
+    render(<Leaderboard />);
+    await waitFor(() => expect(screen.getByText("Cross-benchmark rankings")).toBeTruthy());
+
+    const grid = screen.getByRole("grid", { name: "Cross-benchmark leaderboard" });
+    expect(within(grid).getByRole("link", { name: /^TPC-H SF1 Throughput \(3 streams\)/ })).toBeTruthy();
+    expect(within(grid).queryByRole("link", { name: /^TPC-H SF1 Throughput \(2 streams\)/ })).toBeNull();
+  });
+
   it("keeps raw tuning option values when display labels are trimmed", async () => {
     const resultRows = RESULT_ROWS.map((row) =>
       row.result_id === "r2" ? { ...row, tuning_mode: " auto " } : row,
@@ -632,8 +745,6 @@ describe("Leaderboard", () => {
 
 describe("toggleFacetValue (w13)", () => {
   it("removes a value when it is already selected, leaving siblings intact", () => {
-    // Pre-w13 the dropdown handler did `[value]` (single-element replacement),
-    // collapsing ?bm=tpch,clickbench to just one entry on any subsequent click.
     expect(toggleFacetValue(["tpch", "clickbench"], "tpch")).toEqual(["clickbench"]);
     expect(toggleFacetValue(["tpch", "clickbench"], "clickbench")).toEqual(["tpch"]);
   });

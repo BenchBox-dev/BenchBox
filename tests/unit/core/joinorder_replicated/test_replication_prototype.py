@@ -1,5 +1,3 @@
-"""Replicated-IMDB prototype: offset math, identity, and oracle scaling."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -319,8 +317,7 @@ def test_lookup_fk_values_never_shift():
     assert lookup_pairs.isdisjoint(keyed_pairs), f"lookup FKs must not shift: {lookup_pairs & keyed_pairs}"
     for table, _, _ in LOOKUP_FK_COLUMNS:
         assert table in REPLICATED_TABLES
-    # Spot-check the contract's headline example: every replica references
-    # the same company_type IDs.
+
     assert ("movie_companies", "company_type_id", "company_type") in LOOKUP_FK_COLUMNS
 
 

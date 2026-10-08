@@ -1,5 +1,3 @@
-"""Check Q17's SQL aggregate semantics through real expression adapters."""
-
 from __future__ import annotations
 
 import pytest

@@ -1,5 +1,3 @@
-"""A held-out existing workload, adapted only to the small fixture schema."""
-
 from pathlib import Path
 
 import yaml
@@ -38,8 +36,6 @@ def cases() -> list[dict]:
     for row in rows:
         if row["id"] not in selected:
             continue
-        # Identifier-only adaptation: every selected query uses identical native
-        # syntax on the two engines; no target transpilation enters the input.
         import re
 
         sql = re.sub(r"\b\w+\b", lambda match: mappings.get(match[0], match[0]), row["sql"])

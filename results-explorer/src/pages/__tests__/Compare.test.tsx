@@ -1,23 +1,7 @@
-/**
- * Tests for Compare page.
- *
- * Cases:
- *   (a) Summary cards and query diff table values agree for the same row
- *   (b) For a tpch benchmark (power_score primary), Compare shows power_score,
- *       not geomean_ms, as the primary metric label
- *   (c) For a clickbench benchmark (display_geomean_ms primary), Compare shows
- *       geomean as the primary label
- *   (d) Baseline selector changes which result is treated as baseline in chart section
- */
-
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { route } from "preact-router";
 import type { DetailResult } from "@/types";
-
-// ---------------------------------------------------------------------------
-// Mock manifest module
-// ---------------------------------------------------------------------------
 
 vi.mock("preact-router", () => ({
   route: vi.fn(),
@@ -45,10 +29,6 @@ import {
   type ResultRow,
 } from "@/lib/duckdbQueries";
 import { buildComparisonBoundary, Compare } from "@/pages/Compare";
-
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
 
 describe("buildComparisonBoundary", () => {
   it("reports differing and unrecorded hardware fields together", () => {
@@ -203,10 +183,6 @@ beforeEach(() => {
   );
 });
 
-// ---------------------------------------------------------------------------
-// (a) Summary card "vs worst" value agrees with query diff evidence
-// ---------------------------------------------------------------------------
-
 describe("Compare", () => {
   it("shows the ranking table when a single run is pinned", async () => {
     setupUrl(["a556e716"]);
@@ -223,8 +199,6 @@ describe("Compare", () => {
 
     render(<Compare />);
 
-    // One run is not a comparison, so the compare route falls back to the
-    // ranking table rather than to a page whose only content was a link.
     await waitFor(() => expect(screen.getByTestId("home-hero-filter-band")).toBeTruthy());
     expect(screen.getByRole("heading", { level: 1, name: "Compare benchmark results" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Find runs to compare with this run" }).getAttribute("href")).toBe(`/results/query?pick=${DUCKDB.result_id}`);
@@ -377,7 +351,6 @@ describe("Compare", () => {
 
   it.skip("compare builder enforces same-cohort selection and launches with two compatible runs [retired: candidate table moved to Query]", async () => {
     setupUrl([]);
-    // Two compatible (same benchmark/scale/phase) and one incompatible (different benchmark)
     vi.mocked(listResults).mockResolvedValue([
       {
         result_id: "r1",
@@ -500,16 +473,12 @@ describe("Compare", () => {
     await waitFor(() => expect(getByTestId("compare-builder")).toBeTruthy());
     await waitFor(() => expect(getByTestId("compare-builder-row-r1")).toBeTruthy());
 
-    // Launch is disabled before any selection
     const launch = getByTestId("compare-builder-launch") as HTMLButtonElement;
     expect(launch.disabled).toBe(true);
 
-    // Select first compatible run
     const r1Checkbox = within(getByTestId("compare-builder-row-r1")).getByRole("checkbox") as HTMLInputElement;
     r1Checkbox.click();
 
-    // Compatible-only defaults on after the cohort lock; r3 (different benchmark)
-    // is hidden until the user opts to see it.
     await waitFor(() => {
       expect((getByTestId("compare-builder-compatible-only") as HTMLInputElement).checked).toBe(true);
     });
@@ -520,12 +489,10 @@ describe("Compare", () => {
       expect(r3Checkbox.disabled).toBe(true);
     });
 
-    // Add second compatible run; launch enables
     const r2Checkbox = within(getByTestId("compare-builder-row-r2")).getByRole("checkbox") as HTMLInputElement;
     r2Checkbox.click();
     await waitFor(() => expect((getByTestId("compare-builder-launch") as HTMLButtonElement).disabled).toBe(false));
 
-    // Click Launch — must navigate to /results/compare?ids=r1,r2 (or r2,r1)
     (getByTestId("compare-builder-launch") as HTMLButtonElement).click();
     await waitFor(() => {
       const calls = vi.mocked(route).mock.calls.map((c) => String(c[0]));
@@ -558,7 +525,6 @@ describe("Compare", () => {
     await waitFor(() => expect(getByTestId("compare-builder")).toBeTruthy());
     await waitFor(() => expect(getByTestId("compare-builder-row-r1")).toBeTruthy());
 
-    // Before any selection, the toggle is not present and incompatibles render with the compatibles.
     expect(queryByTestId("compare-builder-compatible-only")).toBeNull();
     expect(getByTestId("compare-builder-row-r3")).toBeTruthy();
 
@@ -668,9 +634,6 @@ describe("Compare", () => {
     const labels = checkboxes
       .map((cb) => cb.getAttribute("aria-label") ?? "")
       .filter((label) => label.startsWith("Select "));
-    // Each row checkbox label is unique even though both rows are DuckDB on
-    // the same benchmark/scale/phase: the trailing short id and run date
-    // disambiguate.
     expect(new Set(labels).size).toBe(labels.length);
     expect(labels.some((label) => label.includes("aaaa1111"))).toBe(true);
     expect(labels.some((label) => label.includes("bbbb2222"))).toBe(true);
@@ -711,15 +674,12 @@ describe("Compare", () => {
   });
 
   it("shows a 10.00x ratio to the lowest selected score in the DuckDB summary card (power_score primary)", async () => {
-    // DUCKDB power_score=3000, SQLITE power_score=300 → DuckDB / lowest selected = 10.00x
     render(<Compare />);
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
     await waitFor(() => expect(document.title).toBe("Compare (2) · BenchBox Results"));
-    // The summary card dt label
     expect(screen.getAllByText(/Compared with lowest selected score/i).length).toBeGreaterThan(0);
-    // The computed ratio: 10.00x
     expect(screen.getAllByText("10.00x").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/2026-04-01.*days ago/).length).toBeGreaterThan(0);
   });
@@ -735,9 +695,6 @@ describe("Compare", () => {
   });
 
   it("renders a funding chip on the primary compare cards, not just the builder table", async () => {
-    // #1105 review: showBuilder is false for a normal ids= compare, so the
-    // page renders these DetailResult-backed cards (not the ResultRow-backed
-    // builder table further down, which already carried FundingChip).
     vi.mocked(getDetailResult).mockImplementation((id) =>
       id === "r1" ? Promise.resolve(makeResult({ result_id: "r1", platform: "DuckDB", funding: "employer" })) : Promise.resolve(SQLITE),
     );
@@ -747,10 +704,6 @@ describe("Compare", () => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
 
-    // FundingChip's compact label for "employer" is "Employer" - distinct
-    // from TrustBadge's compact "Maintainer", so this can only come from the
-    // chip. SQLite's funding stays at the default "unspecified", which
-    // FundingChip deliberately renders as no chip at all.
     expect(screen.getAllByText("Employer").length).toBeGreaterThan(0);
   });
 
@@ -840,14 +793,8 @@ describe("Compare", () => {
     expect(summary).toHaveTextContent("No winner named");
     expect(summary).toHaveTextContent("Insufficient comparable query evidence");
     expect(summary).toHaveTextContent("Selected runs do not share at least two valid query timings");
-    // w4: the badge now names how many of how many are shown, so an empty
-    // filter is distinguishable from an empty comparison.
     expect(queryDiff).toHaveTextContent("Showing 3 of 3 queries.");
     expect(queryDiff).toHaveTextContent("This page does not name a winner because Selected runs do not share at least two valid query timings");
-    // w4 replaced the generic "Missing" badge with an explicit
-    // not-comparable marker. The pinned behaviour this test exists for is
-    // unchanged: the rows are still SHOWN rather than dropped, which is what
-    // keeps the reader aware of the exclusion.
     expect(queryDiff).toHaveTextContent("Not comparable");
   });
 
@@ -931,14 +878,6 @@ describe("Compare", () => {
     expect(window.location.hash).toBe("#comparability-receipt-warnings");
   });
 
-  // ---------------------------------------------------------------------
-  // Live reproduction: DuckDB vs Pandas at H2ODB SF0.01. Pandas carries
-  // validation_status "not_run" alongside three cosmetic environment diffs
-  // (platform version, driver version, execution mode). Before this fix the
-  // guardrails summary named only the three cosmetic diffs and folded
-  // Validation into "+1 more", and the Comparison summary headlined a
-  // confident winner claim with no caveat that one side was unvalidated.
-  // ---------------------------------------------------------------------
   it("names Validation explicitly in the guardrails summary and caveats the winner claim (DuckDB vs Pandas, unvalidated)", async () => {
     vi.mocked(getDetailResult).mockImplementation((id) =>
       id === "r1"
@@ -975,14 +914,10 @@ describe("Compare", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy());
 
     const guardrails = screen.getByRole("region", { name: "Compare guardrails" });
-    // Validation must be named in the visible summary, not folded into "+N more" -
-    // it is sorted to the front, so any truncation falls on the cosmetic fields.
     expect(guardrails.textContent).toMatch(/Warning classes: Validation,/);
 
     const summary = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
     expect(summary).toHaveTextContent("DuckDB");
-    // The headline itself carries the caveat - a reader who reads only the
-    // headline must not conclude this rests on validated data.
     expect(summary).toHaveTextContent("Validation caution");
     expect(summary).toHaveTextContent("Unvalidated result");
   });
@@ -1016,29 +951,20 @@ describe("Compare", () => {
   });
 
   it("summary card speedup and query diff ratio are consistent for 2-platform fixture", async () => {
-    // DUCKDB Q1=10ms, Q2=20ms; SQLITE Q1=100ms, Q2=200ms -> per-query ratio = 10.00x for both
-    // DuckDB summary card: power_score 3000 vs worst 300 → 10.00x
     render(<Compare />);
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
-    // Both the summary card and query diff table show 10.00x.
     const cells = screen.getAllByText("10.00x");
     expect(cells.length).toBeGreaterThanOrEqual(2);
   });
 
-  // -----------------------------------------------------------------------
-  // (b) tpch: power_score is primary
-  // -----------------------------------------------------------------------
   it("shows 'Power score' as the primary metric label for tpch", async () => {
     render(<Compare />);
-    // Wait until data has loaded - results appear as card headings
     await waitFor(() => {
       const spans = screen.getAllByText("DuckDB");
-      // At least one span (card heading) must be present
       expect(spans.length).toBeGreaterThan(0);
     });
-    // Primary label should be "Power score" (not "Geomean query time")
     const labels = screen.getAllByText(/Power score/i);
     expect(labels.length).toBeGreaterThan(0);
   });
@@ -1051,7 +977,7 @@ describe("Compare", () => {
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
-    expect(getPrimaryMetricForBenchmark).toHaveBeenCalledWith("tpch");
+    expect(getPrimaryMetricForBenchmark).toHaveBeenCalledWith("tpch", "unknown");
     const labels = screen.getAllByText(/Power score/i);
     expect(labels.length).toBeGreaterThan(0);
   });
@@ -1081,14 +1007,9 @@ describe("Compare", () => {
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
-    // The secondary geomean row should also be present in the cards
     const geomeans = screen.getAllByText(/Geomean/i);
     expect(geomeans.length).toBeGreaterThan(0);
   });
-
-  // -----------------------------------------------------------------------
-  // (c) clickbench: display_geomean_ms is primary
-  // -----------------------------------------------------------------------
 
   it("shows 'Geomean query time' as the primary label for clickbench", async () => {
     const cbDuck = makeResult({ result_id: "r1", benchmark: "clickbench", platform: "DuckDB" });
@@ -1110,22 +1031,15 @@ describe("Compare", () => {
     expect(labels.length).toBeGreaterThan(0);
   });
 
-  // -----------------------------------------------------------------------
-  // (d) Baseline selector changes baseline in chart section
-  // -----------------------------------------------------------------------
-
   it("baseline selector shows both platforms as options", async () => {
     render(<Compare />);
     await waitFor(() => {
       expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0);
     });
-    // The compare charts render openly, so the page-level baseline selector is
-    // visible without opening any chart tab.
     await waitFor(() => {
       expect(screen.getByRole("combobox", { name: "Baseline" })).toBeTruthy();
     });
     const select = screen.getByRole("combobox", { name: "Baseline" }) as HTMLSelectElement;
-    // Both platforms should appear as options
     const options = Array.from(select.options).map((o) => o.text);
     expect(options).toContain("DuckDB");
     expect(options).toContain("SQLite");
@@ -1383,6 +1297,38 @@ describe("Compare", () => {
     expect(summary).not.toHaveTextContent("DuckDB's power score was");
     expect(screen.queryByText("vs worst")).toBeNull();
     expect(queryDiff).toHaveTextContent("This page does not name a winner because phases differ");
+  });
+
+  it("suppresses winner claims for direct compare URLs with different throughput stream counts", async () => {
+    const threeStreams = makeResult({
+      result_id: "r1",
+      platform: "DuckDB",
+      platform_id: "duckdb",
+      test_type: "throughput",
+      stream_count: 3,
+    });
+    const twoStreams = makeResult({
+      result_id: "r2",
+      platform: "SQLite",
+      platform_id: "sqlite",
+      power_score: 300,
+      display_timings: SQLITE.display_timings,
+      test_type: "throughput",
+      stream_count: 2,
+    });
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1" ? Promise.resolve(threeStreams) : Promise.resolve(twoStreams),
+    );
+
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy();
+    });
+
+    const summary = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
+    expect(summary).toHaveTextContent("Not directly comparable: stream counts differ.");
+    expect(summary).toHaveTextContent("No winner named");
+    expect(summary).not.toHaveTextContent("DuckDB's power score was");
   });
 
   it("keeps the detailed comparability receipt after decision and chart evidence", async () => {

@@ -26,7 +26,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Full compatibility matrix kept out of routine develop PRs.
         os: [ubuntu-latest]
         python-version: ['3.11', '3.12', '3.13', '3.14']
         include:
@@ -39,15 +38,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Create virtual environment
         run: uv venv
@@ -68,12 +67,11 @@ jobs:
 
       - name: Run fast tests
         run: |
-          # -p pytest_cov re-enables coverage plugin (disabled by default in pytest.ini)
           uv run -- python -m pytest tests -m "fast and not (slow or stress or resource_heavy or live_integration)" --tb=short --timeout=120 -p pytest_cov --cov=benchbox --cov-report=xml --cov-report=term-missing --cov-fail-under=70 --junitxml=junit-fast.xml
 
       - name: Upload fast test duration report
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1
         with:
           name: fast-junit-report
           path: junit-fast.xml
@@ -81,7 +79,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
@@ -98,15 +96,15 @@ jobs:
       BENCHBOX_TEST_TIER: t3
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -119,7 +117,7 @@ jobs:
           uv run -- python -m pytest tests -m "slow and not (stress or resource_heavy or live_integration)" -n 0 --tb=short --timeout=1200 --durations=20 --junitxml=junit-t3-slow.xml
 
       - name: Download fast test duration report
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: fast-junit-report
           path: duration-inputs
@@ -136,7 +134,7 @@ jobs:
 
       - name: Upload duration report and artifact
         if: always()
-        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1
         with:
           name: t3-test-durations
           path: |
@@ -150,19 +148,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      # DuckDB packages the 2.0 alpha engine in the 1.6 Python preview series.
       DUCKDB_PREVIEW_VERSION: 1.6.0.dev379
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install BenchBox and the pinned DuckDB preview
         run: |
@@ -201,12 +198,6 @@ jobs:
             -m "not live_integration" -n 0 --tb=short
 
   binary-framing:
-    # Exercise each bundled TPC-H dbgen binary the runner can natively execute
-    # and assert its rows carry no trailing '|' (-DEOL_HANDLING convention, see
-    # PR #1056/#1069). The test skips foreign-arch binaries per-binary, so the
-    # ubuntu/macos/windows runners together cover linux-x86_64, darwin-arm64,
-    # windows-x86_64 and windows-arm64 (an x86_64 PE) natively. This is the only
-    # lane that runs the slow framing guard, so binary drift is caught here.
     name: TPC-H binary framing guard
     runs-on: ${{ matrix.os }}
     strategy:
@@ -216,15 +207,15 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Create virtual environment
         run: uv venv
@@ -240,15 +231,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Run patch safety check
         run: uv run -- python scripts/check_patch_safety.py
@@ -256,20 +247,18 @@ jobs:
   security:
     runs-on: ubuntu-latest
     env:
-      # Comma-separated GHSA/CVE IDs for temporarily accepted false positives.
-      # Keep empty unless triage is documented in the TODO item.
       PIP_AUDIT_IGNORE_VULNS: ""
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: |
@@ -290,15 +279,15 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -345,7 +334,7 @@ jobs:
 
       - name: Upload generated translation evidence
         if: ${{ !cancelled() && steps.generator.outcome != 'skipped' }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: sqlglot-generator-${{ github.run_id }}
           path: |
@@ -372,15 +361,15 @@ jobs:
             python-version: '3.12'
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: |
@@ -397,15 +386,15 @@ jobs:
       BENCHBOX_TEST_TIER: t2
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: |
@@ -436,25 +425,21 @@ jobs:
           --health-retries 10
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
 
       - name: Wait for PostgreSQL service to be reachable
         run: |
-          # The live tests skip via skip_unless_docker_service when localhost:5432
-          # is unreachable, and pytest exits 0 on an all-skipped run. That would
-          # turn this REQUIRED gate green without ever exercising PostgreSQL plan
-          # capture. Fail the step outright if the service container never came up.
           for attempt in $(seq 1 30); do
             if pg_isready -h localhost -p 5432 -U benchbox >/dev/null 2>&1; then
               echo "PostgreSQL is reachable."
@@ -468,11 +453,6 @@ jobs:
 
       - name: Run PostgreSQL live integration tests
         run: |
-          # --no-header keeps the summary line parseable; -p no:cacheprovider
-          # avoids a stale cache masking collection. The grep guard fails the
-          # step when the run collected/ran nothing but skips (e.g. every test
-          # skipped despite a reachable service), so an all-skipped run cannot
-          # green this required gate.
           set -o pipefail
           uv run -- python -m pytest tests/integration/platforms/test_postgresql_live.py \
             -m "live_postgresql" --tb=short -v -p no:cacheprovider \
@@ -483,22 +463,6 @@ jobs:
           fi
 
   cloud-live-plan-capture:
-    # Nightly-only live plan-capture verification for Snowflake, BigQuery,
-    # Redshift, and MotherDuck.
-    # The selected test classes run trivial SELECT 1 queries only (0 bytes
-    # scanned on BigQuery, per-second XS warehouse floor on Snowflake, trivial
-    # compute on Redshift and MotherDuck), so this job stays inside free-tier /
-    # trial budgets. Unlike the postgres-integration gate above, an all-skipped
-    # run stays green: until the cloud secrets below are configured, there are
-    # no credentials and every test skips. Never move this to ci.yml:
-    # PR-triggered cloud queries from arbitrary branches incur uncontrolled
-    # billing.
-    # Expected secret names match the env vars the conftest fixtures read:
-    # REDSHIFT_HOST, REDSHIFT_USER, REDSHIFT_PASSWORD,
-    # REDSHIFT_DATABASE (default "dev"), REDSHIFT_PORT (default "5439"),
-    # MOTHERDUCK_TOKEN, MOTHERDUCK_DATABASE (default "benchbox_test").
-    # Adding the secret values themselves is a repo-admin action outside the
-    # PR; do not echo secret values in any step.
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -520,25 +484,21 @@ jobs:
       MOTHERDUCK_DATABASE: ${{ secrets.MOTHERDUCK_DATABASE || 'benchbox_test' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: |
           uv sync --group dev --extra snowflake --extra bigquery --extra redshift --extra duckdb
 
       - name: Write GCP service account key to temp file
-        # BigQuery needs a file-based credential. The secret must hold the raw
-        # JSON key content (not base64); it is never echoed, printed, or
-        # uploaded as an artifact, living only in a runner temp file with
-        # restrictive permissions for this job's run.
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
         run: |
@@ -553,15 +513,6 @@ jobs:
 
       - name: Run Snowflake, BigQuery, Redshift, and MotherDuck plan-capture live tests
         run: |
-          # Only the plan-capture classes are selected as node ids -- never the
-          # whole live modules, which would also run the heavy TPC-H load /
-          # S3 COPY / warehouse-cost tests and break the billing guardrails.
-          # The -m filter keeps selection to live-marked tests within those
-          # classes; it is not a backstop for drifted node ids (a renamed
-          # class fails loudly with exit code 4 instead of falling back to
-          # marker selection). Skipping without credentials comes from the
-          # modules' own skip conditions, which keep an unconfigured run
-          # green.
           uv run -- python -m pytest \
             "tests/integration/platforms/test_snowflake_live.py::TestLiveSnowflakeQueryPlanCapture" \
             "tests/integration/platforms/test_bigquery_live.py::TestLiveBigQueryQueryPlanCapture" \
@@ -576,15 +527,15 @@ jobs:
       BENCHBOX_TEST_TIER: t2
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: |
@@ -606,15 +557,15 @@ jobs:
             python-version: '3.12'
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Build package
         run: |
@@ -633,14 +584,11 @@ jobs:
           wheel=$(find "$PWD/dist" -maxdepth 1 -name '*.whl' -print -quit)
           tmpdir=$(mktemp -d)
           cd "$tmpdir"
-          # Minimal-surface gate: a clean core install must import benchbox AND
-          # must not pull pandas (optional engine/DataFrame dep). This is the
-          # contract whose absence let v0.3.0 ship a broken clean install.
           uv run --isolated --no-project --with "$wheel" -- python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'core install must not pull pandas'; print('Package installation successful (minimal import surface)')"
           uv run --isolated --no-project --with "$wheel" -- benchbox --help
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: nightly-test-build-dist-${{ matrix.os }}
           path: dist/
@@ -650,7 +598,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Detect results explorer
         id: explorer
@@ -665,17 +613,17 @@ jobs:
 
       - name: Set up Python
         if: steps.explorer.outputs.present == 'true'
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
         if: steps.explorer.outputs.present == 'true'
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Set up Node.js
         if: steps.explorer.outputs.present == 'true'
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: '20'
 
@@ -738,18 +686,6 @@ jobs:
 
   scheduled-workflow-liveness:
     name: "scheduled-workflow-liveness (quarantine #2570)"
-    # Guard for the release-canary-scheduled-activation TODO's failure class:
-    # a workflow that declares `on.schedule` but is not on the DEFAULT branch
-    # never registers and never runs — nothing red appears anywhere (this is
-    # exactly how release-canary.yml sat dead while the repo's safety story
-    # leaned on it). This job scans the DEVELOP tree (where scheduled
-    # workflows are authored) and fails when any of them has no SCHEDULED
-    # run within its cadence-derived window. Scheduled workflows execute from
-    # the DEFAULT branch (develop, as of the 2026-07-08 default-branch switch),
-    # which is where they are authored, so this guard is effective as soon as a
-    # scheduled workflow merges to develop — there is no "until it lands on the
-    # release branch" lag anymore. (Before the switch the default was main, so
-    # a workflow stayed dark until a release carried it there; that gap is gone.)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     continue-on-error: true
@@ -758,17 +694,13 @@ jobs:
       contents: read
     steps:
       - name: Checkout develop (scheduled workflows are authored there first)
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: develop
 
       - name: Assert every scheduled workflow in the tree has a recent scheduled run
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # Bare python3 is intentional: stdlib-only, no uv sync needed for a
-        # pure API check (same precedent as ci.yml's path classifier). The
-        # schedule detection regex is scoped to the `on:` block to stay
-        # stdlib-only without a YAML parser.
         run: |
           python3 - <<'PY'
           import json
@@ -787,19 +719,11 @@ jobs:
           token = os.environ.get("GITHUB_TOKEN", "")
           api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
 
-          # `on:` block = from a top-level `on:` line to the next top-level key.
           on_block_re = re.compile(r"(?ms)^(?:\"on\"|'on'|on):[^\n]*\n(.*?)(?=^\S|\Z)")
           schedule_re = re.compile(r"(?m)^ {1,4}schedule:\s*(#.*)?$")
           cron_re = re.compile(r"(?m)^\s*-\s*cron:\s*['\"]?([^'\"#\n]+)")
 
           def cadence_window_days(cron_exprs: list[str]) -> int:
-              """Generous liveness window from the most frequent cron.
-
-              Daily-or-better -> 3 days; weekly (day-of-week bound) -> 9;
-              monthly (day-of-month bound) -> 35; sparser (month bound,
-              e.g. quarterly) -> 100. Coarse on purpose: this guard flags
-              dead schedules, it does not audit punctuality.
-              """
               windows = []
               for expr in cron_exprs:
                   fields = expr.split()
@@ -817,7 +741,6 @@ jobs:
               return min(windows) if windows else 3
 
           def latest_scheduled_run(workflow_file: str):
-              """Latest schedule-event run, [] if none, None-sentinel via ValueError."""
               url = (
                   f"{api}/repos/{repo}/actions/workflows/{workflow_file}/runs"
                   "?per_page=1&event=schedule"
@@ -835,7 +758,6 @@ jobs:
                           return json.load(resp).get("workflow_runs", [])
                   except urllib.error.HTTPError as err:
                       if err.code == 404:
-                          # Never registered => never ran (absent from default branch).
                           return []
                       if err.code in (401, 403):
                           print(f"::error::GitHub API auth/rate-limit failure ({err.code}) for {url}; cannot assess liveness.")
@@ -848,11 +770,6 @@ jobs:
               sys.exit(1)
 
           def _api_json(url: str):
-              """GET *url* as JSON, or None on any failure.
-
-              Every caller is a grace path: a failure here must never crash the
-              liveness job, only decline to relax it.
-              """
               headers = {
                   "Accept": "application/vnd.github+json",
                   "User-Agent": "benchbox-scheduled-workflow-liveness",
@@ -874,26 +791,6 @@ jobs:
                   return None
 
           def workflow_registered_at(workflow_file: str):
-              """Anchor date for the activation grace of a never-fired schedule.
-
-              The grace exists for a scheduled workflow whose first cron fire is
-              still pending: it has zero scheduled runs not because it is dead
-              but because it has not had a chance to fire yet.
-
-              This used to read ONLY the Actions API `created_at`, which is when
-              the FILE first registered -- and that is the wrong date for a
-              workflow that gains a cron later. `seed-corpus.yml` registered
-              2026-04-02 as a dispatch-only workflow and gained
-              `cron: "0 7 1 * *"` on 2026-08-21 in #1794. Its first scheduled
-              fire is 1 September, but the grace was measured from April, so it
-              was reported dead and took the whole liveness job red -- and would
-              have stayed red until September no matter what anyone did.
-
-              So take the LATER of file registration and the last commit that
-              touched the workflow file. This path is only reached when a
-              workflow has never had a scheduled run at all, so a recently
-              edited file is far more likely to be newly scheduled than dead.
-              """
               anchors = []
 
               payload = _api_json(f"{api}/repos/{repo}/actions/workflows/{workflow_file}")
@@ -922,12 +819,6 @@ jobs:
               window_days = cadence_window_days(cron_re.findall(on_block.group(1)))
               runs = latest_scheduled_run(path.name)
               if not runs:
-                  # Activation grace: a workflow added within its own cadence
-                  # window has not had a scheduled fire yet, so "no runs" is
-                  # expected, not dead. This grace only RELAXES the check (it can
-                  # never turn a live schedule red); worst case it tolerates a
-                  # genuinely-dead brand-new workflow for one cadence window,
-                  # after which the missing run trips the check normally.
                   registered = workflow_registered_at(path.name)
                   if registered is not None and datetime.now(timezone.utc) - registered <= timedelta(days=window_days):
                       print(
@@ -962,41 +853,24 @@ jobs:
           PY
 
   throughput-uat:
-    # Closes the throughput-uat-and-ci-coverage gap: concurrency previously had
-    # zero UAT/CI coverage, so a regression that broke multi-stream execution
-    # (or silently floored the requested stream count -- see
-    # throughput-stream-count-wiring-defect) would have shipped green. This
-    # job is the nightly-only real-DB/real-CLI lane; PR fast-lane runtime is
-    # unaffected (see tests/uat/configs/uat-throughput-duckdb-nightly.yaml).
-    # The Docker CedarDB cell below runs the same stream-count contract on a
-    # client/server engine via INDEPENDENT_CONNECTION, with the cell managing
-    # its own compose stack
-    # (see tests/uat/configs/uat-throughput-cedardb-nightly.yaml).
     runs-on: ubuntu-latest
-    # Cell budgets: DuckDB 900s + CedarDB 600s = 25 min worst case, plus
-    # ~25 min headroom for checkout, deps, integration tests, Docker
-    # startup/cleanup, and both assert steps.
     timeout-minutes: 60
     outputs:
       cedardb_sweep_outcome: ${{ steps.cedardb-sweep.outcome }}
     env:
-      # Throughput@Size floor activation: repository configuration variables
-      # flow into the DuckDB assert step below. Unset vars evaluate to empty,
-      # which the assert step treats as unconfigured, so the floor stays in
-      # observe-only mode until the variables are actually set.
       THROUGHPUT_FLOOR_MEDIAN: ${{ vars.THROUGHPUT_FLOOR_MEDIAN }}
       THROUGHPUT_FLOOR_MAX_DROP_FRACTION: ${{ vars.THROUGHPUT_FLOOR_MAX_DROP_FRACTION }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: |
@@ -1008,26 +882,11 @@ jobs:
 
       - name: Run DuckDB throughput UAT cell (TPC-H SF1, run-official --streams 3)
         id: duckdb-sweep
-        # Gated on the sweep's own exit code: the config's
-        # `validator_clean_rate_floor: 1.0` plus the strict report exit
-        # policy fail this step on any non-clean cell. The TPC-H
-        # queries-11/16/18/20 seed-derivation defect that used to keep this
-        # cell permanently red (and required a `continue-on-error: true`
-        # here) was fixed in #1142 -- see the HISTORICAL NOTE on
-        # `validate_throughput_metric` in tests/uat/throughput.py. Do NOT
-        # re-add `continue-on-error` here; the step below is the
-        # independent, defense-in-depth wiring check, not a substitute for
-        # gating on this step's own exit code.
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-duckdb-nightly.yaml
 
       - name: "Run CedarDB throughput UAT cell (TPC-H SF1, run-official --streams 3) (quarantine #2571)"
         id: cedardb-sweep
-        # Unlike DuckDB's SHARED_CURSOR fast path, CedarDB uses
-        # INDEPENDENT_CONNECTION (a fresh connection per stream), so this cell
-        # proves N concurrent independent sessions end to end via the
-        # production CLI. The cell manages its own compose stack
-        # (cleanup.docker_manage_platforms); no service container is needed.
         continue-on-error: true
         run: |
           make uat-sweep CONFIG=tests/uat/configs/uat-throughput-cedardb-nightly.yaml
@@ -1051,7 +910,7 @@ jobs:
 
       - name: Upload throughput UAT logs and results
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: throughput-uat-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -1062,7 +921,7 @@ jobs:
 
       - name: Upload Throughput@Size baseline record
         if: ${{ !cancelled() && steps.duckdb-sweep.outcome == 'success' }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: throughput-baseline-duckdb-tpch-sf1-${{ github.run_id }}-${{ github.run_attempt }}
           path: ~/Developer/benchmark_runs/throughput-baseline/
@@ -1100,21 +959,21 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Set up Java
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: temurin
           java-version: '21'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: |
@@ -1131,23 +990,19 @@ jobs:
       contents: read
       pull-requests: read
       issues: write
-      # green_unmerged_sweep.py lists check runs (commits/{sha}/check-runs) for
-      # every candidate PR. A job-level permissions map sets every unlisted
-      # scope to "no access", so without these two the scheduled sweep 403s
-      # before it can classify PRs or update its tracking issue.
       checks: read
       actions: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Run green-unmerged sweep
         env:
@@ -1161,13 +1016,13 @@ jobs:
     continue-on-error: true
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: develop
           persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.12'
 
@@ -1183,7 +1038,7 @@ jobs:
 
       - name: Upload drift evidence
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: nightly-ruleset-drift-${{ github.run_id }}-${{ github.run_attempt }}
           path: ruleset-drift.json

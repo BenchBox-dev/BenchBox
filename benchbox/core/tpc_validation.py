@@ -1,12 +1,6 @@
-"""TPC Test Result Validation System
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides comprehensive validation for TPC benchmark test results
-to ensure they meet official TPC specification requirements.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import hashlib
 import json
@@ -24,16 +18,12 @@ from benchbox.utils.printing import emit
 
 
 class ValidationLevel(Enum):
-    """Validation levels for TPC compliance."""
-
     BASIC = "basic"
     STANDARD = "standard"
     CERTIFICATION = "certification"
 
 
 class ValidationResult(Enum):
-    """Results of validation checks."""
-
     PASSED = "passed"
     FAILED = "failed"
     WARNING = "warning"
@@ -42,8 +32,6 @@ class ValidationResult(Enum):
 
 @dataclass
 class ValidationIssue:
-    """Represents a validation issue."""
-
     level: str
     message: str
     details: Optional[dict[str, Any]] = None
@@ -53,8 +41,6 @@ class ValidationIssue:
 
 @dataclass
 class ValidationReport:
-    """Validation report."""
-
     validation_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     timestamp: datetime = field(default_factory=datetime.now)
     benchmark_name: str = ""
@@ -75,26 +61,21 @@ class ValidationReport:
         details: Optional[dict[str, Any]] = None,
         validator_name: str = "",
     ) -> None:
-        """Add a validation issue to the report."""
         issue = ValidationIssue(level=level, message=message, details=details, validator_name=validator_name)
         self.issues.append(issue)
 
-        # Configure overall result based on issue severity
         if level == "ERROR" and self.overall_result == ValidationResult.PASSED:
             self.overall_result = ValidationResult.FAILED
         elif level == "WARNING" and self.overall_result == ValidationResult.PASSED:
             self.overall_result = ValidationResult.WARNING
 
     def get_issues_by_level(self, level: str) -> list[ValidationIssue]:
-        """Get all issues of a specific level."""
         return [issue for issue in self.issues if issue.level == level]
 
     def get_issues_by_validator(self, validator_name: str) -> list[ValidationIssue]:
-        """Get all issues from a specific validator."""
         return [issue for issue in self.issues if issue.validator_name == validator_name]
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert report to dictionary for serialization."""
         return {
             "validation_id": self.validation_id,
             "timestamp": self.timestamp.isoformat(),
@@ -121,8 +102,6 @@ class ValidationReport:
 
 
 class BaseValidator(ABC):
-    """Abstract base class for all validators."""
-
     def __init__(self, name: str, config: Optional[dict[str, Any]] = None) -> None:
         self.name = name
         self.config = config or {}
@@ -130,10 +109,9 @@ class BaseValidator(ABC):
 
     @abstractmethod
     def validate(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Perform validation and update the report."""
+        pass
 
     def _check_required_fields(self, data: dict[str, Any], required_fields: list[str]) -> list[str]:
-        """Check for required fields in data."""
         missing = []
         for field_name in required_fields:
             if field_name not in data:
@@ -142,8 +120,6 @@ class BaseValidator(ABC):
 
 
 class CompletenessValidator(BaseValidator):
-    """Validates test result completeness."""
-
     def __init__(self, config: Optional[dict[str, Any]] = None) -> None:
         super().__init__("completeness", config)
         self.required_queries = self.config.get("required_queries", {})
@@ -151,10 +127,8 @@ class CompletenessValidator(BaseValidator):
         self.required_maintenance_ops = self.config.get("required_maintenance_ops", [])
 
     def validate(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Validate completeness of test results."""
         result = ValidationResult.PASSED
 
-        # Check for required top-level fields
         required_fields = [
             "benchmark_name",
             "scale_factor",
@@ -175,7 +149,6 @@ class CompletenessValidator(BaseValidator):
             )
             result = ValidationResult.FAILED
 
-        # Validate query completeness
         query_results = test_results.get("query_results", {})
         if self.required_queries:
             benchmark_name = test_results.get("benchmark_name", "unknown")
@@ -198,7 +171,6 @@ class CompletenessValidator(BaseValidator):
                 )
                 result = ValidationResult.FAILED
 
-        # Validate data generation completeness
         data_generation = test_results.get("data_generation", {})
         if self.required_tables:
             generated_tables = data_generation.get("generated_tables", [])
@@ -216,7 +188,6 @@ class CompletenessValidator(BaseValidator):
                 )
                 result = ValidationResult.FAILED
 
-        # Validate maintenance operations completeness (for TPC-DI)
         maintenance_ops = test_results.get("maintenance_operations", {})
         if self.required_maintenance_ops:
             completed_ops = list(maintenance_ops.keys())
@@ -234,7 +205,6 @@ class CompletenessValidator(BaseValidator):
                 )
                 result = ValidationResult.FAILED
 
-        # Check for execution metadata
         for query_id, query_result in query_results.items():
             required_query_fields = ["execution_time_seconds", "status", "row_count"]
             missing_query_fields = self._check_required_fields(query_result, required_query_fields)
@@ -253,21 +223,17 @@ class CompletenessValidator(BaseValidator):
 
 
 class QueryResultValidator(BaseValidator):
-    """Validates query execution results."""
-
     def __init__(self, config: Optional[dict[str, Any]] = None) -> None:
         super().__init__("query_result", config)
-        self.max_execution_time = self.config.get("max_execution_time", 3600)  # 1 hour
+        self.max_execution_time = self.config.get("max_execution_time", 3600)
         self.min_row_count = self.config.get("min_row_count", 0)
         self.expected_schemas = self.config.get("expected_schemas", {})
 
     def validate(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Validate query execution results."""
         result = ValidationResult.PASSED
         query_results = test_results.get("query_results", {})
 
         for query_id, query_result in query_results.items():
-            # Check execution status
             status = query_result.get("status", "unknown")
             if status != "success":
                 report.add_issue(
@@ -283,7 +249,6 @@ class QueryResultValidator(BaseValidator):
                 result = ValidationResult.FAILED
                 continue
 
-            # Check execution time
             execution_time = query_result.get("execution_time_seconds", 0)
             if execution_time > self.max_execution_time:
                 report.add_issue(
@@ -299,7 +264,6 @@ class QueryResultValidator(BaseValidator):
                 if result == ValidationResult.PASSED:
                     result = ValidationResult.WARNING
 
-            # Check row count
             row_count = query_result.get("row_count", 0)
             if row_count < self.min_row_count:
                 report.add_issue(
@@ -315,7 +279,6 @@ class QueryResultValidator(BaseValidator):
                 if result == ValidationResult.PASSED:
                     result = ValidationResult.WARNING
 
-            # Check result data integrity
             if "results" in query_result:
                 results = query_result["results"]
                 if not isinstance(results, list):
@@ -327,7 +290,6 @@ class QueryResultValidator(BaseValidator):
                     )
                     result = ValidationResult.FAILED
 
-                # Check for null/empty results when data is expected
                 if row_count > 0 and not results:
                     report.add_issue(
                         "WARNING",
@@ -342,7 +304,6 @@ class QueryResultValidator(BaseValidator):
                     if result == ValidationResult.PASSED:
                         result = ValidationResult.WARNING
 
-            # Validate schema if expected schemas are provided
             if query_id in self.expected_schemas:
                 schema_validation = self._validate_result_schema(
                     query_id, query_result, self.expected_schemas[query_id]
@@ -364,12 +325,10 @@ class QueryResultValidator(BaseValidator):
         query_result: dict[str, Any],
         expected_schema: dict[str, Any],
     ) -> dict[str, Any]:
-        """Validate the schema of query results."""
         results = query_result.get("results", [])
         if not results:
             return {"valid": True, "message": "No results to validate"}
 
-        # Check first row for column structure
         first_row = results[0]
         if not isinstance(first_row, dict):
             return {"valid": False, "error": "Results are not in dictionary format"}
@@ -390,26 +349,20 @@ class QueryResultValidator(BaseValidator):
 
 
 class TimingValidator(BaseValidator):
-    """Validates timing measurements and precision."""
-
     def __init__(self, config: Optional[dict[str, Any]] = None) -> None:
         super().__init__("timing", config)
-        self.precision_threshold = self.config.get("precision_threshold", 0.001)  # 1ms
-        self.max_total_time = self.config.get("max_total_time", 86400)  # 24 hours
+        self.precision_threshold = self.config.get("precision_threshold", 0.001)
+        self.max_total_time = self.config.get("max_total_time", 86400)
         self.min_query_time = self.config.get("min_query_time", 0.0)
-        self.timing_consistency_threshold = self.config.get("timing_consistency_threshold", 0.1)  # 10%
+        self.timing_consistency_threshold = self.config.get("timing_consistency_threshold", 0.1)
 
     def validate(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Validate timing measurements."""
         result = ValidationResult.PASSED
 
-        # Validate overall test timing
         result = self._validate_overall_timing(test_results, report, result)
 
-        # Validate query timing precision and consistency
         result = self._validate_query_timing(test_results, report, result)
 
-        # Validate data generation timing
         result = self._validate_data_generation_timing(test_results, report, result)
 
         return result
@@ -417,7 +370,6 @@ class TimingValidator(BaseValidator):
     def _validate_overall_timing(
         self, test_results: dict[str, Any], report: ValidationReport, result: ValidationResult
     ) -> ValidationResult:
-        """Validate overall test start/end timing."""
         test_start = test_results.get("test_start_time")
         test_end = test_results.get("test_end_time")
 
@@ -466,14 +418,12 @@ class TimingValidator(BaseValidator):
     def _validate_query_timing(
         self, test_results: dict[str, Any], report: ValidationReport, result: ValidationResult
     ) -> ValidationResult:
-        """Validate query timing precision and consistency."""
         query_results = test_results.get("query_results", {})
         execution_times = []
 
         for query_id, query_result in query_results.items():
             execution_time = query_result.get("execution_time_seconds", 0)
 
-            # Check minimum execution time
             if execution_time < self.min_query_time:
                 report.add_issue(
                     "WARNING",
@@ -488,11 +438,9 @@ class TimingValidator(BaseValidator):
                 if result == ValidationResult.PASSED:
                     result = ValidationResult.WARNING
 
-            # Check timing precision
             if execution_time > 0:
                 execution_times.append(execution_time)
 
-                # Check if timing has reasonable precision
                 if execution_time < self.precision_threshold:
                     report.add_issue(
                         "INFO",
@@ -505,7 +453,6 @@ class TimingValidator(BaseValidator):
                         self.name,
                     )
 
-        # Check timing consistency across multiple runs
         if len(execution_times) > 1:
             self._validate_timing_consistency(execution_times, report)
 
@@ -514,7 +461,6 @@ class TimingValidator(BaseValidator):
     def _validate_data_generation_timing(
         self, test_results: dict[str, Any], report: ValidationReport, result: ValidationResult
     ) -> ValidationResult:
-        """Validate data generation timing."""
         data_generation = test_results.get("data_generation", {})
         gen_time = data_generation.get("generation_time", 0)
 
@@ -522,7 +468,7 @@ class TimingValidator(BaseValidator):
             tables_generated = len(data_generation.get("generated_tables", []))
             if tables_generated > 0:
                 avg_time_per_table = gen_time / tables_generated
-                if avg_time_per_table > 3600:  # 1 hour per table
+                if avg_time_per_table > 3600:
                     report.add_issue(
                         "WARNING",
                         f"Data generation time per table ({avg_time_per_table}s) seems excessive",
@@ -539,11 +485,9 @@ class TimingValidator(BaseValidator):
         return result
 
     def _validate_timing_consistency(self, execution_times: list[float], report: ValidationReport) -> None:
-        """Validate timing consistency across multiple measurements."""
         if len(execution_times) < 2:
             return
 
-        # Calculate statistics
         avg_time = mean(execution_times)
         if avg_time > 0:
             std_dev = stdev(execution_times)
@@ -565,8 +509,6 @@ class TimingValidator(BaseValidator):
 
 
 class DataIntegrityValidator(BaseValidator):
-    """Validates data integrity during maintenance operations."""
-
     def __init__(self, config: Optional[dict[str, Any]] = None) -> None:
         super().__init__("data_integrity", config)
         self.integrity_checks = self.config.get("integrity_checks", [])
@@ -574,15 +516,12 @@ class DataIntegrityValidator(BaseValidator):
         self.data_consistency_checks = self.config.get("data_consistency", True)
 
     def validate(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Validate data integrity during maintenance operations."""
         result = ValidationResult.PASSED
 
         maintenance_ops = test_results.get("maintenance_operations", {})
         if not maintenance_ops:
-            # No maintenance operations to validate
             return result
 
-        # Validate each maintenance operation
         for op_name, op_result in maintenance_ops.items():
             op_validation = self._validate_maintenance_operation(op_name, op_result)
 
@@ -595,7 +534,6 @@ class DataIntegrityValidator(BaseValidator):
                 )
                 result = ValidationResult.FAILED
 
-        # Validate referential integrity
         if self.referential_integrity_checks:
             ref_integrity_result = self._validate_referential_integrity(test_results)
             if not ref_integrity_result["valid"]:
@@ -607,7 +545,6 @@ class DataIntegrityValidator(BaseValidator):
                 )
                 result = ValidationResult.FAILED
 
-        # Validate data consistency
         if self.data_consistency_checks:
             consistency_result = self._validate_data_consistency(test_results)
             if not consistency_result["valid"]:
@@ -623,19 +560,15 @@ class DataIntegrityValidator(BaseValidator):
         return result
 
     def _validate_maintenance_operation(self, op_name: str, op_result: dict[str, Any]) -> dict[str, Any]:
-        """Validate a specific maintenance operation."""
-        # Check operation status
         status = op_result.get("status", "unknown")
         if status != "success":
             return {"valid": False, "error": f"Operation failed with status: {status}"}
 
-        # Check for required fields
         required_fields = ["start_time", "end_time", "records_affected"]
         for field_name in required_fields:
             if field_name not in op_result:
                 return {"valid": False, "error": f"Missing required field: {field_name}"}
 
-        # Validate timing
         try:
             start_time = datetime.fromisoformat(op_result["start_time"].replace("Z", "+00:00"))
             end_time = datetime.fromisoformat(op_result["end_time"].replace("Z", "+00:00"))
@@ -645,7 +578,6 @@ class DataIntegrityValidator(BaseValidator):
         except ValueError as e:
             return {"valid": False, "error": f"Invalid timestamp format: {e}"}
 
-        # Validate records affected
         records_affected = op_result.get("records_affected", 0)
         if not isinstance(records_affected, int) or records_affected < 0:
             return {
@@ -656,34 +588,21 @@ class DataIntegrityValidator(BaseValidator):
         return {"valid": True, "message": "Maintenance operation validation passed"}
 
     def _validate_referential_integrity(self, test_results: dict[str, Any]) -> dict[str, Any]:
-        """Validate referential integrity constraints."""
-        # This would need to be implemented based on the specific benchmark schema
-        # For now, we'll do basic validation
 
         data_generation = test_results.get("data_generation", {})
         generated_tables = data_generation.get("generated_tables", [])
 
-        # Check that all expected tables were generated
         if not generated_tables:
             return {"valid": False, "error": "No tables were generated"}
 
-        # Placeholder for more sophisticated referential integrity checks
         return {"valid": True, "message": "Referential integrity validation passed"}
 
     def _validate_data_consistency(self, test_results: dict[str, Any]) -> dict[str, Any]:
-        """Validate data consistency across operations."""
-        # This would check for data consistency issues like:
-        # - Row counts match expectations
-        # - Data types are consistent
-        # - No duplicate keys where uniqueness is expected
 
-        # Placeholder implementation
         return {"valid": True, "message": "Data consistency validation passed"}
 
 
 class MetricsValidator(BaseValidator):
-    """Validates metric calculations and statistical validity."""
-
     def __init__(self, config: Optional[dict[str, Any]] = None) -> None:
         super().__init__("metrics", config)
         self.required_metrics = self.config.get("required_metrics", [])
@@ -691,11 +610,9 @@ class MetricsValidator(BaseValidator):
         self.statistical_significance = self.config.get("statistical_significance", 0.05)
 
     def validate(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Validate metrics calculations."""
         result = ValidationResult.PASSED
         metrics = test_results.get("metrics", {})
 
-        # Check for required metrics
         for metric_name in self.required_metrics:
             if metric_name not in metrics:
                 report.add_issue(
@@ -709,10 +626,8 @@ class MetricsValidator(BaseValidator):
                 )
                 result = ValidationResult.FAILED
 
-        # Validate metric values (range and type)
         result = self._validate_metric_values(metrics, report, result)
 
-        # Validate calculated metrics
         result = self._validate_derived_metrics(test_results, metrics, report, result)
 
         return result
@@ -720,13 +635,10 @@ class MetricsValidator(BaseValidator):
     def _validate_metric_values(
         self, metrics: dict[str, Any], report: ValidationReport, result: ValidationResult
     ) -> ValidationResult:
-        """Validate metric values for range and type constraints."""
         for metric_name, metric_value in metrics.items():
-            # Check if metric is within expected range
             if metric_name in self.metric_ranges:
                 result = self._check_metric_range(metric_name, metric_value, report, result)
 
-            # Validate metric data type
             if not isinstance(metric_value, (int, float)):
                 report.add_issue(
                     "WARNING",
@@ -745,7 +657,6 @@ class MetricsValidator(BaseValidator):
     def _check_metric_range(
         self, metric_name: str, metric_value: Any, report: ValidationReport, result: ValidationResult
     ) -> ValidationResult:
-        """Check if a single metric is within its expected range."""
         range_config = self.metric_ranges[metric_name]
         min_val = range_config.get("min")
         max_val = range_config.get("max")
@@ -775,9 +686,8 @@ class MetricsValidator(BaseValidator):
     def _validate_derived_metrics(
         self, test_results: dict[str, Any], metrics: dict[str, Any], report: ValidationReport, result: ValidationResult
     ) -> ValidationResult:
-        """Validate that derived metrics match reported values."""
         calculated_metrics = self._calculate_derived_metrics(test_results)
-        tolerance = 0.01  # 1% tolerance
+        tolerance = 0.01
         for metric_name, calculated_value in calculated_metrics.items():
             reported_value = metrics.get(metric_name)
             if reported_value is not None:
@@ -798,12 +708,10 @@ class MetricsValidator(BaseValidator):
         return result
 
     def _calculate_derived_metrics(self, test_results: dict[str, Any]) -> dict[str, float]:
-        """Calculate derived metrics for validation."""
         metrics = {}
         query_results = test_results.get("query_results", {})
 
         if query_results:
-            # Calculate average query execution time
             execution_times = [qr.get("execution_time_seconds", 0) for qr in query_results.values()]
             execution_times = [t for t in execution_times if t > 0]
 
@@ -815,7 +723,6 @@ class MetricsValidator(BaseValidator):
                     metrics["query_time_std"] = stdev(execution_times)
                     metrics["query_time_median"] = median(execution_times)
 
-        # Calculate throughput metrics
         test_start = test_results.get("test_start_time")
         test_end = test_results.get("test_end_time")
 
@@ -828,20 +735,17 @@ class MetricsValidator(BaseValidator):
                 if total_time > 0:
                     metrics["queries_per_second"] = len(query_results) / total_time
 
-                    # Calculate rows per second
                     total_rows = sum(qr.get("row_count", 0) for qr in query_results.values())
                     if total_rows > 0:
                         metrics["rows_per_second"] = total_rows / total_time
 
             except ValueError:
-                pass  # Invalid timestamp format
+                pass
 
         return metrics
 
 
 class ComplianceChecker(BaseValidator):
-    """Checks overall TPC compliance requirements."""
-
     def __init__(self, config: Optional[dict[str, Any]] = None) -> None:
         super().__init__("compliance", config)
         self.benchmark_type = self.config.get("benchmark_type", "unknown")
@@ -849,10 +753,8 @@ class ComplianceChecker(BaseValidator):
         self.certification_level = self.config.get("certification_level", "standard")
 
     def validate(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Check TPC compliance requirements."""
         result = ValidationResult.PASSED
 
-        # Check benchmark-specific compliance rules
         benchmark_name = test_results.get("benchmark_name", "unknown")
 
         if benchmark_name == "TPC-H":
@@ -871,7 +773,6 @@ class ComplianceChecker(BaseValidator):
             if result == ValidationResult.PASSED:
                 result = ValidationResult.WARNING
 
-        # Check general TPC compliance requirements
         general_compliance = self._validate_general_compliance(test_results, report)
         if general_compliance == ValidationResult.FAILED:
             result = ValidationResult.FAILED
@@ -881,10 +782,8 @@ class ComplianceChecker(BaseValidator):
         return result
 
     def _validate_tpch_compliance(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Validate TPC-H specific compliance requirements."""
         result = ValidationResult.PASSED
 
-        # Check for all 22 queries
         query_results = test_results.get("query_results", {})
         expected_queries = {str(i) for i in range(1, 23)}
         actual_queries = set(query_results.keys())
@@ -903,7 +802,6 @@ class ComplianceChecker(BaseValidator):
             )
             result = ValidationResult.FAILED
 
-        # Check scale factor compliance
         scale_factor = test_results.get("scale_factor", 1.0)
         valid_scale_factors = [1, 10, 30, 100, 300, 1000, 3000, 10000, 30000, 100000]
 
@@ -923,10 +821,8 @@ class ComplianceChecker(BaseValidator):
         return result
 
     def _validate_tpcds_compliance(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Validate TPC-DS specific compliance requirements."""
         result = ValidationResult.PASSED
 
-        # Check for all 99 queries
         query_results = test_results.get("query_results", {})
         expected_queries = {str(i) for i in range(1, 100)}
         actual_queries = set(query_results.keys())
@@ -945,7 +841,6 @@ class ComplianceChecker(BaseValidator):
             )
             result = ValidationResult.FAILED
 
-        # Check for maintenance operations (TPC-DS specific)
         maintenance_ops = test_results.get("maintenance_operations", {})
         if not maintenance_ops:
             report.add_issue(
@@ -960,10 +855,8 @@ class ComplianceChecker(BaseValidator):
         return result
 
     def _validate_tpcdi_compliance(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Validate TPC-DI specific compliance requirements."""
         result = ValidationResult.PASSED
 
-        # Check for ETL processes
         etl_operations = test_results.get("etl_operations", {})
         if not etl_operations:
             report.add_issue(
@@ -974,7 +867,6 @@ class ComplianceChecker(BaseValidator):
             )
             result = ValidationResult.FAILED
 
-        # Check for data quality operations
         data_quality = test_results.get("data_quality", {})
         if not data_quality:
             report.add_issue(
@@ -989,10 +881,8 @@ class ComplianceChecker(BaseValidator):
         return result
 
     def _validate_general_compliance(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Validate general TPC compliance requirements."""
         result = ValidationResult.PASSED
 
-        # Check for test isolation
         test_isolation = test_results.get("test_isolation", {})
         if not test_isolation.get("isolated", False):
             report.add_issue(
@@ -1004,7 +894,6 @@ class ComplianceChecker(BaseValidator):
             if result == ValidationResult.PASSED:
                 result = ValidationResult.WARNING
 
-        # Check for reproducibility information
         reproducibility = test_results.get("reproducibility", {})
         required_repro_fields = ["seed", "timestamp", "environment"]
         missing_repro_fields = [field for field in required_repro_fields if field not in reproducibility]
@@ -1026,8 +915,6 @@ class ComplianceChecker(BaseValidator):
 
 
 class AuditTrail:
-    """Tracks test execution for reproducibility validation."""
-
     def __init__(self) -> None:
         self.events: list[dict[str, Any]] = []
         self.start_time = datetime.now()
@@ -1039,7 +926,6 @@ class AuditTrail:
         description: str,
         details: Optional[dict[str, Any]] = None,
     ) -> None:
-        """Log an audit event."""
         event = {
             "timestamp": datetime.now().isoformat(),
             "event_type": event_type,
@@ -1049,7 +935,6 @@ class AuditTrail:
         self.events.append(event)
 
     def _capture_environment(self) -> dict[str, Any]:
-        """Capture environment information for reproducibility."""
         import platform
         import sys
 
@@ -1061,7 +946,6 @@ class AuditTrail:
         }
 
     def get_audit_summary(self) -> dict[str, Any]:
-        """Get audit trail summary."""
         return {
             "start_time": self.start_time.isoformat(),
             "end_time": datetime.now().isoformat(),
@@ -1071,8 +955,6 @@ class AuditTrail:
         }
 
     def generate_reproducibility_hash(self, test_results: dict[str, Any]) -> str:
-        """Generate a hash for reproducibility verification."""
-        # Create a deterministic representation for hashing
         reproducible_data = {
             "benchmark_name": test_results.get("benchmark_name"),
             "scale_factor": test_results.get("scale_factor"),
@@ -1081,14 +963,11 @@ class AuditTrail:
             "seed": test_results.get("reproducibility", {}).get("seed"),
         }
 
-        # Create hash
         data_str = json.dumps(reproducible_data, sort_keys=True)
         return hashlib.sha256(data_str.encode()).hexdigest()
 
 
 class CertificationChecker(BaseValidator):
-    """Validates certification readiness."""
-
     def __init__(self, config: Optional[dict[str, Any]] = None) -> None:
         super().__init__("certification", config)
         self.certification_level = self.config.get("certification_level", "standard")
@@ -1096,10 +975,8 @@ class CertificationChecker(BaseValidator):
         self.performance_thresholds = self.config.get("performance_thresholds", {})
 
     def validate(self, test_results: dict[str, Any], report: ValidationReport) -> ValidationResult:
-        """Validate certification readiness."""
         result = ValidationResult.PASSED
 
-        # Check performance thresholds
         metrics = test_results.get("metrics", {})
         for metric_name, threshold in self.performance_thresholds.items():
             if metric_name in metrics:
@@ -1118,7 +995,6 @@ class CertificationChecker(BaseValidator):
                     if result == ValidationResult.PASSED:
                         result = ValidationResult.WARNING
 
-        # Check documentation completeness
         documentation = test_results.get("documentation", {})
         for doc_type in self.required_documentation:
             if doc_type not in documentation or not documentation[doc_type]:
@@ -1133,7 +1009,6 @@ class CertificationChecker(BaseValidator):
                 )
                 result = ValidationResult.FAILED
 
-        # Check test completeness for certification
         certification_completeness = self._check_certification_completeness(test_results)
         if not certification_completeness["complete"]:
             report.add_issue(
@@ -1144,7 +1019,6 @@ class CertificationChecker(BaseValidator):
             )
             result = ValidationResult.FAILED
 
-        # Set certification status
         if result == ValidationResult.PASSED:
             report.certification_status = "READY"
         elif result == ValidationResult.WARNING:
@@ -1155,7 +1029,6 @@ class CertificationChecker(BaseValidator):
         return result
 
     def _check_certification_completeness(self, test_results: dict[str, Any]) -> dict[str, Any]:
-        """Check if all certification requirements are met."""
         checks = {
             "all_queries_passed": True,
             "timing_validation": True,
@@ -1164,19 +1037,16 @@ class CertificationChecker(BaseValidator):
             "documentation": True,
         }
 
-        # Check if all queries passed
         query_results = test_results.get("query_results", {})
         for _query_id, query_result in query_results.items():
             if query_result.get("status") != "success":
                 checks["all_queries_passed"] = False
                 break
 
-        # Check reproducibility information
         reproducibility = test_results.get("reproducibility", {})
         if not reproducibility.get("seed") or not reproducibility.get("environment"):
             checks["reproducibility"] = False
 
-        # Overall completeness
         complete = all(checks.values())
 
         return {
@@ -1187,19 +1057,15 @@ class CertificationChecker(BaseValidator):
 
 
 class TPCResultValidator:
-    """Main TPC result validation engine."""
-
     def __init__(self, config: Optional[dict[str, Any]] = None) -> None:
         self.config = config or {}
         self.validators: list[BaseValidator] = []
         self.audit_trail = AuditTrail()
         self.logger = logging.getLogger("tpc_validation")
 
-        # Initialize validators
         self._initialize_validators()
 
     def _initialize_validators(self) -> None:
-        """Initialize all validators."""
         validator_configs = self.config.get("validators", {})
 
         self.validators = [
@@ -1217,17 +1083,14 @@ class TPCResultValidator:
         test_results: dict[str, Any],
         validation_level: ValidationLevel = ValidationLevel.STANDARD,
     ) -> ValidationReport:
-        """Validate TPC test results."""
         self.audit_trail.log_event("validation_start", "Starting TPC result validation")
 
-        # Create validation report
         report = ValidationReport(
             benchmark_name=test_results.get("benchmark_name", "unknown"),
             scale_factor=test_results.get("scale_factor", 1.0),
             validation_level=validation_level,
         )
 
-        # Run all validators
         for validator in self.validators:
             try:
                 self.audit_trail.log_event("validator_start", f"Running validator: {validator.name}")
@@ -1250,10 +1113,8 @@ class TPCResultValidator:
                 )
                 report.validator_results[validator.name] = ValidationResult.FAILED
 
-        # Generate final metrics and summary
         self._generate_final_metrics(test_results, report)
 
-        # Include audit trail in report
         report.audit_trail = self.audit_trail.get_audit_summary()["events"]
 
         self.audit_trail.log_event("validation_complete", "TPC result validation completed")
@@ -1261,13 +1122,10 @@ class TPCResultValidator:
         return report
 
     def _generate_final_metrics(self, test_results: dict[str, Any], report: ValidationReport) -> None:
-        """Generate final validation metrics."""
-        # Count issues by level
         error_count = len(report.get_issues_by_level("ERROR"))
         warning_count = len(report.get_issues_by_level("WARNING"))
         info_count = len(report.get_issues_by_level("INFO"))
 
-        # Calculate validation scores
         passed_validators = sum(1 for result in report.validator_results.values() if result == ValidationResult.PASSED)
         total_validators = len(report.validator_results)
 
@@ -1284,7 +1142,6 @@ class TPCResultValidator:
             "reproducibility_hash": self.audit_trail.generate_reproducibility_hash(test_results),
         }
 
-        # Create execution summary
         query_results = test_results.get("query_results", {})
         successful_queries = sum(1 for qr in query_results.values() if qr.get("status") == "success")
 
@@ -1298,7 +1155,6 @@ class TPCResultValidator:
         }
 
     def save_report(self, report: ValidationReport, output_path: Path) -> None:
-        """Save validation report to file."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(output_path, "w", encoding="utf-8") as f:
@@ -1307,11 +1163,9 @@ class TPCResultValidator:
         self.logger.info(f"Validation report saved to: {output_path}")
 
     def load_report(self, input_path: Path) -> ValidationReport:
-        """Load validation report from file."""
         with open(input_path, encoding="utf-8") as f:
             report_data = json.load(f)
 
-        # Reconstruct ValidationReport object
         report = ValidationReport(
             validation_id=report_data["validation_id"],
             timestamp=datetime.fromisoformat(report_data["timestamp"]),
@@ -1326,7 +1180,6 @@ class TPCResultValidator:
             certification_status=report_data.get("certification_status"),
         )
 
-        # Reconstruct issues
         for issue_data in report_data["issues"]:
             issue = ValidationIssue(
                 level=issue_data["level"],
@@ -1340,7 +1193,6 @@ class TPCResultValidator:
         return report
 
     def create_default_config(self) -> dict[str, Any]:
-        """Create default validation configuration."""
         return {
             "validators": {
                 "completeness": {
@@ -1386,7 +1238,6 @@ class TPCResultValidator:
 
 
 def create_sample_test_results() -> dict[str, Any]:
-    """Create sample test results for testing validation."""
     return {
         "benchmark_name": "TPC-H",
         "scale_factor": 1.0,
@@ -1439,7 +1290,6 @@ def create_sample_test_results() -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    # Example usage
     validator = TPCResultValidator()
     sample_results = create_sample_test_results()
 
@@ -1449,5 +1299,4 @@ if __name__ == "__main__":
     emit(f"Issues found: {len(report.issues)}")
     emit(f"Certification status: {report.certification_status}")
 
-    # Save report
     validator.save_report(report, Path("validation_report.json"))

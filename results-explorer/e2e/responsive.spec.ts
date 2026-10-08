@@ -5,18 +5,6 @@ const SHORT_DUCKDB = fixtureIds.shortIds.duckdb;
 const SHORT_DATAFUSION = fixtureIds.shortIds.datafusion;
 const DETAIL_ID = fixtureIds.ids.duckdb;
 
-// Desktop/wide use maxY = viewport.height (900). Tablet uses 1200 (1.33x),
-// while mobile allows 1220 so the required engine-version facet can occupy its
-// own compact grid row without making the first leaderboard row fail by 14px.
-// PR #276 originally tightened the desktop intro spacing to fit
-// `query-results-panel.top` under 900 when `query-visible-columns` rendered
-// above the table at desktop via `lg:order-1`. PRs #277 and #291 dropped
-// `lg:order-1` and reverted the tighten, so the panel now lands at ≈399 at
-// desktop with ≈501px of headroom. The historical TODOs document the full
-// trail: see DONE
-// `results-explorer-responsive-desktop-query-panel-regression` (PR #276) and
-// `results-explorer-query-visible-columns-desktop-order-vs-test-name`
-// (PR #291).
 const VIEWPORTS = [
   { name: "mobile", width: 390, height: 900, maxY: 1220 },
   { name: "tablet", width: 768, height: 900, maxY: 1200 },
@@ -34,13 +22,6 @@ const AUDITED_ROUTES = [
   { path: "/results/query", ready: /matching run/ },
 ] as const;
 
-// Deliberately NOT serial. Every test here takes its own `page` fixture and
-// shares no state, so serial mode bought nothing - but it made the first
-// failure abort the whole block. On develop@3af42e29b a single stale-headline
-// assertion suppressed 23 downstream tests, reported only as
-// "1 failed ... 23 did not run", and it hid a real desktop/wide above-the-fold
-// regression for the entire time it was red. Independent viewport assertions
-// must fail independently.
 test.describe.configure({ mode: "parallel" });
 
 test.describe("responsive explorer assertions", () => {
@@ -83,10 +64,6 @@ test.describe("responsive explorer assertions", () => {
       if (viewport.width >= 1280) {
         const rowCount = await leaderboard.locator("tbody tr").count();
         const aboveFold = await rowsAboveFold(leaderboard.locator("tbody tr"), viewport.height);
-        // Home intentionally keeps the product identity, active filters,
-        // ranking selector, and table controls ahead of the data grid. The
-        // desktop budget is therefore "comparison starts above the fold", not
-        // "the whole fixture corpus fits above the fold".
         expect(aboveFold).toBeGreaterThanOrEqual(Math.min(MIN_HOME_ROWS_ABOVE_FOLD_DESKTOP, rowCount));
       }
     });
@@ -99,7 +76,6 @@ test.describe("responsive explorer assertions", () => {
         timeout: 20_000,
       });
 
-      // The query matrix is a collapsed Analysis card by default now.
       await openAnalysisCard(page, "query_heatmap");
       const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
       await expect(heatmap).toBeAttached();
@@ -151,9 +127,6 @@ test.describe("responsive explorer assertions", () => {
     await page.goto("/results/tpch/?sf=0.01&phase=power");
     await waitForDataLoaded(page, /TPC-H Results/i);
 
-    // The route heading above is shell-rendered, so wait on the heatmap
-    // itself: it is data-bound and absent when the snapshot answers cold.
-    // The query matrix is a collapsed Analysis card by default now.
     await openAnalysisCard(page, "query_heatmap");
     const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
     await waitForDataElement(page, heatmap);
@@ -186,9 +159,6 @@ test.describe("responsive explorer assertions", () => {
     await expect.poll(async () => (await pageStickyHeader.boundingBox())?.y ?? 999).toBeLessThanOrEqual(1);
     await expect.poll(async () => (await heatmap.locator("thead tr").first().boundingBox())?.y ?? 999).toBeLessThan(0);
     await expect(pageStickyHeader.getByText("Platform").first()).toBeVisible();
-    // The mirrored sticky header tracks horizontal table scroll; after
-    // scrollLeft=160 the first query column may be off-screen, so assert that
-    // a visible scrolled query header is present rather than pinning Q1.
     await expect(pageStickyHeader.locator("th", { hasText: /^3\b/ }).first()).toBeVisible();
   });
 
@@ -197,7 +167,6 @@ test.describe("responsive explorer assertions", () => {
 
     await page.goto("/results/tpch/?sf=0.01&phase=power");
     await waitForDataLoaded(page, /TPC-H Results/i);
-    // The query matrix is a collapsed Analysis card by default now.
     await openAnalysisCard(page, "query_heatmap");
     const heatmap = page.getByTestId("query-heatmap-scroll-container").first();
     await waitForDataElement(page, heatmap);
@@ -213,8 +182,6 @@ test.describe("responsive explorer assertions", () => {
     await expect.poll(() => queryResults.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
     await expect(page.getByTestId("query-results-scroll-hint")).toBeVisible();
 
-    // A run that published passes reports them in the pass table; the
-    // three-column median table only stands in when it has nothing to show.
     await page.goto(`/results/r/${DETAIL_ID}`);
     await waitForDataLoaded(page, /Query timings/i);
     await expect(page.getByTestId("detail-timings-scroll-container")).toHaveCount(0);
@@ -254,24 +221,12 @@ test.describe("responsive explorer assertions", () => {
     });
   }
 
-  // The document-overflow audit above exempts anything inside `svg[role='img']`,
-  // so it cannot see a chart that overflows its own drawing. That exemption is
-  // why charts shipped clipping their right-hand quarter and bottom rows on a
-  // phone: the SVG box fitted the page, and the marks outside it were simply
-  // never painted.
   for (const viewport of VIEWPORTS.filter((item) => item.width <= 768)) {
     test(`chart drawings fit their own box at ${viewport.name}`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.goto("/results/tpch/");
-      // The matrix view renders the long summary overview instead of the
-      // tabbed chart panel, so every chart is on the page at once: the
-      // distribution section plus one collapsible card per additional view.
       await waitForDataLoaded(page, /More views/);
 
-      // Open every preview card so each full chart (not just its thumbnail)
-      // is measured. Checking only the default view leaves most of the chart
-      // set unmeasured, and the default is the one chart least likely to be
-      // wrong.
       const previews = page.getByTestId("summary-more-views").locator(":scope > div.grid > details");
       const previewCount = await previews.count();
       for (let p = 0; p < previewCount; p += 1) {
@@ -298,8 +253,6 @@ test.describe("responsive explorer assertions", () => {
                 continue;
               }
 
-              // A drawing narrower than its box is scaled UP, which magnifies
-              // every coordinate including the gaps bars were spaced by.
               const drawWidth = Number(viewBox.split(/\s+/)[2]);
               if (drawWidth < box.width - 1.5) {
                 problems.push(
@@ -332,8 +285,6 @@ test.describe("responsive explorer assertions", () => {
       }
 
       const chartsVisited = await page.locator("[data-chart-container] svg[role='img']").count();
-      // If this ever reads too low the measurement above is vacuous and the
-      // test would pass without measuring anything.
       expect(chartsVisited, "charts measured").toBeGreaterThan(5);
     });
   }
@@ -370,9 +321,6 @@ test.describe("responsive explorer assertions", () => {
       await expect(page.getByRole("region", { name: "Leaderboard ranking selector" })).toBeVisible();
       const loadedGeometry = await homeSharedGeometry(page);
 
-      // The skeleton deliberately uses fewer, inert children, but reserves the
-      // loaded-only rows so every shared shell anchor stays fixed while data
-      // arrives.
       expect(loadedGeometry).toEqual(skeletonGeometry);
     });
   }

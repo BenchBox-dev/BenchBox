@@ -1,5 +1,3 @@
-"""Composable UAT phases plus shared phase-result contract."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,8 +5,6 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True, kw_only=True)
 class PhaseResult:
-    """Common phase result contract used by the UAT orchestrator."""
-
     phase: str
     aborted: bool = False
     abort_reason: str | None = None

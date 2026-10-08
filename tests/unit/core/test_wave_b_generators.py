@@ -15,7 +15,6 @@ def test_clickbench_generator_record_and_local_generation(tmp_path):
     gen = ClickBenchDataGenerator(scale_factor=0.00001, output_dir=tmp_path, compression_enabled=False)
     gen.base_records = 2
 
-    # Direct record generation covers the record builder branch.
     rec = gen._generate_hit_record(1, __import__("datetime").datetime(2013, 7, 1))
     assert len(rec) == 105
 

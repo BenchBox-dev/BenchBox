@@ -42,7 +42,6 @@ describe("benchmarkSupportRank", () => {
   it("orders stable before beta before experimental before deprecated", () => {
     const ordered = ["stable", "beta", "experimental", "deprecated", "document_only", "repo_only"];
     const ranks = ordered.map(benchmarkSupportRank);
-    // Strictly increasing: a constant or duplicated rank would still pass a sort-equality check.
     ranks.slice(1).forEach((rank, index) => {
       expect(rank).toBeGreaterThan(ranks[index]!);
     });
@@ -65,8 +64,6 @@ describe("benchmarkSupportGroupLabel", () => {
 
 describe("BenchmarkSupportBadge", () => {
   it("exposes the config for known statuses", () => {
-    // The badge renders through StatusBadge; the contract that matters here
-    // is the status-to-label mapping above plus a null for unknown.
     expect(BenchmarkSupportBadge({ status: "stable" })).not.toBeNull();
     expect(BenchmarkSupportBadge({ status: null })).toBeNull();
     expect(BenchmarkSupportBadge({ status: "custom-thing" })).toBeNull();

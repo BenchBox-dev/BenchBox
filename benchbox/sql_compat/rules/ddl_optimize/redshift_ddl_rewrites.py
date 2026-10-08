@@ -1,13 +1,3 @@
-"""Redshift DDL rewrite rules for Phase.DDL_OPTIMIZE.
-
-Redshift benefits from explicit distribution and sort key declarations for
-analytical workloads. DuckDB DDL output does not include these clauses.
-
-RedshiftAdapter._optimize_table_definition() is the runtime implementation for
-these transformations. This rule registers the REWRITE_DDL intent for governance -
-compat_lint enforcement only; transformer_id is not resolved at runtime.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.rules._registration import register_ddl_rewrite

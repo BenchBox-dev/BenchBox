@@ -1,30 +1,4 @@
 #!/usr/bin/env bash
-# On-demand smoke for catalog `expected_value_min/max` storage-size bounds.
-# Generates a DuckDB SF=0.01 lineitem in-memory, runs each persist+merge
-# cycle for the sketch ops with `sketch_bytes` validation queries, and
-# prints TSV: tool / op_id / observed_bytes. If clickhouse-local is on
-# PATH (or CLICKHOUSE_LOCAL_BIN is set), it also runs ClickHouse probes.
-#
-# The ClickHouse probes cover the three headline sketch ops only. The
-# parameter-sweep variants are unsupported on ClickHouse (the sweep stays
-# within one DataSketches family per engine), so they have no probes here.
-# The ClickHouse probes intentionally run on a small synthetic deterministic
-# dataset (15000 rows from numbers()), NOT the SF=0.01 TPC-H corpus the
-# catalog bounds were calibrated against. Their TSV rows therefore pin
-# drift in the probe SQL and engine behavior, not reproduction of the
-# catalog bounds: size-dependent states serialize differently on the two
-# datasets. Do not compare probe output to catalog min/max directly;
-# rerun the catalog validations on SF=0.01 data when a bound itself is
-# under review.
-#
-# Not run in CI -- this is the on-demand sweep tool referenced by
-# `_project/handoffs/catalog-verified-comment-sweep-*.md`. Run when:
-#   - a tool version pin moves (DuckDB, datasketches extension, etc.)
-#   - a catalog `expected_value_min/max` bound is touched
-#   - quarterly, to catch silent drift
-#
-# Usage: scripts/sketch_storage_smoke.sh [output.tsv]
-# Default output: stdout
 
 set -euo pipefail
 

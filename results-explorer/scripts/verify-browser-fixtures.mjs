@@ -1,27 +1,4 @@
 #!/usr/bin/env node
-/**
- * Post-generation invariant and determinism checks for the browser-test
- * fixture corpus.
- *
- * Run after `generate-browser-fixtures.mjs`. Fails if the generated
- * corpus does not satisfy the minimum contract the browser suite
- * depends on:
- *   - at least one benchmark × scale has ≥4 distinct platforms
- *     (compare happy-path cohort)
- *   - at least two benchmarks exist (compare-invalid benchmark-mismatch
- *     cohort source)
- *   - `maintainer-run`, `community-submission`, and `vendor-supplied`
- *     trust labels are represented (trust-badge coverage)
- *   - at least two platforms in a ≥4-platform cohort have both a
- *     notuned/default run and a tuned (`tuning_mode=tuned` or
- *     `has_tuning`) run
- *   - environment facets include fixture-only cloud/provider/region/shape
- *     coverage plus a normalized container runtime source
- *   - a second generator run produces the same fixture tree. JSON files
- *     must be byte-identical. `data/results.duckdb` is the only allowed
- *     byte-level exception because DuckDB container bytes include storage
- *     metadata; its logical table digest must still be identical.
- */
 
 import {
   cpSync,
@@ -335,19 +312,7 @@ function verifyEnvironmentCoverage(data, errors) {
   }
 }
 
-/**
- * Semantic checks over the generated source bundles (H3): the DB-level
- * verifier only sees ingested rows, so scale-factor fraud (an SF 0.1 run
- * relabelled SF 0.01) must be caught here. TPC-H lineitem rows scale
- * linearly at 6,000,000 x SF; allow a wide 0.5x-2x band for partial
- * subsets. power_at_size must satisfy 3600*SF/geomean(query seconds)
- * within 5 percent; a stale metric from another scale factor misses by
- * an order of magnitude.
- */
 function verifySourceBundleSemantics(errors) {
-  // Scale-rewrite and partial-query derivatives intentionally carry a
-  // mismatched scale factor or incomplete timings to exercise failure
-  // paths; semantics apply only to full measurement bundles.
   const syntheticSuffixes = ["-sf01", "-partial-query", "-zero-timing"];
   for (const payload of generatedBundlePayloads()) {
     const runId = String(payload?.run?.id ?? "");
@@ -367,8 +332,6 @@ function verifySourceBundleSemantics(errors) {
     }
     const metrics = payload?.summary?.tpc_metrics ?? {};
     const power = Number(metrics.power_at_size);
-    // Mirror benchbox/core/results/builder.py _calculate_power_at_size:
-    // one time per query id from the final measurement iteration only.
     const byQuery = new Map();
     for (const query of payload?.queries ?? []) {
       if (query?.run_type !== "measurement" || Number(query?.ms) <= 0) continue;

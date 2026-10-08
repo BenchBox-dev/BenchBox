@@ -1,12 +1,3 @@
-"""Fast coverage tests for ClickHouse tuning helpers.
-
-Pins the behavior of `ClickHouseTuningMixin.apply_platform_optimizations`
-after removing the dead `platform_config.clickhouse_optimizations` branch
-(the attribute was never defined by `PlatformOptimizationConfiguration`,
-so any real, truthy config instance raised `AttributeError` before this
-fix -- see tuning-residual-cleanups-20260716 w2).
-"""
-
 from __future__ import annotations
 
 import logging
@@ -29,12 +20,7 @@ class _ClickHouseTuningHarness(ClickHouseTuningMixin):
 
 
 def test_apply_platform_optimizations_is_noop_for_real_config() -> None:
-    """A real (default) PlatformOptimizationConfiguration must not raise.
 
-    Before the fix, this raised AttributeError because the mixin read
-    `platform_config.clickhouse_optimizations`, an attribute that
-    `PlatformOptimizationConfiguration` never defines.
-    """
     adapter = _ClickHouseTuningHarness()
     connection = Mock()
 
@@ -44,8 +30,7 @@ def test_apply_platform_optimizations_is_noop_for_real_config() -> None:
 
 
 def test_apply_platform_optimizations_noop_with_nondefault_fields_set() -> None:
-    """Even with Databricks/BigQuery-style fields populated, ClickHouse has
-    no mapping for them and must remain a no-op rather than erroring."""
+
     adapter = _ClickHouseTuningHarness()
     connection = Mock()
     platform_config = PlatformOptimizationConfiguration(

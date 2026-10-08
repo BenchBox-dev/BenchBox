@@ -1,14 +1,9 @@
-"""TPC-H streams implementation module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides functionality to generate and manage TPC-H query streams according to the TPC-H specification. Streams represent concurrent user workloads with parameterized queries executed in a specific randomized order.
+# TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-H specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-H specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -25,17 +20,6 @@ from benchbox.utils.verbosity import VerbosityMixin, compute_verbosity
 
 
 class TPCHStreams(VerbosityMixin):
-    """TPC-H streams manager.
-
-    Implements TPC-H streams specification, providing:
-    - Multiple concurrent query streams (22 queries each)
-    - Stream-specific parameter generation
-    - Permutation-based query ordering using TPC-H specification
-    - Compliance with TPC-H specification requirements
-    """
-
-    # TPC-H permutation matrix (41 streams x 22 queries)
-    # Based on permute.h from TPC-H specification
     PERMUTATION_MATRIX: ClassVar[list[list[int]]] = [
         [14, 2, 9, 20, 6, 17, 18, 8, 21, 13, 3, 22, 16, 4, 11, 15, 1, 10, 19, 5, 7, 12],
         [21, 3, 18, 5, 11, 7, 6, 20, 17, 12, 16, 15, 13, 10, 2, 8, 14, 19, 9, 22, 1, 4],
@@ -88,15 +72,6 @@ class TPCHStreams(VerbosityMixin):
         rng_seed: int | None = None,
         verbose: int | bool = 0,
     ) -> None:
-        """Initialize TPC-H streams manager.
-
-        Args:
-            num_streams: Number of concurrent streams to generate
-            scale_factor: TPC-H scale factor
-            output_dir: Directory to output stream files
-            rng_seed: Random number generator seed for parameter generation
-            verbose: Whether to print verbose output
-        """
         self.num_streams = num_streams
         self.scale_factor = scale_factor
         self.output_dir = Path(output_dir) if output_dir else Path.cwd() / "tpch_streams"
@@ -105,28 +80,16 @@ class TPCHStreams(VerbosityMixin):
         self.apply_verbosity(verbosity_settings)
         self.logger = logging.getLogger("benchbox.core.tpch.streams")
 
-        # TPC-H query count (queries 1-22)
         self.query_count = 22
 
-        # Find TPC-H templates path (queries, dists.dss, etc.)
         from benchbox.utils.tpc_compilation import get_tpc_templates_dir
 
         self.tpch_tools_path = get_tpc_templates_dir("tpc-h")
 
     def _compile_qgen(self, work_dir: Path) -> Path | None:
-        """Compile the TPC-H qgen tool for query generation.
-
-        Args:
-            work_dir: Working directory for compilation
-
-        Returns:
-            Path to the compiled qgen executable, or None if compilation fails
-        """
-        # Copy TPC-H tools source to a temporary directory for building
         tools_build_dir = work_dir / "tpch_tools"
         shutil.copytree(self.tpch_tools_path, tools_build_dir)
 
-        # Determine platform-specific settings
         system = platform.system().lower()
         if system == "linux":
             machine_flag = "LINUX"
@@ -135,15 +98,11 @@ class TPCHStreams(VerbosityMixin):
         elif system == "windows":
             machine_flag = "WIN32"
         else:
-            # Default to Linux for unknown platforms
             machine_flag = "LINUX"
 
-        # Run make to build qgen (query generator)
         try:
-            # Handle macOS compilation requirements
             env = dict(os.environ)
             if system == "darwin":
-                # Include macOS-specific compiler flags
                 env["CC"] = "gcc"
                 env["CFLAGS"] = '-O -DDBNAME=\\"dss\\" -DLINUX -DORACLE -DTPCH'
 
@@ -168,12 +127,10 @@ class TPCHStreams(VerbosityMixin):
             if e.stdout:
                 error_msg += f"\nStdout: {e.stdout}"
 
-            # If compilation fails, fall back to using the existing query manager
             self.logger.warning("%s", error_msg)
             self.log_verbose("Falling back to built-in query generation...")
             return None
 
-        # Check for the executable
         qgen_exe = tools_build_dir / "qgen.exe" if system == "windows" else tools_build_dir / "qgen"
 
         if not qgen_exe.exists():
@@ -184,64 +141,32 @@ class TPCHStreams(VerbosityMixin):
         return qgen_exe
 
     def _get_stream_permutation(self, stream_id: int) -> list[int]:
-        """Get the query permutation for a specific stream.
-
-        This follows the TPC-H specification permutation algorithm:
-        SEQUENCE(stream, query) = permutation[stream % MAX_PERMUTE][query - 1]
-
-        Args:
-            stream_id: Stream identifier
-
-        Returns:
-            List of query IDs in permuted order for this stream
-        """
-        # Use modulo to cycle through the 41 available permutations
         permutation_index = stream_id % len(self.PERMUTATION_MATRIX)
 
-        # Return the permutation for this stream
         return self.PERMUTATION_MATRIX[permutation_index].copy()
 
     def _generate_stream_queries_qgen(self, stream_id: int, qgen_exe: Path, work_dir: Path) -> Path:
-        """Generate queries for a specific stream using qgen.
-
-        This uses the TPC-H qgen tool to generate parameterized queries
-        with proper stream-specific parameters and permutation.
-
-        Args:
-            stream_id: Stream identifier
-            qgen_exe: Path to qgen executable
-            work_dir: Working directory for generation
-
-        Returns:
-            Path to the generated stream query file
-        """
-        # Create stream-specific output file
         stream_file = self.output_dir / f"stream_{stream_id}.sql"
 
-        # Get permuted query order for this stream
         query_order = self._get_stream_permutation(stream_id)
 
         self.log_verbose(f"Generating stream {stream_id} with {len(query_order)} queries...")
         if self.very_verbose:
             self.logger.debug(f"Stream {stream_id} query order: {query_order}")
 
-        # Use qgen to generate all queries for this stream
-        # The -p option specifies the stream (permutation) number
-        # The -r option specifies the random seed for parameter generation
         cmd = [
             str(qgen_exe),
             "-p",
-            str(stream_id + 1),  # qgen uses 1-based stream indexing
+            str(stream_id + 1),
             "-s",
             str(self.scale_factor),
             "-r",
-            str(self.rng_seed + stream_id),  # Stream-specific seed
+            str(self.rng_seed + stream_id),
             "-o",
-            str(work_dir),  # Output directory
+            str(work_dir),
         ]
 
         try:
-            # Generate the stream queries
             result = subprocess.run(cmd, cwd=work_dir, check=True, capture_output=True, text=True)
 
             self.log_verbose(f"qgen completed for stream {stream_id}")
@@ -256,8 +181,6 @@ class TPCHStreams(VerbosityMixin):
                 error_msg += f"\nStderr: {e.stderr}"
             raise RuntimeError(error_msg) from e
 
-        # Look for the generated query files from qgen
-        # qgen typically outputs individual query files
         generated_queries = []
         for position, query_id in enumerate(query_order, 1):
             qgen_output_file = work_dir / f"{query_id}.sql"
@@ -268,7 +191,6 @@ class TPCHStreams(VerbosityMixin):
             else:
                 self.logger.warning("Query %s not generated by qgen for stream %s", query_id, stream_id)
 
-        # Create our stream file with all queries in permuted order
         with open(stream_file, "w", encoding="utf-8") as out_f:
             out_f.write(f"-- TPC-H Stream {stream_id}\n")
             out_f.write(f"-- Scale Factor: {self.scale_factor}\n")
@@ -277,7 +199,6 @@ class TPCHStreams(VerbosityMixin):
             out_f.write("-- Generated using TPC-H qgen tool\n")
             out_f.write("-- Compliant with TPC-H specification\n\n")
 
-            # Write queries in permuted order
             for position, query_id, query_content in generated_queries:
                 out_f.write(f"-- Query {query_id} (Stream {stream_id}, Position {position})\n")
                 out_f.write(query_content)
@@ -286,12 +207,6 @@ class TPCHStreams(VerbosityMixin):
         return stream_file
 
     def generate_streams(self) -> list[Path]:
-        """Generate all TPC-H query streams.
-
-        Returns:
-            List of paths to generated stream files
-        """
-        # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.log_operation_start(
@@ -303,11 +218,9 @@ class TPCHStreams(VerbosityMixin):
 
         stream_files = []
 
-        # Create a temporary working directory
         with tempfile.TemporaryDirectory() as temp_dir:
             work_dir = Path(temp_dir)
 
-            # Compile qgen - required for TPC-H specification compliance
             self.log_verbose("Compiling qgen (required for TPC-H compliance)...")
 
             try:
@@ -319,7 +232,6 @@ class TPCHStreams(VerbosityMixin):
                     "and that the TPC-H sources are properly available."
                 ) from e
 
-            # Generate each stream using qgen
             for stream_id in range(self.num_streams):
                 self.log_verbose(f"Generating stream {stream_id}...")
 
@@ -340,14 +252,6 @@ class TPCHStreams(VerbosityMixin):
         return stream_files
 
     def get_stream_info(self, stream_id: int) -> dict[str, Any]:
-        """Get information about a specific stream.
-
-        Args:
-            stream_id: Stream identifier
-
-        Returns:
-            Dictionary containing stream information
-        """
         if stream_id >= self.num_streams:
             raise ValueError(f"Invalid stream ID: {stream_id}. Max streams: {self.num_streams}")
 
@@ -362,29 +266,11 @@ class TPCHStreams(VerbosityMixin):
         }
 
     def get_all_streams_info(self) -> list[dict[str, Any]]:
-        """Get information about all streams.
-
-        Returns:
-            List of dictionaries containing stream information
-        """
         return [self.get_stream_info(i) for i in range(self.num_streams)]
 
 
 class TPCHStreamRunner(VerbosityMixin):
-    """TPC-H stream execution runner.
-
-    This class provides functionality to execute TPC-H streams against
-    a database and collect performance metrics.
-    """
-
     def __init__(self, connection_string: str, dialect: str = "standard", verbose: int | bool = 0) -> None:
-        """Initialize stream runner.
-
-        Args:
-            connection_string: Database connection string
-            dialect: SQL dialect (standard, postgres, mysql, etc.)
-            verbose: Whether to print verbose output
-        """
         self.connection_string = connection_string
         self.dialect = dialect
         verbosity_settings = compute_verbosity(verbose, False)
@@ -392,24 +278,6 @@ class TPCHStreamRunner(VerbosityMixin):
         self.logger = logging.getLogger("benchbox.core.tpch.stream.runner")
 
     def run_stream(self, stream_file: Path, stream_id: int) -> dict[str, Any]:
-        """Run a single TPC-H stream.
-
-        Args:
-            stream_file: Path to stream SQL file
-            stream_id: Stream identifier
-
-        Raises:
-            NotImplementedError: Always. This method never executed SQL against
-                a real database connection -- despite accepting
-                ``connection_string``/``dialect`` at construction time, it only
-                counted ``-- Query`` comment lines in ``stream_file`` and
-                reported every query as successful, regardless of whether the
-                queries (or even the file) existed. That made it impossible to
-                distinguish a real pass from a benchmark that never ran. Use
-                :class:`benchbox.core.tpch.throughput_test.TPCHThroughputTest`
-                for the production, spec-compliant TPC-H Throughput Test,
-                which executes real queries against a real connection.
-        """
         raise NotImplementedError(
             "TPCHStreamRunner.run_stream does not execute SQL. It previously "
             "faked success by counting '-- Query' comment lines in the stream "
@@ -419,17 +287,6 @@ class TPCHStreamRunner(VerbosityMixin):
         )
 
     def run_concurrent_streams(self, stream_files: list[Path]) -> dict[str, Any]:
-        """Run multiple TPC-H streams concurrently.
-
-        Args:
-            stream_files: List of stream SQL files
-
-        Raises:
-            NotImplementedError: Always; delegates to the non-executing
-                :meth:`run_stream`. See :meth:`run_stream` for details. Use
-                :class:`benchbox.core.tpch.throughput_test.TPCHThroughputTest`
-                for the production, spec-compliant TPC-H Throughput Test.
-        """
         raise NotImplementedError(
             "TPCHStreamRunner.run_concurrent_streams does not execute SQL. It "
             "previously delegated to the non-executing run_stream() per "

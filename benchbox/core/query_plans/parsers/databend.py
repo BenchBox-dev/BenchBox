@@ -1,30 +1,3 @@
-"""Databend query plan parser.
-
-Parses Databend ``EXPLAIN <query>`` output into the harmonized ``QueryPlanDAG``.
-Databend emits a box-drawing tree where the operator name is on its own line and
-each operator's properties are listed as ``key: value`` child lines, e.g.::
-
-    HashJoin
-    ├── join type: INNER
-    ├── build keys: [orders.o_orderkey (#8)]
-    ├── probe keys: [lineitem.l_orderkey (#0)]
-    ├── estimated rows: 600.00
-    ├── Filter(Build)
-    │   ├── filters: [is_true(orders.o_orderstatus (#10) = 'O')]
-    │   └── TableScan(Build)
-    │       ├── table: default.tpch.orders
-    │       └── estimated rows: 1500.00
-    └── TableScan(Probe)
-        ├── table: default.tpch.lineitem
-        └── estimated rows: 6000.00
-
-Nesting is encoded by the box-drawing prefix (4 characters per level: ``│   ``/
-``    `` fillers and ``├── ``/``└── `` connectors). Two kinds of line share that
-prefix: operator nodes (a bare CamelCase name, optionally with a ``(Build)``/
-``(Probe)`` suffix) and property lines (``lowercase key: value``). Property lines
-attach to the nearest enclosing operator; only operator lines nest the tree.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -43,11 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class DatabendQueryPlanParser(QueryPlanParser):
-    """Parser for Databend ``EXPLAIN`` box-drawing text output."""
-
-    # Ordered (substring, type) pairs; the first substring found in the
-    # lower-cased, space/underscore-stripped operator name wins, so more specific
-    # names precede the generic ones they contain.
     _OPERATOR_KEYWORDS: tuple[tuple[str, LogicalOperatorType], ...] = (
         ("constanttablescan", LogicalOperatorType.SCAN),
         ("ctescan", LogicalOperatorType.SCAN),
@@ -57,8 +25,6 @@ class DatabendQueryPlanParser(QueryPlanParser):
         ("hashjoin", LogicalOperatorType.JOIN),
         ("rangejoin", LogicalOperatorType.JOIN),
         ("join", LogicalOperatorType.JOIN),
-        # Legacy transform names (AggregatorTransform / FinalAggregator) and the
-        # current AggregateFinal / AggregatePartial / AggregateExpand all map here.
         ("finalaggregator", LogicalOperatorType.AGGREGATE),
         ("aggregatortransform", LogicalOperatorType.AGGREGATE),
         ("aggregatefinal", LogicalOperatorType.AGGREGATE),
@@ -66,7 +32,6 @@ class DatabendQueryPlanParser(QueryPlanParser):
         ("aggregateexpand", LogicalOperatorType.AGGREGATE),
         ("aggregat", LogicalOperatorType.AGGREGATE),
         ("filter", LogicalOperatorType.FILTER),
-        # SortingTransform (legacy) and Sort (current).
         ("sortingtransform", LogicalOperatorType.SORT),
         ("sort", LogicalOperatorType.SORT),
         ("limit", LogicalOperatorType.LIMIT),
@@ -83,21 +48,12 @@ class DatabendQueryPlanParser(QueryPlanParser):
         ("exchange", LogicalOperatorType.OTHER),
     )
 
-    # The first box-drawing connector on a line; everything before it is the
-    # ancestor-filler prefix that encodes depth (4 chars per level).
     _MARKER_RE = re.compile(r"├──|└──")
-    # An operator node line: a CamelCase identifier, optionally with a
-    # parenthesized role suffix like "(Build)" / "(Probe)", and nothing else.
-    # Property lines ("join type: INNER", "estimated rows: 600.00") do not match
-    # because they contain a space and a colon.
     _OPERATOR_RE = re.compile(r"^[A-Za-z][\w]*(?:\([^)]*\))?$")
 
     def __init__(self):
         super().__init__("databend")
 
-    # The plan producers now return None for unavailable plans; both the
-    # retired prefix and "Failed to get query plan" stay rejected as defense
-    # so stray error text can never parse as a plan.
     def _parse_impl(self, query_id: str, explain_output: str) -> QueryPlanDAG:
         if not explain_output or not explain_output.strip():
             raise ValueError("Empty EXPLAIN output")
@@ -131,7 +87,6 @@ class DatabendQueryPlanParser(QueryPlanParser):
                 depth = len(prefix) // 4 + 1
                 content = raw_line[marker.end() :].strip()
             else:
-                # No connector: the root operator line sits at depth 0.
                 depth = 0
                 content = raw_line.strip()
             if not content:
@@ -146,9 +101,7 @@ class DatabendQueryPlanParser(QueryPlanParser):
         return parsed
 
     def _build_raw_tree(self, parsed_lines: list[dict[str, Any]]) -> dict[str, Any] | None:
-        """Build a raw operator tree, attaching property lines to their operator."""
         root: dict[str, Any] | None = None
-        # Stack of operator nodes on the current root-to-leaf path.
         stack: list[dict[str, Any]] = []
 
         for line in parsed_lines:
@@ -161,15 +114,11 @@ class DatabendQueryPlanParser(QueryPlanParser):
                     if root is None:
                         root = node
                     else:
-                        # A stray second top-level node becomes a child of the root
-                        # so a single connected DAG is always returned.
                         root["children"].append(node)
                 else:
                     stack[-1]["children"].append(node)
                 stack.append(node)
             else:
-                # Property line: attach to the nearest enclosing operator (the
-                # deepest stack entry shallower than this line).
                 parent = next((op for op in reversed(stack) if op["depth"] < depth), None)
                 if parent is None and stack:
                     parent = stack[-1]

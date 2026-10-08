@@ -1,31 +1,4 @@
 #!/usr/bin/env python3
-"""Generate cloud TPC tuned templates from the logical tuning profile.
-
-Renders one `<benchmark>_tuned.yaml` per platform/benchmark from the
-required candidates in `benchbox/core/tuning/profiles/tpc.yaml`, using each
-platform's logical-to-physical mapping
-(`benchbox.core.tuning.platform_capabilities.map_candidate_to_platform`).
-
-Platform rules honored here (mirroring the mappers, not reimplementing them):
-
-- BigQuery: at most 4 clustering columns per table; partitioning first.
-- Redshift: single DISTKEY per table (first distribution candidate);
-  remaining locality roles become compound sortkey entries.
-- Snowflake: at most 4 clustering columns per table so the adapter resumes automatic reclustering.
-
-Only platforms whose mapped tuning types reach the physical layout at
-execution time are generated here. BigQuery partitioning/clustering and
-Redshift distribution/sorting are preview-only or inspect-and-log in the
-current adapters (see benchbox/core/tuning/capability_registry.py), so they
-stay out of the certified set until the adapters render them for real;
-Snowflake clustering renders post-load via ALTER TABLE ... CLUSTER BY and
-is the one certified platform in this generator today.
-
-Usage:
-    uv run -- python scripts/generate_cloud_tpc_templates.py --write
-    uv run -- python scripts/generate_cloud_tpc_templates.py --check
-    uv run -- python scripts/generate_cloud_tpc_templates.py --write --output-root examples/tunings
-"""
 
 from __future__ import annotations
 
@@ -40,29 +13,46 @@ CHECKOUT_ROOT = Path(__file__).resolve().parents[1]
 if str(CHECKOUT_ROOT) not in sys.path:
     sys.path.insert(0, str(CHECKOUT_ROOT))
 
-from benchbox.core.tuning.platform_capabilities import (  # noqa: E402
+from benchbox.core.tuning.platform_capabilities import (
     map_candidate_to_platform,
 )
-from benchbox.core.tuning.workload_profiles import (  # noqa: E402
+from benchbox.core.tuning.workload_profiles import (
     load_tpc_tuning_profile,
+)
+
+CLI_DESCRIPTION = (
+    "Generate cloud TPC tuned templates from the logical tuning profile.\n"
+    "\n"
+    "Renders one `<benchmark>_tuned.yaml` per platform/benchmark from the\n"
+    "required candidates in `benchbox/core/tuning/profiles/tpc.yaml`, using each\n"
+    "platform's logical-to-physical mapping\n"
+    "(`benchbox.core.tuning.platform_capabilities.map_candidate_to_platform`).\n"
+    "\n"
+    "Platform rules honored here (mirroring the mappers, not reimplementing them):\n"
+    "\n"
+    "- BigQuery: at most 4 clustering columns per table; partitioning first.\n"
+    "- Redshift: single DISTKEY per table (first distribution candidate);\n"
+    "  remaining locality roles become compound sortkey entries.\n"
+    "- Snowflake: at most 4 clustering columns per table so the adapter resumes automatic reclustering.\n"
+    "\n"
+    "Only platforms whose mapped tuning types reach the physical layout at\n"
+    "execution time are generated here. BigQuery partitioning/clustering and\n"
+    "Redshift distribution/sorting are preview-only or inspect-and-log in the\n"
+    "current adapters (see benchbox/core/tuning/capability_registry.py), so they\n"
+    "stay out of the certified set until the adapters render them for real;\n"
+    "Snowflake clustering renders post-load via ALTER TABLE ... CLUSTER BY and\n"
+    "is the one certified platform in this generator today.\n"
+    "\n"
+    "Usage:\n"
+    "    uv run -- python scripts/generate_cloud_tpc_templates.py --write\n"
+    "    uv run -- python scripts/generate_cloud_tpc_templates.py --check\n"
+    "    uv run -- python scripts/generate_cloud_tpc_templates.py --write --output-root examples/tunings\n"
 )
 
 PLATFORMS = ("snowflake",)
 BENCHMARKS = ("tpch", "tpcds")
 
-PLATFORM_TITLES = {
-    "bigquery": "BigQuery",
-    "redshift": "Redshift",
-    "snowflake": "Snowflake",
-}
-
-HEADER = """# {platform_title} {benchmark_title} Tuned Configuration
-# Generated from the logical tuning profile (benchbox/core/tuning/profiles/tpc.yaml)
-# by scripts/generate_cloud_tpc_templates.py. Do not hand-edit: re-run the
-# generator after changing the profile. Provides platform-native tuning for
-# {benchmark_title} benchmark workloads.
-
-primary_keys:
+HEADER = """primary_keys:
   enabled: true
   enforce_uniqueness: true
   nullable: false
@@ -106,7 +96,6 @@ def render_table(
     table: str,
     candidates: list,
 ) -> dict:
-    """Render one table_tunings entry from mapped candidates."""
     partitioning: list[dict] = []
     clustering: list[dict] = []
     distribution: list[dict] = []
@@ -142,8 +131,6 @@ def render_table(
         if clustering:
             block["clustering"] = _order_entries(clustering)
         if sorting and platform == "snowflake":
-            # Snowflake folds sort hints into clustering; keep both only
-            # when clustering did not already carry the column.
             extra = [e for e in sorting if e["name"] not in {c["name"] for c in clustering}]
             if extra:
                 block["sorting"] = _order_entries(extra)
@@ -153,18 +140,12 @@ def render_table(
 
 
 def render_template(platform: str, benchmark: str) -> str:
-    """Render the full tuned YAML for one platform/benchmark."""
     profile = load_tpc_tuning_profile()
     by_table: dict[str, list] = defaultdict(list)
     for candidate in profile.required_candidates(benchmark):
         by_table[candidate.table].append(candidate)
 
-    lines = [
-        HEADER.format(
-            platform_title=PLATFORM_TITLES[platform],
-            benchmark_title=benchmark.upper(),
-        ).rstrip()
-    ]
+    lines = [HEADER.rstrip()]
     for table in sorted(by_table):
         block = render_table(platform, table, by_table[table])
         dumped = yaml.safe_dump({table: block}, sort_keys=False, default_flow_style=False)
@@ -178,7 +159,7 @@ def template_path(output_root: Path, platform: str, benchmark: str) -> Path:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--write", action="store_true", help="Write generated templates.")
     parser.add_argument("--check", action="store_true", help="Fail when generated output differs.")
     parser.add_argument(

@@ -8,13 +8,6 @@ import {
   type MeasurementBasis,
 } from "@/lib/measurementBasis";
 
-/**
- * Extract the trailing short-hash token from a result id for a11y disambiguation.
- * Result IDs follow `<benchmark>-<platform>-sf<scale>-<date>-<shorthash>`; the
- * trailing token is the unique fingerprint that distinguishes otherwise-similar
- * runs. Strings without a `-` are returned as-is so callers can pass already-short
- * ids without surprise.
- */
 function compareSelectionShortId(id: string): string {
   if (id.length === 0) return "";
   const trailing = id.split("-").pop()!;
@@ -25,18 +18,8 @@ export interface CompareCohortSignature {
   benchmark: string;
   scaleFactor: string;
   phase: string;
-  /** Nullable because generic `bench.results` rows are result-level, not ranking rows. */
+  streamCount: string;
   primaryMetric: string | null;
-  /**
-   * The measurement basis in force for this comparison, or null before one is
-   * locked.
-   *
-   * The basis belongs in the cohort signature for the same reason benchmark
-   * and scale do: it is a property the whole comparison must agree on, and a
-   * run that cannot answer it is not comparable here. Recording it in the lock
-   * also means a shared link reproduces the cohort AND the reduction, not just
-   * the cohort.
-   */
   basis: MeasurementBasis | null;
 }
 
@@ -44,6 +27,7 @@ export type CompareCohortField =
   | "benchmark"
   | "scale"
   | "phase"
+  | "streams"
   | "primary metric"
   | "measurement basis";
 
@@ -52,13 +36,8 @@ export interface CompareCohortRow {
   scale_factor?: unknown;
   phase?: unknown;
   test_type?: unknown;
+  stream_count?: unknown;
   primary_metric?: unknown;
-  /**
-   * `result_basis_availability.available_bases` for this run, when the caller
-   * has it. Absent means "unknown", which is treated as compatible: a snapshot
-   * built before the basis columns existed must not have every row declared
-   * incompatible.
-   */
   available_bases?: unknown;
 }
 
@@ -67,15 +46,6 @@ function asText(value: unknown): string {
   return String(value);
 }
 
-/**
- * Build the comparable-cohort signature used by Query and Platform entrypoints.
- *
- * Benchmark + scale + phase are always compared when present. When
- * `primary_metric` is available from a ranking-aware helper, it is part of the
- * lock. Plain `bench.results` workbench rows are result-level rows, so their
- * same-benchmark lock keeps the Compare page's primary metric stable through
- * the benchmark registry rather than through per-row ranking metadata.
- */
 export function compareCohortSignatureForRow(
   row: CompareCohortRow,
   basis: MeasurementBasis | null = null,
@@ -84,28 +54,12 @@ export function compareCohortSignatureForRow(
     benchmark: canonicalBenchmarkSlug(asText(row.benchmark)),
     scaleFactor: asText(row.scale_factor),
     phase: canonicalPhase(asText(row.phase ?? row.test_type)),
+    streamCount: asText(row.stream_count),
     primaryMetric: asText(row.primary_metric) || null,
     basis,
   };
 }
 
-/**
- * Whether a run can serve the basis a cohort has locked.
- *
- * Matched on the PASS SELECTION, not the whole basis. Availability is a
- * property of which executions a run recorded; the statistic is reduced
- * client-side over whatever the selection yields, and the read model does not
- * publish a per-statistic token. Comparing whole bases here rejected every row
- * in the corpus the moment a cohort locked `all_warm:min`: the pipeline
- * publishes `all_warm`, which parses as the median basis, so `basesEqual`
- * reported a mismatch for a run that had every execution the minimum needs.
- *
- * Unknown availability is compatible, not incompatible. A row that simply does
- * not carry `available_bases` -- an older snapshot, or a caller that did not
- * fetch it -- must not be filtered out of every comparison; the honest
- * response to "we do not know" is to let the value resolution report
- * unavailability per query, where it can name the reason.
- */
 export function rowAnswersBasis(row: CompareCohortRow, basis: MeasurementBasis | null): boolean {
   if (basis === null) return true;
   if (row.available_bases === undefined || row.available_bases === null) return true;
@@ -123,6 +77,7 @@ export function compareCohortMismatches(
   if (candidate.benchmark !== signature.benchmark) mismatches.push("benchmark");
   if (candidate.scaleFactor !== signature.scaleFactor) mismatches.push("scale");
   if (candidate.phase !== signature.phase) mismatches.push("phase");
+  if (candidate.streamCount !== signature.streamCount) mismatches.push("streams");
   if (
     signature.primaryMetric !== null &&
     candidate.primaryMetric !== null &&
@@ -138,23 +93,11 @@ export function compareCohortSummary(signature: CompareCohortSignature): string 
   const parts = [formatBenchmarkLabel(signature.benchmark)];
   if (signature.scaleFactor !== "") parts.push(`SF ${signature.scaleFactor}`);
   if (signature.phase !== "") parts.push(signature.phase);
+  if (signature.streamCount !== "") parts.push(`${signature.streamCount} streams`);
   if (signature.basis !== null) parts.push(`at ${formatBasisLabel(signature.basis)}`);
   return parts.join(" ");
 }
 
-/**
- * Lock the single basis a cross-run comparison reads.
- *
- * The type system already makes a heterogeneous cross-run comparison
- * unrepresentable (see measurementBasis.ts). This is the same rule at the
- * runtime boundary, where bases arrive as untyped strings from a URL or from
- * user selection and a surface could otherwise assemble a list before the
- * types ever see it. Reporting it here puts it in the same place as every
- * other cohort violation, so a surface handles one kind of failure rather
- * than two.
- *
- * An empty list is not an error: nothing is locked yet.
- */
 export function lockCrossRunBasis(
   bases: readonly MeasurementBasis[],
 ): { ok: true; basis: MeasurementBasis | null } | { ok: false; reason: string } {
@@ -187,15 +130,6 @@ export function compareCohortLockReason(
   );
 }
 
-/**
- * Stable partition of rows into `{compatible, incompatible}` against a locked
- * cohort signature. Used by Compare and Query Workbench so compatible
- * candidates surface above incompatibles after the first selection,
- * regardless of the user's column-sort choice.
- *
- * Stability: relative order within each bucket matches the input order. When
- * `signature` is null (no selection yet) every row is treated as compatible.
- */
 export function compareCohortPartition<T extends CompareCohortRow>(
   rows: readonly T[],
   signature: CompareCohortSignature | null,
@@ -210,13 +144,6 @@ export function compareCohortPartition<T extends CompareCohortRow>(
   return { compatible, incompatible };
 }
 
-/**
- * Build a disambiguated accessible name for compare-selection checkboxes.
- * Repeated platform names ("Select DuckDB for comparison" five times) are
- * indistinguishable to assistive technology and locator-driven tests; this
- * helper appends benchmark, scale, phase, run date, and a short result-id
- * suffix so each row has a unique accessible name.
- */
 export interface CompareSelectionLabelInput {
   platform?: string | null;
   benchmark?: string | null;
@@ -226,10 +153,6 @@ export interface CompareSelectionLabelInput {
   resultId?: string | null;
 }
 
-/**
- * Suffix for status copy when a cohort lock hides incompatible rows.
- * Returns an empty string for `count <= 0` so callers can append unconditionally.
- */
 export function hiddenIncompatibleSuffix(count: number): string {
   if (count <= 0) return "";
   return ` ${count} incompatible row${count === 1 ? "" : "s"} hidden.`;

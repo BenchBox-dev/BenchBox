@@ -1,27 +1,4 @@
 #!/usr/bin/env python3
-"""Enforce a zero-skip corpus path-to-result-id bijection (A4 w2, A9 review follow-ups).
-
-The check is fail-closed:
-
-  * ``--accepted-ref`` gives the authoritative accepted-path set (git ls-tree).
-  * ``--bundles-dir`` is an *independent* cross-check: its basenames must be
-    symmetric-difference-empty against the accepted ref (not a fallback), except
-    for ledger dispositions: ``published_only`` may be absent from the dir and
-    ``legacy_overlay`` may appear as dir-only extras.
-  * ``--artifact`` (a DuckDB / SQLite read model) is compared 1:1 against the
-    ``result_id`` recomputed from every accepted bundle. A missing artifact is a
-    hard failure whenever one is expected (``--require-artifact`` or an explicit
-    ``--artifact`` path).
-  * ``--ledger-seed`` supplies the only permitted omissions: ``published_only``
-    paths may be absent from the artifact, ``legacy_overlay`` result ids may be
-    present without a matching accepted path.
-
-Usage:
-  uv run python scripts/publication/check_corpus_bijection.py \
-    --accepted-ref origin/published-results \
-    --bundles-dir downloaded-corpus/ \
-    --artifact assembled-site/results/data/results.duckdb --require-artifact
-"""
 
 from __future__ import annotations
 
@@ -42,7 +19,7 @@ _DEFAULT_ARTIFACT = ROOT / "publication/out/site/results/data/results.duckdb"
 
 
 class BijectionError(RuntimeError):
-    """Raised when the corpus bijection cannot be established."""
+    pass
 
 
 def _is_primary_bundle(path: str) -> bool:
@@ -50,7 +27,6 @@ def _is_primary_bundle(path: str) -> bool:
 
 
 def accepted_paths_from_ref(ref: str) -> list[str]:
-    """Every primary bundle path in the git tree at *ref*."""
     try:
         out = subprocess.run(
             ["git", "ls-tree", "-r", "--name-only", ref, "--", CORPUS_PREFIX],
@@ -70,7 +46,6 @@ def accepted_paths_from_ref(ref: str) -> list[str]:
 
 
 def bundle_files_in_dir(bundles_dir: Path) -> dict[str, Path]:
-    """Map basename -> file path for every primary bundle under *bundles_dir* (recursive)."""
     mapping: dict[str, Path] = {}
     for p in sorted(bundles_dir.rglob("*.json")):
         if not _is_primary_bundle(p.name):
@@ -95,7 +70,6 @@ def recompute_result_id(bundle_path: Path) -> str:
 
 
 def recompute_result_id_from_bytes(raw: bytes, *, hint_path: str = "bundle.json") -> str:
-    """Derive a result_id from raw bundle bytes without requiring a durable file path."""
     from _project.scripts.explorer_pipeline.transformer import BundleTransformer
 
     data = json.loads(raw)
@@ -116,7 +90,6 @@ def _git_show_bytes(ref: str, path: str) -> bytes:
 
 
 def bundle_bytes_for_path(path: str, dir_map: dict[str, Path], ref: str) -> bytes:
-    """Resolve bundle bytes from the dir map, worktree, or ``git show`` of *path*."""
     name = Path(path).name
     if name in dir_map:
         return dir_map[name].read_bytes()
@@ -127,7 +100,6 @@ def bundle_bytes_for_path(path: str, dir_map: dict[str, Path], ref: str) -> byte
 
 
 def _disposition_for_basename(name: str, dispositions: dict[str, str]) -> str | None:
-    """Return the disposition for a basename, preferring the canonical corpus path."""
     direct = f"{CORPUS_PREFIX}{name}"
     if direct in dispositions:
         return dispositions[direct]
@@ -138,7 +110,6 @@ def _disposition_for_basename(name: str, dispositions: dict[str, str]) -> str | 
 
 
 def read_published_result_ids(artifact_path: Path) -> list[str]:
-    """Published ``result_id`` values from a DuckDB or SQLite artifact."""
     try:
         import duckdb
 
@@ -176,12 +147,6 @@ def check_bijection(
     published_records: list[str],
     dispositions: dict[str, str] | None = None,
 ) -> tuple[bool, list[str]]:
-    """Pure set-level bijection: every accepted entry appears in the published set.
-
-    An accepted entry may be absent only when it carries an explicit disposition.
-    Used both by the artifact stage of :func:`check` and by callers that already
-    hold the two identifier sets.
-    """
     dispositions = dispositions or {}
     published_set = set(published_records)
     unaccounted = sorted(b for b in set(accepted_bundles) if b not in published_set and b not in dispositions)
@@ -207,7 +172,6 @@ def check(
     accepted_by_name = {Path(p).name: p for p in accepted}
     print(f"Accepted ref {accepted_ref}: {len(accepted)} primary bundle(s)")
 
-    # Independent cross-check: bundles-dir vs ref, with ledger disposition exceptions.
     dir_map = bundle_files_in_dir(bundles_dir)
     if not dir_map:
         raise BijectionError(f"--bundles-dir {bundles_dir} contains no primary bundles")
@@ -226,8 +190,6 @@ def check(
         )
         return errors
 
-    # Recompute the result_id for every accepted bundle present in the dir.
-    # published_only paths absent from the dir are permitted omissions.
     rid_to_path: dict[str, str] = {}
     for path in accepted:
         name = Path(path).name

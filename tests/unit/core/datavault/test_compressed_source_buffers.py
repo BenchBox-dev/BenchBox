@@ -1,5 +1,3 @@
-"""Bounded regression for compressed CSV buffer eviction during Data Vault ETL."""
-
 import duckdb
 import pytest
 import zstandard
@@ -10,11 +8,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 
 def test_compressed_shards_under_memory_pressure(tmp_path):
-    """Compressed ingestion must preserve every row when CSV buffers are evicted.
 
-    DuckDB 1.5.5's parallel scanner attempts to seek a compressed stream with
-    these two shards at 512 MB. Plain input remains a reference for row identity.
-    """
     for shard in (1, 2):
         data = "".join(
             f"{i}|REGION{i}|{'comment' * 30}|\n" for i in range((shard - 1) * 2_200_000, shard * 2_200_000)

@@ -1,21 +1,6 @@
-"""SingleStore platform adapter for BenchBox benchmarking.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides SingleStore-specific functionality including:
-- MySQL wire protocol connectivity via singlestoredb SDK (port 3306)
-- LOAD DATA LOCAL INFILE for efficient bulk data loading
-- Columnstore DDL with shard key configuration for analytics
-- Support for both Helios (cloud) and self-managed deployments
-- SQLGlot 'mysql' dialect for SQL transpilation
-
-SingleStore (formerly MemSQL) is a distributed SQL database designed for
-real-time analytics and transactions with both row and column storage.
-For analytical benchmarks (TPC-H, TPC-DS), columnstore tables provide
-dramatically better performance than the default rowstore.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -35,14 +20,13 @@ from ..utils.file_format import get_data_extension
 from .base import DriverIsolationCapability, PlatformAdapter
 from .base.data_loading import (
     CsvDialect,
-    DataSourceResolver,  # noqa: F401 - tests patch this module-local name; shared loader resolves it dynamically.
+    DataSourceResolver,  # noqa: F401
     prepare_local_load_file,
     resolve_csv_dialect,
 )
 from .base.mysql_wire import MySqlWireLifecycleMixin, NoOpTableTuningMixin, build_database_config
-from .base.sql_execution import execute_sql_query  # noqa: F401 - tests patch this module-local execution hook.
+from .base.sql_execution import execute_sql_query  # noqa: F401
 
-# SQLGlot dialect - SingleStore is MySQL-compatible
 SINGLESTORE_DIALECT = "mysql"
 
 try:
@@ -50,13 +34,8 @@ try:
 except ImportError:
     _s2 = None
 
-# Default port for SingleStore MySQL protocol
 _DEFAULT_PORT = 3306
 
-# TPC-H shard key columns (best join/filter column per table).
-# NOTE: Only TPC-H tables are mapped. TPC-DS and other benchmark tables
-# will fall back to SHARD KEY () (random distribution), which is functional
-# but suboptimal for join-heavy queries. Add TPC-DS mappings when needed.
 _TPCH_SHARD_KEYS: dict[str, str] = dict(  # noqa: C408
     lineitem="l_orderkey",
     orders="o_orderkey",
@@ -66,23 +45,18 @@ _TPCH_SHARD_KEYS: dict[str, str] = dict(  # noqa: C408
     partsupp="ps_partkey",
 )
 
-# TPC-H sort key columns (primary analytical ordering)
 _TPCH_SORT_KEYS: dict[str, list[str]] = {
     **{table: [key] for table, key in _TPCH_SHARD_KEYS.items()},
     "lineitem": ["l_orderkey", "l_linenumber"],
     "partsupp": ["ps_partkey", "ps_suppkey"],
 }
 
-# Small dimension tables that benefit from REFERENCE TABLE (replicated everywhere)
-# avoids broadcast joins for nation/region lookups
 _REFERENCE_TABLES = {"nation", "region"}
 
-# Parquet files cannot be loaded via LOAD DATA LOCAL INFILE
 _PARQUET_EXTENSIONS = {".parquet"}
 
 
 def _col_in_stmt(col_name: str, stmt: str) -> bool:
-    """Return True if col_name appears as a column identifier in the CREATE TABLE stmt."""
     pattern = rf"(?<![a-zA-Z0-9_]){re.escape(col_name)}(?![a-zA-Z0-9_])"
     return bool(re.search(pattern, stmt, re.IGNORECASE))
 
@@ -94,33 +68,11 @@ _CREATE_TABLE_RE = re.compile(
 
 
 def _extract_create_table_name(stmt: str) -> str | None:
-    """Extract lowercase table name from a CREATE TABLE statement, or return None."""
     m = _CREATE_TABLE_RE.match(stmt.strip())
     return m.group(1).lower() if m else None
 
 
 class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlOptimizer, PlatformAdapter):
-    """SingleStore platform adapter with LOAD DATA LOCAL INFILE bulk loading.
-
-    Supports SingleStore 8.0+ with columnstore analytical tables.
-    Uses singlestoredb SDK for MySQL protocol connectivity and
-    LOAD DATA LOCAL INFILE for efficient bulk data loading.
-
-    Connection Configuration:
-    - Host: SingleStore node hostname or Helios endpoint
-    - Port: 3306 (default MySQL protocol port)
-    - Username: SingleStore user (default: 'root')
-    - Password: SingleStore password
-    - Database: Target database name
-
-    Environment Variables:
-    - SINGLESTORE_HOST: Node hostname
-    - SINGLESTORE_PORT: MySQL protocol port
-    - SINGLESTORE_USER or SINGLESTORE_USERNAME: Username
-    - SINGLESTORE_PASSWORD: Password
-    - SINGLESTORE_DATABASE: Default database name
-    """
-
     plan_capture_phase_eligible = True
     default_service_port = _DEFAULT_PORT
 
@@ -138,18 +90,10 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
         return "SingleStore"
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for SingleStore (MySQL-compatible)."""
         return SINGLESTORE_DIALECT
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add SingleStore-specific CLI arguments.
-
-        Legacy flags for the setup wizard (``benchbox platforms setup``).
-        The ``benchbox run`` flow uses ``--platform-option key=val`` instead
-        and does NOT call ``add_cli_arguments``.  Keep in sync with the
-        option specs registered in ``benchbox/platforms/__init__.py``.
-        """
         if not hasattr(parser, "add_argument"):
             return
         try:
@@ -189,22 +133,12 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> SingleStoreAdapter:
-        """Create SingleStore adapter from unified configuration.
-
-        Standard connection parameters (host/port/credentials) are resolved
-        once by the config builder (_build_singlestore_config) before this
-        method is called.  from_config() passes those resolved values through
-        and handles benchmark-derived database naming, which requires the
-        benchmark + scale_factor context that the builder carries forward.
-        """
         adapter_config: dict[str, Any] = {}
 
-        # Pass through connection parameters already resolved by the config builder.
         for key in ["host", "port", "username", "password"]:
             if config.get(key) is not None:
                 adapter_config[key] = config[key]
 
-        # Database name - use provided or generate from benchmark config
         if config.get("database"):
             adapter_config["database"] = config["database"]
         elif db_env := os.environ.get("SINGLESTORE_DATABASE"):
@@ -215,7 +149,6 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
             benchmark_name = format_benchmark_name(config["benchmark"], config["scale_factor"])
             adapter_config["database"] = f"benchbox_{benchmark_name}".lower().replace("-", "_")
 
-        # Pass through other config
         for key in [
             "force_recreate",
             "tuning_config",
@@ -244,11 +177,6 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
 
         self._dialect = SINGLESTORE_DIALECT
 
-        # Connection configuration.
-        # The config builder (_build_singlestore_config) is the single owner of
-        # env var resolution for the standard CLI path. __init__ just consumes
-        # whatever it receives; simple Python defaults cover direct-construction
-        # paths (e.g. tests) where no builder ran.
         self.host = config.get("host", "localhost")
         self.port = config.get("port", _DEFAULT_PORT)
         self.database = config.get("database", "benchbox")
@@ -259,7 +187,6 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
             raise ValueError(f"Invalid database identifier: {self.database}")
 
     def _admin_connect(self) -> Any:
-        """Create a connection without selecting a database."""
         return _s2.connect(
             host=self.host,
             port=self.port,
@@ -312,35 +239,15 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
         dialect: CsvDialect,
         strip_trailing_delim: bool = False,
     ) -> int:
-        """Load a data file using LOAD DATA LOCAL INFILE.
-
-        Decompression, trailing-delimiter stripping, and boolean normalisation
-        are handled by prepare_local_load_file() — this method only builds and
-        executes the LOAD DATA SQL.
-
-        Args:
-            connection: Active SingleStore connection (local_infile=True)
-            table_name: Target table name (pre-validated)
-            data_file: Path to the data file
-            dialect: Resolved CSV dialect (delimiter, has_header, null_marker, normalize_booleans)
-            strip_trailing_delim: Strip trailing field delimiter from each row.
-                True for .tbl files; False for .dat, .csv, and everything else.
-
-        Returns:
-            Number of rows loaded
-        """
         with prepare_local_load_file(
             data_file, dialect=dialect, strip_trailing_delim=strip_trailing_delim
         ) as load_path:
             cursor = connection.cursor()
             try:
-                # Count existing rows so we return only the delta (correct on retry)
                 cursor.execute(f"SELECT COUNT(*) FROM `{table_name}`")
                 pre_row = cursor.fetchone()
                 pre_count = int(pre_row[0]) if pre_row else 0
 
-                # Safety: load_path is framework-controlled (tempfile or data_dir),
-                # not user input.  Escaping here is defence-in-depth only.
                 escaped_path = str(load_path).replace("\\", "\\\\").replace("'", "\\'")
                 escaped_delim = dialect.delimiter.replace("\\", "\\\\").replace("'", "\\'")
                 clauses = [
@@ -357,7 +264,6 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
                 sql = " ".join(clauses)
                 cursor.execute(sql)
 
-                # LOAD DATA doesn't return rowcount reliably; use delta COUNT(*)
                 cursor.execute(f"SELECT COUNT(*) FROM `{table_name}`")
                 post_row = cursor.fetchone()
                 post_count = int(post_row[0]) if post_row else 0
@@ -366,17 +272,14 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
                 cursor.close()
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply SingleStore session settings for benchmark execution."""
         cursor = connection.cursor()
         try:
             try:
-                # Disable query cache for reproducible results
                 cursor.execute("SET SESSION query_cache_type = 0")
             except Exception as e:
                 self.logger.debug(f"Could not disable query cache: {e}")
 
             try:
-                # Allow large result sets
                 cursor.execute("SET SESSION max_allowed_packet = 1073741824")
             except Exception as e:
                 self.logger.debug(f"Could not set max_allowed_packet: {e}")
@@ -384,16 +287,9 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
             cursor.close()
 
     def _format_query_plan_rows(self, rows: Any) -> str:
-        """Join the first column of each EXPLAIN row into the plan text.
-
-        SingleStore ``EXPLAIN`` returns the plan tree as single-column rows; take
-        column 0 so ``SingleStoreQueryPlanParser`` receives clean tree text rather
-        than the ``str(tuple)`` repr the default mixin formatter would produce.
-        """
         return "\n".join(str(row[0]) if isinstance(row, (tuple, list)) else str(row) for row in rows)
 
     def get_query_plan_parser(self):
-        """Get the SingleStore query plan parser."""
         from benchbox.core.query_plans.parsers.singlestore import SingleStoreQueryPlanParser
 
         return SingleStoreQueryPlanParser()
@@ -408,13 +304,6 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a query and capture its structured plan when enabled.
-
-        Delegates execution to the shared MySQL-wire path, then merges plan
-        capture (SUCCESS-guarded; no EXPLAIN issued when capture_plans is off).
-        Kept outside the execution path so a strict_plan_capture PlanCaptureError
-        propagates rather than being mislabeled as a failed query.
-        """
         return self.execute_query_with_plan_capture(
             super().execute_query,
             connection,
@@ -427,7 +316,6 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
         )
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get SingleStore platform information."""
         platform_info: dict[str, Any] = {
             "platform_type": "singlestore",
             "platform_name": "SingleStore",
@@ -463,39 +351,19 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
 
         return platform_info
 
-    # ------------------------------------------------------------------ #
-    # DDL transformation - inject columnstore, shard/sort keys
-    # ------------------------------------------------------------------ #
-
     def _transform_create_statement(self, stmt: str) -> str:
-        """Transform a CREATE TABLE statement for SingleStore columnstore DDL.
-
-        Handles non-CREATE-TABLE passthrough, table-name normalization (MySQL
-        lower_case_table_names=0 detail), then delegates to
-        optimize_table_definition() for the registered DDL_OPTIMIZE transforms.
-
-        Args:
-            stmt: A single SQL statement (no trailing semicolon)
-
-        Returns:
-            Transformed SQL statement
-        """
         stripped = stmt.strip()
         upper = stripped.upper()
 
         if not upper.startswith("CREATE TABLE"):
             return stmt
 
-        # Extract table name from CREATE TABLE [schema.]`name` or CREATE TABLE name
         table_match = _CREATE_TABLE_RE.match(stripped)
         if not table_match:
             return stmt
 
         table_name = table_match.group(1).lower()
 
-        # Normalize table name to lowercase with backtick quoting.
-        # SingleStore uses lower_case_table_names=0 (case-sensitive), so DimDate ≠ dimdate.
-        # load_data always uses table_name.lower(), so CREATE TABLE must match.
         orig_name = table_match.group(1)
         if orig_name != table_name:
             name_start = table_match.start(1)
@@ -508,14 +376,10 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
 
         return self.optimize_table_definition(stripped, table_name)
 
-    # -- Registered transformer methods (transformer_id keys) ------------- #
-
     def singlestore_strip_foreign_keys(self, stmt: str) -> str:
-        """Remove FOREIGN KEY clauses (SingleStore error 2752)."""
         return strip_foreign_keys(stmt)
 
     def singlestore_reference_table(self, stmt: str) -> str:
-        """Rewrite CREATE TABLE to CREATE REFERENCE TABLE for small dimension tables."""
         table_name = _extract_create_table_name(stmt)
         if table_name is None:
             return stmt
@@ -524,14 +388,11 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
         return stmt
 
     def singlestore_inject_shard_key(self, stmt: str) -> str:
-        """Inject SHARD KEY clause for columnstore tables (skipped for REFERENCE TABLE)."""
         if re.search(r"\bCREATE\s+REFERENCE\s+TABLE\b", stmt, re.IGNORECASE):
             return stmt
         table_name = _extract_create_table_name(stmt)
         if table_name is None:
             return stmt
-        # SingleStore derives an implicit shard key from PRIMARY KEY; adding
-        # an explicit SHARD KEY () would cause error 1706.
         has_primary_key = bool(re.search(r"\bPRIMARY\s+KEY\b", stmt, re.IGNORECASE))
         shard_col = _TPCH_SHARD_KEYS.get(table_name)
         if shard_col and _col_in_stmt(shard_col, stmt):
@@ -551,7 +412,6 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
         return result
 
     def singlestore_inject_sort_key(self, stmt: str) -> str:
-        """Inject SORT KEY clause for columnstore tables (skipped for REFERENCE TABLE)."""
         if re.search(r"\bCREATE\s+REFERENCE\s+TABLE\b", stmt, re.IGNORECASE):
             return stmt
         table_name = _extract_create_table_name(stmt)
@@ -572,36 +432,13 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
             result += f"\n{after}"
         return result
 
-    # ------------------------------------------------------------------ #
-    # DDL generation - columnstore tables with shard keys
-    # ------------------------------------------------------------------ #
-
     def get_shard_key_clause(self, table_name: str) -> str:
-        """Generate SHARD KEY clause for a table.
-
-        Uses well-known join/filter columns for TPC tables.
-        Falls back to an empty shard key (random distribution) for unknowns.
-
-        Args:
-            table_name: Lowercase table name
-
-        Returns:
-            DDL clause string, e.g. ``SHARD KEY (l_orderkey)``
-        """
         shard_col = _TPCH_SHARD_KEYS.get(table_name)
         if shard_col:
             return f"SHARD KEY ({shard_col})"
         return "SHARD KEY ()"
 
     def get_sort_key_clause(self, table_name: str) -> str:
-        """Generate SORT KEY clause for columnstore sort ordering.
-
-        Args:
-            table_name: Lowercase table name
-
-        Returns:
-            DDL clause string, e.g. ``SORT KEY (l_orderkey, l_linenumber)``
-        """
         sort_cols = _TPCH_SORT_KEYS.get(table_name)
         if sort_cols:
             cols_str = ", ".join(sort_cols)
@@ -609,22 +446,9 @@ class SingleStoreAdapter(NoOpTableTuningMixin, MySqlWireLifecycleMixin, BaseDdlO
         return ""
 
     def is_reference_table(self, table_name: str) -> bool:
-        """Return True if this table should be a REFERENCE TABLE.
-
-        Reference tables are fully replicated to every leaf node, which
-        eliminates broadcast joins for small dimension tables like
-        nation and region.
-
-        Args:
-            table_name: Lowercase table name
-
-        Returns:
-            True if the table should be created as a REFERENCE TABLE
-        """
         return table_name in _REFERENCE_TABLES
 
     def validate_platform_capabilities(self, benchmark_type: str):
-        """Validate SingleStore-specific capabilities for the benchmark."""
         errors = []
         warnings = []
 

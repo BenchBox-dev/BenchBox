@@ -1,5 +1,3 @@
-"""Unit tests for the accepted-override display path (explorer badge data)."""
-
 from __future__ import annotations
 
 import copy
@@ -188,7 +186,7 @@ class TestOverrideDuckDBRoundTrip:
             con.close()
 
     def test_full_pipeline_run_publishes_override_columns(self, tmp_path: Path) -> None:
-        """End-to-end: bundle + committed override companion through the public lane."""
+
         data_dir = tmp_path / "data"
         bundles_dir = data_dir / "bundles"
         bundles_dir.mkdir(parents=True)

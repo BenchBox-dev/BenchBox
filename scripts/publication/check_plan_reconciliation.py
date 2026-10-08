@@ -1,11 +1,4 @@
 #!/usr/bin/env python3
-"""Check that publication migration plans cite all controlling surfaces.
-
-The A0-A11 tracker sequence is sourced from the live JSON/Git state branch
-rather than a hard-coded list, so the check cannot silently pass on stale
-expected data. The check fails closed when the authoritative branch cannot be
-reached or its revision changes during the read.
-"""
 
 from __future__ import annotations
 
@@ -34,10 +27,6 @@ REQUIRED_GATES = (
     "G4 ownership",
     "G5 final reconciliation",
 )
-# Expected dependency graph at the freeze decision (source of truth for edge drift).
-# Each key is a tracker item; value is its in-set dependencies. This encodes the
-# exact precedence required by the plan so that removal of any required edge
-# (even when the total order remains topologically valid) is detected.
 EXPECTED_DEPS: dict[str, list[str]] = {
     "independent-publication-a0-baseline-and-freeze": [],
     "independent-publication-a1-authority-and-threat-contract": ["independent-publication-a0-baseline-and-freeze"],
@@ -75,8 +64,6 @@ EXPECTED_DEPS: dict[str, list[str]] = {
         "independent-publication-a10-release-and-mirror-retirement"
     ],
 }
-# Freeze closure deferred A10 retirement onto an independent production deployer.
-# That one external predecessor is pinned here; arbitrary external deps still fail.
 EXPECTED_EXTERNAL_DEPS: dict[str, frozenset[str]] = {
     "independent-publication-a10-release-and-mirror-retirement": frozenset(
         {"independent-production-deployer-and-retirement"}
@@ -95,20 +82,6 @@ def _phase_key(item_id: str, prefix: str) -> tuple[int, str]:
 
 
 def live_tracker_ids(items: list[dict], prefix: str) -> list[str]:
-    """Order non-dropped tracker items matching ``prefix`` by their dependency graph.
-
-    ``todo list`` returns items across all lifecycle states, and its rows carry
-    an optional ``deps`` list. Ordering is read from that dependency graph
-    (a topological order) rather than inferred from the A-phase encoded in the
-    ID, so a renumbering or dependency change that deletes from the names cannot
-    silently reproduce a stale sequence. Dropped items are excluded so the
-    reconciliation cannot pass while a step has been dropped. When no row
-    carries ``deps`` (for example a plain ``list`` payload), ordering falls back
-    to the A-phase key to preserve existing behavior.
-
-    Raises ``ValueError`` if the dependency graph among the selected items
-    contains a cycle.
-    """
     selected: dict[str, dict] = {}
     for item in items:
         item_id = str(item.get("id", ""))
@@ -134,31 +107,6 @@ def live_tracker_ids(items: list[dict], prefix: str) -> list[str]:
 
 
 def dependency_violations(plan_order: list[str], deps: dict[str, list[str]]) -> list[str]:
-    """Return live dependency edges inconsistent with the plan's total order.
-
-    The decision document asserts a total migration order. Every live dependency
-    edge within that set must point strictly earlier in the plan, and (except
-    for the plan's first item) every item must be justified by at least one
-    prior in-set dependency. This detects dependency-edge drift directly -- an
-    added or renumbered edge to a later item, or a removed edge that leaves a
-    chain inconsistent -- rather than inferring order from the A-phase in the
-    ID or a lossy tie-break. A cycle is reported as a backward edge.
-
-    In addition, the live graph is compared against ``EXPECTED_DEPS`` (the
-    freeze-time graph). Removal of any required edge -- even when the item
-    retains another earlier dependency so the total order stays topologically
-    valid (e.g. A8 still depends on A2/A4 after A7 is removed) -- is a
-    violation, as is an unexpected in-set edge. This closes the "last prior
-    edge" gap where only orphan detection would fire.
-
-    Dependencies outside the A0-A11 set are also validated: only edges listed
-    in ``EXPECTED_EXTERNAL_DEPS`` are allowed, and each pinned external
-    predecessor must be present. Arbitrary external deps still fail, because
-    readiness would otherwise require an unplanned predecessor.
-
-    ``deps`` maps each plan item to its live dependency ids (all deps are
-    validated; only in-set edges are checked for order/missing/unexpected).
-    """
     rank = {item_id: i for i, item_id in enumerate(plan_order)}
     order_set = set(plan_order)
     violations: list[str] = []
@@ -190,12 +138,6 @@ def dependency_violations(plan_order: list[str], deps: dict[str, list[str]]) -> 
 
 
 def load_tracker_snapshot(prefix: str | None = None) -> dict | None:
-    """Read the live JSON/Git tracker once and shape it, or ``None`` if unavailable.
-
-    The state branch is cloned at one shallow tip. The scheduled state workflow
-    runs the package validator separately; this check then reads the same
-    validated index atomically instead of issuing one network read per page.
-    """
     try:
         config = json.loads(TRACKER_CONFIG.read_text(encoding="utf-8"))
         remote = config["state_remote"]
@@ -263,11 +205,6 @@ def main() -> int:
         dep_graph: dict[str, list[str]] = snapshot["deps"]
         prefix_ids = [item_id for item_id in states if item_id.startswith(args.todo_prefix)]
 
-        # Retain dropped rows for explicit drift failure. Filtering dropped
-        # before comparison would hide a dropped required phase when the
-        # decision is edited to omit that phase (11 vs 11 would match).
-        # Check against EXPECTED_DEPS and the plan text so the gate fails even
-        # if the plan text was changed to match the filtered live set.
         dropped_required = sorted(
             (
                 item_id
@@ -284,9 +221,6 @@ def main() -> int:
             key=lambda item_id: _phase_key(item_id, args.todo_prefix),
         )
 
-        # Every pinned phase must carry its dependency rows in the same atomic
-        # export snapshot; an absent id means the envelope is incomplete, so
-        # fail closed rather than treating it as having no dependencies.
         live_deps: dict[str, list[str]] | None = {}
         for item_id in live_item_ids:
             if item_id not in dep_graph:
@@ -302,10 +236,6 @@ def main() -> int:
             missing.append("exact ordered A0-A11 tracker sequence (dependency graph unavailable)")
         else:
             expected_sorted = sorted(EXPECTED_DEPS.keys(), key=lambda item_id: _phase_key(item_id, args.todo_prefix))
-            # Require every pinned phase to be present in both sequences.
-            # Without this, both the plan and live could omit a terminal phase
-            # (e.g., A11) and still match (11 vs 11) while the dependency loop
-            # never visits the missing key.
             if tracker_ids != expected_sorted:
                 missing.append("exact ordered A0-A11 tracker sequence (plan missing expected phases)")
             if live_item_ids != expected_sorted:

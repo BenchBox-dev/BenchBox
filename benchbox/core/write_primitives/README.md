@@ -219,19 +219,17 @@ The benchmark reuses TPC-H data through `get_data_source_benchmark() -> "tpch"` 
 ```python
 from benchbox.write_primitives import WritePrimitivesBenchmark
 
-# Initialize and generate data
 bench = WritePrimitivesBenchmark(scale_factor=1.0)
 bench.generate_data()
 
-# Run single operation
 result = bench.execute_operation("insert_single_row", connection)
 
-# Run category
 results = bench.run_category("insert", connection, iterations=3)
 
-# Run full benchmark
 results = bench.run_benchmark(connection, iterations=3)
 ```
+
+The example initializes the benchmark and generates data, runs a single operation, runs the `insert` category, and runs the full benchmark.
 
 ## Performance Metrics
 

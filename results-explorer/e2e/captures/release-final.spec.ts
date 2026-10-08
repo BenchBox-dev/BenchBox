@@ -1,16 +1,3 @@
-/**
- * Final release-gate capture for `results-explorer-retheme-release-gate` w3.
- *
- * Records 390/768/1280/1600 screenshots for every route in the QA matrix
- * after the full retheme is on develop. Skipped by default; opt in with
- * `RETHEME_CAPTURE=1` to refresh artifacts under
- * `_project/audits/screenshots/results-explorer-retheme-final-<date>/`.
- *
- * Console messages and non-2xx network responses are captured to a
- * sibling `console-network-<date>.log` so the readiness report has
- * concrete evidence (w2 cold-load checks).
- */
-
 import { execFileSync } from "child_process";
 import { mkdirSync, appendFileSync, writeFileSync } from "fs";
 import path from "path";

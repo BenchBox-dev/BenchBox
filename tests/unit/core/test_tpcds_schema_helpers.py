@@ -11,9 +11,9 @@ pytestmark = [
 def test_column_get_sql_type_handles_sizes_and_defaults():
     assert Column("c1", DataType.VARCHAR, size=10).get_sql_type() == "VARCHAR(10)"
     assert Column("c2", DataType.CHAR, size=3).get_sql_type() == "CHAR(3)"
-    # DECIMAL uses default (15,2) from enum value
+
     assert Column("c3", DataType.DECIMAL).get_sql_type() == "DECIMAL(15,2)"
-    # INTEGER without size
+
     assert Column("c4", DataType.INTEGER).get_sql_type() == "INTEGER"
 
 
@@ -36,7 +36,7 @@ def test_table_primary_and_foreign_key_helpers():
 def test_create_table_sql_with_constraints():
     t = make_sample_table()
     sql = t.get_create_table_sql(enable_primary_keys=True, enable_foreign_keys=True)
-    # ID is not nullable and is PK; NAME is nullable; REF is not nullable and has FK
+
     assert "CREATE TABLE T1" in sql
     assert "ID INTEGER NOT NULL" in sql
     assert "NAME VARCHAR(20)" in sql and "NOT NULL" not in sql.split("NAME VARCHAR(20)")[-1][:10]

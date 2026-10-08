@@ -1,5 +1,3 @@
-"""Check Q17 through Spark and LakeSail's inherited PySpark expression client."""
-
 from __future__ import annotations
 
 import os
@@ -19,7 +17,6 @@ def spark_session():
     pytest.importorskip("pyspark", reason="Q17 Spark execution requires PySpark")
     from benchbox.platforms.pyspark import ensure_compatible_java, is_java_compatible
 
-    # Java discovery can change JAVA_HOME; own that change for this fixture.
     with pytest.MonkeyPatch.context() as settings:
         settings.setenv("JAVA_HOME", os.environ.get("JAVA_HOME", ""))
         settings.setenv("PYSPARK_PYTHON", sys.executable)
@@ -51,13 +48,11 @@ def spark_adapter(spark_session, platform):
     from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
 
     adapter = PySparkDataFrameAdapter() if platform == "pyspark" else LakeSailDataFrameAdapter()
-    # LakeSail shares this expression client. This exercises its adapter contract,
-    # using an owned local Spark session rather than claiming Sail server coverage.
+
     adapter._spark = spark_session
     try:
         yield adapter
     finally:
-        # The module fixture owns the session; LakeSail.close() would stop it.
         adapter._spark = None
 
 

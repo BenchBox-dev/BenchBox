@@ -1,5 +1,3 @@
-"""Coverage-focused tests for PlatformAdapter database management helpers."""
-
 from __future__ import annotations
 
 import logging
@@ -22,8 +20,6 @@ pytestmark = [
 
 
 class _TrackingAdapter(PlatformAdapter):
-    """Minimal concrete adapter for exercising base helper logic."""
-
     def __init__(self, **config: Any):
         super().__init__(**config)
         self._database_path = config.get("database_path")
@@ -31,7 +27,7 @@ class _TrackingAdapter(PlatformAdapter):
         self.drop_calls: list[dict[str, Any]] = []
 
     @staticmethod
-    def add_cli_arguments(parser) -> None:  # pragma: no cover - shim
+    def add_cli_arguments(parser) -> None:  # pragma: no cover
         return None
 
     @classmethod
@@ -95,8 +91,6 @@ def test_validate_tuning_configuration_for_platform_delegates_to_effective_confi
         validate_for_platform=lambda platform_name: [f"{platform_name} mismatch"]
     )
 
-    # Validation lookups receive the canonical platform type key (normalized
-    # platform_name fallback here), never the display string.
     assert adapter.validate_tuning_configuration_for_platform() == ["trackingplatform mismatch"]
 
 
@@ -412,8 +406,6 @@ def test_display_query_plan_if_enabled_swallows_plan_errors(adapter):
 
 
 class TestAdapterPlanCaptureGaps:
-    """Coverage-focused tests for capture_query_plan failure branches."""
-
     def test_capture_query_plan_disabled(self, adapter):
         adapter.capture_plans = False
         plan, timing = adapter.capture_query_plan(Mock(), "SELECT 1", "Q1")
@@ -428,8 +420,6 @@ class TestAdapterPlanCaptureGaps:
         assert timing == 0.0
 
     def test_capture_query_plan_query_filter(self, adapter):
-        """plan_query_filter (query selection) still gates capture; ids not in the
-        set are skipped. The per-iteration sampling machinery has been retired."""
         adapter.capture_plans = True
         adapter.plan_query_filter = {"Q1"}
 
@@ -440,10 +430,8 @@ class TestAdapterPlanCaptureGaps:
 
         with patch.object(adapter, "get_query_plan", return_value="PLAN"):
             with patch.object(adapter, "get_query_plan_parser", return_value=mock_parser):
-                # Selected query is captured.
                 plan, _ = adapter.capture_query_plan(Mock(), "SELECT 1", "Q1")
                 assert plan == mock_plan
-                # Non-selected query is filtered out.
                 plan2, timing2 = adapter.capture_query_plan(Mock(), "SELECT 1", "Q2")
                 assert plan2 is None
                 assert timing2 == 0.0
@@ -532,7 +520,7 @@ class TestAdapterPlanCaptureGaps:
         adapter.get_query_plan = Mock(return_value="SOME PLAN")
         mock_parser = Mock()
         mock_plan = Mock()
-        mock_plan.estimate_serialized_size.return_value = 200 * 1024  # 200 KB, above 100 KB threshold
+        mock_plan.estimate_serialized_size.return_value = 200 * 1024
         mock_parser.parse_explain_output.return_value = mock_plan
         adapter.get_query_plan_parser = Mock(return_value=mock_parser)
 
@@ -541,7 +529,6 @@ class TestAdapterPlanCaptureGaps:
 
         assert plan == mock_plan
         assert "Large query plan" in caplog.text
-        # No dangling "external plan storage" advice (that feature does not exist).
         assert "external plan storage" not in caplog.text
 
     def test_plan_max_depth_defaults_and_is_configurable(self):
@@ -562,16 +549,11 @@ class TestAdapterPlanCaptureGaps:
 
         adapter.capture_query_plan(Mock(), "SELECT 1", "Q1")
 
-        # The configured plan_max_depth is threaded into the size estimate.
         mock_plan.estimate_serialized_size.assert_called_once_with(max_depth=7)
 
 
 class TestAdapterValidationGaps:
-    """Coverage-focused tests for tuning and row-count validation helpers."""
-
     def test_validate_tuning_metadata_exception(self, adapter):
-        # _validate_database_tunings calls create_connection as a fallback when
-        # _create_direct_connection is not defined (as in _TrackingAdapter).
         adapter.create_connection = Mock(side_effect=RuntimeError("conn boom"))
 
         result = adapter._validate_database_tunings(database="test")
@@ -695,15 +677,12 @@ class TestAdapterValidationGaps:
 
 
 class TestAdapterSchemaGaps:
-    """Coverage-focused tests for schema creation failure branches."""
-
     def test_execute_schema_statements_partial_failure(self, adapter, caplog):
         adapter.logger = logging.getLogger("tests.base_adapter")
         adapter.log_verbose = Mock()
         adapter.log_very_verbose = Mock()
 
         cursor = Mock()
-        # First succeeds, second fails
         cursor.execute.side_effect = [None, RuntimeError("schema boom")]
 
         statements = [
@@ -715,7 +694,6 @@ class TestAdapterSchemaGaps:
             with pytest.raises(RuntimeError, match="Failed to create 1 table"):
                 adapter._execute_schema_statements(statements, cursor)
 
-        # These assertions run after the exception is caught by pytest.raises
         assert "Failed to create table t2" in caplog.text
         adapter.log_verbose.assert_called_with("Schema creation: 1 tables created, 1 failed")
 
@@ -730,8 +708,6 @@ class TestAdapterSchemaGaps:
 
 
 class TestAdapterConnectionGaps:
-    """Coverage-focused tests for PlatformAdapterConnection and Cursor."""
-
     def test_adapter_connection_maintenance_mode(self, adapter):
         from benchbox.platforms.base.adapter import PlatformAdapterConnection
 
@@ -739,11 +715,9 @@ class TestAdapterConnectionGaps:
         conn = PlatformAdapterConnection(mock_conn, adapter)
         conn._maintenance_mode = True
 
-        # Without parameters
         conn.execute("SELECT 1")
         mock_conn.execute.assert_called_with("SELECT 1")
 
-        # With parameters
         conn.execute("SELECT ?", (1,))
         mock_conn.execute.assert_called_with("SELECT ?", (1,))
 
@@ -753,7 +727,6 @@ class TestAdapterConnectionGaps:
         mock_conn = Mock()
         conn = PlatformAdapterConnection(mock_conn, adapter)
 
-        # Parameterized queries in validation mode go through directly
         conn.execute("SELECT ?", (1,))
         mock_conn.execute.assert_called_with("SELECT ?", (1,))
 
@@ -763,7 +736,6 @@ class TestAdapterConnectionGaps:
         mock_conn = Mock()
         conn = PlatformAdapterConnection(mock_conn, adapter)
 
-        # Mock open to fail so the debug log path raises
         def boom(*args, **kwargs):
             raise RuntimeError("io boom")
 
@@ -771,14 +743,12 @@ class TestAdapterConnectionGaps:
 
         adapter.execute_query = Mock(return_value={"rows": []})
 
-        # File I/O error must be swallowed - query must still execute
         conn.execute("SELECT 1")
         adapter.execute_query.assert_called_once()
 
     def test_adapter_cursor_extract_rows_first_row(self):
         from benchbox.platforms.base.adapter import PlatformAdapterCursor
 
-        # First row pattern
         res = {"first_row": (1, "a")}
         cursor = PlatformAdapterCursor(res)
         assert cursor.fetchall() == [(1, "a")]
@@ -787,7 +757,6 @@ class TestAdapterConnectionGaps:
     def test_adapter_cursor_extract_rows_row_count_only(self):
         from benchbox.platforms.base.adapter import PlatformAdapterCursor
 
-        # Row count pattern
         res = {"rows_returned": 2}
         cursor = PlatformAdapterCursor(res)
         assert cursor.fetchall() == [(None,), (None,)]
@@ -809,10 +778,7 @@ class TestAdapterConnectionGaps:
 
 
 class TestAdapterSummarizePerformance:
-    """Coverage for _summarize_performance_characteristics edge-case branches."""
-
     def test_empty_results_returns_zeroed_summary(self, adapter):
-        # Exercises line 589: early return when query_results is falsy
         summary = adapter._summarize_performance_characteristics([], 1.0, 0)
         assert summary["total_queries"] == 0
         assert summary["successful_queries"] == 0
@@ -823,33 +789,27 @@ class TestAdapterSummarizePerformance:
         assert summary["total_queries"] == 0
 
     def test_duration_field_fallback(self, adapter):
-        # Exercises line 609: fallback to "duration" when "execution_time_seconds" is absent
         results = [{"status": "SUCCESS", "duration": 1.5, "rows_returned": 5}]
         summary = adapter._summarize_performance_characteristics(results, 2.0, 0)
         assert summary["successful_queries"] == 1
         assert summary["average_success_query_time_ms"] is not None
 
     def test_non_convertible_rows_returned_defaults_to_zero(self, adapter):
-        # Exercises lines 702-703: except branch when rows_returned cannot be cast to int
         results = [{"status": "SUCCESS", "execution_time_seconds": 0.5, "rows_returned": "bad"}]
         summary = adapter._summarize_performance_characteristics(results, 1.0, 0)
         assert summary["rows_returned_total"] == 0
 
     def test_null_rows_returned_defaults_to_zero(self, adapter):
-        # Exercises line 705: else branch when rows_returned is None
         results = [{"status": "SUCCESS", "execution_time_seconds": 0.5, "rows_returned": None}]
         summary = adapter._summarize_performance_characteristics(results, 1.0, 0)
         assert summary["rows_returned_total"] == 0
 
     def test_non_dict_result_uses_attribute_extraction(self, adapter):
-        # Exercises line 596: _extract fallback returns default for non-dict, non-attr objects
         class BareResult:
             status = "SUCCESS"
 
         results = [BareResult()]
         summary = adapter._summarize_performance_characteristics(results, 1.0, 0)
-        # BareResult has no execution_time_seconds or rows_returned attributes -
-        # _extract returns None/default for those, so counts are computed but timing is None
         assert summary["total_queries"] == 1
         assert summary["average_query_time_ms"] is None
 
@@ -874,12 +834,6 @@ def test_remove_database_drops_when_in_place_reset_declines(adapter):
 
 
 class TestOncePerRunExistingDatabaseDecision:
-    """handle_existing_database decides reuse/recreate once per run.
-
-    Later connections (metadata, introspection, statistics helpers) must not
-    re-validate the unfinished database and drop it mid-run.
-    """
-
     def _invalid_adapter(self):
         adapter = _TrackingAdapter(server_exists=True)
         adapter._validate_database_compatibility = Mock(

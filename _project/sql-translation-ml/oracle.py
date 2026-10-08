@@ -1,5 +1,3 @@
-"""Strict local execution oracle; never imported by the supported package."""
-
 from __future__ import annotations
 
 import datetime as dt
@@ -23,7 +21,6 @@ SETTINGS = {"timezone": "UTC", "collation": "BINARY", "numeric_tolerance": 0}
 
 
 def safe_query(sql: str, dialect: str, schema: dict | None = None) -> exp.Expression:
-    """Restrict generated candidates to read-only expressions over fixture tables."""
     statements = sqlglot.parse(sql, read=dialect)
     if len(statements) != 1 or not isinstance(statements[0], (exp.Select, exp.SetOperation)):
         raise ValueError("expected exactly one SELECT query")
@@ -58,7 +55,6 @@ def safe_query(sql: str, dialect: str, schema: dict | None = None) -> exp.Expres
 
 
 def fixture_rows(seed: int) -> dict[str, list[tuple[Any, ...]]]:
-    """Five independently seeded witnesses, with targeted edge rows in every nonempty table."""
     rng = random.Random(seed)
     rows = [
         (1, 0, None, None, "1999-12-31"),

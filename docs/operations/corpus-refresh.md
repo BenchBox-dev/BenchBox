@@ -37,8 +37,9 @@ promotes them into `develop`'s curated release-preview corpus.
 
 ```bash
 gh workflow run seed-corpus.yml
-# optional: -f benchmark=tpch
 ```
+
+To seed one benchmark only, add `-f benchmark=tpch`, replacing `tpch` with the benchmark name.
 
 After the develop PR merges, confirm the mirror draft against
 `published-results` and merge it. `corpus-drift-check.yml` remains the

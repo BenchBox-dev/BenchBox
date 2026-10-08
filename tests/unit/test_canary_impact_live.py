@@ -1,10 +1,3 @@
-"""Live-tree tests for the canary-impact selector (medium tier).
-
-These tests collect the real canary suite and build the full dependency
-map (~30s); they live in their own module so this file carries a single
-top-level speed marker per the marker-strategy contract.
-"""
-
 from __future__ import annotations
 
 import subprocess
@@ -31,8 +24,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.medium]
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-# Full-tree collection and dependency mapping can exceed the default 60s
-# timeout when the medium suite runs with five workers.
 @pytest.mark.timeout(180)
 class TestLiveTree:
     @pytest.fixture(scope="class")
@@ -55,16 +46,6 @@ class TestLiveTree:
         return node_ids, dep_map
 
     def test_every_collected_file_has_a_per_file_edge(self, live_canary: tuple[list[str], dict[str, FileDeps]]) -> None:
-        """Each non-dynamic file has a dep beyond the shared conftest/plugin set.
-
-        The shared set is added to every entry unconditionally, so asserting
-        non-empty deps would pass vacuously; only a per-file edge proves the
-        analyzer resolved something file-specific. A file whose own analysis
-        yields no repo edge at all is fixture-only: everything it observes
-        flows through the shared fixtures, so it needs no per-file edge.
-        Dynamic files are skipped: they are always selected by the per-test
-        dynamic rule.
-        """
         _, dep_map = live_canary
         root = REPO_ROOT.resolve()
         shared, shared_fallback, _ = _build_shared_deps(root, {})
@@ -99,7 +80,6 @@ class TestLiveTree:
     def test_known_regressions_are_selected(
         self, live_canary: tuple[list[str], dict[str, FileDeps]], commit: str, test_file: str
     ) -> None:
-        """Replay each known-regression commit's changed paths: the failing test must be selected."""
         node_ids, dep_map = live_canary
         changed = subprocess.check_output(
             ["git", "-C", str(REPO_ROOT), "diff", "--name-only", f"{commit}^", commit],

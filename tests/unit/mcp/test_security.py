@@ -1,5 +1,3 @@
-"""Unit coverage for remote MCP security policy and durable coordination."""
-
 from __future__ import annotations
 
 import json
@@ -154,8 +152,6 @@ def test_concurrent_activity_during_store_startup_is_preserved(monkeypatch, tmp_
     first = DurableSecurityStore(tmp_path / "state.sqlite3", AdmissionLimits())
     ticket_id = first._enqueue("principal-a")
 
-    # A later monotonic timestamp in the shared database is ordinary activity,
-    # not evidence of an OS restart.
     monkeypatch.setattr(security, "mono_time", lambda: 1.0)
     DurableSecurityStore(tmp_path / "state.sqlite3", AdmissionLimits())
 
@@ -193,16 +189,14 @@ def test_lost_admission_lease_cancels_running_request(tmp_path: Path) -> None:
 
     async def exercise() -> None:
         store = LostLeaseStore()
-        middleware = RemoteSecurityMiddleware(config, store)  # type: ignore[arg-type]
+        middleware = RemoteSecurityMiddleware(config, store)
         principal = Principal("a" * 32, "client", "issuer", "a", frozenset({"benchbox:read"}))
 
         async def call_next(_ctx: object) -> object:
             await anyio.sleep_forever()
 
         with pytest.raises(MCPError, match="lease was lost"):
-            await middleware._call_admitted(  # type: ignore[arg-type]
-                principal, "tools/list", object(), call_next
-            )
+            await middleware._call_admitted(principal, "tools/list", object(), call_next)
         assert store.released
 
     anyio.run(exercise)

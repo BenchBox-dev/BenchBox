@@ -1,15 +1,7 @@
-"""Pin the SingleStore credential-persistence contract.
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
-Persist-on-failure is deliberate retry UX shared with athena/redshift/
-snowflake: a failed validation still saves the entered credentials to the
-0600-permission store, marked INVALID, so ``--validate-only`` can be re-run
-without re-entering every field. These tests pin that decision; a change to
-it must update the module docstring contract too.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -19,6 +11,7 @@ from benchbox.platforms.credentials import singlestore as ss
 from benchbox.security.credentials import CredentialManager, CredentialStatus
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
+_REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def _run_setup(tmp_path, validation_result):
@@ -50,5 +43,7 @@ class TestSingleStorePersistence:
         assert reloaded.get_platform_credentials("singlestore")["host"] == "db.example.com"
         assert reloaded.get_credential_status("singlestore") == CredentialStatus.VALID
 
-    def test_singlestore_persistence_contract_is_documented(self):
-        assert "even when validation" in (ss.__doc__ or ""), "the persistence contract must stay documented"
+    def test_singlestore_failure_retry_contract_is_in_platform_guide(self):
+        guide = (_REPO_ROOT / "docs" / "platforms" / "singlestore.md").read_text(encoding="utf-8")
+        assert "even when validation fails" in guide
+        assert "benchbox setup --platform singlestore --validate-only" in guide

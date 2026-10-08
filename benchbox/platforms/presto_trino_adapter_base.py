@@ -1,5 +1,3 @@
-"""Shared adapter behavior for Presto-family SQL engines."""
-
 from __future__ import annotations
 
 import ipaddress
@@ -24,8 +22,6 @@ from .base import PlatformAdapter
 
 
 class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTableMixin, PlatformAdapter):
-    """Common implementation for PrestoDB and Trino adapters."""
-
     platform_key = ""
     platform_log_name = ""
     local_start_hint = ""
@@ -60,9 +56,9 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
     default_display_name = ""
     default_driver_package = ""
     platform_config_fields: tuple[str, ...] = ()
-    common_platform_config_fields = tuple(  # noqa: SIM905
+    common_platform_config_fields = tuple(
         "host port catalog username password http_scheme verify_ssl ssl_cert_path "  # noqa: SIM905
-        "session_properties query_timeout table_format staging_root schema".split()  # noqa: SIM905
+        "session_properties query_timeout table_format staging_root schema".split()
     )
     supported_tuning_type_names: tuple[str, ...] = ()
     qualify_analyze_table = False
@@ -93,7 +89,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
 
     @classmethod
     def add_cli_arguments(cls, parser) -> None:
-        """Add Presto-family CLI arguments."""
         group = parser.add_argument_group(f"{cls.platform_log_name} Arguments")
         group.add_argument(
             "--host", type=str, default="localhost", help=f"{cls.platform_log_name} coordinator hostname"
@@ -116,7 +111,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create a Presto-family adapter from unified configuration."""
         from benchbox.platforms.base.config_utils import build_adapter_config
 
         return cls(
@@ -129,12 +123,10 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         )
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect."""
         return self.target_dialect
 
     @classmethod
     def build_platform_config(cls, platform: str, options: dict[str, Any], overrides: dict[str, Any], info: Any) -> Any:
-        """Build platform hook configuration."""
         from benchbox.platforms.base.config_utils import build_platform_config
 
         return build_platform_config(
@@ -149,12 +141,10 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         )
 
     def _client_library_version(self) -> str | None:
-        """Return the concrete Python driver version when available."""
         module = getattr(sys.modules.get(self.__module__), self.driver_module_attr, None)
         return getattr(module, "__version__", None) if module else None
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get platform information for a Presto-family engine."""
         configuration: dict[str, Any] = {
             "catalog": self.catalog,
             "schema": self.schema,
@@ -231,23 +221,19 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         return platform_info
 
     def _connect_with_params(self, params: dict[str, Any]) -> Any:
-        """Connect using the concrete adapter's Python driver."""
         raise NotImplementedError
 
     def _catalog_listing_params(self) -> dict[str, Any]:
-        """Return connection params suitable for SHOW CATALOGS."""
         params = self._bootstrap_connection_params()
         params["schema"] = "information_schema"
         return params
 
     def _bootstrap_connection_params(self) -> dict[str, Any]:
-        """Return params for metadata/setup calls before the final query session."""
         params = self._get_connection_params()
         params.pop("session_properties", None)
         return params
 
     def _get_available_catalogs(self) -> list[str]:
-        """Get list of available catalogs from the server."""
         try:
             conn = self._connect_with_params(self._catalog_listing_params())
             cursor = conn.cursor()
@@ -262,7 +248,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             return []
 
     def _auto_select_catalog(self) -> str | None:
-        """Auto-select best catalog for benchmarking when none specified."""
         available = self._get_available_catalogs()
         if not available:
             return None
@@ -277,7 +262,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         return usable_catalogs[0]
 
     def _validate_catalog_exists(self, catalog: str | None) -> str:
-        """Validate catalog exists, or auto-select one if not specified."""
         validated_catalog, auto_selected = validate_catalog_exists(
             catalog,
             platform_name=self.platform_log_name,
@@ -290,7 +274,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         return validated_catalog
 
     def check_server_database_exists(self, **connection_config) -> bool:
-        """Check if schema exists in the configured catalog."""
         try:
             catalog = connection_config.get("catalog", self.catalog)
             schema = connection_config.get("schema", self.schema)
@@ -331,13 +314,11 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             return False
 
     def _validate_identifier(self, identifier: str) -> bool:
-        """Validate SQL identifier to prevent injection attacks."""
         if not identifier:
             return False
         return bool(re.match(r"^[a-zA-Z_][a-zA-Z0-9_-]*$", identifier)) and len(identifier) <= 128
 
     def _save_auto_selected_catalog(self) -> None:
-        """Save auto-selected catalog to credentials for future runs."""
         try:
             from benchbox.security.credentials import CredentialManager
 
@@ -356,7 +337,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             self.logger.debug(f"Could not save credentials: {e}")
 
     def _is_local_host(self, host: str | None) -> bool:
-        """Return True if the configured host points to the local machine."""
         if not host:
             return False
         normalized = host.strip().lower()
@@ -393,7 +373,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         )
 
     def create_connection(self, **connection_config) -> Any:
-        """Create optimized Presto-family connection."""
         self.log_operation_start(f"{self.platform_log_name} connection")
         self.handle_existing_database(**connection_config)
 
@@ -454,21 +433,11 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             self.logger.error(f"Failed to connect to {self.platform_log_name}: {e}")
             raise
 
-    # DDL optimizer hooks for the shared _optimize_table_definition below.
-    # Memory-like catalogs get WITH properties and NOT NULL stripped; formats
-    # in ddl_format_property_formats gain WITH (format = 'PARQUET').
     ddl_memory_table_formats: tuple[str, ...] = ("memory",)
     ddl_memory_catalog_names: tuple[str, ...] = ()
     ddl_format_property_formats: tuple[str, ...] = ("hive",)
 
     def _optimize_table_definition(self, statement: str) -> str:
-        """Optimize a CREATE TABLE definition for the connector/catalog in use.
-
-        Shared Presto/Trino flow: benchmark DDL carries PRIMARY KEY metadata
-        the engines reject, so it is stripped for every catalog; memory-like
-        catalogs additionally lose WITH properties and NOT NULL constraints;
-        Hive-like catalogs gain an explicit format declaration.
-        """
         from benchbox.platforms.base.ddl_helpers import strip_primary_keys, strip_with_properties
 
         if not statement.upper().startswith("CREATE TABLE"):
@@ -486,7 +455,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         return statement
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using optimized table definitions."""
         from benchbox.platforms.presto_trino_utils import execute_schema_statements
 
         start_time = mono_time()
@@ -503,7 +471,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         return elapsed_seconds(start_time)
 
     def _resolve_data_files(self, benchmark: Any, data_dir: Path) -> dict[str, Any]:
-        """Resolve benchmark data files from benchmark tables or manifest."""
         return resolve_adapter_data_source(self, benchmark, data_dir).tables
 
     def _load_table_data(
@@ -516,7 +483,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         benchmark: Any | None = None,
         data_source: Any | None = None,
     ) -> tuple[int, int] | None:
-        """Load one table and return (rows_loaded, valid_file_count)."""
         from benchbox.platforms.base.data_loading import resolve_csv_dialect
 
         valid_files = normalize_existing_files(file_paths)
@@ -533,10 +499,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         chunk_info = f" from {len(valid_files)} file(s)" if len(valid_files) > 1 else ""
         self.log_verbose(f"Loading data for table: {table_name}{chunk_info}")
 
-        # Resolve the CSV dialect through the shared pipeline (manifest
-        # metadata, then benchmark attributes, then extension fallback) so a
-        # converted dataset whose suffix contradicts its declared dialect
-        # still loads with the right delimiter.
         dialect = None
         if data_source is not None and benchmark is not None:
             dialect = resolve_csv_dialect(data_source, table_name, valid_files[0], benchmark).delimiter
@@ -551,7 +513,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data using INSERT statements."""
         start_time = mono_time()
         table_stats = {}
         cursor = connection.cursor()
@@ -607,7 +568,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         return table_stats, total_time, None
 
     def _log_memory_limit_guidance(self, error_str: str) -> None:
-        """Log one-time guidance for memory-limit errors."""
         error_text = error_str.lower()
         if not any(marker.lower() in error_text for marker in self.memory_error_markers) or hasattr(
             self, "_memory_error_logged"
@@ -626,7 +586,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         )
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply Presto-family session optimizations based on benchmark type."""
         cursor = connection.cursor()
         try:
             if benchmark_type.lower() not in {"olap", "analytics", "tpch", "tpcds"}:
@@ -641,7 +600,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             cursor.close()
 
     def supports_tuning_type(self, tuning_type: Any) -> bool:
-        """Check whether this engine supports a unified tuning type."""
         try:
             from benchbox.core.tuning.interface import TuningType
 
@@ -650,12 +608,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             return False
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE on a table when supported by the selected catalog.
-
-        Raises on failure (does not swallow) so the opt-in statistics phase's
-        gather_statistics() -> run_statistics_phase() caller can detect and
-        record a real failure as status=FAILED.
-        """
         if self.table_format == "memory":
             self.logger.debug(f"ANALYZE not supported for memory catalog - skipping {table_name}")
             return
@@ -676,31 +628,19 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             cursor.close()
 
     def _extract_table_name(self, statement: str) -> str | None:
-        """Extract table name from CREATE TABLE statement."""
         from benchbox.core.sql_utils import extract_table_name
 
         return extract_table_name(statement)
 
     def _normalize_table_name_in_sql(self, sql: str) -> str:
-        """Normalize table names in SQL to lowercase."""
         return normalize_table_name_in_sql(sql)
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get the query execution plan as ``EXPLAIN (FORMAT JSON)``.
-
-        The structured JSON form is required by PrestoTrinoQueryPlanParser.
-        """
         from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
 
         return get_query_plan_from_cursor(connection, query, explain_prefix="EXPLAIN (FORMAT JSON)", logger=self.logger)
 
     def get_query_plan_parser(self):
-        """Return the Presto/Trino parser (inherited by Presto and Starburst).
-
-        Thread the concrete ``platform_key`` (presto / trino / starburst) into the
-        parser so the captured ``QueryPlanDAG.platform`` records the real engine
-        rather than the generic ``presto_trino`` family name.
-        """
         from benchbox.core.query_plans.parsers.presto_trino import PrestoTrinoQueryPlanParser
 
         return PrestoTrinoQueryPlanParser(platform_name=self.platform_key or "presto_trino")
@@ -715,11 +655,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute the query and capture its plan on success when enabled."""
-        # Plan capture routes through the shared chokepoint: for phase-eligible
-        # engines (the default) it records the executed query for the isolated
-        # post-measurement phase instead of running EXPLAIN inline; otherwise it
-        # captures inline. SUCCESS-guarded inside the chokepoint.
         return self.execute_query_with_plan_capture(
             super().execute_query,
             connection=connection,
@@ -732,7 +667,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
         )
 
     def close_connection(self, connection: Any) -> None:
-        """Close connection."""
         try:
             if connection and hasattr(connection, "close"):
                 connection.close()
@@ -740,7 +674,6 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             self.logger.warning(f"Error closing connection: {e}")
 
     def test_connection(self) -> bool:
-        """Test connection to the coordinator."""
         try:
             params = self._bootstrap_connection_params()
             params["schema"] = "information_schema"
@@ -758,18 +691,15 @@ class PrestoTrinoAdapterBase(CursorValidationQueryExecutionMixin, HiveExternalTa
             return False
 
     def apply_unified_tuning(self, unified_config: Any, connection: Any) -> None:
-        """Apply unified tuning configuration."""
         from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
         apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: Any, connection: Any) -> None:
-        """Apply platform optimizations."""
         if platform_config:
             self.logger.info(f"{self.platform_log_name} platform optimizations applied via session properties")
 
     def apply_constraint_configuration(self, primary_key_config: Any, foreign_key_config: Any, connection: Any) -> None:
-        """Apply informational constraint configuration."""
         if primary_key_config and primary_key_config.enabled:
             self.logger.info(
                 f"Primary key constraints enabled for {self.platform_log_name} (informational only, not enforced)"

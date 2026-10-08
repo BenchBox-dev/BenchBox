@@ -1,9 +1,3 @@
-"""Validate Results Explorer DuckDB eligibility invariants.
-
-This script is intentionally independent of the build pipeline so release
-gates can run it against any generated ``results.duckdb`` snapshot.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -37,6 +31,7 @@ REQUIRED_COLUMNS: dict[str, set[str]] = {
         "comparison_exclusion_reason",
         "ranking_exclusion_reason",
         "power_score",
+        "throughput_at_size",
         "display_geomean_ms",
     },
     "cohort_metadata": {
@@ -73,9 +68,6 @@ REQUIRED_COLUMNS: dict[str, set[str]] = {
     },
 }
 
-# These are the same required non-empty scans used by the browser during
-# snapshot initialisation. Keeping the list here makes an empty or partially
-# populated candidate fail before it can replace the last known-good output.
 REQUIRED_NONEMPTY_SCANS: tuple[tuple[str, str], ...] = (
     ("results", "SELECT COUNT(*) FROM results"),
     ("platform_index_rows", "SELECT COUNT(*) FROM platform_index_rows"),
@@ -83,6 +75,14 @@ REQUIRED_NONEMPTY_SCANS: tuple[tuple[str, str], ...] = (
     ("benchmark_matrix_cells", "SELECT COUNT(*) FROM benchmark_matrix_cells"),
     ("result_detail_metrics", "SELECT COUNT(*) FROM result_detail_metrics"),
     ("result_basis_availability", "SELECT COUNT(*) FROM result_basis_availability"),
+)
+
+
+CLI_DESCRIPTION = (
+    "Validate Results Explorer DuckDB eligibility invariants.\n"
+    "\n"
+    "This script is intentionally independent of the build pipeline so release\n"
+    "gates can run it against any generated ``results.duckdb`` snapshot.\n"
 )
 
 
@@ -175,10 +175,12 @@ def check_snapshot(db_path: Path) -> list[str]:
                     ranking_exclusion_reason IS NOT NULL
                     OR CASE
                         WHEN primary_metric = 'power_score' THEN power_score
+                        WHEN primary_metric = 'throughput_at_size' THEN throughput_at_size
                         ELSE display_geomean_ms
                       END IS NULL
                     OR CASE
                         WHEN primary_metric = 'power_score' THEN power_score
+                        WHEN primary_metric = 'throughput_at_size' THEN throughput_at_size
                         ELSE display_geomean_ms
                       END <= 0
                   )
@@ -360,7 +362,7 @@ def check_snapshot(db_path: Path) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("duckdb_path", type=Path)
     args = parser.parse_args(argv)
 

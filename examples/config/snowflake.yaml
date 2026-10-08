@@ -8,10 +8,10 @@ connection:
   username: "${SNOWFLAKE_USER}"
   password: "${SNOWFLAKE_PASSWORD}"
   extra_params:
-    role: "ACCOUNTADMIN"  # Optional
+    role: "ACCOUNTADMIN"
 settings:
   warehouse_size: "MEDIUM"
-  auto_suspend: 300  # seconds
+  auto_suspend: 300
   auto_resume: true
   multi_cluster_warehouse: false
   query_tag: "BenchBox"

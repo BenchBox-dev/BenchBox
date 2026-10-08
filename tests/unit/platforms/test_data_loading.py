@@ -1,9 +1,3 @@
-"""Tests for DataSource.table_metadata plumbing through DataSourceResolver.
-
-Covers the W1 decision gate: table_metadata round-trips from a manifest with
-populated metadata, and backwards-compat with no manifest (table_metadata={}).
-"""
-
 from __future__ import annotations
 
 import json
@@ -25,26 +19,18 @@ from benchbox.platforms.sqlite import SQLiteAdapter
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 class _FakeBenchmark:
-    """Minimal benchmark stub with no tables attribute."""
+    pass
 
 
 @dataclass
 class _BenchmarkWithTables:
-    """Benchmark stub that exposes tables (bypasses ManifestFileSource)."""
-
     tables: dict
 
 
 @dataclass
 class _AdapterStub:
-    """Adapter state consumed by resolve_adapter_data_source."""
-
     platform_name: str = "Test Platform"
     table_mode: str = "external"
     platform_config: dict | None = None
@@ -52,7 +38,7 @@ class _AdapterStub:
 
 
 def _write_manifest(directory: Path, tables_metadata: dict) -> None:
-    """Write a v2 manifest with per-table metadata into *directory*."""
+
     tables_section = {}
     for table_name, meta in tables_metadata.items():
         tables_section[table_name] = {
@@ -79,18 +65,13 @@ def _write_manifest(directory: Path, tables_metadata: dict) -> None:
         "tables": tables_section,
     }
     (directory / "_datagen_manifest.json").write_text(json.dumps(manifest))
-    # Create stub files so resolve() finds them
+
     for table_name in tables_metadata:
         (directory / f"{table_name}.csv").write_text("")
 
 
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-
 def test_table_metadata_roundtrips_through_resolver(tmp_path: Path) -> None:
-    """table_metadata from a manifest with populated metadata round-trips."""
+
     meta = {
         "csv_has_header": True,
         "csv_delimiter": ",",
@@ -113,8 +94,7 @@ def test_table_metadata_roundtrips_through_resolver(tmp_path: Path) -> None:
 
 
 def test_table_metadata_empty_when_no_manifest(tmp_path: Path) -> None:
-    """When no manifest exists, table_metadata defaults to {} (backwards compat)."""
-    # Create a benchmark with tables but no manifest file in tmp_path
+
     stub_file = tmp_path / "customer.csv"
     stub_file.write_text("")
     benchmark = _BenchmarkWithTables(tables={"customer": stub_file})
@@ -123,18 +103,18 @@ def test_table_metadata_empty_when_no_manifest(tmp_path: Path) -> None:
     source = resolver.resolve(benchmark, tmp_path)
 
     assert source is not None
-    # No manifest → table_metadata must be empty dict, never None
+
     assert source.table_metadata == {}
 
 
 def test_datasource_table_metadata_defaults_to_empty_dict() -> None:
-    """DataSource.table_metadata defaults to {} without requiring explicit arg."""
+
     ds = DataSource(source_type="benchmark_tables", tables={"t": [Path("/x")]})
     assert ds.table_metadata == {}
 
 
 def test_resolve_adapter_data_source_uses_standard_adapter_state(monkeypatch, tmp_path: Path) -> None:
-    """Shared adapter resolver delegates with the standard platform attributes."""
+
     calls = {}
     data_source = DataSource(source_type="benchmark_tables", tables={"t": [tmp_path / "t.tbl"]})
 
@@ -163,7 +143,7 @@ def test_resolve_adapter_data_source_uses_standard_adapter_state(monkeypatch, tm
 
 
 def test_table_metadata_present_when_manifest_wins(tmp_path: Path) -> None:
-    """ManifestFileSource (v2) populates table_metadata when it wins the chain."""
+
     meta = {"csv_has_header": False, "csv_normalize_booleans": True}
     _write_manifest(tmp_path, {"orders": meta})
 
@@ -176,17 +156,11 @@ def test_table_metadata_present_when_manifest_wins(tmp_path: Path) -> None:
 
 
 def test_table_metadata_injected_when_benchmark_tables_wins(tmp_path: Path) -> None:
-    """When BenchmarkTablesSource wins, table_metadata is still injected from the manifest.
 
-    This is the critical path for w5+: the adapter's benchmark has a .tables
-    attribute (so BenchmarkTablesSource wins), but the manifest carries CSV dialect
-    metadata that DataSourceResolver must inject via read_table_metadata_hints().
-    """
     meta = {"csv_has_header": True, "csv_delimiter": ","}
-    # Write manifest with metadata
+
     _write_manifest(tmp_path, {"customer": meta})
 
-    # Benchmark has .tables pointing to the same file — BenchmarkTablesSource wins
     stub_file = tmp_path / "customer.csv"
     benchmark = _BenchmarkWithTables(tables={"customer": stub_file})
 
@@ -199,7 +173,7 @@ def test_table_metadata_injected_when_benchmark_tables_wins(tmp_path: Path) -> N
 
 
 def test_clickhouse_native_handler_uses_csv_with_names_for_headered_csv(tmp_path: Path) -> None:
-    """Manifest header metadata should select ClickHouse's header-aware CSV reader."""
+
     connection = _FakeClickHouseConnection()
     handler = ClickHouseNativeHandler(",", adapter=object(), benchmark=object(), has_header=True)
 
@@ -211,7 +185,7 @@ def test_clickhouse_native_handler_uses_csv_with_names_for_headered_csv(tmp_path
 
 
 def test_parquet_handler_streams_record_batches(monkeypatch, tmp_path: Path) -> None:
-    """Generic Parquet loading must not materialize the complete source table."""
+
     pa = pytest.importorskip("pyarrow")
     import pyarrow.parquet as pq
 
@@ -248,8 +222,6 @@ def test_parquet_handler_streams_record_batches(monkeypatch, tmp_path: Path) -> 
 
 
 class _FailingParquetBatchConnection:
-    """SQLite connection proxy that fails before inserting a selected batch."""
-
     def __init__(self, connection, failing_batch: int = 2) -> None:
         self._connection = connection
         self._failing_batch = failing_batch
@@ -273,7 +245,7 @@ def _write_batched_parquet(path: Path) -> None:
 
 
 def test_parquet_handler_rolls_back_prior_batches_when_insert_fails(tmp_path: Path) -> None:
-    """A later batch failure must not leave the file partially loaded."""
+
     source = tmp_path / "events.parquet"
     _write_batched_parquet(source)
     raw_connection = SQLiteAdapter(database_path=":memory:").create_connection()
@@ -284,8 +256,6 @@ def test_parquet_handler_rolls_back_prior_batches_when_insert_fails(tmp_path: Pa
         with pytest.raises(RuntimeError, match="simulated Parquet batch insert failure"):
             ParquetFileHandler().load_table("events", source, connection, object(), logging.getLogger(__name__))
 
-        # This is the same commit DataLoader performs after handling a load
-        # exception; the savepoint must make it safe for the table to commit.
         connection.commit()
         assert connection.execute("SELECT COUNT(*) FROM events").fetchone()[0] == 0
     finally:
@@ -293,7 +263,7 @@ def test_parquet_handler_rolls_back_prior_batches_when_insert_fails(tmp_path: Pa
 
 
 def test_parquet_handler_rolls_back_prior_batches_when_read_fails(monkeypatch, tmp_path: Path) -> None:
-    """A later Parquet read failure must not leave the file partially loaded."""
+
     pytest.importorskip("pyarrow")
     import pyarrow.parquet as pq
 

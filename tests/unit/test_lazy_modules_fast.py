@@ -1,5 +1,3 @@
-"""Fast coverage for lazy exports and lightweight helper modules."""
-
 from __future__ import annotations
 
 import builtins

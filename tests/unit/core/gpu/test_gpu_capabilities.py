@@ -1,9 +1,6 @@
-"""Tests for GPU detection and capabilities.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -28,26 +25,18 @@ pytestmark = [
 
 
 class TestGPUVendor:
-    """Tests for GPUVendor enum."""
-
     def test_nvidia_value(self):
-        """Should have nvidia value."""
         assert GPUVendor.NVIDIA.value == "nvidia"
 
     def test_amd_value(self):
-        """Should have amd value."""
         assert GPUVendor.AMD.value == "amd"
 
     def test_unknown_value(self):
-        """Should have unknown value."""
         assert GPUVendor.UNKNOWN.value == "unknown"
 
 
 class TestGPUDevice:
-    """Tests for GPUDevice dataclass."""
-
     def test_basic_creation(self):
-        """Should create GPU device."""
         device = GPUDevice(
             index=0,
             name="NVIDIA A100",
@@ -60,7 +49,6 @@ class TestGPUDevice:
         assert device.memory_total_mb == 40960
 
     def test_with_all_fields(self):
-        """Should create device with all fields."""
         device = GPUDevice(
             index=0,
             name="NVIDIA RTX 4090",
@@ -82,7 +70,6 @@ class TestGPUDevice:
         assert device.temperature_celsius == 45.0
 
     def test_to_dict(self):
-        """Should convert to dictionary."""
         device = GPUDevice(
             index=0,
             name="Test GPU",
@@ -99,17 +86,13 @@ class TestGPUDevice:
 
 
 class TestGPUInfo:
-    """Tests for GPUInfo dataclass."""
-
     def test_default_creation(self):
-        """Should create with defaults."""
         info = GPUInfo()
         assert info.available is False
         assert info.device_count == 0
         assert info.devices == []
 
     def test_with_devices(self):
-        """Should create with devices."""
         device = GPUDevice(
             index=0,
             name="Test GPU",
@@ -129,7 +112,6 @@ class TestGPUInfo:
         assert len(info.devices) == 1
 
     def test_total_memory_mb(self):
-        """Should calculate total memory."""
         devices = [
             GPUDevice(index=0, name="GPU0", vendor=GPUVendor.NVIDIA, memory_total_mb=16000, memory_free_mb=12000),
             GPUDevice(index=1, name="GPU1", vendor=GPUVendor.NVIDIA, memory_total_mb=16000, memory_free_mb=14000),
@@ -139,7 +121,6 @@ class TestGPUInfo:
         assert info.total_free_memory_mb == 26000
 
     def test_to_dict(self):
-        """Should convert to dictionary."""
         info = GPUInfo(
             available=True,
             device_count=1,
@@ -157,10 +138,7 @@ class TestGPUInfo:
 
 
 class TestGPUCapabilities:
-    """Tests for GPUCapabilities dataclass."""
-
     def test_basic_creation(self):
-        """Should create capabilities."""
         info = GPUInfo()
         caps = GPUCapabilities(info=info)
         assert caps.info == info
@@ -168,7 +146,6 @@ class TestGPUCapabilities:
         assert caps.supports_tensor_cores is False
 
     def test_to_dict(self):
-        """Should convert to dictionary."""
         info = GPUInfo(available=True)
         caps = GPUCapabilities(
             info=info,
@@ -184,11 +161,8 @@ class TestGPUCapabilities:
 
 
 class TestDetectNvidiaSmi:
-    """Tests for nvidia-smi detection."""
-
     @patch("subprocess.run")
     def test_nvidia_smi_success(self, mock_run):
-        """Should parse nvidia-smi output."""
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout="0, NVIDIA A100, 40960, 38000, 8.0, 535.54.03, 45, 150, 25, 4, 16\n",
@@ -200,14 +174,12 @@ class TestDetectNvidiaSmi:
 
     @patch("subprocess.run")
     def test_nvidia_smi_not_found(self, mock_run):
-        """Should handle nvidia-smi not found."""
         mock_run.side_effect = FileNotFoundError()
         devices = _detect_nvidia_smi()
         assert devices == []
 
     @patch("subprocess.run")
     def test_nvidia_smi_timeout(self, mock_run):
-        """Should handle nvidia-smi timeout."""
         import subprocess
 
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="nvidia-smi", timeout=10)
@@ -216,11 +188,8 @@ class TestDetectNvidiaSmi:
 
 
 class TestDetectCudaToolkit:
-    """Tests for CUDA toolkit detection."""
-
     @patch("subprocess.run")
     def test_nvcc_success(self, mock_run):
-        """Should detect CUDA via nvcc."""
         mock_run.return_value = MagicMock(
             returncode=0,
             stdout="nvcc: NVIDIA (R) Cuda compiler driver\nCuda compilation tools, release 12.1, V12.1.66",
@@ -231,34 +200,23 @@ class TestDetectCudaToolkit:
 
     @patch("subprocess.run")
     def test_nvcc_not_found(self, mock_run):
-        """Should handle nvcc not found."""
         mock_run.side_effect = FileNotFoundError()
         available, version = _detect_cuda_toolkit()
-        # Will check CUDA_HOME env variable
 
 
 class TestDetectRapids:
-    """Tests for RAPIDS detection."""
-
     def test_rapids_not_available(self):
-        """Should detect RAPIDS not available when not installed."""
-        # This test works on systems without RAPIDS
         available, version, libraries = _detect_rapids()
-        # Result depends on whether RAPIDS is installed
-        # Just verify it doesn't error
         assert isinstance(available, bool)
         assert isinstance(version, str)
         assert isinstance(libraries, dict)
 
 
 class TestDetectGPU:
-    """Tests for main GPU detection function."""
-
     @patch("benchbox.experimental.gpu.capabilities._detect_nvidia_smi")
     @patch("benchbox.experimental.gpu.capabilities._detect_cuda_toolkit")
     @patch("benchbox.experimental.gpu.capabilities._detect_rapids")
     def test_detect_with_nvidia(self, mock_rapids, mock_cuda, mock_nvidia):
-        """Should detect NVIDIA GPU."""
         mock_nvidia.return_value = [
             {
                 "index": 0,
@@ -288,7 +246,6 @@ class TestDetectGPU:
     @patch("benchbox.experimental.gpu.capabilities._detect_cuda_toolkit")
     @patch("benchbox.experimental.gpu.capabilities._detect_rapids")
     def test_detect_no_gpu(self, mock_rapids, mock_cuda, mock_nvidia):
-        """Should handle no GPU available."""
         mock_nvidia.return_value = []
         mock_cuda.return_value = (False, "")
         mock_rapids.return_value = (False, "", {})
@@ -299,11 +256,8 @@ class TestDetectGPU:
 
 
 class TestGetGPUCapabilities:
-    """Tests for get_gpu_capabilities function."""
-
     @patch("benchbox.experimental.gpu.capabilities.detect_gpu")
     def test_capabilities_with_ampere(self, mock_detect):
-        """Should detect Ampere capabilities."""
         mock_detect.return_value = GPUInfo(
             available=True,
             device_count=1,
@@ -326,7 +280,6 @@ class TestGetGPUCapabilities:
 
     @patch("benchbox.experimental.gpu.capabilities.detect_gpu")
     def test_capabilities_no_gpu(self, mock_detect):
-        """Should handle no GPU."""
         mock_detect.return_value = GPUInfo(available=False)
 
         caps = get_gpu_capabilities()

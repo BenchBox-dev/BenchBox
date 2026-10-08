@@ -1,18 +1,5 @@
-"""Unit tests for benchbox/platforms/questdb_rewriter.py.
-
-Covers the comma-JOIN AST rewriter (w8 foundation) with fixtures for:
-- 2-table basic case
-- Passthrough (no comma join)
-- Unaliased tables (no table qualifier → no rewrite)
-- Filter + join predicate separation
-- Multi-table comma JOINs (3+ tables)
-- Mixed explicit + implicit JOINs
-- Subqueries containing comma JOINs (recursive)
-- INTERVAL, SUBSTRING, CTE stubs (no-ops until w10)
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file for details.
 
 from __future__ import annotations
 
@@ -31,11 +18,6 @@ pytestmark = [
 ]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# _has_comma_join heuristic
-# ──────────────────────────────────────────────────────────────────────────────
-
-
 class TestHasCommaJoin:
     def test_detects_simple_comma_join(self):
         assert _has_comma_join("SELECT * FROM a, b WHERE a.x = b.x")
@@ -44,22 +26,11 @@ class TestHasCommaJoin:
         assert _has_comma_join("SELECT * FROM lineitem l, orders o WHERE l.x = o.x")
 
     def test_ignores_commas_in_string_literals(self):
-        # The literal 'a,b' should not trigger false detection
-        # (heuristic only - false positives OK, but not false negatives)
         sql = "SELECT 'hello, world' FROM x WHERE x.id = 1"
-        # This is a heuristic - may return True; we just verify it doesn't crash
-        _has_comma_join(sql)  # no assertion; just no exception
+        _has_comma_join(sql)
 
     def test_no_match_for_explicit_join(self):
-        # An explicit JOIN should not trigger the comma heuristic
-        # heuristic may still match due to 'AS l J' - that is acceptable
-        # We rely on the AST pass to filter correctly
         _has_comma_join("SELECT * FROM lineitem AS l JOIN orders AS o ON l.id = o.id")
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Passthrough - queries without comma JOINs are returned unchanged
-# ──────────────────────────────────────────────────────────────────────────────
 
 
 class TestPassthrough:
@@ -78,43 +49,32 @@ class TestPassthrough:
         assert once == twice
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# 2-table comma JOIN (w8 foundation)
-# ──────────────────────────────────────────────────────────────────────────────
-
-
 class TestTwoTableCommaJoin:
     def test_basic_aliased(self):
         sql = "SELECT l.x, o.y FROM lineitem l, orders o WHERE l.l_orderkey = o.o_orderkey AND l.quantity > 10"
         result = rewrite(sql)
-        # Comma join promoted to explicit JOIN
         assert "JOIN" in result.upper()
         assert ", orders" not in result and ", lineitem" not in result
-        # ON clause carries the join predicate
         assert "l.l_orderkey = o.o_orderkey" in result or "ON" in result.upper()
-        # Filter stays in WHERE
         assert "WHERE" in result.upper()
 
     def test_filter_separated_from_join_predicate(self):
         sql = "SELECT a.x, b.y FROM a, b WHERE a.x = b.x AND a.z > 1"
         result = rewrite(sql)
         assert "JOIN" in result.upper()
-        # Filter predicate remains in WHERE
         assert "a.z > 1" in result or "WHERE" in result.upper()
 
     def test_join_predicate_removed_from_where(self):
         sql = "SELECT a.x, b.y FROM a, b WHERE a.x = b.x AND a.z > 1"
         result = rewrite(sql)
-        # a.x = b.x should be in the ON clause, not duplicated in WHERE
         on_idx = result.upper().index("ON")
         where_idx = result.upper().index("WHERE") if "WHERE" in result.upper() else len(result)
-        assert on_idx < where_idx  # ON comes before WHERE
+        assert on_idx < where_idx
 
     def test_only_join_predicate_no_filter(self):
         sql = "SELECT a.x FROM a, b WHERE a.id = b.id"
         result = rewrite(sql)
         assert "JOIN" in result.upper()
-        # No remaining WHERE clause needed
         assert "WHERE" not in result.upper()
 
     def test_result_is_valid_sql(self):
@@ -122,7 +82,6 @@ class TestTwoTableCommaJoin:
 
         sql = "SELECT l.x, o.y FROM lineitem l, orders o WHERE l.l_orderkey = o.o_orderkey"
         result = rewrite(sql)
-        # Must parse without error
         sqlglot.parse_one(result, dialect="postgres")
 
     def test_predicateless_comma_join_becomes_cross_join(self):
@@ -130,11 +89,6 @@ class TestTwoTableCommaJoin:
         result = rewrite(sql)
         assert "," not in result.partition("FROM")[2]
         assert "CROSS JOIN" in result.upper()
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Multi-table comma JOINs (w9 cases)
-# ──────────────────────────────────────────────────────────────────────────────
 
 
 class TestMultiTableCommaJoin:
@@ -162,10 +116,8 @@ class TestMultiTableCommaJoin:
         sqlglot.parse_one(result, dialect="postgres")
 
     def test_mixed_explicit_and_implicit_join(self):
-        """Explicit JOIN stays explicit; comma JOIN gets promoted."""
         sql = "SELECT a.x, b.y, c.z FROM a JOIN b ON a.bid = b.id, c WHERE b.cid = c.id AND a.val > 5"
         result = rewrite(sql)
-        # c should be promoted to explicit JOIN - check FROM/JOIN clause, not SELECT list
         from_idx = result.upper().index("FROM")
         from_clause = result[from_idx:]
         assert ", c " not in from_clause and not from_clause.upper().startswith("FROM a,")
@@ -178,20 +130,13 @@ class TestMultiTableCommaJoin:
         assert "a.val > 5" in result
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Subqueries with comma JOINs
-# ──────────────────────────────────────────────────────────────────────────────
-
-
 class TestSubqueryCommaJoin:
     def test_subquery_comma_join_rewritten(self):
         sql = "SELECT t.x FROM t WHERE t.id IN (SELECT a.id FROM a, b WHERE a.bid = b.id)"
         result = rewrite(sql)
-        # Inner comma join should be rewritten
         assert ", b" not in result
 
     def test_exists_subquery_comma_join_rewritten(self):
-        """Comma-JOIN inside an EXISTS predicate is rewritten (Q10-style)."""
         sql = (
             "SELECT t.x FROM t WHERE EXISTS("
             "SELECT * FROM store_sales, date_dim "
@@ -212,19 +157,12 @@ class TestSubqueryCommaJoin:
             "  )"
         )
         result = rewrite(sql)
-        # Both outer and inner comma joins should be promoted
         assert ", supplier" not in result
         assert ", s2" not in result or "JOIN" in result.upper()
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# CTE comma-JOIN patterns (TPC-DS uses CTEs throughout)
-# ──────────────────────────────────────────────────────────────────────────────
-
-
 class TestCteCommaJoin:
     def test_comma_join_inside_cte_body(self):
-        """Comma-JOIN inside a CTE body is rewritten (TPC-DS uses CTEs throughout)."""
         sql = (
             "WITH ctr AS ("
             "  SELECT sr_customer_sk, SUM(sr_return_amt) AS ctr_total_return"
@@ -240,7 +178,6 @@ class TestCteCommaJoin:
         assert "sr_returned_date_sk = d_date_sk" in result or "ON" in result.upper()
 
     def test_multiple_ctes_each_rewritten(self):
-        """Multiple CTEs with comma-JOINs - all are rewritten."""
         sql = (
             "WITH cte1 AS ("
             "  SELECT a.x FROM t1 a, t2 b WHERE a.id = b.id"
@@ -255,16 +192,10 @@ class TestCteCommaJoin:
         assert "t3 c, t4 d" not in result
 
     def test_cte_and_outer_query_both_rewritten(self):
-        """Comma-JOIN in CTE body and outer query - both are rewritten."""
         sql = "WITH cte AS (  SELECT a.x FROM t1 a, t2 b WHERE a.id = b.id) SELECT c.x FROM cte c, t3 e WHERE c.x = e.x"
         result = rewrite(sql)
         assert "t1 a, t2 b" not in result
         assert "cte c, t3 e" not in result
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# TPC-H representative patterns
-# ──────────────────────────────────────────────────────────────────────────────
 
 
 class TestTpchPatterns:
@@ -298,16 +229,10 @@ class TestTpchPatterns:
             "GROUP BY n.n_name ORDER BY revenue DESC"
         )
         result = rewrite(sql)
-        # All comma joins should be promoted
         assert ", orders" not in result
         assert ", lineitem" not in result
         assert ", supplier" not in result
         assert ", nation" not in result
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Rule 2 - INTERVAL arithmetic → dateadd()
-# ──────────────────────────────────────────────────────────────────────────────
 
 
 class TestIntervalRewrite:
@@ -340,16 +265,10 @@ class TestIntervalRewrite:
         assert rewrite(sql) == sql
 
     def test_tpch_q1_pattern(self):
-        # TPC-H Q1: CAST('1998-12-01' AS DATE) - INTERVAL '90' DAY
         sql = "SELECT l_returnflag FROM lineitem WHERE l_shipdate <= CAST('1998-12-01' AS DATE) - INTERVAL '90' DAY"
         result = rewrite(sql)
         assert "INTERVAL" not in result.upper()
         assert "dateadd(" in result
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Rule 3 - SUBSTRING FROM/FOR → substring(str, pos, len)
-# ──────────────────────────────────────────────────────────────────────────────
 
 
 class TestSubstringRewrite:
@@ -367,17 +286,12 @@ class TestSubstringRewrite:
     def test_tpch_q22_pattern(self):
         sql = "SELECT SUBSTRING(c_phone FROM 1 FOR 2) AS cntrycode FROM customer WHERE SUBSTRING(c_phone FROM 1 FOR 2) IN ('13', '17')"
         result = rewrite(sql)
-        assert " FROM " not in result or "FROM customer" in result  # FROM/FOR syntax gone
+        assert " FROM " not in result or "FROM customer" in result
         assert result.count("substring(c_phone, 1, 2)") == 2
 
     def test_no_substring_unchanged(self):
         sql = "SELECT c_name FROM customer"
         assert rewrite(sql) == sql
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Rule 4 - CTE column list removal
-# ──────────────────────────────────────────────────────────────────────────────
 
 
 class TestCteColumnListRewrite:
@@ -396,11 +310,6 @@ class TestCteColumnListRewrite:
         result = rewrite(sql)
         assert "(supplier_no, total_revenue)" not in result
         assert "WITH revenue0 AS (" in result
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Internal helpers
-# ──────────────────────────────────────────────────────────────────────────────
 
 
 class TestInternalHelpers:

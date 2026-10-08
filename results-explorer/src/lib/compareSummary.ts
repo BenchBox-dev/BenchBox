@@ -5,19 +5,16 @@ import {
   compareEvidenceSummary,
   isComparable,
   isValidTimingValue,
+  primaryMetricHigherIsBetter,
+  primaryMetricLabel as labelForPrimaryMetric,
   primaryMetricValue,
   timingValueForQuery,
   validDisplayTimingValues,
+  type PrimaryMetric,
 } from "@/lib/displayEligibility";
 
-export type ComparePrimaryMetric = "power_score" | "display_geomean_ms";
+export type ComparePrimaryMetric = PrimaryMetric;
 
-/**
- * Below this absolute distance from 1.0, two runs are treated as a tie
- * for headline purposes. Picked so a ratio that rounds to "1.00x" via
- * `formatRatio` (two decimals) is always inside the threshold; this is
- * how the audit's same-platform-1.00x reproduction case is closed.
- */
 export const COMPARE_TIE_THRESHOLD = 0.005;
 
 export interface CompareResultMetric {
@@ -50,13 +47,10 @@ export interface CompareCostSummary {
   winnerIsBestCostPerformance: boolean;
 }
 
-/** One selected result whose validation status is not a clean pass. */
 export interface CompareValidationCaveat {
   resultId: string;
   platform: string;
-  /** Raw validation status, e.g. "not_run". */
   status: string;
-  /** Reader-facing label from the shared vocabulary, e.g. "no validation". */
   label: string;
 }
 
@@ -67,40 +61,23 @@ export interface CompareDecisionSummary {
   claimSuppressed: boolean;
   claimSuppressionReason: string | null;
   winner: CompareResultMetric | null;
-  /** Cohort-aware label for the winner (run identity when same-platform). */
   winnerLabel: string | null;
   comparison: CompareResultMetric | null;
   comparisonRatio: number | null;
   comparisonLabel: string;
-  /** True when comparisonRatio is within COMPARE_TIE_THRESHOLD of 1.0. */
   isTie: boolean;
   headline: string;
   queryRecord: WinnerQueryRecord;
   percentiles: ComparePercentiles[];
   cost: CompareCostSummary | null;
-  /**
-   * Selected results whose validation status is present but not a clean pass
-   * (e.g. `not_run`, `failed`, `uncertain`). A result with no recorded status
-   * at all is not included here - this flags an explicit non-clean status,
-   * not an absent one. Non-empty even when `claimSuppressed` is true, so the
-   * UI can still explain *why* a suppressed comparison is untrustworthy.
-   */
   nonCleanValidation: CompareValidationCaveat[];
-  /** Prose caveat built from `nonCleanValidation`, or null when it is empty. */
   validationCaveat: string | null;
-  /** Hardware boundary that must travel with any leading-run claim. */
   comparisonBoundary: string | null;
 }
 
 interface CompareDecisionSummaryOptions {
   suppressWinnerClaims?: boolean;
   suppressionReason?: string;
-  /**
-   * Optional per-result-id labels. When the cohort contains multiple runs
-   * of the same platform, callers pass cohort-aware run identities here so
-   * the headline names the specific run instead of just the platform.
-   * Falls back to `metric.platform` when a label is missing.
-   */
   runLabels?: Record<string, string>;
   comparisonBoundary?: string;
 }
@@ -110,8 +87,8 @@ export function buildCompareDecisionSummary(
   primaryMetric: ComparePrimaryMetric,
   options: CompareDecisionSummaryOptions = {},
 ): CompareDecisionSummary {
-  const higherIsBetter = primaryMetric === "power_score";
-  const primaryMetricLabel = higherIsBetter ? "Power score" : "Geomean query time";
+  const higherIsBetter = primaryMetricHigherIsBetter(primaryMetric);
+  const primaryMetricLabel = labelForPrimaryMetric(primaryMetric);
   const evidence = compareEvidenceSummary(results);
   const suppressWinnerClaims = options.suppressWinnerClaims === true || !evidence.comparable;
   const suppressionReason = options.suppressionReason ?? evidence.reason ?? null;
@@ -132,8 +109,6 @@ export function buildCompareDecisionSummary(
   const winner = suppressWinnerClaims ? null : metricWinner;
   const comparison = sortedMetrics.length > 1 ? sortedMetrics[sortedMetrics.length - 1]! : null;
   const comparisonRatio = winner && comparison ? metricRatio(winner.value, comparison.value, higherIsBetter) : null;
-  // Say what the ratio means, not what it is measured against: "1.29x" beside
-  // "the lowest selected score" leaves the reader to work out the direction.
   const comparisonLabel = higherIsBetter
     ? "better than the lowest selected run"
     : "faster than the slowest selected run";
@@ -171,13 +146,6 @@ export function buildCompareDecisionSummary(
   };
 }
 
-/**
- * Selected results whose validation status is present but not a clean pass.
- * This is the fix for the "headline claims a winner off an unvalidated
- * result" gap: a result missing a status entirely is not flagged (many
- * fixtures/legacy bundles simply never recorded one), but an explicit
- * non-clean status - `not_run` included - always is.
- */
 function buildNonCleanValidation(results: DetailResult[]): CompareValidationCaveat[] {
   const caveats: CompareValidationCaveat[] = [];
   for (const result of results) {
@@ -218,9 +186,6 @@ function buildHeadline(
   }
   if (!winner) return `The selected runs do not have enough primary-metric data for a comparison.${boundarySuffix}`;
   const winnerLabel = options.runLabels?.[winner.resultId] ?? winner.platform;
-  // A reader who reads only this headline must not come away believing the
-  // comparison rests on validated data when it does not - so the caveat rides
-  // along with the leading-run claim itself, not just the receipt below the fold.
   const caveatSuffix = `${validationCaveat ? ` ${validationCaveat}` : ""}${boundarySuffix}`;
   if (comparisonRatio === null) return `${winnerLabel} leads on the selected primary metric.${caveatSuffix}`;
   if (Math.abs(comparisonRatio - 1) < COMPARE_TIE_THRESHOLD) {
@@ -228,6 +193,9 @@ function buildHeadline(
   }
   if (primaryMetric === "power_score") {
     return `In these selected runs, ${winnerLabel}'s power score was ${formatRatio(comparisonRatio)} better than the lowest selected run.${caveatSuffix}`;
+  }
+  if (primaryMetric === "throughput_at_size") {
+    return `In these selected runs, ${winnerLabel}'s Throughput@Size was ${formatRatio(comparisonRatio)} better than the lowest selected run.${caveatSuffix}`;
   }
   return `In these selected runs, ${winnerLabel}'s geomean query time was ${formatRatio(comparisonRatio)} faster than the slowest selected run.${caveatSuffix}`;
 }
@@ -341,7 +309,7 @@ function buildCostSummary(
     resultId: entry.resultId,
     cost: entry.cost,
     costPerformance:
-      primaryMetric === "power_score"
+      primaryMetricHigherIsBetter(primaryMetric)
         ? entry.primaryValue / entry.cost
         : 1 / (entry.primaryValue * entry.cost),
   }));

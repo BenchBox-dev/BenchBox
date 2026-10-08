@@ -1,5 +1,3 @@
-"""Coverage tests for cuDF DataFrame adapter."""
-
 from __future__ import annotations
 
 import importlib
@@ -103,7 +101,7 @@ def test_configure_gpu_success_and_failure(monkeypatch):
         raise RuntimeError("no gpu")
 
     monkeypatch.setitem(sys.modules, "rmm", SimpleNamespace(reinitialize=lambda **_k: _boom()))
-    adapter._configure_gpu()  # no raise
+    adapter._configure_gpu()
 
 
 def test_read_csv_handles_tpc_trailing_column(monkeypatch, tmp_path):
@@ -117,7 +115,7 @@ def test_read_csv_handles_tpc_trailing_column(monkeypatch, tmp_path):
 
     monkeypatch.setattr(mod, "cudf", SimpleNamespace(read_csv=_read_csv))
     monkeypatch.setattr(mod, "has_trailing_delimiter", lambda _p, _d, _n: True)
-    # null_marker="" signals TPC-style data (resolver-backed gate replaces is_tpc_format).
+
     out = adapter.read_csv(tmp_path / "x.tbl", delimiter="|", header=None, names=["a", "b"], null_marker="")
     assert TRAILING_DUMMY_COLUMN not in out.columns
     assert calls["kwargs"]["names"] == ["a", "b", TRAILING_DUMMY_COLUMN]

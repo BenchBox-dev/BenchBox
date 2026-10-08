@@ -1,12 +1,6 @@
-"""Tests for Databricks SQL generation branches - coverage extension.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets: catalog.schema.table naming in DDL, TBLPROPERTIES injection,
-_build_ctas_sort_sql variants, vacuum_table SQL, get_target_dialect.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, Mock, patch
 
@@ -25,7 +19,7 @@ def databricks_deps():
 
 
 def _make_adapter(**kwargs):
-    """Create a DatabricksAdapter without real credentials."""
+
     with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
         from benchbox.platforms.databricks.adapter import DatabricksAdapter
 
@@ -85,7 +79,7 @@ class TestDatabricksBuildCtasSortSql:
 class TestDatabricksTblpropertiesInjection:
     def test_adds_tblproperties_when_missing(self):
         adapter = _make_adapter(delta_auto_optimize=True)
-        # Simulate a CREATE TABLE statement without TBLPROPERTIES
+
         stmt = "CREATE TABLE main.benchbox.lineitem (l_orderkey BIGINT) USING DELTA"
         result = adapter._convert_to_delta_table(stmt)
         assert "TBLPROPERTIES" in result
@@ -107,7 +101,7 @@ class TestDatabricksTblpropertiesInjection:
         adapter = _make_adapter(delta_auto_optimize=False)
         stmt = "CREATE TABLE t (id INT) USING DELTA"
         result = adapter._convert_to_delta_table(stmt)
-        # With auto_optimize off, TBLPROPERTIES is added but empty
+
         assert "TBLPROPERTIES ()" in result
         assert "autoOptimize" not in result
 
@@ -189,7 +183,7 @@ class TestDatabricksHudiSupport:
         assert "delta.autoOptimize" not in result
 
     def test_hudi_ddl_omits_keys_missing_from_table(self):
-        """A global Hudi key must not leak into tables lacking the column."""
+
         adapter = _make_hudi_adapter()
         result = adapter._convert_to_delta_table("CREATE TABLE main.benchbox.region (r_regionkey BIGINT)")
         assert "USING HUDI" in result

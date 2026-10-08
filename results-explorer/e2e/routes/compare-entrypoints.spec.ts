@@ -22,9 +22,6 @@ test.describe("compare entrypoint happy paths", () => {
     await page.goto("/results/tpch/");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
-    // The heading renders from the shell, so it can be visible while the
-    // keyed row query has answered with zero rows. Wait on a row itself
-    // before interacting with it.
     await waitForDataElement(page, page.getByTestId(`list-${DUCKDB.id}`));
 
     await checkRow(page.getByTestId(`list-${DUCKDB.id}`));
@@ -59,8 +56,6 @@ test.describe("compare entrypoint happy paths", () => {
     await waitForDataLoaded(page, /matching run/);
 
     await facetCheckbox(page, "Benchmark", "TPC-H").check();
-    // The curated August corpus seeds 17 TPC-H bundles (five-platform power
-    // cohort plus tuned, partial, community, cloud, and honesty variants).
     await expect(page.getByTestId("query-result-summary")).toContainText("17 matching runs");
     await expect(page.getByRole("button", { name: /Download CSV/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Download JSON/ })).toBeVisible();

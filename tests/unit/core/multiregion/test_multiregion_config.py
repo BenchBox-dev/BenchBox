@@ -1,9 +1,6 @@
-"""Tests for multi-region configuration module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -25,21 +22,16 @@ pytestmark = [
 
 
 class TestRegion:
-    """Tests for Region dataclass."""
-
     def test_basic_creation(self, us_east_region):
-        """Should create region with basic attributes."""
         assert us_east_region.name == "US East"
         assert us_east_region.code == "us-east-1"
         assert us_east_region.provider == CloudProvider.AWS
 
     def test_with_coordinates(self, us_east_region):
-        """Should store latitude and longitude."""
         assert us_east_region.latitude == 38.9
         assert us_east_region.longitude == -77.0
 
     def test_without_coordinates(self):
-        """Should allow missing coordinates."""
         region = Region(
             name="Test",
             code="test-1",
@@ -49,7 +41,6 @@ class TestRegion:
         assert region.longitude is None
 
     def test_hash_and_equality(self, us_east_region):
-        """Should be hashable and comparable."""
         same_region = Region(
             name="Different Name",
             code="us-east-1",
@@ -59,25 +50,19 @@ class TestRegion:
         assert hash(us_east_region) == hash(same_region)
 
     def test_inequality(self, us_east_region, eu_west_region):
-        """Should detect different regions."""
         assert us_east_region != eu_west_region
 
 
 class TestRegionConfig:
-    """Tests for RegionConfig dataclass."""
-
     def test_basic_creation(self, us_east_config, us_east_region):
-        """Should create config with region and endpoint."""
         assert us_east_config.region == us_east_region
         assert us_east_config.endpoint == "us-east.example.com"
         assert us_east_config.port == 5432
 
     def test_connection_string(self, us_east_config):
-        """Should generate connection string."""
         assert us_east_config.connection_string == "us-east.example.com:5432"
 
     def test_custom_port(self, us_east_region):
-        """Should accept custom port."""
         config = RegionConfig(
             region=us_east_region,
             endpoint="test.example.com",
@@ -86,7 +71,6 @@ class TestRegionConfig:
         assert config.connection_string == "test.example.com:3306"
 
     def test_connection_params(self, us_east_region):
-        """Should store connection params."""
         config = RegionConfig(
             region=us_east_region,
             endpoint="test.example.com",
@@ -96,35 +80,26 @@ class TestRegionConfig:
 
 
 class TestMultiRegionConfig:
-    """Tests for MultiRegionConfig dataclass."""
-
     def test_basic_creation(self, multi_region_config, us_east_config, eu_west_config):
-        """Should create multi-region config."""
         assert multi_region_config.primary_region == us_east_config
         assert len(multi_region_config.secondary_regions) == 1
 
     def test_all_regions(self, multi_region_config):
-        """Should return all regions."""
         all_regions = multi_region_config.all_regions
         assert len(all_regions) == 2
 
     def test_get_region_by_code(self, multi_region_config):
-        """Should find region by code."""
         region = multi_region_config.get_region_by_code("us-east-1")
         assert region is not None
         assert region.region.code == "us-east-1"
 
     def test_get_region_not_found(self, multi_region_config):
-        """Should return None for unknown code."""
         region = multi_region_config.get_region_by_code("unknown-region")
         assert region is None
 
 
 class TestCloudProvider:
-    """Tests for CloudProvider enum."""
-
     def test_all_providers(self):
-        """Should have expected providers."""
         providers = list(CloudProvider)
         assert CloudProvider.AWS in providers
         assert CloudProvider.GCP in providers
@@ -132,83 +107,64 @@ class TestCloudProvider:
         assert CloudProvider.SNOWFLAKE in providers
 
     def test_string_values(self):
-        """Should have string values."""
         assert CloudProvider.AWS.value == "aws"
         assert CloudProvider.GCP.value == "gcp"
 
 
 class TestPreDefinedRegions:
-    """Tests for pre-defined region constants."""
-
     def test_aws_regions(self):
-        """Should have AWS regions."""
         assert len(AWS_REGIONS) > 0
         assert "us-east-1" in AWS_REGIONS
         assert "eu-west-1" in AWS_REGIONS
 
     def test_gcp_regions(self):
-        """Should have GCP regions."""
         assert len(GCP_REGIONS) > 0
         assert "us-east1" in GCP_REGIONS
         assert "europe-west1" in GCP_REGIONS
 
     def test_azure_regions(self):
-        """Should have Azure regions."""
         assert len(AZURE_REGIONS) > 0
         assert "eastus" in AZURE_REGIONS
         assert "westeurope" in AZURE_REGIONS
 
     def test_region_has_coordinates(self):
-        """Pre-defined regions should have coordinates."""
         for code, region in AWS_REGIONS.items():
             assert region.latitude is not None
             assert region.longitude is not None
 
 
 class TestGetRegion:
-    """Tests for get_region function."""
-
     def test_get_aws_region(self):
-        """Should get AWS region."""
         region = get_region(CloudProvider.AWS, "us-east-1")
         assert region is not None
         assert region.code == "us-east-1"
 
     def test_get_gcp_region(self):
-        """Should get GCP region."""
         region = get_region(CloudProvider.GCP, "us-east1")
         assert region is not None
         assert region.code == "us-east1"
 
     def test_get_unknown_region(self):
-        """Should return None for unknown region."""
         region = get_region(CloudProvider.AWS, "unknown-region")
         assert region is None
 
     def test_get_custom_provider_region(self):
-        """Should return None for custom provider."""
         region = get_region(CloudProvider.CUSTOM, "any")
         assert region is None
 
 
 class TestCalculateDistance:
-    """Tests for calculate_distance_km function."""
-
     def test_same_location(self, us_east_region):
-        """Should return 0 for same location."""
         distance = calculate_distance_km(us_east_region, us_east_region)
         assert distance is not None
         assert distance == 0
 
     def test_cross_atlantic(self, us_east_region, eu_west_region):
-        """Should calculate transatlantic distance."""
         distance = calculate_distance_km(us_east_region, eu_west_region)
         assert distance is not None
-        # US East to EU West is roughly 5500km
         assert 5000 < distance < 6500
 
     def test_missing_coordinates(self, us_east_region):
-        """Should return None if coordinates missing."""
         no_coords = Region(
             name="No Coords",
             code="no-coords",
@@ -218,8 +174,6 @@ class TestCalculateDistance:
         assert distance is None
 
     def test_us_to_asia(self, us_east_region, ap_region):
-        """Should calculate US to Asia distance."""
         distance = calculate_distance_km(us_east_region, ap_region)
         assert distance is not None
-        # US East to Tokyo is roughly 10800km
         assert 10000 < distance < 12000

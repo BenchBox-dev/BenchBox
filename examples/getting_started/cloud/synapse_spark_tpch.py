@@ -1,59 +1,3 @@
-"""Run TPC-H on Azure Synapse Spark (enterprise managed Spark).
-
-Azure Synapse Analytics is Microsoft's enterprise analytics platform providing
-integrated Spark, SQL, and Data Explorer capabilities. This adapter integrates
-with Synapse Spark pools via the Livy API for benchmark execution.
-
-Key Features:
-    - Enterprise: Mature platform with extensive enterprise features
-    - ADLS Gen2: Azure Data Lake Storage for data staging
-    - Entra ID: Azure Active Directory authentication
-    - Spark Pools: Dedicated pools with configurable sizing
-    - Integration: Native integration with Synapse SQL pools
-
-Prerequisites:
-    1. Azure Synapse Analytics workspace
-    2. Spark pool created in the workspace
-    3. ADLS Gen2 storage account linked to workspace
-    4. Azure Entra ID authentication configured:
-       - az login (interactive)
-       - Service principal (for automation)
-       - Managed identity (on Azure VMs)
-
-Required environment variables:
-    SYNAPSE_WORKSPACE_NAME   Synapse workspace name
-    SYNAPSE_SPARK_POOL       Spark pool name
-    SYNAPSE_STORAGE_ACCOUNT  ADLS Gen2 storage account name
-    SYNAPSE_STORAGE_CONTAINER ADLS Gen2 container name
-
-Optional environment variables:
-    AZURE_TENANT_ID          Azure tenant ID (for service principal auth)
-    SYNAPSE_STORAGE_PATH     Path within container (default: benchbox)
-
-Installation:
-    uv add benchbox --extra synapse-spark
-
-Usage:
-    export SYNAPSE_WORKSPACE_NAME=my-synapse-workspace
-    export SYNAPSE_SPARK_POOL=sparkpool1
-    export SYNAPSE_STORAGE_ACCOUNT=mystorageaccount
-    export SYNAPSE_STORAGE_CONTAINER=benchbox
-
-    python examples/getting_started/cloud/synapse_spark_tpch.py
-
-    # Preview without execution
-    python examples/getting_started/cloud/synapse_spark_tpch.py --dry-run ./preview
-
-Cost Estimation:
-    Synapse Spark uses vCore-hour billing:
-    - Small nodes (4 vCores): ~$0.22/hour
-    - Medium nodes (8 vCores): ~$0.44/hour
-    - Large nodes (16 vCores): ~$0.88/hour
-
-    TPC-H SF=0.01 (~10MB): ~$0.20 for full benchmark
-    TPC-H SF=1.0 (~1GB): ~$1.50 for full benchmark
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -70,13 +14,6 @@ _OUTPUT_DIR = _PROJECT_ROOT / "benchmark_runs" / "getting_started" / "synapse_sp
 
 
 def _require_env(var_name: str) -> str:
-    """Require a Synapse environment variable.
-
-    Azure credentials should be configured via:
-    - Azure CLI: az login
-    - Environment variables for service principal
-    - Managed identity (on Azure VMs)
-    """
     value = os.getenv(var_name)
     if not value:
         raise RuntimeError(
@@ -86,40 +23,6 @@ def _require_env(var_name: str) -> str:
 
 
 def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig]:
-    """Build benchmark and database configurations for Synapse Spark.
-
-    Synapse Spark Concepts:
-
-    1. WORKSPACE
-       - Container for Synapse resources
-       - Includes Spark pools, SQL pools, pipelines
-       - Linked services for storage and security
-       - Azure Private Link support
-
-    2. SPARK POOLS
-       - Dedicated Apache Spark clusters
-       - Configurable node sizes and counts
-       - Auto-pause and auto-scale options
-       - Isolated compute for workloads
-
-    3. ADLS GEN2 STORAGE
-       - Primary storage for data lake
-       - Hierarchical namespace for folders
-       - Integration with Synapse workspace
-       - AAD passthrough authentication
-
-    4. AUTHENTICATION
-       - Azure Entra ID (Azure AD)
-       - DefaultAzureCredential chain
-       - az login for development
-       - Service principal for automation
-
-    5. COST MODEL
-       - vCore-hour billing for Spark
-       - Pool idle timeout (auto-pause)
-       - Storage charged separately
-       - Data movement costs apply
-    """
     benchmark_config = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -137,12 +40,10 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
         type="synapse-spark",
         name="synapse_spark_tpch",
         options={
-            # Required configuration
             "workspace_name": workspace_name,
             "spark_pool_name": spark_pool,
             "storage_account": storage_account,
             "storage_container": storage_container,
-            # Optional configuration
             "storage_path": os.getenv("SYNAPSE_STORAGE_PATH", "benchbox"),
             "tenant_id": os.getenv("AZURE_TENANT_ID"),
         },
@@ -152,14 +53,6 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
 
 
 def run_example(scale_factor: float = 0.01, *, dry_run_output: Path | None = None) -> None:
-    """Execute TPC-H benchmark on Azure Synapse Spark.
-
-    Synapse Spark is ideal for:
-    - Enterprise analytics with existing Synapse investment
-    - Integration with Synapse SQL pools
-    - Large-scale data processing
-    - Compliance and security requirements
-    """
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     benchmark_config, database_config = _build_configs(scale_factor)
 
@@ -175,8 +68,7 @@ def run_example(scale_factor: float = 0.01, *, dry_run_output: Path | None = Non
         print()
         print("Cost estimation (Synapse vCore-hour pricing):")
         print(f"- TPC-H SF={scale_factor}:")
-        # Rough estimate based on Medium nodes (~$0.44/hour per node)
-        nodes = 3  # Typical small pool
+        nodes = 3
         minutes_per_query = 2 if scale_factor >= 1.0 else 1
         cost_per_query = (minutes_per_query / 60) * 0.44 * nodes
         total_cost = cost_per_query * 22

@@ -1,5 +1,3 @@
-"""Helpers for pruning stale generated table artifacts."""
-
 from __future__ import annotations
 
 import logging
@@ -13,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class TableArtifactPattern:
-    """Pattern configuration for table artifact discovery."""
-
     single_suffix: str
     raw_shard_glob_template: str
     compressed_shard_glob_template: str
@@ -22,7 +18,6 @@ class TableArtifactPattern:
 
 
 def _collect_shards(target_dir: Path, shard_glob: str, shard_pattern: re.Pattern[str]) -> list[Path]:
-    """Collect shard files for a table/suffix that match the shard naming pattern."""
     return [path for path in target_dir.glob(shard_glob) if path.is_file() and shard_pattern.fullmatch(path.name)]
 
 
@@ -35,11 +30,6 @@ def prune_stale_table_artifacts(
     use_compression: bool,
     expect_sharded: bool,
 ) -> list[Path]:
-    """Prune stale artifacts for known tables prior to regeneration.
-
-    Always removes the opposite-format artifacts because regeneration will write
-    files in the requested format.
-    """
     removed: list[Path] = []
     for table_name in table_names:
         removed_for_table = 0
@@ -71,7 +61,6 @@ def prune_stale_table_artifacts(
             to_remove.extend(raw_shards)
             if raw_single.is_file():
                 to_remove.append(raw_single)
-            # Keep only one style in compressed mode.
             if compressed_single and compressed_shards:
                 if expect_sharded:
                     to_remove.extend(compressed_single)
@@ -80,7 +69,6 @@ def prune_stale_table_artifacts(
         else:
             to_remove.extend(compressed_single)
             to_remove.extend(compressed_shards)
-            # Keep only one style in uncompressed mode.
             if raw_single.is_file() and raw_shards:
                 if expect_sharded:
                     to_remove.append(raw_single)
@@ -96,7 +84,6 @@ def prune_stale_table_artifacts(
                 removed_for_table += 1
             except OSError:
                 logger.warning("Failed to remove stale artifact: %s", candidate, exc_info=True)
-                # Best-effort cleanup; generation/validation will catch remaining conflicts.
                 continue
         if removed_for_table:
             logger.debug("Removed %d stale artifacts for table %s in %s", removed_for_table, table_name, target_dir)

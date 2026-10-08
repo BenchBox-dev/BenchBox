@@ -1326,23 +1326,6 @@ entries:
     - issue: Harmonize CLI Verbosity Flow (PROJECT_DONE.yaml line 42)
       desc: Completed work that needs quality improvements
 
-# ==============================================================================
-# DATAFRAME SUPPORT - Family-Based Architecture
-# ==============================================================================
-# Architecture: Pandas-like Family + Expression-based Family
-# REVISED TIMELINE: 20-24 weeks (after adversarial review)
-# Platforms: 8 (Pandas, Modin, cuDF, Vaex, Dask, Polars, PySpark, DataFusion)
-# Code reduction: 72% vs per-platform approach (29K LOC vs 105K LOC)
-# NOTE: Includes Phase 0 infrastructure prerequisites addressing critical gaps
-# ==============================================================================
-
-# ==============================================================================
-# PHASE 0: Infrastructure Prerequisites (MUST COMPLETE BEFORE PHASE 1)
-# ==============================================================================
-# Critical gaps identified in adversarial review that are implementation blockers
-# These MUST be addressed before starting core abstractions to avoid rework
-# ==============================================================================
-
 - title: DataFrame Dependency Resolution and Optional Groups Strategy
   worktree: dataframe-phase0-deps
   category: Core Functionality
@@ -2079,13 +2062,6 @@ entries:
     - compatibility
     - phase0
     estimated_effort: "2-3 days"
-
-# ==============================================================================
-# PHASE 1+: Core Implementation (Original Plan with Enhancements)
-# ==============================================================================
-# The following entries are from the original plan, with enhancements based on
-# adversarial review findings integrated into existing phases
-# ==============================================================================
 
 - title: Design and Implement Core DataFrame Abstractions
   worktree: dataframe-core
@@ -3253,14 +3229,6 @@ entries:
     - dataframe
     - release
     estimated_effort: "3 days"
-# ==============================================================================
-# QUERY PLAN CAPTURE & COMPARISON FEATURE
-# ==============================================================================
-# Overview Document: _project/query_plan_capture_overview.md
-# Architecture: Two-tier DAG (logical + physical), opt-in capture, cross-platform
-# Timeline: 5-6 weeks across 6 workstreams
-# Code Addition: ~5,000 LOC (models, parsers, comparison, visualization, tests)
-# ==============================================================================
 
 - title: Query Plan Core Infrastructure (Models & Storage)
   worktree: query-plan-core
@@ -3695,7 +3663,7 @@ entries:
     - tests/unit/parsers/test_redshift_parser.py
     - tests/unit/parsers/test_databricks_parser.py
     - tests/unit/parsers/test_snowflake_parser.py
-    - tests/fixtures/query_plans/ # Sample plans for testing
+    - tests/fixtures/query_plans/
 
   metadata:
     owners:
@@ -4584,7 +4552,7 @@ entries:
     - tests/integration/query_plans/test_cross_platform_comparison.py
     - tests/integration/query_plans/test_regression_detection.py
     - tests/integration/query_plans/test_similarity_search.py
-    - tests/fixtures/query_plans/ # Sample plans
+    - tests/fixtures/query_plans/
 
   metadata:
     owners:
@@ -4601,35 +4569,7 @@ entries:
     - Query Plan CLI & Visualization
     estimated_effort: "1 week (ongoing throughout implementation, 1 week final polish)"
     lines_of_code: "~2,000 LOC (integration tests + examples)"
-# ==============================================================================
-# MARKETING CONTENT IMPLEMENTATION - COMPREHENSIVE TODO LIST
-# ==============================================================================
-# This file contains 24 TODO tasks organized into 6 priority tiers to support
-# the 2026-2027 Marketing Content Plan (128 blog posts, $260K-350K value).
-#
-# CRITICAL TIMELINE:
-# - First flagship post: January 15, 2026 (Week 2)
-# - TIER 0 development time: 18-24 weeks
-# - Time remaining: ~7-8 weeks
-# - STATUS: CRITICAL SHORTFALL - Requires immediate action
-#
-# TOTAL INVESTMENT: $568K-720K over 24 months
-# - Development: $330K-394K
-# - Content Production: $216K-288K
-# - Infrastructure: $22K-38K
-#
-# See MARKETING_CONTENT_IMPLEMENTATION_OVERVIEW.md for complete project details.
-# ==============================================================================
 
-
-# ==============================================================================
-# TIER 0: FOUNDATIONAL VALUE DELIVERY
-# ==============================================================================
-# Status: BLOCKS ALL 128 BLOG POSTS
-# Timeline: Weeks 1-8 (18-24 weeks realistic)
-# Investment: $180K-240K
-# Priority: CRITICAL - Must start immediately
-# ==============================================================================
 
 - title: Visualization Framework - Chart Generation & Results Display
   worktree: content-enablement-viz
@@ -5355,15 +5295,6 @@ entries:
   - Generate full flagship report in <5 minutes
   - Automated monthly ranking updates
 
-# ==============================================================================
-# TIER 1: PLATFORM PARITY - SQL QUERY ENGINES
-# ==============================================================================
-# Status: BLOCKS 59 BLOG POSTS across Q3 2026 - Q2 2027
-# Timeline: Weeks 9-16 (can parallelize)
-# Investment: $80K-100K
-# Priority: HIGH - Blocks specific content quarters
-# ==============================================================================
-
 - title: Trino Platform Adapter
   worktree: platform-expansion-trino
   category: Platform Expansion
@@ -5664,15 +5595,6 @@ entries:
     due_date: "2027-04-01"
     blocking_posts: "15 posts in Q2 2027"
 
-# ==============================================================================
-# TIER 2: COST INTELLIGENCE
-# ==============================================================================
-# Status: BLOCKS 25+ POSTS focused on cost optimization
-# Timeline: Weeks 17-21
-# Investment: $50K-65K
-# Priority: HIGH - Directly delivers user ROI
-# ==============================================================================
-
 - title: Advanced Cost Analysis Framework - Multi-Region & Pricing Models
   worktree: cost-intelligence-advanced
   category: Cost Intelligence
@@ -5859,9 +5781,6 @@ entries:
   - TCO projections for 1/3/5 years
   - Cost optimization recommendations save >20% on average
 
-# Note: Additional TIER 2, 3, 4, 5 tasks would continue here following the same format.
-# For brevity, I'll include titles and basic structure for the remaining tasks:
-
 - title: Cost Optimization Engine - Automated Recommendations
   worktree: cost-intelligence-optimizer
   category: Cost Intelligence
@@ -5887,10 +5806,6 @@ entries:
     estimated_effort: "1 week (0.5 FTE)"
     budget: "$6K-8K"
     due_date: "2026-08-31"
-
-# ==============================================================================
-# TIER 3: AI/ML DIFFERENTIATION
-# ==============================================================================
 
 - title: Vector Search Benchmark Support
   worktree: ai-ml-vector-search
@@ -5956,10 +5871,6 @@ entries:
     due_date: "2027-01-01"
     blocking_posts: "Future AI/ML content"
 
-# ==============================================================================
-# TIER 4: ENTERPRISE OPERATIONS
-# ==============================================================================
-
 - title: Performance Regression Detection System
   worktree: enterprise-ops-regression
   category: Enterprise Operations
@@ -6002,10 +5913,6 @@ entries:
     due_date: "2027-05-01"
     blocking_posts: "Query queueing content"
 
-# ==============================================================================
-# TIER 5: SPECIALIZED BENCHMARKS (2028 CONTENT)
-# ==============================================================================
-
 - title: Geospatial Benchmark Support - PostGIS Integration
   worktree: specialized-geospatial
   category: Specialized Benchmarks
@@ -6045,10 +5952,6 @@ entries:
     budget: "$30K-40K"
     due_date: "2028-Q1"
     blocking_posts: "2028 graph content"
-
-# ==============================================================================
-# SUPPORTING INFRASTRUCTURE
-# ==============================================================================
 
 - title: Enhanced Resource Monitoring & Profiling
   worktree: infrastructure-monitoring
