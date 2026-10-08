@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Run layout_study.py comparing untuned, sort-only and partitioned layouts, with and without the tuned session pack, at SF10 or larger on a host with enough memory; record the memory rung per docs/operations/uat-framework.md",
+    "Record whether any partitioning helps, and update the ADR-3 addendum if the SF1 conclusion changes"
+  ],
+  "context": "PR #2766 and the ADR-3 addendum (docs/development/tuning-adr-003-baseline-and-single-renderer.md, 2026-10-07) measured SF1 only, on ClickHouse 25.8 in a 5.25 GiB container. SF100 does not fit the 16 GB measurement host and SF10 needs more memory than the 5.25 GiB rung. The decision to ship the TPC-H template with date sort keys and no partitioning rests on the argument that sort-key pruning does not depend on scale; it has not been measured at larger scale. Tool: layout_study.py (build SRC_DB TAG LAYOUT..., run TAG QUERY_DIR ROUNDS LAYOUT[@pack]... --out F, report F), currently in /tmp/tpch-tuned-regression-tools-20261007/ and to be copied into the repository or the new item's notes before that directory is cleaned.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2766"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T13:45:43Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "98c06b8496f0431998ff611badde615e",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    }
+  ]
+}

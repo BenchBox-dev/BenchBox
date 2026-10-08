@@ -2990,6 +2990,13 @@
       "status": "done",
       "title": "Fix TPC-DS silent empty-query bug - surface FAILED when power test returns 0 queries"
     },
+    "clickhouse-tpch-layout-study-sf10-plus": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Repeat the ClickHouse TPC-H layout and session-settings study at SF10 or larger"
+    },
     "clickhouse-tpchavoc-q6-decimal-bug": {
       "claim": null,
       "needs": [],
