@@ -40,6 +40,8 @@ _MOUNT_PATH_KEYS = set(_ANONYMIZATION_SPECS["mount_path_keys"])
 _LOCAL_ENDPOINT_VALUES = set(_ANONYMIZATION_SPECS["local_endpoint_values"])
 _MESSAGE_KEYS = set(_ANONYMIZATION_SPECS["message_keys"])
 _PUBLIC_DROP_KEYS = frozenset(_ANONYMIZATION_SPECS["public_drop_keys"])
+_OPTION_MAP_KEYS = frozenset(_ANONYMIZATION_SPECS["option_map_keys"])
+_PUBLIC_OPTION_VALUES = {key: frozenset(values) for key, values in _ANONYMIZATION_SPECS["public_option_values"].items()}
 _OPTION_SOURCE_LABELS = frozenset(
     {
         "registered_default",
@@ -504,6 +506,14 @@ class AnonymizationManager:
             and value in _OPTION_SOURCE_LABELS
             and len(key_path) >= 2
             and _compact_key(key_path[-2]) == "platformoptionsources"
+        ):
+            return value
+
+        if (
+            isinstance(value, str)
+            and len(key_path) >= 2
+            and _compact_key(key_path[-2]) in _OPTION_MAP_KEYS
+            and value in _PUBLIC_OPTION_VALUES.get(_compact_key(key_path[-1]), ())
         ):
             return value
 

@@ -132,6 +132,7 @@ MCP_PLATFORM_OPTION_ALLOWLIST: dict[str, dict[str, MCPPlatformOptionSpec]] = {
     },
     "pandas": {"dtype_backend": _MCP_OPTION("string", choices=("numpy_nullable", "pyarrow"))},
     "polars": {
+        "engine": _MCP_OPTION("string", choices=("default", "in-memory", "streaming")),
         "n_rows": _MCP_OPTION("int", minimum=1, maximum=10_000_000),
         "rechunk": _MCP_OPTION("bool"),
         "streaming": _MCP_OPTION("bool"),
@@ -224,6 +225,7 @@ MCP_PLATFORM_OPTION_CONTRACT: dict[str, dict[str, MCPPlatformOptionContract]] = 
     },
     "pandas": {"dtype_backend": _contract("pandas dataframe dtype backend", "execution")},
     "polars": {
+        "engine": _contract("Polars collect engine", "execution"),
         "n_rows": _contract("Polars input row limit", "resource"),
         "rechunk": _contract("Polars dataframe memory layout", "resource"),
         "streaming": _contract("Polars dataframe execution mode", "execution"),

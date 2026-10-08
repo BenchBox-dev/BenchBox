@@ -612,6 +612,7 @@ singlestore|password|SingleStore password|{}
 polars|streaming|Enable streaming mode for large datasets|{'parser': 'parse_bool', 'default': 'false'}
 polars|rechunk|Rechunk data for better memory layout|{'parser': 'parse_bool', 'default': 'true'}
 polars|n_rows|Limit number of rows to read (for testing)|{'parser': 'int'}
+polars|engine|Polars collect engine: default (each version's own), in-memory, or streaming|{'choices': ('default', 'in-memory', 'streaming'), 'default': 'default'}
 pandas|dtype_backend|Backend for nullable dtypes|{'choices': ('numpy', 'numpy_nullable', 'pyarrow'), 'default': 'numpy_nullable'}
 cudf|device_id|CUDA device ID to use|{'parser': 'int', 'default': '0'}
 cudf|spill_to_host|Enable GPU memory spilling to host RAM|{'parser': 'parse_bool', 'default': 'true'}
