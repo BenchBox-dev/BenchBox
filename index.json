@@ -9575,7 +9575,7 @@
       "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "dropped",
       "title": "Repair scripts/check_decision_records.py or retire it"
     },
     "fix-chromium-result-detail-sort-flake": {
