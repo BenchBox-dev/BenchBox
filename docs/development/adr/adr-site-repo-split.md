@@ -2,10 +2,7 @@
 
 ## Status
 
-Accepted under S1 design authority (tracker item
-`site-split-00-adr-soundness-scope`). Oracle review: PR link recorded here on
-merge. Plan recorded on branch `origin/claude/bold-newton-uudn48`
-(unmerged at the time of writing).
+Accepted 2026-10-06.
 
 ## Context
 
@@ -19,33 +16,28 @@ and rollback throughout.
 
 ## Decisions
 
-D1 through D6 are the plan's wording. D7 onward are owner decisions dated
-2026-10-06, recorded in `site-split-*` tracker contexts (the plan predates
-them). Where an item refines a plan decision, both wordings are recorded and
-the refinement governs execution.
-
-| # | Decision | Wording | Source |
-|---|---|---|---|
-| D1 | User docs location | `docs/**.md` stay in core; the site pulls them via the bundle. | Plan |
-| D2 | Repo name and visibility | `BenchBox-dev/benchbox-site`, public. | Plan |
-| D3 | Rehearsal host | `next.benchbox.dev` CNAME, pointed at the site repo Pages before cutover. | Plan; item 30 |
-| D4 | Deploy control plane port | Plan: port the Python plane to TypeScript later (Phase 5); move it as-is first. Refinement (operative): replace the Python control plane with Node now; no Python in the site repo. | Plan; item 23 |
-| D5 | Docs-PR site gate | Plan: core `docs/` PRs are gated on a site build (`site-compat` job against the pinned site SHA). Refinement (operative): no pre-merge site gate in core and no Node build in core; breakage is detected after merge by the `site-inputs` bundle build and the site repo bundle-consume CI. | Plan; item 10 |
-| D6 | Deploy trigger | Plan: dispatch-only with a required reviewer. Refinement (operative): auto-deploy with no reviewer on `github-pages`; no required reviewers on that environment. | Plan; items 21, 23 |
-| D7 | Trunk-only docs | Trunk-only docs supersede release-pinned docs. | Item 01 |
-| D8 | Visual regression | Advisory (non-blocking) in site CI. | Item 21 |
-| D9 | Language boundary | Node hooks only; no JS/TS source in core; no Python source in the site repo. Run-time third-party tools are allowed (including invoking the published `benchbox` CLI at a pinned version). | Items 21, 24, 50 |
-| D10 | Blog drafts | `_blog/` moves; every asset is re-evaluated (keep, delete, or port); needed Python is ported to TS. | Item 24 |
-| D11 | Sphinx retirement and rollback | Sphinx rollback retention is waived at cutover; rollback until removal means moving the domain back. Sphinx is retired at cutover. | Items 01, 40, 50 |
-| D12 | Publication scope | All of dlv2-62 is in this batch. | Item 51 |
-| D13 | Runner pool | The runner-pool decision leaves the batch to a follow-up 30 days after cutover, using receipt queue-time and latency data. | Item 99 |
-| D14 | Soundness narrowing first | Narrow the soundness paths before deleting retiring paths, so the deletions need no oracle review. | Item 00 |
-| D15 | External links | lychee external-link checks are non-blocking (open or update one issue). | Item 21 |
-| D16 | Bundle compatibility | The `site-inputs` schema uses integer majors; the site supports N and N-1 for one release; core lands first. | Plan; item 22 |
-| D17 | Hosted ruleset edit | The agent may make exactly one hosted-ruleset edit (remove the `landing` context from ruleset 15611785) and no other. | Item 52 |
-| D18 | GitHub cleanup | The agent archives (tag) then deletes the `publication` branch, the `publication-attestation` environment, the two publication secrets, and uninstalls the publication App. These are the only GitHub-object deletions the batch may make. | Item 54 |
-| D19 | First production deploy | The owner approves the first production deploy live in chat before `SITE_DEPLOY_TARGET=production` is set. | Item 40 |
-| D20 | Second review | Proceed with the muse review alone; run agy first in the batch. Spent 2026-10-07: agy hit quota 429 twice, the owner declined the codex substitute and chose to skip. | agy-plan-review item |
+| # | Decision | Resolution |
+|---|---|---|
+| D1 | Where user docs live | Core. Docs change with code: about 20 core tests lock code against doc text, `README.md` has 26 relative `docs/` links, and `benchbox/utils/version.py:61` reads `docs/README.md`. The site gets docs through the bundle. |
+| D2 | Repo | `BenchBox-dev/benchbox-site`, public, default branch `main`, squash-merge only. The owner creates it empty. |
+| D3 | Rehearsal host | `next.benchbox.dev`; the owner adds the DNS record before the batch. A project Pages subpath breaks root-absolute links. |
+| D4 | Deploy control plane | Replaced, not moved: a minimal Node plane in the site repo. The Python `site_deploy` package stays in core until the site removal deletes it. Corpus and snapshot checks become core attestations. |
+| D5 | Docs PRs that break the site | Detected after merge. The site refuses the bundle, keeps the last good site and opens an issue in core. Core runs no Node build. An advisory pre-merge check is a follow-up. |
+| D6 | Deploy trigger | Automatic on site `main` push and on each `core-bundle` dispatch; `workflow_dispatch` for rollback and redeploy. `github-pages` has no required reviewer and a deployment branch policy of `main` only. |
+| D7 | Docs revision | Trunk only. `/docs/` and `/docs/dev/` both render from the newest certified develop bundle, as production does today. Supersedes ADR D13. Release-pinned docs are a follow-up. |
+| D8 | Visual regression | Advisory on site PRs. The baseline is the currently deployed artifact. No approval variables. |
+| D9 | Language rule | Source only: no `.py`, `pyproject.toml` or `uv.lock` in the site repo, and no `.js`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.astro` or `package.json` in core. Third-party tools fetched at run time are allowed. Site hooks use lefthook, cspell and markdownlint-cli2. |
+| D10 | `_blog/` | Moves to the site repo as `drafts/`. Each non-Markdown asset is re-evaluated: kept, deleted or ported to TS. Python never enters the site repo, including its history. |
+| D11 | Sphinx retirement | At cutover. The rule that keeps the last Sphinx artifact redeployable is waived. Between cutover and the site removal, rollback is "move the domain back to core Pages"; after the removal, rollback uses site receipts. |
+| D12 | Publication plane | The publication control plane retirement, including the GitHub clean-up (D18), is in this batch. |
+| D13 | Runner pool | Measure first. Site receipts record queue time and merge-to-live latency; decide after a month. |
+| D14 | Oracle review | Amended 2026-10-07. Soundness paths are never narrowed ahead of a deletion. C1 only *adds* `scripts/site_inputs.py` and `_project/scripts/explorer_pipeline/browser_fixtures.py` as soundness files. C2 removes the entries for the files it deletes, in the same commit, and keeps `prefix .github/workflows/`, `prefix publication/` and `prefix scripts/publication/`. Core PRs that touch soundness paths request the Codex connector; if it is unavailable, the owner posts the stand-in comment after the agent has dispositioned every blocking `oracle-review-shadow` finding on that head. |
+| D15 | External links | A nightly lychee job in the site repo opens or updates one issue. It never blocks a deploy. |
+| D16 | Bundle compatibility | `schema` is an integer major. Additive changes keep it; removals and renames bump it. The site supports N and N-1, proven by a CI matrix. Core lands a change first, the site second. |
+| D17 | Ruleset edit | One hosted-ruleset change only: remove the `landing` required context from ruleset 15611785, right after the site removal merges. No other ruleset change. |
+| D18 | Publication clean-up | Push the archive tag, record the before-state, then delete the `publication` branch, the `publication-attestation` environment and its secrets, and `PUBLICATION_APP_ID`/`PUBLICATION_APP_PRIVATE_KEY`. Uninstall the publication App if the API allows; otherwise the owner does. |
+| D19 | First production deploy | The owner approves it live in chat during the production cutover pause. Later deploys are automatic. |
+| D20 | Second external review | `agy` was out of quota. The owner first deferred it to the batch, then skipped it on 2026-10-07 after a second 429 (codex substitute declined). |
 
 ## Language rule
 
@@ -59,21 +51,23 @@ majors; the site supports N and N-1 for one release; core lands first.
   places `landing/`, `website/` and `deploy/` on `main`. Those paths leave core
   under this ADR; the `main`-is-released-code rule is unchanged.
 - `_project/decisions/adr-astro-unified-site.md` D12, D13 and D14, where they
-  conflict: D12 plugs the site into the dlv2-60 plane (replaced by the bundle
-  plus the Node plane); D13 describes the renderer cutover (done; this batch
-  cuts over repositories, not renderers); D14 overlaps comment-cleanup items
-  with `astro-site-*` items (those items are folded by `site-split-01`).
+  conflict: D12 plugs the site into the publication deploy plane (replaced by
+  the bundle plus the Node plane); D13 describes the renderer cutover (done;
+  this change cuts over repositories, not renderers); D14 overlaps
+  comment-cleanup items with `astro-site-*` items (those items are folded by
+  the tracker reconciliation).
 - `docs/development/adr/adr-independent-publication-authorities.md`:
   superseded by this ADR for the site and deploy control-plane scope. Its
-  corpus authority statements stay normative until `site-split-51` re-homes
-  them; that item applies the superseded marker. `scripts/check_decision_records.py`
-  keeps enforcing the record set until then.
+  corpus authority statements stay normative until the publication retirement
+  re-homes them; that change applies the superseded marker.
+  `scripts/check_decision_records.py` keeps enforcing the record set until then.
 
 ## Consumers appendix
 
-Core tests that consume site behavior and therefore constrain the split. The
-plan cited 35; verification at `d076a974d` found 40 direct consumers (plus
-wiring-only references, excluded). `site-split-50` re-points or deletes each.
+Core tests that consume site behavior and therefore constrain the split. An
+earlier count cited 35; verification at `d076a974d` found 40 direct consumers
+(plus wiring-only references, excluded). The site removal re-points or deletes
+each.
 
 Site deploy plane: `tests/unit/scripts/site_deploy/test_site_deploy_candidate.py`,
 `test_site_deploy_cli_flow.py`, `test_site_deploy_cli.py`,
@@ -112,24 +106,14 @@ Cross-surface pins: `tests/unit/cli/test_logo.py`,
 `tests/unit/core/tuning/test_tuning_mode_vocabulary.py`,
 `tests/uat/test_explorer_smoke.py`, `tests/uat/phases/explorer_smoke.py`.
 
-## Soundness narrowing (D14)
+## Soundness scope (D14)
 
-This ADR's companion change narrows `.github/soundness-paths.txt` before any
-retiring path is deleted:
+This ADR's companion change only adds to `.github/soundness-paths.txt`:
 
-- `prefix .github/workflows/` becomes a regex that matches every workflow
-  except `docs.yml`, `publication-*.yml` and `rehearse-release-isolation.yml`.
-- The `file` lines for the excluded workflows and the missing
-  `publication-lane-docs.yml` / `publication-lane-explorer.yml` are removed,
-  as is the `verify_lane_isolation.py` entry (its only user retires).
-- `prefix publication/` and `prefix scripts/publication/` become `file` entries
-  for the nine corpus files with surviving users: `publication/ledger-seed.json`
-  and `scripts/publication/assembler.py`, `check_artifact_privacy.py`,
-  `check_corpus_bijection.py`, `check_explorer_compat.py`, `compare_db_digest.py`,
-  `reconciler.py`, `validator_parity.py`, `verify_live.py`. Each is imported or
-  shelled-out by a surviving workflow (`ci.yml`, `site-deploy.yml`,
-  `corpus-reconciler.yml`, `sync-results-data-to-published.yml`,
-  `validate-submission.yml`) or a surviving module under `scripts/site_deploy/`.
-- `verify_corpus_promotion.py` and `verify_shadow_site.py` have no surviving
-  workflow or module user (verified by repo-wide import search); they retire in
-  `site-split-51` and receive no entries.
+- `file scripts/site_inputs.py`, the attestation producer the site trusts;
+- `file _project/scripts/explorer_pipeline/browser_fixtures.py`, the fixture
+  producer the bundle carries.
+
+Nothing is removed or narrowed: `prefix .github/workflows/`,
+`prefix publication/` and `prefix scripts/publication/` stay as they are. The
+narrowing moves to C2, in the same commit as the deletions.

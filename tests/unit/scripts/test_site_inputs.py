@@ -54,24 +54,42 @@ def _bundle(tmp_path: Path, schema: int = 1, attestations: str = "pass") -> Path
         "api-public-symbols.json": '{"symbols": []}\n',
         "attestations.json": "attestation tree",
     }
-    att = [
-        {"name": "privacy", "result": attestations},
-        {"name": "explorer_compat", "result": "pass"},
-        {"name": "snapshot_invariants", "result": "pass"},
-        {"name": "corpus_bijection", "result": "pass"},
-        {"name": "validator_parity", "result": "skip"},
-    ]
-    members["attestations.json"] = json.dumps(att) + "\n"
-    digests = {}
     dirs = {"docs", "explorer/fixtures", "explorer/parity"}
     for name, body in members.items():
+        if name == "attestations.json":
+            continue
         target = out / name
         if name in dirs:
             _write(target / "member.txt", body)
         else:
             _write(target, body)
-        digests[name] = site_inputs.member_digest(target)
-    manifest = {"schema": schema, "core_sha": "abc", "members": digests}
+    snapshot = site_inputs.member_digest(out / "explorer/results.duckdb")
+    att = [
+        {
+            "name": "privacy",
+            "result": attestations,
+            "inputs": {"bundle": "fixture-bundle"},
+            "compared": {"core_sha": "abc"},
+        },
+        {"name": "explorer_compat", "result": "pass", "inputs": {"snapshot": snapshot}},
+        {"name": "snapshot_invariants", "result": "pass", "inputs": {"snapshot": snapshot}},
+        {
+            "name": "corpus_bijection",
+            "result": "pass",
+            "inputs": {"snapshot": snapshot},
+            "compared": {"accepted_ref": "abc"},
+        },
+        {"name": "validator_parity", "result": "skip", "compared": {"base": "def", "head": "abc"}},
+    ]
+    _write(out / "attestations.json", json.dumps(att) + "\n")
+    digests = {name: site_inputs.member_digest(out / name) for name in members}
+    manifest = {
+        "schema": schema,
+        "core_sha": "abc",
+        "parent_core_sha": "def",
+        "parent_source": "bundle",
+        "members": digests,
+    }
     _write(out / "manifest.json", json.dumps(manifest) + "\n")
     return out
 
@@ -120,6 +138,88 @@ def test_verify_rejects_skipped_required_attestation(tmp_path: Path) -> None:
     assert site_inputs.cmd_verify(out) == 1
 
 
+def test_verify_rejects_empty_attestations(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    (out / "attestations.json").write_text("[]\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_pass_entry_without_inputs(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        {k: v for k, v in e.items() if k != "inputs"} if e["name"] == "explorer_compat" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_snapshot_digest_mismatch(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, inputs={"snapshot": "0" * 64}) if e["name"] == "snapshot_invariants" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_empty_member_digest(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    manifest["members"]["docs"] = ""
+    (out / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_compared_head_mismatch(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, compared={"base": "def", "head": "0" * 40}) if e["name"] == "validator_parity" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_compared_core_sha_mismatch(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, compared={"core_sha": "0" * 40}) if e["name"] == "privacy" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_compared_accepted_ref_mismatch(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, compared={"accepted_ref": "0" * 40}) if e["name"] == "corpus_bijection" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_compared_base_mismatch(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, compared={"base": "0" * 40, "head": "abc"}) if e["name"] == "validator_parity" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_compared_base_without_parent(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    del manifest["parent_core_sha"]
+    (out / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
 def test_member_digest_raises_on_missing_path(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError):
         site_inputs.member_digest(tmp_path / "absent")
@@ -128,7 +228,12 @@ def test_member_digest_raises_on_missing_path(tmp_path: Path) -> None:
 def test_build_refuses_foreign_core_sha(tmp_path: Path) -> None:
     for sha in ("d076a974d", "0" * 40):
         args = argparse.Namespace(
-            out=str(tmp_path / "out"), core_sha=sha, parent_core_sha=None, certified_by=None, cmd="build"
+            out=str(tmp_path / "out"),
+            core_sha=sha,
+            parent_core_sha=None,
+            parent_source="local",
+            certified_by=None,
+            cmd="build",
         )
         with pytest.raises(RuntimeError, match="not the bundle core_sha"):
             site_inputs.cmd_build(args)
@@ -171,3 +276,130 @@ def test_repo_files_lists_every_tracked_path_with_kinds(tmp_path: Path) -> None:
     assert by_path["scripts/check_decision_records.py"] == "file"
     assert by_path["scripts"] == "tree"
     assert by_path["docs/development/adr/adr-site-repo-split.md"] == "file"
+
+
+def _captured_attestations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, corpus_changed: bool
+) -> tuple[list[dict], list[list[str]]]:
+    commands: list[list[str]] = []
+
+    def fake_run(*cmd: str, cwd: Path = site_inputs.ROOT) -> argparse.Namespace:
+        commands.append([str(c) for c in cmd])
+        return argparse.Namespace(returncode=0, stdout="ok", stderr="")
+
+    def fake_tree_sha(ref: str, subdir: str) -> str:
+        if subdir == "results-data" and corpus_changed:
+            return f"tree-{ref}"
+        return "tree"
+
+    monkeypatch.setattr(site_inputs, "run", fake_run)
+    monkeypatch.setattr(site_inputs, "tree_sha", fake_tree_sha)
+    bundle = tmp_path / "bundle"
+    _write(bundle / "explorer/results.duckdb", "duckdb-bytes")
+    out = tmp_path / "attestations.json"
+    site_inputs.build_attestations(out, bundle, "core", "parent")
+    return json.loads(out.read_text(encoding="utf-8")), commands
+
+
+def _command(commands: list[list[str]], script: str) -> list[str]:
+    matches = [c for c in commands if script in c]
+    assert len(matches) == 1, commands
+    return matches[0]
+
+
+def test_corpus_bijection_matches_the_deploy_gate_form(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    entries, commands = _captured_attestations(tmp_path, monkeypatch, corpus_changed=False)
+    command = _command(commands, "scripts/publication/check_corpus_bijection.py")
+    assert command[command.index("--accepted-ref") + 1] == "core"
+    assert command[command.index("--expect-source") + 1] == "core"
+    assert command[command.index("--bundles-dir") + 1] == str(site_inputs.ROOT / "results-data" / "bundles")
+    assert command[command.index("--ledger-seed") + 1] == str(site_inputs.ROOT / "publication/ledger-seed.json")
+    assert "--require-artifact" in command
+    bijection = next(e for e in entries if e["name"] == "corpus_bijection")
+    assert bijection["compared"] == {"accepted_ref": "core"}
+
+
+def test_build_refuses_missing_ledger_seed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(site_inputs, "ROOT", tmp_path)
+    with pytest.raises(RuntimeError, match="ledger seed missing"):
+        _captured_attestations(tmp_path, monkeypatch, corpus_changed=False)
+
+
+def test_verify_rejects_accepted_ref_other_than_core_sha(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, compared={"accepted_ref": "def"}) if e["name"] == "corpus_bijection" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_validator_parity_skips_when_corpus_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    entries, commands = _captured_attestations(tmp_path, monkeypatch, corpus_changed=False)
+    parity = next(e for e in entries if e["name"] == "validator_parity")
+    assert parity["result"] == "skip"
+    assert parity["reason"] == "corpus unchanged"
+    assert parity["compared"] == {"base": "parent", "head": "core"}
+    assert not [c for c in commands if "scripts/publication/validator_parity.py" in c]
+
+
+def test_validator_parity_uses_the_mirror_form_when_corpus_changed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entries, commands = _captured_attestations(tmp_path, monkeypatch, corpus_changed=True)
+    command = _command(commands, "scripts/publication/validator_parity.py")
+    assert command[command.index("--base-sha") + 1] == "parent"
+    assert command[command.index("--merge-sha") + 1] == "core"
+    assert command[command.index("--head-sha") + 1] == "core"
+    assert "--allow-partial-validation" in command
+    assert "--require-manifest" not in command
+    parity = next(e for e in entries if e["name"] == "validator_parity")
+    assert parity["result"] == "pass"
+    assert parity["compared"] == {"base": "parent", "merge": "core", "head": "core"}
+
+
+@pytest.mark.parametrize("source", [None, "trunk"])
+def test_verify_rejects_unknown_parent_source(tmp_path: Path, source: str | None) -> None:
+    out = _bundle(tmp_path)
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    if source is None:
+        del manifest["parent_source"]
+    else:
+        manifest["parent_source"] = source
+    (out / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def _site_inputs_workflow() -> str:
+    return (ROOT / ".github/workflows/site-inputs.yml").read_text(encoding="utf-8")
+
+
+def test_parent_candidates_come_only_from_develop_runs() -> None:
+    assert "gh run list --workflow site-inputs.yml --branch develop --status success" in _site_inputs_workflow()
+
+
+def test_parent_selection_fails_closed_without_a_bundled_ancestor() -> None:
+    workflow = _site_inputs_workflow()
+    assert "~1" not in workflow
+    assert "parent_source=dispatch" in workflow
+    assert workflow.count("parent_source=bundle") == 2
+
+
+def test_dispatched_parent_is_resolved_to_a_full_commit_sha() -> None:
+    workflow = _site_inputs_workflow()
+    assert 'git rev-parse --verify --end-of-options "${DISPATCH_PARENT}^{commit}"' in workflow
+    assert "^[0-9a-f]{40}$" in workflow
+    assert 'grep -qxF "$DISPATCH_PARENT"' in workflow
+
+
+def test_parent_ref_resolves_to_a_full_commit_sha() -> None:
+    head = site_inputs.must_run("git", "-C", str(site_inputs.ROOT), "rev-parse", "HEAD").strip()
+    assert site_inputs.resolve_parent(head, "HEAD") == head
+    assert site_inputs.resolve_parent(head, head[:12]) == head
+
+
+def test_parent_ref_that_names_no_commit_is_rejected() -> None:
+    head = site_inputs.must_run("git", "-C", str(site_inputs.ROOT), "rev-parse", "HEAD").strip()
+    with pytest.raises(RuntimeError, match="rev-parse"):
+        site_inputs.resolve_parent(head, "no-such-ref-for-site-inputs")

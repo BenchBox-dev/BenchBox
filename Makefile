@@ -843,6 +843,7 @@ format:
 	uv run ruff format .
 
 include $(BENCHBOX_MAKEFILE_ROOT)make/documentation.mk
+include $(BENCHBOX_MAKEFILE_ROOT)make/site-inputs.mk
 
 
 dist: clean

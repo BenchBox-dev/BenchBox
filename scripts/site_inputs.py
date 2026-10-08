@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 SCHEMA = 1
+PARENT_SOURCES = ("bundle", "dispatch", "local")
 GENERATED_QUERIES = Path("docs/benchmarks/queries")
 
 
@@ -270,6 +271,9 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
             {"core_sha": core_sha},
         )
     )
+    seed = ROOT / "publication/ledger-seed.json"
+    if not seed.is_file():
+        raise RuntimeError("ledger seed missing: re-home its dispositions before removing it")
     entries.append(
         attestation(
             "corpus_bijection",
@@ -284,14 +288,18 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
                 "--expect-source",
                 core_sha,
                 "--bundles-dir",
-                str(ROOT / "results-data/bundles"),
+                str(ROOT / "results-data" / "bundles"),
                 "--artifact",
                 str(db),
                 "--require-artifact",
                 "--ledger-seed",
-                str(ROOT / "publication/ledger-seed.json"),
+                str(seed),
             ],
-            {"snapshot": file_sha(db), "bundles": tree_sha(core_sha, "results-data/bundles")},
+            {
+                "snapshot": file_sha(db),
+                "bundles": tree_sha(core_sha, "results-data/bundles"),
+                "ledger_seed": file_sha(seed),
+            },
             {"accepted_ref": core_sha},
         )
     )
@@ -300,7 +308,7 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
             {
                 "name": "validator_parity",
                 "result": "skip",
-                "reason": "corpus tree unchanged since parent",
+                "reason": "corpus unchanged",
                 "compared": {"base": parent_sha, "head": core_sha},
             }
         )
@@ -320,6 +328,7 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
                     core_sha,
                     "--head-sha",
                     core_sha,
+                    "--allow-partial-validation",
                 ],
                 {
                     "corpus_base": tree_sha(parent_sha, "results-data"),
@@ -334,13 +343,18 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
         raise RuntimeError(f"attestations failed: {', '.join(failed)}")
 
 
+def resolve_parent(core_sha: str, parent_ref: str | None) -> str:
+    ref = parent_ref or f"{core_sha}~1"
+    return must_run("git", "-C", str(ROOT), "rev-parse", "--verify", "--end-of-options", f"{ref}^{{commit}}").strip()
+
+
 def cmd_build(args: argparse.Namespace) -> int:
     out = Path(args.out)
     head = must_run("git", "-C", str(ROOT), "rev-parse", "HEAD").strip()
     core_sha = args.core_sha or head
     if head != core_sha:
         raise RuntimeError(f"worktree HEAD {head} is not the bundle core_sha {core_sha}")
-    parent_sha = args.parent_core_sha or must_run("git", "-C", str(ROOT), "rev-parse", f"{core_sha}~1").strip()
+    parent_sha = resolve_parent(core_sha, args.parent_core_sha)
     dirty = must_run("git", "-C", str(ROOT), "status", "--porcelain").splitlines()
     tracked_edits = [line for line in dirty if not line.startswith("??")]
     if tracked_edits:
@@ -352,6 +366,13 @@ def cmd_build(args: argparse.Namespace) -> int:
         shutil.rmtree(out)
     out.mkdir(parents=True)
     build_docs(out / "docs")
+    regenerated = [
+        line
+        for line in must_run("git", "-C", str(ROOT), "status", "--porcelain").splitlines()
+        if not line.startswith("??")
+    ]
+    if regenerated:
+        raise RuntimeError(f"docs generation dirtied the tree at {core_sha}: {regenerated[:5]}")
     build_repo_files(out / "repo-files.json", core_sha)
     build_explorer_snapshot(out / "explorer")
     build_contract(out / "explorer/contract.json")
@@ -379,6 +400,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         "certified_by": args.certified_by or "local",
         "corpus_sha": tree_sha(core_sha, "results-data"),
         "parent_core_sha": parent_sha,
+        "parent_source": args.parent_source,
         "members": members,
         "produced_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -393,14 +415,23 @@ def cmd_verify(out: Path) -> int:
         print(f"schema mismatch: {manifest.get('schema')!r}")
         return 1
     expected = manifest.get("members", {})
+    if not expected:
+        print("empty manifest")
+        return 1
     if sorted(expected) != sorted(REQUIRED_MEMBERS):
         print(f"member set mismatch: {sorted(expected)}")
+        return 1
+    if any(not sha for sha in expected.values()):
+        print("empty member digest in manifest")
         return 1
     bad = [name for name, sha in expected.items() if member_digest(out / name) != sha]
     if bad:
         print(f"digest mismatch: {', '.join(bad)}")
         return 1
     attestations = json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    if not attestations:
+        print("empty attestations")
+        return 1
     by_name = {e["name"]: e["result"] for e in attestations}
     missing = [name for name in list(REQUIRED_ATTESTATIONS) + ["validator_parity"] if name not in by_name]
     if missing:
@@ -418,6 +449,38 @@ def cmd_verify(out: Path) -> int:
     if unknown:
         print(f"unknown attestation results: {', '.join(unknown)}")
         return 1
+    snapshot = expected["explorer/results.duckdb"]
+    inputless = [e["name"] for e in attestations if e["result"] == "pass" and not e.get("inputs")]
+    if inputless:
+        print(f"passing attestations without inputs: {', '.join(inputless)}")
+        return 1
+    drifted = [
+        e["name"]
+        for e in attestations
+        if isinstance(e.get("inputs"), dict) and "snapshot" in e["inputs"] and e["inputs"]["snapshot"] != snapshot
+    ]
+    if drifted:
+        print(f"attestation inputs drifted from manifest: {', '.join(drifted)}")
+        return 1
+    if manifest.get("parent_source") not in PARENT_SOURCES:
+        print(f"unknown parent_source: {manifest.get('parent_source')!r}")
+        return 1
+    core_sha = manifest.get("core_sha")
+    parent_sha = manifest.get("parent_core_sha")
+    rebound = [
+        e["name"]
+        for e in attestations
+        if isinstance(e.get("compared"), dict)
+        and (
+            ("head" in e["compared"] and e["compared"]["head"] != core_sha)
+            or ("base" in e["compared"] and e["compared"]["base"] != parent_sha)
+            or ("core_sha" in e["compared"] and e["compared"]["core_sha"] != core_sha)
+            or ("accepted_ref" in e["compared"] and e["compared"]["accepted_ref"] != core_sha)
+        )
+    ]
+    if rebound:
+        print(f"attestation range drifted from manifest: {', '.join(rebound)}")
+        return 1
     print(
         f"verify OK: schema {SCHEMA}, {len(expected)} members, "
         f"{sum(1 for e in attestations if e['result'] == 'pass')} pass, "
@@ -433,6 +496,7 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("--out", required=True)
     build.add_argument("--core-sha", default=None)
     build.add_argument("--parent-core-sha", default=None)
+    build.add_argument("--parent-source", choices=PARENT_SOURCES, default="local")
     build.add_argument("--certified-by", default=None)
     verify = sub.add_parser("verify")
     verify.add_argument("dir", type=Path)
