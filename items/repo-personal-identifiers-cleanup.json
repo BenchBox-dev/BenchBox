@@ -3,6 +3,7 @@
     "Decision recorded",
     "Identifiers replaced if chosen"
   ],
+  "context": "2026-10-08 owner decision: leave both. The maintainer email is already public as the git identity, and the GitHub handle is public on GitHub. No change.",
   "description": "docs/operations/publication-g4-incident-response-2026-09-04.json (not served, but in the public repo) contains a personal email. The Results Explorer snapshot publishes the maintainer's GitHub handle as override_approver, sourced from results-data override files. Decide whether to use a role identifier.",
   "sessions": [
     {
@@ -12,6 +13,14 @@
       "op": "create",
       "op_id": "d4040c3484be4712be6413516649f86c",
       "session_id": "43d3dfd590314e7ebb852ac2f70db5c9"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-08T13:39:05Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "4ef216fcf4ed4129b53ca0399b4adf55",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
     }
   ]
 }
