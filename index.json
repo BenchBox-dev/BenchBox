@@ -20605,12 +20605,17 @@
       "title": "Retain nightly Throughput@Size per run and runner class so the floor can use a rolling median"
     },
     "throughput-floor-numeric-threshold-from-baseline": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T23:26:53Z",
+        "generation": "01224f4b446b43d7881408bfa931fc5d",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:2a10096285872d23ac8a3bfe"
+      },
       "needs": [
         "throughput-floor-baseline-retention-per-runner"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Throughput UAT gate: activate numeric Throughput@Size floor from baseline"
     },
     "throughput-independent-sessions-per-stream": {
