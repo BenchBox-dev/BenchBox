@@ -3,7 +3,7 @@
     "Owner-approved wording on each page",
     "A recorded decision on the TPC downloads"
   ],
-  "context": "2026-10-08: a user TPC trademarks page (docs/benchmarks/tpc-trademarks.md, owner-approved wording) is ready to commit. Research found the TPC Fair Use Quick Reference v1.0.0 (2019) .docx at tpc.org (the PDF link 404s). Still to check: the current full TPC Policies document; whether Power@Size/Throughput@Size count as TPC Primary/Optional Metrics (owner chose to keep the names with the disclaimer); and the publication obligations in the licences of the bundled dbgen/dsdgen binaries (\"the TPC Copyright Notice and License Agreement must be maintained\"). Related: tpc-remove-certification-and-compliance-claims.",
+  "context": "2026-10-08: trademarks page ready (branch docs/tpc-trademarks-page; owner-approved wording). Owner rule for TPC downloads: read the TPC licence/EULA shipped with dbgen/dsdgen and the TPC Fair Use policy; if redistribution with the TPC notice is allowed, keep /docs/_downloads/ TPC files with the notice; otherwise stop linking them (link tpc.org) and report the repo/wheel copies to the owner. IMDb wording on join-order.md: keep (IMDb's required attribution; verify against current IMDb non-commercial terms). Also still to check: the current full TPC Policies document. Claim removal is tracked in tpc-remove-certification-and-compliance-claims.",
   "description": "benchmarks/join-order.md states the IMDb data is used with permission and gives a redistribution position; benchmarks/tpc-standards.md, tpch-skew.md, tpc-h.md, tpc-ds.md and tpc-ds-obt.md make compliance claims. The site also serves TPC-DS templates and TPC-H query files under /docs/_downloads/. Decide the approved wording and whether those downloads fit the TPC EULA.",
   "sessions": [
     {
@@ -20,6 +20,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "6dc1596141de47129c03e2ccb3f6a19a",
+      "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:667f75493d6fbd10b32fdee5",
+      "at": "2026-10-08T13:40:48Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "fd51cc54278a4a948f29c26e2b7bbc55",
       "session_id": "bcebd139f88a4c38a6dc9549b9b03523"
     }
   ]
