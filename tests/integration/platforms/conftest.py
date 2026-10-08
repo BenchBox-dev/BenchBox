@@ -402,6 +402,7 @@ STUB_PATCHED_MODULES: tuple[str, ...] = (
 )
 
 _STUB_BASELINE_KEY = pytest.StashKey[dict[str, dict[str, Any]]]()
+_IGNORED_LEAK_ATTRS = frozenset({"__warningregistry__"})
 
 
 def import_stub_patched_modules() -> None:
@@ -419,7 +420,7 @@ def snapshot_stub_adapter_attrs() -> dict[str, dict[str, Any]]:
     for name in STUB_PATCHED_MODULES:
         module = sys.modules.get(name)
         if module is not None:
-            snapshot[name] = dict(vars(module))
+            snapshot[name] = {k: v for k, v in vars(module).items() if k not in _IGNORED_LEAK_ATTRS}
     return snapshot
 
 
@@ -432,9 +433,13 @@ def find_stub_adapter_attr_leaks(before: dict[str, dict[str, Any]]) -> list[str]
             continue
         current = vars(module)
         for attr, old_value in old_attrs.items():
+            if attr in _IGNORED_LEAK_ATTRS:
+                continue
             if attr not in current or current[attr] is not old_value:
                 problems.append(f"{name}.{attr}")
         for attr in current:
+            if attr in _IGNORED_LEAK_ATTRS:
+                continue
             if attr not in old_attrs:
                 problems.append(f"{name}.{attr}")
     return problems
