@@ -4438,6 +4438,13 @@
       "status": "open",
       "title": "Concurrent comment-policy runs keep the shared host above the quiet-machine threshold for timed benchmarks"
     },
+    "comment-policy-pinned-notice-drift-guard": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Guard that whole-file pinned notices update their digest pin when modified on a branch"
+    },
     "comment-policy-ratchet-wheel-upgrade": {
       "claim": null,
       "needs": [],
