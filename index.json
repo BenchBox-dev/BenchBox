@@ -15171,7 +15171,7 @@
         "pvm-s0b-polars-engine-option"
       ],
       "priority": "medium-high",
-      "status": "blocked",
+      "status": "open",
       "title": "Probe candidate Polars versions for correctness and engine support, and fix the matrix version list"
     },
     "pvm-s2-sf10-memory-time-probe": {
