@@ -373,14 +373,14 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
 
     def _load_parquet(self, file_paths: list[Path]) -> pl.LazyFrame:
         if len(file_paths) == 1:
-            return pl.scan_parquet(file_paths[0], rechunk=self.rechunk)
+            return pl.scan_parquet(file_paths[0])
 
         parent_dir = file_paths[0].parent
         if all(f.parent == parent_dir for f in file_paths):
             pattern = str(parent_dir / "*.parquet")
-            return pl.scan_parquet(pattern, rechunk=self.rechunk)
+            return pl.scan_parquet(pattern)
 
-        lfs = [pl.scan_parquet(f, rechunk=self.rechunk) for f in file_paths]
+        lfs = [pl.scan_parquet(f) for f in file_paths]
         return cast(pl.LazyFrame, pl.concat(lfs))
 
     def _load_csv(
@@ -401,7 +401,6 @@ class PolarsAdapter(NoConstraintEnforcementMixin, PlatformAdapter):
         scan_kwargs: dict[str, Any] = {
             "separator": delimiter,
             "has_header": False,
-            "rechunk": self.rechunk,
             "ignore_errors": True,
         }
 

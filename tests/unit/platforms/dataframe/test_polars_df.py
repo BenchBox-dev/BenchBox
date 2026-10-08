@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -112,6 +113,62 @@ class TestPolarsExpressionMethods:
         expr = adapter.cast_date(adapter.col("date_str"))
 
         assert isinstance(expr, pl.Expr)
+
+    @pytest.mark.parametrize(
+        ("values", "dtype"),
+        [
+            (["2024-01-02", None], pl.String if pl else None),
+            ([date(2024, 1, 2), None], pl.Date if pl else None),
+            ([datetime(2024, 1, 2, 5, 30), None], pl.Datetime if pl else None),
+        ],
+        ids=["string", "date", "datetime"],
+    )
+    def test_cast_date_converts_supported_dtypes(self, values, dtype):
+        adapter = PolarsDataFrameAdapter()
+        frame = pl.LazyFrame({"value": pl.Series(values, dtype=dtype)})
+
+        result = frame.select(adapter.cast_date(adapter.col("value"))).collect()
+
+        assert result.schema["value"] == pl.Date
+        assert result["value"].to_list() == [date(2024, 1, 2), None]
+
+    def test_cast_date_rejects_invalid_string(self):
+        adapter = PolarsDataFrameAdapter()
+        frame = pl.LazyFrame({"value": ["not a date"]})
+
+        with pytest.raises(pl.exceptions.ComputeError):
+            frame.select(adapter.cast_date(adapter.col("value"))).collect()
+
+    @pytest.mark.parametrize("modern_keyword", [True, False])
+    @pytest.mark.parametrize("preserve", [True, False])
+    def test_csv_empty_string_option_matches_installed_scan_csv(self, monkeypatch, modern_keyword, preserve):
+        from benchbox.platforms.dataframe import polars_df
+
+        monkeypatch.setattr(polars_df, "_scan_csv_accepts_empty_string_is_null", lambda: modern_keyword)
+
+        option = polars_df.csv_empty_string_option(preserve)
+
+        if modern_keyword:
+            assert option == {"empty_string_is_null": not preserve}
+        else:
+            assert option == {"missing_utf8_is_empty_string": preserve}
+
+    @pytest.mark.parametrize(("null_marker", "expected"), [("", [None]), ("\\N", [""])])
+    def test_read_csv_empty_string_handling(self, tmp_path, null_marker, expected):
+        path = tmp_path / "data.csv"
+        path.write_text("a|b\n1|\n")
+        adapter = PolarsDataFrameAdapter()
+
+        frame = adapter.read_csv(path, delimiter="|", null_marker=null_marker, string_columns=["b"]).collect()
+
+        assert frame["b"].to_list() == expected
+
+    def test_readers_pass_no_removed_keywords(self, tmp_path):
+        path = tmp_path / "data.parquet"
+        pl.DataFrame({"a": [1, 2]}).write_parquet(path)
+        adapter = PolarsDataFrameAdapter()
+
+        assert adapter.read_parquet(path).collect()["a"].to_list() == [1, 2]
 
     def test_cast_string(self):
         adapter = PolarsDataFrameAdapter()

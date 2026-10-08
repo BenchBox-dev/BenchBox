@@ -1058,6 +1058,38 @@ jobs:
         if: matrix.partition == 'a'
         run: make tpcds-pandas-cross-surface-equivalence-report
 
+  polars-2-compat:
+    name: polars-2-compat
+    needs: ci-paths
+    if: ${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
+
+      - name: Create virtual environment
+        run: uv venv
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Install Polars 2.0.0 over the locked environment
+        run: uv pip install "polars==2.0.0"
+
+      - name: Run the polars-df smoke and cross-surface gates on Polars 2.0.0
+        run: make polars-df-compat-check
+
   required-local-cases:
     name: required-local-cases
     needs: ci-paths
@@ -1977,7 +2009,7 @@ jobs:
 
   core:
     name: core
-    needs: [ci-paths, code-lint, code-test, medium-collect, medium-test, correctness-gate, required-local-cases, plan-capture-gate, tpch-binary-framing, datafusion-integration, package-smoke, dependency-audit]
+    needs: [ci-paths, code-lint, code-test, medium-collect, medium-test, correctness-gate, polars-2-compat, required-local-cases, plan-capture-gate, tpch-binary-framing, datafusion-integration, package-smoke, dependency-audit]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -2025,6 +2057,7 @@ jobs:
             --expect medium-collect=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect medium-test=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect correctness-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
+            --expect polars-2-compat=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect required-local-cases=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect plan-capture-gate=${{ needs.ci-paths.outputs.heavy-needed == 'true' && needs.ci-paths.outputs.unit-core == 'true' }} \
             --expect tpch-binary-framing=${{ needs.ci-paths.outputs.heavy-needed == 'true' || needs.ci-paths.outputs.framing-needed == 'true' }} \

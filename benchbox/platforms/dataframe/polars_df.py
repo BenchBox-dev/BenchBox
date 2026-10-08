@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +34,27 @@ else:
     PolarsDF = Any
     PolarsLazyDF = Any
     PolarsExpr = Any
+
+
+def _series_to_date(series: PolarsDF) -> PolarsDF:
+    if series.dtype == pl.String:
+        return series.str.to_date()
+    return series.cast(pl.Date)
+
+
+def polars_cast_date(column: PolarsExpr) -> PolarsExpr:
+    return column.map_batches(_series_to_date, return_dtype=pl.Date, is_elementwise=True)
+
+
+@cache
+def _scan_csv_accepts_empty_string_is_null() -> bool:
+    return "empty_string_is_null" in inspect.signature(pl.scan_csv).parameters
+
+
+def csv_empty_string_option(preserve_empty_strings: bool) -> dict[str, bool]:
+    if _scan_csv_accepts_empty_string_is_null():
+        return {"empty_string_is_null": not preserve_empty_strings}
+    return {"missing_utf8_is_empty_string": preserve_empty_strings}
 
 
 class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, PolarsExpr]):
@@ -114,7 +137,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         return column + pl.duration(days=days)
 
     def cast_date(self, column: PolarsExpr) -> PolarsExpr:
-        return column.cast(pl.Date)
+        return polars_cast_date(column)
 
     def cast_string(self, column: PolarsExpr) -> PolarsExpr:
         return column.cast(pl.Utf8)
@@ -133,10 +156,9 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         scan_kwargs: dict[str, Any] = {
             "separator": delimiter,
             "has_header": has_header,
-            "rechunk": self.rechunk,
             "ignore_errors": True,
             "truncate_ragged_lines": True,
-            "missing_utf8_is_empty_string": dialect_preserves_empty_strings(null_marker),
+            **csv_empty_string_option(dialect_preserves_empty_strings(null_marker)),
         }
 
         if self.n_rows is not None:
@@ -155,9 +177,7 @@ class PolarsDataFrameAdapter(ExpressionFamilyAdapter[PolarsDF, PolarsLazyDF, Pol
         return lf
 
     def read_parquet(self, path: Path) -> PolarsLazyDF:
-        scan_kwargs: dict[str, Any] = {
-            "rechunk": self.rechunk,
-        }
+        scan_kwargs: dict[str, Any] = {}
 
         if self.n_rows is not None:
             scan_kwargs["n_rows"] = self.n_rows

@@ -43,7 +43,7 @@ pytestmark = [
 def _polars_environment(_hermetic_state, monkeypatch: pytest.MonkeyPatch) -> None:
     from tests.utilities.session_isolation import own_environment
 
-    own_environment(monkeypatch, ["POLARS_MAX_THREADS", "POLARS_STREAMING_CHUNK_SIZE"])
+    own_environment(monkeypatch, ["POLARS_MAX_THREADS", "POLARS_STREAMING_CHUNK_SIZE", "POLARS_IDEAL_MORSEL_SIZE"])
 
 
 def _polars_thread_config(threads: int = 6, chunk_size: int = 100_000) -> DataFrameTuningConfiguration:

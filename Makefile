@@ -216,6 +216,22 @@ tpch-cross-surface-equivalence-report:
 tpcds-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds --backend expression --backend datafusion
 
+.PHONY: polars-df-compat-check
+polars-df-compat-check:
+	@set -eu; \
+	DIR=$$(mktemp -d); \
+	trap 'rm -rf "$$DIR"' EXIT; \
+	uv run --no-sync -- python -c "import polars; print('polars', polars.__version__)"; \
+	for benchmark in tpch tpcds ssb clickbench; do \
+		BENCHBOX_OUTPUT_DIR="$$DIR" uv run --no-sync -- benchbox run --platform polars-df --benchmark "$$benchmark" \
+			--scale 0.01 --non-interactive; \
+	done; \
+	uv run --no-sync -- python scripts/check_polars_df_smoke.py "$$DIR/results"; \
+	for benchmark in tpch ssb clickbench; do \
+		uv run --no-sync -- python -m benchbox.core.equivalence.cross_surface --benchmark "$$benchmark"; \
+	done; \
+	uv run --no-sync -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds --backend expression --backend datafusion
+
 .PHONY: tpcds-pandas-cross-surface-equivalence-report
 tpcds-pandas-cross-surface-equivalence-report:
 	uv run -- python -m benchbox.core.equivalence.cross_surface --benchmark tpcds --backend pandas

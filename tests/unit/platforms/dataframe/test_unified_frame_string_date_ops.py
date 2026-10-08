@@ -1172,3 +1172,29 @@ class TestFrameLevelAggregation:
         result = frame.mean().collect()
         assert result["a"].to_list() == [2.0]
         assert result["b"].to_list() == [5.0]
+
+
+class TestCastDate:
+    @pytest.mark.parametrize(
+        "values",
+        [
+            ["2024-01-02", None],
+            [datetime.date(2024, 1, 2), None],
+            [datetime.datetime(2024, 1, 2, 5, 30), None],
+        ],
+        ids=["string", "date", "datetime"],
+    )
+    def test_cast_date_converts_supported_dtypes(self, pl, values):
+        expr_factory = _get_unified_expr()
+        frame = _get_unified_lazy_frame()(pl.DataFrame({"value": values}).lazy(), _create_mock_adapter())
+
+        result = frame.select(expr_factory(pl.col("value")).cast_date().alias("value")).collect()
+
+        assert result["value"].to_list() == [datetime.date(2024, 1, 2), None]
+
+    def test_cast_date_rejects_invalid_string(self, pl):
+        expr_factory = _get_unified_expr()
+        frame = _get_unified_lazy_frame()(pl.DataFrame({"value": ["not a date"]}).lazy(), _create_mock_adapter())
+
+        with pytest.raises(pl.exceptions.ComputeError):
+            frame.select(expr_factory(pl.col("value")).cast_date().alias("value")).collect()
