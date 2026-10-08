@@ -4481,6 +4481,13 @@
       "status": "open",
       "title": "comment-policy-strict can never pass: flags vendored, binary, and out-of-scope files"
     },
+    "comment-scanner-stdin-piped-interpreter-adapter": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Add comment-scanner adapter or detection for programs piped to interpreters on stdin"
+    },
     "commit-identity-canonical-skill-source-sync": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Scripts containing shell pipelines feeding inline scripts to interpreters (perl, ruby, python) on stdin are scanned for comments or surfaced as coverage errors.",
+    "Regression tests in tests/unit/scripts/test_comment_policy.py cover stdin pipeline sinks."
+  ],
+  "context": "Follow-up item 2 from comment-checker-review-followups. Currently listed as a known gap in docs/development/comment-policy.md.",
+  "description": "Programs piped to interpreters on stdin (e.g., printf '...' | perl, echo '...' | ruby) in shell scripts or commands currently bypass the comment scanner because stdin pipelines are unmodeled. Detect pipeline sinks terminating in script interpreters and route the piped string payload to the corresponding language scanner, or flag bare unmodeled interpreter stdin usage as a coverage error.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e",
+      "at": "2026-10-08T23:33:41Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "6e20f3c3a32c40fd8f9dab388e235a87",
+      "session_id": "2c188abafba54577ab5700a7c822554e"
+    }
+  ]
+}
