@@ -5,7 +5,7 @@
     "The parity test reads exclusions from the profile, and each exclusion carries a reason.",
     "The verification ladder passes."
   ],
-  "context": "Source: tuning-evidence plan (2026-10-08), plan step 8. Covers muse F6, F16 (rebutted: the generator consumes tpc.yaml) and agy F-07 (the earlier claim that the profile ranks columns by mention count was wrong; L_ORDERKEY has query_count 10 vs L_SHIPDATE 8). Note that default_partitioning.yaml is a separate profile, consumed by benchbox/core/tuning/interface.py _default_layout_targets; review it for the same problem.",
+  "context": "Source: tuning-evidence plan (2026-10-08), plan step 8. Covers muse F6, F16 (rebutted: the generator consumes tpc.yaml) and agy F-07 (the earlier claim that the profile ranks columns by mention count was wrong; L_ORDERKEY has query_count 10 vs L_SHIPDATE 8). default_partitioning.yaml is a separate profile, consumed by benchbox/core/tuning/interface.py _default_layout_targets. PRE-DECIDED GATES: ~/Developer/benchmark_runs/HANDOFF-tuning-evidence-batch-20261008.md section 7.4 (Item 14): the vendor limit wins below its scale threshold and both are recorded; default_partitioning.yaml behavior stays, with a reason field added. Follow it instead of stopping.",
   "description": "## Problem\n`benchbox/core/tuning/profiles/tpc.yaml` records choices that existing templates already made; it does not record measurements. For example, `L_SHIPDATE` has roles `temporal_partition` and `high_selectivity_filter`, status `existing_baseline`, and the rationale \"Existing partition/date locality column in checked TPC-H tuned templates\". `scripts/generate_cloud_tpc_templates.py` and `tests/unit/core/tuning/test_tpc_tuning_template_parity.py` both consume the profile, so stale choices flow into generated templates and tests. The platform-specific exceptions added by the Databricks and Snowflake items are workarounds for that.\n\n## Change\n- Add a measured-evidence field per candidate and platform: measured-keep, measured-reject or unmeasured, with scale, engine version and a link to the evidence. Add a vendor-limit field where vendor docs rule a mechanism out at BenchBox scales (for example, Databricks partitioning under 1 TB).\n- Correct rationales that describe history as if it were evidence.\n- The generator does not emit candidates that are measured-reject or vendor-ruled-out for that platform.\n- Where the profile can now express the Databricks and Snowflake exceptions, the parity test reads them from the profile, and the ad hoc exceptions are removed.\n\n## Decision gate\n- If a measured result contradicts a vendor limit, record both and ask the owner which wins. Do not resolve it silently.\n\n## Guardrails (must preserve)\n- `generate_cloud_tpc_templates.py --check` passes.\n- The parity test is not weakened: each candidate is still mapped, or excluded with a recorded reason.\n- No template content changes unless measurement or a cited vendor document supports it.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`. Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
   "links": [
     "benchbox/core/tuning/profiles/tpc.yaml",
@@ -20,6 +20,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "bedf8bb7801240a49c23697c4d887808",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:45:01Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d5a0a10d02e44cf4b6376f5a1745e44d",
       "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
