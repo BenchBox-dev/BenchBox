@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "find_stub_adapter_attr_leaks in tests/integration/platforms/conftest.py ignores __warningregistry__ in before/after attribute diffs",
+    "A test in tests/integration/platforms/test_stub_installer_isolation.py confirms __warningregistry__ on an adapter module is ignored by find_stub_adapter_attr_leaks",
+    "Existing stub-installer leak detection continues to flag true adapter attribute leaks"
+  ],
+  "context": "Diagnosed during triage of nightly runs 37638195854, 37784986221, and 37794806634 for GitHub issue #2729. The ClickHouse setup module has no warnings.warn call; the warning reaches the module namespace via stacklevel from a library in the live connection path.",
+  "description": "In tests/integration/platforms/conftest.py, find_stub_adapter_attr_leaks compares adapter module attributes before and after tests to detect un-monkeypatched stub-installer mutations. When code paths trigger a Python warning attributed to an adapter module, CPython attaches __warningregistry__ to module.__dict__. The leak guard flags this as a leak (e.g. benchbox.platforms.clickhouse.setup.__warningregistry__), causing teardown failures in t3:docker | clickhouse on the first test per pytest-xdist worker process.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2729"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:9d5794dc0b1b02d1d2d635e2",
+      "at": "2026-10-08T23:36:14Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "8eb723cccb1948309761117dcca4b8c2",
+      "session_id": "dd380b7ca8774be788adfc98150df8c1"
+    }
+  ]
+}
