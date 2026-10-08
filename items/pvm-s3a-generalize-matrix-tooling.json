@@ -1,6 +1,6 @@
 {
   "acceptance": [
-    "A test asserts the DuckDB spec's --dry-run command list equals a golden copy captured from HEAD d076a974d",
+    "A test asserts the DuckDB spec's --dry-run output equals a golden copy captured from the pre-change script: all 123 emitted commands in order, with separate assertions of 116 benchmark invocations and 7 driver installs",
     "Re-analyzing the archived DuckDB manifest gives byte-identical analysis JSON and CSV and identical median-bundle content to the archived outputs (or every difference is listed and explained in the PR)",
     "Existing tests in tests/unit/scripts/test_duckdb_version_matrix.py pass unchanged, or each changed assertion is justified in the PR body",
     "Docs that name the old scripts are updated or still accurate"
@@ -20,6 +20,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "c37028943f5046daaabc18f1b8e9c67e",
+      "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1",
+      "at": "2026-10-08T03:29:01Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "d3093ff97fd94540be6d3bc7af09eabe",
       "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
     }
   ]
