@@ -41,14 +41,18 @@ Two defects showed up in the shadow period.
   Codex structured outputs reject optional keys. The schema was checked with
   `codex exec --output-schema`, `claude --json-schema`, `agy --output-format
   json --json-schema` and muse with the schema in the prompt.
-- **Evidence.** A defect must cite a real file and line in the head commit.
-  Under a file-list brief, a verdict with no defect must name every changed
-  soundness file that exists at the head, Claude must take more than one turn,
-  and the Codex event stream (`--json`) must show a successful command that
-  names one of those files. Inline briefs carry the diff, so a single turn is
-  valid. muse and agy leave no read trace; only the citation check and their
-  own report apply to them. A failed check records the reviewer as absent
-  (`incomplete`), never as a pass.
+- **Evidence.** A defect must cite a real file and line in the head commit; a
+  defect that does not is kept and marked, so it still fails the change rather
+  than handing it to the next reviewer. Under a file-list brief, a verdict with
+  no defect must name every changed soundness file that exists at the head, and
+  the reviewer's trace must show a successful read of each: a Read or Grep
+  naming it in Claude's `stream-json` events (a turn count is not evidence,
+  because the structured-output call is itself a turn), or a Codex command whose
+  text names the exact path (command output, listings and the staged diff do not
+  count). Inline briefs carry the diff, so no read is required. muse and agy
+  leave no read trace; only the citation check and their own report apply to
+  them. A failed check records the reviewer as absent (`incomplete`), never as
+  a pass.
 - **Read rules per harness.** The brief's read rule is filled when the review
   runs: read-only shell commands for Codex (its sandbox already blocks
   writes), Read, Grep and Glob for Claude, workspace file tools for muse.

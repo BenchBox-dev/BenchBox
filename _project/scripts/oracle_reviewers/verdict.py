@@ -225,8 +225,9 @@ def _prior(data: Any) -> PriorDefect:
     return PriorDefect(data["id"], data["status"], sanitize(data["evidence"], MAX_EVIDENCE))
 
 
-def validate(data: Any) -> Verdict:
+def validate(data: Any, *, trusted: bool = False) -> Verdict:
     _require(isinstance(data, dict), "the verdict must be a JSON object")
+    _require(trusted or "defect_count" not in data, "defect_count is set by the oracle, not the reviewer")
     keys = set(data) - {"defect_count"}
     _require(keys == set(VERDICT_KEYS), f"the verdict must have exactly the keys {VERDICT_KEYS}")
     _require(data["status"] in STATUSES, f"status must be one of {STATUSES}")
@@ -263,11 +264,24 @@ def _strip_fence(text: str) -> str:
     return match.group(1) if match else stripped
 
 
+def _stream_result(text: str) -> Any:
+    for line in reversed(text.splitlines()):
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(event, dict) and event.get("type") == "result":
+            return event
+    return None
+
+
 def parse_output(harness: str, text: str) -> Any:
     try:
         payload = json.loads(_strip_fence(text))
     except json.JSONDecodeError as exc:
-        raise VerdictError(f"the reviewer output is not JSON: {exc.msg}") from exc
+        payload = _stream_result(text) if harness == "claude" else None
+        if payload is None:
+            raise VerdictError(f"the reviewer output is not JSON: {exc.msg}") from exc
     if harness == "claude":
         _require(isinstance(payload, dict), "the claude result envelope must be an object")
         _require(payload.get("is_error") is not True, "the claude result envelope reports an error")

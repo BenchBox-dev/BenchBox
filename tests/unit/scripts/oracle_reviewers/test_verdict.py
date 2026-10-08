@@ -121,8 +121,8 @@ def test_end_line_is_optional_and_normalised() -> None:
     assert validate(_verdict(_finding(line=11, end_line=11))).defects[0].end_line is None
     ranged = validate(_verdict(_finding(line=11, end_line=14)))
     assert (ranged.defects[0].line, ranged.defects[0].end_line) == (11, 14)
-    assert validate(ranged.to_json()) == ranged
-    assert validate(plain.to_json()) == plain
+    assert validate(ranged.to_json(), trusted=True) == ranged
+    assert validate(plain.to_json(), trusted=True) == plain
 
 
 @pytest.mark.parametrize("end_line", [10, 0, -1, True, "14", 14.0])
@@ -137,7 +137,7 @@ def test_valid_verdict_round_trips() -> None:
     assert [finding.severity for finding in verdict.defects] == ["High", "Low"]
     assert [item.to_json() for item in verdict.prior_defects] == [prior]
     assert verdict.listed == 2
-    assert validate(verdict.to_json()) == verdict
+    assert validate(verdict.to_json(), trusted=True) == verdict
 
 
 @pytest.mark.parametrize(
@@ -157,9 +157,7 @@ def test_valid_verdict_round_trips() -> None:
         _verdict(prior_defects=[{"id": "D1", "status": "fixed"}]),
         _verdict(prior_defects=[{"id": "<!--x-->", "status": "fixed", "evidence": ""}]),
         _verdict(prior_defects=[{"id": "D1", "status": "fixed", "evidence": ""}] * 2),
-        _verdict(defect_count=-1),
-        _verdict(_finding(), defect_count=0),
-        _verdict(defect_count=True),
+        _verdict(defect_count=3),
         _verdict(_finding(severity="critical")),
         _verdict(_finding(severity="Blocker")),
         _verdict(_finding(line=0)),
@@ -286,7 +284,7 @@ def test_more_listed_defects_than_kept_are_still_counted() -> None:
     verdict = validate(_verdict(*[_finding(line=line) for line in range(1, 61)]))
     assert len(verdict.defects) == 50
     assert verdict.listed == 60
-    assert validate(verdict.to_json()).listed == 60
+    assert validate(verdict.to_json(), trusted=True).listed == 60
 
 
 def test_incomplete_needs_no_decision() -> None:
@@ -320,3 +318,24 @@ def test_parse_agy_envelope_reads_the_response() -> None:
         parse_output("agy", json.dumps({**envelope, "response": ""}))
     with pytest.raises(VerdictError, match="reports an error"):
         parse_output("agy", json.dumps({**envelope, "status": "ERROR"}))
+
+
+@pytest.mark.parametrize("count", [-1, True, 0])
+def test_a_trusted_defect_count_must_cover_the_listed_defects(count: Any) -> None:
+    with pytest.raises(VerdictError):
+        validate(_verdict(_finding(), defect_count=count), trusted=True)
+
+
+def test_parse_claude_stream_reads_the_final_result_event() -> None:
+    stream = "\n".join(
+        [
+            json.dumps({"type": "system", "subtype": "init"}),
+            json.dumps({"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read"}]}}),
+            json.dumps({"type": "result", "is_error": False, "structured_output": _verdict(), "num_turns": 3}),
+        ]
+    )
+    assert parse_output("claude", stream) == _verdict()
+    with pytest.raises(VerdictError, match="not JSON"):
+        parse_output("claude", json.dumps({"type": "system"}) + "\nnot json")
+    with pytest.raises(VerdictError, match="not JSON"):
+        parse_output("muse", stream)

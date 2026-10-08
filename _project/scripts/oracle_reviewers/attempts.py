@@ -83,7 +83,7 @@ def _attempt(data: Mapping[str, Any], max_defects: int, loaded: LoadedAttempts) 
     reviewer = str(data["reviewer"])
     if data["outcome"] == VERDICT_OUTCOME:
         try:
-            verdict = validate(data["verdict"])
+            verdict = validate(data["verdict"], trusted=True)
         except VerdictError as exc:
             return Attempt(slot, reviewer, selection.ABSENT, absence.INVALID, str(exc))
         if verdict.status != COMPLETE:

@@ -54,7 +54,7 @@ def test_claude_reviewer_uses_read_tools_and_json_schema(policy: Policy, tmp_pat
     assert argv[argv.index("--setting-sources") + 1] == "user"
     assert "--strict-mcp-config" in argv
     assert json.loads(argv[argv.index("--json-schema") + 1]) == VERDICT_SCHEMA
-    assert argv[argv.index("--output-format") + 1] == "json"
+    assert argv[argv.index("--output-format") + 1] == "stream-json" and "--verbose" in argv
     assert argv[-1] == PROMPT
 
 

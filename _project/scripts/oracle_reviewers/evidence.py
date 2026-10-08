@@ -4,7 +4,7 @@ import json
 import os
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from .verdict import Finding, Verdict
@@ -13,13 +13,17 @@ INLINE = "inline"
 _LINE_SUFFIX = re.compile(r":\d+(?:-\d+)?$")
 
 
+TRACED = ("claude", "codex")
+CLAUDE_READERS = ("Read", "Grep")
+CITATION_PREFIX = "Citation not found in the head commit"
+
+
 @dataclass(frozen=True)
 class Trace:
-    turns: int | None = None
     reads: tuple[str, ...] = ()
 
 
-def codex_events(stdout: str) -> list[dict]:
+def json_lines(stdout: str) -> list[dict]:
     events = []
     for line in stdout.splitlines():
         try:
@@ -31,6 +35,9 @@ def codex_events(stdout: str) -> list[dict]:
     return events
 
 
+codex_events = json_lines
+
+
 def codex_errors(stdout: str) -> str:
     lines = []
     for event in codex_events(stdout):
@@ -40,10 +47,27 @@ def codex_errors(stdout: str) -> str:
     return "\n".join(lines)
 
 
+def _claude_reads(stdout: str) -> tuple[str, ...]:
+    uses: dict[str, str] = {}
+    succeeded: set[str] = set()
+    for event in json_lines(stdout):
+        content = (event.get("message") or {}).get("content")
+        for block in content if isinstance(content, list) else ():
+            if not isinstance(block, dict):
+                continue
+            if event.get("type") == "assistant" and block.get("type") == "tool_use":
+                if block.get("name") in CLAUDE_READERS and isinstance(block.get("input"), dict):
+                    target = block["input"].get("file_path") or block["input"].get("path") or ""
+                    uses[str(block.get("id"))] = str(target)
+            elif event.get("type") == "user" and block.get("type") == "tool_result" and not block.get("is_error"):
+                succeeded.add(str(block.get("tool_use_id")))
+    return tuple(target for use, target in uses.items() if use in succeeded and target)
+
+
 def trace(harness: str, stdout: str) -> Trace:
     if harness == "codex":
         reads = []
-        for event in codex_events(stdout):
+        for event in json_lines(stdout):
             item = event.get("item")
             if (
                 event.get("type") == "item.completed"
@@ -51,16 +75,26 @@ def trace(harness: str, stdout: str) -> Trace:
                 and item.get("type") == "command_execution"
                 and str(item.get("exit_code")) == "0"
             ):
-                reads.append(f"{item.get('command') or ''}\n{item.get('aggregated_output') or ''}")
-        return Trace(reads=tuple(reads))
+                reads.append(str(item.get("command") or ""))
+        return Trace(tuple(reads))
     if harness == "claude":
-        try:
-            envelope = json.loads(stdout)
-        except json.JSONDecodeError:
-            return Trace()
-        turns = envelope.get("num_turns") if isinstance(envelope, dict) else None
-        return Trace(turns=turns if isinstance(turns, int) and not isinstance(turns, bool) else None)
+        return Trace(_claude_reads(stdout))
     return Trace()
+
+
+def _names(command: str, path: str, workspace: Path) -> bool:
+    root = re.escape(os.path.realpath(workspace) + os.sep)
+    pattern = rf"(?:(?<![\w./-])(?:\./)?|{root}){re.escape(path)}(?![\w./-])"
+    return re.search(pattern, command) is not None
+
+
+def unread(harness: str, required: Iterable[str], run: Trace, workspace: Path) -> list[str]:
+    if harness == "claude":
+        read = {relative(target, workspace) for target in run.reads}
+        return [path for path in required if path not in read]
+    if harness == "codex":
+        return [path for path in required if not any(_names(command, path, workspace) for command in run.reads)]
+    return []
 
 
 def relative(path: str, workspace: Path) -> str:
@@ -87,11 +121,24 @@ def _line_count(workspace: Path, path: str) -> int | None:
 def _citation_error(finding: Finding, workspace: Path) -> str | None:
     count = _line_count(workspace, finding.file)
     if count is None:
-        return f"a defect cites {finding.file}, which is not a file in the head commit"
+        return f"{finding.file} is not a file in the head commit"
     last = finding.end_line or finding.line
     if last > count:
-        return f"a defect cites {finding.file}:{last}, past its last line ({count})"
+        return f"{finding.file} has {count} lines, so line {last} does not exist"
     return None
+
+
+def mark_citations(verdict: Verdict, workspace: Path) -> Verdict:
+    marked = []
+    for finding in verdict.defects:
+        error = _citation_error(finding, workspace)
+        detail = f"{CITATION_PREFIX}: {error}. {finding.detail}".rstrip() if error else finding.detail
+        marked.append(replace(finding, detail=detail))
+    return replace(verdict, defects=tuple(marked))
+
+
+def _shown(paths: list[str]) -> str:
+    return ", ".join(paths[:5]) + (f" and {len(paths) - 5} more" if len(paths) > 5 else "")
 
 
 def check(
@@ -103,22 +150,17 @@ def check(
     required: Iterable[str],
     run: Trace,
 ) -> str | None:
-    for finding in verdict.defects:
-        error = _citation_error(finding, workspace)
-        if error is not None:
-            return error
-    if brief_mode == INLINE:
+    if brief_mode == INLINE or verdict.defects:
         return None
-    if harness == "claude" and (run.turns is None or run.turns <= 1):
-        return "the reviewer read no files: it answered a file-list brief in a single turn"
     needed = sorted(set(required))
-    if harness == "codex" and not any(any(path in text for path in needed) if needed else True for text in run.reads):
-        return "the reviewer read no files: its command trace shows no successful read of the changed files"
-    if verdict.defects:
-        return None
+    if harness in TRACED:
+        if not run.reads:
+            return "the reviewer found no defects but its trace shows no successful file read"
+        missing = unread(harness, needed, run, workspace)
+        if missing:
+            return f"the reviewer found no defects but its trace shows no read of {_shown(missing)}"
     examined = {relative(path, workspace) for path in verdict.files_examined}
     missing = [path for path in needed if path not in examined]
     if missing:
-        shown = ", ".join(missing[:5]) + (f" and {len(missing) - 5} more" if len(missing) > 5 else "")
-        return f"the reviewer found no defects but did not examine {shown}"
+        return f"the reviewer found no defects but did not examine {_shown(missing)}"
     return None

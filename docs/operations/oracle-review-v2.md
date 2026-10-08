@@ -106,7 +106,8 @@ The reviewer answers with schema 2 of the verdict (`VERDICT_SCHEMA` in
 because Codex structured outputs reject optional keys: `status` (`complete` or
 `incomplete`), `incomplete_reason`, `decision` (`SHIP`, `SHIP_WITH_FIXES`,
 `DO_NOT_SHIP`, or `NONE` when incomplete), `summary`, `files_examined`,
-`defects` and `prior_defects`. The brief asks for must-fix defects only, at
+`defects` and `prior_defects`. A reviewer that adds any other key, such as a
+defect count, is invalid. The brief asks for must-fix defects only, at
 most `protocol.max_defects` (10), and for `DO_NOT_SHIP` when the change needs
 rework or more defects would have to be listed.
 
@@ -136,14 +137,19 @@ checkout before it records it; a failed check records the reviewer as absent
 (`incomplete`), so the next reviewer runs and a hollow answer never passes.
 
 - In every mode, each defect must cite a file in the head commit and a line
-  within it.
+  within it. A defect that does not is kept, with a note that its citation was
+  not found, so it still fails the change; discarding the verdict would hand the
+  change to the next reviewer, which might pass it.
 - When the brief lists files instead of carrying the diff (`file-list` mode),
   a verdict with no defect must name, in `files_examined`, every soundness-path
-  file the pull request changes that still exists at the head. A Claude
-  reviewer must have taken more than one turn. Codex runs with `--json`, and its
-  event stream must show a successful command whose text or output names one
-  of those files.
-- An inline brief carries the diff, so a single Claude turn is valid there.
+  file the pull request changes that still exists at the head, and the
+  reviewer's trace must show it read each one. Claude runs with
+  `--output-format stream-json`, and each file needs a successful Read or Grep
+  that names it; the structured-output call does not count. Codex runs with
+  `--json`, and each file needs a successful command whose text names that exact
+  path; a listing, a search of a directory or a read of the staged diff does
+  not count.
+- An inline brief carries the diff, so no read is required there.
 
 The brief no longer forbids running commands. Its `<<read-rule>>` slot is
 filled per harness when the review runs: Codex may run read-only shell

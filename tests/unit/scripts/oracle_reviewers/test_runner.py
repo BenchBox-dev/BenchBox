@@ -84,9 +84,22 @@ def _muse_says(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **over: object) 
     _fake_muse(tmp_path, monkeypatch, f"print({json.dumps(json.dumps({**VERDICT, **over}))})")
 
 
-def _claude_says(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, turns: int, **over: object) -> None:
-    envelope = {"type": "result", "is_error": False, "num_turns": turns, "structured_output": {**VERDICT, **over}}
-    _fake_muse(tmp_path, monkeypatch, f"print({json.dumps(json.dumps(envelope))})", name="claude")
+def _claude_says(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, reads: list[tuple[str, bool]], **over: object
+) -> None:
+    events: list[dict] = []
+    for index, (path, error) in enumerate(reads):
+        use = {"type": "tool_use", "id": f"t{index}", "name": "Read", "input": {"file_path": path}}
+        events.append({"type": "assistant", "message": {"content": [use]}})
+        result = {"type": "tool_result", "tool_use_id": f"t{index}", "is_error": error, "content": "x"}
+        events.append({"type": "user", "message": {"content": [result]}})
+    structured = {"type": "tool_use", "id": "s", "name": "StructuredOutput", "input": {}}
+    events.append({"type": "assistant", "message": {"content": [structured]}})
+    events.append(
+        {"type": "result", "is_error": False, "num_turns": len(reads) + 2, "structured_output": {**VERDICT, **over}}
+    )
+    lines = "\n".join(json.dumps(event) for event in events)
+    _fake_muse(tmp_path, monkeypatch, f"print({json.dumps(lines)})", name="claude")
 
 
 def _codex_says(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, events: list[dict], **over: object) -> None:
@@ -331,24 +344,47 @@ def test_a_reviewer_that_reports_incomplete_is_absent_with_its_reason(
 
 
 @pytest.mark.parametrize(
-    ("defect", "message"),
+    ("defect", "note"),
     [
-        ({"file": "invented.py"}, "a defect cites invented.py, which is not a file in the head commit"),
-        ({"line": 2}, "a defect cites a.txt:2, past its last line (1)"),
-        ({"end_line": 9}, "a defect cites a.txt:9, past its last line (1)"),
-        ({"file": "../outside.txt"}, "file must be a repository-relative path"),
+        (
+            {"file": "invented.py"},
+            "Citation not found in the head commit: invented.py is not a file in the head commit.",
+        ),
+        ({"line": 2}, "Citation not found in the head commit: a.txt has 1 lines, so line 2 does not exist."),
+        ({"end_line": 9}, "Citation not found in the head commit: a.txt has 1 lines, so line 9 does not exist."),
     ],
 )
-def test_a_defect_citing_a_line_the_head_lacks_makes_the_review_incomplete(
-    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, defect: dict, message: str
+def test_a_miscited_defect_is_kept_and_marked_so_the_change_still_fails(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, defect: dict, note: str
+) -> None:
+    from _project.scripts.oracle_reviewers import protocol
+    from _project.scripts.oracle_reviewers.verdict import validate
+
+    workspace, head = _workspace(tmp_path)
+    _muse_says(tmp_path, monkeypatch, decision="SHIP", defects=[{**DEFECT, **defect}])
+    outcome = _review(policy, tmp_path, workspace, head, brief_mode="file-list", required=("a.txt",))
+    assert outcome.missing is None and outcome.verdict is not None
+    assert outcome.verdict["defects"][0]["detail"] == f"{note} d"
+    judged = protocol.judge(validate(outcome.verdict, trusted=True), 10)
+    assert judged.decision == "SHIP_WITH_FIXES"
+
+
+def test_a_path_outside_the_repository_is_rejected(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace, head = _workspace(tmp_path)
-    (tmp_path / "outside.txt").write_text("x\n" * 50, encoding="utf-8")
-    _muse_says(tmp_path, monkeypatch, decision="SHIP_WITH_FIXES", defects=[{**DEFECT, **defect}])
+    _muse_says(tmp_path, monkeypatch, decision="SHIP_WITH_FIXES", defects=[{**DEFECT, "file": "../outside.txt"}])
     outcome = _review(policy, tmp_path, workspace, head)
-    assert outcome.verdict is None and outcome.missing is not None
-    assert outcome.missing.kind in (absence.INCOMPLETE, absence.INVALID)
-    assert outcome.missing.detail == message
+    assert outcome.missing == absence.Absence(absence.INVALID, "file must be a repository-relative path")
+
+
+def test_a_reviewer_cannot_supply_its_own_defect_count(
+    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace, head = _workspace(tmp_path)
+    _muse_says(tmp_path, monkeypatch, decision="SHIP_WITH_FIXES", defect_count=3)
+    outcome = _review(policy, tmp_path, workspace, head)
+    assert outcome.missing == absence.Absence(absence.INVALID, "defect_count is set by the oracle, not the reviewer")
 
 
 def test_a_defect_citing_a_real_line_is_recorded(
@@ -393,21 +429,33 @@ def test_absolute_examined_paths_inside_the_workspace_count(
 
 
 @pytest.mark.parametrize(
-    ("turns", "brief_mode", "accepted"), [(1, "file-list", False), (3, "file-list", True), (1, "inline", True)]
+    ("reads", "brief_mode", "accepted"),
+    [
+        ([], "file-list", False),
+        ([("a.txt", False)], "file-list", True),
+        ([("{ws}/a.txt", False)], "file-list", True),
+        ([("a.txt", True)], "file-list", False),
+        ([("other.txt", False)], "file-list", False),
+        ([], "inline", True),
+    ],
+    ids=["structured-output-only", "read", "absolute-read", "failed-read", "other-file", "inline"],
 )
-def test_claude_must_take_a_reading_turn_on_a_file_list_brief(
-    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, turns: int, brief_mode: str, accepted: bool
+def test_claude_must_read_every_required_file_on_a_file_list_brief(
+    policy: Policy,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    reads: list[tuple[str, bool]],
+    brief_mode: str,
+    accepted: bool,
 ) -> None:
     workspace, head = _workspace(tmp_path)
-    _claude_says(tmp_path, monkeypatch, turns)
+    resolved = [(path.format(ws=workspace.resolve()), error) for path, error in reads]
+    _claude_says(tmp_path, monkeypatch, resolved)
     outcome = _review(policy, tmp_path, workspace, head, reviewer="sonnet", brief_mode=brief_mode, required=("a.txt",))
-    if accepted:
-        assert outcome.missing is None and outcome.verdict is not None
-    else:
-        assert outcome.verdict is None
-        assert outcome.missing == absence.Absence(
-            absence.INCOMPLETE, "the reviewer read no files: it answered a file-list brief in a single turn"
-        )
+    assert (outcome.missing is None and outcome.verdict is not None) is accepted
+    if not accepted:
+        assert outcome.missing is not None and outcome.missing.kind == absence.INCOMPLETE
+        assert "trace shows no" in outcome.missing.detail
 
 
 def test_a_codex_ship_without_any_read_command_is_a_hollow_review(
@@ -419,19 +467,22 @@ def test_a_codex_ship_without_any_read_command_is_a_hollow_review(
     outcome = _review(policy, tmp_path, workspace, head, reviewer="sol", brief_mode="file-list", required=("a.txt",))
     assert outcome.verdict is None
     assert outcome.missing is not None and outcome.missing.kind == absence.INCOMPLETE
-    assert "command trace shows no successful read" in outcome.missing.detail
+    assert outcome.missing.detail == "the reviewer found no defects but its trace shows no successful file read"
 
 
 @pytest.mark.parametrize(
     ("event", "accepted"),
     [
         (_command("/bin/zsh -lc 'cat -n a.txt'", "1 a"), True),
-        (_command("/bin/zsh -lc 'rg -n x .'", "./a.txt:1:a"), True),
+        (_command("/bin/zsh -lc 'rg -n x a.txt'", "1:a"), True),
+        (_command("/bin/zsh -lc 'rg -n x .'", "./a.txt:1:a"), False),
+        (_command("/bin/zsh -lc 'ls -R'", "a.txt"), False),
+        (_command("/bin/zsh -lc 'cat .oracle-pull-request.diff'", "+++ b/a.txt"), False),
         (_command("/bin/zsh -lc 'cat -n a.txt'", "", exit_code=1), False),
-        (_command("/bin/zsh -lc 'ls'", "README"), False),
     ],
+    ids=["cat", "rg-on-file", "rg-on-directory", "listing", "staged-diff-only", "failed"],
 )
-def test_a_codex_file_list_review_needs_a_successful_read_of_a_required_file(
+def test_a_codex_file_list_review_needs_a_successful_read_of_each_required_file(
     policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, event: dict, accepted: bool
 ) -> None:
     workspace, head = _workspace(tmp_path)

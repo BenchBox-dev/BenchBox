@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -14,22 +15,63 @@ def _events(*events: dict) -> str:
     return "\n".join(json.dumps(event) for event in events) + "\n"
 
 
-def test_codex_trace_keeps_only_successful_command_executions() -> None:
-    ok = {"type": "command_execution", "command": "cat a.py", "aggregated_output": "x = 1", "exit_code": 0}
+def test_codex_trace_keeps_only_successful_command_text() -> None:
+    ok = {"type": "command_execution", "command": "cat a.py", "aggregated_output": "b.py c.py", "exit_code": 0}
     failed = {**ok, "command": "cat b.py", "exit_code": 1}
     started = {"type": "item.started", "item": {**ok, "command": "cat c.py"}}
     message = {"type": "item.completed", "item": {"type": "agent_message", "text": "cat d.py"}}
     stdout = _events(
         {"type": "item.completed", "item": ok}, {"type": "item.completed", "item": failed}, started, message
     )
-    assert trace("codex", "not json\n" + stdout) == Trace(reads=("cat a.py\nx = 1",))
+    assert trace("codex", "not json\n" + stdout) == Trace(("cat a.py",))
 
 
-def test_claude_trace_reads_the_turn_count_from_the_envelope() -> None:
-    assert trace("claude", json.dumps({"num_turns": 4})) == Trace(turns=4)
-    assert trace("claude", json.dumps({"num_turns": True})) == Trace()
-    assert trace("claude", "not json") == Trace()
-    assert trace("muse", json.dumps({"num_turns": 4})) == Trace()
+def _claude_stream(*uses: tuple[str, str, dict, bool]) -> str:
+    events = []
+    for use_id, name, tool_input, error in uses:
+        block = {"type": "tool_use", "id": use_id, "name": name, "input": tool_input}
+        events.append({"type": "assistant", "message": {"content": [block]}})
+        result = {"type": "tool_result", "tool_use_id": use_id, "is_error": error, "content": "x"}
+        events.append({"type": "user", "message": {"content": [result]}})
+    events.append({"type": "result", "num_turns": len(uses) + 1})
+    return _events(*events)
+
+
+def test_claude_trace_keeps_successful_reads_and_greps_only() -> None:
+    stdout = _claude_stream(
+        ("1", "Read", {"file_path": "/ws/a.py"}, False),
+        ("2", "Grep", {"pattern": "x", "path": "b.py"}, False),
+        ("3", "Read", {"file_path": "/ws/c.py"}, True),
+        ("4", "Glob", {"pattern": "*.py", "path": "/ws/d.py"}, False),
+        ("5", "StructuredOutput", {"status": "complete"}, False),
+    )
+    assert trace("claude", stdout) == Trace(("/ws/a.py", "b.py"))
+    assert trace("claude", json.dumps({"num_turns": 4})) == Trace()
+    assert trace("muse", stdout) == Trace()
+
+
+@pytest.mark.parametrize(
+    ("command", "named"),
+    [
+        ("cat -n pkg/a.py", True),
+        ("sed -n '1,80p' ./pkg/a.py", True),
+        ("git show HEAD:pkg/a.py", True),
+        ("rg -n compare pkg/a.py", True),
+        ("cat {root}/pkg/a.py", True),
+        ("cat pkg/data.py", False),
+        ("cat pkg/a.pyc", False),
+        ("ls -R pkg", False),
+        ("cat .oracle-pull-request.diff", False),
+        ("cat otherpkg/a.py", False),
+    ],
+)
+def test_a_codex_read_names_the_required_file_exactly(tmp_path: Path, command: str, named: bool) -> None:
+    from _project.scripts.oracle_reviewers.evidence import unread
+
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    text = command.format(root=os.path.realpath(workspace))
+    assert (unread("codex", ["pkg/a.py"], Trace((text,)), workspace) == []) is named
 
 
 def test_codex_errors_become_error_lines_for_the_absence_patterns() -> None:

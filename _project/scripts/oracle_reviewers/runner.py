@@ -128,6 +128,7 @@ def review(
     if verdict.status == INCOMPLETE:
         reason = verdict.incomplete_reason or "the reviewer reported its review incomplete"
         return ReviewOutcome(None, absence.Absence(absence.INCOMPLETE, reason), diagnostic)
+    verdict = evidence.mark_citations(verdict, workspace)
     problem = evidence.check(
         verdict,
         harness=reviewer.harness,
