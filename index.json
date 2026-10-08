@@ -23869,6 +23869,13 @@
       "status": "done",
       "title": "Validate benchmark options against constructor signature at registration time"
     },
+    "validate-corpus-clean-phase-stream-ids-and-query-counts": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Enforce 1..S stream numbering and full query counts in validate_corpus clean-phase check"
+    },
     "validate-isolated-runtime-importability": {
       "claim": null,
       "needs": [],

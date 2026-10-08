@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "_throughput_phase_clean checks that stream IDs are contiguous integers from 1 to S",
+    "_throughput_phase_clean asserts that each stream contains the full required query count for the benchmark (e.g. 22 for TPC-H, 99 for TPC-DS)",
+    "Unit tests verify rejection of 0-based stream IDs and partial-stream runs"
+  ],
+  "context": "Opus review finding O2 on PR #2761 (feat/throughput-corpus-three-engines).",
+  "description": "results-data/validate_corpus.py::_throughput_phase_clean checks that throughput_test status is COMPLETED, stream_results is non-empty, and all streams have success: True, but does not verify that stream IDs follow the standard 1..S numbering (established in P4 #2683) or that each stream completed the full query set (e.g. 22 queries for TPC-H). A truncated or improperly numbered stream can currently pass validation.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:2a10096285872d23ac8a3bfe",
+      "at": "2026-10-08T23:39:11Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "4ddd9302928a46f7b7ebbd2bbe1c2f7f",
+      "session_id": "414237a6e56140ed97e26a248092ab35"
+    }
+  ]
+}
