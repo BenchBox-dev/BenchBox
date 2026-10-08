@@ -1944,6 +1944,13 @@
       "status": "done",
       "title": "bulk_transfer copies primary keys verbatim, so a non-replace transfer into a non-empty target aborts"
     },
+    "bundle-data-generation-hash-missing-from-corpus": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Find which data-generation paths omit benchmark.data_generation_hash"
+    },
     "bundle-known-platforms-derive-from-registry": {
       "claim": null,
       "needs": [],

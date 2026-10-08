@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "A written list of the generation paths that skip the hash, each with a reproducing command or test.",
+    "Each path either records the hash or has a documented reason it cannot, with a test that fails before the fix.",
+    "A fresh DuckDB and a fresh Spark run each export a non-null data_generation_hash."
+  ],
+  "context": "Counts from the corpus under results-data at the time of the throughput corpus work. Re-count before starting.",
+  "description": "Most corpus bundles lack benchmark.data_generation_hash: 82 of 90 DuckDB bundles and every Spark bundle (counted 2026-10-08). The hash is set from the generation manifest at benchbox/core/runner/runner.py:461 and exported at benchbox/core/results/schema.py:488 only when not None. Provenance comparison in benchbox/core/results/exporter.py:1025-1038 therefore cannot compare these runs. Find which generation paths (cached data, platform-side generation, load-only, Spark) leave the manifest without data_generation_identity_hash or base_constants_hash, and fix them.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:2078d44d78bfbb5aca3865ea",
+      "at": "2026-10-08T13:38:40Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "1be6e989ee6c4da9bb1601c37ddd34cd",
+      "session_id": "0bdbb5bb32cc4bd0b5505d2dcb0e488e"
+    }
+  ]
+}
