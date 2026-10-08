@@ -20524,19 +20524,14 @@
       "title": "Define and prove per-stream adapter session capability"
     },
     "throughput-corpus-cohort-depth-third-identity": {
-      "claim": {
-        "expires_at": "2026-10-09T16:01:26Z",
-        "generation": "2f9cd4e64ac54944b79fec23c23c15c5",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:2078d44d78bfbb5aca3865ea"
-      },
+      "claim": null,
       "needs": [
         "tpch-throughput-dialect-translation",
         "corpus-depth-gate-counts-unrankable-bundles",
         "corpus-identity-and-phase-rule-parity"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Give the TPC-H SF1 throughput cohort three engine identities and make the depth gate phase-aware"
     },
     "throughput-deferred-connection-close-never-runs": {
