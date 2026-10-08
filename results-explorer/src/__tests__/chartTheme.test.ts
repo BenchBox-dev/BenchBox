@@ -1,12 +1,3 @@
-/**
- * Tests for chartTheme.ts.
- *
- * Cases:
- *   (a) PALETTE has 4 distinct colors
- *   (b) paletteColor(i) wraps correctly for i >= PALETTE.length
- *   (c) No exports collide with each other (all values are defined)
- */
-
 import { describe, it, expect } from "vitest";
 import {
   PALETTE,
@@ -58,10 +49,6 @@ describe("chartTheme", () => {
     expect(DIVERGING_MAX_PCT).toBeGreaterThan(0);
   });
 
-  // -----------------------------------------------------------------------
-  // TIME_SERIES_PALETTE / timeSeriesColor
-  // -----------------------------------------------------------------------
-
   it("TIME_SERIES_PALETTE has 8 distinct colors", () => {
     expect(TIME_SERIES_PALETTE.length).toBe(8);
     expect(new Set(TIME_SERIES_PALETTE).size).toBe(8);
@@ -80,10 +67,6 @@ describe("chartTheme", () => {
     }
   });
 
-  // -----------------------------------------------------------------------
-  // HEAT_MIN_RATIO / HEAT_MAX_RATIO
-  // -----------------------------------------------------------------------
-
   it("HEAT_MIN_RATIO is 1 (fastest anchor)", () => {
     expect(HEAT_MIN_RATIO).toBe(1);
   });
@@ -100,10 +83,6 @@ describe("chartTheme", () => {
     expect(lightnessForCell(HEAT_MIN_RATIO, HEAT_MIN_RATIO)).toBe("95%");
     expect(lightnessForCell(HEAT_MAX_RATIO, HEAT_MIN_RATIO)).toBe("25%");
   });
-
-  // -----------------------------------------------------------------------
-  // SPEEDUP_LOG2_* constants
-  // -----------------------------------------------------------------------
 
   it("SPEEDUP_LOG2_RANGE equals MAX minus MIN", () => {
     expect(SPEEDUP_LOG2_RANGE).toBeCloseTo(SPEEDUP_LOG2_MAX - SPEEDUP_LOG2_MIN, 10);
@@ -122,10 +101,6 @@ describe("chartTheme", () => {
       expect(stop).toBeGreaterThan(0);
     }
   });
-
-  // -----------------------------------------------------------------------
-  // PHASE_COLORS
-  // -----------------------------------------------------------------------
 
   it("PHASE_COLORS covers the 6 canonical phase names", () => {
     const phases = ["data_generation", "schema_creation", "data_loading", "validation", "power_test", "throughput_test"];

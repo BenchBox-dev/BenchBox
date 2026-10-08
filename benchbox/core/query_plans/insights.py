@@ -1,10 +1,3 @@
-"""
-Query plan insights and analysis.
-
-Provides automated analysis of query plans including complexity scoring
-and anti-pattern detection.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -22,8 +15,6 @@ if TYPE_CHECKING:
 
 @dataclass
 class PlanComplexityScore:
-    """Query plan complexity metrics."""
-
     total_operators: int = 0
     join_count: int = 0
     join_complexity: int = 0
@@ -33,11 +24,10 @@ class PlanComplexityScore:
     scan_count: int = 0
     filter_count: int = 0
     sort_count: int = 0
-    overall_score: int = 0  # 0-100, higher = more complex
-    complexity_level: str = "low"  # "low", "medium", "high", "very_high"
+    overall_score: int = 0
+    complexity_level: str = "low"
 
     def to_dict(self) -> dict:
-        """Convert to dictionary."""
         return {
             "total_operators": self.total_operators,
             "join_count": self.join_count,
@@ -55,16 +45,13 @@ class PlanComplexityScore:
 
 @dataclass
 class PlanInsight:
-    """Single insight or finding about a query plan."""
-
-    category: str  # "warning", "optimization", "info"
+    category: str
     title: str
     description: str
     operator_id: str | None = None
-    severity: str = "medium"  # "low", "medium", "high", "critical"
+    severity: str = "medium"
 
     def to_dict(self) -> dict:
-        """Convert to dictionary."""
         return {
             "category": self.category,
             "title": self.title,
@@ -76,14 +63,11 @@ class PlanInsight:
 
 @dataclass
 class PlanAnalysisResult:
-    """Complete analysis result for a query plan."""
-
     query_id: str
     complexity: PlanComplexityScore
     insights: list[PlanInsight] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        """Convert to dictionary."""
         return {
             "query_id": self.query_id,
             "complexity": self.complexity.to_dict(),
@@ -92,7 +76,6 @@ class PlanAnalysisResult:
 
 
 def _get_join_complexity(op: LogicalOperator) -> int:
-    """Return join complexity weight for the given operator."""
     if op.join_type == JoinType.CROSS:
         return 3
     if op.join_type in (JoinType.FULL, JoinType.ANTI):
@@ -101,7 +84,6 @@ def _get_join_complexity(op: LogicalOperator) -> int:
 
 
 def _classify_complexity_level(overall_score: int) -> str:
-    """Classify numeric complexity score into a named level."""
     if overall_score < 20:
         return "low"
     if overall_score < 50:
@@ -112,21 +94,8 @@ def _classify_complexity_level(overall_score: int) -> str:
 
 
 def compute_complexity_score(plan: QueryPlanDAG) -> PlanComplexityScore:
-    """
-    Compute complexity score from plan structure.
-
-    The complexity score helps identify queries that may need optimization
-    attention due to their structural complexity.
-
-    Args:
-        plan: Query plan to analyze
-
-    Returns:
-        PlanComplexityScore with detailed metrics
-    """
     score = PlanComplexityScore()
 
-    # Dispatch map: operator type -> score field incrementer
     _counter_map = {
         LogicalOperatorType.AGGREGATE: "aggregation_count",
         LogicalOperatorType.SCAN: "scan_count",
@@ -153,7 +122,6 @@ def compute_complexity_score(plan: QueryPlanDAG) -> PlanComplexityScore:
     if plan.logical_root:
         analyze_node(plan.logical_root, 0)
 
-    # Compute overall score (0-100)
     score.overall_score = min(
         100,
         (
@@ -171,30 +139,14 @@ def compute_complexity_score(plan: QueryPlanDAG) -> PlanComplexityScore:
 
 
 def detect_antipatterns(plan: QueryPlanDAG) -> list[PlanInsight]:
-    """
-    Detect common anti-patterns in query plan.
-
-    Identifies potential performance issues such as:
-    - Cartesian products (cross joins without conditions)
-    - Multiple sequential scans on same table
-    - Sort operations after aggregations
-    - Deep nested joins
-
-    Args:
-        plan: Query plan to analyze
-
-    Returns:
-        List of detected anti-patterns as PlanInsight objects
-    """
     insights: list[PlanInsight] = []
 
     if not plan.logical_root:
         return insights
 
-    tables_scanned: dict[str, list[str]] = {}  # table_name -> [operator_ids]
+    tables_scanned: dict[str, list[str]] = {}
 
     def check_node(op: LogicalOperator, depth: int) -> None:
-        # Check for cross joins (potential Cartesian products)
         if op.operator_type == LogicalOperatorType.JOIN:
             if op.join_type == JoinType.CROSS:
                 insights.append(
@@ -208,7 +160,6 @@ def detect_antipatterns(plan: QueryPlanDAG) -> list[PlanInsight]:
                     )
                 )
 
-            # Check for join without apparent condition
             if not op.join_conditions and op.join_type != JoinType.CROSS:
                 insights.append(
                     PlanInsight(
@@ -221,13 +172,11 @@ def detect_antipatterns(plan: QueryPlanDAG) -> list[PlanInsight]:
                     )
                 )
 
-        # Track table scans
         if op.operator_type == LogicalOperatorType.SCAN and op.table_name:
             if op.table_name not in tables_scanned:
                 tables_scanned[op.table_name] = []
             tables_scanned[op.table_name].append(op.operator_id)
 
-        # Check for deep nesting
         if depth > 8:
             insights.append(
                 PlanInsight(
@@ -244,7 +193,6 @@ def detect_antipatterns(plan: QueryPlanDAG) -> list[PlanInsight]:
 
     check_node(plan.logical_root, 0)
 
-    # Check for multiple scans on same table
     for table_name, scan_ops in tables_scanned.items():
         if len(scan_ops) > 1:
             insights.append(
@@ -262,22 +210,9 @@ def detect_antipatterns(plan: QueryPlanDAG) -> list[PlanInsight]:
 
 
 def analyze_plan(plan: QueryPlanDAG) -> PlanAnalysisResult:
-    """
-    Perform complete analysis of a query plan.
-
-    Combines complexity scoring and anti-pattern detection into
-    a comprehensive analysis result.
-
-    Args:
-        plan: Query plan to analyze
-
-    Returns:
-        PlanAnalysisResult with complexity and insights
-    """
     complexity = compute_complexity_score(plan)
     insights = detect_antipatterns(plan)
 
-    # Add complexity-based insights
     if complexity.complexity_level == "very_high":
         insights.append(
             PlanInsight(

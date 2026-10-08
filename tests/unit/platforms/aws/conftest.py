@@ -1,5 +1,3 @@
-"""Shared fixtures for AWS platform adapter tests."""
-
 from __future__ import annotations
 
 from contextlib import ExitStack
@@ -10,7 +8,7 @@ import pytest
 
 @pytest.fixture
 def aws_adapter_dependency_mocks():
-    """Patch AWS adapter dependency gates and SDK modules for unit tests."""
+
     with ExitStack() as stack:
         stack.enter_context(patch("benchbox.platforms.aws.athena_spark_adapter.BOTO3_AVAILABLE", True))
         stack.enter_context(patch("benchbox.platforms.aws.athena_spark_adapter.boto3", MagicMock()))

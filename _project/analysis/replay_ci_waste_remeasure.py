@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Replay the exact 2026-08-31 CI-waste cohort from its pinned manifest."""
 
 from __future__ import annotations
 
@@ -17,8 +16,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from _project.scripts import dev_loop_pr_metrics as metrics  # noqa: E402
-from scripts import path_filter_decision as path_filter  # noqa: E402
+from _project.scripts import dev_loop_pr_metrics as metrics
+from scripts import path_filter_decision as path_filter
 
 DEFAULT_MANIFEST = Path(__file__).with_name("ci-waste-remeasure-2026-08-31-manifest.json")
 PR_EVENTS = frozenset({"pull_request", "pull_request_target"})
@@ -37,8 +36,11 @@ DISTRIBUTION_METRICS = (
 )
 
 
+CLI_DESCRIPTION = "Replay the exact 2026-08-31 CI-waste cohort from its pinned manifest."
+
+
 class ReplayError(RuntimeError):
-    """The pinned cohort could not be replayed exactly."""
+    pass
 
 
 def _suite_id(item: dict[str, Any]) -> int | None:
@@ -347,7 +349,7 @@ def self_test() -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args(argv)

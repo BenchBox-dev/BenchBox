@@ -1,9 +1,6 @@
-"""Tests for the main benchbox package initialization.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import importlib
 
@@ -18,7 +15,6 @@ pytestmark = [
 ]
 
 
-# Check for optional dependencies
 try:
     import pandas
 
@@ -29,28 +25,22 @@ except ImportError:
 
 @pytest.mark.unit
 class TestPackageInit:
-    """Test benchbox package initialization and imports."""
-
     def test_version_exists(self):
-        """Test that __version__ is defined."""
         assert hasattr(benchbox, "__version__")
         assert isinstance(benchbox.__version__, str)
         assert len(benchbox.__version__) > 0
 
     def test_base_benchmark_import(self):
-        """Test that BaseBenchmark is imported correctly."""
         assert hasattr(benchbox, "BaseBenchmark")
         assert benchbox.BaseBenchmark is BaseBenchmark
 
     def test_tpch_import(self):
-        """Test that TPCH is imported correctly."""
         assert hasattr(benchbox, "TPCH")
         from benchbox.tpch import TPCH
 
         assert benchbox.TPCH is TPCH
 
     def test_tpcds_import(self):
-        """Test that TPCDS is imported correctly."""
         assert hasattr(benchbox, "TPCDS")
         from benchbox.tpcds import TPCDS
 
@@ -59,17 +49,13 @@ class TestPackageInit:
 
 @pytest.mark.unit
 class TestLazyImports:
-    """Test lazy import functionality."""
-
     def test_lazy_import_write_primitives(self):
-        """Test lazy importing WritePrimitives benchmark."""
         write_primitives_class = benchbox.WritePrimitives
         assert write_primitives_class is not None
         assert hasattr(write_primitives_class, "__name__")
         assert write_primitives_class.__name__ == "WritePrimitives"
 
     def test_lazy_import_read_primitives(self):
-        """Test lazy importing ReadPrimitives benchmark."""
         read_primitives_class = benchbox.ReadPrimitives
         assert read_primitives_class is not None
         assert hasattr(read_primitives_class, "__name__")
@@ -77,48 +63,40 @@ class TestLazyImports:
 
     @pytest.mark.skipif(not PANDAS_AVAILABLE, reason="pandas not installed (required for TPCDI)")
     def test_lazy_import_tpcdi(self):
-        """Test lazy importing TPCDI benchmark."""
         tpcdi_class = benchbox.TPCDI
         assert tpcdi_class is not None
         assert hasattr(tpcdi_class, "__name__")
 
     def test_lazy_import_ssb(self):
-        """Test lazy importing SSB benchmark."""
         ssb_class = benchbox.SSB
         assert ssb_class is not None
         assert hasattr(ssb_class, "__name__")
 
     def test_lazy_import_amplab(self):
-        """Test lazy importing AMPLab benchmark."""
         amplab_class = benchbox.AMPLab
         assert amplab_class is not None
         assert hasattr(amplab_class, "__name__")
 
     def test_lazy_import_h2odb(self):
-        """Test lazy importing H2ODB benchmark."""
         h2odb_class = benchbox.H2ODB
         assert h2odb_class is not None
         assert hasattr(h2odb_class, "__name__")
 
     def test_lazy_import_clickbench(self):
-        """Test lazy importing ClickBench benchmark."""
         clickbench_class = benchbox.ClickBench
         assert clickbench_class is not None
         assert hasattr(clickbench_class, "__name__")
 
     def test_lazy_import_joinorder(self):
-        """Test lazy importing JoinOrder benchmark."""
         joinorder_class = benchbox.JoinOrder
         assert joinorder_class is not None
         assert hasattr(joinorder_class, "__name__")
 
     def test_invalid_attribute(self):
-        """Test accessing invalid attribute raises AttributeError."""
         with pytest.raises(AttributeError, match="module 'benchbox' has no attribute"):
             _ = benchbox.InvalidBenchmark
 
     def test_all_exports(self):
-        """Test that __all__ contains expected exports."""
         assert hasattr(benchbox, "__all__")
         expected = [
             "BaseBenchmark",
@@ -137,12 +115,9 @@ class TestLazyImports:
             assert item in benchbox.__all__, f"Expected {item} in __all__"
 
     def test_primitives_are_lazy_loadable(self):
-        """WritePrimitives and ReadPrimitives can be loaded lazily."""
-        # Access the classes to trigger lazy loading
         write_primitives_class = benchbox.WritePrimitives
         read_primitives_class = benchbox.ReadPrimitives
 
-        # Verify they're now cached
         lazy_cache = benchbox.__getattr__.__globals__["_lazy_cache"]
         assert "WritePrimitives" in lazy_cache
         assert "ReadPrimitives" in lazy_cache
@@ -151,12 +126,10 @@ class TestLazyImports:
 
     @pytest.mark.skipif(not PANDAS_AVAILABLE, reason="pandas not installed (required for TPCDI)")
     def test_lazy_import_failure_provides_actionable_message(self, monkeypatch):
-        """Missing optional dependencies should yield helpful guidance."""
         importlib.import_module("benchbox.__init__")
 
         lazy_cache = benchbox.__getattr__.__globals__["_lazy_cache"]
         lazy_cache.clear()
-        # Ensure the attribute is not already cached on the public module
         import benchbox as benchbox_package
 
         module_dict = benchbox_package.__dict__
@@ -181,11 +154,9 @@ class TestLazyImports:
             assert "Original error" in message
         finally:
             lazy_cache.clear()
-            # Restore original attribute if it existed
             if had_existing_attr and existing_attr is not None:
                 benchbox_package.TPCDI = existing_attr
             else:
-                # Reload to restore state for downstream tests
                 from benchbox.tpcdi import TPCDI as _TPCDI
 
                 benchbox_package.TPCDI = _TPCDI

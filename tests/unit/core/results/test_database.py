@@ -1,5 +1,3 @@
-"""Unit tests for historical result database."""
-
 from __future__ import annotations
 
 import json
@@ -49,7 +47,6 @@ def create_test_result(
     total_cost: float | None = None,
     compliance_class: str | None = None,
 ) -> BenchmarkResults:
-    """Result-database test defaults delegating to shared factory."""
     ts = timestamp or datetime.now(timezone.utc)
 
     execution_phases = None
@@ -111,35 +108,29 @@ def create_test_result(
 
 
 class TestResultDatabase:
-    """Tests for ResultDatabase class."""
-
     def test_init_creates_database(self, tmp_path):
-        """Test that initialization creates database file."""
+
         db_path = tmp_path / "test.db"
         db = ResultDatabase(db_path)
         assert db.db_path == db_path
         assert db_path.exists()
 
     def test_init_creates_parent_directories(self, tmp_path):
-        """Test that initialization creates parent directories."""
+
         db_path = tmp_path / "nested" / "dirs" / "test.db"
         ResultDatabase(db_path)
         assert db_path.exists()
 
     def test_init_default_path(self):
-        """Test that default path is used when none provided."""
-        # Don't actually create at default path, just verify the logic
+
         db = ResultDatabase.__new__(ResultDatabase)
-        db.db_path = None  # Will be set in __init__
-        # The DEFAULT_DB_PATH should be ~/.benchbox/results.db
-        # This constant is intentionally captured at import, before the
-        # function-scoped HOME. The early plugin already owns that session HOME.
+        db.db_path = None
         from tests.utilities.session_isolation import session_home
 
         assert session_home() / ".benchbox" / "results.db" == DEFAULT_DB_PATH
 
     def test_schema_version_stored(self, tmp_path):
-        """Test that schema version is stored in database."""
+
         db_path = tmp_path / "test.db"
         db = ResultDatabase(db_path)
 
@@ -150,14 +141,12 @@ class TestResultDatabase:
             assert version == SCHEMA_VERSION
 
     def test_foreign_keys_enabled_on_every_connection(self, tmp_path):
-        """SQLite cascade enforcement must be enabled per connection."""
         db = ResultDatabase(tmp_path / "test.db")
 
         with db._connection() as conn:
             assert conn.execute("PRAGMA foreign_keys").fetchone()[0] == 1
 
     def test_delete_result_cascades_queries(self, tmp_path):
-        """Deleting a result removes its child query rows."""
         db = ResultDatabase(tmp_path / "test.db")
         result_id = db.store_result(create_test_result(execution_id="cascade", include_queries=True))
 
@@ -173,7 +162,6 @@ class TestResultDatabase:
             _validate_backup_table_name("queries_orphan_backup_20260826215959123456; DROP TABLE results")
 
     def test_orphan_repair_is_dry_run_by_default_and_backed_up_when_applied(self, tmp_path):
-        """Legacy orphan rows require explicit repair and retain a backup."""
         db_path = tmp_path / "test.db"
         db = ResultDatabase(db_path)
         with sqlite3.connect(db_path) as conn:
@@ -196,10 +184,8 @@ class TestResultDatabase:
 
 
 class TestStoreAndRetrieve:
-    """Tests for storing and retrieving results."""
-
     def test_store_result_returns_id(self, tmp_path):
-        """Test that store_result returns database ID."""
+
         db = ResultDatabase(tmp_path / "test.db")
         result = create_test_result()
         result_id = db.store_result(result)
@@ -207,7 +193,7 @@ class TestStoreAndRetrieve:
         assert result_id > 0
 
     def test_store_and_get_result(self, tmp_path):
-        """Test storing and retrieving a result."""
+
         db = ResultDatabase(tmp_path / "test.db")
         result = create_test_result(
             execution_id="test-123",
@@ -231,13 +217,13 @@ class TestStoreAndRetrieve:
         assert stored.validation_status == "PASSED"
 
     def test_get_result_not_found(self, tmp_path):
-        """Test that get_result returns None for nonexistent result."""
+
         db = ResultDatabase(tmp_path / "test.db")
         result = db.get_result("nonexistent")
         assert result is None
 
     def test_get_result_by_id(self, tmp_path):
-        """Test retrieving result by database ID."""
+
         db = ResultDatabase(tmp_path / "test.db")
         result = create_test_result(execution_id="test-by-id")
         result_id = db.store_result(result)
@@ -247,7 +233,7 @@ class TestStoreAndRetrieve:
         assert stored.execution_id == "test-by-id"
 
     def test_store_result_with_queries(self, tmp_path):
-        """Test storing result with query executions."""
+
         db = ResultDatabase(tmp_path / "test.db")
         result = create_test_result(execution_id="with-queries", include_queries=True)
         result_id = db.store_result(result)
@@ -260,7 +246,7 @@ class TestStoreAndRetrieve:
         assert queries[1].execution_time_ms == 75
 
     def test_duplicate_execution_id_raises(self, tmp_path):
-        """Test that duplicate execution_id raises ValueError."""
+
         db = ResultDatabase(tmp_path / "test.db")
         result1 = create_test_result(execution_id="duplicate")
         result2 = create_test_result(execution_id="duplicate")
@@ -270,7 +256,7 @@ class TestStoreAndRetrieve:
             db.store_result(result2)
 
     def test_store_result_with_cost(self, tmp_path):
-        """Test storing result with cost information."""
+
         db = ResultDatabase(tmp_path / "test.db")
         result = create_test_result(execution_id="with-cost", total_cost=5.50)
         db.store_result(result)
@@ -279,7 +265,7 @@ class TestStoreAndRetrieve:
         assert stored.total_cost == pytest.approx(5.50, rel=1e-3)
 
     def test_stored_result_from_row(self, tmp_path):
-        """Test StoredResult.from_row reconstructs object correctly."""
+
         db = ResultDatabase(tmp_path / "test.db")
         ts = datetime(2025, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
         result = create_test_result(execution_id="row-test", timestamp=ts)
@@ -293,10 +279,8 @@ class TestStoreAndRetrieve:
 
 
 class TestQueryResults:
-    """Tests for querying results."""
-
     def test_query_results_no_filters(self, tmp_path):
-        """Test querying all results."""
+
         db = ResultDatabase(tmp_path / "test.db")
         for i in range(5):
             db.store_result(create_test_result(execution_id=f"test-{i}"))
@@ -305,7 +289,7 @@ class TestQueryResults:
         assert len(results) == 5
 
     def test_query_results_by_platform(self, tmp_path):
-        """Test filtering by platform."""
+
         db = ResultDatabase(tmp_path / "test.db")
         db.store_result(create_test_result(execution_id="duck1", platform="DuckDB"))
         db.store_result(create_test_result(execution_id="duck2", platform="DuckDB"))
@@ -316,7 +300,7 @@ class TestQueryResults:
         assert all(r.platform == "DuckDB" for r in results)
 
     def test_query_results_by_benchmark(self, tmp_path):
-        """Test filtering by benchmark."""
+
         db = ResultDatabase(tmp_path / "test.db")
         db.store_result(create_test_result(execution_id="h1", benchmark="TPC-H"))
         db.store_result(create_test_result(execution_id="ds1", benchmark="TPC-DS"))
@@ -326,7 +310,7 @@ class TestQueryResults:
         assert results[0].benchmark == "TPC-H"
 
     def test_query_results_by_scale_factor(self, tmp_path):
-        """Test filtering by scale factor."""
+
         db = ResultDatabase(tmp_path / "test.db")
         db.store_result(create_test_result(execution_id="sf1", scale_factor=1.0))
         db.store_result(create_test_result(execution_id="sf10", scale_factor=10.0))
@@ -337,7 +321,7 @@ class TestQueryResults:
         assert results[0].scale_factor == 10.0
 
     def test_query_results_by_date_range(self, tmp_path):
-        """Test filtering by date range."""
+
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
@@ -349,7 +333,7 @@ class TestQueryResults:
         assert len(results) == 2
 
     def test_query_results_by_validation_status(self, tmp_path):
-        """Test filtering by validation status."""
+
         db = ResultDatabase(tmp_path / "test.db")
         db.store_result(create_test_result(execution_id="pass1", validation_status="PASSED"))
         db.store_result(create_test_result(execution_id="fail1", validation_status="FAILED"))
@@ -359,7 +343,7 @@ class TestQueryResults:
         assert passed[0].validation_status == "PASSED"
 
     def test_query_results_limit_offset(self, tmp_path):
-        """Test pagination with limit and offset."""
+
         db = ResultDatabase(tmp_path / "test.db")
         for i in range(10):
             db.store_result(create_test_result(execution_id=f"test-{i:02d}"))
@@ -369,13 +353,12 @@ class TestQueryResults:
 
         assert len(page1) == 3
         assert len(page2) == 3
-        # Results should be different due to offset
         page1_ids = {r.execution_id for r in page1}
         page2_ids = {r.execution_id for r in page2}
         assert page1_ids.isdisjoint(page2_ids)
 
     def test_count_results(self, tmp_path):
-        """Test counting results."""
+
         db = ResultDatabase(tmp_path / "test.db")
         db.store_result(create_test_result(execution_id="c1", platform="DuckDB"))
         db.store_result(create_test_result(execution_id="c2", platform="DuckDB"))
@@ -386,7 +369,7 @@ class TestQueryResults:
         assert db.count_results(benchmark="TPC-H") == 3
 
     def test_get_platforms(self, tmp_path):
-        """Test getting unique platform names."""
+
         db = ResultDatabase(tmp_path / "test.db")
         db.store_result(create_test_result(execution_id="p1", platform="DuckDB"))
         db.store_result(create_test_result(execution_id="p2", platform="Snowflake"))
@@ -396,7 +379,7 @@ class TestQueryResults:
         assert sorted(platforms) == ["DuckDB", "Snowflake"]
 
     def test_get_benchmarks(self, tmp_path):
-        """Test getting unique benchmark names."""
+
         db = ResultDatabase(tmp_path / "test.db")
         db.store_result(create_test_result(execution_id="b1", benchmark="TPC-H"))
         db.store_result(create_test_result(execution_id="b2", benchmark="TPC-DS"))
@@ -406,10 +389,8 @@ class TestQueryResults:
 
 
 class TestDeleteResult:
-    """Tests for deleting results."""
-
     def test_delete_result(self, tmp_path):
-        """Test deleting a result."""
+
         db = ResultDatabase(tmp_path / "test.db")
         db.store_result(create_test_result(execution_id="to-delete"))
 
@@ -419,21 +400,17 @@ class TestDeleteResult:
         assert db.get_result("to-delete") is None
 
     def test_delete_nonexistent_result(self, tmp_path):
-        """Test deleting nonexistent result returns False."""
+
         db = ResultDatabase(tmp_path / "test.db")
         deleted = db.delete_result("nonexistent")
         assert deleted is False
 
 
 class TestRankings:
-    """Tests for platform ranking calculations."""
-
     def test_calculate_rankings_geometric_mean(self, tmp_path):
-        """Test ranking by geometric mean (lower is better)."""
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
-        # DuckDB is faster (lower geometric mean)
         db.store_result(
             create_test_result(
                 execution_id="duck1",
@@ -444,7 +421,6 @@ class TestRankings:
                 timestamp=now,
             )
         )
-        # Snowflake is slower
         db.store_result(
             create_test_result(
                 execution_id="snow1",
@@ -460,13 +436,12 @@ class TestRankings:
         rankings = db.calculate_rankings("TPC-H", 1.0, config)
 
         assert len(rankings) == 2
-        assert rankings[0].platform == "DuckDB"  # Faster = rank 1
+        assert rankings[0].platform == "DuckDB"
         assert rankings[0].rank == 1
         assert rankings[1].platform == "Snowflake"
         assert rankings[1].rank == 2
 
     def test_calculate_rankings_power_at_size(self, tmp_path):
-        """Test ranking by power@size (higher is better)."""
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
@@ -486,7 +461,7 @@ class TestRankings:
                 platform="Snowflake",
                 benchmark="TPC-H",
                 scale_factor=1.0,
-                power_at_size=2000.0,  # Higher = better
+                power_at_size=2000.0,
                 timestamp=now,
             )
         )
@@ -494,15 +469,14 @@ class TestRankings:
         config = RankingConfig(metric="power_at_size", lookback_days=90)
         rankings = db.calculate_rankings("TPC-H", 1.0, config)
 
-        assert rankings[0].platform == "Snowflake"  # Higher power@size = rank 1
+        assert rankings[0].platform == "Snowflake"
         assert rankings[1].platform == "DuckDB"
 
     def test_calculate_rankings_min_samples(self, tmp_path):
-        """Test that min_samples filter works."""
+
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
-        # DuckDB has 3 samples
         for i in range(3):
             db.store_result(
                 create_test_result(
@@ -514,7 +488,6 @@ class TestRankings:
                 )
             )
 
-        # Snowflake has only 1 sample
         db.store_result(
             create_test_result(
                 execution_id="snow1",
@@ -528,17 +501,15 @@ class TestRankings:
         config = RankingConfig(min_samples=2, lookback_days=90)
         rankings = db.calculate_rankings("TPC-H", 1.0, config)
 
-        # Only DuckDB should be included
         assert len(rankings) == 1
         assert rankings[0].platform == "DuckDB"
         assert rankings[0].sample_count == 3
 
     def test_calculate_rankings_lookback_days(self, tmp_path):
-        """Test that lookback_days filter works."""
+
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
-        # Recent result
         db.store_result(
             create_test_result(
                 execution_id="recent",
@@ -549,7 +520,6 @@ class TestRankings:
             )
         )
 
-        # Old result (outside lookback window)
         db.store_result(
             create_test_result(
                 execution_id="old",
@@ -567,23 +537,21 @@ class TestRankings:
         assert rankings[0].platform == "DuckDB"
 
     def test_calculate_rankings_trend_detection(self, tmp_path):
-        """Test trend detection in rankings."""
+
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
-        # Current period: DuckDB got faster (lower geometric mean)
         db.store_result(
             create_test_result(
                 execution_id="duck-current",
                 platform="DuckDB",
                 benchmark="TPC-H",
                 scale_factor=1.0,
-                geometric_mean_ms=80.0,  # Faster now
+                geometric_mean_ms=80.0,
                 timestamp=now - timedelta(days=5),
             )
         )
 
-        # Previous period: DuckDB was slower
         db.store_result(
             create_test_result(
                 execution_id="duck-prev",
@@ -599,16 +567,15 @@ class TestRankings:
         rankings = db.calculate_rankings("TPC-H", 1.0, config)
 
         assert len(rankings) == 1
-        assert rankings[0].trend == "up"  # Improved (got faster)
+        assert rankings[0].trend == "up"
         assert rankings[0].trend_change is not None
-        assert rankings[0].trend_change < 0  # Negative change = faster
+        assert rankings[0].trend_change < 0
 
     def test_calculate_rankings_new_platform(self, tmp_path):
-        """Test that new platforms are marked as 'new' trend."""
+
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
-        # Only current period data, no historical data
         db.store_result(
             create_test_result(
                 execution_id="new-platform",
@@ -628,10 +595,7 @@ class TestRankings:
 
 
 class TestRankingsComplianceFilter:
-    """Tests that unofficial results are filtered from rankings by default."""
-
     def test_unofficial_subscale_excluded_by_default(self, tmp_path):
-        """Unofficial subscale results must not appear in default rankings."""
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
@@ -664,7 +628,6 @@ class TestRankingsComplianceFilter:
         assert "UnofficialDB" not in platform_names
 
     def test_unofficial_excluded_with_include_unofficial_false(self, tmp_path):
-        """Explicit include_unofficial=False excludes unofficial results."""
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
@@ -684,7 +647,6 @@ class TestRankingsComplianceFilter:
         assert len(rankings) == 0
 
     def test_unofficial_included_with_include_unofficial_true(self, tmp_path):
-        """include_unofficial=True admits unofficial results into rankings."""
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
@@ -705,7 +667,6 @@ class TestRankingsComplianceFilter:
         assert "SubscaleDB2" in platform_names
 
     def test_legacy_no_compliance_class_included_by_default(self, tmp_path):
-        """Legacy results (compliance_class=None) are included in default rankings."""
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
@@ -727,14 +688,11 @@ class TestRankingsComplianceFilter:
 
 
 class TestPerformanceTrends:
-    """Tests for performance trend analysis."""
-
     def test_get_performance_trends(self, tmp_path):
-        """Test getting performance trends over time."""
+
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
-        # Add results across multiple periods
         for i in range(3):
             db.store_result(
                 create_test_result(
@@ -742,7 +700,7 @@ class TestPerformanceTrends:
                     platform="DuckDB",
                     benchmark="TPC-H",
                     scale_factor=1.0,
-                    geometric_mean_ms=100.0 + i * 10,  # Getting slower
+                    geometric_mean_ms=100.0 + i * 10,
                     timestamp=now - timedelta(days=i * 30 + 5),
                 )
             )
@@ -750,18 +708,16 @@ class TestPerformanceTrends:
         trends = db.get_performance_trends("DuckDB", "TPC-H", 1.0, periods=3, period_days=30)
 
         assert len(trends) > 0
-        # All trends should be for the right platform/benchmark
         for trend in trends:
             assert trend.platform == "DuckDB"
             assert trend.benchmark == "TPC-H"
             assert trend.scale_factor == 1.0
 
     def test_performance_trends_empty_periods(self, tmp_path):
-        """Test that empty periods are skipped."""
+
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
-        # Only one data point
         db.store_result(
             create_test_result(
                 execution_id="single",
@@ -774,31 +730,26 @@ class TestPerformanceTrends:
 
         trends = db.get_performance_trends("DuckDB", "TPC-H", 1.0, periods=6, period_days=30)
 
-        # Should only return periods with data
         assert len(trends) <= 1
 
 
 class TestRegressionDetection:
-    """Tests for performance regression detection."""
-
     def test_detect_regressions(self, tmp_path):
-        """Test detecting performance regressions."""
+
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
-        # Current period: significantly slower (>10% regression)
         db.store_result(
             create_test_result(
                 execution_id="regress-current",
                 platform="DuckDB",
                 benchmark="TPC-H",
                 scale_factor=1.0,
-                geometric_mean_ms=150.0,  # 50% slower
+                geometric_mean_ms=150.0,
                 timestamp=now - timedelta(days=5),
             )
         )
 
-        # Previous period: faster baseline
         db.store_result(
             create_test_result(
                 execution_id="regress-prev",
@@ -812,15 +763,13 @@ class TestRegressionDetection:
 
         regressions = db.detect_regressions(threshold_pct=10.0, lookback_days=30)
 
-        # Should detect the regression
         assert any(r.platform == "DuckDB" and r.benchmark == "TPC-H" and r.is_regression for r in regressions)
 
     def test_detect_no_regressions(self, tmp_path):
-        """Test that stable performance is not flagged as regression."""
+
         db = ResultDatabase(tmp_path / "test.db")
         now = datetime.now(timezone.utc)
 
-        # Current and previous periods are similar
         db.store_result(
             create_test_result(
                 execution_id="stable-current",
@@ -838,23 +787,20 @@ class TestRegressionDetection:
                 platform="DuckDB",
                 benchmark="TPC-H",
                 scale_factor=1.0,
-                geometric_mean_ms=102.0,  # Only 2% change
+                geometric_mean_ms=102.0,
                 timestamp=now - timedelta(days=35),
             )
         )
 
         regressions = db.detect_regressions(threshold_pct=10.0, lookback_days=30)
 
-        # Should not flag stable performance
         regressed_platforms = [r for r in regressions if r.change_pct and r.change_pct > 10.0]
         assert len(regressed_platforms) == 0
 
 
 class TestSummaryStats:
-    """Tests for summary statistics."""
-
     def test_get_summary_stats(self, tmp_path):
-        """Test getting database summary statistics."""
+
         db = ResultDatabase(tmp_path / "test.db")
 
         db.store_result(
@@ -877,14 +823,14 @@ class TestSummaryStats:
         stats = db.get_summary_stats()
 
         assert stats["total_results"] == 2
-        assert stats["total_queries"] == 4  # 2 queries per result
+        assert stats["total_queries"] == 4
         assert stats["unique_platforms"] == 2
         assert stats["unique_benchmarks"] == 2
         assert stats["schema_version"] == SCHEMA_VERSION
         assert "database_path" in stats
 
     def test_get_summary_stats_empty_db(self, tmp_path):
-        """Test summary stats on empty database."""
+
         db = ResultDatabase(tmp_path / "test.db")
         stats = db.get_summary_stats()
 
@@ -894,8 +840,6 @@ class TestSummaryStats:
 
 
 class TestPlatformMetadataCredentialBoundary:
-    """results.db must not persist credential-shaped platform metadata values."""
-
     def test_store_result_filters_all_platform_metadata_sources(self, tmp_path):
         gates = (
             "RAW_CONFIG_GATE",
@@ -936,15 +880,12 @@ class TestPlatformMetadataCredentialBoundary:
 
 
 class TestImportResults:
-    """Tests for importing results from files."""
-
     def test_import_results_from_directory(self, tmp_path):
-        """Test importing results from a directory."""
+
         db = ResultDatabase(tmp_path / "test.db")
         results_dir = tmp_path / "results"
         results_dir.mkdir()
 
-        # Create test result file (v2.0 schema)
         result_data = make_v2_result_dict(
             version="2.0",
             benchmark_id="tpc_h",
@@ -965,18 +906,16 @@ class TestImportResults:
         assert imported == 1
         assert skipped == 0
 
-        # Verify result was imported
         stored = db.get_result("import-test")
         assert stored is not None
         assert stored.platform == "DuckDB"
 
     def test_import_skips_duplicates(self, tmp_path):
-        """Test that import skips duplicate execution IDs."""
+
         db = ResultDatabase(tmp_path / "test.db")
         results_dir = tmp_path / "results"
         results_dir.mkdir()
 
-        # Create test result file (v2.0 schema)
         result_data = make_v2_result_dict(
             version="2.0",
             benchmark_id="tpc_h",
@@ -993,7 +932,6 @@ class TestImportResults:
         with open(results_dir / "result1.json", "w", encoding="utf-8") as f:
             json.dump(result_data, f)
 
-        # Import twice
         imported1, skipped1, excluded1 = db.import_results_from_directory(results_dir)
         imported2, skipped2, excluded2 = db.import_results_from_directory(results_dir)
 
@@ -1003,12 +941,11 @@ class TestImportResults:
         assert skipped2 == 1
 
     def test_import_skips_invalid_files(self, tmp_path):
-        """Test that import skips invalid JSON files."""
+
         db = ResultDatabase(tmp_path / "test.db")
         results_dir = tmp_path / "results"
         results_dir.mkdir()
 
-        # Create invalid file
         with open(results_dir / "invalid.json", "w", encoding="utf-8") as f:
             f.write("{ invalid json")
 
@@ -1019,10 +956,8 @@ class TestImportResults:
 
 
 class TestDataclasses:
-    """Tests for dataclass definitions."""
-
     def test_stored_result_dataclass(self):
-        """Test StoredResult dataclass."""
+
         result = StoredResult(
             id=1,
             execution_id="test",
@@ -1049,7 +984,7 @@ class TestDataclasses:
         assert result.platform == "DuckDB"
 
     def test_stored_query_dataclass(self):
-        """Test StoredQuery dataclass."""
+
         query = StoredQuery(
             id=1,
             result_id=1,
@@ -1067,7 +1002,7 @@ class TestDataclasses:
         assert query.execution_time_ms == 50.0
 
     def test_platform_ranking_dataclass(self):
-        """Test PlatformRanking dataclass."""
+
         ranking = PlatformRanking(
             rank=1,
             platform="DuckDB",
@@ -1086,7 +1021,7 @@ class TestDataclasses:
         assert ranking.trend == "up"
 
     def test_performance_trend_dataclass(self):
-        """Test PerformanceTrend dataclass."""
+
         now = datetime.now(timezone.utc)
         trend = PerformanceTrend(
             platform="DuckDB",
@@ -1106,7 +1041,7 @@ class TestDataclasses:
         assert trend.is_regression is False
 
     def test_ranking_config_defaults(self):
-        """Test RankingConfig default values."""
+
         config = RankingConfig()
 
         assert config.metric == "geometric_mean"

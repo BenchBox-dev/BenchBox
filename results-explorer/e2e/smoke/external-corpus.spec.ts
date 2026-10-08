@@ -27,11 +27,8 @@ type CorpusRouteSeed = {
   platformId: string;
   platformName: string;
   queryId?: string;
-  /** Bundle test_type ("power" | "throughput" | ...), mirroring the pipeline's _test_type inference. */
   testType: string | null;
-  /** Distinct stream ids across execution rows; empty when the bundle records none. */
   streamValues: string[];
-  /** Execution rows the explorer ingests (run_type measurement/warmup/unlabelled), mirroring _query_timings. */
   executionRows: number;
 };
 
@@ -73,9 +70,6 @@ test.describe("External corpus smoke", () => {
   test("@uat-external-corpus renders throughput phase and stream data from mounted bundle", async ({ page }) => {
     const maybeSeed = discoverThroughputSeed();
     const requiredStreams = requiredThroughputStreams();
-    // Only throughput corpora (e.g. the throughput-phase explorer sweep) can
-    // exercise this path; other sweeps skip here and keep the generic route
-    // coverage above.
     if (requiredStreams !== null) {
       expect(maybeSeed, "mounted corpus has no throughput bundle").not.toBeNull();
     } else {
@@ -90,26 +84,16 @@ test.describe("External corpus smoke", () => {
       new RegExp(`${escapeRe(seed.benchmarkName)} result:\\s+${escapeRe(seed.platformName)}`, "i"),
     );
 
-    // The bundle's test_type must survive the pipeline onto the result page:
-    // subtitle names the phase and the run receipt records it.
     await expect(page.getByText(/throughput phase/i)).toBeVisible();
     const receipt = page.locator("#run-receipt");
     await expect(receipt.getByText("throughput", { exact: true }).first()).toBeVisible();
 
-    // Every per-stream execution in the bundle must reach the page. The
-    // "Individual samples" disclosure counts detail.queries, which the
-    // pipeline fills from all measurement/warmup execution rows, so a dropped
-    // or misclassified stream changes the count. A throughput bundle with
-    // fewer than two recorded streams is a dropped-stream regression, not a
-    // reason to skip.
     if (requiredStreams !== null) {
       expect(seed.streamValues).toHaveLength(requiredStreams);
     } else {
       expect(seed.streamValues.length).toBeGreaterThanOrEqual(2);
     }
     await expect(page.getByText(`Individual samples (${seed.executionRows})`)).toBeVisible();
-    // Stream identity must survive onto the page: open the samples disclosure
-    // and require at least two recorded stream ids to appear as cell text.
     await page.getByText(`Individual samples (${seed.executionRows})`).click();
     for (const stream of seed.streamValues.slice(0, 2)) {
       await expect(page.getByRole("cell", { name: stream, exact: true }).first()).toBeVisible();
@@ -150,10 +134,6 @@ function discoverExternalCorpusSeed(): CorpusRouteSeed {
       streamValues: distinctStreams(bundle.queries),
       executionRows: countExecutionRows(bundle.queries),
     };
-    // Prefer a throughput bundle so the throughput-rendering test below has a
-    // seed; otherwise keep the first routable bundle for generic coverage.
-    // NOTE: the throughput test uses discoverThroughputSeed() so this
-    // preference only affects the generic route smoke above.
     if (seed.testType === "throughput") return seed;
     first ??= seed;
   }
@@ -171,10 +151,6 @@ function requiredThroughputStreams(): number | null {
   return value;
 }
 
-/** Dedicated seed for the throughput-rendering test (A3): scans only for a
- * throughput bundle and never disturbs the generic route smoke's seed
- * choice. Returns null when no throughput bundle is mounted, letting the
- * caller skip explicitly. */
 function discoverThroughputSeed(): CorpusRouteSeed | null {
   const fixtureDir = resolve(
     process.env.E2E_FIXTURE_DIR ?? join(process.cwd(), "test-fixtures", ".generated", "data"),
@@ -208,7 +184,6 @@ function platformId(raw: string): string {
   return raw.replace(/[-_]trust[-_](ci|community|local|unknown)/gi, "").trim().toLowerCase().replaceAll(" ", "-");
 }
 
-/** Mirror the explorer pipeline's `_test_type` inference (benchmark.test_type wins, then phases). */
 function inferTestType(bundle: Bundle): string | null {
   const declared = bundle.benchmark?.test_type;
   if (declared) return String(declared);
@@ -219,7 +194,6 @@ function inferTestType(bundle: Bundle): string | null {
   return null;
 }
 
-/** Execution rows the pipeline ingests: measurement, warmup, or unlabelled legacy rows. */
 function isExecutionRow(query: BundleQuery): boolean {
   return query.run_type === undefined || query.run_type === null || query.run_type === "measurement" ||
     query.run_type === "warmup";
@@ -230,8 +204,6 @@ function distinctStreams(queries: BundleQuery[] | undefined): string[] {
   for (const query of queries ?? []) {
     if (!isExecutionRow(query) || query.stream === undefined || query.stream === null) continue;
     const text = String(query.stream).trim();
-    // Mirror the pipeline's int(stream) coercion: only numeric stream ids
-    // survive ingestion, so only they can prove multi-stream rendering.
     if (text !== "" && Number.isInteger(Number(text))) values.add(String(Number(text)));
   }
   return [...values].sort();

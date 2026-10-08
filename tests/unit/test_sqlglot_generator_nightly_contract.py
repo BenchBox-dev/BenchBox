@@ -1,5 +1,3 @@
-"""Nightly-only wiring contract for the SQLGlot generated translation pilot."""
-
 from pathlib import Path
 
 import pytest

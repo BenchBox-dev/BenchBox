@@ -52,7 +52,7 @@ def test_mcp_cli_env_fallback(monkeypatch):
 
     assert captured["results_dir"] == Path("/tmp/mcp-results")
     assert captured["charts_dir"] == Path("/tmp/mcp-charts")
-    # log_level env fallback is handled by server.py, not cli.py
+
     assert captured["log_level"] is None
 
 

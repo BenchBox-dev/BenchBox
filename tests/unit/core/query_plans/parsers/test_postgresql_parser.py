@@ -1,5 +1,3 @@
-"""Tests for PostgreSQL query plan parser."""
-
 from __future__ import annotations
 
 import json
@@ -15,7 +13,6 @@ pytestmark = [
 ]
 
 
-# Test fixtures - PostgreSQL EXPLAIN (FORMAT JSON) output samples
 SIMPLE_SEQ_SCAN = json.dumps(
     [
         {
@@ -247,19 +244,14 @@ WINDOW_FUNCTION = json.dumps(
 
 
 class TestPostgreSQLParser:
-    """Tests for PostgreSQLQueryPlanParser."""
-
     @pytest.fixture
     def parser(self) -> PostgreSQLQueryPlanParser:
-        """Create parser instance."""
         return PostgreSQLQueryPlanParser()
 
     def test_parser_platform_name(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test parser has correct platform name."""
         assert parser.platform_name == "postgresql"
 
     def test_parse_simple_seq_scan(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test parsing a simple sequential scan."""
         plan = parser.parse_explain_output("q1", SIMPLE_SEQ_SCAN)
 
         assert plan is not None
@@ -272,7 +264,6 @@ class TestPostgreSQLParser:
         assert plan.estimated_rows == 500
 
     def test_parse_seq_scan_with_filter(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test parsing a sequential scan with filter."""
         plan = parser.parse_explain_output("q2", SEQ_SCAN_WITH_FILTER)
 
         assert plan is not None
@@ -283,7 +274,6 @@ class TestPostgreSQLParser:
         assert "l_shipdate" in plan.logical_root.filter_expressions[0]
 
     def test_parse_index_scan(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test parsing an index scan."""
         plan = parser.parse_explain_output("q3", INDEX_SCAN)
 
         assert plan is not None
@@ -293,7 +283,6 @@ class TestPostgreSQLParser:
         assert plan.logical_root.physical_operator.operator_type == "Index Scan"
 
     def test_parse_hash_join(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test parsing a hash join with children."""
         plan = parser.parse_explain_output("q4", SIMPLE_JOIN)
 
         assert plan is not None
@@ -303,16 +292,14 @@ class TestPostgreSQLParser:
         assert len(plan.logical_root.join_conditions) == 1
         assert "o_custkey" in plan.logical_root.join_conditions[0]
 
-        # Check children
         assert len(plan.logical_root.children) == 2
-        # First child is Seq Scan on orders
+
         assert plan.logical_root.children[0].operator_type == LogicalOperatorType.SCAN
         assert plan.logical_root.children[0].table_name == "orders"
-        # Second child is Hash (with Seq Scan child on customer)
+
         assert plan.logical_root.children[1].operator_type == LogicalOperatorType.OTHER
 
     def test_parse_left_join(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test parsing a left join."""
         plan = parser.parse_explain_output("q5", LEFT_JOIN)
 
         assert plan is not None
@@ -321,7 +308,6 @@ class TestPostgreSQLParser:
         assert len(plan.logical_root.children) == 2
 
     def test_parse_aggregate_with_group_by(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test parsing aggregate with GROUP BY."""
         plan = parser.parse_explain_output("q6", AGGREGATE_WITH_GROUP_BY)
 
         assert plan is not None
@@ -330,19 +316,16 @@ class TestPostgreSQLParser:
         assert "l_returnflag" in plan.logical_root.group_by_keys
         assert "l_linestatus" in plan.logical_root.group_by_keys
 
-        # Check child is Seq Scan
         assert len(plan.logical_root.children) == 1
         assert plan.logical_root.children[0].operator_type == LogicalOperatorType.SCAN
 
     def test_parse_sort_with_limit(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test parsing Sort with Limit."""
         plan = parser.parse_explain_output("q7", SORT_WITH_LIMIT)
 
         assert plan is not None
         assert plan.logical_root.operator_type == LogicalOperatorType.LIMIT
         assert len(plan.logical_root.children) == 1
 
-        # Check Sort child
         sort_op = plan.logical_root.children[0]
         assert sort_op.operator_type == LogicalOperatorType.SORT
         assert sort_op.sort_keys is not None
@@ -351,56 +334,47 @@ class TestPostgreSQLParser:
         assert sort_op.sort_keys[1]["direction"] == "ASC"
 
     def test_parse_window_function(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test parsing window function."""
         plan = parser.parse_explain_output("q8", WINDOW_FUNCTION)
 
         assert plan is not None
         assert plan.logical_root.operator_type == LogicalOperatorType.WINDOW
 
     def test_empty_output_raises_error(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test that empty output raises ValueError."""
         result = parser.parse_explain_output("q9", "")
         assert result is None
 
     def test_invalid_json_raises_error(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test that invalid JSON returns None (graceful handling)."""
         result = parser.parse_explain_output("q10", "not valid json")
         assert result is None
 
     def test_missing_plan_key_raises_error(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test that missing Plan key returns None."""
         result = parser.parse_explain_output("q11", json.dumps([{"NotPlan": {}}]))
         assert result is None
 
     def test_fingerprint_is_computed(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test that plan fingerprint is computed."""
         plan = parser.parse_explain_output("q12", SIMPLE_SEQ_SCAN)
 
         assert plan is not None
         assert plan.plan_fingerprint is not None
-        assert len(plan.plan_fingerprint) == 64  # SHA256 hex length
+        assert len(plan.plan_fingerprint) == 64
 
     def test_operator_id_counter_resets_per_parse(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test that operator IDs reset between parses."""
         plan1 = parser.parse_explain_output("q1", SIMPLE_SEQ_SCAN)
         plan2 = parser.parse_explain_output("q2", SIMPLE_SEQ_SCAN)
 
         assert plan1 is not None
         assert plan2 is not None
-        # Both should have same operator ID pattern since counter resets
+
         assert plan1.logical_root.operator_id == plan2.logical_root.operator_id
 
     def test_serialization_round_trip(self, parser: PostgreSQLQueryPlanParser) -> None:
-        """Test that plan can be serialized and deserialized."""
         from benchbox.core.results.query_plan_models import QueryPlanDAG
 
         plan = parser.parse_explain_output("q13", SIMPLE_JOIN)
         assert plan is not None
 
-        # Serialize
         json_str = plan.to_json()
 
-        # Deserialize
         restored = QueryPlanDAG.from_json(json_str)
 
         assert restored.query_id == plan.query_id

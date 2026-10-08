@@ -1,7 +1,3 @@
-"""
-Tests for labeled SQL capture in TPC-DS dry-run execution.
-"""
-
 from unittest.mock import Mock
 
 import pytest
@@ -23,7 +19,7 @@ def _mk_benchmark_mock():
 def test_power_test_returns_labeled_keys():
     executor = DryRunExecutor()
     benchmark = _mk_benchmark_mock()
-    # Mock the benchmark to return labeled queries
+
     benchmark.get_queries.return_value = {
         "Position_1_Query_1": "SELECT 1",
         "Position_2_Query_2": "SELECT 2",
@@ -41,7 +37,7 @@ def test_power_test_returns_labeled_keys():
 def test_throughput_test_returns_labeled_keys():
     executor = DryRunExecutor()
     benchmark = _mk_benchmark_mock()
-    # Mock the benchmark to return labeled queries
+
     benchmark.get_queries.return_value = {
         "Stream_0_Position_1_Query_7": "SELECT 7",
         "Stream_1_Position_3_Query_21": "SELECT 21",
@@ -59,7 +55,7 @@ def test_throughput_test_returns_labeled_keys():
 def test_maintenance_test_returns_labeled_keys():
     executor = DryRunExecutor()
     benchmark = _mk_benchmark_mock()
-    # Mock the benchmark to return labeled queries
+
     benchmark.get_queries.return_value = {
         "Op_1_CUSTOMER_INSERT": "INSERT INTO customer SELECT * FROM customer WHERE 1=0",
         "Op_2_WEB_SALES_UPDATE": "UPDATE web_sales SET web_sales_ts = web_sales_ts",

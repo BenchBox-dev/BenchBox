@@ -41,22 +41,25 @@ It accepts one of the keywords `tuned`, `notuning`, `auto`, or an explicit
 path to a YAML file; it defaults to `notuning` when omitted.
 
 ```bash
-# Auto-discover the platform/benchmark tuned template (the primary UX)
 benchbox run --platform duckdb --benchmark tpch --tuning tuned
 
-# Explicit baseline (no tuning)
 benchbox run --platform duckdb --benchmark tpch --tuning notuning
 
-# Point directly at a file
 benchbox run --platform duckdb --benchmark tpch \
   --tuning examples/tunings/duckdb/tpch_tuned.yaml
 
-# DataFrame platform - `tuned` resolves dataframe/polars_optimized.yaml;
-# any other profile must be referenced by path
 benchbox run --platform polars --benchmark tpch --mode dataframe --tuning tuned
 benchbox run --platform polars --benchmark tpch --mode dataframe \
   --tuning examples/tunings/dataframe/polars_streaming.yaml
 ```
+
+The commands, in order:
+
+- `tuned` auto-discovers the platform and benchmark tuned template. This is the primary way to use it.
+- `notuning` is the explicit baseline, with no tuning.
+- The third command points directly at a file.
+- The fourth command uses `tuned` on a DataFrame platform, which resolves `dataframe/polars_optimized.yaml`.
+- The last command references another DataFrame profile by path. Any DataFrame profile other than the curated one must be referenced this way.
 
 `examples/unified_runner.py` is a lighter-weight alternative to the `benchbox`
 CLI for scripting/automation; it accepts the same `--tuning` values but
@@ -116,10 +119,11 @@ Point `--tuning tuned` at a different template collection without relying on
 the working directory:
 
 ```bash
-# Directory must use the same <platform>/<benchmark>_tuned.yaml layout
 export BENCHBOX_TUNING_PATH=/path/to/my-tunings
 benchbox run --platform duckdb --benchmark tpch --tuning tuned
 ```
+
+The directory must use the same `<platform>/<benchmark>_tuned.yaml` layout.
 
 ## Default file via `benchbox.yaml` / `BENCHBOX_TUNING_CONFIG`
 
@@ -127,10 +131,11 @@ Set a default file that `--tuning tuned` uses before falling back to
 auto-discovery:
 
 ```yaml
-# benchbox.yaml
 tuning:
   default_config_file: ./tuning/my_tuning.yaml
 ```
+
+Put this setting in `benchbox.yaml`.
 
 or override it at runtime without editing the file:
 
@@ -142,18 +147,16 @@ benchbox run --platform duckdb --benchmark tpch --tuning tuned
 ## Inspecting templates
 
 ```bash
-# List everything available under examples/tunings/
 benchbox tuning list
 
-# Filter by platform and/or benchmark
 benchbox tuning list --platform duckdb --benchmark tpch
 
-# Show what --tuning would actually resolve to (including which file, if any)
 benchbox tuning show tuned --platform duckdb --benchmark tpch
 
-# Check a SQL tuning file against a platform's capabilities
 benchbox tuning validate examples/tunings/clickhouse/tpch_tuned.yaml --platform clickhouse-local
 ```
+
+The first command lists everything available under `examples/tunings/`. The second filters by platform and benchmark. The third shows what `--tuning` would resolve to, including which file, if any. The fourth checks a SQL tuning file against a platform's capabilities.
 
 ## Configuration structure
 
@@ -269,7 +272,6 @@ You can customize any configuration file by:
 
 Example customization:
 ```yaml
-# Custom TPC-H configuration with specific partitioning
 table_tunings:
   LINEITEM:
     table_name: LINEITEM
@@ -277,7 +279,6 @@ table_tunings:
     - name: L_SHIPDATE
       type: DATE
       order: 1
-    # Add custom sorting
     sorting:
     - name: L_ORDERKEY
       type: INTEGER
@@ -286,6 +287,8 @@ table_tunings:
       type: INTEGER
       order: 2
 ```
+
+This is a custom TPC-H configuration with specific partitioning. The `sorting` entries add custom sorting.
 
 For the full `--tuning` precedence order and the `tuning` command group
 (`init`, `validate`, `defaults`, `list`, `show`, `platforms`), see

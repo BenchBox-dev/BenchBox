@@ -1,10 +1,3 @@
-"""Unit tests for BigQueryQueryPlanParser.
-
-BigQuery plans come from the Job Statistics API (``job.query_plan``), not an
-EXPLAIN statement. The parser consumes the JSON-serialized stage list; these
-tests drive it from a recorded fixture so they run with no GCP project.
-"""
-
 import json
 from pathlib import Path
 
@@ -51,7 +44,6 @@ class TestBigQueryParserBasics:
         assert dag.logical_root.operator_type == LogicalOperatorType.PROJECT
         nodes = _collect(dag.logical_root)
         types = [n.operator_type for n in nodes]
-        # Two Input stages map to scans; the join stage feeds the output.
         assert types.count(LogicalOperatorType.SCAN) == 2
         assert LogicalOperatorType.JOIN in types
         assert LogicalOperatorType.SORT in types
@@ -95,9 +87,6 @@ class TestBigQueryParserMapping:
 
 class TestBigQueryParserMultipleRoots:
     def test_dangling_stage_does_not_become_root(self, parser):
-        # A trailing no-op stage that nothing reads from (and reads nothing) must
-        # not be chosen as root over the real Output stage, which would drop the
-        # whole plan. The real Output subtree must survive.
         stages = [
             {"name": "S00: Input", "id": "0", "inputStages": [], "steps": [{"kind": "READ", "substeps": ["FROM a"]}]},
             {"name": "S01: Input", "id": "1", "inputStages": [], "steps": [{"kind": "READ", "substeps": ["FROM b"]}]},
@@ -113,7 +102,6 @@ class TestBigQueryParserMultipleRoots:
                 "inputStages": ["2"],
                 "steps": [{"kind": "WRITE", "substeps": ["TO o"]}],
             },
-            # Dangling stage with the largest id but no inputs and no referrers.
             {"name": "S99: Noop", "id": "99", "inputStages": [], "steps": []},
         ]
         dag = parser.parse_explain_output("q", json.dumps(stages))

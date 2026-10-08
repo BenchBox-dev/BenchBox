@@ -1,9 +1,6 @@
-"""Unit tests for Starburst platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import os
 from unittest.mock import MagicMock, patch
@@ -17,12 +14,8 @@ pytestmark = [
 
 
 class TestStarburstAdapter:
-    """Tests for Starburst adapter initialization and configuration."""
-
     def test_starburst_requires_host(self):
-        """Starburst adapter raises error without host."""
         with patch.dict(os.environ, {}, clear=True):
-            # Clear any existing env vars
             for key in [
                 "STARBURST_HOST",
                 "STARBURST_USER",
@@ -33,7 +26,6 @@ class TestStarburstAdapter:
             ]:
                 os.environ.pop(key, None)
 
-            # Mock the trino imports
             with patch.dict(
                 "sys.modules",
                 {
@@ -53,7 +45,6 @@ class TestStarburstAdapter:
                 assert "STARBURST_HOST" in str(exc_info.value)
 
     def test_starburst_requires_username(self):
-        """Starburst adapter raises error without username."""
         with patch.dict(os.environ, {}, clear=True):
             for key in ["STARBURST_USER", "STARBURST_USERNAME"]:
                 os.environ.pop(key, None)
@@ -77,7 +68,6 @@ class TestStarburstAdapter:
                 assert "STARBURST_USER" in str(exc_info.value)
 
     def test_starburst_requires_password(self):
-        """Starburst adapter raises error without password."""
         with patch.dict(os.environ, {}, clear=True):
             os.environ.pop("STARBURST_PASSWORD", None)
 
@@ -100,7 +90,6 @@ class TestStarburstAdapter:
                 assert "STARBURST_PASSWORD" in str(exc_info.value)
 
     def test_starburst_defaults_to_https_port_443(self):
-        """Starburst adapter defaults to HTTPS on port 443."""
         with patch.dict(
             "sys.modules",
             {
@@ -121,7 +110,6 @@ class TestStarburstAdapter:
             assert adapter.verify_ssl is True
 
     def test_starburst_accepts_env_vars(self):
-        """Starburst adapter reads credentials from environment variables."""
         with (
             patch.dict(
                 os.environ,
@@ -150,7 +138,6 @@ class TestStarburstAdapter:
             assert adapter.catalog == "env-catalog"
 
     def test_starburst_accepts_starburst_username_env_var(self):
-        """Starburst adapter reads STARBURST_USERNAME as fallback."""
         with (
             patch.dict(
                 os.environ,
@@ -175,7 +162,6 @@ class TestStarburstAdapter:
             assert adapter.username == "username-user@example.com/admin"
 
     def test_starburst_config_overrides_env(self):
-        """Config parameters override environment variables."""
         with (
             patch.dict(
                 os.environ,
@@ -206,7 +192,6 @@ class TestStarburstAdapter:
             assert adapter.password == "config-password"
 
     def test_starburst_appends_role_to_username(self):
-        """Starburst adapter appends role to username if not already included."""
         with (
             patch.dict(
                 os.environ,
@@ -232,7 +217,6 @@ class TestStarburstAdapter:
             assert adapter.username == "test@example.com/accountadmin"
 
     def test_starburst_does_not_duplicate_role(self):
-        """Starburst adapter doesn't append role if already in username."""
         with (
             patch.dict(
                 os.environ,
@@ -255,11 +239,9 @@ class TestStarburstAdapter:
 
             adapter = StarburstAdapter()
 
-            # Role not appended because username already has /admin
             assert adapter.username == "test@example.com/admin"
 
     def test_starburst_custom_port(self):
-        """Starburst adapter accepts custom port."""
         with (
             patch.dict(
                 os.environ,
@@ -285,7 +267,6 @@ class TestStarburstAdapter:
             assert adapter.port == 8443
 
     def test_starburst_platform_name(self):
-        """Starburst adapter returns correct platform name."""
         with patch.dict(
             "sys.modules",
             {
@@ -304,7 +285,6 @@ class TestStarburstAdapter:
             assert adapter.platform_name == "Starburst"
 
     def test_starburst_dialect_is_trino(self):
-        """Starburst adapter uses Trino SQL dialect."""
         with patch.dict(
             "sys.modules",
             {
@@ -324,10 +304,7 @@ class TestStarburstAdapter:
 
 
 class TestStarburstDeploymentRegistry:
-    """Tests for Starburst deployment mode registry integration."""
-
     def test_starburst_has_deployment_modes(self):
-        """Starburst should have deployment modes in registry."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("starburst")
@@ -336,14 +313,12 @@ class TestStarburstDeploymentRegistry:
         assert "managed" in caps.deployment_modes
 
     def test_default_deployment_is_managed(self):
-        """Default deployment mode should be managed."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("starburst")
         assert caps.default_deployment == "managed"
 
     def test_starburst_inherits_from_trino(self):
-        """Starburst should inherit from Trino."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("starburst")
@@ -351,7 +326,6 @@ class TestStarburstDeploymentRegistry:
         assert caps.platform_family == "trino"
 
     def test_managed_deployment_requires_credentials(self):
-        """Managed deployment should require credentials."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("starburst")
@@ -360,7 +334,6 @@ class TestStarburstDeploymentRegistry:
         assert managed_cap.requires_network is True
 
     def test_starburst_is_cloud_category(self):
-        """Starburst should be in cloud category."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         info = PlatformRegistry.get_platform_info("starburst")
@@ -369,10 +342,7 @@ class TestStarburstDeploymentRegistry:
 
 
 class TestStarburstErrorMessages:
-    """Tests for Starburst error messages."""
-
     def test_friendly_auth_error(self):
-        """Starburst provides friendly auth error message."""
         with patch.dict(
             "sys.modules",
             {
@@ -388,7 +358,6 @@ class TestStarburstErrorMessages:
                 password="test-password",
             )
 
-            # Test 401 error
             error = Exception("HTTP 401 Unauthorized")
             message = adapter._build_friendly_connection_error(error)
 
@@ -397,7 +366,6 @@ class TestStarburstErrorMessages:
             assert "email/role" in message.lower()
 
     def test_friendly_connection_error(self):
-        """Starburst provides friendly connection error message."""
         with patch.dict(
             "sys.modules",
             {
@@ -413,7 +381,6 @@ class TestStarburstErrorMessages:
                 password="test-password",
             )
 
-            # Test connection refused error
             error = Exception("Connection refused")
             message = adapter._build_friendly_connection_error(error)
 
@@ -421,7 +388,6 @@ class TestStarburstErrorMessages:
             assert "cannot connect" in message.lower()
 
     def test_friendly_ssl_error(self):
-        """Starburst provides friendly SSL error message."""
         with patch.dict(
             "sys.modules",
             {
@@ -437,7 +403,6 @@ class TestStarburstErrorMessages:
                 password="test-password",
             )
 
-            # Test SSL error
             error = Exception("SSL certificate verify failed")
             message = adapter._build_friendly_connection_error(error)
 
@@ -446,8 +411,6 @@ class TestStarburstErrorMessages:
 
 
 class TestStarburstGetPlatformInfo:
-    """Test get_platform_info returns Starburst-specific metadata."""
-
     def _make_adapter(self):
         with patch.dict(
             "sys.modules",
@@ -481,8 +444,6 @@ class TestStarburstGetPlatformInfo:
 
 
 class TestStarburstAddCliArguments:
-    """Test add_cli_arguments registers expected flags."""
-
     def test_add_cli_arguments_host(self):
         import argparse
 
@@ -527,8 +488,6 @@ class TestStarburstAddCliArguments:
 
 
 class TestStarburstFromConfig:
-    """Test from_config builds adapter from unified config dict."""
-
     def test_from_config_passes_connection_params(self):
         with patch.dict(
             "sys.modules",

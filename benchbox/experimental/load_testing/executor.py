@@ -1,10 +1,3 @@
-"""Concurrent load executor for database workload testing.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -23,8 +16,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class QueryExecution:
-    """Record of a single query execution."""
-
     query_id: str
     stream_id: int
     start_time: float
@@ -32,7 +23,7 @@ class QueryExecution:
     success: bool
     error: str | None = None
     rows_returned: int | None = None
-    queue_wait_time: float = 0.0  # Time waiting in queue before execution
+    queue_wait_time: float = 0.0
     duration_seconds: float | None = None
 
     @property
@@ -44,8 +35,6 @@ class QueryExecution:
 
 @dataclass
 class StreamResult:
-    """Results from a single concurrent stream."""
-
     stream_id: int
     queries_executed: int
     queries_succeeded: int
@@ -56,14 +45,12 @@ class StreamResult:
 
     @property
     def success_rate(self) -> float:
-        """Success rate as a percentage."""
         if self.queries_executed == 0:
             return 0.0
         return (self.queries_succeeded / self.queries_executed) * 100
 
     @property
     def throughput(self) -> float:
-        """Queries per second for this stream."""
         if self.total_time_seconds == 0:
             return 0.0
         return self.queries_executed / self.total_time_seconds
@@ -71,54 +58,25 @@ class StreamResult:
 
 @dataclass
 class ConcurrentLoadConfig:
-    """Configuration for concurrent load testing."""
-
-    # Query execution
     query_factory: Callable[[int], tuple[str, str]]
-    """Factory returning (query_id, sql) for stream iteration index."""
 
     role_factories: dict[str, Callable[[int], tuple[str, str]]] | None = field(default=None, kw_only=True)
-    """Optional per-role query factories for role-aware patterns.
-
-    Maps a stream role (e.g. "writer", "reader") to the factory used for
-    streams launched in that role. When a pattern phase declares `roles`
-    targets, launched streams use the matching role factory; phases without
-    role targets keep using `query_factory`. Every role named by the
-    pattern must have a factory entry.
-    """
 
     connection_factory: Callable[[], Any]
-    """Factory creating new database connections.
-
-    Must return an independent, thread-confined connection per call: one
-    stream owns its connection for its whole lifetime and closes it on
-    exit. Never return a shared connection; concurrent streams closing or
-    writing through the same handle corrupts every in-flight stream.
-    """
 
     execute_query: Callable[[Any, str], tuple[bool, int | None, str | None]]
-    """Function to execute query: (connection, sql) -> (success, rows, error)."""
 
-    # Workload configuration
     pattern: WorkloadPattern = field(default_factory=lambda: SteadyPattern(1, 60))
-    """Workload pattern defining concurrency over time."""
 
     queries_per_stream: int = 10
-    """Number of queries each stream executes."""
 
     query_timeout_seconds: float = 300.0
-    """Timeout for individual query execution."""
 
-    # Resource monitoring
     collect_resource_metrics: bool = True
-    """Whether to collect CPU/memory metrics during execution."""
 
     resource_sample_interval: float = 1.0
-    """Interval between resource metric samples in seconds."""
 
-    # Queue analysis
     track_queue_times: bool = True
-    """Whether to track time queries spend waiting in queue."""
 
     def __post_init__(self) -> None:
         if not self.query_timeout_seconds > 0:
@@ -127,33 +85,24 @@ class ConcurrentLoadConfig:
 
 @dataclass
 class ConcurrentLoadResult:
-    """Results from concurrent load testing."""
-
-    # Timing
     start_time: float
     end_time: float
     total_duration_seconds: float
 
-    # Stream results
     streams: list[StreamResult]
     total_streams_executed: int
     total_streams_succeeded: int
 
-    # Query metrics
     total_queries_executed: int
     total_queries_succeeded: int
     total_queries_failed: int
 
-    # Throughput
-    overall_throughput: float  # Queries per second across all streams
+    overall_throughput: float
 
-    # Queue analysis
     queue_metrics: dict[str, float] = field(default_factory=dict)
 
-    # Resource metrics
     resource_metrics: dict[str, Any] = field(default_factory=dict)
 
-    # Pattern info
     pattern_name: str = ""
     max_concurrency_reached: int = 0
 
@@ -163,20 +112,11 @@ class ConcurrentLoadResult:
 
     @property
     def success_rate(self) -> float:
-        """Overall query success rate as a percentage."""
         if self.total_queries_executed == 0:
             return 0.0
         return (self.total_queries_succeeded / self.total_queries_executed) * 100
 
     def get_percentile_latency(self, percentile: float) -> float:
-        """Get query latency at given percentile.
-
-        Args:
-            percentile: Percentile (0-100)
-
-        Returns:
-            Latency in seconds at the percentile
-        """
         latencies = []
         for stream in self.streams:
             for execution in stream.query_executions:
@@ -192,40 +132,20 @@ class ConcurrentLoadResult:
 
 
 class ConcurrentLoadExecutor:
-    """Executes concurrent database load tests with configurable patterns.
-
-    This executor manages concurrent query streams, tracks execution metrics,
-    and provides queue analysis capabilities.
-    """
-
     def __init__(self, config: ConcurrentLoadConfig):
-        """Initialize the executor.
-
-        Args:
-            config: Configuration for the load test
-        """
         self._config = config
         self._lock = threading.Lock()
         self._stream_results: list[StreamResult] = []
         self._active_streams = 0
         self._active_roles: dict[str, int] = {}
         self._max_concurrency_reached = 0
-        self._queue: deque[tuple[int, float]] = deque()  # (stream_id, enqueue_time)
+        self._queue: deque[tuple[int, float]] = deque()
         self._resource_samples: list[dict[str, float]] = []
         self._stop_monitoring = threading.Event()
         self._stream_stops: dict[int, threading.Event] = {}
         self._abandoned: dict[int, Future] = {}
 
     def run(self) -> ConcurrentLoadResult:
-        """Execute the concurrent load test.
-
-        Returns:
-            Results from the load test
-
-        Raises:
-            ValueError: If the pattern declares stream roles but the config
-                does not provide a matching `role_factories` entry.
-        """
         start_time = time.time()
         start_mono = mono_time()
         pattern = self._config.pattern
@@ -237,7 +157,6 @@ class ConcurrentLoadExecutor:
             f"duration={pattern.total_duration}s"
         )
 
-        # Start resource monitoring
         monitor_thread = None
         if self._config.collect_resource_metrics:
             monitor_thread = threading.Thread(target=self._monitor_resources, daemon=True)
@@ -253,17 +172,14 @@ class ConcurrentLoadExecutor:
         end_time = time.time()
         total_duration = elapsed_seconds(start_mono)
 
-        # Aggregate results
         total_queries = sum(s.queries_executed for s in self._stream_results)
         total_succeeded = sum(s.queries_succeeded for s in self._stream_results)
         total_failed = sum(s.queries_failed for s in self._stream_results)
         streams_succeeded = sum(1 for s in self._stream_results if s.error is None)
 
-        # Calculate queue metrics
         queue_metrics = self._calculate_queue_metrics()
         outstanding_stream_ids = sorted(stream_id for stream_id, future in self._abandoned.items() if not future.done())
 
-        # Calculate resource metrics
         resource_metrics = self._calculate_resource_metrics()
 
         result = ConcurrentLoadResult(
@@ -295,15 +211,6 @@ class ConcurrentLoadExecutor:
         return result
 
     def _validate_role_factories(self, pattern: WorkloadPattern) -> None:
-        """Validate role factory coverage for role-aware patterns.
-
-        Args:
-            pattern: Workload pattern about to execute.
-
-        Raises:
-            ValueError: If any phase declares roles without a matching
-                factory entry, or a role target is negative.
-        """
         declared_roles: set[str] = set()
         for phase in pattern.iter_phases():
             if phase.roles:
@@ -319,32 +226,13 @@ class ConcurrentLoadExecutor:
                 )
 
     def _role_targets(self, phase: WorkloadPhase) -> dict[str, int]:
-        """Compute per-role stream launch counts for a phase.
-
-        For role-aware phases, each role is topped up to its declared
-        target independently, so roles absent from the phase (such as
-        readers during a writer-only drain) get no replacement streams
-        once their in-flight streams finish. Phases without role targets
-        keep the historical behavior of topping up total concurrency.
-
-        Must be called with `self._lock` held.
-
-        Args:
-            phase: Phase currently executing.
-
-        Returns:
-            Mapping of role (or "" for undifferentiated phases) to the
-            number of streams to launch now.
-        """
         if phase.roles:
             return {role: max(0, target - self._active_roles.get(role, 0)) for role, target in phase.roles.items()}
         return {"": max(0, phase.concurrency - self._active_streams)}
 
     def _execute_pattern(self, pattern: WorkloadPattern) -> None:
-        """Execute the workload pattern."""
         stream_counter = 0
 
-        # Use ThreadPoolExecutor for managing concurrent streams
         executor = ThreadPoolExecutor(max_workers=pattern.max_concurrency)
         try:
             futures: dict[Future, tuple[int, str]] = {}
@@ -360,7 +248,6 @@ class ConcurrentLoadExecutor:
                     f"concurrency={phase.concurrency}, duration={phase.duration_seconds}s"
                 )
 
-                # Launch streams for this phase
                 while elapsed_seconds(phase_start) < phase.duration_seconds:
                     with self._lock:
                         current_active = self._active_streams
@@ -374,9 +261,6 @@ class ConcurrentLoadExecutor:
                             stream_counter += 1
                             phase_streams[phase.phase_name] += 1
 
-                            # Track queue time on the monotonic clock: queue_wait
-                            # is computed against mono_time() in _execute_stream,
-                            # so wall-clock time.time() here would corrupt it.
                             enqueue_time = mono_time() if self._config.track_queue_times else 0.0
 
                             with self._lock:
@@ -389,19 +273,13 @@ class ConcurrentLoadExecutor:
                             future = executor.submit(self._execute_stream, stream_id, enqueue_time, role)
                             futures[future] = (stream_id, role)
 
-                    # Check for completed streams
                     completed = [f for f in futures if f.done()]
                     for future in completed:
                         self._record_stream_future(future, *futures[future])
                         del futures[future]
 
-                    # Small sleep to prevent busy-waiting
                     time.sleep(0.1)
 
-                # Phase boundary: roles excluded from the next phase (readers
-                # during a writer-only drain) must finish before the next
-                # phase clock starts, otherwise they bleed into the drain.
-                # Roles continuing into the next phase keep running.
                 upcoming = phases[index + 1].roles if index + 1 < len(phases) else None
                 self._await_role_drain(futures, next_phase_roles=upcoming)
 
@@ -444,7 +322,6 @@ class ConcurrentLoadExecutor:
             self._record_stream_future(future, stream_id, role, abandoned=future in pending)
 
     def _decrement_role_locked(self, role: str) -> None:
-        """Release one active-stream slot. Call with `self._lock` held."""
         remaining = self._active_roles.get(role, 0) - 1
         if remaining > 0:
             self._active_roles[role] = remaining
@@ -452,7 +329,6 @@ class ConcurrentLoadExecutor:
             self._active_roles.pop(role, None)
 
     def _decrement_role(self, role: str) -> None:
-        """Release one active-stream slot for a finished stream role."""
         with self._lock:
             self._decrement_role_locked(role)
 
@@ -461,27 +337,17 @@ class ConcurrentLoadExecutor:
         futures: dict[Future, tuple[int, str]],
         next_phase_roles: dict[str, int] | None,
     ) -> None:
-        """Wait for in-flight streams whose role ends at a phase boundary."""
         if not next_phase_roles:
             return
         draining = [f for f, (_, role) in futures.items() if role not in next_phase_roles]
         self._drain_streams(futures, draining)
 
     def _execute_stream(self, stream_id: int, enqueue_time: float, role: str = "") -> StreamResult:
-        """Execute a single stream of queries.
-
-        Args:
-            stream_id: Unique stream identifier.
-            enqueue_time: Queue entry timestamp for wait-time tracking.
-            role: Stream role used to select a per-role query factory.
-        """
         stream_start = mono_time()
         queue_wait = stream_start - enqueue_time if enqueue_time > 0 else 0
         query_factory = self._query_factory_for(role)
         stop = self._stream_stops.setdefault(stream_id, threading.Event())
 
-        # Remove from queue by identity: ThreadPoolExecutor does not start
-        # streams in enqueue order, so head-of-queue removal strands entries.
         with self._lock:
             self._queue = deque((sid, ts) for sid, ts in self._queue if sid != stream_id)
 
@@ -490,7 +356,6 @@ class ConcurrentLoadExecutor:
         queries_failed = 0
 
         try:
-            # Create connection for this stream
             connection = self._config.connection_factory()
 
             try:
@@ -546,7 +411,6 @@ class ConcurrentLoadExecutor:
                         )
 
             finally:
-                # Close connection
                 if hasattr(connection, "close"):
                     connection.close()
 
@@ -571,20 +435,11 @@ class ConcurrentLoadExecutor:
         )
 
     def _query_factory_for(self, role: str) -> Callable[[int], tuple[str, str]]:
-        """Select the query factory for a stream role.
-
-        Args:
-            role: Stream role; "" denotes an undifferentiated stream.
-
-        Returns:
-            The per-role factory when one is configured, else the default.
-        """
         if role and self._config.role_factories and role in self._config.role_factories:
             return self._config.role_factories[role]
         return self._config.query_factory
 
     def _monitor_resources(self) -> None:
-        """Background thread for resource monitoring."""
         try:
             import psutil
         except ImportError:
@@ -606,7 +461,6 @@ class ConcurrentLoadExecutor:
             self._stop_monitoring.wait(self._config.resource_sample_interval)
 
     def _calculate_queue_metrics(self) -> dict[str, float]:
-        """Calculate queue wait time metrics."""
         wait_times = []
         for stream in self._stream_results:
             for execution in stream.query_executions:
@@ -631,7 +485,6 @@ class ConcurrentLoadExecutor:
         }
 
     def _calculate_resource_metrics(self) -> dict[str, Any]:
-        """Calculate resource utilization metrics."""
         if not self._resource_samples:
             return {}
 

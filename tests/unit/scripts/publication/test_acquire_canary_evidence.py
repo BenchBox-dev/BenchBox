@@ -1,5 +1,3 @@
-"""Unit tests for acquire_canary_evidence.py."""
-
 from __future__ import annotations
 
 import json
@@ -18,7 +16,6 @@ def test_acquire_from_journal_extracts_manifest_and_receipts(tmp_path: Path, mon
     repo.mkdir()
     (repo / ".git").mkdir()
 
-    # Create dummy journal with durable transaction
     tx = transaction.Transaction(
         object_type=transaction.OBJECT_TYPE,
         transaction_schema_version=1,
@@ -46,7 +43,6 @@ def test_acquire_from_journal_extracts_manifest_and_receipts(tmp_path: Path, mon
 
     out_dir = tmp_path / "evidence"
 
-    # Mock journal functions
     j_state = journal.JournalState(
         target="BenchBox-dev/BenchBox:github-pages",
         next_generation=2,

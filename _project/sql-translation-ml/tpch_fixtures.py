@@ -1,5 +1,3 @@
-"""Small TPC-H-schema witnesses, not compliant TPC-H benchmark data."""
-
 from __future__ import annotations
 
 import random

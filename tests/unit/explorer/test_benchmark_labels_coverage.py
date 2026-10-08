@@ -1,17 +1,3 @@
-"""Drift guard: results-explorer BENCHMARK_LABELS must cover every
-canonical benchmark id.
-
-Why a *test* and not a generated file: the explorer ships as a pre-built
-SPA and the canonical benchmark registry lives in the Python package.
-A code-gen step would add build coupling that doesn't pay for itself
-yet. A test is enough — it fires on develop the moment a new benchmark
-is added without a matching label, which is when the catch is needed.
-
-If a new canonical id appears here, add the label to
-``results-explorer/src/utils.ts`` (and consider whether the explorer's
-empty-state copy needs corpus-specific wording).
-"""
-
 from __future__ import annotations
 
 import re
@@ -29,9 +15,6 @@ pytestmark = [
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXPLORER_UTILS = REPO_ROOT / "results-explorer" / "src" / "utils.ts"
 
-# Aliases the explorer carries for backward compatibility with older URLs
-# or display names that are NOT canonical benchmark ids in the registry.
-# Document them here so they don't read as drift.
 KNOWN_DISPLAY_ALIASES = frozenset({"star_schema", "tsbs-devops"})
 
 

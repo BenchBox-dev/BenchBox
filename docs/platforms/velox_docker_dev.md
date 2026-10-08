@@ -36,16 +36,16 @@ The entrypoint (`docker/velox/entrypoint.sh`) supports three modes: `connect` (S
 Run all commands from the **project root** - the build context must include the full BenchBox source tree:
 
 ```bash
-# Quick dev build (single arch, no push)
 docker build \
   --platform linux/amd64 \
   -f docker/velox/Dockerfile \
   -t benchbox-velox:dev .
 
-# Verify the build and confirm Velox loads
 docker run --rm benchbox-velox:dev python3 -c \
   "from benchbox.platforms.velox import VeloxAdapter; print('import OK')"
 ```
+
+The `docker build` command is a quick dev build for a single architecture, with no push. The `docker run` command verifies the build and confirms that Velox loads.
 
 ### Distribution Build (docker buildx)
 
@@ -69,24 +69,22 @@ docker buildx build \
 The host runs `benchbox`; the container runs the Gluten-enabled Spark-Connect server. This is the most flexible workflow: you get the full host BenchBox CLI, local result files, and a clean separation between the client and the Spark+Velox backend.
 
 ```bash
-# 1. Start the server (detached)
 cd docker/velox
-export BENCHBOX_DATA_DIR=/absolute/path/to/your/data   # required -- no default, see below
+export BENCHBOX_DATA_DIR=/absolute/path/to/your/data
 docker compose up -d velox-connect
 
-# 2. Wait for the health check to pass (~60-90 s on a cold JVM)
-docker compose ps velox-connect       # watch Status become "healthy"
-docker compose logs -f velox-connect  # tail logs during startup
+docker compose ps velox-connect
+docker compose logs -f velox-connect
 
-# 3. Run benchbox on the host
 benchbox run --platform velox \
   --platform-option deployment=remote \
   --platform-option endpoint=sc://localhost:50051 \
   --benchmark tpch --scale 1.0
 
-# 4. Stop the server when done
 docker compose down velox-connect
 ```
+
+The steps are: start the server detached, wait for the health check to pass, run `benchbox` on the host, and stop the server when done. `BENCHBOX_DATA_DIR` is required and has no default (see the data path contract below). The health check takes about 60-90 seconds on a cold JVM. Use `docker compose ps` to watch the status become "healthy" and `docker compose logs -f` to follow the startup logs.
 
 ### Data Path Contract
 
@@ -103,8 +101,9 @@ Container: /data/benchmark_runs/tpch_sf1/lineitem.parquet
 ```bash
 export BENCHBOX_DATA_DIR=/mnt/benchdata
 docker compose up -d velox-connect
-# Then run benchbox so the paths it sends are under /mnt/benchdata/
 ```
+
+Then run `benchbox` so that the paths it sends are under `/mnt/benchdata/`.
 
 The mount is read-only (`:ro`). Spark's managed table warehouse is redirected to `/tmp/spark-warehouse` inside the container.
 
@@ -118,19 +117,18 @@ Run BenchBox entirely inside the container using an in-process (local) Gluten se
 cd docker/velox
 export BENCHBOX_DATA_DIR=/absolute/path/to/your/data
 
-# TPC-H SF 0.01 smoke test
 docker compose run --rm velox-runner \
   --benchmark tpch --scale 0.01
 
-# TPC-H SF 1, specific queries
 docker compose run --rm velox-runner \
   --benchmark tpch --scale 1.0 --queries Q1,Q6,Q9,Q17
 
-# TPC-DS SF 10 (increase memory - see sizing below)
 VELOX_OFFHEAP=24g SPARK_DRIVER_MEM=8g \
 docker compose run --rm velox-runner \
   --benchmark tpcds --scale 10.0
 ```
+
+The first command is a TPC-H SF 0.01 smoke test. The second runs TPC-H SF 1 with specific queries. The third runs TPC-DS SF 10 and raises the memory settings; see the sizing guidance below.
 
 The entrypoint translates `run [args]` into:
 
@@ -204,7 +202,6 @@ VELOX_OFFHEAP=16g SPARK_DRIVER_MEM=8g docker compose up -d velox-connect
 For CI pipelines where Docker is available, the all-in-one runner is the simplest integration:
 
 ```yaml
-# GitHub Actions example
 - name: Build Velox image
   run: |
     docker build \
@@ -220,6 +217,8 @@ For CI pipelines where Docker is available, the all-in-one runner is the simples
       benchbox-velox:ci \
       run --benchmark tpch --scale 0.01 --queries Q1,Q6
 ```
+
+This is a GitHub Actions example.
 
 The `tests/integration/platforms/test_velox_live.py` integration tests are gated behind the `live_integration` marker and expect to run inside the image:
 

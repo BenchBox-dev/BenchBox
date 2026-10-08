@@ -1,12 +1,5 @@
-"""CSV/HTML exports and the .tuning.json companion must honor anonymization.
-
-The detailed CSV/HTML writers build rows from the result object directly,
-not from the anonymized JSON payload, so free-text error fields bypassed
-anonymization entirely; .tuning.json was written raw.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from types import SimpleNamespace
 

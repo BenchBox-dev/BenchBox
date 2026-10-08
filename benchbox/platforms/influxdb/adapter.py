@@ -1,23 +1,6 @@
-"""Primary adapter for InfluxDB platforms.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-InfluxDB 3.x is a time series database built on Apache Arrow, DataFusion, and Parquet.
-It supports native SQL queries via FlightSQL protocol, making it suitable for
-benchmarking time series workloads.
-
-Key Features:
-- Native SQL support via FlightSQL
-- Apache Arrow data format
-- Optimized for time series data
-- High-cardinality support
-
-Deployment Modes:
-- Core/OSS: Self-hosted open source (April 2025 GA)
-- Cloud: Managed service (Serverless, Dedicated, Clustered)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -52,65 +35,14 @@ class InfluxDBAdapter(
     InfluxDBSetupMixin,
     PlatformAdapter,
 ):
-    """InfluxDB platform adapter for time series benchmarking.
-
-    Supports InfluxDB 3.x via FlightSQL protocol for SQL-based benchmarking.
-    Optimized for time series workloads like TSBS DevOps.
-
-    Deployment modes:
-    - **InfluxDB Core (OSS)**: Self-hosted, open source, Docker-based
-    - **InfluxDB Cloud**: Managed service with token authentication
-
-    Example usage:
-        >>> from benchbox.platforms.influxdb import InfluxDBAdapter
-        >>>
-        >>> # Cloud mode
-        >>> adapter = InfluxDBAdapter(
-        ...     host="us-east-1-1.aws.cloud2.influxdata.com",
-        ...     token="your-token",
-        ...     org="your-org",
-        ...     database="benchmarks",
-        ...     mode="cloud",
-        ... )
-        >>>
-        >>> # Core mode (local Docker)
-        >>> adapter = InfluxDBAdapter(
-        ...     host="localhost",
-        ...     port=8086,
-        ...     token="your-token",
-
-        ...     database="benchmarks",
-        ...     mode="core",
-        ...     ssl=False,
-        ... )
-    """
-
     plan_capture_phase_eligible = True
-    # Reference docker deployment serves InfluxDB 3 on 8181; Core/Cloud modes
-    # configure their own port (default 8086) via adapter options.
     default_service_port = 8181
 
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
 
     def __init__(self, **config):
-        """Initialize InfluxDB adapter.
-
-        Args:
-            **config: Configuration options including:
-                - host: InfluxDB server hostname
-                - port: Server port (default: 8086)
-                - token: Authentication token (or INFLUXDB_TOKEN env var)
-                - org: Organization name
-                - database: Database (bucket) name
-                - ssl: Use SSL/TLS (default: True)
-                - mode: Deployment mode ('core' or 'cloud')
-
-        Raises:
-            ImportError: If InfluxDB client dependencies are not available
-        """
         super().__init__(**config)
 
-        # Check dependencies
         if not INFLUXDB_AVAILABLE:
             available, missing = check_platform_dependencies("influxdb")
             if not available:
@@ -119,18 +51,14 @@ class InfluxDBAdapter(
 
         self._dialect = "influxdb"
 
-        # Get token from config or environment
         token = config.get("token") or os.environ.get("INFLUXDB_TOKEN")
         config["token"] = token
 
-        # Setup connection parameters
         self._setup_connection_params(config)
 
-        # Validate mode
         if self.mode not in ("core", "cloud"):
             raise ValueError(f"Invalid InfluxDB mode '{self.mode}'. Must be 'core' or 'cloud'.")
 
-        # Log configuration
         if self.mode == "core":
             protocol = "http" if not self.ssl else "https"
             self.logger.info(f"InfluxDB Core mode: {protocol}://{self.host}:{self.port}")
@@ -138,15 +66,6 @@ class InfluxDBAdapter(
             self.logger.info(f"InfluxDB Cloud mode: {self.host}")
 
     def get_table_row_count(self, connection: Any, table: str) -> int:
-        """Get row count for a table.
-
-        Args:
-            connection: Database connection
-            table: Name of the table (measurement in InfluxDB terms)
-
-        Returns:
-            Number of rows in the table
-        """
         query = f'SELECT COUNT(*) FROM "{table}"'
         result = connection.execute(query)
         if result and len(result) > 0:
@@ -154,65 +73,25 @@ class InfluxDBAdapter(
         return 0
 
     def get_tables(self, connection: Any = None) -> list[str]:
-        """Get list of tables (measurements) in the database.
-
-        Args:
-            connection: Optional existing connection
-
-        Returns:
-            List of table names
-        """
         if connection is None:
             connection = self.connection
-        # InfluxDB 3.x uses system.tables for metadata
         query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'iox'"
         try:
             result = connection.execute(query)
             return [row[0] for row in result if row[0]]
         except (RuntimeError, ConnectionError):
-            # Fallback for different InfluxDB versions or connection issues
             return []
 
     def table_exists(self, table_name: str, connection: Any = None) -> bool:
-        """Check if a table (measurement) exists.
-
-        Args:
-            table_name: Name of the table
-            connection: Optional existing connection
-
-        Returns:
-            True if table exists
-        """
         tables = self.get_tables(connection)
         return table_name in tables
 
     def drop_table(self, table_name: str, connection: Any = None) -> None:
-        """Drop a table (not supported in InfluxDB 3.x Core).
-
-        InfluxDB 3.x Core/OSS does not support DELETE operations.
-        Data must be managed via retention policies or the InfluxDB API.
-
-        Args:
-            table_name: Name of the table
-            connection: Optional existing connection
-        """
         self.logger.warning(
             f"InfluxDB Core does not support DROP TABLE. Table '{table_name}' cannot be deleted via SQL."
         )
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create database schema for the benchmark.
-
-        InfluxDB 3.x auto-creates measurements (tables) from write operations.
-        Explicit CREATE TABLE is not typically needed for time series data.
-
-        Args:
-            benchmark: Benchmark instance with schema definitions
-            connection: Database connection
-
-        Returns:
-            Time taken to create schema (0.0 for InfluxDB since schema is implicit)
-        """
         self.logger.info(
             "InfluxDB auto-creates tables from write operations. Explicit schema creation is not required."
         )
@@ -221,26 +100,6 @@ class InfluxDBAdapter(
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load benchmark data into InfluxDB using Line Protocol.
-
-        Converts CSV/Parquet data files to InfluxDB Line Protocol format and
-        writes to the database using the influxdb3-python client.
-
-        For TSBS DevOps data:
-        - Metric tables (cpu, mem, disk, net) are loaded as measurements
-        - hostname is used as a tag (indexed for efficient filtering)
-        - device/interface are additional tags for disk/net tables
-        - Numeric columns become fields
-        - time column provides nanosecond timestamps
-
-        Args:
-            benchmark: Benchmark instance
-            connection: Database connection with write capability
-            data_dir: Directory containing CSV/Parquet data files
-
-        Returns:
-            Tuple of (row_counts, load_time, load_metadata)
-        """
         import time
 
         from ._dependencies import INFLUXDB3_AVAILABLE
@@ -252,7 +111,6 @@ class InfluxDBAdapter(
             )
             return {}, 0.0, {"skipped": True, "reason": "influxdb3-python not available"}
 
-        # Check if connection supports writes
         if not hasattr(connection, "write_batch"):
             self.logger.warning(
                 "Connection does not support batch writes. "
@@ -260,7 +118,6 @@ class InfluxDBAdapter(
             )
             return {}, 0.0, {"skipped": True, "reason": "write not supported"}
 
-        # TSBS DevOps table configurations for Line Protocol
         tsbs_tables = self._tsbs_table_configs()
 
         row_counts: dict[str, int] = {}
@@ -310,7 +167,6 @@ class InfluxDBAdapter(
 
     @staticmethod
     def _tsbs_table_configs() -> dict[str, dict[str, Any]]:
-        """Return TSBS DevOps table configurations for Line Protocol."""
         return {
             "tags": {
                 "tags": ["hostname"],
@@ -390,7 +246,6 @@ class InfluxDBAdapter(
             },
         }
 
-    # Fields that should always remain as floats (not converted to int)
     _FLOAT_ONLY_FIELDS = frozenset(
         {
             "usage_user",
@@ -409,7 +264,6 @@ class InfluxDBAdapter(
     )
 
     def _read_tsbs_csv(self, csv_path: Path, config: dict[str, Any]) -> list[dict[str, Any]]:
-        """Read a TSBS DevOps CSV file and convert rows to records."""
         import csv
 
         records: list[dict[str, Any]] = []
@@ -436,7 +290,6 @@ class InfluxDBAdapter(
 
     @staticmethod
     def _parse_timestamp(ts_str: str):
-        """Parse a timestamp string to datetime, trying ISO then Unix format."""
         from datetime import datetime
 
         try:
@@ -448,7 +301,6 @@ class InfluxDBAdapter(
                 return None
 
     def _parse_field_value(self, field: str, raw: str):
-        """Parse a field value string to int or float as appropriate."""
         try:
             value = float(raw)
             if value.is_integer() and field not in self._FLOAT_ONLY_FIELDS:
@@ -459,27 +311,9 @@ class InfluxDBAdapter(
             return None
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply platform-specific optimizations for the benchmark type.
-
-        InfluxDB 3.x is auto-tuned for time series workloads. No explicit
-        configuration is typically needed.
-
-        Args:
-            connection: Database connection
-            benchmark_type: Type of benchmark (e.g., 'tsbs_devops')
-        """
         self.logger.debug(f"Configuring InfluxDB for benchmark type: {benchmark_type}")
-        # InfluxDB is auto-optimized for time series - no explicit configuration needed
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
-        """Apply platform-specific optimizations.
-
-        InfluxDB 3.x manages its own optimizations. This method is a no-op.
-
-        Args:
-            platform_config: Platform optimization configuration
-            connection: Database connection
-        """
         self.logger.debug("InfluxDB manages its own optimizations - skipping explicit optimization")
 
     def apply_constraint_configuration(
@@ -488,16 +322,6 @@ class InfluxDBAdapter(
         foreign_key_config: ForeignKeyConfiguration,
         connection: Any,
     ) -> None:
-        """Apply constraint configuration.
-
-        InfluxDB 3.x is a time series database and doesn't support traditional
-        relational constraints like primary keys or foreign keys.
-
-        Args:
-            primary_key_config: Primary key configuration (ignored)
-            foreign_key_config: Foreign key configuration (ignored)
-            connection: Database connection
-        """
         self.logger.debug("InfluxDB is a time series database - relational constraints not applicable")
 
     def execute_query(
@@ -508,18 +332,6 @@ class InfluxDBAdapter(
         iteration: int = 1,
         stream_id: int | None = None,
     ) -> tuple[float, int, dict[str, Any] | None]:
-        """Execute a benchmark query and return timing and results.
-
-        Args:
-            connection: Database connection
-            query: SQL query string
-            query_id: Query identifier
-            iteration: Iteration number
-            stream_id: Optional stream ID for throughput tests
-
-        Returns:
-            Tuple of (execution_time, row_count, query_plan)
-        """
         import time
 
         start_time = time.perf_counter()

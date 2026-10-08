@@ -1,5 +1,3 @@
-"""Regression tests for timing collector clock usage."""
-
 from __future__ import annotations
 
 from datetime import datetime, timezone

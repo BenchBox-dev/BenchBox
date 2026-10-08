@@ -1,5 +1,3 @@
-"""Trust-boundary tests for the dedicated skill-integrity CI lane."""
-
 from __future__ import annotations
 
 import hashlib

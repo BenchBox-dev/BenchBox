@@ -4,9 +4,7 @@ export type PanelTone = "data" | "muted" | "elevated" | "hero" | "hero-muted";
 
 interface PanelProps {
   tone?: PanelTone;
-  /** Pads content. Set to false for tables / charts that manage their own padding. */
   padded?: boolean;
-  /** HTML tag to render as (default `section`). */
   as?: keyof JSX.IntrinsicElements;
   ariaLabel?: string;
   ariaLabelledBy?: string;
@@ -52,7 +50,6 @@ export interface DataCardProps {
   title?: ComponentChildren;
   description?: ComponentChildren;
   actions?: ComponentChildren;
-  /** When `true` (default), wraps in a Panel; when `false` returns content as-is. */
   withPanel?: boolean;
   tone?: PanelTone;
   class?: string;

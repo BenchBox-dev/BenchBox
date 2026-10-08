@@ -301,11 +301,10 @@ BenchBox's `clickhouse-local` platform uses embedded ClickHouse through
 chDB, so it runs the headline ClickHouse sketch overrides without any
 cloud credentials or external ClickHouse server. Install BenchBox with the
 `clickhouse-local` extra (or add `chdb` to an existing BenchBox dev
-environment):
+environment). The first command below installs the extra. The second command (`uv add chdb`) applies to an existing BenchBox development checkout:
 
 ```bash
 uv add benchbox --extra clickhouse-local
-# Existing BenchBox development checkout:
 uv add chdb
 ```
 
@@ -387,18 +386,20 @@ The shape mirrors operation-level `platform_overrides`:
 ```yaml
 operations:
   - id: sketch_query_theta_union_merge
-    write_sql: "SELECT datasketch_theta_estimate(...) FROM ..."  # default (DuckDB)
+    write_sql: "SELECT datasketch_theta_estimate(...) FROM ..."
     platform_overrides:
       clickhouse: "SELECT uniqMerge(user_sketch) FROM ..."
     validation_queries:
       - id: scalar_bounds
-        sql: "SELECT datasketch_theta_estimate(...) FROM ..."   # default
+        sql: "SELECT datasketch_theta_estimate(...) FROM ..."
         expected_value_min: 14500
         expected_value_max: 15500
         platform_overrides:
-          clickhouse: "SELECT uniqMerge(user_sketch) FROM ..."  # ClickHouse-native validation
-          redshift: null                                        # explicit skip
+          clickhouse: "SELECT uniqMerge(user_sketch) FROM ..."
+          redshift: null
 ```
+
+In this example the top-level `write_sql` and validation `sql` are the defaults (DuckDB). The ClickHouse override is ClickHouse-native validation, and `redshift: null` is an explicit skip.
 
 Resolution rules:
 
@@ -449,8 +450,9 @@ def merge_extract(path):
     return float(estimate)
 
 merge = manager.execute_aggregate_merge(target_path, merge_extract)
-# merge.metrics["aggregate_value"] holds the extracted scalar
 ```
+
+`merge.metrics["aggregate_value"]` holds the extracted scalar.
 
 The manager owns timing, durability (Parquet write to a target dir),
 byte/file-count bookkeeping, and the `DataFrameWriteResult` envelope. The

@@ -1,12 +1,6 @@
-"""Unified benchmark suite for cross-platform comparisons.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides a single interface for running benchmarks across both SQL and
-DataFrame platforms with unified result collection and reporting.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -30,17 +24,10 @@ from benchbox.core.comparison.types import (
 logger = logging.getLogger(__name__)
 
 
-#: Sentinel query id recorded when a platform fails before running any query.
 FAILED_PLATFORM_QUERY_ID = "ALL"
 
 
 class PlatformRunner(Protocol):
-    """Runs one benchmark on one platform and returns its BenchmarkResults.
-
-    Implemented by the surface (see ``benchbox.cli.commands.compare``) so
-    ``benchbox.core`` stays free of a ``benchbox.cli`` import.
-    """
-
     def __call__(
         self,
         *,
@@ -54,7 +41,6 @@ class PlatformRunner(Protocol):
 
 
 def _query_sort_key(query_id: str) -> tuple[int, float, str]:
-    """Sort query ids numerically when possible, alphabetically otherwise."""
     text = query_id[1:] if query_id[:1].upper() == "Q" else query_id
     try:
         return (0, float(text), "")
@@ -63,73 +49,23 @@ def _query_sort_key(query_id: str) -> tuple[int, float, str]:
 
 
 class UnifiedBenchmarkSuite:
-    """Unified benchmark suite for SQL and DataFrame platform comparisons.
-
-    Provides a single interface for:
-    - Running benchmarks across multiple platforms
-    - Collecting and normalizing results
-    - Statistical analysis
-    - Report generation
-
-    Example:
-        suite = UnifiedBenchmarkSuite(
-            config=UnifiedBenchmarkConfig(
-                platform_type=PlatformType.AUTO,
-                scale_factor=0.01,
-                benchmark="tpch",
-            )
-        )
-
-        # Run comparison
-        results = suite.run_comparison(
-            platforms=["duckdb", "sqlite"],  # SQL platforms
-            data_dir="benchmark_runs/tpch/sf001/data",
-        )
-
-        # Get summary
-        summary = suite.get_summary(results)
-        emit(f"Fastest: {summary.fastest_platform}")
-    """
-
     def __init__(
         self,
         config: UnifiedBenchmarkConfig | None = None,
         platform_runner: PlatformRunner | None = None,
     ):
-        """Initialize the unified benchmark suite.
-
-        Args:
-            config: Benchmark configuration. Defaults to standard config.
-            platform_runner: Callable that runs one benchmark on one platform
-                and returns its ``BenchmarkResults``. The surface injects this
-                -- ``benchbox.core`` must not import ``benchbox.cli``, so the
-                orchestrator wiring lives in the CLI, mirroring the
-                ``execute_run(adapter_factory=...)`` contract in
-                ``benchbox.core.run_service``. Without it, SQL run mode cannot
-                execute and raises rather than reporting an empty success.
-        """
         self.config = config or UnifiedBenchmarkConfig()
         self._platform_runner = platform_runner
 
     def get_available_platforms(self, platform_type: PlatformType | None = None) -> list[str]:
-        """Get available platforms of the specified type.
-
-        Args:
-            platform_type: Filter by platform type. None returns all.
-
-        Returns:
-            List of available platform names.
-        """
         platforms = []
 
-        # Get SQL platforms
         if platform_type in (None, PlatformType.SQL, PlatformType.AUTO):
             from benchbox.platforms import list_available_platforms
 
             sql_available = list_available_platforms()
             platforms.extend(sql_available)
 
-        # Get DataFrame platforms
         if platform_type in (None, PlatformType.DATAFRAME, PlatformType.AUTO):
             from benchbox.platforms import list_available_dataframe_platforms
 
@@ -143,19 +79,9 @@ class UnifiedBenchmarkSuite:
         platforms: list[str],
         data_dir: str | Path | None = None,
     ) -> list[UnifiedPlatformResult]:
-        """Run benchmark comparison across multiple platforms.
-
-        Args:
-            platforms: List of platform names to benchmark
-            data_dir: Directory containing benchmark data (for DataFrame platforms)
-
-        Returns:
-            List of UnifiedPlatformResult for each platform
-        """
         if not platforms:
             raise ValueError("At least one platform is required")
 
-        # Detect platform type if auto
         if self.config.platform_type == PlatformType.AUTO:
             detected_type, inconsistent = detect_platform_types(platforms)
             if inconsistent:
@@ -170,7 +96,6 @@ class UnifiedBenchmarkSuite:
 
         logger.info(f"Running {platform_type.value} comparison across {len(platforms)} platforms")
 
-        # Route to appropriate benchmark runner
         if platform_type == PlatformType.DATAFRAME:
             return self._run_dataframe_comparison(platforms, data_dir)
         else:
@@ -181,15 +106,6 @@ class UnifiedBenchmarkSuite:
         platforms: list[str],
         data_dir: str | Path | None = None,
     ) -> list[UnifiedPlatformResult]:
-        """Run SQL platform comparison.
-
-        Args:
-            platforms: SQL platform names
-            data_dir: Data directory (for embedded platforms)
-
-        Returns:
-            List of results for each platform
-        """
         results = []
 
         for platform in platforms:
@@ -199,10 +115,6 @@ class UnifiedBenchmarkSuite:
                 results.append(result)
             except Exception as e:
                 logger.error(f"Failed to benchmark {platform}: {e}")
-                # Build through _build_platform_result so the aggregates match
-                # the failure: success_rate 0, no geomean, no total time. A
-                # directly-constructed result kept the dataclass default and
-                # reported a failed platform as 100% successful.
                 results.append(
                     self._build_platform_result(
                         platform,
@@ -226,41 +138,11 @@ class UnifiedBenchmarkSuite:
         platform: str,
         data_dir: str | Path | None = None,
     ) -> UnifiedPlatformResult:
-        """Benchmark a single SQL platform through the canonical run path.
-
-        Delegates to :meth:`benchbox.cli.orchestrator.BenchmarkOrchestrator.execute_benchmark`
-        -- the same entry point ``benchbox run`` uses -- so data generation,
-        schema creation, loading, adapter configuration and phase handling are
-        shared with the single-platform command rather than reimplemented here.
-
-        The previous implementation was a hardcoded TPC-H path that required
-        pre-generated data at a guessed directory, never generated data, and
-        never reached a real runner, so the documented
-        ``benchbox compare -p duckdb -p sqlite`` invocation could not work.
-
-        Args:
-            platform: Platform name
-            data_dir: Optional pre-existing data directory. When given it is
-                passed through as the benchmark output root.
-
-        Returns:
-            UnifiedPlatformResult with real per-query timings
-
-        Raises:
-            Exception: Any failure from the run path, so the caller records the
-                platform as failed rather than silently successful.
-        """
         results = self._execute_platform_run(platform, data_dir)
         query_results = self._to_unified_query_results(results, platform)
         return self._build_platform_result(platform, PlatformType.SQL, query_results)
 
     def _execute_platform_run(self, platform: str, data_dir: str | Path | None):
-        """Run one benchmark on one platform through the injected runner.
-
-        Raises:
-            RuntimeError: When no runner was injected. The caller records the
-                platform as failed rather than reporting a vacuous success.
-        """
         if self._platform_runner is None:
             raise RuntimeError(
                 "No platform runner configured for SQL comparison. "
@@ -277,11 +159,6 @@ class UnifiedBenchmarkSuite:
         )
 
     def _normalized_query_ids(self) -> list[str] | None:
-        """Return configured query ids in the form the run path expects.
-
-        The comparison surface accepts ``Q1`` style ids; the run path expects
-        bare ids (``1``). ``None`` means every query in the benchmark.
-        """
         if not self.config.query_ids:
             return None
         normalized = []
@@ -292,14 +169,6 @@ class UnifiedBenchmarkSuite:
 
     @staticmethod
     def _to_unified_query_results(results: Any, platform: str) -> list[UnifiedQueryResult]:
-        """Convert a BenchmarkResults into per-query comparison records.
-
-        Measurement iterations for one query id are folded into a single
-        :class:`UnifiedQueryResult`. Warmup rows are excluded so they cannot
-        distort the comparison. A query whose every iteration failed is kept
-        with ``status="ERROR"`` so it counts against the success rate instead
-        of vanishing from the denominator.
-        """
         by_query: dict[str, dict[str, Any]] = {}
         for row in getattr(results, "query_results", None) or []:
             if not isinstance(row, dict):
@@ -358,23 +227,11 @@ class UnifiedBenchmarkSuite:
         platforms: list[str],
         data_dir: str | Path | None = None,
     ) -> list[UnifiedPlatformResult]:
-        """Run DataFrame platform comparison.
-
-        Delegates to the existing DataFrameBenchmarkSuite.
-
-        Args:
-            platforms: DataFrame platform names
-            data_dir: Data directory
-
-        Returns:
-            List of results for each platform
-        """
         from benchbox.core.dataframe.benchmark_suite import (
             BenchmarkConfig,
             DataFrameBenchmarkSuite,
         )
 
-        # Create DataFrame benchmark config
         df_config = BenchmarkConfig(
             scale_factor=self.config.scale_factor,
             query_ids=self.config.query_ids,
@@ -390,10 +247,8 @@ class UnifiedBenchmarkSuite:
             sf_str = f"sf{self.config.scale_factor}".replace(".", "")
             data_dir = Path(f"benchmark_runs/tpch/{sf_str}/data")
 
-        # Run DataFrame comparison
         df_results = suite.run_comparison(platforms=platforms, data_dir=data_dir)
 
-        # Convert to unified format
         unified_results = []
         for df_result in df_results:
             query_results = []
@@ -435,19 +290,8 @@ class UnifiedBenchmarkSuite:
         platform_type: PlatformType,
         query_results: list[UnifiedQueryResult],
     ) -> UnifiedPlatformResult:
-        """Build platform result with calculated aggregates.
-
-        Args:
-            platform: Platform name
-            platform_type: Platform type
-            query_results: Query results
-
-        Returns:
-            UnifiedPlatformResult with aggregates
-        """
         successful = [r for r in query_results if r.status == "SUCCESS"]
 
-        # Calculate total time and geometric mean
         total_time = sum(r.mean_time_ms for r in successful)
         geometric_mean = 0.0
 
@@ -457,7 +301,6 @@ class UnifiedBenchmarkSuite:
                 log_sum = sum(math.log(t) for t in mean_times)
                 geometric_mean = math.exp(log_sum / len(mean_times))
 
-        # Calculate success rate
         success_rate = (len(successful) / len(query_results) * 100) if query_results else 0
 
         return UnifiedPlatformResult(
@@ -470,27 +313,15 @@ class UnifiedBenchmarkSuite:
         )
 
     def get_summary(self, results: list[UnifiedPlatformResult]) -> UnifiedComparisonSummary:
-        """Generate comparison summary from results.
-
-        Args:
-            results: List of platform results
-
-        Returns:
-            UnifiedComparisonSummary with comparison metrics
-        """
         if not results:
             raise ValueError("No results to summarize")
 
         platforms = [r.platform for r in results]
         platform_type = results[0].platform_type
 
-        # Get geometric means for ranking
         geomeans = {r.platform: r.geometric_mean_ms for r in results if r.geometric_mean_ms > 0}
 
         if not geomeans:
-            # Nothing timed successfully, so there is no ranking to report.
-            # Naming platforms[0] as both fastest and slowest with a 1.00x
-            # speedup presented total failure as a valid comparison.
             return UnifiedComparisonSummary(
                 platforms=platforms,
                 platform_type=platform_type,
@@ -504,20 +335,15 @@ class UnifiedBenchmarkSuite:
         fastest = min(geomeans, key=geomeans.get)
         slowest = max(geomeans, key=geomeans.get)
         if len(geomeans) < 2:
-            # Only one platform produced timings. It is not faster than
-            # anything, so there is no ratio to report.
             slowest = None
             speedup_ratio = None
         else:
             speedup_ratio = geomeans[slowest] / geomeans[fastest] if geomeans[fastest] > 0 else None
 
-        # Find query winners
         query_winners: dict[str, str] = {}
         all_query_ids = set()
         for result in results:
             for qr in result.query_results:
-                # ALL is the sentinel for "this platform failed before running
-                # any query"; counting it would inflate the query total.
                 if qr.query_id == FAILED_PLATFORM_QUERY_ID:
                     continue
                 all_query_ids.add(qr.query_id)
@@ -549,16 +375,6 @@ class UnifiedBenchmarkSuite:
         output_path: str | Path,
         format: str = "json",
     ) -> Path:
-        """Export benchmark results to file.
-
-        Args:
-            results: List of platform results
-            output_path: Output file path
-            format: Output format (json, markdown, text)
-
-        Returns:
-            Path to created file
-        """
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -593,7 +409,6 @@ class UnifiedBenchmarkSuite:
         return output_path
 
     def _generate_markdown_report(self, results: list[UnifiedPlatformResult]) -> str:
-        """Generate markdown report from results."""
         lines = []
         summary = self.get_summary(results)
 
@@ -645,7 +460,6 @@ class UnifiedBenchmarkSuite:
         return "\n".join(lines)
 
     def _generate_text_report(self, results: list[UnifiedPlatformResult]) -> str:
-        """Generate text report from results."""
         lines = []
         summary = self.get_summary(results)
 
@@ -697,21 +511,6 @@ def run_unified_comparison(
     data_dir: str | Path | None = None,
     platform_runner: PlatformRunner | None = None,
 ) -> list[UnifiedPlatformResult]:
-    """Run a unified cross-platform comparison.
-
-    Convenience function for quick comparisons.
-
-    Args:
-        platforms: Platforms to compare
-        platform_type: SQL, DATAFRAME, or AUTO
-        scale_factor: Benchmark scale factor
-        benchmark: Benchmark name
-        query_ids: Optional query subset
-        data_dir: Data directory
-
-    Returns:
-        List of UnifiedPlatformResult
-    """
     suite = UnifiedBenchmarkSuite(
         config=UnifiedBenchmarkConfig(
             platform_type=platform_type,

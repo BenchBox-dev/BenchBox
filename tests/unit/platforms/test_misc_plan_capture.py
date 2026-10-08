@@ -1,17 +1,3 @@
-"""Plan-capture wiring tests for the misc platform family.
-
-Covers MotherDuck, Databend, QuestDB, Velox, Doris, and SingleStore. All tests
-are driven by recorded EXPLAIN fixtures under ``tests/fixtures/query_plans/`` and
-fake/mocked connections, so no live cluster (and no GPU) is required.
-
-Three properties are checked per platform:
-  1. ``get_query_plan_parser()`` returns the expected non-None parser.
-  2. ``execute_query()`` with ``capture_plans=True`` parses and stores a
-     ``QueryPlanDAG`` plus ``plan_fingerprint`` (mock connection).
-  3. Capture degrades gracefully: no EXPLAIN/plan when capture is disabled, and a
-     successful query with an unavailable plan still returns ``status=SUCCESS``.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -37,7 +23,7 @@ _FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "query_plans"
 
 
 def _load(name: str) -> str:
-    # Explicit encoding: the default is locale-dependent (cp1252 on Windows).
+
     return (_FIXTURES / name).read_text(encoding="utf-8")
 
 
@@ -46,11 +32,6 @@ def _collect(op: LogicalOperator) -> list[LogicalOperator]:
     for child in op.children:
         nodes.extend(_collect(child))
     return nodes
-
-
-# ---------------------------------------------------------------------------
-# Parser correctness against recorded fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -70,8 +51,6 @@ def _collect(op: LogicalOperator) -> list[LogicalOperator]:
             LogicalOperatorType.SORT,
             {"trades"},
             (LogicalOperatorType.AGGREGATE, LogicalOperatorType.FILTER, LogicalOperatorType.SCAN),
-            # Single-table query; QuestDB nests its scan sub-operators
-            # (PageFrame -> row/frame forward scan).
             3,
         ),
         (
@@ -91,7 +70,7 @@ def _collect(op: LogicalOperator) -> list[LogicalOperator]:
             2,
         ),
         (
-            SparkQueryPlanParser(),  # Velox reuses the Spark parser (Gluten transformer names)
+            SparkQueryPlanParser(),
             "velox_explain_extended_sample.txt",
             LogicalOperatorType.OTHER,
             {"default.lineitem", "default.orders"},
@@ -145,14 +124,9 @@ def test_join_type_classified_inner(parser, fixture):
 def test_empty_and_garbage_input_degrade_gracefully(parser):
     assert parser.parse_explain_output("q", "") is None
     assert parser.parse_explain_output("q", "   \n  ") is None
-    # Garbage must not raise; it may yield a minimal DAG or None.
+
     result = parser.parse_explain_output("q", "!@#$ %^&*")
     assert result is None or result.logical_root is not None
-
-
-# ---------------------------------------------------------------------------
-# Registry resolution
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -168,11 +142,6 @@ def test_empty_and_garbage_input_degrade_gracefully(parser):
 )
 def test_registry_resolves_platform(platform, parser_cls):
     assert isinstance(get_parser_for_platform(platform), parser_cls)
-
-
-# ---------------------------------------------------------------------------
-# Adapter wiring: MotherDuck (reuses the DuckDB parser)
-# ---------------------------------------------------------------------------
 
 
 class TestMotherDuckWiring:
@@ -213,13 +182,8 @@ class TestMotherDuckWiring:
         assert "query_plan" not in result
 
 
-# ---------------------------------------------------------------------------
-# Adapter wiring: QuestDB / Doris / SingleStore (DBAPI cursor execution path)
-# ---------------------------------------------------------------------------
-
-
 def _cursor_conn():
-    """A DB-API-style connection whose cursor returns one row for any query."""
+
     conn = MagicMock()
     cursor = conn.cursor.return_value
     cursor.fetchall.return_value = [(1,)]
@@ -290,11 +254,6 @@ class TestCursorAdapterWiring:
         assert "query_plan" not in result
 
 
-# ---------------------------------------------------------------------------
-# Adapter wiring: Databend (databend-driver query_iter execution path)
-# ---------------------------------------------------------------------------
-
-
 def _make_databend(monkeypatch):
     import benchbox.platforms.databend.adapter as dba
 
@@ -338,11 +297,6 @@ class TestDatabendWiring:
         assert "query_plan" not in result
 
 
-# ---------------------------------------------------------------------------
-# Adapter wiring: Velox (Gluten + Velox on Spark; reuses Spark execution + parser)
-# ---------------------------------------------------------------------------
-
-
 class _DF:
     def __init__(self, rows):
         self._rows = rows
@@ -368,12 +322,11 @@ class TestVeloxWiring:
         from benchbox.platforms.velox import VeloxAdapter
 
         adapter = VeloxAdapter(capture_plans=True)
-        adapter.disable_cache = False  # avoid catalog.clearCache() on the fake session
+        adapter.disable_cache = False
         return adapter
 
     def test_parser_is_spark(self, adapter):
-        # Velox uses Spark's EXPLAIN EXTENDED format, so it reuses SparkQueryPlanParser
-        # rather than the Presto/Trino parser the original plan assumed.
+
         assert isinstance(adapter.get_query_plan_parser(), SparkQueryPlanParser)
 
     def test_execute_query_captures_plan(self, adapter, monkeypatch):
@@ -398,19 +351,7 @@ class TestVeloxWiring:
         assert "query_plan" not in result or result.get("query_plan") is None
 
 
-# ---------------------------------------------------------------------------
-# Error-channel cleanup: EXPLAIN failures return None (explain_failed)
-# ---------------------------------------------------------------------------
-
-
 class TestErrorChannelCleanup:
-    """EXPLAIN failures must surface as None so capture records explain_failed.
-
-    Returning an error string would bypass the falsy check in
-    ``capture_query_plan`` and be handed to the parser, misclassifying a
-    database EXPLAIN failure as a parse_error.
-    """
-
     def test_questdb_failure_records_explain_failed(self):
         adapter = _make_questdb()
         conn = MagicMock()

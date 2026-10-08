@@ -1,11 +1,3 @@
-"""Tests for MCP tool handler functions exercising real code paths.
-
-These tests call the actual MCP-registered tool functions (via the server's
-internal registry) with appropriate mocking of heavy dependencies (benchmark
-execution, file I/O) to verify argument handling, error paths, and response
-structure.
-"""
-
 import sys
 from contextlib import contextmanager
 from pathlib import Path
@@ -22,13 +14,7 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _get_tool_functions():
-    """Create a fresh MCP server and expose public tool invokers."""
     import benchbox.utils.printing as printing
     from benchbox.mcp import create_server
 
@@ -41,20 +27,11 @@ def _get_tool_functions():
 
 @pytest.fixture(scope="module")
 def tool_functions():
-    """Module-scoped fixture for tool function lookup."""
     return _get_tool_functions()
 
 
-# ---------------------------------------------------------------------------
-# run_benchmark with validate_only=True (consolidated validate_config)
-# ---------------------------------------------------------------------------
-
-
 class TestValidateConfigTool:
-    """Tests for run_benchmark with validate_only=True (consolidated validate_config)."""
-
     def test_valid_duckdb_tpch_returns_valid(self, tool_functions):
-        """Valid platform + benchmark returns valid=True."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=1.0, validate_only=True)
 
@@ -64,7 +41,6 @@ class TestValidateConfigTool:
         assert result["errors"] == []
 
     def test_unknown_platform_returns_error(self, tool_functions):
-        """Unknown platform produces a validation error."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="nonexistent_db", benchmark="tpch", scale_factor=1.0, validate_only=True)
 
@@ -72,7 +48,6 @@ class TestValidateConfigTool:
         assert any("Unknown platform" in e for e in result["errors"])
 
     def test_unknown_benchmark_returns_error(self, tool_functions):
-        """Unknown benchmark produces a validation error."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="fake_benchmark", scale_factor=1.0, validate_only=True)
 
@@ -80,7 +55,6 @@ class TestValidateConfigTool:
         assert any("Unknown benchmark" in e for e in result["errors"])
 
     def test_negative_scale_factor_returns_error(self, tool_functions):
-        """Negative scale factor is invalid."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=-1.0, validate_only=True)
 
@@ -88,23 +62,19 @@ class TestValidateConfigTool:
         assert any("positive" in e.lower() for e in result["errors"])
 
     def test_cloud_platform_produces_warning(self, tool_functions):
-        """Cloud platforms produce credential warnings."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="snowflake", benchmark="tpch", scale_factor=1.0, validate_only=True)
 
         assert any("credential" in w.lower() for w in result["warnings"])
 
     def test_dataframe_unsupported_benchmark_returns_error(self, tool_functions):
-        """DataFrame mode with unsupported benchmark produces error."""
         fn = tool_functions["run_benchmark"]
-        # ai_primitives does not support DataFrame mode
         result = fn(platform="polars-df", benchmark="ai_primitives", scale_factor=1.0, validate_only=True)
 
         assert result["valid"] is False
         assert any("DataFrame" in e for e in result["errors"])
 
     def test_response_contains_execution_mode(self, tool_functions):
-        """Response includes execution_mode field."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=1.0, validate_only=True)
 
@@ -112,16 +82,8 @@ class TestValidateConfigTool:
         assert result["execution_mode"] in ("sql", "dataframe", "data_only")
 
 
-# ---------------------------------------------------------------------------
-# get_query_details tool
-# ---------------------------------------------------------------------------
-
-
 class TestGetQueryDetailsTool:
-    """Tests for the get_query_details tool handler."""
-
     def test_tpch_query_returns_sql(self, tool_functions):
-        """TPC-H query 6 returns SQL text."""
         fn = tool_functions["get_query_details"]
         result = fn(benchmark="tpch", query_id="6")
 
@@ -131,7 +93,6 @@ class TestGetQueryDetailsTool:
         assert "select" in result["sql"].lower() or "SELECT" in result["sql"]
 
     def test_joinorder_query_returns_sql(self, tool_functions):
-        """Canonical JoinOrder query detail uses its registry default SF=1."""
         fn = tool_functions["get_query_details"]
         result = fn(benchmark="joinorder", query_id="1a")
 
@@ -141,7 +102,6 @@ class TestGetQueryDetailsTool:
         assert "movie_companies" in result["sql"]
 
     def test_query_id_with_q_prefix(self, tool_functions):
-        """Q-prefixed query IDs are normalized."""
         fn = tool_functions["get_query_details"]
         result = fn(benchmark="tpch", query_id="Q6")
 
@@ -149,7 +109,6 @@ class TestGetQueryDetailsTool:
         assert result["normalized_id"] == "6"
 
     def test_unknown_benchmark_returns_error(self, tool_functions):
-        """Unknown benchmark returns error response."""
         fn = tool_functions["get_query_details"]
         result = fn(benchmark="fake_benchmark", query_id="1")
 
@@ -157,7 +116,6 @@ class TestGetQueryDetailsTool:
         assert result["error_code"] == "RESOURCE_NOT_FOUND"
 
     def test_response_has_complexity_hints(self, tool_functions):
-        """Response includes complexity hints."""
         fn = tool_functions["get_query_details"]
         result = fn(benchmark="tpch", query_id="6")
 
@@ -165,7 +123,6 @@ class TestGetQueryDetailsTool:
         assert "complexity" in result["complexity_hints"]
 
     def test_response_has_benchmark_info(self, tool_functions):
-        """Response includes benchmark metadata."""
         fn = tool_functions["get_query_details"]
         result = fn(benchmark="tpch", query_id="1")
 
@@ -174,7 +131,6 @@ class TestGetQueryDetailsTool:
         assert result["benchmark_info"]["support_status"] == "stable"
 
     def test_internal_benchmark_info_omits_support_status(self):
-        """Explicit-ID MCP query details must not expose repo-only support tiers."""
         from benchbox.core.benchmark_registry import BENCHMARK_METADATA
         from benchbox.mcp.tools.benchmark import _build_query_details_benchmark_info
 
@@ -188,7 +144,6 @@ class TestGetQueryDetailsTool:
 
 
 def _future_benchmark_meta(support_status: str, surface: str, *, supports_dataframe: bool = False) -> dict[str, object]:
-    """Metadata for a hypothetical future benchmark used to pin visibility invariants."""
     return {
         "display_name": f"Future {support_status}/{surface}",
         "description": "synthetic future-status fixture",
@@ -209,7 +164,6 @@ def _future_benchmark_meta(support_status: str, surface: str, *, supports_datafr
 
 @contextmanager
 def _registered_future_benchmark(benchmark_id: str, meta: dict[str, object]):
-    """Inject a synthetic benchmark through the live registry surface."""
     from benchbox.core import benchmark_registry
 
     fixtures = {benchmark_id: meta}
@@ -218,15 +172,7 @@ def _registered_future_benchmark(benchmark_id: str, meta: dict[str, object]):
 
 
 class TestFutureSupportStatusVisibilityInvariants:
-    """Cross-surface invariants for future support_status x surface combinations.
-
-    These use synthetic metadata so that adding a real `document_only`,
-    `deprecated`, `beta`, or `experimental` benchmark later cannot silently
-    expose or hide it contrary to the surface policy.
-    """
-
     def test_internal_future_status_hidden_from_mcp_discovery(self):
-        """An internal benchmark of any future status stays off MCP discovery surfaces."""
         from benchbox.mcp.tools.discovery import _get_benchmark_info_impl, _list_benchmarks_impl
 
         with _registered_future_benchmark("x_future_internal", _future_benchmark_meta("document_only", "internal")):
@@ -238,7 +184,6 @@ class TestFutureSupportStatusVisibilityInvariants:
             assert "x_future_internal" not in info["available_benchmarks"]
 
     def test_internal_future_status_query_details_omit_support_status(self):
-        """Explicit-ID query details for an internal benchmark omit support claims."""
         from benchbox.mcp.tools.benchmark import _build_query_details_benchmark_info
 
         meta = _future_benchmark_meta("deprecated", "internal")
@@ -249,7 +194,6 @@ class TestFutureSupportStatusVisibilityInvariants:
         assert "support_status" not in info
 
     def test_public_future_status_exposed_and_labeled_over_mcp(self):
-        """A public benchmark of a future status is discoverable with its support_status."""
         from benchbox.mcp.tools.discovery import _get_benchmark_info_impl, _list_benchmarks_impl
 
         with _registered_future_benchmark("x_future_public", _future_benchmark_meta("deprecated", "public")):
@@ -261,7 +205,6 @@ class TestFutureSupportStatusVisibilityInvariants:
             assert info["support_status"] == "deprecated"
 
     def test_dataframe_routing_uses_capability_not_support_status(self):
-        """DataFrame validation must read supports_dataframe, not infer from support tier."""
         from benchbox.core import benchmark_registry
         from benchbox.core.validation.config import validate_benchmark_config as _validate_benchmark_config
 
@@ -281,16 +224,8 @@ class TestFutureSupportStatusVisibilityInvariants:
             assert errors == ["DataFrame mode does not support x_stable_nodf benchmark"]
 
 
-# ---------------------------------------------------------------------------
-# list_available with category="platforms" (consolidated list_platforms)
-# ---------------------------------------------------------------------------
-
-
 class TestListPlatformsTool:
-    """Tests for list_available with category='platforms' (consolidated list_platforms)."""
-
     def test_returns_platforms_list(self, tool_functions):
-        """Response contains platforms list with expected structure."""
         fn = tool_functions["list_available"]
         result = fn(category="platforms")
 
@@ -300,7 +235,6 @@ class TestListPlatformsTool:
         assert len(result["platforms"]) == result["count"]
 
     def test_platform_entries_have_required_fields(self, tool_functions):
-        """Each platform entry has required fields."""
         fn = tool_functions["list_available"]
         result = fn(category="platforms")
 
@@ -309,7 +243,6 @@ class TestListPlatformsTool:
             assert required_fields.issubset(platform.keys()), f"Missing fields in {platform['name']}"
 
     def test_duckdb_is_available(self, tool_functions):
-        """DuckDB should be available in the test environment."""
         fn = tool_functions["list_available"]
         result = fn(category="platforms")
 
@@ -318,7 +251,6 @@ class TestListPlatformsTool:
         assert duckdb_entries[0]["available"] is True
 
     def test_summary_has_counts(self, tool_functions):
-        """Summary section has aggregate counts."""
         fn = tool_functions["list_available"]
         result = fn(category="platforms")
 
@@ -328,16 +260,8 @@ class TestListPlatformsTool:
         assert "dataframe_platforms" in result["summary"]
 
 
-# ---------------------------------------------------------------------------
-# list_available with category="benchmarks" (consolidated list_benchmarks)
-# ---------------------------------------------------------------------------
-
-
 class TestListBenchmarksTool:
-    """Tests for list_available with category='benchmarks' (consolidated list_benchmarks)."""
-
     def test_returns_benchmarks_list(self, tool_functions):
-        """Response contains benchmarks list."""
         fn = tool_functions["list_available"]
         result = fn(category="benchmarks")
 
@@ -346,7 +270,6 @@ class TestListBenchmarksTool:
         assert result["count"] > 0
 
     def test_tpch_is_listed(self, tool_functions):
-        """TPC-H is in the benchmarks list."""
         fn = tool_functions["list_available"]
         result = fn(category="benchmarks")
 
@@ -354,7 +277,6 @@ class TestListBenchmarksTool:
         assert "tpch" in names
 
     def test_internal_benchmarks_are_hidden(self, tool_functions):
-        """Internal registry entries do not appear in MCP discovery lists."""
         fn = tool_functions["list_available"]
         result = fn(category="benchmarks")
 
@@ -363,7 +285,6 @@ class TestListBenchmarksTool:
         assert "joinorder_synthetic" not in names
 
     def test_benchmark_entries_have_required_fields(self, tool_functions):
-        """Each benchmark entry has required structure."""
         fn = tool_functions["list_available"]
         result = fn(category="benchmarks")
 
@@ -375,7 +296,6 @@ class TestListBenchmarksTool:
             assert "scale_factors" in bm
 
     def test_benchmark_entries_project_support_status(self, tool_functions):
-        """MCP benchmark discovery reports registry support status."""
         fn = tool_functions["list_available"]
         result = fn(category="benchmarks")
         benchmarks = {bm["name"]: bm for bm in result["benchmarks"]}
@@ -384,7 +304,6 @@ class TestListBenchmarksTool:
         assert benchmarks["ai_primitives"]["support_status"] == "experimental"
 
     def test_categories_grouping(self, tool_functions):
-        """Response includes category grouping."""
         fn = tool_functions["list_available"]
         result = fn(category="benchmarks")
 
@@ -392,16 +311,8 @@ class TestListBenchmarksTool:
         assert isinstance(result["categories"], dict)
 
 
-# ---------------------------------------------------------------------------
-# get_benchmark_info tool
-# ---------------------------------------------------------------------------
-
-
 class TestGetBenchmarkInfoTool:
-    """Tests for the get_benchmark_info tool handler."""
-
     def test_tpch_info_returns_details(self, tool_functions):
-        """TPC-H benchmark info returns detailed response."""
         fn = tool_functions["get_benchmark_info"]
         result = fn(benchmark="tpch")
 
@@ -410,14 +321,12 @@ class TestGetBenchmarkInfoTool:
         assert result["support_status"] == "stable"
 
     def test_unknown_benchmark_returns_error(self, tool_functions):
-        """Unknown benchmark returns error."""
         fn = tool_functions["get_benchmark_info"]
         result = fn(benchmark="nonexistent")
 
         assert "error" in result
 
     def test_internal_benchmark_returns_not_found(self, tool_functions):
-        """Internal benchmark entries are hidden from MCP benchmark detail discovery."""
         fn = tool_functions["get_benchmark_info"]
         result = fn(benchmark="joinorder_synthetic")
 
@@ -425,16 +334,8 @@ class TestGetBenchmarkInfoTool:
         assert "joinorder_synthetic" not in result["available_benchmarks"]
 
 
-# ---------------------------------------------------------------------------
-# run_benchmark tool - error paths (no actual execution)
-# ---------------------------------------------------------------------------
-
-
 class TestRunBenchmarkToolErrors:
-    """Tests for run_benchmark error handling (no actual benchmark execution)."""
-
     def test_unknown_benchmark_returns_not_found(self, tool_functions):
-        """Unknown benchmark returns RESOURCE_NOT_FOUND error."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="nonexistent_bench", scale_factor=0.01)
 
@@ -442,16 +343,13 @@ class TestRunBenchmarkToolErrors:
         assert result["error_code"] == "RESOURCE_NOT_FOUND"
 
     def test_unknown_platform_returns_error(self, tool_functions):
-        """Unknown platform returns VALIDATION_UNSUPPORTED_PLATFORM error."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="nonexistent_platform", benchmark="tpch", scale_factor=0.01)
 
         assert result.get("status") == "failed"
-        # Either platform validation or adapter creation fails
         assert "error" in result or "error_code" in result
 
     def test_response_has_execution_id(self, tool_functions):
-        """All responses include an execution_id."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="nonexistent", scale_factor=0.01)
 
@@ -459,7 +357,6 @@ class TestRunBenchmarkToolErrors:
         assert result["execution_id"].startswith("mcp_")
 
     def test_not_found_error_has_error_code(self, tool_functions):
-        """Not-found errors include proper error_code."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="nonexistent", scale_factor=0.01)
 
@@ -467,16 +364,8 @@ class TestRunBenchmarkToolErrors:
         assert result["status"] == "failed"
 
 
-# ---------------------------------------------------------------------------
-# run_benchmark tool - successful execution (mocked)
-# ---------------------------------------------------------------------------
-
-
 class TestRunBenchmarkToolSuccess:
-    """Tests for run_benchmark success path with mocked execution."""
-
     def test_successful_run_returns_completed(self, tool_functions, tmp_path):
-        """Successful benchmark run returns completed status with result_file."""
         fn = tool_functions["run_benchmark"]
 
         mock_result = MagicMock()
@@ -508,7 +397,6 @@ class TestRunBenchmarkToolSuccess:
         assert result["mcp_metadata"]["result_file"] == str(result_path)
 
     def test_query_subset_forwarded(self, tool_functions):
-        """Query subset string reaches the shared core run service."""
         fn = tool_functions["run_benchmark"]
 
         with patch(
@@ -520,7 +408,6 @@ class TestRunBenchmarkToolSuccess:
         assert run_core.call_args.kwargs["queries"] == "1,6,17"
 
     def test_result_exported_with_execution_id(self, tool_functions):
-        """Execution ID is set on result before export."""
         fn = tool_functions["run_benchmark"]
 
         mock_result = MagicMock()
@@ -541,13 +428,10 @@ class TestRunBenchmarkToolSuccess:
         ):
             fn(platform="duckdb", benchmark="tpch", scale_factor=0.01)
 
-        # Verify execution_id was set on the result object before export
         assert mock_result.execution_id.startswith("mcp_")
-        # Verify exporter was called with the result
         mock_exporter.export_result.assert_called_once_with(mock_result, formats=["json"])
 
     def test_export_failure_does_not_break_response(self, tool_functions):
-        """Export failure is gracefully handled - response still returned."""
         fn = tool_functions["run_benchmark"]
 
         mock_result = MagicMock()
@@ -576,10 +460,8 @@ class TestRunBenchmarkToolSuccess:
         assert result["mcp_metadata"]["result_file"] is None
 
     def test_all_query_results_included(self, tool_functions, tmp_path):
-        """All query results are returned without truncation."""
         fn = tool_functions["run_benchmark"]
 
-        # Simulate 99 queries (TPC-DS)
         mock_result = MagicMock()
         mock_result.query_results = [
             {"query_id": f"Q{i}", "execution_time": 0.1 * i, "status": "success"} for i in range(1, 100)
@@ -617,12 +499,10 @@ class TestRunBenchmarkToolSuccess:
 
         assert result["mcp_metadata"]["status"] == "completed"
         assert len(result["queries"]) == 99
-        # Verify first and last query
         assert result["queries"][0]["id"] == "1"
         assert result["queries"][98]["id"] == "99"
 
     def test_dataframe_platform_uses_dataframe_execution_path(self, tool_functions, tmp_path):
-        """DataFrame platforms use the dedicated DataFrame execution path."""
         fn = tool_functions["run_benchmark"]
         from benchbox.core.runner.runner import LifecyclePhases
 
@@ -669,16 +549,8 @@ class TestRunBenchmarkToolSuccess:
         assert result["summary"]["queries"]["total"] == 22
 
 
-# ---------------------------------------------------------------------------
-# Results tools - _get_results_impl
-# ---------------------------------------------------------------------------
-
-
 class TestGetResultsImpl:
-    """Tests for the results retrieval implementation."""
-
     def test_missing_file_returns_not_found(self):
-        """Non-existent result file returns RESOURCE_NOT_FOUND."""
         from benchbox.mcp.tools.results import _get_results_impl
 
         result = _get_results_impl("missing_file.json", results_dir=Path("/nonexistent/path"))
@@ -687,7 +559,6 @@ class TestGetResultsImpl:
         assert result["error_code"] == "RESOURCE_NOT_FOUND"
 
     def test_valid_json_file_returns_data(self, tmp_path):
-        """Valid JSON result file returns parsed data."""
         from benchbox.mcp.tools.results import _get_results_impl
 
         result_file = tmp_path / "test_run.json"
@@ -708,7 +579,6 @@ class TestGetResultsImpl:
         assert result["summary"]["timing"]["total_ms"] == 5.0
 
     def test_invalid_json_returns_format_error(self, tmp_path):
-        """Malformed JSON returns RESOURCE_INVALID_FORMAT."""
         from benchbox.mcp.tools.results import _get_results_impl
 
         bad_file = tmp_path / "bad.json"
@@ -720,7 +590,6 @@ class TestGetResultsImpl:
         assert result["error_code"] == "RESOURCE_INVALID_FORMAT"
 
     def test_includes_query_results_when_requested(self, tmp_path):
-        """Query results are included when include_queries=True."""
         from benchbox.mcp.tools.results import _get_results_impl
 
         query_list = [
@@ -746,7 +615,6 @@ class TestGetResultsImpl:
         assert result["queries"][0]["id"] == "1"
 
     def test_auto_appends_json_extension(self, tmp_path):
-        """Files without .json extension get it appended."""
         from benchbox.mcp.tools.results import _get_results_impl
 
         result_file = tmp_path / "run.json"
@@ -766,58 +634,31 @@ class TestGetResultsImpl:
         assert "error" not in result
 
 
-# ---------------------------------------------------------------------------
-# Discovery tool: check_dependencies
-# ---------------------------------------------------------------------------
-
-
 class TestCheckDependenciesTool:
-    """Tests for the check_dependencies tool handler."""
-
     def test_returns_platform_status(self, tool_functions):
-        """check_dependencies returns dependency status for platforms."""
         fn = tool_functions["check_dependencies"]
         result = fn()
 
-        # Should return some platform info
         assert isinstance(result, dict)
 
     def test_specific_platform_check(self, tool_functions):
-        """Checking a specific platform returns focused results."""
         fn = tool_functions["check_dependencies"]
         result = fn(platform="duckdb")
 
         assert isinstance(result, dict)
 
 
-# ---------------------------------------------------------------------------
-# Discovery tool: system_profile
-# ---------------------------------------------------------------------------
-
-
 class TestSystemProfileTool:
-    """Tests for the system_profile tool handler."""
-
     def test_returns_system_info(self, tool_functions):
-        """system_profile returns hardware and software info."""
         fn = tool_functions["system_profile"]
         result = fn()
 
         assert isinstance(result, dict)
-        # Should have CPU, memory, or similar system info
         assert len(result) > 0
 
 
-# ---------------------------------------------------------------------------
-# Mode parameter validation tests
-# ---------------------------------------------------------------------------
-
-
 class TestModeParameterValidation:
-    """Tests for the mode parameter in MCP tools."""
-
     def test_validate_config_with_valid_sql_mode(self, tool_functions):
-        """run_benchmark with validate_only accepts sql mode for SQL-capable platforms."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=1.0, mode="sql", validate_only=True)
 
@@ -825,16 +666,13 @@ class TestModeParameterValidation:
         assert result["execution_mode"] == "sql"
 
     def test_validate_config_with_valid_dataframe_mode(self, tool_functions):
-        """run_benchmark with validate_only accepts dataframe mode for DataFrame-capable platforms."""
         fn = tool_functions["run_benchmark"]
-        # polars only supports dataframe mode
         result = fn(platform="polars", benchmark="tpch", scale_factor=1.0, mode="dataframe", validate_only=True)
 
         assert result["valid"] is True
         assert result["execution_mode"] == "dataframe"
 
     def test_validate_config_with_invalid_mode_value(self, tool_functions):
-        """run_benchmark with validate_only rejects invalid mode values."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=1.0, mode="invalid", validate_only=True)
 
@@ -842,33 +680,26 @@ class TestModeParameterValidation:
         assert any("Invalid mode" in e for e in result["errors"])
 
     def test_validate_config_unsupported_mode_for_platform(self, tool_functions):
-        """run_benchmark with validate_only returns error when platform doesn't support the requested mode."""
         fn = tool_functions["run_benchmark"]
-        # sqlite only supports SQL mode, not dataframe
         result = fn(platform="sqlite", benchmark="tpch", scale_factor=1.0, mode="dataframe", validate_only=True)
 
         assert result["valid"] is False
         assert any("doesn't support dataframe mode" in e for e in result["errors"])
 
     def test_validate_config_default_mode_when_not_specified(self, tool_functions):
-        """run_benchmark with validate_only uses platform default mode when not specified."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=1.0, validate_only=True)
 
-        # DuckDB defaults to SQL mode
         assert result["execution_mode"] == "sql"
 
     def test_validate_config_returns_execution_mode(self, tool_functions):
-        """run_benchmark with validate_only response includes execution_mode field."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=1.0, validate_only=True)
 
         assert "execution_mode" in result
 
     def test_run_benchmark_rejects_unsupported_mode(self, tool_functions):
-        """run_benchmark returns error for unsupported mode."""
         fn = tool_functions["run_benchmark"]
-        # sqlite doesn't support dataframe mode
         result = fn(platform="sqlite", benchmark="tpch", scale_factor=0.01, mode="dataframe")
 
         assert result.get("status") == "failed"
@@ -876,7 +707,6 @@ class TestModeParameterValidation:
         assert "execution_id" in result
 
     def test_run_benchmark_accepts_valid_mode(self, tool_functions, tmp_path):
-        """run_benchmark accepts valid mode for capable platforms."""
         fn = tool_functions["run_benchmark"]
 
         mock_result = MagicMock()
@@ -904,25 +734,20 @@ class TestModeParameterValidation:
         assert result["mcp_metadata"]["execution_mode"] == "sql"
 
     def test_dry_run_with_mode_parameter(self, tool_functions):
-        """run_benchmark with dry_run accepts and uses mode parameter."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, mode="sql", dry_run=True)
 
-        # Should succeed and show execution_mode in response
         assert result["status"] == "dry_run"
         assert result["execution_mode"] == "sql"
 
     def test_dry_run_rejects_unsupported_mode(self, tool_functions):
-        """run_benchmark with dry_run returns error for unsupported mode."""
         fn = tool_functions["run_benchmark"]
-        # sqlite doesn't support dataframe mode
         result = fn(platform="sqlite", benchmark="tpch", scale_factor=0.01, mode="dataframe", dry_run=True)
 
         assert result.get("status") == "error"
         assert result.get("error_code") == "VALIDATION_UNSUPPORTED_MODE"
 
     def test_mode_case_insensitive(self, tool_functions):
-        """Mode parameter is case-insensitive."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=1.0, mode="SQL", validate_only=True)
 
@@ -930,21 +755,17 @@ class TestModeParameterValidation:
         assert result["execution_mode"] == "sql"
 
     def test_dual_mode_platform_accepts_both_modes(self, tool_functions):
-        """Dual-mode platforms (like datafusion) accept both sql and dataframe modes."""
         fn = tool_functions["run_benchmark"]
 
-        # Test SQL mode
         result_sql = fn(platform="datafusion", benchmark="tpch", scale_factor=1.0, mode="sql", validate_only=True)
         assert result_sql["valid"] is True
         assert result_sql["execution_mode"] == "sql"
 
-        # Test DataFrame mode
         result_df = fn(platform="datafusion", benchmark="tpch", scale_factor=1.0, mode="dataframe", validate_only=True)
         assert result_df["valid"] is True
         assert result_df["execution_mode"] == "dataframe"
 
     def test_validate_config_accepts_data_only_mode(self, tool_functions):
-        """run_benchmark with validate_only accepts data_only mode for any platform."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=1.0, mode="data_only", validate_only=True)
 
@@ -952,7 +773,6 @@ class TestModeParameterValidation:
         assert result["execution_mode"] == "data_only"
 
     def test_validate_config_accepts_datagen_alias(self, tool_functions):
-        """run_benchmark with validate_only accepts 'datagen' as alias for data_only mode."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=1.0, mode="datagen", validate_only=True)
 
@@ -960,7 +780,6 @@ class TestModeParameterValidation:
         assert result["execution_mode"] == "data_only"
 
     def test_run_benchmark_data_only_mode(self, tool_functions, tmp_path):
-        """The public run_benchmark surface routes data_only through core."""
         fn = tool_functions["run_benchmark"]
 
         mock_bm = MagicMock()
@@ -982,7 +801,6 @@ class TestModeParameterValidation:
         assert execute_run.call_args.kwargs["config"].test_execution_type == "data_only"
 
     def test_dry_run_accepts_data_only_mode(self, tool_functions):
-        """run_benchmark with dry_run accepts data_only mode."""
         fn = tool_functions["run_benchmark"]
         result = fn(platform="duckdb", benchmark="tpch", scale_factor=0.01, mode="data_only", dry_run=True)
 
@@ -990,16 +808,8 @@ class TestModeParameterValidation:
         assert result["execution_mode"] == "data_only"
 
 
-# ---------------------------------------------------------------------------
-# Phases to test_execution_type mapping tests
-# ---------------------------------------------------------------------------
-
-
 class TestPhasesMapping:
-    """Tests for phases to test_execution_type mapping."""
-
     def test_power_phase_maps_to_power_type(self):
-        """Phases containing 'power' should map to power test_execution_type."""
         from benchbox.core.run_service import map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type(["power"]) == "power"
@@ -1007,39 +817,33 @@ class TestPhasesMapping:
         assert _map_phases_to_test_execution_type(["warmup", "power"]) == "power"
 
     def test_throughput_phase_maps_to_throughput_type(self):
-        """Phases containing only 'throughput' should map to throughput type."""
         from benchbox.core.run_service import map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type(["throughput"]) == "throughput"
         assert _map_phases_to_test_execution_type(["load", "throughput"]) == "throughput"
 
     def test_combined_phases_map_to_combined_type(self):
-        """All three query phases together should map to combined type."""
         from benchbox.core.run_service import map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type(["power", "throughput", "maintenance"]) == "combined"
 
     def test_load_only_phase_maps_to_load_only_type(self):
-        """Load-only phase should map to load_only type."""
         from benchbox.core.run_service import map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type(["load"]) == "load_only"
 
     def test_generate_only_phase_maps_to_data_only_type(self):
-        """Generate-only phase should map to data_only type."""
         from benchbox.core.run_service import map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type(["generate"]) == "data_only"
 
     def test_empty_phases_maps_to_standard(self):
-        """Empty or unrecognized phases should map to standard type."""
         from benchbox.core.run_service import map_phases_to_execution_type as _map_phases_to_test_execution_type
 
         assert _map_phases_to_test_execution_type([]) == "standard"
         assert _map_phases_to_test_execution_type(["warmup"]) == "standard"
 
     def test_run_benchmark_passes_test_execution_type(self, tool_functions, tmp_path):
-        """run_benchmark should pass test_execution_type based on phases."""
         fn = tool_functions["run_benchmark"]
 
         mock_result = MagicMock()
@@ -1062,7 +866,6 @@ class TestPhasesMapping:
         assert execute_run.call_args.kwargs["config"].test_execution_type == "power"
 
     def test_run_benchmark_passes_mode_to_adapter(self, tool_functions, tmp_path):
-        """run_benchmark should pass mode to the unified adapter factory."""
         fn = tool_functions["run_benchmark"]
         from benchbox.core.runner.runner import LifecyclePhases
 
@@ -1098,7 +901,6 @@ class TestPhasesMapping:
         ):
             fn(platform="datafusion", benchmark="tpch", scale_factor=0.01, mode="dataframe")
 
-        # Verify the unified adapter factory was called with mode="dataframe"
         mock_get_adapter.assert_called_once()
         call_kwargs = mock_get_adapter.call_args[1]
         assert call_kwargs.get("mode") == "dataframe"

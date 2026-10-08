@@ -1,13 +1,6 @@
-"""Unified tuning configuration command group.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides a consolidated CLI for all tuning-related operations,
-supporting both SQL platforms (DuckDB, Snowflake, etc.) and DataFrame platforms
-(Polars, Pandas, Dask, etc.).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 from pathlib import Path
@@ -52,22 +45,42 @@ from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 from benchbox.platforms.adapter_factory import is_dataframe_mode
 
 
-@click.group("tuning")
+@click.group(
+    "tuning",
+    help=(
+        "Tuning configuration commands.\n"
+        "\n"
+        "Create, validate, and inspect tuning configurations for SQL and DataFrame platforms.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "  benchbox tuning init --platform duckdb\n"
+        "  benchbox tuning init --platform polars --mode dataframe\n"
+        "  benchbox tuning validate config.yaml --platform polars\n"
+        "  benchbox tuning defaults --platform polars"
+    ),
+)
 def tuning_group() -> None:
-    """Tuning configuration commands.
-
-    Create, validate, and inspect tuning configurations for SQL and DataFrame platforms.
-
-    \b
-    Examples:
-      benchbox tuning init --platform duckdb
-      benchbox tuning init --platform polars --mode dataframe
-      benchbox tuning validate config.yaml --platform polars
-      benchbox tuning defaults --platform polars
-    """
+    pass
 
 
-@tuning_group.command("init")
+@tuning_group.command(
+    "init",
+    help=(
+        "Create a tuning configuration file.\n"
+        "\n"
+        "Generates a YAML configuration file with platform-specific tuning options.\n"
+        "Use --mode to specify SQL (constraints, indexes) or DataFrame (parallelism, memory).\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "  benchbox tuning init --platform duckdb\n"
+        "  benchbox tuning init --platform snowflake --output my-tuning.yaml\n"
+        "  benchbox tuning init --platform polars --mode dataframe\n"
+        "  benchbox tuning init --platform polars --smart-defaults\n"
+        "  benchbox tuning init --platform dask --profile memory-constrained"
+    ),
+)
 @click.option(
     "--platform",
     type=str,
@@ -106,27 +119,12 @@ def init(
     output: Optional[str],
     smart_defaults: bool,
 ) -> None:
-    """Create a tuning configuration file.
-
-    Generates a YAML configuration file with platform-specific tuning options.
-    Use --mode to specify SQL (constraints, indexes) or DataFrame (parallelism, memory).
-
-    \b
-    Examples:
-      benchbox tuning init --platform duckdb
-      benchbox tuning init --platform snowflake --output my-tuning.yaml
-      benchbox tuning init --platform polars --mode dataframe
-      benchbox tuning init --platform polars --smart-defaults
-      benchbox tuning init --platform dask --profile memory-constrained
-    """
     platform_lower = platform.lower()
     platform_key = get_platform_aliases("cli").get(platform_lower, platform_lower)
 
-    # Auto-detect mode based on platform
     if mode == "auto":
         mode = "dataframe" if is_dataframe_mode(platform_lower) else "sql"
 
-    # Validate mode/platform compatibility
     if mode == "dataframe" and platform_key not in DATAFRAME_PLATFORMS:
         console.print(f"[red]Platform '{platform}' does not support DataFrame mode[/red]")
         console.print(f"[yellow]DataFrame platforms: {', '.join(sorted(DATAFRAME_PLATFORMS))}[/yellow]")
@@ -139,7 +137,6 @@ def init(
 
 
 def _init_sql_tuning(ctx: click.Context, platform: str, output: Optional[str]) -> None:
-    """Create SQL platform tuning configuration."""
     console.print(
         Panel.fit(
             Text(f"Creating SQL Tuning Configuration for {platform.title()}", style="bold cyan"),
@@ -171,7 +168,6 @@ def _init_dataframe_tuning(
     output: Optional[str],
     smart_defaults: bool,
 ) -> None:
-    """Create DataFrame platform tuning configuration."""
     console.print(
         Panel.fit(
             Text(f"Creating DataFrame Tuning Configuration for {platform.title()}", style="bold cyan"),
@@ -179,7 +175,6 @@ def _init_dataframe_tuning(
         )
     )
 
-    # Determine output path
     if output is None:
         output = f"{platform}_{profile.replace('-', '_')}_tuning.yaml"
     output_path = Path(output)
@@ -224,11 +219,6 @@ def _init_dataframe_tuning(
 
 
 def _create_profile_config(platform: str, profile: str) -> DataFrameTuningConfiguration:
-    """Thin CLI wrapper over :func:`benchbox.core.dataframe.tuning.profiles.create_profile_config`.
-
-    Keeps the CLI's warning for the only profile with a platform restriction
-    (``gpu`` on non-cuDF) so the user-facing message stays at the surface.
-    """
     if profile == "gpu" and platform != "cudf":
         console.print("[yellow]Warning: GPU profile is only applicable to cuDF[/yellow]")
     from benchbox.core.dataframe.tuning.profiles import create_profile_config as _core_create
@@ -236,7 +226,23 @@ def _create_profile_config(platform: str, profile: str) -> DataFrameTuningConfig
     return _core_create(platform, profile)
 
 
-@tuning_group.command("validate")
+@tuning_group.command(
+    "validate",
+    help=(
+        "Validate a tuning configuration file.\n"
+        "\n"
+        "Checks the configuration for errors and warnings specific to the target platform.\n"
+        "DataFrame platforms (datafusion, polars, pandas, dask, cudf) validate a DataFrame\n"
+        "tuning file. Any other platform validates a SQL tuning file against the platform\n"
+        "capability registry.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "  benchbox tuning validate polars_tuning.yaml --platform polars\n"
+        "  benchbox tuning validate my_config.yaml --platform dask\n"
+        "  benchbox tuning validate examples/tunings/duckdb/tpch_tuned.yaml --platform duckdb"
+    ),
+)
 @click.argument("config_file", type=click.Path(exists=True))
 @click.option(
     "--platform",
@@ -251,21 +257,6 @@ def _create_profile_config(platform: str, profile: str) -> DataFrameTuningConfig
     help="Tuning mode: sql, dataframe, or auto (detect from platform)",
 )
 def validate_config(config_file: str, platform: str, mode: str) -> None:
-    """Validate a tuning configuration file.
-
-    Checks the configuration for errors and warnings specific to the target platform.
-    DataFrame platforms (datafusion, polars, pandas, dask, cudf) validate a DataFrame
-    tuning file. Any other platform validates a SQL tuning file against the platform
-    capability registry. Platforms with both modes (datafusion) select the mode with
-    --mode; auto detects it from the platform.
-
-    \b
-    Examples:
-      benchbox tuning validate polars_tuning.yaml --platform polars
-      benchbox tuning validate my_config.yaml --platform dask
-      benchbox tuning validate examples/tunings/duckdb/tpch_tuned.yaml --platform duckdb
-      benchbox tuning validate datafusion_tuned.yaml --platform datafusion --mode sql
-    """
     platform_name = platform.lower()
     if (
         platform_name not in DATAFRAME_PLATFORMS
@@ -374,7 +365,20 @@ def _validate_sql_config(config_file: str, platform: str) -> None:
     console.print(f"  Table tunings: {len(config.table_tunings)}")
 
 
-@tuning_group.command("defaults")
+@tuning_group.command(
+    "defaults",
+    help=(
+        "Show smart defaults for a platform based on system profile.\n"
+        "\n"
+        "Analyzes the current system (CPU, memory, GPU) and shows recommended\n"
+        "tuning settings for the specified platform.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "  benchbox tuning defaults --platform polars\n"
+        "  benchbox tuning defaults --platform cudf"
+    ),
+)
 @click.option(
     "--platform",
     type=click.Choice(sorted(DATAFRAME_PLATFORMS), case_sensitive=False),
@@ -382,16 +386,6 @@ def _validate_sql_config(config_file: str, platform: str) -> None:
     help="Target DataFrame platform",
 )
 def show_defaults(platform: str) -> None:
-    """Show smart defaults for a platform based on system profile.
-
-    Analyzes the current system (CPU, memory, GPU) and shows recommended
-    tuning settings for the specified platform.
-
-    \b
-    Examples:
-      benchbox tuning defaults --platform polars
-      benchbox tuning defaults --platform cudf
-    """
     console.print(
         Panel.fit(
             Text(f"Smart Defaults for {platform.title()}", style="bold cyan"),
@@ -429,13 +423,11 @@ def show_defaults(platform: str) -> None:
 
 
 def _display_config_settings_table(config: DataFrameTuningConfiguration) -> None:
-    """Display a settings table for a DataFrameTuningConfiguration."""
     settings_table = Table(show_header=True)
     settings_table.add_column("Category", style="cyan")
     settings_table.add_column("Setting", style="white")
     settings_table.add_column("Value", style="yellow")
 
-    # Parallelism
     for attr, label in [
         ("thread_count", "thread_count"),
         ("worker_count", "worker_count"),
@@ -445,7 +437,6 @@ def _display_config_settings_table(config: DataFrameTuningConfiguration) -> None
         if val is not None:
             settings_table.add_row("Parallelism", label, str(val))
 
-    # Memory
     if config.memory.memory_limit is not None:
         settings_table.add_row("Memory", "memory_limit", config.memory.memory_limit)
     if config.memory.chunk_size is not None:
@@ -453,23 +444,19 @@ def _display_config_settings_table(config: DataFrameTuningConfiguration) -> None
     if config.memory.spill_to_disk:
         settings_table.add_row("Memory", "spill_to_disk", "True")
 
-    # Execution
     if config.execution.streaming_mode:
         settings_table.add_row("Execution", "streaming_mode", "True")
     if config.execution.engine_affinity is not None:
         settings_table.add_row("Execution", "engine_affinity", config.execution.engine_affinity)
 
-    # Data types
     if config.data_types.dtype_backend != "numpy_nullable":
         settings_table.add_row("Data Types", "dtype_backend", config.data_types.dtype_backend)
     if config.data_types.auto_categorize_strings:
         settings_table.add_row("Data Types", "auto_categorize_strings", "True")
 
-    # I/O
     if config.io.memory_map:
         settings_table.add_row("I/O", "memory_map", "True")
 
-    # GPU
     if config.gpu.enabled:
         settings_table.add_row("GPU", "enabled", "True")
         settings_table.add_row("GPU", "device_id", str(config.gpu.device_id))
@@ -483,7 +470,22 @@ def _display_config_settings_table(config: DataFrameTuningConfiguration) -> None
         console.print(settings_table)
 
 
-@tuning_group.command("list")
+@tuning_group.command(
+    "list",
+    help=(
+        "List available tuning templates.\n"
+        "\n"
+        "Shows all tuning templates in examples/tunings/, optionally filtered\n"
+        "by platform and/or benchmark.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "  benchbox tuning list\n"
+        "  benchbox tuning list --platform duckdb\n"
+        "  benchbox tuning list --platform duckdb --benchmark tpch\n"
+        "  benchbox tuning list --benchmark tpcds"
+    ),
+)
 @click.option(
     "--platform",
     type=str,
@@ -497,22 +499,27 @@ def _display_config_settings_table(config: DataFrameTuningConfiguration) -> None
     help="Filter to specific benchmark (e.g., tpch, tpcds)",
 )
 def list_templates(platform: Optional[str], benchmark: Optional[str]) -> None:
-    """List available tuning templates.
-
-    Shows all tuning templates in examples/tunings/, optionally filtered
-    by platform and/or benchmark.
-
-    \b
-    Examples:
-      benchbox tuning list
-      benchbox tuning list --platform duckdb
-      benchbox tuning list --platform duckdb --benchmark tpch
-      benchbox tuning list --benchmark tpcds
-    """
     display_tuning_list(console, platform, benchmark)
 
 
-@tuning_group.command("show")
+@tuning_group.command(
+    "show",
+    help=(
+        "Show resolved tuning configuration.\n"
+        "\n"
+        "Displays the tuning configuration that would be used for a given\n"
+        "--tuning argument, platform, and benchmark combination.\n"
+        "\n"
+        "TUNING_ARG can be: tuned, notuning, auto, or a file path.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "  benchbox tuning show tuned --platform duckdb --benchmark tpch\n"
+        "  benchbox tuning show ./my-tuning.yaml\n"
+        "  benchbox tuning show auto --platform polars\n"
+        "  benchbox tuning show notuning"
+    ),
+)
 @click.argument("tuning_arg", default="tuned")
 @click.option(
     "--platform",
@@ -533,20 +540,6 @@ def show_tuning(
     platform: Optional[str],
     benchmark: Optional[str],
 ) -> None:
-    """Show resolved tuning configuration.
-
-    Displays the tuning configuration that would be used for a given
-    --tuning argument, platform, and benchmark combination.
-
-    TUNING_ARG can be: tuned, notuning, auto, or a file path.
-
-    \b
-    Examples:
-      benchbox tuning show tuned --platform duckdb --benchmark tpch
-      benchbox tuning show ./my-tuning.yaml
-      benchbox tuning show auto --platform polars
-      benchbox tuning show notuning
-    """
     config_manager = ctx.obj["config"]
 
     try:
@@ -560,7 +553,6 @@ def show_tuning(
             non_interactive=True,
         )
 
-        # Load the actual configuration if a file was resolved
         loaded_config = None
         if resolution.config_file:
             try:
@@ -578,15 +570,6 @@ def show_tuning(
 
 
 def _sql_platform_capability_rows() -> list[tuple[str, str, str]]:
-    """Build (platform, tuning types, rendering notes) rows from the capability registry.
-
-    Per the tuning-renderer-consolidation-and-baseline-policy-20260712 TODO
-    (w3), this table is generated from
-    benchbox.core.tuning.capability_registry.PLATFORM_TUNING_CAPABILITIES
-    instead of a hand-written platform/feature-description list, so it can
-    no longer drift from what the registry (and therefore the rest of the
-    tuning system) actually knows about each platform.
-    """
     from benchbox.core.tuning.capability_registry import PLATFORM_TUNING_CAPABILITIES
 
     rows = []
@@ -603,12 +586,13 @@ def _sql_platform_capability_rows() -> list[tuple[str, str, str]]:
     return rows
 
 
-@tuning_group.command("platforms")
+@tuning_group.command(
+    "platforms",
+    help=(
+        "List platforms and their tuning capabilities.\n\nShows which platforms support tuning and their key features."
+    ),
+)
 def list_platforms() -> None:
-    """List platforms and their tuning capabilities.
-
-    Shows which platforms support tuning and their key features.
-    """
     console.print(
         Panel.fit(
             Text("Platform Tuning Capabilities", style="bold cyan"),
@@ -616,7 +600,6 @@ def list_platforms() -> None:
         )
     )
 
-    # SQL Platforms
     console.print("\n[bold]SQL Platforms:[/bold]")
     sql_table = Table(show_header=True)
     sql_table.add_column("Platform", style="cyan")
@@ -628,7 +611,6 @@ def list_platforms() -> None:
 
     console.print(sql_table)
 
-    # DataFrame Platforms — rows come from core so the table cannot drift.
     console.print("\n[bold]DataFrame Platforms:[/bold]")
     df_table = Table(show_header=True)
     df_table.add_column("Platform", style="cyan")

@@ -1,16 +1,8 @@
-"""Tests for the dsqgen ``-LOG`` parameter parser and ``DSQGenBinary.generate_parameter_log``.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-The parser tests use logs captured from the bundled dsqgen (seed 7, scale 1).
-The binary tests assert behaviour that must hold on every platform (same seed
-repeats, a different seed changes the values, the stream is reported) and do not
-pin values, because cross-platform value identity is checked separately.
+# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -33,7 +25,7 @@ Q70_LOG = (
     "\t__LIMITB.01 = \n\nEND STREAM 0\n"
 )
 
-# Excerpt of the Q8 log: the real log lists ZIP.01 through ZIP.400 before YEAR.01.
+
 Q8_LOG_EXCERPT = (
     "BEGIN STREAM 0\nTemplate: query8.tpl\n\t__LIMITA.01 = \n\t_LIMITC.01 = limit 100\n\t_LIMITB.01 = \n"
     "\t_LIMITA.01 = \n\t_LIMIT.01 = 100\n\tZIP.01 = 37650\n\tZIP.02 = 11903\n\tZIP.03 = 52277\n"
@@ -192,7 +184,7 @@ class TestGenerateParameterLog:
         assert params.stream == stream_id
 
     def test_scale_dependent_parameters_follow_the_requested_scale(self, dsqgen):
-        # Q44 draws its STORE value from rowcount(...), which depends on scale.
+
         small = dsqgen.generate_parameter_log(44, seed=7, scale_factor=1)
         large = dsqgen.generate_parameter_log(44, seed=7, scale_factor=10)
 

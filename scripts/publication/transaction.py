@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Canonical publication transaction schema, builder, and state machine.
-
-Implements the single state transition engine shared by promotion,
-rollback, and external recovery (Slice B).
-"""
 
 from __future__ import annotations
 
@@ -19,12 +14,10 @@ from scripts.publication.reconciliation import DEFAULT_MAX_AGE_HOURS, validate_l
 SCHEMA_VERSION = 1
 OBJECT_TYPE = "publication-transaction"
 
-# Transaction kinds
 KIND_PROMOTION = "promotion"
 KIND_ROLLBACK = "rollback"
 KIND_LEGACY_RECOVERY = "legacy_recovery"
 
-# States
 STATE_PREPARED = "prepared"
 STATE_WRITE_STARTED = "write-started"
 STATE_WRITE_ACKNOWLEDGED = "write-acknowledged"
@@ -50,7 +43,6 @@ VALID_STATES = {
 }
 VALID_KINDS = {KIND_PROMOTION, KIND_ROLLBACK, KIND_LEGACY_RECOVERY}
 
-# Events
 EVENT_PREPARE = "prepare"
 EVENT_START_WRITE = "start-write"
 EVENT_ACKNOWLEDGE_WRITE = "acknowledge-write"
@@ -65,16 +57,14 @@ EVENT_MARK_TERMINAL = "mark-terminal"
 
 
 class TransactionError(Exception):
-    """Base exception for invalid transaction operations or state transitions."""
+    pass
 
 
 def canonical_json(data: dict[str, Any]) -> str:
-    """Return compact, sorted UTF-8 JSON representation."""
     return json.dumps(data, sort_keys=True, separators=(",", ":"))
 
 
 def compute_digest(data: dict[str, Any]) -> str:
-    """Compute SHA-256 digest of canonical JSON."""
     return hashlib.sha256(canonical_json(data).encode("utf-8")).hexdigest()
 
 
@@ -84,7 +74,6 @@ def validate_live_receipt(
     *,
     max_age_hours: float | None = DEFAULT_MAX_AGE_HOURS,
 ) -> dict[str, Any]:
-    """Validate signed receipt evidence and bind it to the current transaction."""
     receipt = payload.get("attestation")
     if not isinstance(receipt, dict):
         raise TransactionError("A signed live-receipt attestation is required for verification success")
@@ -190,7 +179,6 @@ def prepare_promotion(
     artifact: dict[str, Any],
     transaction_id: str | None = None,
 ) -> tuple[Transaction, Effect]:
-    """Prepare a new promotion transaction in PREPARED state."""
     tx_id = transaction_id or str(uuid.uuid4())
 
     desired_payload = {
@@ -241,7 +229,6 @@ def prepare_rollback(
     barrier_evidence: dict[str, Any],
     transaction_id: str | None = None,
 ) -> tuple[Transaction, Effect]:
-    """Prepare a successor rollback transaction describing restored parent bytes."""
     if failed_transaction.state not in (STATE_RECOVERY_REQUIRED, STATE_WRITE_STARTED, STATE_WRITE_ACKNOWLEDGED):
         raise TransactionError(f"Cannot initiate rollback from non-recoverable state: {failed_transaction.state}")
     if generation <= failed_transaction.generation:
@@ -523,14 +510,6 @@ def _handle_recovery_required(
         return Transaction(**data), Effect(action="terminal_stop", data=data["failure"])
 
     if event_type == EVENT_VERIFY_SUCCESS:
-        # Forward reconciliation of a post-send failure whose provider write
-        # provably landed: the deployment reached the provider's terminal-success
-        # state and the live routes serve the approved candidate. Only a
-        # promotion whose failure was recorded at the post-send stage qualifies;
-        # a pre-send or verification failure has no landed write to reconcile.
-        # Allowlist promotions rather than denylist rollbacks: this handler also
-        # serves legacy_recovery, whose journal states exclude externally-verified,
-        # so reconciling one forward would corrupt the journal on reload.
         if current.kind != KIND_PROMOTION:
             raise TransactionError(f"Recovery reconciliation applies only to promotions, not kind {current.kind!r}")
         failure = current.failure or {}
@@ -540,13 +519,6 @@ def _handle_recovery_required(
         if not obs_digest:
             raise TransactionError("observation_digest is required for recovery reconciliation")
 
-        # The provider status must be bound to *this* transaction's deployment.
-        # The deploy step sends `pages_build_version: github.sha`, which the
-        # provider resolves to the controller's workflow SHA, so that SHA is the
-        # provider-side identity of this transaction's write. It is a journal
-        # field, so it cannot be altered without a CAS-protected journal write.
-        # Requiring the caller to name that same identity makes an unrelated or
-        # stale deployment's success unable to reconcile this transaction.
         expected_deployment_id = (current.controller or {}).get("workflow_sha")
         pages_deployment_id = payload.get("pages_deployment_id")
         if not expected_deployment_id:
@@ -597,7 +569,6 @@ def transition(
     event_type: str,
     payload: dict[str, Any] | None = None,
 ) -> tuple[Transaction, Effect]:
-    """Execute a pure state transition and return (new_transaction, next_effect)."""
     payload = payload or {}
     ev = {
         "event_id": str(uuid.uuid4()),

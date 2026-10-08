@@ -5,5 +5,5 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def _stub_psutil_cpu_count(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Avoid sandbox sysctl restrictions when TPC-DI generators probe CPU count."""
+
     monkeypatch.setattr("benchbox.core.tpcdi.generator.data.psutil.cpu_count", lambda: 2)

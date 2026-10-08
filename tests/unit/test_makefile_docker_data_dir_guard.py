@@ -1,32 +1,3 @@
-"""Coverage for the Makefile's `require_data_dir_if_mounted` guard.
-
-`require_data_dir_if_mounted` (Makefile) is the ONLY validation on the
-`make test-docker-up-lakesail` / `make test-docker-velox` entry points --
-the behaviour documented in `docker/velox/README.md`,
-`docs/platforms/lakesail.md`, and `docs/platforms/velox_docker_dev.md` --
-yet had zero test coverage before this module: mutation testing (deleting
-the `$(call require_data_dir_if_mounted,$*)` line from `test-docker-up-%`
-alone) survived the full suite. These tests shell out to the REAL `make`
-binary against the real Makefile so they pin what developers actually run,
-but never touch a real container engine: `CONTAINER_ENGINE` is pointed at a
-fake stub executable that only logs its argv and exits 0, so the guard is
-exercised (and, on rejection, its ABSENCE of any compose call is proven)
-without creating or destroying any real container/volume.
-
-This module also pins the regression the guard's original placement caused
-(F2 in the 2026-08-06 adversarial review): `require_data_dir_if_mounted`
-used to sit AFTER `status=1` and AFTER `trap cleanup EXIT INT TERM` in
-`test-docker-up-%`, so a guard rejection's own `exit 1` fired the
-failure-cleanup trap -- which runs `compose down -v` against whatever
-project name was already on record and deletes the tracking file. A second
-shell re-running `make test-docker-up-lakesail` without exporting
-BENCHBOX_DATA_DIR against an ALREADY-RUNNING stack from a first shell would
-tear that live stack down and orphan it from tracking, even though the
-guard's job is only to refuse a bad export, not to touch any existing
-stack. `test_guard_rejection_leaves_a_tracked_stack_untouched` below pins
-the fix: the guard must reject before the trap is even installed.
-"""
-
 from __future__ import annotations
 
 import os
@@ -138,15 +109,6 @@ def test_guard_rejects_relative_data_dir_without_touching_compose(tmp_path, targ
 
 @pytest.mark.parametrize("data_dir", [None, "relative/data-dir"], ids=["missing", "relative"])
 def test_docker_velox_guard_rejects_and_never_calls_compose_up(tmp_path, data_dir):
-    """`test-docker-%` (unlike `test-docker-up-%`) installs an unconditional
-    cleanup trap that always runs `compose down -v` on exit, guard rejection
-    included -- but its project name is a fresh, never-persisted
-    `$$(date +%s)-$$RANDOM` value each invocation (no `project_file`
-    tracking, unlike test-docker-up-%), so that `down -v` targets a project
-    that was never created rather than tearing down an existing tracked
-    stack (the F2 scenario). This pins that the guard still rejects before
-    `compose up` and that the engine, if invoked at all by the unconditional
-    trap, only ever sees `down`, never `up`."""
     state_dir = tmp_path / "docker-projects"
     state_dir.mkdir()
     log_file = tmp_path / "engine.log"
@@ -164,9 +126,6 @@ def test_docker_velox_guard_rejects_and_never_calls_compose_up(tmp_path, data_di
 
 
 def test_up_questdb_is_not_guarded(tmp_path):
-    """questdb does not mirror host paths into the container -- the guard
-    must be a no-op for it, and `make test-docker-up-questdb` must proceed
-    to compose even with BENCHBOX_DATA_DIR unset."""
     state_dir = tmp_path / "docker-projects"
     state_dir.mkdir()
     log_file = tmp_path / "engine.log"
@@ -183,10 +142,6 @@ def test_up_questdb_is_not_guarded(tmp_path):
 
 
 def test_guard_rejection_leaves_a_tracked_stack_untouched(tmp_path):
-    """F2 regression pin: a guard rejection in shell B must not tear down
-    (or orphan the tracking of) a healthy stack already brought up in shell
-    A. Simulates shell A's tracked project, then runs the guarded bring-up
-    a second time without exporting BENCHBOX_DATA_DIR, as shell B would."""
     state_dir = tmp_path / "docker-projects"
     state_dir.mkdir()
     project_file = state_dir / "lakesail.project"

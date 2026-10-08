@@ -1,5 +1,3 @@
-"""Tests for public export anonymization of environment and platform metadata."""
-
 from __future__ import annotations
 
 import json
@@ -159,7 +157,7 @@ def test_anonymized_json_export_hashes_infrastructure_identifiers_and_redacts_se
         assert leaked not in serialized
 
     assert payload["export"]["anonymized"] is True
-    # Unread identifier fields are omitted, not published as pseudonyms.
+
     assert "machine_id" not in payload["environment"]
     assert "machine_id" not in payload["environment"]["client_host"]
     assert "engine_host" not in payload["environment"]["platform_runtime"]
@@ -179,7 +177,7 @@ def test_anonymized_json_export_hashes_infrastructure_identifiers_and_redacts_se
     assert payload["platform"]["storage"]["prefix"].startswith("prefix_")
     assert payload["platform"]["raw_config"]["password"] == "<redacted>"
     assert payload["platform"]["raw_config"]["access_token"] == "<redacted>"
-    # Residual local-path drop: credential_file is omitted, not redacted-in-place.
+
     assert "credential_file" not in payload["platform"]["raw_config"]
     assert payload["platform"]["raw_config"]["connection_string"] == "<redacted>"
     assert payload["config"]["platform_options"]["client_secret"] == "<redacted>"
@@ -229,6 +227,5 @@ def test_private_export_preserves_raw_platform_metadata_behind_explicit_option(t
     assert payload["platform"]["raw_config"]["username"] == "<redacted>"
     assert payload["platform"]["raw_config"]["password"] == "<redacted>"
     assert payload["platform"]["raw_config"]["access_token"] == "<redacted>"
-    # raw_metadata and normalized blocks share the same structural boundary:
-    # credentials never egress even when anonymize=False preserves identifiers.
+
     assert "super-secret-password" not in json.dumps(payload.get("platform", {}).get("raw_metadata", {}))

@@ -1,9 +1,6 @@
-"""Test TPC-DS Test Mode CLI Dry Run Output functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import Mock, patch
 
@@ -23,7 +20,6 @@ pytestmark = [
 
 @pytest.fixture
 def mock_benchmark_config():
-    """Mock benchmark configuration."""
     config = BenchmarkConfig(
         name="tpcds",
         display_name="TPC-DS",
@@ -35,7 +31,6 @@ def mock_benchmark_config():
 
 @pytest.fixture
 def mock_system_profile():
-    """Mock system profile."""
     from datetime import datetime
 
     profile = SystemProfile(
@@ -56,14 +51,12 @@ def mock_system_profile():
 
 @pytest.fixture
 def mock_database_config():
-    """Mock database configuration."""
     config = DatabaseConfig(type="duckdb", name="test.db")
     return config
 
 
 @pytest.fixture
 def mock_tpcds_benchmark():
-    """Mock TPC-DS benchmark."""
     benchmark = Mock()
     benchmark._name = "tpcds"
     benchmark.scale_factor = 0.1
@@ -73,13 +66,10 @@ def mock_tpcds_benchmark():
         "3": "SELECT * FROM catalog_sales;",
     }
 
-    # Mock get_all_queries method to return empty - this method is used by _estimate_runtime
     benchmark.get_all_queries = Mock(return_value={})
 
-    # Mock get_create_tables_sql method - this is used for schema generation
     benchmark.get_create_tables_sql = Mock(return_value="CREATE TABLE test_table (id INT);")
 
-    # Mock query manager
     query_manager = Mock()
     benchmark.query_manager = query_manager
 
@@ -87,8 +77,6 @@ def mock_tpcds_benchmark():
 
 
 class TestDryRunTestModes:
-    """Test dry run functionality for different test execution modes."""
-
     def test_standard_execution_mode(
         self,
         mock_benchmark_config,
@@ -97,7 +85,6 @@ class TestDryRunTestModes:
         mock_tpcds_benchmark,
         tmp_path,
     ):
-        """Test dry run with standard execution mode."""
         mock_benchmark_config.test_execution_type = "standard"
 
         with (
@@ -108,11 +95,10 @@ class TestDryRunTestModes:
             executor = DryRunExecutor(tmp_path)
             result = executor.execute_dry_run(mock_benchmark_config, mock_system_profile, mock_database_config)
 
-        # Verify standard execution
         assert result.benchmark_config["test_execution_type"] == "standard"
         assert result.query_preview["test_execution_type"] == "standard"
         assert "Standard sequential execution" in result.query_preview["execution_context"]
-        assert len(result.queries) == 3  # Standard queries
+        assert len(result.queries) == 3
 
     def test_power_test_execution_mode(
         self,
@@ -122,7 +108,6 @@ class TestDryRunTestModes:
         mock_tpcds_benchmark,
         tmp_path,
     ):
-        """Test dry run with TPC-DS power test execution mode."""
         mock_benchmark_config.test_execution_type = "power"
 
         with (
@@ -132,7 +117,6 @@ class TestDryRunTestModes:
         ):
             executor = DryRunExecutor(tmp_path)
 
-            # Mock the real test execution method to return expected power test format
             with patch.object(executor, "_extract_queries_via_real_test_execution") as mock_extract:
                 mock_extract.return_value = {
                     "Position_01_Query_42": "SELECT * FROM web_sales WHERE ws_sold_date_sk = ?;",
@@ -142,12 +126,10 @@ class TestDryRunTestModes:
 
                 result = executor.execute_dry_run(mock_benchmark_config, mock_system_profile, mock_database_config)
 
-        # Verify power test execution
         assert result.benchmark_config["test_execution_type"] == "power"
         assert result.query_preview["test_execution_type"] == "power"
         assert "PowerTest stream permutation" in result.query_preview["execution_context"]
 
-        # Verify stream ordering is shown
         query_keys = list(result.queries.keys())
         assert any("Position_01_Query_42" in key for key in query_keys), (
             f"Expected Position_01_Query_42 in {query_keys}"
@@ -165,7 +147,6 @@ class TestDryRunTestModes:
         mock_tpcds_benchmark,
         tmp_path,
     ):
-        """Test dry run with TPC-DS throughput test execution mode."""
         mock_benchmark_config.test_execution_type = "throughput"
 
         with (
@@ -187,12 +168,10 @@ class TestDryRunTestModes:
 
                 result = executor.execute_dry_run(mock_benchmark_config, mock_system_profile, mock_database_config)
 
-        # Verify throughput test execution
         assert result.benchmark_config["test_execution_type"] == "throughput"
         assert result.query_preview["test_execution_type"] == "throughput"
         assert "ThroughputTest (4 concurrent streams" in result.query_preview["execution_context"]
 
-        # Verify concurrent stream execution is shown
         query_keys = list(result.queries.keys())
         assert any("Stream_1_" in key for key in query_keys), f"Expected Stream_1_ in {query_keys}"
         assert any("Stream_2_" in key for key in query_keys), f"Expected Stream_2_ in {query_keys}"
@@ -205,7 +184,6 @@ class TestDryRunTestModes:
         mock_tpcds_benchmark,
         tmp_path,
     ):
-        """Test dry run with TPC-DS maintenance test execution mode."""
         mock_benchmark_config.test_execution_type = "maintenance"
 
         with (
@@ -225,19 +203,16 @@ class TestDryRunTestModes:
 
                 result = executor.execute_dry_run(mock_benchmark_config, mock_system_profile, mock_database_config)
 
-        # Verify maintenance test execution
         assert result.benchmark_config["test_execution_type"] == "maintenance"
         assert result.query_preview["test_execution_type"] == "maintenance"
         assert "MaintenanceTest (data operations: INSERT/UPDATE/DELETE)" in result.query_preview["execution_context"]
 
-        # Verify TPC-DS maintenance operations are shown (DM1-DM4 categories)
         query_keys = list(result.queries.keys())
         assert any("DM1_INSERT" in key for key in query_keys), f"Expected DM1_INSERT in {query_keys}"
         assert any("DM2_INSERT_RETURNS" in key for key in query_keys), f"Expected DM2_INSERT_RETURNS in {query_keys}"
         assert any("DM3_UPDATE" in key for key in query_keys), f"Expected DM3_UPDATE in {query_keys}"
         assert any("DM4_DELETE" in key for key in query_keys), f"Expected DM4_DELETE in {query_keys}"
 
-        # Verify operations contain actual SQL/descriptions
         for key, operation in result.queries.items():
             if key.startswith("DM"):
                 assert "INSERT" in operation or "UPDATE" in operation or "DELETE" in operation, (
@@ -245,7 +220,6 @@ class TestDryRunTestModes:
                 )
 
     def test_tpch_power_test_execution_mode(self, mock_system_profile, mock_database_config, tmp_path):
-        """Test dry run with TPC-H power test execution mode."""
         mock_benchmark_config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -253,7 +227,6 @@ class TestDryRunTestModes:
             test_execution_type="power",
         )
 
-        # Mock TPC-H benchmark
         mock_tpch_benchmark = Mock()
         mock_tpch_benchmark._name = "tpch"
         mock_tpch_benchmark.scale_factor = 0.1
@@ -262,7 +235,6 @@ class TestDryRunTestModes:
             "2": "SELECT * FROM orders;",
             "3": "SELECT * FROM customer;",
         }
-        # Mock get_all_queries method to return empty - this method is used by _estimate_runtime
         mock_tpch_benchmark.get_all_queries = Mock(return_value={})
 
         with (
@@ -281,12 +253,10 @@ class TestDryRunTestModes:
 
                 result = executor.execute_dry_run(mock_benchmark_config, mock_system_profile, mock_database_config)
 
-        # Verify TPC-H power test execution
         assert result.benchmark_config["test_execution_type"] == "power"
         assert result.query_preview["test_execution_type"] == "power"
         assert "TPC-H PowerTest stream permutation" in result.query_preview["execution_context"]
 
-        # Verify TPC-H stream ordering is shown
         query_keys = list(result.queries.keys())
         assert any("Position_01_Query_3" in key for key in query_keys), f"Expected Position_01_Query_3 in {query_keys}"
         assert any("Position_02_Query_1" in key for key in query_keys), f"Expected Position_02_Query_1 in {query_keys}"
@@ -299,7 +269,6 @@ class TestDryRunTestModes:
         mock_tpcds_benchmark,
         tmp_path,
     ):
-        """Test that query preview formatting works correctly for different test modes."""
         with (
             patch.object(CoreDryRunExecutor, "_get_benchmark_instance", return_value=mock_tpcds_benchmark),
             patch.object(CoreDryRunExecutor, "_get_platform_config", return_value={"type": "duckdb"}),
@@ -347,7 +316,6 @@ class TestDryRunTestModes:
         mock_tpcds_benchmark,
         tmp_path,
     ):
-        """Test that configuration summary shows test execution type correctly."""
         mock_benchmark_config.test_execution_type = "power"
 
         with patch("benchbox.core.tpcds.streams.create_standard_streams"):
@@ -359,28 +327,21 @@ class TestDryRunTestModes:
                 executor = DryRunExecutor(tmp_path)
                 result = executor.execute_dry_run(mock_benchmark_config, mock_system_profile, mock_database_config)
 
-        # Verify the result contains power test configuration instead of checking console output
         assert result.benchmark_config["test_execution_type"] == "power"
         assert result.query_preview["test_execution_type"] == "power"
         assert "PowerTest stream permutation" in result.query_preview["execution_context"]
 
-        # Verify the formatting methods work correctly
         assert executor._format_test_execution_type("power") == "PowerTest (Stream Permutation)"
 
 
 class TestDataFrameMaintenanceDryRun:
-    """Tests for DataFrame + maintenance phase dry run validation."""
-
     def test_maintenance_dataframe_returns_error_message(
         self,
         mock_system_profile,
         tmp_path,
     ):
-        """Test that maintenance + DataFrame mode returns a helpful error message in dry run."""
-        # Create DataFrame database config
         df_database_config = DatabaseConfig(type="polars-df", name="polars")
 
-        # Create benchmark config with maintenance phase
         benchmark_config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -388,7 +349,6 @@ class TestDataFrameMaintenanceDryRun:
             test_execution_type="maintenance",
         )
 
-        # Mock TPC-H benchmark
         mock_tpch_benchmark = Mock()
         mock_tpch_benchmark._name = "tpch"
         mock_tpch_benchmark.scale_factor = 0.1
@@ -403,7 +363,6 @@ class TestDataFrameMaintenanceDryRun:
             executor = DryRunExecutor(tmp_path)
             result = executor.execute_dry_run(benchmark_config, mock_system_profile, df_database_config)
 
-        # Verify the queries contain the error message
         assert "_maintenance_not_supported" in result.queries
         error_msg = result.queries["_maintenance_not_supported"]
         assert "Maintenance phase is not yet implemented for DataFrame mode" in error_msg
@@ -415,7 +374,6 @@ class TestDataFrameMaintenanceDryRun:
         mock_system_profile,
         tmp_path,
     ):
-        """Test that combined + DataFrame mode returns a helpful error message."""
         df_database_config = DatabaseConfig(type="pandas-df", name="pandas")
 
         benchmark_config = BenchmarkConfig(
@@ -439,7 +397,6 @@ class TestDataFrameMaintenanceDryRun:
             executor = DryRunExecutor(tmp_path)
             result = executor.execute_dry_run(benchmark_config, mock_system_profile, df_database_config)
 
-        # Verify the error is returned
         assert "_maintenance_not_supported" in result.queries
         assert "combined" in result.queries["_maintenance_not_supported"]
 
@@ -448,7 +405,6 @@ class TestDataFrameMaintenanceDryRun:
         mock_system_profile,
         tmp_path,
     ):
-        """Test that standard + DataFrame mode works normally (no maintenance error)."""
         df_database_config = DatabaseConfig(type="polars-df", name="polars")
 
         benchmark_config = BenchmarkConfig(
@@ -472,7 +428,6 @@ class TestDataFrameMaintenanceDryRun:
             executor = DryRunExecutor(tmp_path)
             result = executor.execute_dry_run(benchmark_config, mock_system_profile, df_database_config)
 
-        # Should NOT contain the maintenance error
         assert "_maintenance_not_supported" not in result.queries
 
     def test_maintenance_sql_mode_works_normally(
@@ -483,7 +438,6 @@ class TestDataFrameMaintenanceDryRun:
         mock_tpcds_benchmark,
         tmp_path,
     ):
-        """Test that maintenance + SQL mode works normally (not affected by DataFrame guard)."""
         mock_benchmark_config.test_execution_type = "maintenance"
 
         with (
@@ -493,14 +447,11 @@ class TestDataFrameMaintenanceDryRun:
         ):
             executor = DryRunExecutor(tmp_path)
 
-            # Mock the TPC-DS maintenance operations extraction
             with patch.object(executor, "_extract_tpcds_maintenance_operations") as mock_extract:
                 mock_extract.return_value = {
                     "DM1_INSERT": "INSERT INTO STORE_SALES ...;",
                 }
                 result = executor.execute_dry_run(mock_benchmark_config, mock_system_profile, mock_database_config)
 
-        # Should NOT contain the DataFrame maintenance error
         assert "_maintenance_not_supported" not in result.queries
-        # Should contain the maintenance operations
         assert "DM1_INSERT" in result.queries

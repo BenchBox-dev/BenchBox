@@ -1,14 +1,3 @@
-"""Unit tests for scripts/check_dependency_bounds.py.
-
-Pinned invariants:
-  * The PEP 508 parser extracts the full upper bound from the forms
-    BenchBox actually uses (``<N``, ``<N.0``, ``<N.0.0``, ``<N.M.P``).
-  * A dep with no upper bound is skipped (not mis-reported).
-  * ``cap-reached`` blocks only when locked_version >= the full upper bound.
-  * ``ceiling-minus-one`` blocks for next-major caps when locked_major == cap_major - 1.
-  * ``--report-only`` never fails.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path

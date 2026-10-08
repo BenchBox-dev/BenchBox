@@ -1,5 +1,3 @@
-"""Shared constructors for SQL compatibility rule registration."""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction
@@ -25,7 +23,6 @@ def register_ddl_rewrite(
     failure_mode: FailureMode = FailureMode.SYNTAX_ERROR,
     governance_only: bool = True,
 ) -> None:
-    """Register one DDL_OPTIMIZE rewrite rule with the standard metadata shape."""
     REGISTRY.register(
         CompatibilityDecision(
             rule_id=f"ddl_optimize.{rule_platform or platform}.all.{rule_name}",
@@ -159,7 +156,6 @@ _PK_INFORMATIONAL_DIALECTS: tuple[tuple[str, str, str, str], ...] = (
 
 
 def register_pk_capability_rules(benchmark: str) -> None:
-    """Register lock-table PRIMARY KEY capability rules for one benchmark."""
     for platform, suffix, support, failure, ddl_accepted, enforced, conditions, detail, reason in _PK_UNSUPPORTED_RULES:
         _register_pk_rule(
             platform=platform,

@@ -1,5 +1,3 @@
-"""Exercise the cut preflight against real local Git refs and worktrees."""
-
 from __future__ import annotations
 
 import subprocess

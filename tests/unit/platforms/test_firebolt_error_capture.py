@@ -1,11 +1,3 @@
-"""Tests for Firebolt error-message capture in load failure paths.
-
-Firebolt inherits query execution from the base adapter; the Firebolt-specific
-failure sites are the data-load paths, which previously truncated error
-messages via ``str(e)[:100]...``. These tests pin the defensive formatting
-so full driver messages land in the run log.
-"""
-
 import logging
 
 import pytest
@@ -41,8 +33,6 @@ def _load_error_line(adapter: FireboltAdapter, exc: BaseException, caplog) -> st
 
 
 class TestFireboltErrorCapture:
-    """Exercise the defensive error formatter used in the load paths."""
-
     def test_non_empty_message_logged_verbatim(self, caplog):
         adapter = _make_adapter()
         msg = _load_error_line(adapter, RuntimeError("COPY INTO failed: bad file"), caplog)

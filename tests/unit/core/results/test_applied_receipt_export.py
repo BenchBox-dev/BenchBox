@@ -1,14 +1,6 @@
-"""Export + anonymization of the post-load introspection receipt.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-The receipt rides inside the ``.applied.json`` companion via
-``AppliedTuningLedger.to_payload(receipt=...)``. Anonymized exports must scrub
-the receipt's free-text / identifier fields exactly like the ledger statements.
-TODO ``tuning-introspection-receipts-20260716``.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -80,22 +72,21 @@ class TestReceiptAnonymization:
         }
         sanitized = exporter._anonymize_applied_payload(applied)
 
-        # Statement text is gone but the structural status is retained.
         assert "statement" not in sanitized["statements"][0]
         entry = sanitized["receipt"]["entries"][0]
-        assert entry["verdict"] == "corroborated"  # structural verdict kept
+        assert entry["verdict"] == "corroborated"
         assert "statement" not in entry and "table" not in entry
         assert "expected_columns" not in entry and "observed_columns" not in entry
         assert entry["statement_redacted"] is True
-        # Observed catalog facts are stripped of identifiers.
+
         for obj in sanitized["receipt"].get("observed", []):
             assert "table" not in obj and "columns" not in obj and obj["redacted"] is True
-        # Top-level corroboration signal survives.
+
         assert sanitized["receipt"]["corroborated"] is True
 
     def test_anonymization_does_not_mutate_input(self):
         exporter = ResultExporter(anonymize=True)
         applied = {"status": APPLIED_VERIFIED, "statements": [], "dropped": [], "receipt": _receipt_payload()}
         exporter._anonymize_applied_payload(applied)
-        # Original receipt entry still carries its statement text.
+
         assert "statement" in applied["receipt"]["entries"][0]

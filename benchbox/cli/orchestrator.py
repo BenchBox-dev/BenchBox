@@ -1,9 +1,6 @@
-"""Benchmark orchestrator using platform adapter architecture.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import uuid
 from datetime import datetime
@@ -19,8 +16,6 @@ from benchbox.core.benchmark_loader import (
     get_core_benchmark_class,
     instantiate_benchmark_class,
 )
-
-# Import from common_types to avoid circular imports
 from benchbox.core.config import BenchmarkConfig, RunConfig
 from benchbox.core.hooks.platform_hooks import PlatformHookRegistry
 from benchbox.core.platform_config import get_platform_config as _core_get_platform_config
@@ -33,18 +28,10 @@ from benchbox.utils.cloud_storage import is_databricks_path
 from benchbox.utils.printing import quiet_console
 from benchbox.utils.verbosity import VerbositySettings
 
-# Module-level console handle used by orchestrator output paths.
 console = quiet_console
 
 
 def resolved_deployment_mode(database_config) -> Optional[str]:
-    """Return the deployment mode this run selected, or None for the default.
-
-    Platforms that expose a deployment choice register it as a
-    ``deployment_mode`` platform option, so an explicit selection arrives in
-    ``database_config.options``. Returning None lets the registry fall back to
-    the platform's ``default_deployment``.
-    """
     if not database_config:
         return None
     options = getattr(database_config, "options", None) or {}
@@ -53,7 +40,6 @@ def resolved_deployment_mode(database_config) -> Optional[str]:
 
 
 def _build_failure_result(config: BenchmarkConfig, exc: Exception) -> BenchmarkResults:
-    """Build a BenchmarkResults sentinel for a failed execute_benchmark() invocation."""
     from benchbox.core.results.models import ExecutionPhases, SetupPhase
 
     return BenchmarkResults(
@@ -82,14 +68,6 @@ def _build_failure_result(config: BenchmarkConfig, exc: Exception) -> BenchmarkR
 
 
 def _local_datagen_name(benchmark: Any, benchmark_name: str) -> str:
-    """Return the datagen folder name a benchmark reads its local data from.
-
-    Benchmarks that share another benchmark's data (``get_data_source_benchmark``)
-    read the source's folder, except those that generate their own output
-    (``GENERATES_OWN_OUTPUT``, e.g. tpcds_obt, which transforms TPC-DS data into
-    its own OBT table). Pointing those at the source folder makes the runner
-    reuse the source manifest and load the source tables instead of their own.
-    """
     if getattr(benchmark, "GENERATES_OWN_OUTPUT", False):
         return benchmark_name.lower()
     data_source = getattr(benchmark, "get_data_source_benchmark", lambda: None)()
@@ -97,60 +75,36 @@ def _local_datagen_name(benchmark: Any, benchmark_name: str) -> str:
 
 
 class BenchmarkOrchestrator:
-    """Orchestrates benchmark execution using platform adapters."""
-
     def __init__(self, base_dir: Optional[str] = None):
         self.console = quiet_console
         self.directory_manager = DirectoryManager(base_dir)
-        self.custom_output_dir = None  # For cloud storage paths
+        self.custom_output_dir = None
         self._verbosity = VerbositySettings.default()
 
     def set_verbosity(self, settings: VerbositySettings) -> None:
-        """Configure verbosity for orchestrated execution."""
 
         self._verbosity = settings
 
-    # -- Private helpers (wrappable in tests) ---------------------------------
     def _get_benchmark_class(self, benchmark_name: str):
-        """Resolve a benchmark class by name (via core loader)."""
         return get_core_benchmark_class(benchmark_name)
 
     def _get_benchmark_instance(self, config: BenchmarkConfig, system_profile):
-        """Create a benchmark instance honoring parallel and compression fields.
-
-        Attempts to pass `parallel` based on logical cores; falls back to
-        constructor without `parallel` if not supported.
-        """
-        # Prefer using the class directly so tests can patch class resolution
         benchmark_class = self._get_benchmark_class(config.name)
 
-        # Forward benchmark-specific options (--benchmark-option K=V) to constructor kwargs.
-        # Also forward seed/force_regenerate from config.options when the benchmark has
-        # registered specs for them, so they reach the constructor.
         opts = getattr(config, "options", {}) or {}
         benchmark_options = dict(opts.get("benchmark_options", {}))
 
         from benchbox.cli.benchmark_hooks import BenchmarkHookRegistry
 
         registered_specs = BenchmarkHookRegistry.list_option_specs(config.name)
-        # Bridge seed/force_regenerate from top-level config.options into benchmark kwargs
-        # when the benchmark has registered specs for them. These two keys can arrive via
-        # the interactive wizard (which sets them directly on config.options rather than
-        # going through --benchmark-option), so we promote them here to avoid a second
-        # code path that would need to know about benchmark-option registration.
         for key in ("seed", "force_regenerate"):
             if key in registered_specs and key not in benchmark_options and key in opts:
                 val = opts[key]
                 if val is not None:
                     benchmark_options[key] = val
 
-        # Resolve the final datagen root BEFORE construction so nested
-        # generators capture it immediately, instead of constructing first and
-        # mutating output_dir afterward.
         construction_output_dir = self._resolve_construction_output_dir(config, benchmark_class)
 
-        # Delegate construction to the shared builder; compliance_mode_kwargs is applied
-        # within get_benchmark_instance so CLI and runner cannot diverge.
         benchmark_instance = get_benchmark_instance(
             config,
             system_profile,
@@ -162,14 +116,6 @@ class BenchmarkOrchestrator:
             instantiate_fn=instantiate_benchmark_class,
         )
 
-        # Compatibility fallback: benchmarks that declare data sharing only via
-        # the get_data_source_benchmark() instance method (no
-        # DATA_SOURCE_BENCHMARK class attribute) were not resolved at
-        # construction, so redirect them to the shared root now. Class-attr
-        # sharers were already constructed with it. Benchmarks that generate
-        # their own output (e.g. tpcds_obt, which transforms source data into
-        # a separate OBT table) must keep their own output_dir: redirecting
-        # would hide their generated files from the loader.
         if getattr(benchmark_class, "DATA_SOURCE_BENCHMARK", None) is None:
             source_name = _local_datagen_name(benchmark_instance, config.name)
             if source_name != config.name.lower() and self.custom_output_dir is None:
@@ -179,16 +125,6 @@ class BenchmarkOrchestrator:
         return benchmark_instance
 
     def _resolve_construction_output_dir(self, config: BenchmarkConfig, benchmark_class) -> Optional[Union[str, Path]]:
-        """Resolve the local datagen root before the benchmark is constructed.
-
-        Precedence matches the post-construction resolution it replaces:
-        CLI --output (custom_output_dir) wins, then the shared data-source
-        root for data-sharing benchmarks, then the managed per-benchmark path.
-        Returns None when the root is not knowable yet — cloud --output paths
-        resolve later via _resolve_custom_output_root, which needs platform
-        config; the runner's compatibility shim applies that handler
-        post-construction.
-        """
         if self.custom_output_dir:
             from benchbox.utils.cloud_storage import is_cloud_path
 
@@ -209,9 +145,6 @@ class BenchmarkOrchestrator:
         tuning_config: Optional[Any] = None,
         benchmark: Optional["BaseBenchmark"] = None,
     ) -> dict[str, Any]:
-        """Build platform configuration using core helper."""
-        # For benchmarks that share another benchmark's data (e.g., read_primitives → tpch),
-        # use the data source name for database naming so the existing database is reused.
         if benchmark is not None:
             data_source = getattr(benchmark, "get_data_source_benchmark", lambda: None)()
             if data_source:
@@ -225,12 +158,10 @@ class BenchmarkOrchestrator:
             tuning_config=tuning_config,
         )
 
-    # Compatibility: explicit create method used in some tests
     def _create_benchmark_instance(self, config: BenchmarkConfig, system_profile):
         return self._get_benchmark_instance(config, system_profile)
 
     def set_custom_output_dir(self, output_dir: str) -> None:
-        """Set custom output directory for data generation (supports cloud paths)."""
         self.custom_output_dir = output_dir
 
     def execute_benchmark(
@@ -242,31 +173,16 @@ class BenchmarkOrchestrator:
         progress=None,
         execution_context: ExecutionContext | None = None,
     ) -> BenchmarkResults:
-        """Execute benchmark by delegating lifecycle to the core runner.
-
-        Args:
-            config: Benchmark configuration
-            system_profile: System profile for resource information
-            database_config: Database configuration (None for data-only)
-            phases_to_run: List of phases to execute (None for default)
-            progress: Optional BenchmarkProgress instance for progress tracking
-
-        Returns:
-            BenchmarkResults with execution details and performance metrics
-        """
 
         self.console.print(f"[blue]Initializing {config.name} benchmark...[/blue]")
 
         try:
-            # Resolve benchmark instance (keeps tests patchable)
             benchmark = self._get_benchmark_instance(config, system_profile)
             self.console.print(
                 f"[green]✅[/green] Loaded benchmark: [cyan]{getattr(benchmark, '_name', config.name)}[/cyan]"
             )
             self._warn_on_variant_comparability_issues(benchmark)
 
-            # Compute platform config (dict) if a database is provided
-            # Include benchmark context for config-aware adapters (Databricks, Snowflake, etc.)
             platform_cfg = (
                 self._get_platform_config(
                     database_config,
@@ -308,14 +224,8 @@ class BenchmarkOrchestrator:
             )
 
         except Exception as e:
-            # Check if this is a missing credentials error for a cloud platform
-            # NOTE: This is a fallback for non-interactive flows or when credentials
-            # were not checked during platform selection. Interactive flow checks
-            # credentials earlier (after platform selection in run.py).
             if database_config and self._should_offer_credential_setup(database_config, e):
-                # Offer interactive credential setup
                 if self._offer_and_run_credential_setup(database_config.type):
-                    # Credentials were successfully set up - retry the benchmark execution
                     self.console.print("[cyan]Retrying benchmark execution with new credentials...[/cyan]\n")
                     return self.execute_benchmark(
                         config=config,
@@ -325,12 +235,10 @@ class BenchmarkOrchestrator:
                         execution_context=execution_context,
                     )
 
-            # Fall through to existing error handling
             self.console.print(f"[red]❌ Benchmark execution failed: {e}[/red]")
             return _build_failure_result(config, e)
 
     def _warn_on_variant_comparability_issues(self, benchmark) -> None:
-        """Warn when variant contracts report comparability issues. Console-only, CLI-scoped."""
         info_getter = getattr(benchmark, "get_benchmark_info", None)
         if info_getter is None:
             return
@@ -348,13 +256,11 @@ class BenchmarkOrchestrator:
         )
 
     def _warn_on_execute_without_load(self, config, database_config, phases_to_run) -> None:
-        """Warn when a cloud run queries without loading. Console-only, CLI-scoped."""
         if database_config is None:
             return
         phases = resolve_lifecycle_phases(phases_to_run)
         if not (phases.execute and not phases.load):
             return
-        # Power and Throughput tests are designed to query existing data without loading.
         test_execution_type = getattr(config, "test_execution_type", "standard")
         readonly_tests = ["power", "throughput"]
         cloud_platforms = ["databricks", "snowflake", "bigquery", "redshift"]
@@ -364,14 +270,6 @@ class BenchmarkOrchestrator:
             )
 
     def _apply_default_cloud_output_dir(self, database_config) -> None:
-        """If no custom output dir is set and this run stages remotely, pull default from credentials.
-
-        Gated on the *deployment* rather than the platform category: platforms
-        like firebolt (Core), motherduck and starburst are categorised as cloud
-        but their default deployment does not stage through cloud storage, so
-        pulling a cloud output location for them would redirect a local run's
-        data at a remote stage it never needed.
-        """
         if self.custom_output_dir or not database_config:
             return
         from benchbox.security.credentials import CredentialManager
@@ -389,7 +287,6 @@ class BenchmarkOrchestrator:
             self.console.print(f"[dim]Using default output location from credentials: {default_output}[/dim]")
 
     def _resolve_output_root(self, config: BenchmarkConfig, benchmark, platform_cfg):
-        """Resolve the output root for data generation: custom cloud path, custom local, or managed local."""
         if self.custom_output_dir:
             return self._resolve_custom_output_root(config, benchmark, platform_cfg)
 
@@ -399,7 +296,6 @@ class BenchmarkOrchestrator:
         return str(self.directory_manager.get_datagen_path(config.name.lower(), config.scale_factor))
 
     def _resolve_custom_output_root(self, config: BenchmarkConfig, benchmark, platform_cfg):
-        """Resolve a user-supplied custom output directory (possibly cloud) to a concrete output root."""
         from benchbox.utils.cloud_storage import is_cloud_path
 
         if not is_cloud_path(self.custom_output_dir):
@@ -426,23 +322,10 @@ class BenchmarkOrchestrator:
     def _build_platform_adapter(
         self, database_config, execution_mode, output_root, opts, platform_cfg, benchmark, phases, config
     ):
-        """Create a SQL or DataFrame adapter for the selected database, or None if not needed."""
         if database_config is None or not (phases.load or phases.execute):
             return None
         if execution_mode == "dataframe":
             self.console.print("[cyan]Using DataFrame execution mode[/cyan]")
-            # database_config.options carries both user-supplied --platform-option
-            # values (e.g. target_partitions=4) AND runtime-only overrides that
-            # PlatformHookRegistry.build_database_config() merges in alongside them
-            # (verbose, very_verbose, tuning_enabled, force_recreate, ...; see
-            # DatabaseManager.create_config). Unlike the SQL branch below (whose
-            # PlatformAdapter.__init__(self, **config) accepts anything), DataFrame
-            # adapters declare explicit, narrow constructor signatures (e.g.
-            # DataFusionDataFrameAdapter's target_partitions/batch_size/...), and
-            # the runtime-only keys would collide with the verbose=/very_verbose=
-            # kwargs passed explicitly below. Restrict forwarding to option names
-            # actually registered in that platform's _OPTION_SPEC_ROWS so only
-            # genuine --platform-option values reach the adapter (#1062 review).
             registered_option_names = PlatformHookRegistry.list_option_specs(database_config.type)
             dataframe_options = {
                 key: value for key, value in (database_config.options or {}).items() if key in registered_option_names
@@ -463,13 +346,6 @@ class BenchmarkOrchestrator:
         return adapter
 
     def _prepare_run_config(self, config: BenchmarkConfig, database_config) -> RunConfig:
-        """Prepare benchmark run configuration using structured dataclass.
-
-        Resolution itself lives in benchbox.core.run_service. What stays here is
-        the part core cannot own: DirectoryManager is CLI-layer, so the CLI
-        computes the database path and hands the service data instead of a
-        directory manager.
-        """
         tuning_config = None
         if config.options:
             tuning_config = config.options.get("unified_tuning_configuration")
@@ -484,26 +360,15 @@ class BenchmarkOrchestrator:
         return resolve_run_config(config, database_path=database_path, verbosity=self._verbosity)
 
     def _should_offer_credential_setup(self, database_config, error: Exception) -> bool:
-        """Check if error indicates missing credentials for a cloud platform.
-
-        Args:
-            database_config: Database configuration
-            error: Exception that was raised
-
-        Returns:
-            True if we should offer interactive credential setup
-        """
         if not database_config:
             return False
 
         platform = database_config.type.lower()
 
-        # Only offer for cloud platforms that support credential setup
         cloud_platforms = ["snowflake", "bigquery", "databricks", "redshift", "singlestore"]
         if platform not in cloud_platforms:
             return False
 
-        # Check if error message indicates missing credentials
         error_msg = str(error).lower()
         credential_keywords = [
             "configuration requires",
@@ -519,29 +384,18 @@ class BenchmarkOrchestrator:
         return any(keyword in error_msg for keyword in credential_keywords)
 
     def _offer_and_run_credential_setup(self, platform: str) -> bool:
-        """Offer and run interactive credential setup when credentials are missing.
-
-        Args:
-            platform: Platform name (snowflake, bigquery, databricks, redshift, singlestore)
-
-        Returns:
-            True if credentials were successfully set up, False otherwise
-        """
         from rich.prompt import Confirm
 
         from benchbox.cli.commands.setup import run_platform_credential_setup
 
-        # Show friendly message
         self.console.print(f"\n[yellow]⚠️  {platform.capitalize()} credentials not found[/yellow]")
         self.console.print(f"\nTo use {platform.capitalize()}, you need to configure credentials.")
 
-        # Ask if user wants to set up now
         if not Confirm.ask("\n🔧 Would you like to set up credentials now?", default=True):
             self.console.print("[yellow]Skipping credential setup[/yellow]")
             self.console.print(f"\n[dim]To set up later, run: benchbox setup --platform {platform}[/dim]")
             return False
 
-        # Run interactive setup
         success = run_platform_credential_setup(platform, self.console, show_welcome=True)
 
         if success:

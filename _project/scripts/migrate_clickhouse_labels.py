@@ -1,28 +1,3 @@
-"""Retag result bundles carrying the pre-split bare `clickhouse` platform label.
-
-Before the first-class split, ClickHouse results were recorded under the bare
-``clickhouse`` platform name. That label cannot be mapped automatically: it
-does not say which deployment produced the data (embedded chDB, self-hosted
-server, or managed cloud). This script rewrites the label to the
-operator-chosen first-class platform for every bundle that still carries it:
-
-- ``platform.name`` ``clickhouse``/``ClickHouse`` -> the target display name
-- a bare ``_clickhouse_`` filename slug -> ``_<target>_`` (underscored form)
-- the ``.manifest.json`` sidecar ``bundle_file`` entry plus a recomputed
-  ``bundle_hash`` over the rewritten result file
-- companion files (``benchbox.validation.bundle.COMPANION_SUFFIXES``) renamed
-  alongside their bundle so plans/tuning ledgers stay associated
-
-All writes go through temp files plus ``os.replace`` (same directory), so a
-crash leaves either the old or the new file in place, never a partial one.
-Companions are skipped during discovery exactly like bundle discovery skips
-them: they are carried, never treated as bundles themselves.
-
-Dry-run by default; pass ``--apply`` to write. After applying, regenerate
-``results-data/corpus-inventory.json`` (see ``results-data/REGENERATION.md``)
-and re-run ``results-data/validate_corpus.py``.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -42,9 +17,34 @@ TARGETS = {
 }
 
 _BARE_LABEL = re.compile(r"^clickhouse$", re.IGNORECASE)
-# Bare `_clickhouse_` filename slug, excluding the first-class
-# `_clickhouse_local|server|cloud_` slugs (and the hyphenated spellings).
 _BARE_SLUG = re.compile(r"_clickhouse_(?!(local|server|cloud)[_-])", re.IGNORECASE)
+
+
+CLI_DESCRIPTION = (
+    "Retag result bundles carrying the pre-split bare `clickhouse` platform label.\n"
+    "\n"
+    "Before the first-class split, ClickHouse results were recorded under the bare\n"
+    "``clickhouse`` platform name. That label cannot be mapped automatically: it\n"
+    "does not say which deployment produced the data (embedded chDB, self-hosted\n"
+    "server, or managed cloud). This script rewrites the label to the\n"
+    "operator-chosen first-class platform for every bundle that still carries it:\n"
+    "\n"
+    "- ``platform.name`` ``clickhouse``/``ClickHouse`` -> the target display name\n"
+    "- a bare ``_clickhouse_`` filename slug -> ``_<target>_`` (underscored form)\n"
+    "- the ``.manifest.json`` sidecar ``bundle_file`` entry plus a recomputed\n"
+    "  ``bundle_hash`` over the rewritten result file\n"
+    "- companion files (``benchbox.validation.bundle.COMPANION_SUFFIXES``) renamed\n"
+    "  alongside their bundle so plans/tuning ledgers stay associated\n"
+    "\n"
+    "All writes go through temp files plus ``os.replace`` (same directory), so a\n"
+    "crash leaves either the old or the new file in place, never a partial one.\n"
+    "Companions are skipped during discovery exactly like bundle discovery skips\n"
+    "them: they are carried, never treated as bundles themselves.\n"
+    "\n"
+    "Dry-run by default; pass ``--apply`` to write. After applying, regenerate\n"
+    "``results-data/corpus-inventory.json`` (see ``results-data/REGENERATION.md``)\n"
+    "and re-run ``results-data/validate_corpus.py``.\n"
+)
 
 
 @dataclass(frozen=True)
@@ -63,11 +63,6 @@ def _write_json(path: Path, data: dict) -> None:
 
 
 def _atomic_write_bytes(path: Path, payload: bytes) -> None:
-    """Write bytes atomically: temp file in the same directory, then replace.
-
-    A crash leaves either the complete old file or the complete new file;
-    readers never observe a partial write.
-    """
     tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
     tmp.write_bytes(payload)
     os.replace(tmp, path)
@@ -129,7 +124,6 @@ def discover_hits(bundle_dir: Path) -> tuple[list[BundleHit], list[str]]:
 
 
 def _existing_companions(result: Path) -> list[tuple[str, Path]]:
-    """Return ``(suffix, path)`` for companion files present beside a bundle."""
     found = []
     for suffix in COMPANION_SUFFIXES:
         candidate = result.with_name(f"{result.stem}{suffix}")
@@ -139,7 +133,6 @@ def _existing_companions(result: Path) -> list[tuple[str, Path]]:
 
 
 def _planned_names(hit: BundleHit, target: str) -> tuple[Path, Path | None, list[tuple[Path, Path]]]:
-    """Compute rename targets without writing: result, sidecar, companions."""
     slug = target.replace("-", "_")
     new_result = hit.result
     if _BARE_SLUG.search(hit.result.name):
@@ -152,18 +145,6 @@ def _planned_names(hit: BundleHit, target: str) -> tuple[Path, Path | None, list
 
 
 def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
-    """Rewrite one bundle (plus sidecar and companions) to the target platform.
-
-    Returns new result and sidecar paths. Every write is atomic (temp file
-    plus replace), all new files land before any old path is removed, and an
-    existing target aborts the hit before anything is written.
-
-    Raises:
-        FileExistsError: If a rewritten path already exists. `--apply` never
-            overwrites a published artifact; resolve the collision by hand
-            and re-run.
-        ValueError: If the manifest sidecar is malformed. Nothing is written.
-    """
     display = TARGETS[target]
     new_result, new_manifest_guess, companions = _planned_names(hit, target)
     guarded: list[tuple[Path | None, Path | None]] = [(hit.result, new_result)]
@@ -174,8 +155,6 @@ def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
         if old is not None and new is not None and new != old and new.exists():
             raise FileExistsError(f"refusing to overwrite existing file {new}")
 
-    # Preflight everything before writing: a malformed sidecar aborts the
-    # hit with all originals untouched.
     payload = _load_json(hit.result)
     sidecar: dict | None = None
     if hit.manifest is not None:
@@ -190,10 +169,6 @@ def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
     elif isinstance(platform, str) and _BARE_LABEL.match(platform):
         payload["platform"] = display
 
-    # Write every new file before removing any old one, so a crash leaves the
-    # originals recoverable; re-running then reports a collision, never a
-    # half-migrated bundle. Each write is atomic, so even the in-place
-    # (label-only) case cannot leave a partial file behind.
     _write_json(new_result, payload)
     new_manifest: Path | None = None
     if hit.manifest is not None and sidecar is not None and new_manifest_guess is not None:
@@ -214,7 +189,7 @@ def migrate_hit(hit: BundleHit, target: str) -> tuple[Path, Path | None]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--bundle-dir", type=Path, default=Path("results-data/bundles"))
     parser.add_argument(
         "--target", choices=sorted(TARGETS), help="First-class platform to retag to (required with --apply)"

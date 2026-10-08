@@ -1,5 +1,3 @@
-"""Tests for stale artifact pruning helpers."""
-
 from pathlib import Path
 
 import pytest

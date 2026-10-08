@@ -1,5 +1,3 @@
-"""Snowflake integration smoke tests with stubbed connector."""
-
 import pytest
 
 from benchbox.platforms.snowflake import SnowflakeAdapter

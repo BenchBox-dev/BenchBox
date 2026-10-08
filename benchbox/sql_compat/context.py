@@ -1,5 +1,3 @@
-"""CompatibilityContext - typed input to the compatibility resolver."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

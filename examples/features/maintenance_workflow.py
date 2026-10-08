@@ -1,33 +1,12 @@
 #!/usr/bin/env python3
-"""Complete TPC-H Maintenance Workflow Example.
-
-This example demonstrates the complete workflow for running TPC-H benchmarks
-including the Maintenance Test, showing:
-
-1. Proper test execution sequence (Power → Throughput → Maintenance)
-2. Database state changes after Maintenance
-3. Why database reload is required after Maintenance
-4. How to verify database modifications
-
-Usage:
-    python features/maintenance_workflow.py
-
-Key Learning Points:
-    - Maintenance tests can run immediately after Power/Throughput (no reload needed before)
-    - Maintenance tests permanently modify the database
-    - Database MUST be reloaded after Maintenance before running Power/Throughput again
-    - Row counts and query results change after Maintenance
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _EXAMPLES_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_EXAMPLES_DIR))
@@ -37,21 +16,12 @@ from benchbox.tpch import TPCH
 
 
 def print_section(title: str) -> None:
-    """Print a formatted section header."""
     print("\n" + "=" * 80)
     print(f"  {title}")
     print("=" * 80)
 
 
 def check_row_counts(adapter: DuckDBAdapter) -> dict[str, int]:
-    """Get row counts for ORDERS and LINEITEM tables.
-
-    Args:
-        adapter: Database adapter instance
-
-    Returns:
-        Dictionary with table names and row counts
-    """
     orders_count = adapter.execute("SELECT COUNT(*) FROM orders")[0][0]
     lineitem_count = adapter.execute("SELECT COUNT(*) FROM lineitem")[0][0]
 
@@ -59,7 +29,6 @@ def check_row_counts(adapter: DuckDBAdapter) -> dict[str, int]:
 
 
 def main() -> int:
-    """Run complete TPC-H maintenance workflow demonstration."""
 
     print_section("TPC-H MAINTENANCE WORKFLOW DEMONSTRATION")
     print("""
@@ -76,12 +45,10 @@ We will:
   7. Demonstrate reload requirement for additional tests
 """)
 
-    # Configuration
-    scale_factor = 0.01  # Small scale for fast demonstration
+    scale_factor = 0.01
     output_dir = Path("./benchmark_runs/features/maintenance_workflow")
     db_path = output_dir / "tpch_maintenance_demo.duckdb"
 
-    # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print_section("STEP 1: Generate Benchmark Data")
@@ -92,7 +59,7 @@ We will:
     benchmark = TPCH(
         scale_factor=scale_factor,
         output_dir=output_dir,
-        force_regenerate=False,  # Reuse data if already generated
+        force_regenerate=False,
     )
 
     print("Generating TPC-H data files (this may take a moment)...")
@@ -104,11 +71,9 @@ We will:
 
     adapter = DuckDBAdapter(database_path=str(db_path), force_recreate=True)
 
-    # Load data into database
     print("Loading TPC-H tables...")
     adapter.load_benchmark_data(benchmark)
 
-    # Check initial row counts
     print("\nChecking initial row counts...")
     initial_counts = check_row_counts(adapter)
     print(f"  ORDERS table:   {initial_counts['orders']:,} rows")
@@ -126,7 +91,6 @@ We will:
     print(f"  Total time: {power_result.total_execution_time:.2f}s")
     print(f"  Average per query: {power_result.average_query_time:.2f}s")
 
-    # Verify database unchanged
     counts_after_power = check_row_counts(adapter)
     print("\nDatabase state after Power Test:")
     print(f"  ORDERS:   {counts_after_power['orders']:,} rows (unchanged ✓)")
@@ -144,7 +108,6 @@ We will:
     print(f"  Total queries: {throughput_result.total_queries}")
     print(f"  Total time: {throughput_result.total_execution_time:.2f}s")
 
-    # Verify database still unchanged
     counts_after_throughput = check_row_counts(adapter)
     print("\nDatabase state after Throughput Test:")
     print(f"  ORDERS:   {counts_after_throughput['orders']:,} rows (unchanged ✓)")
@@ -205,11 +168,9 @@ We will:
     print("Example of the problem:")
     print()
 
-    # Show a query result before and after
     print("Query: SELECT COUNT(*), SUM(o_totalprice) FROM orders")
     print()
 
-    # We can't show "before" now since we already modified, but we can explain
     print("  Current result (after Maintenance):")
     query_result = adapter.execute("SELECT COUNT(*), SUM(o_totalprice) FROM orders")
     count, total = query_result[0]

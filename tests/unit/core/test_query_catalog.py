@@ -1,13 +1,6 @@
-"""Tests for :mod:`benchbox.core.query_catalog`.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-The catalog is the shared render path behind the MCP ``get_query_details`` tool
-and the query-docs generator, so these tests pin its contract across the full
-benchmark registry rather than one or two examples.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -63,7 +56,6 @@ class TestGetSqlRender:
         assert render.dialect == REFERENCE_DIALECT
         assert not render.is_template
         assert "l_returnflag" in render.sql
-        # netezza -> datafusion translation quotes identifiers / uppercases keywords
         assert "SELECT" in render.sql
 
     def test_dialect_none_reports_default_and_skips_translation(self):
@@ -72,8 +64,6 @@ class TestGetSqlRender:
         assert render.dialect == "default"
 
     def test_benchmark_without_translation_is_labelled_default(self):
-        # datavault translates only to DuckDB and the cloud dialects; the
-        # reference dialect is not among them, so the label must not claim it.
         render = get_sql_render("datavault", "1")
         assert render is not None
         assert render.dialect == "default"
@@ -84,8 +74,6 @@ class TestGetSqlRender:
         assert "hits" in render.sql.lower()
 
     def test_query_id_resolves_with_or_without_q_prefix(self):
-        # SSB's keys are "Q1.1"; a caller passing "1.1" must still resolve and
-        # still get the dialect translation.
         with_prefix = get_sql_render("ssb", "Q1.1", dialect="snowflake")
         without_prefix = get_sql_render("ssb", "1.1", dialect="snowflake")
         assert with_prefix is not None and without_prefix is not None
@@ -126,11 +114,9 @@ class TestGetDataframeRender:
         assert "pandas" in render.source.lower() or "def q1_pandas_impl" in render.source
 
     def test_benchmark_without_dataframe_impl_is_none(self):
-        # tpcdi has SQL queries but no DataFrame registry.
         assert get_dataframe_render("tpcdi", list_query_ids("tpcdi")[0]) is None
 
     def test_id_normalization_matches_q_prefixed_registry(self):
-        # SQL key is "6"; the DataFrame registry id is "Q6".
         assert get_dataframe_query("tpch", "6") is not None
         assert get_dataframe_query("tpch", "Q6") is not None
 
@@ -140,7 +126,6 @@ class TestQueryDisplayName:
         assert query_display_name("tpch", "1") == "Pricing Summary Report"
 
     def test_get_query_info_name_wins(self):
-        # flightdata exposes get_query_info; nyctaxi/tsbs_devops likewise.
         assert query_display_name("flightdata", "ontime-by-carrier") == "On-Time Rate by Carrier"
 
     def test_missing_name_is_none(self):
@@ -181,8 +166,6 @@ class TestNativeQueryKey:
         assert isinstance(native_query_key("tpch", "6"), str)
 
     def test_int_keyed_benchmark_returns_int(self):
-        # datavault's get_queries() keys are ints; a doc snippet indexing it
-        # directly needs the int, not "1".
         assert native_query_key("datavault", "1") == 1
         assert isinstance(native_query_key("datavault", "1"), int)
 
@@ -193,9 +176,6 @@ class TestNativeQueryKey:
 class TestDeterminism:
     @pytest.mark.parametrize("benchmark_id", ["nyctaxi", "tsbs_devops", "tpcds_obt"])
     def test_repeated_renders_are_identical(self, benchmark_id):
-        # These benchmarks derive query parameters from a stateful RNG or a
-        # per-process hash; the catalog must still render them identically on
-        # every call or the docs drift gate is unusable.
         import benchbox.core.query_catalog as qc
 
         def snapshot():
@@ -226,10 +206,6 @@ class TestSupportsDialectTranslation:
         assert supports_dialect_translation("tpch", "duckdb") is True
 
     def test_nyctaxi_advertises_only_rendered_dialects(self):
-        # NYCTaxiBenchmark mixes TranslatableQueryMixin in, but get_queries()
-        # only renders the native source, DuckDB-raw, translated cloud, and
-        # registry-variant dialects. Anything else gets untranslated Postgres
-        # SQL and must fall back to the default render, never mislabeled.
         assert supports_dialect_translation("nyctaxi", "snowflake") is True
         assert supports_dialect_translation("nyctaxi", "bigquery") is True
         assert supports_dialect_translation("nyctaxi", "duckdb") is True

@@ -1,39 +1,3 @@
-"""Azure Synapse (Dedicated SQL pool) query plan parser.
-
-Azure Synapse Dedicated SQL pool's ``EXPLAIN <query>`` returns a single XML
-string describing the *distributed* query plan (DSQL) — a sequence of
-``<dsql_operation>`` steps (data-movement shuffles/broadcasts and per-
-distribution compute statements) rather than a single relational operator tree::
-
-    <?xml version="1.0" encoding="utf-8"?>
-    <dsql_query number_nodes="1" number_distributions="60">
-      <sql>SELECT ...</sql>
-      <dsql_operations total_cost="12.3" total_number_operations="4">
-        <dsql_operation operation_type="RND_ID">
-          <identifier>TEMP_ID_1</identifier>
-        </dsql_operation>
-        <dsql_operation operation_type="ON">
-          <location distribution="AllDistributions" />
-          <sql_operation type="statement">CREATE TABLE TEMP_ID_1 ...</sql_operation>
-        </dsql_operation>
-        <dsql_operation operation_type="SHUFFLE_MOVE">
-          <operation_cost cost="10.0" output_rows="1500" />
-          <source_statement>SELECT ... FROM orders o JOIN lineitem l ...</source_statement>
-        </dsql_operation>
-        <dsql_operation operation_type="RETURN">
-          <location distribution="Control" />
-        </dsql_operation>
-      </dsql_operations>
-    </dsql_query>
-
-The steps are emitted in execution order. They are reconstructed into a linear
-pipeline tree so the terminal ``RETURN`` (result delivered to the control node)
-is the root and the first operation is the deepest leaf. Each step's
-``operation_type`` maps to a logical type; data-movement steps that embed a
-``source_statement`` are refined from the dominant SQL keyword (JOIN / GROUP BY /
-ORDER BY) so join- and aggregate-bearing shuffles are not flattened to OTHER.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -53,10 +17,6 @@ logger = logging.getLogger(__name__)
 
 
 class AzureSynapseQueryPlanParser(QueryPlanParser):
-    """Parser for Azure Synapse Dedicated SQL pool ``EXPLAIN`` XML output."""
-
-    # Mapping for DSQL ``operation_type`` values. Data-movement operations
-    # (``*_MOVE``) are exchanges (OTHER); ``RETURN`` delivers the result set.
     _OPERATION_TYPE_MAP: dict[str, LogicalOperatorType] = {
         "RETURN": LogicalOperatorType.PROJECT,
         "SHUFFLE_MOVE": LogicalOperatorType.OTHER,
@@ -83,24 +43,17 @@ class AzureSynapseQueryPlanParser(QueryPlanParser):
         except ET.ParseError as exc:
             raise ValueError(f"EXPLAIN output is not valid XML: {exc}") from exc
 
-        # Only the operations that are direct children of <dsql_operations> are
-        # pipeline steps; a recursive ".//dsql_operation" search would also pick
-        # up any operation nested inside another step and scramble execution order.
         operations = root_el.findall(".//dsql_operations/dsql_operation")
         if not operations:
             raise ValueError("No dsql_operation elements found in EXPLAIN XML")
 
-        # Build a linear pipeline: execution order leaf -> root, so RETURN is the
-        # root. The first operation becomes the deepest child. Stop at RETURN:
-        # post-RETURN cleanup ops (ON/DROP TABLE temp tables) are not part of the
-        # logical plan and would corrupt the DAG root if included.
         child: LogicalOperator | None = None
         for op in operations:
             child = self._build_operator(op, child)
             if (op.get("operation_type") or "").strip().upper() == "RETURN":
                 break
 
-        assert child is not None  # guaranteed: operations is non-empty
+        assert child is not None
         return QueryPlanDAG(
             query_id=query_id,
             platform=self.platform_name,
@@ -145,7 +98,6 @@ class AzureSynapseQueryPlanParser(QueryPlanParser):
 
     @staticmethod
     def _embedded_sql(op: ET.Element) -> str:
-        """Return the SQL text a DSQL step carries, if any."""
         for tag in ("source_statement", "sql_operation", "statement"):
             el = op.find(tag)
             if el is not None and el.text and el.text.strip():
@@ -155,8 +107,6 @@ class AzureSynapseQueryPlanParser(QueryPlanParser):
     @classmethod
     def _map_operation(cls, operation_type: str, sql_text: str) -> LogicalOperatorType:
         base = cls._OPERATION_TYPE_MAP.get(operation_type.upper(), LogicalOperatorType.OTHER)
-        # Refine compute / data-movement steps that embed a relational statement:
-        # the shuffle that materializes a join or aggregate should reflect that.
         if sql_text and base in (LogicalOperatorType.OTHER,):
             refined = cls._classify_sql(sql_text)
             if refined is not None:
@@ -174,9 +124,6 @@ class AzureSynapseQueryPlanParser(QueryPlanParser):
             return LogicalOperatorType.SORT
         return None
 
-    # Join qualifier immediately preceding the JOIN keyword (optionally with
-    # OUTER), so a left/right/full token elsewhere in the SQL (an identifier or
-    # literal like 'RIGHT_OF_WAY') does not misclassify an INNER join.
     _JOIN_QUALIFIER_RE = re.compile(r"\b(left|right|full|cross)\b(?:\s+outer)?\s+join\b", re.IGNORECASE)
 
     @classmethod

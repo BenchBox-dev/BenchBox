@@ -9,8 +9,6 @@ import {
 
 describe("chartFrame", () => {
   it("draws at the measured container width, so the user-unit scale is 1", () => {
-    // A viewBox this wide, published as width="100%" in a container this wide,
-    // renders one user unit per CSS pixel: an 11-unit label is 11px on screen.
     expect(chartFrame(1166).width).toBe(1166);
     expect(chartFrame(293).width).toBe(293);
   });
@@ -70,8 +68,6 @@ describe("barRowLayout", () => {
 
 describe("axisLabelAnchor", () => {
   it("tucks the outermost tick labels inside the drawing", () => {
-    // Centred on the last tick, half the label's box sits outside the drawing
-    // and is cropped.
     expect(axisLabelAnchor(293, 293)).toBe("end");
     expect(axisLabelAnchor(0, 293)).toBe("start");
   });

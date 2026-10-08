@@ -1,7 +1,3 @@
-// ---------------------------------------------------------------------------
-// TuningBadge - renders tuning_mode as a StatusBadge with role="computed"
-// ---------------------------------------------------------------------------
-
 import { NOT_RECORDED_TUNING_MODE } from "@/lib/facetMatching";
 import { StatusBadge, type StatusTone } from "./StatusBadge";
 

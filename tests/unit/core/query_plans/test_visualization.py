@@ -1,7 +1,3 @@
-"""
-Tests for query plan visualization.
-"""
-
 import pytest
 
 from benchbox.core.query_plans.comparison import compare_query_plans
@@ -26,11 +22,8 @@ pytestmark = [
 
 
 class TestQueryPlanVisualization:
-    """Test query plan visualization."""
-
     @pytest.fixture
     def simple_plan(self) -> QueryPlanDAG:
-        """Create a simple query plan."""
         root = LogicalOperator(
             operator_id="scan_1",
             operator_type=LogicalOperatorType.SCAN,
@@ -46,7 +39,6 @@ class TestQueryPlanVisualization:
 
     @pytest.fixture
     def complex_plan(self) -> QueryPlanDAG:
-        """Create a complex query plan with multiple operators."""
         scan_left = LogicalOperator(
             operator_id="scan_1",
             operator_type=LogicalOperatorType.SCAN,
@@ -84,7 +76,6 @@ class TestQueryPlanVisualization:
         )
 
     def test_render_simple_plan(self, simple_plan):
-        """Test rendering a simple plan."""
         output = render_plan(simple_plan)
 
         assert "Query Plan: q1" in output
@@ -95,7 +86,6 @@ class TestQueryPlanVisualization:
         assert "orders" in output
 
     def test_render_complex_plan(self, complex_plan):
-        """Test rendering a complex plan."""
         output = render_plan(complex_plan)
 
         assert "Query Plan: q5" in output
@@ -107,14 +97,11 @@ class TestQueryPlanVisualization:
         assert "customer" in output
 
     def test_render_tree_structure(self, complex_plan):
-        """Test that tree structure uses box-drawing characters."""
         output = render_plan(complex_plan)
 
-        # Should contain tree characters
         assert "└──" in output or "├──" in output
 
     def test_render_summary(self, complex_plan):
-        """Test rendering plan summary."""
         output = render_summary(complex_plan)
 
         assert "Query: q5" in output
@@ -125,7 +112,6 @@ class TestQueryPlanVisualization:
         assert "Operator Breakdown:" in output
 
     def test_summary_operator_counts(self, complex_plan):
-        """Test that summary includes operator counts."""
         output = render_summary(complex_plan)
 
         assert "Scan: 2" in output
@@ -134,7 +120,6 @@ class TestQueryPlanVisualization:
         assert "Aggregate: 1" in output
 
     def test_visualizer_with_options(self, complex_plan):
-        """Test visualizer with custom options."""
         options = VisualizationOptions(
             show_properties=False,
             compact=True,
@@ -142,21 +127,17 @@ class TestQueryPlanVisualization:
         visualizer = QueryPlanVisualizer(options)
         output = visualizer.render_plan(complex_plan)
 
-        # Should still have basic structure
         assert "Aggregate" in output
         assert "Join" in output
 
     def test_max_depth_limiting(self, complex_plan):
-        """Test max depth limiting."""
         options = VisualizationOptions(max_depth=2)
         visualizer = QueryPlanVisualizer(options)
         output = visualizer.render_plan(complex_plan)
 
-        # Should truncate deep nodes
         assert "..." in output
 
     def test_render_comparison(self, simple_plan, complex_plan):
-        """Test rendering comparison results."""
         comparison = compare_query_plans(simple_plan, complex_plan)
         output = render_comparison(comparison)
 
@@ -168,8 +149,7 @@ class TestQueryPlanVisualization:
         assert "Property:" in output
 
     def test_comparison_shows_differences(self):
-        """Test that comparison output shows differences."""
-        # Create two plans with differences
+
         plan1 = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -195,14 +175,12 @@ class TestQueryPlanVisualization:
         assert "Property Differences" in output or "Property mismatches" in output
 
     def test_identical_plans_comparison(self, simple_plan):
-        """Test comparison of identical plans."""
         comparison = compare_query_plans(simple_plan, simple_plan)
         output = render_comparison(comparison)
 
         assert "100.0%" in output or "identical" in output.lower()
 
     def test_filter_expressions_display(self):
-        """Test display of filter expressions."""
         plan = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -228,7 +206,6 @@ class TestQueryPlanVisualization:
         assert "Filter" in output
 
     def test_aggregation_display(self):
-        """Test display of aggregation functions."""
         plan = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -250,7 +227,6 @@ class TestQueryPlanVisualization:
         assert "Aggregate" in output
 
     def test_join_type_display(self):
-        """Test display of join types."""
         plan = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -278,7 +254,6 @@ class TestQueryPlanVisualization:
         assert "left" in output.lower()
 
     def test_plan_without_costs(self):
-        """Test rendering plan without cost estimates."""
         plan = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -293,11 +268,9 @@ class TestQueryPlanVisualization:
 
         output = render_plan(plan)
         assert "Query Plan: q1" in output
-        # Should not crash without costs
 
     def test_deep_nested_tree(self):
-        """Test rendering deeply nested tree."""
-        # Build a deep tree
+
         leaf = LogicalOperator(
             operator_id="scan_1",
             operator_type=LogicalOperatorType.SCAN,
@@ -325,44 +298,39 @@ class TestQueryPlanVisualization:
 
 
 class TestStringOperatorTypeVisualization:
-    """Test visualization with string operator types (unknown/unmapped operators)."""
-
     def test_render_plan_with_string_operator_type(self):
-        """Test rendering a plan with string operator type."""
         plan = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
             logical_root=LogicalOperator(
                 operator_id="custom_1",
-                operator_type="CustomScan",  # String instead of enum
+                operator_type="CustomScan",
                 table_name="orders",
             ),
         )
 
         output = render_plan(plan)
 
-        # Should render without error and include the string operator type
         assert "CustomScan" in output
         assert "orders" in output
         assert "Query Plan: q1" in output
 
     def test_render_summary_with_string_operator_types(self):
-        """Test rendering summary with string operator types."""
         plan = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
             logical_root=LogicalOperator(
                 operator_id="agg_1",
-                operator_type="ParallelAggregate",  # String
+                operator_type="ParallelAggregate",
                 children=[
                     LogicalOperator(
                         operator_id="custom_1",
-                        operator_type="IndexScan",  # String
+                        operator_type="IndexScan",
                         table_name="orders",
                     ),
                     LogicalOperator(
                         operator_id="custom_2",
-                        operator_type="IndexScan",  # Same string type
+                        operator_type="IndexScan",
                         table_name="customers",
                     ),
                 ],
@@ -371,20 +339,18 @@ class TestStringOperatorTypeVisualization:
 
         output = render_summary(plan)
 
-        # Should include operator breakdown with string types
         assert "ParallelAggregate: 1" in output
         assert "IndexScan: 2" in output
         assert "Total Operators: 3" in output
 
     def test_render_plan_with_string_join_type(self):
-        """Test rendering a plan with string join type."""
         plan = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
             logical_root=LogicalOperator(
                 operator_id="join_1",
                 operator_type=LogicalOperatorType.JOIN,
-                join_type="parallel_hash",  # String instead of JoinType enum
+                join_type="parallel_hash",
                 children=[
                     LogicalOperator(
                         operator_id="scan_1",
@@ -402,12 +368,10 @@ class TestStringOperatorTypeVisualization:
 
         output = render_plan(plan)
 
-        # Should render with the string join type
         assert "Join" in output
         assert "parallel_hash" in output
 
     def test_render_comparison_with_string_operator_types(self):
-        """Test rendering comparison with string operator types."""
         plan1 = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -429,33 +393,31 @@ class TestStringOperatorTypeVisualization:
         comparison = compare_query_plans(plan1, plan2)
         output = render_comparison(comparison)
 
-        # Should render without error and show the type mismatch
         assert "QUERY PLAN COMPARISON" in output
         assert "CustomScan" in output
         assert "IndexScan" in output
 
     def test_render_mixed_enum_and_string_types(self):
-        """Test rendering plan with mixed enum and string operator types."""
         plan = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
             logical_root=LogicalOperator(
                 operator_id="agg_1",
-                operator_type=LogicalOperatorType.AGGREGATE,  # Enum
+                operator_type=LogicalOperatorType.AGGREGATE,
                 aggregation_functions=["SUM(total)"],
                 children=[
                     LogicalOperator(
                         operator_id="custom_1",
-                        operator_type="ParallelHashJoin",  # String
+                        operator_type="ParallelHashJoin",
                         children=[
                             LogicalOperator(
                                 operator_id="scan_1",
-                                operator_type=LogicalOperatorType.SCAN,  # Enum
+                                operator_type=LogicalOperatorType.SCAN,
                                 table_name="orders",
                             ),
                             LogicalOperator(
                                 operator_id="scan_2",
-                                operator_type="IndexSeek",  # String
+                                operator_type="IndexSeek",
                                 table_name="customers",
                             ),
                         ],
@@ -466,14 +428,12 @@ class TestStringOperatorTypeVisualization:
 
         output = render_plan(plan)
 
-        # Should render all operator types correctly
         assert "Aggregate" in output
         assert "ParallelHashJoin" in output
         assert "Scan" in output
         assert "IndexSeek" in output
 
     def test_visualizer_max_depth_with_string_types(self):
-        """Test max depth limiting with string operator types."""
         plan = QueryPlanDAG(
             query_id="q1",
             platform="duckdb",
@@ -499,6 +459,5 @@ class TestStringOperatorTypeVisualization:
         visualizer = QueryPlanVisualizer(options)
         output = visualizer.render_plan(plan)
 
-        # Should truncate at depth limit
         assert "CustomOp1" in output
         assert "..." in output

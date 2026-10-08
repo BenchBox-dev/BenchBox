@@ -1,48 +1,4 @@
 #!/usr/bin/env python3
-"""Regenerate the vendor-derived pricing tables from checked-in vendor evidence.
-
-The machine-readable prices in ``benchbox/core/cost/pricing_data.yaml`` come
-from two places: hand-maintained tables (BigQuery, Snowflake, Firebolt,
-Databricks AWS/GCP) and vendor-API-derived tables rendered by this script
-from ``benchbox/core/cost/pricing_vendor_evidence.yaml``. That evidence file
-records one vendor-native observation per emitted value -- source API, SKU or
-meter identifier, region, currency, retrieval date -- and this script applies
-the derivation rules (region-to-tier mapping, DWU linear scaling, the
-``other`` bucket, tier-independent meter reuse) to render the BenchBox-shaped
-tables. ``make pricing-data-check`` fails when the committed tables diverge
-from what the evidence derives, so a hand edit to a generated value cannot
-pass CI; the weekly ``Pricing Data Drift Check`` workflow re-pulls the vendor
-APIs and surfaces upstream moves as a diff.
-
-This follows the repo's regenerate-plus-check idiom (a default mode that
-rewrites the artifact plus a ``--check`` mode that regenerates in memory and
-exits non-zero on drift), but the artifact here is a subset of sections
-inside one YAML file rather than whole files: each generated section is
-delimited by ``BEGIN/END GENERATED <section>`` markers, and only the lines
-between a marker pair are replaced. Everything else in the file --
-hand-maintained tables, their provenance, comments -- is preserved
-byte-for-byte.
-
-Modes:
-
-- ``scripts/generate_pricing_data.py`` regenerates the marked sections from
-  the evidence file. Fully offline; safe to run anywhere.
-- ``scripts/generate_pricing_data.py --check`` regenerates in memory and
-  exits 1 with a unified diff when the committed file drifts. This is what
-  ``make pricing-data-check`` and the ``guard-pricing-data`` CI step run.
-- ``scripts/generate_pricing_data.py --refresh`` re-pulls the AWS Price List
-  API and the Azure Retail Prices API, folds moved prices into the evidence
-  file (unchanged prices keep their recorded retrieval date, so an unchanged
-  upstream regenerates byte-identical output), then regenerates. Network only;
-  runs on a schedule, never in the PR-blocking path. Refresh only revisits
-  regions already recorded in the evidence file: a brand-new vendor region is
-  not auto-discovered (consistent with the individually-selected-values
-  license posture) and must be added to the evidence file by hand.
-
-Redistribution of the emitted vendor-derived values ships under the accepted
-project-owner risk recorded alongside the redistribution-check item, not
-under a vendor grant: see the header of the evidence file.
-"""
 
 from __future__ import annotations
 
@@ -64,6 +20,8 @@ import yaml
 
 from benchbox.utils.clock import elapsed_seconds, mono_time
 
+CLI_DESCRIPTION = "Regenerate the vendor-derived pricing tables from checked-in vendor evidence."
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COST_DIR = REPO_ROOT / "benchbox" / "core" / "cost"
 EVIDENCE_PATH = COST_DIR / "pricing_vendor_evidence.yaml"
@@ -76,10 +34,6 @@ HTTP_RETRY_BUDGET_SECONDS = 120
 RETRYABLE_HTTP_STATUSES = frozenset({429, 500, 502, 503, 504})
 USER_AGENT = "BenchBox-pricing-generator"
 
-# Tables whose provenance is hand-maintained. Each must carry a
-# ``manual_review_due`` ISO date; --check fails when one is missing or
-# malformed. Generated tables are excluded: their freshness is enforced by
-# the evidence retrieval dates plus the scheduled refresh instead.
 MANUAL_TABLES = (
     "snowflake_credit_prices",
     "bigquery_on_demand_prices",
@@ -88,7 +42,6 @@ MANUAL_TABLES = (
     "databricks_dbu_prices",
 )
 
-# Emitted Redshift node-type columns, in file order, plus the derived bucket.
 REDSHIFT_NODES = (
     "dc2.large",
     "dc2.8xlarge",
@@ -102,8 +55,6 @@ REDSHIFT_NODES = (
     "rg.12xlarge",
 )
 
-# Emitted Redshift region columns, in file order; `other` renders last and
-# always carries the `other_from` region's observed value.
 REDSHIFT_TABLE_COLUMNS = (
     "us-east-1",
     "us-east-2",
@@ -118,7 +69,6 @@ REDSHIFT_TABLE_COLUMNS = (
     "other",
 )
 
-# Synapse dedicated levels as (table key, DW100c multiplier), in file order.
 DWU_LEVELS = (
     ("dw100c", 1),
     ("dw200c", 2),
@@ -153,11 +103,6 @@ DATABRICKS_WORKLOADS = (
 _AZURE_DATABRICKS = "Azure Databricks"
 _AZURE_DATABRICKS_REGIONAL = "Azure Databricks Regional"
 
-# Canonical (service, product, meter) backing every Azure Databricks cell.
-# Tier-independent products (SQL Pro, Serverless SQL) exist only under the
-# Regional product family, and ML runtime bills at the all-purpose rate, so
-# several cells share one meter by design; the evidence file repeats the
-# shared meter per cell and the renderer asserts the binding both ways.
 DATABRICKS_CELL_METER: dict[tuple[str, str], tuple[str, str, str]] = {
     (tier, workload): meter
     for tier in DATABRICKS_TIERS
@@ -182,18 +127,10 @@ DATABRICKS_CELL_METER: dict[tuple[str, str], tuple[str, str, str]] = {
 
 
 class PricingGeneratorError(RuntimeError):
-    """Fail-closed signal: the artifact must not be written on this path."""
+    pass
 
 
 def canonical_decimal(raw: str, *, min_places: int, max_places: int) -> str:
-    """Render a decimal string in the canonical form the tables use.
-
-    At most ``max_places`` fractional digits (a value needing more is a
-    genuine precision change and raises instead of rounding silently), with
-    trailing zeros stripped down to at least ``min_places`` digits, so
-    ``0.3000000000`` renders as ``0.30`` under (2, 4) and API JSON ``0.4``
-    renders as ``0.40`` under (2, 2).
-    """
     try:
         value = Decimal(str(raw).strip())
     except InvalidOperation as exc:
@@ -218,7 +155,6 @@ def canonical_decimal(raw: str, *, min_places: int, max_places: int) -> str:
 
 
 def load_evidence(path: Path = EVIDENCE_PATH) -> dict:
-    """Load and structurally validate the vendor evidence file."""
     try:
         payload = yaml.safe_load(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -252,7 +188,6 @@ def _require_keys(mapping: dict, keys: tuple[str, ...], where: str) -> None:
 
 
 def _flow_list(key: str, items: list[str], *, indent: int, width: int = 100) -> list[str]:
-    """Render a YAML flow list, greedily wrapped past ``width`` columns."""
     opener = " " * indent + f"{key}: ["
     lines: list[str] = []
     current = opener
@@ -335,14 +270,6 @@ def _render_databricks_azure(section: dict) -> list[str]:
 
 
 def _render_region_table(table: str, section: dict, *, price_places: tuple[int, int]) -> list[str]:
-    """Render a region-keyed per-TB table in evidence order, key line included.
-
-    Athena and Synapse serverless price per TB scanned/processed with
-    region-specific rates, so every observed region renders as its own cell
-    and pricing.py resolves each run by region key. The value-section markers
-    wrap the whole mapping (key line included). An empty region map fails
-    closed instead of emitting an unpriced table.
-    """
     regions = section.get("regions", {})
     if not isinstance(regions, dict) or not regions:
         raise PricingGeneratorError(f"{table} has no observed regions to render")
@@ -377,7 +304,6 @@ def _tier_regions(section: dict, key: str) -> list[str]:
 
 
 def render_all_sections(evidence: dict) -> dict[str, list[str]]:
-    """Render every generated section as relative-indent lines, keyed by section id."""
     redshift = evidence["redshift_node_prices"]
     athena = evidence["athena_price_per_tb"]
     dedicated = evidence["synapse_dedicated_dwu_prices"]
@@ -414,59 +340,85 @@ def render_all_sections(evidence: dict) -> dict[str, list[str]]:
 
 
 def require_observed_regions(section: dict, table: str) -> list[str]:
-    """Return the observed regions for a region-keyed table, failing closed on empty."""
     regions = section.get("regions", {})
     if not isinstance(regions, dict) or not regions:
         raise PricingGeneratorError(f"{table} has no observed regions")
     return list(regions)
 
 
-BEGIN_PREFIX = "# BEGIN GENERATED "
-END_PREFIX = "# END GENERATED "
+SECTION_PATHS: dict[str, tuple[tuple[str, ...], bool]] = {
+    "redshift_node_prices": (("redshift_node_prices",), False),
+    "athena_price_per_tb": (("athena_price_per_tb",), True),
+    "synapse_dedicated_dwu_prices": (("synapse_dedicated_dwu_prices",), False),
+    "synapse_serverless_price_per_tb": (("synapse_serverless_price_per_tb",), True),
+    "fabric_cu_prices": (("fabric_cu_prices",), False),
+    "databricks.azure": (("databricks_dbu_prices", "azure"), False),
+    "provenance.redshift_node_prices": (("provenance", "redshift_node_prices"), True),
+    "provenance.athena_price_per_tb": (("provenance", "athena_price_per_tb"), True),
+    "provenance.synapse_dedicated_dwu_prices": (("provenance", "synapse_dedicated_dwu_prices"), True),
+    "provenance.synapse_serverless_price_per_tb": (("provenance", "synapse_serverless_price_per_tb"), True),
+    "provenance.fabric_cu_prices": (("provenance", "fabric_cu_prices"), True),
+}
+_KEY_LINE = re.compile(r"^(?P<indent> *)(?P<key>[A-Za-z0-9_.-]+):(?:\s|$)")
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def _key_line(lines: list[str], path: tuple[str, ...]) -> int:
+    stack: list[tuple[int, str]] = []
+    found = []
+    for index, line in enumerate(lines):
+        match = _KEY_LINE.match(line)
+        if not match:
+            continue
+        indent = len(match.group("indent"))
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        stack.append((indent, match.group("key")))
+        if tuple(key for _, key in stack) == path:
+            found.append(index)
+    if len(found) != 1:
+        raise PricingGeneratorError(f"expected one key for {'.'.join(path)}, found {len(found)}")
+    return found[0]
+
+
+def _block_end(lines: list[str], start: int) -> int:
+    indent = _indent(lines[start])
+    end = start + 1
+    while end < len(lines) and (not lines[end].strip() or _indent(lines[end]) > indent):
+        end += 1
+    while end > start + 1 and not lines[end - 1].strip():
+        end -= 1
+    return end
 
 
 def splice_sections(original_text: str, rendered: dict[str, list[str]]) -> str:
-    """Replace each marked section body with its rendered lines."""
-    lines = original_text.split("\n")
-    begins: dict[str, int] = {}
-    ends: dict[str, int] = {}
-    for index, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith(BEGIN_PREFIX):
-            section = stripped[len(BEGIN_PREFIX) :].split()[0]
-            if section in begins:
-                raise PricingGeneratorError(f"duplicate BEGIN marker for {section}")
-            begins[section] = index
-        elif stripped.startswith(END_PREFIX):
-            section = stripped[len(END_PREFIX) :].split()[0]
-            if section in ends:
-                raise PricingGeneratorError(f"duplicate END marker for {section}")
-            ends[section] = index
-    unknown = (set(begins) | set(ends)) - set(rendered)
+    unknown = set(rendered) - set(SECTION_PATHS)
     if unknown:
-        raise PricingGeneratorError(f"markers without a renderer: {sorted(unknown)}")
-    missing = set(rendered) - set(begins)
+        raise PricingGeneratorError(f"rendered sections without a key path: {sorted(unknown)}")
+    missing = set(SECTION_PATHS) - set(rendered)
     if missing:
-        raise PricingGeneratorError(f"rendered sections without markers: {sorted(missing)}")
-    for section in rendered:
-        if begins[section] > ends[section]:
-            raise PricingGeneratorError(f"END marker precedes BEGIN for {section}")
+        raise PricingGeneratorError(f"key paths without a renderer: {sorted(missing)}")
+    lines = original_text.split("\n")
     for section, block in rendered.items():
-        indent = lines[begins[section]][: len(lines[begins[section]]) - len(lines[begins[section]].lstrip())]
-        body = [(indent + text) if text else "" for text in block]
-        lines[begins[section] + 1 : ends[section]] = body
-        shift = len(body) - (ends[section] - begins[section] - 1)
-        for other in begins:
-            if begins[other] > begins[section]:
-                begins[other] += shift
-        for other in ends:
-            if ends[other] > begins[section]:
-                ends[other] += shift
-    return "\n".join(lines)
+        path, whole = SECTION_PATHS[section]
+        key = _key_line(lines, path)
+        end = _block_end(lines, key)
+        if not whole and lines[key].split(":", 1)[1].split("#", 1)[0].strip():
+            raise PricingGeneratorError(f"{section} key has an inline value, so its body cannot be replaced")
+        first = key if whole else key + 1
+        indent = " " * (_indent(lines[key]) if whole else _indent(lines[key]) + 2)
+        lines[first:end] = [(indent + text) if text else "" for text in block]
+    spliced = "\n".join(lines)
+    before, after = yaml.safe_load(original_text), yaml.safe_load(spliced)
+    if not isinstance(after, dict) or list(after) != list(before or {}):
+        raise PricingGeneratorError("splicing changed the top-level keys of pricing_data.yaml")
+    return spliced
 
 
 def validate_manual_sections(pricing_text: str) -> None:
-    """Require every hand-maintained table to carry a valid manual_review_due date."""
     payload = yaml.safe_load(pricing_text)
     if not isinstance(payload, dict):
         raise PricingGeneratorError("pricing_data.yaml must contain a mapping")
@@ -485,7 +437,6 @@ def validate_manual_sections(pricing_text: str) -> None:
 
 
 def regenerated_text(evidence_path: Path = EVIDENCE_PATH, pricing_path: Path = PRICING_PATH) -> tuple[str, str, int]:
-    """Return (committed text, regenerated text, section count), validating first."""
     evidence = load_evidence(evidence_path)
     original = pricing_path.read_text(encoding="utf-8")
     rendered = render_all_sections(evidence)
@@ -502,7 +453,6 @@ def _display(path: Path) -> str:
 
 
 def run_check(evidence_path: Path = EVIDENCE_PATH, pricing_path: Path = PRICING_PATH) -> int:
-    """Regenerate in memory; report a unified diff and exit 1 on drift."""
     original, updated, count = regenerated_text(evidence_path, pricing_path)
     if updated == original:
         print(f"pricing data matches vendor evidence ({count} generated sections)")
@@ -519,7 +469,6 @@ def run_check(evidence_path: Path = EVIDENCE_PATH, pricing_path: Path = PRICING_
 
 
 def run_regenerate(evidence_path: Path = EVIDENCE_PATH, pricing_path: Path = PRICING_PATH) -> int:
-    """Regenerate the marked sections from the evidence file, writing on change."""
     original, updated, count = regenerated_text(evidence_path, pricing_path)
     if updated == original:
         print(f"pricing data already matches vendor evidence ({count} generated sections)")
@@ -529,13 +478,7 @@ def run_regenerate(evidence_path: Path = EVIDENCE_PATH, pricing_path: Path = PRI
     return 0
 
 
-# ---------------------------------------------------------------------------
-# Scheduled refresh: re-pull the vendor APIs into the evidence file.
-# ---------------------------------------------------------------------------
-
-
 def _retry_after_seconds(value: str | None, *, now: _datetime.datetime | None = None) -> float | None:
-    """Interpret a vendor's Retry-After header; malformed values use backoff."""
     if value is None:
         return None
     value = value.strip()
@@ -545,7 +488,6 @@ def _retry_after_seconds(value: str | None, *, now: _datetime.datetime | None = 
         retry_at = parsedate_to_datetime(value)
         if retry_at.tzinfo is None:
             return None
-        # HTTP dates are wall timestamps; the retry budget below is monotonic.
         observed_at = now if now is not None else _datetime.datetime.now(_datetime.timezone.utc)
         return max(0.0, (retry_at - observed_at).total_seconds())
     except (ValueError, TypeError, OverflowError):
@@ -553,11 +495,6 @@ def _retry_after_seconds(value: str | None, *, now: _datetime.datetime | None = 
 
 
 def _http_get_json(url: str) -> dict:
-    """Fetch fresh evidence with a per-URL retry admission budget.
-
-    Socket timeouts bound blocking operations, not total streaming time.
-    Reject late evidence after reading it and admit no retry past the budget.
-    """
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     started = mono_time()
     for attempt in range(1, HTTP_ATTEMPTS + 1):
@@ -591,7 +528,6 @@ def _http_get_json(url: str) -> dict:
 
 
 def fetch_aws_region_offer(url_template: str, region: str) -> tuple[str, dict, dict]:
-    """Fetch one AWS bulk offer file; return (publication date, products, OnDemand terms)."""
     payload = _http_get_json(url_template.format(region=region))
     try:
         publication = payload["publicationDate"]
@@ -607,7 +543,6 @@ def fetch_aws_region_offer(url_template: str, region: str) -> tuple[str, dict, d
 def extract_aws_prices(
     products: dict, terms: dict, *, product_family: str, unit: str, key_attribute: str
 ) -> dict[str, str]:
-    """Index OnDemand USD prices from an AWS bulk payload by one product attribute."""
     found: dict[str, str] = {}
     for sku, product in products.items():
         if not isinstance(product, dict) or product.get("productFamily") != product_family:
@@ -630,7 +565,6 @@ def extract_aws_prices(
 
 
 def fetch_azure_region_items(service: str, region: str) -> list[dict]:
-    """Fetch every Consumption row for one Azure service/region, following pages."""
     filtr = f"serviceName eq '{service}' and armRegionName eq '{region}' and priceType eq 'Consumption'"
     url: str | None = "https://prices.azure.com/api/retail/prices?$filter=" + urllib.parse.quote(filtr, safe="")
     rows: list[dict] = []
@@ -652,7 +586,6 @@ def fetch_azure_region_items(service: str, region: str) -> list[dict]:
 
 
 def select_azure_meter(rows: list[dict], *, service: str, region: str, product: str, meter: str, unit: str) -> str:
-    """Return the live price of one exact (product, meter) pair, failing on drift in shape."""
     matches = [
         row
         for row in rows
@@ -671,13 +604,6 @@ def select_azure_meter(rows: list[dict], *, service: str, region: str, product: 
 
 
 def select_fabric_cu_price(rows: list[dict], *, region: str) -> str:
-    """Return the Fabric provisioned CU-hour rate, requiring those meters to agree.
-
-    The "Capacity Overage" meter bills burst consumption above provisioned
-    capacity at a multiple of the standard rate; the cost model prices
-    provisioned CU-hours, so overage is excluded by name. Any future CU
-    family that disagrees in price fails loudly instead of joining silently.
-    """
     candidates = [
         row
         for row in rows
@@ -700,17 +626,6 @@ def select_fabric_cu_price(rows: list[dict], *, region: str) -> str:
 
 
 def plan_price_update(recorded: str, fetched: str, *, min_places: int, max_places: int) -> str | None:
-    """Return the replacement evidence string, or None when the fetched price matches.
-
-    The live feed is first narrowed to ``max_places`` decimals (half up),
-    the table's precision standard: the AWS bulk feed carries a fifth digit
-    on some SKUs (rg.4xlarge reports 3.04267 against a four-decimal table)
-    and the Azure feed carries extra digits on some meters (brazilsouth DWU
-    reports 2.4194 against a two-decimal table). Both reproduce the committed
-    values under this rule, so comparison happens at the emitted granularity
-    and an unchanged upstream keeps its retrieval date. A vendor move of half
-    the last emitted digit or more still registers as drift.
-    """
     try:
         narrowed = Decimal(str(fetched).strip()).quantize(Decimal(1).scaleb(-max_places), rounding=ROUND_HALF_UP)
     except InvalidOperation as exc:
@@ -723,8 +638,6 @@ def plan_price_update(recorded: str, fetched: str, *, min_places: int, max_place
 
 
 class EvidenceUpdate:
-    """One line-local evidence edit: ``path`` + ``key`` locate the line, ``old`` guards it."""
-
     def __init__(self, path: tuple[str, ...], key: str, old: str, new: str) -> None:
         self.path = path
         self.key = key
@@ -740,12 +653,6 @@ _VALUE_LINE = re.compile(r"^(\s*)([A-Za-z0-9_.-]+):\s*'([^']*)'\s*(?:#.*)?$")
 
 
 def apply_evidence_updates(text: str, updates: list[EvidenceUpdate]) -> str:
-    """Apply line-local evidence edits, preserving comments and layout.
-
-    Each update must match exactly one line: the indent-derived key path must
-    equal the update path, the key must match, and the quoted value must still
-    be the recorded ``old`` string. Anything else fails closed.
-    """
     lines = text.split("\n")
     for update in updates:
         applied = 0
@@ -779,7 +686,6 @@ def _stamp_retrieved(updates: list[EvidenceUpdate], evidence: dict, table: str, 
 
 
 def collect_refresh_updates(evidence: dict, *, today: str) -> list[EvidenceUpdate]:
-    """Pull every vendor API and diff against the evidence; no file writes here."""
     updates: list[EvidenceUpdate] = []
     _refresh_aws_redshift(evidence, updates, today=today)
     _refresh_aws_athena(evidence, updates, today=today)
@@ -918,9 +824,6 @@ def _refresh_fabric(evidence: dict, updates: list[EvidenceUpdate], *, today: str
 def _refresh_databricks_azure(evidence: dict, updates: list[EvidenceUpdate], *, today: str) -> None:
     section = evidence["databricks_dbu_prices_azure"]
     region = section["region"]
-    # One query returns both the "Azure Databricks" and "Azure Databricks
-    # Regional" product families (every row carries the same serviceName);
-    # the triple match below tells them apart by productName.
     rows = fetch_azure_region_items(_AZURE_DATABRICKS, region)
     by_meter: dict[tuple[str, str, str], str] = {}
     for triple in {
@@ -964,7 +867,6 @@ def run_refresh(
     *,
     today: str | None = None,
 ) -> int:
-    """Re-pull the vendor APIs into the evidence file, then regenerate the tables."""
     stamp = today or str(_datetime.datetime.now(_datetime.timezone.utc).date())
     evidence = load_evidence(evidence_path)
     updates = collect_refresh_updates(evidence, today=stamp)
@@ -978,8 +880,7 @@ def run_refresh(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--check",
@@ -995,7 +896,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Dispatch the requested mode; return the process exit code."""
     args = parse_args(argv)
     try:
         if args.check:

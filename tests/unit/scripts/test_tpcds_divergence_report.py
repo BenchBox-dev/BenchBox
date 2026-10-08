@@ -1,5 +1,3 @@
-"""Tests for the cause labels in scripts/tpcds_divergence_report.py (canned detail text, no data)."""
-
 from __future__ import annotations
 
 import pytest

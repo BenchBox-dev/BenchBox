@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Verify assembled shadow site links, assets, Explorer routes, and Sphinx references (A4 w3, w4).
-
-Usage:
-  uv run python scripts/publication/verify_shadow_site.py [site_dir]
-"""
 
 from __future__ import annotations
 
@@ -18,19 +13,16 @@ EXTERNAL_SCHEMES = ("http://", "https://", "mailto:", "javascript:", "data:")
 
 
 def verify_site_directory(site_dir: Path) -> list[str]:
-    """Verify shadow site structure, entry points, and local asset links."""
     errors: list[str] = []
 
     if not site_dir.exists():
         return [f"Shadow site dir '{site_dir}' does not exist"]
 
-    # Check key files
     expected_entrypoints = ["index.html"]
     for ep in expected_entrypoints:
         if not (site_dir / ep).is_file():
             errors.append(f"Missing essential site entry point: '{ep}'")
 
-    # Scan HTML files for broken local references
     for root, _, files in os.walk(site_dir):
         for f in files:
             if not f.endswith((".html", ".htm")):
@@ -47,13 +39,11 @@ def verify_site_directory(site_dir: Path) -> list[str]:
                 if not target or any(target.startswith(scheme) for scheme in EXTERNAL_SCHEMES):
                     continue
 
-                # Resolve relative or absolute site path
                 if target.startswith("/"):
                     resolved = site_dir / target.lstrip("/")
                 else:
                     resolved = html_path.parent / target
 
-                # Allow directory index lookup
                 if resolved.is_dir() and (resolved / "index.html").is_file():
                     continue
 

@@ -142,7 +142,6 @@ class TestEMRServerlessCoverage:
         adapter._glue_client = glue
         glue.get_database.side_effect = Exception("missing")
         with patch("benchbox.platforms.aws.emr_serverless_adapter.ClientError", Exception):
-            # generic exception here should bubble, so use happy path below instead
             pass
 
         glue = MagicMock()

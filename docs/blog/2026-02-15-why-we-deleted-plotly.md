@@ -177,10 +177,8 @@ BenchBox's ASCII charts are available in every installation starting with v0.1.2
 
 ```bash
 $ benchbox run --platform duckdb --benchmark tpch --scale 0.01
-# Charts appear automatically after the run completes
 
 $ benchbox visualize benchmark_runs/results/<result_file>.json
-# Or generate specific chart types from any result file
 ```
 
 Through the MCP server, `generate_chart()` and `suggest_charts()` return inline ASCII content. The full implementation lives in [`benchbox/core/visualization/ascii/`](../visualization/overview.md), and contributions are welcome, especially for new chart types.

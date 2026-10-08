@@ -1,15 +1,3 @@
-"""TSBS DevOps DDL compatibility rules for Phase.SCHEMA_EMIT.
-
-_generate_create_table in core/tsbs_devops/schema.py branches on dialect to emit
-engine-specific DDL.  Two policy branches are registered here; the third (DuckDB
-partition comment) is legitimate storage-layout rendering and is covered by the
-@compat_local decorator on _generate_create_table.
-
-  clickhouse   → REWRITE_DDL (tier-2): adds ENGINE=MergeTree ORDER BY PARTITION BY
-  timescale    → REWRITE_DDL (tier-2): adds SELECT create_hypertable(...) postfix
-  timescale + "tags" → NATIVE override (tier-1): tags table is not a hypertable
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction
@@ -21,10 +9,6 @@ from benchbox.sql_compat.decision import (
     SupportLevel,
 )
 from benchbox.sql_compat.registry import REGISTRY
-
-# ---------------------------------------------------------------------------
-# ClickHouse: ENGINE = MergeTree + ORDER BY + optional PARTITION BY
-# ---------------------------------------------------------------------------
 
 REGISTRY.register(
     CompatibilityDecision(
@@ -49,9 +33,6 @@ REGISTRY.register(
     benchmark="tsbs_devops",
 )
 
-# ---------------------------------------------------------------------------
-# TimescaleDB: create_hypertable() postfix - all tables except "tags"
-# ---------------------------------------------------------------------------
 
 REGISTRY.register(
     CompatibilityDecision(
@@ -76,13 +57,6 @@ REGISTRY.register(
     benchmark="tsbs_devops",
 )
 
-# ---------------------------------------------------------------------------
-# TimescaleDB + "tags" table: NATIVE override (tier-1)
-#
-# The tags table is a metadata dimension table, not a time-series table.
-# It must NOT be converted to a hypertable; the tier-2 rule above would
-# incorrectly fire for it without this override.
-# ---------------------------------------------------------------------------
 
 _NATIVE_TAGS = CompatibilityDecision(
     rule_id="schema_emit.timescale.tsbs_devops.tags.native_ddl",

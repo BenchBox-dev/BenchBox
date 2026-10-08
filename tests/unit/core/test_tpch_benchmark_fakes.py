@@ -1,5 +1,3 @@
-"""Unit tests for TPCHBenchmark using lightweight fakes."""
-
 from pathlib import Path
 
 import pytest
@@ -14,7 +12,6 @@ pytestmark = [
 
 @pytest.fixture
 def fake_tpch_components(monkeypatch, tmp_path):
-    """Patch TPCHBenchmark dependencies with lightweight fakes."""
 
     class FakeTPCHDataGenerator:
         def __init__(self, scale_factor, parallel, output_dir, **_):
@@ -43,7 +40,6 @@ def fake_tpch_components(monkeypatch, tmp_path):
     monkeypatch.setattr("benchbox.core.tpch.benchmark.TPCHDataGenerator", FakeTPCHDataGenerator)
     monkeypatch.setattr("benchbox.core.tpch.benchmark.TPCHQueries", lambda: FakeTPCHQueryManager())
 
-    # Ensure stream permutations are predictable for stream-based queries
     monkeypatch.setattr(
         "benchbox.core.tpch.streams.TPCHStreams.PERMUTATION_MATRIX",
         [[1, 2], [2, 1]],
@@ -78,17 +74,8 @@ def test_tpch_benchmark_generates_data_with_fakes(fake_tpch_components):
 
 
 def test_get_table_loading_order_is_fk_safe_for_available_subset(fake_tpch_components):
-    """Regression test: DataLoader calls get_table_loading_order(available_tables)
-    with whatever tables were actually generated/discovered (see
-    benchbox/platforms/base/data_loading.py::_load_file_based_data). Before this
-    fix, TPCHBenchmark had no such method, so the loader fell back to
-    alphabetical order -- which loads lineitem before orders/part/supplier and
-    violates FK references once constraints are enforced.
-    """
     bench = TPCHBenchmark(scale_factor=0.1, output_dir=fake_tpch_components)
 
-    # Deliberately shuffled/alphabetical-ish input, as a dict-keys() snapshot
-    # from disk discovery would be in whatever order the filesystem returns.
     available = ["supplier", "lineitem", "customer", "orders", "region", "nation", "part", "partsupp"]
     order = bench.get_table_loading_order(available)
 
@@ -104,8 +91,6 @@ def test_get_table_loading_order_is_fk_safe_for_available_subset(fake_tpch_compo
     assert position["part"] < position["partsupp"]
     assert position["supplier"] < position["partsupp"]
 
-    # A table missing from schema.TABLES (unknown/extra file) must still be
-    # returned rather than dropped.
     order_with_extra = bench.get_table_loading_order([*available, "some_extra_table"])
     assert "some_extra_table" in order_with_extra
 

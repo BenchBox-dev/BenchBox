@@ -1,30 +1,12 @@
 #!/usr/bin/env python3
-"""Query Extraction and Validation
-
-Demonstrates how to validate extracted SQL queries from dry-run output.
-Includes basic validation and optional sqlfluff linting integration.
-
-Useful for:
-- Verifying query syntax before execution
-- Checking SQL standards compliance
-- Automated testing of query generation
-- Quality control in CI/CD
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 import subprocess
 from pathlib import Path
 
 
 def validate_extracted_queries(dry_run_dir: str, target_dialect: str = "duckdb"):
-    """Basic validation of extracted SQL queries.
-
-    Args:
-        dry_run_dir: Path to directory containing dry-run output
-        target_dialect: Target SQL dialect (for linting)
-    """
     queries_dir = Path(dry_run_dir) / "queries"
 
     if not queries_dir.exists():
@@ -46,7 +28,6 @@ def validate_extracted_queries(dry_run_dir: str, target_dialect: str = "duckdb")
         with open(query_file, encoding="utf-8") as f:
             content = f.read()
 
-        # Basic checks
         is_valid = content.strip() and "SELECT" in content.upper() and content.count("(") == content.count(")")
 
         if is_valid:
@@ -63,21 +44,12 @@ def validate_extracted_queries(dry_run_dir: str, target_dialect: str = "duckdb")
 
 
 def lint_with_sqlfluff(dry_run_dir: str, dialect: str = "duckdb"):
-    """Lint queries with sqlfluff.
-
-    Note: Requires sqlfluff to be installed: pip install sqlfluff
-
-    Args:
-        dry_run_dir: Path to directory containing dry-run output
-        dialect: SQL dialect for linting
-    """
     queries_dir = Path(dry_run_dir) / "queries"
 
     if not queries_dir.exists():
         print(f"❌ Queries directory not found: {queries_dir}")
         return
 
-    # Check if sqlfluff is installed
     try:
         subprocess.run(["sqlfluff", "--version"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -108,10 +80,8 @@ if __name__ == "__main__":
         print(f"Using default directory: {dry_run_dir}")
         print("Usage: python query_validation.py <dry_run_directory>\n")
 
-    # Run validation
     all_valid = validate_extracted_queries(dry_run_dir)
 
-    # Try linting if sqlfluff is available
     try:
         lint_with_sqlfluff(dry_run_dir)
     except Exception as e:

@@ -1,16 +1,3 @@
-"""Tests for PySpark sketch factory helpers (write-primitives-sketch-pyspark-dataframe-surface).
-
-Covers:
-- pyspark_supports_approx_top_k version detection
-- make_pyspark_hll_persist_builder / merge_extract: builder calls hll_sketch_agg,
-  extractor calls hll_union_agg + hll_sketch_estimate
-- make_pyspark_topk_persist_builder / merge_extract: builder calls
-  approx_top_k_accumulate, extractor calls combine + estimate
-
-Tests use mock spark sessions and verify the chained Spark API calls without
-requiring PySpark to be installed at test time.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -32,16 +19,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 class _FakeRow:
-    """Minimal stand-in for a PySpark ``Row``: supports positional indexing like the real thing.
-
-    Used instead of a ``MagicMock`` for merge-extract result rows so that
-    ``result`` is produced by genuine ``__getitem__`` lookup logic in the
-    extractor under test, rather than being an injected mock return value.
-    Indexing anywhere other than the populated position raises, so a test
-    using this fixture would fail if the extractor started reading the
-    wrong column/index.
-    """
-
     def __init__(self, values):
         self._values = list(values)
 
@@ -51,12 +28,6 @@ class _FakeRow:
 
 @pytest.fixture()
 def fake_pyspark_functions(monkeypatch):
-    """Install a fake pyspark.sql.functions module so the factories work without PySpark.
-
-    Default MagicMock auto-chaining is intentional — `F.hll_sketch_agg(x).alias(y)`
-    works without explicit return_value setup. Tests inspect call counts and
-    arguments rather than identity-comparing the chained results.
-    """
     fake_F = MagicMock(name="pyspark.sql.functions")
     fake_pyspark = types.ModuleType("pyspark")
     fake_sql = types.ModuleType("pyspark.sql")
@@ -66,9 +37,6 @@ def fake_pyspark_functions(monkeypatch):
     return fake_F
 
 
-# ---------------------------------------------------------------------------
-# Version detection
-# ---------------------------------------------------------------------------
 class TestPysparkSupportsApproxTopK:
     def test_none_session_returns_false(self):
         assert pyspark_supports_approx_top_k(None) is False
@@ -94,9 +62,6 @@ class TestPysparkSupportsApproxTopK:
         assert pyspark_supports_approx_top_k(spark) is False
 
 
-# ---------------------------------------------------------------------------
-# HLL persist builder
-# ---------------------------------------------------------------------------
 class TestPysparkHllPersistBuilder:
     def test_builder_reads_source_and_groups_with_hll_sketch_agg(self, fake_pyspark_functions, tmp_path: Path):
         spark = MagicMock(name="spark")
@@ -124,9 +89,6 @@ class TestPysparkHllPersistBuilder:
         fake_pyspark_functions.hll_sketch_agg.return_value.alias.assert_called_once_with("user_sketch")
 
 
-# ---------------------------------------------------------------------------
-# HLL merge extractor
-# ---------------------------------------------------------------------------
 class TestPysparkHllMergeExtract:
     def test_extractor_reads_state_and_chains_union_then_estimate(self, fake_pyspark_functions, tmp_path: Path):
         spark = MagicMock()
@@ -143,16 +105,11 @@ class TestPysparkHllMergeExtract:
         fake_pyspark_functions.hll_sketch_estimate.assert_called_once_with(
             fake_pyspark_functions.hll_union_agg.return_value
         )
-        # `result` is produced by real `row[0]` indexing on `_FakeRow`, not echoed
-        # from an injected mock return value - this would fail if the extractor
-        # started reading the wrong column/index.
+
         assert result == 14836.5
         assert isinstance(result, float)
 
 
-# ---------------------------------------------------------------------------
-# Top-K factories
-# ---------------------------------------------------------------------------
 class TestPysparkTopkFactories:
     def test_persist_builder_calls_approx_top_k_accumulate(self, fake_pyspark_functions, tmp_path: Path):
         spark = MagicMock()
@@ -181,6 +138,5 @@ class TestPysparkTopkFactories:
             fake_pyspark_functions.approx_top_k_combine.return_value
         )
         fake_pyspark_functions.size.assert_called_once_with(fake_pyspark_functions.approx_top_k_estimate.return_value)
-        # `result` comes from real `row[0]` indexing on `_FakeRow`, not an
-        # injected mock echo.
+
         assert result == 7.0

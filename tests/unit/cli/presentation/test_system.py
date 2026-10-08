@@ -1,5 +1,3 @@
-"""Tests for system recommendation presentation helpers."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace

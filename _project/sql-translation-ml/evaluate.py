@@ -1,5 +1,3 @@
-"""Locked-test execution outcomes and conservative directional uncertainty."""
-
 from __future__ import annotations
 
 import argparse
@@ -44,8 +42,6 @@ def bounds(outcomes: list[dict]) -> dict:
             sample = rng.integers(0, len(clusters), len(clusters))
             bootstrap.append(float(successes[sample].sum() / totals[sample].sum()))
     lower = sorted(bootstrap)[499] if bootstrap else 0.0
-    # Requiring every member of a family to pass protects against the degenerate
-    # all-success bootstrap (whose lower bound is otherwise exactly one).
     family_k = sum(all(cluster) for cluster in clusters)
     family_exact = float(beta.ppf(0.05, family_k, len(clusters) - family_k + 1)) if family_k else 0.0
     return {
@@ -83,18 +79,12 @@ def evaluate(run: Path, system: str) -> None:
     preparation = {r["case_id"]: r for r in load_lines(run / "preparation.jsonl")}
     seen = set()
     cases = []
-    # Count each normalized structure once per direction; variants are supplementary.
     for case in sources:
         key = (case["source"], case["structure"])
         if key not in seen and preparation[case["case_id"]]["eligible"]:
             cases.append(case)
             seen.add(key)
     torch.set_num_threads(4)
-    # Shared CodeT5 tokenizer setup stays outside the measured cold window:
-    # it is identical for every system under test, so starting the clock
-    # before it would attribute CodeT5 download/cache lookup, init time,
-    # and resident memory to the sqlglot/benchbox baselines. Model-specific
-    # loading below stays inside the window.
     tokenizer = AutoTokenizer.from_pretrained(MODEL, revision=REVISION)
     cold = mono_time()
     model = None

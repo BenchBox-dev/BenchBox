@@ -1,12 +1,6 @@
-"""First-run onboarding experience for BenchBox CLI.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides an interactive onboarding wizard for new users, introducing
-key concepts and helping them configure their first benchmark run.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from datetime import datetime
 from pathlib import Path
@@ -24,34 +18,22 @@ console = quiet_console
 
 
 def check_and_run_first_time_setup() -> bool:
-    """Check if this is the first run and offer onboarding.
-
-    Returns:
-        True if this was the first run, False otherwise
-    """
     import sys
 
-    # Don't run onboarding if not in an interactive terminal
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         return False
 
     marker_path = _get_first_run_marker_path()
 
-    # Use atomic file creation to prevent race conditions
-    # Try to create marker file exclusively - if it exists, another process did onboarding
     try:
         marker_path.parent.mkdir(parents=True, exist_ok=True)
-        # Use 'x' mode for exclusive creation (fails if file exists)
         with open(marker_path, "x", encoding="utf-8") as f:
             f.write(f"First run completed at {datetime.now().isoformat()}\n")
     except FileExistsError:
-        # Another process already completed first-run setup
         return False
 
-    # First run detected - show onboarding
     _show_welcome_message()
 
-    # Offer quick tour
     if Confirm.ask("\nWould you like a quick tour of BenchBox?", default=True):
         _run_interactive_tour()
 
@@ -59,16 +41,10 @@ def check_and_run_first_time_setup() -> bool:
 
 
 def _get_first_run_marker_path() -> Path:
-    """Get the path to the first-run marker file.
-
-    Returns:
-        Path to the marker file
-    """
     return Path.home() / ".benchbox" / "first_run_complete"
 
 
 def _show_welcome_message() -> None:
-    """Display welcome message for first-time users."""
     welcome_text = Text()
     welcome_text.append("Welcome to ", style="white")
     welcome_text.append("BenchBox", style="bold cyan")
@@ -104,28 +80,23 @@ def _show_welcome_message() -> None:
 
 
 def _run_interactive_tour() -> None:
-    """Run the interactive tour introducing key concepts."""
     console.print()
 
-    # Step 1: Key Concepts
     _show_key_concepts()
 
     if not Confirm.ask("\nContinue to benchmarks overview?", default=True):
         return
 
-    # Step 2: Available Benchmarks
     _show_benchmarks_overview()
 
     if not Confirm.ask("\nContinue to tuning modes explanation?", default=True):
         return
 
-    # Step 3: Tuning Modes
     _show_tuning_modes()
 
     if not Confirm.ask("\nContinue to scale factor guide?", default=True):
         return
 
-    # Step 4: Scale Factors
     _show_scale_factor_guide()
 
     console.print("\n[bold green]✓ Tour complete![/bold green]")
@@ -133,7 +104,6 @@ def _run_interactive_tour() -> None:
 
 
 def _show_key_concepts() -> None:
-    """Show key concepts panel."""
     concepts_table = Table(show_header=True, box=None, padding=(0, 1))
     concepts_table.add_column("Term", style="cyan bold", width=18)
     concepts_table.add_column("Description", style="white", width=60)
@@ -151,7 +121,6 @@ def _show_key_concepts() -> None:
 
 
 def _show_benchmarks_overview() -> None:
-    """Show overview of available benchmarks."""
     benchmarks_table = Table(show_header=True, box=None)
     benchmarks_table.add_column("Benchmark", style="green bold", width=15)
     benchmarks_table.add_column("Type", style="cyan", width=20)
@@ -170,7 +139,6 @@ def _show_benchmarks_overview() -> None:
 
 
 def _show_tuning_modes() -> None:
-    """Show explanation of tuning modes."""
     tuning_text = Text()
 
     tuning_text.append("Tuning Mode Options:\n\n", style="bold cyan")
@@ -203,7 +171,6 @@ def _show_tuning_modes() -> None:
 
 
 def _show_scale_factor_guide() -> None:
-    """Show scale factor selection guide."""
     scale_table = Table(show_header=True, box=None)
     scale_table.add_column("Scale Factor", style="cyan bold", width=15)
     scale_table.add_column("Dataset Size", style="yellow", width=15)
@@ -223,11 +190,6 @@ def _show_scale_factor_guide() -> None:
 
 
 def show_contextual_help(context: str) -> None:
-    """Show contextual help for a specific prompt.
-
-    Args:
-        context: The context identifier (e.g., "benchmark_selection", "scale_factor")
-    """
     help_content = _get_help_content(context)
 
     if help_content:
@@ -237,14 +199,6 @@ def show_contextual_help(context: str) -> None:
 
 
 def _get_help_content(context: str) -> Optional[Text]:
-    """Get help content for a specific context.
-
-    Args:
-        context: The context identifier
-
-    Returns:
-        Rich Text object with help content, or None if no help available
-    """
     help_texts = {
         "benchmark_selection": _create_benchmark_help(),
         "scale_factor": _create_scale_factor_help(),
@@ -256,7 +210,6 @@ def _get_help_content(context: str) -> Optional[Text]:
 
 
 def _create_benchmark_help() -> Text:
-    """Create help text for benchmark selection."""
     text = Text()
     text.append("Choosing a Benchmark:\n\n", style="bold")
     text.append("• ", style="white")
@@ -273,7 +226,6 @@ def _create_benchmark_help() -> Text:
 
 
 def _create_scale_factor_help() -> Text:
-    """Create help text for scale factor selection."""
     text = Text()
     text.append("Scale Factor Selection:\n\n", style="bold")
     text.append("The scale factor controls dataset size:\n", style="white")
@@ -291,7 +243,6 @@ def _create_scale_factor_help() -> Text:
 
 
 def _create_tuning_help() -> Text:
-    """Create help text for tuning mode selection."""
     text = Text()
     text.append("Tuning Modes:\n\n", style="bold")
     text.append("• ", style="white")
@@ -308,7 +259,6 @@ def _create_tuning_help() -> Text:
 
 
 def _create_concurrency_help() -> Text:
-    """Create help text for concurrency settings."""
     text = Text()
     text.append("Concurrent Streams:\n\n", style="bold")
     text.append("Concurrency simulates multiple users running queries simultaneously:\n", style="white")

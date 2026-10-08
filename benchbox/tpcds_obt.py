@@ -1,5 +1,3 @@
-"""TPC-DS One Big Table benchmark wrapper."""
-
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -8,10 +6,6 @@ from benchbox.core.tpcds_obt.benchmark import TPCDSOBTBenchmark
 
 
 class TPCDSOBT(BaseBenchmark):
-    """Public API wrapper for the TPC-DS OBT benchmark."""
-
-    # Mirror the implementation's run-time contract so orchestration and the
-    # load guard see it on the wrapper too.
     GENERATES_OWN_OUTPUT = TPCDSOBTBenchmark.GENERATES_OWN_OUTPUT
     REQUIRED_LOADED_TABLES = TPCDSOBTBenchmark.REQUIRED_LOADED_TABLES
 
@@ -32,21 +26,16 @@ class TPCDSOBT(BaseBenchmark):
         )
 
     def generate_data(self) -> dict[str, Any]:
-        """Generate the single OBT table and manifest."""
         return self._impl.generate_data()
 
     def get_queries(self, dialect: Optional[str] = None, base_dialect: Optional[str] = None) -> dict[str, str]:
-        """Return all OBT queries (translation hook reserved for future dialect support)."""
         return self._impl.get_queries(dialect=dialect)
 
     def get_query(self, query_id: Union[int, str], **kwargs: Any) -> str:
-        """Return a single OBT query."""
         return self._impl.get_query(query_id, **kwargs)
 
     def get_schema(self) -> dict[str, Any]:
-        """Return schema metadata for the single OBT table."""
         return self._impl.get_schema()
 
     def get_create_tables_sql(self, dialect: Optional[str] = None) -> str:
-        """Return DDL for the OBT table."""
         return self._impl.get_create_tables_sql(dialect=dialect or "duckdb")

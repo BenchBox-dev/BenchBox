@@ -1,7 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { fixtureIds, waitForDataLoaded, waitForShell } from "../support/fixtures";
 
-// Stable full-form result IDs from the deterministic generated fixture corpus.
 const TPCH_DUCKDB_ID = fixtureIds.ids.duckdb;
 const TPCH_DATAFUSION_ID = fixtureIds.ids.datafusion;
 const TPCH_ZERO_TIMING_ID = fixtureIds.ids.zeroTiming;
@@ -11,17 +10,13 @@ test.describe("ResultDetail", () => {
     await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
     await waitForShell(page);
 
-    // The page heading is `<Benchmark> - <Platform>` once DuckDB-WASM has
-    // attached and the detail metrics query resolves.
     await waitForDataLoaded(page, /TPC-H result:\s+DuckDB/);
 
-    // Trust badge and SF row are rendered synchronously beside the heading.
     const main = page.getByRole("main");
     await expect(
       main.getByRole("region", { name: "Result summary" }).getByText("SF 0.01", { exact: true }),
     ).toBeVisible();
 
-    // Query timings header is the stable landmark for the medians table.
     await expect(main.getByRole("heading", { name: /Query timings/ })).toBeVisible();
   });
 
@@ -29,8 +24,6 @@ test.describe("ResultDetail", () => {
     await page.goto(`/results/r/${TPCH_DUCKDB_ID}`);
     await waitForDataLoaded(page, /Query timings/);
 
-    // One per-query table, not two: the median table would repeat the warm
-    // median this one already reports beside the passes behind it.
     await expect(page.getByRole("columnheader", { name: /Median latency/ })).toHaveCount(0);
     const totals = page.getByTestId("pass-strip-totals");
     await expect(totals).toBeVisible();
@@ -69,9 +62,6 @@ test.describe("ResultDetail", () => {
   test("a missing result_id surfaces a user-visible error rather than a blank screen", async ({ page }) => {
     await page.goto("/results/r/does-not-exist");
     await waitForShell(page);
-    // ErrorMessage renders the "No result found for..." string. This is a
-    // happy-path slice for route coverage - the failure-injection suite
-    // (w7) extends this to snapshot-missing / range-read cases.
     await expect(page.getByText(/No result found for/i)).toBeVisible({ timeout: 20_000 });
   });
 
@@ -92,6 +82,4 @@ test.describe("ResultDetail", () => {
   });
 });
 
-// Export constants so compare.spec.ts can share the same IDs without
-// duplicating the contract-with-the-fixture-generator.
 export { TPCH_DUCKDB_ID, TPCH_DATAFUSION_ID };

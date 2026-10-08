@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""Verify corpus promotion gate and shadow promotion (A8).
-
-Verifies the published-results corpus invariants: exact accepted-path
-inventory, zero skips, and Explorer compatibility.
-
-Usage:
-  uv run python scripts/publication/verify_corpus_promotion.py            # live mode
-  uv run python scripts/publication/verify_corpus_promotion.py --shadow   # shadow mode
-"""
 
 from __future__ import annotations
 
@@ -35,7 +26,6 @@ def run(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def get_accepted_bundles(ref: str) -> list[str]:
-    """List all primary JSON bundle paths in the git tree at *ref*."""
     result = run("git", "ls-tree", "-r", "--name-only", ref, "--", CORPUS_PREFIX)
     if result.returncode != 0:
         return []
@@ -51,7 +41,6 @@ def get_accepted_bundles(ref: str) -> list[str]:
 
 
 def get_local_bundles(bundles_dir: Path) -> list[str]:
-    """List all primary JSON bundle paths from a local directory (recursive)."""
     if not bundles_dir.exists():
         return []
     paths = []
@@ -64,7 +53,6 @@ def get_local_bundles(bundles_dir: Path) -> list[str]:
 
 
 def get_inventory_paths() -> list[str]:
-    """List accepted bundle paths recorded in corpus-inventory.json."""
     if not INVENTORY_FILE.exists():
         return []
     data = json.loads(INVENTORY_FILE.read_text(encoding="utf-8"))
@@ -80,7 +68,6 @@ def verify_exact_inventory(
     accepted: list[str],
     inventory_expected: list[str],
 ) -> list[str]:
-    """Verify the accepted-path inventory exactly matches expected."""
     if accepted == inventory_expected:
         return []
     missing = sorted(set(inventory_expected) - set(accepted))
@@ -148,14 +135,14 @@ def _verify_bijection_and_privacy(accepted_ref: str, ledger_seed: Path) -> list[
             errors.extend(f"Corpus bijection: {e}" for e in bijection_errors)
     except BijectionError as exc:
         errors.append(f"Corpus bijection failed: {exc}")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         errors.append(f"Corpus bijection check failed: {e}")
 
     try:
         privacy_findings = scan_directory_for_privacy(REPO_ROOT / "publication" / "out" / "site")
         if privacy_findings:
             errors.extend(f"Privacy: {f}" for f in privacy_findings[:5])
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         errors.append(f"Privacy scan failed: {e}")
     return errors
 
@@ -169,14 +156,14 @@ def _verify_compat_and_site() -> list[str]:
         for version, compat_errors in results.items():
             if compat_errors:
                 errors.append(f"Explorer compatibility failed for v{version}: {compat_errors}")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         errors.append(f"Explorer compatibility check failed: {e}")
 
     try:
         site_errors = verify_site_directory(REPO_ROOT / "publication" / "out" / "site")
         if site_errors:
             errors.append(f"Shadow site verification: {site_errors[:3]}")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         errors.append(f"Shadow site verification failed: {e}")
     return errors
 

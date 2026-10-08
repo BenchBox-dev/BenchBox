@@ -1,5 +1,3 @@
-"""Unit tests for core database manager utilities."""
-
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
@@ -27,7 +25,7 @@ def test_core_check_connection_delegates_to_adapter():
         memory_available_gb=12.0,
         python_version="3.11",
         disk_space_gb=256.0,
-        timestamp=datetime.now(),  # Pydantic requires datetime, not None
+        timestamp=datetime.now(),
         hostname="host",
     )
 

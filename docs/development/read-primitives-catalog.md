@@ -15,9 +15,10 @@ queries:
   - id: aggregation_distinct
     category: aggregation
     sql: |-
-      -- Distinct count of high cardinality key on a large table
       SELECT ...
 ```
+
+In the real catalog the SQL for `aggregation_distinct` is a distinct count of a high-cardinality key on a large table.
 
 * `id` - unique identifier referenced by benchmarks and tests.
 * `category` - lower-case grouping used for `get_queries_by_category`; omit to
@@ -42,7 +43,6 @@ Define alternative SQL for specific platforms using the `variants` field:
 - id: json_aggregates
   category: json
   sql: |-
-    -- Standard SQL version (MySQL syntax)
     SELECT
         p_brand,
         JSON_ARRAYAGG(p_name) as part_names,
@@ -75,6 +75,8 @@ Define alternative SQL for specific platforms using the `variants` field:
       ORDER BY p_brand
       LIMIT 100
 ```
+
+The base `sql` uses standard MySQL syntax.
 
 **When to use variants:**
 - Platform uses different function names (e.g., `JSON_ARRAYAGG` vs `JSON_GROUP_ARRAY`)
@@ -177,7 +179,6 @@ For a complete reference of all current skips, their root causes, and instructio
 - id: timeseries_trend_analysis
   category: timeseries
   sql: |-
-    -- Standard SQL with nested aggregate in REGR_SLOPE
     SELECT
         DATE_TRUNC('month', o_orderdate) as order_month,
         COUNT(*) as order_count,
@@ -204,6 +205,8 @@ For a complete reference of all current skips, their root causes, and instructio
       FROM monthly_totals
       ORDER BY order_month
 ```
+
+The base `sql` is standard SQL with a nested aggregate inside `REGR_SLOPE`.
 
 This example shows:
 - Structural changes (base query → CTE with window function)

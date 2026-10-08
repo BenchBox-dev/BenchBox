@@ -1,12 +1,3 @@
-"""Unit tests for the DuckLake DDL_OPTIMIZE registry rule.
-
-Verifies the registered ``strip_primary_keys`` rule has the correct rule_id,
-action type, payload type, and that its transformer_id names a callable
-method on DuckLakeAdapter through which _rewrite_schema_statement routes.
-These are governance/structure tests; behavioral tests live in
-tests/unit/platforms/test_ducklake_adapter.py.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -37,8 +28,6 @@ def ducklake_decisions():
 
 
 class TestDuckLakeRuleStructure:
-    """The single registered rule has the correct structure."""
-
     def test_exactly_one_rule_registered(self, ducklake_decisions):
         assert [d.rule_id for d in ducklake_decisions] == ["ddl_optimize.ducklake.all.strip_primary_keys"]
 

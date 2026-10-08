@@ -1,11 +1,3 @@
-/**
- * The per-query pass view.
- *
- * Every figure is computed from the run's own executions and captioned with
- * the reduction it performed, so nothing here can disagree with the executions
- * displayed beside it.
- */
-
 import { render, screen, fireEvent, within } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 
@@ -41,8 +33,6 @@ describe("summarizeQueryPasses", () => {
   });
 
   it("excludes failed executions from every warm figure", () => {
-    // A failed execution is not a measurement. Including it would let a fast
-    // failure look like a fast query.
     const s = summarizeQueryPasses([
       exec("Q1", 10, "measurement", 1),
       exec("Q1", 1, "measurement", 2, "fail"),
@@ -72,9 +62,6 @@ describe("summarizeQueryPasses", () => {
   });
 
   it("reports the warmup ratio as absent, never estimated, with no warmup", () => {
-    // w0 measured a corpus p50 of 1.01x, so 1.0 would be a plausible-looking
-    // default -- which is exactly why it must not be one. A run with no warmup
-    // has no penalty to report.
     const s = summarizeQueryPasses([exec("Q1", 10, "measurement", 1)])[0]!;
     expect(s.warmupMs).toBeNull();
     expect(s.warmupRatio).toBeNull();
@@ -107,8 +94,6 @@ describe("rendering", () => {
   ];
 
   it("names the reduction it performed rather than promising a penalty", () => {
-    // The corpus p50 warmup ratio is 1.01x. A caption promising a penalty
-    // would leave a reader thinking a 1.00x column was broken.
     render(<PassStrip queries={withWarmup} />);
     expect(screen.getByText(/median of this run's passing measurement passes/)).toBeTruthy();
   });

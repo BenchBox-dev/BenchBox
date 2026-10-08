@@ -1,5 +1,3 @@
-"""End-to-end tests for running the BenchBox CLI via subprocess."""
-
 from __future__ import annotations
 
 import os
@@ -15,7 +13,6 @@ pytestmark = [
 ]
 
 
-# Check for optional dependencies
 try:
     import clickhouse_driver
 
@@ -43,9 +40,7 @@ def test_cli_version_command_reports_versions():
 
 
 def _prepare_clickhouse_stub(stub_root: Path) -> Path:
-    """Create a minimal chdb and clickhouse_driver stub so subprocess imports succeed."""
 
-    # Create chDB stub
     chdb_package_dir = stub_root / "chdb"
     session_dir = chdb_package_dir / "session"
     session_dir.mkdir(parents=True, exist_ok=True)
@@ -102,7 +97,7 @@ def _prepare_clickhouse_stub(stub_root: Path) -> Path:
 @pytest.mark.platform_smoke
 @pytest.mark.parametrize("database", ["duckdb", "sqlite", "clickhouse-local"])
 def test_cli_dry_run_generates_expected_artifacts(tmp_path: Path, database: str):
-    # Skip clickhouse test if driver not available
+
     if database == "clickhouse-local" and not CLICKHOUSE_DRIVER_AVAILABLE:
         pytest.skip("clickhouse-driver not installed")
     output_dir = tmp_path / f"dry_run_{database}"
@@ -125,13 +120,13 @@ def test_cli_dry_run_generates_expected_artifacts(tmp_path: Path, database: str)
     if database == "clickhouse-local":
         chdb_path = tmp_path / "chdb_store"
         chdb_path.mkdir()
-        # clickhouse-local forces local deployment, so no mode option is needed.
+
         args.extend(
             [
                 "--platform-option",
                 f"data_path={chdb_path / 'benchbox.chdb'}",
                 "--platform-option",
-                "driver_auto_install=false",  # Disable auto-install for test
+                "driver_auto_install=false",
             ]
         )
 

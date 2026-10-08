@@ -1,5 +1,3 @@
-"""Unit policy coverage for MCP telemetry configuration."""
-
 from __future__ import annotations
 
 import pytest

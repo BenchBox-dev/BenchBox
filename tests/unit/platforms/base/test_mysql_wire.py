@@ -1,5 +1,3 @@
-"""Tests for mysql_wire platform base utilities."""
-
 from __future__ import annotations
 
 import pytest
@@ -13,8 +11,6 @@ pytestmark = [
 
 
 class TestSplitSqlStatements:
-    """Test statement splitting with comments, quotes, and semicolons."""
-
     def test_single_statement_without_semicolon(self):
         assert split_sql_statements("SELECT 1") == ["SELECT 1"]
 
@@ -60,6 +56,5 @@ class TestSplitSqlStatements:
         assert split_sql_statements("   \n\t  ") == []
 
     def test_unclosed_block_comment_ending_in_star_does_not_crash(self):
-        # The block-comment scanner once read past the end of the string
-        # when an unterminated comment ended in "*".
+
         assert split_sql_statements("/* banner *") == ["/* banner *"]

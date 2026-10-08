@@ -1,24 +1,6 @@
-"""Resolver-marker <-> coverage-parser round-trip.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-From the 2026-07-12 tuning review, finding R7: `benchbox/core/tuning/
-coverage.py`'s `status_from_log_text` classifies UAT logs by matching
-hand-written marker substrings (`"Tuning: auto-discovered template"`,
-`"Tuning: using basic constraints"`, `"Tuning disabled:"`) against whatever
-`benchbox/cli/tuning_resolver.py`'s `resolve_tuning()` actually printed. Both
-sides had zero coverage tying them together, so a resolver wording change
-could silently break the UAT coverage matrix without either module's own
-tests noticing.
-
-This module calls the real `resolve_tuning()` (via its private `_resolve_*`
-entry points, exercised through the public `resolve_tuning()` dispatcher) to
-produce actual `TuningResolution.info_messages`, then feeds that real text
-into `coverage.py`'s real `status_from_log_text()` -- no hand-written marker
-strings appear on either side of the assertion.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -44,9 +26,7 @@ def mock_console():
 
 
 def _resolution_log_text(resolution) -> str:
-    """Reconstruct the text coverage.py would see in a UAT log: the resolver's
-    own info messages, exactly as `display_tuning_resolution` prints them.
-    """
+
     return "\n".join(resolution.info_messages)
 
 
@@ -119,11 +99,7 @@ class TestResolverMarkerFeedsCoverageParser:
         assert status == TUNED_TEMPLATE
 
     def test_auto_mode_is_not_misclassified_as_any_coverage_status(self, mock_console) -> None:
-        # `--tuning auto`'s info message ("Tuning mode: auto (using smart
-        # defaults...)") doesn't correspond to any of coverage.py's three
-        # UAT-log statuses -- it's a distinct resolution mode entirely. Pin
-        # that the parser correctly reports "no opinion" (None) rather than
-        # accidentally substring-matching one of the three markers.
+
         resolution = resolve_tuning(
             tuning_arg="auto",
             platform="duckdb",

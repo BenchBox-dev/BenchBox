@@ -27,8 +27,10 @@ This document provides guidelines and instructions for contributing.
 2. Install the package in development mode:
 
    ```bash
-   make develop          # equivalent to: uv sync --group dev
+   make develop
    ```
+
+   `make develop` is equivalent to `uv sync --group dev`.
 
 3. Install the pre-commit + pre-push hooks:
 
@@ -66,20 +68,25 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → arm
 2. **Make your changes.** Iterate with the fast lane:
 
    ```bash
-   make test              # fast lane (~1 min)
-   make format            # ruff format .
-   make lint              # ruff check .
-   make typecheck         # ty check
+   make test
+   make format
+   make lint
+   make typecheck
    ```
+
+   `make test` runs the fast lane (about a minute); `make format` runs `ruff format .`, `make lint` runs
+   `ruff check .`, and `make typecheck` runs `ty check`.
 
    The pre-commit hook re-runs format/lint/etc. at commit time, so if you forget, the commit will fix or block as appropriate.
 
 3. **Commit using [Conventional Commits](https://www.conventionalcommits.org/)** (`feat:`, `fix:`, `docs:`, `test:`, `chore:`, `ci:`, `refactor:`):
 
    ```bash
-   git add path/to/file.py path/to/test.py    # explicit paths, never -A
+   git add path/to/file.py path/to/test.py
    git commit -m "fix: resolve race in foo loader"
    ```
+
+   Stage explicit paths; never use `git add -A`.
 
 4. **Run the local preflight, then open the PR:**
 
@@ -88,13 +95,17 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → arm
    make pr-open
    ```
 
-   `make pr-open` refuses to run from `develop` or `release`.
+   `make pr-preflight` runs the local lint and the path-aware content guard or fast tests. `make pr-open` pushes and
+   runs `gh pr create --base develop`; it refuses to run from `develop` or `release`.
 
 5. **Arm it and monitor until it merges:**
 
    ```bash
-   make pr-arm            # PR=<n> optional; refuses on a hold label, requested changes, a draft, or a head that is not pushed
+   make pr-arm
    ```
+
+   `PR=<n>` is optional. `make pr-arm` refuses on a hold label, requested changes, a draft, or a head that is not
+   pushed.
 
    `make pr-arm` reads the live PR first, so a `no-auto-merge` label or a requested change stops it instead of
    being mistaken for a failing check; remove a hold deliberately to release it. Before editing an armed PR,
@@ -110,10 +121,14 @@ The canonical loop is **branch → edit → preflight → `make pr-open` → arm
 6. **After merge**, remove the clean linked worktree. The remote branch normally auto-deletes through the repository setting; sweep stale local branches separately:
 
    ```bash
-   make worktree-remove WORKTREE_PATH="$WORKTREE_PATH"   # removes the linked worktree
-   make branch-prune-merged DRY_RUN=1                      # preview branches with complete historical merge evidence (requires gh)
-   make branch-prune-merged                                # delete only exact, merge-reachable historical heads
+   make worktree-remove WORKTREE_PATH="$WORKTREE_PATH"
+   make branch-prune-merged DRY_RUN=1
+   make branch-prune-merged
    ```
+
+   `make worktree-remove` removes the linked worktree. `make branch-prune-merged DRY_RUN=1` previews branches with
+   complete historical merge evidence (it requires `gh`); without `DRY_RUN` it deletes only exact, merge-reachable
+   historical heads.
 
    Inspect open PRs at any time with `make pr-status`.
 
@@ -161,21 +176,28 @@ markers, parallel-run rules, and troubleshooting.
 We use pytest for testing. Common testing commands:
 
 ```bash
-make test              # Fast local run (no coverage)
-make test-unit         # Run unit tests only
-make test-integration  # Run integration tests only
-make test-fast         # Run fast tests (< 1 sec)
-make test-ci           # CI profile with coverage + reports
+make test
+make test-unit
+make test-integration
+make test-fast
+make test-ci
 ```
+
+`make test` is a fast local run without coverage. `make test-unit` and `make test-integration` run only unit or
+integration tests, `make test-fast` runs tests marked fast (under a second), and `make test-ci` is the CI profile with
+coverage and reports.
 
 The default `pytest.ini` is optimized for quick local feedback. Use the CI profile when you need coverage, HTML reports,
 or JUnit XML output.
 
 ```bash
-uv run -- python -m pytest                     # Fast local run
-uv run -- python -m pytest -c pytest-ci.ini    # CI-equivalent instrumentation
-uv run -- python -m pytest -m fast             # Fast tests only
+uv run -- python -m pytest
+uv run -- python -m pytest -c pytest-ci.ini
+uv run -- python -m pytest -m fast
 ```
+
+The first command is the fast local run, the second uses the CI-equivalent instrumentation, and the third runs only
+fast tests.
 
 The collection hook applies simple defaults: tests in `tests/unit` automatically receive the `unit` and `fast` markers, `tests/integration` receive `integration` with a default `medium` speed, and files in `tests/performance` are marked `performance` and `slow`. Add explicit markers to override those defaults for individual tests.
 

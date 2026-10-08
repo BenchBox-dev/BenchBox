@@ -1,9 +1,6 @@
-"""Core configuration utilities shared across CLI and unified runner.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import argparse
 import json
@@ -19,15 +16,6 @@ from benchbox.utils.printing import emit
 
 
 def deep_merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    """Deep merge two dictionaries, with override values taking precedence.
-
-    Args:
-        base: Base dictionary to merge into
-        override: Dictionary containing override values
-
-    Returns:
-        New dictionary with merged values
-    """
     result = base.copy()
 
     for key, value in override.items():
@@ -40,18 +28,6 @@ def deep_merge_dicts(base: dict[str, Any], override: dict[str, Any]) -> dict[str
 
 
 def load_config_file(config_path: Union[str, Path]) -> dict[str, Any]:
-    """Load configuration from YAML or JSON file.
-
-    Args:
-        config_path: Path to the configuration file
-
-    Returns:
-        Dictionary containing configuration data
-
-    Raises:
-        ValueError: If the file cannot be loaded or parsed
-        FileNotFoundError: If the file does not exist
-    """
     config_path = Path(config_path)
 
     if not config_path.exists():
@@ -61,13 +37,11 @@ def load_config_file(config_path: Union[str, Path]) -> dict[str, Any]:
         with open(config_path, encoding="utf-8") as f:
             file_content = f.read()
 
-        # Try to determine file format and parse
         if config_path.suffix.lower() in [".yaml", ".yml"]:
             config_data = yaml.safe_load(file_content)
         elif config_path.suffix.lower() == ".json":
             config_data = json.loads(file_content)
         else:
-            # Try both formats
             try:
                 config_data = yaml.safe_load(file_content)
             except yaml.YAMLError:
@@ -82,19 +56,8 @@ def load_config_file(config_path: Union[str, Path]) -> dict[str, Any]:
 
 
 def save_config_file(config_data: dict[str, Any], config_path: Union[str, Path], format: str = "yaml") -> None:
-    """Save configuration to YAML or JSON file.
-
-    Args:
-        config_data: Configuration data to save
-        config_path: Path where to save the configuration
-        format: File format ('yaml' or 'json')
-
-    Raises:
-        ValueError: If the format is not supported
-    """
     config_path = Path(config_path)
 
-    # Create directory if it doesn't exist
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -113,19 +76,7 @@ def save_config_file(config_data: dict[str, Any], config_path: Union[str, Path],
 def build_benchmark_config(
     args_or_config: Union[Any, dict[str, Any]], platform: Optional[str] = None
 ) -> dict[str, Any]:
-    """Build benchmark configuration from CLI args or config dict.
-
-    Supports both argparse Namespace objects and plain dictionaries.
-
-    Args:
-        args_or_config: Either an argparse Namespace or a config dictionary
-        platform: Platform name (optional, used for output dir logic)
-
-    Returns:
-        Dictionary containing benchmark configuration
-    """
     if isinstance(args_or_config, dict):
-        # Dict-based configuration (e.g., from unified runner)
         config = args_or_config
         benchmark_config = {
             "scale_factor": config.get("scale_factor", 0.01),
@@ -148,7 +99,6 @@ def build_benchmark_config(
             benchmark_config.update({"compress_data": True, "compression_type": "zstd"})
 
     else:
-        # Argparse Namespace object (e.g., from CLI)
         args = args_or_config
         benchmark_config = {
             "scale_factor": getattr(args, "scale", 0.01),
@@ -180,22 +130,9 @@ def build_platform_adapter_config(
     benchmark_name: Optional[str] = None,
     scale_factor: Optional[float] = None,
 ) -> dict[str, Any]:
-    """Build platform adapter configuration from CLI args or config dict.
-
-    Args:
-        platform: Platform name (e.g., 'duckdb', 'databricks', 'clickhouse')
-        args_or_config: Either an argparse Namespace or a config dictionary
-        system_profile: System profile object (optional)
-        benchmark_name: Benchmark name (optional)
-        scale_factor: Scale factor (optional)
-
-    Returns:
-        Dictionary containing platform adapter configuration
-    """
     platform = platform.lower()
     cfg = {}
 
-    # Extract values from args or config
     if isinstance(args_or_config, dict):
         config = args_or_config
 
@@ -208,7 +145,6 @@ def build_platform_adapter_config(
             return getattr(args, key, default)
 
     if platform == "duckdb":
-        # Database path: use provided or generate
         db_path = get_value("duckdb_database_path")
         if not db_path:
             from benchbox.utils.path_utils import get_benchmark_runs_databases_path
@@ -226,12 +162,10 @@ def build_platform_adapter_config(
         cfg["force_recreate"] = bool(get_value("force", False))
 
     elif platform == "datafusion":
-        # Working directory: use provided or generate
         working_dir = get_value("datafusion_working_dir")
         if working_dir:
             cfg["working_dir"] = working_dir
 
-        # Map DataFusion-specific CLI arguments to config keys
         cfg["memory_limit"] = get_value("datafusion_memory_limit", "16G")
         cfg["partitions"] = get_value("datafusion_partitions")
         cfg["format"] = get_value("datafusion_format", "parquet")
@@ -281,28 +215,10 @@ def build_platform_adapter_config(
 
 
 def validate_config_sections(config: dict[str, Any], required_sections: list) -> bool:
-    """Validate that a configuration contains required sections.
-
-    Args:
-        config: Configuration dictionary to validate
-        required_sections: List of required section names
-
-    Returns:
-        True if all required sections are present, False otherwise
-    """
     return all(section in config for section in required_sections)
 
 
 def validate_numeric_config(config: dict[str, Any], validations: dict[str, Any]) -> list:
-    """Validate numeric configuration values.
-
-    Args:
-        config: Configuration dictionary to validate
-        validations: Dictionary of key -> (min_val, max_val, required) tuples
-
-    Returns:
-        List of validation error messages (empty if all valid)
-    """
     errors = []
 
     for key, (min_val, max_val, required) in validations.items():
@@ -329,17 +245,6 @@ def validate_numeric_config(config: dict[str, Any], validations: dict[str, Any])
 def _get_default_output_dir(
     platform: Optional[str], benchmark_name: Optional[str], scale_factor: float, data_path: Optional[str] = None
 ) -> Optional[str]:
-    """Get default output directory based on platform.
-
-    Args:
-        platform: Platform name
-        benchmark_name: Benchmark name
-        scale_factor: Scale factor
-        data_path: Custom data path (for ClickHouse)
-
-    Returns:
-        Default output directory path or None
-    """
     if not platform or not benchmark_name:
         return None
 
@@ -355,26 +260,14 @@ def _get_default_output_dir(
 
 
 def load_platform_config(platform: str, config_path: Optional[str] = None, verbose: bool = False) -> dict[str, Any]:
-    """Load platform configuration from YAML file or use defaults.
-
-    Args:
-        platform: Platform name
-        config_path: Optional explicit config file path
-        verbose: Whether to print configuration choices
-
-    Returns:
-        Platform configuration dictionary
-    """
     config = {}
 
     if config_path:
-        # Explicit config file specified
         config_file = Path(config_path)
         if not config_file.exists():
             raise FileNotFoundError(f"Platform config file not found: {config_path}")
         source = f"file: {config_path}"
     else:
-        # Try to find default config file
         config_file = Path(f"examples/config/{platform}.yaml")
         if config_file.exists():
             source = f"default file: {config_file}"
@@ -387,16 +280,13 @@ def load_platform_config(platform: str, config_path: Optional[str] = None, verbo
         with open(config_file, encoding="utf-8") as f:
             yaml_config = yaml.safe_load(f)
             if yaml_config and isinstance(yaml_config, dict):
-                # Extract connection and settings from YAML structure
                 connection_config = yaml_config.get("connection", {})
                 settings_config = yaml_config.get("settings", {})
 
-                # Merge connection extra_params into main config
                 config.update(connection_config)
                 if "extra_params" in connection_config:
                     config.update(connection_config["extra_params"])
 
-                # Add settings
                 config.update(settings_config)
 
                 if verbose:
@@ -412,19 +302,7 @@ def load_platform_config(platform: str, config_path: Optional[str] = None, verbo
 def load_tuning_config(
     platform: str, benchmark: str, tuning_mode: str, verbose: bool = False
 ) -> Optional[dict[str, Any]]:
-    """Load tuning configuration based on mode.
-
-    Args:
-        platform: Platform name
-        benchmark: Benchmark name
-        tuning_mode: Either 'tuned', 'notuning', or path to custom config file
-        verbose: Whether to print configuration choices
-
-    Returns:
-        Tuning configuration dictionary or None
-    """
     if tuning_mode in ["tuned", "notuning"]:
-        # Auto-select based on platform/benchmark
         config_file = Path(f"examples/tunings/{platform}/{benchmark}_{tuning_mode}.yaml")
         if not config_file.exists():
             if verbose:
@@ -433,7 +311,6 @@ def load_tuning_config(
             return None
         source = f"auto-selected: {config_file}"
     else:
-        # Custom file path provided
         config_file = Path(tuning_mode)
         if not config_file.exists():
             raise FileNotFoundError(f"Tuning config file not found: {tuning_mode}")
@@ -460,59 +337,32 @@ def merge_all_configs(
     platform_config_path: Optional[str] = None,
     verbose: bool = False,
 ) -> dict[str, Any]:
-    """Merge configurations from all sources with proper precedence.
-
-    Precedence order (highest to lowest):
-    1. CLI arguments (highest priority)
-    2. Tuning YAML files
-    3. Platform YAML files
-    4. Built-in defaults (lowest priority)
-
-    Args:
-        platform: Platform name
-        benchmark: Benchmark name
-        args: Parsed command line arguments
-        tuning_mode: Tuning mode ('tuned', 'notuning', or file path)
-        platform_config_path: Optional explicit platform config path
-        verbose: Whether to print merge details
-
-    Returns:
-        Unified configuration dictionary
-    """
     config = {}
 
-    # 1. Start with built-in defaults (lowest priority)
     defaults = get_builtin_defaults(platform, benchmark)
     config.update(defaults)
     if verbose:
         emit("✅ Applied built-in defaults")
 
-    # 2. Apply platform configuration
     platform_config = load_platform_config(platform, platform_config_path, verbose)
     config.update(platform_config)
 
-    # 3. Apply tuning configuration
     tuning_config = load_tuning_config(platform, benchmark, tuning_mode, verbose)
     if tuning_config:
         config.update(tuning_config)
-        config["tuning_config"] = tuning_config  # Keep original for compatibility
+        config["tuning_config"] = tuning_config
 
-    # 4. Apply CLI arguments (highest priority)
     cli_config = extract_cli_config(args)
     config.update(cli_config)
-    # Normalize CLI aliases
     if "scale" in config:
-        # Map CLI --scale to internal scale_factor
         config["scale_factor"] = config["scale"]
     if verbose:
         emit("✅ Applied CLI arguments")
 
-    # Add convenience fields
     config["platform"] = platform
     config["benchmark"] = benchmark
     config["verbose_enabled"] = config.get("verbose", 0) > 0
     config["very_verbose"] = config.get("verbose", 0) > 1
-    # Quiet mode suppresses all verbosity
     if config.get("quiet", False):
         config["verbose_enabled"] = False
         config["very_verbose"] = False
@@ -521,9 +371,7 @@ def merge_all_configs(
 
 
 def get_builtin_defaults(platform: str, benchmark: str) -> dict[str, Any]:
-    """Get built-in default configuration values."""
     defaults = {
-        # Common defaults
         "scale_factor": 0.01,
         "phases": "power",
         "verbose": 0,
@@ -535,7 +383,6 @@ def get_builtin_defaults(platform: str, benchmark: str) -> dict[str, Any]:
         "force_regenerate": False,
     }
 
-    # Platform-specific defaults
     if platform == "duckdb":
         defaults.update(
             {
@@ -606,15 +453,12 @@ def get_builtin_defaults(platform: str, benchmark: str) -> dict[str, Any]:
 
 
 def extract_cli_config(args: argparse.Namespace) -> dict[str, Any]:
-    """Extract configuration values from CLI arguments."""
     config = {}
 
-    # Convert namespace to dict, filtering out None values
     for key, value in vars(args).items():
         if value is not None:
             config[key] = value
 
-    # Handle special mappings for consistency
     if "duckdb_database_path" in config:
         config["database_path"] = config["duckdb_database_path"]
     if "sqlite_database_path" in config:
@@ -622,7 +466,6 @@ def extract_cli_config(args: argparse.Namespace) -> dict[str, Any]:
     if "data_path" in config:
         config["data_path"] = config["data_path"]
 
-    # Map platform-specific arguments to standard names
     platform_mappings = {
         "server_hostname": "server_hostname",
         "http_path": "http_path",

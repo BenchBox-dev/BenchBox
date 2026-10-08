@@ -1,9 +1,3 @@
-"""Utilities for normalizing output paths for data generation.
-
-Ensures remote and local output roots append the dataset suffix
-<benchmark>_<sf> consistently (e.g., tpch_sf01), matching local defaults.
-"""
-
 from __future__ import annotations
 
 from .scale_factor import format_scale_factor
@@ -20,11 +14,7 @@ def _ensure_suffix(root: str, suffix: str) -> str:
 
 
 def normalize_output_root(output_root: str | None, benchmark: str, scale: float) -> str | None:
-    """Append <benchmark>_<sf> to output root if not present.
 
-    Works for local paths and remote URIs (dbfs:/, s3://, gs://, abfss://).
-    Idempotent: if the suffix is already present, returns the original root.
-    """
     if not output_root:
         return output_root
 

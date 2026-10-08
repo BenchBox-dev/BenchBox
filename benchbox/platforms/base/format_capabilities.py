@@ -1,9 +1,3 @@
-"""Format capability detection and platform compatibility mappings.
-
-This module defines which table formats are supported by each platform and provides
-utilities for format selection and capability queries.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,26 +6,14 @@ from typing import Any, Mapping
 
 
 class SupportLevel(Enum):
-    """Level of support for a table format on a platform."""
-
-    NATIVE = "native"  # Full native support
-    EXTENSION = "extension"  # Requires extension/plugin
-    EXPERIMENTAL = "experimental"  # Experimental support, may be unstable
-    NOT_SUPPORTED = "not_supported"  # Format not supported
+    NATIVE = "native"
+    EXTENSION = "extension"
+    EXPERIMENTAL = "experimental"
+    NOT_SUPPORTED = "not_supported"
 
 
 @dataclass(frozen=True)
 class FormatCapability:
-    """Capability information for a table format.
-
-    Attributes:
-        format_name: Name of the format (e.g., 'parquet', 'delta', 'iceberg')
-        display_name: Human-readable name (e.g., 'Apache Parquet', 'Delta Lake')
-        file_extension: File extension or directory marker
-        features: Set of supported features
-        supported_platforms: Dict mapping platform name to support level
-    """
-
     format_name: str
     display_name: str
     file_extension: str
@@ -39,7 +21,6 @@ class FormatCapability:
     supported_platforms: dict[str, SupportLevel]
 
 
-# Define format capabilities
 PARQUET_CAPABILITY = FormatCapability(
     format_name="parquet",
     display_name="Apache Parquet",
@@ -61,9 +42,6 @@ PARQUET_CAPABILITY = FormatCapability(
         "bigquery": SupportLevel.NATIVE,
         "redshift": SupportLevel.NATIVE,
         "postgresql": SupportLevel.EXTENSION,
-        # Inherits the PostgreSQL pyarrow->COPY Parquet load path
-        # (see _write_parquet_to_copy); the embedded DuckDB engine is not
-        # used for file reads.
         "pg_duckdb": SupportLevel.EXTENSION,
         "sqlite": SupportLevel.EXTENSION,
         "spark": SupportLevel.NATIVE,
@@ -86,7 +64,7 @@ PARQUET_CAPABILITY = FormatCapability(
 DELTA_CAPABILITY = FormatCapability(
     format_name="delta",
     display_name="Delta Lake",
-    file_extension="",  # Delta is directory-based
+    file_extension="",
     features={
         "time_travel",
         "acid_transactions",
@@ -97,33 +75,25 @@ DELTA_CAPABILITY = FormatCapability(
     },
     supported_platforms={
         "databricks": SupportLevel.NATIVE,
-        "duckdb": SupportLevel.EXTENSION,  # delta extension
-        # NOTE: pg_duckdb is deliberately absent here. The embedded engine could
-        # read Delta via the DuckDB delta extension, but BenchBox has no adapter
-        # read path for it, and this registry gates FormatSelector dispatch -
-        # registering it would turn a clean up-front rejection into a late
-        # load failure. See docs/platforms/pg_duckdb.md.
-        "datafusion": SupportLevel.EXTENSION,  # via deltalake Python library
-        "trino": SupportLevel.EXTENSION,  # via delta catalog connector
-        "presto": SupportLevel.EXTENSION,  # via delta catalog connector
-        "spark": SupportLevel.EXTENSION,  # via delta-spark package
-        "emr-serverless": SupportLevel.EXTENSION,  # via delta-spark on EMR
-        "dataproc": SupportLevel.EXTENSION,  # via delta-spark on Dataproc
-        "dataproc-serverless": SupportLevel.EXTENSION,  # via delta-spark on Dataproc Serverless
-        "fabric-spark": SupportLevel.NATIVE,  # delta native on Fabric
-        "synapse-spark": SupportLevel.NATIVE,  # delta native on Synapse Spark pools
-        "athena-spark": SupportLevel.EXTENSION,  # via delta-spark on Athena Spark
-        "quanton": SupportLevel.EXTENSION,  # via delta-spark on Quanton
-        # NOTE: snowflake, clickhouse, redshift, bigquery, fabric-lakehouse
-        # support delta on the platform but BenchBox default loading flows still lack
-        # safe end-to-end format selection for those adapters.
+        "duckdb": SupportLevel.EXTENSION,
+        "datafusion": SupportLevel.EXTENSION,
+        "trino": SupportLevel.EXTENSION,
+        "presto": SupportLevel.EXTENSION,
+        "spark": SupportLevel.EXTENSION,
+        "emr-serverless": SupportLevel.EXTENSION,
+        "dataproc": SupportLevel.EXTENSION,
+        "dataproc-serverless": SupportLevel.EXTENSION,
+        "fabric-spark": SupportLevel.NATIVE,
+        "synapse-spark": SupportLevel.NATIVE,
+        "athena-spark": SupportLevel.EXTENSION,
+        "quanton": SupportLevel.EXTENSION,
     },
 )
 
 ICEBERG_CAPABILITY = FormatCapability(
     format_name="iceberg",
     display_name="Apache Iceberg",
-    file_extension="",  # Iceberg is directory-based
+    file_extension="",
     features={
         "time_travel",
         "partition_evolution",
@@ -132,22 +102,18 @@ ICEBERG_CAPABILITY = FormatCapability(
         "snapshot_management",
     },
     supported_platforms={
-        "duckdb": SupportLevel.EXPERIMENTAL,  # iceberg extension
-        # NOTE: pg_duckdb is deliberately absent here, for the same reason as
-        # Delta above - no adapter read path, and this registry gates dispatch.
-        "datafusion": SupportLevel.EXTENSION,  # via pyiceberg Python library
-        "trino": SupportLevel.EXTENSION,  # via iceberg catalog connector
-        "presto": SupportLevel.EXTENSION,  # via iceberg catalog connector
-        "spark": SupportLevel.EXTENSION,  # via iceberg-spark-runtime
-        "emr-serverless": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on EMR
-        "dataproc": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on Dataproc
-        "dataproc-serverless": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on Dataproc Serverless
-        "synapse-spark": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on Synapse
-        "fabric-spark": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on Fabric
-        "athena-spark": SupportLevel.EXTENSION,  # via iceberg-spark-runtime on Athena Spark
-        "quanton": SupportLevel.NATIVE,  # Iceberg is primary format
-        # NOTE: snowflake, clickhouse support iceberg on the platform but BenchBox
-        # does not yet expose mode-aware format selection for those adapters.
+        "duckdb": SupportLevel.EXPERIMENTAL,
+        "datafusion": SupportLevel.EXTENSION,
+        "trino": SupportLevel.EXTENSION,
+        "presto": SupportLevel.EXTENSION,
+        "spark": SupportLevel.EXTENSION,
+        "emr-serverless": SupportLevel.EXTENSION,
+        "dataproc": SupportLevel.EXTENSION,
+        "dataproc-serverless": SupportLevel.EXTENSION,
+        "synapse-spark": SupportLevel.EXTENSION,
+        "fabric-spark": SupportLevel.EXTENSION,
+        "athena-spark": SupportLevel.EXTENSION,
+        "quanton": SupportLevel.NATIVE,
     },
 )
 
@@ -162,7 +128,7 @@ VORTEX_CAPABILITY = FormatCapability(
         "statistics",
     },
     supported_platforms={
-        "duckdb": SupportLevel.EXTENSION,  # vortex extension
+        "duckdb": SupportLevel.EXTENSION,
         "datafusion": SupportLevel.EXPERIMENTAL,
     },
 )
@@ -170,7 +136,7 @@ VORTEX_CAPABILITY = FormatCapability(
 HUDI_CAPABILITY = FormatCapability(
     format_name="hudi",
     display_name="Apache Hudi",
-    file_extension="",  # Hudi is directory-based
+    file_extension="",
     features={
         "time_travel",
         "acid_transactions",
@@ -180,18 +146,18 @@ HUDI_CAPABILITY = FormatCapability(
         "merge_on_read",
     },
     supported_platforms={
-        "spark": SupportLevel.EXTENSION,  # via hudi-spark-bundle
-        "quanton": SupportLevel.NATIVE,  # Hudi is primary format
-        "emr-serverless": SupportLevel.EXTENSION,  # via hudi-spark-bundle
-        "dataproc": SupportLevel.EXTENSION,  # via hudi-spark-bundle
-        "dataproc-serverless": SupportLevel.EXTENSION,  # via hudi-spark-bundle
+        "spark": SupportLevel.EXTENSION,
+        "quanton": SupportLevel.NATIVE,
+        "emr-serverless": SupportLevel.EXTENSION,
+        "dataproc": SupportLevel.EXTENSION,
+        "dataproc-serverless": SupportLevel.EXTENSION,
     },
 )
 
 DUCKLAKE_CAPABILITY = FormatCapability(
     format_name="ducklake",
     display_name="DuckLake",
-    file_extension="",  # DuckLake is directory-based
+    file_extension="",
     features={
         "time_travel",
         "acid_transactions",
@@ -201,11 +167,10 @@ DUCKLAKE_CAPABILITY = FormatCapability(
         "column_pruning",
     },
     supported_platforms={
-        "duckdb": SupportLevel.NATIVE,  # DuckLake is DuckDB's native table format
+        "duckdb": SupportLevel.NATIVE,
     },
 )
 
-# Registry of all format capabilities
 CAPABILITIES_REGISTRY: dict[str, FormatCapability] = {
     "parquet": PARQUET_CAPABILITY,
     "delta": DELTA_CAPABILITY,
@@ -215,11 +180,7 @@ CAPABILITIES_REGISTRY: dict[str, FormatCapability] = {
     "ducklake": DUCKLAKE_CAPABILITY,
 }
 
-# Platform format preferences (which format to prefer when multiple available)
 PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
-    # SQL databases: text files (tbl) preferred - always available from TPC generators,
-    # no conversion step required. Parquet preferred over csv as fallback (faster,
-    # schema-aware). Users can override via platform config.
     "duckdb": ["tbl", "parquet", "csv", "ducklake", "vortex", "delta"],
     "datafusion": ["tbl", "parquet", "csv", "delta", "iceberg", "vortex"],
     "clickhouse": ["tbl", "parquet", "csv"],
@@ -227,17 +188,10 @@ PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
     "snowflake": ["tbl", "parquet", "csv"],
     "redshift": ["tbl", "parquet", "csv"],
     "postgresql": ["tbl", "parquet", "csv"],
-    # No delta/iceberg: no adapter read path (see docs/platforms/pg_duckdb.md).
     "pg_duckdb": ["tbl", "parquet", "csv"],
     "sqlite": ["tbl", "parquet", "csv"],
-    # Athena's native load path stages delimited text into S3, then optionally
-    # converts it to Parquet with CTAS. Native loads should not select Parquet
-    # input files directly.
     "athena": ["tbl", "csv"],
-    # Cloud warehouses: parquet preferred - BigQuery native load jobs support parquet,
-    # and columnar input avoids text parsing / schema inference overhead.
     "bigquery": ["parquet", "tbl", "csv"],
-    # Catalog/lakehouse platforms: columnar formats required or strongly preferred
     "databricks": ["delta", "parquet", "tbl", "csv"],
     "trino": ["iceberg", "delta", "parquet", "tbl", "csv"],
     "presto": ["iceberg", "delta", "parquet", "tbl", "csv"],
@@ -247,18 +201,13 @@ PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
     "dataproc-serverless": ["delta", "iceberg", "hudi", "parquet", "tbl", "csv"],
     "synapse-spark": ["delta", "iceberg", "parquet", "tbl", "csv"],
     "athena-spark": ["delta", "iceberg", "parquet", "tbl", "csv"],
-    # fabric-lakehouse is read-only (SQL endpoint); data loaded via fabric-spark
     "fabric-lakehouse": ["parquet", "tbl", "csv"],
     "fabric_dw": ["parquet", "tbl", "csv"],
     "fabric-spark": ["delta", "iceberg", "parquet", "tbl", "csv"],
-    # lakesail uses Spark-based loading; parquet/orc are its native table formats
     "lakesail": ["parquet", "tbl", "csv"],
     "quanton": ["iceberg", "hudi", "delta", "parquet", "tbl", "csv"],
 }
 
-# DEPRECATED: All native-mode platforms now use PLATFORM_FORMAT_PREFERENCES as
-# their default format ordering (see _prefer_platform_defaults in data_loading.py).
-# This set is retained only to avoid breaking any external references.
 PREFER_PLATFORM_FORMAT_ORDER: set[str] = {
     "redshift",
 }
@@ -273,27 +222,13 @@ EXTERNAL_PLATFORM_FORMAT_PREFERENCES: dict[str, list[str]] = {
 
 
 def normalize_platform_key(platform_name: str) -> str:
-    """Normalize a platform display name to a registry key.
-
-    Adapters return display names like 'ClickHouse Cloud' or class names like
-    'EMRServerlessAdapter'. This function maps them to the registry keys used
-    in PLATFORM_FORMAT_PREFERENCES (e.g., 'clickhouse', 'emr-serverless').
-
-    Args:
-        platform_name: Display name or class name from an adapter
-
-    Returns:
-        Normalized registry key
-    """
     import re
 
     key = platform_name.strip().lower()
 
-    # Direct match - most common case
     if key in PLATFORM_FORMAT_PREFERENCES:
         return key
 
-    # Explicit overrides for display names that don't normalize cleanly
     _DISPLAY_NAME_MAP: dict[str, str] = {
         "clickhouse cloud": "clickhouse-cloud",
         "clickhouse (cloud)": "clickhouse-cloud",
@@ -306,18 +241,15 @@ def normalize_platform_key(platform_name: str) -> str:
     if key in _DISPLAY_NAME_MAP:
         return _DISPLAY_NAME_MAP[key]
 
-    # Strip "Adapter" suffix from class names
     if key.endswith("adapter"):
         key = key[: -len("adapter")]
 
-    # Try CamelCase → kebab-case (e.g., "SynapseSpark" → "synapse-spark")
     kebab = re.sub(r"([a-z])([A-Z])", r"\1-\2", platform_name.strip()).lower()
     if kebab.endswith("-adapter"):
         kebab = kebab[: -len("-adapter")]
     if kebab in PLATFORM_FORMAT_PREFERENCES:
         return kebab
 
-    # Handle class names with all-caps prefixes (e.g., "EMRServerlessAdapter")
     _CLASS_NAME_MAP: dict[str, str] = {
         "emrserverless": "emr-serverless",
         "dataprocserverless": "dataproc-serverless",
@@ -329,14 +261,10 @@ def normalize_platform_key(platform_name: str) -> str:
     if key in _CLASS_NAME_MAP:
         return _CLASS_NAME_MAP[key]
 
-    # Replace spaces with hyphens as last resort
     hyphenated = key.replace(" ", "-")
     if hyphenated in PLATFORM_FORMAT_PREFERENCES:
         return hyphenated
 
-    # Underscore/hyphen spelling variance (e.g., CLI "pg-duckdb" vs adapter
-    # "pg_duckdb"). Only reached when the hyphenated spelling is not itself
-    # a registered key, so existing hyphenated keys are unaffected.
     if "-" in key:
         underscored = key.replace("-", "_")
         if underscored in PLATFORM_FORMAT_PREFERENCES:
@@ -427,29 +355,17 @@ def get_supported_formats(
     table_mode: str = "native",
     platform_config: Mapping[str, Any] | None = None,
 ) -> list[str]:
-    """Get list of formats supported by a platform.
-
-    Args:
-        platform_name: Name of the platform (e.g., 'duckdb', 'databricks')
-
-    Returns:
-        List of supported format names, ordered by preference
-    """
     key = normalize_platform_key(platform_name)
     supported = []
 
-    # Get platform's format preference order
     preference_order = _get_preference_order(key, table_mode)
 
-    # Check each format in preference order
     for fmt in preference_order:
         capability = CAPABILITIES_REGISTRY.get(fmt)
         if not capability:
-            # Unknown format (tbl, csv handled separately)
             supported.append(fmt)
             continue
 
-        # Check if platform supports this format
         support_level = _get_support_level(key, fmt, table_mode, platform_config=platform_config)
         if support_level and support_level != SupportLevel.NOT_SUPPORTED:
             supported.append(fmt)
@@ -463,27 +379,14 @@ def get_preferred_format(
     table_mode: str = "native",
     platform_config: Mapping[str, Any] | None = None,
 ) -> str:
-    """Get the preferred format for a platform.
-
-    Args:
-        platform_name: Name of the platform
-        available_formats: Optional list of available formats to choose from.
-                         If None, returns the most preferred supported format.
-
-    Returns:
-        Preferred format name, or 'tbl' if no formats available
-    """
     supported = get_supported_formats(platform_name, table_mode=table_mode, platform_config=platform_config)
 
     if available_formats:
-        # Find first supported format that's also available
         for fmt in supported:
             if fmt in available_formats:
                 return fmt
-        # Fallback to first available format
         return available_formats[0] if available_formats else "tbl"
 
-    # Return most preferred supported format
     return supported[0] if supported else "tbl"
 
 
@@ -493,16 +396,6 @@ def is_format_supported(
     table_mode: str = "native",
     platform_config: Mapping[str, Any] | None = None,
 ) -> bool:
-    """Check if a format is supported on a platform.
-
-    Args:
-        platform_name: Name of the platform
-        format_name: Name of the format
-
-    Returns:
-        True if format is supported (at any level except NOT_SUPPORTED)
-    """
-    # Legacy formats (tbl, csv) are always supported
     if format_name in {"tbl", "csv", "dat"}:
         return True
 
@@ -516,26 +409,9 @@ def is_format_supported(
 
 
 def get_format_capability(format_name: str) -> FormatCapability | None:
-    """Get capability information for a format.
-
-    Args:
-        format_name: Name of the format
-
-    Returns:
-        FormatCapability if format is known, None otherwise
-    """
     return CAPABILITIES_REGISTRY.get(format_name)
 
 
 def has_feature(format_name: str, feature: str) -> bool:
-    """Check if a format supports a specific feature.
-
-    Args:
-        format_name: Name of the format
-        feature: Feature name (e.g., 'time_travel', 'predicate_pushdown')
-
-    Returns:
-        True if format supports the feature
-    """
     capability = get_format_capability(format_name)
     return capability is not None and feature in capability.features

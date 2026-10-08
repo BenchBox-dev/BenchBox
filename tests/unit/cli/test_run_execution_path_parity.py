@@ -10,12 +10,6 @@ from click.testing import CliRunner
 
 from benchbox.cli.main import cli
 
-# benchbox.cli.commands.__init__ re-exports `run` (a Click Command) under the
-# same name as the run submodule.  On Python 3.10 mock's string-based patch()
-# resolves the target via getattr(benchbox.cli.commands, "run"), which returns
-# the Command object, not the submodule.  Seeding sys.modules here via
-# __import__ and using patch.object() avoids the ambiguity on all Python
-# versions.
 __import__("benchbox.cli.commands.run")
 _run_module = _sys.modules["benchbox.cli.commands.run"]
 
@@ -78,7 +72,6 @@ def test_direct_and_non_interactive_direct_use_shared_execution_and_export_helpe
         )
         assert result_non_interactive.exit_code == 0
 
-        # Both direct variants should route through the shared helpers.
         assert mock_execute.call_count == 2
         assert mock_export.call_count == 2
 

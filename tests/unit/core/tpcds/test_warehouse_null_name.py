@@ -1,10 +1,3 @@
-"""Regression coverage for a NULL warehouse name in Q21, Q62, Q66 and Q99.
-
-At scale factor 1 the generated warehouse table has a row whose name is NULL. SQL keeps that row
-as its own group and orders it last. Polars sorted it first, and pandas dropped the group and
-reported NaN where SQL has NULL.
-"""
-
 from __future__ import annotations
 
 from datetime import date
@@ -60,7 +53,7 @@ def test_delivery_queries_keep_and_order_a_null_warehouse_last(
     tables = {
         sales: {
             f"{prefix}_ship_date_sk": [10, 10],
-            f"{prefix}_sold_date_sk": [5, 5],  # shipped in 5 days: the first bucket
+            f"{prefix}_sold_date_sk": [5, 5],
             f"{prefix}_warehouse_sk": [1, 2],
             f"{prefix}_ship_mode_sk": [1, 1],
             site_col: [1, 1],
@@ -85,7 +78,7 @@ def test_q21_keeps_and_orders_a_null_warehouse_last(family, monkeypatch):
         "inventory": {
             "inv_item_sk": [1, 1, 1, 1],
             "inv_warehouse_sk": [1, 1, 2, 2],
-            "inv_date_sk": [1, 2, 1, 2],  # before and after the 1998-04-08 pivot
+            "inv_date_sk": [1, 2, 1, 2],
             "inv_quantity_on_hand": [10, 10, 10, 10],
         },
         "item": {"i_item_sk": [1], "i_item_id": ["ITEM1"], "i_current_price": [1.0]},
@@ -135,10 +128,10 @@ def test_q66_keeps_and_orders_a_null_warehouse_last(family, monkeypatch):
 
     march_sales, march_per_sq_foot = 8 + 2, 8 + 12 + 2
     assert [row[:2] for row in rows] == [("Alpha", 100), (None, None)]
-    assert rows[0][march_sales] == 30.0  # web 10 * 2 plus catalog 5 * 2
+    assert rows[0][march_sales] == 30.0
     assert rows[0][march_per_sq_foot] == pytest.approx(0.3)
     assert rows[1][march_sales] == 30.0
-    assert rows[1][march_per_sq_foot] is None  # dividing by a NULL square footage is NULL
+    assert rows[1][march_per_sq_foot] is None
 
 
 def test_none_for_null_converts_only_columns_that_hold_a_null():
@@ -150,7 +143,7 @@ def test_none_for_null_converts_only_columns_that_hold_a_null():
 
     result = _none_for_null(frame, ["clean", "holey", "name"])
 
-    assert result["clean"].dtype == "float64"  # no NULL: native dtype is kept
+    assert result["clean"].dtype == "float64"
     assert list(result["holey"]) == [1.5, None]
     assert list(result["name"]) == ["a", None]
-    assert frame["holey"].dtype == "float64"  # the input is not modified
+    assert frame["holey"].dtype == "float64"

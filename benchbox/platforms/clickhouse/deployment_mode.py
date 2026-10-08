@@ -1,18 +1,3 @@
-"""Canonical ClickHouse deployment-mode normalization helpers.
-
-Migration Contract (as of 2026-04-11):
-    Three first-class platform names now represent the ClickHouse family:
-    - ``clickhouse-local``  - embedded chDB (in-process, no network)
-    - ``clickhouse-server`` - self-hosted ClickHouse via clickhouse-driver (Docker/dedicated)
-    - ``clickhouse-cloud``  - managed ClickHouse Cloud via clickhouse-connect
-
-    Bare ``clickhouse`` was a compatibility alias during the migration window
-    (shipped v0.2.1). That window has elapsed: bare ``clickhouse`` is now a hard
-    error that names the first-class replacements. The colon-suffix selectors
-    (``clickhouse:local``, ``clickhouse:server``, ``clickhouse:cloud``) remain
-    accepted and emit a DeprecationWarning while routing to the first-class name.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -24,28 +9,19 @@ CLICKHOUSE_DEPLOYMENT_MODE_ALIASES = {
     "embedded": "local",
 }
 
-# ---------------------------------------------------------------------------
-# Migration contract: canonical first-class platform names
-# ---------------------------------------------------------------------------
 
-#: The three first-class ClickHouse platform identifiers.
 CLICKHOUSE_CANONICAL_PLATFORM_NAMES: frozenset[str] = frozenset(
     {"clickhouse-local", "clickhouse-server", "clickhouse-cloud"}
 )
 
-#: Explicit colon-suffix selectors mapped to their canonical first-class names.
-#: Bare ``clickhouse`` is handled separately (deployment-aware).
 CLICKHOUSE_LEGACY_SELECTOR_MAP: dict[str, str] = {
     "clickhouse:local": "clickhouse-local",
     "clickhouse:server": "clickhouse-server",
     "clickhouse:cloud": "clickhouse-cloud",
 }
 
-#: Default canonical platform for bare ``clickhouse`` (matches current default_deployment="local").
 CLICKHOUSE_DEFAULT_CANONICAL_PLATFORM: str = "clickhouse-local"
 
-#: All ClickHouse family platform names, including legacy and first-class.
-#: Use ``is_clickhouse_platform()`` for membership tests instead of direct string comparison.
 _CLICKHOUSE_ALL_PLATFORM_NAMES: frozenset[str] = frozenset(
     {
         "clickhouse",
@@ -58,31 +34,10 @@ _CLICKHOUSE_ALL_PLATFORM_NAMES: frozenset[str] = frozenset(
 
 
 def is_clickhouse_platform(platform: str) -> bool:
-    """Return True if *platform* belongs to the ClickHouse family.
-
-    Accepts all ClickHouse platform names: first-class (``clickhouse-local``,
-    ``clickhouse-server``, ``clickhouse-cloud``), the legacy base name
-    (``clickhouse``), and the internal chDB alias (``chdb``).
-
-    Args:
-        platform: Platform name string (case-insensitive).
-
-    Returns:
-        True if the platform is in the ClickHouse family.
-    """
     return platform.lower() in _CLICKHOUSE_ALL_PLATFORM_NAMES
 
 
 def clickhouse_legacy_selector_warning(selector: str, target: str) -> str:
-    """Return the canonical deprecation message for a legacy ClickHouse selector.
-
-    Args:
-        selector: The legacy selector used (e.g. ``clickhouse``, ``clickhouse:local``).
-        target: The first-class platform name to migrate to.
-
-    Returns:
-        Human-readable deprecation message with migration guidance.
-    """
     return (
         f"ClickHouse selector '{selector}' is deprecated. "
         f"Use '--platform {target}' instead. "
@@ -91,7 +46,6 @@ def clickhouse_legacy_selector_warning(selector: str, target: str) -> str:
 
 
 def clickhouse_cloud_mode_error_message() -> str:
-    """Return the canonical guidance for deprecated base-platform cloud mode."""
     return (
         "ClickHouse Cloud is now a separate first-class platform.\n"
         "Use --platform clickhouse-cloud instead of --platform clickhouse:cloud\n"
@@ -105,26 +59,6 @@ def normalize_clickhouse_deployment_mode(
     default: str = DEFAULT_CLICKHOUSE_DEPLOYMENT_MODE,
     allow_cloud: bool = False,
 ) -> str:
-    """Normalize a ClickHouse deployment selector to canonical values.
-
-    Accepted compatibility inputs:
-    - ``local`` -> ``local``
-    - ``server`` -> ``server``
-    - ``embedded`` -> ``local``
-    - ``True``/``False`` for legacy ``embedded`` booleans -> ``local``/``server``
-
-    Args:
-        value: Raw deployment selector.
-        default: Canonical fallback when value is unset.
-        allow_cloud: Whether the dedicated ClickHouse Cloud adapter may pass through
-            ``cloud`` during its internal initialization path.
-
-    Returns:
-        Canonical deployment mode string.
-
-    Raises:
-        ValueError: If the value is invalid or points to deprecated base-platform cloud mode.
-    """
     if value is None:
         return default
 
@@ -154,14 +88,6 @@ def resolve_clickhouse_deployment_mode(
     default: str = DEFAULT_CLICKHOUSE_DEPLOYMENT_MODE,
     allow_cloud: bool = False,
 ) -> str:
-    """Resolve deployment mode from canonical and legacy ClickHouse config keys.
-
-    Resolution priority is:
-    1. ``deployment_mode`` (canonical)
-    2. ``mode`` (legacy string alias)
-    3. ``embedded`` (legacy bool alias)
-    4. ``default``
-    """
     if (value := config.get("deployment_mode")) not in (None, ""):
         return normalize_clickhouse_deployment_mode(value, default=default, allow_cloud=allow_cloud)
 

@@ -1,9 +1,6 @@
-"""Write Primitives benchmark catalog package.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from benchbox.core.write_primitives.catalog.loader import (
     ValidationQuery,

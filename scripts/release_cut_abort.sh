@@ -1,5 +1,4 @@
 #!/bin/sh
-# Discard only an uncommitted, unpushed cut in its creating linked worktree.
 set -eu
 
 version=${1:?Usage: release_cut_abort.sh X.Y.Z}
@@ -62,8 +61,6 @@ if printf '%s\n' "$status" | grep -q '^?? '; then
   exit 1
 fi
 if [ "$current" = "$branch" ]; then
-  # One switch discards tracked cut edits and returns to the unoccupied branch
-  # recorded when this worktree was created. The primary clone may own develop.
   git switch --discard-changes "$original"
 elif [ -n "$status" ]; then
   echo "Error: the creating branch is dirty; inspect it before retrying abort." >&2

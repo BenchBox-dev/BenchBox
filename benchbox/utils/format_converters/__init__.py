@@ -1,10 +1,3 @@
-"""Lazy exports for format conversion utilities.
-
-The converter implementations import optional heavy libraries such as pyarrow
-and pandas. Keep the package import itself lean; resolve concrete converters
-only when callers access them.
-"""
-
 from __future__ import annotations
 
 import importlib

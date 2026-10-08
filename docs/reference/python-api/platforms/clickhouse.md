@@ -41,7 +41,6 @@ In 0.4.1 `ClickHouseAdapter()` starts in local mode. Server mode is selected wit
 from benchbox.tpch import TPCH
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-# Connect to ClickHouse server
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
@@ -51,7 +50,6 @@ adapter = ClickHouseAdapter(
     password=""
 )
 
-# Generate data, then run the benchmark
 benchmark = TPCH(scale_factor=1.0)
 benchmark.generate_data()
 results = benchmark.run_with_platform(adapter)
@@ -59,17 +57,17 @@ results = benchmark.run_with_platform(adapter)
 
 ### Local Mode (Embedded)
 
+This example runs embedded ClickHouse with chDB. `database_path` is optional and sets persistent storage.
+
 ```python
 from benchbox.tpch import TPCH
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-# Embedded ClickHouse with chDB
 adapter = ClickHouseAdapter(
     mode="local",
-    database_path="./benchmark.chdb"  # Optional persistent storage
+    database_path="./benchmark.chdb"
 )
 
-# Generate data, then run the benchmark
 benchmark = TPCH(scale_factor=0.1)
 benchmark.generate_data()
 results = benchmark.run_with_platform(adapter)
@@ -249,14 +247,102 @@ These results are for local mode. In server mode the same methods connect to the
 <span id="benchbox.platforms.clickhouse.ClickHouseAdapter.get_tuning_introspector"></span>
 **`get_tuning_introspector()`**: Returns a `ClickHouseTuningIntrospector` (from `benchbox.platforms.clickhouse.introspection`), which reads the `sorting_key` and `partition_key` of `system.tables` to confirm that the tuning clauses recorded for a run were applied.
 
+#### Diagnostics
+
+These methods come from `ClickHouseDiagnosticsMixin`. Both `ClickHouseAdapter.<name>` and `ClickHouseDiagnosticsMixin.<name>` resolve to the same method.
+
+<span id="benchbox.platforms.clickhouse.diagnostics.ClickHouseDiagnosticsMixin.check_server_database_exists"></span>
+**`check_server_database_exists(**connection_config) -> bool`**: Tells whether the database exists. In local mode it returns whether the path from `get_database_path` exists on disk, and `False` when there is no path. In server mode it connects with an administrative client and looks for the database name in `SHOW DATABASES`. The `database` key of `connection_config` overrides the adapter's database. Any failure returns `False`.
+
+<span id="benchbox.platforms.clickhouse.diagnostics.ClickHouseDiagnosticsMixin.drop_database"></span>
+**`drop_database(**connection_config) -> None`**: Drops the database on a ClickHouse server with `DROP DATABASE IF EXISTS`. In local mode it does nothing. The `database` key of `connection_config` overrides the adapter's database. A failure raises `RuntimeError` (`Failed to drop ClickHouse database: ...`).
+
+<span id="benchbox.platforms.clickhouse.ClickHouseAdapter.get_table_info"></span>
+<span id="benchbox.platforms.clickhouse.diagnostics.ClickHouseDiagnosticsMixin.get_table_info"></span>
+**`get_table_info(connection, table_name: str) -> dict[str, Any]`**: Returns detailed information about a table in the current database: `columns` (a list of `(name, type)` pairs in column order), `row_count`, `bytes_on_disk` and `compressed_size`. The last three come from `system.parts`. A failure does not raise: the result is `{'error': <message>}`.
+
+<span id="benchbox.platforms.clickhouse.ClickHouseAdapter.optimize_table"></span>
+<span id="benchbox.platforms.clickhouse.diagnostics.ClickHouseDiagnosticsMixin.optimize_table"></span>
+**`optimize_table(connection, table_name: str) -> None`**: Runs `OPTIMIZE TABLE <table_name> FINAL` to merge the table's parts for better query performance. A failure is logged as a warning and does not raise.
+
+#### Metadata and command-line options
+
+These methods come from `ClickHouseMetadataMixin`.
+
+<span id="benchbox.platforms.clickhouse.metadata.ClickHouseMetadataMixin.add_cli_arguments"></span>
+**`add_cli_arguments(parser) -> None`** (static method): Adds the ClickHouse option group to an `argparse` parser: `--data-path` (default `/tmp/benchbox_ch_local`, the path for local-mode data) and `--deployment-mode` (default `local`, `server` or `local`).
+
+<span id="benchbox.platforms.clickhouse.metadata.ClickHouseMetadataMixin.get_database_path"></span>
+**`get_database_path(**connection_config) -> str | None`**: Returns the database path for local-mode persistence, or `None`. In server mode it always returns `None`. In local mode it uses the first of these that is set:
+
+1. `connection_config["database_path"]`, if given and not `None`. A `.duckdb` suffix is replaced with `.chdb`, and `.chdb` is appended to any other name that does not already end with it.
+2. The adapter's `database_path`, which `from_config` sets.
+3. `None`. `check_server_database_exists` then returns `False`.
+
+<span id="benchbox.platforms.clickhouse.metadata.ClickHouseMetadataMixin.get_target_dialect"></span>
+**`get_target_dialect() -> str`**: Returns the target SQL dialect, `"clickhouse"`.
+
+#### Delta Lake reads
+
+These methods come from `ClickHouseWorkloadMixin`. They use the probes and resolver in `benchbox.platforms.clickhouse.delta_lake`.
+
+<span id="benchbox.platforms.clickhouse.workload.ClickHouseWorkloadMixin.delta_native_registration"></span>
+**`delta_native_registration(connection) -> bool`**: Probes whether the server registers native Delta Lake reads. It runs the `system.table_functions` and `system.table_engines` probes and applies `has_native_delta_registration`. It returns `True` when the server registers both the `deltaLake` function and the `DeltaLake` engine. The `connection` must expose `execute()`. Nothing is cached: the probe is two light system queries, so callers that decide per statement see the current server state.
+
+<span id="benchbox.platforms.clickhouse.workload.ClickHouseWorkloadMixin.delta_reader_for"></span>
+**`delta_reader_for(connection, location: str) -> DeltaReader`**: Selects the native or snapshot read path for a Delta table. It probes the server once, then calls `resolve_delta_reader` in `benchbox.platforms.clickhouse.delta_lake` with two verdicts: the base-integration verdict, and the verdict for the `deltaLakeLocal` function. Both are needed because a server can register the base integration without the local alias. `location` is the bucket URL or file system path of the Delta table, and the result is the chosen `DeltaReader`. It raises `ValueError` when the location is empty, blank or unrecognized, or when it has no executable read path (a remote location on a server without native reads).
+
+#### Tuning
+
+These methods come from `ClickHouseTuningMixin`.
+
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.get_effective_tuning_configuration"></span>
+**`get_effective_tuning_configuration() -> UnifiedTuningConfiguration | None`**: Returns the tuning configuration with ClickHouse's requirements applied. ClickHouse requires primary keys even when tuning is off, so primary keys are always enabled. When there is no configured tuning, the result has foreign keys disabled.
+
+<span id="benchbox.platforms.clickhouse.ClickHouseAdapter.validate_session_cache_control"></span>
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.validate_session_cache_control"></span>
+**`validate_session_cache_control(connection) -> dict[str, Any]`**: Checks that the session-level cache control settings were applied. It reads `use_query_cache`, `enable_writes_to_query_cache` and `enable_reads_from_query_cache` from `system.settings` and expects each to be `0` when `disable_result_cache` is on and `1` otherwise. The result has these keys:
+
+- **`validated`:** `True` when all three settings have the expected value.
+- **`cache_disabled`:** `True` when validation passed and the cache is disabled.
+- **`settings`:** the settings as read, as a dict of strings.
+- **`warnings`:** a list of validation warnings.
+- **`errors`:** a list of validation errors.
+
+It raises `ConfigurationError` if validation fails and `strict_validation` is `True`.
+
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.supports_tuning_type"></span>
+**`supports_tuning_type(tuning_type) -> bool`**: Tells whether ClickHouse supports a tuning type. The supported types are partitioning, sorting, clustering and distribution.
+
+<span id="benchbox.platforms.clickhouse.ClickHouseAdapter.apply_table_tunings"></span>
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.apply_table_tunings"></span>
+**`apply_table_tunings(table_tuning, connection) -> None`**: Applies ClickHouse-specific table tunings from a `TableTuning` object to an existing table. It does nothing when the object has no tunings. Each tuning type is handled differently:
+
+- **Sorting:** runs `optimize_table`, which issues `OPTIMIZE TABLE ... FINAL`.
+- **Clustering:** runs `OPTIMIZE TABLE ... FINAL` directly.
+- **Partitioning:** only logged, because partitioning is fixed when the table is created.
+- **Distribution:** only logged, because it is handled by engine settings.
+
+If the tuning interface cannot be imported, it logs a warning and skips the tunings. Any other error is raised as `ValueError`.
+
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.apply_unified_tuning"></span>
+**`apply_unified_tuning(unified_config: UnifiedTuningConfiguration, connection) -> None`**: Applies a unified tuning configuration to ClickHouse.
+
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.apply_platform_optimizations"></span>
+**`apply_platform_optimizations(platform_config: PlatformOptimizationConfiguration, connection) -> None`**: An intentional no-op for ClickHouse today. `PlatformOptimizationConfiguration` models only Databricks and BigQuery style options (z-ordering, liquid clustering, auto-optimize, bloom filters, materialized views), and none of them apply to ClickHouse. ClickHouse session settings (memory, threads, join algorithm, cache control) are applied separately by `configure_for_benchmark`, which reads the adapter's own attributes.
+
+<span id="benchbox.platforms.clickhouse.tuning.ClickHouseTuningMixin.apply_constraint_configuration"></span>
+**`apply_constraint_configuration(primary_key_config: PrimaryKeyConfiguration, foreign_key_config: ForeignKeyConfiguration, connection) -> None`**: Logs an informational message for each enabled primary-key and foreign-key setting. It runs no SQL and does not use `connection`. The table-creation hooks handle any constraint DDL the platform supports.
+
 ## Configuration Examples
 
 ### Server Mode - Local Development
 
+The first adapter connects to the default local server. The second adds authentication.
+
 ```python
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
-# Default local server
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
@@ -264,7 +350,6 @@ adapter = ClickHouseAdapter(
     database="benchmark"
 )
 
-# With authentication
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
@@ -277,12 +362,13 @@ adapter = ClickHouseAdapter(
 
 ### Server Mode - Production
 
+This example connects to a production server with TLS. Port 9440 is the secure native port.
+
 ```python
-# Production server with TLS
 adapter = ClickHouseAdapter(
     mode="server",
     host="clickhouse.example.com",
-    port=9440,  # Secure native port
+    port=9440,
     database="production_benchmarks",
     username="admin",
     password="production_password",
@@ -294,11 +380,11 @@ adapter = ClickHouseAdapter(
 
 ### Local Mode - Development
 
+The first adapter runs in memory, which is fast but keeps no data. The second uses persistent storage, so the data survives restarts.
+
 ```python
-# In-memory execution (fast, no persistence)
 adapter = ClickHouseAdapter(mode="local")
 
-# Persistent storage (data survives restarts)
 adapter = ClickHouseAdapter(
     mode="local",
     database_path="./benchmarks/clickhouse_local.chdb"
@@ -307,16 +393,17 @@ adapter = ClickHouseAdapter(
 
 ### Performance Tuning
 
+Raise `max_memory_usage` for large datasets. `max_execution_time` is in seconds, so 600 is a 10 minute timeout. `max_threads=32` uses all available cores on a 32-core machine. `compression` is disabled by default for compatibility.
+
 ```python
-# High-performance configuration
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
     database="benchmark",
-    max_memory_usage="64GB",     # Increase for large datasets
-    max_execution_time=600,      # 10 minute timeout
-    max_threads=32,              # Use all available cores
-    compression=False            # Disabled by default for compatibility
+    max_memory_usage="64GB",
+    max_execution_time=600,
+    max_threads=32,
+    compression=False
 )
 ```
 
@@ -324,13 +411,14 @@ adapter = ClickHouseAdapter(
 
 ### Bulk Loading from Files
 
+The example creates the table, then bulk-inserts from a CSV file.
+
 ```python
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
 adapter = ClickHouseAdapter(mode="server", host="localhost", database="benchmark")
 conn = adapter.create_connection()
 
-# Load from CSV
 conn.execute("""
     CREATE TABLE lineitem (
         l_orderkey UInt32,
@@ -353,7 +441,6 @@ conn.execute("""
     ORDER BY (l_orderkey, l_linenumber)
 """)
 
-# Bulk insert from CSV file
 conn.execute("""
     INSERT INTO lineitem
     FROM INFILE 'data/lineitem.tbl'
@@ -363,8 +450,9 @@ conn.execute("""
 
 ### Loading from S3
 
+ClickHouse can read directly from S3. The first statement reads public objects. The second passes credentials.
+
 ```python
-# ClickHouse can read directly from S3
 conn.execute("""
     CREATE TABLE lineitem AS
     SELECT * FROM s3(
@@ -373,7 +461,6 @@ conn.execute("""
     )
 """)
 
-# With credentials
 conn.execute("""
     CREATE TABLE lineitem AS
     SELECT * FROM s3(
@@ -389,17 +476,17 @@ conn.execute("""
 
 ### Execute Queries Directly
 
+`conn.execute` returns a list of tuples. The example runs a simple count and then a more complex analytical query.
+
 ```python
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 
 adapter = ClickHouseAdapter(mode="server", host="localhost", database="benchmark")
 conn = adapter.create_connection()
 
-# Simple query
 result = conn.execute("SELECT COUNT(*) FROM lineitem")
-row_count = result[0][0]  # Result is list of tuples
+row_count = result[0][0]
 
-# Complex analytical query
 result = conn.execute("""
     SELECT
         l_returnflag,
@@ -416,8 +503,9 @@ result = conn.execute("""
 
 ### Query Plans and Optimization
 
+The first statement gets the query plan. The second analyzes the query pipeline.
+
 ```python
-# Get query plan
 plan = conn.execute("""
     EXPLAIN
     SELECT * FROM lineitem
@@ -426,7 +514,6 @@ plan = conn.execute("""
 for row in plan:
     print(row[0])
 
-# Analyze query pipeline
 pipeline = conn.execute("""
     EXPLAIN PIPELINE
     SELECT COUNT(*) FROM lineitem
@@ -438,8 +525,9 @@ pipeline = conn.execute("""
 
 ### Table Engines
 
+`MergeTree` is the most common engine for analytics. `ReplacingMergeTree` deduplicates rows by the sorting key.
+
 ```python
-# MergeTree (most common for analytics)
 conn.execute("""
     CREATE TABLE orders (
         o_orderkey UInt32,
@@ -452,7 +540,6 @@ conn.execute("""
     PARTITION BY toYYYYMM(o_orderdate)
 """)
 
-# ReplacingMergeTree (deduplication)
 conn.execute("""
     CREATE TABLE customer_updates (
         c_custkey UInt32,
@@ -466,8 +553,9 @@ conn.execute("""
 
 ### Materialized Views
 
+This view pre-aggregates orders by date.
+
 ```python
-# Create materialized view for pre-aggregation
 conn.execute("""
     CREATE MATERIALIZED VIEW orders_by_date
     ENGINE = SummingMergeTree()
@@ -483,8 +571,9 @@ conn.execute("""
 
 ### Distributed Queries
 
+This query runs across multiple shards. It needs a cluster setup.
+
 ```python
-# Query across multiple shards (cluster setup required)
 result = conn.execute("""
     SELECT
         l_returnflag,
@@ -498,20 +587,19 @@ result = conn.execute("""
 
 ### Memory Management
 
-1. **Set appropriate memory limits** per query:
+1. **Set appropriate memory limits** per query. `max_memory_usage` is the per-query limit:
 
    ```python
    adapter = ClickHouseAdapter(
        mode="server",
        host="localhost",
-       max_memory_usage="16GB"  # Per query limit
+       max_memory_usage="16GB"
    )
    ```
 
-2. **Monitor memory usage** during execution:
+2. **Monitor memory usage** during execution. This query checks the memory of running queries:
 
    ```python
-   # Check memory usage
    result = conn.execute("""
        SELECT
            query,
@@ -522,69 +610,60 @@ result = conn.execute("""
    """)
    ```
 
-3. **Use external aggregation** for large GROUP BY:
+3. **Use external aggregation** for large GROUP BY. This setting enables external aggregation automatically:
 
    ```python
-   # Enable external aggregation automatically
    conn.execute("SET max_bytes_before_external_group_by = 10000000000")
    ```
 
 ### Performance Optimization
 
-1. **Choose optimal table engine** and ordering key:
+1. **Choose optimal table engine** and ordering key. Ordering by commonly filtered columns is good. Including all filter columns is better. These are illustrative SQL fragments; supply complete table definitions before execution.
 
-   ```python
-   # Good: Order by commonly filtered columns
+   ```sql
    CREATE TABLE lineitem (...)
    ENGINE = MergeTree()
    ORDER BY (l_shipdate, l_orderkey)
 
-   # Better: Include all filter columns
    ORDER BY (l_shipdate, l_returnflag, l_orderkey)
    ```
 
-2. **Use appropriate data types**:
+2. **Use appropriate data types**. Prefer smaller types:
 
-   ```python
-   # Prefer smaller types
-   UInt8 instead of UInt32 for small integers
-   Date instead of DateTime for date-only fields
-   LowCardinality(String) for repeated strings
-   ```
+   - `UInt8` instead of `UInt32` for small integers
+   - `Date` instead of `DateTime` for date-only fields
+   - `LowCardinality(String)` for repeated strings
 
-3. **Partition large tables**:
+3. **Partition large tables**. `toYYYYMM` makes monthly partitions. This is an illustrative SQL fragment; supply a complete table definition before execution.
 
-   ```python
+   ```sql
    CREATE TABLE lineitem (...)
    ENGINE = MergeTree()
-   PARTITION BY toYYYYMM(l_shipdate)  # Monthly partitions
+   PARTITION BY toYYYYMM(l_shipdate)
    ORDER BY (l_orderkey, l_linenumber)
    ```
 
 ### Connection Management
 
-1. **Reuse connections** for multiple queries:
+1. **Reuse connections** for multiple queries, and close the connection when you are done:
 
    ```python
    adapter = ClickHouseAdapter(mode="server", host="localhost")
    conn = adapter.create_connection()
 
-   # Run multiple queries
    for query_id in range(1, 23):
        result = conn.execute(queries[query_id])
 
-   # Close when done
    adapter.close_connection(conn)
    ```
 
-2. **Set connection timeouts** appropriately:
+2. **Set connection timeouts** appropriately. Long-running benchmarks need longer timeouts. `max_execution_time=600` is 10 minutes:
 
    ```python
-   # Long-running benchmarks need longer timeouts
    adapter = ClickHouseAdapter(
        mode="server",
        host="localhost",
-       max_execution_time=600  # 10 minutes
+       max_execution_time=600
    )
    ```
 
@@ -596,22 +675,22 @@ result = conn.execute("""
 
 **Solutions**:
 
+1. Check whether the server is running.
+2. Start the server if it is not running.
+3. Check that the port is listening.
+4. Test the connection. The Python block below also verifies the connection.
+
 ```bash
-# 1. Check if server is running
 ps aux | grep clickhouse-server
 
-# 2. Start server if not running
 sudo service clickhouse-server start
 
-# 3. Check port is listening
 netstat -ln | grep 9000
 
-# 4. Test connection
 clickhouse-client --host=localhost --port=9000
 ```
 
 ```python
-# Verify connection in Python
 import socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 result = sock.connect_ex(('localhost', 9000))
@@ -627,36 +706,37 @@ else:
 
 **Solutions**:
 
+1. Increase the memory limit.
+2. Enable external operations.
+3. Reduce the scale factor for testing. Start small.
+
 ```python
-# 1. Increase memory limit
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
     max_memory_usage="32GB"
 )
 
-# 2. Enable external operations
 conn = adapter.create_connection()
 conn.execute("SET max_bytes_before_external_group_by = 20000000000")
 conn.execute("SET max_bytes_before_external_sort = 20000000000")
 
-# 3. Reduce scale factor for testing
-benchmark = TPCH(scale_factor=0.1)  # Start small
+benchmark = TPCH(scale_factor=0.1)
 ```
 
 ### Local Mode Import Error
 
 **Problem**: `ImportError: ClickHouse local mode requires chDB but it is not installed.` in local mode
 
-**Solution**:
+**Solution**: Install chDB with the local-mode extra:
 
 ```bash
-# Install chDB with the local-mode extra
 pip install "benchbox[clickhouse-local]"
 ```
 
+Or switch to server mode, which needs the `clickhouse` extra:
+
 ```python
-# Or switch to server mode (needs the clickhouse extra)
 adapter = ClickHouseAdapter(mode="server", host="localhost")
 ```
 
@@ -666,26 +746,24 @@ adapter = ClickHouseAdapter(mode="server", host="localhost")
 
 **Solutions**:
 
+1. Increase the thread count so queries use more CPU cores.
+2. Check the query plan. If it shows `FullScanStep` (a table scan), the table may need a better `ORDER BY`.
+3. Enable query profiling, run the query, then check the query log. In server mode the log is `system.query_log`. chDB has no `system.query_log`.
+
 ```python
-# 1. Increase thread count
 adapter = ClickHouseAdapter(
     mode="server",
     host="localhost",
-    max_threads=16  # Use more CPU cores
+    max_threads=16
 )
 
-# 2. Check query plan
 plan = conn.execute("EXPLAIN SELECT ...")
-# Look for FullScanStep (table scan) - may need better ORDER BY
 
-# 3. Enable query profiling (server mode: chDB has no system.query_log)
 conn.execute("SET log_queries = 1")
 conn.execute("SET log_query_threads = 1")
 
-# Run query
 result = conn.execute("SELECT ...")
 
-# Check query log
 log = conn.execute("""
     SELECT
         query,

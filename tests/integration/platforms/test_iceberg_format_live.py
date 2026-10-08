@@ -1,23 +1,6 @@
-"""Live integration tests: Apache Iceberg table format support.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These tests exercise the real Iceberg format through the PyIceberg-backed
-maintenance operations and the transaction operations manager: table
-creation with Iceberg metadata layout, append/overwrite writes, row-level
-delete/update/merge with result verification, snapshot history, and
-format validation.
-
-A Spark SQL + Iceberg session is not used here: no released Iceberg
-Spark runtime is binary-compatible with the environment's Spark 4.2
-(``IncompatibleClassChangeError`` on ``View``), so the JVM-free
-PyIceberg path is the executable real-format coverage.
-
-Marked ``live_integration``: excluded from the default suite. Requires
-the ``pyiceberg`` and ``pyarrow`` packages.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -54,13 +37,12 @@ def manager():
 
 @pytest.fixture
 def manager_env(tmp_path: Path, monkeypatch):
-    """Manager with its default warehouse isolated under tmp, plus a seeder sharing it."""
+
     monkeypatch.chdir(tmp_path)
     from benchbox.platforms.dataframe.iceberg_maintenance import get_iceberg_maintenance_operations
 
     manager = DataFrameTransactionOperationsManager("iceberg")
-    # Mirror the manager's default warehouse (cwd()/iceberg_warehouse) exactly
-    # so seeder and manager share one catalog and warehouse.
+
     seeder = get_iceberg_maintenance_operations(working_dir=str(tmp_path / "iceberg_warehouse"))
     return manager, seeder
 

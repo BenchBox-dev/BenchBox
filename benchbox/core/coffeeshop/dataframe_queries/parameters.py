@@ -1,11 +1,6 @@
-"""CoffeeShop DataFrame query parameters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Default parameter values for CoffeeShop queries.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -29,17 +24,15 @@ COFFEESHOP_DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
 
 @dataclass
 class CoffeeShopParameters:
-    """Parameter container for a CoffeeShop query."""
-
     query_id: str
     params: dict[str, Any]
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Get a parameter value with optional default."""
+
         return self.params.get(key, default)
 
 
 def get_parameters(query_id: str) -> CoffeeShopParameters:
-    """Get parameters for a CoffeeShop query."""
+
     params = COFFEESHOP_DEFAULT_PARAMS.get(query_id, {}).copy()
     return CoffeeShopParameters(query_id=query_id, params=params)

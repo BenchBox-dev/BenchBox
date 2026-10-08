@@ -1,9 +1,6 @@
-"""Tests for Redshift credential setup with default values.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import Mock, patch
 
@@ -18,8 +15,6 @@ pytestmark = [
 
 
 class TestRedshiftCredentialDefaults:
-    """Test Redshift credential setup shows existing values as defaults."""
-
     @patch("benchbox.platforms.credentials.redshift._prompt_default_output_location")
     @patch("benchbox.platforms.credentials.redshift.validate_redshift_credentials")
     @patch("benchbox.platforms.credentials.redshift.prompt_secure_field")
@@ -35,8 +30,7 @@ class TestRedshiftCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test that existing credential values are shown as defaults in prompts."""
-        # Setup: existing credentials
+
         mock_manager = Mock()
         existing_creds = {
             "host": "my-cluster.abc123.us-east-1.redshift.amazonaws.com",
@@ -48,30 +42,27 @@ class TestRedshiftCredentialDefaults:
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
 
-        # With existing credentials, no auto-detection prompt - only S3 config
-        mock_confirm.return_value = False  # Don't configure S3
-        mock_int_prompt.return_value = 5439  # port
+        mock_confirm.return_value = False
+        mock_int_prompt.return_value = 5439
         mock_prompt_default.side_effect = [
-            "my-cluster.abc123.us-east-1.redshift.amazonaws.com",  # host
-            "mydb",  # database
-            "admin",  # username
-            "public",  # schema
+            "my-cluster.abc123.us-east-1.redshift.amazonaws.com",
+            "mydb",
+            "admin",
+            "public",
         ]
-        mock_prompt_secure.return_value = "secret"  # password
+        mock_prompt_secure.return_value = "secret"
 
         mock_validate.return_value = (True, None)
         console = Mock()
 
         setup_redshift_credentials(mock_manager, console)
 
-        # Verify prompts were called with existing values as current_value
         calls = mock_prompt_default.call_args_list
-        assert calls[0][1]["current_value"] == "my-cluster.abc123.us-east-1.redshift.amazonaws.com"  # host
-        assert calls[1][1]["current_value"] == "mydb"  # database
-        assert calls[2][1]["current_value"] == "admin"  # username
-        assert calls[3][1]["current_value"] == "public"  # schema
+        assert calls[0][1]["current_value"] == "my-cluster.abc123.us-east-1.redshift.amazonaws.com"
+        assert calls[1][1]["current_value"] == "mydb"
+        assert calls[2][1]["current_value"] == "admin"
+        assert calls[3][1]["current_value"] == "public"
 
-        # Verify secure field was called with existing password
         mock_prompt_secure.assert_called_once_with("Password", current_value="secret", console=console)
 
     @patch("benchbox.platforms.credentials.redshift._prompt_default_output_location")
@@ -89,22 +80,20 @@ class TestRedshiftCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test that setup works when no existing credentials exist."""
-        # Setup: no existing credentials
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        # User provides new values
         mock_confirm.side_effect = [
-            False,  # Skip auto-detection
-            False,  # Don't configure S3
+            False,
+            False,
         ]
-        mock_int_prompt.return_value = 5439  # port (default)
+        mock_int_prompt.return_value = 5439
         mock_prompt_default.side_effect = [
-            "new-cluster.xyz.us-east-1.redshift.amazonaws.com",  # host
-            "dev",  # database (default)
-            "newuser",  # username
-            "public",  # schema (default)
+            "new-cluster.xyz.us-east-1.redshift.amazonaws.com",
+            "dev",
+            "newuser",
+            "public",
         ]
         mock_prompt_secure.return_value = "newpassword"
 
@@ -113,16 +102,14 @@ class TestRedshiftCredentialDefaults:
 
         setup_redshift_credentials(mock_manager, console)
 
-        # Verify prompts were called with None as current_value
         calls = mock_prompt_default.call_args_list
-        assert calls[0][1]["current_value"] is None  # host
-        assert calls[1][1]["current_value"] is None  # database
-        assert calls[1][1]["default_if_none"] == "dev"  # database default
-        assert calls[2][1]["current_value"] is None  # username
-        assert calls[3][1]["current_value"] is None  # schema
-        assert calls[3][1]["default_if_none"] == "public"  # schema default
+        assert calls[0][1]["current_value"] is None
+        assert calls[1][1]["current_value"] is None
+        assert calls[1][1]["default_if_none"] == "dev"
+        assert calls[2][1]["current_value"] is None
+        assert calls[3][1]["current_value"] is None
+        assert calls[3][1]["default_if_none"] == "public"
 
-        # Verify secure field was called with None
         mock_prompt_secure.assert_called_once_with("Password", current_value=None, console=console)
 
     @patch("benchbox.platforms.credentials.redshift._prompt_default_output_location")
@@ -140,8 +127,7 @@ class TestRedshiftCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test that existing password is preserved when user enters empty input."""
-        # Setup: existing credentials with password
+
         mock_manager = Mock()
         existing_creds = {
             "host": "my-cluster.redshift.amazonaws.com",
@@ -152,8 +138,7 @@ class TestRedshiftCredentialDefaults:
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
 
-        # With existing credentials, no auto-detection prompt
-        mock_confirm.return_value = False  # Don't configure S3
+        mock_confirm.return_value = False
         mock_int_prompt.return_value = 5439
         mock_prompt_default.side_effect = [
             "my-cluster.redshift.amazonaws.com",
@@ -161,7 +146,6 @@ class TestRedshiftCredentialDefaults:
             "admin",
             "public",
         ]
-        # User enters empty string, existing password should be preserved
         mock_prompt_secure.return_value = "existing_password"
 
         mock_validate.return_value = (True, None)
@@ -169,7 +153,6 @@ class TestRedshiftCredentialDefaults:
 
         setup_redshift_credentials(mock_manager, console)
 
-        # Verify the saved credentials still have the password
         saved_creds = mock_manager.set_platform_credentials.call_args[0][1]
         assert saved_creds["password"] == "existing_password"
 
@@ -188,8 +171,6 @@ class TestRedshiftCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test that S3 configuration shows existing values."""
-        # Setup: existing credentials with S3 config (IAM role)
         mock_manager = Mock()
         existing_creds = {
             "host": "my-cluster.redshift.amazonaws.com",
@@ -203,33 +184,31 @@ class TestRedshiftCredentialDefaults:
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
 
-        # With existing credentials, no auto-detection prompt
-        mock_confirm.return_value = True  # Configure S3
+        mock_confirm.return_value = True
         mock_int_prompt.side_effect = [
-            5439,  # port
-            1,  # IAM role auth method
+            5439,
+            1,
         ]
         mock_prompt_default.side_effect = [
-            "my-cluster.redshift.amazonaws.com",  # host
-            "mydb",  # database
-            "admin",  # username
-            "public",  # schema
-            "my-benchbox-data",  # s3_bucket
-            "arn:aws:iam::123456789012:role/RedshiftS3AccessRole",  # iam_role
-            "us-east-1",  # aws_region
+            "my-cluster.redshift.amazonaws.com",
+            "mydb",
+            "admin",
+            "public",
+            "my-benchbox-data",
+            "arn:aws:iam::123456789012:role/RedshiftS3AccessRole",
+            "us-east-1",
         ]
-        mock_prompt_secure.return_value = "secret"  # password
+        mock_prompt_secure.return_value = "secret"
 
         mock_validate.return_value = (True, None)
         console = Mock()
 
         setup_redshift_credentials(mock_manager, console)
 
-        # Verify S3 prompts were called with existing values
         calls = mock_prompt_default.call_args_list
-        assert calls[4][1]["current_value"] == "my-benchbox-data"  # s3_bucket
-        assert calls[5][1]["current_value"] == "arn:aws:iam::123456789012:role/RedshiftS3AccessRole"  # iam_role
-        assert calls[6][1]["current_value"] == "us-east-1"  # aws_region
+        assert calls[4][1]["current_value"] == "my-benchbox-data"
+        assert calls[5][1]["current_value"] == "arn:aws:iam::123456789012:role/RedshiftS3AccessRole"
+        assert calls[6][1]["current_value"] == "us-east-1"
 
     @patch("benchbox.platforms.credentials.redshift._prompt_default_output_location")
     @patch("benchbox.platforms.credentials.redshift.validate_redshift_credentials")
@@ -246,8 +225,6 @@ class TestRedshiftCredentialDefaults:
         mock_validate,
         mock_output_location,
     ):
-        """Test that S3 access keys show existing values."""
-        # Setup: existing credentials with S3 config (access keys)
         mock_manager = Mock()
         existing_creds = {
             "host": "my-cluster.redshift.amazonaws.com",
@@ -262,24 +239,23 @@ class TestRedshiftCredentialDefaults:
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
 
-        # With existing credentials, no auto-detection prompt
-        mock_confirm.return_value = True  # Configure S3
+        mock_confirm.return_value = True
         mock_int_prompt.side_effect = [
-            5439,  # port
-            2,  # Access keys auth method
+            5439,
+            2,
         ]
         mock_prompt_default.side_effect = [
-            "my-cluster.redshift.amazonaws.com",  # host
-            "mydb",  # database
-            "admin",  # username
-            "public",  # schema
-            "my-bucket",  # s3_bucket
-            "AKIAIOSFODNN7EXAMPLE",  # aws_access_key_id
-            "us-west-2",  # aws_region
+            "my-cluster.redshift.amazonaws.com",
+            "mydb",
+            "admin",
+            "public",
+            "my-bucket",
+            "AKIAIOSFODNN7EXAMPLE",
+            "us-west-2",
         ]
         mock_prompt_secure.side_effect = [
-            "secret",  # password
-            "secret_key",  # aws_secret_access_key
+            "secret",
+            "secret_key",
         ]
 
         mock_validate.return_value = (True, None)
@@ -287,13 +263,12 @@ class TestRedshiftCredentialDefaults:
 
         setup_redshift_credentials(mock_manager, console)
 
-        # Verify AWS access key and secret key prompts were called with existing values
         default_calls = mock_prompt_default.call_args_list
-        assert default_calls[5][1]["current_value"] == "AKIAIOSFODNN7EXAMPLE"  # access_key_id
+        assert default_calls[5][1]["current_value"] == "AKIAIOSFODNN7EXAMPLE"
 
         secure_calls = mock_prompt_secure.call_args_list
-        assert secure_calls[1][0][0] == "AWS Secret Access Key"  # field name
-        assert secure_calls[1][1]["current_value"] == "secret_key"  # secret_access_key
+        assert secure_calls[1][0][0] == "AWS Secret Access Key"
+        assert secure_calls[1][1]["current_value"] == "secret_key"
 
     @patch("benchbox.platforms.credentials.redshift._auto_detect_redshift")
     @patch("benchbox.platforms.credentials.redshift._prompt_default_output_location")
@@ -312,8 +287,7 @@ class TestRedshiftCredentialDefaults:
         mock_output_location,
         mock_auto_detect,
     ):
-        """Test that auto-detection is skipped when existing credentials are present."""
-        # Setup: existing credentials
+
         mock_manager = Mock()
         existing_creds = {
             "host": "old-cluster.redshift.amazonaws.com",
@@ -322,8 +296,7 @@ class TestRedshiftCredentialDefaults:
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
 
-        # NOTE: With existing credentials, auto-detection is skipped
-        mock_confirm.return_value = False  # Don't configure S3
+        mock_confirm.return_value = False
         mock_int_prompt.return_value = 5439
         mock_prompt_default.side_effect = [
             "old-cluster.redshift.amazonaws.com",
@@ -337,12 +310,9 @@ class TestRedshiftCredentialDefaults:
 
         setup_redshift_credentials(mock_manager, console)
 
-        # Verify Confirm.ask was NOT called for auto-detection
-        # (only called for S3 configuration)
         assert mock_confirm.call_count == 1
         storage_call = mock_confirm.call_args_list[0]
         assert "s3" in str(storage_call).lower()
-        # Verify auto-detect was NOT called
         mock_auto_detect.assert_not_called()
 
     @patch("benchbox.platforms.credentials.redshift._auto_detect_redshift")
@@ -362,8 +332,7 @@ class TestRedshiftCredentialDefaults:
         mock_output_location,
         mock_auto_detect,
     ):
-        """Test that auto-detection is skipped when credentials already exist."""
-        # Setup: existing credentials
+
         mock_manager = Mock()
         existing_creds = {
             "host": "my-cluster.redshift.amazonaws.com",
@@ -374,7 +343,7 @@ class TestRedshiftCredentialDefaults:
         }
         mock_manager.get_platform_credentials.return_value = existing_creds
 
-        mock_confirm.return_value = False  # Don't configure S3
+        mock_confirm.return_value = False
         mock_int_prompt.return_value = 5439
         mock_prompt_default.side_effect = [
             "my-cluster.redshift.amazonaws.com",
@@ -388,11 +357,9 @@ class TestRedshiftCredentialDefaults:
 
         setup_redshift_credentials(mock_manager, console)
 
-        # Verify no auto-detection prompt was shown (only S3 config prompt)
         assert mock_confirm.call_count == 1
         mock_auto_detect.assert_not_called()
 
-        # Verify "updating configuration" message was displayed
         console_output = " ".join(str(call) for call in console.print.call_args_list)
         assert "Existing credentials found" in console_output
         assert "updating configuration" in console_output
@@ -414,13 +381,11 @@ class TestRedshiftCredentialDefaults:
         mock_output_location,
         mock_auto_detect,
     ):
-        """Test that auto-detection is offered when no credentials exist."""
-        # Setup: no existing credentials
+
         mock_manager = Mock()
         mock_manager.get_platform_credentials.return_value = None
 
-        # User declines auto-detection and S3
-        mock_confirm.side_effect = [False, False]  # auto-detect, S3
+        mock_confirm.side_effect = [False, False]
         mock_int_prompt.return_value = 5439
         mock_prompt_default.side_effect = [
             "new-cluster.redshift.amazonaws.com",
@@ -434,23 +399,14 @@ class TestRedshiftCredentialDefaults:
 
         setup_redshift_credentials(mock_manager, console)
 
-        # Verify auto-detection prompt WAS shown
         auto_detect_call = mock_confirm.call_args_list[0]
         assert "auto-detection" in str(auto_detect_call).lower()
 
-        # Verify "updating configuration" message was NOT displayed
         console_output = " ".join(str(call) for call in console.print.call_args_list)
         assert "Existing credentials found" not in console_output
 
 
-# ---------------------------------------------------------------------------
-# _auto_detect_redshift direct tests
-# ---------------------------------------------------------------------------
-
-
 class TestAutoDetectRedshift:
-    """Test _auto_detect_redshift reads from environment variables."""
-
     def _console(self):
         from unittest.mock import MagicMock
 
@@ -539,7 +495,7 @@ class TestAutoDetectRedshift:
         assert result["iam_role"] == "arn:aws:iam::123456789:role/RedshiftS3Access"
 
     def test_auto_detect_prints_success_message(self):
-        """Test that _auto_detect_redshift prints a success message when all vars are present."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _auto_detect_redshift
@@ -555,13 +511,11 @@ class TestAutoDetectRedshift:
             result = _auto_detect_redshift(console)
 
         assert result is not None
-        # Function should print at least one success/found message
         assert console.print.called
         output = " ".join(str(c) for c in console.print.call_args_list)
         assert "Found" in output or "✓" in output
 
     def test_auto_detect_prints_s3_message_when_s3_bucket_set(self):
-        """Test that _auto_detect_redshift prints S3 staging message when REDSHIFT_S3_BUCKET is set."""
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _auto_detect_redshift
@@ -582,16 +536,8 @@ class TestAutoDetectRedshift:
         assert "S3" in output or "staging" in output.lower()
 
 
-# ---------------------------------------------------------------------------
-# _test_tcp_connectivity direct tests
-# ---------------------------------------------------------------------------
-
-
 class TestTcpConnectivity:
-    """Tests for _test_tcp_connectivity helper."""
-
     def test_returns_true_on_successful_connection(self):
-        """Test that a successful TCP connect returns (True, None)."""
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _test_tcp_connectivity
@@ -610,13 +556,12 @@ class TestTcpConnectivity:
         assert err is None
 
     def test_returns_false_on_non_zero_connect_result(self):
-        """Test that a non-zero connect_ex result returns (False, message)."""
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _test_tcp_connectivity
 
         mock_sock = MagicMock()
-        mock_sock.connect_ex.return_value = 111  # Connection refused code
+        mock_sock.connect_ex.return_value = 111
 
         with patch("benchbox.platforms.credentials.redshift.socket") as mock_socket_mod:
             mock_socket_mod.AF_INET = 2
@@ -630,7 +575,6 @@ class TestTcpConnectivity:
         assert "111" in err or "TCP" in err
 
     def test_returns_false_on_gaierror(self):
-        """Test that a DNS failure returns (False, message)."""
         import socket as real_socket
         from unittest.mock import MagicMock, patch
 
@@ -651,7 +595,6 @@ class TestTcpConnectivity:
         assert err is not None
 
     def test_returns_false_on_timeout_error(self):
-        """Test that a TimeoutError returns (False, message)."""
         import socket as real_socket
         from unittest.mock import MagicMock, patch
 
@@ -673,16 +616,9 @@ class TestTcpConnectivity:
         assert "timeout" in err.lower() or "unreachable" in err.lower()
 
 
-# ---------------------------------------------------------------------------
-# _diagnose_redshift_connectivity tests
-# ---------------------------------------------------------------------------
-
-
 class TestDiagnoseRedshiftConnectivity:
-    """Tests for _diagnose_redshift_connectivity."""
-
     def test_provisioned_cluster_path(self):
-        """Test provisioned cluster describe_clusters path."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _diagnose_redshift_connectivity
@@ -715,7 +651,7 @@ class TestDiagnoseRedshiftConnectivity:
         assert "sg-111" in result["security_group_ids"]
 
     def test_serverless_workgroup_path(self):
-        """Test serverless workgroup describe path."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _diagnose_redshift_connectivity
@@ -746,7 +682,7 @@ class TestDiagnoseRedshiftConnectivity:
         assert "sg-222" in result["security_group_ids"]
 
     def test_access_denied_returns_diagnostic_error_not_exception(self):
-        """Test that AWS AccessDenied causes graceful degradation with error key."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _diagnose_redshift_connectivity
@@ -765,12 +701,11 @@ class TestDiagnoseRedshiftConnectivity:
                 aws_region="us-east-1",
             )
 
-        # Should not raise; error is captured in result dict
         assert result is not None
         assert result.get("error") is not None
 
     def test_unknown_endpoint_format_returns_error(self):
-        """Test that unrecognized endpoint format returns error key."""
+
         from benchbox.platforms.credentials.redshift import _diagnose_redshift_connectivity
 
         result = _diagnose_redshift_connectivity(
@@ -784,16 +719,9 @@ class TestDiagnoseRedshiftConnectivity:
         assert result["error"] == "Unknown endpoint format"
 
 
-# ---------------------------------------------------------------------------
-# _format_remediation_steps tests
-# ---------------------------------------------------------------------------
-
-
 class TestFormatRemediationSteps:
-    """Tests for _format_remediation_steps display logic."""
-
     def test_publicly_accessible_false_includes_enable_public_access_step(self):
-        """Test that 'Enable public access' step appears when publicly_accessible=False."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _format_remediation_steps
@@ -814,7 +742,7 @@ class TestFormatRemediationSteps:
         assert "public" in output.lower() or "Enable" in output
 
     def test_publicly_accessible_true_omits_enable_public_access_step(self):
-        """Test that 'Enable public access' step is absent when publicly_accessible=True."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _format_remediation_steps
@@ -831,14 +759,11 @@ class TestFormatRemediationSteps:
         with patch("benchbox.platforms.credentials.redshift._get_public_ip", return_value="1.2.3.4"):
             _format_remediation_steps(console, "host.example.com", 5439, "us-east-1", diagnostics, True)
 
-        # When publicly accessible, step 1 should NOT be the "Enable public access" step -
-        # step numbering starts at 1 (security group config).
         output = " ".join(str(c) for c in console.print.call_args_list)
-        # The security group / troubleshooting heading must still appear
         assert "Troubleshooting" in output or "security" in output.lower() or "Configure" in output
 
     def test_publicly_not_accessible_provisioned_cluster_step(self):
-        """Test remediation step for provisioned cluster with public access disabled."""
+
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.credentials.redshift import _format_remediation_steps
@@ -859,14 +784,7 @@ class TestFormatRemediationSteps:
         assert "my-cluster-id" in output
 
 
-# ---------------------------------------------------------------------------
-# validate_redshift_credentials direct tests
-# ---------------------------------------------------------------------------
-
-
 class TestValidateRedshiftCredentials:
-    """Test validate_redshift_credentials success/failure paths."""
-
     def _make_cred_manager(self, creds=None):
         from unittest.mock import MagicMock
 

@@ -1,8 +1,3 @@
-"""Regressions for the incidental MCP defects found in the 2026-08-04 review.
-
-Each test corresponds to one defect and fails on the unfixed tree.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -20,8 +15,6 @@ pytest.importorskip("mcp", reason="MCP SDK not installed. Install with: uv add b
 
 
 class TestValidateResultsNotFoundError:
-    """Defect 1: make_not_found_error was called as (resource_id, results_dir)."""
-
     def test_not_found_names_a_resource_type_not_the_filename(self, tmp_path: Path):
         from benchbox.mcp import create_server
         from tests.unit.mcp.public_api import call_tool
@@ -33,11 +26,9 @@ class TestValidateResultsNotFoundError:
         assert response["details"]["resource_type"] == "result_file"
         assert response["details"]["requested"] == "myrun.json"
         assert response["message"] == "Result_file 'myrun.json' not found"
-        # The suggestion must name a tool that exists.
         assert response["suggestion"] == 'Use get_results(format="list") to see available result files'
 
     def test_not_found_does_not_leak_the_server_results_root(self, tmp_path: Path):
-        """The old binding passed the configured results dir as the resource id."""
         from benchbox.mcp import create_server
         from tests.unit.mcp.public_api import call_tool
 
@@ -48,15 +39,6 @@ class TestValidateResultsNotFoundError:
 
 
 class TestQueryDetailsVisibilityMatrix:
-    """Defect 4: get_query_details against the benchmark visibility matrix.
-
-    The ratified matrix (docs/reference/public-contracts.md, "Benchmark
-    Visibility Policy") keeps internal benchmarks addressable by explicit ID on
-    this tool but withholds their support-status claim. These tests pin that row
-    so the tool cannot drift toward either exposing the claim or hiding the
-    benchmark outright.
-    """
-
     def test_public_benchmark_details_carry_support_status(self):
         from benchbox.core.benchmark_registry import get_all_benchmarks
         from benchbox.mcp.tools.benchmark import _build_query_details_benchmark_info
@@ -79,7 +61,6 @@ class TestQueryDetailsVisibilityMatrix:
             assert set(info) == {"display_name", "category"}, benchmark
 
     def test_internal_benchmarks_stay_addressable_by_explicit_id(self, tmp_path: Path):
-        """ "Runnable/readable by explicit ID" is the matrix's internal row."""
         from benchbox.core.benchmark_registry import get_all_benchmarks, get_benchmark_surface
         from benchbox.mcp import create_server
         from tests.unit.mcp.public_api import call_tool
@@ -89,12 +70,9 @@ class TestQueryDetailsVisibilityMatrix:
 
         for benchmark in internal:
             response = call_tool(server, "get_query_details", benchmark=benchmark, query_id="1")
-            # It may fail for benchmark-specific reasons, but never as "unknown
-            # benchmark" -- that would be the discovery gate leaking into this tool.
             assert response.get("details", {}).get("resource_type") != "benchmark", benchmark
 
     def test_every_registered_benchmark_matches_its_matrix_row(self):
-        """The gate is driven by `surface`, not by a hand-maintained list."""
         from benchbox.core.benchmark_registry import get_all_benchmarks, get_benchmark_surface
         from benchbox.mcp.tools.benchmark import _build_query_details_benchmark_info
 
@@ -105,8 +83,6 @@ class TestQueryDetailsVisibilityMatrix:
 
 
 class TestRemoteModeAnonymization:
-    """Defect 5: exporters were pinned to anonymize=False in every mode."""
-
     @staticmethod
     def _security_runtime(tmp_path: Path):
         from benchbox.mcp.security import RemoteSecurityRuntime
@@ -148,7 +124,6 @@ class TestRemoteModeAnonymization:
         assert analytics_tools.call_args.kwargs["anonymize_results"] is True
 
     def test_durable_job_execution_anonymizes(self, tmp_path: Path):
-        """Durable jobs exist only under a remote policy, so the worker is remote."""
         from unittest.mock import MagicMock
 
         from benchbox.mcp.jobs import DurableJobWorker, JobRecord
@@ -172,7 +147,6 @@ class TestRemoteModeAnonymization:
             completed_at=None,
         )
 
-        # New one-engine path delegates to the shared MCP/core execution helper.
         with (
             patch("benchbox.mcp.jobs._execute_mcp_run_via_core", return_value={}) as run_core,
             patch(
@@ -188,8 +162,6 @@ class TestRemoteModeAnonymization:
     def test_compare_results_threads_the_anonymization_decision(self, tmp_path: Path):
         from benchbox.mcp.tools import analytics as analytics_module
 
-        # After sinking, anonymization is threaded via core compare_results, not
-        # via a direct ResultExporter construction at the MCP layer.
         (tmp_path / "a.json").write_text('{"platform": {"name": "duckdb"}, "benchmark": {"id": "tpch"}}')
         (tmp_path / "b.json").write_text('{"platform": {"name": "duckdb"}, "benchmark": {"id": "tpch"}}')
         with patch("benchbox.core.results.analytics.compare_results") as core_compare:
@@ -207,7 +179,6 @@ class TestRemoteModeAnonymization:
         ],
     )
     def test_anonymize_has_no_permissive_default(self, module_path: str, function_name: str):
-        """A default would make "forgot the kwarg" look like "chose local"."""
         import importlib
         import inspect
 
@@ -220,8 +191,6 @@ class TestRemoteModeAnonymization:
 
 
 class TestChartOutputContract:
-    """Defect 3: the docstring promised ANSI colors the renderer never emits."""
-
     def test_renderer_is_constructed_without_color(self):
         from benchbox.mcp.tools import visualization as visualization_module
 
@@ -229,10 +198,14 @@ class TestChartOutputContract:
 
         assert "ChartOptions(use_color=False)" in source
 
-    def test_generate_chart_docstring_matches_the_renderer(self):
-        from benchbox.mcp.tools import visualization as visualization_module
+    def test_generate_chart_description_matches_the_renderer(self, tmp_path: Path):
+        from benchbox.mcp import create_server
+        from tests.unit.mcp.public_api import list_tools_by_name
 
-        source = inspect.getsource(visualization_module.register_visualization_tools)
+        server = create_server(results_dir=tmp_path, charts_dir=tmp_path, log_level="ERROR")
+        description = list_tools_by_name(server)["generate_chart"].description
 
-        assert "ANSI colors for terminal display" not in source
-        assert "ANSI-color-free" in source
+        assert description is not None
+        assert "Generate ASCII chart output" in description
+        assert "non-ASCII formats are rejected" in description
+        assert "ANSI colors for terminal display" not in description

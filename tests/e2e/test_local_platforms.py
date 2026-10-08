@@ -1,9 +1,3 @@
-"""End-to-end tests for local database platforms.
-
-Tests execute the full benchbox CLI against local platforms (DuckDB, SQLite,
-DataFusion) and validate result output files.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -30,26 +24,17 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 
-# ============================================================================
-# DuckDB E2E Tests
-# ============================================================================
-
-
 class TestDuckDBE2E:
-    """E2E tests for DuckDB platform."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_local
     @pytest.mark.e2e_quick
     @pytest.mark.duckdb
     @pytest.mark.tpch
     def test_tpch_full_execution(self, tmp_path: Path) -> None:
-        """Test full TPC-H benchmark execution with DuckDB at SF 0.01."""
         config = {
             "platform": "duckdb",
             "benchmark": "tpch",
             "scale": "0.01",
-            # DuckDB manages its database location internally
         }
 
         result = run_benchmark(config, timeout=E2E_BENCHMARK_TIMEOUT)
@@ -57,7 +42,6 @@ class TestDuckDBE2E:
         assert result.returncode == 0, f"CLI failed with:\nstdout: {result.stdout}\nstderr: {result.stderr}"
         assert "Benchmark completed" in result.stdout or "benchmark completed" in result.stdout.lower()
 
-        # Find and validate result file
         results_dir = Path("benchmark_runs")
         if results_dir.exists():
             result_files = find_result_files(results_dir, pattern="*duckdb*tpch*.json")
@@ -75,19 +59,16 @@ class TestDuckDBE2E:
     @pytest.mark.duckdb
     @pytest.mark.tpch
     def test_tpch_query_subset(self, tmp_path: Path) -> None:
-        """Test TPC-H with --queries subset flag."""
         config = {
             "platform": "duckdb",
             "benchmark": "tpch",
             "scale": "0.01",
             "queries": "Q1,Q6,Q14",
-            # DuckDB manages its database location internally
         }
 
         result = run_benchmark(config, timeout=300)
 
         assert result.returncode == 0, f"CLI failed: {result.stdout}"
-        # With query subset, should only execute 3 queries
         assert "Q1" in result.stdout or "q1" in result.stdout.lower()
 
     @pytest.mark.e2e
@@ -96,14 +77,12 @@ class TestDuckDBE2E:
     @pytest.mark.tpch
     @pytest.mark.slow
     def test_tpch_with_capture_plans(self, tmp_path: Path) -> None:
-        """Test TPC-H with --capture-plans flag."""
         config = {
             "platform": "duckdb",
             "benchmark": "tpch",
             "scale": "0.01",
             "queries": "Q1,Q6",
             "capture_plans": True,
-            # DuckDB manages its database location internally
         }
 
         result = run_benchmark(config, timeout=300)
@@ -116,12 +95,10 @@ class TestDuckDBE2E:
     @pytest.mark.ssb
     @pytest.mark.slow
     def test_ssb_execution(self, tmp_path: Path) -> None:
-        """Test SSB benchmark execution with DuckDB."""
         config = {
             "platform": "duckdb",
             "benchmark": "ssb",
             "scale": "0.01",
-            # DuckDB manages its database location internally
         }
 
         result = run_benchmark(config, timeout=E2E_BENCHMARK_TIMEOUT)
@@ -130,8 +107,6 @@ class TestDuckDBE2E:
 
 
 class TestSQLiteE2E:
-    """E2E tests for SQLite platform."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_local
     @pytest.mark.slow
@@ -139,7 +114,6 @@ class TestSQLiteE2E:
     @pytest.mark.sqlite
     @pytest.mark.tpch
     def test_tpch_full_execution(self, tmp_path: Path) -> None:
-        """Test full TPC-H benchmark execution with SQLite at SF 0.01."""
         config = {
             "platform": "sqlite",
             "benchmark": "tpch",
@@ -158,7 +132,6 @@ class TestSQLiteE2E:
     @pytest.mark.sqlite
     @pytest.mark.tpch
     def test_tpch_query_subset_smoke(self, tmp_path: Path) -> None:
-        """Run a minimal SQLite execution path while full coverage lives in stress."""
         config = {
             "platform": "sqlite",
             "benchmark": "tpch",
@@ -178,7 +151,6 @@ class TestSQLiteE2E:
     @pytest.mark.sqlite
     @pytest.mark.tpch
     def test_tpch_phases_generate_load(self, tmp_path: Path) -> None:
-        """Test TPC-H with explicit generate and load phases."""
         config = {
             "platform": "sqlite",
             "benchmark": "tpch",
@@ -194,13 +166,10 @@ class TestSQLiteE2E:
 
 
 class TestDataFusionE2E:
-    """E2E tests for DataFusion platform."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_local
     @pytest.mark.slow
     def test_tpch_full_execution(self, tmp_path: Path) -> None:
-        """Test full TPC-H benchmark execution with DataFusion at SF 0.01."""
         if not is_platform_available("datafusion"):
             pytest.skip("DataFusion not available")
 
@@ -218,7 +187,6 @@ class TestDataFusionE2E:
     @pytest.mark.e2e_local
     @pytest.mark.e2e_quick
     def test_dry_run_generates_artifacts(self, tmp_path: Path) -> None:
-        """Test dry-run mode generates expected artifacts."""
         if not is_platform_available("datafusion"):
             pytest.skip("DataFusion not available")
 
@@ -243,14 +211,7 @@ class TestDataFusionE2E:
         assert "Dry run completed" in result.stdout
 
 
-# ============================================================================
-# ClickHouse Local (chDB) E2E Tests
-# ============================================================================
-
-
 class TestClickHouseLocalE2E:
-    """E2E tests for ClickHouse local mode (chDB)."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_local
     @pytest.mark.e2e_quick
@@ -260,7 +221,6 @@ class TestClickHouseLocalE2E:
         clickhouse_stub_dir: Path,
         clickhouse_env: Mapping[str, str],
     ) -> None:
-        """Test dry-run mode with ClickHouse local generates expected artifacts."""
         output_dir = tmp_path / "dry_run"
         output_dir.mkdir()
         chdb_path = tmp_path / "chdb_store"
@@ -291,48 +251,28 @@ class TestClickHouseLocalE2E:
         assert "Dry run completed" in result.stdout
 
 
-# ============================================================================
-# Cross-Platform Comparison Tests
-# ============================================================================
-
-
 class TestCrossPlatformE2E:
-    """E2E tests comparing results across platforms."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_local
     @pytest.mark.slow
     def test_duckdb_sqlite_same_results(self, tmp_path: Path) -> None:
-        """Test that DuckDB and SQLite produce comparable results for TPC-H."""
-        # Run DuckDB
         duckdb_config = {
             "platform": "duckdb",
             "benchmark": "tpch",
             "scale": "0.01",
             "queries": "Q1",
-            # DuckDB manages its database location internally
         }
         duckdb_result = run_benchmark(duckdb_config, timeout=300)
         assert duckdb_result.returncode == 0, f"DuckDB failed: {duckdb_result.stdout}"
 
-        # Run SQLite
         sqlite_config = {
             "platform": "sqlite",
             "benchmark": "tpch",
             "scale": "0.01",
             "queries": "Q1",
-            # SQLite manages its database location internally via database_name
         }
         sqlite_result = run_benchmark(sqlite_config, timeout=300)
         assert sqlite_result.returncode == 0, f"SQLite failed: {sqlite_result.stdout}"
-
-        # Both should complete successfully - results should be semantically equivalent
-        # (actual value comparison would require parsing result files)
-
-
-# ============================================================================
-# Parametrized Tests
-# ============================================================================
 
 
 @pytest.mark.e2e
@@ -340,7 +280,6 @@ class TestCrossPlatformE2E:
 @pytest.mark.e2e_quick
 @pytest.mark.parametrize("platform", ["duckdb", "sqlite"])
 def test_help_command_per_platform(platform: str) -> None:
-    """Test that help command works for each platform."""
     result = run_cli_command(["run", "--help"])
     assert result.returncode == 0
     assert platform in result.stdout.lower() or "platform" in result.stdout.lower()
@@ -357,7 +296,6 @@ def test_help_command_per_platform(platform: str) -> None:
     ],
 )
 def test_dry_run_parametrized(tmp_path: Path, platform: str, benchmark_name: str) -> None:
-    """Test dry-run mode works for multiple platform/benchmark combinations."""
     output_dir = tmp_path / f"dry_run_{platform}_{benchmark_name}"
     output_dir.mkdir()
 
@@ -378,7 +316,6 @@ def test_dry_run_parametrized(tmp_path: Path, platform: str, benchmark_name: str
     assert result.returncode == 0, f"Dry run failed for {platform}/{benchmark_name}: {result.stdout}"
     assert "Dry run completed" in result.stdout
 
-    # Verify artifacts exist
     artifacts = list(output_dir.glob("*"))
     assert artifacts, f"No artifacts generated for {platform}/{benchmark_name}"
     assert list(output_dir.glob("*.json")) or list(output_dir.glob("*.yaml"))

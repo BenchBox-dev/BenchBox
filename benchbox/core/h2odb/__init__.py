@@ -1,21 +1,6 @@
-"""H2O DB benchmark package.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This package provides a complete implementation of the H2O DB benchmark,
-which tests analytical database performance using taxi trip data.
-
-The H2O DB benchmark features:
-1. A single large table with synthetic taxi trip records
-2. 10 analytical queries testing various aspects of performance
-3. Focus on aggregations, grouping, and analytical functions
-4. Based on NYC Taxi & Limousine Commission Trip Record Data structure
-
-For more information, see:
-- https://h2oai.github.io/db-benchmark/
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from .benchmark import H2OBenchmark
 from .generator import H2ODataGenerator

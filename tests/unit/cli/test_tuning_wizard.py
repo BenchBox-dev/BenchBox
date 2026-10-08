@@ -1,10 +1,3 @@
-"""Coverage tests for CLI tuning wizard module.
-
-The wizard tests run against real ``UnifiedTuningConfiguration`` objects so a
-table-layout choice that the config silently drops fails here instead of
-passing against a stand-in that accepts every type.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -43,7 +36,6 @@ def _enabled(config: UnifiedTuningConfiguration) -> set:
 
 
 def _table_slots(config: UnifiedTuningConfiguration) -> dict[str, set[str]]:
-    """Map table name to the layout slots recorded on it."""
     slots: dict[str, set[str]] = {}
     for name, entry in config.table_tunings.items():
         present = {slot for slot in ("partitioning", "clustering", "distribution", "sorting") if getattr(entry, slot)}
@@ -78,8 +70,6 @@ def test_apply_defaults_to_config() -> None:
     cfg = UnifiedTuningConfiguration()
     out = t._apply_defaults_to_config(cfg, defaults={}, platform="redshift", benchmark="tpch")
     assert out.primary_keys.enabled is True
-    # The DuckDB TPC-H template carries sorting but no distribution slot, so
-    # only sorting persists; distribution is declined rather than invented.
     assert TuningType.DISTRIBUTION not in _enabled(out)
     assert TuningType.SORTING in _enabled(out)
     slots = _table_slots(out)
@@ -88,8 +78,6 @@ def test_apply_defaults_to_config() -> None:
 
 
 def test_apply_defaults_to_config_all_platforms() -> None:
-    # Only template-backed slots persist: TPC-H carries partitioning on two
-    # tables and sorting on six, but no clustering or distribution slot.
     expected = {
         "snowflake": set(),
         "bigquery": {TuningType.PARTITIONING},
@@ -114,7 +102,6 @@ def test_apply_defaults_to_config_all_platforms() -> None:
 
 
 def test_enable_layout_applies_every_matching_template_table() -> None:
-    """A global layout choice reaches all tuned tables carrying the slot."""
     cfg = UnifiedTuningConfiguration()
     cfg.enable_platform_optimization(TuningType.SORTING, benchmark="tpch")
     slots = _table_slots(cfg)
@@ -123,7 +110,6 @@ def test_enable_layout_applies_every_matching_template_table() -> None:
 
 
 def test_enable_layout_declines_benchmark_without_template() -> None:
-    """Benchmarks with no packaged template get no foreign table entry."""
     cfg = UnifiedTuningConfiguration()
     cfg.enable_platform_optimization(TuningType.CLUSTERING, benchmark="nyctaxi")
     assert cfg.table_tunings == {}, "unknown benchmarks must not borrow TPC-H tables"
@@ -191,12 +177,9 @@ def test_simple_wizard_objectives_and_platform_feature_toggles(monkeypatch: pyte
 
 
 def test_simple_wizard_persists_table_layout_choices(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Confirmed table-layout choices must survive on the resulting config."""
     monkeypatch.setattr(t.console, "print", lambda *a, **k: None)
     monkeypatch.setattr(t, "_show_simple_summary", lambda *a, **k: None)
 
-    # Snowflake clustering has no TPC-H template slot, so the choice is
-    # declined rather than persisted on a foreign table.
     monkeypatch.setattr(t.Prompt, "ask", _seq(["3"]))
     monkeypatch.setattr(t.Confirm, "ask", _seq([True]))
     snowflake_out = t._run_simple_wizard(
@@ -205,7 +188,6 @@ def test_simple_wizard_persists_table_layout_choices(monkeypatch: pytest.MonkeyP
     assert TuningType.CLUSTERING not in _enabled(snowflake_out)
     assert not _table_slots(snowflake_out)
 
-    # BigQuery partitioning persists; clustering has no slot and is declined.
     monkeypatch.setattr(t.Prompt, "ask", _seq(["3"]))
     monkeypatch.setattr(t.Confirm, "ask", _seq([True]))
     bigquery_out = t._run_simple_wizard(
@@ -216,7 +198,6 @@ def test_simple_wizard_persists_table_layout_choices(monkeypatch: pytest.MonkeyP
     bigquery_slots = _table_slots(bigquery_out)
     assert any("partitioning" in present for present in bigquery_slots.values())
 
-    # Redshift sort keys persist on all six tuned tables; distribution is declined.
     monkeypatch.setattr(t.Prompt, "ask", _seq(["3"]))
     monkeypatch.setattr(t.Confirm, "ask", _seq([True]))
     redshift_out = t._run_simple_wizard(UnifiedTuningConfiguration(), {}, "redshift", "tpch", SimpleNamespace())
@@ -248,8 +229,6 @@ def test_advanced_wizard_and_platform_specific_configurators(monkeypatch: pytest
         lambda c, b="tpch": c.enable_platform_optimization(TuningType.CLUSTERING),
     )
     out2 = t._run_advanced_wizard(cfg2, {}, "snowflake", "tpch", SimpleNamespace())
-    # Clustering has no TPC-H template slot, so the configurator records
-    # nothing instead of inventing a foreign table entry.
     assert TuningType.CLUSTERING not in _enabled(out2)
     assert not _table_slots(out2)
 
@@ -270,8 +249,6 @@ def test_platform_config_helpers(monkeypatch: pytest.MonkeyPatch) -> None:
     t._configure_clickhouse_optimizations(cfg)
     enabled = _enabled(cfg)
     assert TuningType.Z_ORDERING in enabled
-    # Only template-backed slots persist: partitioning on two tables and
-    # sorting on six; clustering and distribution have no TPC-H slot.
     assert TuningType.PARTITIONING in enabled
     assert TuningType.SORTING in enabled
     assert TuningType.CLUSTERING not in enabled

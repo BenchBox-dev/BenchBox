@@ -1,16 +1,3 @@
-"""Tests for the registry's `surface` visibility field.
-
-Foundation w3 introduces a `surface: "public" | "internal"` registry
-field. Default is "public" so existing benchmarks see no behavior
-change. Cutover TODO uses "internal" for joinorder_synthetic to hide
-it from the result-publisher's public surface without explorer UI
-changes.
-
-This test file ships with foundation w3; cutover adds joinorder_synthetic
-and the per-benchmark surface assertion (test_joinorder_synthetic_hidden,
-referenced by cutover's verification).
-"""
-
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -27,10 +14,6 @@ pytestmark = [
 
 @pytest.mark.parametrize("benchmark_id", sorted(benchmark_registry.BENCHMARK_METADATA.keys()))
 def test_existing_benchmarks_default_to_public(benchmark_id: str) -> None:
-    """Regression guard: any benchmark NOT explicitly marked internal must
-    appear public. Foundation is additive — no behavior change for existing
-    entries.
-    """
     surface = benchmark_registry.get_benchmark_surface(benchmark_id)
     declared = benchmark_registry.BENCHMARK_METADATA[benchmark_id].get("surface")
     if declared == "internal":
@@ -40,12 +23,10 @@ def test_existing_benchmarks_default_to_public(benchmark_id: str) -> None:
 
 
 def test_unregistered_benchmark_defaults_public() -> None:
-    """Defensive default for ids not in BENCHMARK_METADATA."""
     assert benchmark_registry.get_benchmark_surface("does-not-exist") == "public"
 
 
 def test_internal_surface_recognized() -> None:
-    """A benchmark marked internal is surfaced as 'internal' by the helper."""
     fake_meta = {
         "x_internal": {
             "display_name": "Internal Test",
@@ -68,7 +49,6 @@ def test_internal_surface_recognized() -> None:
 
 
 def test_public_surface_recognized() -> None:
-    """Explicitly setting surface=public is equivalent to omitting the field."""
     fake_meta = {
         "x_public": {
             "display_name": "Public Test",
@@ -91,12 +71,10 @@ def test_public_surface_recognized() -> None:
 
 
 def test_joinorder_synthetic_hidden() -> None:
-    """The cutover's synthetic compatibility surface is not public."""
     assert benchmark_registry.get_benchmark_surface("joinorder_synthetic") == "internal"
 
 
 def test_public_benchmark_ids_exclude_joinorder_synthetic() -> None:
-    """Public discovery helpers omit internal benchmark surfaces."""
     public_ids = benchmark_registry.list_public_benchmark_ids()
 
     assert "joinorder" in public_ids
@@ -104,7 +82,6 @@ def test_public_benchmark_ids_exclude_joinorder_synthetic() -> None:
 
 
 def _synthetic_meta(support_status: str, surface: str, *, supports_dataframe: bool = False) -> dict[str, object]:
-    """Build a metadata entry for a hypothetical future benchmark."""
     return {
         "display_name": f"Synthetic {support_status}/{surface}",
         "description": "synthetic future-status fixture",
@@ -125,12 +102,6 @@ def _synthetic_meta(support_status: str, surface: str, *, supports_dataframe: bo
 
 @pytest.mark.parametrize("support_status", sorted(benchmark_registry.BENCHMARK_SUPPORT_STATUS_VALUES))
 def test_surface_gates_discovery_independent_of_support_status(support_status: str) -> None:
-    """`surface` alone controls public discovery; `support_status` never hides or reveals.
-
-    Future-proofing invariant: a benchmark of ANY support tier is listed when
-    public and hidden when internal. Visibility must not be repurposed onto the
-    status field.
-    """
     fixtures = {
         "x_future_public": _synthetic_meta(support_status, "public"),
         "x_future_internal": _synthetic_meta(support_status, "internal"),
@@ -145,7 +116,6 @@ def test_surface_gates_discovery_independent_of_support_status(support_status: s
 
 @pytest.mark.parametrize("support_status", sorted(benchmark_registry.BENCHMARK_SUPPORT_STATUS_VALUES))
 def test_registry_summary_counts_dataframe_capability_independent_of_support_status(support_status: str) -> None:
-    """Registry summaries count supports_dataframe, not support tier."""
     base_supported = benchmark_registry.get_benchmark_registry_summary()["dataframe_supported"]
     fixtures = {
         f"x_{support_status}_df": _synthetic_meta(support_status, "public", supports_dataframe=True),

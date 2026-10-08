@@ -1,17 +1,6 @@
 #!/usr/bin/env python3
-"""
-Cross-Platform DataFrame Comparison Example
-
-Demonstrates comparing query performance across different DataFrame platforms
-(Polars, Pandas) using the same TPC-H queries. This showcases how BenchBox's
-family-based architecture enables fair comparisons.
-
-Copyright 2026 Joe Harris / BenchBox Project.
-Licensed under the MIT License.
-
-Usage:
-    python examples/dataframe/cross_platform_comparison.py
-"""
+# Copyright 2026 Joe Harris / BenchBox Project.
+# Licensed under the MIT License.
 
 from __future__ import annotations
 
@@ -19,7 +8,6 @@ import sys
 import time
 from pathlib import Path
 
-# Check platform availability
 platforms_available = {"polars": False, "pandas": False}
 
 try:
@@ -45,7 +33,6 @@ if not any(platforms_available.values()):
 
 
 def load_polars_context(data_dir: Path):
-    """Load data into Polars DataFrame context."""
     from benchbox.platforms.polars_platform import PolarsAdapter
 
     ctx = PolarsAdapter().create_connection()
@@ -62,7 +49,6 @@ def load_polars_context(data_dir: Path):
 
 
 def load_pandas_context(data_dir: Path):
-    """Load data into Pandas DataFrame context."""
     from benchbox.platforms import get_dataframe_adapter
 
     ctx = get_dataframe_adapter("pandas-df", working_dir=str(data_dir)).create_context()
@@ -79,11 +65,9 @@ def load_pandas_context(data_dir: Path):
 
 
 def run_query_timed(query, ctx, family: str) -> tuple[float, int]:
-    """Run a query and return execution time and row count."""
     start = time.perf_counter()
     result = query.execute(ctx, family)
 
-    # Collect if lazy
     if hasattr(result, "collect"):
         result = result.collect()
 
@@ -94,14 +78,12 @@ def run_query_timed(query, ctx, family: str) -> tuple[float, int]:
 
 
 def main() -> int:
-    """Run cross-platform DataFrame comparison."""
     from benchbox.core.tpch.dataframe_queries import get_query
 
     print("=" * 70)
     print("Cross-Platform DataFrame Comparison")
     print("=" * 70)
 
-    # Check data availability
     data_dir = Path("benchmark_runs/tpch/sf0.01/data")
     if not data_dir.exists():
         print(f"\nWarning: Data directory not found: {data_dir}")
@@ -109,7 +91,6 @@ def main() -> int:
         print("  benchbox run --platform duckdb --benchmark tpch --scale 0.01 --phases load")
         return 1
 
-    # Load contexts for available platforms
     contexts = {}
     families = {}
 
@@ -123,13 +104,10 @@ def main() -> int:
         contexts["Pandas"] = load_pandas_context(data_dir)
         families["Pandas"] = "pandas"
 
-    # Queries to compare
     query_ids = ["Q1", "Q3", "Q6", "Q10"]
 
-    # Results storage
     results = {qid: {} for qid in query_ids}
 
-    # Run comparisons
     print("\n" + "-" * 70)
     print("Running Query Comparisons")
     print("-" * 70)
@@ -146,7 +124,6 @@ def main() -> int:
         for platform, ctx in contexts.items():
             family = families[platform]
 
-            # Check if query has implementation for this family
             impl = query.get_impl_for_family(family)
             if impl is None:
                 print(f"  {platform}: No {family} implementation")
@@ -159,12 +136,10 @@ def main() -> int:
             except Exception as e:
                 print(f"  {platform}: Error - {e}")
 
-    # Summary table
     print("\n" + "=" * 70)
     print("Performance Summary")
     print("=" * 70)
 
-    # Header
     platform_names = list(contexts.keys())
     header = f"{'Query':<10}"
     for platform in platform_names:
@@ -174,7 +149,6 @@ def main() -> int:
     print(header)
     print("-" * len(header))
 
-    # Data rows
     for qid in query_ids:
         row = f"{qid:<10}"
         times = []
@@ -187,10 +161,9 @@ def main() -> int:
                 times.append(None)
                 row += f"{'N/A':>15}"
 
-        # Calculate speedup if both platforms ran
         if len(times) == 2 and all(t is not None for t in times):
             if times[0] > 0:
-                speedup = times[1] / times[0]  # Pandas / Polars
+                speedup = times[1] / times[0]
                 row += f"{speedup:>14.2f}x"
             else:
                 row += f"{'N/A':>15}"

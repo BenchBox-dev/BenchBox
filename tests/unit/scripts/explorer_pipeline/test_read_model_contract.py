@@ -1,17 +1,3 @@
-"""Unit tests for the explorer read-model contract additions.
-
-Covers:
-  (a) _platform_id strips known trust suffixes correctly
-  (b) _platform_id is idempotent on clean names
-  (c) _query_display_ms returns median of passing runs, not first
-  (d) _query_display_ms returns None when all runs failed
-  (e) _query_display_ms uses measurement-only rows when run_type present
-  (f) display_geomean_ms differs from geomean_ms when samples vary
-  (g) is_ranking_eligible returns False for community-submission trust
-  (h) select_canonical_row picks ranking-eligible over non-eligible
-  (i) select_canonical_row picks newest when both are ranking-eligible
-"""
-
 from __future__ import annotations
 
 import copy
@@ -53,11 +39,6 @@ def test_canonical_cohort_identity_preserves_alias_and_unknown_phase() -> None:
     assert canonical_phase("throughput") == "throughput"
 
 
-# ---------------------------------------------------------------------------
-# (a) _platform_id strips known trust suffixes correctly
-# ---------------------------------------------------------------------------
-
-
 class TestPlatformId:
     @pytest.mark.parametrize(
         "raw, expected",
@@ -72,14 +53,13 @@ class TestPlatformId:
     def test_strips_trust_suffixes(self, raw: str, expected: str) -> None:
         assert _platform_id(raw) == expected
 
-    # (b) idempotent on clean names
     @pytest.mark.parametrize(
         "name",
         [
             "polars-df",
             "clickhouse-cloud",
-            "clickhouse-local",  # must not be stripped - ends in "local" but no "-trust-"
-            "clickhouse-server",  # must not be stripped - ends in word that could false-match
+            "clickhouse-local",
+            "clickhouse-server",
             "motherduck",
             "duckdb",
         ],
@@ -97,7 +77,6 @@ class TestPlatformId:
         transformer = BundleTransformer()
         entry = transformer.to_manifest_entry(bundle_file)
         assert entry.platform_id == "duckdb"
-        # raw platform field must remain unchanged
         assert entry.platform == "duckdb"
 
     def test_platform_id_written_to_detail_result(self, bundle_file: Path) -> None:
@@ -115,11 +94,6 @@ class TestPlatformId:
         entry = transformer.to_manifest_entry(bundle_path)
         assert entry.platform_id == "duckdb"
         assert entry.platform == "DuckDB-trust-ci"
-
-
-# ---------------------------------------------------------------------------
-# (c) _query_display_ms returns median of passing runs, not first
-# ---------------------------------------------------------------------------
 
 
 class TestQueryDisplayMs:
@@ -141,17 +115,15 @@ class TestQueryDisplayMs:
 
     def test_returns_median_not_first(self) -> None:
         timings = [
-            self._make_timing("Q1", 16.0),  # cold-cache outlier
+            self._make_timing("Q1", 16.0),
             self._make_timing("Q1", 11.0),
             self._make_timing("Q1", 11.0),
             self._make_timing("Q1", 11.0),
         ]
-        # median of [11, 11, 11, 16] = (11+11)/2 = 11.0
         display_ms, sample_count = _query_display_ms(timings)
         assert display_ms == pytest.approx(11.0)
         assert sample_count == 4
 
-    # (d) returns None when all runs failed
     def test_returns_none_when_all_failed(self) -> None:
         timings = [
             self._make_timing("Q1", 100.0, status="fail"),
@@ -162,19 +134,16 @@ class TestQueryDisplayMs:
         assert sample_count == 0
 
     def test_returns_none_for_missing_query_id(self) -> None:
-        # Caller is responsible for pre-filtering; empty list → (None, 0)
         display_ms, sample_count = _query_display_ms([])
         assert display_ms is None
         assert sample_count == 0
 
-    # (e) uses measurement-only rows when run_type present
     def test_uses_measurement_rows_over_throughput(self) -> None:
         timings = [
             self._make_timing("Q1", 10.0, run_type="measurement"),
             self._make_timing("Q1", 50.0, run_type="throughput"),
             self._make_timing("Q1", 60.0, run_type="throughput"),
         ]
-        # Only the measurement row should contribute; median of [10] = 10
         display_ms, sample_count = _query_display_ms(timings)
         assert display_ms == pytest.approx(10.0)
         assert sample_count == 1
@@ -184,7 +153,6 @@ class TestQueryDisplayMs:
             QueryTiming(query_id="Q1", duration_ms=20.0, status="pass"),
             QueryTiming(query_id="Q1", duration_ms=30.0, status="pass"),
         ]
-        # no run_type → median of [20, 30] = 25
         display_ms, sample_count = _query_display_ms(timings)
         assert display_ms == pytest.approx(25.0)
         assert sample_count == 2
@@ -199,23 +167,9 @@ class TestQueryDisplayMs:
         assert display_ms == pytest.approx(20.0)
 
 
-# ---------------------------------------------------------------------------
-# (f) display_geomean_ms differs from geomean_ms when samples vary
-# ---------------------------------------------------------------------------
-
-
 class TestDisplayGeomean:
     def test_display_geomean_differs_from_raw_geomean(self, tmp_path: Path) -> None:
-        """When a query has a cold-cache outlier, display_geomean_ms (median-per-query)
-        should be lower than geomean_ms (mean-of-all-raw-samples).
-
-        Q1: [16ms outlier, 11ms, 11ms, 11ms warm-cache]
-          geomean_ms     = geomean([16, 11, 11, 11]) ≈ 12.25ms  (all raw samples)
-          display_ms(Q1) = median([16, 11, 11, 11]) = 11.0ms
-          display_geomean_ms = geomean([11.0]) = 11.0ms
-        """
         bundle = copy.deepcopy(MINIMAL_BUNDLE)
-        # Only Q1 so the geomean/display_geomean comparison is unambiguous
         bundle["queries"] = [
             {"id": "Q1", "ms": 16.0, "run_type": "measurement", "status": "SUCCESS", "iter": 1},
             {"id": "Q1", "ms": 11.0, "run_type": "measurement", "status": "SUCCESS", "iter": 2},
@@ -230,7 +184,6 @@ class TestDisplayGeomean:
 
         assert entry.geomean_ms is not None
         assert entry.display_geomean_ms is not None
-        # display uses median (11.0); raw geomean includes the 16ms outlier (≈12.25)
         assert entry.display_geomean_ms < entry.geomean_ms
         assert entry.display_geomean_ms == pytest.approx(11.0)
 
@@ -443,11 +396,6 @@ class TestTimingEligibilityContract:
         assert entry.comparison_exclusion_reason == "insufficient_valid_queries"
 
 
-# ---------------------------------------------------------------------------
-# (g) is_ranking_eligible returns False for community-submission trust
-# ---------------------------------------------------------------------------
-
-
 class TestRankingEligibility:
     def _make_entry(
         self,
@@ -482,16 +430,10 @@ class TestRankingEligibility:
         assert is_ranking_eligible(entry) is True
 
     def test_ci_public_verified_is_eligible(self) -> None:
-        # "ci" (not "ci-verified") is the label bundle_publisher.VALID_LABELS
-        # actually accepts and produces - the publisher rejects "ci-verified"
-        # outright (test_bundle_publisher_label.py). A CI-produced bundle must
-        # be ranking-eligible under its real, reachable label.
         entry = self._make_entry("ci", "public-verified")
         assert is_ranking_eligible(entry) is True
 
     def test_vendor_supplied_is_eligible(self) -> None:
-        # Decision D2: vendor-supplied results are ranked (with a distinct badge),
-        # not demoted to browse-only like community submissions.
         entry = self._make_entry("vendor-supplied", "public-vendor-reported")
         assert is_ranking_eligible(entry) is True
 
@@ -500,12 +442,10 @@ class TestRankingEligibility:
         assert is_ranking_eligible(entry) is False
 
     def test_community_submission_public_curated_is_not_eligible(self) -> None:
-        """Trust label alone fails even with good visibility."""
         entry = self._make_entry("community-submission", "public-curated")
         assert is_ranking_eligible(entry) is False
 
     def test_maintainer_run_self_reported_is_not_eligible(self) -> None:
-        """Visibility alone fails even with good trust label."""
         entry = self._make_entry("maintainer-run", "public-self-reported")
         assert is_ranking_eligible(entry) is False
 
@@ -534,11 +474,6 @@ class TestRankingEligibility:
         assert "maintainer-run" in RANKING_ELIGIBLE_TRUST_LABELS
         assert "ci-verified" in RANKING_ELIGIBLE_TRUST_LABELS
         assert "ci" in RANKING_ELIGIBLE_TRUST_LABELS
-
-
-# ---------------------------------------------------------------------------
-# (h) select_canonical_row picks ranking-eligible over non-eligible
-# ---------------------------------------------------------------------------
 
 
 class TestSelectCanonicalRow:
@@ -573,15 +508,12 @@ class TestSelectCanonicalRow:
         entry = self._make_entry("2026-01-01")
         assert select_canonical_row([entry]) is entry
 
-    # (h) eligible beats non-eligible
     def test_eligible_beats_non_eligible(self) -> None:
         eligible = self._make_entry("2026-01-01", "maintainer-run", "public-curated")
         non_eligible = self._make_entry("2026-06-01", "community-submission", "public-self-reported")
-        # non_eligible is newer but not eligible - eligible should win
         result = select_canonical_row([non_eligible, eligible])
         assert result is eligible
 
-    # (i) newest wins when both are eligible
     def test_newest_wins_when_both_eligible(self) -> None:
         older = self._make_entry("2026-01-01")
         newer = self._make_entry("2026-06-01")
@@ -599,7 +531,7 @@ class TestSelectCanonicalRow:
         eligible_newer = self._make_entry("2026-06-01", "maintainer-run", "public-curated")
         non_eligible_newest = self._make_entry("2026-12-01", "community-submission", "public-self-reported")
         result = select_canonical_row([eligible_older, eligible_newer, non_eligible_newest])
-        assert result is eligible_newer  # newest eligible, not newest overall
+        assert result is eligible_newer
 
     def test_clean_row_wins_over_newer_partial_query_failure(self) -> None:
         clean_older = self._make_entry("2026-01-01")
@@ -612,10 +544,8 @@ class TestSelectCanonicalRow:
         assert result is clean_older
 
     def test_deterministic_when_date_and_eligibility_tied(self) -> None:
-        """Result must not depend on input order when all keys except result_id tie."""
         e1 = self._make_entry("2026-01-01")
         e2 = self._make_entry("2026-01-01")
-        # result_ids are "x-2026-01-01" for both - force distinct IDs
         e1 = e1.model_copy(update={"result_id": "aaa-hash"})
         e2 = e2.model_copy(update={"result_id": "zzz-hash"})
         result_ab = select_canonical_row([e1, e2])

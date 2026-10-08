@@ -1,14 +1,4 @@
-"""Tests for first-class clickhouse-local, clickhouse-server platform split.
-
-Covers:
-- Migration contract constants in deployment_mode module
-- ClickHouseLocalAdapter and ClickHouseServerAdapter thin wrappers
-- Adapter factory legacy selector routing with deprecation warnings
-- Platform registry metadata for new platforms
-- is_clickhouse_platform() helper
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -28,11 +18,6 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
-
-
-# ---------------------------------------------------------------------------
-# Migration contract constants
-# ---------------------------------------------------------------------------
 
 
 class TestMigrationContract:
@@ -59,11 +44,6 @@ class TestMigrationContract:
         assert "deprecated" in msg.lower()
 
 
-# ---------------------------------------------------------------------------
-# is_clickhouse_platform helper
-# ---------------------------------------------------------------------------
-
-
 class TestIsClickhousePlatform:
     @pytest.mark.parametrize(
         "platform",
@@ -86,11 +66,6 @@ class TestIsClickhousePlatform:
     )
     def test_returns_false_for_non_clickhouse_platforms(self, platform: str) -> None:
         assert is_clickhouse_platform(platform) is False
-
-
-# ---------------------------------------------------------------------------
-# ClickHouseLocalAdapter thin wrapper
-# ---------------------------------------------------------------------------
 
 
 class TestClickHouseLocalAdapter:
@@ -129,14 +104,8 @@ class TestClickHouseLocalAdapter:
             patch("benchbox.platforms.clickhouse.setup.ClickHouseLocalClient"),
             patch("importlib.util.find_spec", return_value=object()),
         ):
-            # Even if config says server, local adapter forces local
             adapter = ClickHouseLocalAdapter.from_config({"deployment_mode": "server"})
             assert adapter.deployment_mode == "local"
-
-
-# ---------------------------------------------------------------------------
-# ClickHouseServerAdapter thin wrapper
-# ---------------------------------------------------------------------------
 
 
 class TestClickHouseServerAdapter:
@@ -172,7 +141,6 @@ class TestClickHouseServerAdapter:
             patch("benchbox.platforms.clickhouse.adapter.check_platform_dependencies", return_value=(True, [])),
             patch("benchbox.platforms.clickhouse.setup.ClickHouseClient"),
         ):
-            # Even if config says local, server adapter forces server
             adapter = ClickHouseServerAdapter.from_config({"deployment_mode": "local"})
             assert adapter.deployment_mode == "server"
 
@@ -200,11 +168,6 @@ class TestClickHouseServerAdapter:
         assert adapter.password == "benchbox"
 
 
-# ---------------------------------------------------------------------------
-# Adapter factory: legacy selector routing and deprecation warnings
-# ---------------------------------------------------------------------------
-
-
 class TestAdapterFactoryMigration:
     def test_clickhouse_local_resolves_without_warning(self) -> None:
         from benchbox.platforms.adapter_factory import _resolve_clickhouse_legacy
@@ -230,8 +193,6 @@ class TestAdapterFactoryMigration:
     def test_bare_clickhouse_is_removed_and_raises_with_replacements(self) -> None:
         from benchbox.platforms.adapter_factory import _resolve_clickhouse_legacy
 
-        # Bare 'clickhouse' is now a hard error regardless of any deployment
-        # context (the resolver no longer accepts deployment/config hints for it).
         with pytest.raises(ValueError) as exc_info:
             _resolve_clickhouse_legacy("clickhouse")
         msg = str(exc_info.value)
@@ -271,7 +232,6 @@ class TestAdapterFactoryMigration:
             assert warning is None
 
     def test_get_adapter_rejects_bare_clickhouse_with_helpful_error(self) -> None:
-        """Integration: get_adapter("clickhouse") raises naming the replacements."""
         from benchbox.platforms.adapter_factory import get_adapter
 
         with pytest.raises(ValueError) as exc_info:
@@ -279,11 +239,6 @@ class TestAdapterFactoryMigration:
         msg = str(exc_info.value)
         assert "clickhouse-local" in msg
         assert "clickhouse-server" in msg
-
-
-# ---------------------------------------------------------------------------
-# Platform registry: new platforms are registered
-# ---------------------------------------------------------------------------
 
 
 class TestPlatformRegistryNewPlatforms:

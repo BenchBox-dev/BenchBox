@@ -1,21 +1,8 @@
-"""Every TPC-DS query with a parameter adapter binds all the values dsqgen puts in its SQL.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-For each adapted query, family, seed and stream, two things must hold:
+# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
 
-* every value dsqgen logs that reaches the SQL template is read by the adapter, so no drawn value is
-  dropped on the way to the DataFrame surface;
-* every parameter key the implementation reads is supplied by the binding, so no implementation falls
-  back to a default or a literal while the SQL uses a drawn value.
-
-The inventory in ``test_parameter_consumption_inventory.py`` classifies queries by comparing implementations
-with the defaults file; it is a diagnostic. This test is the check that a binding is complete.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -33,18 +20,13 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.medium,
     pytest.mark.tpcds,
-    # Reading an implementation's keys is bounded with SIGALRM, which Windows does not have.
     pytest.mark.skipif(not hasattr(signal, "SIGALRM"), reason="needs SIGALRM"),
 ]
 
-# dsqgen's default seed (19620718) and one other; each with the first two streams. The pairs draw
-# different values for every adapted query, so a binding that ignores the seed or stream cannot pass.
 RUNS = [(None, 0), (None, 1), (42, 0), (42, 1)]
 
 
 class _RecordingValues(Mapping[str, str]):
-    """The logged values, recording which ones the adapter looks up."""
-
     def __init__(self, values: Mapping[str, str]) -> None:
         self._values = dict(values)
         self.read: set[str] = set()
@@ -79,7 +61,6 @@ def _flatten(values) -> Iterator[object]:
 
 
 def _canonical(value: object) -> str:
-    """A drawn or bound value in a form that ignores numeric type and letter case."""
     text = str(value).strip()
     try:
         return repr(float(text))
@@ -101,7 +82,6 @@ def _values_in_sql(dsqgen, query_id: int, logged: Mapping[str, str]) -> set[str]
         for match in _TOKEN.finditer(pending.pop()):
             name = match.group(1)
             used[name].add(int(match.group(2) or 0))
-            # An unlogged define passes its inputs through to the SQL.
             if name in defines and name not in logged_names and name not in expanded:
                 expanded.add(name)
                 pending.append(defines[name])
@@ -111,7 +91,6 @@ def _values_in_sql(dsqgen, query_id: int, logged: Mapping[str, str]) -> set[str]
         name, _, index = key.rpartition(".")
         if name.startswith("_") or name not in used:
             continue
-        # ``[NAME]`` in the template is index 0 and logs as ``NAME.01``.
         if int(index) in {max(i, 1) for i in used[name]}:
             reaching.add(key)
     return reaching
@@ -126,10 +105,6 @@ def test_adapter_reads_every_value_that_reaches_the_sql(dsqgen, query_id, seed, 
     reaching = _values_in_sql(dsqgen, query_id, logged)
     unread = reaching - recording.read
     assert not unread, f"Q{query_id} seed={seed} stream={stream_id}: the adapter never reads {sorted(unread)}"
-    # Reading a value is not enough: it must reach the output. A derived value (Q39's MONTH+1) sits
-    # beside its base value, so the base value itself is still expected to appear. Values are compared
-    # after _canonical, because adapters convert types (Q33's GMT "-5" is bound as -5.0) and bind column
-    # names drawn in upper case (Q1's SR_FEE) as the lower-case column.
     output = {_canonical(value) for value in _flatten(parameters.values())}
     dropped = {key for key in reaching if _canonical(logged[key]) not in output}
     assert not dropped, f"Q{query_id} seed={seed} stream={stream_id}: the adapter drops {sorted(dropped)}"
@@ -142,8 +117,6 @@ def test_binding_supplies_every_key_the_implementation_reads(dsqgen, query_id, s
     from benchbox.core.tpcds.dataframe_queries.parameter_adapters import bind_parameters
 
     binding = bind_parameters(query_id, scale_factor=1, seed=seed, stream_id=stream_id, dsqgen=dsqgen)
-    # The implementation sees only the binding, not the defaults file, so a key it reads that the
-    # binding lacks shows up here instead of being filled in by a default.
     read, complete = _read_keys(query_id, family, {query_id: dict(binding.parameters)})
     assert complete or f"{query_id}:{family}" in INCOMPLETE_RUNS, (
         f"Q{query_id} {family}: the implementation did not run to completion against the stand-in"
@@ -156,7 +129,6 @@ def test_binding_supplies_every_key_the_implementation_reads(dsqgen, query_id, s
 
 
 def test_runs_draw_different_values(dsqgen):
-    """The seeds and streams in RUNS must not collapse to one draw, or the tests above prove less."""
     for query_id in adapter_query_ids():
         draws = {
             tuple(

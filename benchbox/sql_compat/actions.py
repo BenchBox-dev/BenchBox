@@ -1,5 +1,3 @@
-"""CompatAction enum - the eight actions a compatibility rule can produce."""
-
 from __future__ import annotations
 
 from enum import Enum

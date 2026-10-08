@@ -1,9 +1,3 @@
-"""
-Tests for DuckDB query plan capture integration.
-
-Verifies that query plans are captured and parsed during query execution.
-"""
-
 from unittest.mock import MagicMock
 
 import pytest
@@ -17,8 +11,6 @@ pytestmark = [
 
 
 class TestIsDmlQueryHelper:
-    """Direct contract tests for the shared is_dml_query classifier."""
-
     @pytest.mark.parametrize(
         "query",
         [
@@ -52,7 +44,7 @@ class TestIsDmlQueryHelper:
             "CREATE TEMP TABLE t AS SELECT 1",
             "CREATE TEMPORARY TABLE t AS (SELECT 1)",
             "CREATE UNLOGGED TABLE t AS SELECT 1",
-            "CREATE TABLE t (a, b) AS SELECT x, y FROM s",  # CTAS with column alias list
+            "CREATE TABLE t (a, b) AS SELECT x, y FROM s",
             "CREATE TABLE t AS\nWITH cte AS (SELECT 1) SELECT * FROM cte",
             "CREATE TABLE t AS VALUES (1), (2)",
             "/* banner */ CREATE TABLE t AS SELECT 1",
@@ -72,20 +64,20 @@ class TestIsDmlQueryHelper:
         [
             "SELECT 1",
             "WITH cte AS (SELECT 1) SELECT * FROM cte",
-            "SELECT copy_total, merge_flag FROM t",  # identifiers, not verbs (word boundary)
-            "SELECT replacement_id, upserted_at FROM t",  # REPLACE/UPSERT identifiers, not verbs (word boundary)
-            "WITH cleaned AS (SELECT replace(name, 'a', 'b') FROM t) SELECT * FROM cleaned",  # REPLACE() string function, not the DML statement
-            "SELECT replace(name, 'a', 'b') FROM t",  # same function call, no CTE
-            "CREATE TABLE t (id INT)",  # column DDL writes no rows
-            "CREATE TABLE t (x INT GENERATED ALWAYS AS (x + 1) STORED)",  # generated column AS is not CTAS
-            "CREATE TABLE t (note TEXT DEFAULT 'AS SELECT')",  # literal inside column DDL is not CTAS
+            "SELECT copy_total, merge_flag FROM t",
+            "SELECT replacement_id, upserted_at FROM t",
+            "WITH cleaned AS (SELECT replace(name, 'a', 'b') FROM t) SELECT * FROM cleaned",
+            "SELECT replace(name, 'a', 'b') FROM t",
+            "CREATE TABLE t (id INT)",
+            "CREATE TABLE t (x INT GENERATED ALWAYS AS (x + 1) STORED)",
+            "CREATE TABLE t (note TEXT DEFAULT 'AS SELECT')",
             "CREATE INDEX idx ON t (id)",
-            "CREATE VIEW v AS SELECT 1",  # plain view stores no rows
+            "CREATE VIEW v AS SELECT 1",
             "DROP TABLE t",
             "ALTER TABLE t ADD COLUMN y INT",
             "TRUNCATE TABLE t",
-            "SELECT * FROM t WHERE note = 'INTO the void'",  # INTO inside a string literal
-            "SELECT * FROM (SELECT 1 INTO_X) sub",  # parenthesized, not a top-level INTO
+            "SELECT * FROM t WHERE note = 'INTO the void'",
+            "SELECT * FROM (SELECT 1 INTO_X) sub",
             "EXPLAIN SELECT 1",
             "",
             "-- only a comment",
@@ -98,8 +90,6 @@ class TestIsDmlQueryHelper:
 
 
 class TestDuckDBDMLPlanGuard:
-    """EXPLAIN ANALYZE re-executes statements; DML must downgrade to FORMAT JSON."""
-
     @pytest.mark.parametrize(
         "dml",
         [
@@ -151,7 +141,7 @@ class TestDuckDBDMLPlanGuard:
         ],
     )
     def test_ctas_query_does_not_use_analyze(self, write_ddl):
-        """CTAS/CMV/SELECT-INTO materialize rows; EXPLAIN ANALYZE would write them twice."""
+
         adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
         conn = MagicMock()
         conn.execute.return_value.fetchall.return_value = [("logical_plan", "{}")]
@@ -167,8 +157,8 @@ class TestDuckDBDMLPlanGuard:
         [
             "SELECT * FROM t WHERE id = 1",
             "WITH cte AS (SELECT 1) SELECT * FROM cte",
-            "SELECT copy_count, update_ts FROM t",  # column names starting with DML verbs
-            "CREATE TABLE t (id INT)",  # column DDL writes no rows
+            "SELECT copy_count, update_ts FROM t",
+            "CREATE TABLE t (id INT)",
         ],
     )
     def test_non_dml_query_still_uses_analyze(self, non_dml):
@@ -184,8 +174,6 @@ class TestDuckDBDMLPlanGuard:
 
 
 class TestDuckDBDisplayQueryPlan:
-    """display_query_plan_if_enabled must not be called when capture_plans is active."""
-
     def _make_adapter(self, capture_plans: bool):
         return DuckDBAdapter(capture_plans=capture_plans)
 
@@ -224,8 +212,6 @@ class TestDuckDBDisplayQueryPlan:
 
 
 class TestDuckDBPlanRawOutputPolicy:
-    """capture_query_plan must honor the plan_raw_output retention config."""
-
     def _capture(self, **config):
         adapter = DuckDBAdapter(capture_plans=True, **config)
         connection = adapter.create_connection()
@@ -238,7 +224,7 @@ class TestDuckDBPlanRawOutputPolicy:
             adapter.close_connection(connection)
 
     def test_default_policy_retains_raw_output(self):
-        # Default 'truncated' with a 16 KiB cap keeps a small plan's raw text whole.
+
         plan = self._capture()
         assert plan is not None
         assert plan.raw_explain_output is not None
@@ -248,7 +234,7 @@ class TestDuckDBPlanRawOutputPolicy:
         plan = self._capture(plan_raw_output="none")
         assert plan is not None
         assert plan.raw_explain_output is None
-        # Structured DAG and fingerprint are retained regardless of the raw policy.
+
         assert plan.logical_root is not None
         assert plan.plan_fingerprint is not None
 
@@ -260,46 +246,39 @@ class TestDuckDBPlanRawOutputPolicy:
         assert plan.logical_root is not None
 
     def test_invalid_max_bytes_config_falls_back_to_default(self):
-        # A non-integer cap must not crash capture; it falls back to the default cap.
+
         plan = self._capture(plan_raw_output="truncated", plan_raw_output_max_bytes="not-an-int")
         assert plan is not None
         assert plan.raw_explain_output is not None
 
     def test_non_positive_max_bytes_falls_back_to_default_not_drop(self):
-        # A non-positive cap is misconfiguration: it must fall back to the default cap
-        # (retaining raw text) rather than silently nulling it like the 'none' policy.
+
         plan = self._capture(plan_raw_output="truncated", plan_raw_output_max_bytes=0)
         assert plan is not None
         assert plan.raw_explain_output is not None
 
 
 class TestDuckDBPlanCapture:
-    """Test query plan capture in DuckDB adapter."""
-
     @pytest.fixture
     def adapter_with_capture(self):
-        """Create DuckDB adapter with plan capture enabled."""
+
         adapter = DuckDBAdapter(capture_plans=True)
         return adapter
 
     @pytest.fixture
     def adapter_without_capture(self):
-        """Create DuckDB adapter with plan capture disabled."""
+
         adapter = DuckDBAdapter(capture_plans=False)
         return adapter
 
     def test_parser_is_available(self, adapter_with_capture):
-        """Test that DuckDB parser is available."""
+
         parser = adapter_with_capture.get_query_plan_parser()
         assert parser is not None
         assert parser.platform_name == "duckdb"
 
     def test_plan_capture_when_enabled(self, adapter_with_capture):
-        """Test that a plan is captured when capture_plans=True.
 
-        Default behavior (analyze_plans=False) uses plain EXPLAIN (FORMAT JSON), so
-        captured plans are estimated-only: no re-execution, no per-operator timing.
-        """
         connection = adapter_with_capture.create_connection()
 
         try:
@@ -316,7 +295,7 @@ class TestDuckDBPlanCapture:
             plan = result["query_plan"]
             assert plan is not None
             assert plan.logical_root is not None
-            # Default capture uses plain EXPLAIN (FORMAT JSON) - no ANALYZE timing.
+
             phys = plan.logical_root.physical_operator
             assert phys is not None, "physical_operator should always be present"
             timing = phys.properties.get("timing")
@@ -326,11 +305,7 @@ class TestDuckDBPlanCapture:
             adapter_with_capture.close_connection(connection)
 
     def test_plan_capture_analyze_plans_true_populates_timing(self):
-        """With analyze_plans=True (opt-in), captured plans carry actual timing.
 
-        Regression guard for the default flip: EXPLAIN ANALYZE is still fully
-        functional and available for users who explicitly opt in.
-        """
         adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
         connection = adapter.create_connection()
 
@@ -353,7 +328,7 @@ class TestDuckDBPlanCapture:
             adapter.close_connection(connection)
 
     def test_plan_not_captured_when_disabled(self, adapter_without_capture):
-        """Test that plan is not captured when capture_plans=False."""
+
         connection = adapter_without_capture.create_connection()
 
         try:
@@ -364,14 +339,13 @@ class TestDuckDBPlanCapture:
                 validate_row_count=False,
             )
 
-            # Should NOT have query_plan in result
             assert "query_plan" not in result or result["query_plan"] is None
 
         finally:
             adapter_without_capture.close_connection(connection)
 
     def test_capture_query_plan_method(self, adapter_with_capture):
-        """Test the capture_query_plan method directly."""
+
         connection = adapter_with_capture.create_connection()
 
         try:
@@ -381,10 +355,8 @@ class TestDuckDBPlanCapture:
                 query_id="test_q3",
             )
 
-            # Capture time should always be measured
             assert capture_time_ms >= 0
 
-            # Plan may be None if parsing fails, but method should not crash
             if plan:
                 assert plan.query_id == "test_q3"
                 assert plan.platform == "duckdb"
@@ -395,15 +367,13 @@ class TestDuckDBPlanCapture:
             adapter_with_capture.close_connection(connection)
 
     def test_plan_capture_with_table(self, adapter_with_capture):
-        """Test plan capture with actual table creation and query."""
+
         connection = adapter_with_capture.create_connection()
 
         try:
-            # Create a simple table
             connection.execute("CREATE TABLE test_table (id INTEGER, name VARCHAR)")
             connection.execute("INSERT INTO test_table VALUES (1, 'Alice'), (2, 'Bob')")
 
-            # Execute query with plan capture
             result = adapter_with_capture.execute_query(
                 connection=connection,
                 query="SELECT * FROM test_table WHERE id = 1",
@@ -414,7 +384,6 @@ class TestDuckDBPlanCapture:
             assert result["status"] == "SUCCESS"
             assert result["rows_returned"] == 1
 
-            # Plan may or may not be captured depending on DuckDB's EXPLAIN output
             if "query_plan" in result and result["query_plan"]:
                 plan = result["query_plan"]
                 assert plan.platform == "duckdb"
@@ -423,12 +392,7 @@ class TestDuckDBPlanCapture:
             adapter_with_capture.close_connection(connection)
 
     def test_get_query_plan_returns_json_format(self, adapter_with_capture):
-        """get_query_plan must use EXPLAIN (ANALYZE, FORMAT JSON), not the text/box format.
 
-        The text-box parser rejects branching structures (JOINs) and would
-        produce incorrect fingerprints. JSON format handles all query shapes,
-        regardless of whether ANALYZE (opt-in) is used.
-        """
         connection = adapter_with_capture.create_connection()
         try:
             connection.execute("CREATE TABLE t1 (id INTEGER, val VARCHAR)")
@@ -450,7 +414,7 @@ class TestDuckDBPlanCapture:
             adapter_with_capture.close_connection(connection)
 
     def test_plan_capture_succeeds_for_join_query(self, adapter_with_capture):
-        """Multi-JOIN queries must be parseable - the branching-structure error must not occur."""
+
         connection = adapter_with_capture.create_connection()
         try:
             connection.execute("CREATE TABLE a (id INTEGER, x INTEGER)")
@@ -466,7 +430,6 @@ class TestDuckDBPlanCapture:
                 query_id="join_test",
             )
 
-            # Must not fail - plan should be captured for a branching query
             assert plan is not None, (
                 "Plan capture returned None for a multi-JOIN query. "
                 "Likely still using text-box EXPLAIN which rejects branching structures."
@@ -477,8 +440,7 @@ class TestDuckDBPlanCapture:
             adapter_with_capture.close_connection(connection)
 
     def test_plan_capture_does_not_affect_correctness(self, adapter_with_capture, adapter_without_capture):
-        """Test that enabling plan capture doesn't affect query results."""
-        # Execute same query with and without capture
+
         conn_with = adapter_with_capture.create_connection()
         conn_without = adapter_without_capture.create_connection()
 
@@ -497,7 +459,6 @@ class TestDuckDBPlanCapture:
                 validate_row_count=False,
             )
 
-            # Core results should be the same
             assert result_with["status"] == result_without["status"]
             assert result_with["rows_returned"] == result_without["rows_returned"]
             assert result_with["execution_time_seconds"] >= 0
@@ -508,11 +469,7 @@ class TestDuckDBPlanCapture:
             adapter_without_capture.close_connection(conn_without)
 
     def test_analyze_plans_false_produces_no_timing(self):
-        """With analyze_plans=False, captured plans use EXPLAIN (FORMAT JSON) - no timing data.
 
-        This verifies the opt-out path for users who want structural-only plan capture
-        without the re-execution overhead of EXPLAIN ANALYZE.
-        """
         adapter = DuckDBAdapter(capture_plans=True, analyze_plans=False)
         connection = adapter.create_connection()
 
@@ -529,7 +486,6 @@ class TestDuckDBPlanCapture:
             assert plan is not None, "Plan should be captured even with analyze_plans=False"
             assert plan.logical_root is not None
 
-            # EXPLAIN (FORMAT JSON) without ANALYZE does not populate timing
             phys = plan.logical_root.physical_operator
             if phys:
                 timing = phys.properties.get("timing")
@@ -539,17 +495,12 @@ class TestDuckDBPlanCapture:
             adapter.close_connection(connection)
 
     def test_default_adapter_analyze_plans_is_false(self):
-        """analyze_plans defaults to False on a fresh adapter (no explicit override)."""
+
         adapter = DuckDBAdapter(capture_plans=True)
         assert adapter.analyze_plans is False
 
     def test_default_get_query_plan_issues_plain_explain_no_analyze(self):
-        """Default capture (no analyze_plans override) must not run EXPLAIN ANALYZE.
 
-        Verifies the executed SQL directly rather than inferring it from parsed
-        timing fields, so the assertion holds even if the parser's timing
-        extraction changes.
-        """
         adapter = DuckDBAdapter(capture_plans=True)
         connection = MagicMock()
         connection.execute.return_value.fetchall.return_value = [("physical_plan", "{}")]
@@ -561,11 +512,7 @@ class TestDuckDBPlanCapture:
         assert "FORMAT JSON" in called_sql
 
     def test_analyze_plans_notice_printed_once_per_run(self, capsys, monkeypatch):
-        """A one-time notice is printed the first time analyze_plans=True actually captures.
 
-        The notice must not repeat on subsequent captures within the same run, and
-        must not appear at all when analyze_plans is left at its False default.
-        """
         monkeypatch.setattr("benchbox.utils.printing._QUIET", False)
         adapter = DuckDBAdapter(capture_plans=True, analyze_plans=True)
         connection = adapter.create_connection()
@@ -582,7 +529,6 @@ class TestDuckDBPlanCapture:
             second_output = capsys.readouterr().out
             assert "re-executes each query" not in second_output, "Notice must print only once per run"
 
-            # A fresh run (stats reset) gets its own notice.
             adapter._reset_plan_capture_stats()
             adapter.capture_query_plan(connection, "SELECT * FROM notice_test", "notice_q3")
             third_output = capsys.readouterr().out
@@ -591,7 +537,7 @@ class TestDuckDBPlanCapture:
             adapter.close_connection(connection)
 
     def test_no_notice_when_analyze_plans_default(self, capsys, monkeypatch):
-        """No re-execution notice is printed when analyze_plans stays at its False default."""
+
         monkeypatch.setattr("benchbox.utils.printing._QUIET", False)
         adapter = DuckDBAdapter(capture_plans=True)
         connection = adapter.create_connection()
@@ -608,13 +554,6 @@ class TestDuckDBPlanCapture:
 
 
 class TestDuckDBFingerprintIntegration:
-    """Integration tests against a real in-memory DuckDB connection (no mocking).
-
-    Exercises the full capture path (real EXPLAIN, real parser, real fingerprint)
-    and verifies the plan fingerprint stability contract documented in
-    query_plan_models.py. DuckDB in-memory needs no credentials.
-    """
-
     @pytest.fixture
     def adapter(self):
         return DuckDBAdapter(capture_plans=True)
@@ -650,8 +589,7 @@ class TestDuckDBFingerprintIntegration:
         assert plan1.plan_fingerprint == plan2.plan_fingerprint
 
     def test_fingerprint_stable_across_index_addition(self, adapter, conn):
-        # Logical fingerprint excludes the physical access method, so adding an
-        # index does not change it (physical-independence guarantee).
+
         query = "SELECT * FROM orders WHERE amount = 250.0"
         before, _ = adapter.capture_query_plan(conn, query, "dq_before_idx")
         conn.execute("CREATE INDEX idx_orders_amount ON orders(amount)")
@@ -662,13 +600,7 @@ class TestDuckDBFingerprintIntegration:
         )
 
     def test_fingerprint_stable_across_row_count_change(self, adapter):
-        """A GROUP BY fingerprint must not change with table size.
 
-        Regression test for the estimate leak: DuckDB's FORMAT JSON ``extra_info``
-        carries an ``Estimated Cardinality`` that previously folded into the
-        AGGREGATE/SCAN signature fields, so the same query hashed differently at
-        500 vs 5000 rows. The fingerprint must be stats-independent.
-        """
         query = "SELECT grp, sum(amount) AS s FROM sized GROUP BY grp ORDER BY grp"
 
         def fingerprint_for(row_count: int) -> str:
@@ -693,9 +625,7 @@ class TestDuckDBFingerprintIntegration:
         )
 
     def test_fingerprint_differs_for_logically_distinct_plans(self, adapter, conn):
-        # A self-join adds a second table scan to the logical tree, so the
-        # signature differs by construction (two Scan nodes vs one), independent of
-        # indexes, stats, or planner access-method choices.
+
         scan_plan, _ = adapter.capture_query_plan(conn, "SELECT * FROM orders", "dq_scan")
         join_plan, _ = adapter.capture_query_plan(
             conn, "SELECT o.id FROM orders o JOIN orders o2 ON o.id = o2.id", "dq_join"

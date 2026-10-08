@@ -1,11 +1,6 @@
-"""Unit tests for PsycopgConnectionMixin.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests mixin behaviour in isolation using mock connections - no live DB required.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -21,15 +16,7 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Minimal concrete class that satisfies the mixin's `self.logger` and
-# `self.schema` dependencies without pulling in PlatformAdapter machinery.
-# ---------------------------------------------------------------------------
-
-
 class _MinimalAdapter(PsycopgConnectionMixin):
-    """Bare-minimum concrete adapter for unit testing."""
-
     schema = "public"
 
     def __init__(self, **kwargs):
@@ -39,8 +26,6 @@ class _MinimalAdapter(PsycopgConnectionMixin):
 
 
 class _QuestDBLikeAdapter(PsycopgConnectionMixin):
-    """Adapter that overrides _max_identifier_length, mimicking QuestDB."""
-
     _max_identifier_length = 127
     schema = "public"
 
@@ -48,14 +33,7 @@ class _QuestDBLikeAdapter(PsycopgConnectionMixin):
         self.logger = Mock()
 
 
-# ---------------------------------------------------------------------------
-# _validate_identifier
-# ---------------------------------------------------------------------------
-
-
 class TestValidateIdentifier:
-    """Tests for PsycopgConnectionMixin._validate_identifier."""
-
     def test_valid_simple_name(self):
         adapter = _MinimalAdapter()
         assert adapter._validate_identifier("lineitem") is True
@@ -105,44 +83,37 @@ class TestValidateIdentifier:
         assert adapter._validate_identifier("table; DROP TABLE") is False
 
     def test_postgresql_default_limit_at_boundary(self):
-        """Name exactly 63 chars is valid for the default (PG) limit."""
+
         adapter = _MinimalAdapter()
         name_63 = "a" * 63
         assert adapter._validate_identifier(name_63) is True
 
     def test_postgresql_default_limit_exceeds(self):
-        """Name of 64 chars exceeds the default PostgreSQL limit."""
+
         adapter = _MinimalAdapter()
         name_64 = "a" * 64
         assert adapter._validate_identifier(name_64) is False
 
     def test_questdb_limit_accepts_127(self):
-        """QuestDB adapter (_max_identifier_length=127) accepts 127-char names."""
+
         adapter = _QuestDBLikeAdapter()
         name_127 = "a" * 127
         assert adapter._validate_identifier(name_127) is True
 
     def test_questdb_limit_accepts_64(self):
-        """QuestDB adapter accepts names that exceed the PostgreSQL limit."""
+
         adapter = _QuestDBLikeAdapter()
         name_64 = "a" * 64
         assert adapter._validate_identifier(name_64) is True
 
     def test_questdb_limit_rejects_128(self):
-        """QuestDB adapter rejects names exceeding 127 chars."""
+
         adapter = _QuestDBLikeAdapter()
         name_128 = "a" * 128
         assert adapter._validate_identifier(name_128) is False
 
 
-# ---------------------------------------------------------------------------
-# close_connection
-# ---------------------------------------------------------------------------
-
-
 class TestCloseConnection:
-    """Tests for PsycopgConnectionMixin.close_connection."""
-
     def test_closes_connection(self):
         adapter = _MinimalAdapter()
         mock_conn = Mock()
@@ -151,26 +122,19 @@ class TestCloseConnection:
 
     def test_none_connection_is_noop(self):
         adapter = _MinimalAdapter()
-        # Should not raise
+
         adapter.close_connection(None)
 
     def test_close_exception_is_swallowed(self):
         adapter = _MinimalAdapter()
         mock_conn = Mock()
         mock_conn.close.side_effect = Exception("already closed")
-        # Should not raise
+
         adapter.close_connection(mock_conn)
         adapter.logger.debug.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# _get_existing_tables (information_schema default)
-# ---------------------------------------------------------------------------
-
-
 class TestGetExistingTables:
-    """Tests for PsycopgConnectionMixin._get_existing_tables."""
-
     def _make_conn(self, rows: list[tuple]) -> Mock:
         mock_cursor = MagicMock()
         mock_cursor.fetchall.return_value = rows
@@ -231,14 +195,7 @@ class TestGetExistingTables:
         mock_cursor.close.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# Class constant inheritance
-# ---------------------------------------------------------------------------
-
-
 class TestClassConstants:
-    """_max_identifier_length default and override."""
-
     def test_default_is_63(self):
         assert PsycopgConnectionMixin._max_identifier_length == 63
 

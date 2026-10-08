@@ -46,24 +46,18 @@ def test_notebook_has_platform_installs_and_runner_import(nb_name, pkgs):
     code_cells = [c for c in nb.get("cells", []) if c.get("cell_type") == "code"]
     assert code_cells, f"No code cells found in {nb_name}"
 
-    # 1) pip install cell includes platform-specific packages
     install_sources = [
         "".join(c.get("source", [])) for c in code_cells if "pip install" in "".join(c.get("source", []))
     ]
     assert install_sources, f"pip install cell not found in {nb_name}"
     src = install_sources[0]
 
-    # Check if using extras syntax (e.g., benchbox[databricks]) or explicit packages
-    # Extract the platform name from notebook filename (e.g., "databricks" from "databricks_benchmarking.ipynb")
     platform_name = nb_name.replace("_benchmarking.ipynb", "")
     uses_extras = f"benchbox[{platform_name}]" in src
 
     if not uses_extras:
-        # If not using extras, require explicit package names
         for token in pkgs:
             assert token in src, f"{nb_name} missing required install token: {token}"
-    # If using extras, assume the extra includes the required packages
 
-    # 2) must reference core runner in some code cell
     has_runner_ref = any("benchbox.core.runner" in "".join(c.get("source", [])) for c in code_cells)
     assert has_runner_ref, f"{nb_name} missing benchbox.core.runner usage"

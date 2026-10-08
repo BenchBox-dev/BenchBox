@@ -1,5 +1,3 @@
-"""Tests for PostgreSQL query plan capture wiring."""
-
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,7 +12,7 @@ pytestmark = [
 
 @pytest.fixture()
 def adapter(monkeypatch):
-    """PostgreSQLAdapter with psycopg stubbed out."""
+
     monkeypatch.setattr("benchbox.platforms.postgresql.psycopg", MagicMock())
     return PostgreSQLAdapter(capture_plans=True)
 
@@ -26,7 +24,7 @@ def adapter_no_capture(monkeypatch):
 
 
 def _make_connection(plan_json='[{"Plan": {"Node Type": "Result"}}]'):
-    """Build a mock psycopg connection that returns a fixed EXPLAIN JSON."""
+
     cursor = MagicMock()
     cursor.fetchall.return_value = [(plan_json,)]
     conn = MagicMock()
@@ -55,13 +53,7 @@ class TestPostgreSQLPlanCapture:
         assert result is None
 
     def test_get_query_plan_accepts_cursor_backed_stream(self, adapter):
-        """A per-stream cursor (no callable .cursor()) still captures plans, but EXPLAIN
-        runs on a FRESH cursor derived from the stream cursor's underlying connection so a
-        timed-out EXPLAIN daemon thread cannot corrupt the stream cursor reused by the
-        next query."""
-        # psycopg cursors expose execute/fetchall but NOT a .cursor() factory; spec
-        # restricts the mock so getattr(stream_cursor, "cursor") is absent. The cursor
-        # exposes `.connection`, from which a fresh cursor is opened for EXPLAIN.
+
         fresh_cursor = MagicMock(spec=["execute", "fetchall", "close"])
         fresh_cursor.fetchall.return_value = [('[{"Plan": {"Node Type": "Seq Scan"}}]',)]
         stream_cursor = MagicMock(spec=["execute", "fetchall", "close", "connection"])
@@ -71,22 +63,20 @@ class TestPostgreSQLPlanCapture:
 
         assert result is not None
         assert "Seq Scan" in result
-        # EXPLAIN runs on the fresh cursor, never the caller's stream cursor.
+
         fresh_cursor.execute.assert_called_once()
         stream_cursor.execute.assert_not_called()
-        # The fresh cursor is owned by plan capture and closed; the stream cursor is not.
+
         fresh_cursor.close.assert_called_once()
         stream_cursor.close.assert_not_called()
 
     def test_execute_query_with_capture_adds_plan_fields(self, adapter, monkeypatch):
         conn = _make_connection()
 
-        # Patch capture_query_plan on the adapter instance
         mock_plan = MagicMock()
         mock_plan.plan_fingerprint = "abc123"
         monkeypatch.setattr(adapter, "capture_query_plan", lambda *a, **k: (mock_plan, 5.0))
 
-        # Patch the mixin execute_query to return a SUCCESS result
         monkeypatch.setattr(
             "benchbox.platforms.base.psycopg2_mixin.PsycopgConnectionMixin.execute_query",
             lambda self, **kw: {"query_id": kw["query_id"], "status": "SUCCESS", "rows_returned": 1},
@@ -146,11 +136,11 @@ class TestPostgreSQLPlanCapture:
             "DELETE FROM t WHERE id = 3",
             "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET a = s.a",
             "COPY t FROM '/tmp/data.csv'",
-            "  insert into t values (1)",  # leading whitespace + lowercase
+            "  insert into t values (1)",
         ],
     )
     def test_get_query_plan_dml_omits_analyze(self, adapter, dml_query):
-        """DML queries must not include ANALYZE to prevent double-execution."""
+
         cursor = MagicMock()
         cursor.fetchall.return_value = [('{"Plan":{}}',)]
         conn = MagicMock()
@@ -171,7 +161,7 @@ class TestPostgreSQLPlanCapture:
         ],
     )
     def test_get_query_plan_ctas_omits_analyze(self, adapter, write_ddl):
-        """CTAS/CMV/SELECT-INTO materialize rows; EXPLAIN ANALYZE would write them twice."""
+
         cursor = MagicMock()
         cursor.fetchall.return_value = [('{"Plan":{}}',)]
         conn = MagicMock()
@@ -184,7 +174,7 @@ class TestPostgreSQLPlanCapture:
         assert "FORMAT JSON" in call_args.upper()
 
     def test_get_query_plan_select_uses_analyze(self, monkeypatch):
-        """SELECT queries use EXPLAIN ANALYZE for actual timing data when opted in (analyze_plans=True)."""
+
         monkeypatch.setattr("benchbox.platforms.postgresql.psycopg", MagicMock())
         adapter = PostgreSQLAdapter(capture_plans=True, analyze_plans=True)
         cursor = MagicMock()
@@ -200,7 +190,7 @@ class TestPostgreSQLPlanCapture:
         assert "FORMAT JSON" in call_args.upper()
 
     def test_get_query_plan_select_omits_analyze_when_disabled(self, monkeypatch):
-        """analyze_plans=False makes SELECT capture structural-only (no re-execution)."""
+
         monkeypatch.setattr("benchbox.platforms.postgresql.psycopg", MagicMock())
         adapter = PostgreSQLAdapter(capture_plans=True, analyze_plans=False)
         cursor = MagicMock()
@@ -216,8 +206,6 @@ class TestPostgreSQLPlanCapture:
 
 
 class TestPostgreSQLSubclassInheritance:
-    """Verify TimescaleDB, CedarDB, and pg_mooncake inherit the parser without overrides."""
-
     @pytest.mark.parametrize(
         "adapter_class_path,module_path",
         [
@@ -236,10 +224,10 @@ class TestPostgreSQLSubclassInheritance:
             import importlib
 
             module = importlib.import_module(module_name)
-            # Stub out any extra dependencies the subclass may import
+
             cls = getattr(module, class_name)
             adapter = cls.__new__(cls)
-            # Inject capture_plans via the base class dict
+
             adapter.__dict__["capture_plans"] = True
 
             parser = PostgreSQLAdapter.get_query_plan_parser(adapter)

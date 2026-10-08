@@ -1,5 +1,3 @@
-"""Transport configuration tests for the BenchBox MCP CLI."""
-
 from __future__ import annotations
 
 import hashlib

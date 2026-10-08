@@ -1,5 +1,3 @@
-"""Tests for data_organization clustering helpers."""
-
 from __future__ import annotations
 
 import pyarrow as pa

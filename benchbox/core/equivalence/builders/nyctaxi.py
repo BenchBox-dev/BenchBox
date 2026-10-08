@@ -1,5 +1,3 @@
-"""NYC Taxi cross-surface gate builder."""
-
 from __future__ import annotations
 
 import re
@@ -12,11 +10,6 @@ from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duck
 if TYPE_CHECKING:
     from benchbox.core.nyctaxi.downloader import NYCTaxiDataDownloader
 
-# Builder-local SQL-slug to DataFrame-ID map. The SQL surface uses slug IDs
-# (for example ``trips-per-hour``) while the DataFrame surface uses ``Q<N>``
-# IDs. Most pairs join on the display name; Q20 (``Weekday/Weekend
-# Comparison`` vs ``Weekday vs Weekend``) and Q23 (``Single-Day Summary`` vs
-# ``Single Day Summary``) are hand-resolved punctuation variants.
 NYCTAXI_SQL_TO_DF_IDS: dict[str, str] = {
     "trips-per-hour": "Q1",
     "trips-per-day": "Q2",
@@ -49,29 +42,17 @@ NYCTAXI_DF_TO_SQL_IDS: dict[str, str] = {df_id: sql_id for sql_id, df_id in NYCT
 
 
 def _force_offline_synthesis(downloader: NYCTaxiDataDownloader) -> None:
-    """Replace the network download with direct synthetic generation.
-
-    The gate must stay offline and hermetic: patching ``_process_parquet_file``
-    to call ``_generate_synthetic_month`` directly means no
-    ``urllib.request.urlretrieve`` ever runs, so the gate passes with network
-    disabled. ``taxi_zones`` generation is already local (embedded
-    ``TAXI_ZONES_DATA``), so only the trips path needs forcing.
-    """
 
     def _synthetic_only(self: NYCTaxiDataDownloader, url: str, writer: Any, start_trip_id: int) -> int:
         return self._generate_synthetic_month(writer, start_trip_id)
 
-    downloader._process_parquet_file = _synthetic_only.__get__(downloader)  # type: ignore[method-assign]
+    downloader._process_parquet_file = _synthetic_only.__get__(downloader)
 
 
-# Fixed query seed so SQL windows are deterministic across gate runs. The
-# query manager draws random date offsets and zone picks per query; without a
-# seed the SQL and DF surfaces can never share a window.
 NYCTAXI_GATE_SEED = 42
 
 
 def _extract_sql_windows(sql_queries: dict[str, str]) -> dict[str, dict[str, Any]]:
-    """Parse each rendered SQL query's date window and zone into DF overrides."""
     overrides: dict[str, dict[str, Any]] = {}
     for sql_id, sql in sql_queries.items():
         df_id = NYCTAXI_SQL_TO_DF_IDS[sql_id]
@@ -89,7 +70,6 @@ def _extract_sql_windows(sql_queries: dict[str, str]) -> dict[str, dict[str, Any
 
 
 def build_nyctaxi_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate NYC Taxi data offline, load it into in-memory DuckDB, and wire both surfaces."""
     import urllib.request
 
     from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
@@ -103,7 +83,7 @@ def build_nyctaxi_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceD
     def _forbidden_urlretrieve(*args: object, **kwargs: object) -> object:
         raise AssertionError("nyctaxi gate must not touch the network")
 
-    urllib.request.urlretrieve = _forbidden_urlretrieve  # type: ignore[method-assign]
+    urllib.request.urlretrieve = _forbidden_urlretrieve
     try:
         benchmark.generate_data()
     finally:
@@ -113,7 +93,6 @@ def build_nyctaxi_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceD
 
     connection = _load_duckdb_cell(benchmark, output_dir, ["taxi_zones", "trips"], label="NYC Taxi")
     sql_queries = benchmark.get_queries()
-    # Align the DF surface with the seeded SQL windows before wiring queries.
     set_parameter_overrides(_extract_sql_windows(sql_queries))
     queries = NYCTAXI_DATAFRAME_QUERIES
     return CrossSurfaceData(

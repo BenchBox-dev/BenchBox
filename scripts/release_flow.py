@@ -1,32 +1,4 @@
 #!/usr/bin/env python3
-"""Prepare and verify a release as an ordinary pull request on ``develop``.
-
-Two subcommands, exposed as ``make release-prep`` and ``make release-check``:
-
-``prep --version X.Y.Z``
-    Bumps every version marker (``benchbox/__init__.py``, ``pyproject.toml``,
-    the documentation release markers, the landing-page badge) with
-    ``scripts/update_version.py``, refreshes ``uv.lock`` with ``uv lock``, and
-    drafts the ``CHANGELOG.md`` section with
-    ``scripts/generate_changelog_entry.py``. The result is one normal PR diff.
-    The drafted changelog section still needs hand-curation; ``check`` fails
-    until it is curated.
-
-``check --version X.Y.Z``
-    Verifies the complete pre-tag state and exits non-zero with every problem
-    found:
-
-    * ``pyproject.toml``, ``benchbox/__init__.py``, the documentation release
-      markers, the landing-page badge, and the ``uv.lock`` package entry all
-      carry the requested version;
-    * ``CHANGELOG.md`` has a dated, hand-curated section for the version;
-    * the ``uv.lock`` schema revision has not been downgraded;
-    * every top-level path is accounted for in the release curation lists;
-    * no capped dependency has reached its upper bound.
-
-    ``check`` is meant to run on a clean checkout, locally and in CI, so a tag
-    is only cut from a tree that already passed it.
-"""
 
 from __future__ import annotations
 
@@ -40,17 +12,44 @@ from collections.abc import Callable, Sequence
 from datetime import date
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Prepare and verify a release as an ordinary pull request on ``develop``.\n"
+    "\n"
+    "Two subcommands, exposed as ``make release-prep`` and ``make release-check``:\n"
+    "\n"
+    "``prep --version X.Y.Z``\n"
+    "    Bumps every version marker (``benchbox/__init__.py``, ``pyproject.toml``,\n"
+    "    the documentation release markers, the landing-page badge) with\n"
+    "    ``scripts/update_version.py``, refreshes ``uv.lock`` with ``uv lock``, and\n"
+    "    drafts the ``CHANGELOG.md`` section with\n"
+    "    ``scripts/generate_changelog_entry.py``. The result is one normal PR diff.\n"
+    "    The drafted changelog section still needs hand-curation; ``check`` fails\n"
+    "    until it is curated.\n"
+    "\n"
+    "``check --version X.Y.Z``\n"
+    "    Verifies the complete pre-tag state and exits non-zero with every problem\n"
+    "    found:\n"
+    "\n"
+    "    * ``pyproject.toml``, ``benchbox/__init__.py``, the documentation release\n"
+    "      markers, the landing-page badge, and the ``uv.lock`` package entry all\n"
+    "      carry the requested version;\n"
+    "    * ``CHANGELOG.md`` has a dated, hand-curated section for the version;\n"
+    "    * the ``uv.lock`` schema revision has not been downgraded;\n"
+    "    * every top-level path is accounted for in the release curation lists;\n"
+    "    * no capped dependency has reached its upper bound.\n"
+    "\n"
+    "    ``check`` is meant to run on a clean checkout, locally and in CI, so a tag\n"
+    "    is only cut from a tree that already passed it.\n"
+)
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-# A subprocess runner: (argv, cwd) -> (returncode, combined output). Injectable
-# so tests can prove each delegated element fails the check on its own.
 Runner = Callable[[Sequence[str], Path], tuple[int, str]]
 
 _RELEASE_TAG_RE = re.compile(r"^v\d+\.\d+\.\d+$")
 
 
 def _load_script(name: str, root: Path):
-    """Import ``scripts/<name>.py`` from ``root`` without requiring a package."""
     path = root / "scripts" / f"{name}.py"
     spec = importlib.util.spec_from_file_location(f"_release_flow_{name}", path)
     if spec is None or spec.loader is None:
@@ -67,18 +66,12 @@ def run_command(argv: Sequence[str], cwd: Path) -> tuple[int, str]:
 
 
 def normalize_version(value: str) -> str | None:
-    """PEP 440 form of ``value`` (``0.4.2-rc.1`` -> ``0.4.2rc1``), or None."""
     from packaging.version import InvalidVersion, Version
 
     try:
         return str(Version(value))
     except InvalidVersion:
         return None
-
-
-# ---------------------------------------------------------------------------
-# check
-# ---------------------------------------------------------------------------
 
 
 def _load_toml(path: Path) -> dict:
@@ -118,7 +111,6 @@ def _lock_version(root: Path) -> str | None:
 
 
 def check_version_markers(root: Path, version: str) -> list[str]:
-    """Every version marker must equal ``version`` (uv.lock is compared as PEP 440)."""
     update_version = _load_script("update_version", root)
     problems: list[str] = []
 
@@ -136,7 +128,6 @@ def check_version_markers(root: Path, version: str) -> list[str]:
         found = None
         if path.is_file():
             match = update_version.DOC_RELEASE_PATTERN.search(path.read_text(encoding="utf-8"))
-            # The marker pattern's pre-release class also matches a sentence-ending period.
             found = match.group("version").rstrip(".") if match else None
         expect(doc.as_posix(), found)
 
@@ -157,7 +148,6 @@ def check_version_markers(root: Path, version: str) -> list[str]:
 
 
 def check_changelog(root: Path, version: str) -> list[str]:
-    """A dated ``## [version]`` section must exist and look hand-curated."""
     changelog = _load_script("generate_changelog_entry", root)
     if not (root / "CHANGELOG.md").is_file():
         return ["CHANGELOG.md: file not found"]
@@ -205,7 +195,6 @@ def check_dependency_bounds(root: Path, runner: Runner) -> list[str]:
 
 
 def run_checks(root: Path, version: str, runner: Runner = run_command, *, baseline_ref: str | None = None) -> list[str]:
-    """Return every release-content problem; publication acceptance is a separate check."""
     problems: list[str] = []
     if normalize_version(version) is None:
         return [f"version {version!r} is not a valid version"]
@@ -217,13 +206,7 @@ def run_checks(root: Path, version: str, runner: Runner = run_command, *, baseli
     return problems
 
 
-# ---------------------------------------------------------------------------
-# prep
-# ---------------------------------------------------------------------------
-
-
 def latest_release_tag(root: Path, *, before_version: str | None = None) -> str | None:
-    """Newest final ``vX.Y.Z`` tag, as a full ref so a same-named branch cannot shadow it."""
     from packaging.version import Version
 
     code, output = run_command(["git", "tag", "--list", "v[0-9]*", "--sort=-v:refname"], root)
@@ -295,7 +278,6 @@ def prep(root: Path, version: str, since_ref: str | None, release_date: str | No
 
 
 def select_candidate(root: Path, base_sha: str) -> tuple[bool, str]:
-    """Compare release identity against an immutable event base without third-party imports."""
     if re.fullmatch(r"[0-9a-f]{40}", base_sha) is None:
         raise ValueError("release selection requires the full immutable event base SHA")
     code, resolved = run_command(
@@ -373,7 +355,7 @@ def select_candidate(root: Path, base_sha: str) -> tuple[bool, str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
 
     for name in ("prep", "check"):

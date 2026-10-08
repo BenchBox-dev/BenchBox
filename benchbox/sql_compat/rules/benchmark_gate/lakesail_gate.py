@@ -1,5 +1,3 @@
-"""Benchmark-gate rules for LakeSail/Sail."""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction

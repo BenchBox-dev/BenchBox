@@ -8,21 +8,22 @@ via the native TCP binary protocol (`clickhouse-driver`).
 
 ```bash
 uv add benchbox --extra clickhouse-server
-# or equivalently:
 uv add benchbox --extra clickhouse
 ```
+
+The two extras are equivalent.
 
 ## Quick Start
 
 ```bash
-# Start a local ClickHouse server with Docker
 docker run -d --name clickhouse-server \
   -p 9000:9000 -p 8123:8123 \
   clickhouse/clickhouse-server
 
-# Run a TPC-H benchmark
 benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01
 ```
+
+The `docker run` command starts a local ClickHouse server with Docker, and the `benchbox run` command runs a TPC-H benchmark against it.
 
 ## Connection Options
 

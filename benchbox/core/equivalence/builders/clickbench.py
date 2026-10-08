@@ -1,5 +1,3 @@
-"""ClickBench cross-surface gate builder."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,7 +6,6 @@ from benchbox.core.equivalence.builders.base import CrossSurfaceData, _load_duck
 
 
 def build_clickbench_duckdb(scale_factor: float, output_dir: Path) -> CrossSurfaceData:
-    """Generate ClickBench data, load it into in-memory DuckDB, and wire both surfaces."""
     from benchbox.core.clickbench.benchmark import ClickBenchBenchmark
     from benchbox.core.clickbench.dataframe_queries import CLICKBENCH_DATAFRAME_QUERIES
     from benchbox.core.clickbench.generator import ClickBenchDataGenerator

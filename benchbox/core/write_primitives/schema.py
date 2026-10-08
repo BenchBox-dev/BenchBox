@@ -1,5 +1,3 @@
-"""Write Primitives benchmark schema definitions."""
-
 from pathlib import Path
 from typing import Any, cast
 
@@ -33,9 +31,6 @@ STAGING_TABLES = {name: TABLES[name] for name in _SCHEMA_SPECS["staging_tables"]
 _CREATE_ORDER = _SCHEMA_SPECS["create_order"]
 
 
-# Per-dialect rewrites for the logical BINARY column type used by sketch ops.
-# Engines without a binary type (e.g. SQLite) are listed here as None to opt
-# out - callers must handle the None by skipping the table for that dialect.
 _BINARY_TYPE_BY_DIALECT: dict[str, str | None] = {
     "standard": "BINARY",
     "duckdb": "BLOB",
@@ -51,7 +46,6 @@ _BINARY_TYPE_BY_DIALECT: dict[str, str | None] = {
 
 
 def translate_column_type(type_str: str, dialect: str) -> str | None:
-    """Translate a logical column type string to a dialect-specific one."""
     canonical = type_str.strip().upper()
     if canonical == "BINARY":
         return _BINARY_TYPE_BY_DIALECT.get(dialect.lower(), "BINARY")
@@ -59,7 +53,6 @@ def translate_column_type(type_str: str, dialect: str) -> str | None:
 
 
 def _supports_primary_keys(dialect: str) -> bool:
-    """Return whether the target SQL dialect supports PRIMARY KEY in CREATE TABLE."""
     import benchbox.sql_compat.rules.schema_emit.pk_capability  # noqa: F401
     from benchbox.sql_compat.actions import CompatAction
     from benchbox.sql_compat.context import CompatibilityContext, Phase
@@ -82,7 +75,6 @@ def _supports_primary_keys(dialect: str) -> bool:
 
 
 def get_create_table_sql(table_name: str, dialect: str = "standard", if_not_exists: bool = False) -> str:
-    """Generate CREATE TABLE SQL for a given staging table."""
     if table_name not in STAGING_TABLES:
         raise ValueError(f"Unknown staging table: {table_name}. Use STAGING_TABLES only.")
 
@@ -115,12 +107,10 @@ def get_create_table_sql(table_name: str, dialect: str = "standard", if_not_exis
 
 
 def get_all_staging_tables_sql(dialect: str = "standard") -> str:
-    """Generate CREATE TABLE SQL for all staging tables."""
     return "\n\n".join(get_create_table_sql(table_name, dialect) for table_name in _CREATE_ORDER)
 
 
 def get_table_schema(table_name: str) -> dict[str, Any]:
-    """Get schema definition for a table."""
     if table_name not in TABLES:
         raise ValueError(f"Unknown table: {table_name}")
     return cast(dict[str, Any], TABLES[table_name])

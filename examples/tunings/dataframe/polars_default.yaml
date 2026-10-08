@@ -1,6 +1,3 @@
-# Polars DataFrame Tuning - Default Configuration
-# Sensible defaults for general-purpose workloads
-
 execution:
   streaming_mode: false
   engine_affinity: in-memory

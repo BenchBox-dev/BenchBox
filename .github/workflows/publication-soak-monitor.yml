@@ -1,10 +1,5 @@
 name: Publication Availability Monitor
 
-# Five-minute availability observations are retained as outcomes. Full content
-# hashing, including DuckDB, runs hourly and after a publication transaction.
-# This workflow reports unknown during an active transaction; it never turns a
-# transition or a missing observation into healthy coverage.
-
 on:
   workflow_dispatch:
 
@@ -24,17 +19,17 @@ jobs:
       contents: read
     steps:
       - name: Checkout control-plane source
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Fetch publication journal
         run: |
@@ -90,10 +85,6 @@ jobs:
                   json.dumps({"checksums": checksums}, sort_keys=True) + "\n",
                   encoding="utf-8",
               )
-              # The schedule runs every five minutes, so the top-of-hour run
-              # starts within minute 00-04 barring a long scheduler delay.
-              # An exact minute==0 equality would skip the hourly full check
-              # whenever that run starts late.
               full_content_check = datetime.now(timezone.utc).minute < 5
               report = verify_live(
                   base_url="https://benchbox.dev",
@@ -147,7 +138,7 @@ jobs:
 
       - name: Upload observation receipt
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: publication-monitor-observation-${{ github.run_id }}-${{ github.run_attempt }}
           path: monitor/

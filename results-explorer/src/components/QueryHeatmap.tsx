@@ -1,24 +1,3 @@
-/**
- * QueryHeatmap - Platform × Query matrix leaderboard.
- *
- * Renders a BenchmarkSummary as a heat-colored table where each cell shows
- * the canonical display_ms value for (platform, query), colored per column
- * using a log10(ratio-to-fastest) scale clamped at 10×. The default CSS path
- * uses a single-hue sequential palette, with grayscale lightness for reduced
- * color / high-contrast contexts.
- *
- * Accessibility:
- *   - role="grid" on the table; role="gridcell" on data cells.
- *   - Roving tabindex: only one query cell has tabIndex=0; arrow keys navigate.
- *   - aria-live region announces the focused cell value.
- *   - Reduced-color mode (highContrast prop or prefers-contrast CSS) uses
- *     grayscale lightness steps instead of hue so CVD users see structure.
- *
- * Color is emitted via --cell-hue and --cell-lightness CSS custom properties
- * so dark-mode and prefers-contrast media queries can override without
- * touching this component.
- */
-
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
 import type { BenchmarkSummary, PlatformRow, SortDirection, SortState } from "@/types";
@@ -46,29 +25,16 @@ import {
   validPrimaryMetricValue,
 } from "@/lib/displayEligibility";
 
-// ---------------------------------------------------------------------------
-// Color math - sourced from chartMath.ts (single source of truth for parity)
-// Re-exported here so existing callers of `QueryHeatmap` don't need to change.
-// ---------------------------------------------------------------------------
 import { colorForCell, lightnessForCell } from "@/lib/chartMath";
 export { colorForCell, lightnessForCell };
 
-// ---------------------------------------------------------------------------
-// Sticky-left offset table
-//
-// Each frozen column maps to a width in rem so the cumulative offset for the
-// next sticky column can be computed exactly without relying on hard-coded
-// Tailwind classes (`left-44` etc.) that desync when an earlier column is
-// hidden — most notably the optional compare-checkbox column.
-// ---------------------------------------------------------------------------
-
 const STICKY_COL_REM = {
-  checkbox: 2.5, // w-10
-  platform: 10, // w-40
-  run: 6.5, // w-26
-  primary: 6.5, // w-26
-  geomean: 6, // w-24
-  labels: 12, // w-48
+  checkbox: 2.5,
+  platform: 10,
+  run: 6.5,
+  primary: 6.5,
+  geomean: 6,
+  labels: 12,
 } as const;
 
 type StickyColKey = keyof typeof STICKY_COL_REM;
@@ -109,32 +75,13 @@ function stickyLeftStyle(rem: number): JSX.CSSProperties {
   return { left: `${rem}rem` };
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 interface QueryHeatmapProps {
   summary: BenchmarkSummary;
-  /** Currently selected result_ids; undefined = selection disabled. */
   selectedIds?: Set<string>;
   onSelectionChange?: (ids: Set<string>) => void;
-  /** ID of the page-level explanation shown when the selection cap is active. */
   selectionLimitReasonId?: string;
-  /**
-   * Activates reduced-color (grayscale lightness) mode for color-vision
-   * accessibility. Also activates automatically via the CSS
-   * `prefers-contrast: more` media query.
-   */
   highContrast?: boolean;
-  /** When true, keeps query_ids in caller-provided order (e.g. limiter ranking). */
   preserveOrder?: boolean;
-  /**
-   * "card" renders a streamlined read-only matrix for embedding inside a
-   * chart-grid card: no selection checkbox column and no trust/funding/
-   * validation badge column. Selection props are ignored in this variant.
-   * Defaults to "default", the full interactive matrix used on standalone
-   * matrix pages.
-   */
   variant?: "default" | "card";
 }
 
@@ -175,14 +122,9 @@ export function QueryHeatmap({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const pageStickyHeaderRef = useRef<HTMLDivElement>(null);
 
-  // Roving tabindex state: which query cell [rowIdx, colIdx] has tabIndex=0.
   const [focusPos, setFocusPos] = useState({ row: 0, col: 0 });
-  // aria-live announcement for the focused cell.
   const [announcement, setAnnouncement] = useState("");
 
-  // Per-column minimum: fastest time across all platforms for each query.
-  // Memoized on `summary` to avoid recomputing the full matrix on every render
-  // (the for loop runs sortedQueryIds.length × platforms.length iterations).
   const colMins = useMemo<Record<string, number | null>>(() => {
     const mins: Record<string, number | null> = {};
     for (const qid of sortedQueryIds) {
@@ -194,15 +136,12 @@ export function QueryHeatmap({
     return mins;
   }, [platforms, sortedQueryIds]);
 
-  // Determine primary display metric from the artifact's ranking config.
   const primaryMetric = ranking?.primary_metric === "power_score" ? "power_score" : "display_geomean_ms";
   const higherIsBetter = ranking?.primary_order === "desc";
   const defaultPrimaryDirection: SortDirection = higherIsBetter ? "desc" : "asc";
   type MatrixSortKey = "platform" | "primary" | "geomean" | `query:${string}`;
   const [sort, setSort] = useState<SortState<MatrixSortKey> | null>(null);
   const activeSort = sort ?? { key: "primary", direction: defaultPrimaryDirection };
-  // Show secondary geomean column when the artifact carries a secondary metric,
-  // rather than hardcoding the power_score assumption.
   const showGeomeanCol = ranking?.secondary_metric === "display_geomean_ms";
 
   function getPrimaryValue(row: PlatformRow): number | null {
@@ -215,8 +154,6 @@ export function QueryHeatmap({
   }
 
   function compareNullableNumber(a: number | null, b: number | null, direction: SortDirection): number {
-    // Keep missing metrics last in both directions so sorting never hides
-    // populated rows below gaps.
     if (a === null && b === null) return 0;
     if (a === null) return 1;
     if (b === null) return -1;
@@ -283,8 +220,6 @@ export function QueryHeatmap({
     syncPageStickyHeaderScroll();
   }, [hasSelection, showGeomeanCol, sortedQueryIds.length]);
 
-  /** Returns the short_id for a row if available, otherwise falls back to result_id.
-   *  The short_id is used for Compare URLs so bookmarks stay compact. */
   function rowKey(row: PlatformRow): string {
     return row.short_id || row.result_id;
   }
@@ -329,7 +264,6 @@ export function QueryHeatmap({
     );
   }
 
-  /** Keyboard handler for query timing cells - implements roving tabindex. */
   function handleCellKey(e: KeyboardEvent, rowIdx: number, colIdx: number) {
     let nextRow = rowIdx;
     let nextCol = colIdx;
@@ -355,7 +289,6 @@ export function QueryHeatmap({
       default:
         return;
     }
-    // Always prevent page scroll for arrow keys inside the grid, even at boundaries.
     e.preventDefault();
     if (nextRow === rowIdx && nextCol === colIdx) return;
     setFocusPos({ row: nextRow, col: nextCol });
@@ -373,21 +306,10 @@ export function QueryHeatmap({
     );
   }
 
-  // Single-platform: suppress heat coloring (no relative comparison to show).
   const suppressHeat = sorted.length < 2;
 
-  // Column headers name the measure, not its unit: every rendered value in
-  // these columns already carries its unit ("5.9 ms"), so "latency" in the
-  // header only costs width.
   const primaryLabel = primaryMetric === "power_score" ? "Power score" : "Geomean";
   const primaryDirectionLabel = primaryMetric === "power_score" ? "higher is better" : "lower is better";
-  // The legend heading describes what the *cells* show, not the cohort's
-  // primary score metric. Heatmap cells are always per-query latency values,
-  // regardless of whether the primary score column is power_score or
-  // display_geomean_ms. Earlier copy ("Power Score:
-  // higher is better") contradicted the rendered data on tpch-style
-  // cohorts. The primary score column keeps its own column header
-  // explanation (`primaryLabel`/`primaryDirectionLabel`) below.
   const heatmapMeaning = suppressHeat
     ? "Heat color is unavailable because fewer than two platforms can be compared in this ranking."
     : "Heat color compares each query column with the fastest published timing; darker cells are slower.";
@@ -429,7 +351,6 @@ export function QueryHeatmap({
     return {
       ...stickyLeftStyle(cumulativeStickyLeft({ hasSelection, showGeomeanCol }, target)),
       ...stickyWidthStyle(STICKY_COL_REM[target]),
-      // Keep query cells reachable when metadata exceeds the viewport width.
       ...(target !== "checkbox" && target !== "platform" ? { position: "static" as const } : {}),
     };
   }
@@ -526,9 +447,6 @@ export function QueryHeatmap({
 
   const hasUnrankableRow = sorted.some((row) => !isRankable(row));
 
-  // The legend explains the cells it sits on, so it is part of the matrix
-  // container rather than a free-floating block above it, and it stays
-  // collapsed until a reader asks for it.
   const renderLegend = (testId: string) => (
     <details
       class="bg-[var(--bb-surface-data-muted)] text-xs text-[var(--bb-data-fg-muted)]"
@@ -558,7 +476,6 @@ export function QueryHeatmap({
 
   return (
     <div class={`relative ${highContrast ? "heatmap-reduced-color" : ""}`}>
-      {/* aria-live region for cell focus announcements */}
       <div
         role="status"
         aria-live="polite"
@@ -919,9 +836,7 @@ export function QueryHeatmap({
                         ? ratio !== null
                           ? ratio <= 1.005
                             ? `${fmtQueryMs(ms)}, fastest in column`
-                            : // The ratio is this cell over the column minimum, so a
-                              // value above 1 is SLOWER than the fastest run, not
-                              // faster than it.
+                            :
                               `${fmtQueryMs(ms)}, ${formatSpeedup(ratio, { unit: "×" }).valueText} slower than fastest in column`
                           : fmtQueryMs(ms)
                         : isExcludedTiming
@@ -1007,6 +922,5 @@ function queryOutliers(
 function queryRatioLabel(ratio: number | null): string {
   if (ratio === null) return "No ranking baseline";
   if (ratio <= 1.005) return "Fastest in ranking";
-  // Ratio is this run over the fastest run in the column: above 1 is slower.
   return `${formatSpeedup(ratio, { unit: "×" }).valueText} slower than fastest`;
 }

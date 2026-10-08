@@ -1,22 +1,3 @@
-# Trino Docker Compose
-# Single-node Trino with TPC-H and memory connectors for integration testing
-#
-# Usage:
-#   docker compose -f docker-compose.yml up -d
-#   benchbox run --platform trino --benchmark tpch --scale 0.01 \
-#     --platform-option host=localhost --platform-option port=18080 \
-#     --platform-option catalog=memory
-#
-# Ports:
-#   18080 (default host) -> 8080 - HTTP query interface
-#
-# Default credentials:
-#   Username: benchbox (no password required)
-#
-# Catalogs:
-#   tpch   - Built-in TPC-H data generator (read-only)
-#   memory - In-memory tables (read-write, for data loading)
-
 services:
   trino:
     image: trinodb/trino:480

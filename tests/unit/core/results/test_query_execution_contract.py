@@ -1,5 +1,3 @@
-"""Contract tests for the canonical query-execution boundary adapters."""
-
 from __future__ import annotations
 
 import ast
@@ -190,7 +188,6 @@ def test_missing_and_null_optional_values_do_not_become_zero() -> None:
 
 
 def test_compact_property_round_trip_preserves_values_and_units() -> None:
-    """Exhaust a bounded product of semantic edge values without an optional dependency."""
     durations = [None, 0.0, 0.001, 1.0, 1234.5]
     row_counts = [None, 0, 1, 2**31]
     statuses = ["SUCCESS", "FAILED", "SKIPPED", "UNKNOWN"]
@@ -345,20 +342,6 @@ def test_legacy_unknown_policy_rejects_misspelled_correctness_field() -> None:
 
 
 def test_legacy_query_result_producer_literals_have_an_explicit_field_policy() -> None:
-    """Keep runtime query-result producers synchronized with the boundary.
-
-    A producer literal is a ``benchbox`` mapping with a literal ``query_id``
-    key and at least one literal duration/row signal.  CLI, MCP, comparison,
-    export, and validation presentation mappings are excluded because they
-    consume or summarize results rather than populate ``query_results``.
-    Compact-v2 producers use ``id``/``ms`` and are guarded independently by
-    the strict compact adapter tests.
-
-    This deliberately does not guess about dynamically constructed mappings:
-    those are covered by the representative runtime-adapter tests above.  The
-    focused literal inventory prevents a newly spelled producer field from
-    becoming silently lossy; it must be made canonical or explicitly ignored.
-    """
     repository_root = Path(__file__).resolve().parents[4]
     classified_fields = LEGACY_QUERY_FIELDS | LEGACY_IGNORED_EXTRA_FIELDS
     producer_sites: list[str] = []
@@ -390,7 +373,6 @@ def test_legacy_query_result_producer_literals_have_an_explicit_field_policy() -
 
 
 def test_legacy_ignored_field_allowlist_has_no_duplicate_literals() -> None:
-    """A duplicate in the frozenset literal is otherwise discarded at import."""
     module_path = Path(__file__).resolve().parents[4] / "benchbox/core/results/query_execution.py"
     tree = ast.parse(module_path.read_text(encoding="utf-8"), filename=module_path.as_posix())
 

@@ -1,27 +1,4 @@
 #!/usr/bin/env python3
-"""Audit GitHub Actions workflow files for least-privilege permissions.
-
-This script inspects `.github/workflows/*.yml` files to verify that:
-1. No workflow uses wildcard or unconstrained permissions (`write-all` or `read-all`).
-2. Dangerous write permissions are scoped to the specific jobs requiring them.
-3. The independent publication deployment workflow (`publication-deploy.yml`)
-   strictly follows the armed production-deployer least-privilege contract:
-   - `build` job has only `contents: read` (no write permissions).
-   - `deploy` job alone receives the Pages deployment write capabilities.
-   - `verify` job has only `contents: read` (read-only probes).
-   - `rollback` has only the bounded Pages deployment capabilities needed to
-     restore a cryptographically attested artifact plus `actions: read`.
-
-Usage:
-  uv run -- python scripts/publication/check_workflow_permissions.py
-  uv run -- python scripts/publication/check_workflow_permissions.py --workflow .github/workflows/publication-deploy.yml
-  uv run -- python scripts/publication/check_workflow_permissions.py --strict
-
-Exit codes:
-  0 - All workflow permission checks passed.
-  1 - Permission violations found.
-  2 - Invalid usage or unparseable YAML file.
-"""
 
 from __future__ import annotations
 
@@ -31,6 +8,31 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+CLI_DESCRIPTION = (
+    "Audit GitHub Actions workflow files for least-privilege permissions.\n"
+    "\n"
+    "This script inspects `.github/workflows/*.yml` files to verify that:\n"
+    "1. No workflow uses wildcard or unconstrained permissions (`write-all` or `read-all`).\n"
+    "2. Dangerous write permissions are scoped to the specific jobs requiring them.\n"
+    "3. The independent publication deployment workflow (`publication-deploy.yml`)\n"
+    "   strictly follows the armed production-deployer least-privilege contract:\n"
+    "   - `build` job has only `contents: read` (no write permissions).\n"
+    "   - `deploy` job alone receives the Pages deployment write capabilities.\n"
+    "   - `verify` job has only `contents: read` (read-only probes).\n"
+    "   - `rollback` has only the bounded Pages deployment capabilities needed to\n"
+    "     restore a cryptographically attested artifact plus `actions: read`.\n"
+    "\n"
+    "Usage:\n"
+    "  uv run -- python scripts/publication/check_workflow_permissions.py\n"
+    "  uv run -- python scripts/publication/check_workflow_permissions.py --workflow .github/workflows/publication-deploy.yml\n"
+    "  uv run -- python scripts/publication/check_workflow_permissions.py --strict\n"
+    "\n"
+    "Exit codes:\n"
+    "  0 - All workflow permission checks passed.\n"
+    "  1 - Permission violations found.\n"
+    "  2 - Invalid usage or unparseable YAML file.\n"
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_WORKFLOWS_DIR = ROOT / ".github" / "workflows"
@@ -56,7 +58,6 @@ VALID_PERMISSION_VALUES = {"read", "write", "none"}
 
 
 def _normalize_permissions(perms: Any) -> dict[str, str] | str | None:
-    """Normalize permissions representation."""
     if perms is None:
         return None
     if isinstance(perms, str):
@@ -67,15 +68,12 @@ def _normalize_permissions(perms: Any) -> dict[str, str] | str | None:
 
 
 def check_general_workflow_permissions(file_path: Path, data: dict[str, Any]) -> list[str]:
-    """Check general least-privilege rules across all workflows."""
     errors: list[str] = []
     top_perm = _normalize_permissions(data.get("permissions"))
 
-    # Rule 1: No wildcard permissions
     if top_perm == "write-all":
         errors.append(f"{file_path.name}: top-level 'permissions: write-all' violates least privilege")
     elif top_perm == "read-all":
-        # read-all is acceptable but explicit scopes are preferred
         pass
 
     if isinstance(top_perm, dict):
@@ -180,7 +178,6 @@ def _check_rollback_job_perms(file_path: Path, jobs: dict[str, Any]) -> list[str
 
 
 def check_publication_deploy_permissions(file_path: Path, data: dict[str, Any]) -> list[str]:
-    """Verify strict least-privilege rules for publication-deploy.yml."""
     errors: list[str] = []
     jobs = data.get("jobs", {})
 
@@ -205,7 +202,6 @@ TARGET_PUBLICATION_TRANSACTION_NAME = "publication-transaction.yml"
 
 
 def check_publication_transaction_permissions(file_path: Path, data: dict[str, Any]) -> list[str]:
-    """Verify strict least-privilege rules for publication-transaction.yml."""
     errors: list[str] = []
     jobs = data.get("jobs", {})
 
@@ -218,7 +214,6 @@ def check_publication_transaction_permissions(file_path: Path, data: dict[str, A
     if missing_jobs:
         errors.append(f"{file_path.name}: missing required publication transaction jobs: {sorted(missing_jobs)}")
 
-    # prepare: read-only
     prepare_job = jobs.get("prepare", {})
     prepare_perm = _normalize_permissions(prepare_job.get("permissions"))
     if isinstance(prepare_perm, dict):
@@ -230,21 +225,18 @@ def check_publication_transaction_permissions(file_path: Path, data: dict[str, A
     elif prepare_perm not in ("read-all", "contents: read"):
         errors.append(f"{file_path.name} (job 'prepare'): invalid permissions '{prepare_perm}'. Must be read-only.")
 
-    # deploy: contents: write, pages: write, id-token: write, actions: read
     deploy_job = jobs.get("deploy", {})
     deploy_perm = _normalize_permissions(deploy_job.get("permissions"))
     expected_deploy = {"actions": "read", "contents": "write", "pages": "write", "id-token": "write"}
     if deploy_perm != expected_deploy:
         errors.append(f"{file_path.name} (job 'deploy'): must declare exactly {expected_deploy}.")
 
-    # verify: contents: write
     verify_job = jobs.get("verify", {})
     verify_perm = _normalize_permissions(verify_job.get("permissions"))
     expected_verify = {"contents": "write"}
     if verify_perm != expected_verify:
         errors.append(f"{file_path.name} (job 'verify'): must declare exactly {expected_verify}.")
 
-    # finalize: contents: write
     fin_job = jobs.get("finalize", {})
     fin_perm = _normalize_permissions(fin_job.get("permissions"))
     expected_fin = {"contents": "write"}
@@ -258,7 +250,6 @@ TARGET_PUBLICATION_RECOVER_NAME = "publication-recover.yml"
 
 
 def check_publication_recover_permissions(file_path: Path, data: dict[str, Any]) -> list[str]:
-    """Specific least-privilege checks for publication-recover.yml."""
     errors: list[str] = []
     top_perm = _normalize_permissions(data.get("permissions"))
     if top_perm != {"contents": "read"}:
@@ -268,7 +259,6 @@ def check_publication_recover_permissions(file_path: Path, data: dict[str, Any])
     if not isinstance(jobs, dict):
         return errors
 
-    # scan: contents: read, actions: read
     scan_job = jobs.get("scan", {})
     scan_perm = _normalize_permissions(scan_job.get("permissions"))
     expected_scan = {"actions": "read", "contents": "read"}
@@ -282,7 +272,6 @@ def check_publication_recover_permissions(file_path: Path, data: dict[str, Any])
 
 
 def audit_workflow_file(file_path: Path, strict: bool = False) -> list[str]:
-    """Audit a single workflow file for permissions compliance."""
     try:
         content = file_path.read_text(encoding="utf-8")
         data = yaml.safe_load(content)
@@ -294,15 +283,12 @@ def audit_workflow_file(file_path: Path, strict: bool = False) -> list[str]:
 
     errors = check_general_workflow_permissions(file_path, data)
 
-    # Special checks for publication-deploy.yml
     if file_path.name == TARGET_PUBLICATION_DEPLOY_NAME or "publication-deploy" in file_path.stem:
         errors.extend(check_publication_deploy_permissions(file_path, data))
 
-    # Special checks for publication-transaction.yml
     if file_path.name == TARGET_PUBLICATION_TRANSACTION_NAME or "publication-transaction" in file_path.stem:
         errors.extend(check_publication_transaction_permissions(file_path, data))
 
-    # Special checks for publication-recover.yml
     if file_path.name == TARGET_PUBLICATION_RECOVER_NAME or "publication-recover" in file_path.stem:
         errors.extend(check_publication_recover_permissions(file_path, data))
 
@@ -311,7 +297,7 @@ def audit_workflow_file(file_path: Path, strict: bool = False) -> list[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description=__doc__,
+        description=CLI_DESCRIPTION,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(

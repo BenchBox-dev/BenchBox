@@ -1,13 +1,3 @@
-/**
- * Tests for MethodologyDisclosure component.
- *
- * Cases:
- *   (a) Collapsed by default - content hidden on first render
- *   (b) Expands on click - all disclosure rows render
- *   (c) Null-safe rendering for older bundles missing extended fields
- *   (d) modeLabel / testTypeLabel helpers return expected strings
- */
-
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import type { DetailResult } from "@/types";

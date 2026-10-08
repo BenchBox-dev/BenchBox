@@ -1,5 +1,3 @@
-"""Tests for side-effect-free platform readiness diagnostics."""
-
 from __future__ import annotations
 
 import pytest
@@ -70,11 +68,6 @@ def test_lakesail_unreachable_endpoint_reports_environment_skip_without_starting
 
 
 def test_lakesail_sql_unreachable_endpoint_is_ready_when_pysail_importable(monkeypatch):
-    """w23 regression: when the Spark Connect endpoint is unreachable but
-    pysail is importable, the SQL adapter (`lakesail`) can auto-start a local
-    Sail server at run time, so readiness must report ``ready`` rather than
-    ``environment_skip`` (which would fail ``benchbox platforms check`` for a
-    legitimately runnable adapter)."""
     module_checks: list[str] = []
 
     def module_available(name: str) -> bool:
@@ -98,7 +91,6 @@ def test_lakesail_sql_unreachable_endpoint_is_ready_when_pysail_importable(monke
 
 
 def test_lakesail_sql_unreachable_distributed_endpoint_is_environment_skip_when_pysail_importable(monkeypatch):
-    """Remote/distributed LakeSail endpoints cannot be auto-started."""
     monkeypatch.setattr(readiness, "_module_available", lambda name: name in {"pyspark", "pysail"})
     monkeypatch.setattr(
         readiness,
@@ -115,9 +107,6 @@ def test_lakesail_sql_unreachable_distributed_endpoint_is_environment_skip_when_
 
 
 def test_lakesail_dataframe_mode_still_requires_running_endpoint(monkeypatch):
-    """w23 regression (negative side): the DataFrame adapter (`lakesail-df`)
-    cannot auto-start; pysail being importable does NOT make it ready when
-    the endpoint is unreachable."""
     monkeypatch.setattr(readiness, "_module_available", lambda name: name in {"pyspark", "pysail"})
     monkeypatch.setattr(
         readiness,

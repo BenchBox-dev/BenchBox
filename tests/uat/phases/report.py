@@ -1,44 +1,3 @@
-"""Report phase: TSV roll-up + optional cross-scale coverage assertion.
-
-The TSV format mirrors the 2026-05-02 retrospective's
-`matrix_summary.tsv` so historical comparisons are straightforward.
-
-Cross-scale coverage assertion is opt-in per the methodology spec's
-Finding 1 scoping (default OFF; sweep authors enable explicitly).
-
-Exit-code policy (uat-accounting-hardening w1, decided 2026-07-04)
--------------------------------------------------------------------
-`ReportSummary.exit_code()` is default-strict: it returns `1` whenever
-`fail_count`, `timeout_count`, or `unreachable_count` is nonzero, in addition
-to the pre-existing `aborted` (2) and opt-in `cross_scale_floor_breached` (1)
-checks. This was option 1 of the two the planning TODO posed (default-strict
-vs. an additive `--strict` CLI flag). Evidence for picking option 1 over the
-lenient-by-default + `--strict`-flag alternative:
-
-- `tests/uat/_cli.py`'s `report` subcommand (the `make uat-report` entry
-  point) and the `Makefile`'s `uat-report` target were grepped for any
-  handling of the report's exit code beyond passing it straight through to
-  the shell - neither does anything special with a nonzero exit (no
-  `|| true`, no exit-code branching); there is no CI workflow under
-  `.github/workflows/` that parses or gates on this exit code either.
-- The UAT orchestrator (`tests/uat/orchestrator.py`, out of scope for this
-  change) already folds the report phase's `exit_code()` into its own
-  `SweepResult.exit_code()` via `max(phase_exit_codes.values())`, so making
-  report exit codes honest only makes sweep-level exit codes more honest too;
-  no orchestrator test asserts `exit_code() == 0` for a sweep containing an
-  actual fail/timeout/unreachable cell (only for all-passed or
-  aborted/cross-scale-floor-breached cases).
-- The one place that *did* rely on the old lenient default was this
-  module's own test suite (`tests/uat/test_report_accounting.py`), where two
-  fixtures with real failed/unreachable cells asserted `exit_code == 0`
-  simply because nobody had wired the check up yet - not because any
-  caller depended on that leniency. Those tests were updated alongside this
-  change rather than left pinning the stale behavior.
-
-Net: no real caller depends on "exit 0 despite failures," so the more
-honest default (option 1) was chosen over the additive `--strict` flag.
-"""
-
 from __future__ import annotations
 
 import datetime as _dt
@@ -61,15 +20,6 @@ _UNREACHABLE_STATUSES = frozenset({"skipped-unreachable", "skipped_unreachable",
 
 
 def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None:
-    """Write `text` to `path` atomically via a temp sibling + fsync + os.replace.
-
-    Shared by every durable UAT artifact writer (cells.jsonl, its accounting
-    sidecar, compatibility_pruned.jsonl, validator_rollup.tsv, matrix_summary
-    TSVs) so a crash mid-write cannot leave torn JSON/TSV on disk -- see
-    uat-resume-retirement-artifact-durability w2. The temp file is a sibling
-    in the same directory as `path`, so `os.replace` is a same-filesystem
-    rename and therefore atomic on both POSIX and Windows.
-    """
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_name(path.name + ".tmp")
     try:
@@ -79,9 +29,6 @@ def atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> None
             os.fsync(fh.fileno())
         os.replace(tmp_path, path)
     except BaseException:
-        # Don't leave an orphaned .tmp sibling in the run directory when the
-        # write or the replace fails -- the destination is still the previous
-        # good artifact (or absent), which is the durability contract.
         tmp_path.unlink(missing_ok=True)
         raise
 
@@ -111,39 +58,9 @@ class ReportSummary(PhaseResult):
     cross_scale_floor_breached: bool
     registry_pruned_count: int = 0
     unreachable_count_is_estimated: bool = False
-    # A stack that never started (managed compose-up failure) is distinct
-    # from "TCP probe found nothing listening" (unreachable_count) -- see
-    # uat-fail-advance-consistency w3. Additive field; folding it into
-    # fail_count or unreachable_count would misrepresent an environment
-    # condition as a cell failure.
     startup_failed_count: int = 0
-    # Cells whose platform was reachable when it started and had stopped
-    # being reachable before the cell ran -- the stack died mid-platform
-    # (uat-container-readiness-and-memory-headroom-gate). A fifth disjoint
-    # component of total_defined_count alongside attempted/skipped/
-    # unreachable/startup_failed, and like unreachable_count and
-    # startup_failed_count it DOES feed exit_code(): cells that should have
-    # run did not, because the infrastructure under them went away. Folding
-    # it into fail_count would recreate the very miscount it exists to stop
-    # (171 cells recorded as cell failures on 2026-08-04); folding it into
-    # startup_failed_count would assert the stack never started, which is
-    # false.
     died_mid_platform_count: int = 0
-    # The sweep that produced these cells never wrote its finalize marker --
-    # it was killed mid-run (uat-sweep-durability-and-signal-teardown w1). A
-    # partial cells.jsonl must never read as a clean sweep, so this forces a
-    # nonzero exit regardless of what the rows-so-far happen to say.
     unfinalized: bool = False
-    # Cells classified `unvalidated` (a completed run whose validation never
-    # executed -- DataFrame mode, --validation disabled): these are `passed`
-    # cells, already counted in `pass_count`/`attempted_count` above, NOT an
-    # additional disjoint bucket. This is a cross-cutting visibility counter
-    # only -- unlike unreachable_count/startup_failed_count it must never
-    # feed exit_code() below, since UAT must not treat unvalidated as a cell
-    # failure (unvalidated-results-misclassified-as-schema-violations). Its
-    # purpose is the opposite of hiding: keep a majority-unvalidated sweep
-    # (e.g. a DataFrame release-gate stage) visible in the roll-up rather
-    # than reading as an ordinary clean pass.
     unvalidated_count: int = 0
 
     def exit_code(self) -> int:
@@ -165,7 +82,6 @@ def render_row(
     validator_status: str = "",
     source_info: SourceInfo | None = None,
 ) -> str:
-    """Render one row matching the current matrix-summary column order."""
     source_commit_sha = source_info.commit_sha if source_info else ""
     source_dirty = str(source_info.dirty).lower() if source_info else ""
     return (
@@ -177,7 +93,6 @@ def render_row(
 
 
 def terminal_state(cell: CellResult) -> str:
-    """Classify the terminal state visible in durable UAT artifacts."""
     if cell.status == "passed":
         return "passed"
     if is_skipped_status(cell.status):
@@ -193,11 +108,6 @@ def terminal_state(cell: CellResult) -> str:
             return "no_json_exit_0"
         return "no_json_nonzero"
     if cell.status == "failed":
-        # A failed cell that still exported a result JSON must not read as
-        # submission-ready: falling through to `submit_terminal_state`
-        # (default "submittable") mislabeled failures as clean. The
-        # "failed:<submit_state>" token preserves the submit-classification
-        # detail while remaining unambiguous with any real submit-ready state.
         return f"failed:{cell.submit_terminal_state}"
     if cell.submit_terminal_state:
         return cell.submit_terminal_state
@@ -215,7 +125,6 @@ def cross_scale_clean_pair_count(
     rungs: list[float],
     validator_status_by_path: dict[Path, str] | None = None,
 ) -> int:
-    """Count (platform, benchmark) pairs that passed AND validator-cleaned every rung."""
     if validator_status_by_path is None:
         validator_status_by_path = {}
 
@@ -263,39 +172,6 @@ def write_report(
     abort_reason: str | None = None,
     finalized: bool = True,
 ) -> ReportSummary:
-    """Write the matrix summary TSV; optionally enforce a cross-scale floor.
-
-    `registry_pruned_count` is the count of cells dropped for registry
-    reasons - a benchmark id absent from the registry (w2) or a requested
-    scale outside a benchmark's declared `scale_options` (w3, "ladder
-    pruning") - as opposed to `compatibility_pruned_count`, which counts
-    platform/benchmark compatibility-RULE drops. Keep the two disjoint: a
-    caller should count any given pruned cell in exactly one of the two
-    buckets, never both, since both feed `total_defined_count` below.
-
-    `unreachable_count_is_estimated` marks whether `unreachable_count`
-    includes a confirmed sidecar-derived `skipped_unreachable_count` (False)
-    or was defaulted to 0 because the durable sweep's
-    `cells.jsonl.accounting.json` sidecar was missing (True) - see w5's
-    `_read_skipped_unreachable_sidecar` in `tests/uat/_cli.py`. It does not
-    change `unreachable_count` itself; it only flags whether that number is
-    confirmed or assumed.
-
-    `startup_failed_count` is disjoint from `unreachable_count`: it counts
-    cells whose platform's managed Docker stack never started (compose-up
-    failure), as opposed to a reachability probe finding nothing listening.
-    It feeds `total_defined_count` and the exit-code check exactly like
-    `unreachable_count` does, but is reported under its own counter -- see
-    uat-fail-advance-consistency w3.
-
-    `died_mid_platform_count` is disjoint from both: the stack DID start and
-    WAS reachable, then stopped being reachable partway through the
-    platform's cells. It feeds `total_defined_count` and the exit-code check
-    the same way.
-    """
-    # A run whose sweep never finalized (killed mid-stream) is INCOMPLETE and
-    # must not read as a clean COMPLETED run, whatever the rows-so-far say. An
-    # already-ABORTED run stays ABORTED (it reached an orderly, finalized end).
     if not finalized and run_status == "COMPLETED":
         run_status = "INCOMPLETE"
     rows = list(cells)
@@ -313,10 +189,6 @@ def write_report(
         attempted_count + skipped_count + unreachable_count + startup_failed_count + died_mid_platform_count
     )
     candidate_count = total_defined_count
-    # Cross-cutting, NOT one of the disjoint total_defined_count components
-    # above (an unvalidated cell is already `passed`, already counted in
-    # attempted_count/pass_count) -- see the ReportSummary.unvalidated_count
-    # field docstring for why this must stay out of exit_code().
     unvalidated_count = sum(
         1 for r in rows if r.status == "passed" and r.submit_terminal_state == SubmitTerminalState.unvalidated.value
     )
@@ -325,10 +197,6 @@ def write_report(
     for cell in rows:
         v = _validator_status_for_path(validator_status_by_path, cell.result_path) if validator_status_by_path else ""
         lines.append(render_row(cell, validator_status=v, source_info=source_info) + "\n")
-    # Footer token ordering: the four disjoint components (attempted,
-    # skipped, unreachable, startup_failed) precede their total
-    # (total_defined) -- frozen now, before any parser of these lines
-    # exists, so components-then-total is the stable contract.
     lines.append(
         "# "
         f"rows={len(rows)} "
@@ -364,18 +232,8 @@ def write_report(
     if startup_failed_count:
         lines.append(f"# STARTUP_FAILED_CELLS={startup_failed_count} release_gate_attention=required\n")
     if died_mid_platform_count:
-        # Its own aggregate line, like UNREACHABLE_CELLS/STARTUP_FAILED_CELLS:
-        # a platform lost mid-sweep is exactly the condition an operator must
-        # not have to reconstruct by diffing row counts.
         lines.append(f"# DIED_MID_PLATFORM_CELLS={died_mid_platform_count} release_gate_attention=required\n")
     if unvalidated_count:
-        # Visible-by-construction: a reader scanning per-row
-        # submit_terminal_state values across 200 rows is not a safeguard,
-        # so a majority-unvalidated sweep (e.g. a DataFrame release-gate
-        # stage) still gets its own aggregate line, same as
-        # UNREACHABLE_CELLS/STARTUP_FAILED_CELLS -- even though, unlike
-        # those two, this does NOT affect exit_code() (see
-        # ReportSummary.unvalidated_count).
         lines.append(f"# UNVALIDATED_CELLS={unvalidated_count} release_gate_attention=required\n")
     footer = f"# run_status={run_status}"
     if source_info is not None:
@@ -440,29 +298,7 @@ def is_unreachable_status(status: str) -> bool:
     return _normalized_status(status) in _UNREACHABLE_STATUSES
 
 
-# ---------------------------------------------------------------------------
-# Release-gate re-run ordering check.
-#
-# The release-gate contract (uat-certification-rerun-ordering-and-gate) runs
-# four stages — native SQL, then dataframe, then Docker non-OLTP, then Docker
-# OLTP — and requires that ALL native + dataframe platforms complete before any
-# Docker stack starts. The 2026-05-28/29 evidence was contaminated because a
-# Docker stack began before the dataframe sweep finished. Each sweep is a
-# separate invocation, so the cross-stage order is enforced by the runbook; this
-# helper provides the lightweight, machine-checkable proof from lifecycle logs.
-# ---------------------------------------------------------------------------
-
-
 def parse_docker_up_events(lifecycle_log_text: str) -> list[tuple[_dt.datetime, str]]:
-    """Extract ``(timestamp, platform)`` for each Docker ``action=up`` line.
-
-    Parses ``uat_lifecycle.log`` lines of the shape::
-
-        2026-05-30T01:02:03 [docker] platform=lakesail action=up status=ok ...
-
-    Lines without a Docker ``action=up`` marker, or with an unparseable leading
-    ISO timestamp, are skipped.
-    """
     events: list[tuple[_dt.datetime, str]] = []
     for raw in lifecycle_log_text.splitlines():
         line = raw.strip()
@@ -487,30 +323,9 @@ def release_gate_ordering_violations(
     *,
     native_stage_completed_at: _dt.datetime,
 ) -> list[str]:
-    """Return ordering violations for a release-gate run-set.
-
-    Given the ``uat_lifecycle.log`` text of each Docker stage and the timestamp
-    at which the native + dataframe stage completed, return a human-readable
-    violation for every Docker ``action=up`` that started at or before that
-    boundary. An empty list means the four-stage ordering held: no Docker stack
-    came up before native + dataframe finished.
-    """
     violations: list[str] = []
     for log_text in docker_stage_lifecycle_logs:
         for timestamp, platform in parse_docker_up_events(log_text):
-            # append_lifecycle_log() now writes offset-aware timestamps
-            # (datetime.now().astimezone(), #1202 follow-up) so each Docker
-            # event carries its own real offset -- correct even across a DST
-            # transition mid-sweep. This branch is a best-effort fallback for
-            # uat_lifecycle.log files written by an older BenchBox version
-            # that recorded naive local wall-clock time with no offset at
-            # all: attach the boundary's own offset, since both timestamps
-            # come from the same host/sweep run and no better information is
-            # available for a legacy naive entry (#1179). A stale log mixing
-            # naive pre-upgrade lines with a DST transition can still
-            # misattribute the offset -- there is no way to recover the true
-            # offset of a naive timestamp after the fact; only fresh
-            # offset-aware logs are exact.
             if timestamp.tzinfo is None and native_stage_completed_at.tzinfo is not None:
                 timestamp = timestamp.replace(tzinfo=native_stage_completed_at.tzinfo)
             if timestamp <= native_stage_completed_at:

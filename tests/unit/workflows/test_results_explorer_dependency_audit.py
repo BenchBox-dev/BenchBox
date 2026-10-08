@@ -1,5 +1,3 @@
-"""Regression checks for the blocking Results Explorer dependency audit."""
-
 import json
 import re
 from pathlib import Path

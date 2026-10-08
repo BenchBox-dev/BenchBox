@@ -1,10 +1,3 @@
-/**
- * Test harness for scripts/publication/pages.cjs.
- *
- * Simulates actions/github-script environment (Octokit, Actions core, context)
- * to test Pages adapter behavior, validation, token masking, and error sanitization.
- */
-
 'use strict';
 
 const fs = require('fs');

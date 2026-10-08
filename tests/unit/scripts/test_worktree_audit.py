@@ -1,5 +1,3 @@
-"""Unit tests for the read-only worktree lifecycle auditor."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -597,12 +595,10 @@ def test_git_worktrees_enumeration_failure_resolves_unavailable(tmp_path: Path, 
 
 
 def test_pagination_and_truncation_resolves_unavailable(monkeypatch: pytest.MonkeyPatch):
-    # Simulate pagination returning 100 items per page with link header
     page_calls = []
 
     def mock_paginated_request(url: str, token: Any):
         page_calls.append(url)
-        # return 100 items and a Link next header
         return (
             [{"number": len(page_calls) * 100 + i, "base": {"repo": {"id": 123}}} for i in range(100)],
             {"link": '<https://api.github.com/next>; rel="next"'},
@@ -680,14 +676,12 @@ def test_remote_plausibility_cross_check(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(mod, "_github_api_request", mock_repo_request)
 
-    # A transferred repository resolves to the same stable ID and passes.
     repo_id, full_name, err = mod.resolve_repository_identity(
         "BenchBox-dev", "BenchBox", token=None, remote_slug="joeharris76/BenchBox"
     )
     assert err is None
     assert repo_id == 123
 
-    # A same-named fork resolves to a different ID and fails closed.
     repo_id, full_name, err = mod.resolve_repository_identity(
         "BenchBox-dev", "BenchBox", token=None, remote_slug="alice/BenchBox"
     )
@@ -709,12 +703,10 @@ def test_list_api_schema_without_merged_boolean_evaluates_verified_integrated(
         branch="fix/list-api-schema",
         head_sha="head_sha_123",
     )
-    # GitHub LIST API payload: 'merged' boolean is absent, 'merged_at' is present
     canned_prs = [
         {
             "number": 1937,
             "state": "closed",
-            # 'merged' key is intentionally omitted
             "merged_at": "2026-08-28T18:17:34Z",
             "merge_commit_sha": "merge_sha_123",
             "head": {"sha": "head_sha_123"},
@@ -817,7 +809,6 @@ def test_snapshot_failure_is_a_top_level_collection_error(tmp_path: Path, monkey
 
 
 def test_git_run_timeout(monkeypatch: pytest.MonkeyPatch):
-    # Verify timeout handling in _run_git
     def mock_run(*args, **kwargs):
         raise subprocess.TimeoutExpired(cmd=["git", "status"], timeout=0.01)
 

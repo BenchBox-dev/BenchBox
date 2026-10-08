@@ -1,35 +1,4 @@
 #!/usr/bin/env python3
-"""Rehearsal-only release isolation verifier.
-
-Proves a release fully self-hosts its site from a *single* GitHub Pages
-deployment source, with no second deploy source and no hidden coupling of a
-build step to a Pages deploy. This is the evidence tool for the A10 "single
-deployment source" gate (G3 release-deploy removal): while the legacy
-release-driven Pages deploy (``docs.yml``) still contains a ``deploy`` job,
-isolation is NOT proven and this script fails.
-
-This script MUST NOT deploy; it is a read-only verification tool.
-
-What it checks, at the requested git ref:
-  1. Count every workflow that contains a Pages deploy step (official
-     ``actions/deploy-pages`` at any version/pin, known third-party deployers,
-     or a raw ``gh-pages`` push). Isolation requires exactly one, and it must
-     be the intended ``publication-deploy.yml``.
-  2. The legacy ``docs.yml`` workflow must contain no Pages deploy step.
-  3. No single job anywhere both builds the site AND deploys it (hidden
-     coupling). A separate build job feeding a separate deploy job is fine.
-  4. Any job that delegates to a reusable workflow (``jobs.<id>.uses``) is
-     reported as un-analyzable rather than assumed clean.
-
-Usage:
-  uv run -- python scripts/publication/verify_release_isolation.py --ref origin/release --mode rehearsal
-  uv run -- python scripts/publication/verify_release_isolation.py --ref origin/release --mode rehearsal --json
-
-Exit codes:
-  0 - Isolation proven (single deploy source, no hidden coupling).
-  1 - Isolation not proven or operational error.
-  2 - ``--mode prod`` is rejected (must use rehearsal mode).
-"""
 
 from __future__ import annotations
 
@@ -50,10 +19,6 @@ WORKFLOWS_DIR = REPO_ROOT / ".github" / "workflows"
 INTENDED_DEPLOY_WORKFLOW = "publication-deploy.yml"
 LEGACY_DEPLOY_WORKFLOW = "docs.yml"
 
-# Known GitHub Pages deployer actions, matched on the version-independent
-# ``owner/repo`` prefix so ``@v4``, ``@v5``, ``@main`` and 40-hex SHA pins are
-# all caught. ``actions/deploy-pages`` is matched by suffix as well to cover a
-# vendored fork path.
 KNOWN_PAGES_DEPLOYERS = (
     "actions/deploy-pages",
     "peaceiris/actions-gh-pages",
@@ -63,7 +28,6 @@ KNOWN_PAGES_DEPLOYERS = (
     "cloudflare/wrangler-action",
 )
 
-# ``run:`` script fragments that indicate a raw push to a Pages branch.
 RAW_PAGES_PUSH_RE = re.compile(
     r"(git\s+push[^\n]*\bgh-pages\b)"
     r"|(\bnpx\s+gh-pages\b)"
@@ -111,7 +75,6 @@ def _run_git(args: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 def _get_workflow_files_at_ref(ref: str) -> list[str]:
-    """List workflow YAML filenames (bare names) reachable from ref."""
     result = _run_git(["ls-tree", ref, "--name-only", ".github/workflows/"])
     if result.returncode != 0:
         raise RuntimeError(f"git ls-tree failed for ref '{ref}': {result.stderr.strip()}")
@@ -125,7 +88,6 @@ def _get_workflow_files_at_ref(ref: str) -> list[str]:
 
 
 def _read_workflow_at_ref(ref: str, workflow_path: str) -> str:
-    """Read a single workflow file's contents at ref."""
     full_path = f".github/workflows/{Path(workflow_path).name}"
     result = _run_git(["show", f"{ref}:{full_path}"])
     if result.returncode != 0:
@@ -140,12 +102,10 @@ def _uses_is_pages_deployer(uses: str) -> bool:
     for known in KNOWN_PAGES_DEPLOYERS:
         if action == known or action.startswith(f"{known}/"):
             return True
-    # Bare / vendored deploy-pages (``./.github/actions/deploy-pages``, forks).
     return action.endswith("/deploy-pages") or action == "deploy-pages"
 
 
 def _job_pages_deployers(job_def: dict[str, Any]) -> list[str]:
-    """Return the deploy markers found inside a single job's steps."""
     deployers: list[str] = []
     steps = job_def.get("steps", [])
     if not isinstance(steps, list):
@@ -190,7 +150,6 @@ def _scan_workflow(data: dict[str, Any]) -> _WorkflowScan:
     for job_name, job_def in jobs.items():
         if not isinstance(job_def, dict):
             continue
-        # A job that calls a reusable workflow has no inspectable steps.
         if isinstance(job_def.get("uses"), str) and job_def["uses"].strip():
             unanalyzable_jobs.append(str(job_name))
             continue
@@ -210,7 +169,6 @@ def _analyze(
     list[dict[str, Any]],
     list[str],
 ]:
-    """Return (deploy_sources, hidden_couplings, unanalyzable_jobs, errors)."""
     deploy_sources: list[dict[str, Any]] = []
     hidden_couplings: list[dict[str, Any]] = []
     unanalyzable: list[dict[str, Any]] = []
@@ -348,7 +306,6 @@ def verify_release_isolation(ref: str, mode: str = "rehearsal") -> ReleaseIsolat
 
 
 def _resolve_ref(explicit: str | None) -> str:
-    """Default to the release branch ref, falling back to HEAD when unavailable."""
     if explicit:
         return explicit
     probe = _run_git(["rev-parse", "--verify", "--quiet", "origin/release"])

@@ -114,40 +114,12 @@ function appendCompareNotice(current: string | null, next: string): string {
   return current ? `${current} ${next}` : next;
 }
 
-/**
- * Which layout a compare selection renders.
- *
- * Selection COUNT picks the layout, so nobody has to choose a page before
- * choosing runs, and the existing `?ids=` grammar keeps working untouched.
- *
- * Deliberately keyed on DISTINCT runs, not on the raw id list. Two ids that
- * alias to one result are one run and belong on the within-run route, not in a
- * head-to-head that would compare a run against itself.
- */
 export type CompareLayout =
   | { readonly kind: "empty" }
   | { readonly kind: "within_run"; readonly resultId: string }
   | { readonly kind: "head_to_head"; readonly runIds: readonly [string, string] }
   | { readonly kind: "multi_run"; readonly runIds: readonly string[] };
 
-/**
- * Choose the layout for a recovered selection.
- *
- * MUST be called on the RECOVERED set, never on the raw `?ids=` list: recovery
- * resolves aliases, drops duplicates and unavailable ids, and caps the
- * selection at MAX_COMPARE_SELECTIONS. Routing on the raw list would pick a
- * layout from a count the page never actually renders -- a five-id URL would
- * choose multi-run and then render four runs.
- */
-/**
- * True when a ratio is close enough to 1.0 that calling it a win would be
- * reading noise as a result.
- *
- * Reuses the decision summary's threshold rather than declaring a second one.
- * Two thresholds would eventually disagree, and a page that headlines a win
- * while its own summary calls the same pair a tie is worse than either
- * behaviour on its own.
- */
 export function isWithinTieBand(ratio: number | null): boolean {
   if (ratio === null || !Number.isFinite(ratio)) return false;
   return Math.abs(ratio - 1) < COMPARE_TIE_THRESHOLD;
@@ -175,34 +147,16 @@ export function Compare({ url }: CompareProps) {
   const [compareState, setCompareState] = useState<CompareState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  // Bumped by the ErrorMessage retry button so a reader can re-issue this
-  // read after a DuckDB worker fault without reloading the page.
   const [compareRetryToken, setCompareRetryToken] = useState(0);
   const [baselineResultId, setBaselineResultId] = useUrlState(BASELINE_URL_KEY, "", stringSerde);
-  // Through the model's serde, not a hand-rolled parser: the grammar is the
-  // model's to define, and a shared link has to reproduce the sender's figures
-  // exactly. One `basis` parameter, because a cross-run comparison carries
-  // exactly one basis -- the URL grammar mirrors the type grammar.
   const [basis, setBasis] = useUrlState(BASIS_URL_KEY, DEFAULT_BASIS, basisSerde);
-  // ONE limiter drives the chart and the table. Two independent controls would
-  // let the page show a chart of one subset above a table of another, which
-  // reads as a data error rather than as two filters.
   const [queryLimiter, setQueryLimiter] = useUrlState<QueryDiffLimiter>(QUERY_LIMITER_URL_KEY, "all", queryLimiterSerde);
-  // Selection-launch mode: rendered when 0 ids are supplied, or when 1 id is
-  // supplied from a result page.
-  // Was previously an error string ("No result IDs provided. Add ?ids=...")
-  // or a silent redirect back to ResultDetail; both forced URL editing or
-  // dead-ended the user on the page they came from.
   const [showBuilder, setShowBuilder] = useState(false);
   const [compareNotice, setCompareNotice] = useState<string | null>(null);
   const [preserveRequestedIds, setPreserveRequestedIds] = useState(false);
   const results = compareState?.results ?? EMPTY_RESULTS;
   const [availabilityRows, setAvailabilityRows] = useState<Record<string, string>>({});
 
-  // Read the pipeline's precomputed availability rather than deriving it from
-  // raw executions: the read model already holds the answer, and pulling every
-  // execution row for a 103-query run to re-derive it would be a large
-  // download to reach a value we already have.
   useEffect(() => {
     let cancelled = false;
     const ids = results.map((r) => r.result_id);
@@ -221,15 +175,6 @@ export function Compare({ url }: CompareProps) {
     };
   }, [results]);
 
-  /**
-   * Pass selections EVERY selected run can serve.
-   *
-   * Intersected, not unioned. Offering a pass one run cannot answer would put
-   * a control on the page that empties half the comparison the moment it is
-   * used. A run whose availability is unknown (an older snapshot, or a failed
-   * read) does not narrow the set -- value resolution reports unavailability
-   * per query, where it can name the reason.
-   */
   const availablePasses = useMemo<PassSelection[]>(() => {
     const perRun = results
       .map((r) => availabilityRows[r.result_id])
@@ -272,8 +217,6 @@ export function Compare({ url }: CompareProps) {
 
     const idsParam = requestedIdsToken;
     const rawIds = idsParam.split(",");
-    // Resolve every requested ID before applying the comparison limit so a
-    // short ID and its long-form alias consume one slot, not two.
     const plan = planCompareIds(rawIds, rawIds.length);
     let initialNotice: string | null = null;
     if (plan.duplicates.length > 0) {
@@ -304,8 +247,6 @@ export function Compare({ url }: CompareProps) {
             setLoading(false);
             return;
           }
-          // Keep this run selected and send the reader to the shared run
-          // finder instead of returning to the page they came from.
           setCompareState({ results: [detail], primaryMetric: "display_geomean_ms" });
           setShowBuilder(true);
           setLoading(false);
@@ -400,28 +341,18 @@ export function Compare({ url }: CompareProps) {
     };
   }, [requestedIdsToken, compareRetryToken]);
 
-  // A stale baseline token must not make the visible selector disagree with
-  // the figures. Fall back to the first selected run and remove the invalid
-  // token so a copied URL describes the state it actually renders.
   useEffect(() => {
     if (!baselineResultId || results.length === 0) return;
     if (results.some((result) => result.result_id === baselineResultId)) return;
     setBaselineResultId("");
   }, [baselineResultId, results, setBaselineResultId]);
 
-  // Canonicalize URL to the retained short IDs once data is loaded. This also
-  // removes stale, duplicate, or excess entries so a copied URL reproduces
-  // the same visible comparison state after refresh.
   useEffect(() => {
     const ids = results.map((r) => r.result_id);
     if (ids.length === 0 || typeof window === "undefined") return;
     if (preserveRequestedIds) return;
     const currentParams = new URLSearchParams(window.location.search);
     const currentRawIds = currentParams.get("ids") ?? "";
-    // A URL that started as a multi-selection must remain a multi-selection
-    // after stale-ID recovery. Keeping its explicit membership is the only
-    // way for a one-result recovery to reload into the same comparison surface
-    // instead of being reinterpreted as the single-result builder entrypoint.
     if (
       shouldPreserveMultiSelectionUrl(
         currentRawIds.split(","),
@@ -474,9 +405,6 @@ export function Compare({ url }: CompareProps) {
       </div>
     );
 
-  // The compare route with nothing selected is where a reader arrives wanting
-  // to rank runs against each other. The ranking table and its filters answer
-  // that directly, so they stand in for what used to be a link to a picker.
   if (showBuilder) {
     return <>
       {results.length === 1 && <div class="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8" role="status">
@@ -495,13 +423,7 @@ export function Compare({ url }: CompareProps) {
   const comparabilityFields = buildComparabilityFields(results);
   const comparabilityWarnings = comparabilityWarningFields(comparabilityFields);
   const comparabilityWarningCount = comparabilityWarnings.length;
-  // Validation is sorted to the front of the summary so it never gets folded
-  // into "+N more" behind cosmetic environment differences (CPU model,
-  // driver version, ...) - see orderWarningLabelsForSummary.
   const comparabilityWarningLabels = orderWarningLabelsForSummary(comparabilityWarnings);
-  // Compare identity is canonicalized at the cohort boundary. Raw slugs such
-  // as `star_schema` remain valid in result data and route links, but aliases
-  // must not turn one SSB family into a false mixed-benchmark heading.
   const canonicalBenchmark = canonicalBenchmarkSlug(benchmark);
   const mixedBenchmark = new Set(results.map((result) => canonicalBenchmarkSlug(result.benchmark))).size > 1;
   const benchmarkLabel = mixedBenchmark ? "Mixed Benchmark" : formatBenchmarkLabel(canonicalBenchmark);
@@ -510,18 +432,6 @@ export function Compare({ url }: CompareProps) {
     : `SF ${scaleFactor}`;
   const rowCount = results.length;
 
-  /**
-   * How many queries every selected run can answer, and how many exist at all.
-   *
-   * Computed, not approximated. An earlier draft of the basis bar passed the
-   * RUN count for both numbers, so a two-run comparison announced "over 2 of 2
-   * queries" -- a sentence that looks precise and describes nothing. A stated
-   * denominator has to be the real one or it is worse than no denominator.
-   *
-   * Intersection, matching the model's same-query-set rule: a query any run
-   * cannot answer leaves every run's geomean, so it is not part of the set the
-   * figures are computed over.
-   */
   const queryCoverage = useMemo(() => {
     const allQueryIds = new Set<string>();
     for (const result of resolvedResults) {
@@ -534,13 +444,6 @@ export function Compare({ url }: CompareProps) {
     return { shared, total: allQueryIds.size };
   }, [resolvedResults]);
 
-  // Primary metric is loaded async from DuckDB in the effect above; default
-  // stays `display_geomean_ms` until the query resolves (matches Python's
-  // `_DEFAULT_RANKING`).
-  // When a non-default basis is selected, power_score is not applicable because
-  // published power scores are strictly calibrated over the official measurement
-  // phases. Fall back to display_geomean_ms so rankings and summaries reflect
-  // the recomputed query timings under the active basis.
   const effectivePrimaryMetric: ComparePrimaryMetric =
     primaryMetric === "power_score" && !isDefaultBasis(basis)
       ? "display_geomean_ms"
@@ -551,11 +454,6 @@ export function Compare({ url }: CompareProps) {
   const primaries: (number | null)[] = resolvedResults.map((r) =>
     effectivePrimaryMetric === "power_score" ? r.power_score : r.display_geomean_ms,
   );
-  // Cohort-aware run identity labels for the decision summary headline +
-  // winner card (finding #8). Using `formatRunIdentitiesForCohort` here means
-  // that two same-platform runs (e.g. two Polars v1.40.0 from different
-  // dates) get a unique label like "Polars 2026-05-02 (0093bb7a)" instead
-  // of the bare "Polars" that appears in the bug report.
   const summaryRunLabels: Record<string, string> = (() => {
     const labels = formatRunIdentitiesForCohort(
       results.map((r) => ({
@@ -595,11 +493,6 @@ export function Compare({ url }: CompareProps) {
       : null;
   const selectionIsTie = isWithinTieBand(selectionRatio);
 
-  // Cohort-aware run identity labels. When the comparison includes
-  // multiple runs of the same platform (e.g., DataFusion v44 vs v53,
-  // or two PySpark runs from different dates), this disambiguates them
-  // with the shortest qualifier suffix that makes the cohort unique.
-  // Singletons keep the bare platform name.
   const identitySources: RunIdentitySource[] = results.map((r) => ({
     result_id: r.result_id,
     platform: r.platform,
@@ -682,9 +575,6 @@ export function Compare({ url }: CompareProps) {
         baselineIndex={normalizedBaselineIndex}
         runLabels={cohortIdentitiesCompact}
       />
-      {/* The three controls that govern every figure below - what is measured,
-          what it is measured against, and over which queries - read as one
-          set, so they sit in one row rather than three stacked bars. */}
       {results.length > 1 && (
         <div
           class="panel mb-4 grid gap-x-6 gap-y-4 px-4 py-3 shadow-sm lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
@@ -757,12 +647,6 @@ export function Compare({ url }: CompareProps) {
             suppressWinnerClaims={decisionSummary.claimSuppressed}
             suppressionReason={decisionSummary.claimSuppressionReason ?? undefined}
             queryFilter={queryLimiter === "all" ? undefined : limitedQueryIds}
-            // One chart per question. The sparkline table already carries the
-            // per-platform geomean and Power@Size figures, so the single-metric
-            // bar charts repeat them; comparison_bar and query_histogram are
-            // both per-query bars across the selected runs, and diverging_bar
-            // and normalized_speedup are both per-query change against the
-            // baseline. In each pair the responsive drawing survives.
             excludeChartIds={["performance_bar", "power_bar", "comparison_bar", "normalized_speedup"]}
           />
         </div>
@@ -772,8 +656,6 @@ export function Compare({ url }: CompareProps) {
         {rowData.map((r, i) => {
           const color = paletteColor(i);
           const primary = primaries[i] ?? null;
-          // For latency metrics (lower-is-better): ratio = slowest / this (≥1)
-          // For score metrics (higher-is-better): ratio = this / worst (≥1)
           const speedup = higherIsBetter
             ? primary !== null && slowestPrimary !== null && slowestPrimary > 0
               ? primary / slowestPrimary
@@ -857,12 +739,6 @@ export function Compare({ url }: CompareProps) {
                     <dt class="text-[var(--bb-data-fg-muted)]">
                       {isComparisonBaseline ? "Relative position" : vsLabel}
                     </dt>
-                    {/*
-                      Inside the tie band a ratio is not a win in EITHER
-                      direction. Rendering the number alone would let a 1.002x
-                      read as an advantage once it is rounded to "1.00x" and
-                      sat under a "vs slowest" label.
-                    */}
                     {isComparisonBaseline ? (
                       <dd class="text-[var(--bb-data-fg-muted)]">
                         {higherIsBetter ? "Lowest selected" : "Slowest selected"}
@@ -1061,10 +937,6 @@ function severeCohortMismatchReason(results: DetailResult[]) {
   if (new Set(results.map((result) => result.scale_factor)).size > 1) {
     reasons.push("scale factors differ");
   }
-  // Canonicalize exactly as the cohort builder and selection lock do. Comparing
-  // raw values would flag `POWER` against `power` as a severe mismatch and
-  // suppress winner/ranking claims for results the builder admitted into one
-  // canonical cohort.
   if (new Set(results.map((result) => canonicalPhase(result.test_type))).size > 1) {
     reasons.push("phases differ");
   }

@@ -1,5 +1,3 @@
-"""Fast-test coverage for tests/uat/ladder.py."""
-
 from __future__ import annotations
 
 import pytest

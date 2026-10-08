@@ -1,5 +1,3 @@
-"""Regression tests for checked-in Databricks TPC tuning examples."""
-
 from __future__ import annotations
 
 from pathlib import Path

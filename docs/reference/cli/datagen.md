@@ -27,18 +27,16 @@ benchbox datagen --benchmark <name> --scale <sf> [OPTIONS]
 ## Usage Examples
 
 ```bash
-# Generate TPC-H data at scale factor 0.1
 benchbox datagen --benchmark tpch --scale 0.1 --output ./data/tpch_0.1
 
-# Generate TPC-DS data with specific seed
 benchbox datagen --benchmark tpcds --scale 1 --seed 42 --output ./data/tpcds_1
 
-# Generate ClickBench data
 benchbox datagen --benchmark clickbench --scale 1 --output ./data/clickbench
 
-# Generate with verbose logging
 benchbox datagen --benchmark tpch --scale 0.01 --output ./data --verbose
 ```
+
+The commands generate TPC-H data at scale factor 0.1, TPC-DS data with a specific seed, ClickBench data, and TPC-H data with verbose logging.
 
 ## Notes
 

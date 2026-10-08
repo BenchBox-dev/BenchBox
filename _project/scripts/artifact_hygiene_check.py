@@ -1,5 +1,3 @@
-"""Fail PRs that commit temporary review evidence as repository source."""
-
 from __future__ import annotations
 
 import argparse
@@ -40,6 +38,9 @@ BLOCKED_PROJECT_EXTENSIONS = {
     ".zip",
     ".zst",
 }
+
+
+CLI_DESCRIPTION = "Fail PRs that commit temporary review evidence as repository source."
 
 
 @dataclass(frozen=True)
@@ -100,7 +101,7 @@ def classify(path: str) -> Finding | None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--all-tracked", action="store_true", help="scan every tracked path in HEAD")
     mode.add_argument("--base-ref", help="scan added/copied/modified/renamed paths against this ref")

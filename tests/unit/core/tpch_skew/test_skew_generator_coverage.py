@@ -1,5 +1,3 @@
-"""Coverage tests for TPCH skew data generator."""
-
 from __future__ import annotations
 
 import hashlib
@@ -73,7 +71,6 @@ def test_check_existing_and_collect_table_files(tmp_path: Path):
     for name in tables:
         (tmp_path / f"{name}.tbl").write_text("1|x|\n", encoding="utf-8")
 
-    # Files alone are not enough: reuse requires a current manifest stamp.
     assert gen._check_existing_data() is False
     gen._write_manifest({name: tmp_path / f"{name}.tbl" for name in tables})
     assert gen._check_existing_data() is True
@@ -120,7 +117,6 @@ def test_written_manifest_carries_current_skew_stamp(tmp_path: Path):
 
 
 def test_changed_skew_configuration_rejects_manifest_reuse(tmp_path: Path):
-    """The generator and core runner reject a cache after a skew input changes."""
     from benchbox.core.runner.runner import _validate_manifest_if_present
 
     tables = ["customer", "lineitem", "nation", "orders", "part", "partsupp", "region", "supplier"]
@@ -284,7 +280,6 @@ def test_transform_methods_apply_configured_skews(monkeypatch, tmp_path: Path):
 
 
 def test_streaming_preserves_skewed_table_bytes(tmp_path: Path):
-    """Golden digests come from the original in-memory transformer at seed 42."""
     source_rows = {
         "customer": ["1", "name", "addr", "1", "ph", "1.0", "BUILDING", "c"],
         "supplier": ["1", "n", "a", "1", "ph", "1.0", "c"],

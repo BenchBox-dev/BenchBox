@@ -189,11 +189,6 @@ def test_execute_stream_runs_query_path(monkeypatch):
 
 
 def test_build_stream_queries_uses_run_num_streams_and_base_seed_not_stream_id(monkeypatch):
-    """Regression test for the retired `num_streams=stream_id + 1,
-    base_seed=seed + stream_id` bug: a stream's ordering must depend on the
-    run's actual `config.num_streams` / `config.base_seed`, not on its own
-    stream_id -- mirroring TPC-H's single PERMUTATION_MATRIX indexed by
-    `stream_id % 41` (benchbox/core/tpch/streams.py)."""
     query_manager = object()
     benchmark = SimpleNamespace(
         query_manager=query_manager,
@@ -219,9 +214,7 @@ def test_build_stream_queries_uses_run_num_streams_and_base_seed_not_stream_id(m
     throughput._build_stream_queries(stream_id=4, seed=104, config=config)
 
     assert len(captured_kwargs) == 2
-    # Both calls -- regardless of stream_id -- must resolve to the SAME
-    # num_streams/base_seed (the run's config), not stream_id-dependent
-    # values like the retired `stream_id + 1` / `seed + stream_id` formula.
+
     for kwargs in captured_kwargs:
         assert kwargs["num_streams"] == config.num_streams + 1 == 5
         assert kwargs["base_seed"] == config.base_seed == 100
@@ -235,9 +228,6 @@ class DummyStreamQueryWithSql:
 
 
 def test_pregenerate_stream_queries_routes_through_dsqgen_streams(monkeypatch):
-    """`_pregenerate_stream_queries` must call the -STREAMS batch generator
-    exactly once for the whole run (not per-stream), then translate each
-    stream's raw dsqgen SQL to the target platform dialect."""
     benchmark = SimpleNamespace(
         translate_query_text=lambda sql, _src, _tgt: f"TRANSLATED::{sql}",
         _apply_target_dialect_overrides=lambda _qid, sql, _tgt: sql,

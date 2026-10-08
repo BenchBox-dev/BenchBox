@@ -30,12 +30,10 @@ import csv
 import random
 
 class SimpleBenchmark(BaseBenchmark):
-    """Simple custom benchmark for demonstration."""
 
     def __init__(self, scale_factor: float = 1.0, output_dir: Optional[Path] = None):
         super().__init__(scale_factor, output_dir)
 
-        # Define queries
         self._queries = {
             "count_all": "SELECT COUNT(*) FROM test_table",
             "sum_values": "SELECT SUM(value) FROM test_table",
@@ -43,7 +41,6 @@ class SimpleBenchmark(BaseBenchmark):
             "top_values": "SELECT * FROM test_table ORDER BY value DESC LIMIT 10"
         }
 
-        # Define schema
         self._schema = {
             "test_table": {
                 "columns": [
@@ -56,14 +53,11 @@ class SimpleBenchmark(BaseBenchmark):
         }
 
     def generate_data(self) -> Dict[str, Path]:
-        """Generate simple test data."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Calculate row count based on scale factor
         base_rows = 1000
         row_count = int(base_rows * self.scale_factor)
 
-        # Generate test_table data
         test_file = self.output_dir / "test_table.csv"
 
         categories = ['A', 'B', 'C', 'D']
@@ -81,17 +75,14 @@ class SimpleBenchmark(BaseBenchmark):
         return {"test_table": test_file}
 
     def get_queries(self) -> Dict[Union[int, str], str]:
-        """Get all benchmark queries."""
         return self._queries.copy()
 
     def get_query(self, query_id: Union[int, str]) -> str:
-        """Get specific query by ID."""
         if query_id not in self._queries:
             raise ValueError(f"Query '{query_id}' not found")
         return self._queries[query_id]
 
     def get_create_tables_sql(self, dialect: str = "standard", tuning_config=None) -> str:
-        """Get DDL statements for benchmark tables."""
         return """
         CREATE TABLE test_table (
             id INTEGER PRIMARY KEY,
@@ -102,40 +93,30 @@ class SimpleBenchmark(BaseBenchmark):
         """
 
     def get_table_names(self) -> list:
-        """Get list of table names."""
         return list(self._schema.keys())
 
-# Usage example
 def test_simple_benchmark():
-    """Test the simple custom benchmark."""
     import duckdb
 
-    # Initialize benchmark
     benchmark = SimpleBenchmark(scale_factor=0.1)
 
-    # Generate data
     data_files = benchmark.generate_data()
     print(f"Generated data: {list(data_files.keys())}")
 
-    # Setup database
     conn = duckdb.connect(":memory:")
 
-    # Create tables
     ddl = benchmark.get_create_tables_sql("duckdb")
     conn.execute(ddl)
 
-    # Load data
     for table_name, file_path in data_files.items():
         conn.execute(f"""
             INSERT INTO {table_name}
             SELECT * FROM read_csv('{file_path}', header=false, delimiter='|')
         """)
 
-        # Check row count
         count = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
         print(f"Loaded {count} rows into {table_name}")
 
-    # Run queries
     queries = benchmark.get_queries()
     for query_id, query_sql in queries.items():
         result = conn.execute(query_sql).fetchall()
@@ -153,7 +134,7 @@ if __name__ == "__main__":
 
 ### Advanced-level Benchmark Structure
 
-For more complex benchmarks, use a modular architecture:
+For more complex benchmarks, use a modular architecture. `QueryMetadata.complexity` is one of `'simple'`, `'medium'`, or `'complex'`. Subclasses of `AdvancedBenchmark` override `_load_benchmark_config()` to load from config files and `_load_table_schemas()` to define the actual schemas. `DefaultDataGenerator` can be overridden for specific table sizing.
 
 ```python
 from abc import ABC, abstractmethod
@@ -163,7 +144,6 @@ import json
 
 @dataclass
 class TableSchema:
-    """Schema definition for a benchmark table."""
     name: str
     columns: List[Dict[str, Any]]
     primary_key: Optional[List[str]] = None
@@ -172,38 +152,31 @@ class TableSchema:
 
 @dataclass
 class QueryMetadata:
-    """Metadata for benchmark queries."""
     query_id: str
     name: str
     description: str
     category: str
-    complexity: str  # 'simple', 'medium', 'complex'
+    complexity: str
     sql_features: List[str]
     estimated_runtime_ms: Optional[int] = None
 
 class DataGenerator(ABC):
-    """Abstract base class for data generators."""
 
     @abstractmethod
     def generate_table_data(self, table_schema: TableSchema, scale_factor: float, output_path: Path) -> Path:
-        """Generate data for a specific table."""
         pass
 
 class QueryManager(ABC):
-    """Abstract base class for query managers."""
 
     @abstractmethod
     def get_query_metadata(self, query_id: str) -> QueryMetadata:
-        """Get metadata for a specific query."""
         pass
 
     @abstractmethod
     def get_queries_by_category(self, category: str) -> Dict[str, str]:
-        """Get queries filtered by category."""
         pass
 
 class AdvancedBenchmark(BaseBenchmark):
-    """Advanced-level benchmark with modular architecture."""
 
     def __init__(
         self,
@@ -217,21 +190,16 @@ class AdvancedBenchmark(BaseBenchmark):
         self.data_generator = data_generator or self._create_default_data_generator()
         self.query_manager = query_manager or self._create_default_query_manager()
 
-        # Load benchmark configuration
         self.config = self._load_benchmark_config()
         self.schemas = self._load_table_schemas()
 
     def _create_default_data_generator(self) -> DataGenerator:
-        """Create default data generator."""
         return DefaultDataGenerator()
 
     def _create_default_query_manager(self) -> QueryManager:
-        """Create default query manager."""
         return DefaultQueryManager()
 
     def _load_benchmark_config(self) -> Dict[str, Any]:
-        """Load benchmark configuration."""
-        # Override in subclasses to load from config files
         return {
             "name": "Advanced-level Benchmark",
             "version": "1.0.0",
@@ -239,12 +207,9 @@ class AdvancedBenchmark(BaseBenchmark):
         }
 
     def _load_table_schemas(self) -> Dict[str, TableSchema]:
-        """Load table schemas."""
-        # Override in subclasses to define actual schemas
         return {}
 
     def generate_data(self) -> Dict[str, Path]:
-        """Generate data using the configured data generator."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         data_files = {}
@@ -262,28 +227,21 @@ class AdvancedBenchmark(BaseBenchmark):
         return data_files
 
     def get_queries(self) -> Dict[Union[int, str], str]:
-        """Get all queries from the query manager."""
         return self.query_manager.get_all_queries()
 
     def get_query(self, query_id: Union[int, str]) -> str:
-        """Get specific query."""
         return self.query_manager.get_query(str(query_id))
 
     def get_query_metadata(self, query_id: str) -> QueryMetadata:
-        """Get query metadata."""
         return self.query_manager.get_query_metadata(query_id)
 
     def get_queries_by_category(self, category: str) -> Dict[str, str]:
-        """Get queries by category."""
         return self.query_manager.get_queries_by_category(category)
 
 class DefaultDataGenerator(DataGenerator):
-    """Default data generator implementation."""
 
     def generate_table_data(self, table_schema: TableSchema, scale_factor: float, output_path: Path) -> Path:
-        """Generate realistic data based on schema."""
 
-        # Calculate row count
         base_rows = self._get_base_row_count(table_schema.name)
         row_count = int(base_rows * scale_factor)
 
@@ -301,17 +259,13 @@ class DefaultDataGenerator(DataGenerator):
         return output_path
 
     def _get_base_row_count(self, table_name: str) -> int:
-        """Get base row count for table."""
-        # Override for specific table sizing
         return 1000
 
     def _generate_column_value(self, column: Dict[str, Any], row_id: int, total_rows: int) -> Any:
-        """Generate value for a specific column."""
 
         column_type = column["type"].upper()
         column_name = column["name"].lower()
 
-        # Handle different data types
         if "INTEGER" in column_type or "INT" in column_type:
             if column.get("primary_key"):
                 return row_id
@@ -336,35 +290,29 @@ class DefaultDataGenerator(DataGenerator):
             return f"default_{row_id}"
 
 class DefaultQueryManager(QueryManager):
-    """Default query manager implementation."""
 
     def __init__(self):
         self.queries = {}
         self.metadata = {}
 
     def add_query(self, query_id: str, query_sql: str, metadata: QueryMetadata):
-        """Add a query to the manager."""
         self.queries[query_id] = query_sql
         self.metadata[query_id] = metadata
 
     def get_query(self, query_id: str) -> str:
-        """Get specific query."""
         if query_id not in self.queries:
             raise ValueError(f"Query '{query_id}' not found")
         return self.queries[query_id]
 
     def get_all_queries(self) -> Dict[str, str]:
-        """Get all queries."""
         return self.queries.copy()
 
     def get_query_metadata(self, query_id: str) -> QueryMetadata:
-        """Get query metadata."""
         if query_id not in self.metadata:
             raise ValueError(f"Metadata for query '{query_id}' not found")
         return self.metadata[query_id]
 
     def get_queries_by_category(self, category: str) -> Dict[str, str]:
-        """Get queries by category."""
         filtered_queries = {}
 
         for query_id, metadata in self.metadata.items():
@@ -380,6 +328,8 @@ class DefaultQueryManager(QueryManager):
 
 ### Realistic Data Generation
 
+The generator below writes data in batches for memory efficiency. Foreign key columns map to the size of the table they reference (`custkey` 10,000, `orderkey` 50,000, `partkey` 5,000, `suppkey` 1,000, `nationkey` 25, `regionkey` 5), and unknown keys fall back to a default range. In the configuration, `lines_per_order` is a (minimum, maximum) pair. Order status values `F`, `O`, and `P` mean Fulfilled, Open, and Pending. `ECommerceBenchmark` extends the base class with e-commerce specific queries.
+
 ```python
 import numpy as np
 from faker import Faker
@@ -387,7 +337,6 @@ from datetime import datetime, timedelta
 import string
 
 class RealisticDataGenerator(DataGenerator):
-    """Generate realistic data for benchmarks."""
 
     def __init__(self, seed: int = 42):
         self.fake = Faker()
@@ -396,15 +345,12 @@ class RealisticDataGenerator(DataGenerator):
         np.random.seed(seed)
 
     def generate_table_data(self, table_schema: TableSchema, scale_factor: float, output_path: Path) -> Path:
-        """Generate realistic data based on table schema."""
 
-        # Determine table characteristics
         table_config = self._get_table_config(table_schema.name)
         row_count = int(table_config["base_rows"] * scale_factor)
 
         print(f"Generating {row_count} rows for {table_schema.name}")
 
-        # Generate data in batches for memory efficiency
         batch_size = 10000
 
         with open(output_path, 'w', newline='') as f:
@@ -422,7 +368,6 @@ class RealisticDataGenerator(DataGenerator):
         return output_path
 
     def _get_table_config(self, table_name: str) -> Dict[str, Any]:
-        """Get configuration for specific table types."""
 
         configs = {
             "customer": {
@@ -439,7 +384,7 @@ class RealisticDataGenerator(DataGenerator):
             },
             "lineitem": {
                 "base_rows": 200000,
-                "lines_per_order": (1, 7),  # Min, max lines per order
+                "lines_per_order": (1, 7),
                 "discount_range": (0.0, 0.10),
                 "tax_range": (0.0, 0.08)
             },
@@ -459,7 +404,6 @@ class RealisticDataGenerator(DataGenerator):
         end_id: int,
         table_config: Dict[str, Any]
     ) -> List[List[Any]]:
-        """Generate a batch of rows."""
 
         batch_data = []
 
@@ -480,21 +424,16 @@ class RealisticDataGenerator(DataGenerator):
         row_id: int,
         table_config: Dict[str, Any]
     ) -> Any:
-        """Generate realistic value based on column semantics."""
 
         column_name = column["name"].lower()
         column_type = column["type"].upper()
 
-        # Primary key handling
         if column.get("primary_key"):
             return row_id
 
-        # Foreign key handling
         if column_name.endswith("_key") and not column.get("primary_key"):
-            # Generate foreign key reference
             return self._generate_foreign_key_value(column_name, row_id, table_config)
 
-        # Name fields
         if "name" in column_name:
             if "customer" in column_name or "supplier" in column_name:
                 return self.fake.company()
@@ -503,19 +442,15 @@ class RealisticDataGenerator(DataGenerator):
             else:
                 return self.fake.name()
 
-        # Address fields
         if "address" in column_name:
             return self.fake.address().replace('\n', ', ')
 
-        # Phone fields
         if "phone" in column_name:
             return self.fake.phone_number()
 
-        # Comment fields
         if "comment" in column_name:
             return self.fake.text(max_nb_chars=100)
 
-        # Date fields
         if "date" in column_name or "TIMESTAMP" in column_type or "DATE" in column_type:
             if "date_range" in table_config:
                 start_date, end_date = table_config["date_range"]
@@ -523,7 +458,6 @@ class RealisticDataGenerator(DataGenerator):
             else:
                 return self.fake.date_between(start_date='-2y', end_date='today')
 
-        # Numeric fields with semantic meaning
         if "price" in column_name or "amount" in column_name:
             return round(random.uniform(10.0, 10000.0), 2)
 
@@ -544,7 +478,6 @@ class RealisticDataGenerator(DataGenerator):
             else:
                 return round(random.uniform(0.0, 0.08), 2)
 
-        # Priority and status fields
         elif "priority" in column_name:
             if "order_priority" in table_config:
                 return random.choice(table_config["order_priority"])
@@ -552,9 +485,8 @@ class RealisticDataGenerator(DataGenerator):
                 return random.choice(["HIGH", "MEDIUM", "LOW"])
 
         elif "status" in column_name:
-            return random.choice(["F", "O", "P"])  # Fulfilled, Open, Pending
+            return random.choice(["F", "O", "P"])
 
-        # Segment and category fields
         elif "segment" in column_name or "mktsegment" in column_name:
             if "distributions" in table_config and "segment" in table_config["distributions"]:
                 segments = list(table_config["distributions"]["segment"].keys())
@@ -563,7 +495,6 @@ class RealisticDataGenerator(DataGenerator):
             else:
                 return random.choice(["AUTOMOBILE", "BUILDING", "FURNITURE", "MACHINERY"])
 
-        # Generic type-based generation
         elif "INTEGER" in column_type or "INT" in column_type:
             return random.randint(1, 100000)
 
@@ -579,37 +510,30 @@ class RealisticDataGenerator(DataGenerator):
             return f"value_{row_id}"
 
     def _generate_foreign_key_value(self, column_name: str, row_id: int, table_config: Dict[str, Any]) -> int:
-        """Generate realistic foreign key values."""
 
-        # Map foreign key columns to their referenced table sizes
         fk_mappings = {
-            "custkey": 10000,      # customer table size
-            "orderkey": 50000,     # orders table size
-            "partkey": 5000,       # part table size
-            "suppkey": 1000,       # supplier table size
-            "nationkey": 25,       # nation table size
-            "regionkey": 5         # region table size
+            "custkey": 10000,
+            "orderkey": 50000,
+            "partkey": 5000,
+            "suppkey": 1000,
+            "nationkey": 25,
+            "regionkey": 5
         }
 
-        # Extract the base name (remove prefixes like o_, l_, etc.)
         base_name = column_name.split('_')[-1]
 
         if base_name in fk_mappings:
             max_value = fk_mappings[base_name]
             return random.randint(0, max_value - 1)
         else:
-            # Default foreign key generation
             return random.randint(0, 1000)
 
     def _extract_varchar_length(self, column_type: str) -> Optional[int]:
-        """Extract length from VARCHAR(n) type."""
         import re
         match = re.search(r'VARCHAR\((\d+)\)', column_type)
         return int(match.group(1)) if match else None
 
-# Example usage with realistic data
 class ECommerceBenchmark(AdvancedBenchmark):
-    """E-commerce benchmark with realistic data."""
 
     def _create_default_data_generator(self) -> DataGenerator:
         return RealisticDataGenerator()
@@ -648,7 +572,6 @@ class ECommerceBenchmark(AdvancedBenchmark):
     def _create_default_query_manager(self) -> QueryManager:
         query_manager = DefaultQueryManager()
 
-        # Add e-commerce specific queries
         query_manager.add_query(
             "customer_orders",
             """
@@ -693,16 +616,12 @@ class ECommerceBenchmark(AdvancedBenchmark):
 
         return query_manager
 
-# Usage example
 def test_ecommerce_benchmark():
-    """Test the e-commerce benchmark."""
 
     benchmark = ECommerceBenchmark(scale_factor=0.01)
 
-    # Generate data
     data_files = benchmark.generate_data()
 
-    # Test queries
     queries = benchmark.get_queries()
     for query_id in queries:
         metadata = benchmark.get_query_metadata(query_id)
@@ -727,25 +646,21 @@ import re
 import sqlparse
 
 class AdvancedQueryManager(QueryManager):
-    """Advanced-level query manager with analysis capabilities."""
 
     def __init__(self):
         super().__init__()
         self.query_analysis_cache = {}
 
     def add_query_from_file(self, query_id: str, file_path: Path, metadata: QueryMetadata):
-        """Add query from SQL file."""
         with open(file_path, 'r') as f:
             query_sql = f.read()
 
         self.add_query(query_id, query_sql, metadata)
 
     def add_queries_from_directory(self, directory: Path, pattern: str = "*.sql"):
-        """Add all queries from a directory."""
         for sql_file in directory.glob(pattern):
             query_id = sql_file.stem
 
-            # Create default metadata
             metadata = QueryMetadata(
                 query_id=query_id,
                 name=query_id.replace('_', ' ').title(),
@@ -758,7 +673,6 @@ class AdvancedQueryManager(QueryManager):
             self.add_query_from_file(query_id, sql_file, metadata)
 
     def analyze_query_features(self, query_id: str) -> Set[str]:
-        """Analyze SQL features used in a query."""
 
         if query_id in self.query_analysis_cache:
             return self.query_analysis_cache[query_id]
@@ -766,27 +680,22 @@ class AdvancedQueryManager(QueryManager):
         query_sql = self.get_query(query_id)
         features = set()
 
-        # Parse SQL to extract features
         try:
             parsed = sqlparse.parse(query_sql)[0]
             features = self._extract_features_from_tokens(parsed.tokens)
         except:
-            # Fallback to regex-based analysis
             features = self._extract_features_regex(query_sql)
 
-        # Cache results
         self.query_analysis_cache[query_id] = features
         return features
 
     def _extract_features_from_tokens(self, tokens) -> Set[str]:
-        """Extract SQL features from parsed tokens."""
         features = set()
 
         def analyze_token(token):
             if token.ttype is sqlparse.tokens.Keyword:
                 keyword = token.value.upper()
 
-                # Map keywords to features
                 keyword_mappings = {
                     'JOIN': 'joins',
                     'INNER JOIN': 'joins',
@@ -815,7 +724,6 @@ class AdvancedQueryManager(QueryManager):
                     if kw in keyword:
                         features.add(feature)
 
-            # Recursive analysis for nested tokens
             if hasattr(token, 'tokens'):
                 for subtoken in token.tokens:
                     analyze_token(subtoken)
@@ -826,12 +734,10 @@ class AdvancedQueryManager(QueryManager):
         return features
 
     def _extract_features_regex(self, query_sql: str) -> Set[str]:
-        """Extract SQL features using regex patterns."""
         features = set()
 
         query_upper = query_sql.upper()
 
-        # Define patterns for SQL features
         patterns = {
             'joins': r'\b(JOIN|INNER\s+JOIN|LEFT\s+JOIN|RIGHT\s+JOIN|FULL\s+JOIN)\b',
             'aggregation': r'\b(GROUP\s+BY|HAVING|COUNT|SUM|AVG|MIN|MAX)\b',
@@ -851,18 +757,14 @@ class AdvancedQueryManager(QueryManager):
         return features
 
     def calculate_query_complexity(self, query_id: str) -> str:
-        """Calculate query complexity score."""
 
         query_sql = self.get_query(query_id)
         features = self.analyze_query_features(query_id)
 
-        # Complexity scoring
         complexity_score = 0
 
-        # Base score from query length
         complexity_score += len(query_sql.split()) // 10
 
-        # Feature-based scoring
         feature_weights = {
             'joins': 3,
             'aggregation': 2,
@@ -878,11 +780,9 @@ class AdvancedQueryManager(QueryManager):
         for feature in features:
             complexity_score += feature_weights.get(feature, 1)
 
-        # Count number of tables
         table_count = len(re.findall(r'\bFROM\s+(\w+)', query_sql, re.IGNORECASE))
         complexity_score += table_count
 
-        # Classify complexity
         if complexity_score <= 5:
             return "simple"
         elif complexity_score <= 15:
@@ -891,31 +791,25 @@ class AdvancedQueryManager(QueryManager):
             return "complex"
 
     def get_query_statistics(self) -> Dict[str, Any]:
-        """Get statistics about all queries."""
 
         total_queries = len(self.queries)
 
-        # Analyze all queries
         complexities = []
         features_count = {}
         categories_count = {}
 
         for query_id in self.queries:
-            # Complexity analysis
             complexity = self.calculate_query_complexity(query_id)
             complexities.append(complexity)
 
-            # Feature analysis
             features = self.analyze_query_features(query_id)
             for feature in features:
                 features_count[feature] = features_count.get(feature, 0) + 1
 
-            # Category analysis
             metadata = self.get_query_metadata(query_id)
             category = metadata.category
             categories_count[category] = categories_count.get(category, 0) + 1
 
-        # Calculate distributions
         complexity_dist = {
             complexity: complexities.count(complexity)
             for complexity in ["simple", "medium", "complex"]
@@ -930,7 +824,6 @@ class AdvancedQueryManager(QueryManager):
         }
 
     def export_query_catalog(self, output_file: Path):
-        """Export query catalog to JSON."""
 
         catalog = {
             "metadata": {
@@ -959,14 +852,11 @@ class AdvancedQueryManager(QueryManager):
         with open(output_file, 'w') as f:
             json.dump(catalog, f, indent=2)
 
-# Example: Web Analytics Benchmark
 class WebAnalyticsBenchmark(AdvancedBenchmark):
-    """Web analytics benchmark with realistic queries."""
 
     def _create_default_query_manager(self) -> QueryManager:
         query_manager = AdvancedQueryManager()
 
-        # Page views analysis
         query_manager.add_query(
             "daily_page_views",
             """
@@ -990,7 +880,6 @@ class WebAnalyticsBenchmark(AdvancedBenchmark):
             )
         )
 
-        # User journey analysis
         query_manager.add_query(
             "user_journey",
             """
@@ -1033,7 +922,6 @@ class WebAnalyticsBenchmark(AdvancedBenchmark):
             )
         )
 
-        # Conversion funnel
         query_manager.add_query(
             "conversion_funnel",
             """
@@ -1099,12 +987,10 @@ class WebAnalyticsBenchmark(AdvancedBenchmark):
         return query_manager
 
 def test_web_analytics_benchmark():
-    """Test web analytics benchmark with query analysis."""
 
     benchmark = WebAnalyticsBenchmark()
     query_manager = benchmark.query_manager
 
-    # Analyze queries
     stats = query_manager.get_query_statistics()
 
     print("Query Analysis Results:")
@@ -1112,7 +998,6 @@ def test_web_analytics_benchmark():
     print(f"Complexity distribution: {stats['complexity_distribution']}")
     print(f"Most common features: {stats['most_common_features']}")
 
-    # Export catalog
     query_manager.export_query_catalog(Path("web_analytics_catalog.json"))
     print("Query catalog exported to web_analytics_catalog.json")
 

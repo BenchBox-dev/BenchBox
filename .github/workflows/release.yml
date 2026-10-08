@@ -12,17 +12,10 @@ on:
         type: boolean
 
 jobs:
-  # Note: ruleset release-only gates the release-cut PR on lint + test
-  # before squash-merge to release, so the tag fired here is expected to have
-  # already been CI-validated. verify-tag-on-release below enforces that
-  # invariant in the workflow itself (rather than relying solely on the
-  # out-of-band process of "nobody tags/dispatches from anywhere but release")
-  # before any build/publish work starts. The previous check-ci-passed JS
-  # poller was redundant with the ruleset and has been removed.
   verify-tag-on-release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
@@ -60,7 +53,7 @@ jobs:
     needs: verify-tag-on-release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Require a committed UAT charter or pointer
         shell: bash
@@ -88,15 +81,15 @@ jobs:
     outputs:
       report_path: ${{ steps.gate.outputs.report_path }}
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -113,7 +106,7 @@ jobs:
 
       - name: Upload bounds report
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: dependency-bounds-report
           path: release-artifacts/dependency-bounds.md
@@ -126,15 +119,15 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.11'
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Extract version
         id: version
@@ -144,8 +137,6 @@ jobs:
 
       - name: Build package with reproducible timestamp
         run: |
-          # Use commit timestamp for reproducible builds
-          # Anyone building from the same commit gets identical artifacts
           export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
           echo "Building with SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
           uv build
@@ -154,7 +145,7 @@ jobs:
         run: uvx twine check dist/*
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: release-dist
           path: dist/
@@ -167,23 +158,17 @@ jobs:
       name: ${{ github.event.inputs.test_pypi == 'true' && 'test-pypi' || 'pypi' }}
       url: ${{ github.event.inputs.test_pypi == 'true' && 'https://test.pypi.org/p/benchbox' || 'https://pypi.org/p/benchbox' }}
     permissions:
-      id-token: write  # Required for trusted publishing (OIDC)
+      id-token: write
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: release-dist
           path: dist/
 
       - name: Publish to Test PyPI
-        # Decision: no ref-shape restriction here (unlike the real-PyPI step
-        # below). Test PyPI publishing via workflow_dispatch from any ref is
-        # the intended pre-release validation path and is lower risk by
-        # design (test.pypi.org is not the real distribution channel);
-        # verify-tag-on-release above still requires the dispatched ref be
-        # release or an ancestor of it, which is sufficient here.
         if: github.event.inputs.test_pypi == 'true'
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
         with:
           repository-url: https://test.pypi.org/legacy/
           skip-existing: true
@@ -191,19 +176,13 @@ jobs:
           verbose: true
 
       - name: Publish to PyPI
-        # Defense in depth alongside verify-tag-on-release: even if that job is
-        # ever bypassed or miswired, this step alone refuses to publish to
-        # real PyPI unless the triggering ref is an actual v* tag. A
-        # workflow_dispatch from a branch (with the test_pypi input left at
-        # its default false) can therefore never reach real PyPI.
         if: github.event.inputs.test_pypi != 'true' && startsWith(github.ref, 'refs/tags/v')
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
         with:
           skip-existing: true
           attestations: false
           verbose: true
 
-  # Create GitHub Release with build artifacts attached
   github-release:
     needs: [publish, build]
     if: startsWith(github.ref, 'refs/tags/v')
@@ -211,10 +190,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Download build artifacts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: release-dist
           path: dist/
@@ -241,9 +220,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Verify installation works across platforms before publishing. Installing
-  # the uploaded wheel avoids PyPI propagation races and makes this a real
-  # publication gate rather than a post-publication smoke test.
   test-installation:
     needs: build
     runs-on: ${{ matrix.os }}
@@ -253,7 +229,6 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ['3.11', '3.12', '3.13', '3.14']
         exclude:
-          # Reduce matrix size - test latest Python only on Linux
           - os: windows-latest
             python-version: '3.13'
           - os: macos-latest
@@ -264,13 +239,13 @@ jobs:
             python-version: '3.14'
     steps:
       - name: Download build artifacts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: release-dist
           path: dist/
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -281,25 +256,20 @@ jobs:
           python -c "import importlib.util; import benchbox; assert importlib.util.find_spec('pandas') is None, 'published core wheel must not pull pandas'; print(f'BenchBox {benchbox.__version__} installed successfully (minimal import surface)')"
           benchbox --help
 
-  # Delete old workflow artifacts to prevent confusion
   cleanup-artifacts:
     needs: [publish, test-installation]
     runs-on: ubuntu-latest
-    # Housekeeping after publication; a failure here must not mark a published release red.
     continue-on-error: true
     permissions:
       actions: write
     steps:
       - name: Delete old release artifacts
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
             const { owner, repo } = context.repo;
             const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-            // Query each artifact name separately. Listing every artifact in the
-            // repository returns only the newest page and intermittently fails
-            // with HTTP 500 once the repository holds tens of thousands of them.
             for (const name of ['dist', 'release-dist', 'test-dist']) {
               const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, {
                 owner,

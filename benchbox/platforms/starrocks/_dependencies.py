@@ -1,11 +1,9 @@
-"""Optional dependencies for StarRocks platform support."""
-
 try:
     import pymysql
     from pymysql.cursors import DictCursor as PyMySQLDictCursor
 
     PYMYSQL_AVAILABLE = True
-except ImportError:  # pragma: no cover - optional dependency
+except ImportError:  # pragma: no cover
     pymysql = None
     PyMySQLDictCursor = None
     PYMYSQL_AVAILABLE = False
@@ -14,7 +12,7 @@ try:
     import requests
 
     REQUESTS_AVAILABLE = True
-except ImportError:  # pragma: no cover - optional dependency
+except ImportError:  # pragma: no cover
     requests = None
     REQUESTS_AVAILABLE = False
 

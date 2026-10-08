@@ -1,13 +1,3 @@
-"""ClickHouse platform package.
-
-Symbols are re-exported lazily (PEP 562) so importing a lightweight submodule
-such as ``deployment_mode`` does not eagerly pull the heavy adapter/client/setup
-modules. ``adapter_factory`` imports ``clickhouse.deployment_mode`` on the
-``import benchbox`` path; eager re-exports here previously defeated the lazy
-``ClickHouseAdapter`` loading in ``platforms/__init__.py`` and dragged optional
-engine dependencies onto the base import surface.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -24,7 +14,6 @@ if TYPE_CHECKING:
     from .tuning import ClickHouseTuningMixin
     from .workload import ClickHouseWorkloadMixin
 
-# Lazy-loaded re-exports: attribute name -> submodule providing it.
 _EXPORTS = {
     "ClickHouseAdapter": "adapter",
     "ClickHouseLocalClient": "client",
@@ -43,7 +32,6 @@ __all__ = [
 
 
 def __getattr__(name: str) -> Any:
-    """Lazily expose ClickHouse re-exports and sibling submodules (PEP 562)."""
     module_name = _EXPORTS.get(name)
     if module_name is not None:
         module = importlib.import_module(f"{__name__}.{module_name}")

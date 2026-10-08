@@ -1,11 +1,3 @@
-"""TPC-Havoc DataFrame variants for Q19.
-
-Q19 is a join plus a three-way OR of brand/container/quantity/size
-conditions. The variants keep the canonical output while varying the
-condition structure around union-of-branches, filter pushdown, part-side
-prefiltering, column pruning, and revenue formulation.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable

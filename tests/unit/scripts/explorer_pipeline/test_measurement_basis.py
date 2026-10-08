@@ -1,14 +1,3 @@
-"""Tests for measurement basis ingest, basis availability, and display invariance.
-
-Pins:
-  (1) A bundle with 1 warmup + 3 measurement passes yields 4 query_executions rows
-      for that query, and a display_ms equal to the median of the 3 measurement values.
-  (2) A bundle with no warmup rows ingests cleanly and reports warmup as an unavailable basis.
-  (3) A query with fewer measurement passes than its siblings reports its own pass count.
-  (4) display_ms does not move when warmup rows are present.
-  (5) result_basis_availability DuckDB snapshot table correctly reflects basis state.
-"""
-
 from __future__ import annotations
 
 import copy
@@ -34,7 +23,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 def test_warmup_plus_three_measurement_passes_yields_four_executions_and_measurement_median(
     tmp_path: Path,
 ) -> None:
-    """1 warmup + 3 measurement passes -> 4 query_executions rows and display_ms = median(3 measurements)."""
     data = copy.deepcopy(MINIMAL_BUNDLE)
     data["queries"] = [
         {"id": "Q1", "ms": 999.0, "iter": 0, "stream": 0, "run_type": "warmup", "status": "SUCCESS"},
@@ -50,12 +38,10 @@ def test_warmup_plus_three_measurement_passes_yields_four_executions_and_measure
     q1_timings = [t for t in timings if t.query_id == "Q1"]
     assert len(q1_timings) == 4
 
-    # display_ms must be the median of the 3 measurement rows (200.0), NOT affected by 999.0 warmup
     display_ms, sample_count = _query_display_ms(q1_timings)
     assert display_ms == pytest.approx(200.0)
     assert sample_count == 3
 
-    # Basis availability reflects warmup and 3 passes
     avail = _compute_basis_availability(timings)
     assert avail.has_warmup is True
     assert avail.warmup_status == "available"
@@ -67,7 +53,6 @@ def test_warmup_plus_three_measurement_passes_yields_four_executions_and_measure
     assert "warm_pass_3" in avail.available_bases
     assert "warmup" not in avail.unavailable_bases
 
-    # End-to-end pipeline run: check query_executions and result_basis_availability in DuckDB
     data_dir = tmp_path / "data"
     bundles_dir = data_dir / "bundles"
     bundles_dir.mkdir(parents=True)
@@ -78,7 +63,6 @@ def test_warmup_plus_three_measurement_passes_yields_four_executions_and_measure
     db_path = out_dir / "results.duckdb"
 
     with duckdb.connect(str(db_path), read_only=True) as con:
-        # Exactly 4 executions for Q1
         exec_rows = con.execute(
             "SELECT duration_ms, run_type, iter FROM query_executions WHERE query_id = 'Q1' ORDER BY iter"
         ).fetchall()
@@ -88,13 +72,11 @@ def test_warmup_plus_three_measurement_passes_yields_four_executions_and_measure
         assert exec_rows[2] == (200.0, "measurement", 2)
         assert exec_rows[3] == (300.0, "measurement", 3)
 
-        # display_timings has sample_count=3, display_ms=200.0
         dt_row = con.execute(
             "SELECT display_ms, sample_count FROM query_display_timings WHERE query_id = 'Q1'"
         ).fetchone()
         assert dt_row == (pytest.approx(200.0), 3)
 
-        # result_basis_availability reflects available warmup and 3 passes
         rba = con.execute(
             "SELECT has_warmup, measurement_pass_count, warmup_status, available_bases, varying_pass_queries "
             "FROM result_basis_availability"
@@ -109,7 +91,6 @@ def test_warmup_plus_three_measurement_passes_yields_four_executions_and_measure
 def test_bundle_with_no_warmup_ingests_cleanly_and_reports_warmup_unavailable(
     tmp_path: Path,
 ) -> None:
-    """A bundle with no warmup rows ingests cleanly and reports warmup as an unavailable basis."""
     data = copy.deepcopy(MINIMAL_BUNDLE)
     data["queries"] = [
         {"id": "Q1", "ms": 100.0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
@@ -129,7 +110,6 @@ def test_bundle_with_no_warmup_ingests_cleanly_and_reports_warmup_unavailable(
     assert "warmup" not in avail.available_bases
     assert avail.measurement_pass_count == 3
 
-    # Pipeline output check
     data_dir = tmp_path / "data"
     bundles_dir = data_dir / "bundles"
     bundles_dir.mkdir(parents=True)
@@ -150,7 +130,6 @@ def test_bundle_with_no_warmup_ingests_cleanly_and_reports_warmup_unavailable(
 
 
 def test_query_with_fewer_measurement_passes_reports_own_pass_count(tmp_path: Path) -> None:
-    """A query with fewer measurement passes than its siblings reports its own pass count."""
     data = copy.deepcopy(MINIMAL_BUNDLE)
     data["queries"] = [
         {"id": "Q1", "ms": 10.0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
@@ -159,7 +138,6 @@ def test_query_with_fewer_measurement_passes_reports_own_pass_count(tmp_path: Pa
         {"id": "Q2", "ms": 20.0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
         {"id": "Q2", "ms": 21.0, "iter": 2, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
         {"id": "Q2", "ms": 22.0, "iter": 3, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
-        # Q3 has only 1 pass instead of 3
         {"id": "Q3", "ms": 30.0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
     ]
 
@@ -171,7 +149,6 @@ def test_query_with_fewer_measurement_passes_reports_own_pass_count(tmp_path: Pa
     assert avail.query_pass_counts["Q3"] == 1
     assert avail.varying_pass_queries == {"Q3": 1}
 
-    # Pipeline output check
     data_dir = tmp_path / "data"
     bundles_dir = data_dir / "bundles"
     bundles_dir.mkdir(parents=True)
@@ -188,7 +165,6 @@ def test_query_with_fewer_measurement_passes_reports_own_pass_count(tmp_path: Pa
         assert rba[0] == 3
         assert json.loads(rba[1]) == {"Q3": 1}
 
-        # query_display_timings sample_count matches per-query pass count
         q_counts = dict(
             con.execute("SELECT query_id, sample_count FROM query_display_timings ORDER BY query_id").fetchall()
         )
@@ -196,7 +172,6 @@ def test_query_with_fewer_measurement_passes_reports_own_pass_count(tmp_path: Pa
 
 
 def test_display_ms_does_not_move_when_warmup_rows_present() -> None:
-    """display_ms and sample_count are identical whether or not warmup executions are present."""
     base_measurements = [
         {"id": "Q1", "ms": 10.0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
         {"id": "Q1", "ms": 25.0, "iter": 2, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
@@ -225,7 +200,6 @@ def test_display_ms_does_not_move_when_warmup_rows_present() -> None:
 
 
 def test_metadata_and_summary_rows_are_filtered_out() -> None:
-    """Non-execution rows (run_type='metadata' or 'summary') are excluded from timings."""
     data = copy.deepcopy(MINIMAL_BUNDLE)
     data["queries"] = [
         {"id": "meta_1", "ms": 0.0, "run_type": "metadata", "status": "SKIPPED"},
@@ -238,7 +212,6 @@ def test_metadata_and_summary_rows_are_filtered_out() -> None:
 
 
 def test_failed_warmup_query_does_not_claim_warmup_available() -> None:
-    """A failed warmup execution must not cause warmup to be advertised as available."""
     data = copy.deepcopy(MINIMAL_BUNDLE)
     data["queries"] = [
         {"id": "Q1", "ms": 0.0, "iter": 0, "stream": 0, "run_type": "warmup", "status": "FAILED"},
@@ -253,14 +226,12 @@ def test_failed_warmup_query_does_not_claim_warmup_available() -> None:
 
 
 def test_completely_failed_measurement_query_reported_in_varying_pass_queries() -> None:
-    """A query that fails all passes is reported with 0 passes in varying_pass_queries."""
     data = copy.deepcopy(MINIMAL_BUNDLE)
     data["queries"] = [
         {"id": "Q1", "ms": 10.0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
         {"id": "Q1", "ms": 11.0, "iter": 2, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
         {"id": "Q2", "ms": 20.0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
         {"id": "Q2", "ms": 21.0, "iter": 2, "stream": 0, "run_type": "measurement", "status": "SUCCESS"},
-        # Q3 fails both iterations
         {"id": "Q3", "ms": 0.0, "iter": 1, "stream": 0, "run_type": "measurement", "status": "FAILED"},
         {"id": "Q3", "ms": 0.0, "iter": 2, "stream": 0, "run_type": "measurement", "status": "FAILED"},
     ]

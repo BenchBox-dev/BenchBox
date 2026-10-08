@@ -1,5 +1,3 @@
-"""Coverage tests for cli/preferences.py."""
-
 from __future__ import annotations
 
 import importlib
@@ -20,7 +18,6 @@ NOW = datetime(2026, 1, 15, 12, 0, 0)
 
 @pytest.fixture(autouse=True)
 def _preferences_wallclock(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Freeze only this consumer's audit/age clock, never pytest watchdogs."""
 
     class FixedDatetime(datetime):
         @classmethod

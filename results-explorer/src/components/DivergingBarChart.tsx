@@ -1,14 +1,3 @@
-// ---------------------------------------------------------------------------
-// DivergingBarChart - per-query improvement/regression vs baseline
-//
-// delta_pct = (this_ms - baseline_ms) / baseline_ms * 100
-//   negative (left of centre): faster than baseline
-//   positive (right of centre): slower than baseline
-//   bar color: the run the bar belongs to
-//
-// Sorted by abs(delta_pct) descending so biggest changes appear first.
-// ---------------------------------------------------------------------------
-
 import { deltaPct, sortByMagnitudeDesc } from "@/lib/chartMath";
 import { DIVERGING_MAX_PCT, paletteColor } from "@/lib/chartTheme";
 import { useElementSize } from "@/lib/useElementSize";
@@ -39,7 +28,6 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
   const AXIS_H = 20;
   const PADDING = 8;
 
-  // Build flat sorted entries (one bar per query per non-baseline result)
   const rawEntries: DivergingEntry[] = [];
   for (const { queryId, timings } of queries) {
     const baselineT = timings[baselineIdx];
@@ -47,9 +35,6 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
     if (!baselineMs) continue;
     timings.forEach((t, i) => {
       if (i === baselineIdx || !t || t.ms <= 0) return;
-      // The run's own index, not a baseline-relative one. Shifting later runs
-      // up by one to skip the baseline's color wraps the last run back onto the
-      // first run's color once the shift passes the end of the palette.
       const color = paletteColor(i);
       const dp = deltaPct(t.ms, baselineMs);
       if (dp === null) return;
@@ -62,7 +47,6 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
     });
   }
 
-  // Group by queryId, sort by max abs delta descending
   const grouped = new Map<string, DivergingEntry[]>();
   for (const e of rawEntries) {
     const g = grouped.get(e.queryId) ?? [];
@@ -76,7 +60,6 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
   const rowHeight = BAR_H * nonBaselineCount + BAR_GAP * (nonBaselineCount + 1);
   const totalHeight = AXIS_H + sortedGroups.length * rowHeight + PADDING;
 
-  // Summary
   const faster = rawEntries.filter((e) => e.deltaPct < 0).length;
   const slower = rawEntries.filter((e) => e.deltaPct > 0).length;
   const sorted = [...rawEntries].sort((a, b) => a.deltaPct - b.deltaPct);
@@ -102,7 +85,6 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
         aria-label="Diverging bar chart"
         aria-describedby="diverging-bar-description"
       >
-        {/* Center axis */}
         <line
           x1={LABEL_W + (drawWidth - LABEL_W - PADDING) / 2}
           y1={0}
@@ -111,7 +93,6 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
           stroke="var(--bb-chart-axis)"
           stroke-width={1}
         />
-        {/* Axis label */}
         <text
           x={LABEL_W + (drawWidth - LABEL_W - PADDING) / 2}
           y={totalHeight - 4}
@@ -147,16 +128,6 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
                 const isRegression = entry.deltaPct > 0;
                 const barX = isRegression ? centerX : centerX - barW;
                 return (
-                  // Bars are colored by the run they belong to, not by
-                  // direction: which side of the centre line a bar falls on
-                  // already says faster or slower, so spending fill on that
-                  // too would leave nothing to say WHICH run it is.
-                  //
-                  // Composite key: a single platform name can appear twice
-                  // in `entries` if the caller passes variant rows (same
-                  // platform, different tuning_mode). The loop index `si`
-                  // disambiguates within the queryId group; the outer <g>
-                  // key={queryId} disambiguates across groups.
                   <g key={`${entry.platform}-${si}`}>
                     <rect
                       x={barX}
@@ -166,9 +137,6 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
                       fill={entry.color}
                       opacity={0.85}
                     />
-                    {/* A delta at the clamp reaches the end of its half of the
-                        plot; a label started past the bar would fall outside
-                        the viewBox and be cropped. */}
                     <text
                       x={
                         edgeSafeValueLabel(
@@ -214,7 +182,6 @@ export function DivergingBarChart({ queries, results, baselineIdx }: Props) {
         </tbody>
       </table>
 
-      {/* Legend: colors name the runs, position names the direction. */}
       <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--bb-data-fg-muted)]">
         <span>
           Baseline: <strong>{results[baselineIdx]?.platform}</strong>

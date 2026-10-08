@@ -1,11 +1,6 @@
-"""Additional coverage tests for QuestDB platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets uncovered branches in benchbox/platforms/questdb.py to reach ≥80% coverage.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -33,7 +28,6 @@ pytestmark = [
 
 @pytest.fixture()
 def questdb_stubs(monkeypatch):
-    """Patch psycopg so tests don't require the real driver."""
     mock_psycopg = Mock()
     mock_psycopg.__version__ = "3.1.0"
     monkeypatch.setattr(questdb_module, "psycopg", mock_psycopg)
@@ -41,10 +35,7 @@ def questdb_stubs(monkeypatch):
 
 
 class TestMissingPsycopg:
-    """Test ImportError raised when psycopg is unavailable."""
-
     def test_init_raises_when_psycopg_none(self, monkeypatch):
-        """__init__ should raise ImportError when psycopg is None and dep check fails."""
         monkeypatch.setattr(questdb_module, "psycopg", None)
         with (
             patch(
@@ -61,10 +52,7 @@ class TestMissingPsycopg:
 
 
 class TestAddCliArguments:
-    """Test CLI argument registration."""
-
     def test_add_cli_arguments_with_valid_parser(self):
-        """add_cli_arguments should register all expected arguments."""
         mock_parser = Mock()
         QuestDBAdapter.add_cli_arguments(mock_parser)
 
@@ -79,14 +67,11 @@ class TestAddCliArguments:
         assert "partition_by" in added_args
 
     def test_add_cli_arguments_swallows_exception(self):
-        """add_cli_arguments should silently swallow exceptions from add_argument."""
         mock_parser = Mock()
         mock_parser.add_argument.side_effect = Exception("arg conflict")
-        # Should not raise
         QuestDBAdapter.add_cli_arguments(mock_parser)
 
     def test_add_cli_arguments_no_op_without_add_argument(self):
-        """add_cli_arguments should return early when parser has no add_argument attr."""
 
         class FakeParser:
             pass
@@ -95,44 +80,34 @@ class TestAddCliArguments:
 
 
 class TestFromConfigAdvanced:
-    """Test from_config edge cases."""
-
     def test_from_config_ilp_host_override(self, questdb_stubs):
-        """from_config should allow explicit ilp_host override."""
         config = {"host": "dbhost", "ilp_host": "ilphost"}
         adapter = QuestDBAdapter.from_config(config)
         assert adapter.ilp_host == "ilphost"
 
     def test_from_config_ilp_host_fallback_to_host(self, questdb_stubs):
-        """from_config ilp_host should fall back to host when not specified."""
         config = {"host": "myhost"}
         adapter = QuestDBAdapter.from_config(config)
         assert adapter.ilp_host == "myhost"
 
     def test_from_config_partition_by_set(self, questdb_stubs):
-        """from_config should pass partition_by through."""
         config = {"partition_by": "DAY"}
         adapter = QuestDBAdapter.from_config(config)
         assert adapter.partition_by == "DAY"
 
     def test_from_config_loading_method_ilp(self, questdb_stubs):
-        """from_config should accept ilp loading method."""
         config = {"loading_method": "ilp"}
         adapter = QuestDBAdapter.from_config(config)
         assert adapter.loading_method == "ilp"
 
     def test_from_config_force_recreate(self, questdb_stubs):
-        """from_config should map 'force' to force_recreate."""
         config = {"force": True}
         adapter = QuestDBAdapter.from_config(config)
         assert adapter.platform_config.get("force_recreate") is True
 
 
 class TestCreateSchemaBranches:
-    """Test schema creation statement handling branches."""
-
     def test_create_schema_adapts_drop_table(self, questdb_stubs):
-        """create_schema should adapt DROP TABLE by adding IF EXISTS."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -148,7 +123,6 @@ class TestCreateSchemaBranches:
         assert "IF EXISTS" in executed_text
 
     def test_create_schema_applies_questdb_enhancements(self, questdb_stubs):
-        """create_schema should apply QuestDB-specific enhancements for known tables."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -160,11 +134,9 @@ class TestCreateSchemaBranches:
             adapter.create_schema(Mock(), mock_conn)
 
         executed_sql = mock_cursor.execute.call_args[0][0]
-        # symbol and timestamp enhancements should be applied
         assert "TIMESTAMP" in executed_sql or "SYMBOL" in executed_sql
 
     def test_create_schema_non_create_table_stmt_failure_does_not_raise(self, questdb_stubs):
-        """Non-CREATE-TABLE statement failures should only warn, not raise."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = Exception("Some non-critical error")
@@ -177,45 +149,37 @@ class TestCreateSchemaBranches:
             adapter.create_schema(Mock(), mock_conn)
 
     def test_extract_table_name_with_if_not_exists(self, questdb_stubs):
-        """_extract_table_name should handle IF NOT EXISTS syntax."""
         adapter = QuestDBAdapter()
         name = adapter._extract_table_name("CREATE TABLE IF NOT EXISTS my_table (id INT)")
         assert name == "my_table"
 
     def test_extract_table_name_returns_none_for_non_create(self, questdb_stubs):
-        """_extract_table_name returns None for non-CREATE statements."""
         adapter = QuestDBAdapter()
         assert adapter._extract_table_name("SELECT * FROM t") is None
 
     def test_apply_schema_enhancements_unknown_table(self, questdb_stubs):
-        """_apply_questdb_schema_enhancements should return stmt unchanged for unknown tables."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE unknown_table (col1 INT, col2 TEXT)"
         result = adapter._apply_questdb_schema_enhancements(stmt)
-        # No crash, stmt returned (may or may not be modified for unknown table)
         assert "CREATE TABLE" in result
 
     def test_apply_schema_enhancements_no_table_name(self, questdb_stubs):
-        """_apply_questdb_schema_enhancements returns stmt when table name not found."""
         adapter = QuestDBAdapter()
         stmt = "SELECT 1"
         result = adapter._apply_questdb_schema_enhancements(stmt)
         assert result == stmt
 
     def test_get_partition_for_table_with_override(self, questdb_stubs):
-        """_get_partition_for_table should use adapter-level override when set."""
         adapter = QuestDBAdapter(partition_by="YEAR")
         assert adapter._get_partition_for_table("lineitem") == "YEAR"
         assert adapter._get_partition_for_table("orders") == "YEAR"
 
     def test_get_partition_for_table_none_returns_none(self, questdb_stubs):
-        """_get_partition_for_table should return NONE for tables without default."""
         adapter = QuestDBAdapter()
         result = adapter._get_partition_for_table("customer")
         assert result == "NONE"
 
     def test_add_timestamp_and_partition_none_partition(self, questdb_stubs):
-        """_add_timestamp_and_partition should omit PARTITION BY when partition is NONE."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE t (ts TIMESTAMP)"
         result = adapter._add_timestamp_and_partition(stmt, "ts", "NONE")
@@ -223,7 +187,6 @@ class TestCreateSchemaBranches:
         assert "PARTITION BY" not in result
 
     def test_add_timestamp_and_partition_with_partition(self, questdb_stubs):
-        """_add_timestamp_and_partition should add PARTITION BY clause."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE t (ts TIMESTAMP)"
         result = adapter._add_timestamp_and_partition(stmt, "ts", "MONTH")
@@ -231,7 +194,6 @@ class TestCreateSchemaBranches:
         assert "PARTITION BY MONTH" in result
 
     def test_map_column_to_symbol_varchar(self, questdb_stubs):
-        """_map_column_to_symbol should replace VARCHAR with SYMBOL."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE t (l_returnflag VARCHAR(1))"
         result = adapter._map_column_to_symbol(stmt, "l_returnflag")
@@ -239,7 +201,6 @@ class TestCreateSchemaBranches:
         assert "VARCHAR" not in result
 
     def test_map_column_to_symbol_strips_not_null(self, questdb_stubs):
-        """SYMBOL columns must not carry NOT NULL - QuestDB rejects it as a parse error."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE t (r_name TEXT NOT NULL, r_comment TEXT)"
         result = adapter._map_column_to_symbol(stmt, "r_name")
@@ -248,7 +209,6 @@ class TestCreateSchemaBranches:
         assert "r_comment TEXT" in result
 
     def test_map_column_to_timestamp(self, questdb_stubs):
-        """_map_column_to_timestamp should replace DATE with TIMESTAMP."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE t (l_shipdate DATE)"
         result = adapter._map_column_to_timestamp(stmt, "l_shipdate")
@@ -256,14 +216,12 @@ class TestCreateSchemaBranches:
         assert "DATE" not in result
 
     def test_strip_foreign_keys_inline_references(self, questdb_stubs):
-        """shared strip_foreign_keys should remove inline REFERENCES clauses."""
         stmt = "CREATE TABLE t (id INT, cust_id INT REFERENCES customer(id))"
         result = strip_foreign_keys(stmt)
         assert "REFERENCES" not in result
         assert "cust_id INT" in result
 
     def test_strip_pk_constraints_unnamed(self, questdb_stubs):
-        """_strip_pk_constraints removes unnamed PRIMARY KEY (col_list) clause."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE t (id INT, name VARCHAR(50), PRIMARY KEY (id))"
         result = adapter._strip_pk_constraints(stmt)
@@ -272,7 +230,6 @@ class TestCreateSchemaBranches:
         assert "name VARCHAR(50)" in result
 
     def test_strip_pk_constraints_named(self, questdb_stubs):
-        """_strip_pk_constraints removes CONSTRAINT name PRIMARY KEY form."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE t (id INT, CONSTRAINT pk_t PRIMARY KEY (id))"
         result = adapter._strip_pk_constraints(stmt)
@@ -281,7 +238,6 @@ class TestCreateSchemaBranches:
         assert "id INT" in result
 
     def test_strip_pk_constraints_column_level(self, questdb_stubs):
-        """_strip_pk_constraints removes column-level PRIMARY KEY keyword."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE t (id INT PRIMARY KEY, name VARCHAR(50))"
         result = adapter._strip_pk_constraints(stmt)
@@ -289,7 +245,6 @@ class TestCreateSchemaBranches:
         assert "id INT" in result
 
     def test_strip_pk_constraints_multi_column(self, questdb_stubs):
-        """_strip_pk_constraints handles multi-column PK."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE t (a INT, b INT, c INT, PRIMARY KEY (a, b))"
         result = adapter._strip_pk_constraints(stmt)
@@ -297,7 +252,6 @@ class TestCreateSchemaBranches:
         assert "a INT" in result
 
     def test_strip_pk_constraints_quoted_name(self, questdb_stubs):
-        """_strip_pk_constraints removes double-quoted constraint names."""
         adapter = QuestDBAdapter()
         stmt = 'CREATE TABLE t (id INT, CONSTRAINT "pk_t" PRIMARY KEY (id))'
         result = adapter._strip_pk_constraints(stmt)
@@ -306,7 +260,6 @@ class TestCreateSchemaBranches:
         assert "id INT" in result
 
     def test_strip_pk_constraints_backtick_quoted_name(self, questdb_stubs):
-        """_strip_pk_constraints removes backtick-quoted constraint names."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE t (id INT, CONSTRAINT `pk_t` PRIMARY KEY (id))"
         result = adapter._strip_pk_constraints(stmt)
@@ -315,7 +268,6 @@ class TestCreateSchemaBranches:
         assert "id INT" in result
 
     def test_strip_pk_and_fk_together(self, questdb_stubs):
-        """Both PK and FK stripping should work without interfering."""
         adapter = QuestDBAdapter()
         stmt = "CREATE TABLE t (id INT, cust_id INT REFERENCES customer(id), PRIMARY KEY (id))"
         result = adapter._strip_pk_constraints(strip_foreign_keys(stmt))
@@ -325,10 +277,7 @@ class TestCreateSchemaBranches:
 
 
 class TestLoadDataBranches:
-    """Test load_data method branching logic."""
-
     def test_load_data_invalid_identifier_skipped(self, questdb_stubs, tmp_path):
-        """load_data should skip tables with invalid identifiers."""
         data_file = tmp_path / "bad;name.csv"
         data_file.write_text("col1\n1\n", encoding="utf-8")
 
@@ -341,13 +290,6 @@ class TestLoadDataBranches:
 
     @staticmethod
     def _make_benchmark(tables: dict[str, Any]) -> Mock:
-        """Build a Mock benchmark whose csv_* attrs are explicitly None.
-
-        Without this, getattr(mock, "csv_delimiter", None) would return a child
-        Mock — flipping resolve_csv_dialect into the benchmark-attr branch with
-        a Mock as the delimiter value. Setting them to None routes through the
-        format-derived defaults branch instead.
-        """
         mock_benchmark = Mock()
         mock_benchmark.tables = tables
         mock_benchmark.csv_delimiter = None
@@ -356,7 +298,6 @@ class TestLoadDataBranches:
         return mock_benchmark
 
     def test_load_data_missing_file_skipped(self, questdb_stubs, tmp_path):
-        """load_data should skip tables whose data files don't exist."""
         adapter = QuestDBAdapter()
         mock_benchmark = self._make_benchmark({"lineitem": str(tmp_path / "nonexistent.csv")})
 
@@ -364,7 +305,6 @@ class TestLoadDataBranches:
         assert stats.get("lineitem") == 0
 
     def test_load_data_rest_method_success(self, questdb_stubs, tmp_path):
-        """load_data with rest method should call _load_table_via_rest_api."""
         data_file = tmp_path / "lineitem.csv"
         data_file.write_text("col1\n1\n", encoding="utf-8")
 
@@ -379,7 +319,6 @@ class TestLoadDataBranches:
         assert stats["lineitem"] == 100
 
     def test_load_data_ilp_method_success(self, questdb_stubs, tmp_path):
-        """load_data with ilp method should call _load_table_via_ilp."""
         data_file = tmp_path / "lineitem.csv"
         data_file.write_text("col1\n1\n", encoding="utf-8")
 
@@ -394,7 +333,6 @@ class TestLoadDataBranches:
         assert stats["lineitem"] == 50
 
     def test_load_data_rest_fails_records_zero_rows(self, questdb_stubs, tmp_path):
-        """load_data should record 0 rows and continue when REST API fails."""
         data_file = tmp_path / "lineitem.csv"
         data_file.write_text("col1\n1\n", encoding="utf-8")
 
@@ -408,38 +346,32 @@ class TestLoadDataBranches:
 
 
 class TestPopulateTransactionalStagingTables:
-    """Tests for _populate_transactional_staging_tables - w6 QuestDB fix."""
-
     def test_skipped_when_benchmark_lacks_staging_attributes(self, questdb_stubs):
-        """Non-transactional benchmarks (no _staging_tables dict) are silently skipped."""
         adapter = QuestDBAdapter()
         mock_benchmark = Mock()
-        del mock_benchmark._staging_tables  # make attribute missing
+        del mock_benchmark._staging_tables
         connection = Mock()
         adapter._populate_transactional_staging_tables(mock_benchmark, connection)
         connection.execute.assert_not_called()
 
     def test_skipped_when_staging_tables_is_not_dict(self, questdb_stubs):
-        """_staging_tables that is not a dict (e.g. Mock) is skipped to avoid TypeError."""
         adapter = QuestDBAdapter()
         mock_benchmark = Mock()
-        mock_benchmark._staging_tables = Mock()  # not a dict
+        mock_benchmark._staging_tables = Mock()
         connection = Mock()
         adapter._populate_transactional_staging_tables(mock_benchmark, connection)
         connection.execute.assert_not_called()
 
     def test_skipped_for_staging_table_not_in_benchmark(self, questdb_stubs):
-        """txn_* tables absent from benchmark._staging_tables are not populated."""
         adapter = QuestDBAdapter()
         mock_benchmark = Mock()
-        mock_benchmark._staging_tables = {}  # no txn_* tables
+        mock_benchmark._staging_tables = {}
         mock_benchmark._populate_staging_table = Mock()
         connection = Mock()
         adapter._populate_transactional_staging_tables(mock_benchmark, connection)
         mock_benchmark._populate_staging_table.assert_not_called()
 
     def test_populates_empty_staging_tables(self, questdb_stubs):
-        """Empty txn_* tables are populated from their TPC-H source tables."""
         adapter = QuestDBAdapter()
         mock_benchmark = Mock()
         mock_benchmark._staging_tables = {
@@ -449,7 +381,6 @@ class TestPopulateTransactionalStagingTables:
         }
         mock_benchmark._populate_staging_table = Mock()
 
-        # Simulate COUNT(*) = 0 for every query (empty tables throughout)
         mock_connection = Mock()
         count_result = Mock()
         count_result.__bool__ = Mock(return_value=True)
@@ -460,14 +391,12 @@ class TestPopulateTransactionalStagingTables:
         assert mock_benchmark._populate_staging_table.call_count == 3
 
     def test_already_populated_staging_tables_skipped(self, questdb_stubs):
-        """Staging tables with existing rows are not re-populated."""
         adapter = QuestDBAdapter()
         mock_benchmark = Mock()
         mock_benchmark._staging_tables = {"txn_orders": {}}
         mock_benchmark._populate_staging_table = Mock()
 
         mock_connection = Mock()
-        # Return count > 0 (already populated)
         count_result = Mock()
         count_result.__bool__ = Mock(return_value=True)
         count_result.__getitem__ = Mock(return_value=9999)
@@ -477,7 +406,6 @@ class TestPopulateTransactionalStagingTables:
         mock_benchmark._populate_staging_table.assert_not_called()
 
     def test_population_failure_is_warning_not_exception(self, questdb_stubs):
-        """A failure in _populate_staging_table is logged as a warning, run continues."""
         adapter = QuestDBAdapter()
         mock_benchmark = Mock()
         mock_benchmark._staging_tables = {"txn_orders": {}}
@@ -489,16 +417,9 @@ class TestPopulateTransactionalStagingTables:
         count_result.__getitem__ = Mock(return_value=0)
         mock_connection.execute.return_value.fetchone.return_value = count_result
 
-        # Should not raise - failures are downgraded to warnings
         adapter._populate_transactional_staging_tables(mock_benchmark, mock_connection)
 
     def test_populates_when_count_query_throws(self, questdb_stubs):
-        """If SELECT COUNT(*) fails (table doesn't exist yet), population must still run.
-
-        The COUNT check is an optimistic skip-if-already-populated guard.  If the
-        table doesn't exist, the query raises and we must fall through to
-        _populate_staging_table - not silently skip it.
-        """
         adapter = QuestDBAdapter()
         mock_benchmark = Mock()
         mock_benchmark._staging_tables = {"txn_orders": {}}
@@ -512,17 +433,13 @@ class TestPopulateTransactionalStagingTables:
 
 
 class TestLoadTableViaRestApi:
-    """Test REST API data loading helper."""
-
     def test_rest_api_rows_imported_from_text_response(self, questdb_stubs, tmp_path):
-        """_load_table_via_rest_api should parse row count from QuestDB text/plain response."""
         data_file = tmp_path / "test.csv"
         data_file.write_text("col1\n1\n2\n", encoding="utf-8")
 
         adapter = QuestDBAdapter(host="myhost", http_port=9000)
         dialect = CsvDialect(",", False, None, False, None)
 
-        # Real QuestDB /imp response format
         questdb_text_response = (
             "+-----------+\n"
             "|  Location:  |  test_table  |\n"
@@ -542,7 +459,6 @@ class TestLoadTableViaRestApi:
         assert count == 42
 
     def test_rest_api_text_no_match_falls_back_to_count(self, questdb_stubs, tmp_path):
-        """_load_table_via_rest_api falls back to SQL count when response text has no match."""
         data_file = tmp_path / "test.csv"
         data_file.write_text("col1\n1\n", encoding="utf-8")
 
@@ -566,10 +482,7 @@ class TestLoadTableViaRestApi:
 
 
 class TestCountTableRowsViaHttp:
-    """Test row count via HTTP helper."""
-
     def test_count_rows_success(self, questdb_stubs):
-        """_count_table_rows_via_http should parse dataset response."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000)
 
         mock_response = Mock()
@@ -583,7 +496,6 @@ class TestCountTableRowsViaHttp:
         assert count == 123
 
     def test_count_rows_empty_dataset(self, questdb_stubs):
-        """_count_table_rows_via_http should return 0 for empty dataset."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000)
 
         mock_response = Mock()
@@ -597,13 +509,11 @@ class TestCountTableRowsViaHttp:
         assert count == 0
 
     def test_count_rows_invalid_identifier(self, questdb_stubs):
-        """_count_table_rows_via_http should return 0 for invalid identifier."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000)
         count = adapter._count_table_rows_via_http("bad;name")
         assert count == 0
 
     def test_count_rows_request_exception(self, questdb_stubs):
-        """_count_table_rows_via_http should return 0 on exception."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000)
 
         mock_requests = Mock()
@@ -616,10 +526,7 @@ class TestCountTableRowsViaHttp:
 
 
 class TestGetTableColumns:
-    """Test column fetching helper."""
-
     def test_get_table_columns_success(self, questdb_stubs):
-        """_get_table_columns should return column names from SHOW COLUMNS response."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000)
 
         mock_response = Mock()
@@ -633,13 +540,11 @@ class TestGetTableColumns:
         assert cols == ["col1", "col2"]
 
     def test_get_table_columns_invalid_identifier(self, questdb_stubs):
-        """_get_table_columns should return empty list for invalid identifier."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000)
         cols = adapter._get_table_columns("bad;name")
         assert cols == []
 
     def test_get_table_columns_request_failure(self, questdb_stubs):
-        """_get_table_columns should return empty list on exception."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000)
 
         mock_requests = Mock()
@@ -651,7 +556,6 @@ class TestGetTableColumns:
         assert cols == []
 
     def test_get_table_columns_uses_https_when_tls(self, questdb_stubs):
-        """_get_table_columns should use HTTPS URL when use_tls=True."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000, use_tls=True)
 
         mock_response = Mock()
@@ -667,10 +571,7 @@ class TestGetTableColumns:
 
 
 class TestLoadTableViaIlp:
-    """Test ILP data loading helper."""
-
     def test_ilp_raises_when_no_columns(self, questdb_stubs, tmp_path):
-        """_load_table_via_ilp should raise RuntimeError when columns cannot be determined."""
         data_file = tmp_path / "test.csv"
         data_file.write_text("1|2|3\n", encoding="utf-8")
 
@@ -682,7 +583,6 @@ class TestLoadTableViaIlp:
                 adapter._load_table_via_ilp("unknown_table", data_file, dialect)
 
     def test_ilp_sends_rows_via_socket(self, questdb_stubs, tmp_path):
-        """_load_table_via_ilp should send ILP lines over TCP socket."""
         data_file = tmp_path / "test.csv"
         data_file.write_text("1,hello,3.14\n2,world,2.71\n", encoding="utf-8")
 
@@ -701,9 +601,7 @@ class TestLoadTableViaIlp:
         assert mock_socket.sendall.called
 
     def test_ilp_skips_rows_with_wrong_column_count(self, questdb_stubs, tmp_path):
-        """_load_table_via_ilp should skip rows where column count doesn't match."""
         data_file = tmp_path / "test.csv"
-        # 3 columns but data has 2 fields per row
         data_file.write_text("1,hello\n2,world\n", encoding="utf-8")
 
         adapter = QuestDBAdapter(ilp_host="localhost", ilp_port=9009)
@@ -719,8 +617,6 @@ class TestLoadTableViaIlp:
         assert rows == 0
 
     def test_ilp_flushes_in_batches(self, questdb_stubs, tmp_path):
-        """_load_table_via_ilp should flush every 1000 rows."""
-        # Create 1001 rows
         lines = "\n".join(f"{i},val" for i in range(1001)) + "\n"
         data_file = tmp_path / "test.csv"
         data_file.write_text(lines, encoding="utf-8")
@@ -736,11 +632,9 @@ class TestLoadTableViaIlp:
             rows = adapter._load_table_via_ilp("test_table", data_file, dialect)
 
         assert rows == 1001
-        # Should have flushed at least once at the 1000 batch boundary
         assert mock_socket.sendall.call_count >= 2
 
     def test_ilp_socket_closed_on_error(self, questdb_stubs, tmp_path):
-        """_load_table_via_ilp should close socket even when an error occurs."""
         data_file = tmp_path / "test.csv"
         data_file.write_text("1,hello\n", encoding="utf-8")
 
@@ -760,7 +654,6 @@ class TestLoadTableViaIlp:
         mock_socket.close.assert_called_once()
 
     def test_ilp_strips_trailing_pipe_for_tbl_files(self, questdb_stubs, tmp_path):
-        """.tbl suffix → prepare_local_load_file called with strip_trailing_delim=True."""
         from contextlib import contextmanager
 
         from benchbox.platforms.base.data_loading import prepare_local_load_file as real_plf
@@ -789,11 +682,6 @@ class TestLoadTableViaIlp:
         assert captured_strip == [True]
 
     def test_ilp_does_not_strip_trailing_delim_for_csv_files(self, questdb_stubs, tmp_path):
-        """.csv suffix → prepare_local_load_file called with strip_trailing_delim=False.
-
-        Regression guard: a trailing comma in a CSV line is an empty (NULL) last field,
-        not a spurious TPC-H terminator. Stripping it would drop the column.
-        """
         from contextlib import contextmanager
 
         data_file = tmp_path / "title.csv"
@@ -838,10 +726,7 @@ class TestLoadTableViaIlp:
 
 
 class TestRowToIlpLine:
-    """Test ILP row conversion helper."""
-
     def test_row_to_ilp_line_basic(self):
-        """_row_to_ilp_line should produce valid ILP format."""
         line = QuestDBAdapter._row_to_ilp_line(
             "test_table",
             ["id", "name", "val"],
@@ -855,7 +740,6 @@ class TestRowToIlpLine:
         assert "val=3.14" in line
 
     def test_row_to_ilp_line_with_timestamp(self):
-        """_row_to_ilp_line should handle designated timestamp column."""
         line = QuestDBAdapter._row_to_ilp_line(
             "orders",
             ["order_id", "o_orderdate"],
@@ -863,14 +747,11 @@ class TestRowToIlpLine:
             "o_orderdate",
         )
         assert line is not None
-        # Timestamp should appear as epoch nanoseconds at end
         parts = line.split(" ")
         assert len(parts) >= 2
-        # The last part should be a numeric timestamp
         assert parts[-1].isdigit()
 
     def test_row_to_ilp_line_empty_fields_returns_none(self):
-        """_row_to_ilp_line should return None when all fields are empty."""
         line = QuestDBAdapter._row_to_ilp_line(
             "test",
             ["col1", "col2"],
@@ -880,7 +761,6 @@ class TestRowToIlpLine:
         assert line is None
 
     def test_row_to_ilp_line_skips_empty_values(self):
-        """_row_to_ilp_line should skip individual empty values."""
         line = QuestDBAdapter._row_to_ilp_line(
             "test",
             ["col1", "col2", "col3"],
@@ -892,7 +772,6 @@ class TestRowToIlpLine:
         assert "col2" not in line
 
     def test_row_to_ilp_line_measurement_escape(self):
-        """_row_to_ilp_line should escape the measurement name."""
         line = QuestDBAdapter._row_to_ilp_line(
             "my table",
             ["val"],
@@ -904,10 +783,7 @@ class TestRowToIlpLine:
 
 
 class TestPrepareLocalLoadFileForQuestDB:
-    """Test that prepare_local_load_file correctly handles dialect-driven transformations."""
-
     def test_csv_file_no_transform_yields_original_path(self, questdb_stubs, tmp_path):
-        """Plain CSV files with null_marker=None require no transformation."""
         from benchbox.platforms.base.data_loading import prepare_local_load_file
 
         data_file = tmp_path / "data.csv"
@@ -915,10 +791,9 @@ class TestPrepareLocalLoadFileForQuestDB:
 
         dialect = CsvDialect(",", False, None, False, None)
         with prepare_local_load_file(data_file, dialect=dialect, strip_trailing_delim=False) as load_path:
-            assert load_path == data_file  # no copy needed
+            assert load_path == data_file
 
     def test_tbl_dialect_strips_trailing_pipe(self, questdb_stubs, tmp_path):
-        """TPC dialect (null_marker='') with strip_trailing_delim=True removes trailing pipes."""
         from benchbox.platforms.base.data_loading import prepare_local_load_file
 
         data_file = tmp_path / "lineitem.tbl"
@@ -931,7 +806,6 @@ class TestPrepareLocalLoadFileForQuestDB:
         assert content == "1|2|3\n4|5|6\n"
 
     def test_rest_api_strips_trailing_pipe_for_tbl_files(self, questdb_stubs, tmp_path):
-        """_load_table_via_rest_api strips trailing delimiter for .tbl files (TPC-H dbgen format)."""
         data_file = tmp_path / "lineitem.tbl"
         data_file.write_text("1|2|\n3|4|\n", encoding="utf-8")
 
@@ -955,22 +829,12 @@ class TestPrepareLocalLoadFileForQuestDB:
         with patch.dict("sys.modules", {"requests": _FakeRequests()}):
             adapter._load_table_via_rest_api("lineitem", data_file, dialect)
 
-        # Trailing pipes stripped for .tbl (spurious TPC-H terminator)
         assert b"1|2\n" in captured[0]
         assert b"3|4\n" in captured[0]
         assert b"1|2|\n" not in captured[0]
 
     def test_rest_api_does_not_strip_trailing_delim_for_csv_files(self, questdb_stubs, tmp_path):
-        """_load_table_via_rest_api preserves trailing delimiter on .csv files.
-
-        Regression guard: a trailing pipe/comma on a CSV line is an empty last field
-        (NULL), not a spurious TPC-H terminator. Stripping would drop that field.
-        """
         data_file = tmp_path / "title.csv"
-        # JoinOrder title row: id, title, kind_id, production_year, imdb_id (NULL),
-        # phonetic_code (NULL), episode_of_id (NULL), season_nr (NULL), episode_nr (NULL),
-        # series_years (NULL), md5sum (NULL), imdb_index (NULL).
-        # Trailing commas = NULL fields; must NOT be stripped.
         data_file.write_bytes(b"1,Comedy Adventure,,4,1957,,,,,,,\n")
 
         dialect = CsvDialect(",", False, "", False, None)
@@ -993,16 +857,12 @@ class TestPrepareLocalLoadFileForQuestDB:
         with patch.dict("sys.modules", {"requests": _FakeRequests()}):
             adapter._load_table_via_rest_api("title", data_file, dialect)
 
-        # Trailing comma must NOT be stripped — it is an empty (NULL) last field
         assert b"1,Comedy Adventure,,4,1957,,,,,,,\n" in captured[0]
 
 
 class TestConfigureForBenchmarkBranches:
-    """Test configure_for_benchmark branches."""
-
     @pytest.mark.parametrize("benchmark_type", ["tpch", "tpcds", "olap", "timeseries"])
     def test_configure_for_benchmark_sets_parallel_filter(self, questdb_stubs, benchmark_type):
-        """configure_for_benchmark should enable parallel filter for all supported types."""
         adapter = QuestDBAdapter()
         mock_cursor = Mock()
         mock_conn = Mock()
@@ -1014,7 +874,6 @@ class TestConfigureForBenchmarkBranches:
         assert any("parallel.filter" in s for s in executed)
 
     def test_configure_for_benchmark_olap_sets_page_frame(self, questdb_stubs):
-        """configure_for_benchmark with olap types should also set page frame max rows."""
         adapter = QuestDBAdapter()
         mock_cursor = Mock()
         mock_conn = Mock()
@@ -1026,7 +885,6 @@ class TestConfigureForBenchmarkBranches:
         assert any("page.frame.max.rows" in s for s in executed)
 
     def test_configure_for_benchmark_swallows_set_errors(self, questdb_stubs):
-        """configure_for_benchmark should not raise when SET commands fail."""
         adapter = QuestDBAdapter()
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = Exception("SET not supported")
@@ -1037,7 +895,6 @@ class TestConfigureForBenchmarkBranches:
         mock_cursor.close.assert_called_once()
 
     def test_configure_for_benchmark_cursor_closed_always(self, questdb_stubs):
-        """configure_for_benchmark should always close cursor."""
         adapter = QuestDBAdapter()
         mock_cursor = Mock()
         mock_conn = Mock()
@@ -1049,10 +906,7 @@ class TestConfigureForBenchmarkBranches:
 
 
 class TestApplyPlatformOptimizations:
-    """Test platform optimization application."""
-
     def test_apply_platform_optimizations_sets_jit_and_parallel(self, questdb_stubs):
-        """apply_platform_optimizations should configure parallel filter and JIT."""
         adapter = QuestDBAdapter()
         mock_cursor = Mock()
         mock_conn = Mock()
@@ -1066,7 +920,6 @@ class TestApplyPlatformOptimizations:
         assert any("page.frame.max.rows" in s for s in executed)
 
     def test_apply_platform_optimizations_swallows_errors(self, questdb_stubs):
-        """apply_platform_optimizations should not raise when SET commands fail."""
         adapter = QuestDBAdapter()
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = Exception("SET not supported")
@@ -1078,10 +931,7 @@ class TestApplyPlatformOptimizations:
 
 
 class TestApplyConstraintConfiguration:
-    """Test that constraint configuration is a no-op for QuestDB."""
-
     def test_apply_constraint_configuration_is_noop(self, questdb_stubs):
-        """apply_constraint_configuration should silently do nothing."""
         adapter = QuestDBAdapter()
         mock_conn = Mock()
         adapter.apply_constraint_configuration(Mock(), Mock(), mock_conn)
@@ -1089,10 +939,7 @@ class TestApplyConstraintConfiguration:
 
 
 class TestExecuteQueryWithValidation:
-    """Test execute_query when row-count validation is enabled."""
-
     def test_execute_query_with_validation_calls_validator(self, questdb_stubs):
-        """execute_query should call QueryValidator when validate_row_count=True and benchmark_type set."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [(1,), (2,)]
@@ -1117,7 +964,6 @@ class TestExecuteQueryWithValidation:
         mock_validator_instance.validate_query_result.assert_called_once()
 
     def test_execute_query_no_validation_when_no_benchmark_type(self, questdb_stubs):
-        """execute_query should skip validation when benchmark_type is None."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [(1,)]
@@ -1136,10 +982,7 @@ class TestExecuteQueryWithValidation:
 
 
 class TestGetPlatformInfoVersionError:
-    """Test get_platform_info when version query fails."""
-
     def test_get_platform_info_version_query_fails(self, questdb_stubs):
-        """get_platform_info should set version='unknown' when version query fails."""
         adapter = QuestDBAdapter()
 
         mock_cursor = Mock()
@@ -1152,7 +995,6 @@ class TestGetPlatformInfoVersionError:
         assert info["version"] == "unknown"
 
     def test_get_platform_info_configuration_block(self, questdb_stubs):
-        """get_platform_info should include configuration sub-dict."""
         adapter = QuestDBAdapter(
             loading_method="ilp",
             partition_by="DAY",
@@ -1167,10 +1009,7 @@ class TestGetPlatformInfoVersionError:
 
 
 class TestTableOperationErrorBranches:
-    """Test exception handling in table operations."""
-
     def test_table_exists_exception_returns_false(self, questdb_stubs):
-        """table_exists should return False when cursor raises."""
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = Exception("Query failed")
         mock_conn = Mock()
@@ -1181,7 +1020,6 @@ class TestTableOperationErrorBranches:
         assert result is False
 
     def test_drop_table_exception_logs_warning(self, questdb_stubs):
-        """drop_table should log warning and not raise when cursor fails."""
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = Exception("Drop failed")
         mock_conn = Mock()
@@ -1192,159 +1030,123 @@ class TestTableOperationErrorBranches:
 
 
 class TestIlpHelpers:
-    """Test ILP helper utility functions."""
-
     def test_ilp_escape_measurement_special_chars(self):
-        """_ilp_escape_measurement should escape commas, spaces, and equals."""
         assert _ilp_escape_measurement("my,table") == r"my\,table"
         assert _ilp_escape_measurement("my table") == r"my\ table"
         assert _ilp_escape_measurement("my=table") == r"my\=table"
 
     def test_ilp_escape_measurement_clean_name(self):
-        """_ilp_escape_measurement should leave clean names unchanged."""
         assert _ilp_escape_measurement("lineitem") == "lineitem"
 
     def test_ilp_escape_tag_key_special_chars(self):
-        """_ilp_escape_tag_key should escape commas, equals, and spaces."""
         assert _ilp_escape_tag_key("my,key") == r"my\,key"
         assert _ilp_escape_tag_key("my=key") == r"my\=key"
         assert _ilp_escape_tag_key("my key") == r"my\ key"
 
     def test_ilp_escape_field_integer(self):
-        """_ilp_escape_field should format integers with 'i' suffix."""
         result = _ilp_escape_field("count", "42")
         assert result == "count=42i"
 
     def test_ilp_escape_field_float(self):
-        """_ilp_escape_field should format floats without suffix."""
         result = _ilp_escape_field("price", "3.14")
         assert result == "price=3.14"
 
     def test_ilp_escape_field_string(self):
-        """_ilp_escape_field should wrap strings in double quotes."""
         result = _ilp_escape_field("name", "hello")
         assert result == 'name="hello"'
 
     def test_ilp_escape_field_empty_returns_none(self):
-        """_ilp_escape_field should return None for empty value."""
         result = _ilp_escape_field("name", "")
         assert result is None
 
     def test_ilp_escape_field_string_with_quotes(self):
-        """_ilp_escape_field should escape backslashes and double quotes in strings."""
         result = _ilp_escape_field("name", 'say "hello"')
         assert result == 'name="say \\"hello\\""'
 
     def test_ilp_escape_field_negative_integer(self):
-        """_ilp_escape_field should handle negative integers."""
         result = _ilp_escape_field("delta", "-5")
         assert result == "delta=-5i"
 
     def test_ilp_escape_field_scientific_notation(self):
-        """_ilp_escape_field should handle scientific notation floats."""
         result = _ilp_escape_field("val", "1.23e10")
         assert result is not None
         assert "val=" in result
 
 
 class TestDateToEpochNs:
-    """Test date to nanosecond epoch conversion."""
-
     def test_date_format_yyyy_mm_dd(self):
-        """Should convert YYYY-MM-DD format to nanosecond epoch."""
         result = _date_to_epoch_ns("1994-01-01")
         assert result is not None
         assert result.isdigit()
-        # 1994-01-01 is after Unix epoch
         assert int(result) > 0
 
     def test_date_format_datetime(self):
-        """Should convert YYYY-MM-DD HH:MM:SS format."""
         result = _date_to_epoch_ns("1994-01-01 12:30:00")
         assert result is not None
         assert result.isdigit()
 
     def test_date_format_iso_datetime(self):
-        """Should convert YYYY-MM-DDTHH:MM:SS format."""
         result = _date_to_epoch_ns("1994-01-01T12:30:00")
         assert result is not None
         assert result.isdigit()
 
     def test_invalid_date_returns_none(self):
-        """Should return None for invalid date strings."""
         result = _date_to_epoch_ns("not-a-date")
         assert result is None
 
     def test_empty_string_returns_none(self):
-        """Should return None for empty string."""
         result = _date_to_epoch_ns("   ")
         assert result is None
 
     def test_epoch_ns_is_nanoseconds(self):
-        """Epoch value should be in nanoseconds (1e18 magnitude for year 2000)."""
         result = _date_to_epoch_ns("2000-01-01")
         assert result is not None
-        # Year 2000 in nanoseconds: ~9.46e17
         assert int(result) > 9 * 10**17
 
 
 class TestAdapterInitEdgeCases:
-    """Test adapter initialization edge cases."""
-
     def test_ilp_host_defaults_to_host(self, questdb_stubs):
-        """ilp_host should default to host when not explicitly set."""
         adapter = QuestDBAdapter(host="myhost")
         assert adapter.ilp_host == "myhost"
 
     def test_ilp_host_explicit_override(self, questdb_stubs):
-        """ilp_host should use explicit value when provided."""
         adapter = QuestDBAdapter(host="pghost", ilp_host="ilphost")
         assert adapter.ilp_host == "ilphost"
 
     def test_default_loading_method(self, questdb_stubs):
-        """Default loading method should be 'rest'."""
         adapter = QuestDBAdapter()
         assert adapter.loading_method == "rest"
 
     def test_ilp_loading_method(self, questdb_stubs):
-        """Can configure ilp loading method."""
         adapter = QuestDBAdapter(loading_method="ilp")
         assert adapter.loading_method == "ilp"
 
     def test_partition_by_none_by_default(self, questdb_stubs):
-        """partition_by should be None by default (auto per table)."""
         adapter = QuestDBAdapter()
         assert adapter.partition_by is None
 
     def test_connect_timeout_default(self, questdb_stubs):
-        """connect_timeout should default to 10."""
         adapter = QuestDBAdapter()
         assert adapter.connect_timeout == 10
 
     def test_connect_timeout_custom(self, questdb_stubs):
-        """connect_timeout should accept custom value."""
         adapter = QuestDBAdapter(connect_timeout=30)
         assert adapter.connect_timeout == 30
 
     def test_parquet_chunk_rows_default(self, questdb_stubs):
-        """parquet_chunk_rows should default to 200_000."""
         adapter = QuestDBAdapter()
         assert adapter.parquet_chunk_rows == 200_000
 
     def test_parquet_chunk_rows_custom(self, questdb_stubs):
-        """parquet_chunk_rows should accept custom value via platform-option."""
         adapter = QuestDBAdapter(parquet_chunk_rows=50_000)
         assert adapter.parquet_chunk_rows == 50_000
 
     def test_parquet_chunk_rows_from_config(self, questdb_stubs):
-        """from_config should pass parquet_chunk_rows through to the adapter."""
         adapter = QuestDBAdapter.from_config({"parquet_chunk_rows": 10_000})
         assert adapter.parquet_chunk_rows == 10_000
 
 
 class TestCreateSchemaPreDrop:
-    """Pre-drop of stale tables before schema creation."""
-
     def _make_benchmark(self, tables: dict[str, object]) -> Mock:
         benchmark = Mock()
         benchmark.tables = tables
@@ -1354,7 +1156,6 @@ class TestCreateSchemaPreDrop:
         return [call.args[0] for call in mock_cursor.execute.call_args_list if "DROP TABLE" in call.args[0]]
 
     def test_pre_drop_runs_when_not_reused(self, questdb_stubs):
-        """Pre-drop should fire for each known benchmark table when reuse=False."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -1372,7 +1173,6 @@ class TestCreateSchemaPreDrop:
         assert all("IF EXISTS" in d for d in drops)
 
     def test_pre_drop_skipped_when_reused(self, questdb_stubs):
-        """Pre-drop must not fire when the existing database is reused."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -1387,7 +1187,6 @@ class TestCreateSchemaPreDrop:
         assert self._collect_drops(mock_cursor) == []
 
     def test_pre_drop_skipped_in_dry_run(self, questdb_stubs):
-        """Dry-run must never execute DDL, including pre-drops."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -1402,7 +1201,6 @@ class TestCreateSchemaPreDrop:
         assert self._collect_drops(mock_cursor) == []
 
     def test_pre_drop_filters_invalid_identifiers(self, questdb_stubs):
-        """Table names that fail identifier validation are not interpolated."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -1419,7 +1217,6 @@ class TestCreateSchemaPreDrop:
         assert not any("bad;name" in d for d in drops)
 
     def test_pre_drop_skipped_when_tables_not_dict(self, questdb_stubs):
-        """A bare Mock benchmark (tests' default) must not trigger DDL."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -1434,8 +1231,6 @@ class TestCreateSchemaPreDrop:
 
 
 class TestLoadDataMultiChunk:
-    """Multi-chunk table loads (TPC-H lineitem/orders return list[Path])."""
-
     def test_rest_method_sums_rows_across_chunks(self, questdb_stubs, tmp_path):
         chunk_a = tmp_path / "lineitem_0.csv"
         chunk_b = tmp_path / "lineitem_1.csv"
@@ -1469,7 +1264,6 @@ class TestLoadDataMultiChunk:
         assert stats["orders"] == 12
 
     def test_one_failing_chunk_does_not_abort_table(self, questdb_stubs, tmp_path):
-        """A chunk that fails REST only drops its own rows; other chunks are kept."""
         chunk_a = tmp_path / "lineitem_0.csv"
         chunk_b = tmp_path / "lineitem_1.csv"
         chunk_a.write_text("col1\n1\n", encoding="utf-8")
@@ -1486,11 +1280,9 @@ class TestLoadDataMultiChunk:
         ):
             stats, _, _ = adapter.load_data(mock_benchmark, Mock(), tmp_path)
 
-        # First chunk succeeds, second fails -> 42 rows kept
         assert stats["lineitem"] == 42
 
     def test_single_path_still_loads(self, questdb_stubs, tmp_path):
-        """Non-list table_path (single-file tables) must still work."""
         data_file = tmp_path / "region.csv"
         data_file.write_text("col1\n1\n", encoding="utf-8")
 
@@ -1504,7 +1296,6 @@ class TestLoadDataMultiChunk:
         assert stats["region"] == 5
 
     def test_missing_chunks_are_skipped(self, questdb_stubs, tmp_path):
-        """Chunks that don't exist on disk are filtered before load is attempted."""
         chunk_a = tmp_path / "lineitem_0.csv"
         chunk_a.write_text("col1\n1\n", encoding="utf-8")
 
@@ -1522,8 +1313,6 @@ class TestLoadDataMultiChunk:
 
 
 class TestHandleExistingDatabase:
-    """Reuse-detection logic in handle_existing_database."""
-
     def _make_adapter_with_benchmark(self, questdb_stubs, table_names: list[str]) -> QuestDBAdapter:
         adapter = QuestDBAdapter()
         mock_benchmark = Mock()
@@ -1532,11 +1321,6 @@ class TestHandleExistingDatabase:
         return adapter
 
     def _mock_connection(self, questdb_stubs, existing_tables: list[str], empty_tables: set[str]):
-        """Build a psycopg connection mock.
-
-        existing_tables: tables returned by ``SELECT table_name FROM tables()``
-        empty_tables: tables for which ``SELECT 1 FROM t LIMIT 1`` returns None
-        """
         mock_conn = MagicMock()
         mock_conn.autocommit = True
 
@@ -1564,7 +1348,6 @@ class TestHandleExistingDatabase:
         return mock_conn
 
     def test_reuse_when_all_tables_have_data(self, questdb_stubs):
-        """database_was_reused=True when all expected tables exist and are non-empty."""
         tables = ["region", "nation", "lineitem"]
         adapter = self._make_adapter_with_benchmark(questdb_stubs, tables)
         self._mock_connection(questdb_stubs, existing_tables=tables, empty_tables=set())
@@ -1574,12 +1357,6 @@ class TestHandleExistingDatabase:
         assert adapter.database_was_reused is True
 
     def test_fresh_when_tables_exist_but_all_empty(self, questdb_stubs):
-        """database_was_reused=False when tables exist but are all empty.
-
-        This is the bug fixed in this commit: a prior partial run may have
-        created schema without loading any data, leaving empty tables that
-        would cause validation to fail if reused.
-        """
         tables = ["region", "nation", "lineitem"]
         adapter = self._make_adapter_with_benchmark(questdb_stubs, tables)
         self._mock_connection(
@@ -1593,12 +1370,11 @@ class TestHandleExistingDatabase:
         assert adapter.database_was_reused is False
 
     def test_fresh_when_some_tables_missing(self, questdb_stubs):
-        """database_was_reused=False when not all expected tables are present."""
         tables = ["region", "nation", "lineitem"]
         adapter = self._make_adapter_with_benchmark(questdb_stubs, tables)
         self._mock_connection(
             questdb_stubs,
-            existing_tables=["region", "nation"],  # lineitem missing
+            existing_tables=["region", "nation"],
             empty_tables=set(),
         )
 
@@ -1607,7 +1383,6 @@ class TestHandleExistingDatabase:
         assert adapter.database_was_reused is False
 
     def test_force_recreate_skips_check(self, questdb_stubs):
-        """force_recreate=True must set reused=False without querying QuestDB."""
         adapter = QuestDBAdapter(force_recreate=True)
 
         adapter.handle_existing_database()
@@ -1617,10 +1392,7 @@ class TestHandleExistingDatabase:
 
 
 class TestBenchmarkGating:
-    """QuestDB unsupported_benchmarks registry entries gate runs before execution."""
-
     def test_questdb_tpch_is_not_gated(self):
-        """tpch must NOT be in QuestDB unsupported_benchmarks - Phase 2 rewriter handles comma-JOINs."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("questdb")
@@ -1630,7 +1402,6 @@ class TestBenchmarkGating:
         )
 
     def test_questdb_comma_join_benchmarks_not_gated(self):
-        """tpch/tpcds/ssb/tpchavoc/tpch_skew must NOT be gated - Phase 2 rewriter is implemented."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("questdb")
@@ -1641,7 +1412,6 @@ class TestBenchmarkGating:
             )
 
     def test_questdb_vector_search_is_gated(self):
-        """vector_search must be gated (no VECTOR column type in QuestDB)."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("questdb")
@@ -1650,7 +1420,6 @@ class TestBenchmarkGating:
 
     @pytest.mark.parametrize("benchmark_name", ["vector_search"])
     def test_all_expected_benchmarks_are_gated(self, benchmark_name):
-        """vector_search must appear in unsupported_benchmarks (no VECTOR column type in QuestDB 9.3.4)."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         caps = PlatformRegistry.get_platform_capabilities("questdb")
@@ -1660,11 +1429,10 @@ class TestBenchmarkGating:
         )
 
     def test_clean_benchmarks_not_gated(self):
-        """Benchmarks known to pass on QuestDB must NOT appear in unsupported_benchmarks."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         clean = [
-            "tpcds_obt",  # single denormalized table - no comma-JOINs; motivating benchmark for parquet chunking
+            "tpcds_obt",
             "clickbench",
             "h2odb",
             "coffeeshop",
@@ -1683,15 +1451,12 @@ class TestBenchmarkGating:
 
 
 class TestLoadParquetViaChunkedCsv:
-    """Tests for _load_parquet_via_chunked_csv: overwrite semantics, header, row counts."""
-
     def _make_mock_pf(self, batches):
         mock_pf = MagicMock()
         mock_pf.iter_batches.return_value = iter(batches)
         return mock_pf
 
     def test_all_chunks_use_overwrite_false(self, questdb_stubs, tmp_path):
-        """overwrite=false must be used for every chunk to preserve create_schema DDL."""
         data_file = tmp_path / "obt.parquet"
         data_file.write_bytes(b"")
 
@@ -1715,7 +1480,6 @@ class TestLoadParquetViaChunkedCsv:
         assert rows == 200
 
     def test_header_on_every_chunk(self, questdb_stubs, tmp_path):
-        """Every chunk must include a CSV header row (forceHeader=true guards column order)."""
         data_file = tmp_path / "obt.parquet"
         data_file.write_bytes(b"")
 
@@ -1737,7 +1501,6 @@ class TestLoadParquetViaChunkedCsv:
         assert call2[1]["header"] is True
 
     def test_force_header_param_on_every_chunk(self, questdb_stubs, tmp_path):
-        """forceHeader=true must be present on every POST to prevent positional column mapping."""
         data_file = tmp_path / "obt.parquet"
         data_file.write_bytes(b"")
 
@@ -1760,7 +1523,6 @@ class TestLoadParquetViaChunkedCsv:
             )
 
     def test_row_count_fallback_uses_batch_len(self, questdb_stubs, tmp_path):
-        """When response text lacks 'Rows imported', len(batch) is used as fallback."""
         data_file = tmp_path / "obt.parquet"
         data_file.write_bytes(b"")
 
@@ -1780,7 +1542,6 @@ class TestLoadParquetViaChunkedCsv:
         assert rows == 42
 
     def test_missing_pyarrow_raises_import_error(self, questdb_stubs, tmp_path):
-        """ImportError is re-raised with install hint when pyarrow is unavailable."""
         data_file = tmp_path / "obt.parquet"
         data_file.write_bytes(b"")
 
@@ -1793,7 +1554,6 @@ class TestLoadParquetViaChunkedCsv:
             adapter._load_parquet_via_chunked_csv("obt_table", data_file)
 
     def test_custom_chunk_rows_passed_to_iter_batches(self, questdb_stubs, tmp_path):
-        """parquet_chunk_rows flows from adapter config into pf.iter_batches(batch_size=...)."""
         data_file = tmp_path / "obt.parquet"
         data_file.write_bytes(b"")
 
@@ -1814,8 +1574,6 @@ class TestLoadParquetViaChunkedCsv:
 
 
 class TestBenchmarkCompatibilityGateCli:
-    """_check_benchmark_platform_compatibility gates at the CLI layer, not just registry."""
-
     @staticmethod
     def _make_state(platform_key: str, benchmark: str):
         import types as _t
@@ -1828,7 +1586,6 @@ class TestBenchmarkCompatibilityGateCli:
         return s
 
     def test_gated_benchmark_calls_ctx_exit_1(self):
-        """questdb+vector_search must trigger ctx.exit(1) before any I/O."""
         from benchbox.cli.commands.run import _check_benchmark_platform_compatibility
 
         s = self._make_state("questdb", "vector_search")
@@ -1836,7 +1593,6 @@ class TestBenchmarkCompatibilityGateCli:
         s.ctx.exit.assert_called_once_with(1)
 
     def test_ungated_benchmark_does_not_exit(self):
-        """questdb+clickbench is not gated and must not call ctx.exit."""
         from benchbox.cli.commands.run import _check_benchmark_platform_compatibility
 
         s = self._make_state("questdb", "clickbench")
@@ -1844,7 +1600,6 @@ class TestBenchmarkCompatibilityGateCli:
         s.ctx.exit.assert_not_called()
 
     def test_unknown_platform_does_not_exit(self):
-        """An unknown platform has no capability entry - gate must be a no-op."""
         from benchbox.cli.commands.run import _check_benchmark_platform_compatibility
 
         s = self._make_state("nonexistent_platform_xyz", "tpch")
@@ -1852,7 +1607,6 @@ class TestBenchmarkCompatibilityGateCli:
         s.ctx.exit.assert_not_called()
 
     def test_empty_platform_key_does_not_exit(self):
-        """Missing platform_key short-circuits without calling ctx.exit."""
         from benchbox.cli.commands.run import _check_benchmark_platform_compatibility
 
         s = self._make_state("", "tpch")
@@ -1860,7 +1614,6 @@ class TestBenchmarkCompatibilityGateCli:
         s.ctx.exit.assert_not_called()
 
     def test_logger_receives_error_for_gated_benchmark(self):
-        """When a logger is present, it receives an error-level message naming both parties."""
         from benchbox.cli.commands.run import _check_benchmark_platform_compatibility
 
         s = self._make_state("questdb", "vector_search")

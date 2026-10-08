@@ -1,10 +1,3 @@
-"""Schema validation for migrated YAML catalogs (PRs #590, #604).
-
-Asserts the shared Pydantic schemas accept every real migrated catalog and
-reject realistic corruptions (missing field, wrong type/value, typo'd key),
-recovering the field-level type safety the pre-migration Python literals had.
-"""
-
 from __future__ import annotations
 
 import copy
@@ -36,7 +29,7 @@ def _load(package: str, filename: str) -> dict:
     ids=[f"{package}:{filename}" for package, filename in CATALOG_SCHEMAS],
 )
 def test_real_catalog_validates(package: str, filename: str, model: type) -> None:
-    validate_catalog(package, filename, model)  # raises CatalogSchemaError on failure
+    validate_catalog(package, filename, model)
 
 
 def test_validate_all_catalogs_passes() -> None:
@@ -94,8 +87,7 @@ def test_registry_non_positive_base_memory_rejected(value: float) -> None:
 
 
 def test_registry_unknown_field_rejected() -> None:
-    # extra="forbid" turns a misspelled/unknown field into a schema failure, not
-    # a silently-ignored key that surfaces as a runtime KeyError later.
+
     bad = copy.deepcopy(_load("benchbox.core", "benchmark_registry.yaml"))
     first = next(iter(bad["benchmark_metadata"]))
     bad["benchmark_metadata"][first]["unexpected_extra_key"] = bad["benchmark_metadata"][first]["category"]

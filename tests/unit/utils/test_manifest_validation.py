@@ -13,35 +13,27 @@ pytestmark = [
 
 
 def test_validator_builds_manifest_from_scan(tmp_path: Path):
-    # Create a minimal data file
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     f = data_dir / "sample.tbl"
     f.write_text("1|a\n2|b\n3|c\n")
 
-    # Use a benchmark with no hard-coded expectations so presence is enough
     v = BenchmarkDataValidator("ssb", scale_factor=0.01)
     res = v.validate_data_directory(data_dir)
 
     assert res.valid is True
-    # Manifest should be written
     mp = data_dir / "_datagen_manifest.json"
     assert mp.exists()
     manifest = json.loads(mp.read_text())
     assert manifest.get("benchmark") == "ssb"
     assert "tables" in manifest and len(manifest["tables"]) >= 1
 
-    # Validate again: the scan-rebuilt manifest carries no provenance stamp,
-    # so the directory honestly reports stale (regenerate) instead of
-    # laundering unknown-vintage files into current provenance.
     res2 = v.validate_data_directory(data_dir)
     assert res2.valid is False
     assert any("stale" in issue for issue in res2.issues)
 
 
 class TestComputeEntrySize:
-    """Tests for compute_entry_size() helper."""
-
     def test_regular_file(self, tmp_path: Path):
         f = tmp_path / "data.parquet"
         f.write_bytes(b"x" * 1234)
@@ -75,10 +67,7 @@ class TestComputeEntrySize:
 
 
 class TestDataValidationDirectoryEntries:
-    """Tests that data_validation.py handles directory-based manifest entries correctly."""
-
     def _create_directory_manifest(self, data_dir: Path, table_name: str = "lineitem") -> dict:
-        """Create a manifest with a directory entry and matching files on disk."""
         table_dir = data_dir / table_name
         table_dir.mkdir(parents=True)
         (table_dir / "part-0.parquet").write_bytes(b"a" * 100)
@@ -114,7 +103,6 @@ class TestDataValidationDirectoryEntries:
         return manifest
 
     def test_directory_entry_validates(self, tmp_path: Path):
-        """Validator should accept directory entries with matching recursive size."""
         data_dir = tmp_path / "data"
         self._create_directory_manifest(data_dir)
 
@@ -124,11 +112,9 @@ class TestDataValidationDirectoryEntries:
         assert res.valid is True
 
     def test_directory_entry_detects_size_change(self, tmp_path: Path):
-        """Validator should reject directory entries when files change."""
         data_dir = tmp_path / "data"
         self._create_directory_manifest(data_dir)
 
-        # Add extra file to change recursive size
         (data_dir / "lineitem" / "extra.parquet").write_bytes(b"c" * 500)
 
         v = BenchmarkDataValidator("ssb", scale_factor=0.01)

@@ -24,12 +24,10 @@ from benchbox.core.dataframe.profiling import DataFrameProfiler
 
 profiler = DataFrameProfiler(platform="polars")
 
-# Profile a query
 with profiler.profile_query("q1") as ctx:
     result = df.filter(col("l_shipdate") <= lit(cutoff)).collect()
     ctx.set_rows(len(result))
 
-# Get profile
 profile = ctx.get_profile()
 print(f"Query: {profile.query_id}")
 print(f"Execution time: {profile.execution_time_ms:.2f}ms")
@@ -42,12 +40,10 @@ For platforms with lazy evaluation (Polars, PySpark, DataFusion):
 
 ```python
 with profiler.profile_query("q1") as ctx:
-    # Planning phase
     ctx.start_planning()
     lazy_result = df.filter(...).group_by(...).agg(...)
     ctx.end_planning()
 
-    # Execution/collect phase
     ctx.start_collect()
     result = lazy_result.collect()
     ctx.end_collect()
@@ -63,12 +59,10 @@ print(f"Lazy overhead: {profile.lazy_overhead_percent:.1f}%")
 ### Aggregate Statistics
 
 ```python
-# Profile multiple queries
 for query_id in ["q1", "q2", "q3"]:
     with profiler.profile_query(query_id) as ctx:
         execute_query(query_id)
 
-# Get aggregate statistics
 stats = profiler.get_statistics()
 print(f"Queries: {stats['query_count']}")
 print(f"Total time: {stats['total_execution_time_ms']:.0f}ms")
@@ -81,10 +75,11 @@ print(f"Avg lazy overhead: {stats['avg_lazy_overhead_percent']:.1f}%")
 
 ### Polars
 
+Capture the plan before calling `collect()`:
+
 ```python
 from benchbox.core.dataframe.profiling import capture_polars_plan
 
-# Build lazy query
 lazy_df = (
     df.lazy()
     .filter(col("l_shipdate") <= lit(cutoff))
@@ -92,12 +87,10 @@ lazy_df = (
     .agg(col("l_quantity").sum())
 )
 
-# Capture plan BEFORE collect
 plan = capture_polars_plan(lazy_df)
 print(plan.plan_text)
 print("Optimization hints:", plan.optimization_hints)
 
-# Execute
 result = lazy_df.collect()
 ```
 
@@ -121,10 +114,11 @@ print(plan.plan_text)
 
 ### Generic Capture
 
+The generic function selects the capture method for the platform automatically:
+
 ```python
 from benchbox.core.dataframe.profiling import capture_query_plan
 
-# Automatically detects platform
 plan = capture_query_plan(df, platform="polars")
 if plan:
     print(plan.plan_text)
@@ -134,7 +128,7 @@ if plan:
 
 ## SQL vs DataFrame Comparison
 
-Compare execution modes for platforms supporting both:
+Compare execution modes for platforms supporting both. The `sql_times` dictionary holds SQL execution times in milliseconds from a previous benchmark run:
 
 ```python
 from benchbox.core.dataframe.profiling import (
@@ -142,16 +136,13 @@ from benchbox.core.dataframe.profiling import (
     compare_execution_modes,
 )
 
-# Collect DataFrame execution times
 df_profiler = DataFrameProfiler(platform="polars-df")
 for query_id in benchmark.query_ids:
     with df_profiler.profile_query(query_id):
         benchmark.execute_dataframe_query(query_id)
 
-# Get SQL execution times (from previous benchmark run)
 sql_times = {"q1": 45.2, "q2": 123.4, "q3": 89.1}
 
-# Compare
 comparisons = compare_execution_modes(
     df_profiler.get_profiles(),
     sql_times
@@ -219,7 +210,6 @@ for comp in comparisons:
 ### Running Performance Benchmarks
 
 ```bash
-# Run TPC-H on multiple DataFrame platforms
 benchbox run --platform polars-df --benchmark tpch --scale 1 \
   --output results/polars_sf1.json
 
@@ -233,7 +223,6 @@ benchbox run --platform duckdb-df --benchmark tpch --scale 1 \
 ### Comparing Results
 
 ```bash
-# Compare multiple result files
 benchbox compare results/polars_sf1.json results/pandas_sf1.json results/duckdb_sf1.json
 ```
 
@@ -260,14 +249,12 @@ def compare_platforms(result_paths: list[str]) -> dict:
 
     return comparison
 
-# Analyze
 comparison = compare_platforms([
     "results/polars_sf1.json",
     "results/pandas_sf1.json",
     "results/duckdb_sf1.json"
 ])
 
-# Find fastest platform per query
 for query_id in comparison["polars_sf1"]:
     times = {p: comparison[p].get(query_id) for p in comparison}
     fastest = min(times, key=lambda x: times[x] or float('inf'))
@@ -283,7 +270,6 @@ import tracemalloc
 
 tracemalloc.start()
 
-# Execute query
 result = df.filter(...).collect()
 
 current, peak = tracemalloc.get_traced_memory()
@@ -295,6 +281,8 @@ print(f"Peak memory: {peak / 1024 / 1024:.1f} MB")
 
 ### With Profiler Context
 
+The peak memory from `tracemalloc` is converted to MB before it is recorded:
+
 ```python
 import tracemalloc
 
@@ -305,7 +293,7 @@ with profiler.profile_query("q1") as ctx:
     ctx.set_rows(len(result))
 
     _, peak = tracemalloc.get_traced_memory()
-    ctx.set_peak_memory(peak / 1024 / 1024)  # Convert to MB
+    ctx.set_peak_memory(peak / 1024 / 1024)
 
     tracemalloc.stop()
 
@@ -320,9 +308,8 @@ print(f"Peak memory: {profile.peak_memory_mb:.1f} MB")
 Always measure before making changes:
 
 ```python
-# Baseline measurement
 baseline_profiles = []
-for i in range(3):  # Run multiple times
+for i in range(3):
     with profiler.profile_query(f"q1_run{i}"):
         execute_query()
 
@@ -341,10 +328,9 @@ print(plan.plan_text)
 
 ### 3. Compare Lazy vs Eager
 
-For platforms supporting both:
+For platforms supporting both. The eager run applies only where eager execution is available:
 
 ```python
-# Lazy execution
 with profiler.profile_query("q1_lazy") as ctx:
     ctx.start_planning()
     lazy_result = df.lazy().filter(...).group_by(...).agg(...)
@@ -354,11 +340,9 @@ with profiler.profile_query("q1_lazy") as ctx:
     result = lazy_result.collect()
     ctx.end_collect()
 
-# Eager execution (if available)
 with profiler.profile_query("q1_eager") as ctx:
     result = df.filter(...).group_by(...).agg(...)
 
-# Compare
 lazy_profile = profiler.get_profile("q1_lazy")
 eager_profile = profiler.get_profile("q1_eager")
 

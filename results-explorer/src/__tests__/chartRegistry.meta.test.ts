@@ -1,10 +1,3 @@
-/**
- * Registry parity meta-test.
- *
- * Asserts that chartRegistry.ts stays in sync with the generated Python
- * chart-type fixture from benchbox/core/visualization/chart_types.py.
- */
-
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, it, expect } from "vitest";
@@ -53,7 +46,6 @@ describe("chartRegistry parity with chart_types.py", () => {
   });
 
   it("requires_two_results entries match Python requires_two_results=True", () => {
-    // Python: comparison_bar, diverging_bar, normalized_speedup have requires_two_results=True
     const twoResultIds = ["comparison_bar", "diverging_bar", "normalized_speedup"];
     for (const id of twoResultIds) {
       const entry = CHART_REGISTRY.find((e) => e.id === id);

@@ -22,14 +22,14 @@ fresh per-platform / per-benchmark numbers.
 ### Invocation
 
 ```bash
-# Roll up an entire sweep results directory:
 make uat-validate RESULTS_DIR=<checkout-parent>/benchmark_runs/results OUTPUT_TSV=uat-rollup.tsv
 
-# Direct module form, useful inside scripts:
 uv run -- python -m tests.uat._cli validate \
     --results-dir <checkout-parent>/benchmark_runs/results \
     --output-tsv uat-rollup.tsv
 ```
+
+The `make` target rolls up an entire sweep results directory. The direct module form is useful inside scripts.
 
 ### TSV columns
 

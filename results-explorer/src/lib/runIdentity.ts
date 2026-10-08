@@ -1,23 +1,4 @@
 import { splitVersion } from "@/lib/versionLabel";
-// Run-identity formatter: produces stable, distinguishable labels for
-// benchmark runs across charts, compare controls, and tables.
-//
-// The motivating problem (`results-explorer-run-identity-disambiguation`):
-// repeated `platform` values like "DataFusion", "Polars", "PySpark", and
-// "Spark" produce indistinguishable column headers, legend rows, and
-// compare-card titles whenever two runs share a platform name. Color
-// alone is not enough to identify a run.
-//
-// Contract:
-//   - The same source row should produce the same label across variants
-//     (modulo length/composition).
-//   - When a cohort is supplied (e.g., the four runs in a Compare view
-//     or the row set on a Rank chart), `formatRunIdentitiesForCohort`
-//     appends *only enough* qualifiers to make every label in the cohort
-//     unique. Non-duplicate runs keep their plain platform label.
-//   - Qualifier priority: driver/platform version → run date → scale →
-//     deployment fingerprint → trust tier → short result_id (last
-//     resort, only when nothing else differs).
 
 import { formatRunDate, formatRunDateWithAge } from "@/lib/runAge";
 
@@ -62,10 +43,6 @@ interface QualifierSlot {
 
 const RESULT_ID_QUALIFIER_KEYS = new Set(["short_result_id", "result_id"]);
 
-// Natural qualifiers (in priority order) that distinguish runs in a
-// human-meaningful way. The result_id tiebreaker is intentionally NOT
-// in this list — it is only appended by the cohort-aware code path
-// when no natural qualifier disambiguates a duplicate platform name.
 const NATURAL_QUALIFIERS: QualifierDescriptor[] = [
   {
     key: "version",
@@ -74,10 +51,6 @@ const NATURAL_QUALIFIERS: QualifierDescriptor[] = [
       return parts ? `${parts.core}${parts.suffix ? "…" : ""}` : null;
     },
   },
-  // The calendar date alone. A run's age is a reading of the same value that
-  // changes every day and doubles the length of every label carrying it; it
-  // belongs to the date's own display treatment (RunDateChip), not to the
-  // run's identity.
   { key: "run_date", value: (s) => (s.run_date ? formatRunDate(s.run_date) : null) },
   {
     key: "scale_factor",
@@ -95,11 +68,6 @@ const NATURAL_QUALIFIERS: QualifierDescriptor[] = [
   { key: "trust_label", value: (s) => (s.trust_label ? s.trust_label : null) },
 ];
 
-// Chart axes and legends are tight on space, and a run's age reads as noise
-// once truncated (e.g. a calendar date cut mid-string conveys nothing). The
-// 8-char run id already disambiguates runs that share every other qualifier,
-// so chart labels skip the date qualifier and let the id fallback do that
-// job instead. Tables and tooltips keep the date — it stays useful there.
 const NATURAL_QUALIFIERS_CHART: QualifierDescriptor[] = NATURAL_QUALIFIERS.filter(
   (qualifier) => qualifier.key !== "run_date",
 );
@@ -133,11 +101,6 @@ function compactIdToken(source: RunIdentitySource): string {
   return shortId && /^[0-9a-f]{8,}$/i.test(shortId) ? shortId : shortResultIdToken(source.result_id);
 }
 
-// Cohort-aware qualifier list: natural qualifiers, then the trailing
-// result_id token for compact disambiguation, then the full result_id as
-// a guaranteed-unique terminal fallback. BenchBox result_ids end in the
-// content hash segment, so the trailing token distinguishes typical
-// same-platform duplicate runs without appending their shared prefix.
 function describeCohortQualifierSlots(source: RunIdentitySource, qualifiers: readonly QualifierDescriptor[]): QualifierSlot[] {
   const slots: QualifierSlot[] = [];
   for (const qualifier of qualifiers) {
@@ -216,9 +179,6 @@ function joinForVariant(base: string, qualifiers: string[], variant: RunIdentity
   switch (variant) {
     case "compact":
     case "chart":
-      // Chart axes and tight legends — show every qualifier the cohort
-      // needs to remain distinguishable, space-separated. Stripping any
-      // qualifier would re-introduce duplicates.
       return `${base} ${qualifiers.join(" ")}`;
     case "table":
     case "selectOption":
@@ -230,52 +190,25 @@ function joinForVariant(base: string, qualifiers: string[], variant: RunIdentity
   }
 }
 
-/**
- * Single-source formatter. Use this when the caller does not have a
- * cohort context. The output always includes the platform name and may
- * include the highest-priority qualifier(s).
- *
- * For chart axes and tight legends prefer the cohort-aware
- * `formatRunIdentitiesForCohort`, which only attaches qualifiers when
- * the cohort has duplicates.
- */
 export function formatRunIdentity(source: RunIdentitySource, variant: RunIdentityVariant): string {
   return joinForVariant(source.platform, describeNaturalQualifiers(source), variant);
 }
 
-/**
- * Cohort-aware formatter. For each source in `sources`, returns the
- * shortest label (within the chosen variant) that is unique across the
- * cohort. Non-duplicates keep their plain platform name; duplicates
- * append qualifiers in priority order until they are distinguishable.
- *
- * The returned array is parallel to the input array, so call sites can
- * use it with the same indexing as their existing data structures.
- */
 export function formatRunIdentitiesForCohort(
   sources: readonly RunIdentitySource[],
   variant: RunIdentityVariant,
 ): string[] {
   const baseLabels = sources.map((source) => source.platform);
-  // Buckets of sources that currently share a base platform name.
   const bucketsByLabel = new Map<string, number[]>();
   baseLabels.forEach((label, i) => {
     if (!bucketsByLabel.has(label)) bucketsByLabel.set(label, []);
     bucketsByLabel.get(label)!.push(i);
   });
 
-  // Per-source qualifier slots (natural + last-resort ids). Chart labels use
-  // a date-free natural-qualifier set (see NATURAL_QUALIFIERS_CHART above).
   const qualifiers = qualifiersForVariant(variant);
   const slotsBySource = sources.map((source) => describeCohortQualifierSlots(source, qualifiers));
-  // Qualifiers selected for each source. Sources whose bucket has only one
-  // entry stay empty.
   const usedQualifiers = sources.map((): string[] => []);
 
-  // For every duplicate bucket, first try natural qualifiers only. Invariant
-  // natural qualifiers stay out of ordinary labels, but they remain ahead of
-  // result_id fallbacks for runs that otherwise have no distinguishing natural
-  // slot to use.
   for (const [, indices] of bucketsByLabel) {
     if (indices.length < 2) continue;
     const distinguishingKeys = distinguishingQualifierKeys(slotsBySource, indices);

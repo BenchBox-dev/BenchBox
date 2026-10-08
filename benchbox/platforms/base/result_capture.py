@@ -1,31 +1,3 @@
-"""Result capture, plan capture, and post-load validation helpers.
-
-Extracted from `benchbox.platforms.base.adapter` per the refactor map
-(`docs/development/adapter-refactor-map.md` Slice 5). Houses:
-
-- `_collect_resource_utilization` - psutil-based host + process metrics
-  snapshot attached to benchmark results.
-- `_reset_plan_capture_stats` - per-run plan-capture counter reset.
-- Plan capture pipeline: `display_query_plan_if_enabled`,
-  `get_query_plan`, `get_query_plan_parser`, `_record_plan_capture_failure`,
-  and `capture_query_plan` (EXPLAIN-output capture + parse + size guard).
-- `validate_loaded_data` / `validate_row_counts` - post-load database
-  validation entry points that delegate to `ValidationService` /
-  `DataValidator`.
-
-Instance attributes these methods read (initialized on the host adapter):
-- `query_plans_captured`, `plan_capture_failures`, `plan_capture_errors`
-- `capture_plans`, `analyze_plans`, `plan_query_filter`,
-  `plan_capture_timeout_seconds`, `strict_plan_capture`
-- `show_query_plans`, `enable_validation`
-- `platform_name` (property), `logger`
-- `platform_config` (raw config dict). Read for the raw_explain_output retention
-  policy via the optional ``plan_raw_output`` (full|truncated|none, default
-  truncated) and ``plan_raw_output_max_bytes`` (default 16 KiB) keys. The policy
-  governs only the verbatim EXPLAIN text retained on each captured plan; the
-  structured DAG and ``plan_fingerprint`` are always retained.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -86,14 +58,6 @@ _MATERIALIZED_RESULT_VALIDATOR: ContextVar[MaterializedResultValidator | None] =
 
 @contextmanager
 def materialized_result_validation(validator: MaterializedResultValidator) -> Iterator[None]:
-    """Apply a benchmark-local full-result oracle to one adapter execution.
-
-    A context variable keeps concurrent throughput streams isolated while
-    avoiding a public ``execute_query`` signature change across every adapter.
-    Platform implementations pass their already-materialized rows to the
-    shared result builder; the oracle runs after the adapter has captured the
-    measured execution duration.
-    """
     token = _MATERIALIZED_RESULT_VALIDATOR.set(validator)
     try:
         yield
@@ -102,7 +66,6 @@ def materialized_result_validation(validator: MaterializedResultValidator) -> It
 
 
 def materialized_result_validation_active() -> bool:
-    """Return whether the current adapter execution needs its full result rows."""
     return _MATERIALIZED_RESULT_VALIDATOR.get() is not None
 
 
@@ -111,7 +74,6 @@ def apply_materialized_result_validation(
     query_id: str,
     materialized_rows: MaterializedRowsSource | None,
 ) -> None:
-    """Apply the active benchmark-local oracle to a successful result in place."""
     materialized_validator = _MATERIALIZED_RESULT_VALIDATOR.get()
     if materialized_validator is None or result["status"] != "SUCCESS":
         return
@@ -128,40 +90,18 @@ def apply_materialized_result_validation(
 
 try:
     from benchbox.core.results.models import ExecutionPhases, QueryDefinition
-except ImportError:  # pragma: no cover - result models always present in real install
-    ExecutionPhases = None  # type: ignore[assignment, misc]
-    QueryDefinition = None  # type: ignore[assignment, misc]
+except ImportError:  # pragma: no cover
+    ExecutionPhases = None
+    QueryDefinition = None
 
 try:
     from benchbox.core.validation import ValidationResult
-except ImportError:  # pragma: no cover - validation always present in real install
-    ValidationResult = None  # type: ignore[assignment, misc]
+except ImportError:  # pragma: no cover
+    ValidationResult = None
 
 
-# A data-changing verb at the very start of the statement (word-bounded so an
-# identifier like ``COPYRIGHTS`` or ``MERGEABLE`` is not misread as DML).
-# REPLACE and UPSERT (MySQL/SingleStore/Doris family ``REPLACE INTO``/
-# ``UPSERT INTO``) are included defensively: no current ANALYZE-capturing
-# adapter emits a bare form of either today, but a future one would otherwise
-# be physically re-executed during capture, mutating data twice.
 _DML_LEADING_RE = re.compile(r"^(?:INSERT|UPDATE|DELETE|MERGE|COPY|REPLACE|UPSERT)\b", re.IGNORECASE)
-# A data-modifying verb anywhere — used only after a leading WITH to catch
-# CTE-prefixed DML (``WITH cte AS (...) INSERT INTO ...``). COPY is excluded:
-# it cannot appear inside a CTE, and its leading form is already caught above.
-# REPLACE requires a following INTO (unlike INSERT/UPDATE/DELETE/MERGE, which
-# match bare): REPLACE is also a common SQL string function
-# (``replace(col, 'a', 'b')``), so a bare-word match would false-positive on
-# any read-only CTE query that happens to call it, suppressing ANALYZE for a
-# statement that writes nothing. UPSERT has no such overloaded meaning, but is
-# held to the same ``INTO``-qualified form for consistency.
 _DML_AFTER_CTE_RE = re.compile(r"\b(?:INSERT|UPDATE|DELETE|MERGE)\b|\b(?:REPLACE|UPSERT)\s+INTO\b", re.IGNORECASE)
-# Write-producing DDL prefixes: CREATE TABLE ... AS <query> (CTAS) and
-# CREATE MATERIALIZED VIEW ... AS <query>. Both materialize the query's rows,
-# so EXPLAIN ANALYZE would write them a second time. The prefix alone is not
-# enough — _has_top_level_keyword() must also find a paren-depth-0 ``AS``
-# introducing a query, which keeps plain column DDL out: a generated column's
-# ``GENERATED ALWAYS AS (expr)`` and any literal text like ``DEFAULT 'AS
-# SELECT'`` sit inside the column-definition parentheses, so they never match.
 _CREATE_TABLE_PREFIX_RE = re.compile(
     r"^CREATE\s+(?:OR\s+REPLACE\s+)?(?:GLOBAL\s+|LOCAL\s+)?(?:TEMP(?:ORARY)?\s+|UNLOGGED\s+)?TABLE\b",
     re.IGNORECASE,
@@ -170,9 +110,6 @@ _CREATE_MATERIALIZED_VIEW_PREFIX_RE = re.compile(
     r"^CREATE\s+(?:OR\s+REPLACE\s+)?MATERIALIZED\s+VIEW\b",
     re.IGNORECASE,
 )
-# ``AS`` introducing a query body: optionally parenthesized SELECT/WITH/VALUES/
-# TABLE/FROM (DuckDB allows ``CREATE TABLE t AS FROM s``; PostgreSQL allows
-# ``CREATE TABLE t2 AS TABLE t1``).
 _AS_QUERY_RE = re.compile(r"AS\s*\(*\s*(?:SELECT|WITH|VALUES|TABLE|FROM)\b", re.IGNORECASE)
 _SELECT_LEADING_RE = re.compile(r"^SELECT\b", re.IGNORECASE)
 _WITH_LEADING_RE = re.compile(r"^WITH\b", re.IGNORECASE)
@@ -180,39 +117,18 @@ _WORD_CHARS_RE = re.compile(r"\w")
 
 
 def _plan_capture_key(query_id: Any, sql: str) -> str:
-    """Return a stable internal key for a measured query id + executed SQL pair."""
     sql_digest = hashlib.sha256(str(sql).encode("utf-8")).hexdigest()[:16]
     return f"{query_id}#{sql_digest}"
 
 
-# Matches the ``#<16-hex-digest>`` suffix that ``_plan_capture_key`` appends, so the
-# public query id can be recovered from an internal capture key for filter matching
-# (the isolated phase keys queries by the internal key, not the user-facing id).
 _PLAN_CAPTURE_KEY_SUFFIX_RE = re.compile(r"#[0-9a-f]{16}$")
 
 
 def _plan_capture_public_id(query_id: str) -> str:
-    """Recover the public query id from a capture key (``<public>#<digest>``).
-
-    ``--plan-queries`` filters on user-facing ids (``q1``), but the isolated
-    capture phase passes the internal :func:`_plan_capture_key` as the capture
-    query id. Stripping only the exact 16-hex digest suffix leaves a genuine
-    ``#``-bearing id untouched unless it actually ends in a capture digest.
-    """
     return _PLAN_CAPTURE_KEY_SUFFIX_RE.sub("", query_id)
 
 
 def _has_top_level_keyword(statement: str, keyword: str, followed_by: re.Pattern[str] | None = None) -> bool:
-    """Return True when ``keyword`` appears at paren depth 0 outside quotes.
-
-    Used to find the statement-level ``INTO`` of ``SELECT ... INTO <table>``
-    and the statement-level ``AS`` of CTAS / CREATE MATERIALIZED VIEW. The
-    scan skips single-quoted string literals (including ``''`` escapes) and
-    double-quoted identifiers, and ignores anything inside parentheses, so a
-    subquery's text, a literal like ``'INTO'``, or a generated-column ``AS``
-    in a column list never triggers a match. When ``followed_by`` is given,
-    the keyword only counts if that pattern matches at the keyword's position.
-    """
     keyword = keyword.upper()
     klen = len(keyword)
     depth = 0
@@ -224,7 +140,7 @@ def _has_top_level_keyword(statement: str, keyword: str, followed_by: re.Pattern
             i += 1
             while i < n:
                 if statement[i] == "'":
-                    if i + 1 < n and statement[i + 1] == "'":  # escaped '' inside literal
+                    if i + 1 < n and statement[i + 1] == "'":
                         i += 2
                         continue
                     break
@@ -247,7 +163,6 @@ def _has_top_level_keyword(statement: str, keyword: str, followed_by: re.Pattern
 
 
 def _strip_leading_sql_comments(statement: str) -> str:
-    """Drop leading ``--`` line comments and ``/* */`` block comments + whitespace."""
     statement = statement.lstrip()
     while True:
         if statement.startswith("--"):
@@ -265,54 +180,23 @@ def _strip_leading_sql_comments(statement: str) -> str:
 
 
 def is_dml_query(query: str) -> bool:
-    """Return True for statements that write data when executed.
-
-    Used to guard plan capture against double-execution: adapters that capture
-    plans via ``EXPLAIN ANALYZE`` (DuckDB, MotherDuck, PostgreSQL) physically
-    re-run the statement, so a data-writing query would mutate data twice.
-    Callers downgrade to a non-ANALYZE ``EXPLAIN`` for these statements.
-
-    Detection covers the data-modifying verbs INSERT/UPDATE/DELETE/MERGE/COPY/
-    REPLACE/UPSERT (including when they are preceded by a leading ``WITH`` CTE
-    clause) and the write-producing DDL shapes that materialize a query's rows:
-
-    - ``CREATE [OR REPLACE] TABLE ... AS <query>`` (CTAS)
-    - ``CREATE [OR REPLACE] MATERIALIZED VIEW ... AS <query>``
-    - ``SELECT ... INTO <table>``
-
-    Non-writing DDL (plain ``CREATE TABLE`` with column definitions,
-    ``CREATE INDEX``, ``DROP``, ``ALTER``, ``TRUNCATE``) is intentionally
-    excluded: re-running its EXPLAIN writes no rows, so it keeps ANALYZE where
-    applicable. Leading line and block comments are stripped first so a
-    commented preamble (e.g. a ``/* query 12 */`` banner) does not mask the
-    verb.
-    """
     statement = _strip_leading_sql_comments(query)
     if not statement:
         return False
     if _DML_LEADING_RE.match(statement):
         return True
-    # CTE-prefixed DML: the data-modifying verb follows the CTE definitions, so a
-    # leading-verb check alone misses it. Conservatively treat a WITH-prefixed
-    # statement that contains a DML verb as DML — worst case a read-only CTE
-    # query loses ANALYZE stats, which is far cheaper than a double mutation.
     if _WITH_LEADING_RE.match(statement) and _DML_AFTER_CTE_RE.search(statement):
         return True
-    # Write-producing DDL: CTAS and CREATE MATERIALIZED VIEW ... AS materialize
-    # the query's result rows, so EXPLAIN ANALYZE would write the data twice
-    # (or fail on "table already exists" for the non-REPLACE form).
     if (
         _CREATE_TABLE_PREFIX_RE.match(statement) or _CREATE_MATERIALIZED_VIEW_PREFIX_RE.match(statement)
     ) and _has_top_level_keyword(statement, "AS", followed_by=_AS_QUERY_RE):
         return True
-    # SELECT ... INTO <table> writes its result rows into a new table.
     if _SELECT_LEADING_RE.match(statement) and _has_top_level_keyword(statement, "INTO"):
         return True
     return False
 
 
 def _extract_result_field(result: Any, attr: str, default: Any = None) -> Any:
-    """Read ``attr`` from object or dict-style query result."""
     if hasattr(result, attr):
         return getattr(result, attr)
     if isinstance(result, dict):
@@ -321,28 +205,17 @@ def _extract_result_field(result: Any, attr: str, default: Any = None) -> Any:
 
 
 def _coerce_time_seconds(result: Any) -> float | None:
-    """Convert an explicitly-unit-tagged query duration to seconds.
-
-    Duration aliases retain the canonical adapter's validation and explicit
-    units without coupling this field-specific summary to unrelated legacy
-    fields such as ``rows_returned``.
-    """
     duration_ms = query_duration_ms_from_legacy(result)
     return None if duration_ms is None else duration_ms / 1000.0
 
 
 def _build_latency_stats(values: list[float]) -> dict[str, Any] | None:
-    """Compute latency stats (min/max/mean/median/p90/p95/p99/stdev) in both units."""
 
     if not values:
         return None
 
     sorted_values = sorted(values)
     count = len(sorted_values)
-    # Percentiles and stdev delegate to the canonical core helpers so that
-    # result bundles and CLI/MCP surfaces report the same numbers.  Values
-    # are in seconds; convert to milliseconds for percentile_ms /
-    # sample_stdev_ms, then back to seconds for the seconds block.
     values_ms = [v * 1000.0 for v in sorted_values]
     stats_seconds = {
         "count": count,
@@ -362,16 +235,11 @@ def _build_latency_stats(values: list[float]) -> dict[str, Any] | None:
 
 
 def _build_numeric_stats(values: list[float]) -> dict[str, Any] | None:
-    """Compute basic numeric stats (min/max/mean/median/p90/p95/stdev)."""
     if not values:
         return None
 
     sorted_values = sorted(values)
     count = len(sorted_values)
-    # Row-count percentiles use the same nearest-rank definition as timing
-    # percentiles; percentile_ms is reused for its rank math (unit is
-    # irrelevant to the percentile) and sample_stdev_ms for stdev so that
-    # every surface shares one stdev definition (sample, not population).
     values_float = [float(v) for v in sorted_values]
     return {
         "count": count,
@@ -386,12 +254,6 @@ def _build_numeric_stats(values: list[float]) -> dict[str, Any] | None:
 
 
 def _collect_process_metrics(process: Any) -> dict[str, Any]:
-    """Collect per-process resource metrics. Returns empty dict on any failure.
-
-    Each metric is best-effort: psutil reports different attributes on different
-    OSes, and some (io_counters, num_fds, num_handles) are frequently missing.
-    We swallow per-metric failures rather than losing the whole snapshot.
-    """
     process_snapshot: dict[str, Any] = {}
     try:
         with process.oneshot():
@@ -428,7 +290,7 @@ def _collect_process_metrics(process: Any) -> dict[str, Any]:
                 process_snapshot["num_fds"] = None
 
             try:
-                process_snapshot["num_handles"] = process.num_handles()  # type: ignore[attr-defined]
+                process_snapshot["num_handles"] = process.num_handles()
             except Exception:
                 process_snapshot["num_handles"] = None
 
@@ -458,7 +320,7 @@ def _collect_process_metrics(process: Any) -> dict[str, Any]:
             except Exception:
                 process_snapshot["context_switches"] = None
 
-    except Exception:  # pragma: no cover - defensive safeguard
+    except Exception:  # pragma: no cover
         return {}
 
     return process_snapshot
@@ -467,7 +329,6 @@ def _collect_process_metrics(process: Any) -> dict[str, Any]:
 def _accumulate_query_metrics(
     query_results: list[Any],
 ) -> tuple[int, int, list[float], list[float], list[int], list[int], list[dict[str, Any]], dict[str, int]]:
-    """Walk query results once, accumulating the per-status metrics used in performance summary."""
     successes = 0
     skipped = 0
     durations_all: list[float] = []
@@ -527,32 +388,15 @@ def _accumulate_query_metrics(
 
 
 class ResultCaptureMixin:
-    """Mixin providing result capture, plan capture, and validation helpers.
-
-    Expects host class to expose `logger` and the plan-capture /
-    validation configuration attributes (initialized in
-    `PlatformAdapter.__init__`).
-    """
-
     logger: logging.Logger
 
     def _reset_plan_capture_stats(self) -> None:
-        """Reset plan capture counters for a new benchmark run."""
         self.query_plans_captured = 0
         self.plan_capture_failures = 0
         self.plan_capture_errors: list[dict[str, Any]] = []
-        # Isolated-phase recording buffer (see _execute_queries_by_type): cleared per
-        # run for symmetry with the other plan-capture state, so a prior run's
-        # recorded queries can never leak into the next.
         self._plan_capture_phase_active = False
         self._phase_recorded_queries: dict[str, str] = {}
-        # Guards the one-time analyze_plans=True re-execution notice in
-        # capture_query_plan; reset per run so each run gets its own notice.
         self._analyze_plans_notice_printed = False
-        # The lock is created in PlatformAdapter.__init__; create it defensively
-        # for hosts that reset stats without going through __init__ (e.g. tests
-        # that mix in this class directly). Reset runs before any worker threads
-        # spawn, so installing the lock here is safe.
         if not hasattr(self, "_plan_capture_lock"):
             self._plan_capture_lock = threading.Lock()
 
@@ -562,12 +406,6 @@ class ResultCaptureMixin:
         connection: Any | None = None,
         platform_info: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Return normalized runtime/deployment metadata for result construction.
-
-        Subclasses may override this optional hook to provide richer observed
-        metadata. The default maps legacy ``get_platform_info()`` output into
-        conservative normalized blocks.
-        """
         return build_default_normalized_result_metadata(
             self,
             connection=connection,
@@ -575,7 +413,6 @@ class ResultCaptureMixin:
         )
 
     def _collect_resource_utilization(self) -> dict[str, Any]:
-        """Collect host and process resource utilization metrics when possible."""
         snapshot: dict[str, Any] = {
             "available": False,
             "platform": platform.platform(),
@@ -595,17 +432,16 @@ class ResultCaptureMixin:
 
         try:
             process = psutil.Process(os.getpid())
-        except Exception:  # pragma: no cover - defensive safeguard
+        except Exception:  # pragma: no cover
             process = None
 
-        # CPU metrics
         cpu_percent = None
         per_cpu_percent: list[float] | None = None
         try:
-            psutil.cpu_percent(interval=None)  # Prime measurement for accuracy
+            psutil.cpu_percent(interval=None)
             cpu_percent = psutil.cpu_percent(interval=0.0)
             per_cpu_percent = psutil.cpu_percent(interval=0.0, percpu=True)
-        except Exception:  # pragma: no cover - defensive safeguard
+        except Exception:  # pragma: no cover
             cpu_percent = None
             per_cpu_percent = None
 
@@ -614,24 +450,23 @@ class ResultCaptureMixin:
 
         try:
             load_avg = psutil.getloadavg()
-        except Exception:  # pragma: no cover - not available on Windows
+        except Exception:  # pragma: no cover
             load_avg = None
         snapshot["cpu"]["load_average"] = load_avg
 
         try:
             freq = psutil.cpu_freq()
             snapshot["cpu"]["frequency_mhz"] = freq.current if freq else None
-        except Exception:  # pragma: no cover - platform dependent
+        except Exception:  # pragma: no cover
             snapshot["cpu"]["frequency_mhz"] = None
 
         try:
             counted = psutil.cpu_count()
             if counted:
                 snapshot["cpu_count"] = counted
-        except Exception:  # pragma: no cover - fallback to os.cpu_count()
+        except Exception:  # pragma: no cover
             pass
 
-        # Memory metrics
         try:
             vm = psutil.virtual_memory()
             snapshot["memory"] = {
@@ -640,7 +475,7 @@ class ResultCaptureMixin:
                 "used_mb": round((vm.total - vm.available) / (1024 * 1024), 2),
                 "percent": vm.percent,
             }
-        except Exception:  # pragma: no cover - defensive safeguard
+        except Exception:  # pragma: no cover
             snapshot["memory"] = None
 
         try:
@@ -650,10 +485,9 @@ class ResultCaptureMixin:
                 "used_mb": round(swap.used / (1024 * 1024), 2),
                 "percent": swap.percent,
             }
-        except Exception:  # pragma: no cover - optional
+        except Exception:  # pragma: no cover
             snapshot["swap"] = None
 
-        # Disk and network
         try:
             disk = psutil.disk_usage(str(Path.cwd()))
             snapshot["disk"] = {
@@ -663,7 +497,7 @@ class ResultCaptureMixin:
                 "free_mb": round(disk.free / (1024 * 1024), 2),
                 "percent": disk.percent,
             }
-        except Exception:  # pragma: no cover - defensive safeguard
+        except Exception:  # pragma: no cover
             snapshot["disk"] = None
 
         try:
@@ -674,7 +508,7 @@ class ResultCaptureMixin:
                 "read_ops": disk_io.read_count,
                 "write_ops": disk_io.write_count,
             }
-        except Exception:  # pragma: no cover - optional
+        except Exception:  # pragma: no cover
             snapshot["disk_io"] = None
 
         try:
@@ -685,16 +519,15 @@ class ResultCaptureMixin:
                 "packets_sent": net_io.packets_sent,
                 "packets_recv": net_io.packets_recv,
             }
-        except Exception:  # pragma: no cover - optional
+        except Exception:  # pragma: no cover
             snapshot["network_io"] = None
 
         try:
             boot_time = datetime.fromtimestamp(psutil.boot_time()).isoformat()
-        except Exception:  # pragma: no cover - optional
+        except Exception:  # pragma: no cover
             boot_time = None
         snapshot["boot_time"] = boot_time
 
-        # Process metrics
         process_snapshot = _collect_process_metrics(process) if process is not None else {}
 
         if process_snapshot:
@@ -709,18 +542,6 @@ class ResultCaptureMixin:
         return snapshot
 
     def display_query_plan_if_enabled(self, connection: Any, query: str, query_id: str) -> None:
-        """Display query execution plan if show_query_plans is enabled.
-
-        Suppressed while capture_plans is active: capture already runs EXPLAIN
-        in the isolated post-measurement phase, so displaying here would issue
-        EXPLAIN a second time. Centralized here (rather than at each call
-        site) so new adapters cannot accidentally double-EXPLAIN.
-
-        Args:
-            connection: Database connection
-            query: SQL query text
-            query_id: Query identifier
-        """
         if not self.show_query_plans:
             return
         if self.capture_plans:
@@ -735,32 +556,14 @@ class ResultCaptureMixin:
                 console.print(Panel.fit("Query Profiling Information", style="cyan"))
                 console.print(f"{query}")
                 console.print(plan)
-                console.print()  # Add spacing
+                console.print()
         except Exception as e:
             self.logger.debug(f"Failed to get query plan for {query_id}: {e}")
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get query execution plan for analysis.
-
-        Override this method in platform adapters to provide platform-specific plans.
-
-        Args:
-            connection: Database connection
-            query: SQL query text
-
-        Returns:
-            Query execution plan as string, or None if not available
-        """
         return None
 
     def get_query_plan_parser(self):
-        """Get query plan parser for this platform.
-
-        Override this method in platform adapters to provide platform-specific parser.
-
-        Returns:
-            QueryPlanParser instance or None if not available
-        """
         return None
 
     def _record_plan_capture_failure(
@@ -771,7 +574,6 @@ class ResultCaptureMixin:
         *,
         log_warning: bool = True,
     ) -> None:
-        """Record a plan capture failure and optionally raise in strict mode."""
         error_record = {
             "query_id": str(query_id),
             "platform": self.platform_name,
@@ -800,18 +602,6 @@ class ResultCaptureMixin:
             )
 
     def _resolve_raw_output_policy(self, query_id: str) -> tuple[str, int]:
-        """Resolve the raw_explain_output retention policy from ``platform_config``.
-
-        Read from ``platform_config`` (rather than a promoted ``self.<attr>``) so the
-        policy stays within the plan-serialization layer. A non-positive or
-        non-integer ``plan_raw_output_max_bytes`` is treated as misconfiguration and
-        falls back to the default cap with a warning, rather than silently nulling all
-        raw text (which a non-positive cap under the truncated policy would do).
-
-        Returns:
-            Tuple of (policy, max_bytes). Unknown policy values are normalized to the
-            default by ``apply_raw_output_policy``.
-        """
         plan_config = getattr(self, "platform_config", None) or {}
         policy = plan_config.get("plan_raw_output", DEFAULT_RAW_OUTPUT_POLICY)
         configured_max_bytes = plan_config.get("plan_raw_output_max_bytes", DEFAULT_RAW_OUTPUT_MAX_BYTES)
@@ -831,94 +621,14 @@ class ResultCaptureMixin:
         return policy, DEFAULT_RAW_OUTPUT_MAX_BYTES
 
     def capture_query_plan(self, connection: Any, query: str, query_id: str) -> tuple[Any, float]:
-        """Capture structured query plan using platform-specific parser.
-
-        Calls get_query_plan() to obtain EXPLAIN output and parses it into a QueryPlanDAG.
-        Returns timing information for observability of capture overhead.
-
-        By default (analyze_plans=False), DuckDB uses plain EXPLAIN (FORMAT JSON), which
-        captures the estimated plan without re-executing the query. Set
-        analyze_plans=True in the adapter config to opt into EXPLAIN (ANALYZE, FORMAT
-        JSON), which re-executes every captured SELECT once to include actual
-        per-operator timing and cardinality -- roughly 2x wall-clock cost for a
-        --capture-plans run and perturbed cache state. The first time this method
-        actually captures a plan with analyze_plans enabled for a run, it prints a
-        one-time notice (see the ``_analyze_plans_notice_printed`` guard below).
-
-        Plan fingerprints exclude timing/cardinality by design - structural comparisons
-        are unaffected by this setting. See the plan fingerprint stability contract in
-        ``benchbox/core/results/query_plan_models.py`` for what fingerprint equality
-        does and does not guarantee.
-
-        Capture timing (pre- vs. post-execution) — design decision:
-            All adapters capture the plan AFTER the timed execution block (the
-            "post-execution" plan). This is intentional and is the supported
-            default:
-              - With ``analyze_plans=True`` (opt-in) it yields the *actual* plan that
-                ran, including real per-operator timing/cardinality (EXPLAIN ANALYZE) —
-                the most useful artifact for profiling, at the cost of re-execution.
-              - The structural fingerprint is unaffected by post- vs. pre-execution
-                timing, because it excludes costs and row estimates. A plan captured
-                before vs. after execution hashes to the same fingerprint as long as
-                the planner's chosen shape is identical.
-            A pre-execution capture mode (plan as decided before any stats change)
-            would be marginally more stable for cross-run regression detection, but
-            is NOT implemented: the fingerprint's stats-independence already provides
-            that stability, so a separate timing mode is unnecessary. If a true
-            pre-execution plan is ever required, add an opt-in
-            ``capture_plan_timing: pre | post`` config (default ``post``) here rather
-            than changing the default behavior.
-
-        Multi-stream behavior (stream_id):
-            Plan capture is per-query-execution. In a multi-stream (concurrent)
-            run, each stream executes and captures its own plan independently, so
-            the result set contains one plan record per (query_id, stream_id) — the
-            plans are NOT deduplicated or averaged, preserving per-stream provenance.
-            Because the fingerprint is structural, every stream running the same
-            query against the same schema on the same engine version is expected to
-            produce the SAME plan_fingerprint (with the engine-dependent caveat in
-            query_plan_models.py that some parsers, e.g. DuckDB, fold an estimated
-            cardinality into the signature — identical across streams as long as the
-            cardinality estimate is stable). Only the execution stats
-            (timing/per-operator cardinality) differ between streams. Consumers that
-            want a single representative plan per query should deduplicate by
-            ``plan_fingerprint``; a fingerprint mismatch across streams of the same
-            query indicates a genuine plan-shape (or estimate) divergence worth
-            investigating.
-
-        Args:
-            connection: Database connection
-            query: SQL query text
-            query_id: Query identifier
-
-        Returns:
-            Tuple of (QueryPlanDAG | None, capture_time_ms)
-        """
         if not self.capture_plans:
             return None, 0.0
 
-        # Apply query filter if specified. This is query *selection* (which queries
-        # to capture), orthogonal to the retired per-iteration/per-stream sampling
-        # machinery: the canonical model captures each distinct query exactly once
-        # in the isolated post-measurement phase, so plan_first_n / plan_sampling_rate
-        # no longer exist.
-        # Match the filter against the public query id. The isolated capture
-        # phase passes the internal capture key (``<public>#<digest>``) as the
-        # capture query id, so filtering on the raw value would reject a normal
-        # ``--plan-queries q1`` and silently produce no plans. Fall back to the
-        # public id recovered from the key; the inline path passes a bare public
-        # id, which is unchanged by the recovery.
         if self.plan_query_filter and (
             query_id not in self.plan_query_filter and _plan_capture_public_id(query_id) not in self.plan_query_filter
         ):
             return None, 0.0
 
-        # ANALYZE re-execution is an explicit opt-in (analyze_plans defaults to
-        # False): print a one-time run-level notice the first time this path is
-        # about to actually capture a plan with it enabled, so a user who set
-        # analyze_plans=True is not surprised that --capture-plans runs now cost
-        # ~2x wall-clock and perturb cache state. Guarded by a per-run flag reset
-        # in _reset_plan_capture_stats so a fresh run gets its own notice.
         if self.analyze_plans and not getattr(self, "_analyze_plans_notice_printed", False):
             self._analyze_plans_notice_printed = True
             quiet_console.print(
@@ -928,17 +638,6 @@ class ResultCaptureMixin:
 
         start_time = time.perf_counter()
 
-        # Apply timeout protection for the EXPLAIN query. run_with_timeout runs
-        # get_query_plan on a daemon thread and returns promptly when the timeout
-        # fires. (The previous `with ThreadPoolExecutor` implementation blocked in
-        # shutdown(wait=True) on exit even after TimeoutError, so the timeout was
-        # cosmetic: a runaway EXPLAIN still stalled the caller until the database
-        # returned.) Trade-off, accepted by design: after a timeout the abandoned
-        # EXPLAIN thread keeps running — holding the connection — until the
-        # database returns, so a subsequent query issued on the same connection
-        # may contend with it. The previous behavior (stalling the runner for the
-        # full EXPLAIN duration) was strictly worse; full isolation is tracked by
-        # query-plan-capture-isolation-phase-design.
         try:
             explain_output, timed_out = run_with_timeout(
                 self.get_query_plan,
@@ -1022,21 +721,13 @@ class ResultCaptureMixin:
             )
             return None, capture_time_ms
 
-        # Apply the raw_explain_output retention policy before measuring bundle size,
-        # so the size guard reflects what is actually retained. The structured DAG and
-        # fingerprint are untouched; only the verbatim EXPLAIN text is governed.
         raw_output_policy, raw_output_max_bytes = self._resolve_raw_output_policy(query_id)
         plan.apply_raw_output_policy(raw_output_policy, raw_output_max_bytes)
 
         try:
-            # Size the plan as it will actually be serialized: deep nodes past
-            # plan_max_depth become a truncation marker rather than dropping the plan.
             size_kb = plan.estimate_serialized_size(max_depth=getattr(self, "plan_max_depth", DEFAULT_PLAN_MAX_DEPTH))
             size_kb /= 1024
             if size_kb > 100:
-                # Only suggest a stricter raw-output policy when raw text is still
-                # retained; if it is already dropped the bloat is the structured DAG,
-                # which a smaller plan_max_depth bounds.
                 hint = (
                     " Consider a stricter plan_raw_output policy (full|truncated|none)."
                     if plan.raw_explain_output
@@ -1063,33 +754,9 @@ class ResultCaptureMixin:
         query: str,
         query_id: str,
     ) -> None:
-        """Capture the query plan and merge the plan fields into ``result`` in place.
-
-        Encapsulates the per-adapter plan-capture block so it lives in exactly one
-        place. The SUCCESS guard is baked in universally: capture only runs when
-        ``capture_plans`` is enabled and the result succeeded, so a validation-
-        failed result never triggers a wasted EXPLAIN round-trip.
-
-        No-op when ``capture_plans`` is False or ``result["status"]`` is not
-        ``"SUCCESS"``. On success, sets ``query_plan`` and ``plan_fingerprint`` when
-        a plan was parsed (plus ``plan_fingerprint_normalized`` when the adapter's
-        ``normalize_plan_literals`` option is enabled), and always records
-        ``plan_capture_time_ms`` when measured.
-
-        Args:
-            result: Result dict to mutate in place.
-            connection: Database connection.
-            query: SQL query text.
-            query_id: Query identifier.
-        """
         if not getattr(self, "capture_plans", False) or result.get("status") != "SUCCESS":
             return
         if getattr(self, "_plan_capture_phase_active", False):
-            # Isolated-phase mode: do NOT run EXPLAIN inline (that would interleave
-            # capture with the timed query). Record the executed query so the
-            # post-measurement phase captures it exactly once per executed SQL.
-            # Written from concurrent throughput streams, so guard the buffer with
-            # the shared lock.
             recorded_id = result.get("query_id") or query_id
             if recorded_id is not None:
                 capture_key = _plan_capture_key(recorded_id, query)
@@ -1117,31 +784,6 @@ class ResultCaptureMixin:
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Run one query through the shared executor, then merge plan capture.
-
-        Firebolt, Presto/Trino, PostgreSQL, SingleStore, and Doris each wrapped
-        the shared cursor execution with the same two lines: delegate to the
-        parent executor, then merge SUCCESS-guarded plan fields into the
-        result. This method owns that idiom so the copies cannot drift; each
-        adapter keeps its thin ``execute_query`` override (and its platform
-        docstring) and forwards its own ``super().execute_query`` as
-        ``execute``. Adapters with genuinely different semantics — Redshift's
-        FAILED guard and display logic, pg_mooncake's transaction retry,
-        QuestDB's rewriter path — keep their bespoke overrides.
-
-        Args:
-            execute: Bound parent ``execute_query`` to delegate to.
-            connection: Database connection.
-            query: SQL query text.
-            query_id: Query identifier.
-            benchmark_type: Benchmark family for validation.
-            scale_factor: Scale factor for validation.
-            validate_row_count: Whether to validate row counts.
-            stream_id: Throughput stream identifier.
-
-        Returns:
-            Query result dict with plan fields merged when captured.
-        """
         result = execute(
             connection=connection,
             query=query,
@@ -1155,18 +797,7 @@ class ResultCaptureMixin:
         return result
 
     def validate_loaded_data(self, connection: Any, benchmark_type: str, scale_factor: float) -> ValidationResult:
-        """Validate database state after data loading using platform-specific methods.
-
-        Args:
-            connection: Database connection object
-            benchmark_type: Type of benchmark (e.g., 'tpcds', 'tpch')
-            scale_factor: Scale factor for the benchmark
-
-        Returns:
-            ValidationResult with database validation status
-        """
         if not self.enable_validation:
-            # Return a pass-through result if validation is disabled
             return ValidationResult(
                 is_valid=True,
                 errors=[],
@@ -1184,25 +815,14 @@ class ResultCaptureMixin:
         service = ValidationService()
         result = service.run_database(connection, benchmark_type, scale_factor)
 
-        # Include platform-specific details
         result.details.update({"platform": self.platform_name, "validation_enabled": True})
 
         return result
 
     def validate_row_counts(self, connection: Any, expected_counts: dict[str, int]):
-        """Validate actual row counts against expected counts.
-
-        Args:
-            connection: Database connection
-            expected_counts: Dictionary mapping table names to expected row counts
-
-        Returns:
-            ValidationResult with row count comparison results
-        """
         self.log_operation_start("Row count validation", f"{len(expected_counts)} tables to validate")
 
         try:
-            # Import here to avoid circular dependencies
             from benchbox.core.validation.data import DataValidator
 
             validator = DataValidator(self)
@@ -1223,17 +843,12 @@ class ResultCaptureMixin:
             result.add_error(f"Row count validation failed: {e}")
             return result
 
-    # -------------------------------------------------------------------------
-    # Performance summarization and result formatting helpers (extracted w9)
-    # -------------------------------------------------------------------------
-
     def _summarize_performance_characteristics(
         self,
         query_results: list[Any] | None,
         total_duration: float,
         total_rows_loaded: int,
     ) -> dict[str, Any]:
-        """Summarize performance characteristics for benchmark execution results."""
 
         summary: dict[str, Any] = {
             "total_duration_seconds": total_duration,
@@ -1311,36 +926,21 @@ class ResultCaptureMixin:
         return summary
 
     def _format_execution_time(self, execution_time_seconds: float) -> str:
-        """Format execution time with adaptive precision.
-
-        Args:
-            execution_time_seconds: Execution time in seconds
-
-        Returns:
-            Formatted time string with appropriate unit and precision
-        """
         if execution_time_seconds < 0.001:
-            # < 1ms: show as microseconds with 0 decimal places
             return f"{execution_time_seconds * 1000000:.0f}μs"
         elif execution_time_seconds < 1.0:
-            # < 1s: show as milliseconds with 1 decimal place
             return f"{execution_time_seconds * 1000:.1f}ms"
         elif execution_time_seconds < 60.0:
-            # < 1min: show as seconds with 2 decimal places
             return f"{execution_time_seconds:.2f}s"
         else:
-            # >= 1min: show as minutes:seconds
             minutes = int(execution_time_seconds // 60)
             seconds = execution_time_seconds % 60
             return f"{minutes}:{seconds:04.1f}"
 
-    # Derived from _BENCHMARK_FAMILY (TPC family members) + standalone benchmarks.
-    # Adding a derived benchmark to _BENCHMARK_FAMILY automatically registers it here.
     _KNOWN_BENCHMARK_IDS = frozenset(_BENCHMARK_FAMILY) | {"ssb", "clickbench"}
 
     @staticmethod
     def _normalize_known_benchmark_id(name: str) -> str | None:
-        """Normalize a benchmark label when it matches a known benchmark family."""
         benchmark_id = normalize_benchmark_id(name)
         if benchmark_id in ResultCaptureMixin._KNOWN_BENCHMARK_IDS:
             return benchmark_id
@@ -1348,7 +948,6 @@ class ResultCaptureMixin:
 
     @staticmethod
     def _class_name_benchmark_type(class_name: str) -> str | None:
-        """Resolve benchmark IDs from class-name patterns for non-TPC families."""
         benchmark_patterns = [
             ("amplab", "amplab"),
             ("h2odb", "h2odb"),
@@ -1376,31 +975,8 @@ class ResultCaptureMixin:
         result_digest: str | None = None,
         materialized_rows: MaterializedRowsSource | None = None,
     ) -> dict[str, Any]:
-        """Build query result dictionary with consistent validation field mapping.
-
-        This centralizes validation result processing to ensure all platform adapters
-        use the same field names and status mapping logic.
-
-        Args:
-            query_id: Query identifier
-            execution_time: Query execution time in seconds
-            actual_row_count: Number of rows returned
-            first_row: First row of results (optional)
-            validation_result: ValidationResult from QueryValidator (optional)
-            error: Error message if query failed (optional)
-            result_digest: Gate-only full-result value digest (optional). Present
-                only when BENCHBOX_EMIT_RESULT_DIGEST armed the value oracle; absent
-                on a normal run so the payload shape is unchanged.
-            materialized_rows: Full rows, or a lazy row supplier, for an active
-                benchmark-local structural oracle. Ignored when no oracle is active.
-
-        Returns:
-            Dictionary with standardized query result fields
-        """
-        # Import ValidationMode here to avoid circular dependency
         from benchbox.core.expected_results.models import ValidationMode
 
-        # Start with base result fields
         result_dict = {
             "query_id": str(query_id),
             "status": "FAILED" if error else "SUCCESS",
@@ -1415,18 +991,12 @@ class ResultCaptureMixin:
         if error:
             result_dict["error"] = error
 
-        # Include validation metadata if validation was performed
         if validation_result:
-            # Create nested validation object
             row_count_validation = {
                 "expected": validation_result.expected_row_count,
                 "actual": actual_row_count,
             }
 
-            # Correct SKIP vs PASSED vs FAILED mapping. SKIP means unevaluated
-            # and only applies to valid results: an invalid result (evaluated
-            # and failed, or failed-to-evaluate after a provider error) must
-            # surface as FAILED with its message, never as SKIPPED/SUCCESS.
             if validation_result.validation_mode == ValidationMode.SKIP and validation_result.is_valid:
                 row_count_validation["status"] = "SKIPPED"
                 if validation_result.warning_message:
@@ -1434,7 +1004,6 @@ class ResultCaptureMixin:
             elif validation_result.is_valid:
                 row_count_validation["status"] = "PASSED"
             else:
-                # Validation failed - mark query as FAILED
                 row_count_validation["status"] = "FAILED"
                 row_count_validation["error"] = validation_result.error_message
                 result_dict["status"] = "FAILED"
@@ -1461,20 +1030,6 @@ class ResultCaptureMixin:
         exception: Exception,
         log_error: bool = True,
     ) -> dict[str, Any]:
-        """Build standardized query failure result dictionary.
-
-        This centralizes error handling to ensure all platform adapters
-        use the same failure result format.
-
-        Args:
-            query_id: Query identifier
-            start_time: Query start time (from mono_time())
-            exception: The exception that occurred
-            log_error: Whether to log the error (default True)
-
-        Returns:
-            Dictionary with standardized failure result fields
-        """
         execution_time = elapsed_seconds(start_time)
 
         if log_error:
@@ -1503,16 +1058,6 @@ class ResultCaptureMixin:
         )
 
     def _build_dry_run_result(self, query_id: str) -> dict[str, Any]:
-        """Build standardized dry-run query result dictionary.
-
-        Used when dry_run_mode is enabled - SQL is captured but not executed.
-
-        Args:
-            query_id: Query identifier
-
-        Returns:
-            Dictionary with standardized dry-run result fields
-        """
         self.log_very_verbose(f"Captured query {query_id} for dry-run")
         execution = QueryExecution(
             query_id=query_id,
@@ -1537,22 +1082,9 @@ class ResultCaptureMixin:
     def _normalize_and_validate_file_paths(
         file_paths: list | Any,
     ) -> list[Path]:
-        """Normalize file paths to list and filter valid files.
-
-        This centralizes file path validation to ensure consistent handling
-        across all platform adapters during data loading.
-
-        Args:
-            file_paths: File path(s) - can be string, Path, or list
-
-        Returns:
-            List of valid Path objects (filtered by existence and size > 0)
-        """
-        # Normalize to list
         if not isinstance(file_paths, list):
             file_paths = [file_paths]
 
-        # Filter valid files
         valid_files = [Path(f) for f in file_paths if Path(f).exists() and Path(f).stat().st_size > 0]
 
         return valid_files
@@ -1571,10 +1103,8 @@ class ResultCaptureMixin:
         requested_config_hash=None,
         per_table_timings=None,
     ):
-        """Create a benchmark result indicating validation failure."""
         from datetime import datetime as _datetime
 
-        # Create basic execution phases
         setup_phase = SetupPhase(
             data_loading=data_loading_phase,
             schema_creation=schema_creation_phase,
@@ -1582,7 +1112,6 @@ class ResultCaptureMixin:
             post_load_maintenance=self.build_post_load_maintenance_phase(),
         )
 
-        # Create failed power test phase
         power_test_phase = PowerTestPhase(
             start_time=_datetime.now().isoformat(),
             end_time=_datetime.now().isoformat(),
@@ -1594,14 +1123,12 @@ class ResultCaptureMixin:
 
         execution_phases = ExecutionPhases(setup=setup_phase, power_test=power_test_phase)
 
-        # Get platform info
         try:
-            platform_info = self.get_platform_info(None)  # Connection might be invalid
+            platform_info = self.get_platform_info(None)
         except Exception:
             platform_info = {"error": "Could not retrieve platform info"}
         normalized_metadata = self.get_normalized_result_metadata(platform_info=platform_info)
 
-        # Create execution metadata
         execution_metadata = {
             "execution_timestamp": _datetime.now().isoformat(),
             "data_validation_failed": True,
@@ -1611,19 +1138,16 @@ class ResultCaptureMixin:
             "post_load_maintenance": self.get_post_load_maintenance_metadata(),
         }
 
-        # Calculate basic metrics
         total_rows_loaded = sum(table_stats.values()) if table_stats else 0
         data_size_mb = self._calculate_data_size(benchmark.output_dir) if hasattr(benchmark, "output_dir") else 0.0
 
-        # Create failed benchmark result
         return benchmark.create_enhanced_benchmark_result(
             platform=self.platform_name,
-            query_results=[],  # No queries were executed
+            query_results=[],
             execution_metadata=execution_metadata,
             phases=execution_phases,
             resource_utilization={},
             performance_characteristics={},
-            # Override defaults with failure status
             total_rows_loaded=total_rows_loaded,
             data_size_mb=data_size_mb,
             data_loading_time=loading_time,
@@ -1638,12 +1162,11 @@ class ResultCaptureMixin:
             tuning_source=getattr(self, "tuning_source", None),
             platform_info=platform_info,
             **normalized_metadata,
-            validation_status="FAILED",  # This is the key fix
+            validation_status="FAILED",
             validation_details=validation_phase.validation_details,
         )
 
     def _create_throughput_phase(self, throughput_result) -> ThroughputTestPhase | None:
-        """Convert throughput test outputs into structured execution metadata."""
         if throughput_result is None:
             return None
 
@@ -1651,12 +1174,6 @@ class ResultCaptureMixin:
 
         streams: list[ThroughputStream] = []
         total_queries_executed = 0
-        # Persisted execution_order is the flattened global order across all
-        # streams (matching the standard path and the global ORDER BY
-        # consumer in core.results.database). The stream-local ``position``
-        # slot is operational metadata only: persisting it would store
-        # overlapping values from different streams in one INTEGER NOT NULL
-        # column. A producer-supplied ``execution_order`` still wins.
         persisted_order = 0
 
         for stream_result in getattr(throughput_result, "stream_results", []) or []:
@@ -1753,7 +1270,6 @@ class ResultCaptureMixin:
 
     @staticmethod
     def _format_timestamp(value: Any) -> str:
-        """Convert numeric timestamps to ISO-8601 strings."""
         if isinstance(value, str) and value:
             return value
         if isinstance(value, (int, float)) and value > 0:
@@ -1761,7 +1277,6 @@ class ResultCaptureMixin:
         return datetime.now().isoformat()
 
     def _determine_overall_validation_status(self, validation_phase) -> str:
-        """Determine overall validation status from individual validation results."""
         if (
             validation_phase.row_count_validation == "FAILED"
             or validation_phase.schema_validation == "FAILED"
@@ -1780,13 +1295,12 @@ class ResultCaptureMixin:
     def _extract_query_definitions(
         self, benchmark, queries: dict[str, str], stream_id: str = "standard"
     ) -> dict[str, dict[str, QueryDefinition]]:
-        """Extract query definitions for storage optimization."""
         query_definitions = {stream_id: {}}
 
         for query_id, sql_text in queries.items():
             query_definitions[stream_id][query_id] = QueryDefinition(
                 sql=sql_text,
-                parameters={},  # For now, parameters are embedded in SQL
+                parameters={},
             )
 
         return query_definitions
@@ -1794,7 +1308,6 @@ class ResultCaptureMixin:
     def _create_standard_execution_phase(
         self, query_results: list[dict[str, Any]], stream_id: str = "standard"
     ) -> list[QueryExecution]:
-        """Convert compatibility dictionaries to canonical query executions."""
         query_executions = []
 
         for i, result in enumerate(query_results):
@@ -1811,15 +1324,6 @@ class ResultCaptureMixin:
         return query_executions
 
     def _setup_reused_database_phases(self, benchmark, connection: Any) -> tuple:
-        """Set up phases when database is being reused (skip schema creation and data loading).
-
-        When ``self.table_mode == "external"`` the reuse path still calls
-        ``create_external_tables`` so that VIEWs/external references are
-        recreated over the staged data files.
-
-        Returns:
-            Tuple of (schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved)
-        """
         if self.table_mode == "external":
             return self._setup_reused_external_phases(benchmark, connection)
 
@@ -1846,12 +1350,6 @@ class ResultCaptureMixin:
         return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, tuning_metadata_saved
 
     def _setup_reused_external_phases(self, benchmark, connection: Any) -> tuple:
-        """Set up external table phases when database is being reused.
-
-        Even when a database file is reused, external mode must recreate
-        VIEWs/external table references because the previous run may have
-        used native tables.
-        """
         if not self.supports_external_tables:
             raise RuntimeError(f"Platform '{self.platform_name}' does not support --table-mode external")
 
@@ -1874,7 +1372,6 @@ class ResultCaptureMixin:
         return schema_time, schema_creation_phase, loading_time, table_stats, data_loading_phase, False
 
     def _check_validation_failure(self, validation_phase) -> bool:
-        """Check if validation failed and log details. Returns True if validation failed."""
         if (
             validation_phase.row_count_validation == "FAILED"
             or validation_phase.schema_validation == "FAILED"
@@ -1893,16 +1390,6 @@ class ResultCaptureMixin:
         return False
 
     def _log_plan_capture_summary(self, query_results: list[dict[str, Any]]) -> None:
-        """Log a "Query plans: N/M captured" summary using the same row-derived,
-        unique-query-id stat that ends up in ``BenchmarkResults.query_plans_captured``
-        and the ``.plans.json`` companion (see ``adapter.py``'s canonical
-        ``compute_plan_capture_stats`` call site).
-
-        ``self.query_plans_captured`` is a per-variant counter (one increment per
-        distinct captured SQL text, e.g. once per seed-varied stream), so it
-        legitimately exceeds the unique-query-id count on any multi-stream run;
-        printing it here would contradict what the bundle actually contains.
-        """
         from benchbox.core.results.schema import compute_plan_capture_stats
 
         plans_captured, capture_failures, _errors = compute_plan_capture_stats(
@@ -1924,11 +1411,6 @@ class ResultCaptureMixin:
         *,
         power_workload_timing: tuple[str, str, int] | None = None,
     ) -> tuple:
-        """Build power/throughput test phases and return execution phases with metrics.
-
-        Returns:
-            Tuple of (execution_phases, total_exec_time)
-        """
         from datetime import datetime as _datetime
 
         successful_queries = len([r for r in query_results if r["status"] == "SUCCESS"])
@@ -1938,8 +1420,6 @@ class ResultCaptureMixin:
         if self.capture_plans:
             self._log_plan_capture_summary(query_results)
 
-        # When a fallback occurred (e.g. throughput requested but unsupported),
-        # _effective_execution_type reflects the actual execution shape.
         eet = run_config.get("_effective_execution_type")
         execution_type = eet if eet is not None else run_config.get("test_execution_type", "standard")
 
@@ -1950,11 +1430,6 @@ class ResultCaptureMixin:
 
         power_test_phase = None
         if execution_type not in {"throughput"}:
-            # Only a standalone executed power workload supplies wall boundaries.
-            # Keep query aggregates independent for latency and cost consumers;
-            # combined/maintenance callers retain their existing phase accounting.
-            # Wall-based effective cost per hour uses this phase duration, while
-            # query-based spend inputs remain unchanged.
             start_time, end_time, duration_ms = power_workload_timing or (
                 _datetime.now().isoformat(),
                 _datetime.now().isoformat(),
@@ -1982,11 +1457,6 @@ class ResultCaptureMixin:
         return execution_phases, total_exec_time, power_test_phase, throughput_test_phase
 
     def _build_execution_metadata(self, run_config: dict) -> tuple:
-        """Build execution metadata and system profile.
-
-        Returns:
-            Tuple of (execution_metadata, system_profile, anonymous_machine_id)
-        """
         try:
             from benchbox.core.results.anonymization import (
                 AnonymizationConfig,
@@ -1994,8 +1464,6 @@ class ResultCaptureMixin:
             )
             from benchbox.utils.system_info import get_system_info
 
-            # Soft-read env salt when present so capture-side machine ids match
-            # salted public export. Unset salt keeps the empty OSS default.
             anonymization_manager = AnonymizationManager(AnonymizationConfig.from_public_environ())
             system_info = get_system_info()
             system_profile = system_info.to_dict()
@@ -2012,7 +1480,6 @@ class ResultCaptureMixin:
             "python_version": platform.python_version(),
             "benchbox_version": "0.1.0",
             "mode": "sql",
-            # Canonical slug propagated by the runner from BenchmarkConfig.name.
             "benchmark_id": run_config.get("benchmark_name"),
             "run_config": {
                 "compression": {
@@ -2061,7 +1528,6 @@ class ResultCaptureMixin:
         return execution_metadata, system_profile, anonymous_machine_id
 
     def _build_tuning_profile_metadata(self, run_config: dict) -> dict[str, Any] | None:
-        """Build workload-profile tuning metadata without making result capture brittle."""
         try:
             from benchbox.core.tuning.profile_validation import build_tuning_profile_metadata
 
@@ -2071,7 +1537,7 @@ class ResultCaptureMixin:
                 platform=getattr(self, "platform_name", None),
                 tuning_config=effective_config,
             )
-        except Exception as exc:  # pragma: no cover - metadata must not fail result capture
+        except Exception as exc:  # pragma: no cover
             logger = getattr(self, "logger", None)
             if logger is not None:
                 logger.debug("Unable to build tuning profile metadata: %s", exc)

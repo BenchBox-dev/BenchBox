@@ -1,12 +1,4 @@
-"""Fast-lane coverage tests for FabricWarehouseAdapter (w17).
-
-Covers uncovered branches and methods: service principal partial validation,
-create_schema, load_data, check_server_database_exists, get_query_plan,
-analyze_table, apply_platform_optimizations, apply_constraint_configuration,
-supports_tuning_type, generate_tuning_clause, _optimize_table_definition.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -24,14 +16,8 @@ from benchbox.platforms.fabric_warehouse import FabricWarehouseAdapter
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-# ---------------------------------------------------------------------------
-# Fixture helpers
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture()
 def _fabric_stubs(monkeypatch):
-    """Patch pyodbc and dep-check so tests don't need real drivers."""
     mock_pyodbc = MagicMock()
     mock_pyodbc.Error = Exception
     monkeypatch.setattr(fabric_module, "pyodbc", mock_pyodbc)
@@ -48,11 +34,6 @@ def adapter(_fabric_stubs):
     )
 
 
-# ---------------------------------------------------------------------------
-# __init__ service principal partial validation
-# ---------------------------------------------------------------------------
-
-
 class TestServicePrincipalValidation:
     def test_missing_only_client_id(self, _fabric_stubs):
         with pytest.raises(ConfigurationError, match="client_id"):
@@ -62,7 +43,6 @@ class TestServicePrincipalValidation:
                 auth_method="service_principal",
                 client_secret="s",
                 tenant_id="t",
-                # client_id missing
             )
 
     def test_missing_only_client_secret(self, _fabric_stubs):
@@ -73,7 +53,6 @@ class TestServicePrincipalValidation:
                 auth_method="service_principal",
                 client_id="c",
                 tenant_id="t",
-                # client_secret missing
             )
 
     def test_missing_only_tenant_id(self, _fabric_stubs):
@@ -84,13 +63,7 @@ class TestServicePrincipalValidation:
                 auth_method="service_principal",
                 client_id="c",
                 client_secret="s",
-                # tenant_id missing
             )
-
-
-# ---------------------------------------------------------------------------
-# create_connection error branches
-# ---------------------------------------------------------------------------
 
 
 class TestCreateConnectionErrors:
@@ -105,11 +78,6 @@ class TestCreateConnectionErrors:
             adapter.create_connection()
 
 
-# ---------------------------------------------------------------------------
-# check_server_database_exists
-# ---------------------------------------------------------------------------
-
-
 class TestCheckServerDatabaseExists:
     def test_returns_true_when_connection_succeeds(self, adapter):
         mock_conn = MagicMock()
@@ -119,11 +87,6 @@ class TestCheckServerDatabaseExists:
     def test_returns_false_when_connection_fails(self, adapter):
         with patch.object(adapter, "create_connection", side_effect=ConnectionError("fail")):
             assert adapter.check_server_database_exists() is False
-
-
-# ---------------------------------------------------------------------------
-# get_platform_info - connection branches
-# ---------------------------------------------------------------------------
 
 
 class TestGetPlatformInfo:
@@ -141,11 +104,6 @@ class TestGetPlatformInfo:
         with patch.object(adapter, "create_connection", return_value=mock_conn):
             info = adapter.get_platform_info()
         assert info.get("version") == "SQL Server 2022"
-
-
-# ---------------------------------------------------------------------------
-# create_schema
-# ---------------------------------------------------------------------------
 
 
 class TestCreateSchema:
@@ -182,7 +140,6 @@ class TestCreateSchema:
         ):
             adp.create_schema(mock_benchmark, mock_conn)
 
-        # Should have executed CREATE SCHEMA check
         assert any("SCHEMA" in str(c) for c in mock_cursor.execute.call_args_list)
 
     def test_permission_error_raises_runtime_error(self, adapter, _fabric_stubs):
@@ -197,19 +154,12 @@ class TestCreateSchema:
             patch.object(adapter, "_optimize_table_definition", side_effect=Exception("permission denied")),
             patch.object(adapter, "drop_table"),
         ):
-            # The exception propagates as-is (not permission/read-only via pyodbc.Error)
             with pytest.raises(Exception):
                 adapter.create_schema(mock_benchmark, mock_conn)
 
 
-# ---------------------------------------------------------------------------
-# load_data
-# ---------------------------------------------------------------------------
-
-
 class TestLoadData:
     def test_loads_from_benchmark_tables(self, adapter, _fabric_stubs, tmp_path):
-        # Create fake data files
         data_file = tmp_path / "lineitem.tbl"
         data_file.write_text("1|2|3")
 
@@ -263,11 +213,6 @@ class TestLoadData:
         assert stats["lineitem"] == 500
 
 
-# ---------------------------------------------------------------------------
-# get_query_plan
-# ---------------------------------------------------------------------------
-
-
 class TestGetQueryPlan:
     def test_returns_plan_string(self, adapter):
         mock_cursor = MagicMock()
@@ -301,11 +246,6 @@ class TestGetQueryPlan:
         assert adapter.plan_capture_errors[-1]["reason"] == "explain_failed"
 
 
-# ---------------------------------------------------------------------------
-# analyze_table
-# ---------------------------------------------------------------------------
-
-
 class TestAnalyzeTable:
     def test_executes_statistics_update(self, adapter):
         mock_cursor = MagicMock()
@@ -317,8 +257,6 @@ class TestAnalyzeTable:
         assert "UPDATE STATISTICS" in str(mock_cursor.execute.call_args)
 
     def test_raises_on_pyodbc_error(self, adapter, _fabric_stubs):
-        """Must raise (not swallow) so gather_statistics()'s caller can detect
-        and record a real failure as status=FAILED."""
         mock_cursor = MagicMock()
         mock_cursor.execute.side_effect = _fabric_stubs.Error("stats failed")
         mock_conn = MagicMock()
@@ -329,23 +267,13 @@ class TestAnalyzeTable:
         mock_cursor.close.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# apply_platform_optimizations
-# ---------------------------------------------------------------------------
-
-
 class TestApplyPlatformOptimizations:
     def test_noop_when_config_is_none(self, adapter):
-        adapter.apply_platform_optimizations(None, MagicMock())  # should not raise
+        adapter.apply_platform_optimizations(None, MagicMock())
 
     def test_logs_when_config_present(self, adapter):
         config = MagicMock()
-        adapter.apply_platform_optimizations(config, MagicMock())  # should not raise
-
-
-# ---------------------------------------------------------------------------
-# apply_constraint_configuration
-# ---------------------------------------------------------------------------
+        adapter.apply_platform_optimizations(config, MagicMock())
 
 
 class TestApplyConstraintConfiguration:
@@ -356,11 +284,6 @@ class TestApplyConstraintConfiguration:
         pk_config = SimpleNamespace(enabled=True)
         fk_config = SimpleNamespace(enabled=True)
         adapter.apply_constraint_configuration(pk_config, fk_config, MagicMock())
-
-
-# ---------------------------------------------------------------------------
-# supports_tuning_type
-# ---------------------------------------------------------------------------
 
 
 class TestSupportsTuningType:
@@ -377,19 +300,9 @@ class TestSupportsTuningType:
         assert result is True
 
 
-# ---------------------------------------------------------------------------
-# generate_tuning_clause
-# ---------------------------------------------------------------------------
-
-
 class TestGenerateTuningClause:
     def test_returns_empty_string(self, adapter):
         assert adapter.generate_tuning_clause(MagicMock()) == ""
-
-
-# ---------------------------------------------------------------------------
-# _optimize_table_definition
-# ---------------------------------------------------------------------------
 
 
 class TestOptimizeTableDefinition:
@@ -401,18 +314,12 @@ class TestOptimizeTableDefinition:
     def test_no_schema_when_brackets_present(self, adapter):
         sql = "CREATE TABLE [dbo].[lineitem] (id INT)"
         result = adapter._optimize_table_definition(sql)
-        # Already has brackets, should pass through unchanged
         assert result == sql
 
     def test_no_match_returns_original(self, adapter):
         sql = "SELECT 1"
         result = adapter._optimize_table_definition(sql)
         assert result == sql
-
-
-# ---------------------------------------------------------------------------
-# from_config - warehouse key used as database
-# ---------------------------------------------------------------------------
 
 
 class TestFromConfig:
@@ -434,11 +341,6 @@ class TestFromConfig:
         }
         adp = FabricWarehouseAdapter.from_config(config)
         assert adp.database == "explicit_db"
-
-
-# ---------------------------------------------------------------------------
-# configure_for_benchmark
-# ---------------------------------------------------------------------------
 
 
 class TestConfigureForBenchmark:
@@ -481,10 +383,9 @@ class TestConfigureForBenchmark:
         mock_conn = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
-        adapter.configure_for_benchmark(mock_conn, "olap")  # should not raise
+        adapter.configure_for_benchmark(mock_conn, "olap")
 
     def test_result_cache_enabled_skips_query_store(self, adapter, _fabric_stubs):
-        """When disable_result_cache=False, query store block is skipped (branch 631→640)."""
         adapter.disable_result_cache = False
         mock_cursor = MagicMock()
         mock_conn = MagicMock()
@@ -500,12 +401,7 @@ class TestConfigureForBenchmark:
         mock_conn = MagicMock()
         mock_conn.cursor.side_effect = Exception("connection dead")
 
-        adapter.configure_for_benchmark(mock_conn, "tpch")  # should not raise
-
-
-# ---------------------------------------------------------------------------
-# test_connection - write failure branch
-# ---------------------------------------------------------------------------
+        adapter.configure_for_benchmark(mock_conn, "tpch")
 
 
 class TestTestConnection:
@@ -531,14 +427,8 @@ class TestTestConnection:
         assert result["write_capable"] is False
 
 
-# ---------------------------------------------------------------------------
-# create_schema - skip non-CREATE TABLE and null table name branches
-# ---------------------------------------------------------------------------
-
-
 class TestCreateSchemaBranches:
     def test_skips_non_create_table_statement(self, adapter, _fabric_stubs):
-        """Statements not starting with CREATE TABLE are skipped."""
         mock_cursor = MagicMock()
         mock_conn = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
@@ -552,11 +442,9 @@ class TestCreateSchemaBranches:
         ):
             adapter.create_schema(mock_benchmark, mock_conn)
 
-        # No CREATE TABLE → no table creation calls
         mock_cursor.execute.assert_not_called()
 
     def test_skips_when_extract_table_name_returns_none(self, adapter, _fabric_stubs):
-        """If _extract_table_name returns None, statement is skipped."""
         mock_cursor = MagicMock()
         mock_conn = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
@@ -573,7 +461,6 @@ class TestCreateSchemaBranches:
         mock_cursor.execute.assert_not_called()
 
     def test_pyodbc_non_permission_error_reraises(self, adapter, _fabric_stubs):
-        """pyodbc.Error not related to permissions re-raises without wrapping."""
         mock_cursor = MagicMock()
         mock_conn = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
@@ -591,11 +478,6 @@ class TestCreateSchemaBranches:
         ):
             with pytest.raises(_fabric_stubs.Error):
                 adapter.create_schema(mock_benchmark, mock_conn)
-
-
-# ---------------------------------------------------------------------------
-# load_data - manifest-based discovery and error branches
-# ---------------------------------------------------------------------------
 
 
 class TestLoadDataExtended:
@@ -633,7 +515,6 @@ class TestLoadDataExtended:
         assert stats["lineitem"] == 1000
 
     def test_use_onelake_false_uses_direct_path(self, adapter, _fabric_stubs, tmp_path):
-        """When use_onelake=False, _load_data_direct is called directly (line 868)."""
         adapter.use_onelake = False
         data_file = tmp_path / "lineitem.tbl"
         data_file.write_text("1|2|3")
@@ -646,7 +527,6 @@ class TestLoadDataExtended:
         assert stats["lineitem"] == 42
 
     def test_pyodbc_permission_error_raises_runtime(self, adapter, _fabric_stubs, tmp_path):
-        """pyodbc.Error with 'permission' raises RuntimeError (line 876)."""
         data_file = tmp_path / "lineitem.tbl"
         data_file.write_text("1|2|3")
         mock_conn = MagicMock()
@@ -661,7 +541,6 @@ class TestLoadDataExtended:
                 adapter.load_data(benchmark, mock_conn, tmp_path)
 
     def test_pyodbc_fallback_direct_also_fails(self, adapter, _fabric_stubs, tmp_path):
-        """Fallback _load_data_direct failure sets row count to 0 (lines 890-892)."""
         data_file = tmp_path / "lineitem.tbl"
         data_file.write_text("1|2|3")
         mock_conn = MagicMock()
@@ -676,14 +555,12 @@ class TestLoadDataExtended:
         assert stats["lineitem"] == 0
 
     def test_raises_when_no_manifest_and_no_tables_attr(self, adapter, tmp_path):
-        """Benchmark without tables attr and no manifest → ValueError (branch 840→845)."""
         mock_conn = MagicMock()
-        benchmark = object()  # no tables attribute, no manifest file
+        benchmark = object()
         with pytest.raises(ValueError, match="No data files found"):
             adapter.load_data(benchmark, mock_conn, tmp_path)
 
     def test_use_onelake_false_pyodbc_error_sets_zero(self, adapter, _fabric_stubs, tmp_path):
-        """use_onelake=False with pyodbc.Error sets row count to 0 (line 894)."""
         adapter.use_onelake = False
         data_file = tmp_path / "lineitem.tbl"
         data_file.write_text("1|2|3")
@@ -696,7 +573,6 @@ class TestLoadDataExtended:
         assert stats["lineitem"] == 0
 
     def test_generic_exception_sets_row_count_to_zero(self, adapter, _fabric_stubs, tmp_path):
-        """pyodbc fallback succeeds with 0 rows returned (lines 890-892 happy path)."""
         data_file = tmp_path / "lineitem.tbl"
         data_file.write_text("1|2|3")
         mock_conn = MagicMock()
@@ -708,11 +584,6 @@ class TestLoadDataExtended:
         ):
             stats, _, _ = adapter.load_data(benchmark, mock_conn, tmp_path)
         assert stats["lineitem"] == 0
-
-
-# ---------------------------------------------------------------------------
-# _load_data_direct - CSV reading and batch insertion
-# ---------------------------------------------------------------------------
 
 
 class TestLoadDataDirect:
@@ -735,7 +606,7 @@ class TestLoadDataDirect:
 
     def test_skips_empty_file(self, adapter, tmp_path):
         data_file = tmp_path / "lineitem.tbl"
-        data_file.write_text("")  # empty
+        data_file.write_text("")
 
         mock_conn = MagicMock()
         mock_conn.cursor.return_value = MagicMock()
@@ -744,7 +615,6 @@ class TestLoadDataDirect:
         assert row_count == 0
 
     def test_skips_empty_rows(self, adapter, tmp_path):
-        """Empty and blank lines in CSV are skipped (line 1026)."""
         from benchbox.platforms.base.data_loading import CsvDialect
 
         data_file = tmp_path / "lineitem.tbl"
@@ -761,7 +631,6 @@ class TestLoadDataDirect:
         assert row_count == 2
 
     def test_batches_large_file(self, adapter, tmp_path):
-        """Files with > 1000 rows trigger batch flushing."""
         from benchbox.platforms.base.data_loading import CsvDialect
 
         lines = "\n".join(f"{i}|val{i}" for i in range(1, 1502))
@@ -777,11 +646,9 @@ class TestLoadDataDirect:
             row_count = adapter._load_data_direct(mock_conn, "lineitem", [data_file])
 
         assert row_count == 1501
-        # Should have been called multiple times (mid-batch flushes + remainder)
         assert mock_cursor.execute.call_count >= 2
 
     def test_exactly_1000_rows_leaves_empty_final_batch(self, adapter, tmp_path):
-        """With exactly 1000 rows, final batch is empty after flush (branch 1039→1012)."""
         from benchbox.platforms.base.data_loading import CsvDialect
 
         lines = "\n".join(f"{i}|val{i}" for i in range(1, 1001))
@@ -797,11 +664,6 @@ class TestLoadDataDirect:
             row_count = adapter._load_data_direct(mock_conn, "lineitem", [data_file])
 
         assert row_count == 1000
-
-
-# ---------------------------------------------------------------------------
-# _load_data_via_onelake - COPY INTO execution
-# ---------------------------------------------------------------------------
 
 
 class TestLoadDataViaOnelake:
@@ -825,7 +687,6 @@ class TestLoadDataViaOnelake:
             row_count = adapter._load_data_via_onelake(mock_conn, "lineitem", [data_file])
 
         assert row_count == 100
-        # COPY INTO + COUNT(*) = 2 execute calls
         assert mock_cursor.execute.call_count == 2
 
     def test_parquet_copy_into(self, adapter, tmp_path):
@@ -849,7 +710,7 @@ class TestLoadDataViaOnelake:
 
     def test_skips_empty_file(self, adapter, tmp_path):
         data_file = tmp_path / "lineitem.tbl"
-        data_file.write_text("")  # zero bytes
+        data_file.write_text("")
 
         mock_cursor = MagicMock()
         mock_conn = MagicMock()
@@ -885,19 +746,8 @@ class TestLoadDataViaOnelake:
         assert row_count == 1
 
 
-# ---------------------------------------------------------------------------
-# _insert_batch - empty batch fast-path
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# test_connection - success and failure paths
-# ---------------------------------------------------------------------------
-
-
 class TestTestConnectionPaths:
     def test_write_capable_success_returns_true(self, adapter, _fabric_stubs):
-        """Lines 462-463: write test succeeds, write_capable=True."""
         mock_cursor = MagicMock()
         mock_cursor.fetchone.return_value = ("SQL Server 2022",)
         mock_conn = MagicMock()
@@ -911,17 +761,11 @@ class TestTestConnectionPaths:
         assert result["success"] is True
 
     def test_connection_failure_returns_error_dict(self, adapter):
-        """Lines 483-484: create_connection raises, returns error dict."""
         with patch.object(adapter, "create_connection", side_effect=Exception("auth failed")):
             result = adapter.test_connection()
 
         assert result["success"] is False
         assert "auth failed" in result["error"]
-
-
-# ---------------------------------------------------------------------------
-# _extract_table_name
-# ---------------------------------------------------------------------------
 
 
 class TestExtractTableName:

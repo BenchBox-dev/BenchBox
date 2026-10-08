@@ -1,5 +1,3 @@
-"""Authentication, tenancy, admission, and audit controls for remote MCP."""
-
 from __future__ import annotations
 
 import hashlib
@@ -34,13 +32,10 @@ WRITE_SCOPE = "benchbox:write"
 
 
 def _boot_identity() -> str:
-    """Return a stable identifier shared by processes in the current OS boot."""
     return repr(psutil.boot_time())
 
 
 class TokenIdentity(BaseModel):
-    """Trusted identity and permissions for one pre-provisioned bearer digest."""
-
     model_config = ConfigDict(frozen=True)
 
     token_sha256: str
@@ -51,7 +46,6 @@ class TokenIdentity(BaseModel):
     @field_validator("token_sha256")
     @classmethod
     def validate_digest(cls, value: str) -> str:
-        """Require a lowercase SHA-256 digest, never a raw credential."""
         normalized = value.strip().lower()
         if len(normalized) != 64 or any(char not in "0123456789abcdef" for char in normalized):
             raise ValueError("token_sha256 must be a 64-character hexadecimal SHA-256 digest")
@@ -59,8 +53,6 @@ class TokenIdentity(BaseModel):
 
 
 class AdmissionLimits(BaseModel):
-    """Durable request limits shared by every HTTP worker."""
-
     model_config = ConfigDict(frozen=True)
 
     requests_per_minute: int = Field(default=120, ge=1, le=100_000)
@@ -72,8 +64,6 @@ class AdmissionLimits(BaseModel):
 
 
 class JobLimits(BaseModel):
-    """Durable benchmark queue and recovery limits."""
-
     model_config = ConfigDict(frozen=True)
 
     queue_limit: int = Field(default=32, ge=1, le=100_000)
@@ -87,8 +77,6 @@ class JobLimits(BaseModel):
 
 
 class RemoteSecurityConfig(BaseModel):
-    """Fail-closed remote MCP security configuration."""
-
     model_config = ConfigDict(frozen=True)
 
     issuer_url: AnyHttpUrl
@@ -107,7 +95,6 @@ class RemoteSecurityConfig(BaseModel):
     @field_validator("allowed_hosts", "allowed_origins", "tokens")
     @classmethod
     def require_nonempty(cls, value: tuple[Any, ...]) -> tuple[Any, ...]:
-        """Reject incomplete remote security configuration."""
         if not value:
             raise ValueError("remote security allowlists and tokens must not be empty")
         return value
@@ -115,25 +102,21 @@ class RemoteSecurityConfig(BaseModel):
     @field_validator("allowed_platforms", "allowed_benchmarks")
     @classmethod
     def normalize_policy_names(cls, value: tuple[str, ...]) -> tuple[str, ...]:
-        """Normalize policy identifiers to the tool's comparison form."""
         return tuple(dict.fromkeys(item.strip().lower() for item in value if item.strip()))
 
     @model_validator(mode="after")
     def reject_ambiguous_token_digests(self) -> RemoteSecurityConfig:
-        """Ensure one bearer digest cannot resolve to multiple principals."""
         digests = [identity.token_sha256 for identity in self.tokens]
         if len(digests) != len(set(digests)):
             raise ValueError("token_sha256 values must be unique")
         return self
 
     def require_remote_tls(self) -> None:
-        """Require externally visible OAuth endpoints to use HTTPS."""
         if self.issuer_url.scheme != "https" or self.resource_server_url.scheme != "https":
             raise ValueError("remote MCP requires HTTPS issuer_url and resource_server_url")
 
 
 def load_remote_security_config(path: str | Path) -> RemoteSecurityConfig:
-    """Load validated security policy, resolving owned paths beside the config."""
     config_path = Path(path).expanduser().resolve(strict=True)
     try:
         raw = json.loads(config_path.read_text(encoding="utf-8"))
@@ -153,8 +136,6 @@ def load_remote_security_config(path: str | Path) -> RemoteSecurityConfig:
 
 
 class _TransportSecurityLogFilter(logging.Filter):
-    """Keep SDK rejection diagnostics without logging attacker headers."""
-
     def filter(self, record: logging.LogRecord) -> bool:
         message = record.getMessage()
         if message.startswith("Invalid Host header:"):
@@ -167,20 +148,16 @@ class _TransportSecurityLogFilter(logging.Filter):
 
 
 def configure_transport_security_logging() -> None:
-    """Install the idempotent SDK header-redaction filter."""
     logger = logging.getLogger("mcp.server.transport_security")
     if not any(isinstance(item, _TransportSecurityLogFilter) for item in logger.filters):
         logger.addFilter(_TransportSecurityLogFilter())
 
 
 class DigestTokenVerifier(TokenVerifier):
-    """Verify opaque bearer tokens against trusted SHA-256 digests."""
-
     def __init__(self, config: RemoteSecurityConfig):
         self._config = config
 
     async def verify_token(self, token: str) -> AccessToken | None:
-        """Return the configured identity without persisting or logging *token*."""
         digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
         for identity in self._config.tokens:
             if hmac.compare_digest(digest, identity.token_sha256):
@@ -197,8 +174,6 @@ class DigestTokenVerifier(TokenVerifier):
 
 @dataclass(frozen=True, slots=True)
 class Principal:
-    """Opaque stable identity used for ownership, limits, and audit."""
-
     principal_id: str
     client_id: str
     issuer: str | None
@@ -207,7 +182,6 @@ class Principal:
 
     @classmethod
     def from_access_token(cls, token: AccessToken) -> Principal:
-        """Derive an opaque identifier from all SDK principal components."""
         client_id, issuer, subject = principal_components(token)
         material = json.dumps([client_id, issuer, subject], separators=(",", ":"), ensure_ascii=True)
         principal_id = hashlib.sha256(material.encode("utf-8")).hexdigest()[:32]
@@ -215,7 +189,6 @@ class Principal:
 
 
 def authenticated_principal() -> Principal:
-    """Return the request principal or fail closed outside authenticated HTTP."""
     token = get_access_token()
     if token is None:
         raise MCPError(AUTHORIZATION_ERROR, "Authenticated principal required")
@@ -224,25 +197,19 @@ def authenticated_principal() -> Principal:
 
 @dataclass(frozen=True, slots=True)
 class WorkspacePaths:
-    """Server-owned paths for one authenticated tenant."""
-
     root: Path
     results_dir: Path
     charts_dir: Path
 
 
 class TenantWorkspaceProvider:
-    """Resolve request paths solely from the authenticated principal."""
-
     def __init__(self, workspace_root: Path):
         self._workspace_root = workspace_root.resolve()
 
     def paths_for(self, principal: Principal) -> WorkspacePaths:
-        """Return contained, server-owned paths for *principal*."""
         return self.paths_for_principal_id(principal.principal_id)
 
     def paths_for_principal_id(self, principal_id: str) -> WorkspacePaths:
-        """Return contained paths for a trusted persisted principal identifier."""
         root = (self._workspace_root / principal_id).resolve()
         root.relative_to(self._workspace_root)
         results_dir = root / "results"
@@ -252,25 +219,19 @@ class TenantWorkspaceProvider:
         return WorkspacePaths(root, results_dir, charts_dir)
 
     def current_results_dir(self) -> Path:
-        """Resolve the current request's result directory."""
         return self.paths_for(authenticated_principal()).results_dir
 
     def current_charts_dir(self) -> Path:
-        """Resolve the current request's chart directory."""
         return self.paths_for(authenticated_principal()).charts_dir
 
 
 @dataclass(frozen=True, slots=True)
 class AdmissionLease:
-    """A durable active admission ticket."""
-
     ticket_id: str
     principal_id: str
 
 
 class DurableSecurityStore:
-    """SQLite-backed rate, queue, lease, and redacted audit coordination."""
-
     def __init__(self, path: Path, limits: AdmissionLimits):
         self.path = path
         self.limits = limits
@@ -323,8 +284,6 @@ class DurableSecurityStore:
             self._begin(connection)
             metadata = connection.execute("SELECT boot_id FROM mcp_runtime_metadata WHERE singleton = 1").fetchone()
             if metadata is None:
-                # Preserve live state when migrating an existing database. Once
-                # recorded, later boots can be identified without timestamp races.
                 connection.execute(
                     "INSERT INTO mcp_runtime_metadata (singleton, boot_id) VALUES (1, ?)",
                     (boot_id,),
@@ -442,7 +401,6 @@ class DurableSecurityStore:
         return False
 
     async def admit(self, principal_id: str) -> AdmissionLease:
-        """Rate-limit, queue, and acquire a shared concurrency lease."""
         ticket_id = await anyio.to_thread.run_sync(self._enqueue, principal_id)
         deadline_start = mono_time()
         while not await anyio.to_thread.run_sync(self._try_promote, ticket_id, principal_id):
@@ -453,7 +411,6 @@ class DurableSecurityStore:
         return AdmissionLease(ticket_id, principal_id)
 
     def release(self, lease: AdmissionLease) -> None:
-        """Release a ticket idempotently."""
         with self._connect() as connection:
             connection.execute(
                 "DELETE FROM mcp_admission_tickets WHERE ticket_id = ? AND principal_id = ?",
@@ -461,7 +418,6 @@ class DurableSecurityStore:
             )
 
     def renew(self, lease: AdmissionLease) -> bool:
-        """Extend an active lease while its request is still running."""
         with self._connect() as connection:
             cursor = connection.execute(
                 """UPDATE mcp_admission_tickets SET lease_expires_at = ?
@@ -479,7 +435,6 @@ class DurableSecurityStore:
         execution_id: str | None = None,
         artifact_ref: str | None = None,
     ) -> None:
-        """Persist a bounded event without arguments, payloads, or credentials."""
         with self._connect() as connection:
             connection.execute(
                 """INSERT INTO mcp_audit_events
@@ -497,7 +452,6 @@ class DurableSecurityStore:
             )
 
     def audit_events(self) -> list[Mapping[str, Any]]:
-        """Return audit rows for verification and operator diagnostics."""
         with self._connect() as connection:
             rows = connection.execute("SELECT * FROM mcp_audit_events ORDER BY recorded_at, event_id").fetchall()
         return [dict(row) for row in rows]
@@ -534,8 +488,6 @@ READ_METHODS = frozenset(
 
 
 class RemoteSecurityMiddleware:
-    """Authorize and admit each remote tool call using durable shared state."""
-
     def __init__(self, config: RemoteSecurityConfig, store: DurableSecurityStore):
         self.config = config
         self.store = store
@@ -577,7 +529,6 @@ class RemoteSecurityMiddleware:
 
     @staticmethod
     def _result_refs(result: HandlerResult) -> tuple[str | None, str | None]:
-        """Extract only bounded identifiers from a tool result for audit."""
         payload: Mapping[str, Any] | None = result if isinstance(result, Mapping) else None
         if isinstance(result, CallToolResult):
             text = next((part.text for part in result.content if isinstance(part, TextContent)), None)
@@ -600,7 +551,6 @@ class RemoteSecurityMiddleware:
         )
 
     async def __call__(self, ctx: ServerRequestContext[Any, Any], call_next: CallNext) -> HandlerResult:
-        """Enforce policy around SDK dispatch without exposing raw inputs."""
         if ctx.request_id is None:
             return await call_next(ctx)
         principal = authenticated_principal()
@@ -631,7 +581,6 @@ class RemoteSecurityMiddleware:
         ctx: ServerRequestContext[Any, Any],
         call_next: CallNext,
     ) -> HandlerResult:
-        """Coordinate, dispatch, and audit one authenticated request."""
 
         lease: AdmissionLease | None = None
         try:
@@ -644,8 +593,6 @@ class RemoteSecurityMiddleware:
                 try:
                     result = await call_next(ctx)
                 except Exception as exc:
-                    # Capture inside the task group so AnyIO does not wrap a
-                    # protocol MCPError in an opaque ExceptionGroup.
                     dispatch_error = exc
                 finally:
                     task_group.cancel_scope.cancel()
@@ -679,7 +626,6 @@ class RemoteSecurityMiddleware:
         request_scope: anyio.CancelScope,
         lease_lost: anyio.Event,
     ) -> None:
-        """Heartbeat one active request without process-local authority."""
         interval = max(0.001, min(self.store.limits.lease_seconds / 3, 30.0))
         while True:
             await anyio.sleep(interval)
@@ -697,7 +643,6 @@ class RemoteSecurityMiddleware:
         execution_id: str | None = None,
         artifact_ref: str | None = None,
     ) -> None:
-        """Persist audit off the event loop."""
         await anyio.to_thread.run_sync(
             lambda: self.store.audit(
                 principal_id=principal_id,
@@ -711,8 +656,6 @@ class RemoteSecurityMiddleware:
 
 @dataclass(frozen=True, slots=True)
 class RemoteSecurityRuntime:
-    """Constructed remote security services shared by server and transport."""
-
     config: RemoteSecurityConfig
     verifier: DigestTokenVerifier
     workspaces: TenantWorkspaceProvider
@@ -721,7 +664,6 @@ class RemoteSecurityRuntime:
 
     @classmethod
     def from_file(cls, path: str | Path) -> RemoteSecurityRuntime:
-        """Construct the complete runtime from one validated config file."""
         config = load_remote_security_config(path)
         store = DurableSecurityStore(config.state_db, config.admission)
         return cls(
@@ -733,7 +675,6 @@ class RemoteSecurityRuntime:
         )
 
     def auth_settings(self) -> AuthSettings:
-        """Return SDK resource-server auth settings."""
         return AuthSettings(
             issuer_url=self.config.issuer_url,
             resource_server_url=self.config.resource_server_url,
@@ -745,12 +686,10 @@ PathProvider = Path | Callable[[], Path]
 
 
 def resolve_path_provider(provider: PathProvider) -> Path:
-    """Resolve a static local path or request-scoped tenant path."""
     if isinstance(provider, Path):
         return provider
     return Path(provider())
 
 
 def token_sha256(token: str) -> str:
-    """Return a provisioning digest without storing the token."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()

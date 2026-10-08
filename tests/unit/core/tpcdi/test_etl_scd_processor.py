@@ -1,5 +1,3 @@
-"""Coverage tests for remaining TPC-DI ETL SCD processing paths."""
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -41,12 +39,6 @@ class _Conn:
 
 
 def test_detect_scd_changes_trims_padded_strings_on_every_string_dtype() -> None:
-    """Whitespace-only differences are not SCD changes on any string dtype.
-
-    Pandas 3 stores text as StringDtype/str rather than object; the trim step
-    must key off string-ness, not ``dtype == object``, or padded values
-    create spurious dimension versions.
-    """
     scd = EnhancedSCDType2Processor(connection=_Conn())
     for dtype in ("str", object):
         merged = pd.DataFrame(
@@ -77,7 +69,7 @@ def test_scd_module_core_paths(tmp_path: Path):
             "Attr": [10, 20, 20],
         }
     )
-    # validation fail branch (duplicate business key)
+
     failed = scd.process_scd_changes(
         new_data=new_data,
         table_name="DimCustomer",

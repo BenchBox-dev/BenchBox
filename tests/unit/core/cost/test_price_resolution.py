@@ -1,18 +1,3 @@
-"""Fail-closed price resolution: unknown keys flag, designed buckets do not.
-
-Covers the acceptance criteria for fail-closed lookup semantics:
-
-- ``resolve_*`` is the only lookup API (no float-returning twin remains).
-- Quantity lookups return the same ``PriceResolution`` type as price lookups.
-- Every lookup strips whitespace before matching.
-- A designed bucket (``sa-east-1`` -> ``other``) does NOT set
-  ``fallback_used``; a catch-all guess (BigQuery ``africa-south1``) DOES.
-- The calculator still returns a ``QueryCost`` on fallback (never a 0.0
-  total from a failed lookup) but stamps ``pricing_details``.
-- Both over-trigger (valid non-US regions stay available) and
-  under-trigger (unknown keys are flagged) are probed.
-"""
-
 import pytest
 
 from benchbox.core.cost import pricing
@@ -41,7 +26,6 @@ pytestmark = [
 
 
 def test_no_float_returning_lookup_api_remains():
-    """The old get_* twins are gone; resolve_* is the only lookup API."""
     for name in [
         "get_athena_price_per_tb",
         "get_snowflake_credit_price",
@@ -59,7 +43,6 @@ def test_no_float_returning_lookup_api_remains():
 
 
 def test_quantity_lookups_return_price_resolution():
-    """Fabric SKU, Firebolt node, and Databricks size lookups share the type."""
     assert isinstance(resolve_fabric_sku_cu_count("f64"), PriceResolution)
     assert isinstance(resolve_firebolt_fbu_rate("m"), PriceResolution)
     assert isinstance(resolve_databricks_warehouse_dbu_per_hour("Medium"), PriceResolution)
@@ -68,7 +51,6 @@ def test_quantity_lookups_return_price_resolution():
 
 
 def test_every_lookup_strips_whitespace():
-    """Padded keys resolve to their own cell, never to a default."""
     assert resolve_fabric_sku_cu_count("F2048 ").value == 2048
     assert resolve_fabric_sku_cu_count("F2048 ").fallback_used is False
     assert resolve_firebolt_fbu_rate(" m ").fallback_used is False
@@ -83,7 +65,6 @@ def test_every_lookup_strips_whitespace():
 
 
 def test_designed_bucket_is_not_a_fallback():
-    """sa-east-1 resolves into the deliberately priced 'other' bucket."""
     snowflake = resolve_snowflake_credit_price("standard", "aws", "sa-east-1")
     assert snowflake.fallback_used is False
     redshift = resolve_redshift_node_price("dc2.large", "sa-east-1")
@@ -94,7 +75,6 @@ def test_designed_bucket_is_not_a_fallback():
 
 
 def test_catch_all_guess_is_a_fallback():
-    """BigQuery 'other' is a guess, not a priced region."""
     africa = resolve_bigquery_price_per_tb("africa-south1")
     assert africa.value == BIGQUERY_ON_DEMAND_PRICES["africa-south1"]
     assert africa.fallback_used is False
@@ -103,7 +83,6 @@ def test_catch_all_guess_is_a_fallback():
 
 
 def test_valid_non_us_regions_stay_available():
-    """Over-trigger probe: real non-US price differences are not fallbacks."""
     assert resolve_snowflake_credit_price("standard", "aws", "eu-west-1").fallback_used is False
     assert resolve_redshift_node_price("ra3.4xlarge", "eu-west-1").fallback_used is False
     assert resolve_bigquery_price_per_tb("europe-west1").fallback_used is False
@@ -113,7 +92,6 @@ def test_valid_non_us_regions_stay_available():
 
 
 def test_unknown_keys_are_flagged():
-    """Under-trigger probe: every silent default now carries the signal."""
     snowflake = resolve_snowflake_credit_price("nonexistent", "aws", "us-east-1")
     assert snowflake.fallback_used is True and snowflake.reason
     redshift = resolve_redshift_node_price("xx.mega", "us-east-1")
@@ -131,7 +109,6 @@ def test_unknown_keys_are_flagged():
 
 
 def test_athena_and_synapse_serverless_regional_rates():
-    """Priced regions return their own rate; omission and unknown regions flag."""
     assert resolve_athena_price_per_tb("us-east-1").value == 5.0
     assert resolve_athena_price_per_tb("eu-west-1").fallback_used is False
     assert resolve_athena_price_per_tb("ap-northeast-1").fallback_used is False
@@ -153,7 +130,6 @@ def test_athena_and_synapse_serverless_regional_rates():
 
 
 def test_unknown_databricks_warehouse_size_is_defaulted_at_extraction():
-    """An unmapped size keeps the conservative rate but cannot publish."""
     config: dict = {}
     defaulted: list = []
     _resolve_databricks_compute(
@@ -188,7 +164,6 @@ def test_unknown_databricks_warehouse_size_is_defaulted_at_extraction():
     ],
 )
 def test_fallback_still_returns_flagged_query_cost(platform, resource_usage, platform_config):
-    """A failed lookup yields a stamped QueryCost, never None and never 0.0."""
     calculator = CostCalculator()
     cost = calculator.calculate_query_cost(platform, resource_usage, platform_config)
     assert cost is not None
@@ -199,7 +174,6 @@ def test_fallback_still_returns_flagged_query_cost(platform, resource_usage, pla
 
 
 def test_known_keys_leave_no_unavailable_marker():
-    """Happy paths are byte-identical in shape to before: no marker stamped."""
     calculator = CostCalculator()
     cost = calculator.calculate_query_cost(
         "snowflake",

@@ -1,19 +1,4 @@
 #!/usr/bin/env python3
-"""Use Case: Cloud Cost Optimization
-
-Demonstrate strategies for minimizing cloud platform costs while maintaining
-acceptable performance for analytical workloads.
-
-Strategies covered:
-- Query subset selection (run fewer queries)
-- Scale factor optimization (smaller datasets)
-- Dry-run validation (preview before spending)
-- Result caching (avoid re-running queries)
-- Platform comparison (find cost-effective options)
-
-Usage:
-    python use_cases/cost_optimization.py --platform bigquery --dry-run
-"""
 
 from __future__ import annotations
 
@@ -27,7 +12,6 @@ sys.path.insert(0, str(_EXAMPLES_DIR))
 
 
 def main() -> int:
-    """Demonstrate cost optimization strategies."""
     parser = argparse.ArgumentParser(description="Cloud cost optimization strategies")
     parser.add_argument("--platform", default="bigquery", help="Cloud platform")
     parser.add_argument("--dry-run", action="store_true", help="Dry-run mode")

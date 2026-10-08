@@ -1,11 +1,3 @@
-/**
- * The three-to-four run layout: diverging heatmap and standings.
- *
- * A multi-run selection is a ranking problem, not a diff. These tests pin the
- * two properties that make the ranking honest -- one shared query set, and a
- * scale that preserves polarity.
- */
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -57,8 +49,6 @@ describe("the diverging scale", () => {
   });
 
   it("is symmetric in log space, so a 2x speedup and 2x slowdown are equal and opposite", () => {
-    // On a linear ratio scale they would not be: 0.5 is 0.5 below parity while
-    // 2.0 is 1.0 above it, which would render slowdowns as visually larger.
     const faster = divergingRatioPosition(0.5)!;
     const slower = divergingRatioPosition(2)!;
     expect(faster).toBeCloseTo(-slower, 12);
@@ -71,8 +61,6 @@ describe("the diverging scale", () => {
   });
 
   it("returns null for an unanswerable ratio rather than parity", () => {
-    // Defaulting to 0 would paint "we do not know" in the same colour as
-    // "identical to baseline" -- the specific misreading this must not invite.
     expect(divergingRatioPosition(null)).toBeNull();
     expect(divergingRatioPosition(0)).toBeNull();
     expect(divergingRatioPosition(Number.NaN)).toBeNull();
@@ -87,8 +75,6 @@ describe("disagreement spread", () => {
   });
 
   it("has no value when only one run could answer", () => {
-    // Reporting 0 would rank a query only one run answered as perfect
-    // consensus, putting it above genuinely-agreed queries.
     expect(queryDisagreementSpread([1, null])).toBeNull();
     expect(queryDisagreementSpread([])).toBeNull();
   });
@@ -108,7 +94,6 @@ describe("the heatmap grid", () => {
   });
 
   it("re-bases when the baseline changes", () => {
-    // Baseline drives everything downstream; no panel may keep the old one.
     const rebased = buildHeatmapRows(results, 1);
     const q1 = rebased.find((r) => r.queryId === "Q1")!;
     expect(q1.cells.map((c) => c.ratio)).toEqual([0.5, 1, 0.25]);
@@ -128,8 +113,6 @@ describe("the heatmap grid", () => {
       { query_id: "Q1", duration_ms: 0, status: "fail", run_type: "warmup", iter: 0, stream: null },
       { query_id: "Q1", duration_ms: 0, status: "fail", run_type: "measurement", iter: 1, stream: null },
     ];
-    // The publisher currently uses this generic reason even when every raw
-    // execution failed, so failure classification must inspect those rows.
     failed.display_timings[0]!.timing_exclusion_reason = "missing_timing";
     const excluded = run("excluded", [["Q1", null]]);
     excluded.display_timings[0]!.timing_exclusion_reason = "zero_timing";
@@ -209,7 +192,6 @@ describe("standings", () => {
   it("computes every geomean over the same shared query set", () => {
     const withGap = [...results, run("gap", [["Q1", 15], ["Q2", null]])];
     const { sharedQueryIds, totalQueryIds } = buildStandings(withGap, 0, ["a", "b", "c", "d"]);
-    // Q2 leaves EVERY run's denominator, not just the run that lacked it.
     expect(sharedQueryIds).toEqual(["Q1"]);
     expect(totalQueryIds).toBe(2);
   });
@@ -223,8 +205,6 @@ describe("standings", () => {
   });
 
   it("awards a query to a single fastest run and no one on a tie", () => {
-    // Ties awarding a win to each would let the counts exceed the query count
-    // and overstate every tied run.
     const tied = [run("x", [["Q1", 10]]), run("y", [["Q1", 10]]), run("z", [["Q1", 20]])];
     const { rows } = buildStandings(tied, 0, ["x", "y", "z"]);
     expect(rows.reduce((n, r) => n + r.queriesWon, 0)).toBe(0);
@@ -278,14 +258,14 @@ describe("heatmap limiter filtering", () => {
       ["Q3", 100],
     ]),
     run("alt1", [
-      ["Q1", 50], // 0.5x speedup
-      ["Q2", 200], // 2.0x slowdown
-      ["Q3", 100], // 1.0x parity
+      ["Q1", 50],
+      ["Q2", 200],
+      ["Q3", 100],
     ]),
     run("alt2", [
-      ["Q1", 40], // 0.4x speedup
-      ["Q2", 150], // 1.5x slowdown
-      ["Q3", 100], // 1.0x parity
+      ["Q1", 40],
+      ["Q2", 150],
+      ["Q3", 100],
     ]),
   ];
 
@@ -304,7 +284,7 @@ describe("heatmap limiter filtering", () => {
   it("orders by disagreement when limiter is 'movement'", () => {
     const rows = buildHeatmapRows(results, 0);
     const movement = filterHeatmapRows(rows, "movement", 0);
-    expect(movement[0]!.queryId).toBe("Q1"); // spread between 0.4x and 1.0x (1.32) > 1.0x and 2.0x (1.0)
+    expect(movement[0]!.queryId).toBe("Q1");
   });
 });
 
@@ -325,33 +305,26 @@ describe("coordinated baseline re-basing across panels", () => {
   ];
 
   it("re-bases heatmap ratios, standings, and speedup filters together when baseline switches", () => {
-    // Baseline = runA (index 0)
     const heatmapA = buildHeatmapRows(results, 0);
     const standingsA = buildStandings(results, 0, ["A", "B", "C"]);
     const speedupsA = filterHeatmapRows(heatmapA, "speedups", 0);
 
     expect(standingsA.rows.find((r) => r.resultId === "runA")!.isBaseline).toBe(true);
     expect(standingsA.rows.find((r) => r.resultId === "runA")!.ratioToBaseline).toBe(1);
-    // On Q2: runA=100, runB=50 (0.5x, speedup), runC=200 (2.0x, slowdown)
     expect(speedupsA.map((r) => r.queryId)).toContain("Q2");
 
-    // Baseline switches to runB (index 1)
     const heatmapB = buildHeatmapRows(results, 1);
     const standingsB = buildStandings(results, 1, ["A", "B", "C"]);
     const speedupsB = filterHeatmapRows(heatmapB, "speedups", 1);
 
-    // Standings panel: runB is now baseline, runA is not
     expect(standingsB.rows.find((r) => r.resultId === "runB")!.isBaseline).toBe(true);
     expect(standingsB.rows.find((r) => r.resultId === "runA")!.isBaseline).toBe(false);
 
-    // Heatmap panel: Q2 relative to runB (50ms): runA=100ms (2.0x, slowdown!), runB=1.0x, runC=200ms (4.0x, slowdown)
     const q2HeatmapB = heatmapB.find((r) => r.queryId === "Q2")!;
-    expect(q2HeatmapB.cells[0]!.ratio).toBeCloseTo(2, 6); // runA is now 2x slower than runB
-    expect(q2HeatmapB.cells[1]!.ratio).toBeCloseTo(1, 6); // runB is baseline
+    expect(q2HeatmapB.cells[0]!.ratio).toBeCloseTo(2, 6);
+    expect(q2HeatmapB.cells[1]!.ratio).toBeCloseTo(1, 6);
 
-    // Limiter panel: Q2 is no longer a speedup against runB!
     expect(speedupsB.map((r) => r.queryId)).not.toContain("Q2");
-    // But Q1 relative to runB (20ms): runA is 10ms (0.5x, speedup!)
     expect(speedupsB.map((r) => r.queryId)).toContain("Q1");
   });
 });
@@ -360,7 +333,7 @@ describe("competition ranking in standings", () => {
   it("assigns 'T-1' to tied runs and skips to 3", () => {
     const tiedRuns = [
       run("a", [["Q1", 100]]),
-      run("b", [["Q1", 100.2]]), // within 0.005 threshold
+      run("b", [["Q1", 100.2]]),
       run("c", [["Q1", 200]]),
     ];
     const { rows } = buildStandings(tiedRuns, 0, ["A", "B", "C"]);
@@ -380,9 +353,6 @@ describe("competition ranking in standings", () => {
   });
 
   it("does not transitively chain ties across non-tied endpoints", () => {
-    // 100 vs 100.4 is 0.4% (tied).
-    // 100.4 vs 100.8 is 0.398% (tied if pairwise).
-    // BUT 100 vs 100.8 is 0.8% (> 0.5% threshold: not tied with leader).
     const chainedRuns = [
       run("a", [["Q1", 100]]),
       run("b", [["Q1", 100.4]]),
@@ -416,18 +386,16 @@ describe("competition ranking in standings", () => {
 describe("missing evidence reporting in heatmap", () => {
   it("distinguishes baseline_missing from run_missing", () => {
     const results = [
-      run("base", [["Q1", 10], ["Q2", null]]), // base lacks Q2
-      run("alt", [["Q1", 20], ["Q2", 30]]),    // alt has Q2!
-      run("alt2", [["Q1", null], ["Q2", 40]]), // alt2 lacks Q1, has Q2
+      run("base", [["Q1", 10], ["Q2", null]]),
+      run("alt", [["Q1", 20], ["Q2", 30]]),
+      run("alt2", [["Q1", null], ["Q2", 40]]),
     ];
     const rows = buildHeatmapRows(results, 0);
     const q1 = rows.find((r) => r.queryId === "Q1")!;
     const q2 = rows.find((r) => r.queryId === "Q2")!;
 
-    // On Q1, alt2 has no timing -> run_missing
     expect(q1.cells[2]!.missingKind).toBe("run_missing");
 
-    // On Q2, base has no timing, but alt has 30ms -> baseline_missing
     expect(q2.cells[1]!.missingKind).toBe("baseline_missing");
     expect(q2.cells[1]!.timingMs).toBe(30);
   });
@@ -660,18 +628,14 @@ describe("measurement basis resolution for comparison", () => {
       ],
     };
 
-    // With 1 warmup query out of 2 logical queries: valid=1, coverage=50% (>= 50%),
-    // but valid < 2 -> insufficient_valid_queries for comparison and ranking
     const resolved1 = resolveResultsForBasis([rawRun], { passes: WARMUP, statistic: "median" });
     expect(resolved1[0]!.has_display_timing).toBe(true);
     expect(resolved1[0]!.valid_query_count).toBe(1);
     expect(resolved1[0]!.display_exclusion_reason).toBeNull();
     expect(resolved1[0]!.comparison_exclusion_reason).toBe("insufficient_valid_queries");
     expect(resolved1[0]!.ranking_exclusion_reason).toBe("insufficient_valid_queries");
-    // For unavailable Q2 under alternate basis, sample_count must be 0, not copied from default basis
     expect(resolved1[0]!.display_timings.find((t) => t.query_id === "Q2")!.sample_count).toBe(0);
 
-    // With 2 warmup queries out of 2 logical queries: valid=2 -> compare/rank safe
     const rawRun2: DetailResult = {
       ...rawRun,
       queries: [
@@ -754,9 +718,6 @@ describe("shared limiter query selection", () => {
   });
 
   it("ranks movement by full multi-run disagreement spread across opposite-direction candidates", () => {
-    // base=100
-    // Q1: alt1=50 (0.5x), alt2=200 (2.0x) -> spread is 4x (2 bits)
-    // Q2: alt1=300 (3.0x), alt2=300 (3.0x) -> spread is 3x (1.585 bits)
     const oppositeDirectionRuns = [
       run("base", [["Q1", 100], ["Q2", 100]]),
       run("alt1", [["Q1", 50], ["Q2", 300]]),

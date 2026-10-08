@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib.util
 import json
 import os
@@ -15,8 +16,18 @@ import check_comment_policy
 import pytest
 import run_comment_policy as policy_runner
 import yaml
-from check_comment_policy import allowed, check_ratchet, introduced, load_policy, main, scan_sources, source_paths
-from comment_syntax import Finding, javascript_requests, python_findings, scan, sql_comments
+from check_comment_policy import (
+    allowed,
+    check_ratchet,
+    expired_policy_findings,
+    introduced,
+    load_policy,
+    main,
+    scan_sources,
+    source_paths,
+)
+from comment_payloads import stdin_language
+from comment_syntax import Finding, javascript_requests, language, python_findings, scan, source_language, sql_comments
 from run_comment_policy import TRUSTED_FILES, parser_environment, resolve_base
 
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
@@ -166,9 +177,26 @@ def test_valid_directive_needs_exact_registry_identity() -> None:
     assert not allowed(Finding("a.py", 20, "comment", finding.text, "different"), registered, "")
 
 
-def test_expired_or_explanatory_exception_fails() -> None:
-    with pytest.raises(ValueError):
-        load_policy(json.dumps(policy(exceptions=[exception(expires="2000-01-01")])).encode())
+def test_expired_directive_is_reported_and_does_not_allow_source() -> None:
+    registered = load_policy(json.dumps(policy(exceptions=[exception(expires="2000-01-01")])).encode())
+    finding = Finding("a.py", 1, "comment", "# noqa: F401")
+    policy_findings = expired_policy_findings(registered)
+    assert json.loads(json.dumps(registered)) == registered
+    assert [finding.kind for finding in policy_findings] == ["policy-error"]
+    assert check_comment_policy.exit_status("strict", registered, policy_findings) == 1
+    assert check_comment_policy.exit_status("report", registered, policy_findings) == 0
+    assert check_comment_policy.exit_status("transition", policy(enforcement="advisory"), policy_findings) == 0
+    assert (
+        check_comment_policy.exit_status(
+            "transition", policy(enforcement="advisory"), policy_findings, policy_owner_failure=True
+        )
+        == 1
+    )
+    assert introduced(policy_findings, policy_findings, []) == []
+    assert not allowed(finding, registered, "# noqa: F401\n")
+
+
+def test_malformed_exception_still_fails_configuration_validation() -> None:
     with pytest.raises(ValueError):
         load_policy(json.dumps(policy(exceptions=[exception(kind="explanation")])).encode())
 
@@ -243,6 +271,60 @@ def test_transition_worktree_and_staged_content(tmp_path: Path) -> None:
     subprocess.run(["git", "-C", str(tmp_path), "add", "a.py"], check=True)
     (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
     assert main([*args, "--staged"]) == 1
+
+
+def test_expired_policy_fails_owner_transition_but_not_inherited_advisory(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    git_repo(tmp_path, "# noqa: F401\n")
+    advisory_policy = policy(enforcement="advisory")
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(advisory_policy), encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "quality/comment-policy.json"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=F",
+            "-c",
+            "user.email=f@e.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "advisory",
+        ],
+        check=True,
+    )
+    advisory_base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
+    expired = policy(enforcement="advisory", exceptions=[exception(consumer="a.py", expires="2000-01-01")])
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(expired), encoding="utf-8")
+    args = ["--root", str(tmp_path), "--mode", "transition", "--base", advisory_base]
+    assert main(args) == 1
+    assert "quality/comment-policy.json:1: CP policy-error" in capsys.readouterr().out
+    subprocess.run(["git", "-C", str(tmp_path), "add", "quality/comment-policy.json"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=F",
+            "-c",
+            "user.email=f@e.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "expired",
+        ],
+        check=True,
+    )
+    inherited_base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
+    (tmp_path / "a.py").write_text("# noqa: F401\nx = 1\n", encoding="utf-8")
+    assert main(["--root", str(tmp_path), "--mode", "transition", "--base", inherited_base]) == 0
+    assert "configuration or parser failure" not in capsys.readouterr().err
 
 
 def test_enforcement_value_is_validated_and_defaults_to_blocking() -> None:
@@ -806,6 +888,17 @@ def test_python_sql_context_avoids_docstrings_and_fstring_fragments() -> None:
     ]
 
 
+@pytest.mark.parametrize("keyword", ["query", "sql", "statement_sql"])
+def test_python_sql_context_routes_designated_keyword_arguments(keyword: str) -> None:
+    source = f'conn.execute({keyword}="SELECT 1 -- explanation")\n'
+    assert [f.text for f in python_findings("a.py", source)] == ["-- explanation"]
+
+
+def test_python_sql_context_rejects_unrelated_keyword_arguments() -> None:
+    assert not python_findings("a.py", 'conn.execute(timeout="SELECT 1 -- explanation")\n')
+    assert not python_findings("a.py", 'logger.info(message="not SQL -- explanation")\n')
+
+
 @pytest.mark.parametrize(
     "source", ["SELECT [1 /* explanation */, 2];", "SELECT 1 FROM t WHERE x = 1 AND [--flag] = 1;"]
 )
@@ -844,6 +937,81 @@ def test_zsh_shebang_is_minimum_directive() -> None:
 )
 def test_heredoc_arguments_and_script_input_are_data(source: str) -> None:
     assert not scan("a.sh", source, "bash")
+
+
+@pytest.mark.parametrize(
+    "header",
+    ["uv run --project . python -", "uv run --with pkg python -", "env -u FOO python -"],
+)
+def test_heredoc_wrapper_option_operands_reach_stdin_consumer(header: str) -> None:
+    assert [f.text for f in scan("a.sh", f"{header} <<'PY'\n# explanation\nPY\n", "bash")] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "FOO=bar python -",
+        "env FOO=bar python -",
+        'env -S "python -"',
+        'env --split-string="python -"',
+    ],
+)
+def test_heredoc_env_assignments_and_static_split_string_reach_stdin_consumer(header: str) -> None:
+    assert [f.text for f in scan("a.sh", f"{header} <<'PY'\n# explanation\nPY\n", "bash")] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "env -S \"$COMMAND\" <<'PY'\n# explanation\nPY\n",
+        "env -S \"python script.py -\" <<'PY'\n# input data\nPY\n",
+    ],
+)
+def test_heredoc_dynamic_or_wrong_stdin_interpreter_fails_closed(source: str) -> None:
+    findings = scan("a.sh", source, "bash")
+    if "script.py" in source:
+        assert not findings
+    else:
+        assert findings[0].kind == "coverage-error"
+
+
+def test_env_split_string_malformed_operand_fails_closed() -> None:
+    with pytest.raises(ValueError, match="malformed env split-string operand"):
+        stdin_language(["env", "-S", "'python -"])
+
+
+@pytest.mark.parametrize("operand", ["python - # ignored", r"python - \\c", "python - ${COMMAND}"])
+def test_env_split_string_special_gnu_syntax_fails_closed(operand: str) -> None:
+    with pytest.raises(ValueError, match="unsupported env split-string syntax"):
+        stdin_language(["env", "-S", operand])
+
+
+@pytest.mark.parametrize("operand", ["python - # ignored", r"python - \\c", "python - ${COMMAND}"])
+def test_env_split_string_special_syntax_is_reported_by_source_scan(operand: str) -> None:
+    findings = scan("a.sh", f"env -S '{operand}' <<'PY'\n# explanation\nPY\n", "bash")
+    assert findings[0].kind == "coverage-error"
+
+
+def test_heredoc_module_wrapper_requires_explicit_consumer_support() -> None:
+    findings = scan("a.sh", "uv run --module python - <<'PY'\n# explanation\nPY\n", "bash")
+    assert findings[0].kind == "coverage-error"
+
+
+def test_heredoc_unknown_wrapper_option_fails_closed() -> None:
+    findings = scan("a.sh", "uv run --unknown value python - <<'PY'\n# explanation\nPY\n", "bash")
+    assert findings[0].kind == "coverage-error"
+
+
+@pytest.mark.parametrize("command", ["python -", "uv run python -"])
+def test_conditional_heredoc_retains_executable_payload(command: str) -> None:
+    source = f"if {command} <<'PY'\n# explanation\npass\nPY\nthen\n  echo ok\nfi\n"
+    findings = scan("a.sh", source, "bash")
+    assert [(finding.line, finding.text) for finding in findings] == [(2, "# explanation")]
+
+
+def test_conditional_heredoc_unknown_consumer_fails_visibly() -> None:
+    source = "if \"$tool\" - <<'PY'\n# explanation\nPY\nthen\n  echo ok\nfi\n"
+    assert [finding.kind for finding in scan("a.sh", source, "bash")] == ["coverage-error"]
 
 
 def test_multiple_heredocs_and_continued_header() -> None:
@@ -1051,6 +1219,94 @@ def test_python_executable_strings_reach_scanner(source: str) -> None:
 
 
 @pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess, sys\nsubprocess.run([sys.executable, "-m", "pytest", "-c", config])',
+        'import subprocess\nsubprocess.run(["python3", "probe.py", "-c", config])',
+        'import subprocess\nsubprocess.run(["python3", "--", "probe.py", "-c", config])',
+        'import subprocess\nsubprocess.run(["pytest", "-c", config])',
+    ],
+)
+def test_application_options_are_not_executable_source(source: str) -> None:
+    assert not python_findings("a.py", source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run(["bash", "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", "echo ok # explanation"])',
+        'import subprocess\nsubprocess.run(["bash", "-e", "-c", "echo ok # explanation"])',
+        'import subprocess\nsubprocess.run(["bash", "+o", "pipefail", "-c", "echo ok # explanation"])',
+        'import subprocess\nsubprocess.run(["python3", "-W", "ignore", "-X", "dev", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["python3", "-I", "-B", "-c", "# explanation"])',
+    ],
+)
+def test_interpreter_options_preserve_inline_source_scanning(source: str) -> None:
+    assert [finding.text for finding in python_findings("a.py", source)] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run([program, "-c", source])',
+        'import subprocess\nsubprocess.run(["python3", option, "-c", source])',
+        'import subprocess\nsubprocess.run(["python3", "--unknown", "-c", source])',
+        'import subprocess\nsubprocess.run(["python3", "-W", option, "-c", source])',
+    ],
+)
+def test_unknown_inline_process_source_still_fails_visibly(source: str) -> None:
+    findings = python_findings("a.py", source)
+    assert [finding.kind for finding in findings] == ["payload-error"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run(["/bin/bash", "-e", "-c", "echo ok # explanation"])',
+        'import subprocess\nsubprocess.run(["/usr/bin/env", "-u", "IGNORED", "TOKEN=value", "python3", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["env", "-S", "python3 -c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["/usr/bin/uv", "run", "--with", "pkg", "--", "/usr/bin/python3", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["env", "uv", "run", "--", "python3", "-c", "# explanation"])',
+    ],
+)
+def test_wrapped_and_absolute_inline_interpreters_are_scanned(source: str) -> None:
+    assert [finding.text for finding in python_findings("a.py", source)] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run(["uv", "tree", "python3", "-c", "# input data"])',
+        'import subprocess\nsubprocess.run(["uv", "run", "pytest", "-c", "pytest.ini"])',
+    ],
+)
+def test_non_interpreter_wrapper_commands_are_not_inline_source(source: str) -> None:
+    assert not python_findings("a.py", source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run(["env", "--unknown", "python3", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["uv", "run", "--unknown", "python3", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["env", option, "python3", "-c", "# explanation"])',
+        'import subprocess\nsubprocess.run(["uv", "run", "python3", "-c", source])',
+        'import subprocess\nsubprocess.run(["env", "-S", "python3 -c $CODE"])',
+        'import subprocess\nsubprocess.run(["uv", "run", "--module", "python3", "-c", "# input data"])',
+        'import subprocess\nsubprocess.run(["env", "uv", "run", "--module", "python3", "-c", "# input data"])',
+    ],
+)
+def test_unknown_wrapper_execution_fails_visibly(source: str) -> None:
+    assert [finding.kind for finding in python_findings("a.py", source)] == ["payload-error"]
+
+
+def test_absolute_node_inline_source_reports_existing_adapter_gap() -> None:
+    source = 'import subprocess\nsubprocess.run(["/usr/bin/node", "-e", "// explanation"])'
+    findings = python_findings("a.py", source)
+    assert [(finding.kind, finding.payload) for finding in findings] == [("coverage-error", "// explanation")]
+
+
+@pytest.mark.parametrize(
     "source", ["exec(source)", 'code = code + "text"\nexec(code)', 'code = "before"\ncode = "after"\nexec(code)']
 )
 def test_python_unresolved_execution_fails_visibly(source: str) -> None:
@@ -1070,10 +1326,57 @@ def test_local_execution_names_and_ordinary_strings_are_data(source: str) -> Non
 
 
 @pytest.mark.parametrize(
-    "source", ['python3 -c "# explanation"', "eval 'echo ok # explanation'", "bash -lc 'echo ok # explanation'"]
+    "source",
+    [
+        'python3 -c "# explanation"',
+        "eval 'echo ok # explanation'",
+        "bash -lc 'echo ok # explanation'",
+        "VALUE=$(python3 -c '# explanation' || true\n)",
+    ],
 )
 def test_shell_executable_arguments_are_routed(source: str) -> None:
     assert [f.text for f in scan("a.sh", source, "bash")] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "bash -e -o pipefail -c 'echo ok # explanation'",
+        "bash +o pipefail -c 'echo ok # explanation'",
+        "python3 -W ignore -X dev -c '# explanation'",
+        "env -u UNUSED TOKEN=value /usr/bin/python3 -c '# explanation'",
+        "uv run --with pkg -- /usr/bin/python3 -c '# explanation'",
+    ],
+)
+def test_shell_uses_shared_interpreter_option_semantics(source: str) -> None:
+    assert [finding.text for finding in scan("a.sh", source, "bash")] == ["# explanation"]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "python3 -m pytest -c '# input data'",
+        "python3 probe.py -c '# input data'",
+        "uv tree python3 -c '# input data'",
+        "pytest python3 -c '# input data'",
+    ],
+)
+def test_shell_application_arguments_are_not_executable_source(source: str) -> None:
+    assert not scan("a.sh", source, "bash")
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "python3 --unknown -c '# explanation'",
+        'bash "$OPTIONS" -c "echo ok # explanation"',
+        "env --unknown python3 -c '# explanation'",
+        "uv run --module python3 -c '# input data'",
+        'env -S "python3 -c" "# explanation"',
+    ],
+)
+def test_shell_unresolved_interpreter_options_fail_visibly(source: str) -> None:
+    assert [finding.kind for finding in scan("a.sh", source, "bash")] == ["coverage-error"]
 
 
 @pytest.mark.parametrize("source", ["# explanation", "echo ok # explanation", "echo ok # explanation\n"])
@@ -1162,6 +1465,701 @@ def test_consumer_digest_has_stable_python_version_encoding() -> None:
     assert python_consumer_digest(tree) == "sha256:c6aaea25c78f8f6fdbf83d97c11fe1be21e859156b678d34cfbcc79f8c261c69"
 
 
+@pytest.mark.parametrize("prefix", [["python3"], ["env", "python3"], ["uv", "run", "python3"]])
+def test_sys_executable_inline_source_is_not_literal_program_name(prefix: list[str]) -> None:
+    prefix_expression = ", ".join(repr(word) for word in prefix)
+    source = f'import subprocess, sys\nsubprocess.run([{prefix_expression}, "-c", sys.executable])'
+    assert [finding.kind for finding in python_findings("a.py", source)] == ["payload-error"]
+
+
+def test_sys_executable_in_wrapped_command_position_is_scanned() -> None:
+    source = 'import subprocess, sys\nsubprocess.run(["uv", "run", sys.executable, "-c", "# explanation"])'
+    assert [finding.text for finding in python_findings("a.py", source)] == ["# explanation"]
+
+
+@pytest.mark.parametrize("prefix", [["uv", "run"], ["env", "--"]])
+def test_wrapped_non_interpreter_dynamic_arguments_are_data(prefix: list[str]) -> None:
+    prefix_expression = ", ".join(repr(word) for word in prefix)
+    source = f'import subprocess\nsubprocess.run([{prefix_expression}, "pytest", "-k", test_filter])'
+    assert not python_findings("a.py", source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'import subprocess\nsubprocess.run(["uv", command, "python3", "-c", source])',
+        'import subprocess\nsubprocess.run(["uv", "run", "--with", package, "python3", "-c", source])',
+    ],
+)
+def test_dynamic_wrapper_execution_prefix_fails_visibly(source: str) -> None:
+    assert [finding.kind for finding in python_findings("a.py", source)] == ["payload-error"]
+
+
+OWNERSHIP_LEGACY_EXTERNAL = [
+    {"path": "benchbox/_binaries/vendor/tools/", "owner": "upstream", "provenance": "a.py"},
+    {"path": "catalog/tools/", "owner": "catalog", "provenance": "a.py"},
+]
+
+
+def ownership_policy(exclusions: set[str] | None) -> dict:
+    return policy(external=deepcopy(OWNERSHIP_LEGACY_EXTERNAL), ownership_excluded_members=exclusions)
+
+
+def ownership_repo(
+    tmp_path: Path, partial_notice: bool = False, outside_override: str | None = None
+) -> tuple[str, dict]:
+    git_repo(tmp_path, "value = 1\n")
+    directory = tmp_path / "benchbox/_binaries/vendor/tools"
+    directory.mkdir(parents=True)
+    (directory / "generator").write_bytes(b"\xff\x00upstream binary")
+    (directory / "owned.py").write_text("# maintained explanation\n")
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(policy(external=OWNERSHIP_LEGACY_EXTERNAL)))
+    catalog = tmp_path / "catalog/tools"
+    catalog.mkdir(parents=True)
+    (catalog / "upstream.py").write_text("# catalog provenance\n")
+    notice = b"prefix\nProtected notice\nsuffix\n" if partial_notice else b"Required upstream notice\n"
+    (directory / "PATCHES.md").write_bytes(notice)
+    ledger = {
+        name: []
+        for name in (
+            "maintained_roots",
+            "ownership_rules",
+            "external_entries",
+            "format_classes",
+            "payloads",
+            "derived_rules",
+            "consumer_edges",
+            "directives",
+            "notices",
+            "obligations",
+            "review_dispositions",
+        )
+    }
+    ledger["version"] = 1
+    ledger["maintained_roots"] = [{"id": "repository", "selector": {"prefix": ""}, "kind": "source"}]
+    ledger["ownership_rules"] = [
+        {
+            "id": "owned",
+            "owner": "comment-cleanup-owned",
+            "state": "ready",
+            "priority": 10,
+            "blocking_disposition": "Maintained source.",
+            "selectors": [{"path": "benchbox/_binaries/vendor/tools/owned.py"}],
+        }
+    ]
+    ledger["external_entries"] = [
+        {
+            "selector": {"prefix": "benchbox/_binaries/vendor/"},
+            "owner": "comment-cleanup-vendor",
+            "provenance": "Upstream fixture",
+            "governing_requirement": "Approved upstream ownership.",
+            "blocking_disposition": "Excluded upstream source.",
+        }
+    ]
+    ledger["ownership_rules"].append(
+        {
+            "id": "external-ownership-mirrors",
+            "owner": "comment-cleanup-external-ownership",
+            "state": "blocked",
+            "priority": 10,
+            "blocking_disposition": "Frozen catalog audit role.",
+            "selectors": [{"prefix": "catalog/tools/"}],
+        }
+    )
+    if outside_override == "owned":
+        ledger["ownership_rules"].append(
+            {
+                "id": "catalog-owned",
+                "owner": "comment-cleanup-owned",
+                "state": "ready",
+                "priority": 20,
+                "blocking_disposition": "Maintained first-party source.",
+                "selectors": [{"path": "catalog/tools/upstream.py"}],
+            }
+        )
+    elif outside_override == "derived":
+        package = tmp_path / "benchbox/core/example.py"
+        package.parent.mkdir(parents=True)
+        package.write_text("value = 1\n")
+        (catalog / "upstream.py").write_text("from benchbox.core import example\n# maintained explanation\n")
+        ledger["ownership_rules"].append(
+            {
+                "id": "package-owned",
+                "owner": "comment-cleanup-owned",
+                "state": "ready",
+                "priority": 20,
+                "blocking_disposition": "Maintained package.",
+                "selectors": [{"path": "benchbox/core/example.py"}],
+            }
+        )
+        ledger["derived_rules"] = [
+            {
+                "id": "catalog-derived",
+                "method": "python-imports",
+                "state": "ready",
+                "priority": 30,
+                "blocking_disposition": "Owned by imported package.",
+                "selectors": [{"path": "catalog/tools/upstream.py"}],
+            }
+        ]
+    digest = hashlib.sha256(notice).hexdigest()
+    start = len(b"prefix\n") if partial_notice else 0
+    end = start + len(b"Protected notice\n") if partial_notice else len(notice)
+    ledger["notices"] = [
+        {
+            "path": "benchbox/_binaries/vendor/tools/PATCHES.md",
+            "blob_sha256": digest,
+            "byte_start": start,
+            "byte_end": end,
+            "retained_sha256": hashlib.sha256(notice[start:end]).hexdigest(),
+            "governing_requirement": "Retain exact notice.",
+            "source_identity": "fixture",
+            "owner": "comment-cleanup-vendor",
+            "blocking_disposition": "Preserve bytes.",
+        }
+    ]
+    if outside_override == "notice":
+        raw = (catalog / "upstream.py").read_bytes()
+        outside_notice = deepcopy(ledger["notices"][0])
+        outside_notice.update(
+            {
+                "path": "catalog/tools/upstream.py",
+                "blob_sha256": hashlib.sha256(raw).hexdigest(),
+                "byte_start": 0,
+                "byte_end": len(raw),
+                "retained_sha256": hashlib.sha256(raw).hexdigest(),
+                "owner": "comment-cleanup-external-ownership",
+            }
+        )
+        ledger["notices"].append(outside_notice)
+    (tmp_path / "quality/comment-cleanup-scope.json").write_text(json.dumps(ledger))
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "add",
+            "benchbox/",
+            "catalog/tools",
+            "quality/comment-policy.json",
+            "quality/comment-cleanup-scope.json",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "-qm",
+            "ownership fixture",
+        ],
+        check=True,
+    )
+    base = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
+    return base, ledger
+
+
+def test_immutable_ownership_excludes_approved_binary(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    path = "benchbox/_binaries/vendor/tools/generator"
+    assert path in exclusions
+    registered = ownership_policy(exclusions)
+    assert scan_sources(ROOT, {path: b"\xff\x00upstream binary"}, registered) == []
+    assert [f.kind for f in scan_sources(ROOT, {path: b"\xff\x00upstream binary"}, policy())] == ["coverage-error"]
+
+
+def test_immutable_ownership_scans_new_vendor_member(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    path = "benchbox/_binaries/vendor/tools/new.py"
+    (tmp_path / path).write_text("# explanation\n")
+    registered = ownership_policy(check_comment_policy.ownership_exclusions(tmp_path, base, False))
+    assert [(f.path, f.text) for f in scan_sources(ROOT, {path: b"# explanation\n"}, registered)] == [
+        (path, "# explanation")
+    ]
+
+
+def test_candidate_ownership_expansion_is_ineffective(tmp_path: Path) -> None:
+    base, ledger = ownership_repo(tmp_path)
+    candidate = deepcopy(ledger)
+    candidate["external_entries"][0]["selector"] = {"prefix": "benchbox/"}
+    candidate["ownership_rules"] = []
+    (tmp_path / "quality/comment-cleanup-scope.json").write_text(json.dumps(candidate))
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    path = "benchbox/core/new.py"
+    assert path not in exclusions
+    assert "benchbox/_binaries/vendor/tools/owned.py" not in exclusions
+    assert [f.text for f in scan_sources(ROOT, {path: b"# explanation\n"}, ownership_policy(exclusions))] == [
+        "# explanation"
+    ]
+
+
+@pytest.mark.parametrize("changed", [b"Modified upstream notice\n", b"Required upstream notice\nadded text\n"])
+def test_immutable_ownership_rejects_changed_notice(tmp_path: Path, changed: bytes) -> None:
+    base, _ = ownership_repo(tmp_path)
+    (tmp_path / "benchbox/_binaries/vendor/tools/PATCHES.md").write_bytes(changed)
+    with pytest.raises(ValueError, match="protected external notice"):
+        check_comment_policy.ownership_exclusions(tmp_path, base, False)
+
+
+def test_immutable_ownership_respects_explicit_owned_override(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    path = "benchbox/_binaries/vendor/tools/owned.py"
+    assert path not in exclusions
+    assert scan_sources(ROOT, {path: b"# maintained explanation\n"}, policy(external=OWNERSHIP_LEGACY_EXTERNAL)) == []
+    assert [
+        f.text for f in scan_sources(ROOT, {path: b"# maintained explanation\n"}, ownership_policy(exclusions))
+    ] == ["# maintained explanation"]
+
+
+def test_transition_cannot_select_different_ownership_base(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    assert main(["--root", str(tmp_path), "--mode", "transition", "--base", base, "--ownership-base", "a" * 40]) == 2
+
+
+@pytest.mark.parametrize("mode", ["strict", "report"])
+def test_ownership_mode_scans_new_legacy_prefix_member(tmp_path: Path, mode: str) -> None:
+    base, _ = ownership_repo(tmp_path)
+    path = "benchbox/_binaries/vendor/tools/new.py"
+    (tmp_path / path).write_text("# new explanation\n")
+    output = tmp_path / "findings.json"
+    status = main(["--root", str(tmp_path), "--mode", mode, "--ownership-base", base, "--json-out", str(output)])
+    assert status == (1 if mode == "strict" else 0)
+    findings = json.loads(output.read_text())["findings"]
+    assert any(f["path"] == path and f["text"] == "# new explanation" for f in findings)
+
+
+def test_ownership_freezes_legacy_members_outside_ledger_domains(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    old = "catalog/tools/upstream.py"
+    new = "catalog/tools/new.py"
+    assert old in exclusions
+    assert new not in exclusions
+    findings = scan_sources(
+        ROOT, {old: b"# catalog provenance\n", new: b"# new explanation\n"}, ownership_policy(exclusions)
+    )
+    assert [(f.path, f.text) for f in findings] == [(new, "# new explanation")]
+
+
+@pytest.mark.parametrize("mode", ["strict", "report"])
+def test_ownership_mode_ignores_candidate_external_expansion(tmp_path: Path, mode: str) -> None:
+    base, _ = ownership_repo(tmp_path)
+    path = "a.py"
+    (tmp_path / path).write_text("# first-party explanation\n")
+    candidate = policy(external=[*OWNERSHIP_LEGACY_EXTERNAL, {"path": path, "owner": "fake", "provenance": path}])
+    (tmp_path / "quality/comment-policy.json").write_text(json.dumps(candidate))
+    output = tmp_path / "findings.json"
+    status = main(["--root", str(tmp_path), "--mode", mode, "--ownership-base", base, "--json-out", str(output)])
+    assert status == (1 if mode == "strict" else 0)
+    findings = json.loads(output.read_text())["findings"]
+    assert any(f["path"] == path and f["text"] == "# first-party explanation" for f in findings)
+
+
+def test_ownership_staged_changed_notice_rejects_clean_worktree(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    path = "benchbox/_binaries/vendor/tools/PATCHES.md"
+    (tmp_path / path).write_bytes(b"Modified upstream notice\n")
+    subprocess.run(["git", "-C", str(tmp_path), "add", path], check=True)
+    (tmp_path / path).write_bytes(b"Required upstream notice\n")
+    with pytest.raises(ValueError, match="protected external notice"):
+        check_comment_policy.ownership_exclusions(tmp_path, base, True)
+    assert path in check_comment_policy.ownership_exclusions(tmp_path, base, False)
+
+
+def test_ownership_staged_clean_notice_ignores_changed_worktree(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path)
+    path = "benchbox/_binaries/vendor/tools/PATCHES.md"
+    (tmp_path / path).write_bytes(b"Modified upstream notice\n")
+    assert path in check_comment_policy.ownership_exclusions(tmp_path, base, True)
+    with pytest.raises(ValueError, match="protected external notice"):
+        check_comment_policy.ownership_exclusions(tmp_path, base, False)
+
+
+def test_ownership_partial_notice_allows_outside_edit_without_file_waiver(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path, partial_notice=True)
+    path = "benchbox/_binaries/vendor/tools/PATCHES.md"
+    raw = b"prefix\nProtected notice\nchanged suffix\n\n```python\n# outside explanation\n```\n"
+    (tmp_path / path).write_bytes(raw)
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    assert path not in exclusions
+    assert [f.text for f in scan_sources(ROOT, {path: raw}, ownership_policy(exclusions))] == ["# outside explanation"]
+
+
+def test_ownership_partial_notice_rejects_inside_edit(tmp_path: Path) -> None:
+    base, _ = ownership_repo(tmp_path, partial_notice=True)
+    (tmp_path / "benchbox/_binaries/vendor/tools/PATCHES.md").write_bytes(b"prefix\nModified notice!\nsuffix\n")
+    with pytest.raises(ValueError, match="protected external notice"):
+        check_comment_policy.ownership_exclusions(tmp_path, base, False)
+
+
+def test_ownership_absent_ledger_preserves_legacy_behavior(tmp_path: Path) -> None:
+    base = git_repo(tmp_path, "value = 1\n")
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    assert exclusions is None
+    assert (
+        scan_sources(ROOT, {"benchbox/_binaries/vendor/tools/new.py": b"# explanation\n"}, ownership_policy(exclusions))
+        == []
+    )
+
+
+@pytest.mark.parametrize("override", ["owned", "notice", "derived"])
+def test_legacy_outside_domain_obeys_precise_owned_notice_and_derived_priority(tmp_path: Path, override: str) -> None:
+    base, _ = ownership_repo(tmp_path, outside_override=override)
+    exclusions = check_comment_policy.ownership_exclusions(tmp_path, base, False)
+    path = "catalog/tools/upstream.py"
+    assert path not in exclusions
+    raw = (tmp_path / path).read_bytes()
+    assert scan_sources(ROOT, {path: raw}, policy(external=OWNERSHIP_LEGACY_EXTERNAL)) == []
+    assert [f.kind for f in scan_sources(ROOT, {path: raw}, ownership_policy(exclusions))] == ["comment"]
+
+
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        (
+            'import subprocess, sys\nfrom pathlib import Path\nroot = Path(__file__).resolve().parents[2]\nsubprocess.run([sys.executable, str(root / "scripts" / "validate.py"), *values])',
+            [],
+        ),
+        (
+            'import subprocess\nfrom pathlib import Path\nproject = Path(__file__).resolve().parent / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "--locked", "--", "tool", value])',
+            [],
+        ),
+        (
+            'import subprocess\nfrom pathlib import Path\nproject = Path(__file__).resolve().parent / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "python3", "-c", "# retained"])',
+            ["# retained"],
+        ),
+    ],
+)
+def test_path_backed_command_operands_preserve_argument_roles(source: str, expected: list[str]) -> None:
+    assert [finding.text for finding in python_findings("a.py", source)] == expected
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import subprocess, sys\nsubprocess.run([sys.executable, script, *values])",
+        'import subprocess\nfrom pathlib import Path\nproject = unknown / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "tool"])',
+        'import subprocess\nfrom pathlib import Path\nstr = converter\nproject = Path(__file__) / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "tool"])',
+        'import subprocess\nfrom pathlib import Path\nPath = constructor\nproject = Path(__file__) / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "tool"])',
+        'import subprocess\nfrom pathlib import Path\nproject = Path(__file__) / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), *command])',
+        'import subprocess\nfrom pathlib import Path\nsource = str(Path(__file__) / "source.py")\nsubprocess.run(["python3", "-c", source])',
+        'import subprocess\nfrom pathlib import Path\nsource = str(Path(__file__) / "source.py")\nsubprocess.run(["env", "-S", "python3 -c", source])',
+        'import subprocess\nfrom pathlib import Path\nproject = Path(__file__) / "scripts"\nsubprocess.run(["uv", "run", "--project", str(project), "python3", "-c", code])',
+        'import subprocess\nsubprocess.run(["uv", "run", "--with", package, "python3", "-c", code])',
+        'import subprocess\nfrom textwrap import dedent\nsource = dedent(f"print(\\"{value}\\")")\nsubprocess.run(["python3", "-c", source])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / "-c"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["uv", "run", "--project", str(Path("") / "-c"), "python3", "-c", code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["uv", "run", str(Path("") / "-c"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["env", "-S", "python3", str(Path("") / "-c"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / "./-c"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / ".\\\\-c"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("-c") / "foo"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / "-c/foo"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("") / "-c\\\\foo"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path(root) / "script.py"), code])',
+        'import subprocess\nfrom pathlib import Path\nsubprocess.run(["python3", str(Path("\\\\").parent / "-cprint(1)" / "x# hidden")])',
+    ],
+)
+def test_unproven_command_paths_and_dynamic_source_fail_visibly(source: str) -> None:
+    assert [finding.kind for finding in python_findings("a.py", source)] == ["payload-error"]
+
+
+@pytest.mark.parametrize(
+    "imports, executable",
+    [
+        ("import sys\nimport sys", "sys.executable"),
+        ("import sys as runtime\nimport sys as runtime", "runtime.executable"),
+        ("from sys import executable\nfrom sys import executable", "executable"),
+    ],
+)
+def test_identical_import_actors_keep_inline_source_visible(imports: str, executable: str) -> None:
+    source = f"import subprocess\n{imports}\nsubprocess.run([{executable}, '-c', '# explanation'])"
+    findings = python_findings("a.py", source)
+    assert [(finding.kind, finding.text) for finding in findings] == [("comment", "# explanation")]
+
+
+@pytest.mark.parametrize(
+    "binding",
+    [
+        "sys = opaque",
+        "sys = sys",
+        "from alternate import sys",
+        "import alternate as sys",
+    ],
+)
+def test_assignment_or_differing_import_actor_stays_ambiguous(binding: str) -> None:
+    source = (
+        f"import subprocess\nimport sys\nimport sys\n{binding}\nsubprocess.run([sys.executable, '-c', '# explanation'])"
+    )
+    findings = python_findings("a.py", source)
+    assert [(finding.kind, finding.text) for finding in findings] == [
+        ("payload-error", "unresolved executable source: '# explanation'")
+    ]
+
+
+def test_local_parameter_shadow_stays_ambiguous_with_duplicate_outer_imports() -> None:
+    source = "import subprocess\nimport sys\nimport sys\ndef run(sys):\n    subprocess.run([sys.executable, '-c', '# explanation'])\n"
+    findings = python_findings("a.py", source)
+    assert [(finding.kind, finding.text) for finding in findings] == [
+        ("payload-error", "unresolved executable source: '# explanation'")
+    ]
+
+
+@pytest.mark.parametrize(
+    "tag, payload, comment",
+    [
+        ("c", "int value = 1; // explanation", "// explanation"),
+        ("powershell", "$value = 1 # explanation", "# explanation"),
+    ],
+)
+def test_document_fences_use_existing_c_and_powershell_adapters(tag: str, payload: str, comment: str) -> None:
+    findings = scan("docs/example.md", f"```{tag}\n{payload}\n```\n", "examples")
+    assert [(finding.kind, finding.text, finding.line) for finding in findings] == [("comment", comment, 2)]
+
+
+def test_yaml_multiple_documents_scan_every_executable_scalar() -> None:
+    source = "query: SELECT 1 -- first\n---\nquery: SELECT 2 -- second\n"
+    findings = scan("config.yaml", source, "yaml")
+    assert [(finding.kind, finding.text, finding.line) for finding in findings] == [
+        ("comment", "-- first", 1),
+        ("comment", "-- second", 3),
+    ]
+    assert [finding.symbol for finding in findings] == ["document:0.query:", "document:1.query:"]
+
+
+@pytest.mark.parametrize("tail", ["query: [invalid", "query: *missing", "cycle: &cycle\n  child: *cycle"])
+def test_yaml_later_document_errors_fail_closed(tail: str) -> None:
+    findings = scan("config.yaml", f"query: SELECT 1 -- first\n---\n{tail}\n", "yaml")
+    assert [finding.kind for finding in findings] == ["coverage-error"]
+
+
+def test_json_does_not_accept_yaml_multiple_documents() -> None:
+    findings = scan("config.json", '{"query": "SELECT 1 -- first"}\n---\n{"query": "SELECT 2 -- second"}\n', "json")
+    assert [finding.kind for finding in findings] == ["coverage-error"]
+
+
+@pytest.fixture
+def dependency_artifact_inputs(tmp_path: Path, monkeypatch):
+    import io
+    import zipfile
+
+    import check_comment_cleanup_scope as scope
+
+    wheel_path = "_project/scripts/vendor/todo_db-0.8.1-py3-none-any.whl"
+    project_path = "_project/scripts/pyproject.toml"
+    lock_path = "_project/scripts/uv.lock"
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("todo_db-0.8.1.dist-info/METADATA", "Name: todo-db\nVersion: 0.8.1\n")
+        archive.writestr("todo_db/__init__.py", "value = 1\n")
+    wheel = buffer.getvalue()
+    project = b'[project]\ndependencies = ["todo-db[mcp]"]\n[tool.uv.sources]\ntodo-db = {path = "vendor/todo_db-0.8.1-py3-none-any.whl"}\n'
+    digest = hashlib.sha256(wheel).hexdigest()
+    lock = (
+        '[[package]]\nname = "todo-db"\nversion = "0.8.1"\n'
+        'source = {path = "vendor/todo_db-0.8.1-py3-none-any.whl"}\n'
+        'wheels = [{filename = "todo_db-0.8.1-py3-none-any.whl", hash = "sha256:' + digest + '"}]\n'
+    ).encode()
+    frozen = {wheel_path: wheel, project_path: project, lock_path: lock}
+    index = deepcopy(frozen)
+    for path, raw in frozen.items():
+        destination = tmp_path / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(raw)
+    monkeypatch.setattr(scope, "base_blob", lambda root, base, path: frozen[path])
+    monkeypatch.setattr(scope, "git", lambda root, *args: index[args[-1].removeprefix(":")])
+    records = [{"path": wheel_path, "owner": "comment-cleanup-project-tooling", "rule": "tooling", "state": "blocked"}]
+    rules = [{"id": "tooling", "selectors": [{"prefix": "_project/scripts/"}]}]
+    external = [{"path": wheel_path, "owner": "todo-db", "provenance": project_path}]
+    return scope, wheel_path, project_path, lock_path, frozen, index, records, rules, external
+
+
+def test_trusted_locked_dependency_overrides_only_generic_prefix(tmp_path: Path, dependency_artifact_inputs) -> None:
+    scope, path, _, _, _, _, records, rules, external = dependency_artifact_inputs
+    assert scope.immutable_dependency_artifacts(tmp_path, "base", records, rules, external) == {path}
+    assert records[0]["state"] == "excluded"
+
+
+@pytest.mark.parametrize("guard", ["exact-owned", "derived", "notice", "candidate-only", "legacy-prefix", "hash"])
+def test_dependency_classification_preserves_ownership_guards(
+    tmp_path: Path, dependency_artifact_inputs, guard: str
+) -> None:
+    scope, path, _, lock_path, frozen, _, records, rules, external = dependency_artifact_inputs
+    if guard == "exact-owned":
+        rules[0]["selectors"] = [{"path": path}]
+    elif guard in {"derived", "notice"}:
+        records[0]["rule"] = guard
+    elif guard == "candidate-only":
+        external.clear()
+    elif guard == "legacy-prefix":
+        external[0]["path"] = "_project/scripts/vendor/"
+    elif guard == "hash":
+        frozen[lock_path] = frozen[lock_path].replace(hashlib.sha256(frozen[path]).hexdigest().encode(), b"0" * 64)
+    assert scope.immutable_dependency_artifacts(tmp_path, "base", records, rules, external) == set()
+    assert records[0]["state"] == "blocked"
+
+
+@pytest.mark.parametrize("staged", [False, True])
+@pytest.mark.parametrize("changed", ["artifact", "dependency", "lock"])
+def test_dependency_replacements_fail_closed(
+    tmp_path: Path, dependency_artifact_inputs, staged: bool, changed: str
+) -> None:
+    scope, path, project_path, lock_path, frozen, index, records, rules, external = dependency_artifact_inputs
+    changed_path = {"artifact": path, "dependency": project_path, "lock": lock_path}[changed]
+    raw = frozen[changed_path]
+    if changed == "artifact":
+        raw += b"replacement"
+    elif changed == "dependency":
+        raw = raw.replace(b'"todo-db[mcp]"', b'"other-package"')
+    else:
+        raw = raw.replace(hashlib.sha256(frozen[path]).hexdigest().encode(), b"0" * 64)
+    if staged:
+        index[changed_path] = raw
+    else:
+        (tmp_path / changed_path).write_bytes(raw)
+    with pytest.raises(scope.PolicyError, match="immutable dependency (artifact|binding) changed"):
+        scope.immutable_dependency_artifacts(tmp_path, "base", records, rules, external, staged)
+
+
+@pytest.mark.parametrize("staged", [False, True])
+def test_dependency_protection_reads_selected_tree(tmp_path: Path, dependency_artifact_inputs, staged: bool) -> None:
+    scope, path, _, _, frozen, index, records, rules, external = dependency_artifact_inputs
+    if staged:
+        (tmp_path / path).write_bytes(frozen[path] + b"unstaged replacement")
+    else:
+        index[path] += b"staged replacement"
+    assert scope.immutable_dependency_artifacts(tmp_path, "base", records, rules, external, staged) == {path}
+
+
+@pytest.mark.parametrize("changed", [False, True])
+def test_preclassified_external_dependency_still_checks_immutable_bytes(
+    tmp_path: Path, dependency_artifact_inputs, changed: bool
+) -> None:
+    scope, path, _, _, frozen, _, records, rules, external = dependency_artifact_inputs
+    records[0].update(rule="external", state="excluded")
+    if changed:
+        (tmp_path / path).write_bytes(frozen[path] + b"replacement")
+        with pytest.raises(scope.PolicyError, match="immutable dependency artifact changed"):
+            scope.immutable_dependency_artifacts(tmp_path, "base", records, rules, external)
+    else:
+        assert scope.immutable_dependency_artifacts(tmp_path, "base", records, rules, external) == {path}
+
+
+@pytest.mark.parametrize(
+    "name,source,language,expected",
+    [
+        (
+            "dbt",
+            "{{ config(materialized='incremental') }}\nSELECT * FROM {{ ref('orders') }} -- explanation",
+            "sql+jinja",
+            "comment",
+        ),
+        ("literal", "{{ '-- hidden prose' }}", "sql+jinja", "comment"),
+        ("binding", '{% set sql="SELECT 1 -- hidden" %}{{ sql }}', "sql+jinja", "comment"),
+        ("quoted", "SELECT '{{ '-- data' }}'", "sql+jinja", None),
+        ("malformed", "SELECT {{ unclosed\n-- hidden", "sql+jinja", "coverage-error"),
+        ("unknown", "{{ unknown() }}", "sql+jinja", "coverage-error"),
+        ("hook", "{{ config(pre_hook='SELECT 1 -- hidden') }}SELECT 1", "sql+jinja", "coverage-error"),
+        ("filter", "{{ '-- hidden' | trim }}", "sql+jinja", "coverage-error"),
+        ("forward", '{{ sql }}{% set sql="SELECT 1" %}', "sql+jinja", "coverage-error"),
+        ("branchbinding", '{% if x %}{% set sql="SELECT 1" %}{% endif %}{{ sql }}', "sql+jinja", "coverage-error"),
+        (
+            "branches",
+            "SELECT '{% if is_incremental() %}a'{% else %}b' -- user's hidden{% endif %}",
+            "sql+jinja",
+            "comment",
+        ),
+        ("htmlinvalid", "<html>{{ broken</html>", "html+jinja", "coverage-error"),
+        ("groovy", "sh '''\n# hidden shell prose\necho ok\n'''", "groovy", "comment"),
+        ("groovydynamic", "sh command", "groovy", "coverage-error"),
+        ("groovygstring", 'sh "echo $SECRET"', "groovy", "coverage-error"),
+        ("groovyescape", "sh 'echo \\nvalue'", "groovy", "coverage-error"),
+        ("groovycompound", "sh 'echo ok' + command", "groovy", "coverage-error"),
+        ("groovyexecute", "'echo ok'.execute()", "groovy", "coverage-error"),
+        ("htmloutput", "<script>{{ payload }}</script>", "html+jinja", "coverage-error"),
+        ("htmlliteral", '<script>{{ "// hidden" }}</script>', "html+jinja", "coverage-error"),
+        ("htmlemittedtags", '{{ "<script>// hidden</script>" }}', "html+jinja", "coverage-error"),
+        ("htmlbranch", "{% if x %}<script>// hidden</script>{% endif %}", "html+jinja", "coverage-error"),
+        ("htmlstatic", "<div>{# template prose #}</div>", "html+jinja", "comment"),
+        ("quotedcallee", 'this."sh"("echo ok # hidden")', "groovy", "coverage-error"),
+        ("unclosedcall", "sh('echo ok'", "groovy", "coverage-error"),
+        ("closedcall", "sh('echo ok # hidden')", "groovy", "comment"),
+        ("namedclosed", "sh(script: 'echo ok # hidden')", "groovy", "comment"),
+        ("uniquekeysource", '{{ config(unique_key="id -- hidden") }} SELECT 1', "sql+jinja", "coverage-error"),
+        (
+            "uniquekeyexpression",
+            '{{ config(unique_key="concat(user_id,session_number)") }} SELECT 1',
+            "sql+jinja",
+            "coverage-error",
+        ),
+        (
+            "materializedunknown",
+            '{{ config(materialized="custom -- hidden") }} SELECT 1',
+            "sql+jinja",
+            "coverage-error",
+        ),
+        (
+            "schemachangeunknown",
+            '{{ config(on_schema_change="custom -- hidden") }} SELECT 1',
+            "sql+jinja",
+            "coverage-error",
+        ),
+    ],
+)
+def test_template_and_groovy_carriers_fail_closed(name, source, language, expected):
+    findings = scan("case." + language, source, language)
+    if expected is None:
+        assert findings == [], name
+    else:
+        assert expected in {finding.kind for finding in findings}, name
+
+
+def test_groovy_shell_payload_location():
+    findings = scan("Jenkinsfile", "sh '''\n# shell prose\necho ok\n'''", "groovy")
+    assert [(finding.line, finding.text) for finding in findings if finding.kind == "comment"] == [(2, "# shell prose")]
+
+
+def test_owned_template_scripts_are_scanned_beside_rendered_output():
+    source = "{% block body %}{{ body }}<script>// owned\nconsole.log(1)</script>{% endblock %}"
+    requests = javascript_requests("page.html", source, "html+jinja")
+    assert list(requests.values()) == ["// owned\nconsole.log(1)"]
+    results = {key: [{"kind": "comment", "line": 1, "text": "// owned"}] for key in requests}
+    findings = scan("page.html", source, "html+jinja", results)
+    assert not any(finding.kind == "coverage-error" for finding in findings)
+    assert any(finding.kind == "comment" and finding.text == "// owned" for finding in findings)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "<script>{{ payload }}</script>",
+        '<script>{{ "// hidden" }}</script>',
+        '{{ "<script>// hidden</script>" }}',
+        "<script>{% if x %}// hidden{% endif %}</script>",
+    ],
+)
+def test_template_output_is_not_treated_as_literal_javascript(source):
+    assert javascript_requests("page.html", source, "html+jinja") == {}
+    assert any(finding.kind == "coverage-error" for finding in scan("page.html", source, "html+jinja"))
+
+
+def test_owned_template_css_comments_are_found_inside_template_logic():
+    source = "{% if x %}<style>/* owned CSS */a{color:red}</style>{% endif %}"
+    findings = scan("page.html", source, "html+jinja")
+    assert not any(finding.kind == "coverage-error" for finding in findings)
+    assert any(finding.kind == "comment" and "owned CSS" in finding.text for finding in findings)
+
+
 ASTRO_SOURCE = """---
 // frontmatter explanation
 const title = "x";
@@ -1189,7 +2187,7 @@ def test_astro_sources_are_a_registered_maintained_language() -> None:
 
 def test_astro_template_comments_are_found_without_flagging_embedded_blocks() -> None:
     source = "<div>{/* expression */}</div>\n<!-- html -->\n<style>a::after { content: '<!-- data -->'; }</style>\n"
-    findings = scan("a.astro", source, "astro", {})
+    findings = scan("a.astro", source, "astro", {k: [] for k in javascript_requests("a.astro", source, "astro")})
     assert [(f.line, f.kind, f.text) for f in findings if f.kind == "comment" and f.text.startswith("<!--")] == [
         (2, "comment", "<!-- html -->")
     ]
@@ -1206,7 +2204,11 @@ ASTRO_STRING_MARKER_SOURCES = [
 
 def test_astro_html_comment_markers_inside_strings_are_data() -> None:
     for source in ASTRO_STRING_MARKER_SOURCES:
-        assert not [f for f in scan("a.astro", source, "astro", {}) if f.text.startswith("<!--")]
+        assert not [
+            f
+            for f in scan("a.astro", source, "astro", {k: [] for k in javascript_requests("a.astro", source, "astro")})
+            if f.text.startswith("<!--")
+        ]
 
 
 @pytest.mark.parametrize(
@@ -1228,11 +2230,668 @@ def test_astro_template_expressions_are_scanned_as_typescript(source: str, expre
 
 @pytest.mark.parametrize(
     "source",
+    [
+        "<script>{# note #}// hidden</script>",
+        "<scr{# note #}ipt>// hidden</script>",
+    ],
+)
+def test_template_comments_cannot_hide_assembled_executable_regions(source):
+    findings = scan("page.html", source, "html+jinja")
+    assert any(finding.kind == "coverage-error" for finding in findings)
+
+
+def test_sphinx_path_selects_template_adapter_without_waiving_dynamic_output():
+    source = "<script>{{ payload }}</script>"
+    lang = source_language("docs/_templates/page.html", source)
+    assert lang == "html+jinja"
+    assert any(f.kind == "coverage-error" for f in scan("docs/_templates/page.html", source, lang))
+
+
+def test_sphinx_path_preserves_literal_style_comments():
+    source = "<style>/* owned */a{color:red}</style>"
+    lang = source_language("docs/_templates/page.html", source)
+    assert any(f.kind == "comment" and "owned" in f.text for f in scan("docs/_templates/page.html", source, lang))
+
+
+def test_sphinx_alias_leaves_other_html_paths_unchanged():
+    assert source_language("landing/index.html", "<p>hi</p>") == "html"
+
+
+def notebook_cell(source: str, metadata: dict | None = None) -> str:
+    return json.dumps(
+        {
+            "metadata": metadata
+            if metadata is not None
+            else {"language_info": {"name": "python", "pygments_lexer": "ipython3"}},
+            "cells": [{"id": "stable", "cell_type": "code", "source": source.splitlines(keepends=True)}],
+        }
+    )
+
+
+def test_ipython_literal_shell_and_python_offsets() -> None:
+    assert not scan("a.ipynb", notebook_cell("!pip install -q benchbox duckdb\n"), "notebook")
+    findings = scan(
+        "a.ipynb", notebook_cell("!echo ok # shell comment\n%matplotlib inline\n# Python comment\n"), "notebook"
+    )
+    assert [(f.line, f.text, f.symbol) for f in findings if f.kind == "comment"] == [
+        (3, "# Python comment", "cell:stable:"),
+        (1, "# shell comment", "cell:stable:shell:"),
+    ]
+    assert any(f.kind == "coverage-error" for f in findings)
+    findings = scan("a.ipynb", notebook_cell('!python -c "# nested"\n'), "notebook")
+    assert [(f.kind, f.text) for f in findings if f.kind == "comment"] == [("comment", "# nested")]
+    assert any(f.kind == "coverage-error" for f in findings)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "%run evil.py\n",
+        "!cmd /c rem hidden prose\n",
+        "!powershell -Command Write-Output\n",
+        "%pip uninstall package\n",
+        "%%bash\n# hidden\n",
+        "value = !echo ok\n",
+        "!!echo ok\n",
+        "!echo {dangerous()}\n",
+        "!echo $name\n",
+        "!echo a" + chr(92) + "\nb\n",
+        "if True:\n    !echo ok\n",
+        "x = (\n!echo ok\n)\n",
+        "x = " + chr(92) + "\n!echo ok\n",
+        "%matplotlib inline # comment\n",
+        '!python -c "$CODE"\n',
+    ],
+)
+def test_unknown_ipython_constructs_remain_coverage_errors(source: str) -> None:
+    findings = scan("a.ipynb", notebook_cell(source), "notebook")
+    assert any(f.kind == "coverage-error" for f in findings)
+
+
+def test_notebook_multiline_strings_are_not_magics() -> None:
+    source = 'x = """\n!echo literal\n%matplotlib inline\n"""\n# retained\n'
+    findings = scan("a.ipynb", notebook_cell(source), "notebook")
+    assert [(f.line, f.text) for f in findings] == [(5, "# retained")]
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {"language_info": {"name": "python"}},
+        {"language_info": {"name": "python", "codemirror_mode": "python"}},
+        {"language_info": []},
+    ],
+)
+def test_notebook_requires_explicit_ipython_metadata(metadata: dict) -> None:
+    findings = scan("a.ipynb", notebook_cell("!echo ok\n", metadata), "notebook")
+    assert any(f.kind == "coverage-error" for f in findings)
+
+
+def test_notebook_unknown_cell_does_not_hide_other_cells() -> None:
+    source = json.loads(notebook_cell("%run evil.py\n"))
+    source["cells"].extend(
+        [
+            {"id": "python", "cell_type": "code", "source": ["# retained Python\n"]},
+            {"id": "shell", "cell_type": "code", "source": ["!echo ok # retained shell\n"]},
+        ]
+    )
+    findings = scan("a.ipynb", json.dumps(source), "notebook")
+    assert any(f.kind == "coverage-error" and f.symbol == "cell:stable:" for f in findings)
+    assert {f.text for f in findings if f.kind == "comment"} == {"# retained Python", "# retained shell"}
+
+
+def test_notebook_static_pip_arguments_and_offsets() -> None:
+    source = "%pip install benchbox[databricks] matplotlib seaborn pandas --quiet\n# retained\n"
+    findings = scan("a.ipynb", notebook_cell(source), "notebook")
+    assert [(f.line, f.kind, f.text) for f in findings] == [(2, "comment", "# retained")]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "%pip uninstall package\n",
+        "%pip install $PACKAGE\n",
+        "%pip install {package}\n",
+        "%pip install package; python -c pass\n",
+        "%pip install package # hidden\n",
+        '%pip install "package"\n',
+        "%pip install --quiet\n",
+        "%pip install -r requirements.txt\n",
+        "%pip install --config-settings x=y package\n",
+        "%pip install git+https://example.test/package\n",
+        "%%pip install package\n",
+        "x = (\n%pip install package\n)\n",
+        "x = \\\n%pip install package\n",
+        "x = %pip install package\n",
+        "%pip install demo-1.0-py3-none-any.whl\n",
+        "%pip install demo.tar.gz\n",
+        "%pip install demo.zip\n",
+        "%pip install demo.tar.bz2\n",
+        "%pip install demo.tar.xz\n",
+        "%pip install demo.tar.lz\n",
+        "%pip install demo.tar.lzma\n",
+        "%pip install demo.WHL[extra]\n",
+        "%pip install demo.ta[r]\n",
+        "%pip install .\n",
+        "%pip install ../project\n",
+        "%pip install -r requirements.txt\n",
+        "%pip install https://example.test/demo.whl\n",
+        "!pip install demo-1.0-py3-none-any.whl\n",
+        "!pip install demo.tar.gz\n",
+        "!pip install demo.zip\n",
+        "!pip install demo.tar.bz2\n",
+        "!pip install demo.tar.xz\n",
+        "!pip install demo.tar.lz\n",
+        "!pip install demo.tar.lzma\n",
+        "!pip install demo.WHL[extra]\n",
+        "!pip install demo.ta[r]\n",
+        "!pip install .\n",
+        "!pip install ../project\n",
+        "!pip install -r requirements.txt\n",
+        "!pip install https://example.test/demo.whl\n",
+        "!pip3 install demo-1.0-py3-none-any.whl\n",
+        "!pip3 install demo.tar.gz\n",
+        "!pip3 install demo.zip\n",
+        "!pip3 install demo.tar.bz2\n",
+        "!pip3 install demo.tar.xz\n",
+        "!pip3 install demo.tar.lz\n",
+        "!pip3 install demo.tar.lzma\n",
+        "!pip3 install demo.WHL[extra]\n",
+        "!pip3 install demo.ta[r]\n",
+        "!pip3 install .\n",
+        "!pip3 install ../project\n",
+        "!pip3 install -r requirements.txt\n",
+        "!pip3 install https://example.test/demo.whl\n",
+    ],
+)
+def test_notebook_pip_source_and_file_options_remain_unknown(source: str) -> None:
+    findings = scan("a.ipynb", notebook_cell(source), "notebook")
+    assert any(f.kind == "coverage-error" for f in findings)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        '(directory / "page.html").write_text(dynamic)',
+        '(directory / "page.html").write_text(data=dynamic)',
+        'HTML = "<style>body{}</style>"\nHTML = dynamic\n(directory / "page.html").write_text(HTML)',
+        'HTML = "<script>\\n// hidden</script>"\n(directory / "page.html").write_text(HTML)',
+        'HTML = "<script>" + "// hidden</script>"\n(directory / "page.html").write_text(HTML)',
+        'HTML = "<script>" "// hidden</script>"\n(directory / "page.html").write_text(HTML)',
+        '(directory / "page.html").write_text(f"<script>{dynamic}</script>")',
+        '(directory / "page.html").write_text()',
+    ],
+)
+def test_python_html_output_unresolved_source_is_visible(source: str) -> None:
+    source = 'from pathlib import Path\ndirectory = Path("/tmp")\n' + source
+    findings = scan("a.py", source, "python", {})
+    assert any(f.kind == "payload-error" and f.text == "unresolved HTML output source" for f in findings)
+    assert not javascript_requests("a.py", source, "python")
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'HTML = "<script>// inert</script>"',
+        '(directory / "page.txt").write_text("<script>// data</script>")',
+        'help_text = "A <script> tag"',
+    ],
+)
+def test_python_non_html_output_stays_data(source: str) -> None:
+    assert not scan("a.py", source, "python", {})
+    assert not javascript_requests("a.py", source, "python")
+
+
+@pytest.mark.parametrize(
+    "writer",
+    [
+        '(directory / "page.html").write_text(HTML)',
+        '(directory / "page.HTML").write_text(data=HTML)',
+        'from pathlib import Path\nPath("page.htm").write_text(HTML)',
+        'from pathlib import Path as P\nP("page.html").write_text(HTML)',
+    ],
+)
+def test_python_html_output_uses_declaration_offsets(writer: str) -> None:
+    source = (
+        'from pathlib import Path\ndirectory = Path("/tmp")\nHTML = """<script>\n// visible\n</script>"""\n\n' + writer
+    )
+    requests = javascript_requests("a.py", source, "python")
+    assert len(requests) == 1
+    rows = {key: [{"line": 2, "kind": "comment", "text": "// visible", "symbol": ""}] for key in requests}
+    findings = scan("a.py", source, "python", rows)
+    assert [(f.kind, f.line, f.text) for f in findings] == [("comment", 4, "// visible")]
+    missing = scan("a.py", source, "python", {})
+    assert any(f.kind == "coverage-error" and "TypeScript parser result missing" in f.text for f in missing)
+
+
+def test_published_404_html_reaches_native_scanner(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = (ROOT / "scripts/assemble_public_site.py").read_text(encoding="utf-8")
+    comment = "// checker fixture"
+    source = source.replace("<script>", "<script>\n" + comment, 1)
+    requests = javascript_requests("scripts/assemble_public_site.py", source, "python")
+    assert len(requests) == 1
+    payload = next(iter(requests.values()))
+    rows = {
+        key: [
+            {
+                "line": payload[: payload.index(comment)].count("\n") + 1,
+                "kind": "comment",
+                "text": comment,
+                "symbol": "",
+            }
+        ]
+        for key in requests
+    }
+
+    def native_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+        assert json.loads(str(kwargs["input"])) == requests
+        return subprocess.CompletedProcess(command, 0, json.dumps(rows))
+
+    monkeypatch.setattr("check_comment_policy.subprocess.run", native_run)
+    findings = scan_sources(ROOT, {"scripts/assemble_public_site.py": source.encode()}, policy())
+    visible = [f for f in findings if f.text == comment]
+    assert len(visible) == 1
+    assert visible[0].line == source[: source.index(comment)].count("\n") + 1
+
+
+def test_python_html_output_invalid_python_retains_coverage_error() -> None:
+    source = '(directory / "page.html").write_text('
+    assert javascript_requests("a.py", source, "python") == {}
+    assert scan("a.py", source, "python")[0].kind == "coverage-error"
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        '(directory / "page.html").write_text("<script>const x=1;</script>", data=dynamic)',
+        '(directory / "page.html").write_text(data="<script>const x=1;</script>", **options)',
+        '(directory / "page.html").write_text("<script>const x=1;</script>", **options)',
+        '(directory / "page.html").write_text(*arguments)',
+    ],
+)
+def test_python_html_output_ambiguous_argument_binding_is_visible(call: str) -> None:
+    source = 'from pathlib import Path\ndirectory = Path("/tmp")\n' + call
+    assert any(f.kind == "payload-error" for f in scan("a.py", source, "python", {}))
+    assert not javascript_requests("a.py", source, "python")
+
+
+def test_non_path_html_named_data_sink_is_not_executed_source() -> None:
+    source = 'class DataSink:\n    def __truediv__(self, name): return self\n    def write_text(self, data): return data\nvalue = DataSink()\n(value / "page.html").write_text("<script>// data</script>")\n'
+    assert not javascript_requests("a.py", source, "python")
+    assert not scan("a.py", source, "python", {})
+
+
+def test_path_parameter_rebinding_does_not_prove_html_sink() -> None:
+    source = 'from pathlib import Path\ndef write(directory: Path):\n    directory = arbitrary_object\n    (directory / "page.html").write_text("<script>// data</script>")\n'
+    assert not javascript_requests("a.py", source, "python")
+    assert any(f.kind == "payload-error" for f in scan("a.py", source, "python", {}))
+
+
+def test_path_parameter_html_sink_preserves_comment_line() -> None:
+    source = 'from pathlib import Path\ndef write(directory: Path):\n    directory = directory.resolve()\n    (directory / "page.html").write_text("""<style>\n/* visible */\n</style>""")\n'
+    assert [(f.line, f.text) for f in scan("a.py", source, "python", {})] == [(5, "/* visible */")]
+
+
+def test_unknown_division_html_sink_stays_unresolved() -> None:
+    source = '(unknown / "page.html").write_text("<script>// unresolved</script>")'
+    assert not javascript_requests("a.py", source, "python")
+    assert any(f.kind == "payload-error" for f in scan("a.py", source, "python", {}))
+
+
+def test_c_include_targets_are_not_comments() -> None:
+    findings = scan("a.c", '#include <stdio.h>\n#include "local.h"\nint x; /* note */\n', "c")
+    assert [(f.line, f.text) for f in findings] == [(3, "/* note */")]
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "expected"),
+    [
+        ("tests/a.jsonl", '{"a": 1}\n\n{"b": [2]}\n', []),
+        ("tests/a.xml", "<a><!-- note --><b/></a>\n", [(1, "<!-- note -->")]),
+        ("docs/CNAME", "example.org\n", []),
+    ],
+)
+def test_data_formats_have_adapters(path: str, source: str, expected: list) -> None:
+    findings = scan(path, source, language(path))
+    assert [(f.line, f.text) for f in findings] == expected
+
+
+def test_invalid_json_line_is_a_coverage_error() -> None:
+    findings = scan("tests/a.jsonl", '{"a": 1}\n# not json\n', "jsonl")
+    assert [f.kind for f in findings] == ["coverage-error"]
+
+
+@pytest.mark.parametrize("path", ["tests/parity/fixtures/.gitkeep", "docs/operations/key.pem"])
+def test_inert_data_files_are_not_sources(path: str) -> None:
+    assert language(path) is None
+
+
+def test_reviewed_process_argv_is_exact() -> None:
+    from comment_execution import REVIEWED_PROCESS_ARGV
+
+    path, argv = next(key for key in REVIEWED_PROCESS_ARGV if key[0] == "benchbox/core/tpch/streams.py")
+    source = f"import subprocess\ncmd = {argv}\nsubprocess.run(cmd)\n"
+    assert not [f for f in scan(path, source, "python", {}) if f.kind == "payload-error"]
+    assert [f.kind for f in scan("other.py", source, "python", {})] == ["payload-error"]
+    edited = source.replace("'-p'", "'-c'")
+    assert [f.kind for f in scan(path, edited, "python", {})] == ["payload-error"]
+
+
+def test_reviewed_process_argv_entries_match_current_sources() -> None:
+    from comment_execution import REVIEWED_PROCESS_ARGV, PythonBindings
+
+    for path, argv in REVIEWED_PROCESS_ARGV:
+        tree = ast.parse((ROOT / path).read_text(encoding="utf-8"))
+        bindings = PythonBindings(tree)
+        assert any(isinstance(node, ast.Call) and bindings.reviewed_argv(path, node) for node in ast.walk(tree)), (
+            path,
+            argv,
+        )
+
+
+def test_absolute_literal_path_executable_is_resolved() -> None:
+    source = "import subprocess\nfrom pathlib import Path\nhelper = Path('/usr/libexec/java_home')\nsubprocess.run([str(helper), '-v', '17'])\n"
+    assert scan("a.py", source, "python", {}) == []
+
+
+def test_module_file_path_script_operand_is_resolved() -> None:
+    source = "import subprocess, sys\nfrom pathlib import Path\nscript = Path(__file__).parent / 'run.py'\nsubprocess.run([sys.executable, str(script)])\n"
+    assert scan("a.py", source, "python", {}) == []
+    rebound = "__file__ = '-c'\n" + source
+    assert [f.kind for f in scan("a.py", rebound, "python", {})] == ["payload-error"]
+
+
+def test_tailwind_apply_does_not_hide_css_comments() -> None:
+    source = ".btn {\n  @apply inline-flex px-4;\n}\n/* note */\n"
+    assert [(f.line, f.kind) for f in scan("a.css", source, "css")] == [(4, "comment")]
+
+
+@pytest.mark.parametrize(
+    ("literal", "kinds"),
+    [("_binaries/dsdgen", []), ("-c", ["payload-error"])],
+)
+def test_literal_path_executable_must_not_be_an_option(literal: str, kinds: list) -> None:
+    source = f"import subprocess\nfrom pathlib import Path\nexe = Path({literal!r})\nsubprocess.run([str(exe), '-c', 'print(1)'])\n"
+    assert [f.kind for f in scan("a.py", source, "python", {})] == kinds
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ("{% for p in posts %}<li>{{ p.title }}</li>{% endfor %}\n", []),
+        ("{% if x %}<!-- note -->{% endif %}\n", ["comment"]),
+        ("<script>var a = '{{ name }}';</script>\n", ["coverage-error"]),
+        ("{{ '<!-- x -->' }}\n", ["coverage-error"]),
+        ('<script data-v="{{ v }}">var a = 1;</script>\n', []),
+    ],
+)
+def test_jinja_html_template_logic_is_bounded(source: str, kinds: list) -> None:
+    assert [f.kind for f in scan("docs/_templates/a.html", source, "html+jinja", {})] == kinds
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ('read -r -a parts <<< "$(git rev-list --parents -n 1 HEAD)"\n', []),
+        ('if ! jq -e . <<<"$payload" >/dev/null; then\n  exit 1\nfi\n', []),
+        ('value=$(jq -r .a <<< "$json")\n', []),
+        ('python3 <<< "$code"\n', ["coverage-error"]),
+        ('hammerdbcli <<< "$script"\n', ["coverage-error"]),
+        ('xargs -n1 <<< "$items"\n', ["coverage-error"]),
+    ],
+)
+def test_here_string_consumers_are_classified(source: str, kinds: list) -> None:
+    assert [f.kind for f in scan("a.sh", source, "bash")] == kinds
+
+
+def test_github_expressions_in_run_scripts_are_data() -> None:
+    source = (
+        "jobs:\n  a:\n    steps:\n      - run: |\n"
+        '          uv run -- python -c "\n'
+        "          name = '${{ matrix.comparison }}'\n"
+        "          # hidden\n"
+        "          print(name)\n"
+        '          "\n'
+    )
+    findings = scan(".github/workflows/a.yml", source, "yaml", {})
+    assert [f.kind for f in findings] == ["comment"]
+    assert findings[0].text == "# hidden"
+
+
+def test_github_expressions_outside_workflows_stay_dynamic() -> None:
+    source = "steps:\n  - run: |\n      uv run -- python -c \"print('${{ x }}')\"\n"
+    assert [f.kind for f in scan("docs/a.yml", source, "yaml", {})] == ["coverage-error"]
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ('uv run --with "$wheel" -- python -c "import sys  # note"\n', ["comment"]),
+        ('env A="$x" python -c "print(1)  # note"\n', ["comment"]),
+        ('uv run --with "$wheel" python -c "print(1)"\n', ["coverage-error"]),
+        ('uv run -- python -c "$code"\n', ["coverage-error"]),
+    ],
+)
+def test_wrapper_dynamic_words_before_the_command(source: str, kinds: list) -> None:
+    assert sorted(f.kind for f in scan("a.sh", source, "bash")) == kinds
+
+
+def test_shell_fallback_scans_interpreter_chunks_when_full_parse_fails() -> None:
+    source = 'X=$(git show a:b 2>/dev/null \\\n  || echo "{}")\npython3 -c "import sys  # note"\n'
+    findings = scan("a.sh", source, "bash")
+    assert [(f.kind, f.line, f.text) for f in findings] == [("comment", 3, "# note")]
+
+
+def test_shell_fallback_keeps_unparsable_interpreter_chunks_visible() -> None:
+    source = 'X=$(git show a:b 2>/dev/null \\\n  || echo "{}")\npython3 -c "$(cat <<EOF\nprint(1)\nEOF\n)"\n'
+    assert any(f.kind == "coverage-error" for f in scan("a.sh", source, "bash"))
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ("gh pr create --title t \\\n  --body \"$(cat <<'EOF'\n# Heading is PR text\nEOF\n)\"\n", []),
+        ("BODY=$(cat <<EOF | awk '{print}'\ntext\nEOF\n)\n", []),
+        ("X=\"$(python3 - <<'PY'\nimport os  # note\nPY\n)\"\n", ["comment"]),
+    ],
+)
+def test_heredoc_inside_command_substitution(source: str, kinds: list) -> None:
+    assert [f.kind for f in scan("a.sh", source, "bash")] == kinds
+
+
+def test_shell_list_operators_inside_substitution_do_not_hide_inline_code() -> None:
+    source = 'X=$(a | b \\\n  || true)\nY=$(echo "$L" | python3 -c "import sys  # note" || echo "")\n'
+    assert [(f.kind, f.text) for f in scan("a.sh", source, "bash")] == [("comment", "# note")]
+
+
+@pytest.mark.parametrize(
+    ("body", "kinds"),
+    [("Escaped \\`code\\` and \\$(not run)\n", []), ("Real `date`\n", ["coverage-error"])],
+)
+def test_unquoted_heredoc_ignores_escaped_substitutions(body: str, kinds: list) -> None:
+    source = "cat <<EOF\n" + body + "EOF\n"
+    assert [f.kind for f in scan("a.sh", source, "bash")] == kinds
+
+
+def test_uv_run_interpreter_with_dynamic_script_arguments() -> None:
+    source = 'uv run python -c "import sys  # note" "$RUN_ID"\n'
+    assert [(f.kind, f.text) for f in scan("a.sh", source, "bash")] == [("comment", "# note")]
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ('uv pip install --python "$venv/bin/python" "$wheel" && python3 -c "import sys  # note"\n', ["comment"]),
+        ("cat > out.md << EOF\n# Title\nGenerated on $(date).\nEOF\n", []),
+        ("cat > out.md << EOF\nRun $(echo a # hidden)\nEOF\n", ["coverage-error"]),
+        ('python3 - << EOF\nprint("$(date)")\nEOF\n', ["coverage-error"]),
+    ],
+)
+def test_inert_uv_subcommands_and_simple_data_heredoc_substitutions(source: str, kinds: list) -> None:
+    assert [f.kind for f in scan("a.sh", source, "bash")] == kinds
+
+
+def test_reviewed_javascript_flows_are_exact_and_current() -> None:
+    from comment_syntax import REVIEWED_JAVASCRIPT_FLOWS, javascript_key
+
+    for path, text in REVIEWED_JAVASCRIPT_FLOWS:
+        source = (ROOT / path).read_text(encoding="utf-8")
+        row = {"kind": "coverage-error", "line": 1, "text": text}
+        key = javascript_key(path, source)
+        assert scan(path, source, "javascript", {key: [row]}) == []
+        other = "results-explorer/src/other.ts"
+        assert [f.text for f in scan(other, source, "javascript", {javascript_key(other, source): [row]})] == [text]
+
+
+def test_reviewed_javascript_flows_still_occur() -> None:
+    import json
+    import os
+    import shutil
+    import subprocess
+
+    from comment_syntax import REVIEWED_JAVASCRIPT_FLOWS
+
+    typescript = os.environ.get("COMMENT_POLICY_TYPESCRIPT", str(ROOT / "results-explorer/node_modules/typescript"))
+    if shutil.which("node") is None or not Path(typescript).exists():
+        pytest.skip("the TypeScript package for scripts/comment_syntax_js.cjs is not installed")
+    paths = sorted({path for path, _ in REVIEWED_JAVASCRIPT_FLOWS})
+    requests = {path: (ROOT / path).read_text(encoding="utf-8") for path in paths}
+    result = subprocess.run(
+        ["node", str(ROOT / "scripts/comment_syntax_js.cjs")],
+        input=json.dumps(requests),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    observed = {(path, row["text"]) for path, rows in json.loads(result.stdout).items() for row in rows}
+    assert set(REVIEWED_JAVASCRIPT_FLOWS) <= observed
+
+
+@pytest.mark.parametrize(
+    ("source", "kind"),
+    [
+        ('import subprocess\nsubprocess.run(["perl", "-e", "# hello"])\n', "payload-error"),
+        ('import subprocess\nsubprocess.run(["sudo", "python3", "-c", "# hello"])\n', "comment"),
+        ('import subprocess\nsubprocess.run(["-c", "# hi"], executable="python3")\n', "payload-error"),
+        ('import os\nos.system("echo hi # there")\n', "comment"),
+        ('import os\nos.popen("echo hi # there")\n', "comment"),
+        ('import asyncio\nasyncio.create_subprocess_shell("echo hi # there")\n', "comment"),
+        ('import subprocess\nsubprocess.run(["echo hi # there"], shell=True)\n', "comment"),
+        ('import subprocess\nsubprocess.run(["uv", "tool", "run", "python", "-c", "# hello"])\n', "comment"),
+        ('import subprocess\nsubprocess.run(["timeout", "5", "python3", "-c", "x = 1  # n"])\n', "comment"),
+        ('import os\nos.execvp("python3", ["python3", "-c", code])\n', "payload-error"),
+        ('from pathlib import Path\nPath("o.html").write_bytes(b"<!-- hi -->")\n', "comment"),
+        ('open("o.html", "w").write("<!-- hi -->")\n', "comment"),
+        ('with open("o.html", "w") as f:\n    f.write("<!-- hi -->")\n', "comment"),
+        ('from pathlib import Path\np = Path("/tmp/o")\np.with_suffix(".html").write_text("<!-- hi -->")\n', "comment"),
+    ],
+)
+def test_python_process_and_html_sinks_fail_closed(source: str, kind: str) -> None:
+    assert [f.kind for f in scan("a.py", source, "python", {})] == [kind]
+
+
+@pytest.mark.parametrize(
+    "source",
+    ['import subprocess\nsubprocess.run(["git", "-c", "user.name=x", "status"])\n', 'open("o.html").read()\n'],
+)
+def test_data_process_and_html_reads_stay_clean(source: str) -> None:
+    assert scan("a.py", source, "python", {}) == []
+
+
+@pytest.mark.parametrize(
+    ("source", "kind"),
+    [
+        ("bash --command '# hello'\n", "comment"),
+        ("uvx python -c '# hello'\n", "comment"),
+        ("uv tool run python -c '# hello'\n", "comment"),
+        ("command python -c '# hello'\n", "comment"),
+        ("sudo bash -c '# hello'\n", "comment"),
+        ("nice -n 5 python -c 'x'\n", "coverage-error"),
+        ("perl -e 'print 1 # x'\n", "coverage-error"),
+        ("perl -ne 'print # x'\n", "coverage-error"),
+        ("perl -e\n", "coverage-error"),
+        ('perl -e "$CODE"\n', "coverage-error"),
+        ("/usr/bin/time -l bash -c '# hello'\n", "comment"),
+        ("/usr/bin/time -v bash -c 'x'\n", "coverage-error"),
+        ("time bash -c 'x'\n", "coverage-error"),
+    ],
+)
+def test_shell_wrappers_and_unmodeled_interpreters_fail_closed(source: str, kind: str) -> None:
+    assert [f.kind for f in scan("a.sh", source, "bash")] == [kind]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "/usr/bin/time -l perl -e 'alarm shift; exec @ARGV' 300 uv run -- benchbox run\n",
+        "/usr/bin/time -p ruby -e 'puts 1'\n",
+    ],
+)
+def test_unmodeled_inline_source_without_a_comment_marker_is_accepted(source: str) -> None:
+    assert scan("a.sh", source, "bash") == []
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang"),
+    [
+        (
+            "azure-pipelines.yml",
+            "steps:\n  - script: |\n      curl -LsSf https://astral.sh/uv/install.sh | sh\n      benchbox run --platform duckdb\n",
+            "yaml",
+        ),
+        ("audit.json", '{"script": "_project/audits/replay.py"}\n', "json"),
+    ],
+)
+def test_shell_script_keys_without_comments_are_clean(path: str, source: str, lang: str) -> None:
+    assert scan(path, source, lang, {}) == []
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang", "kind"),
+    [
+        ("docker-compose.yml", "services:\n  a:\n    command: bash -c '# hello'\n", "yaml", "comment"),
+        ("docker-compose.yml", 'services:\n  a:\n    entrypoint: ["bash", "-c", "# hello"]\n', "yaml", "comment"),
+        ("ci.yml", "jobs:\n  a:\n    script: doStuff(); // explain\n", "yaml", "coverage-error"),
+        ("ci.yml", "jobs:\n  a:\n    script: run // explain\n", "yaml", "coverage-error"),
+        ("ci.yml", "jobs:\n  a:\n    script: |\n      make test # explain\n", "yaml", "comment"),
+        (".gitlab-ci.yml", "test:\n  script:\n    - make lint\n    - make test # explain\n", "yaml", "comment"),
+        ("package.json", '{"scripts": {"x": "echo hi # there"}}\n', "json", "comment"),
+    ],
+)
+def test_structured_command_keys_are_scanned(path: str, source: str, lang: str, kind: str) -> None:
+    assert [f.kind for f in scan(path, source, lang, {})] == [kind]
+
+
+def test_reviewed_joinorder_copy_where_clause_is_an_integer_id_list() -> None:
+    tree = ast.parse((ROOT / "_project/scripts/build_joinorder_data.py").read_text(encoding="utf-8"))
+    assignments = {
+        node.targets[0].id: node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+    }
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "copy_table_to_csv"
+    ]
+    assert calls
+    for call in calls:
+        for keyword in call.keywords:
+            if keyword.arg == "sql_where":
+                assert isinstance(keyword.value, ast.Name)
+                value = assignments[keyword.value.id]
+                assert isinstance(value, ast.JoinedStr)
+                text = ast.unparse(value)
+                assert "id IN (" in text and "str(value) for value in table_ids" in text
+
+
+@pytest.mark.parametrize(
+    "source",
     ["<p>{x}</p>\n", '<a href="http://example.com">x</a>\n', '<p>{"http://example.com"}</p>\n'],
 )
-def test_astro_expressions_without_comment_tokens_need_no_parse(source: str) -> None:
+def test_astro_expressions_without_comment_tokens_are_still_parsed(source: str) -> None:
     requests = javascript_requests("a.astro", source, "astro")
-    assert all("//" in value or "/*" in value for value in requests.values())
+    assert len(requests) == source.count("{")
 
 
 def test_astro_expression_comment_lines_map_to_source_lines() -> None:
@@ -1266,7 +2925,7 @@ def test_astro_regex_literals_and_division_in_expressions(source: str, expressio
 
 @pytest.mark.parametrize("source", ['<p>{/"/.test(s)}</p>\n', "<p>{/{/.test(s)}</p>\n", "<p>{a / b}</p>\n"])
 def test_astro_regex_literal_without_comment_tokens_is_not_a_coverage_error(source: str) -> None:
-    assert scan("a.astro", source, "astro", {}) == []
+    assert scan("a.astro", source, "astro", {k: [] for k in javascript_requests("a.astro", source, "astro")}) == []
 
 
 def test_astro_frontmatter_regex_literal_with_backtick_does_not_open_a_template() -> None:
@@ -1277,14 +2936,17 @@ def test_astro_frontmatter_regex_literal_with_backtick_does_not_open_a_template(
 
 def test_astro_html_comment_inside_jsx_in_an_expression_is_found() -> None:
     source = "<ul>{xs.map((x) => <li><!-- in jsx --></li>)}</ul>\n<p>{'<!-- data -->'}</p>\n"
-    findings = scan("a.astro", source, "astro", {})
+    findings = scan("a.astro", source, "astro", {k: [] for k in javascript_requests("a.astro", source, "astro")})
     assert [(f.line, f.text) for f in findings] == [(1, "<!-- in jsx -->")]
 
 
 def test_astro_frontmatter_ends_at_the_first_top_level_fence() -> None:
     source = "---\nconst text = `\n---\nstill code\n`;\nconst other = '---';\n---\n<p>{text}</p>\n"
     requests = javascript_requests("a.astro", source, "astro")
-    assert list(requests.values()) == ["const text = `\n---\nstill code\n`;\nconst other = '---';\n"]
+    assert list(requests.values()) == [
+        "const text = `\n---\nstill code\n`;\nconst other = '---';\n",
+        "[\ntext\n];",
+    ]
     assert not scan("a.astro", source, "astro", {k: [] for k in requests})
 
 
@@ -1301,17 +2963,18 @@ def test_astro_unterminated_frontmatter_is_a_coverage_error() -> None:
 
 def test_astro_frontmatter_script_and_style_are_scanned_as_their_own_languages() -> None:
     requests = javascript_requests("a.astro", ASTRO_SOURCE, "astro")
-    assert len(requests) == 3
-    comments = ["// frontmatter explanation", "// script explanation", "/* expression explanation */"]
-    lines = [1, 1, 2]
+    assert len(requests) == 4
+    comments = ["// frontmatter explanation", "// script explanation", "/* expression explanation */", None]
+    lines = [1, 1, 2, 2]
     rows = {
-        key: [{"kind": "comment", "line": line, "text": text, "symbol": ""}]
+        key: [{"kind": "comment", "line": line, "text": text, "symbol": ""}] if text else []
         for key, text, line in zip(requests, comments, lines, strict=True)
     }
     assert list(requests.values()) == [
         '// frontmatter explanation\nconst title = "x";\n',
         '\n  // script explanation\n  console.log("<!-- data -->");\n',
         "[\n/* expression explanation */\n];",
+        "[\ntitle\n];",
     ]
     findings = scan("a.astro", ASTRO_SOURCE, "astro", rows)
     assert sorted((f.line, f.text) for f in findings) == [
@@ -1325,3 +2988,184 @@ def test_astro_frontmatter_script_and_style_are_scanned_as_their_own_languages()
 
 def test_astro_without_frontmatter_has_no_javascript_requests() -> None:
     assert javascript_requests("a.astro", "<p>text</p>\n", "astro") == {}
+
+
+def test_myst_list_table_content_is_scanned_and_postlist_is_display_only() -> None:
+    table = "````{list-table}\n:header-rows: 1\n\n* - Name\n  - Example\n* - a\n  - ```python\n    x = 1  # note\n    ```\n````\n"
+    assert [f.text for f in scan("docs/a.md", table, "examples", {})] == ["# note"]
+    assert scan("docs/blog/index.md", "```{postlist}\n:list-style: none\n```\n", "examples", {}) == []
+
+
+def test_myst_eval_rst_content_is_scanned_like_an_rst_page() -> None:
+    source = "```{eval-rst}\n.. code-block:: python\n\n   x = 1  # note\n```\n"
+    assert [f.text for f in scan("docs/a.md", source, "examples", {})] == ["# note"]
+    assert scan("docs/blog/index.md", "```{eval-rst}\n* `Archive <archive.html>`_\n```\n", "examples", {}) == []
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang"),
+    [
+        ("a.py", 'import subprocess\nsubprocess.run(["mytool", "-c", "# hello"])\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run("echo hi # there", shell=flag)\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run(["echo hi # there"], shell=flag)\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run(["psql", "--command=SELECT 1 -- hi"])\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run(["node", "--eval=// hi"])\n', "python"),
+        ("a.sh", "bash --command='# hello'\n", "bash"),
+        ("a.sh", "node -e'// hi'\n", "bash"),
+        ("a.sh", "lua -e '-- hi'\n", "bash"),
+        ("a.sh", "deno eval '// hi'\n", "bash"),
+        ("a.sh", "bun -e '// hi'\n", "bash"),
+        ("a.sh", "php -r '# hi'\n", "bash"),
+        ("a.sh", "Rscript -e '# hi'\n", "bash"),
+        ("a.sh", "powershell -c '# hi'\n", "bash"),
+        ("a.py", 'from pathlib import Path\n(Path("d").joinpath("o.html")).write_text("<!-- hi -->")\n', "python"),
+        ("ci.yml", 'job:\n  script: "call();// hi"\n', "yaml"),
+    ],
+)
+def test_unmodeled_executable_forms_fail_closed(path: str, source: str, lang: str) -> None:
+    assert [f.kind for f in scan(path, source, lang, {})] in (["payload-error"], ["coverage-error"])
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang", "text"),
+    [
+        ("a.py", 'import subprocess\nsubprocess.run(["sqlite3", "a.db", "SELECT 1 -- hi"])\n', "python", "-- hi"),
+        ("a.py", 'import subprocess\nsubprocess.run(["duckdb", "a.db", "SELECT 1 -- hi"])\n', "python", "-- hi"),
+        ("x.yml", "a:\n  entry: bash -c '# hello'\n", "yaml", "# hello"),
+        (
+            "a.py",
+            'import subprocess\nsubprocess.run(["docker", "exec", "c", "bash", "-c", "# hi"])\n',
+            "python",
+            "# hi",
+        ),
+        ("a.sh", "docker exec c bash -c '# hi'\n", "bash", "# hi"),
+        ("a.sh", "sqlite3 a.db 'SELECT 1 -- hi'\n", "bash", "-- hi"),
+        ("a.sh", "psql -c 'SELECT 1 -- hi'\n", "bash", "-- hi"),
+        ("a.sh", "bash -ce '# hi'\n", "bash", "# hi"),
+    ],
+)
+def test_sql_clients_entry_keys_and_nested_commands_are_scanned(path: str, source: str, lang: str, text: str) -> None:
+    assert [f.text for f in scan(path, source, lang, {})] == [text]
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang"),
+    [
+        ("a.py", 'import subprocess\nsubprocess.run(["git", "-c", "user.name=x", "commit"])\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run(["docker", "run", "-e", "A=1", "img"])\n', "python"),
+        ("a.py", 'import subprocess\nsubprocess.run(["ls", "-l"], shell=False)\n', "python"),
+        ("a.sh", "perl script.pl --verbose\n", "bash"),
+        ("a.sh", "sqlite3 a.db 'SELECT 1'\n", "bash"),
+    ],
+)
+def test_data_flags_and_comment_free_sources_stay_clean(path: str, source: str, lang: str) -> None:
+    assert scan(path, source, lang, {}) == []
+
+
+def test_every_astro_expression_is_sent_to_the_typescript_scanner() -> None:
+    source = '<div>{query("SELECT 1 -- hi")}</div>\n'
+    assert list(javascript_requests("a.astro", source, "astro").values()) == ['[\nquery("SELECT 1 -- hi")\n];']
+
+
+@pytest.mark.parametrize(
+    ("source", "kinds"),
+    [
+        ('LEVELS=($(printf "%s\\n" 1 2 | awk -v max="$MAX" \'$1 <= max\' | sort -nu))\n', []),
+        ('if ! awk "BEGIN { exit !($s >= 1) }"; then\n  exit 1\nfi\n', ["coverage-error"]),
+        ("if ! awk -v s=\"$s\" 'BEGIN { exit !(s >= 1) }'; then\n  exit 1\nfi\n", []),
+        ("LEVELS=($(printf x | awk '{print} # note'))\n", ["coverage-error"]),
+        ("LEVELS=($(psql -c 'SELECT 1 -- note'))\n", ["coverage-error"]),
+    ],
+)
+def test_unparseable_shell_chunks_fail_closed_only_when_they_can_hold_a_comment(source: str, kinds: list) -> None:
+    assert [f.kind for f in scan("a.sh", source, "bash")] == kinds
+
+
+def test_heredoc_inside_command_substitution_is_skipped_as_data() -> None:
+    source = "BODY=$(cat <<EOF | awk '{print}'\nIt's data\nEOF\n)\necho \"$BODY\"\n"
+    assert scan("a.sh", source, "bash") == []
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang", "kinds"),
+    [
+        ("a.sh", "ruby -I lib -e '# hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "ruby -r set -e '# hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "osascript -l JavaScript -e '// hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "php -B '# hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "php -R '# hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "node -p'// hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "find . -exec sh -c '# hi' +\n", "bash", ["comment"]),
+        (
+            "a.py",
+            'import subprocess\nsubprocess.run(["find", ".", "-exec", "sh", "-c", "# hi", ";"])\n',
+            "python",
+            ["comment"],
+        ),
+        (
+            "a.py",
+            'import subprocess\nsubprocess.run(["find", ".", "-exec", "rm", "{}", ";"])\n',
+            "python",
+            ["payload-error"],
+        ),
+        ("a.sh", 'perl script.pl "$x" --verbose\n', "bash", []),
+        ("a.sh", "ruby -I lib -e 'puts 1'\n", "bash", []),
+        ("a.py", 'import subprocess\nsubprocess.run(["find", ".", "-name", "*.py"])\n', "python", []),
+    ],
+)
+def test_interpreter_options_before_inline_source_and_find_exec(path: str, source: str, lang: str, kinds: list) -> None:
+    assert [f.kind for f in scan(path, source, lang, {})] == kinds
+
+
+@pytest.mark.parametrize("source", ["node -p '// hi'\n", "node --print '// hi'\n"])
+def test_shell_node_print_source_is_sent_to_the_typescript_scanner(source: str) -> None:
+    assert list(javascript_requests("a.sh", source, "bash").values()) == ["// hi"]
+
+
+@pytest.mark.parametrize(
+    ("path", "source", "lang", "kinds"),
+    [
+        ("a.sh", "find sh -exec perl -e '# hi' \\;\n", "bash", ["coverage-error"]),
+        ("a.sh", "find . -name sh -exec perl -e '# hi' \\;\n", "bash", ["coverage-error"]),
+        ("a.sh", "find psql -exec perl -e '# hi' \\;\n", "bash", ["coverage-error"]),
+        ("a.sh", "find . -exec $DYN -c '# hi' \\;\n", "bash", ["coverage-error"]),
+        (
+            "a.py",
+            'import subprocess\nsubprocess.run(["find", "sh", "-exec", "perl", "-e", "# hi", ";"])\n',
+            "python",
+            ["payload-error"],
+        ),
+        ("a.sh", "deno eval --ext=ts 'console.log(1) // hi'\n", "bash", ["coverage-error"]),
+        ("a.sh", "find . -name sh -print\n", "bash", []),
+        ("a.sh", "deno eval --ext=ts 'console.log(1)'\n", "bash", []),
+    ],
+)
+def test_find_exec_and_deno_eval_options_are_read_in_order(path: str, source: str, lang: str, kinds: list) -> None:
+    assert [f.kind for f in scan(path, source, lang, {})] == kinds
+
+
+@pytest.mark.parametrize("error", [AssertionError, AttributeError, IndexError, TypeError])
+def test_bashlex_internal_errors_count_as_parse_failures(monkeypatch: pytest.MonkeyPatch, error: type) -> None:
+    import comment_payloads
+
+    def crash(_source: str) -> None:
+        raise error("bashlex internal failure")
+
+    monkeypatch.setattr(comment_payloads.bashlex, "parse", crash)
+    assert [f.kind for f in scan("a.sh", "bash -c '# hi'\n", "bash")] == ["coverage-error"]
+    assert scan("a.sh", "awk '{print}' input.txt\n", "bash") == []
+
+
+def test_unparseable_chunk_with_perl_pod_or_ruby_block_comment_fails_closed() -> None:
+    perl = "LEVELS=($(perl -e '1;\n=pod\nnote\n=cut\n'))\n"
+    ruby = "LEVELS=($(ruby -e 'x = 1\n=begin\nnote\n=end\n'))\n"
+    assert [f.kind for f in scan("a.sh", perl, "bash")] == ["coverage-error"]
+    assert [f.kind for f in scan("a.sh", ruby, "bash")] == ["coverage-error"]
+
+
+def test_mdx_pages_are_scanned_like_markdown() -> None:
+    from comment_syntax import language
+
+    assert language("website/src/content/docs/page.mdx") == "examples"
+    source = "import X from './x.astro';\n\n```python\nx = 1  # note\n```\n"
+    assert [f.text for f in scan("website/src/content/docs/page.mdx", source, "examples", {})] == ["# note"]

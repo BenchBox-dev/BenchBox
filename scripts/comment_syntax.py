@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import io
+import json
 import re
 import shlex
 import tokenize
@@ -10,8 +11,14 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 import yaml
-from comment_execution import PythonBindings
-from comment_payloads import astro_template_comments, nested_sources, shell_payloads
+from comment_execution import PythonBindings, python_html_sources
+from comment_payloads import (
+    astro_template_comments,
+    bounded_html_template,
+    nested_sources,
+    shell_payloads,
+    sql_template_sources,
+)
 from pygments.lexers import get_lexer_by_name
 from pygments.token import Comment, Error
 
@@ -72,6 +79,8 @@ LANGUAGES = {
     ".java": "java",
     ".properties": "properties",
     ".json": "json",
+    ".jsonl": "jsonl",
+    ".xml": "xml",
     ".tf": "terraform",
     ".r": "r",
     ".tpl": "unsupported",
@@ -124,6 +133,7 @@ DATA_SUFFIXES = {
     ".ttf",
     ".map",
     ".snap",
+    ".pem",
 }
 
 
@@ -144,19 +154,23 @@ def language(path: str) -> str | None:
         return "ini"
     if name.startswith(".env"):
         return "bash"
-    if name == "skill-sync.conf":
+    if name == "skill-sync.conf" or name == "CNAME":
         return "line-config"
+    if name.startswith(".") and name in DATA_SUFFIXES:
+        return None
     if path == "tools/skill-sync":
         return "bash"
     if name.lower() in {"makefile", "gnumakefile"} or name.startswith("Makefile."):
         return "make"
     if name.startswith("Dockerfile"):
         return "docker"
-    if path.endswith((".md", ".rst")) and not path.startswith(("_project/", "_blog/")):
+    if path.endswith((".md", ".mdx", ".rst")) and not path.startswith(("_project/", "_blog/")):
         return "examples"
     if not PurePosixPath(path).suffix and path.startswith(OWNED_ROOTS):
         return "unsupported"
     suffix = PurePosixPath(path).suffix.lower()
+    if path.startswith("docs/_templates/") and suffix in {".html", ".htm"}:
+        return "html+jinja"
     if suffix not in LANGUAGES and suffix not in DATA_SUFFIXES and path.startswith(OWNED_ROOTS):
         return "unsupported"
     return LANGUAGES.get(suffix)
@@ -254,35 +268,48 @@ def sql_comments(source: str, dialect: str | None = None) -> list[tuple[int, str
     return result
 
 
-def python_findings(path: str, source: str) -> list[Finding]:
+def _is_sql_callable(func: ast.AST) -> bool:
+    return (
+        isinstance(func, ast.Attribute)
+        and func.attr in {"execute", "executemany", "sql", "query", "prepare", "read_sql", "read_sql_query"}
+    ) or (isinstance(func, ast.Name) and func.id in {"text", "read_sql", "read_sql_query"})
+
+
+def _is_sql_keyword(name: str | None) -> bool:
+    return name is not None and (name in {"sql", "query", "statement"} or name.endswith(("_sql", "_query")))
+
+
+def _python_sql_context(node: ast.AST, parent: ast.AST | None, grandparent: ast.AST | None) -> bool:
+    if isinstance(parent, ast.Call):
+        callable_is_sql = _is_sql_callable(parent.func)
+        if node in parent.args:
+            return callable_is_sql
+        return callable_is_sql and any(
+            keyword.value is node and _is_sql_keyword(keyword.arg) for keyword in parent.keywords
+        )
+    if isinstance(parent, ast.keyword) and parent.value is node and isinstance(grandparent, ast.Call):
+        return _is_sql_callable(grandparent.func) and _is_sql_keyword(parent.arg)
+    if isinstance(parent, (ast.Assign, ast.AnnAssign)):
+        targets = parent.targets if isinstance(parent, ast.Assign) else [parent.target]
+        names = [child.id.lower() for target in targets for child in ast.walk(target) if isinstance(child, ast.Name)]
+        return any(name in {"sql", "query", "statement"} or name.endswith(("_sql", "_query")) for name in names)
+    if isinstance(parent, ast.Dict):
+        return any(
+            value is node
+            and isinstance(key, ast.Constant)
+            and isinstance(key.value, str)
+            and (key.value in {"sql", "query"} or key.value.endswith("_sql"))
+            for key, value in zip(parent.keys, parent.values)
+        )
+    return False
+
+
+def python_findings(path: str, source: str, js_results: dict[str, list[dict]] | None = None) -> list[Finding]:
     tree = ast.parse(source)
     result: list[Finding] = []
     scopes: list[tuple[int, int, str]] = []
 
-    def sql_context(node: ast.AST, parent: ast.AST | None) -> bool:
-        if isinstance(parent, ast.Call) and node in parent.args:
-            func = parent.func
-            return (
-                isinstance(func, ast.Attribute)
-                and func.attr in {"execute", "executemany", "sql", "query", "prepare", "read_sql", "read_sql_query"}
-            ) or (isinstance(func, ast.Name) and func.id in {"text", "read_sql", "read_sql_query"})
-        if isinstance(parent, (ast.Assign, ast.AnnAssign)):
-            targets = parent.targets if isinstance(parent, ast.Assign) else [parent.target]
-            names = [
-                child.id.lower() for target in targets for child in ast.walk(target) if isinstance(child, ast.Name)
-            ]
-            return any(name in {"sql", "query", "statement"} or name.endswith(("_sql", "_query")) for name in names)
-        if isinstance(parent, ast.Dict):
-            return any(
-                value is node
-                and isinstance(key, ast.Constant)
-                and isinstance(key.value, str)
-                and (key.value in {"sql", "query"} or key.value.endswith("_sql"))
-                for key, value in zip(parent.keys, parent.values)
-            )
-        return False
-
-    def visit(node: ast.AST, symbol: str, parent: ast.AST | None = None) -> None:
+    def visit(node: ast.AST, symbol: str, parent: ast.AST | None = None, grandparent: ast.AST | None = None) -> None:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             symbol = f"{symbol}.{node.name}".strip(".")
             scopes.append((node.lineno, node.end_lineno or node.lineno, symbol))
@@ -318,7 +345,7 @@ def python_findings(path: str, source: str) -> list[Finding]:
             sql_text = "".join(
                 str(value.value) if isinstance(value, ast.Constant) else "__expression__" for value in node.values
             )
-        if sql_text and sql_context(node, parent) and re.search(r"--|/\*|#", sql_text):
+        if sql_text and _python_sql_context(node, parent, grandparent) and re.search(r"--|/\*|#", sql_text):
             try:
                 result.extend(
                     Finding(path, node.lineno + sql_text[:offset].count("\n"), "comment", text, symbol, sql_text)
@@ -327,7 +354,7 @@ def python_findings(path: str, source: str) -> list[Finding]:
             except ValueError as exc:
                 result.append(Finding(path, node.lineno, "payload-error", str(exc), symbol, sql_text))
         for child in ast.iter_child_nodes(node):
-            visit(child, symbol, node)
+            visit(child, symbol, node, parent)
 
     visit(tree, "")
     for token in tokenize.generate_tokens(io.StringIO(source).readline):
@@ -335,6 +362,25 @@ def python_findings(path: str, source: str) -> list[Finding]:
             symbol = next((name for start, end, name in reversed(scopes) if start <= token.start[0] <= end), "")
             result.append(Finding(path, token.start[0], "comment", token.string, symbol))
     result.extend(python_executable_findings(path, tree, scopes))
+    for line, text, symbol in python_html_sources(source, tree):
+        if text is None:
+            result.append(
+                Finding(
+                    path, line, "payload-error", "unresolved HTML output source", symbol, python_consumer_digest(tree)
+                )
+            )
+        else:
+            result.extend(
+                Finding(
+                    path,
+                    line + finding.line - 1,
+                    finding.kind,
+                    finding.text,
+                    f"{symbol}:{finding.symbol}",
+                    finding.payload or text,
+                )
+                for finding in scan(path + ".html", text, "html", js_results)
+            )
     return result
 
 
@@ -361,6 +407,8 @@ def python_executable_findings(path: str, tree: ast.AST, scopes: list[tuple[int,
         if payload is None:
             continue
         expression, lang, text = payload
+        if (text is None or lang == "unsupported") and bindings.reviewed_argv(path, node):
+            continue
         symbol = next((name for start, end, name in reversed(scopes) if start <= node.lineno <= end), "")
         if text is None or lang == "unsupported":
             result.append(
@@ -411,11 +459,51 @@ def javascript_requests(path: str, source: str, lang: str) -> dict[str, str]:
         return {javascript_key(path, source): source}
     result = {}
     try:
+        if lang == "python":
+            for _, text, _ in python_html_sources(source):
+                if text is not None:
+                    result.update(javascript_requests(path + ".html", text, "html"))
         for _, child_path, text, child_lang, _ in nested_sources(path, source, lang):
             result.update(javascript_requests(child_path, text, child_lang))
-    except (ValueError, KeyError, TypeError, yaml.YAMLError):
+    except (SyntaxError, ValueError, KeyError, TypeError, yaml.YAMLError):
         return {}
     return result
+
+
+REVIEWED_JAVASCRIPT_FLOWS: dict[tuple[str, str], str] = {
+    (
+        "results-explorer/src/db.ts",
+        "unresolved executable sql payload: scan.sql",
+    ): "SNAPSHOT_READY_SCANS entries are object literals whose sql values are scanned as SQL",
+    (
+        "results-explorer/src/lib/duckdbQueries.ts",
+        "unresolved executable sql payload: query.sql",
+    ): "SnapshotRowsQuery objects come from query builders whose sql property values are scanned as SQL",
+    (
+        "results-explorer/src/pages/Query.tsx",
+        "unresolved executable sql payload: pageQueries.rows.sql",
+    ): "page query objects come from query builders whose sql property values are scanned as SQL",
+    (
+        "results-explorer/src/pages/Query.tsx",
+        "unresolved executable sql payload: pageQueries.count.sql",
+    ): "page query objects come from query builders whose sql property values are scanned as SQL",
+    (
+        "results-explorer/src/pages/Query.tsx",
+        "unresolved executable sql payload: query.sql",
+    ): "starter and builder query objects have sql property values that are scanned as SQL",
+    (
+        "results-explorer/src/pages/Query.tsx",
+        "unresolved executable sql payload: selectQuery.sql",
+    ): "select query objects come from query builders whose sql property values are scanned as SQL",
+    (
+        "results-explorer/src/pages/Query.tsx",
+        "unresolved executable sql payload: sqlText",
+    ): "sqlText is SQL the user types into the query editor; it is runtime input, not source",
+    (
+        "results-explorer/scripts/generate-browser-fixtures.mjs",
+        "unresolved process arguments require an executable-payload adapter: spawnSync(args[0], args.slice(1))",
+    ): "the pipeline command comes from the explorer build contract data file and runs the snapshot pipeline CLI",
+}
 
 
 def javascript_findings(path: str, source: str, js_results: dict[str, list[dict]] | None) -> list[Finding]:
@@ -436,11 +524,69 @@ def javascript_findings(path: str, source: str, js_results: dict[str, list[dict]
                 )
                 for f in scan(path + "." + row["language"], row["text"], row["language"], js_results)
             )
-        else:
+        elif (path, row["text"]) not in REVIEWED_JAVASCRIPT_FLOWS:
             result.append(
                 Finding(path, row["line"], row["kind"], row["text"], row.get("symbol", ""), row.get("payload", ""))
             )
     return result
+
+
+def sql_findings(path: str, source: str, lang: str) -> list[Finding]:
+    if lang == "sql":
+        return [
+            Finding(path, source[:offset].count("\n") + 1, "comment", text) for offset, text in sql_comments(source)
+        ]
+    result = [
+        Finding(path, line_map[offset], "comment", text, "template-sql", rendered)
+        for rendered, line_map in sql_template_sources(source)
+        for offset, text in sql_comments(rendered)
+    ]
+    result.extend(
+        Finding(path, source[:offset].count("\n") + 1, "comment", text.rstrip("\r\n"), "template-comment", source)
+        for offset, token, text in get_lexer_by_name("jinja").get_tokens_unprocessed(source)
+        if token in Comment and token not in Comment.Preproc
+    )
+    return result
+
+
+def template_coverage(path: str, source: str, lang: str) -> list[Finding]:
+    if lang != "html+jinja":
+        return []
+    try:
+        if "{#" in source:
+            raise ValueError("unresolved HTML template comment expansion")
+        bounded_html_template(source)
+    except ValueError as exc:
+        return [Finding(path, 1, "coverage-error", str(exc))]
+    return []
+
+
+def mask_embedded_sources(path: str, source: str, lang: str) -> str:
+    if lang == "bash":
+        lines = source.splitlines(keepends=True)
+        for start, _, text, _, _ in shell_payloads(path, source, include_data=True):
+            for index in range(start - 1, start - 1 + len(text.splitlines())):
+                lines[index] = re.sub(r"[^\n]", " ", lines[index])
+        return "".join(lines) + "\n"
+    if lang in {"html", "html+jinja"}:
+        return re.sub(
+            r"(<(?:script|style)\b[^>]*>)(.*?)(</(?:script|style)\s*>)",
+            lambda m: m.group(1) + re.sub(r"[^\n]", " ", m.group(2)) + m.group(3),
+            source,
+            flags=re.I | re.S,
+        )
+    if lang == "css":
+        return re.sub(r"@apply\b[^;{}/]*;", lambda m: re.sub(r"[^\n]", " ", m.group()), source)
+    return source
+
+
+def validate_json_lines(source: str) -> None:
+    for index, line in enumerate(source.splitlines(), 1):
+        if line.strip():
+            try:
+                json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"invalid JSON line {index}") from exc
 
 
 def astro_findings(path: str, source: str, lang: str) -> list[Finding]:
@@ -454,11 +600,9 @@ def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | 
         if source.startswith("#!"):
             lang = source_language(path, source) or lang
         if lang == "python":
-            return python_findings(path, source)
-        if lang == "sql":
-            return [
-                Finding(path, source[:offset].count("\n") + 1, "comment", text) for offset, text in sql_comments(source)
-            ]
+            return python_findings(path, source, js_results)
+        if lang in {"sql", "sql+jinja"}:
+            return sql_findings(path, source, lang)
         if lang == "javascript":
             return javascript_findings(path, source, js_results)
         nested = [
@@ -466,23 +610,15 @@ def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | 
             for start, child_path, text, child_lang, symbol in nested_sources(path, source, lang)
             for f in scan(child_path, text, child_lang, js_results)
         ]
+        nested.extend(template_coverage(path, source, lang))
         if lang in {"notebook", "examples", "astro"}:
             return nested + astro_findings(path, source, lang)
-        if lang == "bash":
-            lines = source.splitlines(keepends=True)
-            for start, _, text, _, _ in shell_payloads(path, source, include_data=True):
-                for index in range(start - 1, start - 1 + len(text.splitlines())):
-                    lines[index] = re.sub(r"[^\n]", " ", lines[index])
-            source = "".join(lines) + "\n"
-        if lang in {"html", "html+jinja"}:
-            source = re.sub(
-                r"(<(?:script|style)\b[^>]*>)(.*?)(</(?:script|style)\s*>)",
-                lambda m: m.group(1) + re.sub(r"[^\n]", " ", m.group(2)) + m.group(3),
-                source,
-                flags=re.I | re.S,
-            )
+        source = mask_embedded_sources(path, source, lang)
         if lang == "unsupported":
             raise ValueError("source language has no registered adapter")
+        if lang == "jsonl":
+            validate_json_lines(source)
+            return nested
         if lang == "line-config":
             return [
                 Finding(path, index, "comment", text)
@@ -494,7 +630,7 @@ def scan(path: str, source: str, lang: str, js_results: dict[str, list[dict]] | 
             if token in Error:
                 raise ValueError(f"unrecognized {lang} syntax at line {source[:offset].count(chr(10)) + 1}")
             if token in Comment:
-                if token in Comment.Preproc:
+                if token in Comment.Preproc or token in Comment.PreprocFile:
                     continue
                 if lang == "bash" and offset and source[offset - 1] not in " \t\r\n;|&()":
                     continue

@@ -29,30 +29,29 @@ class FakeConn:
 
 
 def test_validate_row_counts_pass_with_warnings_only():
-    # Adapter returns a connection that yields counts we expect
+
     class Adapter:
         platform_name = "duckdb"
         platform_config = {}
 
         def create_connection(self, **_):
-            return FakeConn(0)  # value ignored in _get_table_row_count path
+            return FakeConn(0)
 
         def close_connection(self, _):
             return None
 
     dv = DataValidator(Adapter(), tolerance_percent=0.1, absolute_tolerance=100)
 
-    # Monkey-patch exact counter to return specific counts per table
     def fake_table_count(conn, name):
         return {"ok": 1000, "warn": 980}[name]
 
-    dv._get_table_row_count = fake_table_count  # type: ignore
+    dv._get_table_row_count = fake_table_count
 
     res = dv.validate_row_counts({"ok": 1000, "warn": 900})
     assert res.is_valid is True
     assert res.passed_tables == 1
     assert res.warning_tables == 1
-    # Verify statuses recorded
+
     status = {d.table_name: d.status for d in res.discrepancies}
     assert status["ok"] == ValidationStatus.PASSED
     assert status["warn"] == ValidationStatus.WARNING
@@ -74,7 +73,7 @@ def test_validate_row_counts_fail_with_exceeded_tolerance():
     def fake_table_count(conn, name):
         return {"bad": 1201}[name]
 
-    dv._get_table_row_count = fake_table_count  # type: ignore
+    dv._get_table_row_count = fake_table_count
 
     res = dv.validate_row_counts({"bad": 900})
     assert res.is_valid is False

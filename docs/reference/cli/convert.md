@@ -135,62 +135,60 @@ benchbox convert --input ./data/tpch_sf1 --format ducklake
 ### Basic Conversion
 
 ```bash
-# Convert TPC-H data to Parquet with default settings
 benchbox convert --input ./benchmark_runs/tpch_sf1 --format parquet
 
-# Convert to Delta Lake
 benchbox convert --input ./benchmark_runs/tpch_sf1 --format delta
 
-# Convert to DuckLake (DuckDB's native table format)
 benchbox convert --input ./benchmark_runs/tpch_sf1 --format ducklake
 ```
+
+The first command converts TPC-H data to Parquet with default settings, the second converts to Delta Lake, and the third converts to DuckLake (DuckDB's native table format).
 
 ### Compression Options
 
 ```bash
-# Use Zstd for best compression ratio
 benchbox convert --input ./data/tpch_sf10 --format parquet --compression zstd
 
-# Use gzip for compatibility with older systems
 benchbox convert --input ./data/tpch_sf10 --format parquet --compression gzip
 
-# No compression for debugging
 benchbox convert --input ./data/tpch_sf1 --format parquet --compression none
 ```
+
+Use Zstd for the best compression ratio, gzip for compatibility with older systems, and no compression for debugging.
 
 ### Partitioned Output
 
 ```bash
-# Partition lineitem table by ship date
 benchbox convert --input ./data/tpch_sf1 --format parquet \
     --partition l_shipdate
 
-# Multiple partition columns (hierarchical)
 benchbox convert --input ./data/tpch_sf1 --format parquet \
     --partition l_returnflag --partition l_linestatus
 
-# Partition Delta Lake by date
 benchbox convert --input ./data/tpch_sf10 --format delta \
     --partition l_shipdate
 ```
 
+The first command partitions the lineitem table by ship date. The second uses multiple partition columns (hierarchical), and the third partitions a Delta Lake table by date.
+
 ### Performance Optimization
 
 ```bash
-# Skip validation for faster conversion (not TPC compliant)
 benchbox convert --input ./data/tpch_sf100 --format parquet --no-validate
 
-# Verbose output for debugging
 benchbox convert --input ./data/tpch_sf1 --format parquet --verbose
 ```
+
+`--no-validate` skips validation for faster conversion, but the result is not TPC compliant. `--verbose` gives detailed output for debugging.
 
 ### Separate Output Directory
 
 ```bash
-# Convert to a different directory
 benchbox convert --input ./raw_data/tpch_sf1 --format parquet \
     --output ./converted_data/tpch_sf1_parquet
 ```
+
+This writes the converted data to a different directory.
 
 ## Output
 
@@ -226,23 +224,21 @@ Summary:
 ### With DuckDB
 
 ```sql
--- Read Parquet file
 SELECT * FROM read_parquet('./data/customer.parquet');
 
--- Read partitioned Parquet dataset
 SELECT * FROM read_parquet('./data/lineitem/**/*.parquet', hive_partitioning=true);
 
--- Read Delta Lake table (requires delta extension)
 INSTALL delta;
 LOAD delta;
 SELECT * FROM delta_scan('./data/lineitem');
 
--- Read DuckLake table (DuckDB's native format)
 INSTALL ducklake;
 LOAD ducklake;
 ATTACH 'ducklake:./data/lineitem/metadata.ducklake' AS ducklake_db (DATA_PATH './data/lineitem/data');
 SELECT * FROM ducklake_db.main.lineitem;
 ```
+
+The statements read a Parquet file, a partitioned Parquet dataset, a Delta Lake table (this requires the delta extension) and a DuckLake table (DuckDB's native format), in that order.
 
 ### With Python
 
@@ -250,20 +246,16 @@ SELECT * FROM ducklake_db.main.lineitem;
 import duckdb
 import pyarrow.parquet as pq
 
-# Read Parquet with PyArrow
 table = pq.read_table('./data/customer.parquet')
 df = table.to_pandas()
 
-# Read Parquet with DuckDB
 conn = duckdb.connect()
 df = conn.execute("SELECT * FROM read_parquet('./data/customer.parquet')").fetchdf()
 
-# Read Delta Lake
 from deltalake import DeltaTable
 dt = DeltaTable('./data/customer')
 df = dt.to_pandas()
 
-# Read DuckLake
 conn.execute("INSTALL ducklake; LOAD ducklake;")
 conn.execute("""
     ATTACH 'ducklake:./data/customer/metadata.ducklake' AS ducklake_db
@@ -271,6 +263,8 @@ conn.execute("""
 """)
 df = conn.execute("SELECT * FROM ducklake_db.main.customer").fetchdf()
 ```
+
+The examples read Parquet with PyArrow, Parquet with DuckDB, a Delta Lake table, and a DuckLake table, in that order.
 
 ## Prerequisites
 
@@ -282,15 +276,14 @@ The `convert` command requires:
 For Vortex, Delta Lake, and Iceberg formats, install optional dependencies:
 
 ```bash
-# Vortex support
 uv add vortex-data
 
-# Delta Lake support
 uv add deltalake
 
-# Apache Iceberg support
 uv add pyiceberg
 ```
+
+These provide Vortex, Delta Lake and Apache Iceberg support, in that order.
 
 DuckLake requires DuckDB >= 1.2.0 but has no additional dependencies - the ducklake extension auto-installs on first use.
 

@@ -1,9 +1,3 @@
-"""Runtime environment helpers for platform driver management.
-
-This module centralizes driver version enforcement so platform adapters
-can honour requested package versions before importing heavy dependencies.
-"""
-
 from __future__ import annotations
 
 import contextlib
@@ -23,14 +17,12 @@ from typing import Iterable
 try:
     from importlib import metadata as importlib_metadata
 except ImportError:  # pragma: no cover
-    import importlib_metadata  # type: ignore[assignment]
+    import importlib_metadata
 
 logger = logging.getLogger(__name__)
 
 
 class DriverRuntimeStrategy(str, Enum):
-    """Runtime selection strategy for platform drivers."""
-
     CURRENT_PROCESS = "current-process"
     ISOLATED_SITE_PACKAGES = "isolated-site-packages"
     EXTERNAL_RUNTIME = "external-runtime"
@@ -38,8 +30,6 @@ class DriverRuntimeStrategy(str, Enum):
 
 @dataclass(frozen=True)
 class DriverRuntimeLocation:
-    """Resolved runtime location for a package version."""
-
     package: str
     version: str
     strategy: str
@@ -49,8 +39,6 @@ class DriverRuntimeLocation:
 
 @dataclass(frozen=True)
 class DriverResolution:
-    """Represents the outcome of a driver version resolution."""
-
     package: str
     requested: str | None
     resolved: str | None
@@ -66,12 +54,10 @@ def _normalize_package_name(package: str) -> str:
 
 
 def _normalize_distribution_name(name: str) -> str:
-    """Normalize package/distribution names for comparisons."""
     return re.sub(r"[-_.]+", "-", name.strip().lower())
 
 
 def _candidate_runtime_roots() -> list[Path]:
-    """Return configured roots that may contain isolated driver runtimes."""
     configured = os.getenv("BENCHBOX_DRIVER_RUNTIME_ROOTS", "").strip()
     roots: list[Path] = []
 
@@ -85,7 +71,6 @@ def _candidate_runtime_roots() -> list[Path]:
         roots.extend(
             [
                 cwd / "benchmark_runs" / "driver_envs",
-                # Compatibility root used by existing local benchmark matrices.
                 cwd / "benchmark_runs" / "duckdb_version_envs",
             ]
         )
@@ -101,7 +86,6 @@ def _candidate_runtime_roots() -> list[Path]:
 
 
 def _iter_site_packages(venv_root: Path) -> Iterable[Path]:
-    """Yield site-packages directories for a virtual environment-like root."""
     yield from venv_root.glob("lib/python*/site-packages")
     windows_site_packages = venv_root / "Lib" / "site-packages"
     if windows_site_packages.exists():
@@ -109,7 +93,6 @@ def _iter_site_packages(venv_root: Path) -> Iterable[Path]:
 
 
 def _find_distribution_version(site_packages: Path, package_name: str) -> str | None:
-    """Return the package version discovered in a site-packages directory."""
     expected = _normalize_distribution_name(package_name)
     for dist in importlib_metadata.distributions(path=[str(site_packages)]):
         metadata_name = dist.metadata.get("Name") if dist.metadata else None
@@ -124,19 +107,8 @@ _CPYTHON_ABI_RE = re.compile(r"\.cpython-(\d{2,3})")
 
 
 def _validate_runtime_abi(site_packages: Path, package_name: str) -> bool:
-    """Check that a discovered isolated runtime has ABI-compatible extensions.
-
-    Scans the package directory under *site_packages* for compiled extension
-    files (.so / .pyd).  If any carry a ``cpython-3XX`` ABI tag that differs
-    from the running interpreter, the runtime is rejected.  Extensions with
-    no cpython tag (stable ABI ``.abi3.so``, bare ``.so``) and pure-Python
-    packages (no extension files at all) are always accepted.
-
-    Returns ``True`` when the runtime is usable, ``False`` otherwise.
-    """
     pkg_dir = site_packages / package_name.replace("-", "_")
     if not pkg_dir.is_dir():
-        # No package directory - might be a single-file module; accept it.
         return True
 
     current_tag = f"{sys.version_info.major}{sys.version_info.minor}"
@@ -150,15 +122,11 @@ def _validate_runtime_abi(site_packages: Path, package_name: str) -> bool:
             continue
         m = _CPYTHON_ABI_RE.search(name)
         if m is None:
-            # Bare .so, .abi3.so, or .pyd without cpython tag - always compatible.
             continue
         has_tagged_extension = True
         if m.group(1) == current_tag:
             return True
 
-    # If we found tagged extensions but none matched, this runtime is incompatible.
-    # If no tagged extensions exist at all, the package is compatible (pure-Python
-    # or stable ABI only).
     return not has_tagged_extension
 
 
@@ -167,7 +135,6 @@ def discover_isolated_runtime(
     package_name: str,
     requested_version: str,
 ) -> DriverRuntimeLocation | None:
-    """Discover an isolated runtime root that contains package==requested_version."""
     requested = requested_version.strip()
     if not requested:
         return None
@@ -213,7 +180,6 @@ def discover_isolated_runtime(
 
 
 def _purge_module_tree(module_name: str) -> None:
-    """Remove a module and its submodules from sys.modules."""
     prefix = f"{module_name}."
     for loaded in list(sys.modules.keys()):
         if loaded == module_name or loaded.startswith(prefix):
@@ -240,14 +206,8 @@ def load_driver_module(
     resolution: DriverResolution,
     strict_version_check: bool = True,
 ):
-    """Materialize/import a driver module according to runtime resolution."""
     if resolution.runtime_strategy != DriverRuntimeStrategy.ISOLATED_SITE_PACKAGES.value:
         if resolution.auto_install_used:
-            # Only purge if the already-loaded module doesn't match the requested
-            # version.  C extension modules (e.g. DuckDB) cannot be safely
-            # unloaded and reloaded via dlopen within the same process - doing so
-            # causes SIGSEGV.  If the correct version is already in sys.modules we
-            # can skip the purge entirely.
             existing = sys.modules.get(import_name)
             already_correct = (
                 existing is not None
@@ -268,7 +228,6 @@ def load_driver_module(
         if not runtime_dir.exists():
             raise RuntimeError(f"Runtime path does not exist for module '{import_name}': {runtime_path}")
 
-        # Ensure the requested module comes from the isolated runtime.
         _purge_module_tree(import_name)
         sys.path.insert(0, runtime_path)
         try:
@@ -335,20 +294,6 @@ def ensure_driver_version(
     auto_install: bool = False,
     install_hint: str | None = None,
 ) -> DriverResolution:
-    """Ensure the specified driver package matches the requested version.
-
-    Args:
-        package_name: Distribution name for the driver package.
-        requested_version: Exact version string requested by the user/config.
-        auto_install: Whether BenchBox may attempt installation automatically.
-        install_hint: Human-friendly installation command for error messages.
-
-    Returns:
-        DriverResolution describing the resolved version.
-
-    Raises:
-        RuntimeError: If the driver version is not satisfied and cannot be installed.
-    """
 
     if not package_name:
         requested = (requested_version or "").strip() or None
@@ -370,7 +315,6 @@ def ensure_driver_version(
         requested,
     )
 
-    # Nothing requested: ensure something is installed and report it.
     if requested is None:
         if installed_version is None:
             hint = install_hint or f"uv add {normalized_package}"
@@ -389,7 +333,6 @@ def ensure_driver_version(
             runtime_python_executable=sys.executable,
         )
 
-    # Requested version already satisfied.
     if installed_version == requested:
         return DriverResolution(
             package=normalized_package,
@@ -402,7 +345,6 @@ def ensure_driver_version(
             runtime_python_executable=sys.executable,
         )
 
-    # Requested version may exist in an isolated runtime without mutating current env.
     isolated_runtime = discover_isolated_runtime(
         package_name=normalized_package,
         requested_version=requested,
@@ -419,7 +361,6 @@ def ensure_driver_version(
             runtime_python_executable=isolated_runtime.python_executable,
         )
 
-    # Requested version missing or different.
     auto_install_enabled = _should_auto_install(auto_install)
     if not auto_install_enabled:
         hint = install_hint or f"uv add {normalized_package}=={requested}"
@@ -433,9 +374,6 @@ def ensure_driver_version(
             + f"\nSuggested command: {hint}"
         )
 
-    # Attempt auto-install using uv, targeting the current interpreter's environment.
-    # --python sys.executable ensures uv installs into the running venv (e.g. uv tool envs
-    # where `pip` is absent and the default uv target may differ from sys.executable).
     commands_to_try = [
         ["uv", "pip", "install", "--python", sys.executable, f"{normalized_package}=={requested}"],
         [sys.executable, "-m", "pip", "install", f"{normalized_package}=={requested}"],
@@ -458,7 +396,7 @@ def ensure_driver_version(
                     runtime_path=None,
                     runtime_python_executable=sys.executable,
                 )
-        except Exception as exc:  # pragma: no cover - exercised in tests via mocks
+        except Exception as exc:  # pragma: no cover
             last_error = exc
             logger.warning("Driver auto-install command failed: %s", exc)
 

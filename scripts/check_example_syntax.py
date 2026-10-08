@@ -1,19 +1,6 @@
 #!/usr/bin/env python3
-"""Check Example File Syntax and Imports
-
-This script validates that all Python example files have valid syntax
-and can be compiled without errors.
-
-Usage:
-    python scripts/check_example_syntax.py
-
-Exit codes:
-    0 - All examples valid
-    1 - Syntax errors found
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 import py_compile
 import sys
@@ -22,21 +9,11 @@ from typing import List, Tuple
 
 
 def find_example_files(examples_dir: Path) -> List[Path]:
-    """Find all Python files in examples directory."""
     python_files = list(examples_dir.rglob("*.py"))
-    # Exclude __pycache__ and other artifacts
     return [f for f in python_files if "__pycache__" not in str(f)]
 
 
 def check_syntax(file_path: Path) -> Tuple[bool, str]:
-    """Check if a Python file has valid syntax.
-
-    Args:
-        file_path: Path to Python file
-
-    Returns:
-        (is_valid, error_message)
-    """
     try:
         py_compile.compile(str(file_path), doraise=True)
         return True, ""
@@ -49,23 +26,10 @@ def check_syntax(file_path: Path) -> Tuple[bool, str]:
 
 
 def check_basic_imports(file_path: Path) -> Tuple[bool, str]:
-    """Check if file imports can be resolved (basic check).
-
-    This is a lightweight check that ensures the file can be read
-    and doesn't have obvious import issues.
-
-    Args:
-        file_path: Path to Python file
-
-    Returns:
-        (is_valid, error_message)
-    """
     try:
         content = file_path.read_text(encoding="utf-8")
 
-        # Check for common import patterns that might fail
         if "from benchbox" in content or "import benchbox" in content:
-            # This is expected and fine
             pass
 
         return True, ""
@@ -74,7 +38,6 @@ def check_basic_imports(file_path: Path) -> Tuple[bool, str]:
 
 
 def main():
-    """Main validation entry point."""
     repo_root = Path(__file__).parent.parent
     examples_dir = repo_root / "examples"
 
@@ -95,11 +58,9 @@ def main():
     for example_file in sorted(example_files):
         rel_path = example_file.relative_to(repo_root)
 
-        # Check syntax (compilation)
         is_valid, error_msg = check_syntax(example_file)
 
         if is_valid:
-            # Also check basic imports
             imports_ok, import_error = check_basic_imports(example_file)
             if imports_ok:
                 valid_count += 1
@@ -113,7 +74,6 @@ def main():
             print(f"   {error_msg}")
             invalid_files.append({"file": str(rel_path), "error": error_msg})
 
-    # Summary
     print("\n" + "=" * 60)
     print("Validation Summary")
     print("=" * 60)

@@ -1,17 +1,3 @@
-"""Minimal reproducers for SQLGlot defects observed by BenchBox.
-
-Pinned to ``sqlglot==30.6.0`` (the version resolved by the BenchBox lockfile
-at the time the issues were drafted). Run with:
-
-    uv run --with sqlglot==30.6.0 python _project/sqlglot-upstream/repros/repro_all.py
-
-Each repro prints PASS / FAIL for a syntax or capability observation. Historical
-tier labels are not filing decisions. PASS does not establish execution
-equivalence or authorize workaround removal; FAIL can reflect a proxy dialect
-choice rather than an upstream defect. See sqlite_extract.py for bounded
-execution witnesses and the README for contribution readiness.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -33,13 +19,6 @@ def _result(label: str, passed: bool, detail: str) -> bool:
 
 
 def _check_all_keyword_pair(label: str, sql: str, *, read: str, write: str = "duckdb") -> bool:
-    """Run one transpile and report whether ALL stayed unquoted.
-
-    Caller passes ``read`` and ``write`` as literals so a grep over this
-    file reads the call shape directly -- a wrapper-call-shape probe must
-    match the production read/write pair, and the
-    `cross-dialect probe` doc in the README is keyed off that grep.
-    """
     out = sqlglot.transpile(sql, read=read, write=write, identify=True)[0]
     print(f"  input ({read}->{write}): {sql}")
     print(f"  output             : {out}")
@@ -56,8 +35,6 @@ def repro_1_duckdb_all_keyword() -> bool:
     group_sql = "SELECT col1, col2, SUM(col3) FROM tbl GROUP BY ALL"
     order_sql = "SELECT col1, col2 FROM tbl ORDER BY ALL"
 
-    # Direct-dialect probe: dialect_utils.translate_sql_query when the input
-    # benchmark already speaks DuckDB.
     direct_pass = all(
         [
             _check_all_keyword_pair("GROUP BY ALL (duckdb->duckdb)", group_sql, read="duckdb", write="duckdb"),
@@ -65,11 +42,6 @@ def repro_1_duckdb_all_keyword() -> bool:
         ]
     )
 
-    # Wrapper / cross-dialect probe: BenchBox's actual call shape at
-    # `dialect_utils.translate_sql_query` is read="postgres" (after netezza-
-    # postgres normalization), write="duckdb". Single-dialect PASS is not a
-    # valid retirement gate for `_restore_group_order_by_all_keyword`; this
-    # cross-dialect pair is.
     wrapper_pass = all(
         [
             _check_all_keyword_pair(

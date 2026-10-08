@@ -1,19 +1,3 @@
-"""Status wiring: fallback prices and staleness publish as unavailable.
-
-Covers the fail-closed status contract:
-
-- A ``price_unavailable`` marker stamped on any query's pricing details flips
-  the end-to-end ``cost_status`` to ``unavailable`` with a populated warning
-  (the per-query fallback figure itself is still computable, never zero).
-- A Databricks serverless SQL config that resolves through a fallback price
-  (azure/enterprise has no such tier) yields ``unavailable``, not the
-  $4.40 normalized total the fallback used to publish.
-- Athena and Synapse serverless runs in unlisted regions yield ``unavailable``
-  rather than a default-region rate published as normalized cost; priced
-  regions stay normalized.
-- A stale pricing table yields ``unavailable``, not a warnings-string alone.
-"""
-
 import pytest
 
 import benchbox.core.cost.calculator as calculator_module
@@ -26,7 +10,6 @@ pytestmark = [
 
 
 def _serverless_databricks_config() -> dict:
-    """Live-shaped serverless SQL config on a tier Azure does not offer."""
     return {
         "cloud": "azure",
         "tier": "enterprise",
@@ -38,7 +21,6 @@ def _serverless_databricks_config() -> dict:
 
 
 def test_fallback_priced_databricks_serverless_run_is_unavailable() -> None:
-    """End-to-end probe: fallback DBU price cannot publish as normalized."""
     calculator = CostCalculator()
     query_cost = calculator.calculate_query_cost(
         "databricks",
@@ -61,7 +43,6 @@ def test_fallback_priced_databricks_serverless_run_is_unavailable() -> None:
 
 
 def test_fallback_priced_snowflake_run_is_unavailable() -> None:
-    """End-to-end probe: unknown Snowflake edition cannot publish as normalized."""
     calculator = CostCalculator()
     config = {"edition": "nonexistent", "cloud": "aws", "region": "us-east-1"}
     query_cost = calculator.calculate_query_cost("snowflake", {"credits_used": 1.0}, config)
@@ -80,7 +61,6 @@ def test_fallback_priced_snowflake_run_is_unavailable() -> None:
 def test_stale_pricing_table_is_unavailable(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Staleness reaches the status evaluator, not just a warnings string."""
     monkeypatch.setattr(calculator_module, "get_pricing_age_days", lambda table=None: 313)
 
     calculator = CostCalculator()
@@ -101,7 +81,6 @@ def test_stale_pricing_table_is_unavailable(
 
 
 def test_fresh_pricing_table_emits_no_staleness_warning(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The staleness rule is inert while the pricing clock is fresh."""
     monkeypatch.setattr(calculator_module, "get_pricing_age_days", lambda table=None: 1)
     calculator = CostCalculator()
     phase_cost = calculator.calculate_phase_cost(
@@ -120,7 +99,6 @@ def test_fresh_pricing_table_emits_no_staleness_warning(monkeypatch: pytest.Monk
 
 
 def test_athena_sao_paulo_publishes_regional_rate() -> None:
-    """Sao Paulo Athena publishes $9.00/TB, not the $5.00 flat rate."""
     calculator = CostCalculator()
     query_cost = calculator.calculate_query_cost("athena", {"data_scanned_bytes": 10**12}, {"region": "sa-east-1"})
     assert query_cost is not None
@@ -138,7 +116,6 @@ def test_athena_sao_paulo_publishes_regional_rate() -> None:
 
 
 def test_athena_unlisted_region_is_unavailable() -> None:
-    """Unlisted-region Athena cannot publish the default rate as normalized."""
     calculator = CostCalculator()
     query_cost = calculator.calculate_query_cost("athena", {"data_scanned_bytes": 10**12}, {"region": "moon-east-1"})
     assert query_cost is not None
@@ -156,7 +133,6 @@ def test_athena_unlisted_region_is_unavailable() -> None:
 
 
 def test_synapse_serverless_unlisted_region_is_unavailable() -> None:
-    """Unlisted-region Synapse serverless cannot publish the default rate as normalized."""
     calculator = CostCalculator()
     query_cost = calculator.calculate_query_cost(
         "synapse",
@@ -180,7 +156,6 @@ def test_synapse_serverless_unlisted_region_is_unavailable() -> None:
 
 def test_verified_regions_stay_normalized(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(calculator_module, "get_pricing_age_days", lambda table=None: 1)
-    """Over-trigger probe: the region guard must not close verified regions."""
     calculator = CostCalculator()
 
     athena_cost = calculator.calculate_query_cost("athena", {"data_scanned_bytes": 1024**4}, {"region": "us-east-1"})
@@ -241,7 +216,6 @@ def test_verified_regions_stay_normalized(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_fallback_marker_emits_one_warning_per_table() -> None:
-    """A multi-query phase with one fallback table emits a single warning."""
     calculator = CostCalculator()
     query_costs = [
         calculator.calculate_query_cost("athena", {"data_scanned_bytes": 1024**4}, {"region": "moon-east-1"})

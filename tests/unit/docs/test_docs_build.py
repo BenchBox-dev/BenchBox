@@ -1,5 +1,3 @@
-"""Ensure the Sphinx documentation builds after structural changes."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,21 +12,21 @@ pytestmark = [
 
 try:
     from sphinx.cmd.build import build_main
-except ImportError:  # pragma: no cover - handled at runtime
-    build_main = None  # type: ignore
+except ImportError:
+    build_main = None
 
 try:
-    import sphinxcontrib.mermaid  # noqa: F401
+    import sphinxcontrib.mermaid
 
     has_mermaid = True
-except ImportError:  # pragma: no cover - handled at runtime
+except ImportError:
     has_mermaid = False
 
 try:
-    import ablog  # noqa: F401
+    import ablog
 
     has_ablog = True
-except ImportError:  # pragma: no cover - handled at runtime
+except ImportError:
     has_ablog = False
 
 
@@ -36,7 +34,6 @@ except ImportError:  # pragma: no cover - handled at runtime
 @pytest.mark.skipif(not has_mermaid, reason="Sphinx extension missing: sphinxcontrib.mermaid not installed")
 @pytest.mark.skipif(not has_ablog, reason="Sphinx extension missing: ablog not installed")
 def test_sphinx_docs_build(tmp_path: Path) -> None:
-    """Build the docs with the dummy builder to validate the navigation graph."""
 
     docs_dir = Path(__file__).resolve().parents[3] / "docs"
     output_dir = tmp_path / "_build"

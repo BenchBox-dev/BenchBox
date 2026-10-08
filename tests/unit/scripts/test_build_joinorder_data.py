@@ -1,5 +1,3 @@
-"""Unit tests for the JoinOrder canonical data build script."""
-
 from __future__ import annotations
 
 import datetime as dt
@@ -51,7 +49,7 @@ def test_utc_now_iso_uses_utc_timezone(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_tomllib_uses_python311_standard_library() -> None:
-    """The repository-wide Python 3.11 floor makes the backport unnecessary."""
+
     script_path = REPO_ROOT / "_project" / "scripts" / "build_joinorder_data.py"
     text = script_path.read_text(encoding="utf-8")
     assert "import tomllib" in text

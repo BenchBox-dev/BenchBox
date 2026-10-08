@@ -1,5 +1,3 @@
-"""Resource-heavy SQL compatibility lint inventory checks."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -16,7 +14,7 @@ _BENCHBOX_ROOT = Path(__file__).parent.parent.parent / "benchbox"
 
 
 def test_current_run_benchmark_gate_shape_is_detected():
-    """Mandatory inventory validation accepts the CLI compatibility-API gate."""
+
     from benchbox.sql_compat.inventory import _validate_mandatory_sites, scan
 
     entries = scan(_BENCHBOX_ROOT)

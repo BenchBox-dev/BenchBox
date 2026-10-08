@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-"""Test suite for the unified benchmark validator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 import unittest
@@ -16,10 +13,8 @@ import pytest
 pytestmark = pytest.mark.medium
 
 
-# Include the project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Include tests directory to path for validator
 sys.path.insert(0, str(Path(__file__).parent))
 
 from utilities.benchmark_validator import (
@@ -31,20 +26,15 @@ from utilities.benchmark_validator import (
 
 
 class TestBenchmarkValidator(unittest.TestCase):
-    """Test cases for BenchmarkValidator."""
-
     def setUp(self):
-        """Set up test fixtures."""
         self.validator = BenchmarkValidator(verbose=False)
 
     def test_validator_initialization(self):
-        """Test validator initialization."""
         self.assertIsInstance(self.validator, BenchmarkValidator)
         self.assertFalse(self.validator.verbose)
         self.assertIsNotNone(self.validator.logger)
 
     def test_supported_benchmarks(self):
-        """Test supported benchmarks list."""
         expected_benchmarks = {
             "tpch",
             "tpcds",
@@ -61,7 +51,6 @@ class TestBenchmarkValidator(unittest.TestCase):
         self.assertEqual(actual_benchmarks, expected_benchmarks)
 
     def test_validation_report_creation(self):
-        """Test validation report creation."""
         report = BenchmarkValidationReport(benchmark_name="test")
 
         self.assertEqual(report.benchmark_name, "test")
@@ -74,7 +63,6 @@ class TestBenchmarkValidator(unittest.TestCase):
         self.assertTrue(report.is_valid)
 
     def test_validation_report_metrics(self):
-        """Test validation report metrics calculation."""
         report = BenchmarkValidationReport(benchmark_name="test")
         report.passed_checks = 8
         report.failed_checks = 2
@@ -83,10 +71,9 @@ class TestBenchmarkValidator(unittest.TestCase):
         report.total_checks = 10
 
         self.assertEqual(report.success_rate, 80.0)
-        self.assertFalse(report.is_valid)  # Failed checks > 0
+        self.assertFalse(report.is_valid)
 
     def test_validation_error_creation(self):
-        """Test validation error creation."""
         error = ValidationError(
             category="test",
             message="Test error message",
@@ -100,12 +87,10 @@ class TestBenchmarkValidator(unittest.TestCase):
         self.assertEqual(error.details, "Test details")
 
     def test_load_benchmark_class_invalid(self):
-        """Test loading invalid benchmark class."""
         result = self.validator._load_benchmark_class("invalid_benchmark")
         self.assertIsNone(result)
 
     def test_report_generation_text(self):
-        """Test text report generation."""
         report = BenchmarkValidationReport(benchmark_name="test")
         report.passed_checks = 5
         report.failed_checks = 1
@@ -120,7 +105,6 @@ class TestBenchmarkValidator(unittest.TestCase):
         self.assertIn("Success Rate: 83.3%", text_report)
 
     def test_report_generation_json(self):
-        """Test JSON report generation."""
         report = BenchmarkValidationReport(benchmark_name="test")
         report.passed_checks = 5
         report.failed_checks = 1
@@ -135,7 +119,6 @@ class TestBenchmarkValidator(unittest.TestCase):
         self.assertIn('"test"', json_report)
 
     def test_report_generation_markdown(self):
-        """Test Markdown report generation."""
         report = BenchmarkValidationReport(benchmark_name="test")
         report.passed_checks = 5
         report.failed_checks = 1
@@ -147,11 +130,10 @@ class TestBenchmarkValidator(unittest.TestCase):
 
         self.assertIn("# BenchBox Validation Report", markdown_report)
         self.assertIn("## Summary", markdown_report)
-        self.assertIn("### ❌ TEST", markdown_report)  # Failed because failed_checks > 0
+        self.assertIn("### ❌ TEST", markdown_report)
 
     @patch("utilities.benchmark_validator.BENCHBOX_AVAILABLE", False)
     def test_benchmark_validation_no_benchbox(self):
-        """Test validation when BenchBox is not available."""
         validator = BenchmarkValidator(verbose=False)
         report = validator.validate_benchmark("tpch")
 
@@ -160,8 +142,6 @@ class TestBenchmarkValidator(unittest.TestCase):
         self.assertEqual(report.errors[0].category, "import")
 
     def test_mock_benchmark_validation(self):
-        """Test validation with mock tpch_benchmark."""
-        # a mock benchmark class
         mock_benchmark = Mock()
         mock_benchmark.get_schema.return_value = {"table1": "CREATE TABLE table1 (id INT)"}
         mock_benchmark.get_queries.return_value = {"q1": "SELECT * FROM table1"}
@@ -169,7 +149,6 @@ class TestBenchmarkValidator(unittest.TestCase):
         mock_benchmark.name = "mock_benchmark"
         mock_benchmark.scale_factor = 0.01
 
-        # Test schema validation
         report = BenchmarkValidationReport(benchmark_name="mock")
         self.validator._validate_benchmark_schema(mock_benchmark, report)
 
@@ -177,7 +156,6 @@ class TestBenchmarkValidator(unittest.TestCase):
         self.assertEqual(report.failed_checks, 0)
 
     def test_mock_query_validation(self):
-        """Test query validation with mock queries."""
         mock_benchmark = Mock()
         mock_benchmark.get_queries.return_value = {
             "q1": "SELECT 1",
@@ -190,7 +168,6 @@ class TestBenchmarkValidator(unittest.TestCase):
         self.assertTrue(report.passed_checks > 0)
 
     def test_interface_validation(self):
-        """Test benchmark interface validation."""
         mock_benchmark = Mock()
         mock_benchmark.name = "test"
         mock_benchmark.scale_factor = 1.0
@@ -201,12 +178,10 @@ class TestBenchmarkValidator(unittest.TestCase):
         report = BenchmarkValidationReport(benchmark_name="mock")
         self.validator._validate_benchmark_interface(mock_benchmark, report)
 
-        # Should have some passed checks for interface compliance
         self.assertTrue(report.passed_checks > 0)
         self.assertEqual(report.failed_checks, 0)
 
     def test_validation_result_enum(self):
-        """Test ValidationResult enum."""
         self.assertEqual(ValidationResult.PASS.value, "PASS")
         self.assertEqual(ValidationResult.FAIL.value, "FAIL")
         self.assertEqual(ValidationResult.SKIP.value, "SKIP")
@@ -214,17 +189,12 @@ class TestBenchmarkValidator(unittest.TestCase):
 
 
 class TestBenchmarkValidatorIntegration(unittest.TestCase):
-    """Integration tests for BenchmarkValidator."""
-
     def setUp(self):
-        """Set up test fixtures."""
         self.validator = BenchmarkValidator(verbose=False)
 
     @patch("utilities.benchmark_validator.BENCHBOX_AVAILABLE", True)
     @patch("utilities.benchmark_validator.benchbox")
     def test_validate_all_benchmarks_mock(self, mock_benchbox):
-        """Test validating all benchmarks with mocked benchbox."""
-        # Mock benchmark classes
         mock_tpch = Mock()
         mock_tpch.return_value.get_schema.return_value = {"table1": "schema"}
         mock_tpch.return_value.get_queries.return_value = {"q1": "SELECT 1"}
@@ -234,7 +204,6 @@ class TestBenchmarkValidatorIntegration(unittest.TestCase):
 
         mock_benchbox.TPCH = mock_tpch
 
-        # Test validation
         results = self.validator.validate_all_benchmarks(benchmarks=["tpch"], quick_check=True)
 
         self.assertEqual(len(results), 1)
@@ -242,8 +211,6 @@ class TestBenchmarkValidatorIntegration(unittest.TestCase):
         self.assertIsInstance(results["tpch"], BenchmarkValidationReport)
 
     def test_generate_comprehensive_report(self):
-        """Test generating comprehensive report with multiple benchmarks."""
-        # mock reports
         report1 = BenchmarkValidationReport(benchmark_name="tpch")
         report1.passed_checks = 10
         report1.failed_checks = 0
@@ -258,12 +225,10 @@ class TestBenchmarkValidatorIntegration(unittest.TestCase):
 
         results = {"tpch": report1, "tpcds": report2}
 
-        # Test all report formats
         text_report = self.validator.generate_report(results, "text")
         json_report = self.validator.generate_report(results, "json")
         markdown_report = self.validator.generate_report(results, "markdown")
 
-        # Basic validation that reports contain expected content
         self.assertIn("Total Benchmarks: 2", text_report)
         self.assertIn("Valid Benchmarks: 1", text_report)
 

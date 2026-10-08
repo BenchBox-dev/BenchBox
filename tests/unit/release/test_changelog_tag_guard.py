@@ -1,15 +1,3 @@
-"""CHANGELOG.md released-version sections must have a matching git tag.
-
-Pins the guard added by ``release-accounting-drift-correction``: a
-``## [X.Y.Z] - <date>`` header is this repo's convention for a *released*
-section, and this repo shipped a real accounting drift where a
-``## [0.3.1] - 2026-05-30`` section sat on ``develop`` for weeks with no
-``v0.3.1`` tag ever pushed and no corresponding PyPI release. The guard
-lives in ``scripts/generate_changelog_entry.py`` (the module that already
-knows how to detect the latest ``v*`` tag for changelog generation) so the
-tag-detection logic has exactly one home.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -87,16 +75,12 @@ def test_find_untagged_versions_flags_missing_tag_with_no_branch_info():
 
 
 def test_find_untagged_versions_exempts_in_progress_release_branch_draft():
-    # release-cut drafts the CHANGELOG entry for the version being cut
-    # before its tag exists; the branch is named after that same version.
     tags = {"v0.3.0", "v0.2.1"}
     untagged = gce.find_untagged_changelog_versions(FIXTURE_CHANGELOG, tags, current_branch="v0.3.1")
     assert untagged == []
 
 
 def test_release_branch_exemption_does_not_cover_a_different_untagged_version():
-    # A v0.3.2 release branch does not exempt an unrelated, already-merged
-    # 0.3.1 section from a prior accounting drift.
     tags = {"v0.3.0", "v0.2.1"}
     untagged = gce.find_untagged_changelog_versions(FIXTURE_CHANGELOG, tags, current_branch="v0.3.2")
     assert untagged == ["0.3.1"]
@@ -273,33 +257,16 @@ def test_release_accounting_rejects_invalid_published_version():
 
 
 def test_repo_changelog_has_no_untagged_released_section_on_this_branch():
-    """Guard the actual repo state: no dated CHANGELOG.md section should
-    claim a version without a matching tag, unless this happens to be run
-    from an in-progress release branch for that exact version."""
     ok, untagged = gce.check_tag_claims(REPO_ROOT)
     assert ok, f"CHANGELOG.md claims untagged version(s): {untagged}"
 
 
 def test_repo_release_accounting_matches_v042_published_state():
-    """The published version is an independently maintained literal.
-
-    Deriving it from pyproject.toml (or from the newest v* tag) would make the
-    check circular: it validates exactly those sources, so a sync that moved
-    the declared version, the changelog section, and the comparison anchor to
-    an unpublished release would pass while PyPI still served the previous
-    one. That is the case
-    test_release_accounting_does_not_infer_pypi_publication_from_a_newer_git_tag
-    guards. PyPI itself is the only authority, and this fast test must stay
-    offline, so the release version-sync PR updates this literal along with
-    the six version sources.
-    """
     ok, errors = gce.check_release_accounting(REPO_ROOT, "0.4.2")
     assert ok, "\n".join(errors)
 
 
 def test_current_branch_falls_back_to_github_head_ref(tmp_path, monkeypatch):
-    """On a detached-HEAD PR checkout, the release-branch exemption must come
-    from GITHUB_HEAD_REF (set by Actions for pull_request events)."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     subprocess.run(
         ["git", "-C", str(tmp_path), "commit", "-q", "--allow-empty", "-m", "x"],

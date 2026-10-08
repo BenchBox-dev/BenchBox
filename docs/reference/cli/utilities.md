@@ -19,18 +19,16 @@ Check dependency status and provide installation guidance for different platform
 ### Usage Examples
 
 ```bash
-# Overview of all platform dependencies
 benchbox check-deps
 
-# Check specific platform
 benchbox check-deps --platform databricks
 
-# Show detailed installation matrix
 benchbox check-deps --matrix
 
-# Verbose output with recommendations
 benchbox check-deps --verbose
 ```
+
+The commands, in order, give an overview of all platform dependencies, check one platform, show the detailed installation matrix, and give verbose output with recommendations.
 
 (cli-profile)=
 ## `profile` - System Profiling
@@ -88,12 +86,12 @@ Validate BenchBox configuration files for syntax and completeness.
 ### Usage Examples
 
 ```bash
-# Validate default configuration
 benchbox validate
 
-# Validate specific configuration file
 benchbox validate --config ./custom-config.yaml
 ```
+
+The first command validates the default configuration and the second validates a specific configuration file.
 
 (cli-validate-results)=
 ## Result Integrity Validation

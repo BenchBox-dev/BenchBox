@@ -1,29 +1,10 @@
 #!/usr/bin/env python3
-"""Demonstrate running same benchmark on multiple platforms.
-
-This example shows how to:
-- Run identical benchmarks across different database platforms
-- Compare performance characteristics between platforms
-- Make informed platform selection decisions
-- Handle platform-specific configurations
-
-Usage:
-    python features/multi_platform.py
-
-Key Concepts:
-    - Platform iteration and comparison
-    - Result collection across platforms
-    - Performance comparison metrics
-    - Platform selection criteria
-    - Handling platform-specific features
-"""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _EXAMPLES_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_EXAMPLES_DIR))
@@ -34,19 +15,6 @@ from benchbox.tpch import TPCH
 
 
 def run_on_platform(platform_name: str, adapter, benchmark):
-    """Run benchmark on a specific platform.
-
-    This demonstrates the common pattern for running benchmarks
-    across different platforms with identical configurations.
-
-    Args:
-        platform_name: Human-readable platform name
-        adapter: Platform-specific adapter instance
-        benchmark: Benchmark to execute
-
-    Returns:
-        Benchmark results
-    """
     print(f"Running on {platform_name}...")
     print(f"  Benchmark: {benchmark.name}")
     print(f"  Scale factor: {benchmark.scale_factor}")
@@ -64,18 +32,6 @@ def run_on_platform(platform_name: str, adapter, benchmark):
 
 
 def run_multi_platform_comparison():
-    """Run same benchmark on multiple platforms for comparison.
-
-    This demonstrates:
-    - Running identical benchmarks across platforms
-    - Collecting results from each platform
-    - Comparing overall performance
-
-    Note: This example uses local platforms (DuckDB, SQLite) that
-    don't require credentials. For cloud platforms (Databricks,
-    BigQuery, Snowflake), you would follow the same pattern but
-    need to configure credentials.
-    """
     print("=" * 70)
     print("MULTI-PLATFORM BENCHMARK COMPARISON")
     print("=" * 70)
@@ -84,23 +40,19 @@ def run_multi_platform_comparison():
     print("Platforms: DuckDB, SQLite")
     print()
 
-    # Create benchmark (same for all platforms)
     benchmark = TPCH(
-        scale_factor=0.01,  # Small scale for fast demonstration
+        scale_factor=0.01,
         output_dir=Path("./benchmark_runs/features/multi_platform"),
         force_regenerate=False,
     )
 
-    # Generate data once (reused across platforms)
     print("Generating benchmark data...")
     benchmark.generate_data()
     print("✓ Data generated (will be reused for all platforms)")
     print()
 
-    # Results storage
     platform_results = {}
 
-    # Platform 1: DuckDB
     print("=" * 70)
     print("PLATFORM 1: DuckDB")
     print("=" * 70)
@@ -110,7 +62,6 @@ def run_multi_platform_comparison():
     duckdb_adapter = DuckDBAdapter(database_path=":memory:")
     platform_results["DuckDB"] = run_on_platform("DuckDB", duckdb_adapter, benchmark)
 
-    # Platform 2: SQLite
     print("=" * 70)
     print("PLATFORM 2: SQLite")
     print("=" * 70)
@@ -127,26 +78,16 @@ def run_multi_platform_comparison():
 
 
 def compare_platforms(platform_results: dict):
-    """Compare performance across platforms.
-
-    This shows how to analyze and present multi-platform results
-    for decision-making.
-
-    Args:
-        platform_results: Dictionary mapping platform names to results
-    """
     print("=" * 70)
     print("PLATFORM COMPARISON")
     print("=" * 70)
     print()
 
-    # Overall comparison
     print("Overall Performance:")
     print("-" * 70)
     print(f"{'Platform':<15} {'Total Time':<15} {'Avg Query':<15} {'Relative':<15}")
     print("-" * 70)
 
-    # Find fastest for relative comparison
     fastest_time = min(r.total_execution_time for r in platform_results.values())
 
     for platform, results in sorted(platform_results.items(), key=lambda x: x[1].total_execution_time):
@@ -159,15 +100,12 @@ def compare_platforms(platform_results: dict):
     print("-" * 70)
     print()
 
-    # Per-query comparison
     print("Per-Query Comparison (Top 5 queries):")
     print("-" * 70)
 
-    # Get all query names (assuming same queries across platforms)
     first_platform = next(iter(platform_results.values()))
     query_names = [q.query_name for q in first_platform.query_results[:5]]
 
-    # Header
     header = f"{'Query':<10}"
     for platform in platform_results:
         header += f"{platform:<15}"
@@ -175,7 +113,6 @@ def compare_platforms(platform_results: dict):
     print(header)
     print("-" * 70)
 
-    # Query-by-query comparison
     for query_name in query_names:
         row = f"{query_name:<10}"
         query_times = {}
@@ -189,7 +126,6 @@ def compare_platforms(platform_results: dict):
             else:
                 row += f"{'N/A':<15}"
 
-        # Find winner (fastest)
         if query_times:
             winner = min(query_times.items(), key=lambda x: x[1])
             row += f"{winner[0]}"
@@ -201,7 +137,6 @@ def compare_platforms(platform_results: dict):
 
 
 def show_platform_characteristics():
-    """Show key characteristics of different platforms."""
     print("=" * 70)
     print("PLATFORM CHARACTERISTICS")
     print("=" * 70)
@@ -241,7 +176,6 @@ def show_platform_characteristics():
 
 
 def show_platform_selection_criteria():
-    """Show criteria for selecting platforms."""
     print("=" * 70)
     print("PLATFORM SELECTION CRITERIA")
     print("=" * 70)
@@ -282,7 +216,6 @@ def show_platform_selection_criteria():
 
 
 def show_cloud_platform_usage():
-    """Show how to extend this example to cloud platforms."""
     print("=" * 70)
     print("EXTENDING TO CLOUD PLATFORMS")
     print("=" * 70)
@@ -348,7 +281,6 @@ python features/result_analysis.py \\
 
 
 def main() -> int:
-    """Demonstrate multi-platform comparison workflow."""
     print()
     print("=" * 70)
     print("BENCHBOX FEATURE: MULTI-PLATFORM COMPARISON")
@@ -358,22 +290,16 @@ def main() -> int:
     print("platforms to compare performance and make platform decisions.")
     print()
 
-    # Run on multiple platforms
     platform_results = run_multi_platform_comparison()
 
-    # Compare results
     compare_platforms(platform_results)
 
-    # Show platform characteristics
     show_platform_characteristics()
 
-    # Show selection criteria
     show_platform_selection_criteria()
 
-    # Show cloud platform usage
     show_cloud_platform_usage()
 
-    # Summary
     print("=" * 70)
     print("SUMMARY")
     print("=" * 70)

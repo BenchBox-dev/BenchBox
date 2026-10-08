@@ -1,18 +1,6 @@
-"""Live integration tests: Transaction Primitives catalog behavior on real Delta Lake.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These tests verify the operations catalog loads correctly and that its
-portable validation and cleanup SQL executes against real Delta tables with
-the expected results. Catalog statements using engine-specific transaction
-control (BEGIN/COMMIT/SAVEPOINT) are intentionally not executed verbatim;
-the portable SELECT/DELETE statements are run against seeded Delta tables.
-
-Marked ``live_integration``: excluded from the default suite. Requires
-PySpark, delta-spark, and a compatible Java (auto-selected when available).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -37,7 +25,7 @@ pytestmark = [
 
 @pytest.fixture(scope="module")
 def spark(tmp_path_factory, pyspark_test_environment):
-    """Module-scoped real Spark session with Delta support."""
+
     warehouse = tmp_path_factory.mktemp("delta_catalog_warehouse")
     session = make_delta_spark_session(warehouse, app_name="benchbox-delta-catalog")
     yield session

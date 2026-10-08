@@ -34,12 +34,12 @@ InfluxDB 3.x is a time series database built on the FDAP stack (Apache Arrow, Da
 ### Install BenchBox with InfluxDB Support
 
 ```bash
-# Install with InfluxDB extra
 uv add benchbox --extra influxdb
 
-# Or with pip
 pip install benchbox[influxdb]
 ```
+
+The first command installs the `influxdb` extra with uv. The second does the same with pip.
 
 This installs:
 - `influxdb3-python` - Official InfluxDB 3.x Python client
@@ -57,7 +57,6 @@ print(f"InfluxDB support available: {INFLUXDB_AVAILABLE}")
 ### CLI Usage
 
 ```bash
-# InfluxDB Cloud
 benchbox run --platform influxdb \
   --benchmark tsbs-devops \
   --influxdb-host us-east-1-1.aws.cloud2.influxdata.com \
@@ -66,7 +65,6 @@ benchbox run --platform influxdb \
   --influxdb-database benchmarks \
   --influxdb-mode cloud
 
-# InfluxDB Core (local)
 benchbox run --platform influxdb \
   --benchmark tsbs-devops \
   --influxdb-host localhost \
@@ -76,6 +74,8 @@ benchbox run --platform influxdb \
   --influxdb-mode core \
   --influxdb-ssl false
 ```
+
+The first command targets InfluxDB Cloud. The second targets a local InfluxDB Core server.
 
 ### CLI Arguments
 
@@ -94,7 +94,6 @@ benchbox run --platform influxdb \
 ```python
 from benchbox.platforms.influxdb import InfluxDBAdapter
 
-# InfluxDB Cloud
 adapter = InfluxDBAdapter(
     host="us-east-1-1.aws.cloud2.influxdata.com",
     token="your-token",
@@ -103,7 +102,6 @@ adapter = InfluxDBAdapter(
     mode="cloud",
 )
 
-# InfluxDB Core (local Docker)
 adapter = InfluxDBAdapter(
     host="localhost",
     port=8086,
@@ -113,16 +111,15 @@ adapter = InfluxDBAdapter(
     ssl=False,
 )
 
-# Create connection
 connection = adapter.create_connection()
 
-# Execute query
 result = connection.execute("SELECT * FROM cpu LIMIT 10")
 print(result)
 
-# Close connection
 connection.close()
 ```
+
+The first adapter targets InfluxDB Cloud. The second targets InfluxDB Core running locally in Docker. The remaining lines create a connection, execute a query, and close the connection.
 
 ## Supported Benchmarks
 
@@ -155,14 +152,14 @@ TSBS DevOps simulates a DevOps monitoring scenario with:
 ### Environment Variables
 
 ```bash
-# Authentication token (recommended for security)
 export INFLUXDB_TOKEN="your-token-here"
 ```
+
+Setting the authentication token in the environment is recommended for security.
 
 ### Connection Configuration
 
 ```python
-# Full configuration example
 config = {
     "host": "localhost",
     "port": 8086,
@@ -176,12 +173,13 @@ config = {
 adapter = InfluxDBAdapter.from_config(config)
 ```
 
+This is a full configuration example.
+
 ## InfluxDB Core vs Cloud
 
 ### InfluxDB Core (Open Source)
 
 ```bash
-# Start InfluxDB Core with Docker
 docker run -d \
   --name influxdb \
   -p 8086:8086 \
@@ -193,6 +191,8 @@ docker run -d \
   -e DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=my-token \
   influxdb:3.0
 ```
+
+This starts InfluxDB Core with Docker.
 
 Core limitations:
 - No data compaction for historical queries
@@ -218,13 +218,14 @@ Core limitations:
 ### Connection Issues
 
 ```python
-# Test connection
 connection = adapter.create_connection()
 if connection.test_connection():
     print("Connection successful")
 else:
     print("Connection failed")
 ```
+
+This tests the connection.
 
 ### Common Errors
 

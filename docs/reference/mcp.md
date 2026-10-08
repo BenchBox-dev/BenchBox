@@ -11,11 +11,11 @@ Complete reference for the BenchBox MCP (Model Context Protocol) server, includi
 
 ### Prerequisites
 
-Install BenchBox with the MCP extra:
+Install BenchBox with the MCP extra, using either `uv pip` or `pip`:
 
 ```bash
 uv pip install "benchbox[mcp]"
-# or
+
 python -m pip install "benchbox[mcp]"
 ```
 
@@ -27,20 +27,17 @@ optional extras.
 
 ### Starting the Server
 
+The first command starts the server through the installed entry point. The second starts it through the Python module. The third runs it from a source checkout. The fourth sets explicit MCP path overrides. The fifth opts in to localhost Streamable HTTP.
+
 ```bash
-# Via the installed entry point
 benchbox-mcp
 
-# Via the Python module
 python -m benchbox.mcp
 
-# From a source checkout
 uv run benchbox-mcp
 
-# With explicit MCP path overrides
 benchbox-mcp --results-dir /tmp/benchbox-results --charts-dir /tmp/benchbox-charts
 
-# Opt in to localhost Streamable HTTP
 benchbox-mcp --transport streamable-http
 ```
 
@@ -88,10 +85,9 @@ disabled so progress and future request-scoped notifications remain possible.
 
 ### Testing Locally
 
-To verify the server works, you can test it interactively:
+To verify the server works, you can test it interactively. This command starts the server and sends a test request:
 
 ```bash
-# Start server and send a test request
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | benchbox-mcp
 ```
 
@@ -100,10 +96,9 @@ This should return a JSON response listing all available tools.
 ### Using the MCP Inspector
 
 For interactive testing, use the pinned official
-[MCP Inspector](https://github.com/modelcontextprotocol/inspector):
+[MCP Inspector](https://github.com/modelcontextprotocol/inspector). This command connects to an already-running localhost Streamable HTTP endpoint:
 
 ```bash
-# Connect to an already-running localhost Streamable HTTP endpoint
 npx --yes @modelcontextprotocol/inspector@2.0.0 --cli \
   http://127.0.0.1:8000/mcp --transport http --method tools/list --format json
 ```
@@ -159,13 +154,11 @@ Example:
 BENCHBOX_RESULTS_DIR=/tmp/results BENCHBOX_LOG_LEVEL=DEBUG benchbox-mcp
 ```
 
-Additional localhost examples:
+Additional localhost examples: the first uses IPv4 loopback with a custom port and path, and the second uses IPv6 loopback.
 
 ```bash
-# IPv4 loopback with a custom port and path
 benchbox-mcp --transport streamable-http --port 8765 --streamable-http-path /benchbox-mcp
 
-# IPv6 loopback
 benchbox-mcp --transport streamable-http --host ::1
 ```
 

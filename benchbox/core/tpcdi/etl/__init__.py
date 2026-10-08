@@ -1,5 +1,3 @@
-"""TPC-DI ETL module for data integration and transformation operations."""
-
 from .backend import TPCDIETLBackend
 from .dataframe_backend import DataFrameETLBackend
 from .pipeline import TPCDIETLPipeline

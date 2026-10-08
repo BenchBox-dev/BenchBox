@@ -1,15 +1,3 @@
-"""Scoped read_primitives cross-surface check over a subset of query ids.
-
-Builds ONE bounded DuckDB cell (SF default 0.05, override via --scale) and
-compares only the query ids passed on the command line against the DuckDB-dialect
-SQL reference, printing per-cell PASS/DIVERGE/ERROR/VACUOUS. Lets a burn-down
-focus on a handful of queries without paying the full 148-query gate (~7 min).
-
-Usage:
-  uv run -- python _project/scripts/rp_scoped_check.py [--scale 0.05] <id> [<id> ...]
-  uv run -- python _project/scripts/rp_scoped_check.py --all          # every gateable id
-"""
-
 import argparse
 import tempfile
 from pathlib import Path

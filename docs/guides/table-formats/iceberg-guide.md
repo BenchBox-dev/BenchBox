@@ -112,12 +112,12 @@ For TPC-H benchmarks with standard data loads, manifest overhead is typically un
 Iceberg allows changing partition schemes without rewriting data:
 
 ```sql
--- Original table partitioned by date
 CREATE TABLE events (...) PARTITIONED BY (event_date);
 
--- Add hour-level partitioning for new data (no rewrite)
 ALTER TABLE events ADD PARTITION FIELD hour(event_time);
 ```
+
+The table is originally partitioned by date. The `ALTER` statement adds hour-level partitioning for new data, with no rewrite.
 
 **Benchmark implications:**
 
@@ -130,14 +130,14 @@ ALTER TABLE events ADD PARTITION FIELD hour(event_time);
 Iceberg can partition on transforms without exposing partition columns in queries:
 
 ```sql
--- Create table partitioned by month transform
 CREATE TABLE orders
   PARTITIONED BY (month(order_date))
   AS SELECT * FROM raw_orders;
 
--- Query by exact date, Iceberg applies partition pruning automatically
 SELECT * FROM orders WHERE order_date = '2024-03-15';
 ```
+
+The table is partitioned by a month transform. The query filters by exact date, and Iceberg applies partition pruning automatically.
 
 **Benchmark implications:**
 
@@ -209,18 +209,17 @@ A key Iceberg benefit: load data with Spark, query with Trino (or vice versa).
 **BenchBox multi-engine benchmark:**
 
 ```bash
-# 1. Generate and load data with Spark
 benchbox run --platform spark --benchmark tpch --scale 10 \
   --table-format iceberg --phases load
 
-# 2. Run queries with Trino (same Iceberg tables)
 benchbox run --platform trino --benchmark tpch --scale 10 \
   --table-format iceberg --phases power
 
-# 3. Run queries with Athena (same tables via Glue)
 benchbox run --platform athena --benchmark tpch --scale 10 \
   --table-format iceberg --phases power
 ```
+
+Run the commands in order. The first generates and loads data with Spark. The second runs queries with Trino on the same Iceberg tables. The third runs queries with Athena on the same tables through Glue.
 
 ### Ensuring Consistent Results
 
@@ -231,9 +230,10 @@ BenchBox validates query results against reference answers, catching:
 - Ordering differences
 
 ```bash
-# Compare results from different engines
 benchbox compare spark-results.json trino-results.json
 ```
+
+This compares results from different engines.
 
 ### Common Multi-Engine Issues
 

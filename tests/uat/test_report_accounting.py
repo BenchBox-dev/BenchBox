@@ -1,5 +1,3 @@
-"""Regression coverage for UAT release-accounting denominators."""
-
 from __future__ import annotations
 
 import json
@@ -42,32 +40,22 @@ def test_report_cli_reconciles_skipped_and_unreachable_fixture(tmp_path: Path, c
 
     exit_code = uat_cli.main(["report", "--cells-jsonl", str(FIXTURE), "--output-tsv", str(output_tsv)])
 
-    # Default-strict exit-code policy (uat-accounting-hardening w1/w4): the
-    # fixture has a failed cell and an unreachable cell, so a report exit
-    # code of 0 would no longer mean "everything attempted actually passed."
     assert exit_code == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["rows"] == 5
     assert payload["attempted"] == 3
     assert payload["skipped"] == 1
     assert payload["unreachable"] == 1
-    # The fixture has no `.accounting.json` sidecar, so the unreachable count
-    # is not confirmed (it happens to be right here because the fixture also
-    # carries a `skipped-unreachable` row directly, but the sidecar-derived
-    # portion of it is still an assumption, not a confirmation).
     assert payload["unreachable_is_estimated"] is True
     assert payload["startup_failed"] == 0
     assert payload["total_defined"] == 5
     assert payload["passed"] + payload["failed"] + payload["timed_out"] == payload["attempted"]
-    # w3: total_defined's identity now includes startup_failed as a fourth,
-    # disjoint bucket alongside attempted/skipped/unreachable.
     assert (
         payload["attempted"] + payload["skipped"] + payload["unreachable"] + payload["startup_failed"]
         == payload["total_defined"]
     )
 
     text = output_tsv.read_text(encoding="utf-8")
-    # Footer ordering contract: components (incl. startup_failed) precede total_defined.
     assert "attempted=3 skipped=1 unreachable=1 startup_failed=0 died_mid_platform=0 total_defined=5" in text
     assert "# UNREACHABLE_CELLS=1 release_gate_attention=required" in text
 
@@ -99,13 +87,7 @@ def test_report_counts_execute_unreachable_cells_outside_rows(tmp_path: Path):
     assert "# UNREACHABLE_CELLS=4 release_gate_attention=required" in text
 
 
-# ---------------------------------------------------------------------------
-# w3: startup_failed_count is disjoint from skipped_unreachable_count.
-# ---------------------------------------------------------------------------
-
-
 def test_report_threads_startup_failed_count_into_total_defined_and_exit_code(tmp_path: Path):
-    """A stack that never started is counted separately from unreachable cells."""
     summary = report.write_report(
         [_cell("duckdb", "tpch", 0.01, status="passed")],
         output_path=tmp_path / "matrix_summary.tsv",
@@ -115,14 +97,10 @@ def test_report_threads_startup_failed_count_into_total_defined_and_exit_code(tm
 
     assert summary.unreachable_count == 2
     assert summary.startup_failed_count == 3
-    # 1 attempted + 0 skipped + 2 unreachable + 3 startup_failed.
     assert summary.total_defined_count == 6
-    # startup_failed makes the report exit nonzero like unreachable does,
-    # even with zero fail/timeout/unreachable cells.
     assert summary.exit_code() == 1
 
     text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
-    # Footer ordering contract: components precede their total.
     assert "unreachable=2 startup_failed=3 died_mid_platform=0 total_defined=6" in text
     assert "release_accounting" in text and "startup_failed=3" in text
     assert "# STARTUP_FAILED_CELLS=3 release_gate_attention=required" in text
@@ -140,7 +118,6 @@ def test_report_exit_code_clean_when_startup_failed_count_zero(tmp_path: Path):
 
 
 def test_report_cli_reads_startup_failed_sidecar(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
-    """A report regenerated from cells.jsonl must read startup_failed back from the durable sidecar."""
     cells_jsonl = tmp_path / "cells.jsonl"
     cells_jsonl.write_text(
         json.dumps(
@@ -176,8 +153,6 @@ def test_report_cli_reads_startup_failed_sidecar(tmp_path: Path, capsys: pytest.
 
 
 def test_report_cli_reads_skipped_unreachable_sidecar(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
-    """A report regenerated from cells.jsonl must read skipped-unreachable
-    cells back from the durable sidecar instead of printing unreachable: 0."""
     cells_jsonl = tmp_path / "cells.jsonl"
     cells_jsonl.write_text(
         "\n".join(
@@ -198,7 +173,6 @@ def test_report_cli_reads_skipped_unreachable_sidecar(tmp_path: Path, capsys: py
         + "\n",
         encoding="utf-8",
     )
-    # The durable sweep writes this sidecar next to cells.jsonl.
     cells_jsonl.with_name("cells.jsonl.accounting.json").write_text(
         json.dumps({"skipped_unreachable_count": 3}), encoding="utf-8"
     )
@@ -206,13 +180,9 @@ def test_report_cli_reads_skipped_unreachable_sidecar(tmp_path: Path, capsys: py
 
     exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
 
-    # Default-strict exit-code policy: a confirmed nonzero unreachable count
-    # is itself grounds for a nonzero exit code, independent of pass/fail.
     assert exit_code == 1
     payload = json.loads(capsys.readouterr().out)
     assert payload["unreachable"] == 3
-    # The sidecar was present and read successfully, so this is a confirmed
-    # count, not an estimate.
     assert payload["unreachable_is_estimated"] is False
     assert payload["attempted"] == 2
     assert payload["total_defined"] == 5
@@ -221,7 +191,6 @@ def test_report_cli_reads_skipped_unreachable_sidecar(tmp_path: Path, capsys: py
 
 
 def test_report_cli_without_sidecar_defaults_unreachable_zero(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
-    """Older artifacts predate the sidecar; the report must still regenerate."""
     cells_jsonl = tmp_path / "cells.jsonl"
     cells_jsonl.write_text(
         json.dumps(
@@ -243,10 +212,6 @@ def test_report_cli_without_sidecar_defaults_unreachable_zero(tmp_path: Path, ca
 
     exit_code = uat_cli.main(["report", "--cells-jsonl", str(cells_jsonl), "--output-tsv", str(output_tsv)])
 
-    # must_preserve: the pinned unreachable=0-without-sidecar default and its
-    # exit code stay exactly as before - w5 only adds visibility that this 0
-    # is an assumption, not a confirmation (see the estimated-flag assertion
-    # below), it does not change the default itself.
     assert exit_code == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["unreachable"] == 0
@@ -255,11 +220,6 @@ def test_report_cli_without_sidecar_defaults_unreachable_zero(tmp_path: Path, ca
 
 
 def test_report_cli_malformed_sidecar_falls_back_to_estimated(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
-    """#1151 review: a sidecar that parses as JSON but has the wrong shape
-    (non-numeric counts, or isn't even a mapping) must not crash report
-    regeneration -- it falls back to an estimated 0, exactly like a missing
-    sidecar, instead of raising out of `int()`/`.get()`.
-    """
     cells_jsonl = tmp_path / "cells.jsonl"
     cells_jsonl.write_text(
         json.dumps(
@@ -323,8 +283,6 @@ def test_report_cli_valid_zero_sidecar_is_not_estimated(tmp_path: Path, capsys: 
 
 
 def test_report_cli_non_mapping_sidecar_treated_as_absent(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
-    """A sidecar that parses as a JSON array (not a mapping) must be treated
-    like a missing sidecar -- estimated, not crashed."""
     cells_jsonl = tmp_path / "cells.jsonl"
     cells_jsonl.write_text(
         json.dumps(
@@ -352,11 +310,6 @@ def test_report_cli_non_mapping_sidecar_treated_as_absent(tmp_path: Path, capsys
     payload = json.loads(capsys.readouterr().out)
     assert payload["unreachable"] == 0
     assert payload["unreachable_is_estimated"] is True
-
-
-# ---------------------------------------------------------------------------
-# w1/w4: default-strict exit-code policy.
-# ---------------------------------------------------------------------------
 
 
 def test_write_report_exit_code_zero_when_everything_attempted_passed(tmp_path: Path):
@@ -401,18 +354,12 @@ def test_write_report_exit_code_nonzero_on_unreachable_count(tmp_path: Path):
 
 
 def test_write_report_exit_code_aborted_still_wins_over_clean_run(tmp_path: Path):
-    """`aborted` (exit 2) must still take priority over the fail/timeout/unreachable check."""
     summary = report.write_report(
         [_cell("duckdb", "tpch", 0.01, status="passed")],
         output_path=tmp_path / "matrix_summary.tsv",
         run_status="ABORTED",
     )
     assert summary.exit_code() == 2
-
-
-# ---------------------------------------------------------------------------
-# w3: registry_pruned_count threading into total_defined_count.
-# ---------------------------------------------------------------------------
 
 
 def test_write_report_threads_registry_pruned_count_into_total_defined(tmp_path: Path):
@@ -424,22 +371,11 @@ def test_write_report_threads_registry_pruned_count_into_total_defined(tmp_path:
     )
 
     assert summary.registry_pruned_count == 3
-    assert summary.skipped_count == 5  # 0 row-skipped + 2 compatibility + 3 registry
-    assert summary.total_defined_count == 6  # 1 attempted + 5 skipped + 0 unreachable
+    assert summary.skipped_count == 5
+    assert summary.total_defined_count == 6
 
     text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
     assert "registry_pruned=3" in text
-
-
-# ---------------------------------------------------------------------------
-# unvalidated-results-misclassified-as-schema-violations: an aggregate
-# unvalidated=N counter, visible in the matrix_summary.tsv footer and on
-# ReportSummary/PhaseAccounting, so a majority-unvalidated sweep (e.g. every
-# DataFrame platform in a release-gate stage) cannot pass as an ordinary
-# clean run purely because the per-row submit_terminal_state column went
-# unread. Per the parent fix's contract, this counter must NEVER affect
-# exit_code() -- unvalidated is still not a UAT cell failure.
-# ---------------------------------------------------------------------------
 
 
 def test_write_report_counts_unvalidated_cells_without_affecting_exit_code(tmp_path: Path):
@@ -453,12 +389,9 @@ def test_write_report_counts_unvalidated_cells_without_affecting_exit_code(tmp_p
     )
 
     assert summary.unvalidated_count == 2
-    # Already counted in pass_count/attempted_count -- not a fifth disjoint
-    # total_defined_count bucket alongside skipped/unreachable/startup_failed.
     assert summary.pass_count == 3
     assert summary.attempted_count == 3
     assert summary.total_defined_count == 3
-    # The whole point of this fix: unvalidated must not turn a clean sweep red.
     assert summary.exit_code() == 0
 
     text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
@@ -476,17 +409,6 @@ def test_write_report_omits_unvalidated_footer_line_when_zero(tmp_path: Path):
 
 
 def test_write_report_unvalidated_count_ignores_non_passed_cells(tmp_path: Path):
-    """Defensive: a `failed` cell must never count toward unvalidated_count.
-
-    `run_cell` sets `submit_terminal_state` from the classifier regardless of
-    the cell's final status (e.g. a `query_failure` cell is still `failed`
-    with that state recorded), and `submit_state_is_cell_failure` guarantees
-    `unvalidated` never itself turns a cell `failed`. But this counter
-    shouldn't trust that invariant blindly -- a cell that is `failed` for an
-    unrelated reason (a real subprocess crash) while its stale/partial
-    exported result also happens to read as `unvalidated` must not be folded
-    into a "these are just fine, only unvalidated" count.
-    """
     summary = report.write_report(
         [_cell("duckdb", "tpch", 0.01, status="failed", submit_terminal_state="unvalidated")],
         output_path=tmp_path / "matrix_summary.tsv",
@@ -496,24 +418,14 @@ def test_write_report_unvalidated_count_ignores_non_passed_cells(tmp_path: Path)
 
 
 def test_phase_accounting_carries_unvalidated_and_defaults_to_zero():
-    """PhaseAccounting gained an `unvalidated` field alongside unreachable/startup_failed/registry_pruned."""
     default = PhaseAccounting()
     assert default.unvalidated == 0
 
     accounting = PhaseAccounting(attempted=5, passed=5, total_defined=5, unvalidated=2)
     assert accounting.unvalidated == 2
-    # asdict()-based JSON round trip (gate_summary.write_gate_summary /
-    # read_gate_summary's _dataclass_from_payload) must carry the field.
     from dataclasses import asdict
 
     assert asdict(accounting)["unvalidated"] == 2
-
-
-# ---------------------------------------------------------------------------
-# uat-status-taxonomy-exit-code-fixes w3: failed cells with a resolved result
-# JSON must not read as submission-ready when a report is regenerated from
-# cells.jsonl via `make uat-report`.
-# ---------------------------------------------------------------------------
 
 
 def test_report_cli_marks_failed_cell_with_result_path_not_submittable(
@@ -545,14 +457,7 @@ def test_report_cli_marks_failed_cell_with_result_path_not_submittable(
     text = output_tsv.read_text(encoding="utf-8")
     lines = text.splitlines()
     assert "failed\tfailed:submittable\t" in lines[1]
-    capsys.readouterr()  # drain stdout to keep this test quiet in -s runs
-
-
-# ---------------------------------------------------------------------------
-# uat-status-taxonomy-exit-code-fixes w5: throughput_check must survive a
-# `make uat-report` regeneration from cells.jsonl -- it is the one
-# diagnostic the #1094 stream-count guard exists to surface.
-# ---------------------------------------------------------------------------
+    capsys.readouterr()
 
 
 def test_report_cli_reads_throughput_check_back_from_cells_jsonl(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
@@ -587,7 +492,6 @@ def test_report_cli_reads_throughput_check_back_from_cells_jsonl(tmp_path: Path,
 
 
 def test_report_cli_throughput_check_defaults_to_none_when_absent(tmp_path: Path, capsys: pytest.CaptureFixture[str]):
-    """Older cells.jsonl artifacts predate throughput_check; the report must still regenerate cleanly."""
     cells_jsonl = tmp_path / "cells.jsonl"
     cells_jsonl.write_text(
         json.dumps(
@@ -615,12 +519,6 @@ def test_report_cli_throughput_check_defaults_to_none_when_absent(tmp_path: Path
     capsys.readouterr()
 
 
-# ---------------------------------------------------------------------------
-# died_mid_platform: a stack that started, was reachable, then died partway
-# through its own cell list (uat-container-readiness-and-memory-headroom-gate).
-# ---------------------------------------------------------------------------
-
-
 def test_report_threads_died_mid_platform_count_into_total_defined_and_exit_code(tmp_path: Path):
     summary = report.write_report(
         [_cell("duckdb", "tpch", 0.01, status="passed")],
@@ -629,10 +527,7 @@ def test_report_threads_died_mid_platform_count_into_total_defined_and_exit_code
     )
 
     assert summary.died_mid_platform_count == 171
-    # A fifth disjoint component: 1 attempted + 171 died.
     assert summary.total_defined_count == 172
-    # Cells that should have run did not, because the infrastructure went
-    # away. A sweep that loses a platform mid-run must not read as clean.
     assert summary.exit_code() == 1
 
     text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")

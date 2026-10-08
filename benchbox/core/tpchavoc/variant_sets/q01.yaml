@@ -133,7 +133,7 @@ variants:
         from lineitem
         where l_shipdate <= date '1998-12-01' - interval '90' day
         group by l_returnflag, l_linestatus
-        having 1=0  -- Empty result to test UNION ALL handling
+        having 1=0
     ) final
     where final.count_order > 0
     order by final.l_returnflag, final.l_linestatus

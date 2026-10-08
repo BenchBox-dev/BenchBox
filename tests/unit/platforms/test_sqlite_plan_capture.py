@@ -1,5 +1,3 @@
-"""Tests for SQLite query plan capture wiring."""
-
 import sqlite3
 
 import pytest
@@ -24,7 +22,7 @@ def adapter_no_capture():
 
 @pytest.fixture()
 def conn():
-    """In-memory SQLite connection."""
+
     c = sqlite3.connect(":memory:")
     c.execute("CREATE TABLE orders (id INTEGER PRIMARY KEY, amount REAL)")
     c.execute("INSERT INTO orders VALUES (1, 99.9), (2, 49.9)")
@@ -86,7 +84,7 @@ class TestSQLitePlanCapture:
             validate_row_count=False,
         )
         assert result["status"] == "SUCCESS"
-        # Plan capture runs against real in-memory SQLite
+
         if "query_plan" in result and result["query_plan"] is not None:
             assert result["plan_fingerprint"] is not None
             assert result["plan_capture_time_ms"] >= 0
@@ -141,17 +139,9 @@ class TestSQLitePlanCapture:
 
 
 class TestSQLiteFingerprintIntegration:
-    """Integration tests against a real in-memory SQLite connection (no mocking).
-
-    Exercises the full capture_query_plan path (real EXPLAIN QUERY PLAN, real
-    parser, real fingerprint) and verifies the plan fingerprint stability
-    contract documented in query_plan_models.py.
-    """
-
     @pytest.fixture()
     def mt_conn(self):
-        # check_same_thread=False matches the SQLiteAdapter production default
-        # (sqlite.py) so capture_query_plan's timeout worker thread can reuse it.
+
         c = sqlite3.connect(":memory:", check_same_thread=False)
         c.execute("CREATE TABLE orders (id INTEGER PRIMARY KEY, amount REAL)")
         c.executemany("INSERT INTO orders VALUES (?, ?)", [(i, float(i)) for i in range(1, 400)])
@@ -169,14 +159,11 @@ class TestSQLiteFingerprintIntegration:
         plan1, _ = adapter.capture_query_plan(mt_conn, query, "fp_a")
         plan2, _ = adapter.capture_query_plan(mt_conn, query, "fp_b")
         assert plan1 is not None and plan2 is not None
-        # Same query + same schema + same engine version → identical structural hash.
+
         assert plan1.plan_fingerprint == plan2.plan_fingerprint
 
     def test_fingerprint_stable_across_index_addition(self, adapter, mt_conn):
-        # The fingerprint is a LOGICAL hash: an index scan and a sequential scan
-        # of the same table both normalize to a logical Scan, so adding an index
-        # the planner then uses does NOT change the fingerprint. This pins the
-        # physical-independence guarantee of the stability contract.
+
         query = "SELECT * FROM orders WHERE amount = 250.0"
 
         before, _ = adapter.capture_query_plan(mt_conn, query, "fp_before_idx")
@@ -189,10 +176,7 @@ class TestSQLiteFingerprintIntegration:
         )
 
     def test_fingerprint_differs_for_logically_distinct_plans(self, adapter, mt_conn):
-        # A change in the LOGICAL tree shape must change the fingerprint — the
-        # intended regression signal. A self-join adds a second table scan to the
-        # logical tree, so the signature differs by construction (two Scan nodes vs
-        # one), independent of indexes, stats, or planner access-method choices.
+
         scan_plan, _ = adapter.capture_query_plan(mt_conn, "SELECT * FROM orders", "fp_scan")
         join_plan, _ = adapter.capture_query_plan(
             mt_conn, "SELECT o.id FROM orders o JOIN orders o2 ON o.id = o2.id", "fp_join"
@@ -208,8 +192,6 @@ class TestSQLiteFingerprintIntegration:
 
 
 class TestSQLiteParserModernFormat:
-    """Verify the parser handles modern SQLite output (no TABLE keyword)."""
-
     def test_infer_scan_without_table_keyword(self):
         from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser
 
@@ -232,7 +214,7 @@ class TestSQLiteParserModernFormat:
         assert details.get("table_name") == "orders"
 
     def test_parse_modern_explain_output(self, conn):
-        """End-to-end: parse actual SQLite 3.36+ EXPLAIN QUERY PLAN output."""
+
         from benchbox.core.query_plans.parsers.sqlite import SQLiteQueryPlanParser
 
         cursor = conn.cursor()
@@ -252,13 +234,6 @@ class TestSQLiteParserModernFormat:
 
 
 class TestSQLiteStrictPlanCapture:
-    """strict_plan_capture must propagate PlanCaptureError from execute_query.
-
-    The capture call sits OUTSIDE execute_query's broad except: a capture
-    failure on a successful query must surface as PlanCaptureError in strict
-    mode, not mislabel the query status=FAILED.
-    """
-
     @staticmethod
     def _break_plan_capture(adapter, monkeypatch):
         def boom(connection, query, explain_options=None):
@@ -286,7 +261,7 @@ class TestSQLiteStrictPlanCapture:
         assert result["rows_returned"] == 2
 
     def test_strict_mode_does_not_mask_real_query_failure(self, conn):
-        """A genuine SQL error must still return status=FAILED, not raise."""
+
         adapter = SQLiteAdapter(capture_plans=True, strict_plan_capture=True)
 
         result = adapter.execute_query(conn, "SELECT * FROM no_such_table", "q_bad", validate_row_count=False)

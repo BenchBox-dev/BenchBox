@@ -1,5 +1,3 @@
-"""Gap-closing tests for remaining low-coverage benchmark modules."""
-
 from __future__ import annotations
 
 import re
@@ -180,7 +178,6 @@ def test_metadata_generator_full_feature_walk(monkeypatch):
     generated = gen.setup(conn, "duckdb", cfg)
     assert generated.total_objects > 0
 
-    # Exercise cleanup paths too.
     gen.teardown(conn, "duckdb", generated)
     monkeypatch.setattr(gen, "_find_objects_with_prefix", lambda *_args: ["benchbox_x1", "benchbox_x2"])
     dropped = gen.cleanup_all(conn, "duckdb", "benchbox_")
@@ -248,11 +245,9 @@ def test_transaction_primitives_auxiliary_and_metadata_paths(monkeypatch, tmp_pa
     bench.ensure_auxiliary_data_files()
     assert calls == ["generated", "released"]
 
-    # Lock timeout path
     bench.data_generator._acquire_bulk_load_lock = lambda timeout=300: False
     bench.ensure_auxiliary_data_files()
 
-    # Existing files path
     bench.data_generator.check_bulk_load_files_exist = lambda: True
     bench.ensure_auxiliary_data_files()
 
@@ -291,19 +286,12 @@ def test_transaction_primitives_reset_and_setup_checks(tmp_path):
     bench.reset(conn)
     assert ("txn_orders", "orders") in populated
 
-    # reset() repopulates staging tables but writes no provenance manifest -- only
-    # setup() does -- so populated-but-unmanifested tables are not reuse-eligible
-    # (TODO transactional-staging-reuse-ignores-provenance-20260805). Matching
-    # manifests round-trip against real DuckDB in
-    # tests/unit/core/transactional/test_staging_provenance.py; _StatefulConn drops
-    # WHERE clauses, so it cannot tell a current manifest from a stale one.
     manifest = bench._STAGING_MANIFEST_TABLE
     assert not any(sql.startswith("INSERT INTO") and manifest in sql for sql in conn.executed)
-    # False because the manifest gate rejected it, not because a table looked empty.
+
     assert bench.is_setup(conn) is False
     assert any(manifest in sql for sql in conn.executed)
 
-    # Empty staging tables short-circuit before the manifest is ever consulted.
     conn_zero = _StatefulConn({"txn_orders": 0, "txn_lineitem": 1, "txn_customer": 1})
     assert bench.is_setup(conn_zero) is False
     assert not any(manifest in sql for sql in conn_zero.executed)

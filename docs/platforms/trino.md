@@ -28,12 +28,12 @@ For PrestoDB, use the [Presto adapter](presto.md). For AWS managed Trino, use th
 ## Installation
 
 ```bash
-# Install Trino Python driver
 pip install trino
 
-# Or install with authentication support
 pip install "trino[kerberos]"
 ```
+
+The first command installs the Trino Python driver. The second adds authentication support.
 
 ## Configuration
 
@@ -94,7 +94,6 @@ revert a manually-installed version and how to work around it.
 ### Basic Benchmark Run
 
 ```bash
-# Run TPC-H with Hive catalog
 benchbox run --platform trino --benchmark tpch --scale 1.0 \
   --platform-option host=trino.example.com \
   --platform-option catalog=hive \
@@ -104,7 +103,6 @@ benchbox run --platform trino --benchmark tpch --scale 1.0 \
 ### Iceberg Tables
 
 ```bash
-# Run with Iceberg table format
 benchbox run --platform trino --benchmark tpch --scale 1.0 \
   --platform-option catalog=iceberg \
   --platform-option table_format=iceberg \
@@ -117,7 +115,6 @@ benchbox run --platform trino --benchmark tpch --scale 1.0 \
 from benchbox import TPCH
 from benchbox.platforms.trino import TrinoAdapter
 
-# Initialize adapter
 adapter = TrinoAdapter(
     host="trino-coordinator.example.com",
     port=8080,
@@ -126,7 +123,6 @@ adapter = TrinoAdapter(
     username="analyst",
 )
 
-# Load and run benchmark
 benchmark = TPCH(scale_factor=1.0)
 adapter.load_benchmark(benchmark)
 results = adapter.run_benchmark(benchmark)
@@ -137,22 +133,23 @@ results = adapter.run_benchmark(benchmark)
 ### Local Development (Memory Catalog)
 
 ```bash
-# Start Trino locally (Docker)
 docker run -d -p 8080:8080 --name trino trinodb/trino
 
-# Run benchmark with memory catalog
 benchbox run --platform trino --benchmark tpch --scale 0.1 \
   --platform-option catalog=memory
 ```
+
+The first command starts Trino locally in Docker. The second runs the benchmark with the memory catalog.
 
 If you installed Trino via Homebrew, you can start the service with:
 
 ```bash
 brew install trino
 brew services start trino
-# or run it manually
 trino-server run
 ```
+
+Use either `brew services start trino` or `trino-server run` to start it manually.
 
 BenchBox automatically detects when `localhost:8080` refuses connections and
 emits a friendly error explaining that Trino needs to be started (including the
@@ -162,7 +159,6 @@ remote Trino cluster via `--platform-option host=<host> --platform-option port=<
 ### Production (Hive/Iceberg)
 
 ```bash
-# Run with Hive Metastore
 benchbox run --platform trino --benchmark tpch --scale 10.0 \
   --platform-option host=trino.example.com \
   --platform-option catalog=hive \
@@ -227,23 +223,26 @@ Trino provides detailed EXPLAIN output including:
 ### Connection Timeout
 
 ```bash
-# Verify Trino is accessible
 curl http://trino-host:8080/v1/info
 ```
+
+This verifies that Trino is accessible.
 
 ### Catalog Not Found
 
 ```bash
-# List available catalogs
 trino --server trino-host:8080 --execute "SHOW CATALOGS"
 ```
+
+This lists the available catalogs.
 
 ### Memory Errors
 
 ```sql
--- Check memory usage
 SELECT * FROM system.runtime.queries WHERE state = 'RUNNING';
 ```
+
+This checks memory usage of the running queries.
 
 ## Related Documentation
 

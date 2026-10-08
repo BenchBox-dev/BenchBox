@@ -1,5 +1,3 @@
-"""Parity for --corpus-changed-paths flag in validate_submission."""
-
 from __future__ import annotations
 
 import json
@@ -34,7 +32,7 @@ def test_corpus_flag_empty_file_passes(tmp_path: Path):
     bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
     empty = tmp_path / "corpus.txt"
     empty.write_text("", encoding="utf-8")
-    # empty corpus file means no corpus changes, should not fail on corpus check
+
     assert main([str(bundle), "--corpus-changed-paths", str(empty)]) == 0
 
 
@@ -55,11 +53,9 @@ def test_corpus_flag_invalid_path_fails(tmp_path: Path):
 
 
 def test_corpus_flag_parity_with_bundle_validation(tmp_path: Path):
-    # Ensure flag does not break existing manifest logic
+
     bundle = tmp_path / "b.json"
     bundle.write_text(json.dumps(_minimal_bundle()), encoding="utf-8")
     empty = tmp_path / "corpus.txt"
     empty.write_text("", encoding="utf-8")
-    assert (
-        main([str(bundle), "--corpus-changed-paths", str(empty), "--require-manifest"]) == 1
-    )  # manifest missing should still fail when required
+    assert main([str(bundle), "--corpus-changed-paths", str(empty), "--require-manifest"]) == 1

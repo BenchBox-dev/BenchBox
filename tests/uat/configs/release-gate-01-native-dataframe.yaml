@@ -1,20 +1,6 @@
 # TEMPLATE — canonical, repeatedly-run release-gate stage config; edited in
 # place across releases (e.g. cross_scale_coverage_min_pairs re-derivation),
 # not cloned per sweep. See _project/specs/uat-framework.md Section 9.
-#
-# Release-gate re-run — STAGE 1 of 3: native SQL + dataframe (native execution).
-#
-# Run order (see docs/operations/uat-release-campaign.md):
-#   1. release-gate-01-native-dataframe.yaml   <-- this file
-#   2. release-gate-02-docker-nonoltp.yaml
-#   3. release-gate-03-docker-oltp.yaml
-#
-# Native SQL and dataframe (native-execution) platforms must complete BEFORE
-# any Docker stack starts (the 2026-05-28/29 evidence was contaminated because a
-# Docker stack began before the dataframe sweep finished). This stage runs no
-# Docker platforms, so its uat_lifecycle.log contains no `action=up` events —
-# that absence is what the ordering check keys on. Use a FRESH run root and
-# record the run seed (BENCHBOX_SEED) in the release-gate log.
 name: "release-gate-01-native-dataframe"
 description: "Release-gate stage 1: native SQL + dataframe platforms, scales 0.01/0.1/1"
 
@@ -57,30 +43,9 @@ cleanup:
 validate:
   validator_clean_rate_floor: 1.0
 
-# `package` was in `phases:` above with no `package:` section -- every
-# release-gate sweep aborted at the package phase with
-# PackagePhaseError("package.submit_terminal_state is required..."),
-# invisible until w1's load-time enforcement caught it
-# (uat-config-schema-spec-realignment). local-stage matches every other
-# checked-in config; PR-opening states are stubs (tests/uat/phases/package.py).
 package:
   submit_terminal_state: "local-stage"
 
 report:
   matrix_summary_tsv: "matrix_summary.tsv"
-  # APPROVE gate teeth: require at least this many (platform, benchmark) pairs
-  # to be passed AND validator-clean across all three rungs; a breach forces a
-  # non-zero report exit so the gate cannot be APPROVED on a partial/regressed
-  # sweep.
-  # Derivation (uat-release-gate-enforcement w4, 2026-07-12, updated for the
-  # SQLite vector_search benchmark capability gate): enumerate_cells_with_pruning
-  # over this config yields 138 pairs with every
-  # rung (0.01/0.1/1.0) enumerable -- the only pairs the cross-scale check can
-  # ever count (208 raw pairs minus 55 whose registry scale ladder omits a
-  # rung, e.g. clickbench/joinorder 1.0-only and read_primitives 0.01/0.1-only,
-  # three measured runtime-envelope exclusions, the SQLite vector_search
-  # capability exclusion, and the removal of Modin's 12 eligible pairs).
-  # floor = max(8, floor(0.8 * 138)) = 110. The 0.8 slack absorbs legitimate
-  # environment variance without letting a mass regression sign off; never set
-  # this to the eligible count exactly.
   cross_scale_coverage_min_pairs: 110

@@ -1,12 +1,3 @@
-/**
- * The measurement basis as a cohort-level rule.
- *
- * Basis compatibility belongs next to benchmark, scale and phase for the same
- * reason those do: it is something a whole comparison must agree on, and a run
- * that cannot answer it is not comparable in this cohort. Putting it here
- * means a surface handles one kind of cohort violation, not two.
- */
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -92,9 +83,6 @@ describe("basis compatibility sits alongside benchmark, scale and phase", () => 
 
 describe("unknown availability is compatible, not incompatible", () => {
   it("accepts a row that does not carry an availability list at all", () => {
-    // A snapshot built before the basis columns existed must not have every
-    // row declared incompatible. Value resolution reports unavailability per
-    // query, where it can name the reason.
     expect(rowAnswersBasis({ benchmark: "tpch" }, WARMUP_BASIS)).toBe(true);
     expect(rowAnswersBasis({ benchmark: "tpch", available_bases: null }, WARMUP_BASIS)).toBe(true);
     expect(rowAnswersBasis({ benchmark: "tpch", available_bases: "" }, WARMUP_BASIS)).toBe(true);
@@ -113,11 +101,6 @@ describe("unknown availability is compatible, not incompatible", () => {
   });
 
   it("serves a non-default statistic over an available pass selection", () => {
-    // Regression for a review finding. Availability is a property of the PASS
-    // SELECTION: the pipeline publishes `all_warm`, never `all_warm:min`,
-    // because the statistic is reduced client-side over rows the run already
-    // recorded. Matching whole bases rejected every row in the corpus the
-    // moment a cohort locked the minimum.
     expect(rowAnswersBasis(cohortRow(), MIN_ALL_WARM)).toBe(true);
     expect(rowAnswersBasis(cohortRow(), { passes: WARMUP, statistic: "min" })).toBe(true);
     expect(rowAnswersBasis(cohortRow(), { passes: warmPass(3), statistic: "min" })).toBe(true);
@@ -130,8 +113,6 @@ describe("unknown availability is compatible, not incompatible", () => {
   });
 
   it("does not partition a min-statistic cohort into an empty compatible set", () => {
-    // The user-visible shape of the bug: locking the minimum emptied the
-    // comparison, with every row hidden as incompatible.
     const signature = compareCohortSignatureForRow(cohortRow(), MIN_ALL_WARM);
     const rows = [cohortRow({ id: 1 }), cohortRow({ id: 2 }), cohortRow({ id: 3 })];
     const { compatible, incompatible } = compareCohortPartition(rows, signature);
@@ -157,9 +138,6 @@ describe("a cross-run comparison locks exactly one basis", () => {
   });
 
   it("refuses two different bases at the runtime boundary the types cannot reach", () => {
-    // The types make this unrepresentable in the model. This is the same rule
-    // where bases arrive as untyped strings from a URL, before the types see
-    // them at all.
     const locked = lockCrossRunBasis([DEFAULT_BASIS, MIN_ALL_WARM]);
     expect(locked.ok).toBe(false);
     if (locked.ok) return;

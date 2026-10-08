@@ -1,19 +1,9 @@
-"""TPC-DI ETL validation query suite.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides comprehensive ETL validation queries for TPC-DI covering
-batch processing validation, incremental load validation, data transformation
-validation, and ETL quality score calculations.
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-These queries validate the ETL pipeline execution and ensure data integration
-processes comply with TPC-DI specifications.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 from functools import lru_cache
@@ -51,8 +41,6 @@ def _etl_query_data() -> dict[str, Any]:
 
 
 class TPCDIETLQueries(ParameterizedQueryManager):
-    """TPC-DI ETL validation query manager."""
-
     invalid_query_label = "ETL query"
 
     def __init__(self) -> None:

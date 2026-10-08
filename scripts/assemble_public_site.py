@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Assemble the exact directory tree published by the documentation workflow."""
 
 from __future__ import annotations
 
@@ -9,6 +8,8 @@ import sys
 import tempfile
 from collections.abc import Callable, Sequence
 from pathlib import Path
+
+CLI_DESCRIPTION = "Assemble the exact directory tree published by the documentation workflow."
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ASTRO_DIST = Path("website") / "dist"
@@ -27,7 +28,6 @@ RESULTS_FALLBACK = """<!DOCTYPE html>
       try {
         window.sessionStorage.setItem(redirectKey, originalPath);
       } catch (error) {
-        // Ignore sessionStorage failures and still redirect to the SPA entrypoint.
       }
 
       window.location.replace('/results/');
@@ -57,7 +57,6 @@ def _validate_destination(repo_root: Path, site_dir: Path) -> None:
 
 
 def assemble_public_site(*, repo_root: Path, site_dir: Path, prose_only: bool = False) -> None:
-    """Build the Pages-shaped landing, docs, blog, and optional Explorer tree."""
     repo_root = repo_root.resolve()
     _validate_destination(repo_root, site_dir)
     site_dir = site_dir.resolve()
@@ -92,16 +91,12 @@ def assemble_public_site(*, repo_root: Path, site_dir: Path, prose_only: bool = 
     if image_assets.is_dir():
         _copy_tree(image_assets, site_dir / "_images")
 
-    # CNAME and 404 are Pages deployment concerns; prose_only produces a
-    # non-deployable artifact slice, so neither is emitted in that mode.
     if not prose_only:
         cname = repo_root / "docs" / "CNAME"
         if cname.is_file():
             shutil.copy2(cname, site_dir / "CNAME")
         (site_dir / ".nojekyll").touch()
     else:
-        # Still mark as Jekyll-bypassed so prose_site can be inspected locally,
-        # but do not claim the apex domain.
         (site_dir / ".nojekyll").touch()
 
     if not prose_only:
@@ -130,7 +125,7 @@ STAGE_BUILDERS: dict[str, Callable[..., None]] = {"sphinx": assemble_public_site
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--site-dir", type=Path, required=True, help="destination for the assembled Pages tree")
     parser.add_argument(
         "--prose-only",

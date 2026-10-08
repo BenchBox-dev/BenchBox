@@ -1,24 +1,6 @@
-"""AMPLab DataFrame query implementations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-All 8 AMPLab benchmark queries implemented for both Expression and Pandas families.
-
-Tables: rankings, uservisits, documents
-Patterns: scans, joins, text analytics, GROUP BY with HAVING
-
-Queries:
-- Q1: Scan with pageRank filter
-- Q1a: Aggregation with pageRank filter
-- Q2: Join uservisits+rankings with date range
-- Q2a: Join with pageRank filter and limit
-- Q3: Text search with HAVING
-- Q3a: Document text analysis with CASE WHEN
-- Q4: Country/language analytics with HAVING
-- Q5: Cross-table analytics with join and HAVING
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -34,14 +16,6 @@ from .registry import register_query
 
 
 def _visit_date(series: Any) -> Any:
-    """Coerce a pandas ``visitDate`` column to ``datetime.date`` for comparison.
-
-    The Parquet load path yields a date/datetime column already, but the raw-CSV
-    path (``prefer_parquet=False``) leaves ``visitDate`` as ISO ``YYYY-MM-DD``
-    strings, which pandas refuses to compare against the ``datetime.date`` query
-    params. Normalize both to ``date`` so the comparison matches the date-typed
-    params (mirroring the expression path's ``cast_date()``).
-    """
     import pandas as pd
 
     if isinstance(series, pd.Series) and not pd.api.types.is_datetime64_any_dtype(series):
@@ -51,13 +25,8 @@ def _visit_date(series: Any) -> Any:
     return series
 
 
-# =============================================================================
-# Q1: Scan Query - filter rankings by pageRank
-# =============================================================================
-
-
 def q1_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Filter rankings by pageRank threshold."""
+
     params = get_parameters("Q1")
     threshold = params.get("pagerank_threshold", 1000)
 
@@ -69,7 +38,7 @@ def q1_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q1: Filter rankings by pageRank threshold."""
+
     params = get_parameters("Q1")
     threshold = params.get("pagerank_threshold", 1000)
 
@@ -77,13 +46,7 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
     return rankings[rankings["pageRank"] > threshold][["pageURL", "pageRank"]]
 
 
-# =============================================================================
-# Q1a: Aggregation with pageRank filter
-# =============================================================================
-
-
 def q1a_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q1a: COUNT, AVG, MAX of pageRank above threshold."""
     params = get_parameters("Q1a")
     threshold = params.get("pagerank_threshold", 1000)
 
@@ -99,7 +62,6 @@ def q1a_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q1a_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q1a: COUNT, AVG, MAX of pageRank above threshold."""
     import pandas as pd
 
     params = get_parameters("Q1a")
@@ -116,13 +78,7 @@ def q1a_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# Q2: Join uservisits+rankings with date range
-# =============================================================================
-
-
 def q2_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q2: Join uservisits to rankings, GROUP BY sourceIP, ORDER BY revenue."""
     params = get_parameters("Q2")
     start_date = params.get("start_date", date(2000, 1, 1))
     end_date = params.get("end_date", date(2000, 1, 3))
@@ -148,7 +104,6 @@ def q2_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q2_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q2: Join uservisits to rankings, GROUP BY sourceIP, ORDER BY revenue."""
     params = get_parameters("Q2")
     start_date = params.get("start_date", date(2000, 1, 1))
     end_date = params.get("end_date", date(2000, 1, 3))
@@ -167,13 +122,7 @@ def q2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# Q2a: Join with pageRank filter and limit
-# =============================================================================
-
-
 def q2a_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q2a: Join uservisits to rankings, filter by pageRank, ORDER BY pageRank."""
     params = get_parameters("Q2a")
     threshold = params.get("pagerank_threshold", 1000)
     start_date = params.get("start_date", date(2000, 1, 1))
@@ -195,7 +144,6 @@ def q2a_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q2a_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q2a: Join uservisits to rankings, filter by pageRank, ORDER BY pageRank."""
     params = get_parameters("Q2a")
     threshold = params.get("pagerank_threshold", 1000)
     start_date = params.get("start_date", date(2000, 1, 1))
@@ -213,13 +161,7 @@ def q2a_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# Q3: Text search with HAVING
-# =============================================================================
-
-
 def q3_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q3: Text search on uservisits with HAVING on visit_count."""
     params = get_parameters("Q3")
     start_date = params.get("start_date", date(2000, 1, 1))
     end_date = params.get("end_date", date(2000, 1, 3))
@@ -250,7 +192,6 @@ def q3_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q3_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q3: Text search on uservisits with HAVING on visit_count."""
     params = get_parameters("Q3")
     start_date = params.get("start_date", date(2000, 1, 1))
     end_date = params.get("end_date", date(2000, 1, 3))
@@ -272,13 +213,7 @@ def q3_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("total_revenue", ascending=False).head(limit_rows)
 
 
-# =============================================================================
-# Q3a: Document text analysis with CASE WHEN
-# =============================================================================
-
-
 def q3a_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q3a: Text analysis on documents with keyword matching."""
     params = get_parameters("Q3a")
     keyword1 = params.get("keyword1", "web")
     keyword2 = params.get("keyword2", "data")
@@ -303,7 +238,6 @@ def q3a_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q3a_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q3a: Text analysis on documents with keyword matching."""
     import numpy as np
 
     params = get_parameters("Q3a")
@@ -325,13 +259,7 @@ def q3a_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# Q4: Country/language analytics with HAVING
-# =============================================================================
-
-
 def q4_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q4: Country/language analytics with HAVING."""
     params = get_parameters("Q4")
     start_date = params.get("start_date", date(2000, 1, 1))
     min_revenue = params.get("min_revenue", 1.0)
@@ -358,7 +286,6 @@ def q4_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q4_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q4: Country/language analytics with HAVING."""
     params = get_parameters("Q4")
     start_date = params.get("start_date", date(2000, 1, 1))
     min_revenue = params.get("min_revenue", 1.0)
@@ -378,13 +305,7 @@ def q4_pandas_impl(ctx: DataFrameContext) -> Any:
     return result.sort_values("total_revenue", ascending=False).head(limit_rows)
 
 
-# =============================================================================
-# Q5: Cross-table analytics with join and HAVING
-# =============================================================================
-
-
 def q5_expression_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Join uservisits+rankings, GROUP BY countryCode with HAVING."""
     params = get_parameters("Q5")
     start_date = params.get("start_date", date(2000, 1, 1))
     threshold = params.get("pagerank_threshold", 1000)
@@ -415,7 +336,6 @@ def q5_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def q5_pandas_impl(ctx: DataFrameContext) -> Any:
-    """Q5: Join uservisits+rankings, GROUP BY countryCode with HAVING."""
     params = get_parameters("Q5")
     start_date = params.get("start_date", date(2000, 1, 1))
     threshold = params.get("pagerank_threshold", 1000)
@@ -437,10 +357,6 @@ def q5_pandas_impl(ctx: DataFrameContext) -> Any:
     result = grouped[grouped["total_visits"] > min_visits]
     return result.sort_values("total_revenue", ascending=False).head(limit_rows)
 
-
-# =============================================================================
-# Query Registration
-# =============================================================================
 
 _CATEGORY_CODES = {
     "AG": QueryCategory.AGGREGATE,

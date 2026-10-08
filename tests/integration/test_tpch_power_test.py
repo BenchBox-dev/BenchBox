@@ -1,5 +1,3 @@
-"""Integration tests for the TPC-H power test implementation with real query execution."""
-
 from __future__ import annotations
 
 import json
@@ -9,7 +7,6 @@ import pytest
 
 from benchbox.core.tpch.power_test import TPCHPowerTest, TPCHPowerTestConfig, TPCHPowerTestResult
 
-# Mark all tests in this file as integration tests
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.slow,
@@ -23,15 +20,13 @@ def _make_power_test(
     stream_id: int = 0,
     scale_factor: float = 0.01,
 ) -> TPCHPowerTest:
-    """Create a TPCHPowerTest instance with lightweight defaults and mocked connection."""
 
     bench = benchmark or Mock()
     bench.get_query = Mock(return_value="SELECT 1")
 
-    # Mock connection with execute() method that returns a cursor-like object
     connection = Mock()
     mock_cursor = Mock()
-    mock_cursor.fetchall = Mock(return_value=[(1,)])  # Return realistic result
+    mock_cursor.fetchall = Mock(return_value=[(1,)])
     connection.execute = Mock(return_value=mock_cursor)
 
     return TPCHPowerTest(
@@ -46,8 +41,6 @@ def _make_power_test(
 
 
 class TestPowerTestConfig:
-    """Validate TPCHPowerTestConfig behaviour."""
-
     def test_defaults(self) -> None:
         config = TPCHPowerTestConfig()
         assert config.scale_factor == 1.0
@@ -60,8 +53,6 @@ class TestPowerTestConfig:
 
 
 class TestPowerTestResult:
-    """Verify TPCHPowerTestResult helpers."""
-
     def test_to_dict_serialisation(self) -> None:
         config = TPCHPowerTestConfig(
             scale_factor=0.1, seed=17, stream_id=2, timeout=30.0, warm_up=False, validation=False
@@ -87,8 +78,6 @@ class TestPowerTestResult:
 
 
 class TestPowerTestExecution:
-    """Exercise the real query execution flow."""
-
     def test_run_produces_successful_result(self) -> None:
         power_test = _make_power_test()
         benchmark = power_test.benchmark
@@ -101,9 +90,7 @@ class TestPowerTestExecution:
         assert result.queries_executed == 22
         assert result.queries_successful == 22
         assert len(result.query_results) == 22
-        # preflight + execution calls
         assert benchmark.get_query.call_count == 44
-        # Verify connection.execute() was called for each query
         assert connection.execute.call_count == 22
         assert power_test.validate_results(result) is True
         assert result.power_at_size > 0.0
@@ -112,18 +99,16 @@ class TestPowerTestExecution:
         power_test = _make_power_test()
 
         def fail_once_on_execute(*_args, **_kwargs):
-            """Simulate execution failure on the 5th query."""
             fail_once_on_execute.invocations += 1
             if fail_once_on_execute.invocations == 5 and not fail_once_on_execute.failed:
                 fail_once_on_execute.failed = True
                 raise RuntimeError("boom")
-            # Return mock cursor with realistic result
             mock_cursor = Mock()
             mock_cursor.fetchall = Mock(return_value=[(1,)])
             return mock_cursor
 
-        fail_once_on_execute.invocations = 0  # type: ignore[attr-defined]
-        fail_once_on_execute.failed = False  # type: ignore[attr-defined]
+        fail_once_on_execute.invocations = 0
+        fail_once_on_execute.failed = False
 
         with patch.object(power_test, "_preflight_validate_generation", return_value=None):
             power_test.connection.execute.side_effect = fail_once_on_execute
@@ -217,19 +202,6 @@ class TestPowerTestReferenceSeedContext:
         assert mock_clear.call_count == 22
 
     def test_boundary_query_not_failed_with_custom_seed_at_sf1(self) -> None:
-        """End-to-end regression for the w0 defect: at SF=1.0 with a custom
-        (non-reference) seed, Q11/16/18/20 must be relaxed from their canonical
-        EXACT mode to their RANGE/LOOSE bounds rather than skipped or
-        EXACT-compared against the pinned answer set.
-
-        Routes through the REAL PlatformAdapterConnection + DuckDBAdapter +
-        QueryValidator stack (not a bare Mock connection, which would bypass
-        row-count validation entirely and silently not exercise the defect --
-        see w1 notes on why the raw-Mock pattern elsewhere in this file never
-        caught this bug). Only the innermost raw DB cursor is mocked, forced
-        to return an in-bounds count that differs from the pinned answer-file
-        count where applicable.
-        """
         from benchbox.platforms.base.connection_wrappers import PlatformAdapterConnection
         from benchbox.platforms.duckdb import DuckDBAdapter
 

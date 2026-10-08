@@ -1,13 +1,6 @@
-"""Unit tests for StarRocks setup config and tuning-type support.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Pins _setup_connection_config defaults and env fallbacks, from_config
-benchmark-derived database naming, and _build_starrocks_config env
-resolution. StarRocks needs no live server for any of these paths.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

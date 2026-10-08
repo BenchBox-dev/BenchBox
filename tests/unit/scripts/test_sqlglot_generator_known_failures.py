@@ -1,5 +1,3 @@
-"""Focused tests for the SQLGlot generator known-failure guard."""
-
 from __future__ import annotations
 
 import copy

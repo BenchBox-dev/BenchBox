@@ -1,5 +1,3 @@
-"""Databricks integration smoke tests with stubbed connector."""
-
 import pytest
 
 from benchbox.platforms.databricks import DatabricksAdapter

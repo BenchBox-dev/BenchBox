@@ -1,23 +1,4 @@
 #!/usr/bin/env python3
-"""Demonstrate loading and comparing benchmark results.
-
-This example shows how to:
-- Load benchmark results from JSON files
-- Compare performance across multiple runs
-- Detect performance regressions
-- Analyze query-by-query changes
-- Track performance trends over time
-
-Usage:
-    python features/result_analysis.py
-
-Key Concepts:
-    - Result JSON format and structure
-    - Loading previous benchmark results
-    - Query-by-query comparison
-    - Regression detection strategies
-    - Statistical analysis of performance changes
-"""
 
 from __future__ import annotations
 
@@ -26,7 +7,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# Add parent directory to path for imports
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _EXAMPLES_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_EXAMPLES_DIR))
@@ -36,14 +16,6 @@ from benchbox.tpch import TPCH
 
 
 def generate_sample_results():
-    """Generate two sample benchmark runs for comparison.
-
-    In real scenarios, these would be:
-    - Before/after a code change
-    - Different platform versions
-    - Different tuning configurations
-    - Different time periods
-    """
     print("=" * 70)
     print("GENERATING SAMPLE RESULTS")
     print("=" * 70)
@@ -53,7 +25,6 @@ def generate_sample_results():
     print("  Run 2: Recent (same benchmark, simulated variation)")
     print()
 
-    # Create benchmark
     benchmark = TPCH(
         scale_factor=0.01,
         output_dir=Path("./benchmark_runs/features/analysis"),
@@ -62,27 +33,24 @@ def generate_sample_results():
 
     benchmark.generate_data()
 
-    # Run 1: Baseline
     print("Running baseline benchmark...")
     adapter = DuckDBAdapter(database_path=":memory:")
     baseline_results = adapter.run_benchmark(
         benchmark,
         test_execution_type="power",
-        query_subset=["1", "3", "6", "12", "14"],  # Subset for faster demo
+        query_subset=["1", "3", "6", "12", "14"],
     )
 
     baseline_output = Path("./benchmark_runs/features/analysis/baseline")
     baseline_output.mkdir(parents=True, exist_ok=True)
     baseline_file = baseline_output / "results.json"
 
-    # Save baseline results
     with open(baseline_file, "w", encoding="utf-8") as f:
         json.dump(baseline_results.model_dump(), f, indent=2)
 
     print(f"✓ Baseline saved to {baseline_file}")
     print()
 
-    # Run 2: Recent (simulated with slight variations)
     print("Running recent benchmark...")
     recent_results = adapter.run_benchmark(
         benchmark, test_execution_type="power", query_subset=["1", "3", "6", "12", "14"]
@@ -92,7 +60,6 @@ def generate_sample_results():
     recent_output.mkdir(parents=True, exist_ok=True)
     recent_file = recent_output / "results.json"
 
-    # Save recent results
     with open(recent_file, "w", encoding="utf-8") as f:
         json.dump(recent_results.model_dump(), f, indent=2)
 
@@ -103,20 +70,11 @@ def generate_sample_results():
 
 
 def load_results(result_path: Path) -> dict[str, Any]:
-    """Load benchmark results from JSON file.
-
-    The result JSON contains:
-    - Metadata (benchmark name, platform, timestamp)
-    - Overall metrics (total time, query count)
-    - Query-by-query results (execution times, status)
-    - Configuration details
-    """
     with open(result_path, encoding="utf-8") as f:
         return json.load(f)
 
 
 def compare_overall_metrics(baseline: dict[str, Any], recent: dict[str, Any]):
-    """Compare overall benchmark metrics between two runs."""
     print("=" * 70)
     print("OVERALL METRICS COMPARISON")
     print("=" * 70)
@@ -142,7 +100,6 @@ def compare_overall_metrics(baseline: dict[str, Any], recent: dict[str, Any]):
 
     print()
 
-    # Query counts
     baseline_queries = baseline.get("total_queries", 0)
     recent_queries = recent.get("total_queries", 0)
 
@@ -157,13 +114,6 @@ def compare_overall_metrics(baseline: dict[str, Any], recent: dict[str, Any]):
 
 
 def compare_query_results(baseline: dict[str, Any], recent: dict[str, Any]):
-    """Compare query-by-query performance between runs.
-
-    This is the most important analysis for identifying:
-    - Which queries regressed
-    - Which queries improved
-    - Query performance variance
-    """
     print("=" * 70)
     print("QUERY-BY-QUERY COMPARISON")
     print("=" * 70)
@@ -173,7 +123,6 @@ def compare_query_results(baseline: dict[str, Any], recent: dict[str, Any]):
 
     recent_queries = {q["query_name"]: q for q in recent.get("query_results", [])}
 
-    # Table header
     print(f"{'Query':<10} {'Baseline':<12} {'Recent':<12} {'Change':<12} {'Status':<15}")
     print("-" * 70)
 
@@ -196,7 +145,6 @@ def compare_query_results(baseline: dict[str, Any], recent: dict[str, Any]):
             time_diff = recent_time - baseline_time
             percent_change = (time_diff / baseline_time) * 100
 
-            # Classify change
             if percent_change > 10:
                 status = "⚠️  REGRESSION"
                 regressions.append((query_name, percent_change))
@@ -214,7 +162,6 @@ def compare_query_results(baseline: dict[str, Any], recent: dict[str, Any]):
     print("-" * 70)
     print()
 
-    # Summary
     total = len(baseline_queries)
     print("Summary:")
     print(f"  Total queries:        {total}")
@@ -223,14 +170,12 @@ def compare_query_results(baseline: dict[str, Any], recent: dict[str, Any]):
     print(f"  Stable (±10%):        {len(stable)} ({len(stable) / total * 100:.0f}%)")
     print()
 
-    # Highlight worst regressions
     if regressions:
         print("⚠️  Worst Regressions:")
         for query_name, percent in sorted(regressions, key=lambda x: x[1], reverse=True)[:3]:
             print(f"    {query_name}: {percent:+.1f}%")
         print()
 
-    # Highlight best improvements
     if improvements:
         print("✓ Best Improvements:")
         for query_name, percent in sorted(improvements, key=lambda x: x[1], reverse=True)[:3]:
@@ -241,21 +186,6 @@ def compare_query_results(baseline: dict[str, Any], recent: dict[str, Any]):
 
 
 def detect_regressions(baseline: dict[str, Any], recent: dict[str, Any], threshold: float = 10.0):
-    """Detect performance regressions above a threshold.
-
-    This is useful for CI/CD pipelines where you want to:
-    - Fail builds if performance degrades significantly
-    - Alert teams to performance changes
-    - Track regression trends
-
-    Args:
-        baseline: Baseline benchmark results
-        recent: Recent benchmark results
-        threshold: Percent change threshold for regression (default 10%)
-
-    Returns:
-        True if regressions detected, False otherwise
-    """
     print("=" * 70)
     print(f"REGRESSION DETECTION (Threshold: {threshold}%)")
     print("=" * 70)
@@ -291,7 +221,6 @@ def detect_regressions(baseline: dict[str, Any], recent: dict[str, Any], thresho
 
 
 def show_result_format():
-    """Show the structure of result JSON files."""
     print("=" * 70)
     print("RESULT JSON FORMAT")
     print("=" * 70)
@@ -324,7 +253,6 @@ def show_result_format():
 
 
 def show_analysis_strategies():
-    """Show different analysis strategies for various use cases."""
     print("=" * 70)
     print("ANALYSIS STRATEGIES")
     print("=" * 70)
@@ -362,7 +290,6 @@ def show_analysis_strategies():
 
 
 def main() -> int:
-    """Demonstrate result analysis workflow."""
     print()
     print("=" * 70)
     print("BENCHBOX FEATURE: RESULT ANALYSIS")
@@ -372,10 +299,8 @@ def main() -> int:
     print("to detect regressions and analyze performance changes.")
     print()
 
-    # Generate sample results
     baseline_file, recent_file = generate_sample_results()
 
-    # Load results
     print("=" * 70)
     print("LOADING RESULTS")
     print("=" * 70)
@@ -387,22 +312,16 @@ def main() -> int:
     baseline = load_results(baseline_file)
     recent = load_results(recent_file)
 
-    # Compare overall metrics
     compare_overall_metrics(baseline, recent)
 
-    # Compare query-by-query
     compare_query_results(baseline, recent)
 
-    # Detect regressions
     has_regression = detect_regressions(baseline, recent, threshold=10.0)
 
-    # Show result format
     show_result_format()
 
-    # Show analysis strategies
     show_analysis_strategies()
 
-    # Summary
     print("=" * 70)
     print("SUMMARY")
     print("=" * 70)
@@ -433,7 +352,6 @@ def main() -> int:
     print("    python result_analysis.py baseline.json recent.json")
     print()
 
-    # Exit with error code if regression detected (for CI/CD demo)
     return 1 if has_regression else 0
 
 

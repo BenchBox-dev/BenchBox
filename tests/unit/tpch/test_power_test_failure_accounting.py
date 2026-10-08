@@ -1,15 +1,6 @@
-"""Power-harness failure accounting: no success without executing SQL.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Regression coverage for concurrency-public-api-semantic-reconciliation:
-the canonical TPC-H power harness (``TPCHPowerTest``) must report failure
-when its queries fail, and success only when the connection actually
-executed them. A mock connection records every ``execute`` call so the
-tests prove execution happened (or did not), rather than trusting flags.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -46,7 +37,6 @@ def _benchmark_double() -> Mock:
 
 class TestPowerHarnessFailureAccounting:
     def test_failing_connection_reports_failure_not_success(self):
-        """A connection that raises must never produce a successful result."""
         connection = Mock()
         connection.execute.side_effect = RuntimeError("connection refused")
 
@@ -60,10 +50,8 @@ class TestPowerHarnessFailureAccounting:
         assert "Query 1 failed" in result.errors[0]
 
     def test_success_requires_executed_sql(self):
-        """Success must coincide with the connection executing the query."""
         cursor = Mock()
         cursor.fetchall.return_value = [(1,)]
-        # No platform_result: falls back to fetchall() counting.
         del cursor.platform_result
         connection = Mock()
         connection.execute.return_value = cursor

@@ -6,7 +6,6 @@ export interface SelectOption {
   disabled?: boolean;
 }
 
-// Preact convention: callers pass `class` (not `className`).
 type NativeSelectProps = Omit<
   JSX.IntrinsicElements["select"],
   "size" | "onChange" | "onInput" | "value" | "className"
@@ -18,7 +17,6 @@ interface SelectProps extends NativeSelectProps {
   value: string;
   onChange: (value: string) => void;
   size?: "sm" | "md";
-  /** Optional leading element rendered before the native control (e.g. icon). */
   leading?: ComponentChildren;
 }
 

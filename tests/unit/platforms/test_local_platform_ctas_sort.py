@@ -1,5 +1,3 @@
-"""Tests for local SQL platform CTAS sort hooks."""
-
 from __future__ import annotations
 
 from pathlib import Path

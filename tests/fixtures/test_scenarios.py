@@ -1,19 +1,6 @@
-"""Test Scenarios for BenchBox Testing.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides comprehensive test scenarios for different testing needs
-including unit tests, integration tests, performance tests, and regression tests.
-
-Features:
-- Predefined test scenarios with expected outcomes
-- Parametrized test configurations
-- Error simulation scenarios
-- Performance test scenarios
-- Cross-database compatibility scenarios
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import time
 from dataclasses import dataclass, field
@@ -24,8 +11,6 @@ import pytest
 
 
 class ScenarioType(Enum):
-    """Types of test scenarios."""
-
     UNIT = "unit"
     INTEGRATION = "integration"
     PERFORMANCE = "performance"
@@ -35,8 +20,6 @@ class ScenarioType(Enum):
 
 
 class ScenarioComplexity(Enum):
-    """Test complexity levels."""
-
     SIMPLE = "simple"
     MODERATE = "moderate"
     COMPLEX = "complex"
@@ -45,8 +28,6 @@ class ScenarioComplexity(Enum):
 
 @dataclass
 class BenchmarkScenario:
-    """Represents a test scenario configuration."""
-
     name: str
     scenario_type: ScenarioType
     complexity: ScenarioComplexity
@@ -59,19 +40,14 @@ class BenchmarkScenario:
     tags: list[str] = field(default_factory=list)
 
     def should_run_in_ci(self) -> bool:
-        """Determine if this scenario should run in CI."""
-        # Skip stress tests and very long scenarios in CI
         if self.complexity == ScenarioComplexity.STRESS:
             return False
         return not (self.timeout_seconds and self.timeout_seconds > 60)
 
 
 class TPCDSBenchmarkScenarios:
-    """Collection of TPC-DS test scenarios."""
-
     @staticmethod
     def get_unit_test_scenarios() -> list[BenchmarkScenario]:
-        """Get unit test scenarios."""
         return [
             BenchmarkScenario(
                 name="query_manager_basic",
@@ -151,7 +127,6 @@ class TPCDSBenchmarkScenarios:
 
     @staticmethod
     def get_integration_test_scenarios() -> list[BenchmarkScenario]:
-        """Get integration test scenarios."""
         return [
             BenchmarkScenario(
                 name="end_to_end_query_workflow",
@@ -222,7 +197,6 @@ class TPCDSBenchmarkScenarios:
 
     @staticmethod
     def get_performance_test_scenarios() -> list[BenchmarkScenario]:
-        """Get performance test scenarios."""
         return [
             BenchmarkScenario(
                 name="query_generation_benchmark",
@@ -230,7 +204,7 @@ class TPCDSBenchmarkScenarios:
                 complexity=ScenarioComplexity.MODERATE,
                 description="Benchmark query generation performance",
                 parameters={
-                    "test_queries": list(range(1, 51)),  # First 50 queries
+                    "test_queries": list(range(1, 51)),
                     "iterations": 10,
                     "measure_memory": True,
                     "measure_cpu": True,
@@ -278,7 +252,7 @@ class TPCDSBenchmarkScenarios:
                     "no_memory_leaks": True,
                     "performance_stable": True,
                 },
-                timeout_seconds=360.0,  # 6 minutes
+                timeout_seconds=360.0,
                 tags=["performance", "memory", "sustained"],
             ),
             BenchmarkScenario(
@@ -304,7 +278,6 @@ class TPCDSBenchmarkScenarios:
 
     @staticmethod
     def get_regression_test_scenarios() -> list[BenchmarkScenario]:
-        """Get regression test scenarios."""
         return [
             BenchmarkScenario(
                 name="api_backward_compatibility",
@@ -370,7 +343,6 @@ class TPCDSBenchmarkScenarios:
 
     @staticmethod
     def get_error_handling_scenarios() -> list[BenchmarkScenario]:
-        """Get error handling test scenarios."""
         return [
             BenchmarkScenario(
                 name="invalid_input_handling",
@@ -436,7 +408,6 @@ class TPCDSBenchmarkScenarios:
 
     @staticmethod
     def get_compatibility_scenarios() -> list[BenchmarkScenario]:
-        """Get compatibility test scenarios."""
         return [
             BenchmarkScenario(
                 name="database_compatibility",
@@ -499,15 +470,11 @@ class TPCDSBenchmarkScenarios:
 
 
 class ScenarioRunner:
-    """Execute test scenarios and collect results."""
-
     def __init__(self):
-        """Initialize scenario runner."""
         self.results = {}
         self.current_scenario = None
 
     def run_scenario(self, scenario: BenchmarkScenario, test_function: Callable) -> dict[str, Any]:
-        """Run a test scenario and collect results."""
         self.current_scenario = scenario
 
         start_time = time.time()
@@ -521,13 +488,11 @@ class ScenarioRunner:
         }
 
         try:
-            # Run the test function with scenario parameters
             test_result = test_function(scenario.parameters)
 
             result["status"] = "passed"
             result["outcome"] = test_result
 
-            # Validate against expected outcome
             if scenario.expected_outcome:
                 validation_result = self._validate_outcome(test_result, scenario.expected_outcome)
                 result["validation"] = validation_result
@@ -540,7 +505,6 @@ class ScenarioRunner:
             result["end_time"] = time.time()
             result["duration"] = result["end_time"] - start_time
 
-            # Check timeout
             if scenario.timeout_seconds and result["duration"] > scenario.timeout_seconds:
                 result["status"] = "timeout"
 
@@ -548,7 +512,6 @@ class ScenarioRunner:
         return result
 
     def _validate_outcome(self, actual: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any]:
-        """Validate actual outcome against expected."""
         validation = {
             "passed": True,
             "mismatches": [],
@@ -556,18 +519,15 @@ class ScenarioRunner:
             "extra_keys": [],
         }
 
-        # Check for missing expected keys
         for key in expected:
             if key not in actual:
                 validation["missing_keys"].append(key)
                 validation["passed"] = False
             else:
-                # Compare values
                 expected_val = expected[key]
                 actual_val = actual[key]
 
                 if isinstance(expected_val, (int, float)) and isinstance(actual_val, (int, float)):
-                    # Allow 10% tolerance for numeric values
                     if abs(actual_val - expected_val) > abs(expected_val * 0.1):
                         validation["mismatches"].append({"key": key, "expected": expected_val, "actual": actual_val})
                         validation["passed"] = False
@@ -575,7 +535,6 @@ class ScenarioRunner:
                     validation["mismatches"].append({"key": key, "expected": expected_val, "actual": actual_val})
                     validation["passed"] = False
 
-        # Check for extra keys
         for key in actual:
             if key not in expected:
                 validation["extra_keys"].append(key)
@@ -583,7 +542,6 @@ class ScenarioRunner:
         return validation
 
     def get_summary(self) -> dict[str, Any]:
-        """Get summary of all scenario results."""
         total = len(self.results)
         passed = sum(1 for r in self.results.values() if r["status"] == "passed")
         failed = sum(1 for r in self.results.values() if r["status"] == "failed")
@@ -599,10 +557,8 @@ class ScenarioRunner:
         }
 
 
-# Pytest fixtures for test scenarios
 @pytest.fixture
 def tpcds_test_scenarios():
-    """Fixture providing all TPC-DS test scenarios."""
     return {
         "unit": TPCDSBenchmarkScenarios.get_unit_test_scenarios(),
         "integration": TPCDSBenchmarkScenarios.get_integration_test_scenarios(),
@@ -615,22 +571,18 @@ def tpcds_test_scenarios():
 
 @pytest.fixture
 def scenario_runner():
-    """Fixture providing a test scenario runner."""
     return ScenarioRunner()
 
 
 @pytest.fixture
 def ci_friendly_scenarios(tpcds_test_scenarios):
-    """Fixture providing CI-friendly scenarios only."""
     ci_scenarios = {}
     for category, scenarios in tpcds_test_scenarios.items():
         ci_scenarios[category] = [s for s in scenarios if s.should_run_in_ci()]
     return ci_scenarios
 
 
-# Parametrize decorators for common test patterns
 def parametrize_by_complexity(complexities: list[ScenarioComplexity] = None):
-    """Parametrize tests by complexity level."""
     if complexities is None:
         complexities = [ScenarioComplexity.SIMPLE, ScenarioComplexity.MODERATE]
 
@@ -641,7 +593,6 @@ def parametrize_by_complexity(complexities: list[ScenarioComplexity] = None):
 
 
 def parametrize_by_scenario_type(scenario_types: list[ScenarioType] = None):
-    """Parametrize tests by scenario type."""
     if scenario_types is None:
         scenario_types = [ScenarioType.UNIT, ScenarioType.INTEGRATION]
 
@@ -652,7 +603,6 @@ def parametrize_by_scenario_type(scenario_types: list[ScenarioType] = None):
 
 
 if __name__ == "__main__":
-    # Example usage
     scenarios = TPCDSBenchmarkScenarios()
 
     print("Unit Test Scenarios:")
@@ -679,7 +629,6 @@ if __name__ == "__main__":
     for scenario in scenarios.get_compatibility_scenarios():
         print(f"  - {scenario.name}: {scenario.description}")
 
-    # Count CI-friendly scenarios
     all_scenarios = []
     all_scenarios.extend(scenarios.get_unit_test_scenarios())
     all_scenarios.extend(scenarios.get_integration_test_scenarios())

@@ -1,5 +1,3 @@
-# GENERATED rerun shard (frozen historical) from the 2026-05-05 tuned follow-up sweep — NOT an editable template; see README.md.
-
 name: "uat-tuned-followup-resume-presto-20260505"
 description: "Resume tuned multi-scale local UAT sweep for BenchBox submissions"
 

@@ -1,14 +1,6 @@
-"""MotherDuck credential setup and validation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-MotherDuck authentication is intentionally environment-driven: BenchBox
-requires ``MOTHERDUCK_TOKEN`` for actual runs and does not persist the token
-to ``~/.benchbox/credentials.yaml``.  The setup wizard may accept a masked
-one-time token so users can validate it, but only non-secret metadata is saved.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -26,13 +18,6 @@ DEFAULT_MOTHERDUCK_DATABASE = "benchbox"
 
 
 def setup_motherduck_credentials(cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy]) -> bool:
-    """Interactive setup for MotherDuck connection validation.
-
-    The token is never written to the credential store.  If the environment
-    already provides ``MOTHERDUCK_TOKEN``, the stored status can be marked valid.
-    If the user enters a one-time token at the prompt, BenchBox validates it and
-    saves only the selected database plus the expected env-var name.
-    """
     console.print("\n[bold]You'll need:[/bold]")
     console.print(f"  - A MotherDuck access token in {MOTHERDUCK_TOKEN_ENV}")
     console.print("  - A target MotherDuck database name")
@@ -112,16 +97,6 @@ def validate_motherduck_credentials(
     token: Optional[str] = None,
     database: Optional[str] = None,
 ) -> tuple[bool, Optional[str]]:
-    """Validate MotherDuck credentials by opening a test connection.
-
-    Args:
-        cred_manager: Credential manager instance.
-        token: Optional one-time token supplied by the setup wizard.
-        database: Optional database override supplied by the setup wizard.
-
-    Returns:
-        Tuple of ``(success, error_message)``.
-    """
     creds = cred_manager.get_platform_credentials("motherduck") or {}
     resolved_token = token or os.environ.get(MOTHERDUCK_TOKEN_ENV)
     resolved_database = database or creds.get("database") or DEFAULT_MOTHERDUCK_DATABASE

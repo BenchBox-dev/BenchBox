@@ -1,5 +1,3 @@
-"""Bind checkpoints and outcomes to the local inputs that produced them."""
-
 import hashlib
 import importlib.metadata
 import platform

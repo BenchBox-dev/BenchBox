@@ -1,7 +1,4 @@
-"""Unit tests for TSBS DevOps DataFrame query implementations.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -21,8 +18,6 @@ ALL_QUERY_IDS = [f"Q{i}" for i in range(1, 19)]
 
 
 class TestTSBSDevOpsQueryRegistry:
-    """Tests for TSBS DevOps DataFrame query registry."""
-
     def test_registry_imports_successfully(self):
         from benchbox.core.tsbs_devops.dataframe_queries import TSBS_DEVOPS_DATAFRAME_QUERIES
 
@@ -92,8 +87,6 @@ class TestTSBSDevOpsQueryRegistry:
 
 
 class TestTSBSDevOpsQueryCategories:
-    """Tests for TSBS DevOps query category assignments."""
-
     def test_single_host_queries_have_scan(self):
         from benchbox.core.tsbs_devops.dataframe_queries import get_tsbs_devops_query
 
@@ -130,8 +123,6 @@ class TestTSBSDevOpsQueryCategories:
 
 
 class TestTSBSDevOpsParameters:
-    """Tests for TSBS DevOps query parameters."""
-
     def test_all_queries_have_parameters(self):
         from benchbox.core.tsbs_devops.dataframe_queries.parameters import TSBS_DEVOPS_DEFAULT_PARAMS
 
@@ -242,8 +233,6 @@ class TestTSBSDevOpsParameters:
 
 
 class TestTSBSDevOpsBenchmarkRegistry:
-    """Tests for TSBS DevOps DataFrame support in benchmark registry."""
-
     def test_tsbs_devops_supports_dataframe(self):
         from benchbox.core.benchmark_registry import get_benchmark_metadata
 

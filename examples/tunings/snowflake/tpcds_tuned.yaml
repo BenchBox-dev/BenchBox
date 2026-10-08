@@ -1,9 +1,3 @@
-# Snowflake TPCDS Tuned Configuration
-# Generated from the logical tuning profile (benchbox/core/tuning/profiles/tpc.yaml)
-# by scripts/generate_cloud_tpc_templates.py. Do not hand-edit: re-run the
-# generator after changing the profile. Provides platform-native tuning for
-# TPCDS benchmark workloads.
-
 primary_keys:
   enabled: true
   enforce_uniqueness: true

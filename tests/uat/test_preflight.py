@@ -1,5 +1,3 @@
-"""Fast tests for UAT preflight local-platform provisioning checks."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -97,15 +95,6 @@ def test_preflight_config_accepts_local_platforms_check():
 
 
 def test_preflight_disk_budget_table_error_hard_fails_preflight(tmp_path: Path, monkeypatch):
-    """An estimator crash (bad table) is a hard preflight abort, not a warn-and-continue.
-
-    Regression for uat-disk-gate-always-on w3: a `except Exception` here used
-    to downgrade estimator crashes to a warning and silently fall back to the
-    flat free_space_min_gib cutoff. Unknown cells (missing table rows) stay
-    advisory -- see test_preflight_disk_headroom_gate_respects_zero_override
-    and the unknown_cells coverage below for that path; this test is only
-    for the table itself being unparseable.
-    """
     table = tmp_path / "disk_budget.tsv"
     table.write_text(
         "platform\tbenchmark\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\nduckdb\ttpch\t1.0\t2.0\t0.5\n",
@@ -136,17 +125,10 @@ def test_preflight_disk_budget_table_error_hard_fails_preflight(tmp_path: Path, 
 
 
 def test_preflight_disk_budget_truncated_row_hard_fails_preflight(tmp_path: Path, monkeypatch):
-    """A truncated table row (fewer fields than the header) is a clean preflight abort.
-
-    DictReader fills the missing fields with restval=None and float(None)
-    raises TypeError -- which must be caught and converted to the
-    "disk budget estimator failed:" abort like any other estimator crash,
-    not escape as a raw traceback.
-    """
     table = tmp_path / "disk_budget.tsv"
     table.write_text(
         "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
-        "duckdb\ttpch\t0.01\t1.0\n",  # truncated: 4 of 6 fields
+        "duckdb\ttpch\t0.01\t1.0\n",
         encoding="utf-8",
     )
     cfg = config.validate_config(
@@ -172,10 +154,6 @@ def test_preflight_disk_budget_truncated_row_hard_fails_preflight(tmp_path: Path
 
 
 def test_preflight_disk_budget_unexpected_error_propagates(tmp_path: Path, monkeypatch):
-    """Only (OSError, ValueError, TypeError, KeyError, csv.Error) are caught -- others propagate.
-
-    Guards against re-widening the except clause narrowed in w3.
-    """
     cfg = config.validate_config(
         {
             "name": "budget-smoke",
@@ -337,18 +315,6 @@ def test_preflight_disk_headroom_gate_respects_zero_override(tmp_path: Path, mon
 
 
 def test_preflight_disk_budget_verdict_states_gate_disabled_when_floor_is_zero(tmp_path: Path, monkeypatch):
-    """`free_space_min_gib: 0` must not print a verdict that implies enforcement.
-
-    Regression for finding F3 (uat-disk-budget-platform-chunking review):
-    `gate.headroom` is always computed against the estimate alone, so a
-    disabled floor used to still produce `Disk budget verdict: no shortfall
-    detected against a lower-bound requirement of 22.00 GiB` right above a
-    free-space line that (correctly) said `required 0.00 GiB` -- two
-    contradictory requirements on one screen. Here free space (1 GiB) is
-    also set BELOW the 22 GiB estimate, so `gate.headroom.shortfalls` is
-    non-empty and the OLD code's verdict line would have vanished entirely
-    with no explanation and no abort -- the other half of F3.
-    """
     table = tmp_path / "disk_budget.tsv"
     table.write_text(
         "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\ttransient_growth_gib\n"
@@ -447,7 +413,6 @@ def test_uat_bring_up_path_mirrored_platforms_pass_benchmark_runs_dir_env(
 
 
 def test_preflight_automated_set_matches_script_automated_set():
-    """Preflight and the bring-up script must agree on which platforms are automated."""
     bring_up = _load_bring_up_module()
 
     assert bring_up.automated_platforms() == preflight.automated_local_platforms()
@@ -464,14 +429,7 @@ def _load_bring_up_module():
     return module
 
 
-# ---------------------------------------------------------------------------
-# The disk gate is a LOWER BOUND over a partially-measured inventory. Refusing
-# stays sound; passing must never read as a certification that the sweep fits.
-# ---------------------------------------------------------------------------
-
-
 def _partial_coverage_table(tmp_path: Path) -> Path:
-    """duckdb datagen measured, loaded-database footprint declared unmeasured."""
     table = tmp_path / "disk_budget.tsv"
     table.write_text(
         "platform\tbenchmark\tscale_factor\tpeak_datagen_gib\tpeak_database_gib\t"
@@ -505,15 +463,6 @@ def _duckdb_tpch_config(**overrides):
 
 
 def test_preflight_enforces_configured_floor_when_budget_is_below_it(tmp_path: Path, monkeypatch):
-    """`preflight.free_space_min_gib` must gate even when the estimate is tiny.
-
-    End-to-end companion to `test_disk_headroom_gate_enforces_configured_floor`.
-    Once `disk_budget_config` is passed -- which `preflight_kwargs_from_config`
-    always does -- the flat `elif free_space_min_gib > 0` cutoff below is
-    unreachable, so the configured floor survives ONLY through the
-    `max(min_free_gib, ...)` inside `check_disk_headroom`. Deleting that
-    `max` starts a real sweep with 0.2 GiB free against a 5.0 GiB floor.
-    """
     table = _partial_coverage_table(tmp_path)
     cfg = _duckdb_tpch_config()
 
@@ -529,21 +478,12 @@ def test_preflight_enforces_configured_floor_when_budget_is_below_it(tmp_path: P
         disk_budget_config=cfg,
     )
 
-    # The estimate itself is 1.5 GiB -- well under 0.2 GiB free would NOT be
-    # a shortfall against the estimate alone.
     assert result.aborted is True
     assert result.abort_kind == "disk_floor"
     assert "0.2 GiB free < 5.0 GiB required" in (result.abort_reason or "")
 
 
 def test_preflight_plain_shortfall_reports_a_plain_message(tmp_path: Path, monkeypatch):
-    """A plain free-space shortfall must not be dressed up as anything else.
-
-    Regression guard: the abort text for the common production path (the
-    estimate is far below the configured floor, so the floor is what bites)
-    must name the shortfall and nothing more -- no remedy the operator did
-    not ask about, no all-zeros basis for a term nobody measured.
-    """
     table = _partial_coverage_table(tmp_path)
     cfg = _duckdb_tpch_config()
 
@@ -566,7 +506,6 @@ def test_preflight_plain_shortfall_reports_a_plain_message(tmp_path: Path, monke
 
 
 def test_preflight_passing_verdict_discloses_partial_coverage(tmp_path: Path, monkeypatch):
-    """Passing the gate on unmeasured data must say so, not say "fits"."""
     table = _partial_coverage_table(tmp_path)
     cfg = _duckdb_tpch_config()
 
@@ -583,31 +522,17 @@ def test_preflight_passing_verdict_discloses_partial_coverage(tmp_path: Path, mo
 
     assert result.aborted is False
     summary = result.disk_budget_summary or ""
-    # Coverage and verdict reach the operator on the PASSING path -- the whole
-    # point, since a refusal is already unambiguous.
     assert "Disk budget coverage: PARTIAL" in summary
     assert "LOWER BOUND" in summary
     verdict = next(line for line in summary.splitlines() if line.startswith("Disk budget verdict:"))
     assert "no shortfall detected" in verdict
-    # The verdict line is the one an operator skims for a yes/no. It must not
-    # assert a fit -- the only place "fits" may appear is the coverage line's
-    # explicit denial that this certifies one.
     assert "fits" not in verdict
     assert "not a certification that the sweep fits" in summary
-    # And the gap is a warning, not just prose buried in a summary block.
     assert any("LOWER BOUND" in warning for warning in result.warnings)
-    # The requirement an operator reads off the free-space table is marked as
-    # a floor, not an exact figure their free space comfortably clears.
     assert all("(required >= " in line for line in result.free_space_report)
 
 
 def test_preflight_fully_measured_coverage_reports_a_measured_verdict(tmp_path: Path, monkeypatch):
-    """The honest "fits" case: every gated cell measured, so say it plainly.
-
-    Without this the disclosure could be a constant string that never
-    distinguishes "measured and fine" from "mostly unmeasured" -- which is
-    the exact confusion it exists to prevent.
-    """
     table = _measured_table(tmp_path)
     cfg = _duckdb_tpch_config()
 
@@ -631,12 +556,6 @@ def test_preflight_fully_measured_coverage_reports_a_measured_verdict(tmp_path: 
 
 
 def test_preflight_warns_when_container_data_root_is_not_host_visible(tmp_path: Path, monkeypatch):
-    """macOS/VM-backed engines report a data root that does not exist here.
-
-    `collect_disk_roots` then omits it, so container images/volumes are
-    neither budgeted nor free-space-checked. That omission must be disclosed
-    rather than read as "nothing to check".
-    """
     table = _measured_table(tmp_path)
     cfg = _duckdb_tpch_config()
 

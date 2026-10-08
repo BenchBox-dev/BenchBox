@@ -1,24 +1,3 @@
-"""Sampled-from-real JOB scaling (Track-2, Option B).
-
-Title-stratified downsampling of the canonical IMDb-2013 archive with
-referential-integrity preservation. The sampler keeps a deterministic
-fraction of ``title`` rows via seeded-hash stratified sampling (uniform
-selection within each ``(kind_id, production_year)`` stratum, ranked by
-``sha256(seed, stratum, title_id)``), closes the retained set
-transitively over episode parents merged from both ``title.episode_of_id``
-and ``aka_title.episode_of_id``, and then keeps dependent rows: every row
-in a title-referencing table whose ``movie_id`` survives, every
-``movie_link`` row whose ``movie_id`` and ``linked_movie_id`` both survive,
-the person rows referenced by the surviving cast (``name`` carried
-verbatim, ``aka_name``/``person_info`` filtered to surviving persons),
-plus small dimension tables carried verbatim.
-
-Derived identity is explicit: output archives are labeled
-``joinorder_sampled``, never ``canonical_imdb``. Scale-factor semantics:
-``scale_factor`` is the kept title fraction (1.0 = canonical). Only
-fractional factors in (0, 1] are accepted; bools are rejected outright.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -29,12 +8,6 @@ from dataclasses import KW_ONLY, dataclass, field
 from fractions import Fraction
 from typing import Any
 
-# Tables keyed by a single title id: a row survives when its movie_id is
-# retained. movie_link has two title ends and is handled separately: a
-# row survives only when both movie_id and linked_movie_id are retained,
-# so neither foreign key can dangle. cast_info is the title/person bridge:
-# its movie_id side is filtered here; its person_id side feeds
-# surviving_person_ids() below.
 TITLE_CHILD_TABLES: dict[str, tuple[str, ...]] = {
     "aka_title": ("movie_id",),
     "cast_info": ("movie_id",),
@@ -45,23 +18,14 @@ TITLE_CHILD_TABLES: dict[str, tuple[str, ...]] = {
     "complete_cast": ("movie_id",),
 }
 
-# movie_link has two title ends: a row survives only when both movie_id
-# and linked_movie_id are retained, so neither foreign key can dangle.
 MOVIE_LINK_TABLE = "movie_link"
 MOVIE_LINK_ENDPOINTS: tuple[str, str] = ("movie_id", "linked_movie_id")
 
-# Person-side tables filtered to persons referenced by the surviving cast.
-# The base ``name`` table is carried verbatim (see VERBATIM_TABLES), so a
-# surviving cast row's person_id never dangles; these child tables close
-# over the same surviving person set.
 PERSON_CHILD_TABLES: dict[str, tuple[str, ...]] = {
     "aka_name": ("person_id",),
     "person_info": ("person_id",),
 }
 
-# Small dimension tables carried verbatim (no title/person key). ``name``
-# is verbatim: every person referenced by surviving cast rows keeps a base
-# row, while aka_name/person_info are filtered to surviving persons.
 VERBATIM_TABLES: tuple[str, ...] = (
     "char_name",
     "company_name",
@@ -82,8 +46,6 @@ StratumKey = tuple["int | None", "int | None"]
 
 @dataclass
 class SampledManifest:
-    """Provenance for one sampled archive."""
-
     scale_factor: float
     kept_title_ids: int
     total_title_ids: int
@@ -115,15 +77,6 @@ class SampledManifest:
 
 
 def scale_to_fraction(scale_factor: float | Fraction) -> Fraction:
-    """Express a (0, 1] scale factor as an exact kept fraction.
-
-    The raw requested value is validated before rounding: non-finite
-    values and values outside (0, 1] are rejected even when
-    ``limit_denominator`` would round them back into range. A requested
-    value below the supported 1/1000 resolution (whose best rational
-    approximation rounds to zero) is likewise rejected. Bools are
-    rejected with TypeError: ``True`` would otherwise silently mean 1.0.
-    """
     if isinstance(scale_factor, bool):
         raise TypeError(f"sampled scale_factor must be a number in (0, 1], got bool {scale_factor!r}")
     if isinstance(scale_factor, Fraction):
@@ -144,17 +97,10 @@ def scale_to_fraction(scale_factor: float | Fraction) -> Fraction:
 
 
 def stratum_key(kind_id: int | None, production_year: int | None) -> StratumKey:
-    """Normalize a title's stratification key (None marks unknown)."""
     return (kind_id, production_year)
 
 
 def title_hash_rank(title_id: int, stratum: StratumKey, seed: int) -> float:
-    """Uniform rank in [0, 1) for one title within its stratum.
-
-    Ranks are decorrelated across strata and seeds: titles sharing a
-    numeric id range (IMDb ids cluster by kind/era) do not share keep
-    decisions, unlike the old ``id % denominator`` predicate.
-    """
     digest = hashlib.sha256(f"{seed}\x00{stratum[0]}\x00{stratum[1]}\x00{int(title_id)}".encode()).digest()
     return int.from_bytes(digest, "big") / 2**256
 
@@ -167,13 +113,6 @@ def keep_title_id(
     kind_id: int | None = None,
     production_year: int | None = None,
 ) -> bool:
-    """Seeded-hash keep predicate: keep when the title's stratum rank is below the kept fraction.
-
-    Titles are partitioned by ``(kind_id, production_year)`` strata and
-    selected uniformly within each stratum via ``title_hash_rank``. The
-    ``seed`` decorrelates samples across runs; the same seed always keeps
-    the same titles.
-    """
     rank = title_hash_rank(title_id, stratum_key(kind_id, production_year), seed)
     return rank < float(fraction)
 
@@ -184,14 +123,6 @@ def sample_title_ids(
     *,
     seed: int = 0,
 ) -> set[int]:
-    """Select an exact-quota title set with per-stratum proportionality.
-
-    ``records`` maps each carry ``id`` plus optional ``kind_id`` /
-    ``production_year`` stratum keys. The total kept count is
-    ``round(fraction * N)``, apportioned across strata by largest
-    remainder; within a stratum the lowest-ranked titles win, ordered by
-    ``(title_hash_rank, id)`` for determinism.
-    """
     rows = list(records)
     total = len(rows)
     if total == 0:
@@ -218,13 +149,6 @@ def merge_episode_parents(
     title_parents: Mapping[int, int | None],
     aka_title_parents: Mapping[int, int | None],
 ) -> dict[int, int | None]:
-    """Merge ``episode_of_id`` maps from ``title`` and ``aka_title``.
-
-    Both tables carry the secondary episode reference keyed by title id;
-    a surviving episode's parent must be retained whichever table records
-    it. The ``title`` value wins on conflict; a null on one side falls
-    back to the other side.
-    """
     merged: dict[int, int | None] = {}
     for title_id in set(title_parents) | set(aka_title_parents):
         parent = title_parents.get(title_id)
@@ -237,15 +161,6 @@ def close_title_set_over_episode_parents(
     kept_title_ids: Collection[int],
     episode_parents: Mapping[int, int | None],
 ) -> set[int]:
-    """Expand a kept title set transitively over ``episode_of_id`` parents.
-
-    A retained episode references its parent title in ``episode_of_id``,
-    so the parent must be retained too, along with the parent's own
-    parent for multi-level nesting. Walks parent chains until every kept
-    title's ancestors are retained; cycles terminate via the visited set.
-    Pass a map merged with :func:`merge_episode_parents` so parents
-    recorded only in ``aka_title`` are closed over as well.
-    """
     closed = set(kept_title_ids)
     stack = list(kept_title_ids)
     while stack:
@@ -260,12 +175,6 @@ def _cluster_roots(
     title_ids: Collection[int],
     episode_parents: Mapping[int, int | None],
 ) -> dict[int, set[int]]:
-    """Group titles into episode clusters keyed by ultimate ancestor.
-
-    Each cluster holds a root title plus every episode that reaches it
-    through transitive ``episode_of_id`` links. Parents referenced but
-    absent from ``title_ids`` join their cluster so closure never dangles.
-    """
     parent_of = {int(child): int(parent) for child, parent in episode_parents.items() if parent is not None}
 
     def root(title_id: int) -> int:
@@ -288,15 +197,6 @@ def sample_title_ids_with_episode_closure(
     *,
     seed: int = 0,
 ) -> set[int]:
-    """Select whole episode clusters against the scale quota.
-
-    Parent expansion is charged to the quota instead of added on top:
-    titles are grouped into series clusters (root plus transitive
-    episodes), the ``round(fraction * N)`` budget is apportioned across
-    root strata by largest remainder, and clusters fill each stratum
-    budget in hash-rank order. The retained/total ratio therefore tracks
-    ``scale_factor`` up to cluster granularity instead of overshooting it.
-    """
     rows = list(records)
     if not rows:
         return set()
@@ -336,7 +236,6 @@ def keep_title_child_row(
     kept_title_ids: Container[int],
     key_columns: Iterable[str],
 ) -> bool:
-    """Keep a single-key dependent row when its title reference survives."""
     return all(row.get(column) is not None and row[column] in kept_title_ids for column in key_columns)
 
 
@@ -344,7 +243,6 @@ def keep_movie_link_row(
     row: Mapping[str, int | None],
     kept_title_ids: Container[int],
 ) -> bool:
-    """Keep a movie_link row only when both title endpoints survive."""
     return all(row.get(column) is not None and row[column] in kept_title_ids for column in MOVIE_LINK_ENDPOINTS)
 
 
@@ -352,13 +250,6 @@ def surviving_person_ids(
     cast_rows: Iterable[Mapping[str, int | None]],
     kept_title_ids: Container[int],
 ) -> set[int]:
-    """Collect persons referenced by surviving cast rows.
-
-    ``cast_rows`` are the retained title-side ``cast_info`` rows (already
-    filtered to surviving ``movie_id`` values); every non-null
-    ``person_id`` they reference survives into the sampled person
-    subgraph.
-    """
     persons: set[int] = set()
     for row in cast_rows:
         person_id = row.get("person_id")
@@ -372,11 +263,9 @@ def keep_person_child_row(
     surviving: Container[int],
     key_columns: Iterable[str] = ("person_id",),
 ) -> bool:
-    """Keep a person-side row (aka_name/person_info) when its person survives."""
     return all(row.get(column) is not None and row[column] in surviving for column in key_columns)
 
 
 def manifest_hash(manifest: SampledManifest) -> str:
-    """Content hash of the sampling manifest for oracle binding."""
     body = json.dumps(manifest.to_dict(), sort_keys=True)
     return hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]

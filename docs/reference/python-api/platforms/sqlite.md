@@ -38,14 +38,14 @@ SQLite is not designed for production-scale OLAP workloads. Use ClickHouse, Duck
 from benchbox.tpch import TPCH
 from benchbox.platforms.sqlite import SQLiteAdapter
 
-# In-memory database (fastest, no persistence)
 adapter = SQLiteAdapter(database_path=":memory:")
 
-# Generate data, then run the benchmark
 benchmark = TPCH(scale_factor=0.1)
 benchmark.generate_data()
 results = benchmark.run_with_platform(adapter)
 ```
+
+The in-memory database is the fastest option and has no persistence.
 
 `run_with_platform` does not generate data. Without `generate_data()` the tables are created empty and the queries succeed with zero rows.
 
@@ -55,17 +55,17 @@ results = benchmark.run_with_platform(adapter)
 from benchbox.tpch import TPCH
 from benchbox.platforms.sqlite import SQLiteAdapter
 
-# Persistent file-based database
 adapter = SQLiteAdapter(
     database_path="./tpch.db",
     timeout=30.0
 )
 
-# Generate data, then run the benchmark
 benchmark = TPCH(scale_factor=1.0)
 benchmark.generate_data()
 results = benchmark.run_with_platform(adapter)
 ```
+
+The file-based database is persistent.
 
 The directory that holds the database file must already exist; SQLite does not create directories (`sqlite3.OperationalError: unable to open database file`).
 
@@ -251,13 +251,13 @@ The values are stored as attributes of the same name (`SQLiteAdapter().force_rec
 
 ### Development Testing
 
+This example uses an in-memory database and a tiny scale factor for fast development testing and quick benchmark validation.
+
 ```python
-# Fast in-memory testing for development
 adapter = SQLiteAdapter(database_path=":memory:")
 
-# Quick benchmark validation
 from benchbox.tpch import TPCH
-benchmark = TPCH(scale_factor=0.01)  # Tiny scale for speed
+benchmark = TPCH(scale_factor=0.01)
 benchmark.generate_data()
 results = benchmark.run_with_platform(adapter)
 
@@ -266,51 +266,52 @@ print(f"Validation complete in {results.total_execution_time:.2f}s")
 
 ### Persistent Storage
 
+This example stores results in a file for later analysis. The longer timeout allows for file I/O.
+
 ```python
 from pathlib import Path
 
-# Store results in file for later analysis
 db_path = Path("./data/benchmarks.db")
 db_path.parent.mkdir(parents=True, exist_ok=True)
 
 adapter = SQLiteAdapter(
     database_path=str(db_path),
-    timeout=60.0  # Longer timeout for file I/O
+    timeout=60.0
 )
 ```
 
 ### CI/CD Pipeline
+
+The `CI` branch is a fast in-memory test. Otherwise the example uses local development with a larger dataset. The assertions check benchmark quality, and the 60 second limit is the CI time limit.
 
 ```python
 import os
 from benchbox.platforms.sqlite import SQLiteAdapter
 from benchbox.tpch import TPCH
 
-# Fast CI testing
 if os.getenv("CI"):
     adapter = SQLiteAdapter(database_path=":memory:")
     benchmark = TPCH(scale_factor=0.01)
 else:
-    # Local development with larger dataset
     adapter = SQLiteAdapter(database_path="./dev_benchmark.db")
     benchmark = TPCH(scale_factor=0.1)
 
 benchmark.generate_data()
 results = benchmark.run_with_platform(adapter)
 
-# Assert benchmark quality
 assert results.successful_queries == results.total_queries
-assert results.total_execution_time < 60.0  # CI time limit
+assert results.total_execution_time < 60.0
 ```
 
 ### Multi-threaded Access
 
+Enable this for multi-threaded applications. `check_same_thread=False` allows access from multiple threads, and the higher timeout allows for concurrent access.
+
 ```python
-# Enable for multi-threaded applications
 adapter = SQLiteAdapter(
     database_path="./benchmark.db",
-    check_same_thread=False,  # Allow access from multiple threads
-    timeout=120.0  # Higher timeout for concurrent access
+    check_same_thread=False,
+    timeout=120.0
 )
 ```
 
@@ -323,18 +324,14 @@ from benchbox.platforms.sqlite import SQLiteAdapter
 
 adapter = SQLiteAdapter(database_path="./benchmark.db")
 
-# Create connection
 conn = adapter.create_connection()
-
-# Connection is auto-configured with optimizations:
-# - WAL journal mode
-# - NORMAL synchronous mode
-# - Foreign keys enabled
-# - Cache size: 10000 pages
-# - Temp storage: MEMORY
 ```
 
+The connection is configured automatically with these optimizations: WAL journal mode, NORMAL synchronous mode, foreign keys enabled, a cache size of 10000 pages, and temporary storage in memory.
+
 ### Query Execution
+
+The example first creates a small table to query. See Data Loading for loading benchmark tables.
 
 ```python
 from benchbox.platforms.sqlite import SQLiteAdapter
@@ -342,11 +339,9 @@ from benchbox.platforms.sqlite import SQLiteAdapter
 adapter = SQLiteAdapter(database_path=":memory:")
 conn = adapter.create_connection()
 
-# A table to query (see Data Loading for loading benchmark tables)
 conn.execute("CREATE TABLE customer (c_custkey INTEGER)")
 conn.execute("INSERT INTO customer VALUES (1), (2)")
 
-# Execute query
 result = adapter.execute_query(
     conn,
     "SELECT COUNT(*) FROM customer",
@@ -364,24 +359,22 @@ On 0.4.1 this prints `Status: SUCCESS`, a time of a few milliseconds, and `Rows:
 
 ### From Generated Data
 
+The example generates the data, connects to SQLite, creates the schema, and then loads the data.
+
 ```python
 from benchbox.platforms.sqlite import SQLiteAdapter
 from benchbox.tpch import TPCH
 from pathlib import Path
 
-# Generate data
 data_dir = Path("./tpch_data")
 benchmark = TPCH(scale_factor=0.1, output_dir=data_dir)
 benchmark.generate_data()
 
-# Load into SQLite
 adapter = SQLiteAdapter(database_path="./tpch.db")
 conn = adapter.create_connection()
 
-# Create schema
 adapter.create_schema(benchmark, conn)
 
-# Load data
 table_stats, load_time, _ = adapter.load_data(benchmark, conn, data_dir)
 
 print(f"Loaded {sum(table_stats.values()):,} rows in {load_time:.2f}s")
@@ -396,21 +389,18 @@ for table, count in table_stats.items():
 SQLite adapter automatically applies these optimizations:
 
 ```sql
--- Write-Ahead Logging for better concurrency
 PRAGMA journal_mode = WAL;
-
--- Normal durability (faster than FULL)
 PRAGMA synchronous = NORMAL;
-
--- Large cache (10K pages) for reduced disk I/O
 PRAGMA cache_size = 10000;
-
--- In-memory temp tables
 PRAGMA temp_store = MEMORY;
-
--- Enable foreign key constraints
 PRAGMA foreign_keys = ON;
 ```
+
+- `journal_mode = WAL`: Write-Ahead Logging for better concurrency.
+- `synchronous = NORMAL`: normal durability, which is faster than FULL.
+- `cache_size = 10000`: a large cache (10K pages) that reduces disk I/O.
+- `temp_store = MEMORY`: temporary tables are kept in memory.
+- `foreign_keys = ON`: foreign key constraints are enforced.
 
 ### Query Optimization Tips
 
@@ -469,48 +459,47 @@ SQLite is not designed for large-scale OLAP workloads. Scale factors above 1.0 w
 
 ### Testing Strategy
 
+The test uses a small scale factor for speed. It validates that all queries succeeded, and then validates reasonable performance: an average of under 1 second per query at SF=0.01.
+
 ```python
 from benchbox.platforms.sqlite import SQLiteAdapter
 from benchbox.tpch import TPCH
 
 def test_benchmark_queries():
-    """Test all benchmark queries for correctness."""
     adapter = SQLiteAdapter(database_path=":memory:")
-    benchmark = TPCH(scale_factor=0.01)  # Small scale for speed
+    benchmark = TPCH(scale_factor=0.01)
     benchmark.generate_data()
 
     results = benchmark.run_with_platform(adapter)
 
-    # Validate all queries succeeded
     assert results.successful_queries == results.total_queries
-
-    # Validate reasonable performance
-    assert results.average_query_time < 1.0  # 1s per query at SF=0.01
+    assert results.average_query_time < 1.0
 
     return results
 
-# Run in test suite
 test_benchmark_queries()
 ```
 
 ### Development Workflow
 
+1. Start with an in-memory database for quick iterations.
+2. Validate query logic with test queries.
+3. Move to a file-based database for persistent testing.
+4. Graduate to a production platform (DuckDB, ClickHouse, and so on).
+
+The two adapters below cover steps 1 and 3.
+
 ```python
 from benchbox.platforms.sqlite import SQLiteAdapter
 
-# 1. Start with in-memory for quick iterations
 adapter = SQLiteAdapter(database_path=":memory:")
 
-# 2. Validate query logic
-# ... test queries ...
-
-# 3. Move to file-based for persistent testing
 adapter = SQLiteAdapter(database_path="./dev_test.db")
-
-# 4. Graduate to production platform (DuckDB, ClickHouse, etc.)
 ```
 
 ### Resource Management
+
+Run the benchmark operations inside the `try` block. The `finally` block closes the connection and, optionally, deletes the temporary database.
 
 ```python
 from benchbox.platforms.sqlite import SQLiteAdapter
@@ -519,12 +508,9 @@ adapter = SQLiteAdapter(database_path="./benchmark.db")
 
 try:
     conn = adapter.create_connection()
-    # ... benchmark operations ...
 finally:
-    # Close connection
     conn.close()
 
-    # Optional: Delete temporary database
     if adapter.database_path != ":memory:":
         import os
         if os.path.exists(adapter.database_path):
@@ -537,73 +523,56 @@ finally:
 
 **Problem**: "database is locked" error during concurrent access
 
-**Solutions**:
+**Solutions**: increase the timeout (the example waits up to 2 minutes), use WAL mode, and avoid concurrent writes. WAL mode is already enabled by default and allows concurrent reads. SQLite only supports one writer at a time.
 
 ```python
-# 1. Increase timeout
 adapter = SQLiteAdapter(
     database_path="./benchmark.db",
-    timeout=120.0  # Wait up to 2 minutes
+    timeout=120.0
 )
-
-# 2. Use WAL mode (already enabled by default)
-# WAL mode allows concurrent reads
-
-# 3. Avoid concurrent writes
-# SQLite only supports one writer at a time
 ```
 
 ### Memory Error
 
 **Problem**: Out of memory with large datasets
 
-**Solutions**:
+**Solutions**: use a smaller scale factor, such as 0.1 and not 1.0 or higher, and use a file-based database instead of an in-memory one (not `":memory:"`). Processing data in chunks is not directly supported. Consider using DuckDB instead.
 
 ```python
-# 1. Use smaller scale factor
-benchmark = TPCH(scale_factor=0.1)  # Not 1.0 or higher
+benchmark = TPCH(scale_factor=0.1)
 
-# 2. Use file-based instead of in-memory
-adapter = SQLiteAdapter(database_path="./benchmark.db")  # Not ":memory:"
-
-# 3. Process data in chunks
-# (Not directly supported; consider using DuckDB instead)
+adapter = SQLiteAdapter(database_path="./benchmark.db")
 ```
 
 ### Slow Query Performance
 
 **Problem**: Queries take longer than expected
 
-**Solutions**:
+**Solutions**: reduce the scale factor, add indexes for common joins, and consider using DuckDB for analytical queries. DuckDB uses columnar storage and is optimized for OLAP workloads.
 
 ```python
-# 1. Reduce scale factor
 benchmark = TPCH(scale_factor=0.1)
 
-# 2. Add indexes for common joins
 conn.execute("CREATE INDEX idx_lineitem_orderkey ON lineitem(l_orderkey)")
 conn.execute("ANALYZE")
 
-# 3. Consider using DuckDB for analytical queries (columnar storage)
 from benchbox.platforms.duckdb import DuckDBAdapter
-adapter = DuckDBAdapter()  # Optimized for OLAP workloads
+adapter = DuckDBAdapter()
 ```
 
 ### Missing Tables
 
 **Problem**: "no such table" error
 
-**Solutions**:
+**Solutions**: ensure that the schema is created before data loading. If you use an existing database with an old schema, recreate the database with `force_recreate=True`, which deletes the existing database file on connect.
 
 ```python
-# 1. Ensure schema is created before data loading
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, data_dir)
 
-# 2. Check if using existing database with old schema
 adapter = SQLiteAdapter(
     database_path="./benchmark.db",
-    force_recreate=True  # Delete the existing database file on connect
+    force_recreate=True
 )
 ```
 
@@ -613,12 +582,11 @@ adapter = SQLiteAdapter(
 
 **Explanation**: `SQLiteAdapter.run_power_test`, `run_throughput_test` and `run_maintenance_test` always raise `NotImplementedError`.
 
-**Solution**:
+**Solution**: for the TPC power, throughput and maintenance tests, use another platform. DuckDB does not override these tests with `NotImplementedError`.
 
 ```python
-# For the TPC power, throughput and maintenance tests, use another platform
 from benchbox.platforms.duckdb import DuckDBAdapter
-adapter = DuckDBAdapter()  # Does not override these tests with NotImplementedError
+adapter = DuckDBAdapter()
 ```
 
 ## See Also

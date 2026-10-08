@@ -1,5 +1,3 @@
-"""Early pytest plugin that caps unsafe xdist worker counts and refuses unsafe pytest settings."""
-
 from __future__ import annotations
 
 import os
@@ -12,7 +10,6 @@ from tests.utilities import session_isolation
 
 
 def _safe_worker_count() -> int:
-    """Return a safe pytest-xdist worker count for local development."""
     override = os.environ.get("BENCHBOX_MAX_XDIST_WORKERS")
     if override:
         try:
@@ -46,7 +43,6 @@ def _requested_numprocesses(raw: str) -> Optional[int]:
 
 
 def _rewrite_numprocesses_args(args: list[str], safe: int) -> str | None:
-    """Mutate ``args`` in place when ``-n`` requests exceed the safe cap."""
     candidate: tuple[int, int, str, bool] | None = None
 
     for idx, arg in enumerate(args):
@@ -86,7 +82,6 @@ def _rewrite_numprocesses_args(args: list[str], safe: int) -> str | None:
 
 
 def _last_option_value(args: list[str], long_name: str, short_name: str) -> str | None:
-    """Return the value of the last ``-x value``, ``-xvalue``, ``--long value`` or ``--long=value`` option."""
     value: str | None = None
     for idx, arg in enumerate(args):
         if arg in {short_name, long_name} and idx + 1 < len(args):
@@ -99,12 +94,6 @@ def _last_option_value(args: list[str], long_name: str, short_name: str) -> str 
 
 
 def _wants_parallel_lock(args: list[str]) -> bool:
-    """Whether this process competes for the shared lock: a parallel controller and no explicit bypass.
-
-    An xdist worker never does: its controller holds the lock for it. xdist sets this variable before it
-    prepares the worker's configuration, which loads this plugin. A worker cannot verify the controller's
-    hold on Windows, where the locked lock file is unreadable, so trying to would time out.
-    """
     if os.environ.get("BENCHBOX_SKIP_TEST_LOCK") or os.environ.get("PYTEST_XDIST_WORKER"):
         return False
     value = _last_option_value(args, "--numprocesses", "-n")
@@ -114,11 +103,6 @@ def _wants_parallel_lock(args: list[str]) -> bool:
 
 
 def _selects_live_tests(args: list[str]) -> bool:
-    """Whether the effective ``-m`` expression selects a test marked only ``live_integration``.
-
-    Live tests read the caller's real credential files, so a run that selects them keeps the real HOME.
-    The default expression deselects them. An expression that does not parse is treated as not selecting.
-    """
     expression = _last_option_value(args, "--markers-expression", "-m")
     if not expression:
         return False
@@ -132,7 +116,6 @@ def _selects_live_tests(args: list[str]) -> bool:
 
 @pytest.hookimpl(wrapper=True, tryfirst=True)
 def pytest_load_initial_conftests(early_config, parser, args: list[str]):
-    """Own lock and HOME before collection, then cap xdist's worker plan."""
     if not _selects_live_tests(args) and session_isolation.start(acquire_lock=_wants_parallel_lock(args)):
         early_config.add_cleanup(session_isolation.finish)
     safe = _safe_worker_count()
@@ -144,7 +127,6 @@ def pytest_load_initial_conftests(early_config, parser, args: list[str]):
 
 
 def pytest_xdist_auto_num_workers(config) -> int:
-    """Fallback hook for environments where xdist still asks for auto workers."""
     return _safe_worker_count()
 
 
@@ -159,7 +141,6 @@ FAULTHANDLER_TIMEOUT_REFUSAL = (
 
 
 def _faulthandler_timeout(config) -> float:
-    """Return the effective ``faulthandler_timeout`` ini value, or 0 when the plugin is disabled."""
     try:
         return float(config.getini("faulthandler_timeout") or 0.0)
     except (ValueError, TypeError):

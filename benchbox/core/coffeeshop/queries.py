@@ -1,20 +1,9 @@
-"""CoffeeShop query manager for the reference-aligned schema.
-
-The query set has been rewritten to operate solely on the canonical
-``dim_locations``, ``dim_products``, and ``order_lines`` tables emitted by the
-new generator. Queries emphasise sales performance, regional trends, product
-mix, and pricing behaviour - mirroring typical analytics performed on the
-reference dataset.
-"""
-
 from __future__ import annotations
 
 from typing import Any
 
 
 class CoffeeShopQueryManager:
-    """Manage CoffeeShop analytical queries and parameter defaults."""
-
     def __init__(self) -> None:
         self._queries = self._load_queries()
 
@@ -237,7 +226,7 @@ ORDER BY dl.region, season;
             defaults.update(params)
         try:
             return entry["sql"].format(**defaults)
-        except KeyError as exc:  # pragma: no cover - defensive
+        except KeyError as exc:
             missing = exc.args[0]
             raise ValueError(f"Missing parameter '{missing}' for query '{query_id}'") from exc
 

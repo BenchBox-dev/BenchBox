@@ -1,9 +1,3 @@
-"""Platform-specific CLI option and configuration registry.
-
-Provides a lightweight extension mechanism for platform adapters to expose
-command-line hooks without requiring changes to the core CLI implementation.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -15,7 +9,7 @@ from benchbox.core.schemas import DatabaseConfig
 
 
 class PlatformOptionError(ValueError):
-    """Raised when parsing or registering platform options fails."""
+    pass
 
 
 def _identity(value: str) -> Any:
@@ -33,8 +27,6 @@ def parse_bool(value: str) -> bool:
 
 @dataclass(frozen=True)
 class PlatformOptionSpec:
-    """Describe a platform-specific CLI option."""
-
     name: str
     parser: Callable[[str], Any] = _identity
     default: Any = None
@@ -43,12 +35,6 @@ class PlatformOptionSpec:
     aliases: tuple[str, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
-        # Defaults declared as raw strings (e.g. 'true', '8192') must carry the
-        # same type as parsed user input: get_default_options() feeds them into
-        # database_config.options and, since #1062, straight into DataFrame
-        # adapter constructors, where a str 'true' breaks bool consumers
-        # (polars scan_parquet rejects rechunk='true') and a str 'false' is
-        # truthy — silently inverting the default.
         if isinstance(self.default, str) and self.parser is not _identity:
             object.__setattr__(self, "default", self.parse(self.default))
 
@@ -61,8 +47,6 @@ class PlatformOptionSpec:
 
 
 class PlatformHookRegistry:
-    """Registry for CLI platform hooks (options and database config builders)."""
-
     _option_specs: dict[str, dict[str, PlatformOptionSpec]] = {}
     _alias_index: dict[str, dict[str, str]] = {}
     _config_builders: dict[
@@ -72,12 +56,6 @@ class PlatformHookRegistry:
 
     @classmethod
     def register_option_specs(cls, platform: str, *specs: PlatformOptionSpec) -> None:
-        """Register option specifications for a platform.
-
-        Args:
-            platform: Platform identifier (e.g., "clickhouse")
-            specs: Option specifications to register
-        """
         platform = platform.lower()
         option_map = cls._option_specs.setdefault(platform, {})
         alias_map = cls._alias_index.setdefault(platform, {})
@@ -85,9 +63,6 @@ class PlatformHookRegistry:
         for spec in specs:
             name = spec.name.lower()
             if name in option_map:
-                # Allow re-registration - just skip silently
-                # This handles cases where modules are re-imported during complex import chains
-                # or pytest collection. The first registration wins.
                 continue
             option_map[name] = spec
 
@@ -169,8 +144,6 @@ class PlatformHookRegistry:
         builder = custom_builder or cls._default_builder
         config = builder(platform, options, overrides, info)
 
-        # Custom builders already return merged options that preserve the
-        # saved-creds contract; only the default builder needs this backfill.
         if custom_builder is None:
             config.options.update(options)
         config.options.update(overrides)
@@ -191,7 +164,6 @@ class PlatformHookRegistry:
         auto_install = overrides.get("driver_auto_install")
         if auto_install is None:
             auto_install = options.get("driver_auto_install", False)
-        # Extract execution_mode from overrides for --mode flag support
         execution_mode = overrides.get("execution_mode") or options.get("execution_mode")
         return DatabaseConfig(
             type=platform,

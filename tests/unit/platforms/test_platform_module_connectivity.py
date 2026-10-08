@@ -1,5 +1,3 @@
-"""Unit tests for the platform module connectivity helper."""
-
 from unittest.mock import MagicMock, patch
 
 import pytest

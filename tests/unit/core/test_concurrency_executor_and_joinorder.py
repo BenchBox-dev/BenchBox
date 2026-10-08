@@ -1,9 +1,3 @@
-"""Coverage tests for concurrency executor and joinorder generator (w8).
-
-pool_tester.py and cloud_storage.py already have comprehensive test suites.
-This file targets executor.py (0% coverage) and joinorder/generator.py.
-"""
-
 from __future__ import annotations
 
 import time
@@ -18,11 +12,6 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.medium,
 ]
-
-
-# ===================================================================
-# Concurrency Executor - dataclasses
-# ===================================================================
 
 
 class TestQueryExecution:
@@ -209,11 +198,6 @@ class TestConcurrentLoadResult:
         assert result.get_percentile_latency(50) == 0.0
 
 
-# ===================================================================
-# Concurrency Executor - execution
-# ===================================================================
-
-
 class TestConcurrentLoadExecutor:
     def _make_config(self, *, queries_per_stream=2, duration=0.3, concurrency=1):
         from benchbox.experimental.load_testing.executor import ConcurrentLoadConfig
@@ -277,7 +261,7 @@ class TestConcurrentLoadExecutor:
         )
         executor = ConcurrentLoadExecutor(config)
         result = executor.run()
-        # Streams should report errors but execution shouldn't crash
+
         assert result.total_streams_executed > 0
         errored = [s for s in result.streams if s.error is not None]
         assert len(errored) > 0
@@ -307,7 +291,7 @@ class TestConcurrentLoadExecutor:
         config = self._make_config(concurrency=2, duration=0.5, queries_per_stream=3)
         executor = ConcurrentLoadExecutor(config)
         result = executor.run()
-        # queue_metrics may or may not be populated depending on timing
+
         assert isinstance(result.queue_metrics, dict)
 
     def test_resource_monitoring(self):
@@ -325,7 +309,7 @@ class TestConcurrentLoadExecutor:
         )
         executor = ConcurrentLoadExecutor(config)
         result = executor.run()
-        # resource_metrics populated if psutil is available
+
         assert isinstance(result.resource_metrics, dict)
 
     def test_calculate_queue_metrics_empty(self):
@@ -333,7 +317,7 @@ class TestConcurrentLoadExecutor:
 
         config = self._make_config()
         executor = ConcurrentLoadExecutor(config)
-        # No stream results yet
+
         metrics = executor._calculate_queue_metrics()
         assert metrics == {}
 
@@ -344,11 +328,6 @@ class TestConcurrentLoadExecutor:
         executor = ConcurrentLoadExecutor(config)
         metrics = executor._calculate_resource_metrics()
         assert metrics == {}
-
-
-# ===================================================================
-# Synthetic JoinOrder Generator
-# ===================================================================
 
 
 class TestJoinOrderGenerator:
@@ -418,10 +397,10 @@ class TestJoinOrderGenerator:
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         titles = gen._generate_titles(10)
         assert len(titles) == 10
-        # Each title is a tuple with 12 elements (id, title, ..., None)
+
         assert len(titles[0]) == 12
-        assert titles[0][0] == 1  # first ID
-        assert isinstance(titles[0][1], str)  # title string
+        assert titles[0][0] == 1
+        assert isinstance(titles[0][1], str)
 
     def test_generate_names(self, tmp_path):
         from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
@@ -447,11 +426,10 @@ class TestJoinOrderGenerator:
         keywords = gen._generate_keywords(30)
         assert len(keywords) == 30
         assert [row[0] for row in keywords] == list(range(1, 31))
-        # A random share of rows carries a seeded JOB predicate keyword, so each
-        # row is either its positional keyword or one of the seeds.
+
         seeds = set(JoinOrderGenerator._SEED_KEYWORDS_EXTRA)
-        assert keywords[0][1] in {"action", *seeds}  # first known keyword
-        assert keywords[29][1] in {"keyword_30", *seeds}  # generated keyword
+        assert keywords[0][1] in {"action", *seeds}
+        assert keywords[29][1] in {"keyword_30", *seeds}
 
     def test_generate_character_names(self, tmp_path):
         from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
@@ -459,8 +437,8 @@ class TestJoinOrderGenerator:
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         chars = gen._generate_character_names(10)
         assert len(chars) == 10
-        assert chars[0][1] == "John Doe"  # first known character
-        assert chars[9][1] == "Character 10"  # generated character
+        assert chars[0][1] == "John Doe"
+        assert chars[9][1] == "Character 10"
 
     def test_generate_cast_info(self, tmp_path):
         from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
@@ -469,11 +447,11 @@ class TestJoinOrderGenerator:
         cast = gen._generate_cast_info(20, max_name_id=100, max_title_id=50, max_char_id=30)
         assert len(cast) == 20
         assert len(cast[0]) == 7
-        # IDs should be in range
+
         for row in cast:
-            assert 1 <= row[1] <= 100  # person_id
-            assert 1 <= row[2] <= 50  # movie_id
-            assert 1 <= row[6] <= 12  # role_id
+            assert 1 <= row[1] <= 100
+            assert 1 <= row[2] <= 50
+            assert 1 <= row[6] <= 12
 
     def test_generate_movie_companies(self, tmp_path):
         from benchbox.core.joinorder_synthetic.generator import JoinOrderGenerator
@@ -552,7 +530,7 @@ class TestJoinOrderGenerator:
         test_file = tmp_path / "test.csv"
         test_file.write_text("data")
         gen._write_manifest({"test": test_file})
-        # Manifest should be written
+
         manifest_files = list(tmp_path.glob("*.json"))
         assert len(manifest_files) > 0
 
@@ -561,7 +539,7 @@ class TestJoinOrderGenerator:
 
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         gen._write_manifest({})
-        # No manifest file written for empty data
+
         manifest_files = list(tmp_path.glob("*.json"))
         assert len(manifest_files) == 0
 
@@ -572,6 +550,6 @@ class TestJoinOrderGenerator:
         result = gen._generate_data_local(tmp_path)
         assert isinstance(result, dict)
         assert len(result) > 0
-        # Verify CSV files were created
+
         for table_name, path in result.items():
             assert path.exists(), f"Missing file for table {table_name}"

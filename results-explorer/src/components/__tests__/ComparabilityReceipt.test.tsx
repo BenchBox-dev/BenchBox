@@ -182,9 +182,6 @@ describe("ComparabilityReceipt", () => {
         }),
       ]);
       const warnings = comparabilityWarningFields(fields);
-      // Sanity: without reordering, Validation would land after the three
-      // environment fields (build order), which is exactly the "+1 more"
-      // bug from the audit.
       expect(warnings.map((f) => f.label).indexOf("Validation")).toBeGreaterThan(0);
 
       const ordered = orderWarningLabelsForSummary(warnings);
@@ -268,8 +265,6 @@ describe("ComparabilityReceipt", () => {
       expect(field?.detail).toContain("DuckDB: indexes, clustering, distribution, sort, z_order, stats");
       expect(field?.detail).toContain("SQLite: none");
 
-      // A warning, not a match failure: the overall receipt still stays
-      // facet-matchable, it just surfaces in the warning list.
       const warnings = comparabilityWarningFields(fields);
       expect(warnings.some((f) => f.label === "Applied tuning features")).toBe(true);
     });
@@ -309,8 +304,6 @@ describe("ComparabilityReceipt", () => {
     it("warns -- without failing the match -- when two tuned runs span different generations", () => {
       const fields = buildComparabilityFields([
         makeDetail({ tuning_mode: "tuned", tuning_policy_generation: "adr-003" }),
-        // Absent marker = the concrete "pre-seam" generation, so this is a
-        // genuine cross-seam comparison, not "unknown, skip".
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: undefined }),
       ]);
 
@@ -319,8 +312,6 @@ describe("ComparabilityReceipt", () => {
       expect(field?.detail).toContain("DuckDB: adr-003");
       expect(field?.detail).toContain("SQLite: Earlier rules");
 
-      // A warning, not a match failure: the receipt stays facet-matchable and
-      // the difference only surfaces in the warning list.
       const warnings = comparabilityWarningFields(fields);
       expect(warnings.some((f) => f.label === "Tuning rules version")).toBe(true);
     });
@@ -338,9 +329,6 @@ describe("ComparabilityReceipt", () => {
     });
 
     it("matches (no warning) when both tuned runs are pre-seam (both markers absent)", () => {
-      // Two legacy runs are same-generation ("pre-seam" both), so no warning --
-      // the key distinction from the physical-mechanisms warning, where two
-      // undefineds mean "unknown" and the field is omitted entirely.
       const fields = buildComparabilityFields([
         makeDetail({ tuning_mode: "tuned", tuning_policy_generation: undefined }),
         makeDetail({ result_id: "r2", platform: "SQLite", tuning_mode: "tuned", tuning_policy_generation: undefined }),
@@ -405,9 +393,6 @@ describe("ComparabilityReceipt", () => {
     });
 
     it("shows a mode-only tuning value as a plain label, never a hash fingerprint", () => {
-      // The self-derived tuning_hash must never act as a comparability key, and a
-      // mode-only bundle (no ADR-1 identity hash) shows the coarse tuning_mode
-      // plainly rather than a fabricated `requested`/`applied` fingerprint.
       const fields = buildComparabilityFields([
         makeDetail({ has_tuning: true, tuning_mode: "tuned", tuning_hash: "tuning123" }),
         makeDetail({ result_id: "r2", platform: "SQLite", platform_id: "sqlite", tuning_mode: "notuning" }),
@@ -489,7 +474,6 @@ describe("ComparabilityReceipt", () => {
     });
 
     it("pins the no-flip guarantee: a run without CPU metadata compared to another run reports 'not recorded' on the missing axes, not 'differs'", () => {
-      // Run 1: has recorded CPU family and model
       const recordedRun = makeDetail({
         result_id: "r1",
         platform: "DuckDB",
@@ -504,7 +488,6 @@ describe("ComparabilityReceipt", () => {
         },
       });
 
-      // Run 2: legacy run without CPU metadata (cpu_family and cpu_model undefined)
       const legacyRun = makeDetail({
         result_id: "r2",
         platform: "SQLite",
@@ -524,7 +507,6 @@ describe("ComparabilityReceipt", () => {
       const cpuFamilyField = fields.find((f) => f.label === "CPU family")!;
       const cpuModelField = fields.find((f) => f.label === "CPU model")!;
 
-      // Both axes MUST report status: "missing" ("Not recorded"), NEVER "diff" ("Differs")
       expect(cpuFamilyField.status).toBe("missing");
       expect(cpuFamilyField.summary).toBe("Not recorded");
       expect(cpuFamilyField.detail).toBe("DuckDB: Apple silicon; SQLite: Not recorded");
@@ -533,7 +515,6 @@ describe("ComparabilityReceipt", () => {
       expect(cpuModelField.summary).toBe("Not recorded");
       expect(cpuModelField.detail).toBe("DuckDB: Apple M1 Max; SQLite: Not recorded");
 
-      // Critical check: neither axis generates a warning!
       const warnings = comparabilityWarningFields(fields);
       expect(warnings.some((w) => w.label === "CPU family")).toBe(false);
       expect(warnings.some((w) => w.label === "CPU model")).toBe(false);
@@ -587,7 +568,6 @@ describe("ComparabilityReceipt", () => {
     });
 
     it("warns when client region != platform region or if locality is unknown for remote/cloud platforms", () => {
-      // 1. Cross-region mismatch
       const crossRegionRun = makeDetail({
         result_id: "r1",
         platform: "Snowflake",
@@ -614,7 +594,6 @@ describe("ComparabilityReceipt", () => {
       expect(localityField.status).toBe("diff");
       expect(localityField.detail).toContain("Cross-region: client in us-west-2, platform in us-east-1");
 
-      // 2. Unknown locality on cloud platform
       const unknownLocalityRun = makeDetail({
         result_id: "r3",
         platform: "Snowflake",
@@ -628,7 +607,6 @@ describe("ComparabilityReceipt", () => {
       expect(localityField.status).toBe("diff");
       expect(localityField.summary).toBe("Unknown client locality");
 
-      // 3. Matching collocated runs
       const collocatedRun2 = makeDetail({
         result_id: "r4",
         platform: "Snowflake",
@@ -646,7 +624,6 @@ describe("ComparabilityReceipt", () => {
     });
 
     it("does not warn for provider-native spellings of the same region", () => {
-      // Snowflake CURRENT_REGION() yields AWS_US_EAST_1; IMDS yields us-east-1.
       const snowflakeRun = makeDetail({
         result_id: "r1",
         platform: "Snowflake",
@@ -712,8 +689,6 @@ describe("ComparabilityReceipt", () => {
     });
 
     it("warns instead of asserting collocation when the platform region is unknown", () => {
-      // Remote self-hosted platforms carry no cloud region: without
-      // platform-side evidence the row must warn, never match.
       const remoteRun = makeDetail({
         result_id: "r1",
         platform: "ClickHouse Server",

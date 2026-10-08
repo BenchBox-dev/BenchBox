@@ -1,11 +1,6 @@
-"""GCP platform adapters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides adapters for Google Cloud Platform data services.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

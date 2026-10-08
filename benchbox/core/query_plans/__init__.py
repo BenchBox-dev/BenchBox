@@ -1,5 +1,3 @@
-"""Query plan capture and analysis functionality."""
-
 from benchbox.core.query_plans.insights import (
     PlanAnalysisResult,
     PlanComplexityScore,
@@ -12,7 +10,6 @@ from benchbox.core.query_plans.parsers.base import QueryPlanParser
 
 __all__ = [
     "QueryPlanParser",
-    # Insights
     "PlanAnalysisResult",
     "PlanComplexityScore",
     "PlanInsight",

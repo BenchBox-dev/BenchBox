@@ -1,5 +1,3 @@
-"""Tests for the release curation dry run that runs tests on a simulated release tree."""
-
 from __future__ import annotations
 
 import importlib.util

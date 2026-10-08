@@ -1,5 +1,3 @@
-"""Unit tests for the modular TPC-Havoc variant registry."""
-
 from __future__ import annotations
 
 import pytest
@@ -32,7 +30,7 @@ def test_static_variants_return_sql():
 
 
 def test_query1_signature_variants():
-    # Sanity checks that key Query 1 variants retain their defining traits.
+
     sql1 = Q1_VARIANTS[1].generate("base")
     assert "select avg(l2.l_quantity)" in sql1.lower()
     assert "from lineitem l2" in sql1.lower()

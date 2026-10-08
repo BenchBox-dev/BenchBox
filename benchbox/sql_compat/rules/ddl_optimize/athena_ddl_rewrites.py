@@ -1,14 +1,3 @@
-"""Athena DDL rewrite rules for Phase.DDL_OPTIMIZE.
-
-AthenaAdapter._convert_to_external_table() is the local runtime path. It
-converts DuckDB-style CREATE TABLE statements to Hive-compatible external table
-DDL backed by S3, including staging-table variants for parquet mode.
-
-This rule registers the REWRITE_DDL intent for governance and compat_lint. The
-adapter does not inherit BaseDdlOptimizer, so transformer_id is documentary and
-governance_only=True.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.rules._registration import register_ddl_rewrite

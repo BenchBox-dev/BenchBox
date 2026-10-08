@@ -1,5 +1,3 @@
-"""Variant definitions for Query 2."""
-
 from __future__ import annotations
 
 from .loader import load_variants

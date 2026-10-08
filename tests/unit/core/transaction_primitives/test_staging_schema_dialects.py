@@ -1,9 +1,6 @@
-"""Dialect-specific staging DDL for Transaction Primitives.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -20,7 +17,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 @pytest.mark.parametrize("table_name", sorted(STAGING_TABLES))
 def test_databricks_staging_tables_enable_catalog_managed(table_name: str):
-    """Databricks transactions only write catalogManaged Delta tables."""
+
     sql = get_create_table_sql(table_name, dialect="databricks", if_not_exists=True)
 
     assert sql.startswith(f"CREATE TABLE IF NOT EXISTS {table_name} (")
@@ -37,7 +34,7 @@ def test_other_dialects_keep_plain_create_table(dialect: str):
 
 
 def test_catalog_managed_gate_follows_registry_rule():
-    """Emission is governed by the DDL_OPTIMIZE rule, not a bare dialect branch."""
+
     assert _requires_catalog_managed_staging("databricks") is True
     assert _requires_catalog_managed_staging("DATABRICKS") is True
     for dialect in ("standard", "duckdb", "snowflake", "bigquery", "postgres"):
@@ -45,7 +42,7 @@ def test_catalog_managed_gate_follows_registry_rule():
 
 
 def test_databricks_skips_savepoint_and_isolation_operations(tmp_path):
-    """Databricks rejects SAVEPOINT and SET TRANSACTION (verified live); they skip, not fail."""
+
     from unittest.mock import MagicMock
 
     from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark
@@ -61,7 +58,7 @@ def test_databricks_skips_savepoint_and_isolation_operations(tmp_path):
 
 @pytest.mark.parametrize(("dialect", "expects_sql_rollback"), [("databricks", True), ("duckdb", False)])
 def test_rollback_after_error_issues_sql_rollback_only_where_needed(tmp_path, dialect, expects_sql_rollback):
-    """A no-op driver rollback() leaves a BEGIN TRANSACTION open on Databricks."""
+
     from unittest.mock import MagicMock
 
     from benchbox.core.transaction_primitives.benchmark import TransactionPrimitivesBenchmark

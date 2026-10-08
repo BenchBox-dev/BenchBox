@@ -18,50 +18,53 @@ The unified test runner consolidates functionality from the individual test runn
 
 ### Using Makefile Commands (Recommended)
 
+These Makefile targets cover common scenarios. `make test` runs the default test suite (fast tests). The others run
+all tests, unit tests only, integration tests only, TPC-H tests only, and tests with coverage.
+
 ```bash
-# Use convenient Makefile targets for common scenarios
-make test                # Run default test suite (fast tests)
-make test-all           # Run all tests
-make test-unit          # Run unit tests only
-make test-integration   # Run integration tests only
-make test-tpch          # Run TPC-H tests only
-make coverage           # Run tests with coverage
+make test
+make test-all
+make test-unit
+make test-integration
+make test-tpch
+make coverage
 ```
 
 ### Basic Usage with Unified Test Runner
 
+The commands run all unit tests, run TPC-H tests with coverage, and run integration tests in parallel.
+
 ```bash
-# Run all unit tests
 uv run -- python tests/utilities/unified_test_runner.py --mode unit
 
-# Run TPCH tests with coverage
 uv run -- python tests/utilities/unified_test_runner.py --benchmark tpch --coverage
 
-# Run integration tests in parallel
 uv run -- python tests/utilities/unified_test_runner.py --mode integration --parallel --workers 4
 ```
 
 ### Direct pytest Usage
 
+Run tests directly with pytest and markers. The commands run unit tests only, fast TPC-H tests, DuckDB integration
+tests, and tests with coverage.
+
 ```bash
-# Run tests directly with pytest and markers
-uv run -- python -m pytest -m unit                    # Unit tests only
-uv run -- python -m pytest -m "tpch and fast"          # Fast TPC-H tests
-uv run -- python -m pytest -m "integration and duckdb" # DuckDB integration tests
-uv run -- python -m pytest --cov=benchbox             # Tests with coverage
+uv run -- python -m pytest -m unit
+uv run -- python -m pytest -m "tpch and fast"
+uv run -- python -m pytest -m "integration and duckdb"
+uv run -- python -m pytest --cov=benchbox
 ```
 
 ### Advanced Marker Combinations
 
+The first command runs specific benchmarks with speed filtering. The next two are database-specific testing. The last
+is feature-specific testing.
+
 ```bash
-# Run specific benchmarks with speed filtering
 uv run -- python -m pytest -m "tpch and fast and not slow"
 
-# Database-specific testing
 uv run -- python -m pytest -m "duckdb and unit"
 uv run -- python -m pytest -m "sqlite and integration"
 
-# Feature-specific testing
 uv run -- python -m pytest -m "olap or advanced_sql"
 ```
 
@@ -115,99 +118,83 @@ uv run -- python -m pytest -m "olap or advanced_sql"
 ## Examples
 
 ### Quick Development Testing
+Each `make` target is equivalent to the `pytest` command after it. The commands run fast unit tests for active
+development, and tests for one benchmark. The last command runs unit tests with verbose output.
 ```bash
-# Fast unit tests for active development
 make test-fast
-# or
 uv run -- python -m pytest -m fast
 
-# Test specific benchmark during development
 make test-tpch
-# or
 uv run -- python -m pytest -m tpch
 
-# Unit tests with verbose output
 uv run -- python -m pytest -m unit -v
 ```
 
 ### CI/CD Pipeline
+`make test-ci` is comprehensive CI testing, and `make coverage-report` runs tests with coverage for CI. Each is
+equivalent to the `pytest` command after it. `make coverage-opt-in-all` includes stress and live tests, so use it only
+when their services and credentials are available. `make test-parallel` is explicit full-tree parallel testing and
+requires live services and credentials.
 ```bash
-# Comprehensive CI testing
 make test-ci
-# or
 uv run -- python -m pytest -c pytest-ci.ini -m "not (slow or stress or resource_heavy or live_integration)"
 
-# Run tests with coverage for CI
 make coverage-report
-# or
 uv run -- python -m pytest -c pytest-ci.ini -m "not (stress or resource_heavy or live_integration)" --cov=benchbox --cov-report=xml --junit-xml=test-results.xml
 
-# Include stress and live tests only when their services and credentials are available
 make coverage-opt-in-all
 
-# Explicit full-tree parallel testing (requires live services and credentials)
 make test-parallel
-# or
 uv run -- python -m pytest -n auto --tb=short
 ```
 
 ### Integration Validation
+The commands run DuckDB integration testing, the full integration test suite, and integration tests with coverage.
+Each `make` target is equivalent to the `pytest` command after it.
 ```bash
-# DuckDB integration testing
 make test-duckdb
-# or
 uv run -- python -m pytest -m duckdb
 
-# Full integration test suite
 make test-integration
-# or
 uv run -- python -m pytest -m "integration and not live_integration"
 
-# Integration with coverage
 uv run -- python -m pytest -m integration --cov=benchbox
 ```
 
 ### Performance Testing
+The first command runs performance tests only. The second runs the fast performance tests.
 ```bash
-# Run performance tests only
 uv run -- python -m pytest -m performance
 
-# Fast performance tests
 uv run -- python -m pytest -m "performance and fast"
 ```
 
 ## Migration from Individual Runners
 
 ### From `run_tpch_tests.py`
+The first command is the old way. The `make` target and `pytest` command are the new way.
 ```bash
-# Old way
 python tests/run_tpch_tests.py
 
-# New way
 make test-tpch
-# or
 uv run -- python -m pytest -m tpch
 ```
 
 ### From `run_tpcds_tests.py`
+The first command is the old way. The `make` target and `pytest` command are the new way.
 ```bash
-# Old way
 python tests/run_tpcds_tests.py minimal
 
-# New way
 make test-tpcds
-# or
 uv run -- python -m pytest -m "tpcds and fast"
 ```
 
 ### From `run_coverage.py`
+The first command is the old way. The `make` target and `pytest` command are the new way.
 ```bash
-# Old way
 python tests/run_coverage.py --report html
 
-# New way
 make coverage-html
-# or
 uv run -- python -m pytest --cov=benchbox --cov-report=html
 ```
 

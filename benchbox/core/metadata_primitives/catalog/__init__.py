@@ -1,11 +1,6 @@
-"""Metadata Primitives catalog module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides the query catalog loader and dataclasses for metadata introspection queries.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from .loader import (
     MetadataCatalog,

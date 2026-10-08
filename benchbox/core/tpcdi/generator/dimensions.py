@@ -1,5 +1,3 @@
-"""Dimension table generation mixin for TPC-DI."""
-
 from __future__ import annotations
 
 import csv
@@ -9,10 +7,7 @@ from ..financial_data import generate_realistic_tax_rates
 
 
 class DimensionGenerationMixin:
-    """Generate dimension table datasets for the TPC-DI benchmark."""
-
     def _generate_dimdate_data(self) -> str:
-        """Generate the DimDate dimension data with buffered I/O."""
         file_path = self.output_dir / "DimDate.tbl"
 
         start_date = datetime(2010, 1, 1)
@@ -41,17 +36,15 @@ class DimensionGenerationMixin:
                 day_of_week_num = current_date.weekday() + 1
                 day_of_week_desc = current_date.strftime("%A")
 
-                # Simplified fiscal year (same as calendar)
                 fiscal_year_id = calendar_year_id
                 fiscal_year_desc = calendar_year_desc
                 fiscal_qtr_id = calendar_qtr_id
                 fiscal_qtr_desc = calendar_qtr_desc
 
-                # Simple holiday flag (just major US holidays)
                 holiday_flag = (
-                    (current_date.month == 1 and current_date.day == 1)  # Year
-                    or (current_date.month == 7 and current_date.day == 4)  # Independence Day
-                    or (current_date.month == 12 and current_date.day == 25)  # Christmas
+                    (current_date.month == 1 and current_date.day == 1)
+                    or (current_date.month == 7 and current_date.day == 4)
+                    or (current_date.month == 12 and current_date.day == 25)
                 )
 
                 row = [
@@ -77,18 +70,15 @@ class DimensionGenerationMixin:
 
                 chunk_buffer.append(row)
 
-                # Write in chunks for better I/O performance
                 if len(chunk_buffer) >= self.chunk_size:
                     writer.writerows(chunk_buffer)
                     chunk_buffer.clear()
-                    # Simple progress logging every 1000 records
                     if self.enable_progress and sk_date_id % 1000 == 0:
                         self.logger.info(f"DimDate: generated {sk_date_id:,} of {total_days:,} records")
 
                 current_date += timedelta(days=1)
                 sk_date_id += 1
 
-            # Write remaining rows
             if chunk_buffer:
                 writer.writerows(chunk_buffer)
 
@@ -97,7 +87,6 @@ class DimensionGenerationMixin:
         return str(file_path)
 
     def _generate_dimtime_data(self) -> str:
-        """Generate the DimTime dimension data."""
         file_path = self.output_dir / "DimTime.tbl"
 
         with open(file_path, "w", newline="", encoding="utf-8") as f:
@@ -106,16 +95,14 @@ class DimensionGenerationMixin:
             sk_time_id = 1
 
             for hour in range(24):
-                for minute in range(0, 60, 5):  # Every 5 minutes
+                for minute in range(0, 60, 5):
                     time_value = time(hour, minute)
                     hour_desc = f"Hour {hour:02d}"
                     minute_desc = f"Minute {minute:02d}"
                     second_desc = "Second 00"
 
-                    # Market hours: 9:30 AM to 4:00 PM ET
                     market_hours_flag = (9 <= hour < 16) or (hour == 9 and minute >= 30)
 
-                    # Office hours: 8:00 AM to 6:00 PM
                     office_hours_flag = 8 <= hour < 18
 
                     row = [
@@ -138,14 +125,12 @@ class DimensionGenerationMixin:
         return str(file_path)
 
     def _generate_dimcompany_data(self) -> str:
-        """Generate the DimCompany dimension data with chunked processing."""
         file_path = self.output_dir / "DimCompany.tbl"
         num_companies = int(self.base_companies * self.scale_factor)
 
         with open(file_path, "w", newline="", buffering=self.buffer_size, encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
-            # Process in chunks to manage memory
             for chunk_start in range(1, num_companies + 1, self.chunk_size):
                 chunk_end = min(chunk_start + self.chunk_size, num_companies + 1)
                 chunk_rows = []
@@ -158,9 +143,7 @@ class DimensionGenerationMixin:
                     industry = self._rng.choice(self._industries)
                     sp_rating = self._rng.choice(self._sp_ratings)
                     is_low_grade = sp_rating in ["BB+", "BB", "BB-"]
-                    # Generate market cap based on company size and rating
-                    # Higher rated companies tend to have larger market caps
-                    base_market_cap = self._rng.uniform(100_000_000, 50_000_000_000)  # $100M to $50B
+                    base_market_cap = self._rng.uniform(100_000_000, 50_000_000_000)
                     if not is_low_grade:
                         market_cap = round(base_market_cap * self._rng.uniform(1.2, 2.0), 2)
                     else:
@@ -212,12 +195,10 @@ class DimensionGenerationMixin:
                     chunk_rows.append(row)
 
                 writer.writerows(chunk_rows)
-                # Simple progress logging
                 if self.enable_progress:
                     self.logger.info(f"DimCompany: generated {chunk_end - 1:,} of {num_companies:,} records")
                 self.generation_stats["chunks_processed"] += 1
 
-                # Memory management
                 if self._check_memory_usage():
                     self._cleanup_memory()
 
@@ -226,7 +207,6 @@ class DimensionGenerationMixin:
         return str(file_path)
 
     def _generate_dimsecurity_data(self) -> str:
-        """Generate the DimSecurity dimension data."""
         file_path = self.output_dir / "DimSecurity.tbl"
         num_securities = int(self.base_securities * self.scale_factor)
         num_companies = int(self.base_companies * self.scale_factor)
@@ -237,7 +217,7 @@ class DimensionGenerationMixin:
             for i in range(1, num_securities + 1):
                 sk_security_id = i
                 symbol = f"SYM{i:04d}"
-                issue = "S"  # Stock
+                issue = "S"
                 status = self._rng.choice(self._statuses)
                 name = f"Security {i:04d}"
                 exchange_id = self._rng.choice(["NYSE", "NASDAQ", "AMEX"])
@@ -280,7 +260,6 @@ class DimensionGenerationMixin:
         return str(file_path)
 
     def _generate_dimcustomer_data(self) -> str:
-        """Generate the DimCustomer dimension data."""
         file_path = self.output_dir / "DimCustomer.tbl"
         num_customers = int(self.base_customers * self.scale_factor)
 
@@ -303,7 +282,6 @@ class DimensionGenerationMixin:
                     self._rng.randint(1, 28),
                 ).date()
 
-                # Address information
                 address_line1 = f"{self._rng.randint(1, 9999)} Customer Street"
                 address_line2 = ""
                 postal_code = f"{self._rng.randint(10000, 99999)}"
@@ -311,14 +289,12 @@ class DimensionGenerationMixin:
                 state_prov = self._rng.choice(self._us_states)
                 country = "USA"
 
-                # Contact information
                 phone1 = f"{self._rng.randint(100, 999)}-{self._rng.randint(100, 999)}-{self._rng.randint(1000, 9999)}"
                 phone2 = ""
                 phone3 = ""
                 email1 = f"customer{i}@email.com"
                 email2 = ""
 
-                # Tax information
                 national_tax_rate_desc = "Federal Tax"
                 national_tax_rate = round(self._rng.uniform(0.15, 0.35), 5)
                 local_tax_rate_desc = "State Tax"
@@ -376,7 +352,6 @@ class DimensionGenerationMixin:
         return str(file_path)
 
     def _generate_dimaccount_data(self) -> str:
-        """Generate the DimAccount dimension data."""
         file_path = self.output_dir / "DimAccount.tbl"
         num_accounts = int(self.base_accounts * self.scale_factor)
         num_customers = int(self.base_customers * self.scale_factor)
@@ -387,11 +362,11 @@ class DimensionGenerationMixin:
             for i in range(1, num_accounts + 1):
                 sk_account_id = i
                 account_id = i
-                sk_broker_id = self._rng.randint(1, 100)  # Assume 100 brokers
+                sk_broker_id = self._rng.randint(1, 100)
                 sk_customer_id = self._rng.randint(1, num_customers)
                 status = self._rng.choice(self._statuses)
                 account_desc = f"Account {i:06d}"
-                tax_status = self._rng.randint(0, 2)  # 0=Taxable, 1=Tax Deferred, 2=Tax Free
+                tax_status = self._rng.randint(0, 2)
 
                 is_current = True
                 batch_id = 1
@@ -418,7 +393,6 @@ class DimensionGenerationMixin:
         return str(file_path)
 
     def _generate_industry_data(self) -> str:
-        """Generate Industry reference data."""
         file_path = self.output_dir / "Industry.tbl"
 
         with open(file_path, "w", newline="", encoding="utf-8") as f:
@@ -434,7 +408,6 @@ class DimensionGenerationMixin:
         return str(file_path)
 
     def _generate_statustype_data(self) -> str:
-        """Generate StatusType reference data."""
         file_path = self.output_dir / "StatusType.tbl"
 
         with open(file_path, "w", newline="", encoding="utf-8") as f:
@@ -450,7 +423,6 @@ class DimensionGenerationMixin:
         return str(file_path)
 
     def _generate_taxrate_data(self) -> str:
-        """Generate TaxRate reference data."""
         file_path = self.output_dir / "TaxRate.tbl"
 
         with open(file_path, "w", newline="", encoding="utf-8") as f:
@@ -466,7 +438,6 @@ class DimensionGenerationMixin:
         return str(file_path)
 
     def _generate_tradetype_data(self) -> str:
-        """Generate TradeType reference data."""
         file_path = self.output_dir / "TradeType.tbl"
 
         with open(file_path, "w", newline="", encoding="utf-8") as f:
@@ -482,25 +453,22 @@ class DimensionGenerationMixin:
         return str(file_path)
 
     def _generate_dimbroker_data(self) -> str:
-        """Generate DimBroker dimension data with realistic hierarchy."""
         file_path = self.output_dir / "DimBroker.tbl"
-        num_brokers = max(100, int(self.scale_factor * 50))  # Minimum 100 brokers
+        num_brokers = max(100, int(self.scale_factor * 50))
 
         with open(file_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="|")
 
-            # Generate manager hierarchy
             managers = []
-            for i in range(1, min(21, num_brokers // 5) + 1):  # Up to 20 managers
+            for i in range(1, min(21, num_brokers // 5) + 1):
                 managers.append(i)
 
             for i in range(1, num_brokers + 1):
                 sk_broker_id = i
                 broker_id = i
 
-                # Assign manager (some brokers are managers themselves)
                 if i in managers:
-                    manager_id = None  # Top-level managers
+                    manager_id = None
                 else:
                     manager_id = self._rng.choice(managers)
 
@@ -508,8 +476,7 @@ class DimensionGenerationMixin:
                 last_name = self._rng.choice(self.financial_patterns.last_names)
                 middle_initial = self._rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-                # Generate branch and office
-                branch = f"Branch {((i - 1) // 20) + 1:02d}"  # 20 brokers per branch
+                branch = f"Branch {((i - 1) // 20) + 1:02d}"
                 office = f"Office {self._rng.choice(['A', 'B', 'C', 'D'])}"
                 phone = f"{self._rng.randint(100, 999)}-{self._rng.randint(100, 999)}-{self._rng.randint(1000, 9999)}"
 

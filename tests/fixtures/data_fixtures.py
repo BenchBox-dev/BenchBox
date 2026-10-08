@@ -1,9 +1,6 @@
-"""Data-related fixtures for BenchBox tests.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import csv
 from collections.abc import Generator
@@ -18,24 +15,11 @@ from .database_fixtures import setup_duckdb_extensions
 
 @pytest.fixture
 def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
-    """Create small TPC-H dataset for testing.
-
-    This fixture creates minimal TPC-H data files with just enough
-    records to test functionality without performance overhead.
-
-    Args:
-        tmp_path: Pytest temporary directory fixture
-
-    Returns:
-        Dict[str, Path]: Mapping of table names to data file paths
-    """
     data_dir = tmp_path / "small_tpch_data"
     data_dir.mkdir(exist_ok=True)
 
-    # Create minimal data files
     files = {}
 
-    # Region data (5 rows)
     region_file = data_dir / "region.csv"
     with open(region_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
@@ -59,7 +43,6 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
         )
     files["region"] = region_file
 
-    # Nation data (25 rows - first 10 for testing)
     nation_file = data_dir / "nation.csv"
     with open(nation_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
@@ -85,7 +68,6 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
         )
     files["nation"] = nation_file
 
-    # Customer data (minimal)
     customer_file = data_dir / "customer.csv"
     with open(customer_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
@@ -137,7 +119,6 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
         )
     files["customer"] = customer_file
 
-    # Supplier data (minimal)
     supplier_file = data_dir / "supplier.csv"
     with open(supplier_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
@@ -185,7 +166,6 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
         )
     files["supplier"] = supplier_file
 
-    # Part data (minimal)
     part_file = data_dir / "part.csv"
     with open(part_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
@@ -241,7 +221,6 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
         )
     files["part"] = part_file
 
-    # Partsupp data (minimal)
     partsupp_file = data_dir / "partsupp.csv"
     with open(partsupp_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
@@ -255,7 +234,6 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
         )
     files["partsupp"] = partsupp_file
 
-    # Orders data (minimal)
     orders_file = data_dir / "orders.csv"
     with open(orders_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
@@ -311,7 +289,6 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
         )
     files["orders"] = orders_file
 
-    # Lineitem data (minimal)
     lineitem_file = data_dir / "lineitem.csv"
     with open(lineitem_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f, delimiter="|")
@@ -400,11 +377,6 @@ def small_tpch_data(tmp_path: Path) -> Generator[dict[str, Path], None, None]:
 
 @pytest.fixture
 def sample_queries() -> dict[str, str]:
-    """Provide sample queries for testing.
-
-    Returns:
-        Dict[str, str]: Sample queries by category
-    """
     return {
         "aggregation_simple": "SELECT COUNT(*) FROM lineitem;",
         "aggregation_groupby": """
@@ -471,28 +443,13 @@ def sample_queries() -> dict[str, str]:
 
 @pytest.fixture
 def duckdb_with_tpch_data(duckdb_memory_db: Mock, small_tpch_data: dict[str, Path]) -> Generator[Mock, None, None]:
-    """Create a DuckDB database with TPC-H data loaded.
-
-    This fixture creates a DuckDB database and loads the small TPC-H
-    dataset for testing queries and benchmarks.
-
-    Args:
-        duckdb_memory_db: DuckDB memory database fixture
-        small_tpch_data: Small TPC-H dataset fixture
-
-    Returns:
-        Mock: DuckDB database with TPC-H data loaded
-    """
-    # Setup extensions
     setup_duckdb_extensions(duckdb_memory_db)
 
-    # Skip loading data for mock connections
     if hasattr(duckdb_memory_db, "_mock_name"):
         yield duckdb_memory_db
         return
 
     try:
-        # Create tables and load data
         table_schemas = {
             "region": """
                 CREATE TABLE region (
@@ -591,17 +548,14 @@ def duckdb_with_tpch_data(duckdb_memory_db: Mock, small_tpch_data: dict[str, Pat
             """,
         }
 
-        # Create tables
         for table_name, schema in table_schemas.items():
             duckdb_memory_db.execute(schema)
 
-        # Load data from CSV files
         for table_name, file_path in small_tpch_data.items():
             if table_name in table_schemas:
                 duckdb_memory_db.execute(f"COPY {table_name} FROM '{file_path}' (DELIMITER '|', HEADER);")
 
     except Exception:
-        # Continue with empty database if loading fails
         pass
 
     yield duckdb_memory_db
@@ -609,14 +563,9 @@ def duckdb_with_tpch_data(duckdb_memory_db: Mock, small_tpch_data: dict[str, Pat
 
 @pytest.fixture
 def performance_test_data() -> dict[str, Any]:
-    """Provide performance testing data and thresholds.
-
-    Returns:
-        Dict[str, Any]: Performance test configuration
-    """
     return {
-        "query_timeout": 30,  # seconds
-        "memory_limit": 512,  # MB
+        "query_timeout": 30,
+        "memory_limit": 512,
         "expected_row_counts": {
             "region": 5,
             "nation": 10,
@@ -639,11 +588,6 @@ def performance_test_data() -> dict[str, Any]:
 
 @pytest.fixture
 def data_validation_rules() -> dict[str, dict[str, Any]]:
-    """Provide data validation rules for testing.
-
-    Returns:
-        Dict[str, Dict[str, Any]]: Validation rules by table
-    """
     return {
         "region": {
             "required_columns": ["r_regionkey", "r_name", "r_comment"],

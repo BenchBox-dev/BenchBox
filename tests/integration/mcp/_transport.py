@@ -1,5 +1,3 @@
-"""Shared supported-API transport fixtures for MCP integration tests."""
-
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
@@ -21,7 +19,7 @@ async def http_client(
     request_headers: list[dict[str, str]],
     response_headers: list[dict[str, str]],
 ) -> AsyncIterator[Client]:
-    """Yield an SDK client connected to the in-process HTTP transport."""
+
     server = create_server(results_dir=tmp_path / "results", charts_dir=tmp_path / "charts")
     app = server.streamable_http_app(
         host="127.0.0.1",

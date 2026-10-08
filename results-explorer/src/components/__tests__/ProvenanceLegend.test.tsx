@@ -1,14 +1,3 @@
-/**
- * Tests for ProvenanceLegend.
- *
- * The legend satisfies docs/reference/hosted-results-contract.md
- * (§ Trust label rendering rules): "a legend explaining all trust labels is
- * accessible from every page that displays them". These tests pin:
- *   (a) it starts collapsed and toggles
- *   (b) it explains both axes, including the chip-less `unspecified` case
- *   (c) its prose comes from the badge components, so it cannot drift
- */
-
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import { ProvenanceLegend } from "@/components/ProvenanceLegend";
@@ -18,9 +7,6 @@ import { trustLabelDescription } from "@/components/TrustBadge";
 const toggle = () => screen.getByRole("button", { name: /What do these labels mean\?/i });
 
 describe("ProvenanceLegend", () => {
-  // -----------------------------------------------------------------------
-  // (a) collapsed by default, expandable
-  // -----------------------------------------------------------------------
 
   it("renders collapsed with an accessible toggle", () => {
     render(<ProvenanceLegend />);
@@ -35,10 +21,6 @@ describe("ProvenanceLegend", () => {
     expect(screen.getByRole("heading", { name: "Result source" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Funding" })).toBeTruthy();
   });
-
-  // -----------------------------------------------------------------------
-  // (b) content
-  // -----------------------------------------------------------------------
 
   it("lists every disclosed funding source", () => {
     render(<ProvenanceLegend />);
@@ -70,15 +52,9 @@ describe("ProvenanceLegend", () => {
   it("lists canonical trust labels without duplicating their alias spellings", () => {
     render(<ProvenanceLegend />);
     fireEvent.click(toggle());
-    // `ci`/`ci-verified`/`ci-validated` all render the badge text "CI"; the
-    // legend must name it once, not three times.
     expect(screen.getAllByText("CI")).toHaveLength(1);
     expect(screen.getAllByText("Local")).toHaveLength(1);
   });
-
-  // -----------------------------------------------------------------------
-  // (c) single source for prose
-  // -----------------------------------------------------------------------
 
   it("uses the badge components' own descriptions", () => {
     render(<ProvenanceLegend />);

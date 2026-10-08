@@ -1,5 +1,3 @@
-"""Unit and contract tests for the publication transaction executor."""
-
 from __future__ import annotations
 
 import argparse
@@ -50,7 +48,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 @pytest.fixture
 def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Initialize a Git repository with remote and publication branch for journal CAS testing."""
     repo = tmp_path / "repo"
     repo.mkdir()
     subprocess.run(["git", "init", "-b", "main"], cwd=repo, check=True, capture_output=True)
@@ -67,7 +64,6 @@ def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=repo, check=True)
     subprocess.run(["git", "push", "origin", "main", "publication"], cwd=repo, check=True, capture_output=True)
 
-    # Initialize genesis journal state
     target = {
         "repository": "BenchBox-dev/BenchBox",
         "environment": "github-pages",
@@ -245,7 +241,6 @@ def test_authenticate_approval_enforces_run_attempt_and_environment(tmp_path: Pa
         "user": {"id": 42, "login": "maintainer"},
     }
 
-    # 1. Valid approval succeeds
     record = authenticate_approval_record(
         permit=permit,
         run_id="100",
@@ -257,7 +252,6 @@ def test_authenticate_approval_enforces_run_attempt_and_environment(tmp_path: Pa
     assert record["approver_login"] == "maintainer"
     assert record["permit_sha256"] == permit_digest
 
-    # 2. Defect D5 / Section 5: Run attempt > 1 must fail
     with pytest.raises(TransactionError, match="attempt 2 > 1 is forbidden"):
         authenticate_approval_record(
             permit=permit,
@@ -267,7 +261,6 @@ def test_authenticate_approval_enforces_run_attempt_and_environment(tmp_path: Pa
             simulated_approval=valid_simulated,
         )
 
-    # 3. Comments are audit data, not a second authentication channel.
     no_comment = {key: value for key, value in valid_simulated.items() if key != "comment"}
     assert (
         authenticate_approval_record(
@@ -280,7 +273,6 @@ def test_authenticate_approval_enforces_run_attempt_and_environment(tmp_path: Pa
         is True
     )
 
-    # 4. Wrong environment must fail
     bad_env_simulated = {**valid_simulated, "environment": {"name": "staging"}}
     with pytest.raises(TransactionError, match="Approval authentication failed"):
         authenticate_approval_record(
@@ -299,7 +291,6 @@ def test_full_promotion_lifecycle_and_cas(test_repo: Path, tmp_path: Path) -> No
     provider_resp_path = tmp_path / "provider.json"
     probe_report_path = tmp_path / "probe.json"
 
-    # Step 1: Prepare
     cmd_prepare(
         argparse.Namespace(
             kind=KIND_PROMOTION,
@@ -328,7 +319,6 @@ def test_full_promotion_lifecycle_and_cas(test_repo: Path, tmp_path: Path) -> No
     permit = json.loads(permit_path.read_text(encoding="utf-8"))
     permit_digest = hashlib.sha256(canonical_json(permit).encode("utf-8")).hexdigest()
 
-    # Step 2: Authenticate approval
     cmd_authenticate_approval(
         argparse.Namespace(
             permit=str(permit_path),
@@ -351,7 +341,6 @@ def test_full_promotion_lifecycle_and_cas(test_repo: Path, tmp_path: Path) -> No
         )
     )
 
-    # Step 3: Record prepared
     cmd_record_prepared(
         argparse.Namespace(
             permit=str(permit_path),
@@ -365,7 +354,6 @@ def test_full_promotion_lifecycle_and_cas(test_repo: Path, tmp_path: Path) -> No
     tx = journal.read_transaction(test_repo, "tx-lifecycle-1", ref="publication")
     assert tx.state == STATE_PREPARED
 
-    # Step 4: Start write
     cmd_start_write(
         argparse.Namespace(
             transaction_id="tx-lifecycle-1",
@@ -378,7 +366,6 @@ def test_full_promotion_lifecycle_and_cas(test_repo: Path, tmp_path: Path) -> No
     assert tx.state == STATE_WRITE_STARTED
     assert tx.write and tx.write.get("pages_build_version")
 
-    # Step 5: Acknowledge write
     _write_temp_json(
         provider_resp_path,
         {
@@ -400,7 +387,6 @@ def test_full_promotion_lifecycle_and_cas(test_repo: Path, tmp_path: Path) -> No
     tx = journal.read_transaction(test_repo, "tx-lifecycle-1", ref="publication")
     assert tx.state == STATE_WRITE_ACKNOWLEDGED
 
-    # Step 6: Record verification
     _write_temp_json(
         probe_report_path,
         {
@@ -423,7 +409,6 @@ def test_full_promotion_lifecycle_and_cas(test_repo: Path, tmp_path: Path) -> No
     tx = journal.read_transaction(test_repo, "tx-lifecycle-1", ref="publication")
     assert tx.state == STATE_EXTERNALLY_VERIFIED
 
-    # Step 7: Finalize
     cmd_finalize(
         argparse.Namespace(
             transaction_id="tx-lifecycle-1",
@@ -442,22 +427,16 @@ def test_full_promotion_lifecycle_and_cas(test_repo: Path, tmp_path: Path) -> No
 
 
 def test_defect_d1_and_d2_falsifying_contracts(test_repo: Path, tmp_path: Path) -> None:
-    """Falsifying tests for D1 (one builder, restored desired/receipt link, reject old desired JSON)
-
-    and D2 (unique write correlation, replay rejection).
-    """
     permit_path = tmp_path / "p.json"
     tx_path = tmp_path / "t.json"
     approval_path = tmp_path / "a.json"
     provider_resp_path = tmp_path / "prov.json"
     probe_report_path = tmp_path / "probe.json"
 
-    # Step 1: Promote A (generation 2)
     _execute_simple_promotion(test_repo, tmp_path, tx_id="tx-A", gen=2, candidate_digest="1" * 64)
     state = journal.read_journal_state(test_repo, ref="publication")
     assert state.durable_transaction_id == "tx-A"
 
-    # Step 2: Attempt B (generation 3) -> fails at verification
     cmd_prepare(
         argparse.Namespace(
             kind=KIND_PROMOTION,
@@ -538,7 +517,6 @@ def test_defect_d1_and_d2_falsifying_contracts(test_repo: Path, tmp_path: Path) 
         )
     )
 
-    # Verification fails on B -> record-failure escalates to RECOVERY_REQUIRED
     cmd_record_failure(
         argparse.Namespace(
             transaction_id="tx-B",
@@ -553,11 +531,9 @@ def test_defect_d1_and_d2_falsifying_contracts(test_repo: Path, tmp_path: Path) 
     tx_b = journal.read_transaction(test_repo, "tx-B", ref="publication")
     assert tx_b.state == STATE_RECOVERY_REQUIRED
 
-    # D2 test: Same workflow commit writes different artifact; replaying first ACK on second must reject
     with pytest.raises(TransactionError):
         transaction.transition(tx_b, transaction.EVENT_START_WRITE, payload={})
 
-    # Step 3: Restore A via rollback (generation 4)
     barrier_evidence_path = tmp_path / "barrier.json"
     _write_temp_json(
         barrier_evidence_path,
@@ -596,7 +572,6 @@ def test_defect_d1_and_d2_falsifying_contracts(test_repo: Path, tmp_path: Path) 
     assert permit_rb["parent_transaction_id"] == "tx-A"
     assert permit_rb["content_digest"] == "1" * 64
 
-    # Execute rollback steps
     permit_rb_digest = hashlib.sha256(canonical_json(permit_rb).encode("utf-8")).hexdigest()
     cmd_authenticate_approval(
         argparse.Namespace(
@@ -668,7 +643,6 @@ def test_defect_d1_and_d2_falsifying_contracts(test_repo: Path, tmp_path: Path) 
     assert state.durable_transaction_id == "tx-rollback-A"
     assert state.next_generation == 5
 
-    # Step 4: Promote C (generation 5, parent=rollback-A)
     _execute_simple_promotion(test_repo, tmp_path, tx_id="tx-C", gen=5, candidate_digest="3" * 64)
     state = journal.read_journal_state(test_repo, ref="publication")
     assert state.durable_transaction_id == "tx-C"
@@ -790,7 +764,6 @@ def _execute_simple_promotion(test_repo: Path, tmp_path: Path, tx_id: str, gen: 
 def test_cmd_start_write_with_explicit_pages_build_version(
     test_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """start-write CLI command records explicit pages_build_version and preserves intent OID."""
     tx_id = "tx-explicit-version"
     permit_path = tmp_path / f"p_{tx_id}.json"
     tx_path = tmp_path / f"t_{tx_id}.json"
@@ -877,7 +850,6 @@ def test_cmd_start_write_with_explicit_pages_build_version(
     assert tx.write["intent_commit_oid"] != wire_sha
     assert len(tx.write["intent_commit_oid"]) == 40
 
-    # Verify GITHUB_OUTPUT contents
     output_text = github_output.read_text(encoding="utf-8")
     assert f"pages_build_version={wire_sha}" in output_text
     assert f"intent_commit_oid={tx.write['intent_commit_oid']}" in output_text
@@ -1221,7 +1193,6 @@ def test_cmd_record_verification_live_fetch(test_repo: Path, tmp_path: Path, mon
 def test_cmd_record_verification_requires_live_lookup_not_caller_status(
     test_repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Recovery reconciliation must query the provider live; no CLI flag may inject status."""
     permit_path = tmp_path / "permit.json"
     tx_path = tmp_path / "tx.json"
     approval_path = tmp_path / "approval.json"
@@ -1307,9 +1278,6 @@ def test_cmd_record_verification_requires_live_lookup_not_caller_status(
     probe_path = tmp_path / "probe.json"
     _write_temp_json(probe_path, {"ok": True, "probes": [{"path": "/", "ok": True}]})
 
-    # The parser no longer offers a status-injection flag: even a crafted
-    # namespace carrying one must not bypass the live provider lookup, which
-    # fails closed without a token.
     monkeypatch.delenv("GH_TOKEN", raising=False)
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     with pytest.raises(TransactionError, match="GitHub token is required"):

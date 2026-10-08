@@ -1,17 +1,3 @@
-"""
-DuckDB EXPLAIN output fixtures by version.
-
-Provides sample EXPLAIN outputs from different DuckDB versions to test
-parser compatibility across version changes.
-
-These fixtures represent real-world format variations that may occur
-when users upgrade their DuckDB installations.
-"""
-
-# =============================================================================
-# DuckDB 0.9.x - Text format with box-drawing characters
-# =============================================================================
-
 DUCKDB_0_9_SIMPLE_SCAN = """
 ┌───────────────────────────┐
 │         SEQ_SCAN          │
@@ -99,9 +85,6 @@ DUCKDB_0_9_ORDER_BY = """
 └───────────────────────────┘
 """
 
-# =============================================================================
-# DuckDB 0.10.x / 1.0.x - JSON format (EXPLAIN FORMAT JSON)
-# =============================================================================
 
 DUCKDB_1_0_JSON_SIMPLE_SCAN = """{
     "name": "SEQ_SCAN",
@@ -198,7 +181,6 @@ DUCKDB_1_0_JSON_WITH_TIMING = """{
     ]
 }"""
 
-# DuckDB nested wrapper format (common in EXPLAIN ANALYZE output)
 DUCKDB_1_0_JSON_WRAPPED = """{
     "children": [
         {
@@ -220,7 +202,6 @@ DUCKDB_1_0_JSON_WRAPPED = """{
     ]
 }"""
 
-# DuckDB Python 1.6.0.dev379 / engine v2.0.0-alpha39998 analyzed-plan format.
 DUCKDB_2_0_PREVIEW_JSON_ANALYZED = """{
     "operator": [
         {
@@ -268,12 +249,8 @@ DUCKDB_2_0_PREVIEW_JSON_ANALYZED = """{
     }
 }"""
 
-# =============================================================================
-# Version metadata for parameterized testing
-# =============================================================================
 
 VERSION_FIXTURES = [
-    # (version, format, fixture_name, fixture_value)
     ("0.9.0", "text", "simple_scan", DUCKDB_0_9_SIMPLE_SCAN),
     ("0.9.0", "text", "filter_scan", DUCKDB_0_9_FILTER_SCAN),
     ("0.9.0", "text", "aggregate", DUCKDB_0_9_AGGREGATE),
@@ -289,13 +266,11 @@ VERSION_FIXTURES = [
     ("2.0.0-alpha39998", "json", "preview_analyzed", DUCKDB_2_0_PREVIEW_JSON_ANALYZED),
 ]
 
-# Expected operators for each fixture type
-# Note: Text parser may not capture all operators due to format limitations
 EXPECTED_OPERATORS = {
     "simple_scan": ["SCAN"],
-    "filter_scan": ["SCAN"],  # Text parser may not always capture FILTER separately
-    "aggregate": ["PROJECT"],  # At minimum, PROJECT is captured
-    "join": ["PROJECT", "JOIN"],  # Text parser may not capture leaf SCANs in complex layouts
+    "filter_scan": ["SCAN"],
+    "aggregate": ["PROJECT"],
+    "join": ["PROJECT", "JOIN"],
     "order_by": ["SORT", "SCAN"],
     "with_timing": ["PROJECT", "AGGREGATE", "SCAN"],
     "wrapped": ["PROJECT", "SCAN"],

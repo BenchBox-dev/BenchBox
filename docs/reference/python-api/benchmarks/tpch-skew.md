@@ -134,8 +134,9 @@ import json
 with open("skew_data/_datagen_manifest.json") as handle:
     manifest = json.load(handle)
 print(benchmark.manifest_matches_datagen_identity(manifest))
-# True
 ```
+
+This prints `True` when the manifest was written with this instance's skew configuration.
 
 ### get_query(query_id, \*, params=None, seed=None, scale_factor=None, dialect=None, base_dialect=None)
 

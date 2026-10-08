@@ -1,5 +1,3 @@
-"""Authentication helpers for hosted result submission."""
-
 from __future__ import annotations
 
 import os
@@ -15,28 +13,23 @@ TOKEN_ENV_VARS = ("BENCHBOX_SUBMIT_TOKEN", "BENCHBOX_SERVICE_TOKEN")
 
 
 class SubmissionAuthError(RuntimeError):
-    """Raised when a hosted-submission token cannot be resolved or stored."""
+    pass
 
 
 @dataclass(frozen=True)
 class SubmissionToken:
-    """Resolved hosted-submission token with its non-secret source."""
-
     token: str
     source: str
 
 
 @dataclass(frozen=True)
 class SubmissionAuthStatus:
-    """Current auth status for a hosted submission service URL."""
-
     authenticated: bool
     source: str | None = None
     service_url: str | None = None
 
 
 def normalize_service_url(service_url: str) -> str:
-    """Return a stable keyring account name for a service URL."""
 
     value = service_url.strip().rstrip("/")
     parsed = urlsplit(value)
@@ -49,7 +42,7 @@ def normalize_service_url(service_url: str) -> str:
 def _load_keyring() -> Any:
     try:
         import keyring
-    except ImportError as exc:  # pragma: no cover - dependency is declared
+    except ImportError as exc:  # pragma: no cover
         raise SubmissionAuthError(
             "The Python keyring package is required for stored hosted-submit credentials."
         ) from exc
@@ -59,28 +52,20 @@ def _load_keyring() -> Any:
 def _keyring_error_types() -> tuple[type[BaseException], ...]:
     try:
         from keyring.errors import KeyringError
-    except ImportError:  # pragma: no cover - dependency is declared
+    except ImportError:  # pragma: no cover
         return (Exception,)
     return (KeyringError,)
 
 
 def _password_delete_not_found_types() -> tuple[type[BaseException], ...]:
-    """Backend-specific exceptions raised when delete targets a missing entry.
-
-    Different keyring backends signal "no such credential" through different
-    exception classes; using the typed subclasses avoids the brittle
-    string-matching that earlier code relied on.
-    """
     try:
         from keyring.errors import PasswordDeleteError
-    except ImportError:  # pragma: no cover - dependency is declared
+    except ImportError:  # pragma: no cover
         return ()
     return (PasswordDeleteError,)
 
 
 class SubmissionAuthStore:
-    """OS keyring-backed token store for hosted result submission."""
-
     def __init__(self, *, service_name: str = KEYRING_SERVICE_NAME, keyring_backend: Any | None = None) -> None:
         self.service_name = service_name
         self._keyring_backend = keyring_backend
@@ -114,10 +99,6 @@ class SubmissionAuthStore:
         try:
             self.keyring_backend.delete_password(self.service_name, username)
         except _password_delete_not_found_types():
-            # macOS Keychain (PasswordDeleteError), libsecret, and Windows
-            # Credential Manager all surface "already gone" through different
-            # subclasses or messages. Treat any "missing on delete" as a
-            # benign race with the prior get_token() check.
             return False
         except _keyring_error_types() as exc:
             raise SubmissionAuthError(f"Could not delete hosted-submit credentials from the OS keyring: {exc}") from exc
@@ -137,7 +118,6 @@ def get_submission_auth_status(
     *,
     store: SubmissionAuthStore | None = None,
 ) -> SubmissionAuthStatus:
-    """Inspect auth state without revealing token material."""
 
     env_token = _env_token()
     normalized_url = normalize_service_url(service_url)
@@ -157,7 +137,6 @@ def resolve_submission_token(
     force_refresh: bool = False,
     store: SubmissionAuthStore | None = None,
 ) -> SubmissionToken:
-    """Resolve a hosted-submission bearer token from env, keyring, or prompt."""
 
     if not force_refresh:
         env_token = _env_token()
@@ -193,7 +172,6 @@ def refresh_submission_token(
     *,
     store: SubmissionAuthStore | None = None,
 ) -> SubmissionToken:
-    """Prompt for and store a replacement hosted-submission token."""
 
     env_token = _env_token()
     if env_token:

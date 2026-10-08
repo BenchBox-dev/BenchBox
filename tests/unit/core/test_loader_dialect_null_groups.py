@@ -1,9 +1,6 @@
-"""Tests for unified loader dialect source and pandas NULL group keys.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from pathlib import Path
 from unittest.mock import Mock
@@ -34,8 +31,6 @@ def benchmark_config() -> BenchmarkConfig:
 
 
 class _AttrBenchmark:
-    """Benchmark stub resolving dialect purely from instance attributes."""
-
     name = "attr_fixture"
     csv_delimiter = ";"
     csv_has_header = False
@@ -47,8 +42,6 @@ def _write_csv(path: Path, rows: str) -> Path:
 
 
 class TestSingleDialectSource:
-    """One resolved dialect feeds null marker, delimiter, and header alike."""
-
     def test_manifest_metadata_wins_over_benchmark_attributes(self, tmp_path: Path):
         csv_path = _write_csv(tmp_path / "t.csv", "a;b\n1;2\n")
         loader = DataFrameDataLoader(platform="polars")
@@ -84,8 +77,6 @@ class TestSingleDialectSource:
 
 
 class TestNullGroupKeys:
-    """SQL GROUP BY keeps NULL keys; the pandas surface must keep them too."""
-
     def test_unmatched_left_join_key_kept_as_group(self):
         pd = pytest.importorskip("pandas")
         from benchbox.core.nyctaxi.dataframe_queries.queries import _pandas_top_zone
@@ -110,7 +101,6 @@ class TestNullGroupKeys:
                 return tables[name]
 
         result = _pandas_top_zone(SimplePandasContext(), "Q1", "pickup_location_id")
-        # Two matched zones plus one NULL group for the unmatched location.
         assert len(result) == 3
         assert bool(result["zone"].isna().any())
 
@@ -120,16 +110,11 @@ class TestNullGroupKeys:
         import pandas as pd
 
         df = pd.DataFrame({"k": ["a", None, "a", None], "v": [1, 2, 3, 4]})
-        # dask and cudf execute the same pandas-family impls, so dropna=False
-        # must be valid there too (cudf mirrors the pandas groupby API and
-        # accepts the same parameter; it has no CPU test target here).
         result = dd.from_pandas(df, npartitions=2).groupby("k", dropna=False).sum().compute()
         assert len(result) == 2
 
 
 class TestPopulatedTablesAuxiliaryHeal:
-    """Caller-populated tables must still run the auxiliary-data hook."""
-
     def test_populated_tables_reuse_runs_auxiliary_hook(self, tmp_path: Path, benchmark_config: BenchmarkConfig):
         data_file = tmp_path / "customer.dat"
         data_file.write_text("1|sample\n")
@@ -143,7 +128,6 @@ class TestPopulatedTablesAuxiliaryHeal:
                 self.ensure_auxiliary_data_files = hook
 
         dummy = DummyBenchmark()
-        # No local manifest: table_mode external reuses existing paths outright.
         benchmark_config.options["table_mode"] = "external"
 
         result = _ensure_data_generated(dummy, benchmark_config)

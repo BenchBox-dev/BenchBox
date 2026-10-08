@@ -1,7 +1,3 @@
-# DuckDB TPC-Havoc No-Tuning Configuration
-# This configuration disables all optimizations for baseline performance testing
-# Provides unoptimized baseline performance for comparison
-
 primary_keys:
   enabled: false
   enforce_uniqueness: false

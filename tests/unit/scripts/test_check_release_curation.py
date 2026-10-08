@@ -1,5 +1,3 @@
-"""Tests for the release curation-drift guard's Makefile parsing."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -44,7 +42,6 @@ def _write_makefile(tmp_path: Path, recipe_lines: list[str]) -> Path:
 
 
 def test_parse_curation_list_handles_ignore_unmatch(tmp_path):
-    """--ignore-unmatch must not be swallowed into the parsed path set."""
     makefile = _write_makefile(
         tmp_path,
         [
@@ -65,7 +62,6 @@ def test_parse_curation_list_accepts_target_prerequisites(tmp_path: Path) -> Non
 
 
 def test_parse_curation_list_handles_legacy_prefixed_lines(tmp_path):
-    """Pre---ignore-unmatch form (`-git rm -rf <paths>`) still parses."""
     makefile = _write_makefile(
         tmp_path,
         [
@@ -78,7 +74,6 @@ def test_parse_curation_list_handles_legacy_prefixed_lines(tmp_path):
 
 
 def test_parse_curation_list_ignores_non_rm_lines(tmp_path):
-    """git ls-files guard lines and other commands contribute no paths."""
     makefile = _write_makefile(
         tmp_path,
         [
@@ -92,7 +87,6 @@ def test_parse_curation_list_ignores_non_rm_lines(tmp_path):
 
 
 def test_real_makefile_curation_list_parses_to_paths_only():
-    """Against the repo Makefile: every parsed entry is a path, never a flag."""
     paths = check_release_curation.parse_curation_list(REPO_ROOT / "Makefile")
     assert paths, "expected a non-empty curation list from the repo Makefile"
     flags = {p for p in paths if p.startswith("-")}
@@ -113,17 +107,11 @@ def _write_decision_doc(tmp_path: Path, ending: str) -> Path:
 
 
 def test_parse_main_only_allowlist_accepts_trailing_bullet_at_eof(tmp_path: Path) -> None:
-    """A main-only bullet at end of file must parse with no blank line after it.
-
-    end-of-file-fixer strips trailing blank lines, so the final amendment
-    bullet is terminated by end of input, not by a blank line.
-    """
     paths = check_release_curation.parse_main_only_allowlist(_write_decision_doc(tmp_path, "\n"))
     assert {"benchbox", "Makefile", "publication"} <= paths
 
 
 def test_parse_main_only_allowlist_accepts_trailing_bullet_with_blank_line(tmp_path: Path) -> None:
-    """The historical blank-line-terminated trailing bullet keeps parsing."""
     paths = check_release_curation.parse_main_only_allowlist(_write_decision_doc(tmp_path, "\n\n"))
     assert {"benchbox", "Makefile", "publication"} <= paths
 
@@ -263,7 +251,6 @@ def test_curated_release_make_runtime_fails_closed_when_module_is_omitted(tmp_pa
 
 
 def _release_curation_recipes() -> tuple[str, str]:
-    """Use the shipped removal commands and guard without executing release-cut."""
     text = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
     target = re.search(r"^release-cut:[^\n]*\n((?:[ \t].*\n|\n)+)", text, re.MULTILINE)
     assert target is not None

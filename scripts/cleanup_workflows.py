@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""Delete old GitHub Actions workflow runs.
-
-Usage:
-    # Dry-run (default): show what would be deleted
-    python scripts/cleanup_workflows.py --older-than 60
-
-    # Actually delete workflows older than 60 minutes
-    python scripts/cleanup_workflows.py --older-than 60 --delete
-
-    # Delete all workflow runs (use with caution)
-    python scripts/cleanup_workflows.py --older-than 0 --delete
-"""
 
 from __future__ import annotations
 
@@ -21,16 +9,22 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
+CLI_DESCRIPTION = (
+    "Delete old GitHub Actions workflow runs.\n"
+    "\n"
+    "Usage:\n"
+    "    # Dry-run (default): show what would be deleted\n"
+    "    python scripts/cleanup_workflows.py --older-than 60\n"
+    "\n"
+    "    # Actually delete workflows older than 60 minutes\n"
+    "    python scripts/cleanup_workflows.py --older-than 60 --delete\n"
+    "\n"
+    "    # Delete all workflow runs (use with caution)\n"
+    "    python scripts/cleanup_workflows.py --older-than 0 --delete\n"
+)
+
 
 def get_workflow_runs(repo: str | None = None) -> list[dict]:
-    """Fetch all workflow runs from GitHub.
-
-    Args:
-        repo: Repository in owner/repo format. If None, uses current repo.
-
-    Returns:
-        List of workflow run dictionaries.
-    """
     cmd = ["gh", "run", "list", "--json", "databaseId,createdAt,status,name,conclusion", "--limit", "1000"]
     if repo:
         cmd.extend(["--repo", repo])
@@ -44,21 +38,10 @@ def get_workflow_runs(repo: str | None = None) -> list[dict]:
 
 
 def parse_timestamp(timestamp: str) -> datetime:
-    """Parse GitHub timestamp to datetime."""
-    # GitHub returns ISO 8601 format: 2024-01-15T10:30:00Z
     return datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
 
 
 def delete_workflow_run(run_id: int, repo: str | None = None) -> bool:
-    """Delete a specific workflow run.
-
-    Args:
-        run_id: The database ID of the workflow run.
-        repo: Repository in owner/repo format. If None, uses current repo.
-
-    Returns:
-        True if deletion succeeded, False otherwise.
-    """
     cmd = ["gh", "run", "delete", str(run_id)]
     if repo:
         cmd.extend(["--repo", repo])
@@ -69,7 +52,7 @@ def delete_workflow_run(run_id: int, repo: str | None = None) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description=__doc__,
+        description=CLI_DESCRIPTION,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
@@ -100,13 +83,11 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    # Check gh CLI is available
     if not shutil.which("gh"):
         print("❌ GitHub CLI (gh) not found in PATH")
         print("   Install: https://cli.github.com/")
         return 1
 
-    # Fetch workflow runs
     print(f"Fetching workflow runs{f' from {args.repo}' if args.repo else ''}...")
     runs = get_workflow_runs(args.repo)
 
@@ -114,11 +95,9 @@ def main() -> int:
         print("No workflow runs found.")
         return 0
 
-    # Calculate cutoff time
     now = datetime.now(timezone.utc)
     cutoff_minutes = args.older_than
 
-    # Filter runs to delete
     to_delete = []
     for run in runs:
         created_at = parse_timestamp(run["createdAt"])
@@ -145,7 +124,6 @@ def main() -> int:
         print(f"No workflow runs older than {cutoff_minutes} minutes found.")
         return 0
 
-    # Display what will be deleted
     print(f"\nFound {len(to_delete)} workflow run(s) older than {cutoff_minutes} minutes:\n")
     print(f"{'ID':<12} {'Age (min)':<10} {'Status':<12} {'Conclusion':<12} Name")
     print("-" * 80)
@@ -157,7 +135,6 @@ def main() -> int:
         print(f"   Add --delete to actually delete these {len(to_delete)} workflow run(s).")
         return 0
 
-    # Delete workflows
     print(f"\nDeleting {len(to_delete)} workflow run(s)...")
     deleted = 0
     failed = 0

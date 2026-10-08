@@ -1,9 +1,3 @@
-"""Tests for shared DataFrame data loading utility.
-
-Covers load_tables_from_data_source_impl - the shared implementation used by
-ExpressionFamilyAdapter and PandasFamilyAdapter.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -35,10 +29,8 @@ def _make_adapter(platform_name: str = "polars", load_row_count: int = 10) -> Ma
 
 
 class TestLoadTablesFromDataSourceImpl:
-    """Tests for load_tables_from_data_source_impl."""
-
     def test_passes_adapter_loading_contract_to_resolver(self, tmp_path: Path) -> None:
-        """DataSourceResolver receives platform name, table mode, and config directly."""
+
         adapter = _make_adapter(platform_name="polars")
 
         with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
@@ -57,7 +49,7 @@ class TestLoadTablesFromDataSourceImpl:
         }
 
     def test_raises_when_resolver_returns_none(self, tmp_path: Path) -> None:
-        """Raises ValueError when DataSourceResolver finds no data files."""
+
         adapter = _make_adapter()
 
         with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
@@ -69,7 +61,7 @@ class TestLoadTablesFromDataSourceImpl:
                 load_tables_from_data_source_impl(adapter, MagicMock(), tmp_path)
 
     def test_raises_when_resolver_returns_empty_tables(self, tmp_path: Path) -> None:
-        """Raises ValueError when resolver returns a DataSource with empty tables."""
+
         adapter = _make_adapter()
 
         with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
@@ -81,7 +73,7 @@ class TestLoadTablesFromDataSourceImpl:
                 load_tables_from_data_source_impl(adapter, MagicMock(), tmp_path)
 
     def test_calls_load_table_for_each_valid_file(self, tmp_path: Path) -> None:
-        """load_table is called once per table that has existing files."""
+
         adapter = _make_adapter(load_row_count=42)
         (tmp_path / "orders.tbl").write_bytes(b"data")
         (tmp_path / "customer.tbl").write_bytes(b"data")
@@ -101,10 +93,9 @@ class TestLoadTablesFromDataSourceImpl:
         assert adapter.load_table.call_count == 2
 
     def test_skips_tables_with_no_existing_files(self, tmp_path: Path) -> None:
-        """Tables whose files are all missing are skipped (not raised)."""
+
         adapter = _make_adapter(load_row_count=5)
         (tmp_path / "orders.tbl").write_bytes(b"data")
-        # customer.tbl intentionally NOT created
 
         with patch("benchbox.platforms.base.data_loading.DataSourceResolver") as mock_cls:
             mock_resolver = MagicMock()
@@ -121,7 +112,7 @@ class TestLoadTablesFromDataSourceImpl:
         assert "customer" not in stats
 
     def test_uses_schema_info_column_names_when_provided(self, tmp_path: Path) -> None:
-        """Column names from schema_info are forwarded to load_table."""
+
         adapter = _make_adapter(load_row_count=3)
         (tmp_path / "orders.tbl").write_bytes(b"data")
         schema_info = {"orders": {"columns": [{"name": "o_orderkey"}, {"name": "o_custkey"}]}}
@@ -137,7 +128,7 @@ class TestLoadTablesFromDataSourceImpl:
         assert column_names == ["o_orderkey", "o_custkey"]
 
     def test_uses_table_object_schema_column_names(self, tmp_path: Path) -> None:
-        """Column names from Table-like schema objects are forwarded to load_table."""
+
         adapter = _make_adapter(load_row_count=3)
         (tmp_path / "sat_lineitem.tbl").write_bytes(b"data")
         schema_info = {
@@ -162,8 +153,8 @@ class TestLoadTablesFromDataSourceImpl:
         assert column_names == ["lineitem_hk", "load_end_dts"]
 
     def test_platform_name_attribute_used_directly(self, tmp_path: Path) -> None:
-        """Verifies adapter.platform_name is accessed as an attribute (AttributeError if missing)."""
-        adapter = MagicMock(spec=[])  # spec=[] prevents auto-creating platform_name
+
+        adapter = MagicMock(spec=[])
         with pytest.raises(AttributeError):
             load_tables_from_data_source_impl(adapter, MagicMock(), tmp_path)
 
@@ -171,22 +162,22 @@ class TestLoadTablesFromDataSourceImpl:
 @pytest.mark.parametrize(
     ("null_marker", "expected"),
     [
-        (None, True),  # no NULL conversion: empty fields stay ''
-        ("", False),  # empty fields ARE null (TPC .tbl/.dat, JoinOrder)
-        ("__NULL__", True),  # only the sentinel is NULL; empty fields stay ''
-        ("NULL", True),  # any non-empty sentinel preserves empty strings
+        (None, True),
+        ("", False),
+        ("__NULL__", True),
+        ("NULL", True),
     ],
 )
 def test_dialect_preserves_empty_strings(null_marker: str | None, expected: bool) -> None:
-    """Only '' maps empty CSV fields to NULL; None and sentinels preserve ''."""
+
     assert dialect_preserves_empty_strings(null_marker) is expected
 
 
 def test_restore_columns_includes_sentinel_marker_columns() -> None:
-    """A non-empty null sentinel must not disable the '' restore (ClickBench __NULL__)."""
+
     assert resolve_empty_string_restore_columns(["a", "b"], "__NULL__", ["a", "b", "c"]) == ["a", "b"]
 
 
 def test_restore_columns_skips_empty_marker_columns() -> None:
-    """The '' marker means empty fields are NULL, so no restore may run."""
+
     assert resolve_empty_string_restore_columns(["a"], "", ["a"]) == []

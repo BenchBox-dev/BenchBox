@@ -1,5 +1,3 @@
-"""Tests for data-generation versioning and stale-datagen auto-detection."""
-
 from __future__ import annotations
 
 import json
@@ -49,7 +47,6 @@ def test_base_constants_hash_is_stable() -> None:
 
 
 def test_base_constants_hash_fingerprints_spec_files() -> None:
-    """Distinct spec inputs must hash distinctly, or staleness is undetectable."""
     assert compute_base_constants_hash("tpch") != compute_base_constants_hash("tsbs_devops")
 
 
@@ -133,7 +130,6 @@ def test_result_leaves_version_unset_without_verified_manifest(tmp_path) -> None
 
 
 def test_result_rejects_manifest_for_another_benchmark(tmp_path) -> None:
-    """A current stamp from an unrelated dataset must not verify the result."""
     import json
 
     from benchbox.core.runner.runner import _attach_datagen_version
@@ -151,7 +147,6 @@ def test_result_rejects_manifest_for_another_benchmark(tmp_path) -> None:
 
 
 def test_result_accepts_shared_data_alias_manifest(tmp_path) -> None:
-    """Benchmarks reusing another benchmark's dataset keep verified provenance."""
     import json
 
     from benchbox.core.runner.runner import _attach_datagen_version
@@ -171,7 +166,6 @@ def test_result_accepts_shared_data_alias_manifest(tmp_path) -> None:
 
 
 def test_result_carries_generation_hash_round_trip(tmp_path) -> None:
-    """The base-constants fingerprint survives attach, persist, and load."""
     import json
 
     from benchbox.core.results.loader import reconstruct_benchmark_results
@@ -194,7 +188,6 @@ def test_result_carries_generation_hash_round_trip(tmp_path) -> None:
 
 
 def test_tpcds_direct_manifest_writer_stamps_version(tmp_path: Path) -> None:
-    """The TPC-DS filesystem writer stamps freshly generated manifests."""
     import json
 
     from benchbox.core.tpcds.generator.filesystem import FileArtifactMixin
@@ -216,7 +209,6 @@ def test_tpcds_direct_manifest_writer_stamps_version(tmp_path: Path) -> None:
 
 
 def test_ssb_direct_manifest_writer_stamps_version(tmp_path: Path) -> None:
-    """The SSB writer stamps freshly generated manifests."""
     import json
 
     from benchbox.core.ssb.generator import SSBDataGenerator
@@ -229,7 +221,6 @@ def test_ssb_direct_manifest_writer_stamps_version(tmp_path: Path) -> None:
 
 
 def test_scan_rebuilt_manifest_carries_no_stamp(tmp_path: Path) -> None:
-    """Scan-rebuilt manifests stay unstamped: a scan proves file presence, not provenance."""
     import json
 
     from benchbox.utils.data_validation import BenchmarkDataValidator
@@ -243,7 +234,6 @@ def test_scan_rebuilt_manifest_carries_no_stamp(tmp_path: Path) -> None:
 
 
 def test_stale_stamp_fails_directory_validation(tmp_path: Path) -> None:
-    """A complete dataset with a stale stamp must regenerate, not reuse."""
     import json
 
     from benchbox.utils.data_validation import BenchmarkDataValidator
@@ -263,14 +253,12 @@ def test_stale_stamp_fails_directory_validation(tmp_path: Path) -> None:
 
 
 def test_skew_fingerprint_covers_both_specs() -> None:
-    """The skew hash must differ from the base tpch hash (both specs feed it)."""
     assert compute_base_constants_hash("tpch_skew") != compute_base_constants_hash("tpch")
     stamp = current_datagen_stamp("tpch_skew")
     assert manifest_datagen_is_current(dict(stamp), benchmark="tpch_skew") is True
 
 
 def test_skew_configuration_changes_data_generation_comparison_identity() -> None:
-    """Result comparison must reject distinct effective skew configurations."""
     from benchbox.core.results.exporter import ResultExporter
     from benchbox.core.tpch_skew.skew_config import AttributeSkewConfig, SkewConfiguration
 
@@ -294,7 +282,6 @@ def test_skew_configuration_changes_data_generation_comparison_identity() -> Non
 
 
 def test_skew_manifest_identity_reaches_result_provenance(tmp_path: Path) -> None:
-    """Runner provenance uses the skew manifest's composite generation identity."""
     from benchbox.core.results.loader import reconstruct_benchmark_results
     from benchbox.core.results.schema import build_result_payload
     from benchbox.core.runner.runner import _attach_datagen_version
@@ -334,7 +321,6 @@ def test_adapter_reused_database_flag() -> None:
 
 
 def test_attach_leaves_provenance_unset_without_dataset_identity(tmp_path: Path) -> None:
-    """Execute-only runs must not inherit the local manifest's stamp."""
     import json
 
     from benchbox.core.runner.runner import _attach_datagen_version
@@ -353,7 +339,6 @@ def test_attach_leaves_provenance_unset_without_dataset_identity(tmp_path: Path)
 
 
 def test_compare_flags_generation_mismatch() -> None:
-    """Comparisons across data generations warn instead of ranking silently."""
     from benchbox.core.results.exporter import ResultExporter
 
     def _data(version: int | None, hash_value: str | None) -> dict:
@@ -398,7 +383,6 @@ def test_compare_flags_generation_mismatch() -> None:
 
 
 def test_generation_warning_travels_with_saved_artifacts() -> None:
-    """Saved text/markdown/HTML comparisons must carry the generation caveat."""
     from benchbox.cli.commands.compare import (
         _format_html_comparison,
         _format_markdown_comparison,

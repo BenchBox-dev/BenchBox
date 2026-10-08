@@ -1,14 +1,6 @@
-"""Managed-path tests for EMRServerlessAdapter miss clusters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers the boto3-backed execution paths unreachable without AWS with
-mocked SDK clients: application lifecycle (create/wait/timeout), Glue
-database/table registration branches, the staging upload load path, the
-FAILED result envelope, and connection/close error handling.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -69,9 +61,7 @@ class TestApplicationLifecycle:
         client = MagicMock()
         client.get_application.return_value = {"application": {"state": "STARTING"}}
         adapter._emr_serverless_client = client
-        # The loop reads two clock bindings: start_time from the adapter
-        # module, the guard through elapsed_seconds in benchbox.utils.clock.
-        # Freeze both so the test polls once, then times out, deterministically.
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.time.sleep"),
             patch("benchbox.platforms.aws.emr_serverless_adapter.mono_time", return_value=0.0),
@@ -347,5 +337,3 @@ class TestImportFallback:
                 sys.modules.pop(k, None)
             sys.modules.update(saved)
             importlib.reload(mod)
-        # No assertion on the restored module: whether the real boto3 is
-        # importable depends on the ambient environment, not this code.

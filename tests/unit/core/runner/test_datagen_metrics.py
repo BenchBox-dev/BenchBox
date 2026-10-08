@@ -1,5 +1,3 @@
-"""Regression tests for data-generation metrics in result payloads."""
-
 from __future__ import annotations
 
 import json
@@ -39,8 +37,6 @@ def _mk_system_profile() -> SystemProfile:
 
 
 class _DatagenBenchmark(BaseBenchmark):
-    """Minimal benchmark used to exercise lifecycle data-only results."""
-
     def __init__(self, benchmark_id: str, output_dir: Path):
         super().__init__(scale_factor=0.01, output_dir=output_dir)
         self._name = benchmark_id.upper()
@@ -52,7 +48,7 @@ class _DatagenBenchmark(BaseBenchmark):
     def get_queries(self) -> dict[str, str]:
         return {}
 
-    def get_query(self, query_id, *, params=None) -> str:  # pragma: no cover - unsupported path
+    def get_query(self, query_id, *, params=None) -> str:  # pragma: no cover
         raise ValueError(f"Query {query_id} not found")
 
 

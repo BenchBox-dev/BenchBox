@@ -1,13 +1,6 @@
-"""
-Copyright 2026 Joe Harris / BenchBox Project
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Licensed under the MIT License. See LICENSE file in the project root for details.
-
-Result Display Utilities
-
-This module provides reusable result formatting and display functions
-for benchmark execution results and system information.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -18,12 +11,6 @@ from benchbox.utils.printing import emit
 
 
 def display_results(result_data: dict[str, Any], verbosity: int = 0) -> None:
-    """Display benchmark results in a standardized format.
-
-    Args:
-        result_data: Dictionary containing benchmark results
-        verbosity: Verbosity level (0=minimal, 1=detailed, 2=verbose)
-    """
     benchmark_name = result_data.get("benchmark", "unknown").upper()
     emit(f"Benchmark: {benchmark_name}")
     emit(f"Scale Factor: {result_data.get('scale_factor', 'unknown')}")
@@ -54,12 +41,6 @@ def display_results(result_data: dict[str, Any], verbosity: int = 0) -> None:
 
 
 def display_platform_list(platforms: dict[str, bool], get_requirements_func=None) -> None:
-    """Display list of available platforms.
-
-    Args:
-        platforms: Dictionary mapping platform names to availability status
-        get_requirements_func: Optional function to get platform requirements
-    """
     emit("Available platforms:")
     for platform, available in platforms.items():
         status = "✅ Available" if available else "❌ Not available"
@@ -70,29 +51,21 @@ def display_platform_list(platforms: dict[str, bool], get_requirements_func=None
 
 
 def display_benchmark_list(benchmark_classes: dict[str, Any]) -> None:
-    """Display list of available benchmarks.
+    from benchbox.core.benchmark_registry import get_benchmark_metadata
 
-    Args:
-        benchmark_classes: Dictionary mapping benchmark names to classes
-    """
     emit("Available benchmarks:")
     for benchmark_name in sorted(benchmark_classes.keys()):
         benchmark_class = benchmark_classes[benchmark_name]
-        description = (
-            getattr(benchmark_class, "__doc__", "").split("\n")[0]
-            if benchmark_class.__doc__
-            else "No description available"
-        )
+        metadata = get_benchmark_metadata(benchmark_name)
+        description = metadata.get("description") if metadata else None
+        if not isinstance(description, str) or not description:
+            description = getattr(benchmark_class, "description", None)
+        if not isinstance(description, str) or not description:
+            description = "No description available"
         emit(f"  {benchmark_name}: {description}")
 
 
 def display_configuration_summary(config: dict[str, Any], verbosity: int = 0) -> None:
-    """Display configuration summary.
-
-    Args:
-        config: Unified configuration dictionary
-        verbosity: Verbosity level
-    """
     if verbosity == 0:
         return
 
@@ -109,12 +82,6 @@ def display_configuration_summary(config: dict[str, Any], verbosity: int = 0) ->
 
 
 def display_verbose_config_feedback(config: dict[str, Any], platform: str) -> None:
-    """Display verbose configuration feedback after adapter creation.
-
-    Args:
-        config: Platform adapter configuration
-        platform: Platform name
-    """
     if platform in ["duckdb", "sqlite"]:
         db_path = config.get("database_path", "unknown")
         emit(f"Database file: {db_path}")
@@ -135,21 +102,10 @@ def display_verbose_config_feedback(config: dict[str, Any], platform: str) -> No
 
 
 def print_phase_header(phase: str) -> None:
-    """Print a formatted phase header.
-
-    Args:
-        phase: Phase name to display
-    """
     emit(f"\n--- Running Phase: {phase.title()} ---")
 
 
 def print_completion_message(phase: str, output_location: str | None = None) -> None:
-    """Print a completion message for a phase.
-
-    Args:
-        phase: Phase that completed
-        output_location: Optional output location to display
-    """
     if output_location:
         emit(f"✅ {phase.title()} phase complete in {output_location}")
     else:
@@ -224,7 +180,6 @@ def _print_resource_estimates(resources: dict) -> None:
 
 
 def print_dry_run_summary(result, output_dir, saved_files=None) -> None:
-    """Print a human-friendly summary of dry run artifacts and insights."""
     benchmark_info = result.benchmark_config or {}
     preview = result.query_preview or {}
     platform_info = result.platform_config or {}

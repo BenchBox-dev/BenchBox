@@ -1,16 +1,4 @@
-"""Behavioral tests for TransactionPrimitivesBenchmark.execute_dataframe_workload.
-
-These tests verify REAL execution behavior - delegation to the operations
-manager, non-zero timing on SUCCESS rows, correct result dict format, proper
-operation ordering, and table lifecycle management.
-
-This is distinct from test_dataframe_operations.py which tests the operations
-manager itself. Here we test the BRIDGE between the adapter dispatch and
-the manager, specifically guarding against the phantom-data anti-pattern
-from the prior hollow implementation.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -31,9 +19,6 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 _OP_TYPES_IN_PHASE_ORDER = [
     TransactionOperationType.ATOMIC_INSERT,
@@ -58,7 +43,6 @@ def _make_result(
     success: bool = True,
     error_message: str | None = None,
 ) -> DataFrameTransactionResult:
-    """Build a DataFrameTransactionResult with realistic timing."""
     now = time.time()
     return DataFrameTransactionResult(
         operation_type=op_type,
@@ -72,11 +56,9 @@ def _make_result(
 
 
 def _make_full_mock_manager(supports_all: bool = True) -> MagicMock:
-    """Return a mock DataFrameTransactionOperationsManager with realistic results."""
     manager = MagicMock()
     manager.supports_operation.return_value = supports_all
 
-    # Wire each execute_* to return a real DataFrameTransactionResult with duration > 0
     for op in TransactionOperationType:
         method_name = f"execute_{op.value}"
         getattr(manager, method_name).return_value = _make_result(op)
@@ -88,7 +70,6 @@ def _make_ctx_adapter_config(
     platform_name: str = "pyspark-df",
     options: dict[str, Any] | None = None,
 ) -> tuple[MagicMock, MagicMock, MagicMock]:
-    """Build ctx / adapter / benchmark_config mocks."""
     adapter = MagicMock()
     adapter.platform_name = platform_name
 
@@ -108,7 +89,6 @@ def _run_workload(
     options: dict[str, Any] | None = None,
     query_filter: set[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """Patch dependencies and call execute_dataframe_workload, returning result dicts."""
     ctx, adapter, benchmark_config = _make_ctx_adapter_config(platform_name, options)
 
     with (
@@ -124,14 +104,7 @@ def _run_workload(
         )
 
 
-# ---------------------------------------------------------------------------
-# Basic contract tests
-# ---------------------------------------------------------------------------
-
-
 class TestSkipDataframeDataLoading:
-    """Tests for the skip_dataframe_data_loading guardrail."""
-
     def test_returns_true(self):
         b = TransactionPrimitivesBenchmark()
         assert b.skip_dataframe_data_loading() is True
@@ -142,8 +115,6 @@ class TestSkipDataframeDataLoading:
 
 
 class TestResultDictFormat:
-    """Every result dict must match the adapter contract exactly."""
-
     REQUIRED_KEYS = {"query_id", "status", "execution_time_seconds", "rows_returned", "iteration", "run_type"}
 
     def test_all_required_keys_present(self):
@@ -154,13 +125,11 @@ class TestResultDictFormat:
             assert not missing, f"Result for {row.get('query_id')} missing keys: {missing}"
 
     def test_execution_time_is_float_seconds_not_ms(self):
-        """execution_time_seconds must be a float in seconds (not raw ms from the result)."""
         b = TransactionPrimitivesBenchmark()
         results = _run_workload(b, _make_full_mock_manager())
         for row in results:
             val = row["execution_time_seconds"]
             assert isinstance(val, float), f"execution_time_seconds is {type(val)} not float"
-            # 42ms → 0.042s; never 42.0 which would indicate ms pass-through
             assert val < 1.0 or row["status"] != "SUCCESS", (
                 f"execution_time_seconds={val} looks like ms not seconds (op={row['query_id']})"
             )
@@ -185,14 +154,7 @@ class TestResultDictFormat:
             assert row["iteration"] >= 1
 
 
-# ---------------------------------------------------------------------------
-# Anti-phantom-data guardrail: SUCCESS rows must have non-zero timing
-# ---------------------------------------------------------------------------
-
-
 class TestNoPhantomData:
-    """Guard against the prior defect: phantom SUCCESS rows with 0.0 timing."""
-
     def test_success_rows_have_positive_execution_time(self):
         b = TransactionPrimitivesBenchmark()
         results = _run_workload(b, _make_full_mock_manager())
@@ -208,16 +170,8 @@ class TestNoPhantomData:
         assert not phantom, f"Phantom data rows: {[r['query_id'] for r in phantom]}"
 
 
-# ---------------------------------------------------------------------------
-# Delegation tests: manager execute_* methods must be called
-# ---------------------------------------------------------------------------
-
-
 class TestManagerDelegation:
-    """execute_dataframe_workload must delegate to real execute_* calls."""
-
     def test_all_supported_operations_are_delegated(self):
-        """Each supported operation type must produce a manager.execute_*() call."""
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager(supports_all=True)
         results = _run_workload(b, manager)
@@ -245,7 +199,6 @@ class TestManagerDelegation:
         manager = _make_full_mock_manager()
         _run_workload(b, manager)
         manager.execute_rollback_to_version.assert_called()
-        # Must restore to version=0 (the initial baseline)
         _, kwargs = manager.execute_rollback_to_version.call_args
         assert kwargs.get("version") == 0
 
@@ -263,7 +216,6 @@ class TestManagerDelegation:
         _run_workload(b, manager)
         manager.execute_concurrent_write.assert_called()
         args, _ = manager.execute_concurrent_write.call_args
-        # Second arg is the list of DataFrames
         assert len(args) >= 2
         assert isinstance(args[1], list), "concurrent_write must receive a list of DataFrames"
         assert len(args[1]) == 3, "Expected 3 concurrent DataFrames"
@@ -277,7 +229,6 @@ class TestManagerDelegation:
         assert kwargs.get("resolution_strategy") == "retry"
 
     def test_atomic_delete_targets_staging_data_range(self):
-        """The delete condition must reference the staging data range (8000001-8000010)."""
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()
         _run_workload(b, manager)
@@ -290,26 +241,16 @@ class TestManagerDelegation:
         )
 
     def test_supports_operation_checked_for_each_op(self):
-        """supports_operation must be called for every operation before dispatch."""
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()
         _run_workload(b, manager)
-        # 12 operation types → supports_operation called at least 12 times
         assert manager.supports_operation.call_count >= len(TransactionOperationType)
 
 
-# ---------------------------------------------------------------------------
-# Unsupported operations → SKIPPED
-# ---------------------------------------------------------------------------
-
-
 class TestUnsupportedOperationsSkipped:
-    """Operations that supports_operation() returns False for must be SKIPPED."""
-
     def test_unsupported_operation_emits_skipped_status(self):
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()
-        # Reject all operations
         manager.supports_operation.return_value = False
 
         results = _run_workload(b, manager)
@@ -318,7 +259,6 @@ class TestUnsupportedOperationsSkipped:
             assert row["status"] == "SKIPPED", f"Expected SKIPPED, got {row['status']} for {row['query_id']}"
 
     def test_skipped_rows_have_zero_execution_time(self):
-        """SKIPPED is the only valid case for 0.0 execution_time_seconds."""
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()
         manager.supports_operation.return_value = False
@@ -339,7 +279,6 @@ class TestUnsupportedOperationsSkipped:
             assert method.call_count == 0, f"execute_{op.value} was called for an unsupported op"
 
     def test_partial_support_mixes_success_and_skipped(self):
-        """If only atomic writes are supported, others are SKIPPED."""
         write_ops = {
             TransactionOperationType.ATOMIC_INSERT,
             TransactionOperationType.ATOMIC_UPDATE,
@@ -361,14 +300,7 @@ class TestUnsupportedOperationsSkipped:
                 assert result_by_id[op.value]["status"] == "SKIPPED"
 
 
-# ---------------------------------------------------------------------------
-# query_filter
-# ---------------------------------------------------------------------------
-
-
 class TestQueryFilter:
-    """query_filter must limit which operations run."""
-
     def test_filter_limits_results_to_matching_ops(self):
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()
@@ -387,29 +319,19 @@ class TestQueryFilter:
         assert len(returned_ids) == 12
 
     def test_filtered_out_operations_not_executed(self):
-        """Operations excluded by query_filter must not be delegated to the manager."""
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()
 
         _run_workload(b, manager, query_filter={"ATOMIC_INSERT"})
 
-        # Every method except execute_atomic_insert should have 0 calls
         for op in TransactionOperationType:
             if op != TransactionOperationType.ATOMIC_INSERT:
                 method = getattr(manager, f"execute_{op.value}")
                 assert method.call_count == 0, f"execute_{op.value} was called despite being filtered out"
 
 
-# ---------------------------------------------------------------------------
-# Operation ordering
-# ---------------------------------------------------------------------------
-
-
 class TestOperationOrdering:
-    """Phase A (writes) must complete before Phase B (version ops)."""
-
     def test_phase_a_ops_appear_before_phase_b_in_results(self):
-        """Result ordering must reflect Phase A → Phase B → Phase C."""
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()
 
@@ -436,7 +358,6 @@ class TestOperationOrdering:
         )
 
     def test_rollback_to_version_runs_after_writes(self):
-        """rollback_to_version depends on versions created by atomic writes."""
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()
 
@@ -448,14 +369,7 @@ class TestOperationOrdering:
         assert insert_idx < rollback_idx, "ATOMIC_INSERT must appear before ROLLBACK_TO_VERSION"
 
 
-# ---------------------------------------------------------------------------
-# Table lifecycle
-# ---------------------------------------------------------------------------
-
-
 class TestTableLifecycle:
-    """setup and teardown of the Delta table must both be called."""
-
     def test_setup_transaction_table_called_once_per_iteration(self):
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()
@@ -476,7 +390,6 @@ class TestTableLifecycle:
         )
 
     def test_temp_dir_cleaned_up_on_completion(self):
-        """shutil.rmtree must be called on the temp dir even on success."""
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()
 
@@ -500,7 +413,6 @@ class TestTableLifecycle:
         assert "/tmp/benchbox_txn_test" in call_args[0][0]
 
     def test_temp_dir_cleaned_up_on_exception(self):
-        """shutil.rmtree must also be called when setup raises (finally block)."""
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()
         manager.supports_operation.side_effect = RuntimeError("simulated failure")
@@ -524,14 +436,7 @@ class TestTableLifecycle:
         mock_rmtree.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# Multi-iteration support
-# ---------------------------------------------------------------------------
-
-
 class TestIterations:
-    """power_iterations controls how many times operations are repeated."""
-
     def test_default_iteration_is_one(self):
         b = TransactionPrimitivesBenchmark()
         manager = _make_full_mock_manager()

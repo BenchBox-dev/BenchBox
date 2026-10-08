@@ -1,5 +1,3 @@
-"""Tests for release version updates."""
-
 from __future__ import annotations
 
 import importlib.util

@@ -50,7 +50,6 @@ BenchBox supports benchmarking DataFrame libraries using their native APIs inste
 **Quick Start:**
 
 ```bash
-# Run TPC-H on DataFrame platforms
 benchbox run --platform polars-df --benchmark tpch --scale 0.1
 benchbox run --platform pandas-df --benchmark tpch --scale 0.1
 benchbox run --platform pyspark-df --benchmark tpch --scale 0.1
@@ -71,18 +70,16 @@ uv add benchbox[cloud]
 Or install individual platforms:
 
 ```bash
-# ClickHouse Local (chDB, zero-config)
 uv add benchbox[clickhouse-local]
 
-# ClickHouse Server (self-hosted)
 uv add benchbox[clickhouse-server]
 
-# ClickHouse Cloud (managed)
 uv add benchbox[clickhouse-cloud]
 
-# Databricks SQL
 uv add benchbox[databricks]
 ```
+
+The extras install ClickHouse Local (chDB, zero-config), ClickHouse Server (self-hosted), ClickHouse Cloud (managed) and Databricks SQL.
 
 ### 2. Use the Platform Management CLI
 
@@ -136,10 +133,8 @@ benchbox platforms setup
 from benchbox.platforms import get_platform_adapter
 from benchbox import TPCH
 
-# Create benchmark
 benchmark = TPCH(scale_factor=0.1)
 
-# Test on multiple platforms
 platforms = ["duckdb", "clickhouse-local"]
 
 for platform_name in platforms:
@@ -167,12 +162,12 @@ for platform_name in platforms:
 ```python
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# In-memory database (default)
 adapter = DuckDBAdapter()
 
-# Persistent file database
 adapter = DuckDBAdapter(database_path="benchmark.duckdb")
 ```
+
+The first adapter uses an in-memory database (the default). The second uses a persistent file database.
 
 ---
 
@@ -186,20 +181,20 @@ adapter = DuckDBAdapter(database_path="benchmark.duckdb")
 ```python
 from benchbox.platforms.datafusion import DataFusionAdapter
 
-# In-memory analytics with Parquet (recommended)
 adapter = DataFusionAdapter(
     working_dir="./datafusion_working",
     memory_limit="16G",
-    data_format="parquet"  # or "csv" for lower memory
+    data_format="parquet"
 )
 
-# Memory-constrained configuration
 adapter = DataFusionAdapter(
     memory_limit="4G",
     data_format="csv",
     target_partitions=4
 )
 ```
+
+The first adapter is the recommended in-memory analytics setup with Parquet. Use `data_format="csv"` for lower memory. The second adapter is a memory-constrained configuration.
 
 ---
 
@@ -221,6 +216,8 @@ adapter = ClickHouseAdapter(
     password=""
 )
 ```
+
+Verify that the server is running, then check the credentials. The default user has an empty password.
 
 ---
 
@@ -320,12 +317,12 @@ adapter = SnowflakeAdapter(
 ```python
 from benchbox.platforms.sqlite import SQLiteAdapter
 
-# In-memory database
 adapter = SQLiteAdapter()
 
-# File-based database
 adapter = SQLiteAdapter(database_path="benchmark.db")
 ```
+
+The first adapter uses an in-memory database. The second uses a file-based database.
 
 ---
 
@@ -337,23 +334,19 @@ adapter = SQLiteAdapter(database_path="benchmark.db")
 ### Configuration
 
 ```bash
-# Install the Spark Connect-capable PySpark client
 uv add benchbox --extra lakesail
 
-# Install and start a local Sail server (separate terminal)
 uv add pysail
 python -m pysail spark server --port 50051
 
-# SQL mode
 benchbox run --platform lakesail --benchmark tpch --scale 1.0
 
-# DataFrame mode
 benchbox run --platform lakesail-df --benchmark tpch --scale 1.0
 
-# Distributed mode is selected through the Python adapter
-# (LakeSail registers no --platform-option keys)
 benchbox run --platform lakesail --benchmark tpch --scale 10.0
 ```
+
+In order, these commands install the Spark Connect-capable PySpark client, install the Sail server (`pysail`), start it in a separate terminal, run SQL mode, run DataFrame mode and run at a larger scale. Distributed mode is selected through the Python adapter, because LakeSail registers no `--platform-option` keys.
 
 See [LakeSail Platform Guide](lakesail.md) for the full configuration reference.
 
@@ -371,19 +364,18 @@ Local mode is **Linux-only** - the Gluten Velox bundle jar has no macOS or Windo
 ```
 
 ```bash
-# Install the Velox extra (pulls pyspark[connect]>=3.5.0)
 uv add benchbox --extra velox
 
-# Local mode - in-process SparkSession with the Gluten bundle jar loaded
 benchbox run --platform velox --benchmark tpch --scale 0.1 \
     --platform-option gluten_jar_path=/opt/gluten-velox-bundle-spark4.0_2.13-linux_amd64-1.6.0.jar \
     --platform-option offheap_size=8g
 
-# Remote mode - connect to a pre-started Gluten-enabled Spark Connect server
 benchbox run --platform velox --platform-option deployment=remote \
     --platform-option endpoint=sc://localhost:50051 \
     --benchmark tpch --scale 0.1
 ```
+
+The first command installs the Velox extra, which pulls `pyspark[connect]>=3.5.0`. The first `benchbox run` is local mode, an in-process SparkSession with the Gluten bundle jar loaded. The second is remote mode, which connects to a pre-started Gluten-enabled Spark Connect server.
 
 See [Velox Platform Guide](velox.md) and [Velox Jar Setup](velox_jar_setup.md) for Gluten bundle jar URLs, checksums, and the provided `benchbox-velox` Docker image.
 
@@ -402,42 +394,38 @@ See [Velox Platform Guide](velox.md) and [Velox Jar Setup](velox_jar_setup.md) f
 **DuckDB**:
 
 ```python
-# Check file permissions
 import os
 os.access("benchmark.duckdb", os.W_OK)
 
-# Use absolute path
 adapter = DuckDBAdapter(database_path="/full/path/to/benchmark.duckdb")
 ```
+
+Check that the file is writable, then use an absolute path.
 
 **ClickHouse**:
 
 ```python
-# Verify server is running
 import socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 result = sock.connect_ex(('localhost', 9000))
 if result == 0:
     print("ClickHouse is running")
 
-# Check credentials
 adapter = ClickHouseAdapter(
     host="localhost",
     port=9000,
     username="default",
-    password=""  # Empty password for default user
+    password=""
 )
 ```
 
 **Cloud Platforms (Databricks SQL, BigQuery, Snowflake, Redshift)**:
 
 ```python
-# Verify environment variables
 import os
 print(f"DATABRICKS_TOKEN: {'SET' if os.getenv('DATABRICKS_TOKEN') else 'NOT SET'}")
 print(f"DATABRICKS_HOST: {os.getenv('DATABRICKS_HOST')}")
 
-# Test connection before running benchmark
 from benchbox.platforms.databricks import DatabricksAdapter
 adapter = DatabricksAdapter()
 try:
@@ -447,33 +435,34 @@ except Exception as e:
     print(f"Connection failed: {e}")
 ```
 
+Verify the environment variables, then test the connection before running the benchmark.
+
 #### Authentication Issues
 
 **BigQuery**:
 
 ```bash
-# Set credentials
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account-key.json"
 
-# Or use application default credentials
 gcloud auth application-default login
 ```
+
+Set the credentials with the service account key, or use application default credentials with `gcloud auth application-default login`.
 
 **Databricks SQL**:
 
 ```bash
-# Personal access token
 export DATABRICKS_TOKEN="dapi..."
 export DATABRICKS_HOST="https://your-workspace.cloud.databricks.com"
 
-# Or use Databricks CLI config
 databricks configure --token
 ```
+
+Use a personal access token, or configure credentials through the Databricks CLI with `databricks configure --token`.
 
 **Snowflake**:
 
 ```python
-# Use key-pair authentication
 from benchbox.platforms.snowflake import SnowflakeAdapter
 adapter = SnowflakeAdapter(
     account="xy12345",
@@ -488,79 +477,80 @@ adapter = SnowflakeAdapter(
 **DuckDB**:
 
 ```python
-# Set memory limit
 adapter = DuckDBAdapter(memory_limit="4GB")
 
-# Use persistent database for large datasets
 adapter = DuckDBAdapter(
     database_path="large_dataset.duckdb",
     memory_limit="8GB"
 )
 ```
 
+Set a memory limit, and use a persistent database for large datasets.
+
 **ClickHouse**:
 
 ```python
-# Increase memory limits
 adapter = ClickHouseAdapter(
     host="localhost",
     settings={
-        "max_memory_usage": "10000000000",  # 10GB
+        "max_memory_usage": "10000000000",
         "max_bytes_before_external_sort": "5000000000"
     }
 )
 ```
 
+Increase the memory limits. The `max_memory_usage` value of 10000000000 is 10 GB.
+
 **Cloud Platforms**:
 
 ```python
-# BigQuery: Use query cache
 from benchbox.platforms.bigquery import BigQueryAdapter
 adapter = BigQueryAdapter(
-    maximum_bytes_billed=10000000000,  # 10GB limit
+    maximum_bytes_billed=10000000000,
     use_query_cache=True
 )
 
-# Snowflake: Increase warehouse size
 from benchbox.platforms.snowflake import SnowflakeAdapter
 adapter = SnowflakeAdapter(
-    warehouse="LARGE_WH",  # or X-LARGE, 2X-LARGE
+    warehouse="LARGE_WH",
     warehouse_size="LARGE"
 )
 ```
+
+BigQuery: use the query cache. `maximum_bytes_billed=10000000000` is a 10 GB limit.
+
+Snowflake: increase the warehouse size. Besides `LARGE_WH`, use `X-LARGE` or `2X-LARGE`.
 
 #### Slow Query Performance
 
 **General Debugging**:
 
 ```python
-# Enable verbose logging
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Run with profiling
 adapter = DuckDBAdapter(enable_profiling=True)
 
-# Test with smaller scale factor first
-benchmark = TPCH(scale_factor=0.01)  # Start small
+benchmark = TPCH(scale_factor=0.01)
 ```
+
+Enable verbose logging, run with profiling, and test with a smaller scale factor first (start small).
 
 **Platform-Specific Optimizations**:
 
 **DuckDB**:
 
 ```python
-# Increase thread count
 adapter = DuckDBAdapter(thread_limit=8)
 
-# Use persistent database
 adapter = DuckDBAdapter(database_path="cached.duckdb")
 ```
+
+Increase the thread count, and use a persistent database.
 
 **ClickHouse**:
 
 ```python
-# Enable query optimizations
 adapter = ClickHouseAdapter(
     host="localhost",
     settings={
@@ -574,30 +564,30 @@ adapter = ClickHouseAdapter(
 **Cloud Platforms**:
 
 ```python
-# Databricks SQL: Use larger cluster
 adapter = DatabricksAdapter(
     http_path="/sql/1.0/warehouses/large-warehouse"
 )
 
-# BigQuery: Use batch priority for cost savings
 adapter = BigQueryAdapter(
-    job_priority="BATCH",  # Slower but cheaper
+    job_priority="BATCH",
     use_legacy_sql=False
 )
 ```
+
+Databricks SQL: use a larger cluster.
+
+BigQuery: use batch priority, which is slower but cheaper.
 
 #### Data Loading Failures
 
 **Check file format**:
 
 ```python
-# DuckDB supports multiple formats
 conn.execute("""
     CREATE TABLE test AS
     SELECT * FROM read_parquet('data/*.parquet')
 """)
 
-# Or CSV with explicit schema
 conn.execute("""
     CREATE TABLE test AS
     SELECT * FROM read_csv('data/*.csv',
@@ -606,6 +596,8 @@ conn.execute("""
                           auto_detect=true)
 """)
 ```
+
+DuckDB reads multiple formats. The first query reads Parquet. The second reads CSV with an explicit delimiter and schema detection.
 
 **Verify file paths**:
 
@@ -627,18 +619,17 @@ else:
 **Issue**: Database file is locked
 
 ```python
-# Solution: Ensure no other process is using the file
-# Or use separate database files
 adapter1 = DuckDBAdapter(database_path="db1.duckdb")
 adapter2 = DuckDBAdapter(database_path="db2.duckdb")
 ```
+
+Ensure no other process is using the file, or use separate database files as shown.
 
 #### ClickHouse
 
 **Issue**: "Memory limit exceeded" errors
 
 ```python
-# Solution: Increase limits or enable external operations
 adapter = ClickHouseAdapter(
     settings={
         "max_memory_usage": "20000000000",
@@ -648,55 +639,58 @@ adapter = ClickHouseAdapter(
 )
 ```
 
+Increase the limits or enable external operations (spilling group-by and sort to disk).
+
 #### Databricks SQL
 
 **Issue**: "Cluster not found" or "Warehouse not available"
 
 ```python
-# Solution: Verify HTTP path
 from benchbox.platforms.databricks import DatabricksAdapter
 
-# List available warehouses
 adapter = DatabricksAdapter()
-warehouses = adapter.list_warehouses()  # If implemented
+warehouses = adapter.list_warehouses()
 print(f"Available warehouses: {warehouses}")
 
-# Use correct HTTP path format
 adapter = DatabricksAdapter(
     http_path="/sql/1.0/warehouses/abc123def456"
 )
 ```
+
+Verify the HTTP path: list the available warehouses (`list_warehouses` may not be implemented in every release), then use the correct HTTP path format.
 
 #### BigQuery
 
 **Issue**: "Exceeded quota" or billing errors
 
 ```python
-# Solution: Set cost controls
 from benchbox.platforms.bigquery import BigQueryAdapter
 
 adapter = BigQueryAdapter(
-    maximum_bytes_billed=5000000000,  # 5GB limit
-    job_priority="BATCH",  # Lower cost
-    use_query_cache=True,  # Reuse cached results
-    dry_run=True  # Test without execution first
+    maximum_bytes_billed=5000000000,
+    job_priority="BATCH",
+    use_query_cache=True,
+    dry_run=True
 )
 ```
+
+Set cost controls. The 5000000000 limit is 5 GB, `BATCH` priority lowers cost, `use_query_cache` reuses cached results, and `dry_run` tests without execution first.
 
 #### Snowflake
 
 **Issue**: Warehouse auto-suspended
 
 ```python
-# Solution: Configure auto-resume
 from benchbox.platforms.snowflake import SnowflakeAdapter
 
 adapter = SnowflakeAdapter(
     warehouse="COMPUTE_WH",
     auto_resume=True,
-    auto_suspend=300  # 5 minutes
+    auto_suspend=300
 )
 ```
+
+Configure auto-resume. `auto_suspend=300` suspends the warehouse after 5 minutes.
 
 ### Getting Help
 

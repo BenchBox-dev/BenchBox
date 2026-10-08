@@ -1,15 +1,6 @@
-#!/usr/bin/env python
-"""Unified Benchmark Validator for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This validation utility consolidates functionality from various
-validation scripts and provides a unified interface for validating all BenchBox
-benchmarks. It includes schema validation, query syntax validation, data generation
-verification, and comprehensive reporting.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import argparse
 import json
@@ -22,29 +13,26 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional
 
-# Include the project root directory to the path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 try:
-    import duckdb  # type: ignore[import-untyped]
+    import duckdb
 
     DUCKDB_AVAILABLE = True
 except ImportError:
     DUCKDB_AVAILABLE = False
-    duckdb = None  # type: ignore[assignment]
+    duckdb = None
 
 try:
-    import benchbox  # type: ignore[import-untyped]
+    import benchbox
 
     BENCHBOX_AVAILABLE = True
 except ImportError:
     BENCHBOX_AVAILABLE = False
-    benchbox = None  # type: ignore[assignment]
+    benchbox = None
 
 
 class ValidationResult(Enum):
-    """Enumeration for validation results."""
-
     PASS = "PASS"
     FAIL = "FAIL"
     SKIP = "SKIP"
@@ -53,8 +41,6 @@ class ValidationResult(Enum):
 
 @dataclass
 class ValidationError:
-    """Represents a validation error or warning."""
-
     category: str
     message: str
     severity: str = "error"
@@ -63,8 +49,6 @@ class ValidationError:
 
 @dataclass
 class BenchmarkValidationReport:
-    """Comprehensive validation report for a tpch_benchmark."""
-
     benchmark_name: str
     total_checks: int = 0
     passed_checks: int = 0
@@ -77,31 +61,16 @@ class BenchmarkValidationReport:
 
     @property
     def success_rate(self) -> float:
-        """Calculate success rate as percentage."""
         if self.total_checks == 0:
             return 0.0
         return (self.passed_checks / self.total_checks) * 100
 
     @property
     def is_valid(self) -> bool:
-        """Check if benchmark passed all critical validations."""
         return self.failed_checks == 0
 
 
 class BenchmarkValidator:
-    """
-    Unified validator for all BenchBox benchmarks.
-
-    This class provides validation capabilities including:
-    - Schema validation for all benchmarks
-    - Query syntax validation using DuckDB parser
-    - Data generation verification
-    - Cross-benchmark compatibility checks
-    - OLAP feature validation
-    - Result consistency verification
-    """
-
-    # Supported benchmarks
     SUPPORTED_BENCHMARKS = {
         "tpch": "TPCH",
         "tpcds": "TPCDS",
@@ -115,43 +84,30 @@ class BenchmarkValidator:
     }
 
     def __init__(self, verbose: bool = False, duckdb_connection: Optional[Any] = None):
-        """
-        Initialize the benchmark validator.
-
-        Args:
-            verbose: Enable verbose logging
-            duckdb_connection: Optional DuckDB connection for query validation
-        """
         self.verbose = verbose
         self.duckdb_connection = duckdb_connection
         self.logger = self._setup_logger()
 
-        # DuckDB connection if not provided
         if self.duckdb_connection is None and DUCKDB_AVAILABLE:
             self.duckdb_connection = duckdb.connect(":memory:")
             self._setup_duckdb_extensions()
 
     def _setup_logger(self) -> logging.Logger:
-        """Setup logger for validation output."""
         logger = logging.getLogger("BenchmarkValidator")
         logger.setLevel(logging.DEBUG if self.verbose else logging.INFO)
 
-        # console handler
         handler = logging.StreamHandler()
         handler.setLevel(logging.DEBUG if self.verbose else logging.INFO)
 
-        # formatter
         formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
         handler.setFormatter(formatter)
 
-        # Include handler to logger
         if not logger.handlers:
             logger.addHandler(handler)
 
         return logger
 
     def _setup_duckdb_extensions(self) -> None:
-        """Setup DuckDB extensions for validation."""
         if not DUCKDB_AVAILABLE or not self.duckdb_connection:
             return
 
@@ -171,7 +127,6 @@ class BenchmarkValidator:
                 self.duckdb_connection.execute(f"INSTALL {ext}")
                 self.duckdb_connection.execute(f"LOAD {ext}")
             except Exception:
-                # Extension may not be available, continue silently
                 pass
 
     def validate_benchmark(
@@ -184,28 +139,12 @@ class BenchmarkValidator:
         quick_check: bool = False,
         full_validation: bool = False,
     ) -> BenchmarkValidationReport:
-        """
-        Validate a specific tpch_benchmark.
-
-        Args:
-            benchmark_name: Name of the benchmark to validate
-            scale_factor: Scale factor for data generation validation
-            validate_data: Whether to validate data generation
-            validate_queries: Whether to validate query syntax
-            validate_schema: Whether to validate schema definition
-            quick_check: Run only fast validation checks
-            full_validation: Run validation including data generation
-
-        Returns:
-            BenchmarkValidationReport with validation results
-        """
         start_time = time.time()
         report = BenchmarkValidationReport(benchmark_name=benchmark_name)
 
         self.logger.info(f"Starting validation for {benchmark_name}")
 
         try:
-            # Load benchmark class
             benchmark_class = self._load_benchmark_class(benchmark_name)
             if benchmark_class is None:
                 report.errors.append(
@@ -217,10 +156,8 @@ class BenchmarkValidator:
                 report.failed_checks += 1
                 return report
 
-            # benchmark instance
             benchmark = benchmark_class(scale_factor=scale_factor)
 
-            # Run validation checks
             if validate_schema:
                 self._validate_benchmark_schema(benchmark, report)
 
@@ -230,14 +167,11 @@ class BenchmarkValidator:
             if validate_data and not quick_check:
                 self._validate_data_generation(benchmark, report, full_validation)
 
-            # Validate benchmark interface compliance
             self._validate_benchmark_interface(benchmark, report)
 
-            # OLAP features validation
             if full_validation and DUCKDB_AVAILABLE:
                 self._validate_olap_features(benchmark, report)
 
-            # Cross-benchmark compatibility
             if full_validation:
                 self._validate_cross_benchmark_compatibility(benchmark, report)
 
@@ -251,7 +185,6 @@ class BenchmarkValidator:
             )
             self.logger.error(f"Validation failed for {benchmark_name}: {e}")
 
-        # Calculate final metrics
         report.execution_time = time.time() - start_time
         report.total_checks = report.passed_checks + report.failed_checks + report.skipped_checks
 
@@ -259,7 +192,6 @@ class BenchmarkValidator:
         return report
 
     def _load_benchmark_class(self, benchmark_name: str) -> Optional[type]:
-        """Load benchmark class dynamically."""
         if not BENCHBOX_AVAILABLE:
             self.logger.error("BenchBox not available for import")
             return None
@@ -278,28 +210,23 @@ class BenchmarkValidator:
             return None
 
     def _validate_benchmark_schema(self, benchmark: Any, report: BenchmarkValidationReport) -> None:
-        """Validate benchmark schema definition."""
         self.logger.info("Validating benchmark schema...")
 
         try:
-            # Check if benchmark has schema method
             if not hasattr(benchmark, "get_schema"):
                 report.errors.append(ValidationError(category="schema", message="Benchmark missing get_schema method"))
                 report.failed_checks += 1
                 return
 
-            # schema
             schema = benchmark.get_schema()
             report.passed_checks += 1
 
-            # Validate schema structure
             if schema is None:
                 report.errors.append(ValidationError(category="schema", message="Schema is None"))
                 report.failed_checks += 1
                 return
 
             if isinstance(schema, dict):
-                # Validate dictionary schema
                 if len(schema) == 0:
                     report.errors.append(ValidationError(category="schema", message="Schema dictionary is empty"))
                     report.failed_checks += 1
@@ -307,7 +234,6 @@ class BenchmarkValidator:
                     report.passed_checks += 1
                     report.validation_details["schema_tables"] = len(schema)
 
-                    # Validate each table schema
                     for table_name, _table_schema in schema.items():
                         if not isinstance(table_name, str):
                             report.errors.append(
@@ -321,7 +247,6 @@ class BenchmarkValidator:
                             report.passed_checks += 1
 
             elif isinstance(schema, (list, str)):
-                # Basic validation for list/string schemas
                 if len(schema) == 0:
                     report.errors.append(ValidationError(category="schema", message="Schema is empty"))
                     report.failed_checks += 1
@@ -342,11 +267,9 @@ class BenchmarkValidator:
             report.failed_checks += 1
 
     def _validate_benchmark_queries(self, benchmark: Any, report: BenchmarkValidationReport, quick_check: bool) -> None:
-        """Validate benchmark queries."""
         self.logger.info("Validating benchmark queries...")
 
         try:
-            # Check if benchmark has query methods
             if not hasattr(benchmark, "get_queries"):
                 report.errors.append(
                     ValidationError(
@@ -357,11 +280,9 @@ class BenchmarkValidator:
                 report.failed_checks += 1
                 return
 
-            # queries
             queries = benchmark.get_queries()
             report.passed_checks += 1
 
-            # Validate queries structure
             if not isinstance(queries, dict):
                 report.errors.append(
                     ValidationError(
@@ -380,13 +301,11 @@ class BenchmarkValidator:
             report.passed_checks += 1
             report.validation_details["query_count"] = len(queries)
 
-            # Validate individual queries
             valid_queries = 0
             query_validation_limit = 5 if quick_check else len(queries)
 
             for query_id, query_sql in list(queries.items())[:query_validation_limit]:
                 try:
-                    # Basic SQL validation
                     if not isinstance(query_sql, str):
                         report.errors.append(
                             ValidationError(
@@ -402,10 +321,8 @@ class BenchmarkValidator:
                         report.failed_checks += 1
                         continue
 
-                    # DuckDB syntax validation
                     if DUCKDB_AVAILABLE and self.duckdb_connection:
                         try:
-                            # Use EXPLAIN to validate syntax without executing
                             self.duckdb_connection.execute(f"EXPLAIN {query_sql}")
                             valid_queries += 1
                             report.passed_checks += 1
@@ -419,7 +336,6 @@ class BenchmarkValidator:
                             )
                             report.failed_checks += 1
                     else:
-                        # Basic string validation without DuckDB
                         if any(keyword in query_sql.upper() for keyword in ["SELECT", "WITH", "CREATE"]):
                             valid_queries += 1
                             report.passed_checks += 1
@@ -443,7 +359,6 @@ class BenchmarkValidator:
 
             report.validation_details["valid_queries"] = valid_queries
 
-            # Test parameterized queries if available
             if hasattr(benchmark, "get_parameterized_query"):
                 self._validate_parameterized_queries(benchmark, report, quick_check)
 
@@ -454,16 +369,13 @@ class BenchmarkValidator:
     def _validate_parameterized_queries(
         self, benchmark: Any, report: BenchmarkValidationReport, quick_check: bool
     ) -> None:
-        """Validate parameterized queries."""
         self.logger.info("Validating parameterized queries...")
 
         try:
-            # Test a few parameterized queries
             test_queries = [1, 2, 3] if quick_check else [1, 2, 3, 4, 5]
 
             for query_id in test_queries:
                 try:
-                    # Try to get parameterized query with default parameters
                     param_query = benchmark.get_query(query_id, {})
 
                     if isinstance(param_query, str) and len(param_query.strip()) > 0:
@@ -478,7 +390,6 @@ class BenchmarkValidator:
                         report.failed_checks += 1
 
                 except Exception as e:
-                    # This might be expected if the query doesn't exist
                     if "not found" in str(e).lower() or "invalid" in str(e).lower():
                         report.skipped_checks += 1
                     else:
@@ -502,11 +413,9 @@ class BenchmarkValidator:
     def _validate_data_generation(
         self, benchmark: Any, report: BenchmarkValidationReport, full_validation: bool
     ) -> None:
-        """Validate data generation capabilities."""
         self.logger.info("Validating data generation...")
 
         try:
-            # Check if benchmark has data generation method
             if not hasattr(benchmark, "generate_data"):
                 report.errors.append(
                     ValidationError(
@@ -517,26 +426,22 @@ class BenchmarkValidator:
                 report.failed_checks += 1
                 return
 
-            # Test data generation in memory (if supported)
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_path = Path(temp_dir)
 
-                # new benchmark instance with temporary output directory
                 benchmark_class = type(benchmark)
                 test_benchmark = benchmark_class(
-                    scale_factor=0.01,  # Very small scale for testing
+                    scale_factor=0.01,
                     output_dir=temp_path,
                 )
 
                 try:
-                    # Generate data
                     start_time = time.time()
                     data_result = test_benchmark.generate_data()
                     generation_time = time.time() - start_time
 
                     report.validation_details["data_generation_time"] = generation_time
 
-                    # Validate data generation result
                     if data_result is None:
                         report.errors.append(
                             ValidationError(
@@ -547,7 +452,6 @@ class BenchmarkValidator:
                         report.failed_checks += 1
                         return
 
-                    # Check if data files were created
                     data_files = list(temp_path.glob("*.csv")) + list(temp_path.glob("*.parquet"))
                     if len(data_files) == 0:
                         report.errors.append(
@@ -561,7 +465,6 @@ class BenchmarkValidator:
                         report.passed_checks += 1
                         report.validation_details["generated_files"] = len(data_files)
 
-                        # Validate file contents if full validation
                         if full_validation:
                             self._validate_generated_data_files(data_files, report)
 
@@ -584,12 +487,10 @@ class BenchmarkValidator:
             report.failed_checks += 1
 
     def _validate_generated_data_files(self, data_files: list[Path], report: BenchmarkValidationReport) -> None:
-        """Validate generated data files."""
         self.logger.info("Validating generated data files...")
 
         for file_path in data_files:
             try:
-                # Check file size
                 if file_path.stat().st_size == 0:
                     report.errors.append(
                         ValidationError(
@@ -600,7 +501,6 @@ class BenchmarkValidator:
                     report.failed_checks += 1
                     continue
 
-                # Basic file content validation
                 if file_path.suffix.lower() == ".csv":
                     with open(file_path, encoding="utf-8") as f:
                         first_line = f.readline().strip()
@@ -616,8 +516,6 @@ class BenchmarkValidator:
                             report.passed_checks += 1
 
                 elif file_path.suffix.lower() == ".parquet":
-                    # Basic parquet validation would require pandas/pyarrow
-                    # For now, just check that file exists and has content
                     report.passed_checks += 1
 
             except Exception as e:
@@ -630,10 +528,8 @@ class BenchmarkValidator:
                 report.failed_checks += 1
 
     def _validate_benchmark_interface(self, benchmark: Any, report: BenchmarkValidationReport) -> None:
-        """Validate benchmark interface compliance."""
         self.logger.info("Validating benchmark interface...")
 
-        # Required attributes
         required_attributes = ["name", "scale_factor"]
         for attr in required_attributes:
             if hasattr(benchmark, attr):
@@ -647,7 +543,6 @@ class BenchmarkValidator:
                 )
                 report.failed_checks += 1
 
-        # Required methods
         required_methods = ["get_queries", "get_schema", "generate_data"]
         for method in required_methods:
             if hasattr(benchmark, method) and callable(getattr(benchmark, method)):
@@ -662,7 +557,6 @@ class BenchmarkValidator:
                 report.failed_checks += 1
 
     def _validate_olap_features(self, benchmark: Any, report: BenchmarkValidationReport) -> None:
-        """Validate OLAP features support."""
         self.logger.info("Validating OLAP features...")
 
         if not DUCKDB_AVAILABLE or not self.duckdb_connection:
@@ -676,7 +570,6 @@ class BenchmarkValidator:
             report.warnings += 1
             return
 
-        # Test basic OLAP features
         olap_features = {
             "window_functions": "SELECT ROW_NUMBER() OVER (ORDER BY 1) FROM (SELECT 1) t",
             "ctes": "WITH test AS (SELECT 1 as x) SELECT * FROM test",
@@ -699,15 +592,7 @@ class BenchmarkValidator:
                 report.warnings += 1
 
     def _validate_cross_benchmark_compatibility(self, benchmark: Any, report: BenchmarkValidationReport) -> None:
-        """Validate cross-benchmark compatibility."""
         self.logger.info("Validating cross-benchmark compatibility...")
-
-        # This is a placeholder for cross-benchmark validation
-        # Could include checks for:
-        # - Common schema patterns
-        # - Query result formats
-        # - Data export compatibility
-        # - etc.
 
         report.passed_checks += 1
         report.validation_details["cross_benchmark_compatibility"] = "basic"
@@ -719,18 +604,6 @@ class BenchmarkValidator:
         quick_check: bool = False,
         full_validation: bool = False,
     ) -> dict[str, BenchmarkValidationReport]:
-        """
-        Validate all specified benchmarks.
-
-        Args:
-            benchmarks: List of benchmark names to validate. If None, validates all supported benchmarks.
-            scale_factor: Scale factor for validation
-            quick_check: Run only fast validation checks
-            full_validation: Run validation
-
-        Returns:
-            Dictionary mapping benchmark names to validation reports
-        """
         if benchmarks is None:
             benchmarks = list(self.SUPPORTED_BENCHMARKS.keys())
 
@@ -752,7 +625,6 @@ class BenchmarkValidator:
                 results[benchmark_name] = report
 
             except Exception as e:
-                # error report for failed validation
                 error_report = BenchmarkValidationReport(benchmark_name=benchmark_name)
                 error_report.errors.append(
                     ValidationError(
@@ -769,16 +641,6 @@ class BenchmarkValidator:
         return results
 
     def generate_report(self, results: dict[str, BenchmarkValidationReport], output_format: str = "text") -> str:
-        """
-        Generate a validation report.
-
-        Args:
-            results: Dictionary of validation results
-            output_format: Output format ('text', 'json', 'markdown')
-
-        Returns:
-            Formatted report string
-        """
         if output_format == "json":
             return self._generate_json_report(results)
         elif output_format == "markdown":
@@ -787,14 +649,12 @@ class BenchmarkValidator:
             return self._generate_text_report(results)
 
     def _generate_text_report(self, results: dict[str, BenchmarkValidationReport]) -> str:
-        """Generate text format report."""
         lines = []
         lines.append("=" * 80)
         lines.append("BENCHBOX VALIDATION REPORT")
         lines.append("=" * 80)
         lines.append("")
 
-        # Summary
         total_benchmarks = len(results)
         valid_benchmarks = sum(1 for r in results.values() if r.is_valid)
         total_checks = sum(r.total_checks for r in results.values())
@@ -816,7 +676,6 @@ class BenchmarkValidator:
         )
         lines.append("")
 
-        # Individual benchmark results
         for benchmark_name, report in results.items():
             lines.append(f"BENCHMARK: {benchmark_name.upper()}")
             lines.append("-" * 40)
@@ -843,7 +702,6 @@ class BenchmarkValidator:
         return "\n".join(lines)
 
     def _generate_json_report(self, results: dict[str, BenchmarkValidationReport]) -> str:
-        """Generate JSON format report."""
         json_data = {
             "summary": {
                 "total_benchmarks": len(results),
@@ -881,12 +739,10 @@ class BenchmarkValidator:
         return json.dumps(json_data, indent=2)
 
     def _generate_markdown_report(self, results: dict[str, BenchmarkValidationReport]) -> str:
-        """Generate Markdown format report."""
         lines = []
         lines.append("# BenchBox Validation Report")
         lines.append("")
 
-        # Summary
         total_benchmarks = len(results)
         valid_benchmarks = sum(1 for r in results.values() if r.is_valid)
         total_checks = sum(r.total_checks for r in results.values())
@@ -909,7 +765,6 @@ class BenchmarkValidator:
         )
         lines.append("")
 
-        # Individual benchmark results
         lines.append("## Benchmark Results")
         lines.append("")
 
@@ -943,7 +798,6 @@ class BenchmarkValidator:
 
 
 def main():
-    """Main function for command-line interface."""
     parser = argparse.ArgumentParser(
         description="Unified Benchmark Validator for BenchBox",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1014,19 +868,16 @@ Examples:
 
     args = parser.parse_args()
 
-    # Determine which benchmarks to validate
     if args.benchmark == "all":
         benchmarks = list(BenchmarkValidator.SUPPORTED_BENCHMARKS.keys())
     else:
         benchmarks = [b.strip() for b in args.tpch_benchmark.split(",")]
 
-    # Set default validation options if none specified
     if not any([args.validate_data, args.validate_queries, args.validate_schema]):
         args.validate_data = True
         args.validate_queries = True
         args.validate_schema = True
 
-    # Check for required dependencies
     if not BENCHBOX_AVAILABLE:
         print("ERROR: BenchBox not available. Please install BenchBox.")
         sys.exit(1)
@@ -1034,10 +885,8 @@ Examples:
     if not DUCKDB_AVAILABLE:
         print("WARNING: DuckDB not available. Query syntax validation will be limited.")
 
-    # validator
     validator = BenchmarkValidator(verbose=args.verbose)
 
-    # Run validation
     print(f"Starting validation for benchmarks: {', '.join(benchmarks)}")
 
     results = validator.validate_all_benchmarks(
@@ -1047,10 +896,8 @@ Examples:
         full_validation=args.full_validation,
     )
 
-    # Generate report
     report = validator.generate_report(results, args.output_format)
 
-    # Output report
     if args.output_file:
         with open(args.output_file, "w", encoding="utf-8") as f:
             f.write(report)
@@ -1058,7 +905,6 @@ Examples:
     else:
         print(report)
 
-    # Exit with appropriate code
     all_valid = all(r.is_valid for r in results.values())
     sys.exit(0 if all_valid else 1)
 

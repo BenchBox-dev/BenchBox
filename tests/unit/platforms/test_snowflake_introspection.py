@@ -1,18 +1,6 @@
-"""Tests for the Snowflake clustering-key introspector and its corroboration.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Snowflake's tuning footprint lands AFTER load: the adapter applies the
-clustering key with ``ALTER TABLE ... CLUSTER BY``. Those statements were
-already captured (``apply_standard_unified_tuning`` wraps the connection in a
-recording connection) but had no corroboration rule, so they classified as
-``unverifiable`` and BLOCKED the upgrade -- a tuned Snowflake run could never
-reach ``applied_verified``, and its receipt said "no corroboration rule for this
-statement" instead of naming the key. TODO
-``snowflake-cluster-key-corroboration-20260730``.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -55,8 +43,6 @@ class _FakeCursor:
 
 
 class _FakeSnowflakeConnection:
-    """Cursor-style connection, as the real Snowflake driver exposes."""
-
     def __init__(self, rows, fail: bool = False):
         self._rows = rows
         self._fail = fail
@@ -77,12 +63,6 @@ def _clustered_ledger(table: str = "LINEITEM") -> AppliedTuningLedger:
 
 
 class TestParseClusteringKey:
-    """Snowflake reports ``LINEAR(A, B)``; this repo's own adapter compares
-    against a bare ``(A, B)``. Guessing wrong fails CLOSED -- every clustered
-    table would mismatch its own catalog fact and nothing would error -- so both
-    forms are accepted.
-    """
-
     @pytest.mark.parametrize(
         "raw",
         ["LINEAR(L_ORDERKEY, L_SHIPDATE)", "(L_ORDERKEY, L_SHIPDATE)", "L_ORDERKEY, L_SHIPDATE"],
@@ -95,7 +75,7 @@ class TestParseClusteringKey:
         assert parse_clustering_key(raw) == ()
 
     def test_preserves_key_order(self):
-        # Clustering key order is significant to Snowflake's pruning.
+
         assert parse_clustering_key("LINEAR(B, A)") == ("b", "a")
 
 
@@ -141,7 +121,7 @@ class TestSnowflakeIntrospector:
 
     def test_bounded_to_ledger_tables(self):
         conn = _FakeSnowflakeConnection(
-            [("LINEITEM", "LINEAR(A)"), ("ORDERS", "LINEAR(B)")],  # ORDERS not in ledger
+            [("LINEITEM", "LINEAR(A)"), ("ORDERS", "LINEAR(B)")],
         )
         state = SnowflakeTuningIntrospector().introspect(conn, _clustered_ledger())
         assert {obj.table for obj in state.objects} == {"LINEITEM"}
@@ -188,8 +168,7 @@ class TestSnowflakeCorroboration:
 
         verdicts = [(e.kind, e.verdict) for e in receipt.entries]
         assert (KIND_CLUSTER_KEY, "corroborated") in verdicts
-        # RESUME RECLUSTER is maintenance and the session SET is transient:
-        # noted, but neither earns nor blocks.
+
         assert receipt.summary["gate_relevant_total"] == 1
         assert receipt.corroborated is True
 
@@ -203,7 +182,7 @@ class TestSnowflakeCorroboration:
         assert receipt.corroborated is False
 
     def test_unclustered_table_blocks_verification(self):
-        # The clustering key never applied: CLUSTERING_KEY is NULL.
+
         ledger = _clustered_ledger()
         conn = _FakeSnowflakeConnection([("LINEITEM", None)])
         receipt = corroborate(ledger, SnowflakeTuningIntrospector().introspect(conn, ledger))
@@ -219,7 +198,7 @@ class TestSnowflakeCorroboration:
         assert receipt.corroborated is False
 
     def test_key_order_is_significant(self):
-        # Snowflake prunes on the leading column, so (A, B) != (B, A).
+
         ledger = _clustered_ledger()
         conn = _FakeSnowflakeConnection([("LINEITEM", "LINEAR(L_SHIPDATE, L_ORDERKEY)")])
         receipt = corroborate(ledger, SnowflakeTuningIntrospector().introspect(conn, ledger))

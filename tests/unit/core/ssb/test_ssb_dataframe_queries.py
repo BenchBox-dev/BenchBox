@@ -1,13 +1,4 @@
-"""Unit tests for SSB DataFrame query implementations.
-
-Tests for:
-- Query registry functionality
-- Query parameter system
-- Expression family implementations
-- Pandas family implementations
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -27,11 +18,11 @@ try:
 
     DEPS_AVAILABLE = True
 except ImportError:
-    pd = None  # type: ignore[assignment]
-    pl = None  # type: ignore[assignment]
-    PolarsDataFrameAdapter = None  # type: ignore[assignment]
-    UnifiedLazyFrame = Any  # type: ignore[assignment,misc]
-    UnifiedPandasFrame = Any  # type: ignore[assignment,misc]
+    pd = None
+    pl = None
+    PolarsDataFrameAdapter = None
+    UnifiedLazyFrame = Any
+    UnifiedPandasFrame = Any
     DEPS_AVAILABLE = False
 
 pytestmark = [
@@ -74,7 +65,6 @@ QUERY_RESULT_COLUMNS = {
 
 
 def _to_pandas_result(result: Any) -> pd.DataFrame:
-    """Normalize DataFrame-family query results to pandas for comparison."""
     if isinstance(result, UnifiedLazyFrame):
         result = result.collect()
     elif isinstance(result, UnifiedPandasFrame):
@@ -92,8 +82,6 @@ def _to_pandas_result(result: Any) -> pd.DataFrame:
 
 
 class _PandasContext:
-    """Minimal pandas-family context used by SSB pandas query implementations."""
-
     def __init__(self, tables: dict[str, pd.DataFrame]) -> None:
         self._tables = tables
 
@@ -102,29 +90,26 @@ class _PandasContext:
 
 
 class TestSSBQueryRegistry:
-    """Tests for SSB DataFrame query registry."""
-
     def test_registry_imports_successfully(self):
-        """Test that the registry can be imported."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         assert SSB_DATAFRAME_QUERIES is not None
 
     def test_registry_has_13_queries(self):
-        """Test that all 13 SSB queries are registered."""
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         queries = SSB_DATAFRAME_QUERIES.get_all_queries()
         assert len(queries) == 13
 
     def test_registry_benchmark_name(self):
-        """Test that registry has correct benchmark name."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         assert SSB_DATAFRAME_QUERIES.benchmark == "ssb"
 
     def test_get_query_by_id(self):
-        """Test getting a query by ID."""
+
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query("Q1.1")
@@ -132,14 +117,14 @@ class TestSSBQueryRegistry:
         assert query.query_id == "Q1.1"
 
     def test_get_nonexistent_query(self):
-        """Test getting a query that doesn't exist."""
+
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query("Q99")
         assert query is None
 
     def test_list_queries(self):
-        """Test listing all queries."""
+
         from benchbox.core.ssb.dataframe_queries import list_ssb_queries
 
         queries = list_ssb_queries()
@@ -147,14 +132,14 @@ class TestSSBQueryRegistry:
 
     @pytest.mark.parametrize("query_id", ALL_QUERY_IDS)
     def test_all_queries_registered(self, query_id):
-        """Test that each SSB query is registered."""
+
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query(query_id)
         assert query is not None, f"Query {query_id} should be registered"
 
     def test_queries_have_both_implementations(self):
-        """Test that all queries have both expression and pandas implementations."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         for query in SSB_DATAFRAME_QUERIES.get_all_queries():
@@ -162,7 +147,7 @@ class TestSSBQueryRegistry:
             assert query.pandas_impl is not None, f"{query.query_id} missing pandas impl"
 
     def test_all_queries_callable(self):
-        """Test that all query implementations are callable."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         for query in SSB_DATAFRAME_QUERIES.get_all_queries():
@@ -170,7 +155,7 @@ class TestSSBQueryRegistry:
             assert callable(query.pandas_impl), f"{query.query_id} pandas_impl not callable"
 
     def test_query_descriptions_not_empty(self):
-        """Test that all queries have descriptions."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         for query in SSB_DATAFRAME_QUERIES.get_all_queries():
@@ -178,7 +163,7 @@ class TestSSBQueryRegistry:
             assert len(query.description) > 10, f"{query.query_id} description too short"
 
     def test_query_names_not_empty(self):
-        """Test that all queries have names."""
+
         from benchbox.core.ssb.dataframe_queries import SSB_DATAFRAME_QUERIES
 
         for query in SSB_DATAFRAME_QUERIES.get_all_queries():
@@ -186,10 +171,7 @@ class TestSSBQueryRegistry:
 
 
 class TestSSBQueryCategories:
-    """Tests for SSB query category assignments."""
-
     def test_flight1_queries_have_filter_aggregate(self):
-        """Test that Flight 1 queries have FILTER and AGGREGATE categories."""
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         for qid in ["Q1.1", "Q1.2", "Q1.3"]:
@@ -198,7 +180,6 @@ class TestSSBQueryCategories:
             assert QueryCategory.AGGREGATE in query.categories, f"{qid} should have AGGREGATE"
 
     def test_flight2_queries_have_multi_join(self):
-        """Test that Flight 2 queries have MULTI_JOIN category."""
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         for qid in ["Q2.1", "Q2.2", "Q2.3"]:
@@ -206,7 +187,6 @@ class TestSSBQueryCategories:
             assert QueryCategory.MULTI_JOIN in query.categories, f"{qid} should have MULTI_JOIN"
 
     def test_flight3_queries_have_multi_join(self):
-        """Test that Flight 3 queries have MULTI_JOIN category."""
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         for qid in ["Q3.1", "Q3.2", "Q3.3", "Q3.4"]:
@@ -214,7 +194,6 @@ class TestSSBQueryCategories:
             assert QueryCategory.MULTI_JOIN in query.categories, f"{qid} should have MULTI_JOIN"
 
     def test_flight4_queries_have_multi_join(self):
-        """Test that Flight 4 queries have MULTI_JOIN category."""
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         for qid in ["Q4.1", "Q4.2", "Q4.3"]:
@@ -223,10 +202,7 @@ class TestSSBQueryCategories:
 
 
 class TestSSBParameters:
-    """Tests for SSB query parameters."""
-
     def test_get_parameters_q1_1(self):
-        """Test getting parameters for Q1.1."""
         from benchbox.core.ssb.dataframe_queries.parameters import get_parameters
 
         params = get_parameters("Q1.1")
@@ -237,7 +213,6 @@ class TestSSBParameters:
         assert params.get("quantity") == 25
 
     def test_get_parameters_q3_3(self):
-        """Test getting parameters for Q3.3 (city pairs)."""
         from benchbox.core.ssb.dataframe_queries.parameters import get_parameters
 
         params = get_parameters("Q3.3")
@@ -247,7 +222,6 @@ class TestSSBParameters:
         assert params.get("s_city2") == "UNITED KI5"
 
     def test_get_parameters_q4_2(self):
-        """Test getting parameters for Q4.2."""
         from benchbox.core.ssb.dataframe_queries.parameters import get_parameters
 
         params = get_parameters("Q4.2")
@@ -259,7 +233,7 @@ class TestSSBParameters:
 
     @pytest.mark.parametrize("query_id", ALL_QUERY_IDS)
     def test_all_queries_have_parameters(self, query_id):
-        """Test that all queries have parameter definitions."""
+
         from benchbox.core.ssb.dataframe_queries.parameters import get_parameters
 
         params = get_parameters(query_id)
@@ -267,7 +241,7 @@ class TestSSBParameters:
         assert len(params.params) > 0, f"{query_id} should have at least one parameter"
 
     def test_parameter_get_with_default(self):
-        """Test getting parameter with default value."""
+
         from benchbox.core.ssb.dataframe_queries.parameters import get_parameters
 
         params = get_parameters("Q1.1")
@@ -275,10 +249,8 @@ class TestSSBParameters:
 
 
 class TestSSBBenchmarkRegistry:
-    """Tests for SSB DataFrame support in benchmark registry."""
-
     def test_ssb_supports_dataframe(self):
-        """Test that SSB is marked as supporting DataFrames."""
+
         from benchbox.core.benchmark_registry import get_benchmark_metadata
 
         meta = get_benchmark_metadata("ssb")
@@ -288,8 +260,6 @@ class TestSSBBenchmarkRegistry:
 
 @pytest.mark.skipif(not DEPS_AVAILABLE, reason="pandas and/or polars not installed")
 class TestSSBQueryExecutionBehavior:
-    """Behavioral SSB query execution tests on small real datasets."""
-
     @pytest.fixture(scope="session")
     def ssb_tables(self):
         return {
@@ -367,7 +337,6 @@ class TestSSBQueryExecutionBehavior:
 
     @pytest.mark.parametrize("query_id", ALL_QUERY_IDS)
     def test_all_queries_return_expected_columns_and_match_families(self, query_id, expr_ctx, pandas_ctx):
-        """All SSB queries should execute with matching schemas and results."""
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query(query_id)
@@ -385,7 +354,6 @@ class TestSSBQueryExecutionBehavior:
         )
 
     def test_q1_1_known_revenue_value(self, expr_ctx, pandas_ctx):
-        """Q1.1 should aggregate the expected revenue from the matching 1993 row."""
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query("Q1.1")
@@ -398,7 +366,6 @@ class TestSSBQueryExecutionBehavior:
         )
 
     def test_q4_3_known_profit_breakdown(self, expr_ctx, pandas_ctx):
-        """Q4.3 should return the expected grouped profit breakdown."""
         from benchbox.core.ssb.dataframe_queries import get_ssb_query
 
         query = get_ssb_query("Q4.3")

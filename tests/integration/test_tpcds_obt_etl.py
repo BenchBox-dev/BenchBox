@@ -57,12 +57,12 @@ def create_table(conn: Any, table_name: str, overrides: dict[str, str] | None = 
 
 def test_transform_runs_end_to_end_with_duckdb(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     pytest.importorskip("duckdb")
-    import duckdb  # noqa: F401
+    import duckdb
 
     transformer = TPCDSOBTTransformer()
 
     def loader(conn: Any, _: Path, channels: list[str]) -> None:
-        # Shared dimensions
+
         for table in [
             DATE_DIM,
             TIME_DIM,
@@ -183,7 +183,7 @@ def test_transform_runs_end_to_end_with_duckdb(tmp_path: Path, monkeypatch: pyte
 
 
 def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verify all OBT queries execute without errors against generated data."""
+
     duckdb = pytest.importorskip("duckdb")
 
     from benchbox.core.tpcds_obt.queries import TPCDSOBTQueryManager
@@ -192,9 +192,8 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
     transformer = TPCDSOBTTransformer()
     conn = duckdb.connect(":memory:")
 
-    # Create synthetic dimension tables with proper values for query execution
     def create_dimensions(conn: Any) -> None:
-        # DATE_DIM with meaningful date attributes
+
         conn.execute("""
             CREATE TABLE date_dim AS SELECT
                 1 AS d_date_sk,
@@ -227,7 +226,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 'current' AS d_current_year
         """)
 
-        # TIME_DIM with time attributes (t_time is seconds since midnight)
         conn.execute("""
             CREATE TABLE time_dim AS SELECT
                 1 AS t_time_sk,
@@ -242,7 +240,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 'meal1' AS t_meal_time
         """)
 
-        # ITEM with product attributes
         conn.execute("""
             CREATE TABLE item AS SELECT
                 1 AS i_item_sk,
@@ -269,7 +266,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 'Test Product' AS i_product_name
         """)
 
-        # STORE with store attributes
         conn.execute("""
             CREATE TABLE store AS SELECT
                 1 AS s_store_sk,
@@ -303,7 +299,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 0.07 AS s_tax_percentage
         """)
 
-        # CUSTOMER with customer attributes
         conn.execute("""
             CREATE TABLE customer AS SELECT
                 1 AS c_customer_sk,
@@ -326,7 +321,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 1 AS c_last_review_date_sk
         """)
 
-        # CUSTOMER_DEMOGRAPHICS
         conn.execute("""
             CREATE TABLE customer_demographics AS SELECT
                 1 AS cd_demo_sk,
@@ -340,7 +334,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 1 AS cd_dep_college_count
         """)
 
-        # HOUSEHOLD_DEMOGRAPHICS
         conn.execute("""
             CREATE TABLE household_demographics AS SELECT
                 1 AS hd_demo_sk,
@@ -350,7 +343,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 1 AS hd_vehicle_count
         """)
 
-        # CUSTOMER_ADDRESS
         conn.execute("""
             CREATE TABLE customer_address AS SELECT
                 1 AS ca_address_sk,
@@ -368,7 +360,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 'residential' AS ca_location_type
         """)
 
-        # PROMOTION
         conn.execute("""
             CREATE TABLE promotion AS SELECT
                 1 AS p_promo_sk,
@@ -392,7 +383,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 'Y' AS p_discount_active
         """)
 
-        # REASON
         conn.execute("""
             CREATE TABLE reason AS SELECT
                 1 AS r_reason_sk,
@@ -400,7 +390,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 'Product Defective' AS r_reason_desc
         """)
 
-        # WEB_SITE
         conn.execute("""
             CREATE TABLE web_site AS SELECT
                 1 AS web_site_sk,
@@ -431,7 +420,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 0.08 AS web_tax_percentage
         """)
 
-        # WEB_PAGE
         conn.execute("""
             CREATE TABLE web_page AS SELECT
                 1 AS wp_web_page_sk,
@@ -450,7 +438,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 100 AS wp_max_ad_count
         """)
 
-        # SHIP_MODE
         conn.execute("""
             CREATE TABLE ship_mode AS SELECT
                 1 AS sm_ship_mode_sk,
@@ -461,7 +448,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 'Contract' AS sm_contract
         """)
 
-        # WAREHOUSE
         conn.execute("""
             CREATE TABLE warehouse AS SELECT
                 1 AS w_warehouse_sk,
@@ -480,7 +466,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 -6.0 AS w_gmt_offset
         """)
 
-        # CALL_CENTER
         conn.execute("""
             CREATE TABLE call_center AS SELECT
                 1 AS cc_call_center_sk,
@@ -516,7 +501,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 0.05 AS cc_tax_percentage
         """)
 
-        # CATALOG_PAGE
         conn.execute("""
             CREATE TABLE catalog_page AS SELECT
                 1 AS cp_catalog_page_sk,
@@ -530,7 +514,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 'page' AS cp_type
         """)
 
-        # INCOME_BAND
         conn.execute("""
             CREATE TABLE income_band AS SELECT
                 1 AS ib_income_band_sk,
@@ -538,9 +521,8 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 50000 AS ib_upper_bound
         """)
 
-    # Create sales and returns data
     def create_fact_tables(conn: Any) -> None:
-        # STORE_SALES with proper FK references
+
         conn.execute("""
             CREATE TABLE store_sales AS
             SELECT
@@ -569,7 +551,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 400.00 AS ss_net_profit
         """)
 
-        # STORE_RETURNS
         conn.execute("""
             CREATE TABLE store_returns AS
             SELECT
@@ -595,7 +576,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 30.00 AS sr_net_loss
         """)
 
-        # WEB_SALES
         conn.execute("""
             CREATE TABLE web_sales AS
             SELECT
@@ -635,7 +615,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 240.00 AS ws_net_profit
         """)
 
-        # WEB_RETURNS
         conn.execute("""
             CREATE TABLE web_returns AS
             SELECT
@@ -665,7 +644,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 15.00 AS wr_net_loss
         """)
 
-        # CATALOG_SALES
         conn.execute("""
             CREATE TABLE catalog_sales AS
             SELECT
@@ -705,7 +683,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 600.00 AS cs_net_profit
         """)
 
-        # CATALOG_RETURNS
         conn.execute("""
             CREATE TABLE catalog_returns AS
             SELECT
@@ -739,7 +716,6 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
                 25.00 AS cr_net_loss
         """)
 
-    # Patch the loader to use our synthetic tables
     def loader(conn_arg: Any, _: Path, channels: list[str]) -> None:
         create_dimensions(conn_arg)
         create_fact_tables(conn_arg)
@@ -753,14 +729,10 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
         output_format="parquet",
     )
 
-    # Load the OBT data back into DuckDB for query testing
     conn.execute(f"CREATE TABLE {OBT_TABLE_NAME} AS SELECT * FROM '{result['table']}'")
 
-    # Some OBT queries reference external dimension tables for complex joins
-    # Create those dimension tables so all queries can execute
     create_dimensions(conn)
 
-    # Get all queries and execute them
     manager = TPCDSOBTQueryManager()
     queries = manager.get_queries()
 
@@ -768,7 +740,7 @@ def test_all_queries_execute_against_obt_data(tmp_path: Path, monkeypatch: pytes
     for query_id, sql in queries.items():
         try:
             result_rows = conn.execute(sql).fetchall()
-            # Just verify it executed - we don't check exact results
+
             assert result_rows is not None
         except Exception as e:
             execution_errors[query_id] = str(e)

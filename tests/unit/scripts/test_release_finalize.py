@@ -1,5 +1,3 @@
-"""Release finalization must bind a tag to the verified PR merge commit."""
-
 from __future__ import annotations
 
 import subprocess
@@ -132,7 +130,7 @@ def release_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path,
 
 def test_tag_creation_push_resume_and_release_advance(release_repo: tuple[Path, Path, str]) -> None:
     primary, linked, merge = release_repo
-    git(linked, "tag", "v9.9.8", merge)  # interrupted after local tag creation
+    git(linked, "tag", "v9.9.8", merge)
     assert release_finalize.tag_merge_commit("9.9.8", merge) == "pushed"
     assert release_finalize.tag_merge_commit("9.9.9", merge) == "pushed"
     assert release_finalize.tag_merge_commit("9.9.9", merge) == "already pushed"

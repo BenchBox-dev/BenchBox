@@ -1,11 +1,3 @@
-/**
- * Shared corpus fixtures for the explorer's two index pages.
- *
- * The overview and the ranking table read the same three queries, so their
- * suites read the same rows: a divergence between them would be a property of
- * the fixtures rather than of the pages.
- */
-
 export const TIMING_ELIGIBLE = {
   has_display_timing: true,
   valid_query_count: 2,
@@ -16,10 +8,6 @@ export const TIMING_ELIGIBLE = {
   ranking_exclusion_reason: null,
 };
 
-/**
- * ResultRow fixtures - shape mirrors the explicit `bench.results` projection
- * used by `listResults()`.
- */
 export const RESULT_ROWS = [
   {
     result_id: "r1",
@@ -189,17 +177,11 @@ export const RESULT_ROWS = [
   },
 ];
 
-/** Per-platform summary rows - shape mirrors `bench.meta_leaderboard`. */
 export const META_LEADERBOARD_ROWS = [
   { platform_id: "duckdb", platform: "DuckDB", avg_rank: 1, n_cohorts: 2 },
   { platform_id: "sqlite", platform: "SQLite", avg_rank: 2, n_cohorts: 1 },
 ];
 
-/**
- * Per-variant cohort rows - shape mirrors `bench.cohort_metadata`.
- * The pivot in `getMetaLeaderboardData` reconstructs the nested MetaLeaderboard
- * from these rows.
- */
 export const COHORT_ROWS = [
   {
     cohort_key: "clickbench-sf0.1-power",

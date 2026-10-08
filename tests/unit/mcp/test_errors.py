@@ -1,9 +1,6 @@
-"""Tests for BenchBox MCP error handling module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -27,34 +24,27 @@ pytestmark = [
 
 
 class TestErrorCode:
-    """Tests for ErrorCode enum."""
-
     def test_validation_error_codes_exist(self):
-        """Test that validation error codes are defined."""
         assert ErrorCode.VALIDATION_ERROR.value == "VALIDATION_ERROR"
         assert ErrorCode.VALIDATION_UNKNOWN_PLATFORM.value == "VALIDATION_UNKNOWN_PLATFORM"
         assert ErrorCode.VALIDATION_UNKNOWN_BENCHMARK.value == "VALIDATION_UNKNOWN_BENCHMARK"
         assert ErrorCode.VALIDATION_INVALID_SCALE_FACTOR.value == "VALIDATION_INVALID_SCALE_FACTOR"
 
     def test_platform_error_codes_exist(self):
-        """Test that platform error codes are defined."""
         assert ErrorCode.PLATFORM_UNAVAILABLE.value == "PLATFORM_UNAVAILABLE"
         assert ErrorCode.PLATFORM_DEPENDENCIES_MISSING.value == "PLATFORM_DEPENDENCIES_MISSING"
         assert ErrorCode.PLATFORM_CREDENTIALS_MISSING.value == "PLATFORM_CREDENTIALS_MISSING"
 
     def test_benchmark_error_codes_exist(self):
-        """Test that benchmark error codes are defined."""
         assert ErrorCode.BENCHMARK_EXECUTION_FAILED.value == "BENCHMARK_EXECUTION_FAILED"
         assert ErrorCode.BENCHMARK_DATA_GENERATION_FAILED.value == "BENCHMARK_DATA_GENERATION_FAILED"
         assert ErrorCode.BENCHMARK_QUERY_FAILED.value == "BENCHMARK_QUERY_FAILED"
 
     def test_resource_error_codes_exist(self):
-        """Test that resource error codes are defined."""
         assert ErrorCode.RESOURCE_NOT_FOUND.value == "RESOURCE_NOT_FOUND"
         assert ErrorCode.RESOURCE_INVALID_FORMAT.value == "RESOURCE_INVALID_FORMAT"
 
     def test_internal_error_codes_exist(self):
-        """Test that internal error codes are defined."""
         assert ErrorCode.INTERNAL_ERROR.value == "INTERNAL_ERROR"
         assert ErrorCode.INTERNAL_TIMEOUT.value == "INTERNAL_TIMEOUT"
 
@@ -75,32 +65,26 @@ def test_scrub_secret_material_covers_quoted_colon_and_prose_values(text: str, e
 @pytest.mark.parametrize(
     ("text", "expected"),
     [
-        # Benign diagnostic prose: byte-identical preservation.
         ("secret sauce is the default", "secret sauce is the default"),
         ("token refresh required", "token refresh required"),
         ("password reset required", "password reset required"),
         ("password field is missing", "password field is missing"),
         ("password reset required for user", "password reset required for user"),
-        # Connector assignments: scrub the value.
         ("password is hunter2", "password is ****"),
         ("token was abc123", "token was ****"),
         ("secret equals REALVAL", "secret equals ****"),
         ("password set to xyz", "password set to ****"),
         ("token configured as ABCDEF", "token configured as ****"),
-        # Quoted / structured assignments.
         ("password: 'hunter2'", "password: ****"),
         ('token: "secret-value"', "token: ****"),
         ("password=REAL_SECRET", "password=****"),
-        # Bare prose with credential-like tokens (digits / underscores / ALLCAPS).
         ("driver returned password PROSE_SECRET", "driver returned password ****"),
         ("driver returned password hunter2", "driver returned password ****"),
-        # Mixed: preserve benign words, scrub real assignment values.
         ("secret sauce and password=REAL_SECRET", "secret sauce and password=****"),
         ("token refresh required; password=REAL_SECRET", "token refresh required; password=****"),
     ],
 )
 def test_scrub_secret_material_prose_precision(text: str, expected: str) -> None:
-    """Benign secret-related prose stays readable; assignment forms stay scrubbed."""
     assert scrub_secret_material(text) == expected
 
 
@@ -119,17 +103,13 @@ def test_scrub_secret_material_prose_precision(text: str, expected: str) -> None
     ],
 )
 def test_make_execution_error_prose_precision(text: str, expected_message: str) -> None:
-    """Structured execution errors preserve diagnostics and scrub assignments."""
     result = make_execution_error(text)
     assert result["message"] == expected_message
     assert "REAL_SECRET" not in result["message"]
 
 
 class TestErrorCategory:
-    """Tests for ErrorCategory enum."""
-
     def test_categories_defined(self):
-        """Test that all categories are defined."""
         assert ErrorCategory.CLIENT.value == "client"
         assert ErrorCategory.PLATFORM.value == "platform"
         assert ErrorCategory.EXECUTION.value == "execution"
@@ -137,35 +117,26 @@ class TestErrorCategory:
 
 
 class TestErrorCategories:
-    """Tests for error code to category mapping."""
-
     def test_validation_errors_are_client_category(self):
-        """Test that validation errors map to client category."""
         assert ERROR_CATEGORIES[ErrorCode.VALIDATION_ERROR] == ErrorCategory.CLIENT
         assert ERROR_CATEGORIES[ErrorCode.VALIDATION_UNKNOWN_PLATFORM] == ErrorCategory.CLIENT
         assert ERROR_CATEGORIES[ErrorCode.VALIDATION_UNKNOWN_BENCHMARK] == ErrorCategory.CLIENT
 
     def test_platform_errors_are_platform_category(self):
-        """Test that platform errors map to platform category."""
         assert ERROR_CATEGORIES[ErrorCode.PLATFORM_UNAVAILABLE] == ErrorCategory.PLATFORM
         assert ERROR_CATEGORIES[ErrorCode.PLATFORM_DEPENDENCIES_MISSING] == ErrorCategory.PLATFORM
 
     def test_benchmark_errors_are_execution_category(self):
-        """Test that benchmark errors map to execution category."""
         assert ERROR_CATEGORIES[ErrorCode.BENCHMARK_EXECUTION_FAILED] == ErrorCategory.EXECUTION
         assert ERROR_CATEGORIES[ErrorCode.BENCHMARK_QUERY_FAILED] == ErrorCategory.EXECUTION
 
     def test_internal_errors_are_server_category(self):
-        """Test that internal errors map to server category."""
         assert ERROR_CATEGORIES[ErrorCode.INTERNAL_ERROR] == ErrorCategory.SERVER
         assert ERROR_CATEGORIES[ErrorCode.INTERNAL_TIMEOUT] == ErrorCategory.SERVER
 
 
 class TestMCPError:
-    """Tests for MCPError dataclass."""
-
     def test_basic_error_creation(self):
-        """Test creating a basic MCPError."""
         error = MCPError(
             code=ErrorCode.VALIDATION_ERROR,
             message="Test error message",
@@ -177,7 +148,6 @@ class TestMCPError:
         assert error.retry_hint is False
 
     def test_error_with_all_fields(self):
-        """Test creating MCPError with all fields."""
         error = MCPError(
             code=ErrorCode.PLATFORM_CONNECTION_FAILED,
             message="Connection failed",
@@ -191,7 +161,6 @@ class TestMCPError:
         assert error.retry_hint is True
 
     def test_category_property(self):
-        """Test that category property returns correct category."""
         error = MCPError(code=ErrorCode.VALIDATION_ERROR, message="test")
         assert error.category == ErrorCategory.CLIENT
 
@@ -199,7 +168,6 @@ class TestMCPError:
         assert error.category == ErrorCategory.SERVER
 
     def test_to_dict_basic(self):
-        """Test converting MCPError to dict."""
         error = MCPError(
             code=ErrorCode.VALIDATION_UNKNOWN_PLATFORM,
             message="Unknown platform: xyz",
@@ -215,7 +183,6 @@ class TestMCPError:
         assert "retry_hint" not in result
 
     def test_to_dict_with_all_fields(self):
-        """Test converting MCPError with all fields to dict."""
         error = MCPError(
             code=ErrorCode.INTERNAL_TIMEOUT,
             message="Operation timed out",
@@ -235,10 +202,7 @@ class TestMCPError:
 
 
 class TestMakeError:
-    """Tests for make_error helper function."""
-
     def test_basic_error(self):
-        """Test creating a basic error."""
         result = make_error(
             ErrorCode.VALIDATION_ERROR,
             "Invalid input",
@@ -248,7 +212,6 @@ class TestMakeError:
         assert result["message"] == "Invalid input"
 
     def test_error_with_details(self):
-        """Test creating error with details."""
         result = make_error(
             ErrorCode.RESOURCE_NOT_FOUND,
             "File not found",
@@ -257,7 +220,6 @@ class TestMakeError:
         assert result["details"] == {"file": "test.json"}
 
     def test_error_with_suggestion(self):
-        """Test creating error with suggestion."""
         result = make_error(
             ErrorCode.PLATFORM_UNAVAILABLE,
             "DuckDB not available",
@@ -266,7 +228,6 @@ class TestMakeError:
         assert result["suggestion"] == "Install with: pip install duckdb"
 
     def test_error_with_retry_hint(self):
-        """Test creating error with retry hint."""
         result = make_error(
             ErrorCode.INTERNAL_TIMEOUT,
             "Timeout",
@@ -276,10 +237,7 @@ class TestMakeError:
 
 
 class TestMakeValidationError:
-    """Tests for make_validation_error helper function."""
-
     def test_basic_validation_error(self):
-        """Test creating a basic validation error."""
         result = make_validation_error("Invalid scale factor")
         assert result["error"] is True
         assert result["error_code"] == "VALIDATION_ERROR"
@@ -287,7 +245,6 @@ class TestMakeValidationError:
         assert result["message"] == "Invalid scale factor"
 
     def test_validation_error_with_details(self):
-        """Test validation error with details and suggestion."""
         result = make_validation_error(
             "Scale factor out of range",
             details={"value": -1, "valid_range": "0.001 to 10000"},
@@ -298,10 +255,7 @@ class TestMakeValidationError:
 
 
 class TestMakeNotFoundError:
-    """Tests for make_not_found_error helper function."""
-
     def test_basic_not_found_error(self):
-        """Test creating a basic not found error."""
         result = make_not_found_error("benchmark", "xyz")
         assert result["error"] is True
         assert result["error_code"] == "RESOURCE_NOT_FOUND"
@@ -310,7 +264,6 @@ class TestMakeNotFoundError:
         assert result["details"]["requested"] == "xyz"
 
     def test_not_found_error_with_available(self):
-        """Test not found error with available options."""
         result = make_not_found_error(
             "platform",
             "invalid",
@@ -321,10 +274,7 @@ class TestMakeNotFoundError:
 
 
 class TestMakePlatformError:
-    """Tests for make_platform_error helper function."""
-
     def test_basic_platform_error(self):
-        """Test creating a basic platform error."""
         result = make_platform_error(
             ErrorCode.PLATFORM_UNAVAILABLE,
             "snowflake",
@@ -335,7 +285,6 @@ class TestMakePlatformError:
         assert result["details"]["platform"] == "snowflake"
 
     def test_platform_error_with_installation(self):
-        """Test platform error with installation command."""
         result = make_platform_error(
             ErrorCode.PLATFORM_DEPENDENCIES_MISSING,
             "clickhouse",
@@ -346,9 +295,6 @@ class TestMakePlatformError:
 
 
 class TestExceptionSecretScrubbing:
-    """Exception text is a credential materialisation channel (a DSN or SQL
-    text echoed back by a driver); the response must scrub it."""
-
     def test_secret_assignment_is_scrubbed(self):
         result = make_execution_error("failed", exception=Exception("motherduck_token=SENT-123 during ATTACH"))
         msg = result["details"]["exception_message"]
@@ -425,7 +371,6 @@ class TestExceptionSecretScrubbing:
         ],
     )
     def test_credential_assignment_vocabulary_is_scrubbed(self, text: str, sentinel: str) -> None:
-        """Assignment forms for the remaining credential vocabulary must not leak."""
         result = make_execution_error(text, exception=Exception(text))
         blob = str(result)
         assert sentinel not in blob
@@ -435,7 +380,6 @@ class TestExceptionSecretScrubbing:
         assert "****" in result["details"]["exception_message"]
 
     def test_pat_does_not_match_path_assignment(self) -> None:
-        """Exact-key ``pat`` must not expand into non-secret ``path``."""
         text = "path=/var/tmp/data failed to open"
         result = make_execution_error(text, exception=Exception(text))
         assert result["details"]["exception_message"] == text
@@ -458,7 +402,6 @@ class TestExceptionSecretScrubbing:
         ],
     )
     def test_sas_querystring_assignment_masks_ampersand_segments(self, text: str) -> None:
-        """SAS values are query-string shaped; ``&sig=...`` must not survive."""
         result = make_execution_error(text, exception=Exception(text))
         blob = str(result)
         assert "SIG_GATE" not in blob
@@ -467,11 +410,6 @@ class TestExceptionSecretScrubbing:
         assert "****" in result["details"]["exception_message"]
 
     def test_unquoted_multiline_private_key_pem_is_scrubbed(self) -> None:
-        """Unquoted PEM must not leave base64 body lines in MCP error egress.
-
-        PEM armor labels are assembled at runtime so static secret scanners do
-        not treat the test fixture as a real key material sample.
-        """
         pem_label = " ".join(("RSA", "PRIVATE", "KEY"))
         begin = f"-----BEGIN {pem_label}-----"
         end = f"-----END {pem_label}-----"
@@ -484,7 +422,6 @@ class TestExceptionSecretScrubbing:
         assert begin not in blob
         assert "private_key=****" in result["message"]
         assert "private_key=****" in result["details"]["exception_message"]
-        # Trailing diagnostic prose after the PEM block remains.
         assert "after" in result["message"]
 
     def test_unquoted_multiline_private_key_base64_continuation_is_scrubbed(self) -> None:
@@ -497,7 +434,6 @@ class TestExceptionSecretScrubbing:
         assert "private_key=****" in result["details"]["exception_message"]
 
     def test_truncated_pem_without_end_is_scrubbed(self) -> None:
-        """BEGIN without END must still mask following base64 body lines."""
         pem_label = " ".join(("RSA", "PRIVATE", "KEY"))
         begin = f"-----BEGIN {pem_label}-----"
         body = "MIIE_GATE_BLOB"
@@ -510,7 +446,6 @@ class TestExceptionSecretScrubbing:
         assert "private_key=****" in result["details"]["exception_message"]
 
     def test_crlf_private_key_base64_continuation_is_scrubbed(self) -> None:
-        """Windows-style CRLF continuations must not leave base64 lines."""
         body = "MIIE_GATE_BLOB"
         text = f"private_key={body}\r\ncontinuedBase64Line\r\nnot_part_of_key=1"
         result = make_execution_error(text, exception=Exception(text))
@@ -521,17 +456,13 @@ class TestExceptionSecretScrubbing:
 
 
 class TestMakeExecutionError:
-    """Tests for make_execution_error helper function."""
-
     def test_basic_execution_error(self):
-        """Test creating a basic execution error."""
         result = make_execution_error("Benchmark failed")
         assert result["error"] is True
         assert result["error_code"] == "BENCHMARK_EXECUTION_FAILED"
         assert result["message"] == "Benchmark failed"
 
     def test_execution_error_with_execution_id(self):
-        """Test execution error with execution ID."""
         result = make_execution_error(
             "Query timeout",
             execution_id="mcp_abc123",
@@ -539,7 +470,6 @@ class TestMakeExecutionError:
         assert result["details"]["execution_id"] == "mcp_abc123"
 
     def test_execution_error_with_exception(self):
-        """Test execution error with exception details."""
         exc = ValueError("Invalid configuration")
         result = make_execution_error(
             "Configuration error",
@@ -549,7 +479,6 @@ class TestMakeExecutionError:
         assert result["details"]["exception_message"] == "Invalid configuration"
 
     def test_execution_error_with_retry_hint(self):
-        """Test execution error with retry hint."""
         result = make_execution_error(
             "Transient failure",
             retry_hint=True,

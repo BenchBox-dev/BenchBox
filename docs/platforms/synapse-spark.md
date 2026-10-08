@@ -17,11 +17,11 @@ Azure Synapse Analytics is Microsoft's enterprise analytics platform providing i
 
 ## Installation
 
-```bash
-# Install with Synapse Spark support
-uv add benchbox --extra synapse-spark
+This installs Synapse Spark support and the `azure-identity`, `azure-storage-file-datalake` and `requests`
+dependencies.
 
-# Dependencies installed: azure-identity, azure-storage-file-datalake, requests
+```bash
+uv add benchbox --extra synapse-spark
 ```
 
 ## Prerequisites
@@ -38,29 +38,30 @@ uv add benchbox --extra synapse-spark
 
 ### Environment Variables
 
+`SYNAPSE_WORKSPACE_NAME`, `SYNAPSE_SPARK_POOL`, `SYNAPSE_STORAGE_ACCOUNT` and `SYNAPSE_STORAGE_CONTAINER` are
+required. `AZURE_TENANT_ID` and `SYNAPSE_STORAGE_PATH` are optional.
+
 ```bash
-# Required
 export SYNAPSE_WORKSPACE_NAME=my-synapse-workspace
 export SYNAPSE_SPARK_POOL=sparkpool1
 export SYNAPSE_STORAGE_ACCOUNT=mystorageaccount
 export SYNAPSE_STORAGE_CONTAINER=benchbox
 
-# Optional
 export AZURE_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 export SYNAPSE_STORAGE_PATH=data/benchbox
 ```
 
 ### CLI Usage
 
+The commands cover basic usage, usage with a storage path, and a dry run that previews queries.
+
 ```bash
-# Basic usage
 benchbox run --platform synapse-spark --benchmark tpch --scale 1.0 \
   --platform-option workspace_name=my-synapse-workspace \
   --platform-option spark_pool_name=sparkpool1 \
   --platform-option storage_account=mystorageaccount \
   --platform-option storage_container=benchbox
 
-# With storage path
 benchbox run --platform synapse-spark --benchmark tpch --scale 1.0 \
   --platform-option workspace_name=my-synapse-workspace \
   --platform-option spark_pool_name=sparkpool1 \
@@ -68,7 +69,6 @@ benchbox run --platform synapse-spark --benchmark tpch --scale 1.0 \
   --platform-option storage_container=benchbox \
   --platform-option storage_path=data/benchbox
 
-# Dry-run to preview queries
 benchbox run --platform synapse-spark --benchmark tpch --dry-run ./preview \
   --platform-option workspace_name=my-synapse-workspace \
   --platform-option spark_pool_name=sparkpool1 \
@@ -91,34 +91,31 @@ benchbox run --platform synapse-spark --benchmark tpch --dry-run ./preview \
 
 ## Python API
 
+The example initializes the adapter with a workspace and storage (`tenant_id` is optional), verifies the connection,
+creates the schema, loads data to ADLS and creates tables, executes a query via Livy, and cleans up the session.
+
 ```python
 from benchbox.platforms.azure import SynapseSparkAdapter
 
-# Initialize with workspace and storage
 adapter = SynapseSparkAdapter(
     workspace_name="my-synapse-workspace",
     spark_pool_name="sparkpool1",
     storage_account="mystorageaccount",
     storage_container="benchbox",
-    tenant_id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",  # Optional
+    tenant_id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
 )
 
-# Verify connection
 adapter.create_connection()
 
-# Create schema
 adapter.create_schema("tpch_benchmark")
 
-# Load data to ADLS and create tables
 adapter.load_data(
     tables=["lineitem", "orders", "customer"],
     source_dir="/path/to/tpch/data",
 )
 
-# Execute query via Livy
 result = adapter.execute_query("SELECT COUNT(*) FROM lineitem")
 
-# Clean up session
 adapter.close()
 ```
 

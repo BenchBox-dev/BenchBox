@@ -1,12 +1,10 @@
-"""Schema normalization helpers for DataFrame loading paths."""
-
 from __future__ import annotations
 
 from typing import Any
 
 
 def iter_schema_columns(table_schema: Any) -> list[Any]:
-    """Return a table schema's columns across BenchBox schema shapes."""
+
     if isinstance(table_schema, dict):
         columns = table_schema.get("columns", [])
         if isinstance(columns, dict):
@@ -26,12 +24,6 @@ def iter_schema_columns(table_schema: Any) -> list[Any]:
     return list(columns)
 
 
-# Column constraint keywords that terminate the SQL type in a DDL column
-# definition. The type ends at the first of these tokens (case-insensitive).
-# ``WITH``/``WITHOUT``/``PRECISION``/``VARYING``/``ZONE``/``TIME`` are
-# intentionally absent: they are continuations of multi-word types
-# (``TIMESTAMP WITH TIME ZONE``, ``DOUBLE PRECISION``, ``CHARACTER VARYING``),
-# handled by the _TYPE_CONTINUATIONS table in _consume_type below.
 _CONSTRAINT_KEYWORDS = frozenset(
     {
         "NOT",
@@ -53,9 +45,7 @@ _CONSTRAINT_KEYWORDS = frozenset(
     }
 )
 
-# Tokens that may legitimately follow a base type word as part of a multi-word
-# SQL type, keyed by the (uppercased) preceding token. Used to keep consuming
-# type words past a space without crossing into a constraint.
+
 _TYPE_CONTINUATIONS = {
     "DOUBLE": {"PRECISION"},
     "CHARACTER": {"VARYING"},
@@ -63,26 +53,16 @@ _TYPE_CONTINUATIONS = {
     "BIT": {"VARYING"},
     "TIMESTAMP": {"WITH", "WITHOUT"},
     "TIME": {"WITH", "WITHOUT", "ZONE"},
-    # "<TIMESTAMP|TIME> WITH[OUT]" -> "TIME ZONE"
     "WITH": {"TIME"},
     "WITHOUT": {"TIME"},
 }
 
-# Pairs of (opening, closing) quote characters for quoted identifiers.
+
 _QUOTE_PAIRS = {'"': '"', "`": "`", "[": "]"}
 
 
 def _read_quoted_identifier(text: str, opener: str, closer: str) -> tuple[str, int, bool]:
-    """Read a delimited identifier whose first char (``text[0]``) is ``opener``.
 
-    Returns ``(identifier, pos_after, terminated)`` where ``identifier`` is the
-    UNQUOTED logical name (outer delimiters removed) and ``pos_after`` is the index
-    just past the closing delimiter. A doubled closing delimiter is the standard
-    SQL escape for a literal delimiter inside the name (``"a""b"`` -> ``a"b``,
-    ``[a]]b]`` -> ``a]b``). ``terminated`` is False for an unterminated quote, in
-    which case ``identifier`` is the remainder after the opener and ``pos_after``
-    is ``len(text)``.
-    """
     i = 1
     n = len(text)
     chars: list[str] = []
@@ -90,7 +70,6 @@ def _read_quoted_identifier(text: str, opener: str, closer: str) -> tuple[str, i
         ch = text[i]
         if ch == closer:
             if i + 1 < n and text[i + 1] == closer:
-                # Doubled delimiter: an escaped literal delimiter inside the name.
                 chars.append(closer)
                 i += 2
                 continue
@@ -101,23 +80,7 @@ def _read_quoted_identifier(text: str, opener: str, closer: str) -> tuple[str, i
 
 
 def _split_ddl_column(column: str) -> tuple[str | None, str | None]:
-    """Split a DDL column definition into ``(name, type)``.
 
-    Parses ``"name TYPE [constraints...]"`` with awareness of:
-
-    - quoted/bracketed identifiers that may contain spaces
-      (``"odd name" INTEGER``, ``[odd name] INT``, ```odd name` INT``),
-    - parenthesized precision/scale with internal commas/spaces
-      (``DECIMAL(10, 2)``, ``VARCHAR(255)``),
-    - multi-word types (``DOUBLE PRECISION``, ``TIMESTAMP WITH TIME ZONE``,
-      ``TIMESTAMP WITHOUT TIME ZONE``, ``CHARACTER VARYING``),
-    - trailing column constraints (``NOT NULL``, ``DEFAULT ...``,
-      ``PRIMARY KEY``, ``UNIQUE``, ``CHECK(...)``, ``REFERENCES ...``), which
-      are stripped from the returned type.
-
-    Returns ``(None, None)`` for an empty/whitespace-only string. Either field
-    may be ``None`` if absent.
-    """
     text = column.strip()
     if not text:
         return None, None
@@ -125,16 +88,11 @@ def _split_ddl_column(column: str) -> tuple[str | None, str | None]:
     pos = 0
     n = len(text)
 
-    # --- extract the column name (respecting quoted identifiers) ---
     if text[0] in _QUOTE_PAIRS:
         closer = _QUOTE_PAIRS[text[0]]
-        # Return the UNQUOTED identifier: the delimiters are SQL syntax, not part
-        # of the logical name. The parsed name feeds the DataFrame loaders'
-        # ``column_names``, which must match the SQL identifier (``odd name``), so
-        # returning ``"odd name"`` verbatim would break cross-surface column lookups.
+
         name, pos, terminated = _read_quoted_identifier(text, text[0], closer)
         if not terminated:
-            # Unterminated quote: treat the remainder as the (unquoted) name.
             return name, None
     else:
         start = pos
@@ -142,7 +100,6 @@ def _split_ddl_column(column: str) -> tuple[str | None, str | None]:
             pos += 1
         name = text[start:pos]
 
-    # Skip whitespace between name and type.
     while pos < n and text[pos].isspace():
         pos += 1
     if pos >= n:
@@ -153,16 +110,14 @@ def _split_ddl_column(column: str) -> tuple[str | None, str | None]:
 
 
 def _consume_type(text: str, pos: int, n: int) -> str:
-    """Consume the SQL type starting at ``pos``, stopping before constraints."""
+
     type_parts: list[str] = []
     while pos < n:
-        # Skip leading whitespace before the next token.
         while pos < n and text[pos].isspace():
             pos += 1
         if pos >= n:
             break
 
-        # Read one type word (up to whitespace or an opening paren).
         start = pos
         while pos < n and not text[pos].isspace() and text[pos] != "(":
             pos += 1
@@ -171,8 +126,6 @@ def _consume_type(text: str, pos: int, n: int) -> str:
         if word:
             upper = word.upper()
             if not type_parts:
-                # The first word is always the base type, even if it collides
-                # with a constraint keyword (defensive; base types do not).
                 type_parts.append(word)
             elif upper in _CONSTRAINT_KEYWORDS:
                 break
@@ -181,8 +134,6 @@ def _consume_type(text: str, pos: int, n: int) -> str:
             else:
                 break
 
-        # Capture a parenthesized precision/scale immediately following the word
-        # (or following a base type with no space, e.g. ``DECIMAL(10, 2)``).
         if pos < n and text[pos] == "(":
             paren = _consume_parens(text, pos, n)
             if type_parts:
@@ -195,9 +146,9 @@ def _consume_type(text: str, pos: int, n: int) -> str:
 
 
 def _is_type_continuation(type_parts: list[str], upper: str) -> bool:
-    """Return True if ``upper`` continues the multi-word type so far."""
+
     prev = type_parts[-1].upper()
-    # Strip any trailing parenthesized part from the previous token for lookup.
+
     paren_idx = prev.find("(")
     if paren_idx != -1:
         prev = prev[:paren_idx]
@@ -205,7 +156,7 @@ def _is_type_continuation(type_parts: list[str], upper: str) -> bool:
 
 
 def _consume_parens(text: str, pos: int, n: int) -> str:
-    """Return the balanced parenthesized substring starting at ``text[pos]``."""
+
     depth = 0
     start = pos
     while pos < n:
@@ -217,18 +168,12 @@ def _consume_parens(text: str, pos: int, n: int) -> str:
             if depth == 0:
                 return text[start : pos + 1]
         pos += 1
-    # Unbalanced: return whatever was opened.
+
     return text[start:n]
 
 
 def column_name(column: Any) -> str | None:
-    """Return a schema column's name, if present.
 
-    Handles dict columns, object columns, and DDL-string columns of the form
-    ``"name TYPE [constraints...]"`` (e.g. ``"id INTEGER PRIMARY KEY"``), used by
-    benchmarks like joinorder_synthetic whose schema lists raw column definitions.
-    The DDL name respects quoted/bracketed identifiers that contain spaces.
-    """
     if isinstance(column, dict):
         name = column.get("name")
     elif isinstance(column, str):
@@ -239,13 +184,7 @@ def column_name(column: Any) -> str | None:
 
 
 def column_sql_type(column: Any, default: str = "VARCHAR") -> str:
-    """Return a schema column's SQL type across dict, object, and DDL-string schemas.
 
-    For DDL-string columns the full type is preserved, including parenthesized
-    precision/scale (``DECIMAL(10, 2)``, ``VARCHAR(255)``) and multi-word types
-    (``DOUBLE PRECISION``, ``TIMESTAMP WITH TIME ZONE``); trailing column
-    constraints (``NOT NULL``, ``DEFAULT``, ``PRIMARY KEY``, ...) are stripped.
-    """
     if isinstance(column, str):
         _, sql_type = _split_ddl_column(column)
         return sql_type if sql_type else default
@@ -271,7 +210,7 @@ def column_sql_type(column: Any, default: str = "VARCHAR") -> str:
 
 
 def extract_schema_columns(schema: Any) -> dict[str, list[dict[str, str]]]:
-    """Normalize a benchmark schema to table -> column definitions."""
+
     if not isinstance(schema, dict):
         return {}
 
@@ -288,7 +227,7 @@ def extract_schema_columns(schema: Any) -> dict[str, list[dict[str, str]]]:
 
 
 def get_benchmark_schema_columns(benchmark: Any) -> dict[str, list[dict[str, str]]]:
-    """Extract normalized schema columns from a benchmark instance."""
+
     if not hasattr(benchmark, "get_schema"):
         return {}
     try:

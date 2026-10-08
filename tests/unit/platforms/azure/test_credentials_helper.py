@@ -1,14 +1,3 @@
-"""Unit tests for AzureTokenProvider.
-
-Pinned behaviors (matched to the per-adapter code these replaced):
-  * tenant_id presence toggles the ``additionally_allowed_tenants`` kwarg;
-  * access_token() caches until 5 minutes before expiry;
-  * auth_headers() returns Bearer + JSON content-type.
-
-The credential class is injected - tests pass a MagicMock rather than
-patching azure.identity.
-"""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -83,7 +72,7 @@ class TestAccessTokenCaching:
         now = {"value": 500}
         monkeypatch.setattr(credentials_module, "time", SimpleNamespace(time=lambda: now["value"]))
         assert provider.access_token() == "tok-A"
-        # Advance clock past expires_at - 300 = 700 -> refresh required.
+
         now["value"] = 800
         assert provider.access_token() == "tok-B"
         assert cred_class.return_value.get_token.call_count == 2

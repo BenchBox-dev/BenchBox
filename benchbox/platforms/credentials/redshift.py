@@ -1,9 +1,6 @@
-"""Redshift credentials setup and validation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import contextlib
 import os
@@ -20,10 +17,6 @@ from benchbox.utils.printing import QuietConsoleProxy
 
 
 def _resolve_auto_config(existing_creds: Optional[dict], console: Union[Console, QuietConsoleProxy]) -> Optional[dict]:
-    """Return auto-detected redshift config from env vars, or None.
-
-    Skips auto-detect entirely when existing credentials are present.
-    """
     if existing_creds:
         console.print("ℹ️  [cyan]Existing credentials found - updating configuration[/cyan]\n")
         return None
@@ -37,7 +30,6 @@ def _resolve_auto_config(existing_creds: Optional[dict], console: Union[Console,
 
 
 def _config_from_auto(auto_config: dict, console: Union[Console, QuietConsoleProxy]) -> dict:
-    """Echo auto-detected values to the user and return them as a normalized config dict."""
     console.print(f"\n✅ Found cluster endpoint: [cyan]{auto_config.get('host')}[/cyan]")
     console.print(f"✅ Found port: [cyan]{auto_config.get('port')}[/cyan]")
     console.print(f"✅ Found database: [cyan]{auto_config.get('database')}[/cyan]")
@@ -54,7 +46,6 @@ def _config_from_auto(auto_config: dict, console: Union[Console, QuietConsolePro
 def _prompt_core_credentials(
     console: Union[Console, QuietConsoleProxy], existing_creds: Optional[dict]
 ) -> Optional[dict]:
-    """Prompt for required Redshift credentials. Returns None on missing required field."""
     console.print("\n[bold]Redshift Cluster Configuration:[/bold]")
     existing = existing_creds or {}
 
@@ -101,7 +92,6 @@ def _prompt_core_credentials(
 
 
 def _prompt_s3_staging(console: Union[Console, QuietConsoleProxy], existing_creds: Optional[dict]) -> dict:
-    """Prompt for optional S3 staging configuration. Returns S3/IAM/AWS fields (possibly None)."""
     empty = {
         "s3_bucket": None,
         "iam_role": None,
@@ -162,7 +152,6 @@ def _prompt_s3_staging(console: Union[Console, QuietConsoleProxy], existing_cred
 
 
 def _build_credentials_dict(config: dict) -> dict:
-    """Assemble the credentials dict, including only non-empty optional fields."""
     credentials: dict[str, Any] = {
         "host": config["host"],
         "port": config["port"],
@@ -182,7 +171,6 @@ def _finalize_credentials(
     console: Union[Console, QuietConsoleProxy],
     credentials: dict,
 ) -> None:
-    """Validate, persist, and report outcome for the gathered credentials."""
     console.print("\n🧪 [bold]Validating credentials...[/bold]")
     cred_manager.set_platform_credentials("redshift", credentials, CredentialStatus.NOT_VALIDATED)
 
@@ -221,12 +209,6 @@ def _finalize_credentials(
 
 
 def setup_redshift_credentials(cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy]) -> None:
-    """Interactive setup for Redshift credentials.
-
-    Args:
-        cred_manager: Credential manager instance
-        console: Rich console for output
-    """
     console.print("\n📋 [bold]You'll need:[/bold]")
     console.print("  • Redshift cluster endpoint")
     console.print("  • Username and password")
@@ -257,7 +239,6 @@ def _prompt_default_output_location(
     credentials: dict,
     s3_bucket: Optional[str],
 ) -> None:
-    """Prompt for default cloud output location for Redshift."""
     from benchbox.platforms.credentials.shared import prompt_default_output_location
 
     prompt_default_output_location(
@@ -304,7 +285,6 @@ _REDSHIFT_ADAPTER_CREDENTIAL_KEYS = (
 
 
 def _build_redshift_adapter(creds: dict[str, Any]) -> Any:
-    """Build a Redshift adapter from saved credentials."""
     from benchbox.platforms.redshift import RedshiftAdapter
 
     adapter_kwargs = {key: creds[key] for key in _REDSHIFT_ADAPTER_CREDENTIAL_KEYS if key in creds}
@@ -312,7 +292,6 @@ def _build_redshift_adapter(creds: dict[str, Any]) -> Any:
 
 
 def _probe_redshift_connection(adapter: Any, *, database: str, connect_timeout: int) -> None:
-    """Open a direct validation connection and run smoke queries."""
     connection = None
     cursor = None
 
@@ -338,19 +317,16 @@ def _probe_redshift_connection(adapter: Any, *, database: str, connect_timeout: 
 
 
 def _is_timeout_error(error_msg: str) -> bool:
-    """Return True when the driver reported a timeout-style failure."""
     error_lower = error_msg.lower()
     return "timeout" in error_lower or "timed out" in error_lower
 
 
 def _is_retryable_error(error_msg: str) -> bool:
-    """Return True for transient errors worth retrying (timeout, connection refused)."""
     error_lower = error_msg.lower()
     return _is_timeout_error(error_msg) or "could not connect" in error_lower or "connection refused" in error_lower
 
 
 def _format_redshift_validation_error(error_msg: str, database: str) -> str:
-    """Map driver errors to user-facing Redshift setup guidance."""
     error_lower = error_msg.lower()
 
     if _is_timeout_error(error_msg):
@@ -372,15 +348,6 @@ def _format_redshift_validation_error(error_msg: str, database: str) -> str:
 def validate_redshift_credentials(
     cred_manager: CredentialManager, console: Optional[Union[Console, QuietConsoleProxy]] = None
 ) -> tuple[bool, Optional[str]]:
-    """Validate Redshift credentials by testing connection with diagnostics.
-
-    Args:
-        cred_manager: Credential manager instance
-        console: Optional console for detailed output
-
-    Returns:
-        Tuple of (success, error_message)
-    """
     creds = cred_manager.get_platform_credentials("redshift")
 
     if not creds:
@@ -404,36 +371,30 @@ def validate_redshift_credentials(
     except ImportError as e:
         return False, str(e)
 
-    # Step 1: Test TCP connectivity first (quick check)
     if console:
         console.print("\n[dim]Testing network connectivity...[/dim]")
 
     tcp_reachable, tcp_error = _test_tcp_connectivity(host, port, timeout=10)
 
     if not tcp_reachable:
-        # TCP connection failed - run diagnostics
         if console:
             console.print(f"[yellow]⚠️  Network connectivity issue: {tcp_error}[/yellow]")
 
-            # Run AWS diagnostics
             diagnostics = _diagnose_redshift_connectivity(
                 host, port, aws_access_key_id, aws_secret_access_key, aws_region
             )
 
-            # Show diagnostic output
             _format_diagnostic_output(console, host, port, aws_region, diagnostics)
 
-            # Show remediation steps
             _format_remediation_steps(console, host, port, aws_region, diagnostics, tcp_reachable)
 
         return False, "Connection timeout. Check VPC/security group settings and network connectivity."
 
-    # Step 2: Attempt database connection with retries
     if console:
         console.print("[dim]Network connectivity OK. Testing database connection...[/dim]")
 
     max_retries = 3
-    retry_delays = [0, 2, 5]  # seconds between retries
+    retry_delays = [0, 2, 5]
 
     last_error = None
 
@@ -444,8 +405,7 @@ def validate_redshift_credentials(
                     console.print(f"[dim]Retry attempt {attempt + 1}/{max_retries}...[/dim]")
                 time.sleep(retry_delays[attempt])
 
-            # Attempt connection with progressive timeout
-            timeout = 10 + (attempt * 10)  # 10s, 20s, 30s
+            timeout = 10 + (attempt * 10)
 
             _probe_redshift_connection(adapter, database=database, connect_timeout=timeout)
             return True, None
@@ -453,16 +413,13 @@ def validate_redshift_credentials(
         except Exception as e:
             last_error = e
 
-            # Only retry transient errors (timeout, connection refused) with attempts remaining
             if attempt < max_retries - 1 and _is_retryable_error(str(e)):
                 continue
 
             break
 
-    # All retries exhausted
     error_msg = str(last_error)
 
-    # Run diagnostics for detailed error
     if console:
         diagnostics = _diagnose_redshift_connectivity(host, port, aws_access_key_id, aws_secret_access_key, aws_region)
         _format_diagnostic_output(console, host, port, aws_region, diagnostics)
@@ -472,14 +429,6 @@ def validate_redshift_credentials(
 
 
 def _auto_detect_redshift(console: Union[Console, QuietConsoleProxy]) -> Optional[dict]:
-    """Attempt to auto-detect Redshift configuration from environment variables.
-
-    Args:
-        console: Rich console for output
-
-    Returns:
-        Dictionary with detected config or None
-    """
     env_vars = {
         "host": os.getenv("REDSHIFT_HOST"),
         "port": os.getenv("REDSHIFT_PORT"),
@@ -487,7 +436,6 @@ def _auto_detect_redshift(console: Union[Console, QuietConsoleProxy]) -> Optiona
         "username": os.getenv("REDSHIFT_USERNAME"),
         "password": os.getenv("REDSHIFT_PASSWORD"),
         "schema": os.getenv("REDSHIFT_SCHEMA"),
-        # S3 staging (optional)
         "s3_bucket": os.getenv("REDSHIFT_S3_BUCKET"),
         "iam_role": os.getenv("REDSHIFT_IAM_ROLE"),
         "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID"),
@@ -495,7 +443,6 @@ def _auto_detect_redshift(console: Union[Console, QuietConsoleProxy]) -> Optiona
         "aws_region": os.getenv("AWS_DEFAULT_REGION"),
     }
 
-    # Check if we have the required fields
     required = ["host", "username", "password", "database"]
     found_required = all(env_vars.get(field) for field in required)
 
@@ -504,7 +451,6 @@ def _auto_detect_redshift(console: Union[Console, QuietConsoleProxy]) -> Optiona
         console.print(f"  ⚠️  Missing environment variables: {', '.join(missing)}")
         return None
 
-    # Convert port to int if present
     if env_vars.get("port"):
         try:
             env_vars["port"] = int(env_vars["port"])
@@ -515,7 +461,6 @@ def _auto_detect_redshift(console: Union[Console, QuietConsoleProxy]) -> Optiona
 
     console.print("  ✓ Found all required environment variables")
 
-    # Check for S3 staging configuration
     if env_vars.get("s3_bucket"):
         console.print("  ✓ Found S3 staging configuration")
 
@@ -523,16 +468,6 @@ def _auto_detect_redshift(console: Union[Console, QuietConsoleProxy]) -> Optiona
 
 
 def _test_tcp_connectivity(host: str, port: int, timeout: int = 5) -> tuple[bool, Optional[str]]:
-    """Test raw TCP connectivity to Redshift endpoint.
-
-    Args:
-        host: Redshift host endpoint
-        port: Port to connect to (default 5439)
-        timeout: Connection timeout in seconds
-
-    Returns:
-        Tuple of (success, error_message)
-    """
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
@@ -553,15 +488,9 @@ def _test_tcp_connectivity(host: str, port: int, timeout: int = 5) -> tuple[bool
 
 
 def _get_public_ip() -> Optional[str]:
-    """Get the current public IP address for display in error messages.
-
-    Returns:
-        Public IP address or None if unavailable
-    """
     try:
         import urllib.request
 
-        # Use multiple services for redundancy
         services = [
             "https://api.ipify.org",
             "https://checkip.amazonaws.com",
@@ -585,18 +514,6 @@ def _get_public_ip() -> Optional[str]:
 def _diagnose_redshift_connectivity(
     host: str, port: int, aws_access_key_id: Optional[str], aws_secret_access_key: Optional[str], aws_region: str
 ) -> dict:
-    """Run AWS API diagnostics on Redshift Serverless workgroup.
-
-    Args:
-        host: Redshift endpoint hostname
-        port: Port number
-        aws_access_key_id: AWS access key (optional)
-        aws_secret_access_key: AWS secret key (optional)
-        aws_region: AWS region
-
-    Returns:
-        Dictionary with diagnostic results
-    """
     diagnostics = {
         "workgroup_name": None,
         "publicly_accessible": None,
@@ -607,13 +524,10 @@ def _diagnose_redshift_connectivity(
     }
 
     try:
-        # Extract workgroup name from endpoint
-        # Format: workgroup-name.account-id.region.redshift-serverless.amazonaws.com
         if ".redshift-serverless.amazonaws.com" in host:
             workgroup_name = host.split(".")[0]
             diagnostics["workgroup_name"] = workgroup_name
         elif ".redshift.amazonaws.com" in host:
-            # Provisioned cluster
             cluster_id = host.split(".")[0]
             diagnostics["cluster_id"] = cluster_id
             diagnostics["is_serverless"] = False
@@ -621,14 +535,12 @@ def _diagnose_redshift_connectivity(
             diagnostics["error"] = "Unknown endpoint format"
             return diagnostics
 
-        # Try to use boto3 to get workgroup details
         try:
             import boto3
         except ImportError:
             diagnostics["error"] = "boto3 not available for diagnostics"
             return diagnostics
 
-        # Create client with provided credentials or use default chain
         client_kwargs = {"region_name": aws_region}
         if aws_access_key_id and aws_secret_access_key:
             client_kwargs["aws_access_key_id"] = aws_access_key_id
@@ -636,7 +548,6 @@ def _diagnose_redshift_connectivity(
 
         try:
             if diagnostics.get("is_serverless") is False:
-                # Provisioned cluster
                 redshift_client = boto3.client("redshift", **client_kwargs)
                 response = redshift_client.describe_clusters(ClusterIdentifier=diagnostics["cluster_id"])
                 cluster = response["Clusters"][0]
@@ -649,28 +560,23 @@ def _diagnose_redshift_connectivity(
                 ]
 
             else:
-                # Serverless workgroup
                 redshift_serverless_client = boto3.client("redshift-serverless", **client_kwargs)
                 response = redshift_serverless_client.get_workgroup(workgroupName=workgroup_name)
                 workgroup = response["workgroup"]
 
                 diagnostics["publicly_accessible"] = workgroup.get("publiclyAccessible", False)
 
-                # Get VPC configuration from endpoint
                 if "endpoint" in workgroup:
                     endpoint = workgroup["endpoint"]
                     diagnostics["vpc_id"] = endpoint.get("vpcEndpoint", {}).get("vpcId")
 
-                # Get security group IDs
                 if "securityGroupIds" in workgroup:
                     diagnostics["security_group_ids"] = workgroup["securityGroupIds"]
 
-                # Get subnet IDs
                 if "subnetIds" in workgroup:
                     diagnostics["subnet_ids"] = workgroup["subnetIds"]
 
         except Exception as e:
-            # AWS API call failed - could be permissions, wrong region, etc.
             diagnostics["error"] = f"AWS API error: {str(e)}"
 
     except Exception as e:
@@ -682,18 +588,8 @@ def _diagnose_redshift_connectivity(
 def _format_diagnostic_output(
     console: Union[Console, QuietConsoleProxy], host: str, port: int, aws_region: str, diagnostics: dict
 ) -> None:
-    """Format and display diagnostic information.
-
-    Args:
-        console: Console for output
-        host: Redshift endpoint
-        port: Port number
-        aws_region: AWS region
-        diagnostics: Diagnostic results from _diagnose_redshift_connectivity
-    """
     console.print("\n[bold cyan]🔍 Connection Diagnostics[/bold cyan]\n")
 
-    # Show what we detected
     if diagnostics.get("workgroup_name"):
         console.print(f"  • Workgroup: [cyan]{diagnostics['workgroup_name']}[/cyan] ({aws_region})")
     elif diagnostics.get("cluster_id"):
@@ -701,25 +597,21 @@ def _format_diagnostic_output(
     else:
         console.print(f"  • Endpoint: [cyan]{host}:{port}[/cyan]")
 
-    # Show publicly accessible status
     if diagnostics.get("publicly_accessible") is not None:
         if diagnostics["publicly_accessible"]:
             console.print("  • Publicly Accessible: [green]✓ Yes[/green]")
         else:
             console.print("  • Publicly Accessible: [red]✗ No[/red]")
 
-    # Show user's IP if available
     user_ip = _get_public_ip()
     if user_ip:
         console.print(f"  • Your Public IP: [cyan]{user_ip}[/cyan]")
 
-    # Show VPC info if available
     if diagnostics.get("vpc_id"):
         console.print(f"  • VPC: {diagnostics['vpc_id']}")
     if diagnostics.get("security_group_ids"):
         console.print(f"  • Security Groups: {', '.join(diagnostics['security_group_ids'])}")
 
-    # Show error if AWS API failed
     if diagnostics.get("error"):
         console.print(f"\n[dim]Note: {diagnostics['error']}[/dim]")
 
@@ -732,16 +624,6 @@ def _format_remediation_steps(
     diagnostics: dict,
     tcp_reachable: bool,
 ) -> None:
-    """Format and display remediation steps for connection issues.
-
-    Args:
-        console: Console for output
-        host: Redshift endpoint
-        port: Port number
-        aws_region: AWS region
-        diagnostics: Diagnostic results
-        tcp_reachable: Whether TCP connection was successful
-    """
     console.print("\n[bold yellow]📋 Troubleshooting Steps[/bold yellow]\n")
 
     workgroup_name = diagnostics.get("workgroup_name")
@@ -749,19 +631,16 @@ def _format_remediation_steps(
     publicly_accessible = diagnostics.get("publicly_accessible")
     user_ip = _get_public_ip()
 
-    # Step 1: Make publicly accessible if needed
     if publicly_accessible is False:
         console.print("[bold]1. Enable public access to your Redshift workgroup/cluster[/bold]")
 
         if workgroup_name:
-            # Serverless workgroup
             console_url = f"https://console.aws.amazon.com/redshiftv2/home?region={aws_region}#serverless-workgroup-configuration?workgroup={workgroup_name}"
             console.print(f"   → Open AWS Console: [link={console_url}]{console_url}[/link]")
             console.print("   → Click 'Actions' → 'Edit'")
             console.print("   → Under 'Network and security', enable 'Turn on Publicly accessible'")
             console.print("   → Click 'Save changes'\n")
         elif cluster_id:
-            # Provisioned cluster
             console_url = f"https://console.aws.amazon.com/redshiftv2/home?region={aws_region}#cluster-details?cluster={cluster_id}"
             console.print(f"   → Open AWS Console: [link={console_url}]{console_url}[/link]")
             console.print("   → Click 'Actions' → 'Modify publicly accessible setting'")
@@ -776,7 +655,6 @@ def _format_remediation_steps(
     else:
         step_num = 1
 
-    # Step 2: Update security group
     console.print(f"[bold]{step_num}. Configure security group to allow inbound connections[/bold]")
 
     if diagnostics.get("security_group_ids"):
@@ -802,7 +680,6 @@ def _format_remediation_steps(
 
     step_num += 1
 
-    # Step 3: Verify VPC has internet gateway
     if publicly_accessible is False or diagnostics.get("vpc_id"):
         console.print(f"[bold]{step_num}. Verify VPC has an Internet Gateway attached[/bold]")
         if diagnostics.get("vpc_id"):
@@ -815,12 +692,10 @@ def _format_remediation_steps(
 
         step_num += 1
 
-    # Step 4: Test connection
     console.print(f"[bold]{step_num}. Test the connection[/bold]")
     console.print("   → After making the above changes, run:")
     console.print("   [cyan]benchbox setup --platform redshift --validate-only[/cyan]\n")
 
-    # Additional resources
     console.print("[bold]📚 Additional Resources[/bold]")
     console.print("   → AWS Docs: https://docs.aws.amazon.com/redshift/latest/mgmt/managing-cluster-cross-vpc.html")
     console.print("   → Network troubleshooting: https://repost.aws/knowledge-center/redshift-cluster-private-public")

@@ -1,22 +1,7 @@
-// ---------------------------------------------------------------------------
-// dashboards - user-saveable chart configurations.
-//
-// A dashboard is a named collection of saved chart views. Each saved view
-// stores the URL that reproduces it (chart selection, sort, filters, and
-// deep-link anchor all live in explorer URL state), so dashboards need no
-// backend: they persist to localStorage and reopen as plain navigation.
-//
-// Model versions: payloads carry a `version` field; anything that does not
-// validate against the current shape is ignored entry-wise (one corrupt
-// dashboard never takes down the rest).
-// ---------------------------------------------------------------------------
-
 export interface SavedChartView {
   id: string;
   name: string;
-  /** Path + query + hash that reproduces the configured chart view. */
   url: string;
-  /** Registry chart id when the view targets one chart card (may be null). */
   chartId: string | null;
   savedAt: string;
 }
@@ -58,10 +43,6 @@ function asStringOrNull(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
-/** True for same-origin explorer paths. Rejects protocol-relative URLs
- * (`//host/...`), backslash escapes (`/\...`), and absolute URLs, so a
- * seeded or imported payload can never turn a saved view into an
- * open redirect off the explorer origin. */
 export function isInternalExplorerPath(url: string): boolean {
   if (!url.startsWith("/") || url.startsWith("//") || url.startsWith("/\\")) return false;
   try {
@@ -112,17 +93,8 @@ export function parseDashboardsPayload(raw: unknown): Dashboard[] {
   return dashboards;
 }
 
-// Session fallback when localStorage writes fail (unavailable, blocked, or
-// quota-exceeded): the latest snapshot is kept in this module-scoped variable
-// so loadDashboards() keeps returning what the session just saved. It is
-// cleared on the next successful localStorage write and does not survive a
-// page reload. Only used in the browser; server-side writes stay no-ops.
 let memoryDashboards: Dashboard[] | null = null;
 
-// Ids deleted while localStorage writes were failing. Without tombstones a
-// delete followed by a failed write would resurrect: the in-memory snapshot
-// no longer contains the id, so the merge in readStorage would re-admit the
-// stale stored copy.
 let memoryTombstones: Set<string> = new Set();
 
 function cloneDashboards(dashboards: Dashboard[]): Dashboard[] {
@@ -133,9 +105,6 @@ function readStorage(): Dashboard[] {
   let stored: Dashboard[];
   try {
     if (typeof window === "undefined") return [];
-    // Property access itself can throw SecurityError when storage is
-    // blocked (private browsing, restricted iframes), so it stays inside
-    // the try alongside getItem/parse.
     const storage = window.localStorage;
     if (!storage) return [];
     const raw = storage.getItem(DASHBOARD_STORAGE_KEY);
@@ -145,9 +114,6 @@ function readStorage(): Dashboard[] {
     stored = [];
   }
   if (memoryDashboards === null) return stored.filter((dashboard) => !memoryTombstones.has(dashboard.id));
-  // The failed-write snapshot is authoritative for its ids; entries stored by
-  // another tab that the snapshot never saw are preserved alongside it.
-  // Tombstoned ids stay deleted even though the snapshot no longer lists them.
   const memoryIds = new Set(memoryDashboards.map((dashboard) => dashboard.id));
   return [
     ...cloneDashboards(memoryDashboards),
@@ -158,9 +124,6 @@ function readStorage(): Dashboard[] {
 function writeStorage(dashboards: Dashboard[]): void {
   if (typeof window !== "undefined") {
     try {
-      // window.localStorage access stays inside the try: it throws
-      // SecurityError when storage is blocked, and that must fall back
-      // to memory rather than crash the caller.
       const storage = window.localStorage;
       if (storage) {
         const payload = dashboards.map((dashboard) => ({ ...dashboard, version: DASHBOARD_MODEL_VERSION }));
@@ -170,14 +133,8 @@ function writeStorage(dashboards: Dashboard[]): void {
         return;
       }
     } catch {
-      // Fall through to the session fallback below.
     }
   }
-  // Storage is unavailable: keep the snapshot in memory so the session still
-  // sees what it saved. Callers return the mutated model, which now matches
-  // what loadDashboards() reads back until the page reloads. Ids absent from
-  // the new snapshot but present in the old one were deleted, so tombstone
-  // them to keep the stale stored copy from resurrecting.
   if (typeof window !== "undefined") {
     if (memoryDashboards !== null) {
       const nextIds = new Set(dashboards.map((dashboard) => dashboard.id));
@@ -221,10 +178,6 @@ export function renameDashboard(id: string, name: string): Dashboard[] {
 export function deleteDashboard(id: string): Dashboard[] {
   const next = readStorage().filter((dashboard) => dashboard.id !== id);
   writeStorage(next);
-  // If the write fell back to memory, tombstone the id explicitly. The
-  // snapshot diff in writeStorage only covers deletes after the first
-  // failed write; without this, deleting while memoryDashboards is still
-  // null would resurrect the stale stored copy on the next read.
   if (memoryDashboards !== null) memoryTombstones.add(id);
   return next;
 }
