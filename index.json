@@ -15161,7 +15161,7 @@
         "pvm-s0a-polars2-compat-fixes"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "blocked",
       "title": "Add a Polars engine option that every collect respects, and record the engine and runtime package in results"
     },
     "pvm-s1-version-correctness-probe": {

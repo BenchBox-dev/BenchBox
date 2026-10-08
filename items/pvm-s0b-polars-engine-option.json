@@ -6,7 +6,7 @@
     "Requesting in-memory or streaming fails the run with an error naming the version and value when the collect signature has no engine parameter (simulated 1.0.0) or Polars rejects the value",
     "With no engine option, run output and bundle fields other than the new metadata are unchanged on 1.44.2; existing CI is green"
   ],
-  "context": "Sequenced after pvm-s0a because both edit benchbox/platforms/dataframe/polars_df.py. Evidence (HEAD d076a974d): polars_df.py:372-374 collect() uses engine=\"streaming\" when self.streaming, otherwise bare collect(); polars_df.py:406-408 scalar() does df.collect() when lazy; tpch/dataframe_queries.py:829, 863 and 1092 call ctx.scalar. Explorer _driver_version (transformer.py:374) prefers driver_version_actual for non-DuckDB platforms.",
+  "context": "PR #2781 (feat/polars-engine-option, head e44319a02f7001b49d61dcf6ecdf595c14fe96f9) is complete and verified but not mergeable: the required oracle-review check waits for the Codex connector's review of the head. @codex review was requested at 2026-10-08T16:02Z and 16:43Z; no connector review or reaction arrived within the 2-hour cap (D11), so the item is blocked. Owner: Codex connector / repository owner. Evidence: 38 new unit tests, AST guard mutation checks, four cross-surface gates on Polars 1.44.2 and 2.0.0, and a real polars-df run with engine=in-memory. The benchbox-oracle shadow review of this head is COMMENTED; its one finding was fixed in e44319a02 and the thread resolved. Next action: when the connector reviews the head, resolve any threads, rerun the failed oracle-review run, run make pr-arm from ../BenchBox.wt-polars-engine-option, monitor to merge, finish this item, then start pvm-s1.",
   "description": "The version matrix compares three engine setups: (A) each version's default collect(), which is in-memory on 1.x and streaming on 2.0; (B) in-memory on every version, which means engine=\"in-memory\" on 2.0; (C) engine=\"streaming\" where supported. That only works if one setting controls every Polars materialization, and today it does not: PolarsDataFrameAdapter.scalar(), get_row_count() and _get_first_row() call collect directly, TPC-H Q11, Q15 and Q22 and several TPC-DS queries use ctx.scalar, and the Polars branches of unified_frame.py materialization collect directly.\n\nVerified engine support (D0 probe 2026-10-07): 1.0.0 has no engine parameter and silently ignores any engine keyword; 1.12.0 and 1.22.0 reject \"in-memory\"/\"streaming\" with ValueError; 1.31.0 onward accept both; every version from 1.12 rejects unknown values.\n\nWork:\n- Add a polars-df platform option `engine` with values default, in-memory and streaming. `default` calls collect() with no engine argument, so each version uses its own default.\n- Route every Polars materialization through one adapter helper that applies the option. Only Polars branches change; PySpark, DataFusion and generic branches keep their contracts.\n- Fold the existing streaming flag and engine_affinity tuning into the same helper without changing their current behaviour.\n- Record in the result bundle the requested engine, the collect policy actually applied (the engine argument passed, or none), the polars version, and the polars-runtime-32 version when that package is installed (it exists from 1.35.2). Observed execution (streaming fallback, intermediate materialization) is not captured and is recorded as such, never inferred.\n\nGuardrails:\n- Default behaviour is unchanged: with no option set, the calls made must equal today's on the locked version.\n- If a version cannot honour the requested engine value (no `engine` parameter in the collect signature, or Polars rejects the value), fail the run with an error naming the version and value. Never fall back silently.\n- No version-string branching; capability detection by signature inspection only, documented in the PR.\n\nReview amendments (D0 2026-10-07): codex C1, C9, C10; agy A4.",
   "links": [
     "benchbox/platforms/dataframe/polars_df.py",
@@ -81,6 +81,14 @@
       "generation": "470e4e4fb5524d2a8df0e21d9b8f488f",
       "op": "release",
       "op_id": "46c505a7cd7c45378d240da9eee62305",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T18:45:53Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "2b4da5e4ab884f81ad716897921659c5",
       "session_id": "1f74fac6df92445cbacc470514ed2645"
     }
   ]
