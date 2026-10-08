@@ -89,6 +89,21 @@ def review_threads(repo: str, pr: int) -> list[dict[str, Any]]:
         after = connection["pageInfo"]["endCursor"]
 
 
+def oracle_reviews(repo: str, pr: int) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": item.get("id"),
+            "login": (item.get("user") or {}).get("login"),
+            "user_type": (item.get("user") or {}).get("type"),
+            "state": item.get("state"),
+            "body": item.get("body") or "",
+            "submitted_at": item.get("submitted_at"),
+            "commit_id": item.get("commit_id"),
+        }
+        for item in get_paginated(f"repos/{repo}/pulls/{pr}/reviews?per_page=100")
+    ]
+
+
 def state_artifact_name(pr: int) -> str:
     return f"{STATE_ARTIFACT_PREFIX}{pr}"
 

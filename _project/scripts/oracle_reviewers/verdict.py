@@ -212,7 +212,8 @@ def _finding(data: Any) -> Finding:
     _require(isinstance(title, str) and title.strip() != "", "title must be a non-empty string")
     _require(isinstance(detail, str), "detail must be a string")
     span_end = end_line if end_line is not None and end_line > line else None
-    return Finding(severity, path, line, sanitize(title, MAX_TITLE), sanitize(detail, MAX_DETAIL), span_end)
+    safe_path = _COMMENT_CLOSE.sub("--&gt;", _COMMENT_OPEN.sub("&lt;!--", path))
+    return Finding(severity, safe_path, line, sanitize(title, MAX_TITLE), sanitize(detail, MAX_DETAIL), span_end)
 
 
 def _prior(data: Any) -> PriorDefect:

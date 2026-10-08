@@ -1,10 +1,9 @@
 # Oracle review protocol: decisions, evidence and rounds
 
 Date: 2026-10-08
-Status: Decided. Verdict schema 2, computed decisions, review evidence checks
-and per-harness read rules are in place. Follow-up rounds, carried decisions,
-the DO NOT SHIP strike limit and the protocol marker are decided here and land
-separately.
+Status: Decided and in place: verdict schema 2, computed decisions, review
+evidence checks, per-harness read rules, follow-up rounds, carried decisions,
+the DO NOT SHIP strike limit and the protocol marker.
 Related: `_project/scripts/oracle_reviewers/`, `.github/oracle-reviewers.yml`,
 `docs/operations/oracle-review-v2.md`,
 `_project/decisions/oracle-review-v2-shadow-2026-10-05.md` (its blocking

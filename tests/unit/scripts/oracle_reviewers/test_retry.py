@@ -9,7 +9,6 @@ from _project.scripts.oracle_reviewers.retry import (
     ALL_ABSENT,
     INTEGRITY,
     UNREPORTED,
-    Reviewed,
     State,
     decide_rerun,
     due_for_retry,
@@ -141,9 +140,8 @@ def test_pending_cause_round_trips_and_clears_on_decisive_results(policy: Policy
     assert decided.pending_cause is None
 
 
-def test_reviewed_files_survive_pending_runs_and_are_replaced_by_decisive_ones() -> None:
-    first = Reviewed(OTHER, "medium-high", "failure", {"a.py": "1" * 40})
-    previous = State(7, OTHER, "failure", NOW, reviewed=first)
+def test_strikes_survive_pending_runs_and_never_go_down() -> None:
+    previous = State(7, OTHER, "failure", NOW, strikes=2)
     pending = next_state(
         previous=previous,
         pr=7,
@@ -153,11 +151,9 @@ def test_reviewed_files_survive_pending_runs_and_are_replaced_by_decisive_ones()
         now=NOW,
         pool_blocked_until={},
         pending_cause=ALL_ABSENT,
-        reviewed=Reviewed(HEAD, "medium-high", "pending", {}),
     )
-    assert pending.reviewed == first
-    second = Reviewed(HEAD, "medium-high", "success", {"a.py": "2" * 40})
-    decisive = next_state(
+    assert pending.strikes == 2
+    lower = next_state(
         previous=pending,
         pr=7,
         head_sha=HEAD,
@@ -165,8 +161,13 @@ def test_reviewed_files_survive_pending_runs_and_are_replaced_by_decisive_ones()
         manual=False,
         now=NOW,
         pool_blocked_until={},
-        reviewed=second,
+        strikes=1,
     )
-    assert decisive.reviewed == second
-    assert State.from_json(decisive.to_json()) == decisive
-    assert State.from_json({**decisive.to_json(), "reviewed": None}).reviewed is None
+    assert lower.strikes == 2
+    higher = next_state(
+        previous=lower, pr=7, head_sha=HEAD, outcome="failure", manual=False, now=NOW, pool_blocked_until={}, strikes=3
+    )
+    assert higher.strikes == 3
+    assert State.from_json(higher.to_json()) == higher
+    legacy = {key: value for key, value in higher.to_json().items() if key != "strikes"}
+    assert State.from_json({**legacy, "reviewed": {"head_sha": OTHER}}).strikes == 0

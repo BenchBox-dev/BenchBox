@@ -22,6 +22,7 @@ SIGNALS = {CONNECTOR: (CONNECTOR_LOGIN, "Codex connector"), ORACLE: (ORACLE_LOGI
 ORACLE_CONTEXT = "oracle-review-shadow"
 _ORACLE_VERDICT = re.compile(rf"### {ORACLE_CONTEXT}: (?P<state>[a-z]+) for `(?P<sha>[0-9a-f]{{40}})`")
 STANDIN_ATTESTERS = frozenset({"joeharris76"})
+_REFUSED_LINE = "Decision: **REFUSED**."
 _STANDIN_MARKER = re.compile(r"Stand-in oracle review: APPROVE ([0-9a-f]{40})")
 
 
@@ -98,6 +99,11 @@ def _oracle_verdict(reviews: list[dict[str, Any]], head_sha: str) -> tuple[str |
     return _review_verdict(ordered[-1], head_sha), max(decisive, default=None)
 
 
+def _refused(reviews: list[dict[str, Any]]) -> bool:
+    ordered = sorted(reviews, key=lambda review: _parse_time(review["submitted_at"]))
+    return bool(ordered) and _REFUSED_LINE in (ordered[-1].get("body") or "").splitlines()
+
+
 def _parse_time(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
@@ -145,6 +151,12 @@ def decide(
         standin_after = max(filter(None, (base_time, verdict_time)), default=None)
     standin = next((comment for comment in comments if _is_standin(comment, head_sha, standin_after)), None)
     if review_signal and signal == ORACLE and verdict != "success" and not standin:
+        if _refused(head_reviews):
+            return WAITING, (
+                f"oracle-review: the oracle refused to review {head_sha} after repeated DO NOT SHIP decisions; "
+                "close this pull request and open a new one, or post a stand-in attestation after that review, "
+                "then rerun this check"
+            )
         return WAITING, (
             f"oracle-review: the oracle's latest review of {head_sha} reports {verdict or 'no verdict'}, not "
             "success; fix the findings, or post a stand-in attestation after that review, then rerun this check"

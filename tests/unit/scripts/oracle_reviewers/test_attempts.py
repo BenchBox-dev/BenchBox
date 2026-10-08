@@ -12,7 +12,7 @@ from _project.scripts.oracle_reviewers.absence import Absence
 from _project.scripts.oracle_reviewers.dedup import fingerprint, marker
 from _project.scripts.oracle_reviewers.diff import commentable_lines
 from _project.scripts.oracle_reviewers.policy import Policy
-from _project.scripts.oracle_reviewers.retry import ALL_ABSENT, INTEGRITY, UNREPORTED, Reviewed, State
+from _project.scripts.oracle_reviewers.retry import ALL_ABSENT, INTEGRITY, UNREPORTED
 from _project.scripts.oracle_reviewers.selection import Attempt, SelectionInput, Step, excluded_families
 from _project.scripts.oracle_reviewers.verdict import Finding, validate
 
@@ -392,7 +392,7 @@ def test_comment_delivery_still_lists_every_finding_on_a_diff_line(policy: Polic
     assert final.review is None
     assert "Defects on diff lines" in final.body
     assert "Defects outside the diff" not in final.body and "Defects without a review thread" not in final.body
-    assert "checker.py:1`: Low issue" in final.body
+    assert "checker.py:1`: D2: Low issue" in final.body
 
 
 def test_review_comment_spans_a_fully_commentable_range(policy: Policy, tmp_path: Path) -> None:
@@ -455,7 +455,7 @@ def test_findings_already_open_are_not_posted_again_but_still_block(policy: Poli
     assert final.review is not None
     assert [item["body"].split("\n", 1)[0] for item in final.review["comments"]] == ["**Critical**: Critical issue"]
     assert "**Defects already open as review threads, not posted again**" in final.body
-    assert f"- **High** `{CHECKER}`: High issue" in final.body
+    assert f"- **High** `{CHECKER}`: D1: High issue" in final.body
 
 
 def test_second_run_with_every_finding_open_adds_no_thread(policy: Policy, tmp_path: Path) -> None:
@@ -467,69 +467,6 @@ def test_second_run_with_every_finding_open_adds_no_thread(policy: Policy, tmp_p
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
     assert final.review is not None and final.review["comments"] == []
     assert "checker.py:40`" not in final.body
-
-
-def test_cli_finalize_carries_the_reviewed_result(
-    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    old = "c" * 40
-    reviewed = Reviewed(old, "medium-high|Critical,High|sonnet|" + "e" * 40, "success", {CHECKER: "1" * 40})
-    previous = State(7, old, "success", NOW, reviewed=reviewed)
-    plan = {
-        **_plan(policy),
-        "decision": "carry",
-        "findings_delivery": "review",
-        "reviewed_head": old,
-        "previous_state": previous.to_json(),
-    }
-    plan_path = tmp_path / "plan.json"
-    plan_path.write_text(json.dumps(plan), encoding="utf-8")
-    out = _run_cli(
-        monkeypatch,
-        tmp_path,
-        "finalize",
-        "--plan",
-        str(plan_path),
-        "--attempts-dir",
-        str(tmp_path),
-        "--out-dir",
-        str(tmp_path / "o"),
-    )
-    assert out == {"state": "success", "comment": "false", "review": "true", "has_state": "true"}
-    review = json.loads((tmp_path / "o" / "review.json").read_text(encoding="utf-8"))
-    assert review["commit_id"] == HEAD and review["comments"] == []
-    assert f"since head `{old}` was reviewed" in review["body"]
-    state = json.loads((tmp_path / "o" / "state" / "state.json").read_text(encoding="utf-8"))
-    assert state["head_sha"] == HEAD
-    assert state["reviewed"] == reviewed.to_json()
-
-
-def test_cli_finalize_records_the_reviewed_files(
-    policy: Policy, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    plan = {**_plan(policy), "reviewed_files": {CHECKER: "1" * 40}, "review_basis": "basis"}
-    plan_path = tmp_path / "plan.json"
-    plan_path.write_text(json.dumps(plan), encoding="utf-8")
-    attempts_dir = tmp_path / "attempts"
-    _write(attempts_dir, 1, "sonnet", verdict=_v("", []))
-    _run_cli(
-        monkeypatch,
-        tmp_path,
-        "finalize",
-        "--plan",
-        str(plan_path),
-        "--attempts-dir",
-        str(attempts_dir),
-        "--out-dir",
-        str(tmp_path / "o"),
-    )
-    state = json.loads((tmp_path / "o" / "state" / "state.json").read_text(encoding="utf-8"))
-    assert state["reviewed"] == {
-        "head_sha": HEAD,
-        "basis": "basis",
-        "outcome": "success",
-        "files": {CHECKER: "1" * 40},
-    }
 
 
 def test_a_pending_run_posts_its_diagnostics_as_a_review(

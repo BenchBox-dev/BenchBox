@@ -628,3 +628,58 @@ def test_fetch_threads_and_reviews_keep_the_author_type(monkeypatch: pytest.Monk
     monkeypatch.setattr(oracle_review_check, "_paginate", lambda token, path: [review])
     fetched = oracle_review_check.fetch_reviews("t", "o/r", 7)[0]
     assert (fetched["user_type"], fetched["body"]) == ("Bot", "b")
+
+
+def _refusal_body() -> str:
+    from _project.scripts.oracle_reviewers import protocol, report
+
+    patches = {"aaaaaaaa": "11111111"}
+    plan = {
+        "status_context": "oracle-review-shadow",
+        "head_sha": HEAD,
+        "mode": "shadow",
+        "tier": "very-high",
+        "tier_reasons": [],
+        "findings_delivery": "review",
+        "protocol": {
+            "cycle": 3,
+            "round": 0,
+            "base_ref": "develop",
+            "patch_map": patches,
+            "patch_digest": "d" * 32,
+            "strikes": 3,
+            "max_do_not_ship": 3,
+            "next_id": 1,
+        },
+    }
+    return report.refused(plan).body
+
+
+def test_a_refused_pull_request_is_told_to_open_a_new_one() -> None:
+    status, message = _oracle(reviews=[_oracle_review(body=_refusal_body())])
+    assert status == oracle_review_check.WAITING
+    assert "refused to review" in message and "close this pull request and open a new one" in message
+    failure_status, failure_message = _oracle(reviews=[_oracle_review("failure")])
+    assert failure_status == oracle_review_check.WAITING and "refused" not in failure_message
+
+
+def test_a_refusal_header_keeps_the_verdict_line_the_check_parses() -> None:
+    assert _refusal_body().startswith(f"### oracle-review-shadow: failure for `{HEAD}`\n")
+
+
+def test_a_standin_after_a_refusal_passes() -> None:
+    reviews = [_oracle_review(body=_refusal_body(), submitted_at=AFTER_HEAD)]
+    later = "2026-10-08T23:59:59Z"
+    status, message = _oracle(reviews=reviews, comments=[_attestation(created_at=later)])
+    assert status == oracle_review_check.PASS and "stand-in review attested" in message
+    early = _oracle(reviews=reviews, comments=[_attestation(created_at=BEFORE_HEAD)])
+    assert early[0] == oracle_review_check.WAITING
+
+
+def test_a_standin_never_overrides_an_open_oracle_thread_after_a_refusal() -> None:
+    reviews = [_oracle_review(body=_refusal_body())]
+    threads = [{"resolved": False, "author": "benchbox-oracle", "author_type": "Bot"}]
+    status, message = _oracle(
+        reviews=reviews, threads=threads, comments=[_attestation(created_at="2026-10-08T23:59:59Z")]
+    )
+    assert status == oracle_review_check.WAITING and "unresolved oracle review thread" in message
