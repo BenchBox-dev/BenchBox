@@ -3488,18 +3488,13 @@
       "title": "Remove comments and docstrings from ClickHouse adapters"
     },
     "comment-cleanup-coffeeshop": {
-      "claim": {
-        "expires_at": "2026-10-09T23:59:00Z",
-        "generation": "86b94aa947fd4ee39e047793e3fa6d2c",
-        "renewals": 0,
-        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e"
-      },
+      "claim": null,
       "needs": [
         "comment-cleanup-checker",
         "comment-cleanup-contracts-gate"
       ],
       "priority": "medium",
-      "status": "active",
+      "status": "done",
       "title": "Remove comments and docstrings from CoffeeShop modules"
     },
     "comment-cleanup-compilation": {
