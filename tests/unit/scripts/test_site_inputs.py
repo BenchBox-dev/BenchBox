@@ -384,3 +384,39 @@ def test_parent_selection_fails_closed_without_a_bundled_ancestor() -> None:
     assert "~1" not in workflow
     assert "parent_source=dispatch" in workflow
     assert workflow.count("parent_source=bundle") == 2
+
+
+def test_dispatched_parent_is_resolved_to_a_full_commit_sha() -> None:
+    workflow = _site_inputs_workflow()
+    assert 'git rev-parse --verify --end-of-options "${DISPATCH_PARENT}^{commit}"' in workflow
+    assert "^[0-9a-f]{40}$" in workflow
+    assert 'grep -qxF "$DISPATCH_PARENT"' in workflow
+
+
+def test_build_resolves_the_parent_ref_to_a_full_commit_sha(tmp_path: Path) -> None:
+    head = site_inputs.must_run("git", "-C", str(site_inputs.ROOT), "rev-parse", "HEAD").strip()
+    args = argparse.Namespace(
+        out=str(tmp_path / "out"),
+        core_sha=head,
+        parent_core_sha="HEAD",
+        parent_source="local",
+        certified_by=None,
+        cmd="build",
+    )
+    with pytest.raises(RuntimeError) as raised:
+        site_inputs.cmd_build(args)
+    assert f"parent_core_sha {head} is not a strict ancestor" in str(raised.value)
+
+
+def test_build_rejects_a_parent_that_names_no_commit(tmp_path: Path) -> None:
+    head = site_inputs.must_run("git", "-C", str(site_inputs.ROOT), "rev-parse", "HEAD").strip()
+    args = argparse.Namespace(
+        out=str(tmp_path / "out"),
+        core_sha=head,
+        parent_core_sha="no-such-ref-for-site-inputs",
+        parent_source="local",
+        certified_by=None,
+        cmd="build",
+    )
+    with pytest.raises(RuntimeError, match="rev-parse"):
+        site_inputs.cmd_build(args)

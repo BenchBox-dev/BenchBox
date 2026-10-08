@@ -349,7 +349,10 @@ def cmd_build(args: argparse.Namespace) -> int:
     core_sha = args.core_sha or head
     if head != core_sha:
         raise RuntimeError(f"worktree HEAD {head} is not the bundle core_sha {core_sha}")
-    parent_sha = args.parent_core_sha or must_run("git", "-C", str(ROOT), "rev-parse", f"{core_sha}~1").strip()
+    parent_ref = args.parent_core_sha or f"{core_sha}~1"
+    parent_sha = must_run(
+        "git", "-C", str(ROOT), "rev-parse", "--verify", "--end-of-options", f"{parent_ref}^{{commit}}"
+    ).strip()
     dirty = must_run("git", "-C", str(ROOT), "status", "--porcelain").splitlines()
     tracked_edits = [line for line in dirty if not line.startswith("??")]
     if tracked_edits:

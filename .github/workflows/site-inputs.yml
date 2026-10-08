@@ -71,11 +71,15 @@ jobs:
             BUNDLED_SHAS="$(printf '%s\n%s' "$BUNDLED_SHAS" "$NAMES")"
           done
           if [ -n "$DISPATCH_PARENT" ]; then
+            if ! DISPATCH_PARENT="$(git rev-parse --verify --end-of-options "${DISPATCH_PARENT}^{commit}")" || ! [[ "$DISPATCH_PARENT" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "parent_core_sha does not name a commit" >&2
+              exit 1
+            fi
             if ! git merge-base --is-ancestor "$DISPATCH_PARENT" "$CORE_SHA"; then
               echo "parent_core_sha ${DISPATCH_PARENT} is not an ancestor of ${CORE_SHA}" >&2
               exit 1
             fi
-            if printf '%s\n' "$BUNDLED_SHAS" | grep -qx "$DISPATCH_PARENT"; then
+            if printf '%s\n' "$BUNDLED_SHAS" | grep -qxF "$DISPATCH_PARENT"; then
               echo "parent_source=bundle" >> "$GITHUB_OUTPUT"
             elif [ -z "$(printf '%s' "$BUNDLED_SHAS" | tr -d '[:space:]')" ]; then
               echo "No unexpired develop bundle exists; using the dispatched parent ${DISPATCH_PARENT}." >> "$GITHUB_STEP_SUMMARY"
