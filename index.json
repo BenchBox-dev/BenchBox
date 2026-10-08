@@ -15082,15 +15082,10 @@
       "title": "Find and correct durable copies of the stale 'git config user.email noreply@anthropic.com' instruction"
     },
     "pvm-d0-external-plan-review": {
-      "claim": {
-        "expires_at": "2026-10-09T03:20:55Z",
-        "generation": "fdd5c7b4da214a75b2dc329a156207ae",
-        "renewals": 0,
-        "worker": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1"
-      },
+      "claim": null,
       "needs": [],
       "priority": "high",
-      "status": "active",
+      "status": "done",
       "title": "Gate: finish external adversarial review of the Polars version-matrix plan and fold in accepted findings"
     },
     "pvm-d1-publication-scope-decision": {
