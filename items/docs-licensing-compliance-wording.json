@@ -3,7 +3,7 @@
     "Owner-approved wording on each page",
     "A recorded decision on the TPC downloads"
   ],
-  "context": "2026-10-08: trademarks page ready (branch docs/tpc-trademarks-page; owner-approved wording). Owner rule for TPC downloads: read the TPC licence/EULA shipped with dbgen/dsdgen and the TPC Fair Use policy; if redistribution with the TPC notice is allowed, keep /docs/_downloads/ TPC files with the notice; otherwise stop linking them (link tpc.org) and report the repo/wheel copies to the owner. IMDb wording on join-order.md: keep (IMDb's required attribution; verify against current IMDb non-commercial terms). Also still to check: the current full TPC Policies document. Claim removal is tracked in tpc-remove-certification-and-compliance-claims.",
+  "context": "2026-10-08: PR #2790 landed on develop (commit 7f10fb04d06f84801947d63750221308a0e2474f), adding benchmarks/tpc-trademarks.md with owner-approved trademark wording and fair-use disclaimers. Bundled dbgen/dsdgen licenses (TPC EULA v2.2) reviewed: Section 9 expressly permits redistribution with required legend (\"THE TPC SOFTWARE IS AVAILABLE WITHOUT CHARGE FROM TPC.\") and included EULA/notices. BenchBox binaries and /docs/_downloads/ include these notices. IMDb attribution on join-order.md kept per owner decision and verified against IMDb non-commercial requirements. Compliance claim removal tracked separately in tpc-remove-certification-and-compliance-claims.",
   "description": "benchmarks/join-order.md states the IMDb data is used with permission and gives a redistribution position; benchmarks/tpc-standards.md, tpch-skew.md, tpc-h.md, tpc-ds.md and tpc-ds-obt.md make compliance claims. The site also serves TPC-DS templates and TPC-H query files under /docs/_downloads/. Decide the approved wording and whether those downloads fit the TPC EULA.",
   "sessions": [
     {
@@ -37,6 +37,14 @@
       "generation": "e94b3c8447e441acb63f7daa6d545825",
       "op": "take",
       "op_id": "24b30b322fca46b59bb12018c1eeb295",
+      "session_id": "a51cb5bff4a449988fe0c1453a9c9f24"
+    },
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:a9f51c620a99fea6b166f0af",
+      "at": "2026-10-08T23:43:51Z",
+      "client": "antigravity-client",
+      "op": "update",
+      "op_id": "05147b78fdee4750ae8c484fe816027e",
       "session_id": "a51cb5bff4a449988fe0c1453a9c9f24"
     }
   ]
