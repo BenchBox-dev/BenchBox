@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "A DataFrame run of TPC-DS, SSB and ClickBench reports PASSED or FAILED, not UNCERTAIN or NOT_RUN, at the scales the provider supports",
+    "The supported benchmark and scale combinations are documented, and unsupported ones still report UNCERTAIN"
+  ],
+  "description": "query_validation.py returns UNCERTAIN for TPC-DS and for TPC-H at scales other than 1, and NOT_RUN for SSB and ClickBench. DataFrame runs on those benchmarks therefore never produce a validated result, and correctness has to be established by other means (the cross-surface gate at SF 0.1 against a DuckDB SQL reference). Add a validation provider, for example a reference row-count or result-hash oracle per benchmark and scale, so a DataFrame run can report PASSED where it is correct. Recorded as an out-of-scope follow-up of the Polars matrix work.",
+  "links": [
+    "benchbox/core/dataframe/query_validation.py",
+    "benchbox/core/equivalence/cross_surface.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T23:28:49Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "11b06248d95944eea113e4a1914a575f",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
+    }
+  ]
+}

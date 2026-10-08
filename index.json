@@ -5882,6 +5882,13 @@
       "status": "done",
       "title": "DataFrame Tuning Configuration Support"
     },
+    "dataframe-validation-beyond-tpch-sf1": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "DataFrame benchmark validation cannot report a clean pass outside TPC-H SF1"
+    },
     "dataframe-write-primitives": {
       "claim": null,
       "needs": [],
