@@ -5787,6 +5787,15 @@
       "status": "done",
       "title": "Implement DataFrame Version of AI Primitives Benchmark"
     },
+    "dataframe-auto-tuning-layout-review-20261008": {
+      "claim": null,
+      "needs": [
+        "tuning-evidence-benefit-rule-20261008"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Check whether DataFrame auto tuning makes layout choices that the tuned-template evidence rules out"
+    },
     "dataframe-backwards-compatibility-and-mode-coexistence": {
       "claim": null,
       "needs": [],

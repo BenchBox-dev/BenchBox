@@ -1,0 +1,20 @@
+{
+  "acceptance": [
+    "Context lists each auto decision per DataFrame platform, with file:line.",
+    "Each layout decision has a verdict (consistent, contradicted or unmeasured) with its evidence.",
+    "Harness output for auto vs notuning on one local DataFrame platform is recorded with a benefit-rule verdict.",
+    "A follow-up item exists for every contradicted decision."
+  ],
+  "context": "Source: tuning-evidence plan (2026-10-08). muse's adversarial review listed the auto blast radius as a blind spot that neither the plan nor the adjudication covered. Other blind spots it listed are covered elsewhere: load accounting, correctness, cache, throughput, cost, scale, seed and version (all in the harness and rule items); small-file counts (Databricks item); clustering-state timing (cloud item). On published bundles: all 41 published ClickHouse bundles on develop are notuning runs (checked 2026-10-08), so no tuned bundle needs retraction.",
+  "description": "## Problem\nThe `auto` tuning mode (DataFrame platforms only) chooses settings and layouts on its own. The ClickHouse evidence showed that date partitioning at small scale and sort keys that break join order can make a workload slower, and vendor guidance warns against partitioning below about 1 TB. Nobody has checked whether `auto` makes the same kind of choice (for example, partitioning or sorting by date on Polars, DataFusion or PySpark), or whether `auto` beats `notuning` at all.\n\n## Change\n- List what `auto` decides, per DataFrame platform, from the code that builds the auto configuration.\n- For each layout choice (partitioning, sort, row-group or file sizing), compare it with the vendor guidance and the measured results recorded in `tuning-profile-measured-outcomes-20261008` and the ADR-3 addenda.\n- Measure `auto` against `notuning` with the harness on one local DataFrame platform (Polars or DataFusion) for TPC-H SF1, and apply the benefit rule.\n- File one follow-up item per `auto` choice that the evidence rules out.\n\n## Decision gate\n- Findings only. Change `auto` behavior only through a follow-up item.\n\n## Guardrails (must preserve)\n- Leave `auto` as it is in this item.\n- Local engines only.\n\n## Process guardrails\n- Stage explicit paths; never `git add -A`.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:40:30Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "475529fa09354b09a0f6af5c43f9d319",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    }
+  ]
+}
