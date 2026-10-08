@@ -24470,6 +24470,13 @@
       "status": "done",
       "title": "Prevent shared-clone identity contamination with worktree-scoped identity at claim time"
     },
+    "worktree-typescript-module-resolution": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Resolve TypeScript and node_modules discovery in linked worktrees for JS comment syntax tests"
+    },
     "wrapper-update-verb-capability-declaration-handoff": {
       "claim": null,
       "needs": [],

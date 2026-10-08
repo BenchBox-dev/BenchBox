@@ -1,0 +1,17 @@
+{
+  "acceptance": [
+    "node tests/unit/scripts/test_comment_syntax_js.cjs runs successfully in any linked worktree without requiring manual COMMENT_POLICY_TYPESCRIPT environment configuration when node_modules is installed in the primary clone."
+  ],
+  "context": "Observed while running test_comment_syntax_js.cjs in linked worktrees. Linked worktrees do not share node_modules by default.",
+  "description": "Running node tests/unit/scripts/test_comment_syntax_js.cjs in a linked worktree fails with MODULE_NOT_FOUND for typescript unless COMMENT_POLICY_TYPESCRIPT is explicitly exported to point at the primary clone's results-explorer/node_modules. Update scripts/comment_syntax_js.cjs to fall back to the primary git repository root's results-explorer/node_modules when run in a linked worktree, or provide a worktree-init helper that symlinks or resolves node_modules.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e",
+      "at": "2026-10-08T23:35:22Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "af8ae25cec194eebbca832113ff3f2bd",
+      "session_id": "2c188abafba54577ab5700a7c822554e"
+    }
+  ]
+}
