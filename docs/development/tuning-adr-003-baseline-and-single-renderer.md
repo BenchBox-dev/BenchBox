@@ -309,5 +309,19 @@ attribution:
   column that already leads its sort key.
 
 The measurements are SF1 only. Larger scales were not run: SF100 does not fit
-the 16 GB measurement host, so the absence of a large-scale partitioning benefit
-is argued from the pruning result above, not measured there.
+the 16 GB measurement host, and SF10 needs more memory than the 5.25 GiB
+envelope used here. The absence of a large-scale partitioning benefit is argued
+from the pruning result above, which does not depend on scale, and is not
+measured there. SF10 and larger remain unmeasured.
+
+**Per-template decisions.** A tuned template is kept when its geometric mean
+beats `notuning` beyond noise, no query fails that passes untuned, and every
+query more than 1.5× slower than untuned is named here. For SSB and TPC-DS the
+rule is relaxed to a geometric mean no worse than `notuning` within about 10%
+and no added failing query.
+
+| Template | Decision | Evidence (SF1, ClickHouse 25.8, 5.25 GiB) |
+|---|---|---|
+| TPC-H | Adjust: partitioning dropped, date sort keys kept | Sort-only layout ran at 0.79× the `notuning` geometric mean. Slower queries: Q18 (1.4× to 2.7×), Q3 (about 1.5×), Q5 (1.4× to 1.5×), because `lineitem` is sorted by ship date instead of order key. |
+| SSB | Keep | Fresh server, three cells, no failures: geometric mean 109.8 ms `notuning`, 61.2 ms tuned (0.56×), 64.1 ms tuned with `optimize_after_load`. Host load average stayed at or below 8.3. |
+| TPC-DS | Keep, unchanged | Geometric mean 80.9 ms `notuning`, 84.1 ms tuned, 76.4 ms tuned with `optimize_after_load`. The same three queries fail in every cell. |
