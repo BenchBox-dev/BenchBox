@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 SCHEMA = 1
+PARENT_SOURCES = ("bundle", "dispatch", "local")
 GENERATED_QUERIES = Path("docs/benchmarks/queries")
 
 
@@ -394,6 +395,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         "certified_by": args.certified_by or "local",
         "corpus_sha": tree_sha(core_sha, "results-data"),
         "parent_core_sha": parent_sha,
+        "parent_source": args.parent_source,
         "members": members,
         "produced_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -455,6 +457,9 @@ def cmd_verify(out: Path) -> int:
     if drifted:
         print(f"attestation inputs drifted from manifest: {', '.join(drifted)}")
         return 1
+    if manifest.get("parent_source") not in PARENT_SOURCES:
+        print(f"unknown parent_source: {manifest.get('parent_source')!r}")
+        return 1
     core_sha = manifest.get("core_sha")
     parent_sha = manifest.get("parent_core_sha")
     rebound = [
@@ -486,6 +491,7 @@ def main(argv: list[str] | None = None) -> int:
     build.add_argument("--out", required=True)
     build.add_argument("--core-sha", default=None)
     build.add_argument("--parent-core-sha", default=None)
+    build.add_argument("--parent-source", choices=PARENT_SOURCES, default="local")
     build.add_argument("--certified-by", default=None)
     verify = sub.add_parser("verify")
     verify.add_argument("dir", type=Path)

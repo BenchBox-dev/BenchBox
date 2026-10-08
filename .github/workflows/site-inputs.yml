@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       parent_core_sha:
-        description: "Base SHA for the validator_parity attestation (default: parent of the built commit)"
+        description: "Base SHA for the validator_parity attestation (default: the newest bundled ancestor on develop)"
         required: false
         default: ""
 
@@ -64,7 +64,7 @@ jobs:
         run: |
           CORE_SHA="$(git rev-parse HEAD)"
           echo "core_sha=${CORE_SHA}" >> "$GITHUB_OUTPUT"
-          RUN_IDS="$(gh run list --workflow site-inputs.yml --status success --json databaseId --limit 10 -q '.[].databaseId')"
+          RUN_IDS="$(gh run list --workflow site-inputs.yml --branch develop --status success --json databaseId --limit 10 -q '.[].databaseId')"
           BUNDLED_SHAS=""
           for RUN in $RUN_IDS; do
             NAMES="$(gh api "repos/${REPO}/actions/runs/${RUN}/artifacts" -q '.artifacts[] | select(.expired == false and (.name | startswith("site-inputs-"))) | .name | ltrimstr("site-inputs-")')"
@@ -75,7 +75,12 @@ jobs:
               echo "parent_core_sha ${DISPATCH_PARENT} is not an ancestor of ${CORE_SHA}" >&2
               exit 1
             fi
-            if ! printf '%s\n' "$BUNDLED_SHAS" | grep -qx "$DISPATCH_PARENT"; then
+            if printf '%s\n' "$BUNDLED_SHAS" | grep -qx "$DISPATCH_PARENT"; then
+              echo "parent_source=bundle" >> "$GITHUB_OUTPUT"
+            elif [ -z "$(printf '%s' "$BUNDLED_SHAS" | tr -d '[:space:]')" ]; then
+              echo "No unexpired develop bundle exists; using the dispatched parent ${DISPATCH_PARENT}." >> "$GITHUB_STEP_SUMMARY"
+              echo "parent_source=dispatch" >> "$GITHUB_OUTPUT"
+            else
               echo "no site-inputs bundle attested on parent ${DISPATCH_PARENT}" >&2
               exit 1
             fi
@@ -88,17 +93,12 @@ jobs:
                 break
               fi
             done
-            if [ -n "$PREV" ]; then
-              echo "parent_sha=${PREV}" >> "$GITHUB_OUTPUT"
-            elif [ -n "$(printf '%s' "$BUNDLED_SHAS" | tr -d '[:space:]')" ]; then
-              echo "site-inputs bundles exist but none is an ancestor of ${CORE_SHA}; refusing to narrow the range" >&2
+            if [ -z "$PREV" ]; then
+              echo "no unexpired develop bundle is an ancestor of ${CORE_SHA}; dispatch site-inputs.yml with parent_core_sha set to the last deployed core_sha" >&2
               exit 1
-            else
-              {
-                echo "No prior site-inputs bundle found; using ${CORE_SHA}~1 for the first attestation base."
-              } >> "$GITHUB_STEP_SUMMARY"
-              echo "parent_sha=$(git rev-parse "${CORE_SHA}~1")" >> "$GITHUB_OUTPUT"
             fi
+            echo "parent_sha=${PREV}" >> "$GITHUB_OUTPUT"
+            echo "parent_source=bundle" >> "$GITHUB_OUTPUT"
           fi
           if [ "$IS_DISPATCH" = "true" ]; then
             CERTIFIED="$(gh run list --workflow trunk.yml --branch develop --status success --json headSha,event --limit 20 -q '[.[] | select(.event == "push") | .headSha] | .[]')"
@@ -113,11 +113,13 @@ jobs:
         env:
           CORE_SHA: ${{ steps.shas.outputs.core_sha }}
           PARENT_SHA: ${{ steps.shas.outputs.parent_sha }}
+          PARENT_SOURCE: ${{ steps.shas.outputs.parent_source }}
           CERTIFIED_BY: ${{ steps.shas.outputs.certified_by }}
         run: |
           make site-inputs SITE_INPUTS_OUT=site-inputs-bundle \
             SITE_INPUTS_CORE_SHA="$CORE_SHA" \
             SITE_INPUTS_PARENT_SHA="$PARENT_SHA" \
+            SITE_INPUTS_PARENT_SOURCE="$PARENT_SOURCE" \
             SITE_INPUTS_CERTIFIED_BY="$CERTIFIED_BY"
 
       - name: Pack bundle

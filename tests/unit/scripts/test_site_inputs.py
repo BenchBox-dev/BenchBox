@@ -87,6 +87,7 @@ def _bundle(tmp_path: Path, schema: int = 1, attestations: str = "pass") -> Path
         "schema": schema,
         "core_sha": "abc",
         "parent_core_sha": "def",
+        "parent_source": "bundle",
         "members": digests,
     }
     _write(out / "manifest.json", json.dumps(manifest) + "\n")
@@ -227,7 +228,12 @@ def test_member_digest_raises_on_missing_path(tmp_path: Path) -> None:
 def test_build_refuses_foreign_core_sha(tmp_path: Path) -> None:
     for sha in ("d076a974d", "0" * 40):
         args = argparse.Namespace(
-            out=str(tmp_path / "out"), core_sha=sha, parent_core_sha=None, certified_by=None, cmd="build"
+            out=str(tmp_path / "out"),
+            core_sha=sha,
+            parent_core_sha=None,
+            parent_source="local",
+            certified_by=None,
+            cmd="build",
         )
         with pytest.raises(RuntimeError, match="not the bundle core_sha"):
             site_inputs.cmd_build(args)
@@ -351,3 +357,30 @@ def test_validator_parity_uses_the_mirror_form_when_corpus_changed(
     parity = next(e for e in entries if e["name"] == "validator_parity")
     assert parity["result"] == "pass"
     assert parity["compared"] == {"base": "parent", "merge": "core", "head": "core"}
+
+
+@pytest.mark.parametrize("source", [None, "trunk"])
+def test_verify_rejects_unknown_parent_source(tmp_path: Path, source: str | None) -> None:
+    out = _bundle(tmp_path)
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    if source is None:
+        del manifest["parent_source"]
+    else:
+        manifest["parent_source"] = source
+    (out / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def _site_inputs_workflow() -> str:
+    return (ROOT / ".github/workflows/site-inputs.yml").read_text(encoding="utf-8")
+
+
+def test_parent_candidates_come_only_from_develop_runs() -> None:
+    assert "gh run list --workflow site-inputs.yml --branch develop --status success" in _site_inputs_workflow()
+
+
+def test_parent_selection_fails_closed_without_a_bundled_ancestor() -> None:
+    workflow = _site_inputs_workflow()
+    assert "~1" not in workflow
+    assert "parent_source=dispatch" in workflow
+    assert workflow.count("parent_source=bundle") == 2
