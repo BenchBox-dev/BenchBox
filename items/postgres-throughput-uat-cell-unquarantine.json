@@ -5,7 +5,7 @@
     "Root cause identified from captured logs and fixed (CedarDB replaces the Postgres cell per owner decision)",
     "continue-on-error removed from both CedarDB steps after at least 3 consecutive green nightly CedarDB cells; GitHub issue #2571 closed or retitled"
   ],
-  "context": "2026-10-07 closer check: green streak stays at 1. The 10-07 nightly (run 37619200963) failed throughput-uat on test_no_cross_stream_result_bleed (both TPC-H and TPC-DS variants, old 0-based assertions vs 1..S streams) before CedarDB cells could add greens; the fix merged the same day as #2754 (commit a327722d3, in origin/develop ea93839df) and both bleed tests pass locally. A miss is not a red cell, but only greens count: still need 10-08 and 10-09 (and 10-10 if counting exclusive of the miss window) consecutive green CedarDB cells before the quarantine-removal + floor-activation PR. not_before hold until 2026-10-08T14:00Z respected; no take/finish attempted.",
+  "context": "2026-10-07 closer check: green streak stays at 1. The 10-07 nightly (run 37619200963) failed throughput-uat on test_no_cross_stream_result_bleed (both TPC-H and TPC-DS variants, old 0-based assertions vs 1..S streams) before CedarDB cells could add greens; the fix merged the same day as #2754 (commit a327722d3, in origin/develop ea93839df) and both bleed tests pass locally. A miss is not a red cell, but only greens count.\n\n2026-10-08 status: the 10-08 nightly (run 37776283388) is green for the CedarDB cell, so the streak is 1 of 3. The work is in draft PR #2757 (fix/throughput-nightly-gate-activation, head 58142e68f, develop merged through 47ee38575). It is time-blocked: 10-09 and 10-10 nightlies must both be green CedarDB cells before the PR is marked ready, reviewed, merged and this item finished. Do not take or finish before then.",
   "description": "`.github/workflows/nightly.yml:1038` and `:1119` set `continue-on-error: true` on the Postgres throughput sweep and assert steps (quarantine for GitHub issue #2571, added in #2572). The sweep failed in all 10 nightlies from 09-25 to 10-04, hitting the 2400 s cell cap with no result JSON. Raising the timeout in #2384 changed nothing. The per-stream INDEPENDENT_CONNECTION path that PostgreSQL uses therefore has no working nightly check.\n\nThe failure cannot be diagnosed from CI. The throughput-uat job (nightly.yml:964-1155) has no upload-artifact step. The verbose re-run is skipped on timeout (tests/uat/runner.py:393). PostgreSQL statement_timeout defaults to 0 (postgresql.py:239,403), and the UAT options set only the username.\n\nLikely cause, unverified: one runaway query (TPC-H Q17 or Q20, correlated subqueries) on unindexed PostgreSQL at SF1 consumes the whole budget.",
   "links": [
     ".github/workflows/nightly.yml",
@@ -13,7 +13,7 @@
     "tests/uat/runner.py",
     "benchbox/platforms/postgresql.py"
   ],
-  "not_before": "2026-10-08T14:00:00Z",
+  "not_before": "2026-10-10T14:00:00Z",
   "sessions": [
     {
       "actor": "mcp:claude-code:joe@joe-mac-mini.local:0e967770a23b0dbff7e5fe59",
@@ -64,6 +64,14 @@
       "op": "update",
       "op_id": "c42b9b9fbe494edbaefe5024250af848",
       "session_id": "082ce851046a484a9eb47c9708b918d9"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:2078d44d78bfbb5aca3865ea",
+      "at": "2026-10-08T20:50:30Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "70c3cee12fb848bbb9306dd37b5da8ac",
+      "session_id": "0bdbb5bb32cc4bd0b5505d2dcb0e488e"
     }
   ]
 }
