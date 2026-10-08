@@ -60,7 +60,7 @@ BenchBox implements three TPC benchmarks, each targeting different use cases:
 
 ### Note on Compliance
 
-BenchBox implements TPC benchmark *workloads* for development and evaluation purposes. Official TPC compliance requires independent auditing and full disclosure reports. Results from BenchBox should be labeled as "TPC-H-like" or "derived from TPC-H" rather than official TPC results unless properly audited.
+BenchBox implements TPC benchmark *workloads* for development and evaluation purposes. Official TPC compliance requires independent auditing and full disclosure reports. Results from BenchBox should be labeled as "TPC-H-like" or "derived from TPC-H" rather than official TPC results unless properly audited. See {doc}`tpc-trademarks` for what the TPC trademarks and derived query text mean for you.
 
 ## Included Benchmarks
 
@@ -70,6 +70,7 @@ BenchBox implements TPC benchmark *workloads* for development and evaluation pur
 tpc-h
 tpc-ds
 tpc-di
+tpc-trademarks
 ```
 
 ## See Also
