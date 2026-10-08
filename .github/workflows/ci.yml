@@ -2013,9 +2013,6 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read
@@ -2077,12 +2074,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Exit 3 above means an upstream was cancelled by a newer run, not
-          # by a real failure. Cancelling this run makes this job conclude
-          # cancelled (grey) instead of failed (red). `|| true`: the run may
-          # already be fully cancelled. If cancellation never lands, this
-          # step exits 0 and the job still fails on the step above, so a
-          # real problem can never green through this path.
           gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
           sleep 90
 
@@ -2092,9 +2083,6 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read
@@ -2135,12 +2123,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Exit 3 above means an upstream was cancelled by a newer run, not
-          # by a real failure. Cancelling this run makes this job conclude
-          # cancelled (grey) instead of failed (red). `|| true`: the run may
-          # already be fully cancelled. If cancellation never lands, this
-          # step exits 0 and the job still fails on the step above, so a
-          # real problem can never green through this path.
           gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
           sleep 90
 
@@ -2150,9 +2132,6 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read
@@ -2189,12 +2168,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Exit 3 above means an upstream was cancelled by a newer run, not
-          # by a real failure. Cancelling this run makes this job conclude
-          # cancelled (grey) instead of failed (red). `|| true`: the run may
-          # already be fully cancelled. If cancellation never lands, this
-          # step exits 0 and the job still fails on the step above, so a
-          # real problem can never green through this path.
           gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
           sleep 90
 
@@ -2204,9 +2177,6 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read
@@ -2246,12 +2216,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Exit 3 above means an upstream was cancelled by a newer run, not
-          # by a real failure. Cancelling this run makes this job conclude
-          # cancelled (grey) instead of failed (red). `|| true`: the run may
-          # already be fully cancelled. If cancellation never lands, this
-          # step exits 0 and the job still fails on the step above, so a
-          # real problem can never green through this path.
           gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
           sleep 90
 
@@ -2261,9 +2225,6 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read
@@ -2302,12 +2263,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          # Exit 3 above means an upstream was cancelled by a newer run, not
-          # by a real failure. Cancelling this run makes this job conclude
-          # cancelled (grey) instead of failed (red). `|| true`: the run may
-          # already be fully cancelled. If cancellation never lands, this
-          # step exits 0 and the job still fails on the step above, so a
-          # real problem can never green through this path.
           gh run cancel "${{ github.run_id }}" --repo "${{ github.repository }}" || true
           sleep 90
 
@@ -2317,9 +2272,6 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # actions:write lets a superseded run cancel itself so this aggregate
-    # concludes cancelled instead of failed; contents:read checks out the
-    # result helper. Never widen these: PR code executes in this workflow.
     permissions:
       actions: write
       contents: read

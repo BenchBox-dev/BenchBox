@@ -372,7 +372,7 @@ def test_link_gate_tag_allowance_cannot_allow_trunk_breakage(tmp_path: Path) -> 
 def test_link_gate_passes_real_inventory_output_with_stale_allowances(tmp_path: Path) -> None:
     inputs = _inputs(tmp_path, deployed=None, deployed_snapshot=None)
     (inputs.site_dir / "docs").mkdir(parents=True)
-    (inputs.site_dir / "docs" / "old.html").write_text(
+    (Path(inputs.site_dir) / "docs" / "old.html").write_text(
         '<!doctype html><html><head><title>Old</title></head><body><h1>Old</h1><a href="gone.html">gone</a></body></html>',
         encoding="utf-8",
     )

@@ -374,15 +374,6 @@ def live_cedardb_adapter():
     yield adapter
 
 
-# ==============================================================================
-# Stub-installer leak guard
-# ==============================================================================
-
-#: Adapter (and adapter-adjacent) modules that platform stub installers patch.
-#: Every installer in ``common.py`` patches these only through ``monkeypatch``,
-#: so a test whose net effect changes any attribute is leaking stub state into
-#: other tests. This complements the unit-tier ``tests.utilities.leak_detector``
-#: (owned elsewhere; intentionally not modified) with integration-tier coverage.
 STUB_PATCHED_MODULES: tuple[str, ...] = (
     "benchbox.platforms.databricks.adapter",
     "benchbox.platforms.bigquery",
@@ -414,12 +405,6 @@ _STUB_BASELINE_KEY = pytest.StashKey[dict[str, dict[str, Any]]]()
 
 
 def import_stub_patched_modules() -> None:
-    """Import every watched module that is importable, for pre-test baselines.
-
-    Helpers read ``sys.modules`` without importing (mirroring the unit-tier leak
-    detector), so modules first imported inside a test body would otherwise have
-    no baseline to compare against.
-    """
     import importlib
 
     for name in STUB_PATCHED_MODULES:
@@ -430,7 +415,6 @@ def import_stub_patched_modules() -> None:
 
 
 def snapshot_stub_adapter_attrs() -> dict[str, dict[str, Any]]:
-    """Snapshot watched adapter-module attributes without importing anything."""
     snapshot: dict[str, dict[str, Any]] = {}
     for name in STUB_PATCHED_MODULES:
         module = sys.modules.get(name)
@@ -440,11 +424,10 @@ def snapshot_stub_adapter_attrs() -> dict[str, dict[str, Any]]:
 
 
 def find_stub_adapter_attr_leaks(before: dict[str, dict[str, Any]]) -> list[str]:
-    """Return ``module.attr`` names whose identity changed since ``before``."""
     problems: list[str] = []
     for name, old_attrs in before.items():
         module = sys.modules.get(name)
-        if module is None:  # pragma: no cover - defensive
+        if module is None:
             problems.append(f"{name} (module removed)")
             continue
         current = vars(module)
@@ -459,27 +442,12 @@ def find_stub_adapter_attr_leaks(before: dict[str, dict[str, Any]]) -> list[str]
 
 @pytest.hookimpl(wrapper=True)
 def pytest_runtest_setup(item):
-    """Capture the adapter-module baseline before any fixture is set up.
-
-    This must run before function-scoped fixtures: the session-wide
-    ``mock_platform_dependency_checks`` fixture legitimately patches some of
-    these same attributes with mocks and restores them at teardown (net zero),
-    so a baseline taken after fixture setup would mistake the restore for a
-    leak. A yield-fixture check would have the symmetric problem at teardown,
-    running before ``monkeypatch`` undo.
-    """
     item.stash[_STUB_BASELINE_KEY] = snapshot_stub_adapter_attrs()
     yield
 
 
 @pytest.hookimpl(wrapper=True)
 def pytest_runtest_teardown(item):
-    """Fail a test whose net effect changed stub-installer-patched attributes.
-
-    This runs after all function-scoped fixture finalizers, so ``monkeypatch``
-    has already undone legitimate stub installs. Anything still changed was
-    assigned directly and would leak into other tests.
-    """
     yield
     baseline = item.stash.get(_STUB_BASELINE_KEY, None)
     if baseline is None:

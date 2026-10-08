@@ -103,15 +103,6 @@ class TuningConfigMixin:
 
     @staticmethod
     def _has_tuned_run_marker(metadata_manager: Any) -> bool:
-        """Probe for the fail-closed tuned-run marker without raising.
-
-        A tuned run writes the marker before applying any physical tuning, so
-        a marker-only database (failed save, crash between apply and save, a
-        constraints-only config with its section markers swallowed) is still
-        refused for a notuning run. Managers predating the marker API (and
-        test doubles) lack the probe -- treat that as "no marker", since the
-        legacy `load_unified_tunings` check above still applies.
-        """
         probe = getattr(metadata_manager, "has_tuned_run_marker", None)
         if not callable(probe):
             return False
@@ -121,19 +112,6 @@ class TuningConfigMixin:
             return False
 
     def ensure_tuned_run_marker(self, connection: Any) -> bool:
-        """Write the fail-closed tuned-run marker before any physical tuning.
-
-        A tuned run calls this first: when it returns False the caller must
-        fail the run instead of applying tuning, so a database is never
-        physically tuned without refusal evidence. No-ops (True) for
-        baseline runs, which need no metadata table.
-
-        Args:
-            connection: Database connection
-
-        Returns:
-            True if the marker was written (or no tuning is active), False otherwise
-        """
         effective_config = self.get_effective_tuning_configuration()
         if not self.tuning_enabled or not effective_config:
             return True
