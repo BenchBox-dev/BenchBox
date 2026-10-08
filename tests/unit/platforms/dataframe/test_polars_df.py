@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -112,6 +113,98 @@ class TestPolarsExpressionMethods:
         expr = adapter.cast_date(adapter.col("date_str"))
 
         assert isinstance(expr, pl.Expr)
+
+    @pytest.mark.parametrize(
+        ("values", "dtype"),
+        [
+            (["2024-01-02", None], pl.String if pl else None),
+            ([date(2024, 1, 2), None], pl.Date if pl else None),
+            ([datetime(2024, 1, 2, 5, 30), None], pl.Datetime if pl else None),
+        ],
+        ids=["string", "date", "datetime"],
+    )
+    def test_cast_date_converts_supported_dtypes(self, values, dtype):
+        adapter = PolarsDataFrameAdapter()
+        frame = pl.LazyFrame({"value": pl.Series(values, dtype=dtype)})
+
+        result = frame.select(adapter.cast_date(adapter.col("value"))).collect()
+
+        assert result.schema["value"] == pl.Date
+        assert result["value"].to_list() == [date(2024, 1, 2), None]
+
+    def test_cast_date_rejects_invalid_string(self):
+        adapter = PolarsDataFrameAdapter()
+        frame = pl.LazyFrame({"value": ["not a date"]})
+
+        with pytest.raises(pl.exceptions.ComputeError):
+            frame.select(adapter.cast_date(adapter.col("value"))).collect()
+
+    @pytest.mark.parametrize("modern_keyword", [True, False])
+    @pytest.mark.parametrize("preserve", [True, False])
+    def test_csv_empty_string_option_matches_installed_scan_csv(self, monkeypatch, modern_keyword, preserve):
+        from benchbox.platforms import polars_compat
+
+        monkeypatch.setattr(
+            polars_compat,
+            "reader_accepts",
+            lambda reader, keyword: modern_keyword and keyword == "empty_string_is_null",
+        )
+
+        option = polars_compat.csv_empty_string_option(preserve)
+
+        if modern_keyword:
+            assert option == {"empty_string_is_null": not preserve}
+        else:
+            assert option == {"missing_utf8_is_empty_string": preserve}
+
+    @pytest.mark.parametrize(("null_marker", "expected"), [("", [None]), ("\\N", [""])])
+    def test_read_csv_empty_string_handling(self, tmp_path, null_marker, expected):
+        path = tmp_path / "data.csv"
+        path.write_text("a|b\n1|\n")
+        adapter = PolarsDataFrameAdapter()
+
+        frame = adapter.read_csv(path, delimiter="|", null_marker=null_marker, string_columns=["b"]).collect()
+
+        assert frame["b"].to_list() == expected
+
+    @pytest.mark.parametrize("accepts_rechunk", [True, False])
+    @pytest.mark.parametrize("rechunk", [True, False])
+    def test_reader_rechunk_option_follows_installed_reader(self, monkeypatch, accepts_rechunk, rechunk):
+        from benchbox.platforms import polars_compat
+
+        monkeypatch.setattr(polars_compat, "reader_accepts", lambda reader, keyword: accepts_rechunk)
+
+        assert polars_compat.reader_rechunk_option("scan_parquet", rechunk) == (
+            {"rechunk": rechunk} if accepts_rechunk else {}
+        )
+        assert polars_compat.reader_rechunk_effective(rechunk) is (rechunk and accepts_rechunk)
+
+    def test_read_parquet_passes_rechunk_only_when_the_reader_accepts_it(self, tmp_path, monkeypatch):
+        from benchbox.platforms import polars_compat
+
+        path = tmp_path / "data.parquet"
+        pl.DataFrame({"a": [1, 2]}).write_parquet(path)
+        calls = []
+        real_scan = pl.scan_parquet
+
+        def recording_scan(source, **kwargs):
+            calls.append(kwargs)
+            return real_scan(source, **{key: value for key, value in kwargs.items() if key != "rechunk"})
+
+        monkeypatch.setattr(pl, "scan_parquet", recording_scan)
+        expected = polars_compat.reader_accepts("scan_parquet", "rechunk")
+
+        PolarsDataFrameAdapter(rechunk=True).read_parquet(path)
+
+        assert ("rechunk" in calls[0]) is expected
+        assert PolarsDataFrameAdapter(rechunk=True).get_platform_info()["rechunk_effective"] is expected
+
+    def test_readers_pass_no_removed_keywords(self, tmp_path):
+        path = tmp_path / "data.parquet"
+        pl.DataFrame({"a": [1, 2]}).write_parquet(path)
+        adapter = PolarsDataFrameAdapter()
+
+        assert adapter.read_parquet(path).collect()["a"].to_list() == [1, 2]
 
     def test_cast_string(self):
         adapter = PolarsDataFrameAdapter()

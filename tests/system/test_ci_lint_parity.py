@@ -99,6 +99,9 @@ MERGE_GATE_LOCAL_EQUIVALENTS: dict[tuple[str, str, str], str] = {
     ("ci.yml", "code-lint", "Untracked skill-mirror drift guard (cloud parity)"): "ci-lint",
     ("ci.yml", "parity-check", "Verify parity fixtures match Python source"): "parity-check",
     ("ci.yml", "required-local-cases", "Run the required local-engine cases"): "test-required-local-cases",
+    ("ci.yml", "polars-2-compat", "Run the polars-df smoke and cross-surface gates on Polars 2.0.0"): (
+        "polars-df-compat-check"
+    ),
     ("test.yml", "test", "Run linting"): "ci-lint",
     ("test.yml", "test", "Run type checking"): "ci-lint",
     ("test.yml", "compat-test", "Run linting"): "ci-lint",
