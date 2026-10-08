@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "test_current_run_benchmark_gate_shape_is_detected passes against develop",
+    "The test and _validate_mandatory_sites use one shared definition of which files may hold the benchmark gate",
+    "The test still fails if no benchmark_gate site exists in either file"
+  ],
+  "context": "Release canary has failed on this test in every red run since 2026-10-06 (runs 37481029046, 37641510012, 37798380568). Release PRs are blocked while the canary is red.",
+  "description": "tests/integration/test_compat_lint_clean_resource_heavy.py:21 selects benchmark_gate entries whose file ends with run.py and asserts the list is not empty. The gate now lives in benchbox/cli/run_platform_resolution.py, so the list is empty and the release canary fails (shard 5, `assert []`). The production check in benchbox/sql_compat/inventory.py:670 already accepts both run.py and run_platform_resolution.py. Make the test use the same condition, ideally by sharing it rather than copying it, so the test cannot drift from the production check again.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2728"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-08T23:54:50Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "8b6adc2ee43f4d66933218a7db0f10a6",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}

@@ -1995,6 +1995,13 @@
       "status": "done",
       "title": "Fix (not just pin) calculate_checksum's separator/dtype collisions with an escaped, type-tagged rendering plus same-change digest regen"
     },
+    "canary-compat-gate-test-predicate-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "critical",
+      "status": "open",
+      "title": "Fix the compat-lint canary test that still expects the benchmark gate in run.py"
+    },
     "canary-flightdata-bad-width-shard": {
       "claim": null,
       "needs": [],
