@@ -6,10 +6,14 @@ from pathlib import Path
 import pytest
 
 from _project.scripts.oracle_reviewers.brief import (
+    FILE_LIST_DIFF_LINE,
     FULL_DIFF_LINE,
     FULL_DIFF_PLACEHOLDER,
+    READ_RULE_PLACEHOLDER,
+    READ_RULES,
     build_brief,
     with_full_diff,
+    with_read_rule,
     write_private,
 )
 from _project.scripts.oracle_reviewers.classifier import ChangedFile
@@ -19,14 +23,15 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 FILES = [ChangedFile("benchbox/core/equivalence/checker.py", None, 3, 1)]
 
 
-def _brief(diff: str | None, max_bytes: int = 100_000):
+def _brief(diff: str | None, max_bytes: int = 100_000, full_diff_available: bool = False):
     return build_brief(
+        full_diff_available=full_diff_available,
         repo="BenchBox-dev/BenchBox",
         pr=7,
         base_sha="b" * 40,
         head_sha="a" * 40,
         tier="medium-high",
-        blocking=("Critical", "High"),
+        max_defects=10,
         files=FILES,
         diff_text=diff,
         max_bytes=max_bytes,
@@ -74,7 +79,7 @@ def _scoped(full_diff_available: bool, **over):
         base_sha="b" * 40,
         head_sha="a" * 40,
         tier="medium-high",
-        blocking=("Critical", "High"),
+        max_defects=10,
         files=FILES,
         diff_text="+x = 1\n",
         max_bytes=100_000,
@@ -97,7 +102,9 @@ def test_scoped_brief_omits_the_diff_line_when_none_is_available() -> None:
 
 
 def test_a_full_review_brief_never_mentions_the_whole_diff() -> None:
-    assert FULL_DIFF_PLACEHOLDER not in _brief("+x = 1\n").text
+    inline = _brief("+x = 1\n", full_diff_available=True)
+    assert inline.mode == "inline"
+    assert FULL_DIFF_PLACEHOLDER not in inline.text
 
 
 def test_with_full_diff_fills_the_first_placeholder_only(tmp_path: Path) -> None:
@@ -113,3 +120,48 @@ def test_with_full_diff_drops_the_line_without_a_path() -> None:
     stripped = with_full_diff(text, None)
     assert FULL_DIFF_PLACEHOLDER not in stripped and "whole pull request diff" not in stripped
     assert stripped == _scoped(False).text
+
+
+def test_the_brief_never_forbids_the_commands_a_reviewer_reads_with() -> None:
+    text = _brief("+x = 1\n").text
+    assert "run commands" not in text
+    assert text.count(READ_RULE_PLACEHOLDER) == 1
+    codex = with_read_rule(text, "codex")
+    assert READ_RULE_PLACEHOLDER not in codex
+    assert "Read files only with read-only shell commands: cat, sed -n" in codex
+    assert "Never run a command that writes a file" in codex
+
+
+def test_every_harness_has_a_read_rule_and_it_fills_only_the_template_slot() -> None:
+    assert set(READ_RULES) == {"claude", "codex", "muse", "agy"}
+    text = _brief(f"+{READ_RULE_PLACEHOLDER}\n").text
+    for harness, rule in READ_RULES.items():
+        filled = with_read_rule(text, harness)
+        assert filled.index(rule) < filled.index("Unified diff")
+        assert filled.count(READ_RULE_PLACEHOLDER) == 1
+
+
+def test_the_brief_states_the_decisions_and_the_defect_limit() -> None:
+    text = _brief("+x = 1\n").text
+    for decision in ("SHIP:", "SHIP_WITH_FIXES:", "DO_NOT_SHIP:"):
+        assert f"- {decision}" in text
+    assert "at most 10." in text and "more than 10 defects" in text
+    assert "never decides the outcome" in text
+    assert "set decision to NONE" in text
+    assert "Blocking severities" not in text
+
+
+def test_a_file_list_brief_points_at_the_staged_diff_when_one_exists() -> None:
+    with_diff = _brief("+" + "x" * 200_000 + "\n", full_diff_available=True)
+    assert with_diff.mode == "file-list"
+    assert FILE_LIST_DIFF_LINE in with_diff.text and FULL_DIFF_LINE not in with_diff.text
+    without = _brief("+" + "x" * 200_000 + "\n", full_diff_available=False)
+    assert FULL_DIFF_PLACEHOLDER not in without.text
+    assert with_full_diff(with_diff.text, None) == without.text
+
+
+def test_dropping_the_diff_line_removes_only_the_line_holding_the_first_placeholder() -> None:
+    scoped = _scoped(True).text + FILE_LIST_DIFF_LINE
+    stripped = with_full_diff(scoped, None)
+    assert FULL_DIFF_LINE not in stripped
+    assert stripped.endswith(FILE_LIST_DIFF_LINE)

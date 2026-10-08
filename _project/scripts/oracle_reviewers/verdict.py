@@ -2,29 +2,50 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Collection, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
 from .policy import SEVERITIES
 
-MAX_FINDINGS = 50
+MAX_LISTED = 50
 MAX_SUMMARY = 4000
+MAX_REASON = 1000
 MAX_TITLE = 200
 MAX_DETAIL = 4000
+MAX_EVIDENCE = 1000
 MAX_PATH = 400
+MAX_EXAMINED = 2000
+
+COMPLETE = "complete"
+INCOMPLETE = "incomplete"
+STATUSES = (COMPLETE, INCOMPLETE)
+SHIP = "SHIP"
+SHIP_WITH_FIXES = "SHIP_WITH_FIXES"
+DO_NOT_SHIP = "DO_NOT_SHIP"
+NO_DECISION = "NONE"
+DECISIONS = (SHIP, SHIP_WITH_FIXES, DO_NOT_SHIP, NO_DECISION)
+FIXED = "fixed"
+NOT_FIXED = "not_fixed"
+WITHDRAWN = "withdrawn"
+PRIOR_STATUSES = (FIXED, NOT_FIXED, WITHDRAWN)
 
 FINDING_KEYS = ("severity", "file", "line", "end_line", "title", "detail")
 OPTIONAL_FINDING_KEYS = frozenset({"end_line"})
-VERDICT_KEYS = ("summary", "findings")
+PRIOR_KEYS = ("id", "status", "evidence")
+VERDICT_KEYS = ("status", "incomplete_reason", "decision", "summary", "files_examined", "defects", "prior_defects")
 
 VERDICT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
     "required": list(VERDICT_KEYS),
     "properties": {
+        "status": {"type": "string", "enum": list(STATUSES)},
+        "incomplete_reason": {"type": "string"},
+        "decision": {"type": "string", "enum": list(DECISIONS)},
         "summary": {"type": "string"},
-        "findings": {
+        "files_examined": {"type": "array", "items": {"type": "string"}},
+        "defects": {
             "type": "array",
             "items": {
                 "type": "object",
@@ -37,6 +58,19 @@ VERDICT_SCHEMA: dict[str, Any] = {
                     "end_line": {"type": ["integer", "null"]},
                     "title": {"type": "string"},
                     "detail": {"type": "string"},
+                },
+            },
+        },
+        "prior_defects": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": list(PRIOR_KEYS),
+                "properties": {
+                    "id": {"type": "string"},
+                    "status": {"type": "string", "enum": list(PRIOR_STATUSES)},
+                    "evidence": {"type": "string"},
                 },
             },
         },
@@ -62,6 +96,8 @@ _MARKDOWN_LINK = re.compile(r"!?\[([^\]]*)\]\([^)]*\)")
 _URL = re.compile(r"(?i)\b(?:https?|ftp|file|data|javascript):[^\s<>()]+|\bwww\.[^\s<>()]+")
 _MENTION = re.compile(r"(?<![A-Za-z0-9_`])@(?=[A-Za-z0-9])")
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_COMMENT_OPEN = re.compile(r"<\s*!\s*-\s*-")
+_COMMENT_CLOSE = re.compile(r"-\s*-\s*>")
 REDACTED = "[redacted]"
 LINK_REMOVED = "[link removed]"
 
@@ -91,15 +127,41 @@ class Finding:
 
 
 @dataclass(frozen=True)
-class Verdict:
-    summary: str
-    findings: tuple[Finding, ...]
-
-    def blocking(self, severities: tuple[str, ...] | list[str]) -> tuple[Finding, ...]:
-        return tuple(finding for finding in self.findings if finding.severity in severities)
+class PriorDefect:
+    id: str
+    status: str
+    evidence: str
 
     def to_json(self) -> dict[str, Any]:
-        return {"summary": self.summary, "findings": [finding.to_json() for finding in self.findings]}
+        return {"id": self.id, "status": self.status, "evidence": self.evidence}
+
+
+@dataclass(frozen=True)
+class Verdict:
+    status: str
+    incomplete_reason: str
+    decision: str
+    summary: str
+    files_examined: tuple[str, ...]
+    defects: tuple[Finding, ...]
+    prior_defects: tuple[PriorDefect, ...] = ()
+    defect_count: int | None = None
+
+    @property
+    def listed(self) -> int:
+        return len(self.defects) if self.defect_count is None else self.defect_count
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "incomplete_reason": self.incomplete_reason,
+            "decision": self.decision,
+            "summary": self.summary,
+            "files_examined": list(self.files_examined),
+            "defects": [finding.to_json() for finding in self.defects],
+            "prior_defects": [prior.to_json() for prior in self.prior_defects],
+            "defect_count": self.listed,
+        }
 
 
 def sanitize(text: str, limit: int) -> str:
@@ -109,6 +171,8 @@ def sanitize(text: str, limit: int) -> str:
     cleaned = _MARKDOWN_LINK.sub(lambda match: match.group(1), cleaned)
     cleaned = _URL.sub(LINK_REMOVED, cleaned)
     cleaned = _MENTION.sub("", cleaned)
+    cleaned = _COMMENT_OPEN.sub("&lt;!--", cleaned)
+    cleaned = _COMMENT_CLOSE.sub("--&gt;", cleaned)
     return cleaned if len(cleaned) <= limit else cleaned[: limit - 1] + "…"
 
 
@@ -151,14 +215,46 @@ def _finding(data: Any) -> Finding:
     return Finding(severity, path, line, sanitize(title, MAX_TITLE), sanitize(detail, MAX_DETAIL), span_end)
 
 
+def _prior(data: Any) -> PriorDefect:
+    _require(
+        isinstance(data, dict) and set(data) == set(PRIOR_KEYS), f"each prior defect must have the keys {PRIOR_KEYS}"
+    )
+    _require(isinstance(data["id"], str) and re.fullmatch(r"[A-Za-z0-9-]{1,32}", data["id"]) is not None, "bad id")
+    _require(data["status"] in PRIOR_STATUSES, f"prior defect status must be one of {PRIOR_STATUSES}")
+    _require(isinstance(data["evidence"], str), "prior defect evidence must be a string")
+    return PriorDefect(data["id"], data["status"], sanitize(data["evidence"], MAX_EVIDENCE))
+
+
 def validate(data: Any) -> Verdict:
     _require(isinstance(data, dict), "the verdict must be a JSON object")
-    _require(set(data) == set(VERDICT_KEYS), f"the verdict must have exactly the keys {VERDICT_KEYS}")
+    keys = set(data) - {"defect_count"}
+    _require(keys == set(VERDICT_KEYS), f"the verdict must have exactly the keys {VERDICT_KEYS}")
+    _require(data["status"] in STATUSES, f"status must be one of {STATUSES}")
+    _require(data["decision"] in DECISIONS, f"decision must be one of {DECISIONS}")
+    _require(isinstance(data["incomplete_reason"], str), "incomplete_reason must be a string")
     _require(isinstance(data["summary"], str), "summary must be a string")
-    _require(isinstance(data["findings"], list), "findings must be a list")
-    _require(len(data["findings"]) <= MAX_FINDINGS, f"at most {MAX_FINDINGS} findings are accepted")
-    findings = tuple(_finding(item) for item in data["findings"])
-    return Verdict(sanitize(data["summary"], MAX_SUMMARY), findings)
+    examined = data["files_examined"]
+    _require(isinstance(examined, list) and all(isinstance(item, str) for item in examined), "files_examined bad")
+    _require(isinstance(data["defects"], list), "defects must be a list")
+    _require(isinstance(data["prior_defects"], list), "prior_defects must be a list")
+    complete = data["status"] == COMPLETE
+    _require(complete != (data["decision"] == NO_DECISION), "a complete review decides, and only it does")
+    count = data.get("defect_count", len(data["defects"]))
+    _require(isinstance(count, int) and not isinstance(count, bool) and count >= 0, "defect_count must be >= 0")
+    _require(count >= len(data["defects"]), "defect_count is below the listed defects")
+    defects = tuple(_finding(item) for item in data["defects"][:MAX_LISTED])
+    priors = tuple(_prior(item) for item in data["prior_defects"][:MAX_LISTED])
+    _require(len({prior.id for prior in priors}) == len(priors), "a prior defect id repeats")
+    return Verdict(
+        status=data["status"],
+        incomplete_reason=sanitize(data["incomplete_reason"], MAX_REASON),
+        decision=data["decision"],
+        summary=sanitize(data["summary"], MAX_SUMMARY),
+        files_examined=tuple(item for item in examined[:MAX_EXAMINED] if len(item) <= MAX_PATH * 4),
+        defects=defects,
+        prior_defects=priors,
+        defect_count=count,
+    )
 
 
 def _strip_fence(text: str) -> str:
@@ -180,6 +276,11 @@ def parse_output(harness: str, text: str) -> Any:
         result = payload.get("result")
         _require(isinstance(result, str), "the claude result envelope has no result")
         return parse_output("text", result)
+    if harness == "agy" and isinstance(payload, dict) and {"status", "response"} <= set(payload):
+        _require(payload["status"] == "SUCCESS", "the agy result envelope reports an error")
+        response = payload["response"]
+        _require(isinstance(response, (str, dict)) and bool(response), "the agy result envelope has no response")
+        return response if isinstance(response, dict) else parse_output("text", response)
     return payload
 
 
@@ -189,17 +290,8 @@ class Placement:
     summary: tuple[Finding, ...]
 
 
-def place(
-    findings: tuple[Finding, ...],
-    commentable: Mapping[str, frozenset[int]],
-    thread_severities: Collection[str] | None = None,
-) -> Placement:
-    inline = tuple(
-        finding
-        for finding in findings
-        if finding.line in commentable.get(finding.file, frozenset())
-        and (thread_severities is None or finding.severity in thread_severities)
-    )
+def place(findings: tuple[Finding, ...], commentable: Mapping[str, frozenset[int]]) -> Placement:
+    inline = tuple(finding for finding in findings if finding.line in commentable.get(finding.file, frozenset()))
     summary = tuple(finding for finding in findings if finding not in inline)
     return Placement(inline, summary)
 

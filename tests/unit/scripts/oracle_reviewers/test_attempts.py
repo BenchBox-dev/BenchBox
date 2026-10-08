@@ -18,7 +18,10 @@ from _project.scripts.oracle_reviewers.verdict import Finding, validate
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
+CHECKER = "benchbox/core/equivalence/checker.py"
+
 RUN_ID = "4242"
+OUTSIDE_NOTE = "Defects outside the diff count like the others: fix them before merge."
 HEAD = "a" * 40
 NOW = datetime(2026, 10, 5, 12, 0, tzinfo=UTC)
 DIFF = """diff --git a/benchbox/core/equivalence/checker.py b/benchbox/core/equivalence/checker.py
@@ -45,7 +48,7 @@ def _plan(policy: Policy, tier: str = "medium-high", labels: tuple[str, ...] = (
         "decision_reason": "",
         "tier": tier,
         "tier_reasons": ["changes comparison logic"],
-        "blocking": list(policy.tiers[tier].blocking),
+        "max_defects": policy.protocol.max_defects,
         "chain": [reviewer.to_json() for reviewer in policy.chain(tier)],
         "diversity_exempt": list(policy.tiers[tier].diversity_exempt),
         "excluded_families": sorted(excluded_families(labels, policy)),
@@ -64,6 +67,19 @@ def _finding(severity: str, line: int = 2) -> dict[str, Any]:
         "line": line,
         "title": f"{severity} issue",
         "detail": "see @someone at https://example.com",
+    }
+
+
+def _v(summary: str = "", findings: list[dict[str, Any]] | None = None, decision: str | None = None) -> dict:
+    defects = findings or []
+    return {
+        "status": "complete",
+        "incomplete_reason": "",
+        "decision": decision or ("SHIP_WITH_FIXES" if defects else "SHIP"),
+        "summary": summary,
+        "files_examined": [CHECKER],
+        "defects": defects,
+        "prior_defects": [],
     }
 
 
@@ -91,28 +107,30 @@ def _decide(policy: Policy, plan: dict, directory: Path):
 
 
 def test_absence_then_clean_verdict_passes(policy: Policy, tmp_path: Path) -> None:
-    plan = _plan(policy)
+    plan = {**_plan(policy), "findings_delivery": "review"}
     _write(tmp_path, 1, "sonnet", missing=Absence("timeout", "slow"))
-    _write(tmp_path, 2, "sol", verdict={"summary": "ok", "findings": [_finding("Medium")]})
+    _write(tmp_path, 2, "sol", verdict=_v("ok"))
     loaded, step, errors = _decide(policy, plan, tmp_path)
     assert errors == []
     assert step.kind == selection.PASS
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, {})
     assert final.state == "success"
-    assert final.description == "sol: no blocking findings"
-    assert "sonnet: absent (timeout)" in final.body
+    assert final.description == "sol: SHIP"
+    assert final.review is not None and final.review["comments"] == []
+    assert "Decision: **SHIP**." in final.review["body"]
+    assert "sonnet: absent (timeout)" in final.review["body"]
 
 
-def test_blocking_verdict_fails_and_splits_findings(policy: Policy, tmp_path: Path) -> None:
+def test_ship_with_fixes_fails_and_splits_defects(policy: Policy, tmp_path: Path) -> None:
     plan = _plan(policy)
     findings = [_finding("High", 2), _finding("Low", 40)]
-    _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": findings})
+    _write(tmp_path, 1, "sonnet", verdict=_v("bad", findings))
     loaded, step, errors = _decide(policy, plan, tmp_path)
     assert step.kind == selection.FAIL
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
     assert final.state == "failure"
-    assert final.description == "sonnet: 1 blocking finding(s)"
-    inline, outside = final.body.split("**Findings outside the diff**")
+    assert final.description == "sonnet: SHIP WITH FIXES, 2 defect(s) to fix"
+    inline, outside = final.body.split("**Defects outside the diff**")
     assert "checker.py:2`" in inline and "checker.py:40`" in outside
     assert "@someone" not in final.body and "https://" not in final.body
     assert "Shadow mode" in final.body
@@ -120,7 +138,7 @@ def test_blocking_verdict_fails_and_splits_findings(policy: Policy, tmp_path: Pa
 
 def test_review_delivery_builds_line_threads_only_inside_the_diff(policy: Policy, tmp_path: Path) -> None:
     plan = {**_plan(policy), "findings_delivery": "review"}
-    _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": [_finding("High", 2), _finding("Low", 40)]})
+    _write(tmp_path, 1, "sonnet", verdict=_v("bad", [_finding("High", 2), _finding("Low", 40)]))
     loaded, step, errors = _decide(policy, plan, tmp_path)
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
     assert final.review is not None
@@ -133,11 +151,11 @@ def test_review_delivery_builds_line_threads_only_inside_the_diff(policy: Policy
 
 def test_artifact_from_another_run_or_head_is_rejected(policy: Policy, tmp_path: Path) -> None:
     plan = _plan(policy)
-    _write(tmp_path, 1, "sonnet", verdict={"summary": "", "findings": []}, run_id="1")
+    _write(tmp_path, 1, "sonnet", verdict=_v("", []), run_id="1")
     _, _, errors = _decide(policy, plan, tmp_path)
     assert any("another run" in error for error in errors)
     other = tmp_path / "head"
-    _write(other, 1, "sonnet", verdict={"summary": "", "findings": []}, head_sha="c" * 40)
+    _write(other, 1, "sonnet", verdict=_v("", []), head_sha="c" * 40)
     loaded, step, errors = _decide(policy, plan, other)
     assert any("another head" in error for error in errors)
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, {})
@@ -147,7 +165,7 @@ def test_artifact_from_another_run_or_head_is_rejected(policy: Policy, tmp_path:
 
 def test_out_of_order_reviewer_fails_the_replay(policy: Policy, tmp_path: Path) -> None:
     plan = _plan(policy)
-    _write(tmp_path, 1, "luna", verdict={"summary": "", "findings": []})
+    _write(tmp_path, 1, "luna", verdict=_v("", []))
     loaded, step, errors = _decide(policy, plan, tmp_path)
     assert errors == ["slot 1 ran luna, but the policy selects sonnet"]
     assert report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, {}).state == "pending"
@@ -155,18 +173,29 @@ def test_out_of_order_reviewer_fails_the_replay(policy: Policy, tmp_path: Path) 
 
 def test_reviewer_outside_the_chain_is_rejected(policy: Policy, tmp_path: Path) -> None:
     plan = _plan(policy, tier="very-high", labels=())
-    _write(tmp_path, 1, "sonnet", verdict={"summary": "", "findings": []})
+    _write(tmp_path, 1, "sonnet", verdict=_v("", []))
     _, _, errors = _decide(policy, plan, tmp_path)
     assert any("outside the tier chain" in error for error in errors)
 
 
 def test_invalid_verdict_counts_as_absent(policy: Policy, tmp_path: Path) -> None:
     plan = _plan(policy)
-    _write(tmp_path, 1, "sonnet", verdict={"summary": "", "findings": [{"severity": "Severe"}]})
+    _write(tmp_path, 1, "sonnet", verdict=_v("", [{"severity": "Severe"}]))
     loaded, step, errors = _decide(policy, plan, tmp_path)
     assert errors == []
     assert loaded.attempts[0].absence == "invalid"
     assert step.reviewer is not None and step.reviewer.name == "sol"
+
+
+def test_an_incomplete_verdict_in_an_artifact_never_passes(policy: Policy, tmp_path: Path) -> None:
+    plan = _plan(policy)
+    incomplete = {**_v("could not read"), "status": "incomplete", "decision": "NONE", "incomplete_reason": "no access"}
+    _write(tmp_path, 1, "sonnet", verdict=incomplete)
+    loaded, step, errors = _decide(policy, plan, tmp_path)
+    assert errors == []
+    assert loaded.attempts[0] == Attempt(1, "sonnet", selection.ABSENT, "incomplete", "no access")
+    assert loaded.verdicts == {}
+    assert step.kind == selection.REVIEW and step.reviewer is not None and step.reviewer.name == "sol"
 
 
 def test_all_absent_is_pending_and_names_every_reviewer(policy: Policy, tmp_path: Path) -> None:
@@ -237,7 +266,7 @@ def test_cli_select_finalize_and_ensure_attempt(
         monkeypatch, tmp_path, "select", "--plan", plan_path, "--attempts-dir", str(attempts_dir), "--slot", "3"
     )
     assert stale == {"reviewer": "", "harness": ""}
-    _write(attempts_dir, 2, "sol", verdict={"summary": "", "findings": [_finding("Critical")]})
+    _write(attempts_dir, 2, "sol", verdict=_v("", [_finding("Critical")]))
     final_dir = tmp_path / "final"
     out = _run_cli(
         monkeypatch,
@@ -259,7 +288,7 @@ def test_cli_select_finalize_and_ensure_attempt(
     assert state["head_sha"] == HEAD and state["outcome"] == "failure"
     assert state["pending_cause"] is None
     comment = json.loads((final_dir / "comment.json").read_text(encoding="utf-8"))
-    assert "Findings on diff lines" in comment["body"]
+    assert "Defects on diff lines" in comment["body"]
 
 
 def test_cli_finalize_refuses_a_plan_from_another_run(
@@ -298,8 +327,8 @@ def test_cli_finalize_fixed_decisions(
 
 def test_verdict_comes_from_the_terminal_reviewer_slot(policy: Policy) -> None:
     plan = _plan(policy)
-    decisive = validate({"summary": "decisive", "findings": [_finding("High", 2)]})
-    later = validate({"summary": "later", "findings": [_finding("Low", 40)]})
+    decisive = validate(_v("decisive", [_finding("High", 2)]))
+    later = validate(_v("later", [_finding("Low", 40)]))
     sonnet = Step(selection.FAIL, policy.reviewers["sonnet"], ("sonnet: blocking findings",))
     attempts_list = [Attempt(1, "sonnet", selection.FAIL), Attempt(2, "sol", selection.PASS)]
     final = report.finalize(plan, sonnet, [], attempts_list, {1: decisive, 2: later}, commentable_lines(DIFF))
@@ -309,64 +338,60 @@ def test_verdict_comes_from_the_terminal_reviewer_slot(policy: Policy) -> None:
     assert final.pending_cause is None
 
 
-def test_blocking_finding_outside_the_diff_still_fails(policy: Policy, tmp_path: Path) -> None:
+def test_defect_outside_the_diff_still_fails(policy: Policy, tmp_path: Path) -> None:
     plan = _plan(policy)
-    _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": [_finding("Critical", 400)]})
+    _write(tmp_path, 1, "sonnet", verdict=_v("bad", [_finding("Critical", 400)]))
     loaded, step, errors = _decide(policy, plan, tmp_path)
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
     assert step.kind == selection.FAIL
     assert final.state == "failure"
-    assert "Findings on diff lines" not in final.body
-    assert "checker.py:400`" in final.body.split("**Findings outside the diff**")[1]
-    assert "Blocking findings outside the diff still fail the review." in final.body
-
-
-CHECKER = "benchbox/core/equivalence/checker.py"
+    assert "Defects on diff lines" not in final.body
+    assert "checker.py:400`" in final.body.split("**Defects outside the diff**")[1]
+    assert OUTSIDE_NOTE in final.body
 
 
 def _review_final(policy: Policy, tmp_path: Path, findings: list[dict[str, Any]], tier: str = "medium-high"):
     plan = {**_plan(policy, tier), "findings_delivery": "review"}
-    _write(tmp_path, 1, "sonnet" if tier != "very-high" else "opus", verdict={"summary": "s", "findings": findings})
+    _write(tmp_path, 1, "sonnet" if tier != "very-high" else "opus", verdict=_v("s", findings))
     loaded, step, errors = _decide(policy, plan, tmp_path)
     return report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
 
 
-def test_review_delivery_opens_threads_only_for_blocking_severities(policy: Policy, tmp_path: Path) -> None:
+def test_review_delivery_opens_a_thread_for_every_defect_on_a_diff_line(policy: Policy, tmp_path: Path) -> None:
     findings = [_finding("Critical", 2), _finding("High", 1), _finding("Medium", 2), _finding("Low", 1)]
     final = _review_final(policy, tmp_path, findings)
     assert final.review is not None
     assert [item["body"].split("\n", 1)[0] for item in final.review["comments"]] == [
         "**Critical**: Critical issue",
         "**High**: High issue",
+        "**Medium**: Medium issue",
+        "**Low**: Low issue",
     ]
-    outside = final.body.split("**Findings without a review thread**")[1]
-    assert "**Medium** `benchbox/core/equivalence/checker.py:2`: Medium issue" in outside
-    assert "**Low** `benchbox/core/equivalence/checker.py:1`: Low issue" in outside
-    assert "Blocking findings outside the diff" not in final.body
+    assert OUTSIDE_NOTE not in final.body
 
 
-def test_review_delivery_follows_the_tiers_blocking_list(policy: Policy, tmp_path: Path) -> None:
-    final = _review_final(policy, tmp_path, [_finding("Medium", 2), _finding("Low", 2)], tier="very-high")
-    assert final.review is not None
-    assert [item["body"].split("\n", 1)[0] for item in final.review["comments"]] == ["**Medium**: Medium issue"]
-    assert "Low issue" in final.body.split("**Findings without a review thread**")[1]
+@pytest.mark.parametrize("tier", ["medium-high", "very-high"])
+def test_severity_never_gates_a_listed_defect(policy: Policy, tmp_path: Path, tier: str) -> None:
+    final = _review_final(policy, tmp_path, [_finding("Low", 2)], tier=tier)
+    assert final.state == "failure"
+    assert "Decision: **SHIP WITH FIXES**." in final.body
 
 
-def test_review_delivery_keeps_a_blocking_finding_outside_the_diff_in_the_body(policy: Policy, tmp_path: Path) -> None:
+def test_review_delivery_keeps_a_defect_outside_the_diff_in_the_body(policy: Policy, tmp_path: Path) -> None:
     final = _review_final(policy, tmp_path, [_finding("High", 400)])
     assert final.review is not None and final.review["comments"] == []
     assert final.state == "failure"
-    assert "Blocking findings outside the diff still fail the review." in final.body
+    assert OUTSIDE_NOTE in final.body
 
 
 def test_comment_delivery_still_lists_every_finding_on_a_diff_line(policy: Policy, tmp_path: Path) -> None:
     plan = _plan(policy)
-    _write(tmp_path, 1, "sonnet", verdict={"summary": "s", "findings": [_finding("High", 2), _finding("Low", 1)]})
+    _write(tmp_path, 1, "sonnet", verdict=_v("s", [_finding("High", 2), _finding("Low", 1)]))
     loaded, step, errors = _decide(policy, plan, tmp_path)
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
     assert final.review is None
-    assert "Findings on diff lines" in final.body
-    assert "Findings outside the diff" not in final.body and "Findings without a review thread" not in final.body
+    assert "Defects on diff lines" in final.body
+    assert "Defects outside the diff" not in final.body and "Defects without a review thread" not in final.body
     assert "checker.py:1`: Low issue" in final.body
 
 
@@ -413,7 +438,7 @@ def test_the_fingerprint_ignores_the_line_range() -> None:
 
 def test_review_threads_carry_a_fingerprint_marker(policy: Policy, tmp_path: Path) -> None:
     plan = {**_plan(policy), "findings_delivery": "review"}
-    _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": [_finding("High", 2)]})
+    _write(tmp_path, 1, "sonnet", verdict=_v("bad", [_finding("High", 2)]))
     loaded, step, errors = _decide(policy, plan, tmp_path)
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
     assert final.review is not None
@@ -423,13 +448,13 @@ def test_review_threads_carry_a_fingerprint_marker(policy: Policy, tmp_path: Pat
 def test_findings_already_open_are_not_posted_again_but_still_block(policy: Policy, tmp_path: Path) -> None:
     plan = {**_plan(policy), "findings_delivery": "review", "open_findings": [fingerprint(CHECKER, "High issue")]}
     findings = [_finding("High", 2), _finding("Critical", 2)]
-    _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": findings})
+    _write(tmp_path, 1, "sonnet", verdict=_v("bad", findings))
     loaded, step, errors = _decide(policy, plan, tmp_path)
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
     assert final.state == "failure"
     assert final.review is not None
     assert [item["body"].split("\n", 1)[0] for item in final.review["comments"]] == ["**Critical**: Critical issue"]
-    assert "**Findings already open as review threads, not posted again**" in final.body
+    assert "**Defects already open as review threads, not posted again**" in final.body
     assert f"- **High** `{CHECKER}`: High issue" in final.body
 
 
@@ -437,7 +462,7 @@ def test_second_run_with_every_finding_open_adds_no_thread(policy: Policy, tmp_p
     findings = [_finding("High", 2), _finding("Low", 40)]
     prints = [fingerprint(CHECKER, "High issue"), fingerprint(CHECKER, "Low issue")]
     plan = {**_plan(policy), "findings_delivery": "review", "open_findings": prints}
-    _write(tmp_path, 1, "sonnet", verdict={"summary": "bad", "findings": findings})
+    _write(tmp_path, 1, "sonnet", verdict=_v("bad", findings))
     loaded, step, errors = _decide(policy, plan, tmp_path)
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, commentable_lines(DIFF))
     assert final.review is not None and final.review["comments"] == []
@@ -486,7 +511,7 @@ def test_cli_finalize_records_the_reviewed_files(
     plan_path = tmp_path / "plan.json"
     plan_path.write_text(json.dumps(plan), encoding="utf-8")
     attempts_dir = tmp_path / "attempts"
-    _write(attempts_dir, 1, "sonnet", verdict={"summary": "", "findings": []})
+    _write(attempts_dir, 1, "sonnet", verdict=_v("", []))
     _run_cli(
         monkeypatch,
         tmp_path,
@@ -535,7 +560,7 @@ def test_a_pending_run_posts_its_diagnostics_as_a_review(
 
 def test_withheld_result_is_posted_as_a_pending_review(policy: Policy, tmp_path: Path) -> None:
     plan = {**_plan(policy), "findings_delivery": "review"}
-    _write(tmp_path, 1, "sonnet", verdict={"summary": "", "findings": []}, run_id="1")
+    _write(tmp_path, 1, "sonnet", verdict=_v("", []), run_id="1")
     loaded, step, errors = _decide(policy, plan, tmp_path)
     final = report.finalize(plan, step, errors, loaded.attempts, loaded.verdicts, {})
     assert final.state == "pending" and final.review is not None

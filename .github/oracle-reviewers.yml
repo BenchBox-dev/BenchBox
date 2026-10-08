@@ -11,6 +11,9 @@ tier_labels:
   "oracle-tier:low-medium": low-medium
   "oracle-tier:medium-high": medium-high
   "oracle-tier:very-high": very-high
+protocol:
+  max_defects: 10
+  max_do_not_ship: 3
 retry:
   daily_budget: 6
   backoff_start_minutes: 60
@@ -24,6 +27,7 @@ reviewers:
     model: claude-opus-5-5
     effort: medium
     read_only: hard
+    reads_files: true
     timeout_minutes: 30
     turn_cap: 60
     allowed_tiers: [very-high]
@@ -35,6 +39,7 @@ reviewers:
     model: claude-sonnet-5-5
     effort: medium
     read_only: hard
+    reads_files: true
     timeout_minutes: 25
     turn_cap: 60
     allowed_tiers: [low-medium, medium-high]
@@ -46,6 +51,7 @@ reviewers:
     model: gpt-6.1-sol
     effort: medium
     read_only: hard
+    reads_files: true
     timeout_minutes: 25
     turn_cap: null
     allowed_tiers: [low-medium, medium-high, very-high]
@@ -57,6 +63,7 @@ reviewers:
     model: gpt-6-luna
     effort: high
     read_only: hard
+    reads_files: true
     timeout_minutes: 25
     turn_cap: null
     allowed_tiers: [low-medium, medium-high]
@@ -68,6 +75,7 @@ reviewers:
     model: muse-spark-1.3-contributor
     effort: medium
     read_only: hard
+    reads_files: true
     timeout_minutes: 25
     turn_cap: 80
     allowed_tiers: [low-medium, medium-high]
@@ -79,6 +87,7 @@ reviewers:
     model: gemini-3.8-flash-medium
     effort: medium
     read_only: soft
+    reads_files: false
     timeout_minutes: 20
     turn_cap: null
     allowed_tiers: [low-medium, medium-high]
@@ -86,15 +95,12 @@ reviewers:
     disabled_reason: CI authentication and quota output are not yet calibrated, and the workflow has no agy job
 tiers:
   low-medium:
-    blocking: [Critical, High]
     order: [luna, muse, agy, sonnet, sol]
     diversity_exempt: []
   medium-high:
-    blocking: [Critical, High]
     order: [sonnet, sol, luna, muse, agy]
     diversity_exempt: []
   very-high:
-    blocking: [Critical, High, Medium]
     order: [opus, sol]
     diversity_exempt: [opus]
 classifier:

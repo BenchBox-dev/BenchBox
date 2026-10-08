@@ -29,6 +29,7 @@ def test_codex_reviewer_is_hard_read_only_with_output_schema(policy: Policy, tmp
         "read-only",
         "-c",
         "model_reasoning_effort=medium",
+        "--json",
         "--output-schema",
         schema_file,
         "-o",
@@ -81,6 +82,7 @@ def test_agy_reviewer_uses_plan_mode_and_never_effort(policy: Policy, tmp_path: 
     assert invocation.cwd == WS
     assert argv[:5] == ("agy", "--model", "gemini-3.8-flash-medium", "--mode", "plan")
     assert "--effort" not in argv
+    assert argv[argv.index("--output-format") + 1] == "json"
     assert json.loads(argv[argv.index("--json-schema") + 1]) == VERDICT_SCHEMA
     assert argv[-1] == f"--print={PROMPT}"
 

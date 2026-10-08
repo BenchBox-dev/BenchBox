@@ -84,8 +84,8 @@ def _skip_reason(
         return f"skipped: {reviewer.pool} pool out of quota until {blocked_until.isoformat()}"
     if selection.brief_mode == "oversize":
         return "skipped: the brief exceeds the size cap even without the diff"
-    if selection.brief_mode == "file-list" and reviewer.read_only != "hard":
-        return "skipped: the diff exceeds the brief cap and only hard read-only reviewers may read files"
+    if selection.brief_mode == "file-list" and not (reviewer.read_only == "hard" and reviewer.reads_files):
+        return "skipped: the diff exceeds the brief cap and only hard read-only reviewers that read files may review it"
     return None
 
 
@@ -94,9 +94,9 @@ def next_step(selection: SelectionInput, attempts: Sequence[Attempt]) -> Step:
     by_name = {reviewer.name: reviewer for reviewer in selection.chain}
     for attempt in ordered:
         if attempt.outcome == FAIL:
-            return Step(FAIL, by_name.get(attempt.reviewer), (f"{attempt.reviewer}: blocking findings",))
+            return Step(FAIL, by_name.get(attempt.reviewer), (f"{attempt.reviewer}: did not clear the change",))
         if attempt.outcome == PASS:
-            return Step(PASS, by_name.get(attempt.reviewer), (f"{attempt.reviewer}: no blocking findings",))
+            return Step(PASS, by_name.get(attempt.reviewer), (f"{attempt.reviewer}: cleared the change",))
     attempted = {attempt.reviewer: attempt for attempt in ordered}
     quota_pools = {
         by_name[attempt.reviewer].pool

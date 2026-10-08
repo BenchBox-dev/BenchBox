@@ -137,6 +137,22 @@ def test_soundness_pr_plans_a_review_with_a_private_brief(monkeypatch: pytest.Mo
     brief = tmp_path / "plan" / "brief.md"
     assert stat.S_IMODE(brief.stat().st_mode) == 0o600
     assert HEAD in brief.read_text(encoding="utf-8")
+    assert plan["max_defects"] == 10
+    assert plan["evidence_files"] == ["benchbox/core/equivalence/checker.py"]
+    assert "blocking" not in plan
+
+
+def test_evidence_files_are_the_soundness_files_present_at_the_head(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    files = [
+        *SOUNDNESS,
+        {"filename": "benchbox/core/equivalence/gone.py", "additions": 0, "deletions": 3, "status": "removed"},
+        {"filename": "docs/notes.md", "additions": 1, "deletions": 0},
+    ]
+    _, values, plan = _plan(monkeypatch, tmp_path, FakeGitHub(_pull(), files))
+    assert values["decision"] == "review"
+    assert plan["evidence_files"] == ["benchbox/core/equivalence/checker.py"]
 
 
 def test_non_soundness_pr_posts_success_without_reviewers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
