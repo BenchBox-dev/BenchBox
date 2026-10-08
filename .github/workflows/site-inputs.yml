@@ -93,7 +93,13 @@ jobs:
             done
             if [ -n "$PREV" ]; then
               echo "parent_sha=${PREV}" >> "$GITHUB_OUTPUT"
+            elif [ -n "$(printf '%s' "$BUNDLED_SHAS" | tr -d '[:space:]')" ]; then
+              echo "site-inputs bundles exist but none is an ancestor of ${CORE_SHA}; refusing to narrow the range" >&2
+              exit 1
             else
+              {
+                echo "No prior site-inputs bundle found; using ${CORE_SHA}~1 for the first attestation base."
+              } >> "$GITHUB_STEP_SUMMARY"
               echo "parent_sha=$(git rev-parse "${CORE_SHA}~1")" >> "$GITHUB_OUTPUT"
             fi
           fi

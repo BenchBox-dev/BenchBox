@@ -68,6 +68,9 @@ VALIDATOR_EXACT_PATHS = (
     "scripts/validate_submission.py",
     "scripts/publication/validator_parity.py",
     "scripts/generate_corpus_inventory.py",
+    "benchbox/core/benchmark_registry.py",
+    "benchbox/__init__.py",
+    "benchbox/core/__init__.py",
     "pyproject.toml",
     "uv.lock",
 )
@@ -271,7 +274,11 @@ def export_accepted_bundles(accepted_sha: str, dest: Path) -> None:
         archive.extractall(dest, filter="data")
 
 
-def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) -> None:
+def resolve_accepted_sha() -> str:
+    return must_run("git", "-C", str(ROOT), "rev-parse", "--verify", f"{ACCEPTED_CORPUS_REF}^{{commit}}").strip()
+
+
+def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str, accepted_sha: str) -> None:
     db = bundle / "explorer/results.duckdb"
     digest = member_digest(bundle)
     entries = []
@@ -308,9 +315,6 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
             {"core_sha": core_sha},
         )
     )
-    accepted_sha = must_run(
-        "git", "-C", str(ROOT), "rev-parse", "--verify", f"{ACCEPTED_CORPUS_REF}^{{commit}}"
-    ).strip()
     seed = ROOT / "publication/ledger-seed.json"
     if not seed.is_file():
         raise RuntimeError("ledger seed missing: re-home its dispositions before removing it")
@@ -337,7 +341,6 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
                 ],
                 {
                     "snapshot": file_sha(db),
-                    "bundles": tree_sha(core_sha, "results-data/bundles"),
                     "accepted_bundles": tree_sha(accepted_sha, "results-data/bundles"),
                     "ledger_seed": file_sha(seed),
                 },
@@ -345,12 +348,16 @@ def build_attestations(out: Path, bundle: Path, core_sha: str, parent_sha: str) 
             )
         )
     corpus_unchanged = tree_sha(core_sha, "results-data") == tree_sha(parent_sha, "results-data")
-    if corpus_unchanged and not validator_changed(parent_sha, core_sha):
+    if corpus_unchanged:
+        if validator_changed(parent_sha, core_sha):
+            reason = "validator code changed without corpus change; parity reruns on the next corpus change"
+        else:
+            reason = "corpus tree and validator code unchanged since parent"
         entries.append(
             {
                 "name": "validator_parity",
                 "result": "skip",
-                "reason": "corpus tree and validator code unchanged since parent",
+                "reason": reason,
                 "compared": {"base": parent_sha, "head": core_sha},
             }
         )
@@ -417,7 +424,8 @@ def cmd_build(args: argparse.Namespace) -> int:
     (out / "landing").mkdir(parents=True, exist_ok=True)
     build_prompt_catalog(out / "landing/prompt-catalog.json")
     shutil.copy2(ROOT / "_project/design/site-inventory/api-public-symbols.json", out / "api-public-symbols.json")
-    build_attestations(out / "attestations.json", out, core_sha, parent_sha)
+    accepted_sha = resolve_accepted_sha()
+    build_attestations(out / "attestations.json", out, core_sha, parent_sha, accepted_sha)
     members = {
         "docs": member_digest(out / "docs"),
         "repo-files.json": member_digest(out / "repo-files.json"),
@@ -436,6 +444,7 @@ def cmd_build(args: argparse.Namespace) -> int:
         "certified_by": args.certified_by or "local",
         "corpus_sha": tree_sha(core_sha, "results-data"),
         "parent_core_sha": parent_sha,
+        "accepted_sha": accepted_sha,
         "members": members,
         "produced_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -506,6 +515,8 @@ def cmd_verify(out: Path) -> int:
         and (
             ("head" in e["compared"] and e["compared"]["head"] != core_sha)
             or ("base" in e["compared"] and e["compared"]["base"] != parent_sha)
+            or ("core_sha" in e["compared"] and e["compared"]["core_sha"] != core_sha)
+            or ("accepted_ref" in e["compared"] and e["compared"]["accepted_ref"] != manifest.get("accepted_sha"))
         )
     ]
     if rebound:

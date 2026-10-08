@@ -65,15 +65,31 @@ def _bundle(tmp_path: Path, schema: int = 1, attestations: str = "pass") -> Path
             _write(target, body)
     snapshot = site_inputs.member_digest(out / "explorer/results.duckdb")
     att = [
-        {"name": "privacy", "result": attestations, "inputs": {"bundle": "fixture-bundle"}},
+        {
+            "name": "privacy",
+            "result": attestations,
+            "inputs": {"bundle": "fixture-bundle"},
+            "compared": {"core_sha": "abc"},
+        },
         {"name": "explorer_compat", "result": "pass", "inputs": {"snapshot": snapshot}},
         {"name": "snapshot_invariants", "result": "pass", "inputs": {"snapshot": snapshot}},
-        {"name": "corpus_bijection", "result": "pass", "inputs": {"snapshot": snapshot}},
+        {
+            "name": "corpus_bijection",
+            "result": "pass",
+            "inputs": {"snapshot": snapshot},
+            "compared": {"accepted_ref": "acc123"},
+        },
         {"name": "validator_parity", "result": "skip", "compared": {"base": "def", "head": "abc"}},
     ]
     _write(out / "attestations.json", json.dumps(att) + "\n")
     digests = {name: site_inputs.member_digest(out / name) for name in members}
-    manifest = {"schema": schema, "core_sha": "abc", "parent_core_sha": "def", "members": digests}
+    manifest = {
+        "schema": schema,
+        "core_sha": "abc",
+        "parent_core_sha": "def",
+        "accepted_sha": "acc123",
+        "members": digests,
+    }
     _write(out / "manifest.json", json.dumps(manifest) + "\n")
     return out
 
@@ -166,6 +182,34 @@ def test_verify_rejects_compared_head_mismatch(tmp_path: Path) -> None:
     assert site_inputs.cmd_verify(out) == 1
 
 
+def test_verify_rejects_compared_core_sha_mismatch(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, compared={"core_sha": "0" * 40}) if e["name"] == "privacy" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_compared_accepted_ref_mismatch(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    changed = [
+        dict(e, compared={"accepted_ref": "0" * 40}) if e["name"] == "corpus_bijection" else e
+        for e in json.loads((out / "attestations.json").read_text(encoding="utf-8"))
+    ]
+    (out / "attestations.json").write_text(json.dumps(changed) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
+def test_verify_rejects_compared_accepted_ref_without_manifest_key(tmp_path: Path) -> None:
+    out = _bundle(tmp_path)
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    del manifest["accepted_sha"]
+    (out / "manifest.json").write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    assert site_inputs.cmd_verify(out) == 1
+
+
 def test_verify_rejects_compared_base_mismatch(tmp_path: Path) -> None:
     out = _bundle(tmp_path)
     changed = [
@@ -186,6 +230,9 @@ def test_is_validator_path_matches_exact_and_prefix() -> None:
     assert site_inputs.is_validator_path("benchbox/core/results/anonymization.py") is True
     assert site_inputs.is_validator_path("pyproject.toml") is True
     assert site_inputs.is_validator_path("uv.lock") is True
+    assert site_inputs.is_validator_path("benchbox/core/benchmark_registry.py") is True
+    assert site_inputs.is_validator_path("benchbox/__init__.py") is True
+    assert site_inputs.is_validator_path("benchbox/core/__init__.py") is True
     assert site_inputs.is_validator_path("benchbox/core/validation/engines.py") is False
     assert site_inputs.is_validator_path("scripts/validate_submission_test.py") is False
     assert site_inputs.is_validator_path("_project/scripts/explorer_pipeline/transformer.py") is False
