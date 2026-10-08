@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The Windows 3.11 and 3.12 'Run fast tests' steps pass on at least three consecutive scheduled nightlies before the change",
+    "continue-on-error and the quarantine suffix are removed from those legs",
+    "Issue #2568 is closed"
+  ],
+  "description": "After the encoding, path and teardown fixes merge, remove continue-on-error and the '(quarantine #2568)' suffix from the Windows legs of the 'test' job in nightly.yml, so a Windows failure blocks again. Judge readiness by the 'Run fast tests' step on both Windows Python versions, not by job conclusion, because continue-on-error reports a failed job as success. Skip this item if the coverage decision retires the Windows leg instead.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2568"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-08T23:55:56Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "3d39555c3f804cfea1ea06dcf9bd2a69",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}
