@@ -5,6 +5,7 @@
     "The disclosures listed in the description are present",
     "The draft links to the published results from pvm-s6-publish-polars-results, or states where the data lives"
   ],
+  "context": "2026-10-08 BLOCKED: needs pvm-s5 analysis; chain starts at pvm-s0b merging (PR #2781, waiting on the Codex connector review; owner: Codex connector / repository owner). Draft goes in _blog/platform-deep-dives/drafts/ and is not published (D5).",
   "description": "Write the post that presents the Polars 2.0 results, using the blog skill (plan, draft, critique, voice and style checks).\n\nGuardrails:\n- Choose the title and angle after reading the pvm-s5 findings, not before.\n- Lead with the default-settings comparison (setup A), then separate the engine-default change from engine improvements (setup B) and streaming against streaming (setup C).\n- Include the disclosures: host (Apple M4, 16 GiB), thread count, data generation, Parquet reads in each run, min–max per median, did-not-complete cells, the correctness evidence used, and no speed claims against DuckDB.\n- Every chart and number cites the analysis output.\n- Draft only: publishing goes through the blog skill's normal review, and its own approval.",
   "links": [
     "_blog/STYLE_GUIDE.md",
@@ -27,6 +28,14 @@
       "op": "update",
       "op_id": "d67e38defc2e42f6ab7662ff3200023d",
       "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T18:47:29Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "f421e11ab1f74adea0283bd7203caf68",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
     }
   ]
 }
