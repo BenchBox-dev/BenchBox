@@ -79,7 +79,7 @@ required check can stay pending forever on a change that does not touch it.
 | `docs` | `docs/`, CLI and registries | Sphinx build with warnings as errors, example validation, spell check |
 | `landing` | `landing/`, quickstart inputs | site theme token scan |
 | `tooling` | every event | content guard, skill integrity, and audit checks by path |
-| `oracle-review` | every PR; review required on soundness paths | Codex connector review of the current head, or the stand-in approval when the connector cannot review, with connector threads resolved; other paths report success |
+| `oracle-review` | every PR; review required on soundness paths | `benchbox-oracle` success review of the current head, or the stand-in approval, with oracle threads resolved; other paths report success |
 
 The public-site visual comparison is advisory and feeds no required context until the site is in production. It runs only when a rendered public-site input changed
 (`render_changed` in the `visual-inputs` job). The site build keeps the broader
@@ -163,12 +163,14 @@ when the required checks pass and every review thread is resolved. The drift
 check reports a `merge_queue` rule that reappears.
 
 The policy requires `oracle-review` (from `.github/workflows/oracle-review.yml`): it
-passes when the change touches no soundness path, or when the Codex connector
-has reviewed the current head and none of its review threads is unresolved.
+passes when the change touches no soundness path, or when the `benchbox-oracle`
+App's latest review of the current head, submitted after any retarget, reports
+success and none of its review threads is unresolved.
 It also passes when an account in `STANDIN_ATTESTERS`
 (`_project/scripts/oracle_review_check.py`) has posted
 `Stand-in oracle review: APPROVE <full head SHA>` for the exact head after any
-retarget, unedited, with no connector thread unresolved. A
+retarget and after the oracle's latest review of that head, unedited, with no
+oracle thread unresolved. A
 plain owner comment does not count. See
 [soundness drain](soundness-drain.md).
 
@@ -185,10 +187,9 @@ The soundness gate, as operated:
 - `.github/soundness-paths.txt`, read by `_project/scripts/soundness_paths.py`,
   classifies the soundness-critical surface. `oracle-review` checks the diff
   against the trusted base's predicate, including changes to the gate itself.
-  A soundness-path PR needs the Codex connector's review or thumbs-up on its
-  current head, or the stand-in approval when the connector cannot review,
-  with every connector thread resolved.
-- **Residual risk:** `oracle-review` runs the workflow file from the pull request, so a PR that edits `.github/workflows/` can change how its own check runs; checking out the base commit protects only the checker and the manifest. The daily soundness merge digest runs from `develop` and flags a soundness-path commit that merged without the connector's review. It is a weak backstop: the same PR can edit the digest script, and the digest also accepts a review recorded as text in the PR.
+  A soundness-path PR needs the `benchbox-oracle` App's success review of its
+  current head, or the stand-in approval, with every oracle thread resolved.
+- **Residual risk:** `oracle-review` runs the workflow file from the pull request, so a PR that edits `.github/workflows/` can change how its own check runs; checking out the base commit protects only the checker and the manifest. The daily soundness merge digest runs from `develop` and flags a soundness-path commit that merged without an oracle success review or another review signal. It is a weak backstop: the same PR can edit the digest script, and the digest also accepts a review recorded as text in the PR.
 - `make pr-open` does not arm auto-merge when it creates a PR; `make pr-arm`
   (or `make pr-open READY=1`) arms it after a live check of the PR, so a PR
   cannot merge while a follow-up commit is still being written. Arm only when
@@ -214,7 +215,7 @@ The soundness gate, as operated:
   from local HEAD. It enables squash auto-merge for the exact reviewed head;
   required checks and thread resolution control the merge.
 - A new push invalidates the prior head's review. Wait for a current-head
-  connector review and successful `oracle-review` before re-arming a
+  oracle review and successful `oracle-review` before re-arming a
   soundness-path PR. The retired code-owner self-approval deadlock does not
   require manual merging under this policy.
 

@@ -1,15 +1,16 @@
 <!-- Copyright 2026 Joe Harris / BenchBox Project. Licensed under the MIT License. -->
 
-# Self-hosted oracle review (shadow mode)
+# Self-hosted oracle review
 
 ```{tags} contributor, operations, ci
 ```
 
 `.github/workflows/oracle-review-shadow.yml` reviews soundness-path pull
 requests with agent CLIs and posts a non-required `oracle-review-shadow` status
-through the owner's GitHub App. The required `oracle-review` check is
-unchanged. The policy lives in `.github/oracle-reviewers.yml`; the decision
-record is `_project/decisions/oracle-review-v2-shadow-2026-10-05.md`.
+through the owner's GitHub App. The required `oracle-review` check reads that
+App's pull request reviews (see Cut-over). The policy lives in
+`.github/oracle-reviewers.yml`; the decision record is
+`_project/decisions/oracle-review-v2-shadow-2026-10-05.md`.
 
 ## Setup
 
@@ -64,9 +65,8 @@ Without the App secrets, the `post` job logs the result and succeeds.
      summary. DO NOT SHIP opens no thread. A run with no verdict still
      posts a review that explains the pending result, so the latest review
      always reflects the latest run. The ruleset requires every thread to be
-     resolved, so these threads block merges like the connector's. The
-     policy uses `review` from the start of the parity period before the
-     cut-over.
+     resolved, so these threads block merges. The policy has used `review`
+     since the parity period, and the oracle signal requires it.
 
 ## Rounds
 
@@ -256,10 +256,13 @@ review the pull request actually received.
 
 ## Cut-over
 
-The required `oracle-review` check takes `--signal connector` (the default) or
+The cut-over is done: `.github/oracle-reviewers.yml` sets `mode: enforce` and
+`.github/workflows/oracle-review.yml` passes `--signal oracle`. The required
+`oracle-review` check takes `--signal connector` (the script's default) or
 `--signal oracle`. With `connector` it requires the Codex connector's review
 of the head, or its thumbs-up, and counts the connector's open threads. With
-`oracle` it requires, from the `benchbox-oracle` App's Bot account:
+`oracle`, the signal in use, it requires, from the `benchbox-oracle` App's Bot
+account:
 
 - a review of the head, not pending or dismissed, submitted after any retarget,
   whose latest one opens with `### oracle-review-shadow: success for` the head
@@ -279,11 +282,12 @@ verdict is a deliberate act; it never overrides an open thread.
 
 Every run also evaluates the signal it does not require and logs the result on
 two `parity:` lines. That evaluation fetches its own inputs, and an error in it
-is logged and never changes the check's result. Compare those lines across real
-pull requests before the cut-over.
+is logged and never changes the check's result. Since the cut-over, the
+connector lines are informational only.
 
 The checker runs from the base commit, so the workflow can pass `--signal`
-only after `develop`'s copy of the script accepts it. The cut-over sets
-`mode: enforce` in `.github/oracle-reviewers.yml` and adds `--signal oracle`
+only after `develop`'s copy of the script accepts it. The cut-over set
+`mode: enforce` in `.github/oracle-reviewers.yml` and added `--signal oracle`
 to `.github/workflows/oracle-review.yml` in the same change; a unit test fails
-if they disagree or if delivery is not `review`.
+if they disagree or if delivery is not `review`. To revert, set `mode: shadow`
+and remove `--signal oracle` in the same change.

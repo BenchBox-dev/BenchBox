@@ -3,8 +3,7 @@
 Ready PRs target an integration branch. Stacking is allowed narrowly: a stack
 belongs to one agent and one tracker item and is at most three PRs deep. Agents
 must not build on another agent's unmerged branch. Every PR above the bottom one
-is a **draft** that targets its parent branch, so it gets Codex connector review
-and CI there. When the parent squash-merges, retarget the child to `develop`,
+is a **draft** that targets its parent branch, so it gets CI there. When the parent squash-merges, retarget the child to `develop`,
 rebase it onto the squash commit with
 `git rebase --onto origin/develop <old parent tip>`, let CI
 rerun, and only then arm it. `make pr-open` always targets `develop`, so open
@@ -82,11 +81,11 @@ rebased before it can land:
    `git rebase --onto origin/develop <old parent tip>` and force-push with
    `--force-with-lease` on the feature branch only.
 3. Mark it ready for review (`gh pr ready`). `make pr-arm` rejects drafts, and
-   the transition re-runs the base guard and requests a connector review.
-4. Wait for CI on the new head. For a soundness-path change, also wait for a
-   Codex connector review or thumbs-up on the rebased head: the rebase
-   rewrites the head, so review of the draft against its parent no longer
-   covers it.
+   the transition re-runs the base guard and starts an oracle review.
+4. Wait for CI on the new head. For a soundness-path change, also wait for an
+   oracle success review on the rebased head: the oracle does not review
+   drafts or PRs based on a parent branch, so this is the first review the
+   change gets.
 5. Arm it with `make pr-arm`.
 
 In a stack three deep (`A <- B <- C`), rewriting `B` leaves `C` based on the

@@ -8,20 +8,23 @@
 ## The signal, and what it is not
 
 Soundness-path PRs (paths in `.github/soundness-paths.txt`) merge only after
-the required `oracle-review` check passes, which needs the Codex connector's
-review of the current head. CI cannot catch a change that redefines the oracle
-it validates against, so such a PR can sit green but unmergeable while it
-waits for that review.
+the required `oracle-review` check passes, which needs a success review of the
+current head from the `benchbox-oracle` App. CI cannot catch a change that
+redefines the oracle it validates against, so such a PR can sit green but
+unmergeable while it waits for that review. The oracle reviews each push on its own; to rerun it,
+post a top-level `/oracle-review` comment or run
+`gh workflow run oracle-review-shadow.yml --ref develop -f pr=<number>`.
 
-When the Codex connector cannot review (for example at its usage limit), a
+When the oracle cannot review, or its verdict must be overruled, a
 listed attester in `STANDIN_ATTESTERS` (`_project/scripts/oracle_review_check.py`)
 can substitute an independent stand-in review. After that review of the
 current head, the attester posts a PR comment whose whole text is the line
 `Stand-in oracle review: APPROVE <full head SHA>`; the review itself goes in a
 separate comment. The check accepts it only for
-that exact head, only if posted after any retarget, and never while a review
-thread from the required reviewer is unresolved. It is not compared with the
-push time, so it can be posted as soon as the head exists. An edited comment
+that exact head, only if posted after any retarget and after the oracle's
+latest review of that head, and never while a review thread from the oracle
+is unresolved. It is not compared with the push time, but a later oracle
+review of the head supersedes it. An edited comment
 does not count, and neither does one with any other text, because Markdown
 around the line can hide or quote it.
 Posting the comment does not rerun the check: rerun the latest oracle-review
@@ -108,8 +111,8 @@ back under 24h on a fresh push, etc.). Do not hand-manage it — the next
 ## The digest issue
 
 No workflow runs the report on a schedule any more: the daily
-`soundness-drain.yml` was retired with the six-unit CI; the Codex connector
-now reviews soundness-path PRs. Run
+`soundness-drain.yml` was retired with the six-unit CI; the `benchbox-oracle`
+App now reviews soundness-path PRs. Run
 `make soundness-drain-report` for the read-only view, or the script with
 `--apply` when you want the label and issue updated. The digest is posted to a single pinned issue titled
 **"Soundness-PR drain queue"** — found by exact title plus a body marker

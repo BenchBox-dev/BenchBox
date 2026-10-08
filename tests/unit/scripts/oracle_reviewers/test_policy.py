@@ -17,8 +17,8 @@ def _raw() -> dict[str, Any]:
     return yaml.safe_load(POLICY_PATH.read_text(encoding="utf-8"))
 
 
-def test_policy_is_in_shadow_mode_with_its_own_context(policy: Policy) -> None:
-    assert policy.mode == "shadow"
+def test_policy_enforces_with_its_own_context(policy: Policy) -> None:
+    assert policy.mode == "enforce"
     assert policy.status_context == "oracle-review-shadow"
     assert policy.findings_delivery == "review"
     assert policy.bot_login == "benchbox-oracle"
