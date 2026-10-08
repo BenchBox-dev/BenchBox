@@ -1,0 +1,19 @@
+{
+  "acceptance": [
+    "2026-10-09 (or subsequent) scheduled nightly validation run passes throughput-uat job with cedardb cell (quarantine removed)",
+    "Throughput@Size floor calculates rolling median from retained annotations without falling back to observe-only or false alerting",
+    "Results artifact is uploaded and verified"
+  ],
+  "context": "Post-merge verification for PR #2757.",
+  "description": "PR #2757 unquarantined the CedarDB throughput UAT cell (removed continue-on-error) and activated the per-runner-class rolling median floor. PR #2757 was merged after 2 green nightly cells with owner waiver. The first official gating nightly run will be 2026-10-09 (or next scheduled run). Monitor this run to ensure the unquarantined CedarDB cell, statement timeouts, and numeric floor evaluate cleanly in production without false-positive ejection.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:2a10096285872d23ac8a3bfe",
+      "at": "2026-10-08T23:40:25Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "3106dedaeb2546adb0bf719f16c1d902",
+      "session_id": "414237a6e56140ed97e26a248092ab35"
+    }
+  ]
+}

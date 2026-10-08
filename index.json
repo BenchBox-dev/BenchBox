@@ -13337,6 +13337,13 @@
       "status": "done",
       "title": "Modularize build orchestration by domain after quality contracts stabilize"
     },
+    "monitor-nightly-cedardb-throughput-gate-and-floor": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Verify first unquarantined nightly throughput run and numeric floor baseline"
+    },
     "motherduck-cloud-deployment-integration-testing": {
       "claim": null,
       "needs": [],
