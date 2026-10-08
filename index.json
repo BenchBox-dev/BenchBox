@@ -21116,6 +21116,15 @@
       "status": "done",
       "title": "TPC-DS Streaming Data Generation Compression ✅"
     },
+    "tpc-full-spec-cli-and-api-names": {
+      "claim": null,
+      "needs": [
+        "tpc-full-spec-enforcement"
+      ],
+      "priority": "medium",
+      "status": "open",
+      "title": "Rename the TPC run mode to full-spec with deprecated official aliases"
+    },
     "tpc-full-spec-enforcement": {
       "claim": null,
       "needs": [],
