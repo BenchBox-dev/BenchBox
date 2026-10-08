@@ -6,7 +6,7 @@
     "The datagen manifests show the fixed dbgen stamp (path and hash recorded)",
     "The projected wall time and the D2 budget outcome (fits, trimmed set, or split plan) with the handoff authority quoted are recorded in context"
   ],
-  "context": "The DuckDB SF10 matrix (2026-08-29) took 2.02 h for 116 commands; TPC-DS power took 63 min of that. Its 7 TPC-H SF10 bundles carry known_defects defective-macdbgen-addresses, so its data must not be reused. polars-df converts generated files to Parquet with pyarrow (data_loader.py:447-519), so the Parquet bytes do not depend on the Polars version; runner.py:964 makes every DataFrame run reload its tables.",
+  "context": "The DuckDB SF10 matrix (2026-08-29) took 2.02 h for 116 commands; TPC-DS power took 63 min of that. Its 7 TPC-H SF10 bundles carry known_defects defective-macdbgen-addresses, so its data must not be reused. polars-df converts generated files to Parquet with pyarrow (data_loader.py:447-519), so the Parquet bytes do not depend on the Polars version; runner.py:964 makes every DataFrame run reload its tables.\n2026-10-08 BLOCKED: needs pvm-s1's version list, and pvm-s1 needs pvm-s0b merged (PR #2781, waiting on the Codex connector review; owner: Codex connector / repository owner).",
   "description": "The matrix host is an Apple M4 with 10 cores and 16 GiB RAM. No Polars SF10 result exists. In 1.x, the default in-memory engine cannot spill; 2.0 spills to disk by default at 80% of RAM. Decide feasibility per benchmark before the full run. This item is a pilot: its timings never enter the published results (D0 C7).\n\nWork: at SF10 with freshly generated data (see guardrails), run each of tpch, tpcds, ssb and clickbench twice on each of: 2.0.0 setup A (default), 2.0.0 setup B (in-memory), 1.44.2, and the oldest version admitted by pvm-s1. Sample the benchmark process tree's RSS every second (psutil) and record its peak; record host swap-out growth (vm_stat) and `memory_pressure` level as host-pressure flags; pin POLARS_TEMP_DIR to a directory in the output dir and record spill bytes and free disk. Stop other heavy processes.\n\nReference row counts (D0 C6/A9): run each benchmark once with DuckDB SQL (untimed) on the same generated data at the chosen scale factor and record each query's result row count. This is the cross-version agreement reference; it does not depend on any Polars cell completing. Regenerate it at SF1 if a benchmark drops to SF1.\n\nOutcome classes and resource policy, fixed before measuring (D0 C5/A5/A15):\n- completed: exit 0, peak process-tree RSS <= 14 GiB, host swap-out growth <= 1 GiB.\n- resource-policy-exceeded: completed but over either limit (timing kept separately, excluded from headline comparisons).\n- timeout (wall time > 3x the 2.0.0 setup A time for that benchmark, minimum 30 min), oom-killed, execution-failure.\n- If 2.0.0 setup A itself is not \"completed\" on a benchmark at SF10, that benchmark drops to SF1 for every version and setup, and the drop is disclosed. No per-version scale substitution.\n- A setup where 2.0 completes and 1.x does not is a result to report, not a defect.\n\nDecision gate: the per-benchmark scale factor, the did-not-complete list, and the projected full-matrix wall time (3 rounds x versions x setups x benchmarks, each invocation including its internal per-query warm-up) are recorded. Budget per handoff D2: pre-approved up to 24 h; trim optional versions (1.12.0, 1.22.0, 1.31.0, then 1.0.0), then setup C on 1.35.2/1.40.1; never drop A or B on guaranteed versions; run the minimum set up to 48 h; beyond that, split by benchmark across sessions.\n\nGuardrails:\n- Data must come from the fixed generator: confirm the datagen manifest records the fixed dbgen binary stamp (the macOS dbgen address defect, #2708).\n- Output directory is outside the checkout.",
   "links": [
     "results-data/DEFECTIVE_DATAGEN_AUDIT.md",
@@ -36,6 +36,14 @@
       "op": "update",
       "op_id": "39e2a97b6b01481099fbbb8bf227435b",
       "session_id": "812ba5be3c0c4d27866953a8d8ff4e33"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T18:47:04Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "4fba284149ba4222aabf0b5f056b8add",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
     }
   ]
 }
