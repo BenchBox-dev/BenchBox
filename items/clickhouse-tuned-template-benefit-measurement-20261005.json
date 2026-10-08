@@ -61,6 +61,15 @@
       "op": "defer",
       "op_id": "f8beb1d67a7c422181ec5d4510d7cdef",
       "session_id": "0b049bb7b35344849c3bc1ea57ed95a2"
+    },
+    {
+      "actor": "mcp:tbh:joe@joe-mac-mini.local:154ae91a481281d11ac2019e",
+      "at": "2026-10-08T11:36:02Z",
+      "client": "tbh",
+      "generation": "52e3a0065e5d43c8ba223b66d687be9f",
+      "op": "release",
+      "op_id": "66ac84654f084fd695031a067fb5374c",
+      "session_id": "0b049bb7b35344849c3bc1ea57ed95a2"
     }
   ]
 }
