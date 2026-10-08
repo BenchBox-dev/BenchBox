@@ -19201,7 +19201,7 @@
       "claim": null,
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "dropped",
       "title": "Keep internal files out of the site under the Sphinx fallback renderer"
     },
     "site-split-00-adr-soundness-scope": {
