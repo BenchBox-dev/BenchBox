@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "Shadow data on muse file-list SHIPs is compared with other reviewers' results",
+    "A decision: require a traced second reviewer, add a muse trace, or accept the risk with its documented reason",
+    "_project/decisions/oracle-review-protocol-2026-10-08.md records the outcome"
+  ],
+  "description": "muse (read_only: hard, reads_files: true) can take file-list briefs, but leaves no read trace, so only its own files_examined list and the citation check apply. muse is early in the low-medium and medium-high chains. agy cannot read files in headless plan mode (reads are denied) and stays disabled with reads_files: false. The decision record leaves open whether a muse or agy SHIP on a file-list brief needs a second reviewer.",
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-08T23:32:01Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "faa10e1284794cae86cd653ae542d228",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}

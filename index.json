@@ -13849,6 +13849,13 @@
       "status": "open",
       "title": "Oracle runner gaps: staged diff hidden from the integrity check, shared credentials, stand-in window"
     },
+    "oracle-self-attested-file-list-reviewers-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "muse and agy SHIP verdicts on file-list briefs are self-attested"
+    },
     "oracle-strike-count-distinct-patches-20261008": {
       "claim": null,
       "needs": [],
