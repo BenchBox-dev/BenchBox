@@ -6,10 +6,9 @@
 # contributors. Maintainer runbooks, governance, release and CI procedure,
 # dated evidence, incident records and planning documents belong in
 # docs/internal/, which is never published. A page in these directories that
-# stays unpublished must be listed in EXCLUDED_FILES in
-# website/src/converter/sources.ts and exclude_patterns in docs/conf.py.
+# stays unpublished must be listed in docs/publish-exclusions.txt.
 #
-# website/tests/sources.test.ts and tests/unit/docs/test_publish_allowlist.py
+# tests/unit/docs/test_publish_policy.py and website/tests/sources.test.ts
 # enforce this list.
 
 development/adding-dataframe-platform.md
