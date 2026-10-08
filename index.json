@@ -13751,6 +13751,13 @@
       "status": "done",
       "title": "oracle map renders a staged gate's scale from the shared default and passes unknown provenance labels through"
     },
+    "oracle-read-evidence-tightening-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Oracle read evidence still accepts reads that show none of the head file's content"
+    },
     "oracle-review-codex-limit-fallback-20261006": {
       "claim": null,
       "needs": [],
