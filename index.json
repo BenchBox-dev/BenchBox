@@ -1995,6 +1995,13 @@
       "status": "done",
       "title": "Fix (not just pin) calculate_checksum's separator/dtype collisions with an escaped, type-tagged rendering plus same-change digest regen"
     },
+    "canary-chdb-stub-leak-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "critical",
+      "status": "open",
+      "title": "Stop test_tpchavoc_clickhouse_equivalence from leaking the chdb module global past the stub-installer guard"
+    },
     "canary-compat-gate-test-predicate-20261008": {
       "claim": null,
       "needs": [],

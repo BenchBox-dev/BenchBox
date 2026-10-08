@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "The equivalence tests pass under the leak guard in a shard run that includes them, with and without chdb installed",
+    "chdb is not added to the global ignore list unless a written reason shows the global cannot be restored",
+    "A test in test_stub_installer_isolation.py still shows the guard flags a real leak of this attribute"
+  ],
+  "context": "Failing in release canary runs 37798380568 (shard 1) and an earlier shard 2 run. The failing set changes day to day (4 tests on 2026-10-06, 9 on 2026-10-07, 3 on 2026-10-08), so confirm against a fresh canary run rather than the old list. Not reproducible locally in a quick run; reproduce under the shard's xdist settings.",
+  "description": "The release canary fails in shards 1 and 2 with 'test leaked stub-installer state on adapter modules: benchbox.platforms.clickhouse._dependencies.chdb' on tests in tests/integration/platforms/test_tpchavoc_clickhouse_equivalence.py. The guard in tests/integration/platforms/conftest.py (find_stub_adapter_attr_leaks) reports the attribute because it is None when the snapshot is taken and the imported chdb module afterwards. This is a different attribute from the __warningregistry__ one fixed in the commit that added _IGNORED_LEAK_ATTRS, so that fix does not cover it. Prefer restoring the global in the test or its fixture (monkeypatch) over adding chdb to _IGNORED_LEAK_ATTRS, because an ignore entry would hide real leaks of the same attribute from later tests.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/issues/2728"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:d02dfef56486eaa54f16af92",
+      "at": "2026-10-08T23:54:55Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "932d606bb0b148edb66e9e8cea14b36d",
+      "session_id": "e40b1c8674df4499842f44749410458f"
+    }
+  ]
+}
