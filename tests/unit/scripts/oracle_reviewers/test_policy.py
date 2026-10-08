@@ -61,9 +61,9 @@ def test_agy_is_disabled_until_calibrated(policy: Policy) -> None:
     assert "calibrated" in agy.disabled_reason
 
 
-def test_muse_is_enabled_first_in_low_medium(policy: Policy) -> None:
+def test_muse_is_enabled_second_in_low_medium(policy: Policy) -> None:
     assert policy.reviewers["muse"].enabled is True
-    assert policy.tiers["low-medium"].order[0] == "muse"
+    assert policy.tiers["low-medium"].order[:2] == ("luna", "muse")
     enabled = {name for name, reviewer in policy.reviewers.items() if reviewer.enabled}
     assert enabled == {"opus", "sonnet", "sol", "luna", "muse"}
 
@@ -80,7 +80,7 @@ def test_max_attempts_must_cover_the_longest_enabled_chain() -> None:
 
 
 def test_tier_orders_and_blocking(policy: Policy) -> None:
-    assert policy.tiers["low-medium"].order == ("muse", "agy", "luna", "sonnet", "sol")
+    assert policy.tiers["low-medium"].order == ("luna", "muse", "agy", "sonnet", "sol")
     assert policy.tiers["medium-high"].order == ("sonnet", "sol", "luna", "muse", "agy")
     assert policy.tiers["very-high"].order == ("opus", "sol")
     assert policy.tiers["low-medium"].blocking == ("Critical", "High")

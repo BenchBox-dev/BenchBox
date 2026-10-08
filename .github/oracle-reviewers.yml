@@ -87,7 +87,7 @@ reviewers:
 tiers:
   low-medium:
     blocking: [Critical, High]
-    order: [muse, agy, luna, sonnet, sol]
+    order: [luna, muse, agy, sonnet, sol]
     diversity_exempt: []
   medium-high:
     blocking: [Critical, High]
