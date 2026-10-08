@@ -13821,6 +13821,13 @@
       "status": "open",
       "title": "oracle-review starts a run for every review-thread reply"
     },
+    "oracle-runner-integrity-lows-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Oracle runner gaps: staged diff hidden from the integrity check, shared credentials, stand-in window"
+    },
     "oracle-strike-count-distinct-patches-20261008": {
       "claim": null,
       "needs": [],
