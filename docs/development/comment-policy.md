@@ -53,10 +53,13 @@ exits successfully, so a pull request is never blocked for a comment. Findings
 about input the checker could not analyze are reported the same way and do not
 fail either, and the summary line counts them, so the gaps are visible before
 the switch to blocking. Parser and configuration failures, which stop the check
-before it has findings, still fail in both modes. `comment-policy-strict` and
-`comment-policy-report` ignore the mode. Paths and comment text in the output
-come from the pull request, so control characters are escaped and a line is
-never left starting with `::`.
+before it has findings, still fail in both modes. The enforced gate is the CI
+comparison (`scripts/run_comment_policy.py`) at 0 violations against the base commit.
+Strict mode (`make comment-policy-strict`) is a diagnostic tool that scans the whole
+inventory applying the candidate's own exceptions, rather than the baseline intersection,
+and is not an enforced CI gate. `comment-policy-report` provides raw inventory counts. Paths and
+comment text in the output come from the pull request, so control characters are
+escaped and a line is never left starting with `::`.
 
 Moving from `advisory` to `blocking` is a one-line change to the policy. It is
 checked against the base policy, so that change is not blocked by itself, and
@@ -180,3 +183,10 @@ Known gaps, each a place where a comment can pass unreported:
   such comments where they are part of the product's output, for example
   maintenance SQL headers, dry-run DDL previews, stream-file headers, the Trino
   tuning note and the AWS Glue job script.
+- A program piped to an unmodeled interpreter on stdin (such as `printf '...' | perl`
+  or `echo '...' | ruby`) is not scanned.
+- A whole-file pinned notice in `quality/comment-cleanup-scope.json` (such as
+  `_sources/tpc-h/PATCHES.md`) is verified against its recorded digest, but
+  changes to the file are not guarded to require an accompanying pin update on branches.
+- MDX (`.mdx`) files map to the Markdown scanner, so MDX imports and JSX `{/* */}`
+  comments outside Markdown code fences are not inspected.

@@ -114,3 +114,30 @@ test('method-form reviewed wrappers and spread SQL arguments stay visible', () =
   assert.equal(scan('a.ts', 'query(...["SELECT 1 -- hi"]);')[0].kind, 'coverage-error');
   assert.deepEqual(scan('a.ts', 'let statement; statement = await conn.prepare("SELECT ?"); statement.query(...params);').filter(f => f.kind !== 'payload'), []);
 });
+
+test('reviewed JavaScript flows still occur in source files', () => {
+  const fs = require('node:fs');
+  const expected = [
+    ['results-explorer/src/db.ts', 'unresolved executable sql payload: scan.sql'],
+    ['results-explorer/src/pages/Query.tsx', 'unresolved executable sql payload: pageQueries.count.sql'],
+    ['results-explorer/src/pages/Query.tsx', 'unresolved executable sql payload: pageQueries.rows.sql'],
+    ['results-explorer/src/pages/Query.tsx', 'unresolved executable sql payload: query.sql'],
+    ['results-explorer/src/pages/Query.tsx', 'unresolved executable sql payload: selectQuery.sql'],
+    ['results-explorer/src/pages/Query.tsx', 'unresolved executable sql payload: sqlText'],
+  ];
+  const files = new Set(expected.map(([file]) => file));
+  const observed = new Set();
+  for (const relPath of files) {
+    const fullPath = path.resolve(__dirname, '../../..', relPath);
+    const source = fs.readFileSync(fullPath, 'utf8');
+    for (const finding of scan(relPath, source)) {
+      observed.add(`${relPath}::${finding.text}`);
+    }
+  }
+  for (const [relPath, text] of expected) {
+    assert.ok(
+      observed.has(`${relPath}::${text}`),
+      `expected reviewed flow "${text}" in ${relPath}`
+    );
+  }
+});

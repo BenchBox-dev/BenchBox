@@ -935,7 +935,7 @@ provides-extras = ["dev", "docs", "viz", "explorer", "all", "cloud", "cloudstora
 dev = [
     { name = "ablog", marker = "python_full_version >= '3.11'", specifier = ">=0.11.13" },
     { name = "ansi2html", specifier = ">=1.8.0" },
-    { name = "bashlex", specifier = ">=0.18" },
+    { name = "bashlex", specifier = "==0.18" },
     { name = "chdb", marker = "sys_platform != 'win32'", specifier = ">=0.10.0" },
     { name = "clickhouse-connect", specifier = ">=0.10.0" },
     { name = "clickhouse-driver", specifier = ">=0.2.0" },

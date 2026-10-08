@@ -14,7 +14,7 @@ import tokenize
 from collections import Counter
 from dataclasses import asdict
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from check_comment_cleanup_scope import (
     COMMENT_POLICY_DIRECTIVES,
@@ -70,12 +70,33 @@ def expired_policy_findings(policy: dict) -> list[Finding]:
     ]
 
 
+def _is_wheel_bump(candidate_entry: dict, baseline_entry: dict) -> bool:
+    cand_path = PurePosixPath(candidate_entry["path"])
+    base_path = PurePosixPath(baseline_entry["path"])
+    if cand_path.suffix != ".whl" or base_path.suffix != ".whl":
+        return False
+    if cand_path.parent != base_path.parent:
+        return False
+    if candidate_entry.get("owner") != baseline_entry.get("owner"):
+        return False
+    if candidate_entry.get("provenance") != baseline_entry.get("provenance"):
+        return False
+    cand_dist = cand_path.name.split("-", 1)[0]
+    base_dist = base_path.name.split("-", 1)[0]
+    return cand_dist == base_dist
+
+
 def check_ratchet(policy: dict, baseline: dict) -> None:
     if baseline.get("enforcement", "blocking") == "blocking" and policy.get("enforcement", "blocking") == "advisory":
         raise ValueError("enforcement cannot be relaxed from blocking to advisory")
     if not set(baseline["completed"]).issubset(policy["completed"]):
         raise ValueError("completed scopes cannot be removed")
-    if any(entry not in baseline["external"] for entry in policy["external"]):
+    for entry in policy["external"]:
+        if entry in baseline["external"]:
+            continue
+        matched_base = [b for b in baseline["external"] if _is_wheel_bump(entry, b)]
+        if matched_base and not any(b in policy["external"] for b in matched_base):
+            continue
         raise ValueError("candidate policy cannot add or expand external exclusions")
 
 
