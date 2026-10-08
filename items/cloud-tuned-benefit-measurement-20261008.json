@@ -1,12 +1,13 @@
 {
   "acceptance": [
+    "Fake-driver unit tests cover the Databricks and Snowflake settle hooks and cost readers, and the verification ladder passes.",
     "Owner approvals (command, runtime, cost cap, log path, stop condition) are recorded in context before each run.",
     "Each platform and template has harness output with clustering state, settle condition, load and maintenance time, cost and CIs (paths in context).",
     "Each template has a benefit-rule verdict, and its evidence state is updated.",
     "Any template change the verdict calls for is filed or made through the profile and generator."
   ],
   "context": "Source: tuning-evidence plan (2026-10-08), plan step 9. Covers muse F11/F13/F15 (cost metering and clustering state). The plan first put this inside the existing live-certification items. It is a separate item so that certification (does tuning apply and verify) stays apart from benefit (does it help).",
-  "description": "## Problem\nNo Databricks or Snowflake tuned template has been measured against `notuning`. On both platforms, layout work is asynchronous and costs money: Databricks OPTIMIZE/ZORDER, and Snowflake automatic reclustering (\"reclustering consumes credits\"; rows are \"not necessarily updated immediately\"). A comparison that ignores clustering state or cost can mislead either way.\n\n## Change\nAfter live certification has passed, run the harness on Databricks and Snowflake for TPC-H, and TPC-DS if the budget allows. For each arm, record:\n- clustering state before timing: Snowflake `SYSTEM$CLUSTERING_INFORMATION`, and Databricks `DESCRIBE DETAIL` (numFiles, size) plus OPTIMIZE metrics;\n- the settle condition used (for example, reclustering idle, or OPTIMIZE finished);\n- load time and OPTIMIZE or reclustering time;\n- cost from billing or query-history views (Snowflake credits, Databricks DBUs).\n\nApply the benefit rule, record a verdict per template and tier, and update the evidence states.\n\n## Decision gates\n- Each live run needs explicit owner approval naming the command, maximum runtime, maximum cost, log path and stop condition.\n- The owner picks the scale factor(s), and the evidence records that they are far below the vendors' 1 TB / multi-TB guidance.\n\n## Guardrails (must preserve)\n- Use dedicated database names; never shared ones.\n- Never relax a certification assertion.\n- Stop at the approved cost cap.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit owner approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
+  "description": "## Problem\nNo Databricks or Snowflake tuned template has been measured against `notuning`. On both platforms, layout work is asynchronous and costs money: Databricks OPTIMIZE/ZORDER, and Snowflake automatic reclustering (\"reclustering consumes credits\"; rows are \"not necessarily updated immediately\"). A comparison that ignores clustering state or cost can mislead either way.\n\n## Change\n1. Extend the measurement harness (`tuning-evidence-measurement-harness-20261008`) through its platform seam with Databricks and Snowflake connections, settle hooks and cost readers:\n   - Snowflake: settle when automatic reclustering is idle, from `SYSTEM$CLUSTERING_INFORMATION`. Read cost from query-history and metering views (credits).\n   - Databricks: settle when OPTIMIZE has finished, reading `DESCRIBE DETAIL` numFiles and size. Read cost from system billing tables (DBUs).\n   - Cover the hooks and readers with fake-driver unit tests before any live run.\n2. After live certification has passed, run the harness for TPC-H on both platforms, and TPC-DS if the budget allows. For each arm, record clustering state before timing, the settle condition, load and maintenance time, and cost.\n3. Apply the benefit rule, record a verdict per template and tier, and update the evidence states.\n\n## Decision gates\n- Each live run needs explicit owner approval naming the command, maximum runtime, maximum cost, log path and stop condition.\n- The owner picks the scale factor(s), and the evidence records that they are far below the vendors' 1 TB / multi-TB guidance.\n\n## Guardrails (must preserve)\n- Use dedicated database names; never shared ones.\n- Never relax a certification assertion.\n- Stop at the approved cost cap.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`. Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- No live cloud runs without explicit owner approval stating the command, maximum runtime, log path and stop condition.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
   "links": [
     "https://docs.snowflake.com/en/user-guide/tables-clustering-keys",
     "https://docs.databricks.com/aws/en/delta/clustering"
@@ -18,6 +19,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "907712132a494fe8a8635aff56ba2983",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:35:27Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "94fd21474096407b93da606d7e2621e2",
       "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
