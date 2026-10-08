@@ -1299,6 +1299,38 @@ describe("Compare", () => {
     expect(queryDiff).toHaveTextContent("This page does not name a winner because phases differ");
   });
 
+  it("suppresses winner claims for direct compare URLs with different throughput stream counts", async () => {
+    const threeStreams = makeResult({
+      result_id: "r1",
+      platform: "DuckDB",
+      platform_id: "duckdb",
+      test_type: "throughput",
+      stream_count: 3,
+    });
+    const twoStreams = makeResult({
+      result_id: "r2",
+      platform: "SQLite",
+      platform_id: "sqlite",
+      power_score: 300,
+      display_timings: SQLITE.display_timings,
+      test_type: "throughput",
+      stream_count: 2,
+    });
+    vi.mocked(getDetailResult).mockImplementation((id) =>
+      id === "r1" ? Promise.resolve(threeStreams) : Promise.resolve(twoStreams),
+    );
+
+    render(<Compare />);
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Comparison summary" })).toBeTruthy();
+    });
+
+    const summary = screen.getByRole("heading", { name: "Comparison summary" }).closest("section");
+    expect(summary).toHaveTextContent("Not directly comparable: stream counts differ.");
+    expect(summary).toHaveTextContent("No winner named");
+    expect(summary).not.toHaveTextContent("DuckDB's power score was");
+  });
+
   it("keeps the detailed comparability receipt after decision and chart evidence", async () => {
     render(<Compare />);
     await waitFor(() => {

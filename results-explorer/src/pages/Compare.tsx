@@ -11,6 +11,7 @@ import {
 } from "@/lib/duckdbQueries";
 import { errMsg, fmtGeomean } from "@/utils";
 import { canonicalBenchmarkSlug, canonicalPhase, formatBenchmarkLabel } from "@/lib/displayLabels";
+import { compareCohortSignatureForRow } from "@/lib/compareCohort";
 import { resultDetailHref, visibleResultIdForRow, MAX_COMPARE_SELECTIONS } from "@/lib/resultLinks";
 import { formatRunIdentitiesForCohort, type RunIdentitySource } from "@/lib/runIdentity";
 import { CompareSummarySkeleton } from "@/components/LoadingSpinner";
@@ -942,6 +943,9 @@ function severeCohortMismatchReason(results: DetailResult[]) {
   }
   if (new Set(results.map((result) => canonicalPhase(result.test_type))).size > 1) {
     reasons.push("phases differ");
+  }
+  if (new Set(results.map((result) => compareCohortSignatureForRow(result).streamCount)).size > 1) {
+    reasons.push("stream counts differ");
   }
   return reasons.length > 0 ? reasons.join(" and ") : null;
 }
