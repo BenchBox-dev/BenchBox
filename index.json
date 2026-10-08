@@ -15106,12 +15106,17 @@
       "title": "Measure Polars performance across 1.x and 2.0 with a reproducible version matrix"
     },
     "pvm-s0a-polars2-compat-fixes": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T03:30:31Z",
+        "generation": "e6b5a48cdf7448fe84aa7f00f44b9eec",
+        "renewals": 0,
+        "worker": "mcp:claude-code:joe@joe-mac-mini.local:92b9e135d2dfcf93e45171b1"
+      },
       "needs": [
         "pvm-d0-external-plan-review"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "active",
       "title": "Make the Polars DataFrame benchmarks run correctly on Polars 2.0 without breaking 1.x"
     },
     "pvm-s0b-polars-engine-option": {
