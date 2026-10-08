@@ -3413,13 +3413,18 @@
       "title": "Remove comments and docstrings from AI primitives modules"
     },
     "comment-cleanup-amplab": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T23:58:08Z",
+        "generation": "18706b43c2344e61a1488cf4ee9dd61a",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e"
+      },
       "needs": [
         "comment-cleanup-checker",
         "comment-cleanup-contracts-gate"
       ],
       "priority": "medium",
-      "status": "open",
+      "status": "active",
       "title": "Remove comments and docstrings from AMPLab modules"
     },
     "comment-cleanup-analysis-comparison": {
