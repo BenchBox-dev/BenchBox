@@ -1,0 +1,21 @@
+{
+  "acceptance": [
+    "The maintainer decides: keep the rule, or map SWF with no defects to DO_NOT_SHIP or to an incomplete verdict",
+    "The decision is recorded in _project/decisions/oracle-review-protocol-2026-10-08.md",
+    "If the rule changes, protocol.judge and test_protocol.py change with it"
+  ],
+  "description": "protocol.judge computes the decision from the defect list, so a reviewer answering SHIP_WITH_FIXES with no listed defects is recorded as SHIP and passes. This follows the maintainer's specified rule (SWF with 0 defects becomes SHIP). The shadow oracle raised it as a Medium three times on #2783, arguing that it loosens the reviewer's stated outcome, especially on inline briefs where no read evidence applies. Each time it was deferred as a maintainer decision.",
+  "links": [
+    "https://github.com/BenchBox-dev/BenchBox/pull/2783"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:8c06561181af4cd0d5004653",
+      "at": "2026-10-08T23:28:46Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "cf68e652d78240129843a4e7bc12750c",
+      "session_id": "05afd70780334fa0b0e411a688cf8f7a"
+    }
+  ]
+}

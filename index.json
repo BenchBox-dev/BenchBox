@@ -13772,6 +13772,13 @@
       "status": "open",
       "title": "oracle-review starts a run for every review-thread reply"
     },
+    "oracle-swf-empty-defect-list-decision-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Decide whether SHIP_WITH_FIXES with an empty defect list should keep turning into SHIP"
+    },
     "orphan-detector-freeze-branch-residual-20260804": {
       "claim": null,
       "needs": [],
