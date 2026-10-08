@@ -14354,6 +14354,13 @@
       "status": "done",
       "title": "Decision: should cloud-only platforms such as Snowflake and Databricks accept a ':local' selector suffix?"
     },
+    "polars-maintenance-collect-bypasses-engine-option": {
+      "claim": null,
+      "needs": [],
+      "priority": "low",
+      "status": "open",
+      "title": "Polars maintenance and write-primitive operations call collect() directly and ignore the engine option"
+    },
     "polars-platform-adapter": {
       "claim": null,
       "needs": [],

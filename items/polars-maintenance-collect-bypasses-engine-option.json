@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A decision is recorded: either these paths follow the engine option or the exclusion is documented where the option is documented",
+    "If they follow the option, the AST guard in test_polars_engine_option.py fails when any of them calls .collect( directly"
+  ],
+  "description": "The polars-df `engine` option routes every benchmark-query materialization through polars_compat.collect_frame, and an AST guard enforces that for polars_df.py, expression_family.py and the Polars branches of unified_frame.py. polars_maintenance.py and the write-primitive DataFrame operations still call .collect() directly, so a run with engine=in-memory or engine=streaming does not apply the engine to them. They implement maintenance and write operations, not benchmark queries, so they were left out of scope. Decide whether they should follow the option, and if so route them through collect_frame and extend the guard to cover them.",
+  "links": [
+    "benchbox/platforms/polars_compat.py",
+    "benchbox/platforms/dataframe/polars_maintenance.py",
+    "tests/unit/platforms/dataframe/test_polars_engine_option.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:37773d419e8920fbabca7f3c",
+      "at": "2026-10-08T23:28:33Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "fc0c516c287249b0aaa15ffcd232aa7b",
+      "session_id": "1f74fac6df92445cbacc470514ed2645"
+    }
+  ]
+}
