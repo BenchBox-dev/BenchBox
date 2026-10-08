@@ -1,13 +1,6 @@
-"""External-table-mode tests for EMRServerlessAdapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Verifies the SparkExternalTableMixin wiring with mocked boto3 clients:
-capability flag, job-run DDL registration with completion wait, and the
-end-to-end create_external_tables flow with row counts.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 

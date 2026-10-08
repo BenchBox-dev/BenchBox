@@ -1,5 +1,3 @@
-"""CLI smoke tests for benchbox visualize (ASCII-only)."""
-
 from __future__ import annotations
 
 import importlib
@@ -20,11 +18,10 @@ visualize_module = importlib.import_module("benchbox.cli.commands.visualize")
 
 @pytest.fixture(autouse=True)
 def _ensure_quiet_off(_hermetic_state, monkeypatch):
-    """Inject visible output and restore the caller's actual quiet state."""
+
     monkeypatch.setattr(printing, "_QUIET", False)
 
 
-# Helper to generate valid result JSON
 SAMPLE_RESULT_JSON = """{
   "version": "2.1",
   "run": {
@@ -57,7 +54,7 @@ SAMPLE_RESULT_JSON = """{
 
 
 def test_visualize_cli_renders_ascii(tmp_path):
-    """Test that visualize command renders ASCII output."""
+
     result_file = tmp_path / "test_result.json"
     result_file.write_text(SAMPLE_RESULT_JSON)
 
@@ -72,7 +69,7 @@ def test_visualize_cli_renders_ascii(tmp_path):
 
 
 def test_visualize_cli_no_color(tmp_path):
-    """Test that --no-color disables ANSI escape codes."""
+
     result_file = tmp_path / "test_result.json"
     result_file.write_text(SAMPLE_RESULT_JSON)
 
@@ -87,7 +84,7 @@ def test_visualize_cli_no_color(tmp_path):
 
 
 def test_visualize_cli_no_unicode(tmp_path):
-    """Test that --no-unicode produces ASCII-only output."""
+
     result_file = tmp_path / "test_result.json"
     result_file.write_text(SAMPLE_RESULT_JSON)
 
@@ -103,7 +100,7 @@ def test_visualize_cli_no_unicode(tmp_path):
 
 
 def test_visualize_cli_both_no_color_and_no_unicode(tmp_path):
-    """Test combining --no-color and --no-unicode flags."""
+
     result_file = tmp_path / "test_result.json"
     result_file.write_text(SAMPLE_RESULT_JSON)
 
@@ -119,7 +116,7 @@ def test_visualize_cli_both_no_color_and_no_unicode(tmp_path):
 
 
 def test_visualize_cli_multiple_chart_types(tmp_path):
-    """Test rendering multiple chart types."""
+
     result_file = tmp_path / "test_result.json"
     result_file.write_text(SAMPLE_RESULT_JSON)
 
@@ -134,7 +131,7 @@ def test_visualize_cli_multiple_chart_types(tmp_path):
 
 
 def test_visualize_cli_continues_after_one_renderer_fails(tmp_path, monkeypatch):
-    """A failing chart renderer should not prevent later chart types from rendering."""
+
     from benchbox.core.visualization import ascii_api
 
     result_file = tmp_path / "test_result.json"
@@ -160,7 +157,7 @@ def test_visualize_cli_continues_after_one_renderer_fails(tmp_path, monkeypatch)
 
 
 def test_visualize_cli_theme_option(tmp_path):
-    """Test that theme option is accepted."""
+
     result_file = tmp_path / "test_result.json"
     result_file.write_text(SAMPLE_RESULT_JSON)
 
@@ -174,7 +171,7 @@ def test_visualize_cli_theme_option(tmp_path):
 
 
 def test_visualize_cli_chart_type_all(tmp_path):
-    """Test that --chart-type all renders all supported types."""
+
     result_file = tmp_path / "test_result.json"
     result_file.write_text(SAMPLE_RESULT_JSON)
 
@@ -188,7 +185,7 @@ def test_visualize_cli_chart_type_all(tmp_path):
 
 
 def test_visualize_cli_invalid_chart_type_fails(tmp_path):
-    """Unknown --chart-type values should fail with a validation error."""
+
     result_file = tmp_path / "test_result.json"
     result_file.write_text(SAMPLE_RESULT_JSON)
 
@@ -203,7 +200,7 @@ def test_visualize_cli_invalid_chart_type_fails(tmp_path):
 
 
 def test_visualize_cli_comparison_chart_requires_two_results(tmp_path):
-    """Pairwise comparison charts should require exactly two results."""
+
     result_file = tmp_path / "test_result.json"
     result_file.write_text(SAMPLE_RESULT_JSON)
 

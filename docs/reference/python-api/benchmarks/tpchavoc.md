@@ -72,7 +72,7 @@ True
 
 ## Query methods
 
-Query ids run from 1 to 22 and variant ids from 1 to 10. Variant SQL is generated with TPC-H's default parameter values: the `params` argument of `get_query_variant()` is accepted, but none of the names tried (`date`, `discount`, `quantity`, `year`) changed the text.
+Query ids run from 1 to 22 and variant ids from 1 to 10. Variant SQL is generated with TPC-H's default parameter values. The `params` argument of `get_query_variant()` replaces `{key}` tokens in the variant SQL, and the only token in use is `{q11_fraction}`, which defaults to a value derived from the scale factor. Other names, such as `date` or `discount`, do not change the text.
 
 ### get_query_variant(query_id, variant_id, params=None)
 

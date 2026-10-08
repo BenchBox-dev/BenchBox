@@ -1,5 +1,3 @@
-"""Tests for optional Docker runtime metadata discovery."""
-
 from __future__ import annotations
 
 import json

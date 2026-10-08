@@ -1,16 +1,12 @@
-"""Tests for BenchBox MCP resources.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 import sys
 
 import pytest
 
-# Skip all tests if Python < 3.10
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -18,7 +14,6 @@ pytestmark = [
 
 
 def _future_benchmark_meta(support_status: str, surface: str) -> dict[str, object]:
-    """Metadata for a hypothetical future benchmark used to pin visibility invariants."""
     return {
         "display_name": f"Future {support_status}/{surface}",
         "description": "synthetic future-status fixture",
@@ -38,10 +33,7 @@ def _future_benchmark_meta(support_status: str, surface: str) -> dict[str, objec
 
 
 class TestBenchmarkResources:
-    """Tests for benchmark resources."""
-
     def test_list_benchmarks_resource_format(self):
-        """Test that benchmark list resource returns valid JSON."""
         from benchbox.core.benchmark_registry import get_all_benchmarks
 
         all_benchmarks = get_all_benchmarks()
@@ -61,14 +53,12 @@ class TestBenchmarkResources:
         result = {"benchmarks": benchmarks, "count": len(benchmarks)}
         json_str = json.dumps(result)
 
-        # Verify it's valid JSON
         parsed = json.loads(json_str)
         assert "benchmarks" in parsed
         assert "count" in parsed
         assert parsed["count"] > 0
 
     def test_list_benchmarks_resource_projects_support_status(self):
-        """Resource benchmark list should expose registry support status."""
         from benchbox.mcp.resources.registry import _build_benchmarks_list
 
         parsed = json.loads(_build_benchmarks_list())
@@ -79,7 +69,6 @@ class TestBenchmarkResources:
         assert "joinorder_synthetic" not in benchmarks
 
     def test_get_benchmark_resource_tpch(self):
-        """Test getting TPC-H benchmark resource."""
         from benchbox.core.benchmark_registry import get_all_benchmarks
 
         all_benchmarks = get_all_benchmarks()
@@ -99,7 +88,6 @@ class TestBenchmarkResources:
         assert result["query_count"] == 22
 
     def test_get_benchmark_resource_projects_support_status(self):
-        """Detailed benchmark resource should expose registry support status."""
         from benchbox.mcp.resources.registry import _build_benchmark_detail
 
         parsed = json.loads(_build_benchmark_detail("tpch"))
@@ -108,7 +96,6 @@ class TestBenchmarkResources:
         assert parsed["support_status"] == "stable"
 
     def test_internal_future_status_hidden_from_resources(self):
-        """A future internal benchmark must not surface on the resource list or detail."""
         from unittest.mock import patch
 
         from benchbox.core import benchmark_registry
@@ -124,7 +111,6 @@ class TestBenchmarkResources:
             assert "support_status" not in detail
 
     def test_public_future_status_exposed_in_resources(self):
-        """A future public benchmark is listed with its registry support status."""
         from unittest.mock import patch
 
         from benchbox.core import benchmark_registry
@@ -140,10 +126,7 @@ class TestBenchmarkResources:
 
 
 class TestPlatformResources:
-    """Tests for platform resources."""
-
     def test_list_platforms_resource_format(self):
-        """Test that platform list resource returns valid JSON."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         platforms = []
@@ -173,7 +156,6 @@ class TestPlatformResources:
         assert parsed["count"] > 0
 
     def test_get_platform_resource_duckdb(self):
-        """Test getting DuckDB platform resource."""
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -186,10 +168,7 @@ class TestPlatformResources:
 
 
 class TestSystemResources:
-    """Tests for system resources."""
-
     def test_system_profile_resource_format(self):
-        """Test that system profile resource returns valid JSON."""
         import platform
 
         import psutil

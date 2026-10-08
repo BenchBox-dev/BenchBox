@@ -1,29 +1,6 @@
-"""BigQuery DDL Generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Generates CREATE TABLE statements with BigQuery-specific physical tuning:
-- Time-based partitioning (DATE, DATETIME, TIMESTAMP)
-- Integer range partitioning (RANGE_BUCKET)
-- Clustering (up to 4 columns)
-- Table options (require_partition_filter, etc.)
-
-Example:
-    >>> from benchbox.core.tuning.generators.bigquery import BigQueryDDLGenerator
-    >>> generator = BigQueryDDLGenerator()
-    >>> clauses = generator.generate_tuning_clauses(table_tuning)
-    >>> emit(generator.generate_create_table_ddl("lineitem", columns, clauses))
-    CREATE TABLE lineitem (
-        l_orderkey INT64 NOT NULL,
-        l_shipdate DATE,
-        ...
-    )
-    PARTITION BY l_shipdate
-    CLUSTER BY l_orderkey, l_partkey
-    OPTIONS (require_partition_filter = true);
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -47,35 +24,13 @@ logger = logging.getLogger(__name__)
 
 
 class PartitionGranularity(str, Enum):
-    """BigQuery partitioning granularity for time-based partitions."""
-
     DAY = "DAY"
     MONTH = "MONTH"
     YEAR = "YEAR"
-    HOUR = "HOUR"  # Only for DATETIME/TIMESTAMP
+    HOUR = "HOUR"
 
 
 class BigQueryDDLGenerator(BaseDDLGenerator):
-    """DDL generator for BigQuery physical tuning.
-
-    Supports:
-    - PARTITION BY (time-based and integer range)
-    - CLUSTER BY (up to 4 columns)
-    - OPTIONS (require_partition_filter, description, etc.)
-
-    BigQuery Tuning Notes:
-    - Clustering is automatically maintained
-    - Max 4 clustering columns
-    - Clustering order matters (most selective first)
-    - Partitioning recommended for tables > 10TB
-
-    Tuning Configuration Mapping:
-    - partitioning → PARTITION BY
-    - clustering → CLUSTER BY
-    - sorting → Maps to CLUSTER BY (BigQuery uses clustering for sort optimization)
-    - distribution → Not applicable (logged as warning)
-    """
-
     IDENTIFIER_QUOTE = "`"
     SUPPORTS_IF_NOT_EXISTS = True
     STATEMENT_TERMINATOR = ";"
@@ -89,12 +44,6 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
         require_partition_filter: bool = False,
         default_partition_granularity: PartitionGranularity = PartitionGranularity.DAY,
     ):
-        """Initialize the BigQuery DDL generator.
-
-        Args:
-            require_partition_filter: Whether to enforce partition filter in queries.
-            default_partition_granularity: Default granularity for time partitions.
-        """
         self._require_partition_filter = require_partition_filter
         self._default_granularity = default_partition_granularity
 
@@ -107,15 +56,6 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
         table_tuning: TableTuning | None,
         platform_opts: PlatformOptimizationConfiguration | None = None,
     ) -> TuningClauses:
-        """Generate BigQuery tuning clauses.
-
-        Args:
-            table_tuning: Table tuning configuration.
-            platform_opts: Platform-specific options.
-
-        Returns:
-            TuningClauses with partition_by, cluster_by, and table_options.
-        """
         clauses = TuningClauses()
 
         if not table_tuning:
@@ -123,7 +63,6 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
 
         from benchbox.core.tuning.interface import TuningType
 
-        # Handle distribution warning (not applicable for BigQuery)
         distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
         if distribution_columns:
             logger.warning(
@@ -133,7 +72,6 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
                 f"Configured columns {[c.name for c in distribution_columns]} will be ignored."
             )
 
-        # Handle partitioning
         partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
         if partition_columns:
             sorted_cols = sorted(partition_columns, key=lambda c: c.order)
@@ -147,11 +85,9 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
             partition_clause = self._generate_partition_clause(partition_col, platform_opts)
             clauses.partition_by = partition_clause
 
-            # Add require_partition_filter option if enabled
             if self._require_partition_filter:
                 clauses.table_options["require_partition_filter"] = True
 
-        # Handle clustering (from both clustering and sorting config)
         cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
         sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
 
@@ -160,7 +96,6 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
         if all_cluster_cols:
             sorted_cols = sorted(all_cluster_cols, key=lambda c: c.order)
 
-            # Limit to max 4 columns
             if len(sorted_cols) > self.MAX_CLUSTER_COLUMNS:
                 logger.warning(
                     f"BigQuery supports max {self.MAX_CLUSTER_COLUMNS} clustering columns. "
@@ -178,19 +113,9 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
         partition_col,
         platform_opts: PlatformOptimizationConfiguration | None = None,
     ) -> str:
-        """Generate PARTITION BY clause based on column type.
-
-        Args:
-            partition_col: Partition column with type info.
-            platform_opts: Platform-specific options (may contain granularity).
-
-        Returns:
-            PARTITION BY clause string.
-        """
         col_name = partition_col.name
         col_type = partition_col.type.upper() if partition_col.type else ""
 
-        # Get granularity from platform opts or use default
         granularity = self._default_granularity
         if platform_opts:
             gran_str = getattr(platform_opts, "partition_granularity", None)
@@ -200,10 +125,7 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
                 except ValueError:
                     logger.warning(f"Invalid partition_granularity '{gran_str}', using default")
 
-        # Determine partition type based on column type
         if "INT" in col_type:
-            # Integer range partitioning requires RANGE_BUCKET
-            # Use sensible defaults; can be customized via platform_opts
             range_start = 0
             range_end = 1000000
             range_interval = 10000
@@ -218,19 +140,16 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
             )
 
         elif "TIMESTAMP" in col_type or "DATETIME" in col_type:
-            # DATETIME/TIMESTAMP needs DATETIME_TRUNC or TIMESTAMP_TRUNC
             trunc_fn = "TIMESTAMP_TRUNC" if "TIMESTAMP" in col_type else "DATETIME_TRUNC"
             return f"PARTITION BY {trunc_fn}({col_name}, {granularity.value})"
 
         elif "DATE" in col_type:
-            # DATE columns can use direct partitioning for DAY, or DATE_TRUNC for MONTH/YEAR
             if granularity == PartitionGranularity.DAY:
                 return f"PARTITION BY {col_name}"
             else:
                 return f"PARTITION BY DATE_TRUNC({col_name}, {granularity.value})"
 
         else:
-            # Unknown type - try direct partitioning
             logger.info(
                 f"Unknown partition column type '{col_type}' for column '{col_name}'. Using direct PARTITION BY."
             )
@@ -244,14 +163,6 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
         if_not_exists: bool = False,
         schema: str | None = None,
     ) -> str:
-        """Generate BigQuery CREATE TABLE statement.
-
-        BigQuery DDL structure:
-        CREATE TABLE t (...)
-        PARTITION BY col
-        CLUSTER BY col1, col2
-        OPTIONS (...);
-        """
         parts = ["CREATE TABLE"]
 
         if if_not_exists:
@@ -261,11 +172,9 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
 
         statement = " ".join(parts)
 
-        # Column definitions
         col_list = self.generate_column_list(columns)
         statement = f"{statement} (\n    {col_list}\n)"
 
-        # Add tuning clauses
         if tuning:
             if tuning.partition_by:
                 statement = f"{statement}\n{tuning.partition_by}"
@@ -273,7 +182,6 @@ class BigQueryDDLGenerator(BaseDDLGenerator):
             if tuning.cluster_by:
                 statement = f"{statement}\n{tuning.cluster_by}"
 
-            # Add OPTIONS clause
             options_clause = tuning.get_table_options_clause()
             if options_clause:
                 statement = f"{statement}\n{options_clause}"

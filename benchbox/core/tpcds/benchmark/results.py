@@ -1,5 +1,3 @@
-"""TPC-DS benchmark result dataclasses."""
-
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
@@ -11,8 +9,6 @@ from .config import ThroughputTestConfig
 
 @dataclass
 class ThroughputTestResult:
-    """Result of TPC-DS Throughput Test."""
-
     config: ThroughputTestConfig
     start_time: float
     end_time: float
@@ -29,8 +25,6 @@ class ThroughputTestResult:
 
 @dataclass
 class MaintenanceTestResult:
-    """Result of TPC-DS Maintenance Test."""
-
     test_duration: float
     total_operations: int
     successful_operations: int
@@ -42,8 +36,6 @@ class MaintenanceTestResult:
 
 @dataclass
 class QueryResult:
-    """Result of a single query execution (legacy compatibility)."""
-
     query_id: int
     stream_id: Optional[int] = None
     start_time: Optional[datetime] = None
@@ -57,8 +49,6 @@ class QueryResult:
 
 @dataclass
 class PhaseResult:
-    """Result of a benchmark phase (legacy compatibility)."""
-
     phase_name: str
     queries: list[QueryResult] = field(default_factory=list)
     start_time: Optional[datetime] = None
@@ -70,8 +60,6 @@ class PhaseResult:
 
 @dataclass
 class BenchmarkResult:
-    """Complete benchmark result (legacy compatibility)."""
-
     scale_factor: float
     num_streams: int = 1
     power_test: Optional[PhaseResult] = None

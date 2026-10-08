@@ -1,5 +1,3 @@
-"""Enumerate phase: resolve the final cell list given config filters and registry truth."""
-
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -17,12 +15,6 @@ from tests.uat.matrix import (
     resolve_platforms,
 )
 
-# Rows recorded with this status are registry/ladder-derived accounting
-# entries rather than platform/benchmark compatibility-rule prunes (those use
-# `CompatibilityRule.status`, e.g. "blocked"). Reusing `CompatibilityPrunedCell`
-# for both keeps a single pruned-accounting shape (compatibility_pruned.jsonl)
-# per the anti-pattern this module avoids: inventing a second, differently
-# shaped accounting file for registry-derived drops.
 REGISTRY_PRUNE_STATUS = "pruned-registry"
 BENCHMARK_NOT_IN_REGISTRY_RULE_ID = "benchmark-not-in-registry"
 PLATFORM_NOT_IN_REGISTRY_RULE_ID = "platform-not-in-registry"
@@ -57,20 +49,10 @@ class EnumerationResult:
 
 
 def is_registry_prune(cell: CompatibilityPrunedCell) -> bool:
-    """True when a pruned row is a registry/ladder-derived drop (``pruned-registry``).
-
-    Registry drops (a benchmark/platform id absent from the registry, or a
-    scale outside a benchmark's declared ``scale_options``) share the
-    ``CompatibilityPrunedCell`` shape with platform/benchmark compatibility-RULE
-    prunes, but must be accounted separately: `write_report` carries a distinct
-    ``registry_pruned_count`` bucket, and lumping registry rows into
-    ``compatibility_pruned_count`` mislabels them (uat-report-regen-prune-accounting w2).
-    """
     return cell.status == REGISTRY_PRUNE_STATUS
 
 
 def count_pruned_by_kind(pruned: Iterable[CompatibilityPrunedCell]) -> tuple[int, int]:
-    """Split a mixed pruned-row stream into (compatibility_rule_count, registry_count)."""
     rows = tuple(pruned)
     registry = sum(1 for cell in rows if is_registry_prune(cell))
     return len(rows) - registry, registry
@@ -81,15 +63,6 @@ def enumerate_cells(
     *,
     benchmarks: dict[str, BenchmarkInfo] | None = None,
 ) -> list[Cell]:
-    """Build the cell list from a validated config.
-
-    - Resolves platforms via groups/include/exclude.
-    - Resolves benchmarks via groups/include/exclude.
-    - Drops dataframe platforms paired with SQL-only benchmarks.
-    - For each (platform, benchmark), filters the scale ladder against
-      the registry's `scale_options`.
-    - Honours `scales.override` (single scale per cell) over `scales.rungs`.
-    """
     return list(enumerate_cells_with_pruning(config, benchmarks=benchmarks).cells)
 
 
@@ -98,12 +71,8 @@ def enumerate_cells_with_pruning(
     *,
     benchmarks: dict[str, BenchmarkInfo] | None = None,
 ) -> EnumerationResult:
-    """Build executable cells plus compatibility-pruned accounting rows."""
     benchmarks = benchmarks if benchmarks is not None else load_benchmarks()
 
-    # Default groups apply only when neither `groups` nor `include` is set.
-    # Otherwise an explicit `include` would otherwise be unioned with the
-    # default group, producing too-large matrices.
     platform_groups_default = ("sql",) if config.platforms.uses_implicit_group_default else ()
     benchmark_groups_default = ("all",) if config.benchmarks.uses_implicit_group_default else ()
     platform_list = resolve_platforms(
@@ -118,8 +87,6 @@ def enumerate_cells_with_pruning(
         benchmarks=benchmarks,
     )
 
-    # `requested_rungs` centralizes the effective values from
-    # `config.scales.rungs` and `config.scales.override` for every consumer.
     requested = list(config.scales.requested_rungs)
 
     cells: list[Cell] = []
@@ -128,15 +95,6 @@ def enumerate_cells_with_pruning(
 
     missing_benchmarks = missing_benchmarks_from_include(config.benchmarks.include, benchmarks)
     missing_platforms = missing_platforms_from_include(config.platforms.include)
-    # `resolve_benchmarks` silently drops `benchmarks.include` entries absent
-    # from the registry (see `missing_benchmarks_from_include`'s docstring) -
-    # so a typo'd/removed benchmark id never reaches `benchmark_list` below.
-    # Surface it here as a visible accounting row instead of a zero-signal
-    # drop, one row per platform x requested scale (mirrors the shape
-    # `_pruned_rows_for_rule` already uses for compatibility-rule prunes).
-    # Include missing ids as accounting dimensions too. This preserves a
-    # diagnostic row when both explicit include lists contain only unknown
-    # ids, rather than letting each side's empty resolved list hide the other.
     accounting_platforms = [*platform_list, *missing_platforms]
     accounting_benchmarks = [*benchmark_list, *missing_benchmarks]
     for missing_benchmark in missing_benchmarks:
@@ -145,13 +103,6 @@ def enumerate_cells_with_pruning(
                 _registry_absent_rows(platform=platform, benchmark=missing_benchmark, requested=requested)
             )
 
-    # Mirror of the missing-benchmark accounting above (w2,
-    # uat-config-schema-spec-realignment): `resolve_platforms` silently drops
-    # `platforms.include` entries absent from the registry (see
-    # `missing_platforms_from_include`'s docstring), so a typo'd/removed
-    # platform id never reaches `platform_list`. Surface it as a visible
-    # accounting row per missing platform x resolved benchmark, instead of an
-    # execute-time surprise.
     for missing_platform in missing_platforms:
         for benchmark in accounting_benchmarks:
             compatibility_pruned.extend(
@@ -162,10 +113,6 @@ def enumerate_cells_with_pruning(
         for benchmark in benchmark_list:
             info = benchmarks.get(benchmark)
             if info is None:
-                # Defensive: `benchmark_list` is built from `benchmarks` above,
-                # so this should be unreachable, but a config-benchmark id
-                # absent from the registry must never vanish silently -
-                # record the same accounting row rather than a bare continue.
                 compatibility_pruned.extend(
                     _registry_absent_rows(platform=platform, benchmark=benchmark, requested=requested)
                 )
@@ -185,16 +132,8 @@ def enumerate_cells_with_pruning(
             dropped = [scale for scale in requested if scale not in filtered]
             uses_min_scale_fallback = not filtered and config.scales.override is None and info.min_scale is not None
             if uses_min_scale_fallback:
-                # The whole requested ladder was outside scale_options (e.g.
-                # joinorder/tpcds_obt are single-scale-1.0-only benchmarks
-                # requested at the 0.01 smoke scale); the benchmark still
-                # runs, just at its canonical min_scale instead of vanishing,
-                # so this is a substitution, not a drop - no accounting row.
                 filtered = [info.min_scale]
             elif dropped:
-                # Some, but not all, requested scales survived: the dropped
-                # ones truly do not run at any scale and must be visible in
-                # accounting output instead of silently shrinking the ladder.
                 compatibility_pruned.extend(
                     _ladder_pruned_rows(platform=platform, benchmark=benchmark, dropped=dropped)
                 )
@@ -209,7 +148,6 @@ def _registry_absent_rows(
     benchmark: str,
     requested: list[float],
 ) -> list[CompatibilityPrunedCell]:
-    """Accounting rows for a benchmark id absent from the registry entirely."""
     return [
         CompatibilityPrunedCell(
             platform=platform,
@@ -233,7 +171,6 @@ def _registry_absent_platform_rows(
     benchmark: str,
     requested: list[float],
 ) -> list[CompatibilityPrunedCell]:
-    """Accounting rows for a platform id absent from the registry entirely."""
     return [
         CompatibilityPrunedCell(
             platform=platform,
@@ -257,7 +194,6 @@ def _ladder_pruned_rows(
     benchmark: str,
     dropped: list[float],
 ) -> list[CompatibilityPrunedCell]:
-    """Accounting rows for scales dropped by the registry scale-ladder filter."""
     return [
         CompatibilityPrunedCell(
             platform=platform,

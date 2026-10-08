@@ -1,14 +1,9 @@
-"""TPC-H benchmark implementation module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides main TPC-H benchmark implementation.
+# TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-H specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-H specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -68,11 +63,8 @@ def describe_query_parameters(
     return f"qgen -r ({seed} + 1000 * stream_id)"
 
 
-# Data structures for test results
 @dataclass
 class TPCHThroughputTestConfig:
-    """Configuration for TPC-H Throughput Test."""
-
     num_streams: int = 2
     scale_factor: float = 1.0
     base_seed: int = 42
@@ -85,8 +77,6 @@ class TPCHThroughputTestConfig:
 
 @dataclass
 class TPCHThroughputTestResult:
-    """Result of TPC-H Throughput Test."""
-
     config: TPCHThroughputTestConfig
     start_time: float
     end_time: float
@@ -101,8 +91,6 @@ class TPCHThroughputTestResult:
 
 @dataclass
 class TPCHMaintenanceTestConfig:
-    """Configuration for TPC-H Maintenance Test."""
-
     scale_factor: float = 1.0
     num_concurrent_streams: int = 2
     maintenance_interval: float = 30.0
@@ -113,7 +101,6 @@ class TPCHMaintenanceTestConfig:
 
 
 def _validate_tpch_get_query_args(query_id: int, scale_factor: float | None, seed: int | None) -> None:
-    """Validate common arguments for get_query."""
     if not isinstance(query_id, int):
         raise TypeError(f"query_id must be an integer, got {type(query_id).__name__}")
     if not (1 <= query_id <= 22):
@@ -130,7 +117,6 @@ def _validate_tpch_get_query_args(query_id: int, scale_factor: float | None, see
 def _resolve_tpch_seed(
     actual_seed: int | None, query_id: int, stream_id: int | None, permutation: list | None
 ) -> int | None:
-    """Resolve seed from stream_id or explicit permutation for TPC-H queries."""
     if stream_id is not None:
         if not (0 <= stream_id < len(TPCHStreams.PERMUTATION_MATRIX)):
             raise ValueError(f"stream_id must be 0-{len(TPCHStreams.PERMUTATION_MATRIX) - 1}")
@@ -156,7 +142,6 @@ def _resolve_tpch_seed(
 
 
 def _expand_sqlite_named_column_aliases(query: str) -> str:
-    """Move TPC-H named table-alias columns into SELECT aliases for SQLite translation."""
     import re
 
     alias_pattern = re.compile(r"(\bAS\s+c_orders)\s*\(\s*c_custkey\s*,\s*c_count\s*\)", re.IGNORECASE)
@@ -182,19 +167,6 @@ def _expand_sqlite_named_column_aliases(query: str) -> str:
 
 
 class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
-    """TPC-H benchmark implementation.
-
-    This class provides a complete implementation of the TPC-H benchmark,
-    including data generation, query execution, and result validation.
-
-    Attributes:
-        scale_factor: The scale factor for the benchmark (1.0 = ~1GB)
-        output_dir: Directory to output generated data and results
-        query_manager: The TPC-H query manager
-        data_generator: The TPC-H data generator
-        tables: Dictionary mapping table names to paths of generated data files
-    """
-
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -205,46 +177,21 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         official: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Initialize a TPC-H benchmark instance.
-
-        Args:
-            scale_factor: Scale factor for the benchmark (1.0 = ~1GB)
-            output_dir: Directory to output generated data files
-            verbose: Whether to print verbose output during operations
-            parallel: Number of parallel processes for data generation
-            force_regenerate: Force data regeneration even if valid data exists
-            official: True for a ``--official`` run. Required for the run to
-                classify as ``official`` and therefore to be submittable; see
-                :func:`benchbox.core.tpch.compliance.classify_tpch_run`.
-            **kwargs: Additional implementation-specific options
-
-        Raises:
-            ValueError: If scale_factor is not positive or parallel is not positive
-            TypeError: If scale_factor is not a number or parallel is not an integer
-        """
-        # Validate scale_factor to match TPC-DS patterns
         if not isinstance(scale_factor, (int, float)):
             raise TypeError(f"scale_factor must be a number, got {type(scale_factor).__name__}")
         if scale_factor <= 0:
             raise ValueError(f"scale_factor must be positive, got {scale_factor}")
 
-        # Single shared validator - no silent rounding. Genuine TPC-H runs only:
-        # derived benchmarks (TPC-Havoc, TPC-H Skew) inherit this __init__ but
-        # are variant/robustness studies outside TPC-H methodology, so they stay
-        # unclassified (None) instead of being stamped unofficial (which would
-        # exclude their results from default rankings).
         if type(self) is TPCHBenchmark:
             self.compliance_class = validate_tpch_scale(scale_factor, official=official)
         else:
             self.compliance_class = None
 
-        # Validate parallel parameter
         if not isinstance(parallel, int):
             raise TypeError(f"parallel must be an integer, got {type(parallel).__name__}")
         if parallel < 1:
             raise ValueError(f"parallel must be positive, got {parallel}")
 
-        # Extract quiet from kwargs to prevent duplicate kwarg error
         kwargs = dict(kwargs)
         quiet = kwargs.pop("quiet", False)
 
@@ -259,29 +206,20 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
             verbose=verbose,
             quiet=quiet,
             force_regenerate=force_regenerate,
-            **kwargs,  # Pass through compression parameters
+            **kwargs,
         )
         self.tables: dict[str, Path | list[Path]] = {}
 
-        # Initialize streams manager
         self.streams_manager: TPCHStreams | None = None
 
-        # Initialize maintenance test manager
         self.maintenance_test: TPCHMaintenanceTest | None = None
 
     def generate_data(self) -> list[Union[str, Path]]:
-        """Generate TPC-H benchmark data.
-
-        Returns:
-            A list of paths to the generated data files
-        """
-        # Ensure output directory exists
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.log_verbose(f"Generating TPC-H data at scale factor {self.scale_factor}...")
         self.log_verbose(f"Output directory: {self.output_dir}")
 
-        # Use the data generator to create TPC-H tables
         self.tables = self.data_generator.generate()
 
         if self.verbose_enabled:
@@ -292,20 +230,8 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return list(self.tables.values())
 
     def get_queries(self, dialect: str | None = None, base_dialect: str | None = None) -> dict[str, str]:
-        """Get all TPC-H benchmark queries.
-
-        Args:
-            dialect: Target SQL dialect for translation (e.g., 'duckdb', 'bigquery', 'snowflake')
-                    If None, returns queries in their original format.
-
-        Returns:
-            A dictionary mapping query IDs (1-22) to query strings
-        """
         src = (base_dialect or "netezza").lower()
         tgt = (dialect or src).lower()
-        # Render scale-dependent parameters (e.g. Q11's 0.0001/SF value threshold)
-        # at the benchmark's actual scale factor, not the SF=1 default, so the
-        # run path stays scale-faithful for both TPC-H and TPC-Havoc variants.
         int_queries = self.query_manager.get_all_queries(scale_factor=self.scale_factor)
         base_queries = {str(k): v for k, v in int_queries.items()}
         translated_queries = {}
@@ -314,19 +240,6 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return translated_queries
 
     def translate_query_text(self, query: str, source_dialect: str, target_dialect: str) -> str:
-        """Translate a query from TPC-H's source dialect to target dialect.
-
-        Uses the centralized translation function with proper dialect handling
-        and identifier quoting to prevent reserved keyword conflicts.
-
-        Args:
-            query: SQL query text to translate
-            source_dialect: Source SQL dialect (default: 'netezza')
-            target_dialect: Target SQL dialect (e.g., 'duckdb', 'bigquery')
-
-        Returns:
-            Translated SQL query text
-        """
         from benchbox.utils.dialect_utils import translate_sql_query
 
         src = (source_dialect or "netezza").lower()
@@ -352,23 +265,6 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         base_dialect: str | None = None,
         **kwargs,
     ) -> str:
-        """Get a specific TPC-H benchmark query.
-
-        Args:
-            query_id: The ID of the query to retrieve (1-22)
-            params: Optional parameters to customize the query (legacy parameter, mostly ignored)
-            seed: Random number generator seed for parameter generation
-            scale_factor: Scale factor for parameter calculations
-            dialect: Target SQL dialect (handled by translate_query)
-            **kwargs: Additional parameters for future extensibility
-
-        Returns:
-            The fully prepared query string
-
-        Raises:
-            ValueError: If the query_id is invalid
-            TypeError: If query_id is not an integer
-        """
         _validate_tpch_get_query_args(query_id, scale_factor, seed)
 
         if params is None:
@@ -386,15 +282,7 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         query = self.query_manager.get_query(query_id, seed=actual_seed, scale_factor=actual_scale_factor)
         return self.translate_query_text(query, src, tgt)
 
-    # (Removed duplicate translate_query_text definition; consolidated above.)
-
     def get_schema(self) -> dict[str, dict[str, Any]]:
-        """Get the TPC-H schema.
-
-        Returns:
-            Dictionary mapping table names (lowercase) to table definitions.
-            Each table definition contains 'name' and 'columns' keys.
-        """
         schema = {}
         for table in TABLES:
             table_schema = {
@@ -414,20 +302,6 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         return schema
 
     def get_table_loading_order(self, available_tables: list[str]) -> list[str]:
-        """Get the correct order for loading TPC-H tables to respect foreign key dependencies.
-
-        Derived from schema FK metadata (see
-        ``benchbox.core.tpch.schema.get_table_loading_order``), not a
-        hand-maintained constant. Without this, callers fall back to
-        alphabetical table order, which loads e.g. ``lineitem`` before
-        ``orders`` and violates FK references when constraints are enforced.
-
-        Args:
-            available_tables: List of table names that are actually available
-
-        Returns:
-            List of table names in the correct loading order
-        """
         from benchbox.core.tpch.schema import get_table_loading_order as _schema_table_loading_order
 
         full_order = _schema_table_loading_order()
@@ -444,18 +318,8 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
         dialect: str = "standard",
         tuning_config: UnifiedTuningConfiguration | None = None,
     ) -> str:
-        """Get SQL to create all TPC-H tables.
-
-        Args:
-            dialect: SQL dialect to use (currently ignored, TPC-H uses standard SQL)
-            tuning_config: Unified tuning configuration for constraint settings
-
-        Returns:
-            SQL script for creating all tables
-        """
         from benchbox.core.tpch.schema import get_create_all_tables_sql
 
-        # Extract constraint settings from tuning configuration
         self.log_very_verbose(
             f"TPC-H get_create_tables_sql called: dialect={dialect}, tuning_config={tuning_config is not None}"
         )
@@ -489,9 +353,4 @@ class TPCHBenchmark(GeneratorOutputDirMixin, BaseBenchmark):
 
     @property
     def generator(self) -> TPCHDataGenerator:
-        """Access to the data generator.
-
-        Returns:
-            The data generator instance
-        """
         return self.data_generator

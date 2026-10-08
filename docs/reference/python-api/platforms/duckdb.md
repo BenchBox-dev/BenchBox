@@ -25,19 +25,16 @@ Common use cases:
 
 ## Quick Start
 
-Basic usage:
+Basic usage. The first adapter uses an in-memory database, which is the default. The second uses a persistent database. The last lines run the benchmark.
 
 ```python
 from benchbox.tpch import TPCH
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# In-memory database (default)
 adapter = DuckDBAdapter()
 
-# Or persistent database
 adapter = DuckDBAdapter(database_path="benchmark.duckdb")
 
-# Run benchmark
 benchmark = TPCH(scale_factor=0.1)
 results = benchmark.run_with_platform(adapter)
 ```
@@ -166,7 +163,7 @@ The values are stored as attributes of the same name (`DuckDBAdapter().force_rec
 **`create_schema(benchmark, connection: Any) -> float`**: Creates the benchmark's tables on the connection and returns the elapsed time in seconds (`float`). It translates the benchmark's standard SQL DDL to DuckDB, drops foreign-key constraints for TPC-DS, and runs one `CREATE TABLE` per table. Raises `Exception` with the message `Failed to create table <name>: <cause>` if a statement fails.
 
 <span id="benchbox.platforms.duckdb.DuckDBAdapter.validate_connection_health"></span>
-**`validate_connection_health(connection: Any)`**: Runs `SELECT 1` on the connection and returns a `ValidationResult` (`is_valid`, `errors`, `warnings`, `details`). It also tries to read the memory and thread settings with `PRAGMA`; if a read fails it adds a warning and stays valid. On the DuckDB 1.5.6 used for this page both reads failed, so a healthy connection returns `is_valid=True` with the warnings `Could not query memory limit setting` and `Could not query threads setting`.
+**`validate_connection_health(connection: Any)`**: Runs `SELECT 1` on the connection and returns a `ValidationResult` (`is_valid`, `errors`, `warnings`, `details`). It also tries to read the memory and thread settings with `PRAGMA`; if a read fails it adds a warning and stays valid. On DuckDB 1.5.6 both reads fail, so a healthy connection returns `is_valid=True` with the warnings `Could not query memory limit setting` and `Could not query threads setting`.
 
 <span id="benchbox.platforms.duckdb.DuckDBAdapter.validate_platform_capabilities"></span>
 **`validate_platform_capabilities(benchmark_type: str)`**: Checks the adapter setup for a benchmark type such as `'tpch'` and returns a `ValidationResult`. It reports an error if the `duckdb` module is missing, and warnings for DuckDB 0.8 or 0.9 and for a `memory_limit` below 1 GB. `details` holds the platform name, benchmark type, dry-run flag, database path, memory limit, thread limit and DuckDB version.
@@ -237,18 +234,15 @@ The values are stored as attributes of the same name (`DuckDBAdapter().force_rec
 
 ### In-Memory Database
 
-Suitable for small datasets and rapid iteration:
+Suitable for small datasets and rapid iteration. The first adapter uses the default in-memory configuration. The second sets a memory limit. The third controls the thread count:
 
 ```python
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Default in-memory configuration
 adapter = DuckDBAdapter()
 
-# With memory limit
 adapter = DuckDBAdapter(memory_limit="2GB")
 
-# With thread control
 adapter = DuckDBAdapter(
     memory_limit="4GB",
     thread_limit=4
@@ -257,31 +251,28 @@ adapter = DuckDBAdapter(
 
 ### Persistent Database
 
-For reusable benchmark data:
+For reusable benchmark data. The first run creates the persistent database, and the data persists afterward. The second adapter later reuses the same database:
 
 ```python
-# Create persistent database
 adapter = DuckDBAdapter(database_path="./benchmarks/tpch.duckdb")
 
-# Run benchmark (data persists)
 benchmark = TPCH(scale_factor=1.0)
 results = benchmark.run_with_platform(adapter)
 
-# Later: reuse the same database
 adapter2 = DuckDBAdapter(database_path="./benchmarks/tpch.duckdb")
 results2 = benchmark.run_with_platform(adapter2)
 ```
 
 ### Performance Tuning
 
-Configure for optimal performance:
+Configure for optimal performance. Set `memory_limit` appropriately for your system, and match `thread_limit` to your CPU cores. `max_temp_directory_size` caps the space used for spilling:
 
 ```python
 adapter = DuckDBAdapter(
     database_path="benchmark.duckdb",
-    memory_limit="16GB",             # Set appropriate for your system
-    thread_limit=8,                  # Match your CPU cores
-    max_temp_directory_size="200GB"  # Cap the space used for spilling
+    memory_limit="16GB",
+    thread_limit=8,
+    max_temp_directory_size="200GB"
 )
 ```
 
@@ -294,15 +285,13 @@ connection.execute("SET preserve_insertion_order = false")
 
 ### Profiling and Debugging
 
-Print each query's plan while a benchmark runs, or capture structured plans with the results:
+Print each query's plan while a benchmark runs, or capture structured plans with the results. The first adapter prints each query's plan after the query runs. The second captures plans into the results instead of printing them:
 
 ```python
 adapter = DuckDBAdapter(show_query_plans=True)
 
-# Run benchmark: each query's plan is printed after it runs
 results = benchmark.run_with_platform(adapter)
 
-# Capture plans into the results instead of printing them
 adapter = DuckDBAdapter(capture_plans=True)
 ```
 
@@ -314,14 +303,14 @@ The adapter handles data loading automatically, but you can customize the proces
 
 ### Bulk Loading from Parquet
 
+The example creates an adapter, opens a DuckDB connection and loads the Parquet files with custom SQL.
+
 ```python
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create adapter and open a DuckDB connection
 adapter = DuckDBAdapter(database_path="benchmark.duckdb")
 conn = adapter.create_connection()
 
-# Custom bulk load from Parquet
 conn.execute("""
     CREATE TABLE lineitem AS
     SELECT * FROM read_parquet('data/lineitem/*.parquet')
@@ -330,8 +319,9 @@ conn.execute("""
 
 ### Loading from CSV
 
+DuckDB detects the CSV format automatically. This example also sets the delimiter and columns explicitly.
+
 ```python
-# DuckDB automatically detects CSV format
 conn.execute("""
     CREATE TABLE customer AS
     SELECT * FROM read_csv('data/customer.tbl',
@@ -354,41 +344,39 @@ conn.execute("""
 
 ### Execute Queries Directly
 
+The first statement executes arbitrary SQL. The second executes a query with parameters. The last lets the adapter time the query and return a result dict.
+
 ```python
 from benchbox.platforms.duckdb import DuckDBAdapter
 
 adapter = DuckDBAdapter(database_path="benchmark.duckdb")
 conn = adapter.create_connection()
 
-# Execute arbitrary SQL
 result = conn.execute("SELECT COUNT(*) FROM lineitem")
 row_count = result.fetchone()[0]
 
-# Execute with parameters
 query = "SELECT * FROM orders WHERE o_orderdate > ?"
 result = conn.execute(query, ["1995-01-01"])
 
-# Or let the adapter time the query and return a result dict
 outcome = adapter.execute_query(conn, "SELECT COUNT(*) FROM lineitem", "count_lineitem")
 print(outcome["status"], outcome["first_row"])
 ```
 
 ### Query Plans and Optimization
 
+The first call returns the query plan as JSON text. The second uses DuckDB's own `EXPLAIN`. The last adapter has `analyze_plans=True`, so it runs `EXPLAIN ANALYZE` and the plans carry actual timings.
+
 ```python
-# Get query plan as JSON text
 plan = adapter.get_query_plan(
     conn, "SELECT * FROM lineitem WHERE l_shipdate > '1995-01-01'"
 )
 print(plan[:200])
 
-# Or use DuckDB's own EXPLAIN
 explain_result = conn.execute(
     "EXPLAIN SELECT * FROM lineitem WHERE l_shipdate > '1995-01-01'"
 )
 print(explain_result.fetchall())
 
-# Plans with actual timings: the adapter runs EXPLAIN ANALYZE
 analyzing = DuckDBAdapter(database_path="benchmark.duckdb", analyze_plans=True)
 ```
 
@@ -396,28 +384,28 @@ analyzing = DuckDBAdapter(database_path="benchmark.duckdb", analyze_plans=True)
 
 ### Parallel Query Execution
 
+DuckDB parallelizes queries automatically. `thread_limit=8` uses 8 threads for parallel execution, and complex aggregations use all of them.
+
 ```python
-# DuckDB automatically parallelizes queries
 adapter = DuckDBAdapter(
     memory_limit="16GB",
-    thread_limit=8  # Use 8 threads for parallel execution
+    thread_limit=8
 )
 
-# Complex aggregation will use all threads
 results = benchmark.run_with_platform(adapter)
 ```
 
 ### Extensions and Functions
 
+The first `INSTALL` downloads the extension. After loading `httpfs`, DuckDB can read directly from S3.
+
 ```python
 adapter = DuckDBAdapter()
 conn = adapter.create_connection()
 
-# Load DuckDB extensions (the first INSTALL downloads the extension)
 conn.execute("INSTALL httpfs")
 conn.execute("LOAD httpfs")
 
-# Now can read from S3
 conn.execute("""
     CREATE TABLE data AS
     SELECT * FROM read_parquet('s3://bucket/data/*.parquet')
@@ -426,8 +414,9 @@ conn.execute("""
 
 ### Window Functions
 
+DuckDB supports advanced window functions.
+
 ```python
-# DuckDB supports advanced window functions
 query = """
     SELECT
         l_orderkey,
@@ -473,12 +462,7 @@ result = conn.execute(query)
    adapter = DuckDBAdapter(thread_limit=os.cpu_count())
    ```
 
-2. **Use appropriate data types** in schema:
-
-   ```python
-   # Prefer HUGEINT over VARCHAR for large integers
-   # Use DATE/TIMESTAMP instead of VARCHAR for dates
-   ```
+2. **Use appropriate data types** in schema. Prefer `HUGEINT` over `VARCHAR` for large integers, and use `DATE` or `TIMESTAMP` instead of `VARCHAR` for dates.
 
 3. **Create indexes** for filtered columns:
 
@@ -488,10 +472,10 @@ result = conn.execute(query)
 
 ### Data Validation
 
-1. **Verify row counts** after loading:
+1. **Verify row counts** after loading. The expected value of 6,001,215 rows applies to TPC-H `lineitem` at scale factor 1:
 
    ```python
-   expected_rows = 6_001_215  # TPC-H lineitem rows at scale factor 1
+   expected_rows = 6_001_215
    actual_rows = conn.execute("SELECT COUNT(*) FROM lineitem").fetchone()[0]
    assert actual_rows == expected_rows, f"Expected {expected_rows}, got {actual_rows}"
    ```
@@ -510,13 +494,11 @@ result = conn.execute(query)
 
 **Problem**: Query fails with out of memory error
 
-**Solution**:
+**Solution**: Set an explicit memory limit, or use a persistent database so DuckDB can spill to disk:
 
 ```python
-# Set explicit memory limit
 adapter = DuckDBAdapter(memory_limit="4GB")
 
-# Or use persistent database with disk spilling
 adapter = DuckDBAdapter(
     database_path="benchmark.duckdb",
     memory_limit="4GB",
@@ -528,16 +510,13 @@ adapter = DuckDBAdapter(
 
 **Problem**: Queries execute slowly
 
-**Solutions**:
+**Solutions**: These three options are, in order: increase the thread count, use a persistent database to avoid repeated loads, and show query plans to identify bottlenecks.
 
 ```python
-# 1. Increase thread count
 adapter = DuckDBAdapter(thread_limit=8)
 
-# 2. Use persistent database to avoid repeated loads
 adapter = DuckDBAdapter(database_path="cached.duckdb")
 
-# 3. Show query plans to identify bottlenecks
 adapter = DuckDBAdapter(show_query_plans=True)
 ```
 
@@ -545,14 +524,12 @@ adapter = DuckDBAdapter(show_query_plans=True)
 
 **Problem**: "Database is locked" error
 
-**Solution**:
+**Solution**: Use separate database files for concurrent access, or use an in-memory database for read-only workloads:
 
 ```python
-# Use separate database files for concurrent access
 adapter1 = DuckDBAdapter(database_path="benchmark1.duckdb")
 adapter2 = DuckDBAdapter(database_path="benchmark2.duckdb")
 
-# Or use in-memory for read-only workloads
 adapter = DuckDBAdapter(database_path=":memory:")
 ```
 

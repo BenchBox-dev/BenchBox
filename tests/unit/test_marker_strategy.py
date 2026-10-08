@@ -1,5 +1,3 @@
-"""Guardrails for explicit pytest markers and measured test tiers."""
-
 from __future__ import annotations
 
 import ast
@@ -36,9 +34,7 @@ _test_modules_cache: list[Path] | None = None
 
 
 def _iter_test_modules() -> list[Path]:
-    """Return test modules with real tests.  Result is cached at module level
-    to avoid re-scanning 700+ files for each of the three tests that call this.
-    """
+
     global _test_modules_cache
     if _test_modules_cache is not None:
         return _test_modules_cache
@@ -142,7 +138,7 @@ class _FakeCollectedItem:
 
 
 def test_conftest_has_no_collection_time_speed_marker_rewrite():
-    """Collection may enforce quarantine and budgets, but never rewrite speed markers."""
+
     text = (_TESTS_ROOT / "conftest.py").read_text(encoding="utf-8")
 
     assert "test_speed_buckets.json" not in text

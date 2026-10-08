@@ -179,7 +179,6 @@ class TestRedshiftPhysicalIdentifiers:
         assert any("tablename = 'lineitem'" in statement for statement in statements)
         assert "ANALYZE lineitem" not in statements
         config = SimpleNamespace(table_tunings={"LINEITEM": tuning})
-        # The isolated vacuum/analyze pass in configure_for_benchmark covers the default case.
         assert redshift_adapter.auto_analyze is True
         assert redshift_adapter.apply_post_load_tunings("LINEITEM", config, connection) is False
         assert "ANALYZE lineitem" not in connection.recorder.statements

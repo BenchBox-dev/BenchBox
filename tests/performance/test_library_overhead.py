@@ -1,5 +1,3 @@
-"""Performance tests measuring BenchBox library overhead and memory usage."""
-
 from __future__ import annotations
 
 import gc
@@ -22,8 +20,6 @@ pytestmark = [
 
 
 class DummyBenchmark:
-    """Lightweight benchmark used for performance measurements."""
-
     def __init__(self) -> None:
         self.name = "dummy"
         self.scale_factor = 1.0
@@ -34,13 +30,10 @@ class DummyBenchmark:
         self.tables = None
 
     def generate_data(self) -> dict[str, object]:
-        """No-op data generation placeholder."""
         return {}
 
 
 class DummyAdapter:
-    """Adapter that simulates work with a controllable baseline workload."""
-
     def __init__(self, platform_name: str, workload: float = 0.001) -> None:
         self.platform_name = platform_name
         self.workload = workload
@@ -50,7 +43,6 @@ class DummyAdapter:
         self.call_count = 0
 
     def run_benchmark(self, benchmark: DummyBenchmark, **_kwargs) -> BenchmarkResults:
-        """Simulate benchmark execution with a steady baseline workload."""
         self.call_count += 1
         time.sleep(self.workload)
 
@@ -112,7 +104,6 @@ def _baseline_kwargs(connection_path: str | None) -> dict[str, object]:
 
 @pytest.mark.performance
 def test_run_benchmark_lifecycle_memory_overhead() -> None:
-    """Library orchestration should not introduce significant peak memory usage."""
 
     adapter = DummyAdapter("mock-memory", workload=0.0005)
     benchmark = DummyBenchmark()
@@ -147,7 +138,6 @@ def test_run_benchmark_lifecycle_memory_overhead() -> None:
 
 @pytest.mark.performance
 def test_result_exporter_memory_efficiency(tmp_path: Path) -> None:
-    """Exporting results should remain memory efficient across formats."""
 
     query_results = [
         {

@@ -1,13 +1,6 @@
-"""Tests for Azure Synapse SQL generation branches - coverage extension.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets: generate_tuning_clause with various distribution types,
-_optimize_table_definition variants, external data source/file format DDL,
-COPY INTO SQL, connection string format.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, Mock, patch
 
@@ -23,7 +16,7 @@ pytestmark = [
 
 @pytest.fixture(autouse=True)
 def synapse_stubs():
-    """Mock pyodbc dependency check."""
+
     with (
         patch.dict("sys.modules", {"pyodbc": MagicMock()}),
         patch("benchbox.platforms.azure_synapse.check_platform_dependencies", return_value=(True, [])),
@@ -112,7 +105,7 @@ class TestSynapseOptimizeTableDefinition:
         stmt = "CREATE TABLE orders (id INT) WITH (DISTRIBUTION = HASH([id]))"
         result = adapter._optimize_table_definition(stmt)
         assert "DISTRIBUTION = HASH([id])" in result
-        # Should not add a second distribution
+
         assert result.count("DISTRIBUTION") == 1
 
     def test_adds_schema_prefix(self):
@@ -135,7 +128,7 @@ class TestSynapseConnectionString:
 
 class TestSynapseExternalTableDdl:
     def test_setup_external_table_primitives_sql(self):
-        """External setup should generate CREATE EXTERNAL DATA SOURCE / FILE FORMAT SQL."""
+
         adapter = _make_adapter(
             storage_account="mystorageaccount",
             container="data",

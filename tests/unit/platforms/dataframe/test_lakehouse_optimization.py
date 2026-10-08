@@ -1,13 +1,4 @@
-"""Execution tests for lakehouse compaction, optimization, and vacuum.
-
-Delta Lake tests run against real local Delta tables via delta-rs;
-Iceberg tests run against a real SQL catalog in tmp; Hudi tests drive the
-documented CALL procedures (run_compaction, run_clustering, run_clean) against
-a recording Spark double. A final section pins the shared capability flags
-and the opt-in protocol surface.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -30,20 +21,20 @@ try:
 
     DELTA_AVAILABLE = True
 except ImportError:
-    pa = None  # type: ignore[assignment]
-    DeltaTable = None  # type: ignore[assignment]
-    write_deltalake = None  # type: ignore[assignment]
-    DeltaLakeMaintenanceOperations = None  # type: ignore[assignment]
+    pa = None
+    DeltaTable = None
+    write_deltalake = None
+    DeltaLakeMaintenanceOperations = None
     DELTA_AVAILABLE = False
 
 try:
-    import pyiceberg  # noqa: F401
+    import pyiceberg
 
     from benchbox.platforms.dataframe.iceberg_maintenance import IcebergMaintenanceOperations
 
     ICEBERG_AVAILABLE = True
 except ImportError:
-    IcebergMaintenanceOperations = None  # type: ignore[assignment]
+    IcebergMaintenanceOperations = None
     ICEBERG_AVAILABLE = False
 
 
@@ -159,11 +150,9 @@ class TestIcebergVacuum:
         remaining = ops.catalog.load_table(identifier).snapshots()
         assert len(remaining) == 1
         assert remaining[0].snapshot_id not in result.metrics["expired_snapshot_ids"]
-        # The surviving snapshot still scans.
         assert ops.catalog.load_table(identifier).scan().to_arrow().num_rows == 2
 
     def test_vacuum_default_preserves_fresh_history(self, tmp_path: Path) -> None:
-        """No retention_hours honors the backend default (5-day max age)."""
         ops, identifier = self._two_snapshot_table(tmp_path)
 
         result = ops.vacuum_table(identifier, dry_run=False)
@@ -173,7 +162,6 @@ class TestIcebergVacuum:
         assert len(ops.catalog.load_table(identifier).snapshots()) == 2
 
     def test_vacuum_default_uses_table_properties(self, tmp_path: Path) -> None:
-        """A zero max-snapshot-age property makes the default expire everything old."""
         ops, identifier = self._two_snapshot_table(tmp_path)
         table = ops.catalog.load_table(identifier)
         transaction = table.transaction()
@@ -204,7 +192,6 @@ class TestIcebergVacuum:
         assert len(ops.catalog.load_table(identifier).snapshots()) == 2
 
     def test_vacuum_skips_tagged_snapshots(self, tmp_path: Path) -> None:
-        """Snapshots referenced by a tag are protected from expiration."""
         ops, identifier = self._two_snapshot_table(tmp_path)
         table = ops.catalog.load_table(identifier)
         old_id = [

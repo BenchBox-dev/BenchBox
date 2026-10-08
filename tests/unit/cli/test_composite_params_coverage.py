@@ -1,5 +1,3 @@
-"""Coverage tests for cli/composite_params.py."""
-
 from __future__ import annotations
 
 import importlib
@@ -27,7 +25,7 @@ def test_plan_capture_parse_variants() -> None:
     p = mod.PlanCaptureConfig.parse("queries:1,6,17,strict:true")
     assert p.queries == ["1", "6", "17"]
     assert p.strict is True
-    # The retired per-iteration sampling keys are rejected with a clear error.
+
     with pytest.raises(click.BadParameter):
         mod.PlanCaptureConfig.parse("sample:0.1")
     with pytest.raises(click.BadParameter):

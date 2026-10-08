@@ -1,9 +1,6 @@
-"""Tests for Amazon EMR Serverless platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -19,10 +16,7 @@ pytestmark = [
 
 
 class TestEMRServerlessAdapterInitialization:
-    """Test EMRServerlessAdapter initialization."""
-
     def test_missing_s3_staging_dir_raises_error(self):
-        """Test error when s3_staging_dir is not provided."""
         from benchbox.platforms.aws import EMRServerlessAdapter
 
         with pytest.raises(ConfigurationError, match="s3_staging_dir"):
@@ -32,7 +26,7 @@ class TestEMRServerlessAdapterInitialization:
             )
 
     def test_missing_execution_role_raises_error(self):
-        """Test error when execution_role_arn is not provided."""
+
         from benchbox.platforms.aws import EMRServerlessAdapter
 
         with pytest.raises(ConfigurationError, match="execution_role_arn"):
@@ -42,7 +36,7 @@ class TestEMRServerlessAdapterInitialization:
             )
 
     def test_missing_application_id_without_create_raises_error(self):
-        """Test error when application_id not provided and create_application=False."""
+
         from benchbox.platforms.aws import EMRServerlessAdapter
 
         with pytest.raises(ConfigurationError, match="application_id"):
@@ -52,7 +46,6 @@ class TestEMRServerlessAdapterInitialization:
             )
 
     def test_invalid_s3_path_raises_error(self):
-        """Test error when s3_staging_dir has invalid format."""
         from benchbox.platforms.aws import EMRServerlessAdapter
 
         with pytest.raises(ConfigurationError, match="Invalid S3"):
@@ -63,7 +56,7 @@ class TestEMRServerlessAdapterInitialization:
             )
 
     def test_valid_configuration_with_application_id(self):
-        """Test valid configuration with existing application ID."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -86,7 +79,7 @@ class TestEMRServerlessAdapterInitialization:
             assert adapter.database == "my_benchmark_db"
 
     def test_valid_configuration_with_create_application(self):
-        """Test valid configuration with create_application=True."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -106,7 +99,7 @@ class TestEMRServerlessAdapterInitialization:
             assert adapter.application_name == "my-app"
 
     def test_default_values(self):
-        """Test default configuration values."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -128,10 +121,8 @@ class TestEMRServerlessAdapterInitialization:
 
 
 class TestEMRServerlessTableFormat:
-    """Test table_format parameter configuration."""
-
     def test_table_format_default_parquet(self):
-        """Test table_format defaults to parquet."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -146,7 +137,7 @@ class TestEMRServerlessTableFormat:
             assert adapter.table_format == "parquet"
 
     def test_table_format_delta(self):
-        """Test table_format can be set to delta."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -162,7 +153,7 @@ class TestEMRServerlessTableFormat:
             assert adapter.table_format == "delta"
 
     def test_table_format_from_config(self):
-        """Test table_format is passed through from_config."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -181,10 +172,8 @@ class TestEMRServerlessTableFormat:
 
 
 class TestEMRServerlessAdapterPlatformInfo:
-    """Test platform info methods."""
-
     def test_get_platform_info(self):
-        """Test get_platform_info returns correct metadata."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -211,7 +200,7 @@ class TestEMRServerlessAdapterPlatformInfo:
             assert info["supports_dataframe"] is True
 
     def test_get_dialect(self):
-        """Test get_target_dialect returns spark."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -229,10 +218,8 @@ class TestEMRServerlessAdapterPlatformInfo:
 
 
 class TestEMRServerlessAdapterConnection:
-    """Test connection functionality."""
-
     def test_create_connection_success(self):
-        """Test successful connection to existing application."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.boto3") as mock_boto3,
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
@@ -266,11 +253,8 @@ class TestEMRServerlessAdapterConnection:
 
 
 class TestEMRServerlessAdapterDataLoading:
-    """Test data loading functionality."""
-
     def test_load_data_existing_tables(self, tmp_path):
-        """Test load_data skips upload when tables exist."""
-        # Create actual source directory to pass validation
+
         source_dir = tmp_path / "test_data"
         source_dir.mkdir()
 
@@ -299,10 +283,8 @@ class TestEMRServerlessAdapterDataLoading:
 
 
 class TestEMRServerlessJobState:
-    """Test job state constants."""
-
     def test_job_state_values(self):
-        """Test EMRServerlessJobState constants are correct."""
+
         from benchbox.platforms.aws.emr_serverless_adapter import EMRServerlessJobState
 
         assert EMRServerlessJobState.SUBMITTED == "SUBMITTED"
@@ -314,17 +296,15 @@ class TestEMRServerlessJobState:
 
 
 class TestEMRServerlessAdapterRegistry:
-    """Test platform registry integration."""
-
     def test_platform_metadata_exists(self):
-        """Test EMR Serverless metadata exists in platform registry."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
         assert "emr-serverless" in all_metadata
 
     def test_platform_metadata_content(self):
-        """Test EMR Serverless metadata content is correct."""
+
         from benchbox.core.platform_registry import PlatformRegistry
 
         all_metadata = PlatformRegistry.get_all_platform_metadata()
@@ -338,10 +318,8 @@ class TestEMRServerlessAdapterRegistry:
 
 
 class TestEMRServerlessAdapterTuning:
-    """Test tuning interface implementation."""
-
     def test_apply_platform_optimizations(self):
-        """Test apply_platform_optimizations returns empty list."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -359,7 +337,7 @@ class TestEMRServerlessAdapterTuning:
             assert result == []
 
     def test_apply_primary_keys(self):
-        """Test apply_primary_keys returns empty list."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -379,10 +357,9 @@ class TestEMRServerlessAdapterTuning:
             assert result == []
 
     def test_configure_for_benchmark(self):
-        """Test configure_for_benchmark sets benchmark type."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
-            # SparkConfigOptimizer is now used from the mixin module
             patch("benchbox.platforms.base.cloud_spark.mixins.SparkConfigOptimizer") as mock_optimizer,
         ):
             mock_staging.from_uri.return_value = MagicMock()
@@ -405,10 +382,8 @@ class TestEMRServerlessAdapterTuning:
 
 
 class TestEMRServerlessAdapterCLI:
-    """Test CLI argument handling."""
-
     def test_add_cli_arguments(self):
-        """Test add_cli_arguments adds expected arguments."""
+
         from benchbox.platforms.aws import EMRServerlessAdapter
 
         parser = MagicMock()
@@ -420,10 +395,8 @@ class TestEMRServerlessAdapterCLI:
 
 
 class TestEMRServerlessAdapterFromConfig:
-    """Test from_config factory method."""
-
     def test_from_config_basic(self):
-        """Test from_config creates adapter with basic config."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
         ):
@@ -447,10 +420,8 @@ class TestEMRServerlessAdapterFromConfig:
 
 
 class TestEMRServerlessAdapterClose:
-    """Test cleanup functionality."""
-
     def test_close_logs_metrics(self):
-        """Test close logs resource usage metrics."""
+
         with (
             patch("benchbox.platforms.aws.emr_serverless_adapter.CloudSparkStaging") as mock_staging,
             patch("benchbox.platforms.aws.emr_serverless_adapter.logger") as mock_logger,
@@ -470,13 +441,10 @@ class TestEMRServerlessAdapterClose:
 
             adapter.close()
 
-            # Verify logging was called
             mock_logger.info.assert_called()
 
 
 class TestLoadDataRequestedFormat:
-    """Registration must follow the resolved upload format, not table_format alone."""
-
     def test_requested_delta_registers_delta(self, tmp_path):
         ClientError = pytest.importorskip("botocore.exceptions").ClientError
         source_dir = tmp_path / "test_data"

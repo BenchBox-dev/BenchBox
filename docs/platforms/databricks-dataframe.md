@@ -30,8 +30,9 @@ Delta Lake tables - but runs queries as DataFrame expressions instead of SQL.
 
 ## Installation
 
+This installs `databricks-sql-connector`, `databricks-sdk` and `databricks-connect`.
+
 ```bash
-# Installs databricks-sql-connector + databricks-sdk + databricks-connect
 uv add benchbox --extra cloud-spark-databricks
 ```
 
@@ -61,13 +62,14 @@ execution mode.
 
 ## Usage
 
+The first command runs TPC-H with DataFrame execution. The last two compare SQL and DataFrame on the same benchmark:
+the first is SQL and the second is DataFrame.
+
 ```bash
-# Run TPC-H with DataFrame execution
 benchbox run --platform databricks-df --benchmark tpch --scale 1.0
 
-# Compare SQL vs DataFrame on the same benchmark
-benchbox run --platform databricks    --benchmark tpch --scale 1.0  # SQL
-benchbox run --platform databricks-df --benchmark tpch --scale 1.0  # DataFrame
+benchbox run --platform databricks    --benchmark tpch --scale 1.0
+benchbox run --platform databricks-df --benchmark tpch --scale 1.0
 ```
 
 ## Supported Benchmarks

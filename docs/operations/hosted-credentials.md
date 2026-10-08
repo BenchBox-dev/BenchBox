@@ -13,12 +13,12 @@ evidence, and configuration files.
 Choose the shortest practical lifetime.
 
 ```sh
-# Developer or headless writer: 90 days.
 export TODO_DB_AUTH_TOKEN="$(turso db tokens create benchbox-todo --expiration 90d)"
 
-# Scheduled audit/export: server-enforced read-only, 180 days.
 export TODO_DB_RO_AUTH_TOKEN="$(turso db tokens create benchbox-todo --read-only --expiration 180d)"
 ```
+
+The first token is for a developer or headless writer and lasts 90 days. The second is for a scheduled audit or export, is server-enforced read-only, and lasts 180 days.
 
 Inject the result with an OS keychain, password manager, process supervisor, or
 CI secret store. Point `TODO_DB_CREDENTIAL_COMMAND` at that store so sessions
@@ -80,11 +80,6 @@ that script read `TODO_DB_CREDENTIAL_CAPABILITY`, which todo-db sets to
 `read-only` or `read-write` in the command's environment:
 
 ```sh
-#!/bin/sh
-# Exit 0 with no output means "absent", which is the only condition that lets a
-# read-only request fall back to read-write. A missing entry makes `security`
-# exit 44, and a non-zero exit is an error that stops resolution, so the absent
-# case has to be handled deliberately.
 case "$TODO_DB_CREDENTIAL_CAPABILITY" in
   read-only)
     security find-generic-password -w -s benchbox-todo-ro 2>/dev/null || exit 0
@@ -94,6 +89,12 @@ case "$TODO_DB_CREDENTIAL_CAPABILITY" in
     ;;
 esac
 ```
+
+Start the script with `#!/bin/sh`. In the read-only branch, `|| exit 0` handles the absent case on purpose. Exit 0
+with no output means the entry is absent, which is the only condition that lets a
+read-only request fall back to read-write. A missing entry makes `security` exit
+44, so the script turns that into exit 0. Any other non-zero exit is an error
+and stops resolution.
 
 If your store holds one entry serving both capabilities, point the variable
 straight at it and skip the script. `doctor` will then report

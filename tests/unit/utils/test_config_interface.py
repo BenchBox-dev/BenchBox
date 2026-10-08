@@ -1,9 +1,6 @@
-"""Tests for configuration interface utilities.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -23,70 +20,54 @@ pytestmark = [
 
 
 class TestConfigInterface:
-    """Test ConfigInterface base class."""
-
     def test_config_interface_is_abstract(self):
-        """Test that ConfigInterface is abstract and cannot be instantiated."""
         with pytest.raises(TypeError):
             ConfigInterface()
 
     def test_config_interface_methods_not_implemented(self):
-        """Test that ConfigInterface requires implementation of abstract methods."""
 
-        # Attempting to create a class without implementing abstract methods should fail
         class TestConfig(ConfigInterface):
             pass
 
-        # Cannot instantiate without implementing get() and set()
         with pytest.raises(TypeError):
             TestConfig()
 
 
 class TestSimpleConfigProvider:
-    """Test SimpleConfigProvider functionality."""
-
     def test_simple_config_provider_creation_empty(self):
-        """Test creating SimpleConfigProvider with no initial data."""
         config = SimpleConfigProvider()
 
-        # Config has defaults, so check it's a dict and get() works
         assert isinstance(config._config, dict)
         assert config.get("nonexistent_key") is None
 
     def test_simple_config_provider_creation_with_data(self):
-        """Test creating SimpleConfigProvider with initial data."""
         initial_data = {"key1": "value1", "key2": 42, "key3": {"nested": "value"}}
 
         config = SimpleConfigProvider(initial_data)
 
-        # Verify initial data was set correctly
         assert config.get("key1") == "value1"
         assert config.get("key2") == 42
         assert config.get("key3") == {"nested": "value"}
 
     def test_get_existing_key(self):
-        """Test getting value for existing key."""
         config = SimpleConfigProvider({"test_key": "test_value", "number": 123})
 
         assert config.get("test_key") == "test_value"
         assert config.get("number") == 123
 
     def test_get_nonexistent_key_no_default(self):
-        """Test getting value for nonexistent key without default."""
         config = SimpleConfigProvider({"existing": "value"})
 
         result = config.get("nonexistent")
         assert result is None
 
     def test_get_nonexistent_key_with_default(self):
-        """Test getting value for nonexistent key with default."""
         config = SimpleConfigProvider({"existing": "value"})
 
         result = config.get("nonexistent", "default_value")
         assert result == "default_value"
 
     def test_get_with_various_types(self):
-        """Test getting values of various types."""
         config = SimpleConfigProvider(
             {
                 "string": "hello",
@@ -108,7 +89,6 @@ class TestSimpleConfigProvider:
         assert config.get("none") is None
 
     def test_set_new_key(self):
-        """Test setting value for new key."""
         config = SimpleConfigProvider()
 
         config.set("new_key", "new_value")
@@ -117,7 +97,6 @@ class TestSimpleConfigProvider:
         assert "new_key" in config._config
 
     def test_set_existing_key(self):
-        """Test updating value for existing key."""
         config = SimpleConfigProvider({"existing": "old_value"})
 
         config.set("existing", "new_value")
@@ -126,7 +105,6 @@ class TestSimpleConfigProvider:
         assert config._config["existing"] == "new_value"
 
     def test_set_various_types(self):
-        """Test setting values of various types."""
         config = SimpleConfigProvider()
 
         config.set("string", "hello")
@@ -146,53 +124,41 @@ class TestSimpleConfigProvider:
         assert config.get("none") is None
 
     def test_has_existing_key(self):
-        """Test checking if existing key exists."""
         config = SimpleConfigProvider({"existing": "value", "none_value": None})
 
-        # Test key existence via get() with sentinel
         assert config.get("existing") is not None or "existing" in config._config
-        assert "none_value" in config._config  # None is still a value
+        assert "none_value" in config._config
 
     def test_has_nonexistent_key(self):
-        """Test checking if nonexistent key exists."""
         config = SimpleConfigProvider({"existing": "value"})
 
         assert "nonexistent" not in config._config
 
     def test_get_all_empty(self):
-        """Test that empty provider has default configuration."""
         config = SimpleConfigProvider()
 
-        # SimpleConfigProvider has defaults, so check it's a dict with defaults
         assert isinstance(config._config, dict)
-        # Should have execution defaults
         assert "execution.timeout_minutes" in config._config
 
     def test_get_all_with_data(self):
-        """Test that provider stores all provided data."""
         data = {"key1": "value1", "key2": 42, "nested": {"inner": "value"}}
         config = SimpleConfigProvider(data)
 
-        # Verify all data is accessible via get()
         assert config.get("key1") == "value1"
         assert config.get("key2") == 42
         assert config.get("nested") == {"inner": "value"}
 
     def test_data_isolation(self):
-        """Test that configuration data is properly isolated."""
         initial_data = {"key": "value"}
         config = SimpleConfigProvider(initial_data)
 
-        # Modifying initial data shouldn't affect config (constructor copies it)
         initial_data["key"] = "changed"
         assert config.get("key") == "value"
 
-        # Direct modification of _config attribute should work
         config._config["new_key"] = "new_value"
         assert config.get("new_key") == "new_value"
 
     def test_nested_data_handling(self):
-        """Test handling of nested data structures."""
         config = SimpleConfigProvider(
             {
                 "level1": {"level2": {"level3": "deep_value"}},
@@ -204,14 +170,11 @@ class TestSimpleConfigProvider:
         assert config.get("list_of_dicts") == [{"item": 1}, {"item": 2}]
 
     def test_key_types(self):
-        """Test that keys must be strings."""
         config = SimpleConfigProvider()
 
-        # String keys should work
         config.set("string_key", "value")
         assert config.get("string_key") == "value"
 
-        # Other key types should also work (Python dict allows it)
         config.set(123, "numeric_key_value")
         config.set(("tuple", "key"), "tuple_key_value")
 
@@ -220,14 +183,6 @@ class TestSimpleConfigProvider:
 
 
 class TestCLIConfigProvider:
-    """The CLI adapter now lives in the CLI layer and is pushed down.
-
-    `benchbox.utils.config_interface` used to import `benchbox.cli.config`
-    itself, which was the layering violation .importlinter carried as an ignore
-    entry. utils now exposes a registration seam and the CLI fills it, so the
-    import edge points down.
-    """
-
     def teardown_method(self):
         set_config_provider(None)
 
@@ -305,7 +260,6 @@ class TestConfigProviderRegistration:
         assert get_config_provider().get("execution.timeout_minutes") == 120
 
     def test_utils_does_not_import_the_cli_to_find_a_provider(self):
-        """The inverted edge: utils resolves without benchbox.cli loaded."""
         import ast
         from pathlib import Path as _Path
 

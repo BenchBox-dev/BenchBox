@@ -16,29 +16,14 @@ export interface QueryDiffRow {
   candidatePlatform: string;
   baselineMs: number | null;
   candidateMs: number | null;
-  /** Baseline latency divided by candidate latency: above 1 means faster. */
   speedupRatio: number | null;
   deltaMs: number | null;
   status: QueryDiffStatus;
-  /** Executions behind each side's value under the current basis. */
   baselineSamples: number | null;
   candidateSamples: number | null;
-  /**
-   * False when one side cannot answer the current basis.
-   *
-   * The row is still rendered. A query dropped for being unanswerable is a
-   * query the reader never learns was excluded, and the count they see stops
-   * matching the corpus.
-   */
   comparable: boolean;
 }
 
-/**
- * Which subset of the per-query rows to show.
- *
- * Applied to the chart and the table through this ONE function, so the two can
- * never show different subsets of the same comparison.
- */
 export type QueryDiffLimiter = "all" | "speedups" | "slowdowns" | "movement";
 
 export const QUERY_DIFF_LIMITER_LABELS: Record<QueryDiffLimiter, string> = {
@@ -48,16 +33,8 @@ export const QUERY_DIFF_LIMITER_LABELS: Record<QueryDiffLimiter, string> = {
   movement: "Largest movement",
 };
 
-/** Product contract: largest-query views show at most ten logical queries. */
 export const DEFAULT_QUERY_DIFF_LIMIT = 10;
 
-/**
- * Rank and cap the rows for a limiter.
- *
- * Rows that cannot be compared under the current basis are never ranked into a
- * "largest" view -- they have no magnitude to rank by -- but `all` keeps them,
- * so they stay visible and marked rather than disappearing.
- */
 export function applyQueryDiffLimiter(
   rows: readonly QueryDiffRow[],
   limiter: QueryDiffLimiter,
@@ -78,11 +55,6 @@ export function applyQueryDiffLimiter(
   return sorted.slice(0, Math.max(0, topN));
 }
 
-/**
- * Select and rank query IDs for a given limiter across comparison results.
- *
- * Provides a single shared query selection for the chart, the heatmap, and the table.
- */
 export function selectQueryIdsForLimiter(
   results: readonly DetailResult[],
   baselineIndex: number,
@@ -101,7 +73,6 @@ export function selectQueryIdsForLimiter(
   const baseline = results[normalizedBaselineIndex];
   const candidates = results.filter((_, i) => i !== normalizedBaselineIndex);
 
-  // Queries where baseline has a valid timing and at least one candidate has a valid timing
   const comparable = allQueryIds.filter((queryId) => {
     const baseMs = baseline ? timingValueForQuery(baseline, queryId) : null;
     if (baseMs === null || baseMs <= 0) return false;
@@ -159,12 +130,6 @@ export function selectQueryIdsForLimiter(
   };
 }
 
-/**
- * The sentence every limiter state must carry, including the empty one.
- *
- * "No queries match" without a denominator leaves a reader unable to tell an
- * empty filter from an empty comparison.
- */
 export function queryDiffCountSentence(shown: number, total: number, limiter: QueryDiffLimiter): string {
   if (total === 0) return "No queries to compare.";
   if (shown === 0) {

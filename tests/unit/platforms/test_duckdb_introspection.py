@@ -1,15 +1,6 @@
-"""Tests for the DuckDB post-load introspector + the adapter upgrade wiring.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Exercises the REAL corroboration path against a live in-memory DuckDB catalog
-(``duckdb_indexes()``): a corroborated tuned run reaches ``applied_verified``
-with a receipt, an induced index-column mismatch downgrades to
-``applied_unverified`` with a diff, and an introspection failure stays
-``applied_unverified``. TODO ``tuning-introspection-receipts-20260716``.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -48,9 +39,6 @@ def _ledger_for(*statements: str) -> AppliedTuningLedger:
     return ledger
 
 
-# ---------------------------------------------------------------------------
-# Introspector: real duckdb_indexes() reads.
-# ---------------------------------------------------------------------------
 class TestDuckDBIntrospector:
     def test_reads_indexes_as_structured_facts(self):
         con = _con_with_indexes()
@@ -68,7 +56,7 @@ class TestDuckDBIntrospector:
         con = _con_with_indexes()
         con.execute("CREATE TABLE PART(P_PARTKEY INTEGER)")
         con.execute("CREATE INDEX idx_part_sort ON PART (P_PARTKEY)")
-        # Ledger only touched LINEITEM -> PART's index is not surfaced.
+
         ledger = _ledger_for("CREATE INDEX IF NOT EXISTS idx_lineitem_sort ON LINEITEM (L_ORDERKEY, L_LINENUMBER)")
         state = DuckDBTuningIntrospector().introspect(con, ledger)
         tables = {obj.table.lower() for obj in state.objects}
@@ -84,9 +72,6 @@ class TestDuckDBIntrospector:
         assert state.objects == []
 
 
-# ---------------------------------------------------------------------------
-# End-to-end corroboration against the real catalog.
-# ---------------------------------------------------------------------------
 class TestCorroborateAgainstRealCatalog:
     def test_persisted_indexes_corroborate(self):
         con = _con_with_indexes()
@@ -99,8 +84,7 @@ class TestCorroborateAgainstRealCatalog:
         assert all(e.verdict == CORROBORATED for e in receipt.entries)
 
     def test_recording_connection_populates_then_corroborates(self):
-        # Populate the ledger EXACTLY as apply_unified_tuning does (through the
-        # recording connection), then corroborate against the same live catalog.
+
         con = duckdb.connect(":memory:")
         con.execute("CREATE TABLE LINEITEM(L_ORDERKEY INTEGER, L_LINENUMBER INTEGER)")
         ledger = AppliedTuningLedger()
@@ -112,15 +96,14 @@ class TestCorroborateAgainstRealCatalog:
     def test_induced_mismatch_downgrades_with_diff(self):
         con = duckdb.connect(":memory:")
         con.execute("CREATE TABLE LINEITEM(L_ORDERKEY INTEGER, L_LINENUMBER INTEGER)")
-        con.execute("CREATE INDEX idx_lineitem_sort ON LINEITEM (L_ORDERKEY)")  # only (a)
+        con.execute("CREATE INDEX idx_lineitem_sort ON LINEITEM (L_ORDERKEY)")
         ledger = _ledger_for("CREATE INDEX IF NOT EXISTS idx_lineitem_sort ON LINEITEM (L_ORDERKEY, L_LINENUMBER)")
         receipt = corroborate(ledger, DuckDBTuningIntrospector().introspect(con, ledger))
         assert receipt.corroborated is False
         assert receipt.entries[0].diff is not None
 
     def test_dropped_index_is_absent(self):
-        # An index the ledger recorded but that no longer exists (mirrors the
-        # CTAS-sorted-ingestion drop of DuckDB's sort index) -> absent.
+
         con = duckdb.connect(":memory:")
         con.execute("CREATE TABLE LINEITEM(L_ORDERKEY INTEGER, L_LINENUMBER INTEGER)")
         ledger = _ledger_for("CREATE INDEX IF NOT EXISTS idx_lineitem_sort ON LINEITEM (L_ORDERKEY, L_LINENUMBER)")
@@ -129,9 +112,6 @@ class TestCorroborateAgainstRealCatalog:
         assert receipt.entries[0].verdict == ABSENT
 
 
-# ---------------------------------------------------------------------------
-# Adapter wiring: _corroborate_applied_ledger is the SOLE emitter of verified.
-# ---------------------------------------------------------------------------
 class TestAdapterUpgradeWiring:
     def test_adapter_upgrades_to_verified_only_via_corroboration(self):
         con = _con_with_indexes()
@@ -158,7 +138,7 @@ class TestAdapterUpgradeWiring:
         assert receipt["corroborated"] is False
 
     def test_adapter_non_unverified_status_is_untouched(self):
-        # noop/failed/not_applicable never get an introspection attempt.
+
         con = _con_with_indexes()
         adapter = DuckDBAdapter()
         adapter._applied_tuning_ledger = _ledger_for(
@@ -179,16 +159,13 @@ class TestAdapterUpgradeWiring:
         )
         status, receipt = adapter._corroborate_applied_ledger(_Boom(), APPLIED_UNVERIFIED)
         assert status == APPLIED_UNVERIFIED
-        # Receipt is produced and records the degradation reason.
+
         assert receipt is not None and receipt["corroborated"] is False
 
     def test_duckdb_adapter_exposes_introspector(self):
         assert isinstance(DuckDBAdapter().get_tuning_introspector(), DuckDBTuningIntrospector)
 
 
-# ---------------------------------------------------------------------------
-# CTAS-sort index re-creation: the sort footprint survives to corroboration.
-# ---------------------------------------------------------------------------
 def _sorted_tuning_config() -> UnifiedTuningConfiguration:
     config = UnifiedTuningConfiguration()
     config.table_tunings["LINEITEM"] = TableTuning(
@@ -202,10 +179,6 @@ def _sorted_tuning_config() -> UnifiedTuningConfiguration:
 
 
 class TestCtasSortIndexReCreation:
-    """The CTAS `CREATE OR REPLACE TABLE` drops the pre-load sort index; the
-    adapter re-creates it post-CTAS so the footprint survives and corroborates.
-    """
-
     def _adapter_with_loaded_table(self) -> tuple[DuckDBAdapter, object]:
         con = duckdb.connect(":memory:")
         con.execute("CREATE TABLE LINEITEM(L_ORDERKEY INTEGER, L_LINENUMBER INTEGER, L_COMMENT VARCHAR)")
@@ -219,9 +192,9 @@ class TestCtasSortIndexReCreation:
     def test_ctas_sort_recreates_index_and_records_post_load_op(self):
         adapter, con = self._adapter_with_loaded_table()
         config = _sorted_tuning_config()
-        # Pre-load tuning creates the index (recorded via the wrapped connection).
+
         adapter.apply_unified_tuning(config, recording_connection(con, adapter._applied_tuning_ledger, PHASE_DDL))
-        # CTAS sort drops-and-recreates the table; the override re-makes the index.
+
         assert adapter.apply_ctas_sort("LINEITEM", config, con) is True
 
         indexes = {row[0] for row in con.execute("SELECT index_name FROM duckdb_indexes()").fetchall()}
@@ -246,5 +219,5 @@ class TestCtasSortIndexReCreation:
         adapter.dry_run_mode = True
         config = _sorted_tuning_config()
         adapter.apply_ctas_sort("LINEITEM", config, con)
-        # Dry run captures SQL but must not execute the re-creation or record an op.
+
         assert not [op for op in adapter._applied_layout_operations if op["mechanism"] == "sort_index"]

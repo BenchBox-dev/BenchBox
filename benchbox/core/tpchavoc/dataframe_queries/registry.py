@@ -1,5 +1,3 @@
-"""TPC-Havoc DataFrame query registry."""
-
 from __future__ import annotations
 
 from importlib import import_module
@@ -20,15 +18,15 @@ TPCHAVOC_DATAFRAME_QUERIES = _build_registry()
 
 
 def get_dataframe_queries() -> QueryRegistry:
-    """Get the TPC-Havoc DataFrame query registry."""
+
     return TPCHAVOC_DATAFRAME_QUERIES
 
 
 def get_query(query_id: str) -> DataFrameQuery:
-    """Get a TPC-Havoc DataFrame variant by ID."""
+
     return TPCHAVOC_DATAFRAME_QUERIES.get_or_raise(query_id)
 
 
 def list_query_ids() -> list[str]:
-    """List all TPC-Havoc DataFrame variant IDs."""
+
     return TPCHAVOC_DATAFRAME_QUERIES.get_query_ids()

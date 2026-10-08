@@ -28,20 +28,16 @@ test.describe("compare entrypoints after tray migration (rx-18)", () => {
   });
 
   test("overview, benchmark, and receipt pages expose comparison entrypoints", async ({ page }) => {
-    // Home
     await page.goto("/results/");
     await waitForShell(page);
     await waitForDataLoaded(page, /Recent Results/i);
-    // Home entry is always a link, but its text reflects picking count
     await expect(page.getByTestId("overview-compare-cta")).toBeVisible();
 
-    // BenchmarkIndex guidance is disabled below 2
     await page.goto("/results/tpch/");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
     await expect(page.getByTestId("benchmark-compare-cta-pending")).toHaveText("Select 2 results to compare");
 
-    // ResultDetail sends the current run to Find runs, where the second run is selected.
     await page.goto(`/results/r/${fixtureIds.ids.duckdb}`);
     await waitForShell(page);
     await waitForDataLoaded(page, /Query timings/);
@@ -52,12 +48,9 @@ test.describe("compare entrypoints after tray migration (rx-18)", () => {
   });
 
   test("no stale compare labels remain", async ({ page }) => {
-    // This test mirrors the rg check: no old labels in bundle.
-    // We just verify the new labels are present.
     await page.goto("/results/tpch/");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
-    // Should have BenchmarkIndex's tray once 2 selected, not old 'Compare 0 runs'
     await expect(page.getByTestId("benchmark-compare-cta-pending")).toHaveText("Select 2 results to compare");
   });
 });

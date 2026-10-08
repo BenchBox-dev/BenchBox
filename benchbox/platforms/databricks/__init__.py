@@ -1,15 +1,7 @@
-"""Databricks platform support for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides credential management and setup utilities for Databricks
-SQL Warehouse connections.
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
-# Import and re-export the Databricks adapters
-# Import and re-export dependency checking utilities
 from benchbox.platforms.base.config_utils import make_platform_config_builder
 from benchbox.utils.dependencies import check_platform_dependencies, get_dependency_error_message
 
@@ -56,8 +48,3 @@ _build_databricks_config = make_platform_config_builder(
         "disable_result_cache",
     ],
 )
-
-
-# NOTE: Registration of the config builder is done in benchbox/platforms/__init__.py
-# after all imports are complete, to avoid circular import issues with the
-# databricks package structure.

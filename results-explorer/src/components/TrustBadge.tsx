@@ -1,26 +1,3 @@
-// ---------------------------------------------------------------------------
-// TrustBadge - renders trust_label as a StatusBadge with role="trust"
-//
-// Tone semantics:
-//   maintainer-run       → success  (verified by project maintainers)
-//   community-submission → info     (user-submitted, explicitly disclosed)
-//   vendor-supplied      → warning  (vendor-produced; ranked but conflict of interest)
-//   ci / ci-verified     → neutral  (automated pipeline, no human review)
-//   local / local-run    → neutral  (developer machine, no CI validation)
-//   unofficial-research  → warning  (non-standard config, not comparable)
-//   unknown / empty      → neutral  (fallback for unrecognised / missing values)
-//
-// The keys below cover BOTH the explorer pipeline's trust labels
-// (ci-verified, local-run) AND the publisher vocabulary in
-// benchbox/core/publishing/bundle_publisher.py:VALID_LABELS
-// (ci, local, unofficial-research), so a valid label never falls through to the
-// "unrecognised" fallback. Keep the two in sync.
-//
-// Tones meet WCAG AA contrast (light background + dark text in each tier).
-// Do NOT de-emphasise community results - show them prominently with their
-// own color rather than a "cautionary" yellow.
-// ---------------------------------------------------------------------------
-
 import { describeOverride, describeValidationStatus } from "@/lib/displayLabels";
 import { StatusBadge, type StatusTone } from "./StatusBadge";
 
@@ -79,30 +56,22 @@ const DEFAULT_CONFIG = {
   title: "The source of this result was not recorded.",
 };
 
-/** Tooltip/legend prose for a trust label. Single source for both surfaces. */
 export function trustLabelDescription(trustLabel: string): string {
   return TRUST_CONFIG[trustLabel]?.title ?? DEFAULT_CONFIG.title;
 }
 
 interface TrustBadgeProps {
   trustLabel: string;
-  /** When true, show only the first word of the label. */
   compact?: boolean;
 }
 
 interface ValidationBadgeProps {
   validationStatus?: string | null;
   showMissing?: boolean;
-  /**
-   * Accepted-override rule ids (parsed `override_rules`). When non-empty the
-   * badge never renders clean: tone is forced to "warning" and the title
-   * names the covering override, regardless of the recorded status.
-   */
   overrideRules?: string[] | null;
 }
 
 export interface OverrideBadgeProps {
-  /** Accepted-override rule ids (parsed `override_rules`). Renders nothing when empty. */
   rules?: string[] | null;
   approver?: string | null;
   evidence?: string | null;
@@ -111,10 +80,6 @@ export interface OverrideBadgeProps {
 }
 
 export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
-  // Render an explicit "Unknown" badge for a missing label rather than hiding
-  // the trust dimension entirely: a silently-absent badge reads as "no opinion"
-  // instead of "provenance not recorded". (trust_label is NOT NULL in the
-  // snapshot schema today, so this is a defensive contract, not a hot path.)
   const known = trustLabel ? TRUST_CONFIG[trustLabel] : undefined;
   const config =
     known ??
@@ -133,11 +98,6 @@ export function TrustBadge({ trustLabel, compact = false }: TrustBadgeProps) {
   );
 }
 
-// Renders the shared validation-status vocabulary (see
-// `describeValidationStatus` in src/lib/displayLabels.ts) as a badge. The
-// visible text is the reader-facing label, never the raw enum value (e.g.
-// "no validation", not "not_run") - the raw status is still available via the
-// title tooltip for anyone who wants precision.
 export function ValidationBadge({ validationStatus, showMissing = false, overrideRules }: ValidationBadgeProps) {
   const override = describeOverride(overrideRules ?? []);
   if (!validationStatus && !showMissing && !override) return null;
@@ -157,8 +117,6 @@ export function ValidationBadge({ validationStatus, showMissing = false, overrid
   }
   const info = describeValidationStatus(validationStatus);
   if (override) {
-    // An accepted override is never a clean pass, even when the recorded
-    // status alone would badge as one.
     return (
       <StatusBadge
         role="validation"
@@ -176,9 +134,6 @@ export function ValidationBadge({ validationStatus, showMissing = false, overrid
   );
 }
 
-// Renders an accepted plausibility override as its own badge. Null (renders
-// nothing) when no override was accepted. The evidence link, when present,
-// is a plain text URL — never fetched, only shown as the audit trail.
 export function OverrideBadge({ rules, approver, evidence, expires, compact = false }: OverrideBadgeProps) {
   const override = describeOverride(rules ?? [], { approver, expires });
   if (!override) return null;

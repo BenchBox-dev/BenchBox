@@ -1,5 +1,3 @@
-"""Tests for benchbox.core.tuning.type_mapping."""
-
 from __future__ import annotations
 
 import pytest
@@ -21,8 +19,6 @@ _SAMPLE_MAPPING = {
 
 
 class TestMapSqlTypeWithFallback:
-    """Direct tests for map_sql_type_with_fallback edge cases."""
-
     def test_exact_match(self):
         assert map_sql_type_with_fallback("INTEGER", _SAMPLE_MAPPING) == "INT"
 

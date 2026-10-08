@@ -1,19 +1,4 @@
 #!/usr/bin/env node
-/**
- * Dependency audit gate: `npm audit` at the high level, minus an explicit,
- * self-expiring allowlist of advisories that have no available fix.
- *
- * An allowlist entry (audit-high-allowlist.json) stops covering its advisory,
- * and the gate fails, once any of these is true:
- * - its `review_by` date has passed;
- * - the registry now holds a release outside the advisory's vulnerable range
- *   (a fix exists, so the entry should be removed and the dependency updated);
- * - the entry is malformed.
- *
- * Every other high or critical finding fails the gate. A vulnerability reached
- * only through other vulnerable packages (npm reports these by package name) is
- * covered when every advisory beneath it is allowlisted.
- */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -34,7 +19,6 @@ function isoDay(date) {
   return date.toISOString().slice(0, 10);
 }
 
-/** Problems that make an allowlist entry unusable, as messages. */
 export function entryProblems(entry, today, patchedVersions = []) {
   const label = `allowlist entry ${entry?.id ?? "<missing id>"}`;
   const problems = [];
@@ -60,7 +44,6 @@ export function entryProblems(entry, today, patchedVersions = []) {
   return problems;
 }
 
-/** Vulnerable ranges npm reported for an advisory id, from the audit JSON. */
 function reportedRanges(audit, id) {
   const ranges = new Set();
   for (const vulnerability of Object.values(audit.vulnerabilities ?? {})) {
@@ -73,12 +56,6 @@ function reportedRanges(audit, id) {
   return [...ranges];
 }
 
-/**
- * Decide the gate from parsed `npm audit --json` output.
- *
- * `versionsOutsideRange(package, range)` returns the published stable versions
- * of `package` that do not satisfy the vulnerable `range`.
- */
 export function evaluateAudit({ audit, allowlist, today, versionsOutsideRange }) {
   const failures = [];
   const active = [];
@@ -154,7 +131,6 @@ export function evaluateAudit({ audit, allowlist, today, versionsOutsideRange })
   return { failures, active, unused };
 }
 
-/** Stable versions the registry lists outside `range`, via npm itself. */
 function registryVersionsOutsideRange(name, range, run = spawnSync) {
   const list = (spec) => {
     const result = run("npm", ["view", spec, "version", "--json"], {
@@ -179,7 +155,6 @@ function runNpmAudit() {
     maxBuffer: 64 * 1024 * 1024,
   });
   if (result.error) throw result.error;
-  // npm exits non-zero when it finds vulnerabilities but still writes the report.
   return JSON.parse(result.stdout);
 }
 

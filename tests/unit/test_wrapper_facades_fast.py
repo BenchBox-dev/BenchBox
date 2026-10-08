@@ -1,5 +1,3 @@
-"""Fast proxy coverage for public benchmark wrapper classes."""
-
 from __future__ import annotations
 
 from pathlib import Path

@@ -1,5 +1,3 @@
-"""Contract parity between the stdio and Streamable HTTP MCP transports."""
-
 from __future__ import annotations
 
 import os
@@ -37,7 +35,6 @@ RAW_TEXTCHARTS_PREFIX = "textcharts_"
 
 
 async def _inventory(client: Client) -> dict[str, list[dict[str, Any]]]:
-    """Return the public discovery contract in a transport-neutral shape."""
 
     def normalize(items: list[Any]) -> list[dict[str, Any]]:
         return sorted(
@@ -58,7 +55,7 @@ async def _inventory(client: Client) -> dict[str, list[dict[str, Any]]]:
 
 
 async def _prompt_payloads(client: Client) -> dict[str, list[str]]:
-    """Render every prompt through the public client API."""
+
     rendered: dict[str, list[str]] = {}
     for name, arguments in PROMPT_ARGUMENTS.items():
         result = await client.get_prompt(name, arguments)

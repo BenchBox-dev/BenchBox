@@ -1,5 +1,3 @@
-"""Tests for test-tier duration policy and JUnit artifact generation."""
-
 from __future__ import annotations
 
 import json

@@ -213,17 +213,13 @@ level of rigour.
 ```python
 from benchbox import TPCDI
 
-# Initialize TPC-DI benchmark
 tpcdi = TPCDI(scale_factor=1.0, output_dir="tpcdi_data")
 
-# Generate data warehouse tables
 data_files = tpcdi.generate_data()
 
-# Get validation queries
 validation_queries = tpcdi.get_queries()
 print(f"Generated {len(validation_queries)} validation queries")
 
-# Run specific validation query
 customer_validation = tpcdi.get_query("V1")
 print(customer_validation)
 ```
@@ -231,26 +227,23 @@ print(customer_validation)
 ### ETL Process Simulation
 
 ```python
-# Simulate ETL process
 tpcdi = TPCDI(scale_factor=1.0, output_dir="tpcdi_etl")
 
-# Generate source data files (simulated)
 source_data = tpcdi.generate_source_data()
 
-# Transform and load data (simplified example)
 transformation_results = tpcdi.run_etl_process(
     source_data=source_data,
     batch_id=1,
     effective_date="2023-01-01"
 )
 
-# Validate ETL results
 validation_results = {}
 for query_id in ["V1", "V2", "V3"]:
     query_sql = tpcdi.get_query(query_id)
-    # Execute validation query
-    validation_results[query_id] = "PASSED"  # Simplified
+    validation_results[query_id] = "PASSED"
 ```
+
+This simulates the ETL process. The source data files are simulated, and the ETL step is a simplified example. The validation loop does not execute the queries: it records every result as `"PASSED"` as a simplification.
 
 ### DuckDB Integration Example
 
@@ -258,16 +251,13 @@ for query_id in ["V1", "V2", "V3"]:
 import duckdb
 from benchbox import TPCDI
 
-# Initialize and generate data
 tpcdi = TPCDI(scale_factor=0.1, output_dir="tpcdi_small")
 data_files = tpcdi.generate_data()
 
-# Create DuckDB connection and schema
 conn = duckdb.connect("tpcdi.duckdb")
 schema_sql = tpcdi.get_create_tables_sql()
 conn.execute(schema_sql)
 
-# Load dimension and fact tables
 tables_to_load = [
     'DimCustomer', 'DimAccount', 'DimSecurity', 'DimCompany',
     'DimBroker', 'DimDate', 'DimTime',
@@ -286,14 +276,12 @@ for table_name in tables_to_load:
         """)
         print(f"Loaded {table_name}")
 
-# Run validation queries
 validation_queries = ["V1", "V2", "V3"]
 for query_id in validation_queries:
     query_sql = tpcdi.get_query(query_id)
     result = conn.execute(query_sql).fetchall()
     print(f"Validation {query_id}: {len(result)} validation records")
 
-# Run analytical queries
 analytical_queries = ["A1", "A2"]
 for query_id in analytical_queries:
     query_sql = tpcdi.get_query(query_id)
@@ -304,12 +292,7 @@ for query_id in analytical_queries:
 ### SCD Type 2 Implementation Example
 
 ```python
-# Example of SCD Type 2 processing for customer dimension
 def process_customer_scd_type2(new_customer_data, existing_dim_customer):
-    """
-    Process customer data with SCD Type 2 logic.
-    This is a simplified example of the transformation logic.
-    """
     batch_id = 1001
     effective_date = "2023-06-01"
 
@@ -357,6 +340,8 @@ def process_customer_scd_type2(new_customer_data, existing_dim_customer):
     return scd_logic
 ```
 
+This is a simplified example of the transformation logic for SCD Type 2 processing of the customer dimension. The first statement closes existing records that have changed. The second inserts new records for changed customers and new customers.
+
 ## Performance Characteristics
 
 ### ETL Performance Patterns
@@ -397,11 +382,12 @@ Configure TPC-DI via `--benchmark-option KEY=VALUE`:
 Accepts hyphenated aliases (e.g. `enable-parallel`, `max-workers`).
 
 ```bash
-# Enable parallel ETL with 4 workers
 benchbox run --platform duckdb --benchmark tpcdi --scale 1 \
   --benchmark-option enable_parallel=true \
   --benchmark-option max_workers=4
 ```
+
+This enables parallel ETL with 4 workers.
 
 ### Scale Factor Guidelines
 
@@ -419,14 +405,15 @@ benchbox run --platform duckdb --benchmark tpcdi --scale 1 \
 tpcdi = TPCDI(
     scale_factor=1.0,
     output_dir="tpcdi_data",
-    # ETL-specific configuration
-    batch_size=10000,           # Records per batch
-    enable_scd=True,            # Enable SCD Type 2 processing
-    validate_data=True,         # Run data quality checks
-    audit_trail=True,           # Enable audit logging
-    parallel_loading=4          # Parallel load processes
+    batch_size=10000,
+    enable_scd=True,
+    validate_data=True,
+    audit_trail=True,
+    parallel_loading=4
 )
 ```
+
+These are ETL-specific options: `batch_size` is the number of records per batch, `enable_scd` enables SCD Type 2 processing, `validate_data` runs data quality checks, `audit_trail` enables audit logging, and `parallel_loading` sets the number of parallel load processes.
 
 ## Integration Examples
 
@@ -439,17 +426,14 @@ from benchbox import TPCDI
 from datetime import datetime, timedelta
 
 def extract_source_data(**context):
-    """Extract data from source systems."""
     tpcdi = TPCDI(scale_factor=1.0)
     source_data = tpcdi.generate_source_data()
     return source_data
 
 def transform_and_load(**context):
-    """Transform and load data into warehouse."""
     tpcdi = TPCDI(scale_factor=1.0)
     batch_id = context['batch_id']
 
-    # Run ETL transformations
     results = tpcdi.run_etl_process(
         batch_id=batch_id,
         effective_date=context['ds']
@@ -457,7 +441,6 @@ def transform_and_load(**context):
     return results
 
 def validate_data_quality(**context):
-    """Run data quality validation."""
     tpcdi = TPCDI(scale_factor=1.0)
 
     validation_results = {}
@@ -466,7 +449,6 @@ def validate_data_quality(**context):
 
     return validation_results
 
-# Define DAG
 dag = DAG(
     'tpcdi_etl_pipeline',
     default_args={
@@ -482,7 +464,6 @@ dag = DAG(
     catchup=False
 )
 
-# Define tasks
 extract_task = PythonOperator(
     task_id='extract_source_data',
     python_callable=extract_source_data,
@@ -501,9 +482,10 @@ validate_task = PythonOperator(
     dag=dag
 )
 
-# Set dependencies
 extract_task >> transform_task >> validate_task
 ```
+
+The last line sets the task dependencies: extract runs first, then transform and load, then validation.
 
 ### Data Quality Framework
 
@@ -514,7 +496,6 @@ class TPCDIDataQualityFramework:
         self.connection = connection
 
     def run_systematic_validation(self) -> dict:
-        """Run all data quality checks."""
         results = {
             'validation_queries': {},
             'data_quality_checks': {},
@@ -522,7 +503,6 @@ class TPCDIDataQualityFramework:
             'business_rules': {}
         }
 
-        # Run validation queries
         for query_id in ["V1", "V2", "V3", "V4", "V5"]:
             query_sql = self.tpcdi.get_query(query_id)
             result = self.connection.execute(query_sql).fetchall()
@@ -531,7 +511,6 @@ class TPCDIDataQualityFramework:
                 'row_count': len(result)
             }
 
-        # Run data quality checks
         dq_checks = {
             'DQ1': self._check_referential_integrity(),
             'DQ2': self._check_temporal_consistency(),
@@ -546,7 +525,6 @@ class TPCDIDataQualityFramework:
         return results
 
     def _check_referential_integrity(self) -> dict:
-        """Check foreign key relationships."""
         checks = [
             ("Customer-Account", "SELECT COUNT(*) FROM DimAccount a LEFT JOIN DimCustomer c ON a.SK_CustomerID = c.SK_CustomerID WHERE c.SK_CustomerID IS NULL"),
             ("Trade-Customer", "SELECT COUNT(*) FROM FactTrade t LEFT JOIN DimCustomer c ON t.SK_CustomerID = c.SK_CustomerID WHERE c.SK_CustomerID IS NULL"),
@@ -564,8 +542,6 @@ class TPCDIDataQualityFramework:
         return results
 
     def _check_temporal_consistency(self) -> dict:
-        """Check SCD temporal consistency."""
-        # Check for overlapping date ranges in SCD Type 2 tables
         overlap_check = """
         SELECT COUNT(*) FROM DimCustomer c1
         JOIN DimCustomer c2 ON c1.CustomerID = c2.CustomerID
@@ -581,7 +557,6 @@ class TPCDIDataQualityFramework:
         }
 
     def _check_business_rules(self) -> dict:
-        """Check financial industry business rules."""
         rules = [
             ("Positive Trade Amounts", "SELECT COUNT(*) FROM FactTrade WHERE TradePrice <= 0"),
             ("Valid Customer Tiers", "SELECT COUNT(*) FROM DimCustomer WHERE Tier NOT IN (1,2,3)"),
@@ -599,7 +574,6 @@ class TPCDIDataQualityFramework:
         return results
 
     def _check_data_completeness(self) -> dict:
-        """Check for missing critical data."""
         completeness_checks = [
             ("Customer Names", "SELECT COUNT(*) FROM DimCustomer WHERE LastName IS NULL OR FirstName IS NULL"),
             ("Trade Prices", "SELECT COUNT(*) FROM FactTrade WHERE TradePrice IS NULL"),
@@ -617,7 +591,6 @@ class TPCDIDataQualityFramework:
         return results
 
     def _check_duplicate_detection(self) -> dict:
-        """Check for inappropriate duplicates."""
         duplicate_checks = [
             ("Current Customer Records", """
                 SELECT CustomerID, COUNT(*)
@@ -644,11 +617,12 @@ class TPCDIDataQualityFramework:
 
         return results
 
-# Usage
 dq_framework = TPCDIDataQualityFramework(tpcdi, conn)
 quality_results = dq_framework.run_systematic_validation()
 print(f"Data Quality Score: {quality_results}")
 ```
+
+The framework runs the validation queries first, then the data quality checks. `_check_temporal_consistency` looks for overlapping date ranges in SCD Type 2 tables.
 
 ## Best Practices
 
@@ -678,8 +652,10 @@ print(f"Data Quality Score: {quality_results}")
 ### ETL Performance Issues
 
 **Issue: Slow SCD Type 2 processing**
+
+Use merge or upsert patterns instead of separate UPDATE and INSERT statements.
+
 ```sql
--- Solution: Use merge/upsert patterns instead of separate UPDATE/INSERT
 MERGE DimCustomer AS target
 USING customer_staging AS source
 ON target.CustomerID = source.CustomerID AND target.IsCurrent = 1
@@ -691,22 +667,26 @@ WHEN NOT MATCHED THEN
 ```
 
 **Issue: Memory issues during large batch loading**
+
+Use smaller batch sizes and streaming. `batch_size=5000` gives smaller batches, and `streaming_load=True` streams large files.
+
 ```python
-# Solution: Use smaller batch sizes and streaming
 tpcdi = TPCDI(
     scale_factor=1.0,
-    batch_size=5000,      # Smaller batches
-    streaming_load=True   # Stream large files
+    batch_size=5000,
+    streaming_load=True
 )
 ```
 
 ### Data Quality Issues
 
 **Issue: Referential integrity violations**
+
+Load dimensions before facts and validate foreign keys. The query uses `-1` as a default surrogate key for missing dimension rows.
+
 ```sql
--- Solution: Load dimensions before facts, validate FKs
 INSERT INTO FactTrade (SK_CustomerID, SK_SecurityID, ...)
-SELECT COALESCE(c.SK_CustomerID, -1), -- Use default for missing
+SELECT COALESCE(c.SK_CustomerID, -1),
        COALESCE(s.SK_SecurityID, -1),
        ...
 FROM staging_trade st

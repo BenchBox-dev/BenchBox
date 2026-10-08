@@ -1,9 +1,6 @@
-"""Tests for Onehouse API client.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, Mock, patch
 
@@ -18,10 +15,8 @@ pytestmark = [
 
 
 class TestOnehouseClientInitialization:
-    """Test OnehouseClient initialization."""
-
     def test_default_values(self):
-        """Test client initializes with correct defaults."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests", MagicMock()),
@@ -36,7 +31,7 @@ class TestOnehouseClientInitialization:
             assert client.timeout_seconds == 30
 
     def test_custom_values(self):
-        """Test client accepts custom configuration."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests", MagicMock()),
@@ -65,10 +60,8 @@ class TestOnehouseClientInitialization:
 
 
 class TestJobState:
-    """Test JobState enum."""
-
     def test_terminal_states(self):
-        """Test terminal state detection."""
+
         from benchbox.platforms.onehouse import JobState
 
         assert JobState.SUCCEEDED.is_terminal is True
@@ -79,7 +72,7 @@ class TestJobState:
         assert JobState.QUEUED.is_terminal is False
 
     def test_success_state(self):
-        """Test success state detection."""
+
         from benchbox.platforms.onehouse import JobState
 
         assert JobState.SUCCEEDED.is_success is True
@@ -88,10 +81,8 @@ class TestJobState:
 
 
 class TestTableFormat:
-    """Test TableFormat enum."""
-
     def test_table_formats(self):
-        """Test table format values."""
+
         from benchbox.platforms.onehouse import TableFormat
 
         assert TableFormat.HUDI.value == "hudi"
@@ -100,10 +91,8 @@ class TestTableFormat:
 
 
 class TestClusterConfig:
-    """Test ClusterConfig dataclass."""
-
     def test_default_values(self):
-        """Test default cluster configuration."""
+
         from benchbox.platforms.onehouse import ClusterConfig
 
         config = ClusterConfig()
@@ -116,7 +105,7 @@ class TestClusterConfig:
         assert config.idle_timeout_minutes == 15
 
     def test_custom_values(self):
-        """Test custom cluster configuration."""
+
         from benchbox.platforms.onehouse import ClusterConfig
 
         config = ClusterConfig(
@@ -137,10 +126,8 @@ class TestClusterConfig:
 
 
 class TestOnehouseClientConnection:
-    """Test connection functionality."""
-
     def test_test_connection_success(self):
-        """Test successful connection test."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -161,7 +148,7 @@ class TestOnehouseClientConnection:
             assert result is True
 
     def test_test_connection_failure(self):
-        """Test connection test failure handling."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -179,10 +166,8 @@ class TestOnehouseClientConnection:
 
 
 class TestOnehouseClientJobs:
-    """Test job management functionality."""
-
     def test_submit_sql_job(self):
-        """Test SQL job submission."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -207,7 +192,7 @@ class TestOnehouseClientJobs:
             assert job_id == "job-12345"
 
     def test_get_job_status(self):
-        """Test job status retrieval."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -233,7 +218,7 @@ class TestOnehouseClientJobs:
             assert result.duration_seconds == 10.5
 
     def test_cancel_job(self):
-        """Test job cancellation."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -251,16 +236,13 @@ class TestOnehouseClientJobs:
             client = OnehouseClient(api_key="test-key")
             client.cancel_job("job-12345")
 
-            # Verify cancel endpoint was called
             calls = mock_session.request.call_args_list
             assert any("cancel" in str(call) for call in calls)
 
 
 class TestOnehouseClientCluster:
-    """Test cluster management functionality."""
-
     def test_provision_cluster(self):
-        """Test cluster provisioning."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -282,7 +264,7 @@ class TestOnehouseClientCluster:
             assert client._cluster_id == "cluster-abc123"
 
     def test_terminate_cluster(self):
-        """Test cluster termination."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -306,26 +288,20 @@ class TestOnehouseClientCluster:
 
 
 class TestOnehouseClientErrors:
-    """Test error handling."""
-
     def test_auth_error(self):
-        """Test authentication error handling."""
-        # Import real requests for exception classes
+
         import requests as real_requests
 
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
         ):
-            # Copy real exception classes to mock
             mock_requests.exceptions = real_requests.exceptions
 
             from benchbox.platforms.onehouse import OnehouseClient
 
-            # Create client first
             client = OnehouseClient(api_key="invalid-key")
 
-            # Now setup mock for session
             mock_session = MagicMock()
             mock_response = MagicMock()
             mock_response.status_code = 401
@@ -336,23 +312,19 @@ class TestOnehouseClientErrors:
                 client._request("GET", "/test")
 
     def test_permission_error(self):
-        """Test permission error handling."""
-        # Import real requests for exception classes
+
         import requests as real_requests
 
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
         ):
-            # Copy real exception classes to mock
             mock_requests.exceptions = real_requests.exceptions
 
             from benchbox.platforms.onehouse import OnehouseClient
 
-            # Create client first
             client = OnehouseClient(api_key="test-key")
 
-            # Now setup mock for session
             mock_session = MagicMock()
             mock_response = MagicMock()
             mock_response.status_code = 403
@@ -364,10 +336,8 @@ class TestOnehouseClientErrors:
 
 
 class TestOnehouseClientClose:
-    """Test cleanup functionality."""
-
     def test_close_terminates_cluster(self):
-        """Test close terminates active cluster."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -392,10 +362,8 @@ class TestOnehouseClientClose:
 
 
 class TestOnehouseClientPySparkJobs:
-    """Test PySpark job submission."""
-
     def test_submit_pyspark_job_basic(self):
-        """Test basic PySpark job submission."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -420,7 +388,7 @@ class TestOnehouseClientPySparkJobs:
             assert job_id == "pyspark-job-123"
 
     def test_submit_pyspark_job_with_all_options(self):
-        """Test PySpark job submission with all options."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -436,7 +404,7 @@ class TestOnehouseClientPySparkJobs:
             from benchbox.platforms.onehouse import OnehouseClient, TableFormat
 
             client = OnehouseClient(api_key="test-key")
-            client._cluster_id = "cluster-123"  # Set active cluster
+            client._cluster_id = "cluster-123"
 
             job_id = client.submit_pyspark_job(
                 script="df = spark.read.parquet('s3://bucket/data')",
@@ -450,16 +418,13 @@ class TestOnehouseClientPySparkJobs:
 
             assert job_id == "full-pyspark-job"
 
-            # Verify request was made with correct data
             call_args = mock_session.request.call_args_list[-1]
             assert "jobs" in call_args[1]["url"]
 
 
 class TestOnehouseClientWaitForJob:
-    """Test job waiting functionality."""
-
     def test_wait_for_job_success(self):
-        """Test waiting for a successful job."""
+
         mock_clock = Mock(side_effect=[0, 5, 10])
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
@@ -470,7 +435,6 @@ class TestOnehouseClientWaitForJob:
         ):
             mock_session = MagicMock()
 
-            # First call: RUNNING, second call: SUCCEEDED
             mock_response_running = MagicMock()
             mock_response_running.status_code = 200
             mock_response_running.json.return_value = {"state": "RUNNING"}
@@ -487,7 +451,6 @@ class TestOnehouseClientWaitForJob:
             mock_session.request.side_effect = [mock_response_running, mock_response_success]
             mock_requests.Session.return_value = mock_session
 
-            # Mock time to avoid actual sleep
             mock_time.sleep = MagicMock()
 
             from benchbox.platforms.onehouse import JobState, OnehouseClient
@@ -499,7 +462,7 @@ class TestOnehouseClientWaitForJob:
             assert result.duration_seconds == 15.5
 
     def test_wait_for_job_failure(self):
-        """Test waiting for a failed job raises error."""
+
         mock_clock = Mock(side_effect=[0, 5])
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
@@ -529,8 +492,8 @@ class TestOnehouseClientWaitForJob:
                 client.wait_for_job("job-123")
 
     def test_wait_for_job_timeout(self):
-        """Test job timeout raises error."""
-        mock_clock = Mock(side_effect=[0, 3700])  # 3700 > 60*60 timeout
+
+        mock_clock = Mock(side_effect=[0, 3700])
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -548,7 +511,6 @@ class TestOnehouseClientWaitForJob:
             mock_session.request.return_value = mock_response
             mock_requests.Session.return_value = mock_session
 
-            # Simulate timeout - first call at 0, loop checks exceed timeout
             mock_time.sleep = MagicMock()
 
             from benchbox.platforms.onehouse import OnehouseClient
@@ -559,7 +521,7 @@ class TestOnehouseClientWaitForJob:
                 client.wait_for_job("job-123", timeout_minutes=1)
 
     def test_wait_for_job_cancelled_state(self):
-        """Test waiting for a cancelled job raises error."""
+
         mock_clock = Mock(side_effect=[0, 5])
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
@@ -587,10 +549,8 @@ class TestOnehouseClientWaitForJob:
 
 
 class TestOnehouseClientJobResults:
-    """Test job results retrieval."""
-
     def test_get_job_results(self):
-        """Test retrieving job results."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -613,10 +573,8 @@ class TestOnehouseClientJobResults:
 
 
 class TestOnehouseClientDatabase:
-    """Test database management."""
-
     def test_create_database(self):
-        """Test creating a database."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -634,12 +592,11 @@ class TestOnehouseClientDatabase:
             client = OnehouseClient(api_key="test-key")
             client.create_database("test_db", location="s3://bucket/databases/test_db")
 
-            # Verify request was made
             calls = mock_session.request.call_args_list
             assert any("databases" in str(call) for call in calls)
 
     def test_create_database_no_location(self):
-        """Test creating a database without location."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -657,16 +614,13 @@ class TestOnehouseClientDatabase:
             client = OnehouseClient(api_key="test-key")
             client.create_database("simple_db")
 
-            # Verify request was made
             calls = mock_session.request.call_args_list
             assert any("databases" in str(call) for call in calls)
 
 
 class TestOnehouseClientClusterStatus:
-    """Test cluster status functionality."""
-
     def test_get_cluster_status_no_cluster(self):
-        """Test get_cluster_status when no cluster is provisioned."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests", MagicMock()),
@@ -680,7 +634,7 @@ class TestOnehouseClientClusterStatus:
             assert "No cluster provisioned" in status["message"]
 
     def test_get_cluster_status_with_cluster(self):
-        """Test get_cluster_status with active cluster."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -704,10 +658,8 @@ class TestOnehouseClientClusterStatus:
 
 
 class TestOnehouseClientProvisionErrors:
-    """Test cluster provisioning error handling."""
-
     def test_provision_cluster_missing_id(self):
-        """Test provision_cluster raises error when response missing cluster_id."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -715,7 +667,7 @@ class TestOnehouseClientProvisionErrors:
             mock_session = MagicMock()
             mock_response = MagicMock()
             mock_response.status_code = 200
-            mock_response.json.return_value = {}  # Missing cluster_id
+            mock_response.json.return_value = {}
             mock_response.content = b"{}"
             mock_session.request.return_value = mock_response
             mock_requests.Session.return_value = mock_session
@@ -729,10 +681,8 @@ class TestOnehouseClientProvisionErrors:
 
 
 class TestOnehouseClientTerminateErrors:
-    """Test terminate cluster error handling."""
-
     def test_terminate_cluster_handles_exception(self):
-        """Test terminate_cluster handles exceptions gracefully."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -746,18 +696,14 @@ class TestOnehouseClientTerminateErrors:
             client = OnehouseClient(api_key="test-key")
             client._cluster_id = "cluster-123"
 
-            # Should not raise, just log warning
             client.terminate_cluster()
 
-            # Cluster ID should still be cleared
             assert client._cluster_id is None
 
 
 class TestOnehouseClientConnectionErrors:
-    """Test connection error handling."""
-
     def test_connection_error(self):
-        """Test ConnectionError handling."""
+
         import requests as real_requests
 
         with (
@@ -778,7 +724,7 @@ class TestOnehouseClientConnectionErrors:
                 client._request("GET", "/test")
 
     def test_timeout_error(self):
-        """Test Timeout error handling."""
+
         import requests as real_requests
 
         with (
@@ -799,7 +745,7 @@ class TestOnehouseClientConnectionErrors:
                 client._request("GET", "/test")
 
     def test_http_error_with_json_message(self):
-        """Test HTTPError handling with JSON error message."""
+
         import requests as real_requests
 
         with (
@@ -824,7 +770,7 @@ class TestOnehouseClientConnectionErrors:
                 client._request("GET", "/test")
 
     def test_http_error_without_json_message(self):
-        """Test HTTPError handling when JSON parsing fails."""
+
         import requests as real_requests
 
         with (
@@ -850,10 +796,8 @@ class TestOnehouseClientConnectionErrors:
 
 
 class TestOnehouseClientJobStatusFallback:
-    """Test job status fallback handling."""
-
     def test_unknown_job_state_defaults_to_pending(self):
-        """Test that unknown job states default to PENDING."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,
@@ -875,10 +819,8 @@ class TestOnehouseClientJobStatusFallback:
 
 
 class TestOnehouseClientSqlJobOptions:
-    """Test SQL job submission with various options."""
-
     def test_submit_sql_job_with_output_location(self):
-        """Test SQL job with output location."""
+
         with (
             patch("benchbox.platforms.onehouse.onehouse_client.REQUESTS_AVAILABLE", True),
             patch("benchbox.platforms.onehouse.onehouse_client.requests") as mock_requests,

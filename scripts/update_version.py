@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""
-Version Update Utility for BenchBox
-
-This script helps maintain version consistency across all BenchBox files.
-It updates the version in benchbox/__init__.py and optionally in pyproject.toml.
-
-Usage:
-    python scripts/update_version.py --version 1.2.3
-    python scripts/update_version.py --version 1.2.3 --update-pyproject
-    python scripts/update_version.py --version 1.2.3 --dry-run
-    python scripts/update_version.py --check  # Check consistency only
-"""
 
 import argparse
 import re
@@ -18,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-try:  # pragma: no cover - script executed outside tests
+try:  # pragma: no cover
     from benchbox.utils.version import (
         check_version_consistency as _core_check_version_consistency,
         reset_version_cache,
@@ -36,10 +24,6 @@ DOCUMENTATION_PATHS = (
 
 LANDING_PAGE_PATH = Path("landing") / "index.html"
 
-# pyproject.toml's package version is the "version =" line inside the [project]
-# table. Anchoring to the line start keeps keys that merely end in "version",
-# such as [tool.ruff] target-version, out of the match; searching only the
-# [project] table keeps a version key in any other table out of it.
 PYPROJECT_VERSION_PATTERN = re.compile(
     r'^(?P<prefix>version\s*=\s*["\'])(?P<version>[^"\']+)(?P<suffix>["\'])',
     re.MULTILINE,
@@ -53,8 +37,6 @@ DOC_RELEASE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Pattern for the version badge in the landing page. The anchor is formatted
-# across several lines, so match the full tag instead of assuming compact HTML.
 LANDING_VERSION_PATTERN = re.compile(
     r'(?P<prefix><a\b(?=[^>]*\bclass="[^"]*\bbadge-version\b[^"]*")[^>]*>\s*)'
     r"v?(?P<version>\d+\.\d+\.\d+(?:-[\w\.]+)?)"
@@ -64,12 +46,10 @@ LANDING_VERSION_PATTERN = re.compile(
 
 
 def get_project_root() -> Path:
-    """Get the project root directory."""
     return Path(__file__).parent.parent
 
 
 def find_project_version(content: str) -> Optional[re.Match[str]]:
-    """Return the version match inside pyproject.toml's [project] table."""
     header = PYPROJECT_PROJECT_HEADER_PATTERN.search(content)
     if header is None:
         return None
@@ -79,7 +59,6 @@ def find_project_version(content: str) -> Optional[re.Match[str]]:
 
 
 def get_current_version_from_init() -> Optional[str]:
-    """Get the current version from benchbox/__init__.py."""
     init_file = get_project_root() / "benchbox" / "__init__.py"
 
     if not init_file.exists():
@@ -92,7 +71,6 @@ def get_current_version_from_init() -> Optional[str]:
 
 
 def get_current_version_from_pyproject() -> Optional[str]:
-    """Get the current version from pyproject.toml."""
     pyproject_file = get_project_root() / "pyproject.toml"
 
     if not pyproject_file.exists():
@@ -105,7 +83,6 @@ def get_current_version_from_pyproject() -> Optional[str]:
 
 
 def update_version_in_init(new_version: str, dry_run: bool = False) -> bool:
-    """Update the version in benchbox/__init__.py."""
     init_file = get_project_root() / "benchbox" / "__init__.py"
 
     if not init_file.exists():
@@ -135,7 +112,6 @@ def update_version_in_init(new_version: str, dry_run: bool = False) -> bool:
 
 
 def update_version_in_pyproject(new_version: str, dry_run: bool = False) -> bool:
-    """Update the version in pyproject.toml."""
     pyproject_file = get_project_root() / "pyproject.toml"
 
     if not pyproject_file.exists():
@@ -165,7 +141,6 @@ def update_version_in_pyproject(new_version: str, dry_run: bool = False) -> bool
 
 
 def update_release_marker(path: Path, new_version: str, dry_run: bool = False) -> bool:
-    """Update the release marker in documentation files."""
 
     if not path.exists():
         print(f"Warning: {path} not found")
@@ -199,7 +174,6 @@ def update_release_marker(path: Path, new_version: str, dry_run: bool = False) -
 
 
 def update_landing_page_version(new_version: str, dry_run: bool = False) -> bool:
-    """Update the version badge in the landing page."""
     path = get_project_root() / LANDING_PAGE_PATH
 
     if not path.exists():
@@ -233,7 +207,6 @@ def update_landing_page_version(new_version: str, dry_run: bool = False) -> bool
 
 
 def run_version_consistency_check() -> tuple[bool, str]:
-    """Check if versions are consistent across files."""
     if _core_check_version_consistency is None:
         init_version = get_current_version_from_init()
         pyproject_version = get_current_version_from_pyproject()
@@ -267,8 +240,6 @@ def run_version_consistency_check() -> tuple[bool, str]:
 
 
 def validate_version_format(version: str) -> bool:
-    """Validate that the version follows semantic versioning."""
-    # Basic semver pattern: MAJOR.MINOR.PATCH with optional pre-release
     pattern = r"^\d+\.\d+\.\d+(?:-(?:alpha|beta|rc|dev)(?:\.\d+)?)?$"
 
     if not re.match(pattern, version):
@@ -300,23 +271,18 @@ def main():
     if not validate_version_format(args.version):
         sys.exit(1)
 
-    # Update versions
     success = True
 
-    # Always update __init__.py
     if not update_version_in_init(args.version, dry_run=args.dry_run):
         success = False
 
-    # Optionally update pyproject.toml
     if args.update_pyproject and not update_version_in_pyproject(args.version, dry_run=args.dry_run):
         success = False
 
-    # Always update documentation release markers
     for doc_path in DOCUMENTATION_PATHS:
         updated = update_release_marker(doc_path, args.version, dry_run=args.dry_run)
         success = success and updated
 
-    # Update landing page version badge
     if not update_landing_page_version(args.version, dry_run=args.dry_run):
         success = False
 
@@ -326,11 +292,9 @@ def main():
         else:
             print(f"Successfully updated version to {args.version}")
 
-            # Clear caches so follow-up checks re-read metadata
             if reset_version_cache:
                 reset_version_cache()
 
-        # Check consistency after update (uses cached values if dry-run)
         consistent, message = run_version_consistency_check()
         if not consistent:
             print(f"Warning: {message}")

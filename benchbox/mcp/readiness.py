@@ -1,5 +1,3 @@
-"""Revision-bound evidence gate for shared MCP endpoints."""
-
 from __future__ import annotations
 
 import hashlib
@@ -25,8 +23,6 @@ EXTERNAL_GATES = frozenset({"tls_edge", "shared_storage_restore", "scaling_rollb
 
 @dataclass(frozen=True, slots=True)
 class ReadinessEvidence:
-    """Validated production-readiness evidence."""
-
     source_revision: str
     generated_at: datetime
     automated: Mapping[str, bool]
@@ -64,7 +60,6 @@ class ReadinessEvidence:
         )
 
     def validate(self, *, now: datetime, source_revision: str) -> None:
-        """Reject stale, mismatched, incomplete, or failed evidence."""
         if self.source_revision != source_revision:
             raise ValueError("MCP readiness evidence does not match BENCHBOX_BUILD_SHA")
         if now.astimezone(timezone.utc) - self.generated_at > MAX_AUTOMATED_EVIDENCE_AGE:
@@ -105,7 +100,6 @@ def _require_passed(values: Mapping[str, bool], expected: frozenset[str], field:
 
 
 def verify_publication_evidence(path: Path, env: Mapping[str, str]) -> ReadinessEvidence:
-    """Validate evidence plus out-of-band digest and build revision bindings."""
     expected_digest = env.get("BENCHBOX_MCP_READINESS_SHA256")
     source_revision = env.get("BENCHBOX_BUILD_SHA")
     if not expected_digest or not source_revision:

@@ -1,34 +1,4 @@
 #!/usr/bin/env python3
-"""Use Case: Systematic Platform Evaluation
-
-This example demonstrates how to systematically evaluate multiple database
-platforms to make informed platform selection decisions.
-
-Use this pattern when:
-- Migrating from one database platform to another
-- Choosing a platform for a new project
-- Evaluating cost vs performance trade-offs
-- Comparing self-hosted vs cloud-managed options
-- Validating vendor performance claims
-
-Evaluation criteria:
-- Query performance (latency and throughput)
-- Data loading speed
-- Cost (compute, storage, egress)
-- Operational complexity
-- Feature compatibility
-- Scalability characteristics
-
-Usage:
-    # Evaluate multiple platforms
-    python use_cases/platform_evaluation.py --platforms duckdb,sqlite,clickhouse-local
-
-    # Dry-run first (preview without execution)
-    python use_cases/platform_evaluation.py --platforms databricks,bigquery --dry-run
-
-    # Custom scale factor
-    python use_cases/platform_evaluation.py --platforms duckdb,clickhouse-local --scale 1.0
-"""
 
 from __future__ import annotations
 
@@ -38,7 +8,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-# Add parent directory to path for imports
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _EXAMPLES_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_EXAMPLES_DIR))
@@ -50,8 +19,6 @@ from benchbox.tpch import TPCH
 
 @dataclass
 class PlatformEvaluation:
-    """Results from evaluating a single platform."""
-
     platform_name: str
     total_time: float
     query_count: int
@@ -63,20 +30,12 @@ class PlatformEvaluation:
 
 
 class PlatformEvaluator:
-    """Systematically evaluate database platforms."""
-
     def __init__(self, output_dir: Path):
-        """Initialize evaluator.
-
-        Args:
-            output_dir: Directory to store evaluation results
-        """
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.evaluations: list[PlatformEvaluation] = []
 
     def evaluate_duckdb(self, benchmark: TPCH) -> PlatformEvaluation:
-        """Evaluate DuckDB."""
         print("Evaluating DuckDB...")
         print("  Type: Embedded OLAP database")
         print("  Cost: Free (open source)")
@@ -92,12 +51,11 @@ class PlatformEvaluator:
             query_count=results.total_queries,
             successful_queries=results.successful_queries,
             average_query_time=results.average_query_time,
-            cost_estimate=0.0,  # Free
+            cost_estimate=0.0,
             notes="Excellent for embedded analytics, local development, and single-machine workloads",
         )
 
     def evaluate_sqlite(self, benchmark: TPCH) -> PlatformEvaluation:
-        """Evaluate SQLite."""
         print("Evaluating SQLite...")
         print("  Type: Embedded transactional database")
         print("  Cost: Free (open source)")
@@ -114,12 +72,11 @@ class PlatformEvaluator:
             query_count=results.total_queries,
             successful_queries=results.successful_queries,
             average_query_time=results.average_query_time,
-            cost_estimate=0.0,  # Free
+            cost_estimate=0.0,
             notes="Best for embedded applications, mobile apps, and small analytical workloads",
         )
 
     def compare_evaluations(self) -> None:
-        """Generate comparison report."""
         if not self.evaluations:
             print("No evaluations to compare")
             return
@@ -129,13 +86,11 @@ class PlatformEvaluator:
         print("=" * 90)
         print()
 
-        # Overall performance table
         print("Performance Summary:")
         print("-" * 90)
         print(f"{'Platform':<15} {'Total Time':<15} {'Avg Query':<15} {'Success Rate':<15} {'Cost Est.':<15}")
         print("-" * 90)
 
-        # Find fastest for relative comparison
         fastest_time = min(e.total_time for e in self.evaluations)
 
         for eval in sorted(self.evaluations, key=lambda e: e.total_time):
@@ -155,7 +110,6 @@ class PlatformEvaluator:
         print("-" * 90)
         print()
 
-        # Detailed notes
         print("Platform Notes:")
         print("-" * 90)
         for eval in self.evaluations:
@@ -163,7 +117,6 @@ class PlatformEvaluator:
             print(f"  {eval.notes}")
         print()
 
-        # Winner selection
         print("=" * 90)
         print("RECOMMENDATION")
         print("=" * 90)
@@ -198,7 +151,6 @@ class PlatformEvaluator:
         print()
 
     def save_report(self, report_path: Path) -> None:
-        """Save evaluation report as JSON."""
         report = {
             "evaluations": [
                 {
@@ -221,7 +173,6 @@ class PlatformEvaluator:
 
 
 def main() -> int:
-    """Run platform evaluation."""
     parser = argparse.ArgumentParser(description="Systematic platform evaluation")
     parser.add_argument(
         "--platforms",
@@ -267,7 +218,6 @@ def main() -> int:
         print(f"  python {Path(__file__).name} --platforms {args.platforms} --scale {args.scale}")
         return 0
 
-    # Create benchmark (shared across all platforms)
     print("Creating TPC-H benchmark...")
     print(f"  Scale factor: {args.scale}")
     print()
@@ -283,10 +233,8 @@ def main() -> int:
     print("✓ Data generated (will be reused across all platforms)")
     print()
 
-    # Create evaluator
     evaluator = PlatformEvaluator(output_dir=args.output_dir)
 
-    # Evaluate each platform
     for platform_name in platforms:
         print("=" * 90)
 
@@ -308,10 +256,8 @@ def main() -> int:
 
         print()
 
-    # Generate comparison report
     evaluator.compare_evaluations()
 
-    # Save report
     report_path = args.output_dir / "evaluation_report.json"
     evaluator.save_report(report_path)
     print()

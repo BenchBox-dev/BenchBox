@@ -1,17 +1,6 @@
-"""NYC Taxi geospatial extensions for advanced spatial analytics.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides platform-specific spatial query implementations for:
-- DuckDB Spatial extension
-- PostgreSQL/PostGIS
-- ClickHouse native geo functions
-
-These queries require spatial extensions that are not portable via SQLGlot,
-so each platform has its own implementation.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from pathlib import Path
 from typing import Any
@@ -29,31 +18,18 @@ def _load_spatial_specs() -> dict[str, Any]:
 _SPATIAL_SPECS = _load_spatial_specs()
 _SPATIAL_QUERIES = _SPATIAL_SPECS["spatial_queries"]
 
-# NYC Taxi Zone centroids (representative points for each zone)
-# Source: NYC TLC Zone Shapefiles processed to centroids
-# Format: (location_id, longitude, latitude)
 TAXI_ZONE_CENTROIDS = {
     int(location_id): tuple(coordinates) for location_id, coordinates in _SPATIAL_SPECS["taxi_zone_centroids"].items()
 }
 
-# Extended schema with spatial columns
 SPATIAL_SCHEMA_EXTENSION = _SPATIAL_SPECS["spatial_schema_extension"]
 
-# Platform-specific spatial queries
 DUCKDB_SPATIAL_QUERIES = _SPATIAL_QUERIES["duckdb"]
 POSTGIS_SPATIAL_QUERIES = _SPATIAL_QUERIES["postgres"]
 CLICKHOUSE_SPATIAL_QUERIES = _SPATIAL_QUERIES["clickhouse"]
 
 
 def get_spatial_queries(platform: str) -> dict[str, dict[str, Any]]:
-    """Get spatial queries for a specific platform.
-
-    Args:
-        platform: Platform name (duckdb, postgres, clickhouse)
-
-    Returns:
-        Dictionary of spatial query definitions
-    """
     platform_lower = platform.lower()
 
     if platform_lower == "duckdb":
@@ -67,11 +43,6 @@ def get_spatial_queries(platform: str) -> dict[str, dict[str, Any]]:
 
 
 def get_all_spatial_queries() -> dict[str, dict[str, dict[str, Any]]]:
-    """Get all spatial queries organized by platform.
-
-    Returns:
-        Dictionary mapping platform -> query_id -> query_definition
-    """
     return {
         "duckdb": DUCKDB_SPATIAL_QUERIES,
         "postgres": POSTGIS_SPATIAL_QUERIES,
@@ -90,14 +61,6 @@ def get_all_spatial_queries() -> dict[str, dict[str, dict[str, Any]]]:
     ),
 )
 def get_spatial_create_table_sql(dialect: str = "duckdb") -> str:
-    """Generate CREATE TABLE SQL for the spatial zones table.
-
-    Args:
-        dialect: SQL dialect (duckdb, postgres, clickhouse)
-
-    Returns:
-        CREATE TABLE statement
-    """
     if dialect == "duckdb":
         return """
 CREATE TABLE taxi_zones_spatial (
@@ -141,7 +104,6 @@ ORDER BY location_id;
         """.strip()
 
     else:
-        # Standard SQL fallback
         return """
 CREATE TABLE taxi_zones_spatial (
     location_id INTEGER PRIMARY KEY,
@@ -155,14 +117,6 @@ CREATE TABLE taxi_zones_spatial (
 
 
 def check_spatial_support(platform: str) -> dict[str, bool]:
-    """Check what spatial features are available for a platform.
-
-    Args:
-        platform: Platform name
-
-    Returns:
-        Dictionary of feature -> supported status
-    """
     platform_lower = platform.lower()
 
     if platform_lower == "duckdb":
@@ -186,7 +140,7 @@ def check_spatial_support(platform: str) -> dict[str, bool]:
             "st_convexhull": True,
             "st_dwithin": True,
             "geohash": True,
-            "h3": False,  # Requires extension
+            "h3": False,
             "geography": True,
         }
     elif platform_lower in {"clickhouse", "clickhouse-local", "clickhouse-server"}:

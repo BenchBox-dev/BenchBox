@@ -2,31 +2,6 @@ import { useMemo, useRef } from "preact/hooks";
 import { TableScrollHint } from "@/components/TableScrollHint";
 import { useIsNarrowViewport } from "@/lib/useIsNarrowViewport";
 
-/**
- * Submission activity: when runs were published, one row per subject.
- *
- * The index pages listed counts without ever showing the shape of the corpus
- * over time - whether a benchmark is actively receiving runs or was populated
- * once and left. This is the smallest chart that answers that: weekly buckets
- * across a fixed window, one row per subject, ordered by total submissions.
- *
- * Deliberately not a general-purpose heatmap. It counts published runs; it
- * makes no performance claim, so it carries no eligibility policy.
- *
- * The underlying window is always `WEEKS_DESKTOP`: which subjects have a row,
- * their order, each row's total, and the colour scale (`peak`) are all
- * computed over that full window regardless of viewport. Below the `sm`
- * breakpoint there is not enough width to show 26 week columns next to a
- * legible row label, so rendering crops to the trailing `WEEKS_MOBILE`
- * columns of that same data rather than recomputing a narrower window. A
- * subject last active inside the 26-week window but before the visible
- * 10-week slice still gets a row; its cells just don't reach that far back.
- * This is what keeps a row's presence, order and colour identical at both
- * sizes - a narrower *computed* window could not do that, since any subject
- * last active more than `WEEKS_MOBILE` weeks ago would silently disappear
- * from the mobile table with nothing disclosing the drop.
- */
-
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const WEEKS_DESKTOP = 26;
 const WEEKS_MOBILE = 10;
@@ -36,21 +11,16 @@ export interface SubmissionActivityRow {
   id: string;
   label: string;
   href: string;
-  /** Run dates (YYYY-MM-DD or full ISO). Unparseable values are ignored. */
   dates: readonly string[];
 }
 
 interface Props {
   rows: readonly SubmissionActivityRow[];
-  /** Noun for the subject of each row, e.g. "benchmark". */
   subject: string;
-  /** Fixes "now" for tests. */
   reference?: Date;
-  /** Rows to draw before collapsing the rest into a summary line. */
   maxRows?: number;
 }
 
-/** Start-of-week (Monday, UTC) containing `ms`. */
 function weekStart(ms: number): number {
   const date = new Date(ms);
   const day = (date.getUTCDay() + 6) % 7;
@@ -67,8 +37,6 @@ export function SubmissionActivity({ rows, subject, reference, maxRows = 20 }: P
   const isMobile = useIsNarrowViewport(MOBILE_QUERY);
   const weekCount = isMobile ? WEEKS_MOBILE : WEEKS_DESKTOP;
 
-  // Always computed over WEEKS_DESKTOP - see the module doc comment.
-  // `isMobile` only decides how many trailing columns get rendered, below.
   const model = useMemo(() => {
     const parsed = rows.map((row) => ({
       ...row,
@@ -77,11 +45,6 @@ export function SubmissionActivity({ rows, subject, reference, maxRows = 20 }: P
     const latest = parsed.flatMap((row) => row.days).reduce((max, day) => (day > max ? day : max), 0);
     if (latest === 0) return null;
 
-    // The window normally ends on today, so a current corpus shows the weeks it
-    // has been quiet. Once the newest submission falls outside that window it
-    // anchors to that submission instead: ending on today would put every row
-    // out of range and render nothing at all, hiding a corpus that was active
-    // in the past. A submission dated ahead of today anchors the same way.
     const referenceWeek = weekStart((reference ?? new Date()).getTime());
     const latestWeek = weekStart(latest);
     const latestInWindow =
@@ -115,9 +78,6 @@ export function SubmissionActivity({ rows, subject, reference, maxRows = 20 }: P
   const shown = model.series.slice(0, maxRows);
   const hidden = model.series.length - shown.length;
   const monthFormat = new Intl.DateTimeFormat(undefined, { month: "short", timeZone: "UTC" });
-  // Crop to the trailing `weekCount` columns of the fixed-window data; see
-  // the module doc comment for why this is a render-time slice, not a
-  // narrower computed window.
   const visibleWeeks = model.weeks.slice(model.weeks.length - weekCount);
 
   return (

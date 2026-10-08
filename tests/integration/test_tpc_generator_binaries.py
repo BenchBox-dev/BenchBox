@@ -1,14 +1,6 @@
-"""Integration coverage for TPC generator binaries (no binary mocks).
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Exercises the real dbgen/dsdgen executables through the production
-generator paths at tiny scale factors. Tests skip when the precompiled
-binary for the current platform is unavailable (e.g. minimal CI images),
-so the fast unit lane never depends on binary availability.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import hashlib
 from pathlib import Path
@@ -24,7 +16,7 @@ TPCH_TABLES = ["customer", "lineitem", "nation", "orders", "part", "partsupp", "
 
 
 def _require_binary(name: str) -> Path:
-    """Resolve a real TPC binary or skip when the platform has none."""
+
     from benchbox.utils.tpc_compilation import ensure_tpc_binaries
 
     results = ensure_tpc_binaries([name], auto_compile=False)
@@ -40,8 +32,6 @@ def _md5(path: Path) -> str:
 
 
 class TestDbgenAvailability:
-    """The real dbgen binary resolves and is executable."""
-
     def test_dbgen_binary_resolves(self):
         binary = _require_binary("dbgen")
         assert binary.name.startswith("dbgen")
@@ -52,8 +42,6 @@ class TestDbgenAvailability:
 
 
 class TestRealDbgenGeneration:
-    """End-to-end TPC-H generation through the real dbgen, unmocked."""
-
     def test_tiny_scale_produces_all_tbl_files(self, tmp_path: Path):
         _require_binary("dbgen")
         from benchbox.core.tpch.generator import TPCHDataGenerator
@@ -75,7 +63,7 @@ class TestRealDbgenGeneration:
         lineitem = Path(tables["lineitem"])
         first = lineitem.read_text(encoding="utf-8").splitlines()[0]
         fields = first.split("|")
-        # 16 pipe-separated TPC-H lineitem columns per record.
+
         assert len(fields) == 16
         assert fields[0].isdigit()
 
@@ -109,7 +97,7 @@ class TestRealDbgenGeneration:
             )
 
     def test_generated_lineitem_loads_into_duckdb(self, tmp_path: Path):
-        """Real dbgen output parses under the SQL surface's null semantics."""
+
         duckdb = pytest.importorskip("duckdb")
         _require_binary("dbgen")
         from benchbox.core.tpch.generator import TPCHDataGenerator

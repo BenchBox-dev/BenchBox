@@ -1,5 +1,3 @@
-"""Declarative table definitions for the TPC-DS schema."""
-
 from __future__ import annotations
 
 from pathlib import Path

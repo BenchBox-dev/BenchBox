@@ -1,23 +1,6 @@
-"""DataFrame operations for Metadata Primitives benchmark.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides DataFrame implementations of metadata introspection operations,
-enabling benchmarking of schema discovery, column introspection, and table statistics
-on DataFrame platforms like Polars, PySpark, and Pandas.
-
-Platform Support:
-    - Polars: Schema introspection (df.schema, df.dtypes, df.describe())
-    - Pandas: Schema introspection (df.dtypes, df.info(), df.describe())
-    - PySpark: Full catalog support via spark.catalog API + Delta Lake/Iceberg metadata
-
-The operations are organized into categories based on capability level:
-    - Schema Introspection: Available on all platforms
-    - Catalog Operations: PySpark with configured catalog only
-    - Lakehouse Metadata: Delta Lake and Iceberg table formats
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -41,15 +24,6 @@ def _module_available(module_name: str) -> bool:
 
 
 class MetadataOperationType(Enum):
-    """Types of metadata operations supported by the benchmark.
-
-    Operations are grouped by platform capability level:
-    - Schema introspection: All DataFrame platforms
-    - Catalog operations: PySpark with catalog
-    - Lakehouse metadata: Delta Lake / Iceberg
-    """
-
-    # Schema introspection (all platforms)
     LIST_COLUMNS = "list_columns"
     GET_DTYPES = "get_dtypes"
     GET_SCHEMA = "get_schema"
@@ -57,33 +31,28 @@ class MetadataOperationType(Enum):
     ROW_COUNT = "row_count"
     COLUMN_COUNT = "column_count"
 
-    # Catalog operations (PySpark with catalog)
     LIST_DATABASES = "list_databases"
     LIST_TABLES = "list_tables"
     LIST_TABLE_COLUMNS = "list_table_columns"
     TABLE_EXISTS = "table_exists"
     GET_TABLE_INFO = "get_table_info"
 
-    # Lakehouse metadata (Delta Lake / Iceberg)
     TABLE_HISTORY = "table_history"
     TABLE_DETAIL = "table_detail"
     FILE_METADATA = "file_metadata"
     PARTITION_INFO = "partition_info"
     SNAPSHOT_INFO = "snapshot_info"
 
-    # Complexity testing
     WIDE_TABLE_SCHEMA = "wide_table_schema"
     LARGE_CATALOG_LIST = "large_catalog_list"
     COMPLEX_TYPE_INTROSPECTION = "complex_type_introspection"
 
 
 class MetadataOperationCategory(Enum):
-    """Categories of metadata operations."""
-
-    SCHEMA = "schema"  # Schema introspection (all platforms)
-    CATALOG = "catalog"  # Catalog operations (PySpark)
-    LAKEHOUSE = "lakehouse"  # Delta Lake / Iceberg metadata
-    COMPLEXITY = "complexity"  # Complexity stress testing
+    SCHEMA = "schema"
+    CATALOG = "catalog"
+    LAKEHOUSE = "lakehouse"
+    COMPLEXITY = "complexity"
 
 
 _Op = MetadataOperationType
@@ -106,42 +75,17 @@ OPERATION_CATEGORIES = {
 
 @dataclass
 class DataFrameMetadataCapabilities:
-    """Platform capabilities for DataFrame metadata operations.
-
-    Different DataFrame platforms have varying levels of metadata introspection
-    support. This dataclass captures what operations each platform can perform.
-
-    Attributes:
-        platform_name: Name of the platform (e.g., "polars-df", "pyspark-df")
-        supports_schema_introspection: Can introspect DataFrame schema/dtypes
-        supports_describe: Can compute summary statistics
-        supports_catalog: Has catalog API (list databases, tables)
-        supports_delta_lake: Has Delta Lake metadata capabilities
-        supports_iceberg: Has Iceberg metadata capabilities
-        supports_partitions: Can introspect partition information
-        supports_complex_types: Can introspect nested/complex types
-        notes: Platform-specific notes
-    """
-
     platform_name: str
-    supports_schema_introspection: bool = True  # All platforms support basic schema
-    supports_describe: bool = True  # Most platforms support describe
-    supports_catalog: bool = False  # Only PySpark with catalog
-    supports_delta_lake: bool = False  # Requires delta-spark or deltalake
-    supports_iceberg: bool = False  # Requires iceberg-spark or pyiceberg
-    supports_partitions: bool = False  # PySpark, some lakehouse formats
-    supports_complex_types: bool = True  # Most platforms handle complex types
+    supports_schema_introspection: bool = True
+    supports_describe: bool = True
+    supports_catalog: bool = False
+    supports_delta_lake: bool = False
+    supports_iceberg: bool = False
+    supports_partitions: bool = False
+    supports_complex_types: bool = True
     notes: str = ""
 
     def supports_operation(self, operation: MetadataOperationType) -> bool:
-        """Check if an operation type is supported.
-
-        Args:
-            operation: The operation type to check
-
-        Returns:
-            True if the operation is supported
-        """
         checks = {
             MetadataOperationType.DESCRIBE_STATS: self.supports_describe,
             MetadataOperationType.TABLE_HISTORY: self.supports_delta_lake,
@@ -160,27 +104,12 @@ class DataFrameMetadataCapabilities:
         return self.supports_catalog if operation in _CATALOG_OPS else False
 
     def get_supported_operations(self) -> list[MetadataOperationType]:
-        """Get list of operations supported by this platform.
-
-        Returns:
-            List of supported MetadataOperationType values
-        """
         return [op for op in MetadataOperationType if self.supports_operation(op)]
 
     def get_unsupported_operations(self) -> list[MetadataOperationType]:
-        """Get list of operations not supported by this platform.
-
-        Returns:
-            List of unsupported MetadataOperationType values
-        """
         return [op for op in MetadataOperationType if not self.supports_operation(op)]
 
     def get_supported_categories(self) -> list[MetadataOperationCategory]:
-        """Get list of operation categories supported by this platform.
-
-        Returns:
-            List of supported MetadataOperationCategory values
-        """
         categories = {OPERATION_CATEGORIES[op] for op in self.get_supported_operations() if op in OPERATION_CATEGORIES}
         return sorted(categories, key=lambda c: c.value)
 
@@ -211,18 +140,8 @@ DATAFUSION_METADATA_CAPABILITIES = _metadata_capabilities(
 
 
 def get_platform_capabilities(platform_name: str, **kwargs: Any) -> DataFrameMetadataCapabilities:
-    """Get metadata capabilities for a platform.
-
-    Args:
-        platform_name: Platform name (e.g., "polars-df", "pyspark-df")
-        **kwargs: Optional overrides (e.g., supports_delta_lake=True)
-
-    Returns:
-        DataFrameMetadataCapabilities for the platform
-    """
     platform_lower = platform_name.lower()
 
-    # Select base capabilities
     if "polars" in platform_lower:
         base = POLARS_METADATA_CAPABILITIES
     elif "pandas" in platform_lower:
@@ -232,7 +151,6 @@ def get_platform_capabilities(platform_name: str, **kwargs: Any) -> DataFrameMet
     elif "datafusion" in platform_lower:
         base = DATAFUSION_METADATA_CAPABILITIES
     else:
-        # Generic capabilities
         base = DataFrameMetadataCapabilities(
             platform_name=platform_name,
             supports_schema_introspection=True,
@@ -245,20 +163,6 @@ def get_platform_capabilities(platform_name: str, **kwargs: Any) -> DataFrameMet
 
 @dataclass
 class DataFrameMetadataResult:
-    """Result of a DataFrame metadata operation.
-
-    Attributes:
-        operation_type: Type of metadata operation
-        success: Whether the operation completed successfully
-        start_time: Operation start timestamp (Unix time)
-        end_time: Operation end timestamp (Unix time)
-        duration_ms: Operation duration in milliseconds
-        result_count: Number of items returned (columns, tables, etc.)
-        result_data: The actual metadata result (schema dict, column list, etc.)
-        error_message: Error description if operation failed
-        metrics: Additional platform-specific metrics
-    """
-
     operation_type: MetadataOperationType
     success: bool
     start_time: float
@@ -278,18 +182,6 @@ class DataFrameMetadataResult:
         result_data: Any = None,
         metrics: dict[str, Any] | None = None,
     ) -> DataFrameMetadataResult:
-        """Create a successful result.
-
-        Args:
-            operation_type: The operation that completed
-            start_time: When the operation started
-            result_count: Number of items in the result
-            result_data: The actual result data
-            metrics: Additional metrics
-
-        Returns:
-            DataFrameMetadataResult indicating success
-        """
         end_time = time.time()
         return cls(
             operation_type=operation_type,
@@ -309,16 +201,6 @@ class DataFrameMetadataResult:
         error_message: str,
         start_time: float | None = None,
     ) -> DataFrameMetadataResult:
-        """Create a failure result.
-
-        Args:
-            operation_type: The operation that failed
-            error_message: Description of the failure
-            start_time: Optional start time (defaults to now)
-
-        Returns:
-            DataFrameMetadataResult indicating failure
-        """
         now = time.time()
         return cls(
             operation_type=operation_type,
@@ -332,11 +214,6 @@ class DataFrameMetadataResult:
 
 
 class UnsupportedOperationError(Exception):
-    """Raised when a metadata operation is not supported on the current platform.
-
-    Provides a helpful error message with alternatives.
-    """
-
     def __init__(
         self,
         operation: MetadataOperationType,
@@ -355,15 +232,6 @@ class UnsupportedOperationError(Exception):
 
 
 def get_unsupported_message(operation: MetadataOperationType, platform_name: str) -> str:
-    """Get helpful error message for unsupported operations.
-
-    Args:
-        operation: The unsupported operation
-        platform_name: The platform name
-
-    Returns:
-        Helpful error message with alternatives
-    """
     category = OPERATION_CATEGORIES.get(operation, MetadataOperationCategory.SCHEMA)
 
     if category == MetadataOperationCategory.CATALOG:
@@ -402,23 +270,6 @@ def get_unsupported_message(operation: MetadataOperationType, platform_name: str
 
 
 class DataFrameMetadataOperationsManager:
-    """Manager for DataFrame metadata introspection operations.
-
-    Provides a unified interface for metadata operations across DataFrame platforms.
-    Handles platform capability detection and provides helpful error messages for
-    unsupported operations.
-
-    Example:
-        manager = DataFrameMetadataOperationsManager("polars-df")
-
-        # Check capabilities
-        if manager.supports_operation(MetadataOperationType.GET_SCHEMA):
-            result = manager.execute_get_schema(df)
-
-        # Get all supported operations
-        ops = manager.get_supported_operations()
-    """
-
     def __init__(
         self,
         platform_name: str,
@@ -426,26 +277,13 @@ class DataFrameMetadataOperationsManager:
         delta_available: bool | None = None,
         iceberg_available: bool | None = None,
     ) -> None:
-        """Initialize the metadata operations manager.
-
-        Args:
-            platform_name: Platform name (e.g., "polars-df", "pyspark-df")
-            spark_session: SparkSession instance (required for pyspark-df catalog ops)
-            delta_available: Override for Delta Lake availability detection
-            iceberg_available: Override for Iceberg availability detection
-
-        Raises:
-            ValueError: If platform is not supported for DataFrame operations
-        """
         self.platform_name = platform_name.lower()
         self.spark_session = spark_session
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
 
-        # Build capabilities with optional overrides
         overrides = {}
 
         if "pyspark" in self.platform_name or "spark" in self.platform_name:
-            # Detect Delta Lake / Iceberg availability
             if delta_available is None:
                 delta_available = self._detect_delta_lake()
             if iceberg_available is None:
@@ -457,26 +295,14 @@ class DataFrameMetadataOperationsManager:
         self._capabilities = get_platform_capabilities(self.platform_name, **overrides)
 
     def _detect_delta_lake(self) -> bool:
-        """Detect if Delta Lake is available.
-
-        Returns:
-            True if delta-spark or deltalake is available
-        """
         return _module_available("delta") or _module_available("deltalake")
 
     def _detect_iceberg(self) -> bool:
-        """Detect if Iceberg is available.
-
-        Returns:
-            True if iceberg-spark or pyiceberg is available
-        """
         if _module_available("pyiceberg"):
             return True
 
-        # Check for iceberg-spark via SparkSession
         if self.spark_session is not None:
             try:
-                # Check if iceberg catalog is configured
                 catalogs = self.spark_session.conf.get("spark.sql.catalog", "")
                 if "iceberg" in catalogs.lower():
                     return True
@@ -486,41 +312,15 @@ class DataFrameMetadataOperationsManager:
         return False
 
     def get_capabilities(self) -> DataFrameMetadataCapabilities:
-        """Get platform metadata capabilities.
-
-        Returns:
-            DataFrameMetadataCapabilities for this platform
-        """
         return self._capabilities
 
     def supports_operation(self, operation: MetadataOperationType) -> bool:
-        """Check if an operation type is supported.
-
-        Args:
-            operation: The operation to check
-
-        Returns:
-            True if supported
-        """
         return self._capabilities.supports_operation(operation)
 
     def get_supported_operations(self) -> list[MetadataOperationType]:
-        """Get list of supported operations.
-
-        Returns:
-            List of supported MetadataOperationType values
-        """
         return self._capabilities.get_supported_operations()
 
     def validate_operation(self, operation: MetadataOperationType) -> None:
-        """Validate that an operation is supported.
-
-        Args:
-            operation: The operation to validate
-
-        Raises:
-            UnsupportedOperationError: If operation is not supported
-        """
         if not self.supports_operation(operation):
             raise UnsupportedOperationError(
                 operation, self.platform_name, get_unsupported_message(operation, self.platform_name)
@@ -564,12 +364,7 @@ class DataFrameMetadataOperationsManager:
     def _catalog_name(table_name: str, database: str | None = None) -> str:
         return f"{database}.{table_name}" if database else table_name
 
-    # =========================================================================
-    # Schema Introspection Operations (All Platforms)
-    # =========================================================================
-
     def execute_list_columns(self, dataframe: Any) -> DataFrameMetadataResult:
-        """List column names from a DataFrame."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             if "polars" in self.platform_name:
@@ -581,7 +376,6 @@ class DataFrameMetadataOperationsManager:
             elif "datafusion" in self.platform_name:
                 columns = [field.name for field in dataframe.schema()]
             else:
-                # Generic fallback
                 columns = list(getattr(dataframe, "columns", []))
 
             return self._success(MetadataOperationType.LIST_COLUMNS, start_time, len(columns), columns)
@@ -589,7 +383,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.LIST_COLUMNS, action)
 
     def execute_get_dtypes(self, dataframe: Any) -> DataFrameMetadataResult:
-        """Get data types for all columns."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             if "polars" in self.platform_name:
@@ -601,7 +394,6 @@ class DataFrameMetadataOperationsManager:
             elif "datafusion" in self.platform_name:
                 dtypes = {field.name: str(field.type) for field in dataframe.schema()}
             else:
-                # Generic fallback
                 dtypes = {}
                 if hasattr(dataframe, "dtypes"):
                     dtypes = dict(dataframe.dtypes)
@@ -611,7 +403,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.GET_DTYPES, action)
 
     def execute_get_schema(self, dataframe: Any) -> DataFrameMetadataResult:
-        """Get full schema information for a DataFrame."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             schema_info: list[dict[str, Any]] = []
@@ -622,7 +413,7 @@ class DataFrameMetadataOperationsManager:
                         {
                             "name": col,
                             "dtype": str(dtype),
-                            "nullable": True,  # Polars columns are nullable by default
+                            "nullable": True,
                         }
                     )
             elif "pandas" in self.platform_name:
@@ -653,7 +444,6 @@ class DataFrameMetadataOperationsManager:
                         }
                     )
             else:
-                # Generic fallback
                 if hasattr(dataframe, "columns") and hasattr(dataframe, "dtypes"):
                     for col, dtype in zip(dataframe.columns, dataframe.dtypes):
                         schema_info.append({"name": col, "dtype": str(dtype), "nullable": True})
@@ -663,7 +453,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.GET_SCHEMA, action)
 
     def execute_describe_stats(self, dataframe: Any) -> DataFrameMetadataResult:
-        """Get summary statistics for a DataFrame."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             if "polars" in self.platform_name:
@@ -679,7 +468,6 @@ class DataFrameMetadataOperationsManager:
                 result_data = stats_df.collect()
                 result_count = stats_df.count()
             elif "datafusion" in self.platform_name:
-                # DataFusion doesn't have describe() yet
                 result_data = None
                 result_count = 0
             else:
@@ -691,7 +479,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.DESCRIBE_STATS, action)
 
     def execute_row_count(self, dataframe: Any) -> DataFrameMetadataResult:
-        """Get row count for a DataFrame."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             if "polars" in self.platform_name:
@@ -708,7 +495,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.ROW_COUNT, action)
 
     def execute_column_count(self, dataframe: Any) -> DataFrameMetadataResult:
-        """Get column count for a DataFrame."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             if "polars" in self.platform_name:
@@ -724,12 +510,7 @@ class DataFrameMetadataOperationsManager:
 
         return self._run_operation(MetadataOperationType.COLUMN_COUNT, action)
 
-    # =========================================================================
-    # Catalog Operations (PySpark with Catalog)
-    # =========================================================================
-
     def execute_list_databases(self) -> DataFrameMetadataResult:
-        """List all databases in the catalog."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             failure = self._catalog_failure(MetadataOperationType.LIST_DATABASES, start_time)
@@ -746,7 +527,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.LIST_DATABASES, action)
 
     def execute_list_tables(self, database: str | None = None) -> DataFrameMetadataResult:
-        """List all tables in a database."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             failure = self._catalog_failure(MetadataOperationType.LIST_TABLES, start_time)
@@ -761,7 +541,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.LIST_TABLES, action)
 
     def execute_list_table_columns(self, table_name: str, database: str | None = None) -> DataFrameMetadataResult:
-        """List columns for a specific table in the catalog."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             failure = self._catalog_failure(MetadataOperationType.LIST_TABLE_COLUMNS, start_time)
@@ -791,7 +570,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.LIST_TABLE_COLUMNS, action)
 
     def execute_table_exists(self, table_name: str, database: str | None = None) -> DataFrameMetadataResult:
-        """Check if a table exists in the catalog."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             failure = self._catalog_failure(MetadataOperationType.TABLE_EXISTS, start_time)
@@ -803,7 +581,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.TABLE_EXISTS, action)
 
     def execute_get_table_info(self, table_name: str, database: str | None = None) -> DataFrameMetadataResult:
-        """Get detailed information about a table."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             failure = self._catalog_failure(MetadataOperationType.GET_TABLE_INFO, start_time)
@@ -821,16 +598,10 @@ class DataFrameMetadataOperationsManager:
 
         return self._run_operation(MetadataOperationType.GET_TABLE_INFO, action)
 
-    # =========================================================================
-    # Lakehouse Metadata Operations (Delta Lake / Iceberg)
-    # =========================================================================
-
     def execute_table_history(self, table_path: str) -> DataFrameMetadataResult:
-        """Get transaction history for a Delta Lake table."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             if self.spark_session is not None:
-                # Use DeltaTable API
                 from delta.tables import DeltaTable
 
                 delta_table = DeltaTable.forPath(self.spark_session, table_path)
@@ -842,7 +613,6 @@ class DataFrameMetadataOperationsManager:
                     [row.asDict() for row in history],
                 )
             else:
-                # Use deltalake Python library
                 from deltalake import DeltaTable as PyDeltaTable
 
                 dt = PyDeltaTable(table_path)
@@ -852,18 +622,15 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.TABLE_HISTORY, action, "Delta Lake library not available")
 
     def execute_table_detail(self, table_path: str) -> DataFrameMetadataResult:
-        """Get detailed metadata for a Delta Lake table."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             if self.spark_session is not None:
-                # Use DeltaTable API
                 from delta.tables import DeltaTable
 
                 delta_table = DeltaTable.forPath(self.spark_session, table_path)
                 detail = delta_table.detail().collect()[0].asDict()
                 return self._success(MetadataOperationType.TABLE_DETAIL, start_time, 1, detail)
             else:
-                # Use deltalake Python library
                 from deltalake import DeltaTable as PyDeltaTable
 
                 dt = PyDeltaTable(table_path)
@@ -881,16 +648,13 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.TABLE_DETAIL, action, "Delta Lake library not available")
 
     def execute_file_metadata(self, table_path: str) -> DataFrameMetadataResult:
-        """Get file-level metadata for a lakehouse table."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             if self._capabilities.supports_delta_lake:
-                # Delta Lake file metadata
                 if self.spark_session is not None:
                     from delta.tables import DeltaTable
 
                     delta_table = DeltaTable.forPath(self.spark_session, table_path)
-                    # Get files via detail or internal API
                     detail = delta_table.detail().collect()[0]
                     files = {
                         "numFiles": detail.numFiles if hasattr(detail, "numFiles") else None,
@@ -903,7 +667,7 @@ class DataFrameMetadataOperationsManager:
                     file_uris = dt.file_uris()
                     files = {
                         "numFiles": len(file_uris),
-                        "files": file_uris[:100],  # Limit for large tables
+                        "files": file_uris[:100],
                     }
                 return self._success(
                     MetadataOperationType.FILE_METADATA,
@@ -913,9 +677,6 @@ class DataFrameMetadataOperationsManager:
                 )
 
             elif self._capabilities.supports_iceberg:
-                # Iceberg file metadata - requires catalog configuration
-                # Note: pyiceberg.catalog and pyiceberg.table would be used here
-                # but require proper catalog setup which is outside scope of basic introspection
                 return DataFrameMetadataResult.failure_result(
                     MetadataOperationType.FILE_METADATA,
                     "Iceberg file metadata requires catalog configuration",
@@ -932,7 +693,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.FILE_METADATA, action, "Lakehouse library not available")
 
     def execute_partition_info(self, table_path: str) -> DataFrameMetadataResult:
-        """Get partition information for a table."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             if self.spark_session is not None and self._capabilities.supports_delta_lake:
@@ -952,7 +712,6 @@ class DataFrameMetadataOperationsManager:
                 )
 
             elif self._capabilities.supports_delta_lake:
-                # Use standalone deltalake Python library (no SparkSession)
                 from deltalake import DeltaTable as PyDeltaTable
 
                 dt = PyDeltaTable(table_path)
@@ -978,11 +737,8 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.PARTITION_INFO, action, "Lakehouse library not available")
 
     def execute_snapshot_info(self, table_path: str) -> DataFrameMetadataResult:
-        """Get snapshot information for an Iceberg table."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
-            # This requires proper Iceberg catalog configuration
-            # Simplified implementation for now
             return DataFrameMetadataResult.failure_result(
                 MetadataOperationType.SNAPSHOT_INFO,
                 "Iceberg snapshot info requires catalog configuration. "
@@ -992,15 +748,9 @@ class DataFrameMetadataOperationsManager:
 
         return self._run_operation(MetadataOperationType.SNAPSHOT_INFO, action)
 
-    # =========================================================================
-    # Complexity Testing Operations
-    # =========================================================================
-
     def execute_wide_table_schema(self, dataframe: Any) -> DataFrameMetadataResult:
-        """Introspect schema of a wide DataFrame (100+ columns)."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
-            # Get column count
             if "polars" in self.platform_name:
                 column_count = dataframe.width
                 schema_info = [
@@ -1030,13 +780,11 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.WIDE_TABLE_SCHEMA, action)
 
     def execute_large_catalog_list(self) -> DataFrameMetadataResult:
-        """List tables in a large catalog (100+ tables)."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             failure = self._catalog_failure(MetadataOperationType.LARGE_CATALOG_LIST, start_time)
             if failure is not None:
                 return failure
-            # Get all tables across all databases
             tables_result = []
             databases = self.spark_session.catalog.listDatabases()
 
@@ -1065,7 +813,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.LARGE_CATALOG_LIST, action)
 
     def execute_complex_type_introspection(self, dataframe: Any) -> DataFrameMetadataResult:
-        """Introspect complex/nested types in a DataFrame."""
 
         def action(start_time: float) -> DataFrameMetadataResult:
             complex_types = []
@@ -1090,10 +837,8 @@ class DataFrameMetadataOperationsManager:
                         nested_depth = max(nested_depth, type_info.get("nested_depth", 0))
 
             elif "pandas" in self.platform_name:
-                # Pandas has limited complex type support
                 for col, dtype in dataframe.dtypes.items():
                     if str(dtype) == "object":
-                        # Could contain nested structures
                         complex_types.append(
                             {
                                 "name": col,
@@ -1121,16 +866,6 @@ class DataFrameMetadataOperationsManager:
         return self._run_operation(MetadataOperationType.COMPLEX_TYPE_INTROSPECTION, action)
 
     def _analyze_polars_type(self, col_name: str, dtype: Any, pl: Any) -> dict[str, Any]:
-        """Analyze a Polars data type for complexity.
-
-        Args:
-            col_name: Column name
-            dtype: Polars data type
-            pl: Polars module
-
-        Returns:
-            Type analysis dict
-        """
         dtype_str = str(dtype)
         is_complex = False
         complex_type = None
@@ -1154,17 +889,6 @@ class DataFrameMetadataOperationsManager:
         }
 
     def _analyze_spark_type(self, field: Any, ArrayType: type, MapType: type, StructType: type) -> dict[str, Any]:
-        """Analyze a Spark schema field for complexity.
-
-        Args:
-            field: Spark StructField
-            ArrayType: Spark ArrayType class
-            MapType: Spark MapType class
-            StructType: Spark StructType class
-
-        Returns:
-            Type analysis dict
-        """
         dtype = field.dataType
         is_complex = False
         complex_type = None
@@ -1207,16 +931,6 @@ def get_dataframe_metadata_manager(
     platform_name: str,
     spark_session: Any = None,
 ) -> DataFrameMetadataOperationsManager | None:
-    """Get a DataFrame metadata operations manager for a platform.
-
-    Args:
-        platform_name: Platform name (e.g., "polars-df", "pandas-df", "pyspark-df")
-        spark_session: SparkSession instance (required for pyspark-df catalog ops)
-
-    Returns:
-        DataFrameMetadataOperationsManager if platform supports DataFrame operations,
-        None if platform is not a DataFrame platform.
-    """
     return get_dataframe_manager(
         platform_name,
         manager_class=DataFrameMetadataOperationsManager,
@@ -1228,23 +942,18 @@ def get_dataframe_metadata_manager(
 
 
 __all__ = [
-    # Enums
     "MetadataOperationType",
     "MetadataOperationCategory",
     "OPERATION_CATEGORIES",
-    # Capabilities
     "DataFrameMetadataCapabilities",
     "get_platform_capabilities",
     "POLARS_METADATA_CAPABILITIES",
     "PANDAS_METADATA_CAPABILITIES",
     "PYSPARK_METADATA_CAPABILITIES",
     "DATAFUSION_METADATA_CAPABILITIES",
-    # Results
     "DataFrameMetadataResult",
-    # Errors
     "UnsupportedOperationError",
     "get_unsupported_message",
-    # Manager
     "DataFrameMetadataOperationsManager",
     "get_dataframe_metadata_manager",
 ]

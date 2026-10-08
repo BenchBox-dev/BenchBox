@@ -1,13 +1,6 @@
-"""StarRocks OLAP platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides a BenchBox platform adapter for StarRocks, an open-source
-columnar analytics engine supporting sub-second OLAP queries on
-large-scale datasets. Connects via MySQL protocol using PyMySQL.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -36,16 +29,6 @@ class StarRocksAdapter(
     StarRocksTuningMixin,
     PlatformAdapter,
 ):
-    """StarRocks OLAP platform adapter.
-
-    Supports:
-    - Connection via MySQL protocol (port 9030)
-    - TPC-H and TPC-DS benchmarks
-    - Columnar storage with Duplicate Key model
-    - Distributed hash partitioning
-    - Stream Load for high-throughput data ingestion
-    """
-
     plan_capture_phase_eligible = True
     default_service_port = 9030
 
@@ -53,7 +36,6 @@ class StarRocksAdapter(
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> StarRocksAdapter:
-        """Create StarRocks adapter from unified configuration."""
         adapter_config: dict[str, Any] = {}
 
         adapter_config["host"] = config.get("host", "localhost")
@@ -91,19 +73,6 @@ class StarRocksAdapter(
         return cls(**adapter_config)
 
     def __init__(self, **config: Any) -> None:
-        """Initialize StarRocks adapter.
-
-        Args:
-            **config: Configuration parameters including:
-                - host: StarRocks FE hostname (default: localhost)
-                - port: MySQL protocol port (default: 9030)
-                - username: Database username (default: root)
-                - password: Database password (default: "")
-                - database: Target database name
-                - http_port: BE HTTP port for Stream Load (default: 8040)
-                - deployment_mode: Deployment mode (default: self-hosted)
-        """
-        # Check dependencies before proceeding
         deps_ok, missing = check_platform_dependencies("starrocks")
         if not deps_ok:
             raise ImportError(
@@ -114,23 +83,18 @@ class StarRocksAdapter(
 
         super().__init__(**config)
 
-        # Set dialect for SQL translation
         self._dialect = self.get_target_dialect()
 
-        # Setup connection config from arguments and env vars
         self._setup_connection_config(config)
 
     @property
     def dialect(self) -> str:
-        """Return the SQL dialect for this adapter."""
         return self._dialect or "starrocks"
 
     def get_connection(self) -> Any:
-        """Get a StarRocks connection."""
         return self.create_connection()
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | None:
-        """StarRocks sorting is defined at CREATE TABLE time via sort keys."""
         return None
 
     def _validate_data_integrity(
@@ -139,7 +103,6 @@ class StarRocksAdapter(
         connection: Any,
         table_stats: dict[str, int],
     ) -> tuple[str, dict[str, Any]]:
-        """Validate data integrity and table accessibility for StarRocks."""
         validation_details: dict[str, Any] = {}
 
         try:

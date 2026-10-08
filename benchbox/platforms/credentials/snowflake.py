@@ -1,9 +1,6 @@
-"""Snowflake credentials setup and validation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import os
 from typing import Optional, Union
@@ -17,12 +14,6 @@ from benchbox.utils.printing import QuietConsoleProxy
 
 
 def setup_snowflake_credentials(cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy]) -> None:
-    """Interactive setup for Snowflake credentials.
-
-    Args:
-        cred_manager: Credential manager instance
-        console: Rich console for output
-    """
     console.print("\n📋 [bold]You'll need:[/bold]")
     console.print("  • Snowflake account identifier")
     console.print("  • Username and password")
@@ -31,16 +22,12 @@ def setup_snowflake_credentials(cred_manager: CredentialManager, console: Union[
 
     console.print("[dim]Need help? Visit: https://docs.snowflake.com/en/user-guide/admin-user-management[/dim]\n")
 
-    # Load existing credentials to use as defaults
     existing_creds = cred_manager.get_platform_credentials("snowflake")
 
-    # Only offer auto-detection if no existing credentials
     if existing_creds:
-        # Show indicator that we're updating existing config
         console.print("ℹ️  [cyan]Existing credentials found - updating configuration[/cyan]\n")
         auto_config = None
     else:
-        # First-time setup - offer auto-detection from environment variables
         auto_config = None
         try_auto = Confirm.ask("🔍 Attempt auto-detection from environment variables?", default=True)
 
@@ -48,7 +35,6 @@ def setup_snowflake_credentials(cred_manager: CredentialManager, console: Union[
             console.print("\n[dim]Checking environment variables...[/dim]")
             auto_config = _auto_detect_snowflake(console)
 
-    # Get credentials (use auto-detected or prompt)
     if auto_config:
         account = auto_config.get("account")
         username = auto_config.get("username")
@@ -69,7 +55,6 @@ def setup_snowflake_credentials(cred_manager: CredentialManager, console: Union[
     else:
         console.print("\n[bold]Snowflake Configuration:[/bold]")
 
-        # Use existing credentials as defaults if available
         current_account = existing_creds.get("account") if existing_creds else None
         current_username = existing_creds.get("username") if existing_creds else None
         current_password = existing_creds.get("password") if existing_creds else None
@@ -87,7 +72,6 @@ def setup_snowflake_credentials(cred_manager: CredentialManager, console: Union[
             console.print("[red]❌ Account identifier is required[/red]")
             return
 
-        # Normalize account identifier - remove .snowflakecomputing.com if present
         if ".snowflakecomputing.com" in account:
             account = account.replace(".snowflakecomputing.com", "")
             console.print(f"[dim]Using account identifier: {account}[/dim]")
@@ -116,12 +100,10 @@ def setup_snowflake_credentials(cred_manager: CredentialManager, console: Union[
             console.print("[red]❌ Database name is required[/red]")
             return
 
-        # Optional settings
         console.print("\n[bold]Optional Settings:[/bold]")
         schema = prompt_with_default("Schema name", current_value=current_schema, default_if_none="PUBLIC")
         role = prompt_with_default("Role (leave empty for default)", current_value=current_role, default_if_none="")
 
-    # Build credentials
     credentials = {
         "account": account,
         "username": username,
@@ -135,10 +117,8 @@ def setup_snowflake_credentials(cred_manager: CredentialManager, console: Union[
     if role:
         credentials["role"] = role
 
-    # Validate credentials
     console.print("\n🧪 [bold]Validating credentials...[/bold]")
 
-    # Save temporarily for validation
     cred_manager.set_platform_credentials("snowflake", credentials, CredentialStatus.NOT_VALIDATED)
 
     success, error = validate_snowflake_credentials(cred_manager)
@@ -151,7 +131,6 @@ def setup_snowflake_credentials(cred_manager: CredentialManager, console: Union[
         console.print(f"   Location: [cyan]{cred_manager.credentials_path}[/cyan]")
         console.print("   Status: [green]Ready to use[/green]\n")
 
-        # Prompt for default output location (optional)
         _prompt_default_output_location(cred_manager, console, credentials)
 
         console.print("[bold]Try it:[/bold]")
@@ -170,13 +149,6 @@ def setup_snowflake_credentials(cred_manager: CredentialManager, console: Union[
 def _prompt_default_output_location(
     cred_manager: CredentialManager, console: Union[Console, QuietConsoleProxy], credentials: dict
 ) -> None:
-    """Prompt for default cloud output location for Snowflake.
-
-    Args:
-        cred_manager: Credential manager instance
-        console: Rich console for output
-        credentials: Current credentials dictionary
-    """
     from benchbox.core.platform_registry import SNOWFLAKE_DEFAULT_OUTPUT_LOCATION, PlatformRegistry
     from benchbox.utils.cloud_storage import is_cloud_path
 
@@ -190,8 +162,6 @@ def _prompt_default_output_location(
         console.print("[dim]You can add --output <cloud-path> when running benchmarks[/dim]\n")
         return
 
-    # Examples come from the registry so this prompt and the documented
-    # examples cannot drift apart; stage forms sort first (no setup required).
     examples = PlatformRegistry.get_cloud_path_examples("snowflake")
     stage_examples = [e for e in examples if e.startswith("@")]
     external_examples = [e for e in examples if not e.startswith("@")]
@@ -208,7 +178,6 @@ def _prompt_default_output_location(
             console.print(f"  • [dim]{example}[/dim]")
         console.print("\n[dim]Note: External stages require cloud storage setup[/dim]\n")
 
-    # Prompt for path with validation - suggest user stage as default
     while True:
         cloud_path = Prompt.ask("[bold]Enter default storage path[/bold]", default=SNOWFLAKE_DEFAULT_OUTPUT_LOCATION)
 
@@ -216,8 +185,6 @@ def _prompt_default_output_location(
             console.print("[yellow]Skipping default output location[/yellow]\n")
             return
 
-        # Validate with the SAME classifier the run path uses, so anything this
-        # prompt accepts is guaranteed to resolve as a remote location later.
         if not is_cloud_path(cloud_path):
             console.print(f"[yellow]⚠️  Warning: '{cloud_path}' doesn't look like a valid path[/yellow]")
             console.print(
@@ -227,11 +194,9 @@ def _prompt_default_output_location(
             if not proceed:
                 continue
 
-        # Confirm the path
         console.print(f"\n[green]✓[/green] Will use: [cyan]{cloud_path}[/cyan]")
         confirmed = Confirm.ask("Is this correct?", default=True)
         if confirmed:
-            # Set credentials with default_output_location
             credentials["default_output_location"] = cloud_path
             cred_manager.set_platform_credentials("snowflake", credentials, CredentialStatus.VALID)
             cred_manager.save_credentials()
@@ -240,14 +205,6 @@ def _prompt_default_output_location(
 
 
 def validate_snowflake_credentials(cred_manager: CredentialManager) -> tuple[bool, Optional[str]]:
-    """Validate Snowflake credentials by testing connection.
-
-    Args:
-        cred_manager: Credential manager instance
-
-    Returns:
-        Tuple of (success, error_message)
-    """
     creds = cred_manager.get_platform_credentials("snowflake")
 
     if not creds:
@@ -259,17 +216,15 @@ def validate_snowflake_credentials(cred_manager: CredentialManager) -> tuple[boo
     if missing:
         return False, f"Missing required fields: {', '.join(missing)}"
 
-    # Try to import Snowflake connector
     try:
         import snowflake.connector
     except ImportError:
         return False, "Snowflake connector not installed. Run: pip install snowflake-connector-python"
 
-    # Test connection
     try:
         connection = snowflake.connector.connect(
             account=creds["account"],
-            user=creds["username"],  # Snowflake uses 'user' parameter
+            user=creds["username"],
             password=creds["password"],
             warehouse=creds["warehouse"],
             database=creds["database"],
@@ -280,15 +235,12 @@ def validate_snowflake_credentials(cred_manager: CredentialManager) -> tuple[boo
 
         cursor = connection.cursor()
 
-        # Test basic query
         cursor.execute("SELECT 1")
         cursor.fetchall()
 
-        # Test warehouse access
         cursor.execute("SELECT CURRENT_WAREHOUSE()")
         cursor.fetchall()
 
-        # Test database access
         cursor.execute("SELECT CURRENT_DATABASE()")
         cursor.fetchall()
 
@@ -299,7 +251,6 @@ def validate_snowflake_credentials(cred_manager: CredentialManager) -> tuple[boo
 
     except Exception as e:
         error_msg = str(e)
-        # Make error more user-friendly
         if "incorrect username or password" in error_msg.lower() or "authentication" in error_msg.lower():
             return False, "Authentication failed. Check your username and password."
         elif "account" in error_msg.lower() and "does not exist" in error_msg.lower():
@@ -315,14 +266,6 @@ def validate_snowflake_credentials(cred_manager: CredentialManager) -> tuple[boo
 
 
 def _auto_detect_snowflake(console: Union[Console, QuietConsoleProxy]) -> Optional[dict]:
-    """Attempt to auto-detect Snowflake configuration from environment variables.
-
-    Args:
-        console: Rich console for output
-
-    Returns:
-        Dictionary with detected config or None
-    """
     env_vars = {
         "account": os.getenv("SNOWFLAKE_ACCOUNT"),
         "username": os.getenv("SNOWFLAKE_USERNAME"),
@@ -333,7 +276,6 @@ def _auto_detect_snowflake(console: Union[Console, QuietConsoleProxy]) -> Option
         "role": os.getenv("SNOWFLAKE_ROLE"),
     }
 
-    # Check if we have the required fields
     required = ["account", "username", "password", "warehouse", "database"]
     found_required = all(env_vars.get(field) for field in required)
 
@@ -342,7 +284,6 @@ def _auto_detect_snowflake(console: Union[Console, QuietConsoleProxy]) -> Option
         console.print(f"  ⚠️  Missing environment variables: {', '.join(missing)}")
         return None
 
-    # Normalize account identifier
     account = env_vars["account"]
     if account and ".snowflakecomputing.com" in account:
         env_vars["account"] = account.replace(".snowflakecomputing.com", "")

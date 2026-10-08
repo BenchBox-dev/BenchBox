@@ -35,7 +35,6 @@ Common use cases:
 from benchbox.tpch import TPCH
 from benchbox.platforms.snowflake import SnowflakeAdapter
 
-# Connect to Snowflake
 adapter = SnowflakeAdapter(
     account="xy12345.us-east-1",
     username="benchbox_user",
@@ -45,7 +44,6 @@ adapter = SnowflakeAdapter(
     schema="PUBLIC"
 )
 
-# Generate data, then run the benchmark
 benchmark = TPCH(scale_factor=1.0)
 benchmark.generate_data()
 results = benchmark.run_with_platform(adapter)
@@ -111,7 +109,7 @@ Session and loading:
 | `delta_table_format` | `str` | `"DELTA"` | `TABLE_FORMAT` for Delta external tables. |
 | `force_recreate` | `bool` | `False` | Drop an existing database when a connection is created. |
 
-The adapter also accepts the keys every BenchBox adapter takes: see [Constructor Parameters](#constructor-parameters). Keys it does not recognise are accepted and ignored. The constructor reads no environment variables: `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER` and `SNOWFLAKE_PASSWORD` are mentioned in its error message but not consulted, so pass the values yourself.
+Defaulted string settings use the default when you supply a falsey value. The adapter also accepts the keys every BenchBox adapter takes: see [Constructor Parameters](#constructor-parameters). Keys it does not recognise are accepted and ignored. The constructor reads no environment variables: `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER` and `SNOWFLAKE_PASSWORD` are mentioned in its error message but not consulted, so pass the values yourself.
 
 #### Returns
 
@@ -123,7 +121,7 @@ A `SnowflakeAdapter`. Construction makes no network call; call `create_connectio
 - `ConfigurationError` (from `benchbox.core.exceptions`): `account`, `username` or `password` is missing or empty (`Snowflake configuration is incomplete. Missing: ...`; the message lists each missing name).
 - `ValueError`: `staging_root` is a Snowflake stage reference that is not valid for the mode. Native mode accepts only the user stage `@~/...`, and external mode accepts only a cloud URI.
 
-Credentials and the account name are not checked here. They fail in `create_connection()`, which needs a live connection and was taken from reading the code.
+Credentials and the account name are not checked here. They fail in `create_connection()`.
 
 #### Example
 
@@ -183,109 +181,107 @@ The values are stored as attributes of the same name (`SnowflakeAdapter(account=
 
 ### Methods and attributes
 
-Each method is marked with how its description was checked. Calls that talk to Snowflake need an account and a live connection; those are marked as taken from reading the code. The others were run offline, either directly or against a stub connection object that records the SQL the adapter sends and returns prepared rows.
-
 #### Construction and configuration
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.__init__"></span>
-**`__init__(**config)`**: Creates the adapter from keyword arguments. See Parameters above. It checks that the Snowflake connector is importable, validates the settings and opens no connection. *Checked offline.*
+**`__init__(**config)`**: Creates the adapter from keyword arguments. See Parameters above. It checks that the Snowflake connector is importable, validates the settings and opens no connection.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.from_config"></span>
-**`from_config(config: dict[str, Any])`** (class method): Builds an adapter from a unified configuration dictionary and returns it. `benchmark` and `scale_factor` are required (a missing key raises `KeyError`). `database` is used when the configuration has a non-empty one; otherwise (absent or empty) it is generated as `<benchmark>_sf<token>_<tuning>`, for example `tpch_sf001_notuning_noconstraints`. The keys `account`, `warehouse`, `schema`, `username`, `password`, `role`, `edition`, `authenticator`, `private_key_path`, `private_key_passphrase`, `warehouse_size`, `auto_suspend`, `auto_resume`, `multi_cluster_warehouse`, `query_tag`, `timezone`, `file_format`, `compression`, `staging_root`, `iceberg_external_volume`, `iceberg_catalog`, `delta_table_format`, `disable_result_cache`, `strict_validation`, `suppress_nondeterministic_errors`, `modify_warehouse_settings`, `force_recreate` and the tuning keys pass through. `force` sets `force_recreate`. `table_mode` and other keys are not forwarded. *Checked offline.*
+**`from_config(config: dict[str, Any])`** (class method): Builds an adapter from a unified configuration dictionary and returns it. `benchmark` and `scale_factor` are required (a missing key raises `KeyError`). `database` is used when the configuration has a non-empty one; otherwise (absent or empty) it is generated as `<benchmark>_sf<token>_<tuning>`, for example `tpch_sf001_notuning_noconstraints`. The keys `account`, `warehouse`, `schema`, `username`, `password`, `role`, `edition`, `authenticator`, `private_key_path`, `private_key_passphrase`, `warehouse_size`, `auto_suspend`, `auto_resume`, `multi_cluster_warehouse`, `query_tag`, `timezone`, `file_format`, `compression`, `staging_root`, `iceberg_external_volume`, `iceberg_catalog`, `delta_table_format`, `disable_result_cache`, `strict_validation`, `suppress_nondeterministic_errors`, `modify_warehouse_settings`, `force_recreate` and the tuning keys pass through. `force` sets `force_recreate`. `table_mode` and other keys are not forwarded.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.add_cli_arguments"></span>
-**`add_cli_arguments(parser) -> None`** (static method): Adds a `Snowflake Arguments` group to an `argparse.ArgumentParser` and returns `None`: `--account`, `--warehouse` (default `COMPUTE_WH`), `--platform` (the database name), `--schema` (default `PUBLIC`), `--username`, `--password`, `--role`, `--authenticator` (default `snowflake`), `--private-key-path`, `--modify-warehouse-settings`, `--suppress-nondeterministic-errors` and `--no-disable-result-cache`. *Checked offline.*
+**`add_cli_arguments(parser) -> None`** (static method): Adds a `Snowflake Arguments` group to an `argparse.ArgumentParser` and returns `None`: `--account`, `--warehouse` (default `COMPUTE_WH`), `--platform` (the database name), `--schema` (default `PUBLIC`), `--username`, `--password`, `--role`, `--authenticator` (default `snowflake`), `--private-key-path`, `--modify-warehouse-settings`, `--suppress-nondeterministic-errors` and `--no-disable-result-cache`.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.platform_name"></span>
-**`platform_name`** (property): Always the string `'Snowflake'`. *Checked offline.*
+**`platform_name`** (property): Always the string `'Snowflake'`.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.get_target_dialect"></span>
-**`get_target_dialect() -> str`**: Returns `'snowflake'`, the SQL dialect BenchBox translates queries into. *Checked offline.*
+**`get_target_dialect() -> str`**: Returns `'snowflake'`, the SQL dialect BenchBox translates queries into.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.get_platform_info"></span>
-**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict` describing the platform. Without a connection it holds `platform_type` (`'snowflake'`), `platform_name`, `connection_mode` (`'remote'`), `configuration` (`account`, `warehouse`, `database`, `schema`, `role`, `edition`, `warehouse_size`, `auto_suspend`, `auto_resume`, `multi_cluster_warehouse`, `result_cache_enabled`, `file_format`, `compression`, `staging_root`), `client_library_version` (the installed `snowflake-connector-python` version) and `platform_version` (`None`). With a connection it also reads the Snowflake version and warehouse details from the account. *The no-connection form was checked offline; the connected form needs a live connection and was taken from reading the code.*
+**`get_platform_info(connection: Any = None) -> dict[str, Any]`**: Returns a `dict` describing the platform. Without a connection it holds `platform_type` (`'snowflake'`), `platform_name`, `connection_mode` (`'remote'`), `configuration` (`account`, `warehouse`, `database`, `schema`, `role`, `edition`, `warehouse_size`, `auto_suspend`, `auto_resume`, `multi_cluster_warehouse`, `result_cache_enabled`, `file_format`, `compression`, `staging_root`), `client_library_version` (the installed `snowflake-connector-python` version) and `platform_version` (`None`). With a connection it also reads the Snowflake version and warehouse details from the account.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.get_normalized_result_metadata"></span>
-**`get_normalized_result_metadata(*, connection: Any | None = None, platform_info: Mapping[str, Any] | None = None) -> dict[str, Any]`**: Returns the platform metadata that BenchBox stores with results, as a `dict` with the entries `execution_environment`, `platform_deployment` (`deployment_type` `'managed_cloud'`), `platform_raw_config` (with `username` and `password` shown as `<redacted>`), `platform_cloud`, `platform_compute` and `platform_storage`. Pass `connection` or a precomputed `platform_info` (keyword-only); without either it calls `get_platform_info()`. *Checked offline.*
+**`get_normalized_result_metadata(*, connection: Any | None = None, platform_info: Mapping[str, Any] | None = None) -> dict[str, Any]`**: Returns the platform metadata that BenchBox stores with results, as a `dict` with the entries `execution_environment`, `platform_deployment` (`deployment_type` `'managed_cloud'`), `platform_raw_config` (with `username` and `password` shown as `<redacted>`), `platform_cloud`, `platform_compute` and `platform_storage`. Pass `connection` or a precomputed `platform_info` (keyword-only); without either it calls `get_platform_info()`.
 
 #### Connection and database
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.create_connection"></span>
-**`create_connection(**connection_config) -> Any`**: Returns a `snowflake.connector` connection with `autocommit` on, `application='BenchBox'` and the adapter's `timezone`, `warehouse`, `database` and `schema`. Existing-database handling comes first: with `force_recreate=True` the database is dropped, and otherwise it is validated and reused if it passes. With `private_key_path` it logs in with the key (read with `private_key_passphrase`) and does not send the password; with `authenticator` other than `'snowflake'` it passes that authenticator through. It runs `SELECT CURRENT_VERSION()` to prove the connection works, so bad credentials or a missing database raise here, as the underlying connector exception. *Needs a live connection; taken from reading the code.*
+**`create_connection(**connection_config) -> Any`**: Returns a `snowflake.connector` connection with `autocommit` on, `application='BenchBox'` and the adapter's `timezone`, `warehouse`, `database` and `schema`. Existing-database handling comes first: with `force_recreate=True` the database is dropped, and otherwise it is validated and reused if it passes. With `private_key_path` it logs in with the key (read with `private_key_passphrase`) and does not send the password; with `authenticator` other than `'snowflake'` it passes that authenticator through. It runs `SELECT CURRENT_VERSION()` to prove the connection works, so bad credentials or a missing database raise here, as the underlying connector exception.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.close_connection"></span>
-**`close_connection(connection: Any) -> None`**: Closes the connection and returns `None`. `None` is accepted, and an error while closing is logged as a warning, not raised. *Checked offline against a stub connection.*
+**`close_connection(connection: Any) -> None`**: Closes the connection and returns `None`. `None` is accepted, and an error while closing is logged as a warning, not raised.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.check_server_database_exists"></span>
-**`check_server_database_exists(**connection_config) -> bool`**: Returns `True` when the account has a database named `database` (or the `database` keyword). If it does not, it also returns `True` when that database has a schema `schema` that already holds tables. Any error, including a failed login, returns `False`. *Needs a live connection; taken from reading the code.*
+**`check_server_database_exists(**connection_config) -> bool`**: Returns `True` when the account has a database named `database` (or the `database` keyword). If it does not, it also returns `True` when that database has a schema `schema` that already holds tables. Any error, including a failed login, returns `False`.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.drop_database"></span>
-**`drop_database(**connection_config) -> None`**: Runs `DROP DATABASE IF EXISTS "<database>"` and returns `None`. Raises `RuntimeError` (`Failed to drop Snowflake database ...`) on failure. *Needs a live connection; taken from reading the code.*
+**`drop_database(**connection_config) -> None`**: Runs `DROP DATABASE IF EXISTS "<database>"` and returns `None`. Raises `RuntimeError` (`Failed to drop Snowflake database ...`) on failure.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.configure_for_benchmark"></span>
-**`configure_for_benchmark(connection: Any, benchmark_type: str) -> None`**: Applies session settings to an open connection and returns `None`. It sets the query tag `<query_tag>_optimization`, the time zone, `AUTOCOMMIT = TRUE`, and for the benchmark types `olap`, `analytics`, `tpch` and `tpcds` also `QUERY_ACCELERATION_MAX_SCALE_FACTOR = 8`, `USE_CACHED_RESULT` (`FALSE` while `disable_result_cache` is true) and `STATEMENT_TIMEOUT_IN_SECONDS = 1800`. With `suppress_nondeterministic_errors` it turns off the nondeterministic-merge and -update errors. Warehouse changes (`ALTER WAREHOUSE` for size, auto-suspend, auto-resume or multi-cluster scaling) happen only when `modify_warehouse_settings` is true; they persist after the run. It finishes with `USE WAREHOUSE` and, when the result cache is disabled, validates the setting as `validate_session_cache_control` does and stores the outcome. *Checked offline against a stub connection.*
+**`configure_for_benchmark(connection: Any, benchmark_type: str) -> None`**: Applies session settings to an open connection and returns `None`. It sets the query tag `<query_tag>_optimization`, the time zone, `AUTOCOMMIT = TRUE`, and for the benchmark types `olap`, `analytics`, `tpch` and `tpcds` also `QUERY_ACCELERATION_MAX_SCALE_FACTOR = 8`, `USE_CACHED_RESULT` (`FALSE` while `disable_result_cache` is true) and `STATEMENT_TIMEOUT_IN_SECONDS = 1800`. With `suppress_nondeterministic_errors` it turns off the nondeterministic-merge and -update errors. Warehouse changes (`ALTER WAREHOUSE` for size, auto-suspend, auto-resume or multi-cluster scaling) happen only when `modify_warehouse_settings` is true; they persist after the run. It finishes with `USE WAREHOUSE` and, when the result cache is disabled, validates the setting as `validate_session_cache_control` does and stores the outcome.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.validate_session_cache_control"></span>
-**`validate_session_cache_control(connection: Any) -> dict[str, Any]`**: Reads `SHOW PARAMETERS LIKE 'USE_CACHED_RESULT' IN SESSION` and returns a `dict` with `validated` (the value matches what `disable_result_cache` asks for), `cache_disabled`, `settings` (for example `{'USE_CACHED_RESULT': 'FALSE'}`), `warnings` and `errors`. When the value does not match and `strict_validation` is true (the default) it raises `ConfigurationError` (`Snowflake session cache control validation failed - benchmark results may be incorrect due to cached query results`); with `strict_validation=False` it returns `validated: False` instead. *Checked offline against a stub connection.*
+**`validate_session_cache_control(connection: Any) -> dict[str, Any]`**: Reads `SHOW PARAMETERS LIKE 'USE_CACHED_RESULT' IN SESSION` and returns a `dict` with `validated` (the value matches what `disable_result_cache` asks for), `cache_disabled`, `settings` (for example `{'USE_CACHED_RESULT': 'FALSE'}`), `warnings` and `errors`. When the value does not match and `strict_validation` is true (the default) it raises `ConfigurationError` (`Snowflake session cache control validation failed - benchmark results may be incorrect due to cached query results`); with `strict_validation=False` it returns `validated: False` instead.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.create_schema"></span>
-**`create_schema(benchmark, connection: Any) -> float`**: Creates the database and schema if they do not exist, makes them current, and runs the benchmark's `CREATE TABLE` statements, returning the elapsed time in seconds (`float`). When every expected table already exists and holds rows (and `force_recreate` is false) it skips the table creation and returns early; loads are full refreshes either way, so skipped DDL never leaves stale data. It sets the query tag `<query_tag>_schema_creation`. *Needs a live connection; taken from reading the code.*
+**`create_schema(benchmark, connection: Any) -> float`**: Creates the database and schema if they do not exist, makes them current, and runs the benchmark's `CREATE TABLE` statements, returning the elapsed time in seconds (`float`). When every expected table already exists and holds rows (and `force_recreate` is false) it skips the table creation and returns early; loads are full refreshes either way, so skipped DDL never leaves stale data. It sets the query tag `<query_tag>_schema_creation`.
 
 #### Loading data into tables
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.load_data"></span>
-**`load_data(benchmark, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]`**: Loads the benchmark's data files and returns `(table_row_counts, seconds, per_table_timings)`; `table_row_counts` maps upper-case table names to the row counts read back with `SELECT COUNT(*)`. Each file is uploaded with `PUT` to the table's internal stage (`@%TABLE`) and loaded with `COPY INTO ... ON_ERROR = 'CONTINUE' PURGE = TRUE FORCE = TRUE`. Every load is a full refresh: leftover stage files are removed and the table is truncated first, so reruns do not append. A table with no usable files is reported with `0` rows. Any other failure stops the run, because a half-loaded table must not be benchmarked. Text files use the delimiter the benchmark declares (`|` for `.tbl`) and the file formats `BENCHBOX_CSV_FORMAT` and `BENCHBOX_TBL_FORMAT`, created with the adapter's `compression`; Parquet files are loaded with `MATCH_BY_COLUMN_NAME = 'CASE_INSENSITIVE'`. *Needs a live connection; taken from reading the code.*
+**`load_data(benchmark, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]`**: Loads the benchmark's data files and returns `(table_row_counts, seconds, per_table_timings)`; `table_row_counts` maps upper-case table names to the row counts read back with `SELECT COUNT(*)`. Each file is uploaded with `PUT` to the table's internal stage (`@%TABLE`) and loaded with `COPY INTO ... ON_ERROR = 'CONTINUE' PURGE = TRUE FORCE = TRUE`. Every load is a full refresh: leftover stage files are removed and the table is truncated first, so reruns do not append. A table with no usable files is reported with `0` rows. Any other failure stops the run, because a half-loaded table must not be benchmarked. Text files use the delimiter the benchmark declares (`|` for `.tbl`) and the file formats `BENCHBOX_CSV_FORMAT` and `BENCHBOX_TBL_FORMAT`, created with the adapter's `compression`; Parquet files are loaded with `MATCH_BY_COLUMN_NAME = 'CASE_INSENSITIVE'`.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.create_external_tables"></span>
-**`create_external_tables(benchmark: Any, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]`**: Registers external tables over files in cloud storage and returns `(table_row_counts, seconds, None)`. It first calls `validate_external_table_requirements`. It creates the stage `<schema>.BENCHBOX_EXTERNAL_STAGE` with `URL` set to `staging_root`, and then, per table, an external table (Parquet or Delta, selected from the local files' layout) or, for Iceberg directories, an Iceberg table that needs `iceberg_external_volume`. Each table is refreshed and counted. *Needs a live connection; taken from reading the code.*
+**`create_external_tables(benchmark: Any, connection: Any, data_dir: Path) -> tuple[dict[str, int], float, dict[str, Any] | None]`**: Registers external tables over files in cloud storage and returns `(table_row_counts, seconds, None)`. It first calls `validate_external_table_requirements`. It creates the stage `<schema>.BENCHBOX_EXTERNAL_STAGE` with `URL` set to `staging_root`, and then, per table, an external table (Parquet or Delta, selected from the local files' layout) or, for Iceberg directories, an Iceberg table that needs `iceberg_external_volume`. Each table is refreshed and counted.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.supports_external_tables"></span>
-**`supports_external_tables`** (class attribute): `True`. The adapter implements `create_external_tables`. *Checked offline.*
+**`supports_external_tables`** (class attribute): `True`. The adapter implements `create_external_tables`.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.validate_external_table_requirements"></span>
-**`validate_external_table_requirements() -> None`**: Returns `None` when `staging_root` is a cloud URI. Raises `ValueError` when it is not set (`Snowflake external mode requires --platform-option staging_root=<cloud-uri> ...`), or when it is a Snowflake stage reference such as `@~/path` (external tables need a URI). *Checked offline.*
+**`validate_external_table_requirements() -> None`**: Returns `None` when `staging_root` is a cloud URI. Raises `ValueError` when it is not set (`Snowflake external mode requires --platform-option staging_root=<cloud-uri> ...`), or when it is a Snowflake stage reference such as `@~/path` (external tables need a URI).
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.analyze_table"></span>
-**`analyze_table(connection: Any, table_name: str) -> None`**: Runs `ALTER TABLE <TABLE> RECLUSTER` for the upper-cased table name and returns `None`. Snowflake keeps its own statistics, so this is a clustering maintenance call. A failure is raised, not swallowed, so that the statistics phase can record it as failed. *Checked offline against a stub connection.*
+**`analyze_table(connection: Any, table_name: str) -> None`**: Runs `ALTER TABLE <TABLE> RECLUSTER` for the upper-cased table name and returns `None`. Snowflake keeps its own statistics, so this is a clustering maintenance call. A failure is raised, not swallowed, so that the statistics phase can record it as failed.
 
 #### Query execution and plans
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.execute_query"></span>
-**`execute_query(connection: Any, query: str, query_id: str, benchmark_type: str | None = None, scale_factor: float | None = None, validate_row_count: bool = True, stream_id: int | None = None) -> dict[str, Any]`**: Runs one query and returns a result `dict`; it does not raise for SQL errors. It sets the session query tag to `<query_tag>_<query_id>`, runs the query (divisions are guarded against zero divisors), and on success returns `status` `'SUCCESS'` with `query_id`, `execution_time_seconds`, `rows_returned`, `first_row`, `translated_query` (`None`), `query_statistics` and `resource_usage`. `query_statistics` comes from `INFORMATION_SCHEMA.QUERY_HISTORY` and may hold only a note that statistics were not available yet. It accepts a connection or an open cursor. On an error `status` is `'FAILED'` with `error` and `error_type`. *Checked offline against a stub connection.*
+**`execute_query(connection: Any, query: str, query_id: str, benchmark_type: str | None = None, scale_factor: float | None = None, validate_row_count: bool = True, stream_id: int | None = None) -> dict[str, Any]`**: Runs one query and returns a result `dict`; it does not raise for SQL errors. It sets the session query tag to `<query_tag>_<query_id>`, runs the query (divisions are guarded against zero divisors), and on success returns `status` `'SUCCESS'` with `query_id`, `execution_time_seconds`, `rows_returned`, `first_row`, `translated_query` (`None`), `query_statistics` and `resource_usage`. `query_statistics` comes from `INFORMATION_SCHEMA.QUERY_HISTORY` and may hold only a note that statistics were not available yet. It accepts a connection or an open cursor. On an error `status` is `'FAILED'` with `error` and `error_type`.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.get_query_plan"></span>
-**`get_query_plan(connection: Any, query: str) -> str | None`**: Returns the plan as the JSON text of `EXPLAIN USING JSON <query>` (a single value), or `None` if the statement fails or returns nothing. It accepts a connection or an open cursor. *Checked offline against a stub connection.*
+**`get_query_plan(connection: Any, query: str) -> str | None`**: Returns the plan as the JSON text of `EXPLAIN USING JSON <query>` (a single value), or `None` if the statement fails or returns nothing. It accepts a connection or an open cursor.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.get_query_plan_parser"></span>
-**`get_query_plan_parser()`**: Returns a `SnowflakeQueryPlanParser` (from `benchbox.core.query_plans.parsers.snowflake`). *Checked offline.*
+**`get_query_plan_parser()`**: Returns a `SnowflakeQueryPlanParser` (from `benchbox.core.query_plans.parsers.snowflake`).
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.plan_capture_phase_eligible"></span>
-**`plan_capture_phase_eligible`** (class attribute): `True`. Query plans for Snowflake are captured in a separate pass after the timed run, not inline with the timed queries. *Checked offline.*
+**`plan_capture_phase_eligible`** (class attribute): `True`. Query plans for Snowflake are captured in a separate pass after the timed run, not inline with the timed queries.
 
 #### Tuning
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.generate_tuning_clause"></span>
-**`generate_tuning_clause(table_tuning) -> str`**: Returns the clause to append to `CREATE TABLE`, or `''` when there is no tuning. Clustering columns give `CLUSTER BY (c1, c2, ...)` in `order` sequence. Without clustering columns, partitioning columns give the same `CLUSTER BY (...)`. Sorting and distribution add nothing; a table with only those returns `''`. *Checked offline.*
+**`generate_tuning_clause(table_tuning) -> str`**: Returns the clause to append to `CREATE TABLE`, or `''` when there is no tuning. Clustering columns give `CLUSTER BY (c1, c2, ...)` in `order` sequence. Without clustering columns, partitioning columns give the same `CLUSTER BY (...)`. Sorting and distribution add nothing; a table with only those returns `''`.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.apply_table_tunings"></span>
-**`apply_table_tunings(table_tuning, connection: Any) -> None`**: Sets the clustering key of an existing table and returns `None`. It reads `CLUSTERING_KEY` and `AUTO_CLUSTERING_ON` from `INFORMATION_SCHEMA.TABLES`; if the key differs from the wanted columns (clustering columns, else partitioning columns) it runs `ALTER TABLE <TABLE> CLUSTER BY (...)`. For four columns or fewer it also marks the table for `ALTER TABLE <TABLE> RESUME RECLUSTER`, which runs after the table loads and is reported as `phases.post_load_maintenance`, not as load time. If the key already matches it skips the `ALTER` and only marks the table when automatic reclustering is off. Sorting adds nothing and distribution is logged as unsupported. It does nothing for an empty tuning. Raises `ValueError` (`Failed to apply tunings to Snowflake table <TABLE>: ...`) on an unexpected failure. *Checked offline against a stub connection.*
+**`apply_table_tunings(table_tuning, connection: Any) -> None`**: Sets the clustering key of an existing table and returns `None`. It reads `CLUSTERING_KEY` and `AUTO_CLUSTERING_ON` from `INFORMATION_SCHEMA.TABLES`; if the key differs from the wanted columns (clustering columns, else partitioning columns) it runs `ALTER TABLE <TABLE> CLUSTER BY (...)`. For four columns or fewer it also marks the table for `ALTER TABLE <TABLE> RESUME RECLUSTER`, which runs after the table loads and is reported as `phases.post_load_maintenance`, not as load time. If the key already matches it skips the `ALTER` and only marks the table when automatic reclustering is off. Sorting adds nothing and distribution is logged as unsupported. It does nothing for an empty tuning. Raises `ValueError` (`Failed to apply tunings to Snowflake table <TABLE>: ...`) on an unexpected failure.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.apply_unified_tuning"></span>
-**`apply_unified_tuning(unified_config: UnifiedTuningConfiguration, connection: Any) -> None`**: Applies a `UnifiedTuningConfiguration` and returns `None`: `apply_constraint_configuration`, then `apply_platform_optimizations` when present, then `apply_table_tunings` for each table. It does nothing for an empty configuration. *Checked offline against a stub connection.*
+**`apply_unified_tuning(unified_config: UnifiedTuningConfiguration, connection: Any) -> None`**: Applies a `UnifiedTuningConfiguration` and returns `None`: `apply_constraint_configuration`, then `apply_platform_optimizations` when present, then `apply_table_tunings` for each table. It does nothing for an empty configuration.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.apply_platform_optimizations"></span>
-**`apply_platform_optimizations(platform_config: PlatformOptimizationConfiguration, connection: Any) -> None`**: Logs that the optimisations are stored for warehouse and session management and returns `None`. It changes nothing in Snowflake, and does nothing for `None`. *Checked offline against a stub connection.*
+**`apply_platform_optimizations(platform_config: PlatformOptimizationConfiguration, connection: Any) -> None`**: Logs that the optimisations are stored for warehouse and session management and returns `None`. It changes nothing in Snowflake, and does nothing for `None`.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.apply_constraint_configuration"></span>
-**`apply_constraint_configuration(primary_key_config: PrimaryKeyConfiguration, foreign_key_config: ForeignKeyConfiguration, connection: Any) -> None`**: Logs that primary-key or foreign-key constraints are enabled (informational only in Snowflake) and returns `None`. It runs no SQL. *Checked offline against a stub connection.*
+**`apply_constraint_configuration(primary_key_config: PrimaryKeyConfiguration, foreign_key_config: ForeignKeyConfiguration, connection: Any) -> None`**: Logs that primary-key or foreign-key constraints are enabled (informational only in Snowflake) and returns `None`. It runs no SQL.
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.get_tuning_introspector"></span>
-**`get_tuning_introspector()`**: Returns a `SnowflakeTuningIntrospector` (from `benchbox.platforms.snowflake_introspection`), which reads clustering keys from `INFORMATION_SCHEMA` to confirm that the recorded `ALTER TABLE ... CLUSTER BY` statements took effect. *Checked offline.*
+**`get_tuning_introspector()`**: Returns a `SnowflakeTuningIntrospector` (from `benchbox.platforms.snowflake_introspection`), which reads clustering keys from `INFORMATION_SCHEMA` to confirm that the recorded `ALTER TABLE ... CLUSTER BY` statements took effect.
 
 #### Capabilities
 
 <span id="benchbox.platforms.snowflake.SnowflakeAdapter.driver_isolation_capability"></span>
-**`driver_isolation_capability`** (class attribute): `DriverIsolationCapability.FEASIBLE_CLIENT_ONLY` (from `benchbox.platforms.base`): a requested connector version can run in an isolated runtime, but the Snowflake service itself cannot be versioned. *Checked offline.*
+**`driver_isolation_capability`** (class attribute): `DriverIsolationCapability.FEASIBLE_CLIENT_ONLY` (from `benchbox.platforms.base`): a requested connector version can run in an isolated runtime, but the Snowflake service itself cannot be versioned.
 
 ## Configuration Examples
 
@@ -303,14 +299,13 @@ adapter = SnowflakeAdapter(
 
 ### Key-Pair Authentication (Recommended for Production)
 
+The commands below generate a key pair, extract the public key, and assign the public key to the user in Snowflake. Run the `ALTER USER` statement in Snowflake, not in a shell.
+
 ```bash
-# Generate key pair
 openssl genrsa 2048 | openssl pkcs8 -topk8 -inform PEM -out rsa_key.p8 -nocrypt
 
-# Extract public key
 openssl rsa -in rsa_key.p8 -pubout -out rsa_key.pub
 
-# In Snowflake, assign public key to user
 ALTER USER benchbox_user SET RSA_PUBLIC_KEY='MIIBIjANBgkqh...';
 ```
 
@@ -318,12 +313,14 @@ ALTER USER benchbox_user SET RSA_PUBLIC_KEY='MIIBIjANBgkqh...';
 adapter = SnowflakeAdapter(
     account="xy12345.us-east-1",
     username="benchbox_user",
-    password="unused",  # Must be non-empty, but is not sent with key-pair
+    password="unused",
     private_key_path="/path/to/rsa_key.p8",
     warehouse="COMPUTE_WH",
     database="BENCHBOX"
 )
 ```
+
+`password` must be non-empty, but it is not sent when you use a key pair.
 
 ### OAuth Authentication
 
@@ -343,7 +340,6 @@ adapter = SnowflakeAdapter(
 `warehouse_size`, `auto_suspend`, `auto_resume` and `multi_cluster_warehouse` change the warehouse only when `modify_warehouse_settings=True` is also set. Without it the adapter uses the warehouse as it is and only records the values. The `ALTER WAREHOUSE` changes persist after the run.
 
 ```python
-# Small for development (1 credit/hour)
 adapter = SnowflakeAdapter(
     account="xy12345.us-east-1",
     username="user",
@@ -353,7 +349,6 @@ adapter = SnowflakeAdapter(
     modify_warehouse_settings=True
 )
 
-# Large for production (8 credits/hour)
 adapter = SnowflakeAdapter(
     account="xy12345.us-east-1",
     username="user",
@@ -363,7 +358,6 @@ adapter = SnowflakeAdapter(
     modify_warehouse_settings=True
 )
 
-# 4X-Large for heavy workloads (128 credits/hour)
 adapter = SnowflakeAdapter(
     account="xy12345.us-east-1",
     username="user",
@@ -374,10 +368,13 @@ adapter = SnowflakeAdapter(
 )
 ```
 
+The three examples show a small warehouse for development, a large one for production, and a 4X-Large one for heavy workloads. Snowflake bills X-Small at 1 credit per hour, Large at 8 credits per hour, and 4X-Large at 128 credits per hour.
+
 ### Multi-Cluster Warehouse
 
+Multi-cluster mode lets the warehouse scale out automatically for concurrent workloads. `modify_warehouse_settings=True` is needed for the settings to take effect. `auto_suspend=60` suspends the warehouse after 1 minute idle.
+
 ```python
-# Auto-scale for concurrent workloads
 adapter = SnowflakeAdapter(
     account="xy12345.us-east-1",
     username="user",
@@ -385,8 +382,8 @@ adapter = SnowflakeAdapter(
     warehouse="MULTI_CLUSTER_WH",
     warehouse_size="LARGE",
     multi_cluster_warehouse=True,
-    modify_warehouse_settings=True,  # Needed for the settings above to take effect
-    auto_suspend=60,  # Suspend after 1 minute idle
+    modify_warehouse_settings=True,
+    auto_suspend=60,
     auto_resume=True
 )
 ```
@@ -395,7 +392,7 @@ adapter = SnowflakeAdapter(
 
 ### PUT and COPY INTO (Recommended)
 
-Snowflake uses internal stages for efficient data loading:
+Snowflake uses internal stages for efficient data loading. The data is generated locally first. `load_data` then uses PUT and COPY INTO automatically: the files are uploaded to an internal stage and then bulk loaded.
 
 ```python
 from benchbox.platforms.snowflake import SnowflakeAdapter
@@ -410,28 +407,27 @@ adapter = SnowflakeAdapter(
     database="BENCHBOX"
 )
 
-# Generate data locally
 data_dir = Path("./tpch_data")
 benchmark = TPCH(scale_factor=1.0, output_dir=data_dir)
 benchmark.generate_data()
 
-# Create the tables, then load data (automatically uses PUT + COPY INTO)
 conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 table_stats, load_time, _ = adapter.load_data(benchmark, conn, data_dir)
 
-# Data uploaded to internal stage, then bulk loaded
 print(f"Loaded {sum(table_stats.values()):,} rows in {load_time:.2f}s")
 ```
 
+`create_schema` creates the tables before `load_data` loads them.
+
 ### External Stage (S3/GCS/Azure)
 
+The first statement creates an S3 external stage. The second loads a file from that stage.
+
 ```python
-# Create external stage
 conn = adapter.create_connection()
 cursor = conn.cursor()
 
-# S3 external stage
 cursor.execute("""
     CREATE OR REPLACE STAGE benchbox_stage
     URL = 's3://my-bucket/benchbox-data/'
@@ -441,7 +437,6 @@ cursor.execute("""
     )
 """)
 
-# Load from external stage
 cursor.execute("""
     COPY INTO lineitem
     FROM @benchbox_stage/lineitem.tbl
@@ -456,16 +451,15 @@ cursor.execute("""
 ### Compressed Data
 
 ```python
-# compression sets the COMPRESSION option of the load file formats
 adapter = SnowflakeAdapter(
     account="xy12345.us-east-1",
     username="user",
     password="password",
-    compression="GZIP"  # GZIP, BROTLI, ZSTD, etc.
+    compression="GZIP"
 )
-
-# GZIP files automatically decompressed during COPY INTO
 ```
+
+`compression` sets the `COMPRESSION` option of the load file formats. Snowflake handles compressed files automatically, and GZIP files are decompressed during COPY INTO. Supported compression values include GZIP, BROTLI and ZSTD.
 
 ## Query Execution
 
@@ -475,7 +469,6 @@ adapter = SnowflakeAdapter(
 adapter = SnowflakeAdapter(account="...", username="...", password="...")
 conn = adapter.create_connection()
 
-# Execute SQL query
 cursor = conn.cursor()
 cursor.execute("""
     SELECT
@@ -497,12 +490,10 @@ for row in results:
 ### Query Statistics
 
 ```python
-# Execute with query tag for tracking
 cursor.execute("ALTER SESSION SET QUERY_TAG = 'benchmark_q1'")
 cursor.execute(query)
 results = cursor.fetchall()
 
-# Get query history with performance metrics
 cursor.execute("""
     SELECT
         QUERY_ID,
@@ -526,10 +517,11 @@ print(f"Bytes scanned: {stats[5]:,}")
 print(f"Credits used: {stats[7]}")
 ```
 
+The first statements execute the query under a query tag so it can be tracked. The second query reads the query history for that tag to get performance metrics.
+
 ### Query Plans
 
 ```python
-# Get query execution plan
 cursor.execute("""
     EXPLAIN
     SELECT * FROM lineitem
@@ -546,7 +538,6 @@ for step in plan:
 ### Clustering
 
 ```python
-# Create table with clustering key
 cursor.execute("""
     CREATE OR REPLACE TABLE orders_clustered (
         o_orderkey NUMBER,
@@ -558,83 +549,77 @@ cursor.execute("""
     CLUSTER BY (o_orderdate, o_orderkey)
 """)
 
-# Snowflake automatically maintains clustering
-
-# Manual recluster if needed
 cursor.execute("ALTER TABLE orders_clustered RECLUSTER")
 
-# Enable automatic clustering
 cursor.execute("ALTER TABLE orders_clustered RESUME RECLUSTER")
 
-# Check clustering quality
 cursor.execute("""
     SELECT SYSTEM$CLUSTERING_INFORMATION('orders_clustered')
 """)
 ```
 
+The table declares its clustering key in `CREATE TABLE`, and Snowflake maintains clustering automatically. `RECLUSTER` reclusters manually if needed, `RESUME RECLUSTER` enables automatic clustering, and `SYSTEM$CLUSTERING_INFORMATION` reports clustering quality.
+
 ### Time Travel
 
 ```python
-# Query data as of 1 hour ago
 cursor.execute("""
     SELECT * FROM lineitem
     AT(OFFSET => -3600)
     WHERE l_shipdate = '1995-01-01'
 """)
 
-# Query data at specific timestamp
 cursor.execute("""
     SELECT * FROM lineitem
     AT(TIMESTAMP => '2025-01-01 00:00:00'::TIMESTAMP)
     WHERE l_shipdate = '1995-01-01'
 """)
 
-# View table changes (before/after)
 cursor.execute("""
     SELECT * FROM lineitem
     BEFORE(STATEMENT => '01a12345-6789-abcd-ef01-234567890abc')
 """)
 ```
 
+The first query reads data as of one hour ago (the offset is in seconds). The second reads data at a specific timestamp. The third views the table as it was before a given statement ran, which shows that statement's changes.
+
 ### Zero-Copy Cloning
 
 ```python
-# Clone database instantly (no data copy)
 cursor.execute("""
     CREATE DATABASE benchbox_clone
     CLONE benchbox
 """)
 
-# Clone table
 cursor.execute("""
     CREATE TABLE lineitem_clone
     CLONE lineitem
 """)
 
-# Clone at specific time
 cursor.execute("""
     CREATE TABLE lineitem_yesterday
     CLONE lineitem
-    AT(OFFSET => -86400)  -- 24 hours ago
+    AT(OFFSET => -86400)
 """)
 ```
+
+The database and table clones are created instantly because no data is copied. The last clone uses an offset of -86400 seconds to capture the table as it was 24 hours ago.
 
 ### Result Set Caching
 
 Snowflake caches results by default, but the adapter turns the cache off for benchmark runs (`disable_result_cache=True`) so that timings are real. To allow caching, pass `disable_result_cache=False` or set the parameter yourself:
 
 ```python
-# Enable result caching
 cursor.execute("ALTER SESSION SET USE_CACHED_RESULT = TRUE")
 
-# First execution computes result
 cursor.execute("SELECT COUNT(*) FROM lineitem")
-result1 = cursor.fetchone()  # Executes query
+result1 = cursor.fetchone()
 
-# Second execution uses cached result (instant, no credits)
 cursor.execute("SELECT COUNT(*) FROM lineitem")
-result2 = cursor.fetchone()  # Returns cached result
+result2 = cursor.fetchone()
 ```
+
+The first execution computes the result. The second execution returns the cached result immediately and uses no credits.
 
 ## Best Practices
 
@@ -643,27 +628,25 @@ result2 = cursor.fetchone()  # Returns cached result
 1. **Right-size warehouses** for workload:
 
    ```python
-   # Development: X-SMALL to SMALL
-   # Testing: MEDIUM to LARGE
-   # Production: LARGE to 4X-LARGE
-
    adapter = SnowflakeAdapter(
-       warehouse_size="MEDIUM",  # Balance of cost and performance
-       auto_suspend=300,  # Suspend after 5 min idle
-       auto_resume=True,  # Auto-resume on query
-       modify_warehouse_settings=True  # Apply these values to the warehouse
+       warehouse_size="MEDIUM",
+       auto_suspend=300,
+       auto_resume=True,
+       modify_warehouse_settings=True
    )
    ```
+
+   Typical sizes are X-SMALL to SMALL for development, MEDIUM to LARGE for testing, and LARGE to 4X-LARGE for production. MEDIUM balances cost and performance. `auto_suspend=300` suspends the warehouse after 5 idle minutes, and `auto_resume=True` resumes it when a query arrives. `modify_warehouse_settings=True` applies these values to the warehouse.
 
 2. **Use separate warehouses** for different workloads:
 
    ```python
-   # Loading warehouse
    load_adapter = SnowflakeAdapter(warehouse="LOAD_WH", warehouse_size="LARGE")
 
-   # Query warehouse
    query_adapter = SnowflakeAdapter(warehouse="QUERY_WH", warehouse_size="MEDIUM")
    ```
+
+   The first adapter is the loading warehouse. The second is the query warehouse.
 
 3. **Enable multi-cluster** for concurrent workloads:
 
@@ -680,33 +663,34 @@ result2 = cursor.fetchone()  # Returns cached result
 
    ```python
    adapter = SnowflakeAdapter(
-       auto_suspend=60,  # Aggressive suspension (1 minute)
+       auto_suspend=60,
        auto_resume=True
    )
    ```
 
+   `auto_suspend=60` is an aggressive setting that suspends the warehouse after 1 minute.
+
 2. **Use result caching**:
 
    ```python
-   # Snowflake reuses results for identical queries when this is TRUE.
-   # BenchBox sets it to FALSE during benchmark runs (disable_result_cache=True).
    cursor.execute("ALTER SESSION SET USE_CACHED_RESULT = TRUE")
    ```
+
+   Snowflake reuses results for identical queries when this is TRUE. BenchBox sets it to FALSE during benchmark runs (`disable_result_cache=True`).
 
 3. **Start small, scale up as needed**:
 
    ```python
-   # Start with smallest warehouse
    adapter = SnowflakeAdapter(warehouse_size="X-SMALL")
 
-   # Monitor and resize if needed
    cursor.execute(f"ALTER WAREHOUSE {warehouse} SET WAREHOUSE_SIZE = 'MEDIUM'")
    ```
+
+   Start with the smallest warehouse, then monitor and resize if needed.
 
 4. **Monitor credit usage**:
 
    ```python
-   # Check warehouse credit usage
    cursor.execute("""
        SELECT
            WAREHOUSE_NAME,
@@ -720,20 +704,24 @@ result2 = cursor.fetchone()  # Returns cached result
    """)
    ```
 
+   This query reports warehouse credit usage over the last seven days.
+
 ### Data Organization
 
 1. **Use clustering keys** for filtered columns:
 
-   ```python
+   These are illustrative SQL fragments. Supply complete table definitions before you run them.
+
+   ```sql
    CREATE TABLE lineitem (...)
    CLUSTER BY (l_shipdate, l_orderkey)
    ```
 
 2. **Partition large tables** by date:
 
-   ```python
-   # Snowflake automatically creates micro-partitions
-   # Clustering by date provides similar benefits
+   Snowflake creates micro-partitions automatically. Date-based clustering uses a clause such as this illustrative fragment:
+
+   ```sql
    CLUSTER BY (DATE_TRUNC('month', order_date))
    ```
 
@@ -744,10 +732,11 @@ result2 = cursor.fetchone()  # Returns cached result
        SELECT SYSTEM$CLUSTERING_INFORMATION('lineitem')
    """)
 
-   # Recluster if quality degrades
    if clustering_depth > 10:
        cursor.execute("ALTER TABLE lineitem RECLUSTER")
    ```
+
+   Recluster when clustering quality degrades.
 
 ## Common Issues
 
@@ -755,18 +744,15 @@ result2 = cursor.fetchone()  # Returns cached result
 
 **Problem**: "Warehouse is suspended" error
 
-**Solutions**:
+**Solutions**: enable auto-resume so the warehouse starts automatically, resume it manually, and check its status:
 
 ```python
-# 1. Enable auto-resume
 adapter = SnowflakeAdapter(
-    auto_resume=True  # Warehouse starts automatically
+    auto_resume=True
 )
 
-# 2. Manually resume warehouse
 cursor.execute(f"ALTER WAREHOUSE {warehouse} RESUME")
 
-# 3. Check warehouse status
 cursor.execute(f"SHOW WAREHOUSES LIKE '{warehouse}'")
 status = cursor.fetchall()
 print(f"Warehouse state: {status[0][1]}")
@@ -778,19 +764,15 @@ print(f"Warehouse state: {status[0][1]}")
 
 **Solutions**:
 
+1. Verify the account identifier format. Correct values look like `xy12345.us-east-1` or `xy12345.us-east-1.aws`. A full URL such as `https://xy12345.snowflakecomputing.com` is incorrect.
+2. Check that the username exists. It is case-insensitive. In the Snowflake UI, run `SHOW USERS;`.
+3. Use key-pair authentication for better security. `password` must be non-empty, but it is not sent:
+
 ```python
-# 1. Verify account identifier format
-# Correct: "xy12345.us-east-1" or "xy12345.us-east-1.aws"
-# Incorrect: "https://xy12345.snowflakecomputing.com"
-
-# 2. Check username (case-insensitive but must exist)
-# In Snowflake UI: SHOW USERS;
-
-# 3. Use key-pair auth for better security
 adapter = SnowflakeAdapter(
     account="xy12345.us-east-1",
     username="benchbox_user",
-    password="unused",  # Must be non-empty, but is not sent with key-pair
+    password="unused",
     private_key_path="/path/to/key.p8"
 )
 ```
@@ -799,10 +781,9 @@ adapter = SnowflakeAdapter(
 
 **Problem**: "Insufficient privileges" error
 
-**Solutions**:
+**Solutions**: grant the required privileges in Snowflake, then specify a role that has them:
 
 ```bash
-# Grant required privileges in Snowflake
 GRANT USAGE ON WAREHOUSE COMPUTE_WH TO ROLE benchbox_role;
 GRANT USAGE ON DATABASE BENCHBOX TO ROLE benchbox_role;
 GRANT CREATE SCHEMA ON DATABASE BENCHBOX TO ROLE benchbox_role;
@@ -811,12 +792,11 @@ GRANT CREATE TABLE ON SCHEMA BENCHBOX.PUBLIC TO ROLE benchbox_role;
 ```
 
 ```python
-# Specify role with sufficient privileges
 adapter = SnowflakeAdapter(
     account="xy12345.us-east-1",
     username="user",
     password="password",
-    role="BENCHBOX_ROLE"  # Role with required privileges
+    role="BENCHBOX_ROLE"
 )
 ```
 
@@ -824,10 +804,9 @@ adapter = SnowflakeAdapter(
 
 **Problem**: Unexpected credit consumption
 
-**Solutions**:
+**Solutions**: check the query history for expensive queries, use a smaller warehouse, enable aggressive auto-suspend (`auto_suspend=60` is 1 minute), and set resource monitors:
 
 ```python
-# 1. Check query history for expensive queries
 cursor.execute("""
     SELECT
         QUERY_TEXT,
@@ -840,13 +819,10 @@ cursor.execute("""
     LIMIT 10
 """)
 
-# 2. Use smaller warehouse
 adapter = SnowflakeAdapter(warehouse_size="X-SMALL")
 
-# 3. Enable aggressive auto-suspend
-adapter = SnowflakeAdapter(auto_suspend=60)  # 1 minute
+adapter = SnowflakeAdapter(auto_suspend=60)
 
-# 4. Set resource monitors
 cursor.execute("""
     CREATE RESOURCE MONITOR daily_limit WITH CREDIT_QUOTA = 100
     TRIGGERS ON 75 PERCENT DO NOTIFY
@@ -862,29 +838,22 @@ cursor.execute(f"""
 
 **Problem**: Queries slower than expected
 
-**Solutions**:
+**Solutions**: resize the warehouse, check clustering quality, add clustering keys, enable automatic clustering, and check the query profile. For the profile, open the Snowflake UI, choose Query History, click the query, and view its profile.
 
 ```python
-# 1. Resize warehouse
 cursor.execute(f"""
     ALTER WAREHOUSE {warehouse} SET WAREHOUSE_SIZE = 'LARGE'
 """)
 
-# 2. Check clustering quality
 cursor.execute("""
     SELECT SYSTEM$CLUSTERING_INFORMATION('lineitem')
 """)
 
-# 3. Add clustering keys
 cursor.execute("""
     ALTER TABLE lineitem CLUSTER BY (l_shipdate, l_orderkey)
 """)
 
-# 4. Enable automatic clustering
 cursor.execute("ALTER TABLE lineitem RESUME RECLUSTER")
-
-# 5. Check query profile
-# In Snowflake UI: Query History → Click query → View Profile
 ```
 
 ## See Also

@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Validate that shared visualization screenshots stay in sync.
-
-This checks the generated blog image source tree against the published docs copy.
-If files drift, docs changes can silently ship stale screenshots.
-"""
 
 from __future__ import annotations
 
@@ -16,7 +11,6 @@ DOCS_DIR = ROOT / "docs" / "blog" / "images"
 
 
 def expected_png_names(source_dir: Path = PRIMARY_DIR) -> list[str]:
-    """Return the managed screenshot filenames from the source tree."""
     return sorted(path.name for path in source_dir.glob("*.png"))
 
 
@@ -25,7 +19,6 @@ def find_mismatches(
     target_dir: Path = DOCS_DIR,
     names: Iterable[str] | None = None,
 ) -> list[str]:
-    """Return human-readable mismatch descriptions for the synced screenshot set."""
     if names is not None:
         selected_names = sorted(set(names))
     else:
@@ -51,7 +44,6 @@ def find_mismatches(
 
 
 def main() -> int:
-    """CLI entrypoint."""
     if not PRIMARY_DIR.exists():
         print(f"Source directory {PRIMARY_DIR} not found, skipping sync check.")
         return 0

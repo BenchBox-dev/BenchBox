@@ -23,6 +23,8 @@ The benchmark is particularly valuable for testing systems used in data science 
 - **Analytics-oriented queries** - Focuses on data exploration patterns
 - **Performance measurement** - Designed for precise timing comparisons
 
+BenchBox generates synthetic taxi trip data that mimics the structure and characteristics of the NYC Taxi & Limousine Commission Trip Record Data used in the H2O DB benchmark.
+
 ## Schema Description
 
 The H2O DB benchmark uses a single table design based on the NYC Taxi & Limousine Commission Trip Record Data structure:
@@ -200,17 +202,13 @@ ORDER BY total_revenue DESC;
 ```python
 from benchbox import H2ODB
 
-# Initialize H2O DB benchmark
 h2odb = H2ODB(scale_factor=1.0, output_dir="h2odb_data")
 
-# Generate taxi trip data
 data_files = h2odb.generate_data()
 
-# Get all benchmark queries
 queries = h2odb.get_queries()
 print(f"Generated {len(queries)} H2O DB queries")
 
-# Get specific query
 count_query = h2odb.get_query("Q1")
 print(count_query)
 ```
@@ -218,11 +216,9 @@ print(count_query)
 ### Data Generation at Scale
 
 ```python
-# Generate large-scale taxi data for performance testing
 h2odb_large = H2ODB(scale_factor=10.0, output_dir="h2odb_large")
 data_files = h2odb_large.generate_data()
 
-# Check generated data size
 trips_file = h2odb_large.output_dir / "trips.csv"
 size_gb = trips_file.stat().st_size / (1024**3)
 print(f"Generated trips data: {size_gb:.2f} GB")
@@ -234,16 +230,13 @@ print(f"Generated trips data: {size_gb:.2f} GB")
 import duckdb
 from benchbox import H2ODB
 
-# Initialize and generate data
 h2odb = H2ODB(scale_factor=0.1, output_dir="h2odb_small")
 data_files = h2odb.generate_data()
 
-# Create DuckDB connection and schema
 conn = duckdb.connect("h2odb.duckdb")
 schema_sql = h2odb.get_create_tables_sql()
 conn.execute(schema_sql)
 
-# Load trips data
 trips_file = h2odb.output_dir / "trips.csv"
 conn.execute(f"""
     INSERT INTO trips
@@ -255,17 +248,14 @@ conn.execute(f"""
 row_count = conn.execute("SELECT COUNT(*) FROM trips").fetchone()[0]
 print(f"Loaded {row_count:,} trip records")
 
-# Run H2O DB benchmark queries
 query_results = {}
 
-# Basic aggregation tests
 for query_id in ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6"]:
     query_sql = h2odb.get_query(query_id)
     result = conn.execute(query_sql).fetchall()
     query_results[query_id] = len(result)
     print(f"{query_id}: {len(result)} result rows")
 
-# Temporal analysis queries
 temporal_params = {
     'start_date': '2020-01-01',
     'end_date': '2020-01-31'
@@ -280,6 +270,8 @@ for query_id in ["Q7", "Q8"]:
 conn.close()
 ```
 
+Queries Q1 to Q6 are the basic aggregation tests. Q7 and Q8 are temporal analysis queries and take start and end dates as parameters.
+
 ### Performance Benchmarking Framework
 
 ```python
@@ -293,7 +285,6 @@ class H2ODBPerformanceTester:
         self.connection = connection
 
     def benchmark_query_group(self, query_group: str, iterations: int = 3) -> Dict:
-        """Benchmark specific H2O DB query groups."""
         query_groups = {
             'basic': ['Q1', 'Q2'],
             'grouping': ['Q3', 'Q4', 'Q5', 'Q6'],
@@ -307,7 +298,6 @@ class H2ODBPerformanceTester:
         query_ids = query_groups[query_group]
         results = {}
 
-        # Parameters for temporal queries
         params = {
             'start_date': '2020-01-01',
             'end_date': '2020-01-31',
@@ -342,10 +332,8 @@ class H2ODBPerformanceTester:
         return results
 
     def run_complete_benchmark(self) -> Dict:
-        """Run all H2O DB query groups and return systematic results."""
         complete_results = {}
 
-        # Test each query group
         for group in ['basic', 'grouping', 'temporal', 'advanced']:
             print(f"\\nRunning {group.upper()} queries...")
             try:
@@ -355,7 +343,6 @@ class H2ODBPerformanceTester:
                 print(f"Error in {group} queries: {e}")
                 complete_results[group] = {'error': str(e)}
 
-        # Calculate summary statistics
         all_times = []
         for group_data in complete_results.values():
             if isinstance(group_data, dict) and 'error' not in group_data:
@@ -365,7 +352,7 @@ class H2ODBPerformanceTester:
 
         if all_times:
             complete_results['summary'] = {
-                'total_queries': len(all_times) // 3,  # 3 iterations per query
+                'total_queries': len(all_times) // 3,
                 'total_avg_time': mean(all_times),
                 'total_median_time': median(all_times),
                 'total_min_time': min(all_times),
@@ -375,7 +362,6 @@ class H2ODBPerformanceTester:
         return complete_results
 
     def analyze_aggregation_performance(self) -> Dict:
-        """Analyze aggregation performance across different group sizes."""
         aggregation_tests = [
             ('single_agg', 'SELECT passenger_count, SUM(fare_amount) FROM trips GROUP BY passenger_count'),
             ('multi_agg', 'SELECT passenger_count, SUM(fare_amount), AVG(fare_amount), COUNT(*) FROM trips GROUP BY passenger_count'),
@@ -403,10 +389,8 @@ class H2ODBPerformanceTester:
 
         return results
 
-# Usage
 performance_tester = H2ODBPerformanceTester(h2odb, conn)
 
-# Test individual query groups
 basic_results = performance_tester.benchmark_query_group('basic')
 grouping_results = performance_tester.benchmark_query_group('grouping')
 
@@ -414,14 +398,14 @@ print("\\nQuery Group Performance Summary:")
 print(f"Basic Queries: {basic_results}")
 print(f"Grouping Queries: {grouping_results}")
 
-# Run complete benchmark
 complete_results = performance_tester.run_complete_benchmark()
 print(f"\\nComplete Benchmark Summary: {complete_results.get('summary', 'No summary available')}")
 
-# Analyze aggregation patterns
 agg_results = performance_tester.analyze_aggregation_performance()
 print(f"\\nAggregation Performance Analysis: {agg_results}")
 ```
+
+The `total_queries` summary divides the number of timings by 3 because each query runs 3 iterations by default.
 
 ### Data Science Workflow Integration
 
@@ -429,17 +413,13 @@ print(f"\\nAggregation Performance Analysis: {agg_results}")
 import pandas as pd
 from benchbox import H2ODB
 
-# Generate data for data science workflows
 h2odb = H2ODB(scale_factor=1.0, output_dir="h2odb_ds")
 data_files = h2odb.generate_data()
 
-# Load into pandas for ML preprocessing simulation
 trips_df = pd.read_csv(h2odb.output_dir / "trips.csv")
 
-# Typical data science operations that H2O DB tests
 print("Data Science Operations Performance Test:")
 
-# Feature engineering operations
 start_time = time.time()
 trips_df['hour'] = pd.to_datetime(trips_df['pickup_datetime']).dt.hour
 trips_df['day_of_week'] = pd.to_datetime(trips_df['pickup_datetime']).dt.dayofweek
@@ -448,7 +428,6 @@ trips_df['trip_duration'] = (pd.to_datetime(trips_df['dropoff_datetime']) -
 feature_eng_time = time.time() - start_time
 print(f"Feature engineering: {feature_eng_time:.3f}s")
 
-# Aggregation operations (similar to H2O DB queries)
 start_time = time.time()
 hourly_stats = trips_df.groupby('hour').agg({
     'fare_amount': ['sum', 'mean', 'std', 'count'],
@@ -458,7 +437,6 @@ hourly_stats = trips_df.groupby('hour').agg({
 groupby_time = time.time() - start_time
 print(f"GroupBy aggregation: {groupby_time:.3f}s")
 
-# Statistical analysis
 start_time = time.time()
 vendor_stats = trips_df.groupby('vendor_id').agg({
     'fare_amount': ['count', 'sum', 'mean', 'std', 'min', 'max'],
@@ -470,6 +448,8 @@ print(f"Statistical analysis: {stats_time:.3f}s")
 
 print(f"\\nTotal preprocessing time: {feature_eng_time + groupby_time + stats_time:.3f}s")
 ```
+
+The example loads the data into pandas to simulate ML preprocessing, then times three typical data science operations that H2O DB tests: feature engineering, GroupBy aggregation (similar to the H2O DB queries) and statistical analysis.
 
 ## Performance Characteristics
 
@@ -527,16 +507,21 @@ print(f"\\nTotal preprocessing time: {feature_eng_time + groupby_time + stats_ti
 h2odb = H2ODB(
     scale_factor=1.0,
     output_dir="h2odb_data",
-    # Data generation options
-    date_range_days=365,     # Range of trip dates
-    trip_distance_max=50.0,  # Maximum trip distance
-    fare_amount_max=200.0,   # Maximum fare amount
-    # Performance options
-    enable_indexing=True,    # Create performance indices
-    partition_by_date=True,  # Partition by pickup date
-    compress_output=True     # Compress generated files
+    date_range_days=365,
+    trip_distance_max=50.0,
+    fare_amount_max=200.0,
+    enable_indexing=True,
+    partition_by_date=True,
+    compress_output=True
 )
 ```
+
+- `date_range_days`: range of trip dates.
+- `trip_distance_max`: maximum trip distance.
+- `fare_amount_max`: maximum fare amount.
+- `enable_indexing`: create performance indices.
+- `partition_by_date`: partition by pickup date.
+- `compress_output`: compress generated files.
 
 ## Integration Examples
 
@@ -547,36 +532,29 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from benchbox import H2ODB
 
-# Initialize Spark for large-scale analytics
-spark = SparkSession.builder \\
-    .appName("H2ODB-Benchmark") \\
-    .config("spark.sql.adaptive.enabled", "true") \\
-    .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \\
+spark = SparkSession.builder \
+    .appName("H2ODB-Benchmark") \
+    .config("spark.sql.adaptive.enabled", "true") \
+    .config("spark.sql.adaptive.coalescePartitions.enabled", "true") \
     .getOrCreate()
 
-# Generate large-scale taxi data
 h2odb = H2ODB(scale_factor=100, output_dir="/data/h2odb_sf100")
 data_files = h2odb.generate_data()
 
-# Load data into Spark DataFrame with optimizations
 trips_df = spark.read.csv("/data/h2odb_sf100/trips.csv",
                          header=True, inferSchema=True)
 
-# Partition by pickup date for temporal queries
 trips_df = trips_df.withColumn("pickup_date",
                                to_date("pickup_datetime"))
 trips_df = trips_df.repartition(100, "pickup_date")
 trips_df.cache()
 trips_df.createOrReplaceTempView("trips")
 
-# Run H2O DB queries with Spark SQL
 print("Running H2O DB queries on Spark...")
 
-# Q1: Basic count
 q1_result = spark.sql("SELECT COUNT(*) as count FROM trips")
 q1_result.show()
 
-# Q3: Grouping by passenger count
 q3_result = spark.sql("""
     SELECT
         passenger_count,
@@ -587,7 +565,6 @@ q3_result = spark.sql("""
 """)
 q3_result.show()
 
-# Q7: Temporal analysis
 q7_result = spark.sql("""
     SELECT
         hour(pickup_datetime) as hour,
@@ -598,11 +575,12 @@ q7_result = spark.sql("""
 """)
 q7_result.show()
 
-# Show execution plans
 q3_result.explain(True)
 
 spark.stop()
 ```
+
+The example partitions the data by pickup date for temporal queries and caches it. Q1 is a basic count, Q3 groups by passenger count, and Q7 is a temporal analysis by hour. `explain(True)` shows the execution plan for Q3.
 
 ### ClickHouse Integration
 
@@ -610,14 +588,11 @@ spark.stop()
 import clickhouse_connect
 from benchbox import H2ODB
 
-# Initialize ClickHouse for high-performance analytics
 client = clickhouse_connect.get_client(host='localhost', port=8123)
 h2odb = H2ODB(scale_factor=10.0, output_dir="h2odb_data")
 
-# Generate data
 data_files = h2odb.generate_data()
 
-# Create ClickHouse table configured for analytics
 create_table_sql = """
 CREATE TABLE trips (
     vendor_id UInt8,
@@ -649,20 +624,16 @@ ORDER BY (pickup_datetime, vendor_id);
 
 client.execute(create_table_sql)
 
-# Load data using ClickHouse CSV import
 trips_file = h2odb.output_dir / "trips.csv"
 with open(trips_file, 'rb') as f:
     client.insert_file('trips', f, fmt='CSV')
 
-# Run configured H2O DB queries
 print("Running H2O DB queries on ClickHouse...")
 
-# Q1: Optimized count
 q1_configured = "SELECT count() FROM trips"
 q1_result = client.query(q1_configured)
 print(f"Q1 result: {q1_result.result_rows}")
 
-# Q3: Optimized grouping
 q3_configured = """
 SELECT
     passenger_count,
@@ -674,7 +645,6 @@ ORDER BY passenger_count
 q3_result = client.query(q3_configured)
 print(f"Q3 results: {len(q3_result.result_rows)} groups")
 
-# Q7: Optimized temporal analysis
 q7_configured = """
 SELECT
     toHour(pickup_datetime) as hour,
@@ -686,6 +656,8 @@ ORDER BY hour
 q7_result = client.query(q7_configured)
 print(f"Q7 results: {len(q7_result.result_rows)} hours")
 ```
+
+The table uses a MergeTree engine partitioned by month, and the queries use ClickHouse-native functions (`count()`, `sum()`, `toHour()`) for Q1 (count), Q3 (grouping) and Q7 (temporal analysis). The CSV is loaded with ClickHouse's CSV import.
 
 ## Best Practices
 
@@ -712,13 +684,14 @@ print(f"Q7 results: {len(q7_result.result_rows)} hours")
 ### Performance Issues
 
 **Issue: Slow aggregation queries on large datasets**
+
+Solution: create appropriate indices and use columnar storage.
+
 ```sql
--- Solution: Create appropriate indices and use columnar storage
 CREATE INDEX idx_trips_passenger_count ON trips(passenger_count);
 CREATE INDEX idx_trips_vendor_id ON trips(vendor_id);
 CREATE INDEX idx_trips_pickup_hour ON trips(EXTRACT(HOUR FROM pickup_datetime));
 
--- Use columnar table format
 CREATE TABLE trips_columnar (
     LIKE trips
 ) USING PARQUET
@@ -726,44 +699,49 @@ PARTITIONED BY (DATE_TRUNC('month', pickup_datetime));
 ```
 
 **Issue: Memory issues with large GROUP BY operations**
-```sql
--- Solution: Use incremental aggregation or external sorting
-SET work_mem = '2GB';  -- PostgreSQL
-SET max_memory_usage = 8000000000;  -- ClickHouse
 
--- Or break down large groups
+Solution: use incremental aggregation or external sorting. The first `SET` statement is for PostgreSQL and the second is for ClickHouse. Alternatively, break large groups into smaller pieces, such as the monthly chunk below.
+
+```sql
+SET work_mem = '2GB';
+SET max_memory_usage = 8000000000;
+
 SELECT passenger_count, vendor_id, SUM(fare_amount)
 FROM trips
 WHERE pickup_datetime >= '2020-01-01'
-  AND pickup_datetime < '2020-02-01'  -- Process monthly chunks
+  AND pickup_datetime < '2020-02-01'
 GROUP BY passenger_count, vendor_id;
 ```
 
 ### Data Quality Issues
 
 **Issue: Incorrect temporal analysis results**
+
+Solution: ensure proper timezone handling and date parsing. The `pickup_datetime >= '1900-01-01'` filter removes invalid dates.
+
 ```sql
--- Solution: Ensure proper timezone handling and date parsing
 SELECT
     EXTRACT(HOUR FROM pickup_datetime AT TIME ZONE 'UTC') as hour,
     SUM(fare_amount) as sum_fare_amount
 FROM trips
 WHERE pickup_datetime IS NOT NULL
-  AND pickup_datetime >= '1900-01-01'  -- Filter invalid dates
+  AND pickup_datetime >= '1900-01-01'
 GROUP BY EXTRACT(HOUR FROM pickup_datetime AT TIME ZONE 'UTC')
 ORDER BY hour;
 ```
 
 **Issue: Unexpected aggregation results**
+
+Solution: handle NULL values and outliers appropriately. The `passenger_count BETWEEN 0 AND 10` filter removes unrealistic values.
+
 ```sql
--- Solution: Handle NULL values and outliers appropriately
 SELECT
     passenger_count,
     COUNT(*) as trip_count,
     SUM(CASE WHEN fare_amount > 0 THEN fare_amount ELSE 0 END) as sum_fare_amount,
     AVG(CASE WHEN fare_amount BETWEEN 0 AND 1000 THEN fare_amount END) as avg_fare_amount
 FROM trips
-WHERE passenger_count BETWEEN 0 AND 10  -- Filter unrealistic values
+WHERE passenger_count BETWEEN 0 AND 10
 GROUP BY passenger_count
 ORDER BY passenger_count;
 ```

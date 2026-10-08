@@ -25,11 +25,9 @@ The AMPLab Big Data Benchmark tests the performance of big data processing syste
 from benchbox import AMPLab
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Create benchmark
 benchmark = AMPLab(scale_factor=0.1)
 benchmark.generate_data()
 
-# Run benchmark
 adapter = DuckDBAdapter()
 results = adapter.run_benchmark(benchmark)
 print(results.total_queries)
@@ -132,8 +130,9 @@ The directory also receives `_datagen_manifest.json`. The paths are also availab
 ```python
 schema_sql = benchmark.get_create_tables_sql(dialect="duckdb")
 print(schema_sql.splitlines()[:4])
-# ['CREATE TABLE rankings (', '  pageURL VARCHAR(300),', '  pageRank INTEGER,', '  avgDuration INTEGER']
 ```
+
+This prints the first four lines of the script: `['CREATE TABLE rankings (', '  pageURL VARCHAR(300),', '  pageRank INTEGER,', '  avgDuration INTEGER']`.
 
 #### `AMPLab.get_schema`
 
@@ -191,8 +190,9 @@ With a `dialect`, each query is translated with SQLGlot from the `netezza` diale
 ```python
 queries = benchmark.get_queries()
 print(list(queries.keys()))
-# ['1', '1a', '2', '2a', '3', '3a', '4', '5']
 ```
+
+The keys are `['1', '1a', '2', '2a', '3', '3a', '4', '5']`.
 
 ### Inherited members
 
@@ -238,7 +238,7 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 | Data and configuration | <span id="benchbox.amplab.AMPLab.output_dir"></span>`output_dir` | property | The resolved directory from the constructor argument. |
 | Data and configuration | <span id="benchbox.amplab.AMPLab.run_with_platform_api_surface"></span>`run_with_platform_api_surface` | class attribute | |
 | Data and configuration | <span id="benchbox.amplab.AMPLab.scale_factor"></span>`scale_factor` | instance attribute | The constructor argument. |
-| Data and configuration | <span id="benchbox.amplab.AMPLab.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Not defined in the released 0.4.1 wheel. Source builds after 0.4.1 define it on `BaseBenchmark`, default `False`. |
+| Data and configuration | <span id="benchbox.amplab.AMPLab.SKIP_DATA_LOADING"></span>`SKIP_DATA_LOADING` | class attribute | Defined on `BaseBenchmark` from 0.4.2, default `False`. Set it to `True` for a benchmark that needs schema objects but no data files. |
 | Data and configuration | <span id="benchbox.amplab.AMPLab.tables"></span>`tables` | property | Empty until `generate_data()` has run, then the table-to-path mapping. |
 
 ## Usage Examples
@@ -249,11 +249,9 @@ Every other member comes from `BaseBenchmark`. See {doc}`/reference/python-api/b
 from benchbox import AMPLab
 from benchbox.platforms.duckdb import DuckDBAdapter
 
-# Initialize with testing scale
 benchmark = AMPLab(scale_factor=0.1)
 data_files = benchmark.generate_data()
 
-# Run with DuckDB
 adapter = DuckDBAdapter(memory_limit="4GB")
 results = adapter.run_benchmark(benchmark)
 
@@ -276,7 +274,6 @@ conn = adapter.create_connection()
 adapter.create_schema(benchmark, conn)
 adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-# Test query types
 query_types = {
     'Scan': ['1', '1a'],
     'Join': ['2', '2a'],
@@ -309,7 +306,6 @@ from benchbox import AMPLab
 from benchbox.platforms.duckdb import DuckDBAdapter
 import time
 
-# Test across scale factors
 scale_factors = [0.01, 0.1, 0.5]
 
 for sf in scale_factors:
@@ -323,7 +319,6 @@ for sf in scale_factors:
     adapter.create_schema(benchmark, conn)
     adapter.load_data(benchmark, conn, benchmark.output_dir)
 
-    # Time scan query
     scan_query = benchmark.get_query("1", params={'pagerank_threshold': 1000})
 
     start = time.time()
@@ -338,14 +333,13 @@ for sf in scale_factors:
 
 1. **Use Appropriate Scale Factors**
 
-   ```python
-   # Development
-   dev = AMPLab(scale_factor=0.01)  # about 6.6 MB
+   Use a small scale factor for development, a moderate one for testing, and the full scale for production. Scale factor 0.01 is about 6.6 MB.
 
-   # Testing
+   ```python
+   dev = AMPLab(scale_factor=0.01)
+
    test = AMPLab(scale_factor=0.1)
 
-   # Production
    prod = AMPLab(scale_factor=1.0)
    ```
 
@@ -366,14 +360,13 @@ for sf in scale_factors:
 
 3. **Test Query Types Separately**
 
+   Test scan, join, and analytics performance separately.
+
    ```python
-   # Test scan performance
    scan_queries = ['1', '1a']
 
-   # Test join performance
    join_queries = ['2', '2a']
 
-   # Test analytics performance
    analytics_queries = ['3', '3a', '4', '5']
    ```
 

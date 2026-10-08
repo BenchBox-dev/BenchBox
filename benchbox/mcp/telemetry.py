@@ -1,5 +1,3 @@
-"""Redacted shared telemetry for the BenchBox MCP service."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -40,14 +38,11 @@ _KNOWN_METHODS = frozenset(
 
 
 def _bounded(value: object) -> str:
-    """Return a bounded identifier suitable for a telemetry attribute."""
     return str(value)[:_MAX_ATTRIBUTE_LENGTH]
 
 
 @dataclass(frozen=True, slots=True)
 class TelemetrySettings:
-    """Environment-derived OTLP configuration without embedded credentials."""
-
     endpoint: str | None
     service_name: str = "benchbox-mcp"
 
@@ -69,13 +64,6 @@ class TelemetrySettings:
 
 
 class ScopeFilteringExporter(SpanExporter):
-    """Export only BenchBox's deliberately bounded spans.
-
-    The MCP SDK emits useful outer spans, but they include the raw JSON-RPC
-    request identifier. BenchBox exports its inner span instead, inheriting the
-    SDK-extracted W3C parent while keeping the exported schema allow-listed.
-    """
-
     def __init__(self, delegate: SpanExporter) -> None:
         self._delegate = delegate
 
@@ -91,8 +79,6 @@ class ScopeFilteringExporter(SpanExporter):
 
 
 class RedactedTelemetryMiddleware:
-    """Create one bounded span per MCP request without inputs or payloads."""
-
     async def __call__(self, ctx: ServerRequestContext[Any, Any], call_next: CallNext) -> HandlerResult:
         method = ctx.method if ctx.method in _KNOWN_METHODS else "unknown"
         protocol = (
@@ -122,7 +108,6 @@ class RedactedTelemetryMiddleware:
 
 
 def configure_telemetry(settings: TelemetrySettings) -> bool:
-    """Configure process-wide OTLP export once when an endpoint is present."""
     global _configured_provider
 
     if settings.endpoint is None:
@@ -134,8 +119,6 @@ def configure_telemetry(settings: TelemetrySettings) -> bool:
 
     resource = Resource.create({"service.name": settings.service_name})
     provider = TracerProvider(resource=resource)
-    # Headers/certificates remain in the standard OTEL environment and stay
-    # out of BenchBox configuration and logs.
     exporter = ScopeFilteringExporter(OTLPSpanExporter(endpoint=settings.endpoint))
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)

@@ -1,9 +1,3 @@
-"""Behavior-verifying tests for DuckDB adapter using real in-memory connections.
-
-These tests replace mock-heavy coverage tests with real database operations.
-Every test creates a real DuckDB connection - no MagicMock on the connection path.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -16,7 +10,7 @@ pytestmark = [
 
 @pytest.fixture()
 def adapter():
-    """Create a DuckDB adapter with in-memory database."""
+
     from benchbox.platforms.duckdb import DuckDBAdapter
 
     return DuckDBAdapter(database_path=":memory:", memory_limit="256MB")
@@ -24,7 +18,7 @@ def adapter():
 
 @pytest.fixture()
 def connection(adapter):
-    """Create a real in-memory DuckDB connection."""
+
     conn = adapter.create_connection()
     yield conn
     try:
@@ -43,7 +37,7 @@ class TestDuckDBRealConnection:
     def test_memory_limit_is_applied(self, connection):
         row = connection.execute("SELECT current_setting('memory_limit')").fetchone()
         assert row is not None
-        # DuckDB reports memory in human-readable form, e.g. "244.1 MiB"
+
         value = row[0].lower()
         assert "mib" in value or "mb" in value or "gib" in value
 
@@ -81,7 +75,7 @@ class TestDuckDBRealConnection:
         assert result["rows_returned"] == 0
 
     def test_real_sql_execution_with_tables(self, adapter, connection):
-        """Verify table creation and querying works end-to-end."""
+
         connection.execute("CREATE TABLE region (r_regionkey INTEGER, r_name VARCHAR(25))")
         connection.execute("INSERT INTO region VALUES (0, 'AFRICA'), (1, 'AMERICA'), (2, 'ASIA')")
 
@@ -97,7 +91,7 @@ class TestDuckDBRealConnection:
     def test_platform_info_returns_real_version(self, adapter, connection):
         info = adapter.get_platform_info(connection)
         assert "platform_version" in info
-        # DuckDB version is a string like "v1.2.0"
+
         assert "." in info["platform_version"]
 
     def test_from_config_creates_working_adapter(self, tmp_path):
@@ -118,17 +112,13 @@ class TestDuckDBRealConnection:
 
     def test_close_connection_makes_connection_unusable(self, adapter):
         conn = adapter.create_connection()
-        conn.execute("SELECT 1")  # works
+        conn.execute("SELECT 1")
         conn.close()
         with pytest.raises(Exception):
-            conn.execute("SELECT 1")  # should fail after close
+            conn.execute("SELECT 1")
 
     def test_statistics_phase_is_idempotent_across_repeated_runs(self, adapter, connection):
-        """Sanity check for the opt-in statistics phase (design doc's idempotence
-        check, w3 of track2-joinorder-stats-phase-controls): re-running the
-        statistics build (ANALYZE) on unchanged data must produce the same plan
-        shape / cardinality estimates both times, so the phase measures stats
-        build cost rather than incidental cache warmth."""
+
         connection.execute("CREATE TABLE region (r_regionkey INTEGER, r_name VARCHAR(25))")
         connection.execute("INSERT INTO region SELECT range::INTEGER, 'NAME_' || range::VARCHAR FROM range(500)")
 

@@ -1,38 +1,4 @@
 #!/usr/bin/env python3
-"""
-format_benchmark.py - Table formats storage and query timing benchmark script.
-
-Captures data needed for the BenchBox table-formats blog series:
-  - Post 0 (Intro): storage sizes across all five formats at SF1
-  - Post 1 (Parquet): compression storage sizes + write times at SF1 and SF10
-  - Post 2 (Delta Lake): storage sizes at SF1 and SF10, query timing vs Parquet
-  - Post 4 (Vortex): storage size and query timing at SF1 and SF10
-
-Measurements:
-  1. Export timing and storage size per format/compression combination
-  2. Query timing (TPC-H representative subset) via DuckDB reading external files
-
-Formats covered:
-  - Parquet (none, snappy, lz4, zstd:3, zstd:9)
-  - Delta Lake (snappy, zstd) via deltalake/delta-rs
-  - DuckLake (snappy default) via DuckDB ducklake extension
-  - Apache Iceberg (snappy, zstd) via pyiceberg with local SQLite catalog
-  - Vortex via DuckDB vortex extension or Python vortex bindings
-
-NOT COVERED (requires cloud access):
-  - Delta Lake OPTIMIZE / Z-ORDER on Databricks
-
-Usage:
-  uv run python _blog/table-formats/research/format_benchmark.py
-  uv run python _blog/table-formats/research/format_benchmark.py --sf 10
-  uv run python _blog/table-formats/research/format_benchmark.py --sf 1 --sf 10
-  uv run python _blog/table-formats/research/format_benchmark.py --queries Q1,Q6,Q12,Q14,Q19
-  uv run python _blog/table-formats/research/format_benchmark.py --runs 5 --sf 10
-
-Output:
-  benchmark_runs/format_benchmarks/format-benchmarks-YYYY-MM-DD.json
-  benchmark_runs/format_benchmarks/format-benchmarks-YYYY-MM-DD.md
-"""
 
 import argparse
 import json
@@ -74,10 +40,6 @@ except ImportError:
     print("Install with: uv add vortex-data")
 
 
-# ---------------------------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------------------------
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
 TPCH_TABLES = [
@@ -91,7 +53,6 @@ TPCH_TABLES = [
     "supplier",
 ]
 
-# Parquet compression configurations: (label, codec, level)
 PARQUET_CONFIGS = [
     ("none", "none", None),
     ("snappy", "snappy", None),
@@ -100,42 +61,29 @@ PARQUET_CONFIGS = [
     ("zstd:9", "zstd", 9),
 ]
 
-# Delta Lake configurations: (label, compression_codec)
 DELTA_CONFIGS = [
-    ("snappy", "snappy"),  # delta-rs default
+    ("snappy", "snappy"),
     ("zstd", "zstd"),
 ]
 
-# Representative TPC-H queries for format comparison.
-# Selected to cover: I/O-heavy scan (Q1), range-filter predicate pushdown (Q6),
-# join + date filter (Q12), compute-heavy aggregation (Q14), multi-predicate (Q19).
 DEFAULT_QUERY_SUBSET = [1, 6, 12, 14, 19]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def dir_size_mb(path: Path) -> float:
-    """Return total size of all files under path in MB."""
     total = sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
     return total / (1024**2)
 
 
 def source_db_path(sf: float) -> Optional[Path]:
-    """Return the path of the loaded TPC-H DuckDB database for a scale factor."""
     sf_tag = f"sf{sf:g}".replace(".", "")
     db_dir = REPO_ROOT / "benchmark_runs" / "databases" / f"tpch_{sf_tag}"
     if not db_dir.exists():
         return None
-    # Find the .duckdb file
     candidates = list(db_dir.glob("*.duckdb"))
     return candidates[0] if candidates else None
 
 
 def ensure_tpch_data(sf: float) -> Path:
-    """Ensure TPC-H data is generated and loaded at the given scale factor. Returns DB path."""
     db = source_db_path(sf)
     if db:
         print(f"  Found existing TPC-H SF{sf:g} database: {db}")
@@ -175,7 +123,6 @@ def ensure_tpch_data(sf: float) -> Path:
 
 
 def get_tpch_queries(query_ids: list[int]) -> dict[int, str]:
-    """Get TPC-H query text from the DuckDB tpch extension."""
     conn = duckdb.connect()
     conn.execute("INSTALL tpch; LOAD tpch;")
     queries = {}
@@ -189,18 +136,12 @@ def get_tpch_queries(query_ids: list[int]) -> dict[int, str]:
     return queries
 
 
-# ---------------------------------------------------------------------------
-# Parquet export
-# ---------------------------------------------------------------------------
-
-
 def export_parquet(
     source_db: Path,
     output_dir: Path,
     codec: str,
     compression_level: Optional[int],
 ) -> tuple[float, float]:
-    """Export TPC-H tables to Parquet. Returns (write_seconds, total_mb)."""
     import pyarrow.parquet as pq
 
     if output_dir.exists():
@@ -225,17 +166,11 @@ def export_parquet(
     return elapsed, total_mb
 
 
-# ---------------------------------------------------------------------------
-# Delta Lake export
-# ---------------------------------------------------------------------------
-
-
 def export_delta(
     source_db: Path,
     output_dir: Path,
     compression: str,
 ) -> tuple[float, float]:
-    """Export TPC-H tables to Delta Lake. Returns (write_seconds, total_mb)."""
     if not HAS_DELTALAKE:
         return 0.0, 0.0
 
@@ -253,7 +188,7 @@ def export_delta(
             table_path,
             arrow_table,
             mode="overwrite",
-            configuration={"delta.targetFileSize": "134217728"},  # 128 MB target
+            configuration={"delta.targetFileSize": "134217728"},
         )
     elapsed = time.perf_counter() - t0
 
@@ -262,16 +197,10 @@ def export_delta(
     return elapsed, total_mb
 
 
-# ---------------------------------------------------------------------------
-# DuckLake export
-# ---------------------------------------------------------------------------
-
-
 def export_ducklake(
     source_db: Path,
     output_dir: Path,
 ) -> tuple[float, float]:
-    """Export TPC-H tables to DuckLake. Returns (write_seconds, total_mb)."""
     if output_dir.exists():
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True)
@@ -297,17 +226,11 @@ def export_ducklake(
     return elapsed, total_mb
 
 
-# ---------------------------------------------------------------------------
-# Iceberg export
-# ---------------------------------------------------------------------------
-
-
 def export_iceberg(
     source_db: Path,
     output_dir: Path,
     compression: str = "snappy",
 ) -> tuple[float, float]:
-    """Export TPC-H tables to Apache Iceberg via pyiceberg. Returns (write_seconds, total_mb)."""
     if not HAS_PYICEBERG:
         return 0.0, 0.0
 
@@ -317,7 +240,6 @@ def export_iceberg(
 
     src = duckdb.connect(str(source_db), read_only=True)
 
-    # Create a temporary SQLite-backed catalog (no external service needed)
     catalog_db = output_dir / "_catalog.db"
     catalog = SqlCatalog(
         "benchbox_bench",
@@ -350,32 +272,21 @@ def export_iceberg(
     elapsed = time.perf_counter() - t0
 
     src.close()
-    # Exclude the catalog DB from size measurement (metadata-only)
     total = sum(f.stat().st_size for f in output_dir.rglob("*") if f.is_file() and f.name != "_catalog.db")
     total_mb = total / (1024**2)
     return elapsed, total_mb
-
-
-# ---------------------------------------------------------------------------
-# Vortex export
-# ---------------------------------------------------------------------------
 
 
 def export_vortex(
     source_db: Path,
     output_dir: Path,
 ) -> tuple[float, float]:
-    """Export TPC-H tables to Vortex format. Returns (write_seconds, total_mb).
-
-    Tries DuckDB vortex extension first, falls back to Python vortex bindings.
-    """
     if output_dir.exists():
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True)
 
     src = duckdb.connect(str(source_db), read_only=True)
 
-    # Try DuckDB vortex extension first
     use_duckdb_ext = False
     try:
         test_conn = duckdb.connect()
@@ -401,7 +312,6 @@ def export_vortex(
             conn.unregister("_vortex_src")
         conn.close()
     else:
-        # Python vortex bindings fallback
         array_fn = getattr(vortex, "array", None)
         if not array_fn:
             encoding = getattr(vortex, "encoding", None)
@@ -428,17 +338,11 @@ def export_vortex(
     return elapsed, total_mb
 
 
-# ---------------------------------------------------------------------------
-# Query timing
-# ---------------------------------------------------------------------------
-
-
 def run_query_timing(
     conn: duckdb.DuckDBPyConnection,
     queries: dict[int, str],
     num_runs: int,
 ) -> dict[int, dict]:
-    """Run each query num_runs times, return timing stats in milliseconds."""
     results = {}
     for qid, sql in queries.items():
         times = []
@@ -463,7 +367,6 @@ def run_query_timing(
 
 
 def create_parquet_views(conn: duckdb.DuckDBPyConnection, parquet_dir: Path):
-    """Register TPC-H table views over Parquet files."""
     conn.execute("INSTALL parquet; LOAD parquet;")
     for table in TPCH_TABLES:
         path = parquet_dir / f"{table}.parquet"
@@ -471,7 +374,6 @@ def create_parquet_views(conn: duckdb.DuckDBPyConnection, parquet_dir: Path):
 
 
 def create_delta_views(conn: duckdb.DuckDBPyConnection, delta_dir: Path):
-    """Register TPC-H table views over Delta Lake files."""
     conn.execute("INSTALL delta; LOAD delta;")
     for table in TPCH_TABLES:
         path = delta_dir / table
@@ -479,7 +381,6 @@ def create_delta_views(conn: duckdb.DuckDBPyConnection, delta_dir: Path):
 
 
 def create_ducklake_views(conn: duckdb.DuckDBPyConnection, ducklake_dir: Path):
-    """Attach DuckLake catalog and expose tables as views in main schema."""
     conn.execute("INSTALL ducklake; LOAD ducklake;")
     catalog_path = ducklake_dir / "tpch.ducklake"
     data_path = ducklake_dir / "data"
@@ -489,7 +390,6 @@ def create_ducklake_views(conn: duckdb.DuckDBPyConnection, ducklake_dir: Path):
 
 
 def create_vortex_views(conn: duckdb.DuckDBPyConnection, vortex_dir: Path):
-    """Register TPC-H table views over Vortex files."""
     conn.execute("INSTALL vortex; LOAD vortex;")
     for table in TPCH_TABLES:
         path = vortex_dir / f"{table}.vortex"
@@ -503,7 +403,6 @@ def time_format_queries(
     queries: dict[int, str],
     num_runs: int,
 ) -> dict[int, dict]:
-    """Create a fresh DuckDB connection, set up views for a format, run queries."""
     print(f"    Timing queries against {format_label}...")
     conn = duckdb.connect()
     try:
@@ -514,11 +413,6 @@ def time_format_queries(
         return {}
     finally:
         conn.close()
-
-
-# ---------------------------------------------------------------------------
-# Markdown output
-# ---------------------------------------------------------------------------
 
 
 def geomean(values: list[float]) -> float:
@@ -539,7 +433,6 @@ def render_markdown(results: dict, sf: float, query_ids: list[int]) -> str:
         "",
     ]
 
-    # Storage and write time table
     lines += [
         "## Storage and Write Time",
         "",
@@ -555,7 +448,6 @@ def render_markdown(results: dict, sf: float, query_ids: list[int]) -> str:
         lines.append(f"| {label} | {size_mb:.0f} | {ratio} | {write_s:.1f} |")
     lines.append("")
 
-    # Query timing table
     timing = results.get("timing", {})
     if timing:
         q_headers = " | ".join(f"Q{q} (ms)" for q in query_ids)
@@ -584,18 +476,12 @@ def render_markdown(results: dict, sf: float, query_ids: list[int]) -> str:
     return "\n".join(lines)
 
 
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-
 def benchmark_sf(
     sf: float,
     query_ids: list[int],
     num_runs: int,
     output_base: Path,
 ) -> dict:
-    """Run all format benchmarks for a single scale factor."""
     sf_tag = f"sf{sf:g}".replace(".", "")
     work_dir = output_base / sf_tag
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -604,12 +490,10 @@ def benchmark_sf(
     print(f"Scale factor: SF{sf:g}")
     print(f"{'=' * 60}")
 
-    # Ensure source data exists
     source_db = ensure_tpch_data(sf)
 
     results: dict = {"sf": sf, "storage": {}, "timing": {}}
 
-    # --- Parquet exports ---
     print("\n[Parquet exports]")
     for label, codec, level in PARQUET_CONFIGS:
         config_dir = work_dir / f"parquet_{label.replace(':', '')}"
@@ -624,7 +508,6 @@ def benchmark_sf(
         }
         print(f"    {size_mb:.0f} MB in {write_s:.1f}s")
 
-    # --- Delta Lake exports ---
     if HAS_DELTALAKE:
         print("\n[Delta Lake exports]")
         for label, compression in DELTA_CONFIGS:
@@ -640,7 +523,6 @@ def benchmark_sf(
             }
             print(f"    {size_mb:.0f} MB in {write_s:.1f}s")
 
-    # --- DuckLake export ---
     print("\n[DuckLake export]")
     ducklake_dir = work_dir / "ducklake"
     print("  Exporting ducklake (snappy default)...")
@@ -654,7 +536,6 @@ def benchmark_sf(
     }
     print(f"    {size_mb:.0f} MB in {write_s:.1f}s")
 
-    # --- Iceberg exports ---
     if HAS_PYICEBERG:
         print("\n[Iceberg exports]")
         for label, compression in [("snappy", "snappy"), ("zstd", "zstd")]:
@@ -670,7 +551,6 @@ def benchmark_sf(
             }
             print(f"    {size_mb:.0f} MB in {write_s:.1f}s")
 
-    # --- Vortex export ---
     print("\n[Vortex export]")
     vortex_dir = work_dir / "vortex"
     print("  Exporting vortex...")
@@ -687,43 +567,36 @@ def benchmark_sf(
     else:
         print("    Skipped (no vortex extension or package available)")
 
-    # --- Query timing ---
     if query_ids:
         print(f"\n[Query timing ({num_runs} runs each)]")
         queries = get_tpch_queries(query_ids)
         print(f"  Loaded {len(queries)} TPC-H queries")
 
-        # Parquet zstd:3 (BenchBox default)
         parquet_zstd3_dir = work_dir / "parquet_zstd3"
         if parquet_zstd3_dir.exists():
             timing = time_format_queries("parquet/zstd:3", create_parquet_views, parquet_zstd3_dir, queries, num_runs)
             results["timing"]["parquet_zstd3"] = timing
 
-        # Parquet snappy
         parquet_snappy_dir = work_dir / "parquet_snappy"
         if parquet_snappy_dir.exists():
             timing = time_format_queries("parquet/snappy", create_parquet_views, parquet_snappy_dir, queries, num_runs)
             results["timing"]["parquet_snappy"] = timing
 
-        # Parquet none
         parquet_none_dir = work_dir / "parquet_none"
         if parquet_none_dir.exists():
             timing = time_format_queries("parquet/none", create_parquet_views, parquet_none_dir, queries, num_runs)
             results["timing"]["parquet_none"] = timing
 
-        # Delta snappy
         if HAS_DELTALAKE:
             delta_snappy_dir = work_dir / "delta_snappy"
             if delta_snappy_dir.exists():
                 timing = time_format_queries("delta/snappy", create_delta_views, delta_snappy_dir, queries, num_runs)
                 results["timing"]["delta_snappy"] = timing
 
-        # DuckLake
         if ducklake_dir.exists():
             timing = time_format_queries("ducklake", create_ducklake_views, ducklake_dir, queries, num_runs)
             results["timing"]["ducklake"] = timing
 
-        # Vortex (requires DuckDB vortex extension for read_vortex())
         if vortex_dir.exists() and any(vortex_dir.glob("*.vortex")):
             timing = time_format_queries("vortex", create_vortex_views, vortex_dir, queries, num_runs)
             if timing:
@@ -782,13 +655,11 @@ def main():
         sf_results = benchmark_sf(sf, query_ids, args.runs, output_base / "work")
         all_results["scale_factors"][str(sf)] = sf_results
 
-    # Write JSON
     json_path = output_base / f"format-benchmarks-{today}.json"
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(all_results, f, indent=2)
     print(f"\nResults saved to: {json_path}")
 
-    # Write Markdown for each SF
     for sf in scale_factors:
         sf_results = all_results["scale_factors"][str(sf)]
         md = render_markdown(sf_results, sf, query_ids)

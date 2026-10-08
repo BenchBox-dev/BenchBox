@@ -1,5 +1,3 @@
-"""Tests for the deterministic agent-instruction governance audit."""
-
 from __future__ import annotations
 
 import ast
@@ -20,15 +18,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 @pytest.fixture(autouse=True)
 def _isolate_git_identity_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Force identity to resolve from config alone.
-
-    `git var` prefers GIT_AUTHOR_* / GIT_COMMITTER_* / EMAIL over any config
-    file, so an ambient value in the invoking shell decides these assertions
-    instead of the fixture repo. A cloud session that exports GIT_AUTHOR_* to
-    satisfy [COMMIT-IDENTITY-001] does exactly that, and it turned the
-    negative identity tests green against a repo configured as an agent.
-    Tests that want an ambient identity set it themselves, after this runs.
-    """
     for name in ("GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "EMAIL"):
         monkeypatch.delenv(name, raising=False)
 
@@ -73,7 +62,6 @@ def _candidate(tmp_path: Path) -> Path:
 
 
 def _with_repo_file(project: Path, relative: str) -> Path:
-    """Copy one repository file into a candidate project and return its path there."""
     target = project / relative
     if not target.exists():
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -172,7 +160,6 @@ def test_project_write_closeout_drift_fails(tmp_path: Path) -> None:
         "closes at a merged pull request",
         "re-enqueue after a spurious ejection",
         "fix and push after a real failure",
-        # The limits on merging: deleting any one widens what an agent may merge unasked.
         "owner-only action",
         "a denied permission",
         "production publish or release",
@@ -215,7 +202,6 @@ def test_project_comment_policy_drift_fails(tmp_path: Path, phrase: str) -> None
 
 
 def test_agent_facing_text_does_not_hand_a_finished_pr_back() -> None:
-    """The repository's own instructions must not tell anyone to stop with a green PR."""
     assert agent_instruction_audit.audit_handback_wording(ROOT) == []
 
 
@@ -250,7 +236,6 @@ def test_handback_wording_fails_in_every_scanned_location(tmp_path: Path, line: 
 
 
 def test_an_owner_only_marker_does_not_exempt_a_handback_line(tmp_path: Path) -> None:
-    """The guard has no per-line exemption: appending a marker must not hide a hand-back."""
     project = _candidate(tmp_path)
     command = project / ".claude/commands/pr.md"
     command.write_text(command.read_text() + "\nMark PR 12 ready when CI is green. owner-only\n")
@@ -260,18 +245,15 @@ def test_an_owner_only_marker_does_not_exempt_a_handback_line(tmp_path: Path) ->
 @pytest.mark.parametrize(
     "text",
     [
-        # Markdown reflow and emphasis must not hide the old wording.
         "Do not poll\nCI: pending is\nterminal.",
         "Mark **PR 12** ready when CI is green.",
         "Mark the _pull request_ ready for the queue.",
         "Auto-merge stays\nwithheld until a human decides.",
-        # A hand-back that the first guard missed.
         "When CI passes, ask the user to enable auto-merge.",
         "Then ask the owner to merge it.",
         "Then ask the maintainer to enable the auto merge.",
         "Wait for the human to merge the green PR.",
         "Then waiting for the maintainer to merge it, stop.",
-        # Variants a first version missed.
         "Mark the pull-request as ready once the checks finish and the summary is posted for review.",
         "Auto merge remains withheld pending approval.",
     ],
@@ -286,20 +268,16 @@ def test_handback_wording_survives_reflow_and_formatting(tmp_path: Path, text: s
 @pytest.mark.parametrize(
     "text",
     [
-        # Safety guidance and instructions that do not hand back completed work.
         "Do not mark PR ready before required external review is complete.",
         "Never mark a PR ready while review dispositions are incomplete.",
         "When the branch is final, arm the exact head and monitor until merged.",
         "Never ask the owner to merge a finished PR.",
         "Do not ask the user to enable auto-merge; arm it yourself.",
-        # Asking for an unrelated setting is not a PR hand-back.
         "If the tool is missing, ask the user to enable the plugin in settings.",
         "Never wait for the owner to merge a finished PR.",
-        # Release and publication authorization is an explicit exception, not a PR hand-back.
         "Wait for the owner to approve the production release before publishing.",
         "For a release, wait for the owner to approve deployment.",
         "Ask the owner to approve the production release before publishing.",
-        # A list item must not join the next one into a phrase.
         "- mark the PR\n- ready to arm after the checks",
     ],
 )
@@ -327,7 +305,6 @@ def test_project_commit_anchor_reflow_passes(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
     original = agents.read_text()
-    # Break the pinned phrase "not authorization" across two lines: anchors are whitespace-normalized.
     reflowed = original.replace("not authorization", "not\nauthorization", 1)
     assert reflowed != original, "the reflow fixture text is no longer in AGENTS.md; the test would mutate nothing"
     agents.write_text(reflowed)
@@ -524,13 +501,13 @@ def test_development_agent_doc_fails(tmp_path: Path) -> None:
     assert any("docs/development/agent-extra.md" in error for error in errors)
 
 
-def test_missing_sphinx_agent_exclude_fails(tmp_path: Path) -> None:
+def test_missing_agent_publish_exclusion_fails(tmp_path: Path) -> None:
     project = _candidate(tmp_path)
-    conf = project / "docs/conf.py"
-    conf.parent.mkdir(parents=True, exist_ok=True)
-    conf.write_text('exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]\n')
+    exclusions = project / "docs/publish-exclusions.txt"
+    exclusions.parent.mkdir(parents=True, exist_ok=True)
+    exclusions.write_text("# comment\ninternal/\n")
     _, errors = audit(project, CORPUS)
-    assert any("must exclude the docs/agent/ tree from Sphinx" in error for error in errors)
+    assert any("must exclude the docs/agent/ tree from the published site" in error for error in errors)
 
 
 def _git_configured_repo(tmp_path: Path, name: str, email: str) -> Path:
@@ -560,7 +537,6 @@ def test_explicit_task_local_agent_identity_override_passes(tmp_path: Path, monk
 
 
 def test_signing_service_committer_behind_human_author_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A signing service may hold the committer slot when the author is human."""
     project = _git_configured_repo(tmp_path, "Claude", "noreply@anthropic.com")
     monkeypatch.setenv("GIT_AUTHOR_NAME", "Joe Harris")
     monkeypatch.setenv("GIT_AUTHOR_EMAIL", "joeharris76@gmail.com")
@@ -568,19 +544,12 @@ def test_signing_service_committer_behind_human_author_passes(tmp_path: Path, mo
 
 
 def test_signing_service_committer_without_human_author_fails(tmp_path: Path) -> None:
-    """The allowance is conditional: an agent author is never acceptable."""
     project = _git_configured_repo(tmp_path, "Claude", "noreply@anthropic.com")
     errors = audit_git_identity(project)
     assert any("author identity resolves to known agent/service" in error for error in errors)
 
 
 def test_repo_local_human_identity_warns_without_failing(tmp_path: Path) -> None:
-    """The drift a human identity causes is real but not an error.
-
-    A repo-local human identity is a supported setup, so it must stay
-    non-fatal -- but it is still inherited by every linked worktree, which is
-    the property worth surfacing.
-    """
     project = _git_configured_repo(tmp_path, "Some Human", "human@example.invalid")
     warnings = audit_identity_overrides(project)
     assert len(warnings) == 2
@@ -591,13 +560,11 @@ def test_repo_local_human_identity_warns_without_failing(tmp_path: Path) -> None
 
 
 def test_global_only_identity_produces_no_override_warning(tmp_path: Path) -> None:
-    """Nothing displaces the global identity, so there is nothing to report."""
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     assert audit_identity_overrides(tmp_path) == []
 
 
 def test_agent_identity_both_warns_and_stays_fatal(tmp_path: Path) -> None:
-    """The warning is additive; it must not soften the known-agent rejection."""
     project = _git_configured_repo(tmp_path, "Claude", "noreply@anthropic.com")
     assert len(audit_identity_overrides(project)) == 2
     errors = audit_git_identity(project)
@@ -606,11 +573,6 @@ def test_agent_identity_both_warns_and_stays_fatal(tmp_path: Path) -> None:
 
 
 def test_worktree_scoped_identity_is_reported_as_an_override(tmp_path: Path) -> None:
-    """Worktree scope is an override too, even though it is the safe one.
-
-    Worktree-scoped identity is the prevention mechanism for shared-clone
-    contamination, so it must still be *visible* rather than silently trusted.
-    """
     project = _git_configured_repo(tmp_path, "Some Human", "human@example.invalid")
     subprocess.run(["git", "-C", str(project), "config", "extensions.worktreeConfig", "true"], check=True)
     subprocess.run(
@@ -622,11 +584,6 @@ def test_worktree_scoped_identity_is_reported_as_an_override(tmp_path: Path) -> 
 
 
 def test_identity_override_warning_does_not_change_exit_status(tmp_path: Path) -> None:
-    """A warning that failed the gate would be bypassed, not heeded.
-
-    Drives the real CLI rather than the function, because the exit status and
-    the JSON contract are what callers depend on.
-    """
     project = _candidate(tmp_path)
     subprocess.run(["git", "init", "-q", str(project)], check=True)
     subprocess.run(["git", "-C", str(project), "config", "user.name", "Some Human"], check=True)
@@ -700,12 +657,6 @@ def test_commit_range_rejects_agent_coauthor_trailer(tmp_path: Path) -> None:
 
 
 def test_commit_range_rejects_agent_coauthor_by_name_with_non_vendor_address(tmp_path: Path) -> None:
-    """An agent that signs with its own address is still an agent.
-
-    Matching only the vendor address let this exact trailer through both the
-    merge-time guard and the commit-msg hook, which is the attribution
-    [COMMIT-IDENTITY-001] exists to reject.
-    """
     project = _git_range_repo(tmp_path)
     _git_commit(
         project,
@@ -718,7 +669,6 @@ def test_commit_range_rejects_agent_coauthor_by_name_with_non_vendor_address(tmp
 
 
 def test_commit_range_accepts_human_coauthor_named_like_a_vendor(tmp_path: Path) -> None:
-    """The name arm matches the whole display name, not a substring of it."""
     project = _git_range_repo(tmp_path)
     _git_commit(
         project,
@@ -742,60 +692,25 @@ def test_commit_range_rejects_agent_session_trailer(tmp_path: Path) -> None:
 
 
 def test_commit_range_reports_unresolvable_base_ref(tmp_path: Path) -> None:
-    """A missing base ref must surface, never silently pass as 'no findings'."""
     project = _git_range_repo(tmp_path)
     errors = audit_commit_range(project, "origin/does-not-exist")
     assert any("unable to inspect commit range" in error for error in errors)
 
 
 def test_unresolvable_git_identity_is_not_a_violation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """An environment where git resolves no identity must not fail this guard.
-
-    `git var GIT_AUTHOR_IDENT` exits non-zero when it can neither read a
-    configured identity nor auto-detect one, and `_resolved_git_identity` then
-    returns ("", ""). That is the state of an ephemeral CI runner, and it cannot
-    be reproduced by clearing config locally because git synthesises an implicit
-    user@host identity instead - so drive the resolver directly.
-
-    The check exists to reject a *known agent* identity; an absent one is
-    nothing to judge. `make ci-lint` runs this target and develop-post-merge
-    runs ci-lint, so treating absence as an error turned every post-merge run
-    red with "unable to resolve Git author identity" once #1523 removed the step
-    that injected a placeholder identity to keep the check runnable. Removing
-    that injection was right - a check fed a known-good identity can never fail
-    - but a check that always fails where no identity exists is as
-    uninformative. agent-commit-range-check remains the merge-time control.
-    """
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     monkeypatch.setattr(agent_instruction_audit, "_resolved_git_identity", lambda _project, _role: ("", ""))
     assert audit_git_identity(tmp_path) == []
 
 
 def test_unresolvable_identity_skip_does_not_weaken_the_agent_check(tmp_path: Path) -> None:
-    """The skip must not become a blanket pass.
-
-    A guard that returns [] for the absent case is only safe while the populated
-    case still fails, so pin both halves together: this is the assertion that
-    would catch the skip being widened into "always return []".
-    """
     project = _git_configured_repo(tmp_path, "Codex", "codex@openai.com")
     errors = audit_git_identity(project)
     assert len(errors) == 2
     assert all("known agent/service Codex <codex@openai.com>" in error for error in errors)
 
 
-# ---------------------------------------------------------------------------
-# Check attribution and budget headroom.
-#
-# The pre-commit hook runs the whole audit through one entry point, so before
-# these landed a byte-budget failure was reported under a hook named "reject
-# stale agent Git identity" and sent an investigation after a Git config problem
-# that did not exist.
-# ---------------------------------------------------------------------------
-
-
 def test_every_error_names_the_check_that_produced_it(tmp_path: Path) -> None:
-    """A caller must be able to say which check failed, not just that one did."""
     project = _candidate(tmp_path)
     (project / "AGENTS.md").write_text("Co-Authored-By: Claude\n", encoding="utf-8")
     _, errors = audit(project, CORPUS)
@@ -814,7 +729,6 @@ def test_every_error_names_the_check_that_produced_it(tmp_path: Path) -> None:
 
 
 def test_a_budget_failure_is_attributed_to_budget_not_identity(tmp_path: Path) -> None:
-    """The exact misreport this guards: over-budget must not read as identity."""
     project = _candidate(tmp_path)
     corpus = json.loads(json.dumps(CORPUS))
     corpus["budgets"]["active_bytes"] = 1
@@ -833,12 +747,10 @@ def test_failing_checks_lists_each_check_once_in_first_seen_order() -> None:
 
 
 def test_headroom_warns_near_the_ceiling_and_stays_a_warning() -> None:
-    """A near-full surface warns; only exceeding the ceiling is an error."""
     metrics, _ = audit(ROOT, CORPUS)
     budgets = dict(CORPUS["budgets"], active_bytes=metrics.active_bytes + 1)
     warnings = agent_instruction_audit.budget_headroom_warnings(metrics, budgets)
     assert any("active instruction bytes" in warning for warning in warnings)
-    # The same near-full state must not be an error - the budget is the gate.
     _, errors = audit(ROOT, dict(CORPUS, budgets=budgets))
     assert not [error for error in errors if "exceed budget" in error]
 
@@ -851,11 +763,6 @@ def test_headroom_is_silent_with_room_to_spare() -> None:
 
 
 def test_the_precommit_hook_name_does_not_claim_a_single_check() -> None:
-    """The hook runs the full audit, so its name must not promise only identity.
-
-    Pinning the name is the only mechanical guard available here: pre-commit
-    prints the hook name, not the command, when a hook fails.
-    """
     import yaml
 
     config = yaml.safe_load((ROOT / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
@@ -868,12 +775,6 @@ def test_the_precommit_hook_name_does_not_claim_a_single_check() -> None:
 
 
 def test_audit_entry_point_imports_without_third_party_packages() -> None:
-    """`.github/workflows/pr.yml` runs this file with bare `python3` before `uv sync`.
-
-    A non-stdlib import at module scope hard-fails the required skill-integrity
-    lane. That lane is path-filtered, so the PR that introduced `packaging` and
-    `tomli` never exercised it.
-    """
     source = (ROOT / "_project/scripts/agent_instruction_audit.py").read_text(encoding="utf-8")
     forbidden = ("import packaging", "from packaging", "import tomli", "import tomllib")
     offenders = [needle for needle in forbidden if needle in source]
@@ -881,18 +782,14 @@ def test_audit_entry_point_imports_without_third_party_packages() -> None:
 
 
 def test_missing_review_depth_binding_fails_the_parity_audit(tmp_path: Path) -> None:
-    """REVIEW-PARITY-001 requires REVIEW-DEPTH-001; the audit must enforce it."""
     project = _candidate(tmp_path)
     protocol = project / "docs/agent/review-protocol.md"
-    # Strip the ID wherever it is bound; the binding is a combined bullet, not a
-    # dedicated one, because SHARED section 5 forbids restating its behavior.
     protocol.write_text(protocol.read_text().replace("`[REVIEW-DEPTH-001]`", ""))
     _, errors = audit(project, CORPUS)
     assert any("REVIEW-DEPTH-001" in error for error in errors)
 
 
 def test_restating_a_dependency_cap_in_agents_md_fails(tmp_path: Path) -> None:
-    """`pyproject.toml` owns the bounds; a restated copy drifted once already."""
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
     agents.write_text(agents.read_text() + "\n- Caps: `pyarrow<25`.\n")
@@ -901,7 +798,6 @@ def test_restating_a_dependency_cap_in_agents_md_fails(tmp_path: Path) -> None:
 
 
 def test_the_cap_guard_is_not_defeated_by_same_line_placement(tmp_path: Path) -> None:
-    """An exemption keyed on the pointer text would be bypassed by one line."""
     project = _candidate(tmp_path)
     agents = project / "AGENTS.md"
     agents.write_text(

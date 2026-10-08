@@ -44,9 +44,10 @@ We split the extraction into three phases. The first two improved BenchBox's arc
 ```python
 @dataclass
 class ChartOptions:
-    # ... width, height, color, unicode, theme ...
     scale_factor_formatter: Callable[[float], str] | None = field(default=None, repr=False)
 ```
+
+The class has other fields as well (width, height, color, unicode and theme), which are omitted here.
 
 BenchBox injects its formatter at the call site, and the charting library falls back to `f"SF={sf}"` when no formatter is provided, so one new field eliminated the only cross-boundary import.
 
@@ -59,9 +60,10 @@ We scaffolded a standalone `textcharts` package with a src layout, a `py.typed` 
 Back in BenchBox, the original `ascii/` modules became thin compatibility shims, small re-export files that preserved the old import paths, each about three lines long:
 
 ```python
-"""Compatibility shim, delegates to textcharts.histogram."""
-from textcharts.histogram import *  # noqa: F401, F403
+from textcharts.histogram import *
 ```
+
+Each shim is a compatibility shim that delegates to `textcharts.histogram`.
 
 The 17 shim files totaled just 60 lines, and BenchBox's 568 visualization tests passed without modification on the first run because the shims preserved every existing import path.
 
@@ -84,11 +86,12 @@ This turned out to be the unexpected payoff. Once the library stood on its own, 
 Each rename forced BenchBox to make its data transformation explicit. Where chart classes had previously accepted benchmark-shaped data silently through field names, the dispatch layer in `ascii_runtime.py` now explicitly maps BenchBox's domain concepts to generic chart fields:
 
 ```python
-# BenchBox domain (query_id, execution_time_ms) -> textcharts (label, value)
 histogram_data.append(
     HistogramBar(label=query_id, value=mean_latency, platform=platform)
 )
 ```
+
+This maps BenchBox's domain data (`query_id`, `execution_time_ms`) to textcharts' generic (`label`, `value`).
 
 That mapping was always happening, but now it's visible, testable, and documented.
 
@@ -110,7 +113,7 @@ The trade-off is operational rather than architectural. BenchBox now depends on 
 
 This post is an architecture retrospective, not a runtime benchmark report, so the numbers here describe code structure rather than hardware performance. Unless noted otherwise, counts such as 7,500 lines, 19 modules, 17 shim files, and ~290 moved test methods come from source-tree measurements we collected during the extraction work on March 10, 2026, using BenchBox v0.1.4 locally and the standalone `textcharts` package at the same migration point.
 
-Approximate figures are rounded because they summarize moved test methods and pre-extraction file sizes from the research notes rather than a single immutable file snapshot. The accepted ADR from March 5, 2026 documents the ownership boundary and migration constraints that shaped the extraction.
+Approximate figures are rounded because they summarize moved test methods and pre-extraction file sizes rather than a single immutable file snapshot. The [accepted ADR](../development/adr/adr-textcharts-extraction.md) from March 5, 2026 documents the ownership boundary and migration constraints that shaped the extraction.
 
 ---
 

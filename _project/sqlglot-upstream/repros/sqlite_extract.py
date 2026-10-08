@@ -1,14 +1,3 @@
-"""Execute bounded SQLite date-extraction reproducers without importing BenchBox.
-
-Run in an isolated environment with a selected SQLGlot version. Exit 1 means
-at least one translation disagrees with its explicit expected result; exit 2
-means the reproducer or a reference query failed. These cases are witnesses,
-not a general equivalence proof. PostgreSQL is not executed by this script.
-The verdict also gates on translated equivalents of the naive-lowering
-counterexamples, so an incomplete upstream fix cannot pass on the
-projection cases while leaving TIMESTAMP casts or integer division wrong.
-"""
-
 from __future__ import annotations
 
 import json
@@ -19,7 +8,6 @@ import sqlglot
 
 
 def cases() -> list[tuple[str, str, str, list[tuple[object, ...]]]]:
-    """Use DATE values with independently specified calendar components."""
     result = []
     dates = {
         "YEAR": [(2000,), (1900,), (2024,), (2024,), (None,)],
@@ -62,15 +50,6 @@ def cases() -> list[tuple[str, str, str, list[tuple[object, ...]]]]:
 
 
 def translated_trap_cases() -> list[tuple[str, str, str, list[tuple[object, ...]]]]:
-    """Source-level equivalents of the naive-lowering traps, translated at runtime.
-
-    Each entry is (id, source dialect, source SQL, expected rows). Unlike the
-    hand-written SQLite traps in main() (which pin the already-lowered shape
-    and only guard the witness, never the verdict), these go through sqlglot's
-    read->sqlite lowering inside main(), so a naive STRFTIME lowering that is
-    still wrong on TIMESTAMP casts or integer division fails the harness
-    instead of passing silently.
-    """
     return [
         (
             "timestamp-cast-affinity",
@@ -106,8 +85,6 @@ def main() -> int:
                 record.update(matched=False, error=f"{type(exc).__name__}: {exc}")
             records.append(record)
 
-        # The simple replacement must not be accepted from a bare YEAR example.
-        # SQLite TIMESTAMP casts have numeric affinity, not temporal semantics.
         traps = [
             (
                 "timestamp-cast-affinity",

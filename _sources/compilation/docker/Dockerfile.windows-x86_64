@@ -2,7 +2,6 @@ FROM --platform=linux/amd64 ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install MinGW cross-compilation tools and Wine for running Windows executables during build
 RUN apt-get update && apt-get install -y \
     build-essential \
     gcc \
@@ -19,11 +18,9 @@ RUN apt-get update && apt-get install -y \
     xvfb \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure Wine for headless operation
 ENV WINEDEBUG=-all
 ENV DISPLAY=:99
 
-# Set up cross-compilation environment for Windows x86_64
 ENV CROSS_CC=x86_64-w64-mingw32-gcc
 ENV CROSS_MACHINE=WIN32
 ENV CROSS_DATABASE=SQLSERVER

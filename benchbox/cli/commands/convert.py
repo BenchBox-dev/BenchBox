@@ -1,9 +1,3 @@
-"""Format conversion command for benchmark data.
-
-This command converts benchmark data between different table formats
-(TBL, Parquet, Vortex, Delta Lake, Apache Iceberg) for optimized query performance.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -26,23 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_schemas_from_manifest(manifest: ManifestV2, benchmark_name: str | None) -> dict[str, dict[str, Any]]:
-    """Get table schemas for conversion.
-
-    Attempts to load schemas from the benchmark definition.
-    Falls back to inferring schemas if benchmark is not specified.
-
-    Args:
-        manifest: Manifest with table information
-        benchmark_name: Name of benchmark (e.g., 'tpch', 'tpcds')
-
-    Returns:
-        Dictionary mapping table_name -> schema dict
-
-    Raises:
-        click.ClickException: If schemas cannot be determined
-    """
     if not benchmark_name:
-        # Try to get benchmark from manifest
         benchmark_name = manifest.benchmark
 
     if not benchmark_name:
@@ -50,14 +28,12 @@ def _get_schemas_from_manifest(manifest: ManifestV2, benchmark_name: str | None)
             "Cannot determine benchmark type. Specify --benchmark or ensure manifest contains benchmark field."
         )
 
-    # Import benchmark loader to get schemas
     from benchbox.core.benchmark_loader import get_core_benchmark_class
 
     try:
         benchmark_class = get_core_benchmark_class(benchmark_name)
         benchmark_instance = benchmark_class()
 
-        # Get schemas from benchmark
         schemas = {}
         if hasattr(benchmark_instance, "get_schema"):
             for table_name in manifest.tables.keys():
@@ -80,7 +56,67 @@ def _get_schemas_from_manifest(manifest: ManifestV2, benchmark_name: str | None)
         raise click.ClickException(f"Failed to load benchmark '{benchmark_name}': {e}") from e
 
 
-@click.command("convert")
+@click.command(
+    "convert",
+    help=(
+        "Convert benchmark data to optimized table formats.\n"
+        "\n"
+        "Converts TPC benchmark data from TBL (pipe-delimited) format to columnar\n"
+        "formats like Parquet, Vortex, Delta Lake, or Apache Iceberg. This enables\n"
+        "significant query performance improvements (2-10x faster).\n"
+        "\n"
+        "The command reads the manifest file in the input directory to discover\n"
+        "tables and their source files, then converts each table to the target format.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "\n"
+        "\b\n"
+        "    # Convert to Parquet with default settings\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format parquet\n"
+        "\n"
+        "\b\n"
+        "    # Convert to Vortex for high compression\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format vortex\n"
+        "\n"
+        "\b\n"
+        "    # Convert to Delta Lake with Zstd compression\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format delta --compression zstd\n"
+        "\n"
+        "\b\n"
+        "    # Convert to partitioned Parquet by date column\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format parquet \\\n"
+        "        --partition l_shipdate\n"
+        "\n"
+        "\b\n"
+        "    # Convert with multiple partition columns\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format parquet \\\n"
+        "        --partition l_shipdate --partition l_returnflag\n"
+        "\n"
+        "\b\n"
+        "    # Convert to Iceberg without validation (faster, not TPC compliant)\n"
+        "    benchbox convert --input ./data/tpch_sf1 --format iceberg --no-validate\n"
+        "\n"
+        "\b\n"
+        "    # Specify benchmark explicitly for schema lookup\n"
+        "    benchbox convert --input ./data/custom --format parquet --benchmark tpch\n"
+        "\n"
+        "\b\n"
+        "Supported Formats:\n"
+        "    parquet  - Apache Parquet (columnar, compressed)\n"
+        "    vortex   - Vortex (high compression, fast scans)\n"
+        "    delta    - Delta Lake (ACID transactions, time travel)\n"
+        "    iceberg  - Apache Iceberg (schema evolution, hidden partitioning)\n"
+        "    ducklake - DuckLake (DuckDB native, ACID transactions, time travel)\n"
+        "\n"
+        "\b\n"
+        "Compression Options:\n"
+        "    snappy   - Fast compression, moderate ratio (default)\n"
+        "    gzip     - Better ratio, slower\n"
+        "    zstd     - Best ratio, moderate speed\n"
+        "    none     - No compression"
+    ),
+)
 @click.option(
     "--input",
     "input_dir",
@@ -141,70 +177,11 @@ def convert(
     validate: bool,
     verbose: bool,
 ) -> None:
-    """Convert benchmark data to optimized table formats.
-
-    Converts TPC benchmark data from TBL (pipe-delimited) format to columnar
-    formats like Parquet, Vortex, Delta Lake, or Apache Iceberg. This enables
-    significant query performance improvements (2-10x faster).
-
-    The command reads the manifest file in the input directory to discover
-    tables and their source files, then converts each table to the target format.
-
-    \b
-    Examples:
-
-    \b
-        # Convert to Parquet with default settings
-        benchbox convert --input ./data/tpch_sf1 --format parquet
-
-    \b
-        # Convert to Vortex for high compression
-        benchbox convert --input ./data/tpch_sf1 --format vortex
-
-    \b
-        # Convert to Delta Lake with Zstd compression
-        benchbox convert --input ./data/tpch_sf1 --format delta --compression zstd
-
-    \b
-        # Convert to partitioned Parquet by date column
-        benchbox convert --input ./data/tpch_sf1 --format parquet \\
-            --partition l_shipdate
-
-    \b
-        # Convert with multiple partition columns
-        benchbox convert --input ./data/tpch_sf1 --format parquet \\
-            --partition l_shipdate --partition l_returnflag
-
-    \b
-        # Convert to Iceberg without validation (faster, not TPC compliant)
-        benchbox convert --input ./data/tpch_sf1 --format iceberg --no-validate
-
-    \b
-        # Specify benchmark explicitly for schema lookup
-        benchbox convert --input ./data/custom --format parquet --benchmark tpch
-
-    \b
-    Supported Formats:
-        parquet  - Apache Parquet (columnar, compressed)
-        vortex   - Vortex (high compression, fast scans)
-        delta    - Delta Lake (ACID transactions, time travel)
-        iceberg  - Apache Iceberg (schema evolution, hidden partitioning)
-        ducklake - DuckLake (DuckDB native, ACID transactions, time travel)
-
-    \b
-    Compression Options:
-        snappy   - Fast compression, moderate ratio (default)
-        gzip     - Better ratio, slower
-        zstd     - Best ratio, moderate speed
-        none     - No compression
-    """
-    # Configure logging
     if verbose:
         logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
     else:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    # Locate manifest
     manifest_path = input_dir / "_datagen_manifest.json"
     if not manifest_path.exists():
         raise click.ClickException(
@@ -214,18 +191,15 @@ def convert(
     console.print(f"[bold blue]Converting to {target_format.upper()}[/bold blue]")
     console.print(f"Input: {input_dir}")
 
-    # Load manifest
     try:
         manifest = load_manifest(manifest_path)
     except Exception as e:
         raise click.ClickException(f"Failed to load manifest: {e}") from e
 
-    # Upgrade to v2 if needed
     if isinstance(manifest, ManifestV1):
         console.print("[dim]Upgrading manifest v1 to v2...[/dim]")
         manifest = upgrade_v1_to_v2(manifest)
 
-    # Get schemas
     try:
         schemas = _get_schemas_from_manifest(manifest, benchmark)
     except click.ClickException:
@@ -233,12 +207,10 @@ def convert(
     except Exception as e:
         raise click.ClickException(f"Failed to get schemas: {e}") from e
 
-    # Determine output directory
     effective_output_dir = output_dir or input_dir
     if output_dir:
         console.print(f"Output: {effective_output_dir}")
 
-    # Build conversion options
     options = ConversionOptions(
         compression=compression,
         partition_cols=list(partition_cols) if partition_cols else [],
@@ -247,21 +219,19 @@ def convert(
         output_dir=effective_output_dir,
     )
 
-    # Show conversion settings
     console.print(f"Compression: {compression}")
     if partition_cols:
         console.print(f"Partitioning by: {', '.join(partition_cols)}")
     console.print(f"Row validation: {'enabled' if validate else 'disabled'}")
     console.print()
 
-    # Run conversion
     orchestrator = FormatConversionOrchestrator()
     console.print(f"[bold]Converting {len(manifest.tables)} tables...[/bold]")
 
     try:
         results = orchestrator.convert_benchmark_tables(
             manifest_path=manifest_path,
-            output_dir=input_dir,  # Source files are relative to input_dir
+            output_dir=input_dir,
             target_format=target_format.lower(),
             schemas=schemas,
             options=options,
@@ -269,7 +239,6 @@ def convert(
     except Exception as e:
         raise click.ClickException(f"Conversion failed: {e}") from e
 
-    # Print summary
     console.print()
     console.print("[bold green]Conversion complete![/bold green]")
     console.print()
@@ -286,7 +255,6 @@ def convert(
         compression_ratio = f"{result.compression_ratio:.2f}x" if result.compression_ratio > 0 else "N/A"
         console.print(f"  [green]✓[/green] {table_name}: {result.row_count:,} rows, compression: {compression_ratio}")
 
-    # Overall statistics
     console.print()
     console.print("[bold]Summary:[/bold]")
     console.print(f"  Tables converted: {len(results)}")

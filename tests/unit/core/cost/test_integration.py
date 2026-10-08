@@ -1,5 +1,3 @@
-"""Integration tests for cost estimation added to benchmark results."""
-
 from unittest.mock import MagicMock
 
 import pytest
@@ -25,7 +23,6 @@ pytestmark = [
 
 
 def create_test_results(**kwargs):
-    """Cost-test defaults delegating to shared factory."""
     defaults = {
         "benchmark_name": "Test",
         "platform": "snowflake",
@@ -39,18 +36,7 @@ def create_test_results(**kwargs):
 
 
 class TestAddCostEstimationToResults:
-    """Tests for add_cost_estimation_to_results function."""
-
     def test_adds_cost_summary_to_results(self, monkeypatch):
-        """Test that cost_summary is added to BenchmarkResults.
-
-        The warehouse size arrives through the normalized compute block marked
-        observed. A size read only from adapter configuration cannot reach
-        ``cost_status="normalized"``: ``SnowflakeAdapter`` defaults it to
-        "MEDIUM" when the user set nothing, so an unobserved configured size may
-        be a fabricated value and must not back a published total. See
-        ``test_configured_only_warehouse_size_does_not_publish_a_total``.
-        """
         monkeypatch.setattr("benchbox.core.cost.calculator.get_pricing_age_days", lambda table=None: 1)
         results = create_test_results(
             benchmark_name="TPC-H",
@@ -91,7 +77,7 @@ class TestAddCostEstimationToResults:
         assert updated_results.cost_summary["currency"] == "USD"
         normalized_cost = updated_results.cost_summary["normalized_cost"]
         assert normalized_cost["cost_status"] == "normalized"
-        # (0.5 + 0.8) credits * standard/aws/us table rate
+
         expected_total = str((0.5 + 0.8) * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value)
         assert normalized_cost["normalized_cost_usd"] == expected_total
         assert normalized_cost["deployment"]["cloud_provider"] == "aws"
@@ -99,7 +85,6 @@ class TestAddCostEstimationToResults:
         assert normalized_cost["deployment"]["warehouse_size"] == "MEDIUM"
 
     def test_adds_per_query_costs(self):
-        """Test that per-query costs are added to query_results."""
         results = create_test_results(
             benchmark_name="TPC-H",
             platform="snowflake",
@@ -121,40 +106,35 @@ class TestAddCostEstimationToResults:
         updated_results = add_cost_estimation_to_results(results)
 
         assert "cost" in updated_results.query_results[0]
-        # 0.5 credits * standard/aws/us table rate
+
         expected = 0.5 * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
         assert updated_results.query_results[0]["cost"] == expected
 
     def test_handles_missing_platform(self):
-        """Test graceful handling when platform is None."""
         results = create_test_results(benchmark_name="Test", platform=None, scale_factor=1)
 
         updated_results = add_cost_estimation_to_results(results)
 
-        # Should not raise exception, should return results unchanged
         assert not hasattr(updated_results, "cost_summary") or updated_results.cost_summary is None
 
     def test_handles_missing_resource_usage(self):
-        """Test queries without resource_usage don't crash."""
         results = create_test_results(
             benchmark_name="TPC-H",
             platform="snowflake",
             scale_factor=1,
             platform_info={"platform_type": "snowflake"},
             query_results=[
-                {"query_id": "Q1", "execution_time": 1.5},  # No resource_usage
+                {"query_id": "Q1", "execution_time": 1.5},
                 {"query_id": "Q2", "resource_usage": {"credits_used": 0.5}},
             ],
         )
 
         updated_results = add_cost_estimation_to_results(results)
 
-        # Should not crash, Q2 should have cost, Q1 should not
         assert "cost" not in updated_results.query_results[0]
         assert "cost" in updated_results.query_results[1]
 
     def test_platform_config_override(self):
-        """Test that platform_config override works."""
         results = create_test_results(
             benchmark_name="TPC-H",
             platform="snowflake",
@@ -164,7 +144,6 @@ class TestAddCostEstimationToResults:
             ],
         )
 
-        # Override with business_critical pricing (higher cost)
         platform_config = {
             "edition": "business_critical",
             "cloud": "aws",
@@ -173,32 +152,26 @@ class TestAddCostEstimationToResults:
 
         updated_results = add_cost_estimation_to_results(results, platform_config)
 
-        # Business critical table rate vs the standard rate
         expected = 1.0 * resolve_snowflake_credit_price("business_critical", "aws", "us-east-1").value
         assert updated_results.query_results[0]["cost"] == expected
 
     def test_handles_exception_gracefully(self):
-        """Test that exceptions during cost calculation don't crash."""
         results = create_test_results(
             benchmark_name="Test",
             platform="snowflake",
             scale_factor=1,
-            platform_info=None,  # Will cause issues but should be caught
+            platform_info=None,
             query_results=[
                 {"query_id": "Q1", "resource_usage": {"credits_used": 0.5}},
             ],
         )
 
-        # Should not raise exception
         updated_results = add_cost_estimation_to_results(results)
         assert "query_id" in updated_results.query_results[0]
 
 
 class TestExtractPlatformConfigFromResults:
-    """Tests for _extract_platform_config_from_results function."""
-
     def test_extracts_snowflake_config(self):
-        """Test Snowflake config extraction."""
         results = create_test_results(
             benchmark_name="Test",
             platform="snowflake",
@@ -221,7 +194,6 @@ class TestExtractPlatformConfigFromResults:
         assert config["warehouse_size"] == "LARGE"
 
     def test_extracts_bigquery_config(self):
-        """Test BigQuery config extraction."""
         results = create_test_results(
             benchmark_name="Test",
             platform="bigquery",
@@ -238,7 +210,6 @@ class TestExtractPlatformConfigFromResults:
         assert config["location"] == "europe-west1"
 
     def test_extracts_redshift_config(self):
-        """Test Redshift config extraction."""
         results = create_test_results(
             benchmark_name="Test",
             platform="redshift",
@@ -261,7 +232,6 @@ class TestExtractPlatformConfigFromResults:
         assert config["region"] == "us-west-2"
 
     def test_extracts_databricks_config(self):
-        """Test Databricks config extraction."""
         results = create_test_results(
             benchmark_name="Test",
             platform="databricks",
@@ -278,13 +248,12 @@ class TestExtractPlatformConfigFromResults:
         config = _extract_platform_config_from_results(results)
 
         assert config["platform_type"] == "databricks"
-        assert config["cloud"] == "aws"  # Inferred from hostname
+        assert config["cloud"] == "aws"
         assert config["tier"] == "standard"
         assert config["workload_type"] == "all_purpose"
-        assert config["cluster_size_dbu_per_hour"] == 2.0  # Default estimate
+        assert config["cluster_size_dbu_per_hour"] == 2.0
 
     def test_databricks_cloud_inference_azure(self):
-        """Test Databricks cloud inference for Azure."""
         results = create_test_results(
             benchmark_name="Test",
             platform="databricks",
@@ -301,7 +270,6 @@ class TestExtractPlatformConfigFromResults:
         assert config["cloud"] == "azure"
 
     def test_databricks_cloud_inference_gcp(self):
-        """Test Databricks cloud inference for GCP."""
         results = create_test_results(
             benchmark_name="Test",
             platform="databricks",
@@ -318,7 +286,6 @@ class TestExtractPlatformConfigFromResults:
         assert config["cloud"] == "gcp"
 
     def test_extracts_databricks_warehouse_size(self):
-        """Test Databricks warehouse size extraction from compute_configuration."""
         results = create_test_results(
             benchmark_name="Test",
             platform="databricks",
@@ -335,12 +302,11 @@ class TestExtractPlatformConfigFromResults:
 
         config = _extract_platform_config_from_results(results)
 
-        assert config["cluster_size_dbu_per_hour"] == 8.0  # Medium = 8 DBU/hour
+        assert config["cluster_size_dbu_per_hour"] == 8.0
         assert config["warehouse_size"] == "Medium"
-        assert config["workload_type"] == "sql_compute"  # PRO warehouse
+        assert config["workload_type"] == "sql_compute"
 
     def test_databricks_workload_type_serverless(self):
-        """Test Databricks serverless warehouse type mapping."""
         results = create_test_results(
             benchmark_name="Test",
             platform="databricks",
@@ -358,7 +324,6 @@ class TestExtractPlatformConfigFromResults:
         assert config["workload_type"] == "serverless_sql"
 
     def test_databricks_various_warehouse_sizes(self):
-        """Test various Databricks warehouse size mappings."""
         test_cases = [
             ("2X-Small", 1.0),
             ("X-Small", 2.0),
@@ -391,30 +356,18 @@ class TestExtractPlatformConfigFromResults:
             )
 
     def test_handles_missing_platform_info(self):
-        """Test returns empty dict when platform_info is None."""
         results = create_test_results(benchmark_name="Test", platform="snowflake", scale_factor=1, platform_info=None)
 
         config = _extract_platform_config_from_results(results)
         assert config == {}
 
     def test_omits_unobservable_fields_and_records_them_as_defaulted(self):
-        """Missing cloud/region are recorded as defaulted, never invented.
-
-        Snowflake runs on all three providers, so neither the provider nor the
-        region can be derived from the platform's identity. Publishing a guess
-        would assert a deployment the run never observed, and it would not buy a
-        cost total either: each ``_defaulted_fields`` entry becomes a
-        normalized-cost warning, and any warning forces
-        ``cost_status="unavailable"``. ``edition`` keeps its "standard" default
-        because it selects a credit price rather than describing the deployment.
-        """
         results = create_test_results(
             benchmark_name="Test",
             platform="snowflake",
             scale_factor=1,
             platform_info={
                 "platform_type": "snowflake",
-                # Missing edition, cloud, region
             },
         )
 
@@ -427,11 +380,8 @@ class TestExtractPlatformConfigFromResults:
 
 
 class TestCalculatePhaseCosts:
-    """Tests for _calculate_phase_costs function."""
-
     def test_calculates_costs_from_execution_phases(self):
-        """Test phase cost calculation from execution_phases structure."""
-        # Create mock execution phases
+
         power_test = MagicMock()
         power_test.query_executions = [
             MagicMock(resource_usage={"credits_used": 0.5}),
@@ -454,13 +404,12 @@ class TestCalculatePhaseCosts:
 
         assert len(phase_costs) == 1
         assert phase_costs[0].phase_name == "power_test"
-        # (0.5 + 0.8) credits * standard/aws/us table rate
+
         expected = (0.5 + 0.8) * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
         assert phase_costs[0].total_cost == pytest.approx(expected)
         assert phase_costs[0].query_count == 2
 
     def test_calculates_throughput_test_costs(self):
-        """Test throughput test with multiple streams."""
         stream1 = MagicMock()
         stream1.query_executions = [
             MagicMock(resource_usage={"credits_used": 0.3}),
@@ -491,18 +440,17 @@ class TestCalculatePhaseCosts:
 
         assert len(phase_costs) == 1
         assert phase_costs[0].phase_name == "throughput_test"
-        # (0.3 + 0.4 + 0.5) credits * standard/aws/us table rate
+
         expected = (0.3 + 0.4 + 0.5) * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
         assert phase_costs[0].total_cost == pytest.approx(expected)
         assert phase_costs[0].query_count == 3
 
     def test_fallback_to_query_results(self):
-        """Test fallback when execution_phases is not available."""
         results = create_test_results(
             benchmark_name="Custom",
             platform="snowflake",
             scale_factor=1,
-            execution_phases=None,  # No phases structure
+            execution_phases=None,
             query_results=[
                 {"query_id": "Q1", "resource_usage": {"credits_used": 0.5}},
                 {"query_id": "Q2", "resource_usage": {"credits_used": 0.3}},
@@ -516,13 +464,12 @@ class TestCalculatePhaseCosts:
 
         assert len(phase_costs) == 1
         assert phase_costs[0].phase_name == "all_queries"
-        # (0.5 + 0.3) credits * standard/aws/us table rate
+
         expected = (0.5 + 0.3) * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
         assert phase_costs[0].total_cost == pytest.approx(expected)
         assert phase_costs[0].query_count == 2
 
     def test_fallback_with_object_query_results(self):
-        """Fallback path reads resource_usage off QueryExecution-like objects."""
         from benchbox.core.cost.models import PhaseCost
 
         platform_config = {"edition": "standard", "cloud": "aws", "region": "us-east-1"}
@@ -545,12 +492,11 @@ class TestCalculatePhaseCosts:
         assert phase_costs[0].query_count == 2
 
     def test_handles_missing_resource_usage_in_phases(self):
-        """Test queries without resource_usage are skipped."""
         power_test = MagicMock()
         power_test.query_executions = [
             MagicMock(resource_usage={"credits_used": 0.5}),
-            MagicMock(resource_usage=None),  # Missing
-            MagicMock(spec=[]),  # No resource_usage attribute
+            MagicMock(resource_usage=None),
+            MagicMock(spec=[]),
         ]
 
         execution_phases = MagicMock()
@@ -567,14 +513,12 @@ class TestCalculatePhaseCosts:
 
         phase_costs = _calculate_phase_costs(results, "snowflake", platform_config, calculator)
 
-        # Only 1 query with valid resource_usage
         assert len(phase_costs) == 1
         assert phase_costs[0].query_count == 1
         expected = 0.5 * resolve_snowflake_credit_price("standard", "aws", "us-east-1").value
         assert phase_costs[0].total_cost == pytest.approx(expected)
 
     def test_returns_empty_list_when_no_costs(self):
-        """Test returns empty list when no valid costs found."""
         results = create_test_results(
             benchmark_name="Test", platform="snowflake", scale_factor=1, execution_phases=None, query_results=[]
         )
@@ -587,7 +531,6 @@ class TestCalculatePhaseCosts:
         assert phase_costs == []
 
     def test_multiple_phases_calculated(self):
-        """Test all three phases are calculated when present."""
         power_test = MagicMock()
         power_test.query_executions = [MagicMock(resource_usage={"credits_used": 1.0})]
 
@@ -621,10 +564,7 @@ class TestCalculatePhaseCosts:
 
 
 class TestMultiPlatformIntegration:
-    """Integration tests across multiple platforms."""
-
     def test_bigquery_integration(self):
-        """Test BigQuery cost estimation integration."""
         results = create_test_results(
             benchmark_name="TPC-H",
             platform="bigquery",
@@ -636,21 +576,17 @@ class TestMultiPlatformIntegration:
             query_results=[
                 {
                     "query_id": "Q1",
-                    "resource_usage": {"bytes_billed": 1024**4},  # 1 TB
+                    "resource_usage": {"bytes_billed": 1024**4},
                 },
             ],
         )
 
         updated_results = add_cost_estimation_to_results(results)
 
-        # Golden: 1 TiB * $6.25/TiB. Provenance: bigquery_on_demand_prices
-        # (cloud.google.com/bigquery/pricing, retrieved 2026-09-18). Update
-        # only when the vendor page changes.
         assert updated_results.query_results[0]["cost"] == 6.25
         assert updated_results.cost_summary["total_cost"] == 6.25
 
     def test_redshift_integration(self):
-        """Test Redshift cost estimation integration."""
         results = create_test_results(
             benchmark_name="TPC-H",
             platform="redshift",
@@ -666,20 +602,18 @@ class TestMultiPlatformIntegration:
             query_results=[
                 {
                     "query_id": "Q1",
-                    "resource_usage": {"execution_time_seconds": 3600},  # 1 hour
+                    "resource_usage": {"execution_time_seconds": 3600},
                 },
             ],
         )
 
         updated_results = add_cost_estimation_to_results(results)
 
-        # 1 hour * 2 nodes * dc2.large/us-east-1 table rate
         expected = 1.0 * 2 * resolve_redshift_node_price("dc2.large", "us-east-1").value
         assert updated_results.query_results[0]["cost"] == pytest.approx(expected)
         assert updated_results.cost_summary["total_cost"] == pytest.approx(expected)
 
     def test_databricks_integration(self):
-        """Test Databricks cost estimation integration."""
         results = create_test_results(
             benchmark_name="TPC-H",
             platform="databricks",
@@ -694,20 +628,18 @@ class TestMultiPlatformIntegration:
             query_results=[
                 {
                     "query_id": "Q1",
-                    "resource_usage": {"execution_time_seconds": 1800},  # 30 min
+                    "resource_usage": {"execution_time_seconds": 1800},
                 },
             ],
         )
 
         updated_results = add_cost_estimation_to_results(results)
 
-        # 0.5 hours * 2.0 DBU/hour * premium all-purpose table rate
         expected_cost = 0.5 * 2.0 * resolve_databricks_dbu_price("aws", "premium", "all_purpose").value
         assert abs(updated_results.query_results[0]["cost"] - expected_cost) < 0.001
         assert abs(updated_results.cost_summary["total_cost"] - expected_cost) < 0.001
 
     def test_duckdb_zero_cost_integration(self):
-        """Test DuckDB returns zero cost."""
         results = create_test_results(
             benchmark_name="TPC-H",
             platform="duckdb",
@@ -731,7 +663,6 @@ class TestMultiPlatformIntegration:
         assert normalized_cost["cost_usd"] is None
 
     def test_missing_cloud_metadata_marks_normalized_cost_unavailable(self, caplog):
-        """Defaulted cloud metadata is warned about and not ranked as normalized cost."""
         results = create_test_results(
             benchmark_name="TPC-H",
             platform="snowflake",

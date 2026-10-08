@@ -1,5 +1,3 @@
-"""Dataset identity fields in schema-v2 result bundles."""
-
 from __future__ import annotations
 
 import pytest

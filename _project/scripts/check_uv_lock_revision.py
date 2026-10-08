@@ -1,20 +1,3 @@
-"""Reject a uv.lock schema-revision downgrade.
-
-An older local uv (< 0.8) silently rewrites the committed ``revision = 3``
-lockfile back to revision 2 as a side effect of any ``uv add``/``uv lock``
-run, and the downgrade rides along with the intended change. This guard
-fails when the revision DECREASES relative to the committed baseline;
-unchanged and increased revisions pass so legitimate lock updates need no
-ceremony.
-
-Modes:
-  --old N --new N   pure comparison (test interface, no git or files needed)
-  --baseline-ref R compare ``git show R:uv.lock`` against ./uv.lock
-  default           compare ``git show HEAD:uv.lock`` against ./uv.lock
-
-Exit status: 0 ok, 1 downgrade (or malformed lock), 2 usage error.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -24,6 +7,25 @@ import sys
 from pathlib import Path
 
 _REVISION_RE = re.compile(r"^revision\s*=\s*(\d+)\s*$", re.MULTILINE)
+
+
+CLI_DESCRIPTION = (
+    "Reject a uv.lock schema-revision downgrade.\n"
+    "\n"
+    "An older local uv (< 0.8) silently rewrites the committed ``revision = 3``\n"
+    "lockfile back to revision 2 as a side effect of any ``uv add``/``uv lock``\n"
+    "run, and the downgrade rides along with the intended change. This guard\n"
+    "fails when the revision DECREASES relative to the committed baseline;\n"
+    "unchanged and increased revisions pass so legitimate lock updates need no\n"
+    "ceremony.\n"
+    "\n"
+    "Modes:\n"
+    "  --old N --new N   pure comparison (test interface, no git or files needed)\n"
+    "  --baseline-ref R compare ``git show R:uv.lock`` against ./uv.lock\n"
+    "  default           compare ``git show HEAD:uv.lock`` against ./uv.lock\n"
+    "\n"
+    "Exit status: 0 ok, 1 downgrade (or malformed lock), 2 usage error.\n"
+)
 
 
 def parse_revision(lock_text: str, origin: str) -> int:
@@ -60,7 +62,7 @@ def _committed_lock_text(repo_root: Path, ref: str = "HEAD") -> str | None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--old", type=int, default=None, help="baseline revision (test interface)")
     parser.add_argument("--new", type=int, default=None, help="candidate revision (test interface)")
     parser.add_argument("--baseline-ref", help="git ref containing the baseline uv.lock (default: HEAD)")
@@ -85,7 +87,6 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
-        # No committed baseline (fresh repo / uv.lock not yet tracked).
         print(f"no committed uv.lock baseline ({baseline_ref}); nothing to compare")
         return 0
     try:

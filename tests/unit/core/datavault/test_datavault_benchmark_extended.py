@@ -1,18 +1,6 @@
-"""Extended tests for DataVaultBenchmark to increase coverage.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets methods not covered by test_datavault_benchmark.py:
-- tpch_source_dir property
-- get_query / get_all_queries / get_queries
-- get_schema
-- get_create_tables_sql (duckdb/standard dialects)
-- get_table_loading_order
-- get_table_count
-- cleanup
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -29,8 +17,6 @@ pytestmark = [
 
 
 class TestDataVaultBenchmarkProperties:
-    """Tests for basic benchmark properties."""
-
     def test_has_name(self) -> None:
         bm = DataVaultBenchmark(scale_factor=0.01)
         assert bm._name == "Data Vault Benchmark"
@@ -68,8 +54,6 @@ class TestDataVaultBenchmarkProperties:
 
 
 class TestDataVaultTpchSourceDir:
-    """Tests for the tpch_source_dir property."""
-
     def test_tpch_source_dir_computed_from_output_dir(self, tmp_path: Path) -> None:
         output = tmp_path / "benchmark_runs" / "datagen" / "datavault_sf001"
         bm = DataVaultBenchmark(scale_factor=0.01, output_dir=output)
@@ -86,8 +70,6 @@ class TestDataVaultTpchSourceDir:
 
 
 class TestDataVaultQueries:
-    """Tests for query retrieval methods."""
-
     @pytest.fixture
     def bm(self) -> DataVaultBenchmark:
         return DataVaultBenchmark(scale_factor=0.01)
@@ -98,7 +80,6 @@ class TestDataVaultQueries:
 
     def test_get_all_queries_keys_are_ints(self, bm: DataVaultBenchmark) -> None:
         queries = bm.get_all_queries()
-        # Keys should be integers 1-22
         for k in queries:
             assert isinstance(k, int)
         assert set(queries.keys()) == set(range(1, 23))
@@ -129,8 +110,6 @@ class TestDataVaultQueries:
 
 
 class TestDataVaultSchema:
-    """Tests for schema-related methods."""
-
     @pytest.fixture
     def bm(self) -> DataVaultBenchmark:
         return DataVaultBenchmark(scale_factor=0.01)
@@ -167,11 +146,8 @@ class TestDataVaultSchema:
 
 
 class TestDataVaultCleanup:
-    """Tests for cleanup behavior."""
-
     def test_cleanup_no_error_when_no_generator(self) -> None:
         bm = DataVaultBenchmark(scale_factor=0.01)
-        # Should not raise even though _tpch_generator is None
         bm.cleanup()
 
     def test_cleanup_calls_generator_cleanup(self) -> None:
@@ -185,39 +161,30 @@ class TestDataVaultCleanup:
 
 
 class TestDataVaultBenchmarkEdgeCases:
-    """Additional tests for edge cases and less-covered paths."""
-
     def test_invalid_hash_algorithm_raises(self) -> None:
         with pytest.raises(ValueError, match="Unsupported hash algorithm"):
             DataVaultBenchmark(scale_factor=0.01, hash_algorithm="sha512")
 
     def test_supported_hash_algorithms(self) -> None:
-        """MD5 is the only currently supported algorithm."""
         bm_md5 = DataVaultBenchmark(scale_factor=0.01, hash_algorithm="md5")
         assert bm_md5.hash_algorithm == "md5"
 
     def test_tpch_source_dir_default_output_dir(self) -> None:
-        """tpch_source_dir with default output_dir uses cwd fallback."""
         bm = DataVaultBenchmark(scale_factor=0.01)
-        # Override output_dir to None to force the cwd fallback branch
-        bm.output_dir = None  # type: ignore[assignment]
-        bm._tpch_source_dir = None  # reset cache
+        bm.output_dir = None
+        bm._tpch_source_dir = None
         src = bm.tpch_source_dir
         assert "tpch_" in src.name
 
     def test_get_create_tables_sql_non_standard_dialect(self) -> None:
-        """Non-standard dialects should trigger SQLGlot translation path."""
         bm = DataVaultBenchmark(scale_factor=0.01)
-        # Use a non-standard dialect to exercise the translation branch
         try:
             ddl = bm.get_create_tables_sql(dialect="mysql")
             assert "CREATE TABLE" in ddl
         except Exception:
-            # Translation errors are OK; the branch was still exercised
             pass
 
     def test_execute_query_with_mock_connection(self) -> None:
-        """execute_query should call cursor.execute and fetchall."""
         from unittest.mock import MagicMock
 
         bm = DataVaultBenchmark(scale_factor=0.01)
@@ -230,7 +197,6 @@ class TestDataVaultBenchmarkEdgeCases:
         mock_cursor.execute.assert_called_once()
 
     def test_execute_query_connection_without_cursor(self) -> None:
-        """When connection has no cursor() method, use it directly."""
         from unittest.mock import MagicMock
 
         bm = DataVaultBenchmark(scale_factor=0.01)
@@ -251,7 +217,6 @@ class TestDataVaultBenchmarkEdgeCases:
         assert len(queries) > 0
 
     def test_get_create_tables_sql_with_tuning_config(self) -> None:
-        """Tuning config path in get_create_tables_sql."""
         from unittest.mock import MagicMock
 
         bm = DataVaultBenchmark(scale_factor=0.01)
@@ -262,44 +227,36 @@ class TestDataVaultBenchmarkEdgeCases:
         assert "CREATE TABLE" in ddl
 
     def test_lazy_load_query_manager(self) -> None:
-        """query_manager property should lazy-load on first access."""
         bm = DataVaultBenchmark(scale_factor=0.01)
         assert bm._query_manager is None
         qm = bm.query_manager
         assert qm is not None
-        # Second access should return cached instance
         assert bm.query_manager is qm
 
     def test_lazy_load_tpch_generator(self, tmp_path: Path) -> None:
-        """tpch_generator property should lazy-load the TPC-H generator."""
         bm = DataVaultBenchmark(scale_factor=0.01, output_dir=tmp_path / "datavault")
         assert bm._tpch_generator is None
         gen = bm.tpch_generator
         assert gen is not None
-        # Second access uses cache
         assert bm.tpch_generator is gen
 
     def test_lazy_load_etl_transformer(self) -> None:
-        """etl_transformer property should lazy-load the ETL transformer."""
         bm = DataVaultBenchmark(scale_factor=0.01)
         assert bm._etl_transformer is None
         transformer = bm.etl_transformer
         assert transformer is not None
-        # Second access uses cache
         assert bm.etl_transformer is transformer
 
     def test_check_manifest_returns_none_when_no_file(self, tmp_path: Path) -> None:
-        """_check_existing_manifest returns None when manifest doesn't exist."""
         bm = DataVaultBenchmark(scale_factor=0.01, output_dir=tmp_path)
         result = bm._check_existing_manifest()
         assert result is None
 
     def test_check_manifest_benchmark_mismatch(self, tmp_path: Path) -> None:
-        """_check_existing_manifest returns None when benchmark name doesn't match."""
         import json
 
         manifest = {
-            "benchmark": "tpch",  # wrong benchmark
+            "benchmark": "tpch",
             "scale_factor": 0.01,
             "tables": {},
         }
@@ -309,12 +266,11 @@ class TestDataVaultBenchmarkEdgeCases:
         assert result is None
 
     def test_check_manifest_scale_factor_mismatch(self, tmp_path: Path) -> None:
-        """_check_existing_manifest returns None when scale factor doesn't match."""
         import json
 
         manifest = {
             "benchmark": "datavault",
-            "scale_factor": 1.0,  # wrong scale factor
+            "scale_factor": 1.0,
             "tables": {},
         }
         (tmp_path / "_datagen_manifest.json").write_text(json.dumps(manifest))
@@ -323,14 +279,12 @@ class TestDataVaultBenchmarkEdgeCases:
         assert result is None
 
     def test_check_manifest_invalid_json_returns_none(self, tmp_path: Path) -> None:
-        """_check_existing_manifest returns None on parse error."""
         (tmp_path / "_datagen_manifest.json").write_text("not valid json{")
         bm = DataVaultBenchmark(scale_factor=0.01, output_dir=tmp_path)
         result = bm._check_existing_manifest()
         assert result is None
 
     def test_generate_data_with_mocked_generators(self, tmp_path: Path) -> None:
-        """generate_data should call tpch_generator.generate() and etl_transformer.transform()."""
         from unittest.mock import MagicMock, patch
 
         bm = DataVaultBenchmark(scale_factor=0.01, output_dir=tmp_path)
@@ -352,7 +306,6 @@ class TestDataVaultBenchmarkEdgeCases:
         mock_etl.transform.assert_called_once()
 
     def test_generate_data_with_force_regenerate(self, tmp_path: Path) -> None:
-        """force_regenerate=True skips manifest check."""
         from unittest.mock import MagicMock
 
         bm = DataVaultBenchmark(scale_factor=0.01, output_dir=tmp_path, force_regenerate=True)
@@ -369,16 +322,13 @@ class TestDataVaultBenchmarkEdgeCases:
         assert isinstance(result, dict)
 
     def test_generate_data_output_dir_none_raises(self) -> None:
-        """generate_data raises ValueError when output_dir is None."""
         bm = DataVaultBenchmark(scale_factor=0.01)
-        bm.output_dir = None  # type: ignore[assignment]
+        bm.output_dir = None
         with pytest.raises(ValueError, match="output_dir must be set"):
             bm.generate_data()
 
 
 class TestDataVaultManifestDialectMetadata:
-    """Generated-table manifest entries carry durable CSV dialect metadata."""
-
     def _write(self, tmp_path: Path, output_format: str) -> dict:
         import json
         from datetime import datetime
@@ -414,9 +364,6 @@ class TestDataVaultManifestDialectMetadata:
         assert entry["metadata"]["csv_has_header"] is False
 
     def test_satellite_manifest_resolves_empty_field_to_null(self, tmp_path: Path) -> None:
-        """Loader-side contract: a satellite manifest must resolve to a dialect
-        that the DuckDB handler turns into nullstr='', so the empty
-        load_end_dts field loads as NULL, not ''."""
         from benchbox.platforms.base.data_loading import (
             DataSource,
             DuckDBNativeHandler,

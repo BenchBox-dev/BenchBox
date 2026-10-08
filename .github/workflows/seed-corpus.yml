@@ -1,14 +1,7 @@
 name: Seed Corpus
 
-# NOTE: Actual benchmark runs require meaningful compute resources and wall-clock time.
-# SF 0.01 / SF 0.1 jobs typically complete in a few minutes on a GitHub-hosted runner.
-# The supported matrix contains only local, three-identity cohorts.
-
 on:
   schedule:
-    # Monthly publication sweep. Generation already existed as an on-demand
-    # workflow; the missing piece was putting it on a calendar so
-    # published-results does not stall until someone remembers to click.
     - cron: "0 7 1 * *"
   workflow_dispatch:
     inputs:
@@ -28,7 +21,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # TPC-H SF 0.01
           - benchmark: tpch
             platform: duckdb
             scale_factor: "0.01"
@@ -42,7 +34,6 @@ jobs:
             scale_factor: "0.01"
             extras: polars
 
-          # TPC-H SF 0.1
           - benchmark: tpch
             platform: duckdb
             scale_factor: "0.1"
@@ -56,7 +47,6 @@ jobs:
             scale_factor: "0.1"
             extras: polars
 
-          # TPC-H SF 1.0
           - benchmark: tpch
             platform: duckdb
             scale_factor: "1.0"
@@ -70,7 +60,6 @@ jobs:
             scale_factor: "1.0"
             extras: clickhouse-local
 
-          # TPC-DS SF 1 (integer-only scale factors)
           - benchmark: tpcds
             platform: duckdb
             scale_factor: "1"
@@ -84,7 +73,6 @@ jobs:
             scale_factor: "1"
             extras: clickhouse-local
 
-          # SSB SF 0.01
           - benchmark: ssb
             platform: duckdb
             scale_factor: "0.01"
@@ -98,7 +86,6 @@ jobs:
             scale_factor: "0.01"
             extras: polars
 
-          # SSB SF 0.1
           - benchmark: ssb
             platform: duckdb
             scale_factor: "0.1"
@@ -112,33 +99,24 @@ jobs:
             scale_factor: "0.1"
             extras: polars
 
-    # Skip matrix entries that don't match the requested benchmark (when
-    # provided). This CANNOT be a job-level `if`: the matrix context is not
-    # available there (the job `if` is evaluated before the matrix expands), and
-    # referencing it made the whole workflow fail to start — GitHub recorded a
-    # failed run with zero jobs on every push. `env` at job level *can* read
-    # matrix, so the condition is computed once here and each step guards on it.
     env:
       SELECTED: ${{ github.event_name == 'schedule' || github.event.inputs.benchmark == '' || github.event.inputs.benchmark == matrix.benchmark }}
-      # BenchBox normally keeps generated data beside the checkout so worktrees
-      # can share it. CI must keep the run inside the workspace because the
-      # later staging steps intentionally collect and commit result bundles.
       BENCHBOX_OUTPUT_DIR: ${{ github.workspace }}/benchmark_runs
 
     steps:
       - name: Checkout code
         if: env.SELECTED == 'true'
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Python
         if: env.SELECTED == 'true'
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.12"
 
       - name: Install uv
         if: env.SELECTED == 'true'
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install BenchBox
         if: env.SELECTED == 'true'
@@ -163,8 +141,6 @@ jobs:
         id: locate
         shell: bash
         run: |
-          # Default results dir is benchmark_runs/results/ relative to repo root.
-          # Find the most recently modified schema-v2 JSON (excludes companions).
           RESULT=$(find benchmark_runs/results -maxdepth 1 -name "*.json" \
             ! -name "*.plans.json" ! -name "*.tuning.json" \
             ! -name "*.override.json" \
@@ -188,7 +164,6 @@ jobs:
           BASENAME=$(basename "$RESULT_FILE")
           cp "$RESULT_FILE" "$DEST/$BASENAME"
 
-          # Copy companion files if they exist alongside the primary bundle.
           STEM="${RESULT_FILE%.json}"
           [ -f "${STEM}.plans.json" ] && cp "${STEM}.plans.json" "$DEST/" || true
           [ -f "${STEM}.tuning.json" ] && cp "${STEM}.tuning.json" "$DEST/" || true
@@ -198,9 +173,8 @@ jobs:
 
       - name: Upload bundle artifact
         if: env.SELECTED == 'true'
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
-          # Artifact name must be unique per matrix entry.
           name: seed-bundle--${{ matrix.benchmark }}--${{ matrix.platform }}--sf${{ matrix.scale_factor }}
           path: results-data/bundles/${{ matrix.benchmark }}/${{ matrix.platform }}/sf${{ matrix.scale_factor }}/
           retention-days: 14
@@ -209,8 +183,6 @@ jobs:
     name: Open PR with seed corpus bundles
     runs-on: ubuntu-latest
     needs: generate-seed-corpus
-    # Run even if some matrix jobs failed (continue-on-error jobs don't affect needs status,
-    # but required jobs might fail - collect whatever succeeded).
     if: always()
     permissions:
       contents: write
@@ -218,30 +190,24 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Download all bundle artifacts
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           pattern: seed-bundle--*
           path: results-data/bundles/
           merge-multiple: false
 
       - name: Flatten artifact subdirectories
-        # download-artifact@v4 with merge-multiple: false creates one subdir per artifact.
-        # The artifact name encodes benchmark/platform/sf, so we need to move files into
-        # the correct nested path under results-data/bundles/.
         shell: bash
         run: |
           shopt -s nullglob
           for artifact_dir in results-data/bundles/seed-bundle--*/; do
-            # Parse artifact name: seed-bundle--{benchmark}--{platform}--sf{scale}
             name=$(basename "$artifact_dir")
-            # Strip prefix
             rest="${name#seed-bundle--}"
             benchmark="${rest%%--*}"; rest="${rest#*--}"
             platform="${rest%%--*}"; rest="${rest#*--}"
-            # rest is now sf{scale}
             scale="${rest#sf}"
 
             dest="results-data/bundles/${benchmark}/${platform}/sf${scale}"
@@ -251,7 +217,7 @@ jobs:
           done
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Regenerate corpus inventory
         run: uv run -- python scripts/generate_corpus_inventory.py --write

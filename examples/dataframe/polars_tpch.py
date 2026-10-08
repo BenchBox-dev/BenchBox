@@ -1,24 +1,12 @@
 #!/usr/bin/env python3
-"""
-Polars DataFrame TPC-H Benchmark Example
-
-Demonstrates running TPC-H queries using Polars' native DataFrame API.
-This uses the Expression family implementation with lazy evaluation
-and query optimization.
-
-Copyright 2026 Joe Harris / BenchBox Project.
-Licensed under the MIT License.
-
-Usage:
-    python examples/dataframe/polars_tpch.py
-"""
+# Copyright 2026 Joe Harris / BenchBox Project.
+# Licensed under the MIT License.
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-# Ensure polars is available
 try:
     import polars as pl
 
@@ -29,7 +17,6 @@ except ImportError:
 
 
 def main() -> int:
-    """Run Polars DataFrame TPC-H benchmark demonstration."""
     from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES, get_query
     from benchbox.platforms.polars_platform import PolarsAdapter
 
@@ -37,14 +24,12 @@ def main() -> int:
     print("Polars DataFrame TPC-H Benchmark")
     print("=" * 60)
 
-    # Show registered queries
     print("\nRegistered TPC-H queries:")
     for qid in TPCH_DATAFRAME_QUERIES.get_query_ids()[:5]:
         query = TPCH_DATAFRAME_QUERIES.get(qid)
         print(f"  {qid}: {query.query_name}")
     print(f"  ... and {len(TPCH_DATAFRAME_QUERIES) - 5} more")
 
-    # Check data availability
     data_dir = Path("benchmark_runs/tpch/sf0.01/data")
     if not data_dir.exists():
         print(f"\nWarning: Data directory not found: {data_dir}")
@@ -53,11 +38,9 @@ def main() -> int:
         print("\nSkipping query execution, showing structure only.")
         return 0
 
-    # Create context with Polars DataFrame
     print("\nCreating Polars DataFrame context...")
     ctx = PolarsAdapter().create_connection()
 
-    # Load tables (lazy scanning from Parquet)
     parquet_dir = data_dir / "parquet"
     if parquet_dir.exists():
         print(f"Loading tables from {parquet_dir}...")
@@ -65,7 +48,6 @@ def main() -> int:
         for table in tables:
             table_path = parquet_dir / f"{table}.parquet"
             if table_path.exists():
-                # Use lazy scanning for efficiency
                 df = pl.scan_parquet(str(table_path))
                 ctx.register_table(table, df)
                 print(f"  Loaded {table}")
@@ -73,7 +55,6 @@ def main() -> int:
         print(f"Parquet directory not found: {parquet_dir}")
         return 1
 
-    # Execute sample queries
     print("\n" + "-" * 60)
     print("Executing Sample Queries")
     print("-" * 60)
@@ -90,10 +71,8 @@ def main() -> int:
         print(f"  Description: {query.description}")
 
         try:
-            # Execute expression family implementation
             result = query.execute(ctx, "expression")
 
-            # Collect results (triggers lazy evaluation)
             result_df = result.collect() if hasattr(result, "collect") else result
 
             print(f"  Result shape: {result_df.shape}")

@@ -1,21 +1,6 @@
-"""CoffeeShop DataFrame query implementations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-All 11 CoffeeShop benchmark queries implemented for both Expression and Pandas families.
-
-Tables: order_lines (fact), dim_locations, dim_products (dimensions)
-Patterns: joins, CASE WHEN, window functions, date operations, NULLIF
-
-Query categories:
-- Sales Analysis (SA1-SA5): Revenue, products, locations
-- Product Analysis (PR1-PR2): Product mix, price bands
-- Trend Analysis (TR1): Quarterly trends
-- Time Analysis (TM1): Day-part cadence
-- Quality Checks (QC1-QC2): Data quality metrics
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -25,28 +10,15 @@ from typing import Any
 
 
 def _parse_date(value: str | date) -> date:
-    """Parse a date string (YYYY-MM-DD) to a date object, or return as-is if already a date."""
     if isinstance(value, date):
         return value
     return date.fromisoformat(value)
 
 
 def _date_between(series: Any, start: str | date, end: str | date) -> Any:
-    """Boolean mask selecting an order_date column within [start, end] (inclusive).
-
-    Production loads DATE columns as pyarrow ``date32`` (date-valued), so comparing
-    against ``datetime.date`` bounds is correct. Some contexts/fixtures instead
-    provide ``datetime64[ns]``; pandas refuses to compare those against ``date``, so
-    align the bounds to ``Timestamp`` when the column is datetime-typed.
-    Pandas 3 reports ``is_datetime64_any_dtype`` as True for Arrow ``date32``
-    as well, but ``date32`` refuses ``Timestamp`` bounds while accepting
-    ``date`` bounds - so Arrow date columns keep ``date`` bounds.
-    """
     import pandas as pd
 
     low, high = _parse_date(start), _parse_date(end)
-    # Guard the dtype check with isinstance so non-Series inputs (e.g. expression
-    # mocks in unit tests) skip introspection and just use the comparison operators.
     dtype = series.dtype if isinstance(series, pd.Series) else None
     is_arrow_date = isinstance(dtype, pd.ArrowDtype) and str(dtype).startswith(("date32", "date64"))
     if isinstance(series, pd.Series) and pd.api.types.is_datetime64_any_dtype(series) and not is_arrow_date:
@@ -55,14 +27,6 @@ def _date_between(series: Any, start: str | date, end: str | date) -> Any:
 
 
 def _hour_pandas(series: Any) -> Any:
-    """Extract the hour (0-23) from a pandas order_time column.
-
-    Production loads TIME columns as "HH:MM:SS" strings, but custom contexts and
-    temporal fixtures may register order_time as a native temporal column. Use the
-    ``.dt`` accessor for temporal dtypes and only slice the leading two characters
-    when the column is genuinely string-typed - slicing a timestamp such as
-    "2023-..." would otherwise misread the year prefix as hour 20.
-    """
     import pandas as pd
 
     if isinstance(series, pd.Series) and (
@@ -75,14 +39,6 @@ def _hour_pandas(series: Any) -> Any:
 
 
 def _is_temporal_expression_column(frame: Any, name: str) -> bool:
-    """Return True when *name* is a native temporal column on an expression frame.
-
-    Inspects the underlying native (Polars/PySpark/DataFusion) schema so TM1 can
-    use the temporal hour accessor for time/datetime columns and fall back to the
-    "HH:MM:SS" string-slice path for string columns. Returns False on any
-    introspection failure (e.g. expression mocks in unit tests) so the safe
-    string-slice path is used.
-    """
     try:
         native = getattr(frame, "native", frame)
         if hasattr(native, "collect_schema"):
@@ -105,13 +61,8 @@ from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory
 from .parameters import get_parameters
 from .registry import register_query
 
-# =============================================================================
-# SA1: Daily revenue and order volume by region
-# =============================================================================
-
 
 def sa1_expression_impl(ctx: DataFrameContext) -> Any:
-    """SA1: Daily revenue and order volume by region."""
     params = get_parameters("SA1")
     start_date = params.get("start_date", "2023-01-01")
     end_date = params.get("end_date", "2023-01-31")
@@ -142,7 +93,6 @@ def sa1_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def sa1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """SA1: Daily revenue and order volume by region."""
     import numpy as np
 
     params = get_parameters("SA1")
@@ -152,9 +102,6 @@ def sa1_pandas_impl(ctx: DataFrameContext) -> Any:
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
     filtered = ol[_date_between(ol["order_date"], start_date, end_date)]
-    # order_lines is denormalized (carries its own location_id/region); drop those
-    # before the join so the grouped/filtered columns come from dim_locations, as
-    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
     merged = filtered.drop(columns=["location_id", "region"], errors="ignore").merge(
         dl, left_on="location_record_id", right_on="record_id"
     )
@@ -168,13 +115,7 @@ def sa1_pandas_impl(ctx: DataFrameContext) -> Any:
     return grouped.sort_values(["order_date", "region"])
 
 
-# =============================================================================
-# SA2: Top products by revenue for a given year
-# =============================================================================
-
-
 def sa2_expression_impl(ctx: DataFrameContext) -> Any:
-    """SA2: Top products by revenue for a given year."""
     params = get_parameters("SA2")
     year = params.get("year", 2023)
     limit = params.get("limit", 15)
@@ -193,7 +134,6 @@ def sa2_expression_impl(ctx: DataFrameContext) -> Any:
             col("quantity").sum().alias("total_quantity"),
             col("total_price").sum().alias("total_revenue"),
         )
-        # SQL selects "dp.name AS product_name"; match that output schema.
         .rename({"name": "product_name"})
         .sort("total_revenue", descending=True)
         .limit(limit)
@@ -201,7 +141,6 @@ def sa2_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def sa2_pandas_impl(ctx: DataFrameContext) -> Any:
-    """SA2: Top products by revenue for a given year."""
     params = get_parameters("SA2")
     year = params.get("year", 2023)
     limit = params.get("limit", 15)
@@ -209,29 +148,19 @@ def sa2_pandas_impl(ctx: DataFrameContext) -> Any:
     ol = ctx.get_table("order_lines")
     dp = ctx.get_table("dim_products")
     filtered = ol[ol["order_date"].dt.year == year]
-    # Drop order_lines' denormalized product_id before the join so dim_products'
-    # columns (product_id/name/subcategory/validity) are used unambiguously, as
-    # the SQL does, rather than pandas suffixing the product_id collision.
     merged = filtered.drop(columns=["product_id"], errors="ignore").merge(
         dp, left_on="product_record_id", right_on="record_id"
     )
     return (
         merged.groupby(["subcategory", "name"], as_index=False)
         .agg(total_quantity=("quantity", "sum"), total_revenue=("total_price", "sum"))
-        # SQL selects "dp.name AS product_name"; match that output schema.
         .rename(columns={"name": "product_name"})
         .sort_values("total_revenue", ascending=False)
         .head(limit)
     )
 
 
-# =============================================================================
-# SA3: Monthly performance metrics
-# =============================================================================
-
-
 def sa3_expression_impl(ctx: DataFrameContext) -> Any:
-    """SA3: Monthly performance metrics for a selected year."""
     params = get_parameters("SA3")
     year = params.get("year", 2023)
 
@@ -266,7 +195,6 @@ def sa3_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def sa3_pandas_impl(ctx: DataFrameContext) -> Any:
-    """SA3: Monthly performance metrics for a selected year."""
     import numpy as np
 
     params = get_parameters("SA3")
@@ -286,13 +214,7 @@ def sa3_pandas_impl(ctx: DataFrameContext) -> Any:
     return grouped.sort_values(["year", "month"])
 
 
-# =============================================================================
-# SA4: Revenue share by region (window function)
-# =============================================================================
-
-
 def sa4_expression_impl(ctx: DataFrameContext) -> Any:
-    """SA4: Revenue share by region using window function."""
     params = get_parameters("SA4")
     start_date = params.get("start_date", "2023-01-01")
     end_date = params.get("end_date", "2024-12-31")
@@ -323,7 +245,6 @@ def sa4_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def sa4_pandas_impl(ctx: DataFrameContext) -> Any:
-    """SA4: Revenue share by region using window function."""
     params = get_parameters("SA4")
     start_date = params.get("start_date", "2023-01-01")
     end_date = params.get("end_date", "2024-12-31")
@@ -331,9 +252,6 @@ def sa4_pandas_impl(ctx: DataFrameContext) -> Any:
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
     filtered = ol[_date_between(ol["order_date"], start_date, end_date)]
-    # order_lines is denormalized (carries its own location_id/region); drop those
-    # before the join so the grouped/filtered columns come from dim_locations, as
-    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
     merged = filtered.drop(columns=["location_id", "region"], errors="ignore").merge(
         dl, left_on="location_record_id", right_on="record_id"
     )
@@ -346,13 +264,7 @@ def sa4_pandas_impl(ctx: DataFrameContext) -> Any:
     return grouped.sort_values("revenue", ascending=False)
 
 
-# =============================================================================
-# SA5: Top-performing locations by revenue
-# =============================================================================
-
-
 def sa5_expression_impl(ctx: DataFrameContext) -> Any:
-    """SA5: Top-performing locations by revenue."""
     params = get_parameters("SA5")
     start_date = params.get("start_date", "2023-01-01")
     end_date = params.get("end_date", "2024-12-31")
@@ -380,7 +292,6 @@ def sa5_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def sa5_pandas_impl(ctx: DataFrameContext) -> Any:
-    """SA5: Top-performing locations by revenue."""
     params = get_parameters("SA5")
     start_date = params.get("start_date", "2023-01-01")
     end_date = params.get("end_date", "2024-12-31")
@@ -389,9 +300,6 @@ def sa5_pandas_impl(ctx: DataFrameContext) -> Any:
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
     filtered = ol[_date_between(ol["order_date"], start_date, end_date)]
-    # order_lines is denormalized (carries its own location_id/region); drop those
-    # before the join so the grouped/filtered columns come from dim_locations, as
-    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
     merged = filtered.drop(columns=["location_id", "region"], errors="ignore").merge(
         dl, left_on="location_record_id", right_on="record_id"
     )
@@ -403,13 +311,7 @@ def sa5_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# PR1: Product mix and revenue by subcategory
-# =============================================================================
-
-
 def pr1_expression_impl(ctx: DataFrameContext) -> Any:
-    """PR1: Product mix and revenue by subcategory with date validity check."""
     params = get_parameters("PR1")
     start_date = params.get("start_date", "2023-01-01")
     end_date = params.get("end_date", "2023-12-31")
@@ -436,7 +338,6 @@ def pr1_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def pr1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """PR1: Product mix and revenue by subcategory with date validity check."""
     params = get_parameters("PR1")
     start_date = params.get("start_date", "2023-01-01")
     end_date = params.get("end_date", "2023-12-31")
@@ -444,9 +345,6 @@ def pr1_pandas_impl(ctx: DataFrameContext) -> Any:
     ol = ctx.get_table("order_lines")
     dp = ctx.get_table("dim_products")
     filtered = ol[_date_between(ol["order_date"], start_date, end_date)]
-    # Drop order_lines' denormalized product_id before the join so dim_products'
-    # columns (product_id/name/subcategory/validity) are used unambiguously, as
-    # the SQL does, rather than pandas suffixing the product_id collision.
     merged = filtered.drop(columns=["product_id"], errors="ignore").merge(
         dp, left_on="product_record_id", right_on="record_id"
     )
@@ -460,13 +358,7 @@ def pr1_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# PR2: Price-band distribution
-# =============================================================================
-
-
 def pr2_expression_impl(ctx: DataFrameContext) -> Any:
-    """PR2: Price-band distribution using CASE WHEN."""
     params = get_parameters("PR2")
     start_date = params.get("start_date", "2023-01-01")
     end_date = params.get("end_date", "2024-12-31")
@@ -499,7 +391,6 @@ def pr2_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def pr2_pandas_impl(ctx: DataFrameContext) -> Any:
-    """PR2: Price-band distribution using CASE WHEN."""
     import numpy as np
 
     params = get_parameters("PR2")
@@ -522,13 +413,7 @@ def pr2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# TR1: Quarterly revenue and order growth
-# =============================================================================
-
-
 def tr1_expression_impl(ctx: DataFrameContext) -> Any:
-    """TR1: Quarterly revenue and order growth."""
     params = get_parameters("TR1")
     start_year = params.get("start_year", 2023)
     end_year = params.get("end_year", 2024)
@@ -554,7 +439,6 @@ def tr1_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def tr1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TR1: Quarterly revenue and order growth."""
     import numpy as np
 
     params = get_parameters("TR1")
@@ -572,13 +456,7 @@ def tr1_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# TM1: Order cadence by day-part for a region
-# =============================================================================
-
-
 def tm1_expression_impl(ctx: DataFrameContext) -> Any:
-    """TM1: Order cadence by day-part for a selected region."""
     params = get_parameters("TM1")
     region = params.get("region", "South")
     start_date = params.get("start_date", "2023-01-01")
@@ -596,11 +474,6 @@ def tm1_expression_impl(ctx: DataFrameContext) -> Any:
         .join(dl, left_on="location_record_id", right_on="record_id")
         .filter(col("region") == lit(region))
     )
-    # order_time is usually loaded as an "HH:MM:SS" string (TIME has no reliable
-    # DataFrame dtype), so parse the hour from the leading two characters - but when
-    # a context registers order_time as a native temporal column, use the temporal
-    # hour accessor instead so we match the SQL's hour(order_time) without misreading
-    # a "2023-..." timestamp prefix.
     if _is_temporal_expression_column(joined, "order_time"):
         hour_expr = col("order_time").dt.hour()
     else:
@@ -632,7 +505,6 @@ def tm1_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def tm1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """TM1: Order cadence by day-part for a selected region."""
     import numpy as np
 
     params = get_parameters("TM1")
@@ -643,17 +515,10 @@ def tm1_pandas_impl(ctx: DataFrameContext) -> Any:
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
     filtered = ol[_date_between(ol["order_date"], start_date, end_date)]
-    # order_lines is denormalized (carries its own location_id/region); drop those
-    # before the join so the grouped/filtered columns come from dim_locations, as
-    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
     merged = filtered.drop(columns=["location_id", "region"], errors="ignore").merge(
         dl, left_on="location_record_id", right_on="record_id"
     )
     merged = merged[merged["region"] == region].copy()
-    # order_time is usually loaded as an "HH:MM:SS" string, but custom contexts may
-    # register it as a native temporal column; extract the hour via .dt for temporal
-    # dtypes and only string-slice genuine strings (slicing a "2023-..." timestamp
-    # would misread the year prefix as hour 20). Matches the SQL's hour(order_time).
     merged["hour"] = _hour_pandas(merged["order_time"])
     conditions = [
         (merged["hour"] >= 5) & (merged["hour"] <= 10),
@@ -669,13 +534,7 @@ def tm1_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# QC1: Average lines per order
-# =============================================================================
-
-
 def qc1_expression_impl(ctx: DataFrameContext) -> Any:
-    """QC1: Average lines and items per order."""
     params = get_parameters("QC1")
     start_date = params.get("start_date", "2023-01-01")
     end_date = params.get("end_date", "2024-12-31")
@@ -701,7 +560,6 @@ def qc1_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def qc1_pandas_impl(ctx: DataFrameContext) -> Any:
-    """QC1: Average lines and items per order."""
     import numpy as np
     import pandas as pd
 
@@ -722,13 +580,7 @@ def qc1_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# =============================================================================
-# QC2: Seasonal revenue comparison across regions
-# =============================================================================
-
-
 def qc2_expression_impl(ctx: DataFrameContext) -> Any:
-    """QC2: Seasonal revenue comparison across regions."""
     params = get_parameters("QC2")
     start_year = params.get("start_year", 2023)
     end_year = params.get("end_year", 2024)
@@ -765,7 +617,6 @@ def qc2_expression_impl(ctx: DataFrameContext) -> Any:
 
 
 def qc2_pandas_impl(ctx: DataFrameContext) -> Any:
-    """QC2: Seasonal revenue comparison across regions."""
     import numpy as np
 
     params = get_parameters("QC2")
@@ -775,9 +626,6 @@ def qc2_pandas_impl(ctx: DataFrameContext) -> Any:
     ol = ctx.get_table("order_lines")
     dl = ctx.get_table("dim_locations")
     filtered = ol[(ol["order_date"].dt.year >= start_year) & (ol["order_date"].dt.year <= end_year)].copy()
-    # order_lines is denormalized (carries its own location_id/region); drop those
-    # before the join so the grouped/filtered columns come from dim_locations, as
-    # the SQL uses (dl.*), instead of pandas suffixing the collision to _x/_y.
     merged = filtered.drop(columns=["location_id", "region"], errors="ignore").merge(
         dl, left_on="location_record_id", right_on="record_id"
     )
@@ -795,10 +643,6 @@ def qc2_pandas_impl(ctx: DataFrameContext) -> Any:
         .sort_values(["region", "season"])
     )
 
-
-# =============================================================================
-# Query Registration
-# =============================================================================
 
 _CATEGORY_CODES = {
     "AG": QueryCategory.AGGREGATE,

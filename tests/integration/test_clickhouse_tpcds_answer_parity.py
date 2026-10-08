@@ -32,6 +32,7 @@ from benchbox.core.tpcds.benchmark.runner import TPCDSBenchmark
 from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 from benchbox.core.tuning.packaged_templates import packaged_template_path
 from benchbox.platforms.clickhouse import ClickHouseAdapter, ClickHouseLocalClient
+from benchbox.platforms.clickhouse.query_transformer import ClickHouseQueryTransformer
 from tests.utilities.optional_engines import require_chdb
 
 pytestmark = [
@@ -63,13 +64,40 @@ def _drop_all_tables(client: Any) -> None:
         client.execute(f"DROP TABLE IF EXISTS {table_name}")
 
 
+def _parity_sql(sql: str) -> str:
+    transformer = ClickHouseQueryTransformer()
+    return transformer.add_query_settings(transformer.transform(sql))
+
+
 def _query_answers(client: Any, queries: dict[str, str]) -> dict[str, list[tuple[str, ...]]]:
     """Run every query and return rows as sorted repr tuples (multiset)."""
     answers: dict[str, list[tuple[str, ...]]] = {}
     for query_id in sorted(queries, key=int):
-        rows = client.execute(queries[query_id])
+        rows = client.execute(_parity_sql(queries[query_id]))
         answers[query_id] = sorted(tuple(repr(value) for value in row) for row in rows)
     return answers
+
+
+class _RecordingClient:
+    def __init__(self) -> None:
+        self.statements: list[str] = []
+
+    def execute(self, sql: str) -> list[tuple[str, ...]]:
+        self.statements.append(sql)
+        return [("ok",)]
+
+
+def test_query_answers_execute_production_transformed_sql() -> None:
+    queries = {"1": "SELECT SUM(SR_FEE) AS s FROM store_returns"}
+    untuned = _RecordingClient()
+    tuned = _RecordingClient()
+    assert _query_answers(untuned, queries) == {"1": [("'ok'",)]}
+    assert _query_answers(tuned, queries) == {"1": [("'ok'",)]}
+    assert untuned.statements == tuned.statements
+    (statement,) = untuned.statements
+    assert "SR_FEE" not in statement
+    assert "sr_fee" in statement
+    assert statement.rstrip().endswith("SETTINGS joined_subquery_requires_alias = 0")
 
 
 def test_tuned_tpcds_answers_match_untuned(tmp_path: Path) -> None:

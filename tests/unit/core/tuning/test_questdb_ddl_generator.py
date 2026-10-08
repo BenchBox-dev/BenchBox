@@ -1,12 +1,6 @@
-"""Tests for benchbox.core.tuning.generators.questdb.QuestDBDDLGenerator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Focused on the generator class itself - DDL string content and TuningClauses
-field values. Does not duplicate adapter-level tests.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock
 
@@ -74,7 +68,6 @@ class TestCustomPartitionByViaPlatformOpts:
         from benchbox.core.tuning import TableTuning, TuningColumn
         from benchbox.core.tuning.interface import TuningType
 
-        # Create a table tuning with explicit partitioning
         tt = TableTuning(
             table_name="lineitem",
             partitioning=[TuningColumn("l_shipdate", "DATE", 1)],

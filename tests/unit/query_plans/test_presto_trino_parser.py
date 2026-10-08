@@ -1,9 +1,3 @@
-"""Unit tests for PrestoTrinoQueryPlanParser.
-
-Driven by recorded EXPLAIN (FORMAT JSON) fixtures under tests/fixtures/query_plans/
-so they run with no live Presto/Trino/Athena instance.
-"""
-
 from pathlib import Path
 
 import pytest
@@ -73,18 +67,15 @@ class TestPrestoTrinoParserBasics:
         assert types.count(LogicalOperatorType.SCAN) == 2
         tables = {n.table_name for n in nodes if n.table_name}
         assert any("nation" in t for t in tables) and any("region" in t for t in tables)
-        # The Presto join criteria live in the identifier, not the details banner.
         join = next(n for n in nodes if n.operator_type == LogicalOperatorType.JOIN)
         assert join.join_conditions and "regionkey" in join.join_conditions[0]
         assert "PARTITIONED" not in (join.join_conditions[0] if join.join_conditions else "")
 
     def test_distributed_fragments_are_stitched(self, parser):
-        # Fragment-keyed (TYPE DISTRIBUTED) output must stitch RemoteSource refs
-        # so downstream fragments' scans/joins are not dropped.
         dag = parser.parse_explain_output("q_dist", _load("trino_distributed_explain_sample.json"))
         nodes = _collect(dag.logical_root)
         types = [n.operator_type for n in nodes]
-        assert dag.logical_root.operator_type == LogicalOperatorType.PROJECT  # rooted at fragment 0 (Output)
+        assert dag.logical_root.operator_type == LogicalOperatorType.PROJECT
         assert LogicalOperatorType.JOIN in types
         assert types.count(LogicalOperatorType.SCAN) == 2, "both fragments' scans must be present after stitching"
         tables = {n.table_name for n in nodes if n.table_name}
@@ -96,7 +87,6 @@ class TestPrestoTrinoParserBasics:
         frag = json.loads(_load("trino_distributed_explain_sample.json"))
         reordered = json.dumps({"2": frag["2"], "1": frag["1"], "0": frag["0"]})
         dag = parser.parse_explain_output("q_reordered", reordered)
-        # Lowest-numbered fragment (Output) is the root regardless of key order.
         assert dag.logical_root.operator_type == LogicalOperatorType.PROJECT
 
     def test_cross_dialect_shares_core_operator_shape(self, parser):
@@ -168,13 +158,10 @@ class TestPrestoTrinoRegistration:
 
 class TestPrestoTrinoConcretePlatform:
     def test_default_platform_is_family_name(self):
-        # Direct/registry instantiation keeps the generic family name.
         assert PrestoTrinoQueryPlanParser().platform_name == "presto_trino"
 
     @pytest.mark.parametrize("platform", ["presto", "trino", "starburst", "athena"])
     def test_concrete_platform_threaded_into_dag(self, platform):
-        # The adapter threads its concrete platform name in, and it is stamped
-        # onto the captured DAG instead of the generic "presto_trino".
         parser = PrestoTrinoQueryPlanParser(platform_name=platform)
         assert parser.platform_name == platform
         dag = parser.parse_explain_output("q1", _load("trino_explain_sample.json"))

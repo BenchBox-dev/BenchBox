@@ -1,9 +1,6 @@
-"""Platform management and detection for BenchBox CLI.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 import sys
@@ -42,32 +39,16 @@ def _check_removed_platform(platform: str) -> None:
         sys.exit(1)
 
 
-# CLI spellings are a scoped platform-manifest projection. DataFrame ``-df``
-# aliases carry explicit mode semantics in the manifest; ``benchbox run``
-# captures that suffix before calling this normalizer.
 PLATFORM_ALIASES: dict[str, str] = get_platform_aliases("cli")
 PLATFORM_ALIAS_MODES: dict[str, DefaultMode] = get_platform_alias_modes("cli")
 
 
 def normalize_platform_name(name: str) -> str:
-    """Normalize platform name: lowercase and resolve aliases."""
     normalized = name.lower()
     return PLATFORM_ALIASES.get(normalized, normalized)
 
 
 def resolve_platform_selector(selector: str) -> str:
-    """Return the platform key that availability and dependency checks apply to.
-
-    A ``<platform>:<deployment>`` selector resolves to the first-class platform
-    for ClickHouse and otherwise to the base platform, after confirming the base
-    platform offers that deployment. A platform that declares no deployment modes
-    accepts only ``local``, matching ``PlatformRegistry.supports_deployment_mode``
-    and the adapter factory. A selector without a deployment suffix is returned
-    unchanged.
-
-    Raises:
-        ValueError: If the deployment is not offered by the base platform.
-    """
     key = selector.lower()
     if key in CLICKHOUSE_LEGACY_SELECTOR_MAP:
         return CLICKHOUSE_LEGACY_SELECTOR_MAP[key]
@@ -86,7 +67,6 @@ def resolve_platform_selector(selector: str) -> str:
 
 
 def get_platform_alias_mode(name: str) -> DefaultMode | None:
-    """Return an execution mode explicitly implied by a scoped CLI alias."""
     return PLATFORM_ALIAS_MODES.get(name.lower())
 
 
@@ -98,8 +78,6 @@ _SUPPORT_STATUS_STYLES = {
 }
 
 
-#: Tier order for display: the tiers a user can rely on come first, and an
-#: unrecognised status sorts last rather than being folded into a known tier.
 _SUPPORT_STATUS_ORDER = ("stable", "beta", "experimental", "deprecated")
 
 
@@ -110,12 +88,6 @@ def _support_tier_rank(support_status: str | None) -> tuple[int, str]:
 
 
 def _platforms_by_support_tier(platforms: dict) -> list[tuple[str, Any]]:
-    """Order platforms by support tier, then by display name within a tier.
-
-    Stable rows first answers "which of these actually work" without the user
-    reading all 51. Ordering is stable within a tier so the table does not
-    reshuffle between runs.
-    """
     return sorted(
         platforms.items(),
         key=lambda item: (_support_tier_rank(item[1].support_status), item[1].display_name.lower()),
@@ -123,7 +95,6 @@ def _platforms_by_support_tier(platforms: dict) -> list[tuple[str, Any]]:
 
 
 def _support_tier_counts(platforms: dict) -> dict[str, int]:
-    """Count platforms per support tier, in display order."""
     counts: dict[str, int] = {}
     for _name, info in _platforms_by_support_tier(platforms):
         tier = info.support_status if info.support_status else "unknown"
@@ -132,12 +103,6 @@ def _support_tier_counts(platforms: dict) -> dict[str, int]:
 
 
 def _format_support_status(support_status: str | None) -> str:
-    """Render a platform's product support tier for display.
-
-    This is the registry's `support_status`, not local driver availability. An
-    unrecognised or absent status renders as "unknown" rather than defaulting to
-    a tier, so the CLI never invents a support promise the registry did not make.
-    """
     if not support_status:
         return "[dim]unknown[/dim]"
     style = _SUPPORT_STATUS_STYLES.get(support_status)
@@ -147,24 +112,6 @@ def _format_support_status(support_status: str | None) -> str:
 
 
 class NumberedSelectPrompt(Prompt):
-    """A prompt that displays numbered options and accepts number or name input.
-
-    Displays a numbered list of options and allows users to select by:
-    - Entering the number (e.g., "1", "2", "3")
-    - Entering the option name/value (e.g., "enable", "duckdb")
-
-    Example usage:
-        action = NumberedSelectPrompt.ask(
-            "What would you like to do?",
-            options=[
-                ("enable", "Enable platform"),
-                ("disable", "Disable platform"),
-                ("done", "Done"),
-            ],
-            default="done",
-        )
-    """
-
     def __init__(
         self,
         prompt: str,
@@ -173,14 +120,6 @@ class NumberedSelectPrompt(Prompt):
         default: str | None = None,
         console: Any = None,
     ):
-        """Initialize the numbered select prompt.
-
-        Args:
-            prompt: The prompt text to display
-            options: List of (value, label) tuples. Value is returned, label is displayed.
-            default: Default value (must match a value from options)
-            console: Rich console instance
-        """
         self.options = options
         self._value_to_number = {value: i + 1 for i, (value, _) in enumerate(options)}
         self._number_to_value = {i + 1: value for i, (value, _) in enumerate(options)}
@@ -193,15 +132,12 @@ class NumberedSelectPrompt(Prompt):
         )
 
     def make_prompt(self, default: str) -> Text:
-        """Build the prompt text with numbered options displayed above."""
-        # Display numbered options
         for i, (value, label) in enumerate(self.options, 1):
             default_marker = " (default)" if value == self._default_value else ""
             self.console.print(f"  [cyan]{i}.[/cyan] {label}{default_marker}")
 
         self.console.print()
 
-        # Build the input prompt
         prompt_text = Text()
         prompt_text.append(self.prompt)
         prompt_text.append(" ")
@@ -213,14 +149,11 @@ class NumberedSelectPrompt(Prompt):
         return prompt_text
 
     def process_response(self, value: str) -> str:
-        """Process the response, accepting either number or name."""
         value = value.strip()
 
-        # Empty input with default
         if not value and self._default_value:
             return self._default_value
 
-        # Try as number first
         try:
             num = int(value)
             if num in self._number_to_value:
@@ -229,13 +162,11 @@ class NumberedSelectPrompt(Prompt):
         except ValueError:
             pass
 
-        # Try as value/name (case-insensitive)
         value_lower = value.lower()
         for opt_value, _ in self.options:
             if opt_value.lower() == value_lower:
                 return opt_value
 
-        # Not found
         valid_names = ", ".join(v for v, _ in self.options)
         raise InvalidResponse(f"[red]Invalid selection: '{value}'. Enter 1-{len(self.options)} or: {valid_names}[/red]")
 
@@ -248,17 +179,6 @@ class NumberedSelectPrompt(Prompt):
         default: str | None = None,
         console: Any = None,
     ) -> str:
-        """Display numbered options and prompt for selection.
-
-        Args:
-            prompt: The question/prompt to display
-            options: List of (value, label) tuples
-            default: Default value to use if user presses Enter
-            console: Rich console instance
-
-        Returns:
-            The selected option's value
-        """
         _prompt = cls(prompt, options=options, default=default, console=console)
         return _prompt()
 
@@ -271,18 +191,6 @@ def numbered_platform_select(
     group_by_status: bool = True,
     console_instance: Any = None,
 ) -> str | None:
-    """Display platforms as a numbered list and prompt for selection.
-
-    Args:
-        prompt: The prompt text to display
-        platforms: Dictionary of platform name -> PlatformInfo
-        filter_func: Optional function to filter platforms (receives PlatformInfo, returns bool)
-        group_by_status: If True, group platforms by enabled/available/missing status
-        console_instance: Rich console instance
-
-    Returns:
-        Selected platform name, or None if cancelled
-    """
     _console = console_instance or console
 
     filtered = {name: info for name, info in platforms.items() if filter_func(info)} if filter_func else platforms
@@ -300,7 +208,6 @@ def numbered_platform_select(
 def _build_platform_options(
     filtered: dict[str, "PlatformInfo"], group_by_status: bool, _console: Any
 ) -> list[tuple[str, str]]:
-    """Build numbered options list from platforms, optionally grouped by status."""
     options: list[tuple[str, str]] = []
 
     if group_by_status:
@@ -332,7 +239,6 @@ def _build_platform_options(
 def _prompt_platform_selection(
     prompt: str, options: list[tuple[str, str]], filtered: dict[str, Any], _console: Any
 ) -> str | None:
-    """Prompt user to select a platform by number or name."""
     prompt_text = f"{prompt} [1-{len(options)}]"
 
     while True:
@@ -359,8 +265,6 @@ def _prompt_platform_selection(
 
 
 class PlatformManager:
-    """Manages platform detection, configuration, and CLI commands."""
-
     def __init__(self, config_path: Optional[Path] = None):
         self.console = quiet_console
         self.config_path = config_path or Path.home() / ".benchbox" / "platforms.yaml"
@@ -368,15 +272,12 @@ class PlatformManager:
 
     @property
     def platform_registry(self) -> dict[str, Any]:
-        """Get platform registry metadata for all platforms."""
         return PlatformRegistry.get_all_platform_metadata()
 
     def _detect_library(self, lib_spec: dict[str, Any]) -> LibraryInfo:
-        """Detect a single library."""
         return PlatformRegistry.detect_library(lib_spec)
 
     def _load_config(self) -> dict[str, Any]:
-        """Load platform configuration from file."""
         if not self.config_path.exists():
             return {"enabled_platforms": PlatformRegistry.get_platform_names()}
 
@@ -388,7 +289,6 @@ class PlatformManager:
             return {"enabled_platforms": PlatformRegistry.get_platform_names()}
 
     def _save_config(self):
-        """Save platform configuration to file."""
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             with open(self.config_path, "w", encoding="utf-8") as f:
@@ -397,44 +297,35 @@ class PlatformManager:
             console.print(f"[red]Error: Failed to save platform config: {e}[/red]")
 
     def detect_platforms(self) -> dict[str, PlatformInfo]:
-        """Detect all platforms and their availability."""
         platforms = {}
-        # Use all platforms in metadata registry instead of just those with adapters
         all_platform_names = list(self.platform_registry.keys())
         available_platform_names = PlatformRegistry.get_available_platforms()
 
-        # Enabled platforms from config
         enabled_platforms = self._config.get("enabled_platforms", available_platform_names)
 
         for platform_name in all_platform_names:
             platform_info = PlatformRegistry.get_platform_info(platform_name)
             if platform_info:
-                # Override enabled status with config
                 platform_info.enabled = platform_name in enabled_platforms and platform_info.available
                 platforms[platform_name] = platform_info
 
         return platforms
 
     def get_available_platforms(self) -> list[str]:
-        """Get list of available platform names (detected as available)."""
         detected = self.detect_platforms()
         return [name for name, info in detected.items() if info.available]
 
     def get_enabled_platforms(self) -> list[str]:
-        """Get list of enabled platform names."""
         platforms = self.detect_platforms()
         return [name for name, info in platforms.items() if info.enabled]
 
     def get_valid_platforms_for_cli(self) -> list[str]:
-        """Get list of platform names that should be shown in CLI choices."""
         return self.get_enabled_platforms()
 
     def is_platform_available(self, platform_name: str) -> bool:
-        """Check if a specific platform is available."""
         return PlatformRegistry.is_platform_available(platform_name)
 
     def enable_platform(self, platform_name: str) -> bool:
-        """Enable a platform."""
         platform_info = PlatformRegistry.get_platform_info(platform_name)
 
         if not platform_info:
@@ -450,7 +341,6 @@ class PlatformManager:
         return True
 
     def disable_platform(self, platform_name: str) -> bool:
-        """Disable a platform."""
         platform_info = PlatformRegistry.get_platform_info(platform_name)
         if not platform_info:
             return False
@@ -462,7 +352,6 @@ class PlatformManager:
         return True
 
     def get_installation_guide(self, platform_name: str) -> Optional[dict[str, Any]]:
-        """Get detailed installation guide for a platform."""
         platform_info = PlatformRegistry.get_platform_info(platform_name)
         if not platform_info:
             return None
@@ -480,32 +369,10 @@ class PlatformManager:
         }
 
     def display_platform_status(self, detail: bool = False):
-        """Display the platform status table.
-
-        The default view is deliberately narrow. With 51 platforms, the full
-        table does not fit an 80-column terminal: Rich truncates every
-        informative header to an ellipsis and wraps Description into six rows
-        of single-word fragments per platform, which destroys exactly the
-        answer the user came for -- which of these platforms actually work.
-
-        So Category and Description move behind ``--detail``, and rows are
-        ordered by support tier with a per-tier count in the summary. Nothing
-        is hidden or gated: every platform still appears, and every row still
-        carries its tier, per
-        ``_project/decisions/architecture-support-tier-commitment.md``.
-
-        Args:
-            detail: Restore the Category and Description columns.
-        """
         platforms = self.detect_platforms()
 
         table = Table(title="BenchBox Platform Status")
         table.add_column("Platform", style="cyan", no_wrap=True)
-        # "Driver" is local dependency availability; "Support" is the product
-        # support tier from the registry. They are independent: a stable platform
-        # can be Missing locally, and an installed driver implies nothing about
-        # the tier. See docs/reference/public-contracts.md ("Support Status
-        # Taxonomy"), which states the two must not be conflated.
         table.add_column("Driver", style="bold")
         table.add_column("Support", style="bold")
         table.add_column("Libraries", style="dim")
@@ -514,7 +381,6 @@ class PlatformManager:
             table.add_column("Description", style="dim")
 
         for name, info in _platforms_by_support_tier(platforms):
-            # Driver column - is the local dependency installed?
             if info.enabled:
                 status = "[green]✅ Enabled[/green]"
             elif info.available:
@@ -522,10 +388,8 @@ class PlatformManager:
             else:
                 status = "[red]❌ Missing[/red]"
 
-            # Support column - product support tier, independent of the above
             support = _format_support_status(info.support_status)
 
-            # Libraries column
             lib_statuses = []
             for lib in info.libraries:
                 if lib.installed:
@@ -544,7 +408,6 @@ class PlatformManager:
 
         self.console.print(table)
 
-        # Show summary
         total_platforms = len(platforms)
         available_count = sum(1 for p in platforms.values() if p.available)
         enabled_count = sum(1 for p in platforms.values() if p.enabled)
@@ -559,13 +422,6 @@ class PlatformManager:
             self.console.print("[dim]Run with --detail for category and description.[/dim]")
 
     def emit_platform_json(self) -> None:
-        """Emit the full platform record as JSON on stdout.
-
-        The narrow default table drops columns to stay readable. This is the
-        path that loses nothing, so a script never has to parse the table.
-        Printed through the quiet-aware console with wrapping and markup
-        disabled so the output remains exactly JSON.
-        """
         platforms = self.detect_platforms()
         payload = [
             {
@@ -586,10 +442,6 @@ class PlatformManager:
         console.print(json.dumps({"platforms": payload}, indent=2), markup=False, soft_wrap=True)
 
     def display_platform_list(self, show_all: bool = True):
-        """Display platform list for 'benchbox platforms list' command.
-
-        Note: Database selection uses a different table-based display.
-        """
         platforms = self.detect_platforms()
 
         self.console.print("[bold cyan]BenchBox Platforms[/bold cyan]\n")
@@ -613,11 +465,6 @@ class PlatformManager:
             self.console.print()
 
     def display_platform_deployments(self, filter_platform: Optional[str] = None):
-        """Display platform deployment modes.
-
-        Args:
-            filter_platform: Optional platform name to filter results
-        """
         platforms = self.detect_platforms()
 
         table = Table(title="Platform Deployment Modes")
@@ -633,7 +480,6 @@ class PlatformManager:
             if filter_platform and name != filter_platform:
                 continue
 
-            # Get deployment modes from registry
             caps = PlatformRegistry.get_platform_capabilities(name)
             if not caps or not caps.deployment_modes:
                 continue
@@ -644,7 +490,6 @@ class PlatformManager:
             for mode_name, deployment_cap in caps.deployment_modes.items():
                 is_default = "✓" if mode_name == default_deployment else ""
 
-                # Build requirements list
                 requirements = []
                 if deployment_cap.requires_credentials:
                     requirements.append("credentials")
@@ -654,7 +499,6 @@ class PlatformManager:
                     requirements.append("network")
                 req_str = ", ".join(requirements) if requirements else "-"
 
-                # Format: platform:mode for CLI usage
                 cli_name = f"{name}:{mode_name}"
 
                 table.add_row(
@@ -674,12 +518,10 @@ class PlatformManager:
             self.console.print("[yellow]No platforms with deployment modes configured.[/yellow]")
 
 
-# Global platform manager instance
 _platform_manager: Optional[PlatformManager] = None
 
 
 def get_platform_manager() -> PlatformManager:
-    """Get the global platform manager instance."""
     global _platform_manager
     if _platform_manager is None:
         _platform_manager = PlatformManager()
@@ -687,13 +529,11 @@ def get_platform_manager() -> PlatformManager:
 
 
 def _readiness_platform_name(requested_platform: str, normalized_platform: str) -> str:
-    """Preserve explicit DataFrame aliases for readiness messages."""
     requested = requested_platform.lower()
     return requested if requested.endswith("-df") else normalized_platform
 
 
 def _append_readiness_details(panel_content: list[str], results: tuple[PlatformReadinessResult, ...]) -> None:
-    """Append readiness details to a rich panel content list."""
     if not results:
         return
 
@@ -709,7 +549,6 @@ def _append_readiness_details(panel_content: list[str], results: tuple[PlatformR
 
 
 def _print_readiness_details(results: tuple[PlatformReadinessResult, ...]) -> None:
-    """Print readiness details under a platform check row."""
     for result in results:
         label = "ready" if result.ready else "environment skip"
         color = "green" if result.ready else "yellow"
@@ -720,15 +559,24 @@ def _print_readiness_details(results: tuple[PlatformReadinessResult, ...]) -> No
             console.print(f"      [dim]Fix: {escape(result.remediation)}[/dim]")
 
 
-# CLI Commands
-
-
-@click.group()
+@click.group(help=("Manage database platform adapters."))
 def platforms():
-    """Manage database platform adapters."""
+    pass
 
 
-@platforms.command("list")
+@platforms.command(
+    "list",
+    help=(
+        "List all available platforms and their status.\n"
+        "\n"
+        "The default table is ordered by support tier and omits category and\n"
+        "description so it stays readable at 80 columns. Use --detail to add them\n"
+        "back, or --json/--format json for the full record.\n"
+        "\n"
+        "Use --show-deployments to see available deployment modes for platforms\n"
+        "that support multiple deployment targets (e.g., clickhouse-local, clickhouse-server)."
+    ),
+)
 @click.option(
     "--all",
     "show_all",
@@ -758,15 +606,6 @@ def platforms():
     help="Show available deployment modes (local, server, cloud) per platform",
 )
 def list_platforms(show_all: bool, format: str, json_output: bool, detail: bool, show_deployments: bool):
-    """List all available platforms and their status.
-
-    The default table is ordered by support tier and omits category and
-    description so it stays readable at 80 columns. Use --detail to add them
-    back, or --json/--format json for the full record.
-
-    Use --show-deployments to see available deployment modes for platforms
-    that support multiple deployment targets (e.g., clickhouse-local, clickhouse-server).
-    """
     manager = get_platform_manager()
 
     if show_deployments:
@@ -779,16 +618,14 @@ def list_platforms(show_all: bool, format: str, json_output: bool, detail: bool,
         manager.display_platform_list(show_all=show_all)
 
 
-@platforms.command("status")
+@platforms.command("status", help=("Show detailed status for all platforms or a specific platform."))
 @click.argument("platform", required=False)
 def platform_status(platform: Optional[str]):
-    """Show detailed status for all platforms or a specific platform."""
     manager = get_platform_manager()
 
     if platform:
         requested_platform = platform
         platform = normalize_platform_name(platform)
-        # Show detailed status for specific platform
         platforms_info = manager.detect_platforms()
 
         if platform not in platforms_info:
@@ -801,7 +638,6 @@ def platform_status(platform: Optional[str]):
 
         info = platforms_info[platform]
 
-        # Detailed panel
         status_color = "green" if info.enabled else ("yellow" if info.available else "red")
         status_text = "Enabled" if info.enabled else ("Available" if info.available else "Missing Dependencies")
 
@@ -811,7 +647,6 @@ def platform_status(platform: Optional[str]):
         panel_content.append(f"[bold]Status:[/bold] [{status_color}]{status_text}[/{status_color}]")
         panel_content.append(f"[bold]Category:[/bold] {info.category.title()}")
 
-        # Library details
         panel_content.append("\n[bold]Libraries:[/bold]")
         for lib in info.libraries:
             lib_status = "✅" if lib.installed else "❌"
@@ -821,7 +656,6 @@ def platform_status(platform: Optional[str]):
             if not lib.installed and lib.import_error:
                 panel_content.append(f"    [dim]Error: {lib.import_error}[/dim]")
 
-        # Installation info
         if not info.available:
             panel_content.append("\n[bold]Installation:[/bold]")
             panel_content.append(f"  {info.installation_command}")
@@ -840,15 +674,13 @@ def platform_status(platform: Optional[str]):
             )
         )
     else:
-        # Show status for all platforms
         manager.display_platform_status()
 
 
-@platforms.command("enable")
+@platforms.command("enable", help=("Enable a database platform."))
 @click.argument("platform")
 @click.option("--force", is_flag=True, help="Enable platform even if dependencies are missing")
 def enable_platform(platform: str, force: bool):
-    """Enable a database platform."""
     platform = normalize_platform_name(platform)
     manager = get_platform_manager()
     platforms_info = manager.detect_platforms()
@@ -862,12 +694,10 @@ def enable_platform(platform: str, force: bool):
 
     info = platforms_info[platform]
 
-    # Check if already enabled
     if info.enabled:
         console.print(f"[yellow]Platform {info.display_name} is already enabled[/yellow]")
         sys.exit(0)
 
-    # Check availability
     if not info.available and not force:
         console.print(f"[red]❌ Cannot enable {info.display_name}: missing required dependencies[/red]")
         console.print("\nTo install dependencies:")
@@ -875,7 +705,6 @@ def enable_platform(platform: str, force: bool):
         console.print("\nOr use --force to enable anyway (may cause runtime errors)")
         sys.exit(1)
 
-    # Enable the platform
     if manager.enable_platform(platform):
         if info.available:
             console.print(f"[green]✅ Enabled platform: {info.display_name}[/green]")
@@ -887,10 +716,9 @@ def enable_platform(platform: str, force: bool):
         sys.exit(1)
 
 
-@platforms.command("disable")
+@platforms.command("disable", help=("Disable a database platform."))
 @click.argument("platform")
 def disable_platform(platform: str):
-    """Disable a database platform."""
     platform = normalize_platform_name(platform)
     manager = get_platform_manager()
     platforms_info = manager.detect_platforms()
@@ -904,17 +732,14 @@ def disable_platform(platform: str):
 
     info = platforms_info[platform]
 
-    # Check if already disabled
     if not info.enabled:
         console.print(f"[yellow]Platform {info.display_name} is already disabled[/yellow]")
         sys.exit(0)
 
-    # Confirm disabling
     if not Confirm.ask(f"Disable platform {info.display_name}?"):
         console.print("Cancelled")
         sys.exit(0)
 
-    # Disable the platform
     if manager.disable_platform(platform):
         console.print(f"[yellow]○ Disabled platform: {info.display_name}[/yellow]")
         sys.exit(0)
@@ -923,11 +748,10 @@ def disable_platform(platform: str):
         sys.exit(1)
 
 
-@platforms.command("install")
+@platforms.command("install", help=("Guide installation of platform dependencies."))
 @click.argument("platform")
 @click.option("--dry-run", is_flag=True, help="Show installation commands without executing")
 def install_platform(platform: str, dry_run: bool):
-    """Guide installation of platform dependencies."""
     platform = normalize_platform_name(platform)
     manager = get_platform_manager()
     guide = manager.get_installation_guide(platform)
@@ -940,10 +764,8 @@ def install_platform(platform: str, dry_run: bool):
         console.print(f"Available platforms: {', '.join(available)}")
         sys.exit(1)
 
-    # Type checker doesn't understand that sys.exit prevents execution
     assert guide is not None
 
-    # Show installation guide
     console.print(
         Panel.fit(
             Text(f"Installation Guide: {guide['platform']}", style="bold cyan"),
@@ -982,11 +804,10 @@ def install_platform(platform: str, dry_run: bool):
     sys.exit(0)
 
 
-@platforms.command("check")
+@platforms.command("check", help=("Check platform availability and configuration."))
 @click.argument("platforms_to_check", nargs=-1)
 @click.option("--enabled-only", is_flag=True, help="Check only enabled platforms")
 def check_platforms(platforms_to_check: tuple, enabled_only: bool):
-    """Check platform availability and configuration."""
     manager = get_platform_manager()
     platforms_info = manager.detect_platforms()
 
@@ -997,7 +818,6 @@ def check_platforms(platforms_to_check: tuple, enabled_only: bool):
             else tuple((p, p) for p in platforms_info.keys())
         )
     else:
-        # Normalize platform names (case + aliases), preserving the requested name for readiness context.
         selected_platforms = tuple((p, normalize_platform_name(p)) for p in platforms_to_check)
 
     if not selected_platforms:
@@ -1018,10 +838,6 @@ def check_platforms(platforms_to_check: tuple, enabled_only: bool):
         readiness_results = check_platform_readiness(readiness_platform)
         readiness_failed = has_readiness_failures(readiness_results)
 
-        # Disabled platforms are always informational. A readiness failure on
-        # an available-but-disabled platform must not fail `platforms check`,
-        # since the user has opted out of running it; only an enabled platform
-        # with a failed readiness probe is a real environment problem.
         if info.available and not info.enabled:
             console.print(f"[yellow]○ {info.display_name}: Available but disabled[/yellow]")
         elif info.available and readiness_failed:
@@ -1044,7 +860,22 @@ def check_platforms(platforms_to_check: tuple, enabled_only: bool):
         sys.exit(1)
 
 
-@platforms.command("setup")
+@platforms.command(
+    "setup",
+    help=(
+        "Enable and install local platform adapters, interactively.\n"
+        "\n"
+        "This is about which adapters are available on this machine. For cloud\n"
+        "CREDENTIALS -- Databricks, Snowflake, BigQuery, Redshift, Athena,\n"
+        "MotherDuck, SingleStore -- use `benchbox setup --platform <name>`.\n"
+        "\n"
+        'The two commands are both spelled "setup", and adapter error messages have\n'
+        "repeatedly sent users to `benchbox platforms setup --platform <name>`,\n"
+        "which had no such option and exited 2. Rather than leave that a dead end,\n"
+        "`--platform` here delegates to `benchbox setup`, which is what the user\n"
+        "meant. `benchbox setup` rejects a non-cloud platform with its own list."
+    ),
+)
 @click.option("--interactive/--non-interactive", default=True, help="Interactive setup mode")
 @click.option(
     "--platform",
@@ -1054,24 +885,7 @@ def check_platforms(platforms_to_check: tuple, enabled_only: bool):
 )
 @click.pass_context
 def setup_platforms(ctx: click.Context, interactive: bool, credential_platform: str | None):
-    """Enable and install local platform adapters, interactively.
-
-    This is about which adapters are available on this machine. For cloud
-    CREDENTIALS -- Databricks, Snowflake, BigQuery, Redshift, Athena,
-    MotherDuck, SingleStore -- use `benchbox setup --platform <name>`.
-
-    The two commands are both spelled "setup", and adapter error messages have
-    repeatedly sent users to `benchbox platforms setup --platform <name>`,
-    which had no such option and exited 2. Rather than leave that a dead end,
-    `--platform` here delegates to `benchbox setup`, which is what the user
-    meant. `benchbox setup` rejects a non-cloud platform with its own list.
-    """
     if credential_platform is not None:
-        # The Choice above is load-bearing: ctx.invoke skips Click's parameter
-        # processing, so without it an unknown name reached the credential
-        # wizard unvalidated and produced a confident "Nonesuch Credentials
-        # Setup" panel that exited 0. Validating here keeps the delegation
-        # honest and rejects a non-cloud platform with the real list.
         from benchbox.cli.commands.setup import setup_credentials
 
         ctx.invoke(setup_credentials, platform=credential_platform)
@@ -1096,7 +910,6 @@ def setup_platforms(ctx: click.Context, interactive: bool, credential_platform: 
     console.print("\nThis wizard will help you set up database platforms for BenchBox.")
     console.print("You can enable/disable platforms and get installation guidance.\n")
 
-    # Show current status summary
     enabled_count = sum(1 for info in platforms_info.values() if info.enabled)
     available_count = sum(1 for info in platforms_info.values() if info.available)
     missing_count = sum(1 for info in platforms_info.values() if not info.available)
@@ -1105,7 +918,6 @@ def setup_platforms(ctx: click.Context, interactive: bool, credential_platform: 
         f"[bold]Current Status:[/bold] {enabled_count} enabled, {available_count} available, {missing_count} missing dependencies\n"
     )
 
-    # Define action options for numbered menu
     action_options = [
         ("enable", "Enable a platform"),
         ("disable", "Disable a platform"),
@@ -1114,7 +926,6 @@ def setup_platforms(ctx: click.Context, interactive: bool, credential_platform: 
         ("done", "Done - exit setup"),
     ]
 
-    # Interactive platform management
     while True:
         action = NumberedSelectPrompt.ask(
             "What would you like to do?",
@@ -1170,13 +981,11 @@ def setup_platforms(ctx: click.Context, interactive: bool, credential_platform: 
             else:
                 console.print("[yellow]No enabled platforms to disable.[/yellow]")
 
-        # Refresh platform info
         platforms_info = manager.detect_platforms()
         console.print()
 
     console.print("[green]Platform setup complete![/green]")
 
-    # Show final summary
     enabled_count = sum(1 for info in platforms_info.values() if info.enabled)
     available_count = sum(1 for info in platforms_info.values() if info.available)
 

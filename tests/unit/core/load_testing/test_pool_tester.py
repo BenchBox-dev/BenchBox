@@ -1,9 +1,6 @@
-"""Tests for connection pool tester module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import threading
 import time
@@ -25,7 +22,6 @@ pytestmark = [
 
 @pytest.fixture
 def mock_pool_connection():
-    """Mock connection for pool testing."""
 
     class MockPoolConnection:
         connection_count = 0
@@ -47,7 +43,6 @@ def mock_pool_connection():
                 with MockPoolConnection.lock:
                     MockPoolConnection.current_connections -= 1
 
-    # Reset counters for each test
     MockPoolConnection.connection_count = 0
     MockPoolConnection.current_connections = 0
 
@@ -56,7 +51,6 @@ def mock_pool_connection():
 
 @pytest.fixture
 def mock_pool_factory(mock_pool_connection):
-    """Factory for mock pool connections."""
 
     def factory():
         return mock_pool_connection()
@@ -66,7 +60,6 @@ def mock_pool_factory(mock_pool_connection):
 
 @pytest.fixture
 def mock_pool_execute():
-    """Execute function for pool testing."""
 
     def execute(connection, sql):
         return True
@@ -75,10 +68,7 @@ def mock_pool_execute():
 
 
 class TestConnectionAttempt:
-    """Tests for ConnectionAttempt dataclass."""
-
     def test_basic_creation(self):
-        """Should create attempt record."""
         attempt = ConnectionAttempt(
             attempt_id=1,
             start_time=1000.0,
@@ -90,7 +80,6 @@ class TestConnectionAttempt:
         assert attempt.success is True
 
     def test_failed_attempt(self):
-        """Should record failure."""
         attempt = ConnectionAttempt(
             attempt_id=2,
             start_time=1000.0,
@@ -103,17 +92,13 @@ class TestConnectionAttempt:
 
 
 class TestPoolTestConfig:
-    """Tests for PoolTestConfig dataclass."""
-
     def test_default_values(self, mock_pool_factory):
-        """Should use sensible defaults."""
         config = PoolTestConfig(connection_factory=mock_pool_factory)
         assert config.max_connections_to_test == 100
         assert config.health_check_query == "SELECT 1"
         assert config.ramp_step_size == 10
 
     def test_custom_values(self, mock_pool_factory, mock_pool_execute):
-        """Should accept custom values."""
         config = PoolTestConfig(
             connection_factory=mock_pool_factory,
             execute_query=mock_pool_execute,
@@ -125,10 +110,7 @@ class TestPoolTestConfig:
 
 
 class TestPoolTestResult:
-    """Tests for PoolTestResult dataclass."""
-
     def test_basic_creation(self):
-        """Should create result."""
         result = PoolTestResult(
             total_attempts=100,
             successful_connections=95,
@@ -149,10 +131,7 @@ class TestPoolTestResult:
 
 
 class TestConnectionPoolTester:
-    """Tests for ConnectionPoolTester."""
-
     def test_pool_limit_test(self, mock_pool_factory, mock_pool_execute, mock_pool_connection):
-        """Should test pool limits."""
         config = PoolTestConfig(
             connection_factory=mock_pool_factory,
             execute_query=mock_pool_execute,
@@ -168,8 +147,6 @@ class TestConnectionPoolTester:
         assert result.max_concurrent_connections <= mock_pool_connection.max_connections
 
     def test_detects_pool_exhaustion(self, mock_pool_connection):
-        """Should detect when pool is exhausted."""
-        # Set low max connections
         mock_pool_connection.max_connections = 5
 
         def factory():
@@ -188,7 +165,6 @@ class TestConnectionPoolTester:
         assert result.estimated_pool_size <= 5
 
     def test_pool_under_load(self, mock_pool_factory, mock_pool_execute, mock_pool_connection):
-        """Should test pool under concurrent load."""
         config = PoolTestConfig(
             connection_factory=mock_pool_factory,
             execute_query=mock_pool_execute,
@@ -201,7 +177,6 @@ class TestConnectionPoolTester:
         assert result.success_rate >= 0
 
     def test_connection_churn(self, mock_pool_factory, mock_pool_execute):
-        """Should test connection churn."""
         config = PoolTestConfig(
             connection_factory=mock_pool_factory,
             execute_query=mock_pool_execute,
@@ -215,7 +190,6 @@ class TestConnectionPoolTester:
         assert result.total_attempts > 0
 
     def test_connection_time_tracking(self, mock_pool_factory, mock_pool_execute):
-        """Should track connection times."""
         config = PoolTestConfig(
             connection_factory=mock_pool_factory,
             execute_query=mock_pool_execute,
@@ -231,7 +205,6 @@ class TestConnectionPoolTester:
         assert result.avg_connect_time_ms >= 0
 
     def test_recommendations_generated(self, mock_pool_connection):
-        """Should generate recommendations on issues."""
         mock_pool_connection.max_connections = 3
 
         def factory():
@@ -246,15 +219,11 @@ class TestConnectionPoolTester:
         tester = ConnectionPoolTester(config)
         result = tester.test_pool_limits()
 
-        # Should have recommendations due to exhaustion
         assert len(result.recommendations) > 0
 
 
 class TestConnectionPoolTesterEdgeCases:
-    """Edge case tests for ConnectionPoolTester."""
-
     def test_immediate_connection_failure(self):
-        """Should handle immediate connection failures."""
 
         def failing_factory():
             raise RuntimeError("Cannot connect")
@@ -271,7 +240,6 @@ class TestConnectionPoolTesterEdgeCases:
         assert result.success_rate == 0
 
     def test_slow_connection(self, mock_pool_execute):
-        """Should track slow connections."""
 
         def slow_factory():
             time.sleep(0.1)
@@ -292,11 +260,9 @@ class TestConnectionPoolTesterEdgeCases:
         tester = ConnectionPoolTester(config)
         result = tester.test_pool_limits()
 
-        # Connection times should reflect the delay
         assert result.avg_connect_time_ms >= 100
 
     def test_health_check_failure(self, mock_pool_factory):
-        """Should handle health check failures."""
 
         def failing_execute(connection, sql):
             return False
@@ -313,7 +279,6 @@ class TestConnectionPoolTesterEdgeCases:
         assert result.failed_connections > 0
 
     def test_connection_close_error(self, mock_pool_execute):
-        """Should handle errors when closing connections."""
 
         class BadCloseConn:
             def close(self):
@@ -330,15 +295,12 @@ class TestConnectionPoolTesterEdgeCases:
             hold_connection_seconds=0.05,
         )
         tester = ConnectionPoolTester(config)
-        # Should not raise despite close errors
         result = tester.test_pool_limits()
 
         assert result.total_attempts > 0
 
 
 class TestAcquireErrorCapture:
-    """`_acquire_connection` must always capture a non-empty error string."""
-
     def test_non_empty_exception_message_captured(self):
         def factory():
             raise RuntimeError("pool exhausted")

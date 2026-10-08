@@ -140,10 +140,6 @@ export function buildWhereClause(filters: QueryFilterState): BuiltQuery {
     params,
   );
   expandListFilter("storage_format", filters.storageFormats, clauses, params);
-  // `buildFacetCountQuery` surfaces rows with a NULL physical_rendering_id as an
-  // `unknown` option, so that token must become `IS NULL` rather than being sent
-  // through `IN (...)` -- which matched nothing and returned zero rows for a
-  // bucket the UI advertised. Mirrors the tuning_mode handling above.
   addNullableSentinelClause(
     "physical_rendering_id",
     filters.physicalRenderingIds,
@@ -264,9 +260,6 @@ export function buildFacetCountQuery(
     const cutoff90 = dateWindowCutoffIso("90d")!;
     const cutoff365 = dateWindowCutoffIso("365d")!;
     const baseParams = where.params;
-    // When other filters produce a WHERE clause, append AND; otherwise open a
-    // fresh WHERE. Without this, an empty where.sql produces invalid SQL like
-    // `FROM bench.results AND run_date >= ?`.
     const cutoffClause = where.sql ? `${where.sql} AND run_date >= ?` : "WHERE run_date >= ?";
     return {
       sql: `
@@ -316,23 +309,10 @@ function renderSqlLiteral(value: unknown): string {
   if (value === null || value === undefined) return "NULL";
   if (typeof value === "number") return Number.isFinite(value) ? String(value) : "NULL";
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
-  // Escape single quotes and backslashes for DuckDB string literals.
   const escaped = String(value).split("\\").join("\\\\").split("'").join("''");
   return `'${escaped}'`;
 }
 
-// ---------------------------------------------------------------------------
-// Presentation-only grouping for the cohort index tables
-// ---------------------------------------------------------------------------
-
-/**
- * How to split cohort rows into labelled groups.
- *
- * PRESENTATION ONLY. Grouping rearranges rows; it never changes how a rank is
- * computed or which rows are ranking-eligible. Ranking semantics are governed
- * by a separate contract with its own release gate, and a grouping control that
- * quietly reordered or re-filtered would become a second, hidden ranking policy.
- */
 export type CohortGroupBy = "none" | "engine_version";
 
 export const COHORT_GROUP_BY_LABELS: Record<CohortGroupBy, string> = {
@@ -347,24 +327,11 @@ export interface CohortGroup<T> {
 }
 
 export interface LimitedCohortGroup<T> extends CohortGroup<T> {
-  /** Full group size before the rendering window is applied. */
   totalRows: number;
 }
 
-/** Rows lacking the grouping value collect here rather than vanishing. */
 export const UNGROUPED_LABEL = "Not recorded";
 
-/**
- * Split rows into labelled groups, preserving input order within each group.
- *
- * Stability matters: the caller has already sorted by rank, so preserving
- * order is what makes "grouping does not change ranking" true in the rendered
- * output and not merely in principle.
- *
- * A row whose grouping value is absent goes to an explicit "Not recorded"
- * group. Dropping it would let a filter silently shrink the cohort, and the
- * per-group counts would then not sum to the total the page states.
- */
 export function groupCohortRows<T>(
   rows: readonly T[],
   groupBy: CohortGroupBy,
@@ -381,7 +348,6 @@ export function groupCohortRows<T>(
     if (bucket) bucket.push(row);
     else groups.set(key, [row]);
   }
-  // "Not recorded" sorts last; everything else keeps a stable natural order.
   return [...groups.entries()]
     .sort(([a], [b]) => {
       if (a === UNGROUPED_LABEL) return 1;
@@ -391,20 +357,10 @@ export function groupCohortRows<T>(
     .map(([key, groupRows]) => ({ key, label: key, rows: groupRows }));
 }
 
-/** Total across groups, for asserting the split lost nothing. */
 export function cohortGroupTotal<T>(groups: readonly CohortGroup<T>[]): number {
   return groups.reduce((sum, group) => sum + group.rows.length, 0);
 }
 
-/**
- * Apply the caller's global sorted rendering window after complete groups and
- * counts are known. Group labels may rearrange those rows, but must not change
- * which rows the ungrouped view admitted to the window.
- *
- * Cloned cohorts (e.g. a test that deep-copies rows) have different object
- * identities but the same logical identity, so the window uses a stable id
- * plus a full-row fingerprint to disambiguate colliding ids.
- */
 export function limitCohortGroups<T>(
   groups: readonly CohortGroup<T>[],
   rankedRows: readonly T[],

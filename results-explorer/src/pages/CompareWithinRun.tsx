@@ -32,27 +32,12 @@ import {
   type MeasurementBasis,
 } from "@/lib/measurementBasis";
 
-/**
- * Within-run comparison: one run, several measurement bases as columns.
- *
- * THE ONLY PLACE A STATISTIC MAY VARY BETWEEN SERIES. Everywhere else that
- * would measure the statistic rather than the engine; here engine, hardware,
- * corpus and scale are fixed by construction, so the basis IS the subject and
- * nothing is confounded.
- *
- * For the same reason its figures are not platform results. A number here says
- * "this run is X% faster read one way than another", which is a statement about
- * measurement methodology, not about an engine. `isRankable` is exported as
- * `false` so a ranking surface cannot consume this page's output by accident.
- */
 interface CompareWithinRunProps extends RoutableProps {
   resultId?: string;
 }
 
-/** Structural exclusion from ranking. Not a policy flag; a fact about the page. */
 export const WITHIN_RUN_FIGURES_ARE_RANKABLE = false;
 
-/** Drop duplicate bases to ensure each column represents a distinct measurement basis. */
 export function deduplicateBases(bases: readonly MeasurementBasis[]): MeasurementBasis[] {
   const unique: MeasurementBasis[] = [];
   for (const b of bases) {
@@ -137,18 +122,9 @@ export function withinRunUnavailableKind(
 export interface WithinRunRow {
   queryId: string;
   cells: WithinRunCell[];
-  /** True when every column produced a value for this query. */
   comparable: boolean;
 }
 
-/**
- * Build the grid, enforcing the same-query-set rule across columns.
- *
- * A query any column cannot answer is marked with its evidence state in that column AND
- * excluded from every column's geomean. This is the case that produced a wrong
- * 1.18x reading in the design prototype: each column had silently averaged over
- * whichever queries it happened to have.
- */
 export function buildWithinRunRows(
   executions: readonly BasisExecution[],
   displayMsByQuery: ReadonlyMap<string, number | null>,
@@ -178,9 +154,6 @@ export function buildWithinRunRows(
   return { rows, sharedQueryIds: rows.filter((r) => r.comparable).map((r) => r.queryId) };
 }
 
-/**
- * Calculate per-column geometric means over the queries present across all columns.
- */
 export function calculateColumnGeomeans(
   rows: readonly WithinRunRow[],
   sharedQueryIds: readonly string[],
@@ -217,8 +190,6 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
   const [detail, setDetail] = useState<DetailResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  // Bumped by the ErrorMessage retry button so a reader can re-issue this
-  // read after a DuckDB worker fault without reloading the page.
   const [detailRetryToken, setDetailRetryToken] = useState(0);
   const search = typeof window === "undefined" ? "" : window.location.search;
   const parsed = useMemo(() => parseBasesParam(search), [search]);
@@ -372,11 +343,6 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
         <h1 class="mt-1 text-2xl font-bold text-[var(--bb-data-fg-primary)]">
           Compare measurements from one {detail.platform} run
         </h1>
-        {/*
-          The reason this page may do what no other compare surface may. Stated
-          on the page, not just in a comment, because it is also the reason its
-          numbers must not travel.
-        */}
         <p class="mt-2 text-sm text-[var(--bb-data-fg-muted)]">
           Each column reads the same run in a different way. The platform, hardware, and queries stay fixed, so any difference comes from the selected passes or summary method.
         </p>
@@ -396,7 +362,6 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
         </div>
       </section>
 
-      {/* Basis Cards */}
       <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {bases.map((basis, i) => {
           const color = paletteColor(i);
@@ -485,7 +450,6 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
         })}
       </div>
 
-      {/* Add Basis Controls */}
       {bases.length < MAX_WITHIN_RUN_BASES && addableBases.length > 0 && (
         <div class="panel mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-3 shadow-sm">
           <div>
@@ -519,7 +483,6 @@ export function CompareWithinRun({ resultId }: CompareWithinRunProps) {
         </div>
       )}
 
-      {/* Grid Table */}
       <section class="card" aria-label="Per-query values by basis">
         <div class="overflow-x-auto">
           <table class="min-w-full w-max divide-y divide-[var(--bb-data-border)] text-sm">

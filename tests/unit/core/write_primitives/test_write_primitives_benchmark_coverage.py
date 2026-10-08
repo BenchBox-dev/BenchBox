@@ -1,9 +1,3 @@
-"""Coverage tests for WritePrimitivesBenchmark execution paths.
-
-Targets the uncovered lines in benchbox/core/write_primitives/benchmark.py to
-reach ≥80% coverage. Tests are isolated - all DB calls use MagicMock.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -22,11 +16,6 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _make_val_query(
@@ -72,11 +61,6 @@ def wp(tmp_path: Path) -> WritePrimitivesBenchmark:
     return WritePrimitivesBenchmark(output_dir=tmp_path)
 
 
-# ---------------------------------------------------------------------------
-# _check_validation_query - module-level function
-# ---------------------------------------------------------------------------
-
-
 class TestCheckValidationQuery:
     def test_exact_match_passes(self):
         vq = _make_val_query(expected_rows=5)
@@ -119,11 +103,6 @@ class TestCheckValidationQuery:
         assert _check_validation_query(vq, 999) is True
 
 
-# ---------------------------------------------------------------------------
-# WritePrimitivesBenchmark.__init__ (default output_dir branch)
-# ---------------------------------------------------------------------------
-
-
 class TestInitDefaultOutputDir:
     def test_default_output_dir_uses_tpch_path(self, tmp_path):
         with patch("benchbox.core.write_primitives.benchmark.get_benchmark_runs_datagen_path") as mock_path:
@@ -133,14 +112,8 @@ class TestInitDefaultOutputDir:
             assert str(bm.output_dir) == str(tmp_path)
 
     def test_quiet_kwarg_is_consumed(self, tmp_path):
-        # quiet=True must not raise a duplicate-kwarg error
         bm = WritePrimitivesBenchmark(output_dir=tmp_path, quiet=True)
         assert bm is not None
-
-
-# ---------------------------------------------------------------------------
-# output_dir setter - propagation to data_generator
-# ---------------------------------------------------------------------------
 
 
 class TestOutputDirSetter:
@@ -155,15 +128,9 @@ class TestOutputDirSetter:
         bm = WritePrimitivesBenchmark(output_dir=tmp_path)
         new_dir = tmp_path / "sub"
         new_dir.mkdir()
-        # Ensure tpch_generator exists before exercising the branch
         if hasattr(bm.data_generator, "tpch_generator"):
             bm.output_dir = new_dir
             assert str(bm.data_generator.tpch_generator.output_dir) == str(new_dir)
-
-
-# ---------------------------------------------------------------------------
-# generate_data
-# ---------------------------------------------------------------------------
 
 
 class TestGenerateData:
@@ -180,11 +147,6 @@ class TestGenerateData:
         with patch.object(wp.data_generator, "generate", return_value=fake_tables):
             result = wp.generate_data(tables=["orders"])
         assert len(result) == 1
-
-
-# ---------------------------------------------------------------------------
-# ensure_auxiliary_data_files
-# ---------------------------------------------------------------------------
 
 
 class TestEnsureAuxiliaryDataFiles:
@@ -228,7 +190,7 @@ class TestEnsureAuxiliaryDataFiles:
 
         def check_files():
             call_count["n"] += 1
-            return call_count["n"] > 1  # False on first call, True on second
+            return call_count["n"] > 1
 
         with (
             patch.object(wp.data_generator, "check_bulk_load_files_exist", side_effect=check_files),
@@ -238,11 +200,6 @@ class TestEnsureAuxiliaryDataFiles:
         ):
             wp.ensure_auxiliary_data_files()
             mock_gen.assert_not_called()
-
-
-# ---------------------------------------------------------------------------
-# _acquire_setup_lock
-# ---------------------------------------------------------------------------
 
 
 class TestAcquireSetupLock:
@@ -260,25 +217,21 @@ class TestAcquireSetupLock:
 
     def test_acquires_lock_on_first_try(self, wp):
         conn = MagicMock()
-        # First execute creates the lock table (no exception)
-        # Second execute inserts the lock row (no exception)
         conn.execute.return_value = MagicMock()
         result = wp._acquire_setup_lock(conn, timeout_seconds=5, dialect="standard")
         assert result is True
 
     def test_returns_false_on_timeout(self, wp):
         conn = MagicMock()
-        # create table succeeds but INSERT always fails with duplicate key
         call_count = {"n": 0}
 
         def side_effect(sql):
             call_count["n"] += 1
             if call_count["n"] == 1:
-                return MagicMock()  # CREATE TABLE succeeds
+                return MagicMock()
             raise Exception("duplicate key constraint violation")
 
         conn.execute.side_effect = side_effect
-        # timeout=0 makes the while loop not execute
         result = wp._acquire_setup_lock(conn, timeout_seconds=0, dialect="standard")
         assert result is False
 
@@ -289,17 +242,12 @@ class TestAcquireSetupLock:
         def side_effect(sql):
             call_count["n"] += 1
             if call_count["n"] == 1:
-                return MagicMock()  # CREATE TABLE succeeds
-            raise Exception("network error")  # Non-constraint error
+                return MagicMock()
+            raise Exception("network error")
 
         conn.execute.side_effect = side_effect
         result = wp._acquire_setup_lock(conn, timeout_seconds=5, dialect="standard")
         assert result is False
-
-
-# ---------------------------------------------------------------------------
-# _release_setup_lock
-# ---------------------------------------------------------------------------
 
 
 class TestReleaseSetupLock:
@@ -318,11 +266,6 @@ class TestReleaseSetupLock:
         conn = MagicMock()
         conn.execute.side_effect = Exception("connection lost")
         wp._release_setup_lock(conn, dialect="standard")
-
-
-# ---------------------------------------------------------------------------
-# _get_effective_write_sql
-# ---------------------------------------------------------------------------
 
 
 class TestGetEffectiveWriteSql:
@@ -371,11 +314,6 @@ class TestGetEffectiveWriteSql:
         assert skip is None
 
 
-# ---------------------------------------------------------------------------
-# Aggregate-state source conversion
-# ---------------------------------------------------------------------------
-
-
 class TestAggregateStateSourceConversion:
     def test_find_aggregate_tbl_sources_requires_actual_matches(self, tmp_path):
         stale_root = tmp_path / "stale_root"
@@ -409,11 +347,6 @@ class TestAggregateStateSourceConversion:
         assert "compression='zstd'" not in sql
 
 
-# ---------------------------------------------------------------------------
-# _get_population_sql special cases
-# ---------------------------------------------------------------------------
-
-
 class TestGetPopulationSql:
     def test_merge_ops_target(self, wp):
         sql = wp._get_population_sql("merge_ops_target", "orders")
@@ -439,11 +372,6 @@ class TestGetPopulationSql:
         assert "SELECT * FROM" in sql
 
 
-# ---------------------------------------------------------------------------
-# _populate_staging_tables
-# ---------------------------------------------------------------------------
-
-
 class TestPopulateStagingTables:
     def test_skips_already_populated_table(self, wp):
         conn = MagicMock()
@@ -453,18 +381,15 @@ class TestPopulateStagingTables:
 
     def test_populates_empty_table(self, wp):
         conn = MagicMock()
-        # COUNT(*) on staging = 0, COUNT(*) on source = 50, then COUNT(*) after insert = 50
         call_count = {"n": 0}
 
         def execute_side(sql):
             call_count["n"] += 1
             mock = MagicMock()
             if call_count["n"] == 1:
-                mock.fetchone.return_value = (0,)  # staging count = 0
-            elif call_count["n"] == 2:
-                mock.fetchone.return_value = (50,)  # source count = 50
-            elif call_count["n"] == 4:
-                mock.fetchone.return_value = (50,)  # post-insert count
+                mock.fetchone.return_value = (0,)
+            elif call_count["n"] == 2 or call_count["n"] == 4:
+                mock.fetchone.return_value = (50,)
             return mock
 
         conn.execute.side_effect = execute_side
@@ -479,9 +404,9 @@ class TestPopulateStagingTables:
             call_count["n"] += 1
             mock = MagicMock()
             if call_count["n"] == 1:
-                mock.fetchone.return_value = (0,)  # staging empty
+                mock.fetchone.return_value = (0,)
             else:
-                raise Exception("table does not exist")  # source missing
+                raise Exception("table does not exist")
             return mock
 
         conn.execute.side_effect = execute_side
@@ -496,7 +421,7 @@ class TestPopulateStagingTables:
             call_count["n"] += 1
             mock = MagicMock()
             if call_count["n"] == 1:
-                mock.fetchone.return_value = (0,)  # staging empty
+                mock.fetchone.return_value = (0,)
             else:
                 raise Exception("table does not exist")
             return mock
@@ -512,17 +437,12 @@ class TestPopulateStagingTables:
         def execute_side(sql):
             call_count["n"] += 1
             mock = MagicMock()
-            mock.fetchone.return_value = (0,)  # both staging and source empty
+            mock.fetchone.return_value = (0,)
             return mock
 
         conn.execute.side_effect = execute_side
         with pytest.raises(RuntimeError, match="is empty"):
             wp._populate_staging_tables(conn, {"update_ops_orders": "orders"})
-
-
-# ---------------------------------------------------------------------------
-# setup()
-# ---------------------------------------------------------------------------
 
 
 class TestSetup:
@@ -534,14 +454,13 @@ class TestSetup:
 
     def test_raises_when_lock_not_acquired(self, wp):
         conn = MagicMock()
-        # Required tables check passes (SELECT 1 FROM orders / lineitem)
         call_count = {"n": 0}
 
         def execute_side(sql):
             call_count["n"] += 1
             if call_count["n"] <= 2:
-                return MagicMock()  # required table checks pass
-            raise Exception("permission denied")  # lock table create fails
+                return MagicMock()
+            raise Exception("permission denied")
 
         conn.execute.side_effect = execute_side
         with pytest.raises(RuntimeError, match="Could not acquire setup lock"):
@@ -575,7 +494,6 @@ class TestSetup:
             result = wp.setup(conn, force=True)
 
         assert result["success"] is True
-        # DROP TABLE IF EXISTS should have been called for each staging table
         drop_calls = [c for c in conn.execute.call_args_list if "DROP TABLE" in str(c)]
         assert len(drop_calls) > 0
 
@@ -594,11 +512,6 @@ class TestSetup:
         assert result["success"] is True
 
 
-# ---------------------------------------------------------------------------
-# teardown()
-# ---------------------------------------------------------------------------
-
-
 class TestTeardown:
     def test_drops_all_staging_tables(self, wp):
         conn = MagicMock()
@@ -611,11 +524,6 @@ class TestTeardown:
         conn = MagicMock()
         conn.execute.side_effect = Exception("permission denied")
         wp.teardown(conn)
-
-
-# ---------------------------------------------------------------------------
-# cleanup_auxiliary_files()
-# ---------------------------------------------------------------------------
 
 
 class TestCleanupAuxiliaryFiles:
@@ -644,11 +552,6 @@ class TestCleanupAuxiliaryFiles:
             wp.cleanup_auxiliary_files()
 
 
-# ---------------------------------------------------------------------------
-# reset()
-# ---------------------------------------------------------------------------
-
-
 class TestReset:
     def test_truncates_and_repopulates(self, wp):
         conn = MagicMock()
@@ -664,11 +567,6 @@ class TestReset:
 
         with patch.object(wp, "_populate_staging_tables", return_value={}):
             wp.reset(conn)
-
-
-# ---------------------------------------------------------------------------
-# is_setup()
-# ---------------------------------------------------------------------------
 
 
 class TestIsSetup:
@@ -693,11 +591,6 @@ class TestIsSetup:
         assert wp.is_setup(conn) is False
 
 
-# ---------------------------------------------------------------------------
-# get_schema()
-# ---------------------------------------------------------------------------
-
-
 class TestGetSchema:
     def test_returns_dict_with_tables(self, wp):
         schema = wp.get_schema()
@@ -712,11 +605,6 @@ class TestGetSchema:
     def test_dialect_parameter_accepted(self, wp):
         schema = wp.get_schema(dialect="snowflake")
         assert isinstance(schema, dict)
-
-
-# ---------------------------------------------------------------------------
-# get_create_tables_sql()
-# ---------------------------------------------------------------------------
 
 
 class TestGetCreateTablesSql:
@@ -734,11 +622,6 @@ class TestGetCreateTablesSql:
         assert "CREATE TABLE" in sql.upper()
 
 
-# ---------------------------------------------------------------------------
-# get_benchmark_info()
-# ---------------------------------------------------------------------------
-
-
 class TestGetBenchmarkInfo:
     def test_returns_expected_keys(self, wp):
         info = wp.get_benchmark_info()
@@ -754,11 +637,6 @@ class TestGetBenchmarkInfo:
     def test_total_operations_positive(self, wp):
         info = wp.get_benchmark_info()
         assert info["total_operations"] > 0
-
-
-# ---------------------------------------------------------------------------
-# get_query() and get_queries() and get_queries_by_category()
-# ---------------------------------------------------------------------------
 
 
 class TestQueryAccessors:
@@ -790,11 +668,6 @@ class TestQueryAccessors:
             assert len(result) > 0
 
 
-# ---------------------------------------------------------------------------
-# execute_operation()
-# ---------------------------------------------------------------------------
-
-
 class TestExecuteOperation:
     def test_raises_on_none_connection(self, wp):
         with pytest.raises(ValueError, match="Connection is None"):
@@ -806,7 +679,6 @@ class TestExecuteOperation:
 
     def test_success_path_with_mock_operation(self, wp):
         conn = MagicMock()
-        # execute returns object with rowcount
         mock_result = MagicMock()
         mock_result.rowcount = 10
         mock_result.fetchall.return_value = [("row1",)]
@@ -908,14 +780,9 @@ class TestExecuteOperation:
         with patch.object(wp.operations_manager, "get_operation", return_value=op):
             result = wp.execute_operation("CLEANUP_FAIL_OP", conn)
 
-        assert result.success is True  # write succeeded
+        assert result.success is True
         assert result.cleanup_success is False
         assert result.cleanup_warning is not None
-
-
-# ---------------------------------------------------------------------------
-# run_benchmark()
-# ---------------------------------------------------------------------------
 
 
 class TestRunBenchmark:
@@ -984,11 +851,6 @@ class TestRunBenchmark:
         assert len(results) > 0
 
 
-# ---------------------------------------------------------------------------
-# DataFrame support methods
-# ---------------------------------------------------------------------------
-
-
 class TestDataFrameSupport:
     def test_supports_dataframe_mode(self, wp):
         assert wp.supports_dataframe_mode() is True
@@ -1003,11 +865,6 @@ class TestDataFrameSupport:
     def test_get_dataframe_capabilities_none_for_unknown_platform(self, wp):
         result = wp.get_dataframe_capabilities("unknown-platform")
         assert result is None
-
-
-# ---------------------------------------------------------------------------
-# execute_dataframe_workload()
-# ---------------------------------------------------------------------------
 
 
 class TestExecuteDataframeWorkload:
@@ -1031,7 +888,6 @@ class TestExecuteDataframeWorkload:
         assert "DuckDB not available" in results[0]["error"]
 
     def test_measurement_iterations_respected(self, wp):
-        # warmup_iterations uses "or 1" fallback so 0 still becomes 1; use 1 for warmup
         benchmark_config = SimpleNamespace(options={"power_iterations": 2, "power_warmup_iterations": 1})
         fake_rows = [{"query_id": "OP_1", "status": "SUCCESS", "execution_time_seconds": 0.1, "rows_returned": 5}]
 
@@ -1042,7 +898,6 @@ class TestExecuteDataframeWorkload:
                 benchmark_config=benchmark_config,
             )
 
-        # 1 warmup + 2 measurement = 3 calls
         assert mock_exec.call_count == 3
         measurement_rows = [r for r in results if r.get("run_type") == "measurement"]
         assert len(measurement_rows) == 2
@@ -1060,11 +915,6 @@ class TestExecuteDataframeWorkload:
 
         warmup_rows = [r for r in results if r.get("run_type") == "warmup"]
         assert len(warmup_rows) == 1
-
-
-# ---------------------------------------------------------------------------
-# _select_dataframe_operation_ids()
-# ---------------------------------------------------------------------------
 
 
 class TestSelectDataframeOperationIds:

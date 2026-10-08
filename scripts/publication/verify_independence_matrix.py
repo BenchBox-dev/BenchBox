@@ -1,26 +1,4 @@
 #!/usr/bin/env python3
-"""Four-lane independence matrix verifier (A11 w2).
-
-Proves decoupling and independence across publication lanes:
-1. package  - Python package and wheels
-2. site     - Prose and Sphinx API documentation
-3. explorer - Results Explorer React/TypeScript web app
-4. corpus   - Curated seed bundles and results.duckdb
-
-Independence Invariant:
-When lane L_i is updated, only Hash(L_i) changes, while Hash(L_{j != i})
-remain strictly identical across transitions.
-
-This tool never fabricates transitions. It verifies real recorded lane
-transitions supplied in ``--receipts-dir``. With no real transition record it
-fails closed (exit 2): it cannot prove independence against a fixture it made
-up.
-
-Exit codes:
-  0 - Independence verified, zero cross-lane coupling violations.
-  1 - Independence violation detected (lane coupling or unexpected hash drift).
-  2 - Configuration, file reading, or argument error (including missing input).
-"""
 
 from __future__ import annotations
 
@@ -43,11 +21,10 @@ HEX_64_RE = re.compile(r"^(sha256:)?[0-9a-f]{64}$", re.IGNORECASE)
 
 
 class MatrixInputError(ValueError):
-    """Raised when no real transition record is available."""
+    pass
 
 
 def _validate_artifact_evidence(evidence: Any) -> list[str]:
-    """Validate immutable workflow-artifact provenance carried by a transition."""
     if not isinstance(evidence, dict):
         return ["evidence must be an object"]
     errors: list[str] = []
@@ -69,8 +46,6 @@ def _validate_artifact_evidence(evidence: Any) -> list[str]:
 
 @dataclass
 class LaneTransition:
-    """A recorded transition between two publication states."""
-
     transition_id: str
     target_lane: str
     before_hashes: dict[str, str]
@@ -84,8 +59,6 @@ class LaneTransition:
 
 @dataclass
 class IndependenceReport:
-    """Structured report on cross-lane independence verification."""
-
     valid: bool = True
     lanes: list[str] = field(default_factory=lambda: list(LANES))
     transitions_checked: int = 0
@@ -112,7 +85,6 @@ def verify_transition_independence(
     before_hashes: dict[str, str],
     after_hashes: dict[str, str],
 ) -> LaneTransition:
-    """Verify that only target_lane has mutated between before and after hashes."""
     violations: list[str] = []
 
     if target_lane not in LANES:
@@ -176,11 +148,6 @@ def _parse_transition_records(raw_transitions: Any) -> list[LaneTransition]:
 
 
 def load_transitions_from_dir(receipts_dir: Path) -> list[LaneTransition]:
-    """Load recorded lane transitions from a receipts directory.
-
-    Raises MatrixInputError when no recognised transition record is present or
-    the file cannot be parsed as JSON.
-    """
     matrix_file = receipts_dir / MATRIX_FILE_NAME
     lane_trans_file = receipts_dir / LANE_TRANSITIONS_FILE_NAME
 
@@ -210,13 +177,6 @@ def verify_independence(
     transitions: list[LaneTransition] | None = None,
     receipts_dir: Path | None = None,
 ) -> IndependenceReport:
-    """Verify lane independence matrix and build the 4x4 coupling matrix.
-
-    Exactly one real source of transitions must be provided: an explicit
-    ``transitions`` list or a ``receipts_dir`` holding a recorded transition
-    file. With neither, this raises ``MatrixInputError`` - there is no synthetic
-    fallback.
-    """
     if transitions:
         eval_transitions = list(transitions)
     elif receipts_dir is not None:

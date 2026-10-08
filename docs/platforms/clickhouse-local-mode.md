@@ -31,8 +31,7 @@ The embedded chDB connection used by `clickhouse-local` runs as its built-in
 `default` user and does not expose the grants required to inspect
 `system.users`, `system.roles`, or `system.grants`. The metadata-primitives ACL
 workload therefore requires `clickhouse-server` (or ClickHouse Cloud) with an
-appropriately privileged user; it is not an executable `clickhouse-local` UAT
-cell. Non-ACL catalog queries remain supported in local mode.
+appropriately privileged user; it is unsupported in local mode. Non-ACL catalog queries remain supported in local mode.
 
 ## Installation
 
@@ -44,20 +43,18 @@ cell. Non-ACL catalog queries remain supported in local mode.
 ### Install chDB
 
 ```bash
-# Install chDB for ClickHouse local mode support
 uv add chdb
 
-# Verify installation
 uv run -- python -c "import chdb; print(chdb.chdb_version())"
 ```
+
+The second command verifies the installation.
 
 ### Install BenchBox with ClickHouse Support
 
 ```bash
-# Install BenchBox (if not already installed)
 uv add benchbox
 
-# Sync project dependencies
 uv sync --group dev
 ```
 
@@ -66,18 +63,17 @@ uv sync --group dev
 ### Basic Usage
 
 ```bash
-# Run TPC-H benchmark in ClickHouse local mode
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 
-# Run with custom data path
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01 \
   --platform-option data_path=/tmp/benchmark_data
 
-# Compare with server mode
 benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
   --platform-option host=localhost \
   --platform-option port=9000
 ```
+
+The first command runs TPC-H in ClickHouse local mode. The second runs it with a custom data path. The third runs the same benchmark in server mode for comparison.
 
 ### CLI Arguments
 
@@ -139,22 +135,20 @@ The bare `clickhouse` selector has been removed and now raises an error naming t
 
 ### TPC-H Benchmark
 ```bash
-# Small scale for development
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 
-# Medium scale for testing
 benchbox run --platform clickhouse-local --benchmark tpch --scale 1.0
 ```
 
+Scale 0.01 is a small scale for development. Scale 1.0 is a medium scale for testing.
+
 ### ClickBench Benchmark
 ```bash
-# Run ClickBench analytical queries
 benchbox run --platform clickhouse-local --benchmark clickbench
 ```
 
 ### Custom Data Directory
 ```bash
-# Use specific directory for generated data
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1 \
   --platform-option data_path=/path/to/benchmark/data
 ```
@@ -217,10 +211,8 @@ Queries running slower than expected in local mode
 
 3. **Compare Deployments**: Test both platforms to isolate issues
    ```bash
-   # Test local mode
    benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 
-   # Test server mode (if available)
    benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01
    ```
 
@@ -231,12 +223,12 @@ Queries running slower than expected in local mode
 While local mode has fewer tuning options than server mode, you can optimize performance:
 
 ```bash
-# Use appropriate scale factors
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.1
 
-# Monitor memory usage during execution
 top -p $(pgrep -f benchbox)
 ```
+
+The `top` command monitors memory usage during execution.
 
 ### Tuned Runs
 
@@ -266,15 +258,15 @@ counted in data-loading time.
 ### Integration with Other Tools
 
 ```bash
-# Export results for analysis
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01 --output results.json
 
-# Run multiple benchmarks
 for benchmark in tpch tpcds ssb; do
   echo "Running $benchmark..."
   benchbox run --platform clickhouse-local --benchmark "$benchmark" --scale 0.01
 done
 ```
+
+The first command exports results for analysis. The loop runs multiple benchmarks.
 
 ## Technical Details
 
@@ -305,26 +297,26 @@ Local mode supports all standard formats:
 ### From Server to Local
 
 ```bash
-# Server mode command
 benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
   --platform-option host=localhost \
   --platform-option port=9000
 
-# Local mode equivalent
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 ```
+
+The first command is the server mode command. The second is the local mode equivalent.
 
 ### From Local to Server
 
 ```bash
-# Current local mode command
 benchbox run --platform clickhouse-local --benchmark tpch --scale 0.01
 
-# Server mode equivalent (requires ClickHouse server)
 benchbox run --platform clickhouse-server --benchmark tpch --scale 0.01 \
   --platform-option host=localhost \
   --platform-option port=9000
 ```
+
+The first command is the current local mode command. The second is the server mode equivalent and requires a ClickHouse server.
 
 For full migration details from the legacy `clickhouse` selector, see the [Migration Guide](clickhouse-migration.md).
 

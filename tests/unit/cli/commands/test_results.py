@@ -92,7 +92,7 @@ def test_results_paths_emits_nothing_when_no_results(cli_runner, monkeypatch):
 
 
 def test_results_paths_emits_paths_with_rich_markup_chars_unescaped(cli_runner, monkeypatch, tmp_path):
-    """Path emission must not run through Rich markup; brackets in paths survive verbatim."""
+
     results_module = import_module("benchbox.cli.commands.results")
     tricky = tmp_path / "results [archive] / r.json"
     exporter = SimpleNamespace(
@@ -173,9 +173,7 @@ def test_results_group_with_submitted_reports_empty(cli_runner, monkeypatch, tmp
 
 
 def test_show_cli_reconstructs_legacy_command(cli_runner, tmp_path, monkeypatch):
-    # Reset Rich console singleton so it binds to CliRunner's captured stdout,
-    # and ensure quiet mode is off so output is not suppressed.
-    # Use a wide console width to prevent Rich from truncating text inside Panels.
+
     from rich.console import Console
 
     monkeypatch.setattr(printing, "_STD_CONSOLE", Console(width=200))

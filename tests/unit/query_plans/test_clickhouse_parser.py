@@ -1,9 +1,3 @@
-"""Unit tests for ClickHouseQueryPlanParser.
-
-Driven by recorded EXPLAIN PLAN / PIPELINE text fixtures under
-tests/fixtures/query_plans/ so they run with no live ClickHouse instance.
-"""
-
 from pathlib import Path
 
 import pytest
@@ -48,7 +42,7 @@ class TestClickHouseExplainPlan:
         dag = parser.parse_explain_output("q2", _load("clickhouse_explain_plan_sample.txt"))
         nodes = _collect(dag.logical_root)
         types = [n.operator_type for n in nodes]
-        assert dag.logical_root.operator_type == LogicalOperatorType.PROJECT  # Expression root
+        assert dag.logical_root.operator_type == LogicalOperatorType.PROJECT
         for expected in (
             LogicalOperatorType.SORT,
             LogicalOperatorType.AGGREGATE,
@@ -82,7 +76,7 @@ class TestClickHouseOperatorNormalization:
             ("MergeSorting", LogicalOperatorType.SORT),
             ("MergingSorted", LogicalOperatorType.SORT),
             ("MergingSortedTransform", LogicalOperatorType.SORT),
-            ("ArrayJoin", LogicalOperatorType.OTHER),  # column expansion, not a relational join
+            ("ArrayJoin", LogicalOperatorType.OTHER),
             ("Limit", LogicalOperatorType.LIMIT),
             ("LimitBy", LogicalOperatorType.LIMIT),
             ("Offset", LogicalOperatorType.LIMIT),
@@ -101,7 +95,7 @@ class TestClickHouseOperatorNormalization:
             ("default.lineitem", "default.lineitem"),
             ("default.lineitem (columns: a, b)", "default.lineitem"),
             ("lineitem", "lineitem"),
-            ("Sorting for ORDER BY", None),  # multi-word, not a table
+            ("Sorting for ORDER BY", None),
             ("WHERE x > 1", None),
             ("", None),
         ],
@@ -116,7 +110,7 @@ class TestClickHouseErrorRecovery:
         assert parser.parse_explain_output("q", "   \n  ") is None
 
     def test_garbage_input_does_not_raise(self, parser):
-        # Graceful: no exception (may yield a minimal DAG or None).
+
         result = parser.parse_explain_output("q", "!@#$ %^&*")
         assert result is None or result.logical_root is not None
 

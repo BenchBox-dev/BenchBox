@@ -1,5 +1,3 @@
-"""Coverage-focused tests for transaction primitives data generator helpers."""
-
 from __future__ import annotations
 
 import json
@@ -239,7 +237,6 @@ def test_write_manifest_writes_entries_and_file(
     generator: TransactionPrimitivesDataGenerator,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Verify _write_manifest creates entries for each table and writes the manifest."""
     import benchbox.core.transaction_primitives.generator as gen_mod
 
     entries_added: list[tuple[str, Path, int]] = []

@@ -1,5 +1,3 @@
-"""Plan history command implementation."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,7 +9,28 @@ from benchbox.cli.shared import console
 from benchbox.core.query_plans.history import PlanHistory
 
 
-@click.command("plan-history")
+@click.command(
+    "plan-history",
+    help=(
+        "Show plan evolution history for a query.\n"
+        "\n"
+        "Displays how a query's execution plan has changed across benchmark runs.\n"
+        "Use this to identify:\n"
+        "\n"
+        "- When plan changes occurred\n"
+        "- How plan changes correlate with performance\n"
+        "- Plan flapping (unstable optimizer behavior)\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    # Show history for query q05\n"
+        "    benchbox plan-history --query-id q05 --history-dir ./plan_history\n"
+        "\n"
+        "\b\n"
+        "    # Check for plan instability\n"
+        "    benchbox plan-history --query-id q05 --history-dir ./plan_history --check-flapping"
+    ),
+)
 @click.option(
     "--query-id",
     required=True,
@@ -49,24 +68,6 @@ def plan_history(
     check_flapping: bool,
     platform: str | None,
 ):
-    """Show plan evolution history for a query.
-
-    Displays how a query's execution plan has changed across benchmark runs.
-    Use this to identify:
-
-    - When plan changes occurred
-    - How plan changes correlate with performance
-    - Plan flapping (unstable optimizer behavior)
-
-    \b
-    Examples:
-        # Show history for query q05
-        benchbox plan-history --query-id q05 --history-dir ./plan_history
-
-    \b
-        # Check for plan instability
-        benchbox plan-history --query-id q05 --history-dir ./plan_history --check-flapping
-    """
     try:
         history = PlanHistory(history_dir)
 
@@ -81,7 +82,6 @@ def plan_history(
             console.print(f"[yellow]No history found for query '{query_id}'{scope}[/yellow]")
             ctx.exit(1)
 
-        # Show limited entries
         display_entries = entries[-limit:]
 
         title_scope = f" (platform: {platform})" if platform else ""
@@ -103,9 +103,6 @@ def plan_history(
         table.add_column("Time (ms)", justify="right")
         table.add_column("Version", justify="right")
 
-        # Get version history (version-aware: a fingerprint_version encoding
-        # bump alone is not a plan change, and cross-platform fingerprints
-        # are never compared when --platform filters the lineage).
         versions = history.get_plan_version_history(query_id, platform=platform)
         version_map = {entries[i].run_id: versions[i][1] for i in range(len(entries))}
 
@@ -114,9 +111,6 @@ def plan_history(
             fp_short = entry.fingerprint[:12] + "..."
             version = version_map.get(entry.run_id, "?")
 
-            # Highlight genuine plan changes (version bumps), not raw
-            # fingerprint inequality: a v1->v2 re-encoding of the same plan
-            # keeps the version and must not highlight.
             if prev_version is not None and version != prev_version:
                 fp_display = f"[yellow]{fp_short}[/yellow]"
                 version_display = f"[yellow]v{version}[/yellow]"
@@ -126,7 +120,7 @@ def plan_history(
 
             table.add_row(
                 entry.run_id,
-                entry.timestamp[:19],  # Trim to date+time
+                entry.timestamp[:19],
                 fp_display,
                 f"{entry.execution_time_ms:.2f}",
                 version_display,
@@ -135,9 +129,6 @@ def plan_history(
 
         console.print(table)
 
-        # Summary statistics (identity-aware: distinct logical plans — version
-        # numbers identify change episodes, so an A -> B -> A flap must not
-        # count three; changes count version transitions in the lineage).
         unique_plans = history.count_unique_plans(query_id, platform=platform)
         ordered_versions = [versions[i][1] for i in range(len(entries))]
         plan_changes = sum(1 for a, b in zip(ordered_versions, ordered_versions[1:]) if a != b)
@@ -146,7 +137,6 @@ def plan_history(
         console.print(f"  Unique plans: {unique_plans}")
         console.print(f"  Plan changes: {plan_changes}")
 
-        # Flapping detection
         if check_flapping:
             console.print()
             is_flapping = history.detect_plan_flapping(query_id, platform=platform)

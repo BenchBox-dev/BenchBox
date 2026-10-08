@@ -1,5 +1,3 @@
-"""Aggregate the fail-closed Results Explorer browser gate policy."""
-
 from __future__ import annotations
 
 import os
@@ -12,7 +10,6 @@ def evaluate_gate(
     certified: str = "",
     certifying_run: str = "",
 ) -> tuple[bool, str]:
-    """Return whether the required browser gate may pass and why."""
     if changes_result != "success":
         return False, f"explorer-changes did not succeed ({changes_result}); refusing to pass the gate."
 

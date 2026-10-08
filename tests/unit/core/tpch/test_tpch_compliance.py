@@ -1,16 +1,5 @@
-"""Unit tests for TPC-H compliance classification.
-
-Tests classify_tpch_run, validate_tpch_scale, and TpchComplianceClass
-across all three enum values × official flag combinations, plus the
-``official`` wiring from BenchmarkConfig to the benchmark instance.
-
-Mirrors tests/unit/core/tpcds/test_compliance.py: the two TPC families share
-one gate shape, with benchmark-specific official scale points (TPC-H includes
-SF=30, which TPC-DS does not).
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -26,14 +15,7 @@ from benchbox.core.tpch.compliance import (
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
-# ---------------------------------------------------------------------------
-# classify_tpch_run
-# ---------------------------------------------------------------------------
-
-
 class TestClassifyTpchRun:
-    """Tests for classify_tpch_run across all three class × official combos."""
-
     def test_official_sf1_with_official_flag(self):
         assert classify_tpch_run(1.0, official=True) is TpchComplianceClass.OFFICIAL
 
@@ -41,7 +23,6 @@ class TestClassifyTpchRun:
         assert classify_tpch_run(10.0, official=True) is TpchComplianceClass.OFFICIAL
 
     def test_official_sf30_with_official_flag(self):
-        # SF=30 is a TPC-H official scale point (TPC-DS has no SF=30).
         assert classify_tpch_run(30.0, official=True) is TpchComplianceClass.OFFICIAL
 
     def test_all_official_scale_points_are_official(self):
@@ -57,7 +38,6 @@ class TestClassifyTpchRun:
         assert classify_tpch_run(30.0, official=False) is TpchComplianceClass.UNOFFICIAL_NONSTANDARD
 
     def test_non_official_scale_point_with_official_flag_is_nonstandard(self):
-        # SF=2.0 is not an official TPC-H scale point
         assert classify_tpch_run(2.0, official=True) is TpchComplianceClass.UNOFFICIAL_NONSTANDARD
 
     def test_subscale_is_unofficial_subscale_regardless_of_official_flag(self):
@@ -68,7 +48,6 @@ class TestClassifyTpchRun:
         assert classify_tpch_run(0.999) is TpchComplianceClass.UNOFFICIAL_SUBSCALE
 
     def test_dev_scale_factors_classify_subscale(self):
-        # The suite's smoke scales are development runs, never submittable.
         assert classify_tpch_run(0.01) is TpchComplianceClass.UNOFFICIAL_SUBSCALE
         assert classify_tpch_run(0.1) is TpchComplianceClass.UNOFFICIAL_SUBSCALE
 
@@ -77,14 +56,7 @@ class TestClassifyTpchRun:
         assert classify_tpch_run(0.5) is TpchComplianceClass.UNOFFICIAL_SUBSCALE
 
 
-# ---------------------------------------------------------------------------
-# validate_tpch_scale
-# ---------------------------------------------------------------------------
-
-
 class TestValidateTpchScale:
-    """Tests for validate_tpch_scale."""
-
     def test_subscale_returns_subscale_class(self):
         assert validate_tpch_scale(0.5) is TpchComplianceClass.UNOFFICIAL_SUBSCALE
 
@@ -110,14 +82,7 @@ class TestValidateTpchScale:
         assert validate_tpch_scale(0.5, official=True) is TpchComplianceClass.UNOFFICIAL_SUBSCALE
 
 
-# ---------------------------------------------------------------------------
-# TpchComplianceClass enum properties
-# ---------------------------------------------------------------------------
-
-
 class TestTpchComplianceClassEnum:
-    """TpchComplianceClass inherits str - string comparisons must work."""
-
     def test_enum_values_are_strings(self):
         assert TpchComplianceClass.OFFICIAL == "official"
         assert TpchComplianceClass.UNOFFICIAL_NONSTANDARD == "unofficial_nonstandard"
@@ -135,8 +100,6 @@ class TestTpchComplianceClassEnum:
 
 
 class TestOfficialFlagReachesTheClassifier:
-    """Guard the wiring, not just the pure function."""
-
     def test_benchmark_classifies_an_official_run_as_official(self):
         from benchbox.core.tpch.benchmark import TPCHBenchmark
 
@@ -145,7 +108,6 @@ class TestOfficialFlagReachesTheClassifier:
         assert TPCHBenchmark(scale_factor=0.01).compliance_class is TpchComplianceClass.UNOFFICIAL_SUBSCALE
 
     def test_loader_forwards_official_from_the_benchmark_config(self):
-        """BenchmarkConfig -> get_benchmark_instance -> benchmark must carry the flag."""
         from benchbox.core.benchmark_loader import get_benchmark_instance
         from benchbox.core.schemas import BenchmarkConfig
 
@@ -166,7 +128,6 @@ class TestOfficialFlagReachesTheClassifier:
         assert compliance_mode_kwargs(ungated) == {}
 
     def test_an_official_run_is_not_refused_by_submit_classification(self):
-        """The whole point: an official run must clear the submit gate."""
         from benchbox.validation.bundle import CLI_REFUSED_COMPLIANCE_CLASSES
 
         official = validate_tpch_scale(1.0, official=True)
@@ -175,7 +136,6 @@ class TestOfficialFlagReachesTheClassifier:
         assert validate_tpch_scale(0.01).value in CLI_REFUSED_COMPLIANCE_CLASSES
 
     def test_dataframe_fallback_classifies_tpch_from_config(self):
-        """The DataFrame surface fallback must use TPC-H scale points, not TPC-DS ones."""
         from benchbox.core.schemas import BenchmarkConfig
         from benchbox.platforms.dataframe.benchmark_mixin import dataframe_compliance_class
 

@@ -1,17 +1,3 @@
-"""`benchbox compare` run mode must never report a success it did not achieve.
-
-Regression pins for the defect where the invocation printed as the FIRST
-example of ``benchbox compare --help`` produced::
-
-    Failed to benchmark duckdb: 'benchmark'
-    Total Queries: 0 / Fastest: duckdb / Speedup: 1.00x
-    duckdb  N/A  N/A  100%
-    EXIT=0
-
-Two independent things were wrong and both are pinned here: the summary
-fabricated a self-comparison, and the command exited 0 on total failure.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -31,7 +17,6 @@ pytestmark = [
 
 
 def _failed(platform: str, reason: str = "no driver") -> UnifiedPlatformResult:
-    """A platform that raised before running any query."""
     return UnifiedBenchmarkSuite()._build_platform_result(
         platform,
         PlatformType.SQL,

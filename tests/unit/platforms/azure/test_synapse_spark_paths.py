@@ -1,17 +1,6 @@
-"""Managed-path tests for SynapseSparkAdapter miss clusters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers the Livy session lifecycle with mocked HTTP: session creation
-failures, wait branches (target/error/timeout), ensure-session recovery,
-connection status mapping, the FAILED result envelope, close paths, and
-init guards. Transport is patched per-method (get/post/delete) so the
-real requests exceptions stay intact for except clauses; auth headers
-are stubbed because the token provider is credential-backed. AQE
-rendering is owned by the AQE-toggle change, not asserted here.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -59,12 +48,7 @@ def _make_adapter(**overrides):
 
 @contextlib.contextmanager
 def _transport(*, get=None, post=None, delete=None):
-    """Patch Livy HTTP methods; yields mocks without touching requests.exceptions.
 
-    Note: the adapter module holds the shared global ``requests`` module, so
-    these patches rebind ``requests.get/post/delete`` process-wide for the
-    block (same approach as the coverage sibling).
-    """
     with (
         patch(f"{_MODULE}.requests.get") as mock_get,
         patch(f"{_MODULE}.requests.post") as mock_post,
@@ -169,9 +153,7 @@ class TestSessionLifecycle:
                 adapter._wait_for_session_state(7, ["idle"])
 
     def test_wait_timeout_raises(self, adapter):
-        # timeout_seconds=0 keeps the poll loop unentered, so no HTTP fires;
-        # still wrap the transport so a future pre-loop status fetch cannot
-        # escape the unit lane as a live call.
+
         with _transport(), pytest.raises(ConfigurationError, match="Timeout waiting"):
             adapter._wait_for_session_state(7, ["idle"], timeout_seconds=0)
 
@@ -365,6 +347,3 @@ class TestImportFallback:
             sys.modules.pop("requests", None)
             sys.modules.update(saved)
             self._reload()
-        # No assertion on the restored module: whether the real requests
-        # package is importable depends on the ambient environment, matching
-        # the AWS/GCP fallback tests' convention.

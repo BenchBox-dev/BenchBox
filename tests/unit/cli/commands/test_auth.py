@@ -1,5 +1,3 @@
-"""Unit tests for hosted submission auth helpers and CLI commands."""
-
 from __future__ import annotations
 
 import importlib
@@ -228,7 +226,7 @@ def test_auth_login_rejects_combined_token_and_token_stdin(monkeypatch: pytest.M
 def test_auth_store_delete_handles_missing_via_typed_exception(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """N1 fix: backend `not found` no longer requires substring matching."""
+
     from keyring.errors import PasswordDeleteError
 
     class FakeRacingKeyring:
@@ -247,7 +245,7 @@ def test_auth_store_delete_handles_missing_via_typed_exception(
             self.passwords[(service_name, username)] = password
 
         def delete_password(self, service_name: str, username: str) -> None:
-            # Simulate a race: the credential disappeared between get() and delete().
+
             raise PasswordDeleteError("Item not in some-locale-specific-text")
 
     store = submit_auth.SubmissionAuthStore(keyring_backend=FakeRacingKeyring())

@@ -1,5 +1,3 @@
-"""Unit tests for platform-specific environment detection."""
-
 from __future__ import annotations
 
 from subprocess import CompletedProcess

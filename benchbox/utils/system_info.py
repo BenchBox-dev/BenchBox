@@ -1,9 +1,6 @@
-"""Core system information utilities without CLI dependencies.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import platform
 from dataclasses import dataclass
@@ -16,8 +13,6 @@ from benchbox.utils.environment import is_cpu_architecture_token
 
 @dataclass
 class SystemInfo:
-    """Core system information dataclass."""
-
     os_name: str
     os_version: str
     architecture: str
@@ -27,14 +22,11 @@ class SystemInfo:
     available_memory_gb: float
     python_version: str
     hostname: str
-    # Appended with a default rather than inserted next to cpu_model: every
-    # existing positional construction of SystemInfo keeps working, and a
-    # producer that cannot determine the vendor simply omits it.
+
     cpu_vendor: str | None = None
     cpu_identity_provenance: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for compatibility."""
         return {
             "os_type": self.os_name,
             "os_version": self.os_version,
@@ -43,12 +35,6 @@ class SystemInfo:
             "cpu_vendor": self.cpu_vendor,
             "cpu_identity_provenance": self.cpu_identity_provenance,
             "cpu_cores": self.cpu_cores,
-            # `cpu_count` and `memory_gb` are the spellings
-            # ClientHostEnvironment.from_system_profile reads. They are emitted
-            # alongside the originals rather than replacing them: the original
-            # names are part of this dict's existing contract, and dropping
-            # them to fix the consumer would trade one silent mismatch for
-            # another.
             "cpu_count": self.cpu_cores,
             "memory_gb": self.total_memory_gb,
             "os_release": self.os_version,
@@ -60,13 +46,6 @@ class SystemInfo:
 
 
 def _proc_cpuinfo_model() -> str | None:
-    """Return the CPU model from /proc/cpuinfo, or None when unavailable.
-
-    Extracted so tests can neutralise exactly this read. Patching
-    ``builtins.open`` instead is too broad: psutil reads /proc on Linux (and
-    does not on macOS), so a blanket patch passes locally and then fails in CI
-    with FileNotFoundError escaping from an unrelated call.
-    """
     try:
         with open("/proc/cpuinfo", encoding="utf-8") as handle:
             for line in handle:
@@ -78,20 +57,11 @@ def _proc_cpuinfo_model() -> str | None:
 
 
 def get_system_info() -> SystemInfo:
-    """Get current system information."""
-    # Get memory info
+
     memory_info = psutil.virtual_memory()
     total_memory_gb = memory_info.total / (1024**3)
     available_memory_gb = memory_info.available / (1024**3)
 
-    # Get CPU info.
-    #
-    # detect_cpu_info() first, NOT platform.processor(). On Darwin
-    # platform.processor() returns the bare architecture ("arm"), which is not
-    # a CPU model at all -- it normalizes to the cpu_family "unknown" and makes
-    # the published hardware axis useless. detect_cpu_info() reads the real
-    # brand string (sysctl on Darwin, /proc/cpuinfo on Linux, Windows CIM)
-    # and degrades to None rather than to a placeholder.
     cpu_vendor: str | None = None
     cpu_identity_provenance: str | None = None
     try:
@@ -106,9 +76,6 @@ def get_system_info() -> SystemInfo:
         cpu_model = None
 
     if not cpu_model:
-        # Legacy fallback chain, kept for platforms detect_cpu_info() cannot
-        # answer. platform.processor() is still consulted last rather than not
-        # at all: on several Linux distributions it does return a real model.
         try:
             cpu_model = platform.processor() or ""
             if not cpu_model:
@@ -116,8 +83,6 @@ def get_system_info() -> SystemInfo:
         except Exception:
             cpu_model = ""
         if not cpu_model or is_cpu_architecture_token(cpu_model, platform.machine()):
-            # Absence is evidence. Never turn an architecture into a model-like
-            # placeholder that downstream surfaces can mistake for identity.
             cpu_model = None
         else:
             cpu_identity_provenance = "inferred"
@@ -138,7 +103,6 @@ def get_system_info() -> SystemInfo:
 
 
 def get_memory_info() -> dict[str, float]:
-    """Get current memory usage information."""
     memory_info = psutil.virtual_memory()
     return {
         "total_gb": memory_info.total / (1024**3),
@@ -149,7 +113,6 @@ def get_memory_info() -> dict[str, float]:
 
 
 def get_cpu_info() -> dict[str, Any]:
-    """Get CPU information and current usage."""
     return {
         "logical_cores": psutil.cpu_count(),
         "physical_cores": psutil.cpu_count(logical=False),

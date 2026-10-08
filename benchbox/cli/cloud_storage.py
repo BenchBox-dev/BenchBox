@@ -1,9 +1,6 @@
-"""Cloud storage configuration prompts for interactive mode.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import sys
 from typing import Optional
@@ -25,23 +22,9 @@ def prompt_cloud_output_location(
     non_interactive: bool = False,
     default_output: Optional[str] = None,
 ) -> Optional[str]:
-    """Prompt user for cloud output location if required by platform.
-
-    Args:
-        platform_name: Selected platform (e.g., 'databricks')
-        benchmark_name: Selected benchmark (e.g., 'ssb')
-        scale_factor: Benchmark scale factor
-        non_interactive: If True, don't prompt (return None)
-        default_output: Pre-configured default output location from credentials (optional)
-
-    Returns:
-        Cloud path string or None if not needed/provided
-    """
-    # Check if platform requires cloud storage
     if not PlatformRegistry.requires_cloud_storage(platform_name):
         return None
 
-    # In non-interactive mode, return None (error will be caught later)
     if non_interactive or not sys.stdin.isatty():
         return None
 
@@ -56,19 +39,16 @@ def prompt_cloud_output_location(
         )
     )
 
-    # Display example paths
     examples = PlatformRegistry.get_cloud_path_examples(platform_name)
     if examples:
         console.print(f"\n[bold cyan]Example paths for {platform_name.upper()}:[/bold cyan]")
         for example in examples:
             console.print(f"  • [dim]{example}[/dim]")
 
-    # Display platform-specific guidance
     _display_platform_guidance(platform_name)
 
     console.print()
 
-    # Check if default exists and offer to use it
     if default_output:
         console.print("[bold cyan]Configured Default Location:[/bold cyan]")
         console.print(f"  {default_output}")
@@ -86,7 +66,6 @@ def prompt_cloud_output_location(
         console.print("[dim]You can enter a different location below...[/dim]")
         console.print()
 
-    # Ask if user wants to provide output location
     wants_cloud = Confirm.ask(
         "Do you want to specify a cloud output location now?",
         default=True,
@@ -101,7 +80,6 @@ def prompt_cloud_output_location(
 
 
 def _prompt_and_validate_cloud_path(default_output: Optional[str]) -> Optional[str]:
-    """Prompt for a cloud storage path with format validation and confirmation loop."""
     while True:
         cloud_path = Prompt.ask("\n[bold]Enter cloud storage path[/bold]", default=default_output or "")
 
@@ -123,11 +101,6 @@ def _prompt_and_validate_cloud_path(default_output: Optional[str]) -> Optional[s
 
 
 def _display_platform_guidance(platform_name: str) -> None:
-    """Display platform-specific cloud storage guidance.
-
-    Args:
-        platform_name: Platform name (databricks, bigquery, etc.)
-    """
     guidance = {
         "databricks": [
             "",

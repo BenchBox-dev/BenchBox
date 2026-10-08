@@ -2,10 +2,6 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/pre
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/db", async () => {
-  // Vitest throws for a named import a factory omits, so `queryRows` still
-  // needs a fake here - but re-export the real constant rather than a
-  // hardcoded copy, so a future change to DUCKDB_USER_QUERY_TIMEOUT_MS can't
-  // drift from what these tests assert against.
   const actual = await vi.importActual<typeof import("@/db")>("@/db");
   return {
     ...actual,
@@ -252,12 +248,6 @@ beforeEach(() => {
   });
 });
 
-// The "Configure visible columns" assertions in this file encode the
-// expandable Visible Columns affordance on the Query page. PR #266
-// introduced these assertions but did not ship the matching <details>
-// element in Query.tsx, so the three cases below silently failed on
-// develop until restored. See TODO
-// query-test-configure-visible-columns-failures.
 describe("Query", () => {
   it("preserves a run handed off from the one-run Compare route", async () => {
     vi.mocked(getDetailResult).mockResolvedValue(BASE_ROWS[0] as never);
@@ -361,8 +351,6 @@ describe("Query", () => {
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getByTestId("query-compare-checkbox-r1"));
-    // Compatible-only defaults on after the cohort lock; toggle it off to
-    // surface the still-disabled incompatible row for assertion.
     fireEvent.click(screen.getByTestId("query-compare-compatible-only"));
     const incompatible = screen.getByTestId("query-compare-checkbox-r3") as HTMLInputElement;
     expect(incompatible.disabled).toBe(true);
@@ -437,7 +425,6 @@ describe("Query", () => {
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
-    // Before any selection, no toggle and the incompatible row is visible.
     expect(screen.queryByTestId("query-compare-compatible-only")).toBeNull();
     expect(screen.getByTestId("query-compare-checkbox-r3")).toBeTruthy();
 
@@ -549,12 +536,6 @@ describe("Query", () => {
 
     expect(screen.getAllByText("SQLite").length).toBeGreaterThan(0);
     expect(within(resultsTable).getAllByText("ClickBench").length).toBeGreaterThan(0);
-    // `results-explorer-query-workbench-controls-and-facets` w6 introduces
-    // the centralized `formatTrustLabel` formatter, applied via Query.tsx
-    // `formatQueryRowCell`. With that formatter wired in, the raw
-    // "maintainer-run" trust label renders as "Maintainer run" in the
-    // table. PR #277 had aligned this assertion to the unformatted source
-    // because the formatter didn't exist yet; w6 closes that gap.
     expect(within(resultsTable).getByText("Maintainer run")).toBeTruthy();
   });
 
@@ -584,11 +565,6 @@ describe("Query", () => {
     const headerRow = scrollContainer.querySelector("thead tr")!;
     const bodyRow = scrollContainer.querySelector("tbody tr")!;
 
-    // Every cell except the leading compare-select column is unpinned - in
-    // particular the trailing action column, which is what used to overlap
-    // a data cell. The leading column stays pinned deliberately (see the
-    // comment on it in Query.tsx); iterate every cell, not just the last
-    // one, so a stray re-pin anywhere in the row would fail this test.
     const headerCells = Array.from(headerRow.children) as HTMLElement[];
     const bodyCells = Array.from(bodyRow.children) as HTMLElement[];
     headerCells.forEach((cell, index) => {
@@ -635,11 +611,6 @@ describe("Query", () => {
   });
 
   it("provides Reset / Select all / Clear optional bulk actions in the Configure visible columns disclosure", async () => {
-    // Regression contract for w3 of
-    // results-explorer-query-workbench-controls-and-facets: the
-    // disclosure body must offer Reset to default, Select all, and
-    // Clear optional actions so users do not have to toggle 20+
-    // checkboxes one by one.
     render(<Query />);
     await waitFor(() => expect(screen.getAllByText("DuckDB").length).toBeGreaterThan(0));
 
@@ -648,8 +619,6 @@ describe("Query", () => {
     expect(within(disclosure).getByRole("button", { name: "Select all" })).toBeTruthy();
     const clearOptional = within(disclosure).getByRole("button", { name: "Clear optional" });
 
-    // Click "Select all" — every column checkbox in the disclosure
-    // should now be checked.
     fireEvent.click(within(disclosure).getByRole("button", { name: "Select all" }));
     await waitFor(() => {
       const checkboxes = within(disclosure).getAllByRole("checkbox") as HTMLInputElement[];
@@ -657,9 +626,6 @@ describe("Query", () => {
       expect(checkboxes.every((cb) => cb.checked)).toBe(true);
     });
 
-    // Click "Clear optional" — at most one column stays checked
-    // (`result_id` if present, else first available); we never let users
-    // hide every useful column.
     fireEvent.click(clearOptional);
     await waitFor(() => {
       const checked = (within(disclosure).getAllByRole("checkbox") as HTMLInputElement[]).filter((cb) => cb.checked);
@@ -860,8 +826,6 @@ describe("Query", () => {
       const selectCalls = vi.mocked(queryRows).mock.calls.filter(([sql]) => isDefaultResultSelect(sql));
       expect(String(selectCalls.at(-1)?.[0])).toContain("physical_rendering_id IN (?)");
     });
-    // ADR-2 §3: it is a page-local URL facet, not a coarse FACET_KEYS chip, so
-    // it persists under its own literal query key.
     expect(new URL(window.location.href).searchParams.get("physical_rendering_id")).toBe(
       "databricks_liquid_auto",
     );
@@ -1052,9 +1016,6 @@ describe("Query", () => {
 
     await waitFor(() => expect(screen.getByText("read-only connection")).toBeTruthy());
 
-    // Workbench SQL is user-authored and can legitimately run long, so
-    // runSql must give it the generous user-query bound rather than the
-    // default meant for the app's own bounded reads (see Query.tsx runSql).
     const sqlCall = vi.mocked(queryRows).mock.calls.find(([sql]) => String(sql).startsWith("CREATE TABLE"));
     expect(sqlCall?.[2]).toBe(DUCKDB_USER_QUERY_TIMEOUT_MS);
   });

@@ -1,18 +1,3 @@
-"""Regression guard for the submission-manifest waiver's spoof resistance.
-
-`validate-submission.yml` waives the `--require-manifest` requirement for
-maintainer corpus-mirror PRs (they legitimately carry maintainer-run bundles
-with no sidecar). The waiver MUST gate on an unforgeable signal.
-
-`github.head_ref` is attacker-controlled on fork PRs, so a branch-name-only
-waiver (`case $HEAD_REF in auto/results-mirror-*`) is spoofable: anyone could
-open a fork PR from a branch so named and drop the sidecar requirement,
-laundering a community bundle into a maintainer-run (ranking-eligible) stamp.
-The load-bearing checks are `github.event.pull_request.head.repo.fork == false`,
-which a fork PR cannot forge, and the exact `github-actions[bot]` PR author.
-This test fails closed if either signal is ever dropped from the waiver.
-"""
-
 from __future__ import annotations
 
 import re
@@ -61,8 +46,6 @@ def test_waiver_gates_manifest_skip_on_fork_check() -> None:
     )
     assert author_var is not None, "no env var bound to pull_request.user.login"
 
-    # The block that clears REQUIRE_MANIFEST (the sidecar waiver) must be
-    # guarded by the fork variable resolving to the same-repo ("false") case.
     assert re.search(rf'\[\s*"\${fork_var}"\s*=\s*"false"\s*\]', run), (
         "The manifest waiver must be nested under an "
         f'[ "${fork_var}" = "false" ] guard; a fork PR must never reach the '
@@ -70,13 +53,6 @@ def test_waiver_gates_manifest_skip_on_fork_check() -> None:
     )
     assert "auto/results-mirror-*" in run, "The waiver should still narrow to the mirror branch pattern."
 
-    # Presence alone doesn't prove NESTING: a future edit could leave the fork
-    # check in the step but move the mirror-branch waiver back outside it,
-    # reintroducing the fork-branch spoofing bypass while both substrings
-    # above still individually appear somewhere in `run`. Extract the actual
-    # `then ... fi` body guarded by the fork check and require BOTH the
-    # branch pattern and the empty-REQUIRE_MANIFEST assignment to be inside
-    # it, not just present anywhere in the step.
     guard_match = re.search(
         rf'\[\s*"\${fork_var}"\s*=\s*"false"\s*\]\s*&&\s*'
         rf'\[\s*"\${author_var}"\s*=\s*"github-actions\[bot\]"\s*\]\s*;\s*then\n(.*?)\nfi\b',
@@ -101,7 +77,6 @@ def test_waiver_gates_manifest_skip_on_fork_check() -> None:
 
 
 def test_default_requires_manifest() -> None:
-    # Fail-closed default: the sidecar is required unless explicitly waived.
     run = _validate_step()["run"]
     assert 'REQUIRE_MANIFEST="--require-manifest"' in run, (
         "REQUIRE_MANIFEST must default to --require-manifest (fail closed); "

@@ -1,9 +1,3 @@
-"""Microsoft Fabric Lakehouse SQL Analytics Endpoint adapter.
-
-This adapter targets Fabric Lakehouse SQL Analytics Endpoint, which is read-only.
-Data loading and DDL operations must be performed through Fabric Spark.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -37,8 +31,6 @@ except ImportError:
 
 
 class FabricLakehouseAdapter(PlatformAdapter):
-    """Read-only adapter for Fabric Lakehouse SQL Analytics Endpoint."""
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
@@ -106,7 +98,6 @@ class FabricLakehouseAdapter(PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create adapter from normalized configuration."""
         return cls(**config)
 
     @property
@@ -181,7 +172,6 @@ class FabricLakehouseAdapter(PlatformAdapter):
             autocommit=True,
         )
 
-        # Validate endpoint can execute read-only queries.
         cursor = conn.cursor()
         try:
             cursor.execute("SELECT 1")
@@ -229,8 +219,6 @@ class FabricLakehouseAdapter(PlatformAdapter):
         return token not in self._READ_ONLY_TOKENS
 
     def create_schema(self, benchmark: Any, connection: Any) -> float:
-        # Raises (not returns dict) because these setup-phase calls are fatal:
-        # the orchestrator has no mechanism to continue if schema creation fails.
         raise self._read_only_error("CREATE SCHEMA/TABLE")
 
     def load_data(
@@ -251,7 +239,6 @@ class FabricLakehouseAdapter(PlatformAdapter):
             finally:
                 cursor.close()
         except Exception as exc:
-            # Not all endpoint configurations expose SET options.
             logger.debug("SET options not applied (endpoint may not support them): %s", exc)
 
     def execute_query(

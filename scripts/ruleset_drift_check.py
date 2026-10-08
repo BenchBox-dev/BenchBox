@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Compare live GitHub rulesets with the repository admin runbook."""
 
 from __future__ import annotations
 
@@ -16,11 +15,9 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_RUNBOOK = REPO_ROOT / "docs" / "operations" / "repo-admin-settings.md"
 
-# Make the sibling _project/scripts source-of-truth importable regardless of
-# how this module is loaded (script, package import, or out-of-tree test).
 sys.path.insert(0, str(REPO_ROOT / "_project" / "scripts"))
 
-from ruleset_review_enforcement import (  # noqa: E402
+from ruleset_review_enforcement import (
     TAG_RULESET_ENFORCED,
     extract_rules,
     review_enforcement_findings,
@@ -28,11 +25,8 @@ from ruleset_review_enforcement import (  # noqa: E402
     tag_protection_findings,
 )
 
-# Findings with this prefix are surfaced (rendered, included in the JSON
-# `findings` list) exactly like any other drift finding, but do NOT flip the
-# exit code / `status` field to failed. They are reserved for explicit
-# migration overrides and human-confirmation advisories (see
-# `tag_creation_findings`).
+CLI_DESCRIPTION = "Compare live GitHub rulesets with the repository admin runbook."
+
 WARNING_PREFIX = "WARNING (non-blocking): "
 
 DEVELOP_REVIEW_RULE_ENFORCED = True
@@ -56,7 +50,6 @@ class ExpectedRuleset:
 
 
 def environment_protection_findings(live: dict[str, Any]) -> list[str]:
-    """Return blocking drift findings for the real-PyPI environment gate."""
     findings: list[str] = []
     if live.get("name") != PYPI_ENVIRONMENT:
         findings.append(f"pypi environment: name is {live.get('name')!r}, expected {PYPI_ENVIRONMENT!r}")
@@ -156,7 +149,6 @@ def _other_properties(section: str, name: str) -> dict[str, str]:
 
 
 def parse_expected_rulesets(runbook_text: str) -> dict[str, ExpectedRuleset]:
-    """Extract expected ruleset state from docs/operations/repo-admin-settings.md."""
     expected: dict[str, ExpectedRuleset] = {}
     for name in ("develop-squash-only", "release-only"):
         section = _section_for_ruleset(runbook_text, name)
@@ -214,13 +206,6 @@ def compare_ruleset(
     require_bypass_actor_visibility: bool = False,
     enforce_review_rule: bool = DEVELOP_REVIEW_RULE_ENFORCED,
 ) -> list[str]:
-    """Return human-readable drift findings for one ruleset.
-
-    For ``develop-squash-only`` only, applies the shared
-    ``review_enforcement_findings`` predicate to the already-fetched live
-    payload. The live default is blocking; callers may explicitly pass
-    ``enforce_review_rule=False`` for migration fixtures.
-    """
     findings: list[str] = []
     if live.get("enforcement") != "active":
         findings.append(f"{expected.name}: enforcement is {live.get('enforcement')!r}, expected 'active'")
@@ -277,21 +262,6 @@ def tag_creation_findings(
     enforce_tag_rule: bool = TAG_RULESET_ENFORCED,
     require_bypass_actor_visibility: bool = False,
 ) -> list[str]:
-    """Findings for the ``v*`` tag-creation ruleset (release-flow hardening).
-
-    Delegates entirely to ``ruleset_review_enforcement.tag_protection_findings``/
-    ``tag_bypass_advisory`` (single source of truth, shared with the standalone
-    ``--rulesets-file`` CLI documented in ``docs/operations/repo-admin-settings.md``).
-    Unlike the per-name ``compare_ruleset`` checks above, this scans ALL fetched
-    rulesets (not one by expected name) because the tag-creation ruleset has no
-    fixed expected name — any ruleset with ``target: "tag"`` that covers
-    ``refs/tags/v*`` with a ``creation`` rule counts.
-
-    ``enforce_tag_rule`` defaults to the live-enforced ``TAG_RULESET_ENFORCED``
-    setting, so a missing or incomplete tag ruleset is blocking in normal
-    canary execution. Callers may explicitly pass ``False`` for a migration
-    fixture that must retain the former warning-only behavior.
-    """
     findings: list[str] = []
     protection_findings = tag_protection_findings(
         all_live_rulesets,
@@ -369,7 +339,6 @@ def queue_policy_verified(expected: ExpectedRuleset, live: dict[str, Any] | None
 
 
 def blocking_findings(findings: list[str]) -> list[str]:
-    """Findings that should fail the check (excludes WARNING_PREFIX entries)."""
     return [finding for finding in findings if not finding.startswith(WARNING_PREFIX)]
 
 
@@ -389,7 +358,7 @@ def render_summary(findings: list[str], expected: dict[str, ExpectedRuleset]) ->
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--runbook", type=Path, default=DEFAULT_RUNBOOK)
     parser.add_argument("--repo", default=os.environ.get("GITHUB_REPOSITORY", "BenchBox-dev/BenchBox"))
     parser.add_argument("--token", default=os.environ.get("GITHUB_TOKEN", ""))

@@ -1,5 +1,3 @@
-"""Tests for the corpus promotion reconciler (A8)."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -20,7 +18,6 @@ assert SPEC and SPEC.loader
 reconciler = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(reconciler)
 
-# Pinned digest helpers
 SHA40 = "x" * 40
 SHA64 = "x" * 64
 
@@ -43,22 +40,13 @@ def _run_cli(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess
     )
 
 
-# ---------------------------------------------------------------------------
-# CRITICAL 2 — --ledger-head-sha is REQUIRED
-# ---------------------------------------------------------------------------
-
-
 def test_rejects_when_ledger_head_sha_is_none() -> None:
-    """Reconciler must fail-closed when --ledger-head-sha is None/empty."""
-    # CLI requires the flag via argparse, so this is an exit code 2 (arg missing)
     result = _run_cli("--events-file", "/tmp/nonexistent-events.jsonl", "--limit", "5")
     assert result.returncode != 0
-    # Help/error mentions required ledger-head-sha
     assert "ledger-head-sha" in result.stderr or "ledger-head-sha" in result.stdout
 
 
 def test_rejects_empty_ledger_head_sha() -> None:
-    """Passing an empty string must be rejected, not treated as genesis shortcut."""
     events_file = _write_events(Path("/tmp"), [])
     result = _run_cli(
         "--events-file",
@@ -70,11 +58,6 @@ def test_rejects_empty_ledger_head_sha() -> None:
     )
     assert result.returncode != 0
     assert "not be empty" in result.stdout
-
-
-# ---------------------------------------------------------------------------
-# CRITICAL 1 — Coalescing against ledger head, not candidate parent
-# ---------------------------------------------------------------------------
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -105,7 +88,6 @@ def _commit_bundles(repo: Path, names: list[str], message: str) -> str:
         if existing.name not in desired:
             rel = existing.relative_to(repo).as_posix()
             existing.unlink()
-            # Only rm if tracked; ignore if never committed.
             subprocess.run(
                 ["git", "rm", "--quiet", "--ignore-unmatch", rel],
                 cwd=repo,
@@ -117,7 +99,6 @@ def _commit_bundles(repo: Path, names: list[str], message: str) -> str:
         path = bundles / name
         path.write_text(f'{{"id": "{name}"}}\n', encoding="utf-8")
         _git(repo, "add", path.relative_to(repo).as_posix())
-    # Allow empty commits only when the tree is unchanged (same-path merges use -s ours).
     status = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=repo,
@@ -133,7 +114,6 @@ def _commit_bundles(repo: Path, names: list[str], message: str) -> str:
 
 
 def test_candidate_with_more_paths_than_ledger_accepted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Candidate with MORE paths than ledger head is a set-preserving union (accepted)."""
     repo = _init_corpus_repo(tmp_path)
     base_sha = _commit_bundles(repo, ["a.json", "b.json"], "base")
     ledger_sha = base_sha
@@ -160,12 +140,9 @@ def test_candidate_with_more_paths_than_ledger_accepted(tmp_path: Path, monkeypa
 
 
 def test_candidate_with_fewer_paths_than_ledger_rejected(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Candidate with FEWER paths than ledger head loses history → rejected."""
     repo = _init_corpus_repo(tmp_path)
     base_sha = _commit_bundles(repo, ["a.json", "b.json"], "base")
     ledger_sha = _commit_bundles(repo, ["a.json", "b.json", "c.json"], "ledger")
-    # Branch from base (fewer paths), merge ledger with -s ours so the merge tree
-    # keeps only base paths while still being a 2-parent merge commit.
     _git(repo, "checkout", "-b", "fewer", base_sha)
     fewer_tip = _commit_bundles(repo, ["a.json", "b.json"], "fewer-paths")
     _git(repo, "checkout", "-b", "merge-fewer", fewer_tip)
@@ -189,7 +166,6 @@ def test_candidate_with_fewer_paths_than_ledger_rejected(tmp_path: Path, monkeyp
 
 
 def test_candidate_with_same_paths_as_ledger_accepted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Candidate with SAME paths as ledger head is a valid set-preserving union."""
     repo = _init_corpus_repo(tmp_path)
     base_sha = _commit_bundles(repo, ["a.json", "b.json"], "base")
     ledger_sha = base_sha
@@ -215,11 +191,6 @@ def test_candidate_with_same_paths_as_ledger_accepted(tmp_path: Path, monkeypatc
     assert reason == "accepted"
 
 
-# ---------------------------------------------------------------------------
-# Merge SHA revalidation (REQUIRED 3 / CRITICAL 3)
-# ---------------------------------------------------------------------------
-
-
 def test_verify_merge_commit_rejects_non_existent() -> None:
     is_merge, count, err = reconciler.verify_merge_commit("0" * 40)
     assert is_merge is False
@@ -228,24 +199,14 @@ def test_verify_merge_commit_rejects_non_existent() -> None:
 
 
 def test_verify_merge_commit_rejects_single_parent() -> None:
-    # A normal (non-merge) commit has exactly 1 parent; verify function returns
-    # not-a-merge for that shape. We simulate by checking the logic holds for
-    # parent counts below 2.
     is_merge, count, err = reconciler.verify_merge_commit("0" * 40)
-    # Not a real merge (fails cat-file), so rejection path is taken.
     assert is_merge is False
 
 
 def test_verify_base_ancestor_rejects_non_ancestor() -> None:
-    # Non-ancestor base should fail
     is_ancestor, err = reconciler.verify_base_ancestor("0" * 40, "1" * 40)
     assert is_ancestor is False
     assert "not an ancestor" in err
-
-
-# ---------------------------------------------------------------------------
-# Event file handling
-# ---------------------------------------------------------------------------
 
 
 def test_read_event_file_handles_empty(tmp_path: Path) -> None:
@@ -268,30 +229,19 @@ def test_read_event_file_parses_jsonl(tmp_path: Path) -> None:
     assert got == events
 
 
-# ---------------------------------------------------------------------------
-# Reconcile decision logic (path preservation vs candidate parent)
-# ---------------------------------------------------------------------------
-
-
 def test_reconcile_decision_compares_against_ledger_head_not_parent() -> None:
-    """The coalescing check must compare against ledger head paths, not the
-    candidate's git parent. This asserts the decision logic uses P_H ⊆ P_C."""
-    # Simulate the exact check used in reconcile_event: candidate is accepted
-    # only when every ledger path exists in the candidate.
     ledger = {"results-data/bundles/a.json", "results-data/bundles/b.json"}
     candidate_more = ledger | {"results-data/bundles/c.json"}
     candidate_less = ledger - {"results-data/bundles/b.json"}
     candidate_same = set(ledger)
 
-    assert ledger <= candidate_more  # accept
-    assert not (ledger <= candidate_less)  # reject
-    assert ledger <= candidate_same  # accept
+    assert ledger <= candidate_more
+    assert not (ledger <= candidate_less)
+    assert ledger <= candidate_same
 
 
 def test_duplicate_events_are_idempotent() -> None:
-    """Duplicate events should be processed consistently (same decision)."""
     event = {"merge_sha": SHA40, "base_sha": SHA40, "ts": "t"}
-    # Processing the same event twice yields identical decisions
     decisions = []
     for _ in range(2):
         decisions.append(reconciler.reconcile_event(event, "ledger", 0))
@@ -299,7 +249,6 @@ def test_duplicate_events_are_idempotent() -> None:
 
 
 def test_stale_events_rejected() -> None:
-    """Out-of-order / stale events fail through revalidation (bad SHAs)."""
     event = {"merge_sha": "0" * 40, "base_sha": "0" * 40, "ts": "stale"}
     accepted, gen, reason = reconciler.reconcile_event(event, "ledger", 0)
     assert accepted is False
@@ -307,29 +256,18 @@ def test_stale_events_rejected() -> None:
 
 
 def test_generation_advances_monotonically() -> None:
-    """Each accepted event advances generation by exactly one monotonically."""
     gen = 7
-    # Stale/rejected event: generation unchanged.
     rejected_accepted, gen_after_reject, _ = reconciler.reconcile_event(
         {"merge_sha": "0" * 40, "base_sha": "0" * 40, "ts": "t"}, "ledger", gen
     )
     assert rejected_accepted is False
-    assert gen_after_reject == gen  # unchanged
+    assert gen_after_reject == gen
 
-    # Accepted event (path-preserving, bad SHAs are handled before path check,
-    # so a valid merge passes revalidation; here we model the generation step).
     new_gen = gen + 1
-    assert new_gen == gen + 1  # monotonically next
+    assert new_gen == gen + 1
 
 
 def test_missed_events_are_replayable_from_log() -> None:
-    """Missed bridge events are recovered by replaying the event log (schedule fallback).
-
-    The reconciler reads events from a JSONL log and processes them in order,
-    so an hourly scheduled run replays any events the push-bridge missed.
-    Rejected events must fail the CLI (nonzero) so the schedule does not
-    silently mark a rejected SHA as success.
-    """
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=REPO_ROOT,
@@ -349,13 +287,11 @@ def test_missed_events_are_replayable_from_log() -> None:
         "--limit",
         "100",
     )
-    # A revalidation failure (bad SHA) is a rejected event → nonzero exit.
     assert result.returncode != 0
     assert "rejected" in result.stdout
 
 
 def test_cli_exits_nonzero_when_event_rejected(tmp_path: Path) -> None:
-    """Events file with one rejectable event must make the CLI exit 1."""
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=REPO_ROOT,
@@ -384,18 +320,12 @@ def test_cli_exits_nonzero_when_event_rejected(tmp_path: Path) -> None:
 
 
 def test_reconcile_cap_respects_limit(tmp_path: Path) -> None:
-    """--limit caps the number of events read from the log."""
     events = [{"merge_sha": SHA40, "base_sha": SHA40, "ts": f"t-{i}"} for i in range(20)]
     event_file = _write_events(tmp_path, events)
     got = reconciler.read_event_file(event_file, 100)
     assert len(got) == 20
     limited = reconciler.read_event_file(event_file, 5)
     assert len(limited) == 5
-
-
-# ---------------------------------------------------------------------------
-# CLI behavior
-# ---------------------------------------------------------------------------
 
 
 def test_cli_rejects_missing_events_file(tmp_path: Path) -> None:
@@ -412,7 +342,7 @@ def test_cli_rejects_missing_events_file(tmp_path: Path) -> None:
         "--ledger-head-sha",
         head,
     )
-    assert result.returncode == 0  # empty events accepted as no-op
+    assert result.returncode == 0
     assert "no_events" in result.stdout
 
 

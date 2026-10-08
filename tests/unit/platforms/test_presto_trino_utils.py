@@ -1,13 +1,3 @@
-"""Unit tests for presto_trino_utils helpers.
-
-Pins the contract for the five helpers extracted by the dedup consolidation:
-  * escape_insert_value: NULL handling, date literals, numeric passthrough, string quoting
-  * is_date_value: date pattern detection
-  * normalize_existing_files: path list normalization and empty-file exclusion
-  * load_file_batches: batched INSERT VALUES cursor delegation
-  * show_tables_lower: SHOW TABLES result normalization
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -87,7 +77,7 @@ class TestEscapeInsertValue:
         assert escape_insert_value("it's a dog's life") == "'it''s a dog''s life'"
 
     def test_string_that_looks_like_date_but_is_not_quoted(self) -> None:
-        # "not-a-date" has letters, so is_date_value returns False → quoted as string
+
         assert escape_insert_value("not-a-date") == "'not-a-date'"
 
 
@@ -190,7 +180,7 @@ class TestLoadFileBatches:
         assert rows == 5
 
     def test_explicit_delimiter_overrides_extension_heuristic(self, tmp_path: Path) -> None:
-        """A resolver-derived comma delimiter wins over the .tbl pipe heuristic."""
+
         f = self._make_file(tmp_path, "1,Alice\n")
         cursor = MagicMock()
         with (

@@ -1,5 +1,3 @@
-"""Tests for scripts/post_merge_signature.py."""
-
 from __future__ import annotations
 
 import json
@@ -8,15 +6,11 @@ from pathlib import Path
 
 import pytest
 
-# scripts/ has no __init__.py and is not on sys.path by default; mirror the
-# sys.path injection tests/unit/scripts/conftest.py does for path_filter_decision,
-# inline here since this test file lives directly under tests/unit/ (scope_limit
-# for this TODO does not permit adding a conftest.py).
 _SCRIPTS_DIR = str(Path(__file__).resolve().parents[2] / "scripts")
 if _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)
 
-from post_merge_signature import (  # noqa: E402
+from post_merge_signature import (
     SignatureError,
     attribution_action,
     build_incident_artifact,
@@ -69,10 +63,6 @@ JUNIT_NO_FILE_ATTR = """<?xml version="1.0" encoding="utf-8"?>
 </testsuites>
 """
 
-# Named replay fixtures for the two historical incidents required by the
-# post-merge attribution contract. The first exercises dotted JUnit
-# normalization plus unrelated ownership; the second exercises external
-# source-ref movement.
 BIGQUERY_2068_DOTTED_JUNIT_FAILURE_IDS = [
     "tests.unit.platforms.credentials.test_bigquery_defaults.TestBigQueryCredentialDefaults::test_partial_existing_credentials"
 ]
@@ -82,11 +72,6 @@ LEDGER_2073_EXTERNAL_REF_EVIDENCE = {
     "predecessor_source_inputs": {"published-results": "source-old"},
     "ownership_match": False,
 }
-
-
-# ---------------------------------------------------------------------------
-# build_signature_from_junit
-# ---------------------------------------------------------------------------
 
 
 def test_build_signature_from_junit_extracts_failures_and_errors(tmp_path: Path) -> None:
@@ -103,7 +88,6 @@ def test_build_signature_from_junit_extracts_failures_and_errors(tmp_path: Path)
             "tests/unit/test_foo.py::test_error",
         ]
     )
-    # Passing and skipped testcases must not be counted as failures.
     assert not any("test_pass" in fid or "test_skip" in fid for fid in signature["failure_ids"])
 
 
@@ -139,11 +123,6 @@ def test_build_signature_from_junit_malformed_xml_raises(tmp_path: Path) -> None
         build_signature_from_junit("fast-test", junit_path)
 
 
-# ---------------------------------------------------------------------------
-# build_signature_from_job_failure
-# ---------------------------------------------------------------------------
-
-
 def test_build_signature_from_job_failure_with_step() -> None:
     signature = build_signature_from_job_failure("lint", "Run CI lint mirror")
 
@@ -158,11 +137,6 @@ def test_build_signature_from_job_failure_without_step_is_empty() -> None:
     signature = build_signature_from_job_failure("lint", None)
 
     assert signature == {"job": "lint", "kind": "none", "failure_ids": []}
-
-
-# ---------------------------------------------------------------------------
-# diff_signatures
-# ---------------------------------------------------------------------------
 
 
 def test_diff_signatures_returns_only_new_ids() -> None:
@@ -194,16 +168,9 @@ def test_diff_signatures_missing_previous_key_treated_as_empty() -> None:
 
 
 def test_diff_signatures_identical_signature_is_not_new() -> None:
-    # The #1100 case at the function level: an already-red develop whose
-    # signature is unchanged must not surface any "new" IDs.
     signature = {"failure_ids": ["tests/a.py::test_a"]}
 
     assert diff_signatures(signature, signature) == []
-
-
-# ---------------------------------------------------------------------------
-# load_signature
-# ---------------------------------------------------------------------------
 
 
 def test_load_signature_missing_file_raises(tmp_path: Path) -> None:
@@ -245,11 +212,6 @@ def test_load_signature_round_trips_valid_file(tmp_path: Path) -> None:
     assert signature["failure_ids"] == []
 
 
-# ---------------------------------------------------------------------------
-# CLI (main())
-# ---------------------------------------------------------------------------
-
-
 def test_cli_build_from_junit_writes_signature_file(tmp_path: Path) -> None:
     junit_path = tmp_path / "junit.xml"
     junit_path.write_text(JUNIT_WITH_FAILURES, encoding="utf-8")
@@ -264,10 +226,6 @@ def test_cli_build_from_junit_writes_signature_file(tmp_path: Path) -> None:
 
 
 def test_cli_build_job_failed_with_clean_junit_falls_back_to_job_failure(tmp_path: Path) -> None:
-    # #1136 review: a gate can fail for a reason junit never records (e.g.
-    # pytest-cov's --cov-fail-under gate - every testcase passes, the step
-    # still fails). Trusting the empty junit-derived signature here would
-    # make the diff see no new failures and silently suppress a real revert.
     junit_path = tmp_path / "junit.xml"
     junit_path.write_text(JUNIT_ALL_PASS, encoding="utf-8")
     out_path = tmp_path / "signature.json"
@@ -294,8 +252,6 @@ def test_cli_build_job_failed_with_clean_junit_falls_back_to_job_failure(tmp_pat
 
 
 def test_cli_build_job_failed_with_real_junit_failures_keeps_junit_signature(tmp_path: Path) -> None:
-    # A job that failed WITH real testcase failures keeps the more precise
-    # junit-derived signature - --job-failed only overrides an EMPTY one.
     junit_path = tmp_path / "junit.xml"
     junit_path.write_text(JUNIT_WITH_FAILURES, encoding="utf-8")
     out_path = tmp_path / "signature.json"
@@ -322,8 +278,6 @@ def test_cli_build_job_failed_with_real_junit_failures_keeps_junit_signature(tmp
 
 
 def test_cli_build_without_job_failed_keeps_clean_junit_signature(tmp_path: Path) -> None:
-    # The default (no --job-failed, i.e. the job actually succeeded) must
-    # keep behaving exactly as before: a clean junit stays a clean signature.
     junit_path = tmp_path / "junit.xml"
     junit_path.write_text(JUNIT_ALL_PASS, encoding="utf-8")
     out_path = tmp_path / "signature.json"
@@ -393,9 +347,6 @@ def test_cli_build_from_missing_junit_returns_error_exit_code(
 def test_cli_build_from_malformed_junit_returns_error_exit_code(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    # The workflow's emit steps rely on this non-zero exit to trigger their
-    # `|| build --failed-step "... (junit xml unparseable)"` fallback when
-    # pytest was killed mid-write and left a truncated junit file behind.
     junit_path = tmp_path / "junit.xml"
     junit_path.write_text("<testsuites><testsuite>truncated mid-write", encoding="utf-8")
     out_path = tmp_path / "signature.json"
@@ -456,9 +407,6 @@ def test_cli_diff_missing_previous_file_errors_out(tmp_path: Path, capsys: pytes
         ]
     )
 
-    # Failing loudly (non-zero exit) is required so the workflow's
-    # `if ! ... ; then fail-open ; fi` pattern can catch it - the diff must
-    # never be silently treated as "no new failures".
     assert exit_code == 1
     captured = capsys.readouterr()
     assert "error:" in captured.err
@@ -630,8 +578,6 @@ def test_missing_current_signature_reaches_owned_incident_without_revert() -> No
 
 
 def test_replay_2068_bigquery_dotted_junit_incident_never_reverts() -> None:
-    # Replay of the historical #2068 shape: a dotted JUnit classname is
-    # extractable, but the changed subsystem is unrelated to BigQuery tests.
     evidence = _complete_attribution_evidence(
         failure_ids=BIGQUERY_2068_DOTTED_JUNIT_FAILURE_IDS,
         changed_paths=["results-data/README.md", ".github/workflows/seed-corpus.yml"],
@@ -657,8 +603,6 @@ def test_replay_2068_bigquery_dotted_junit_incident_never_reverts() -> None:
 
 
 def test_replay_2073_ledger_external_ref_incident_never_reverts() -> None:
-    # Replay of the historical #2073 shape: source identity drift is evidence
-    # of an external-input incident, not ownership by the merged code.
     evidence = _complete_attribution_evidence(
         **LEDGER_2073_EXTERNAL_REF_EVIDENCE,
     )
@@ -696,11 +640,6 @@ def test_incident_key_reuses_repeated_signature_and_separates_distinct_signature
 
     assert first == repeated
     assert first != distinct
-
-
-# ---------------------------------------------------------------------------
-# imported_module_paths / real dependency attribution (finding #1)
-# ---------------------------------------------------------------------------
 
 
 def test_imported_module_paths_finds_lazy_function_local_imports(tmp_path: Path) -> None:
@@ -748,10 +687,6 @@ def test_imported_module_paths_finds_same_package_import_without_module(tmp_path
 
 
 def test_attribution_reverts_via_real_import_when_basename_differs(tmp_path: Path) -> None:
-    # The finding #1 repro: a test imports a module whose basename does not
-    # match the test's own basename or its `test_` stem, so the old
-    # basename-only heuristic wrongly returned advisory. Real import
-    # analysis must still catch it.
     (tmp_path / "benchbox").mkdir()
     (tmp_path / "benchbox" / "throughput_test.py").write_text("def run():\n    pass\n", encoding="utf-8")
     tests_dir = tmp_path / "tests"
@@ -784,12 +719,6 @@ def test_attribution_stays_advisory_when_import_analysis_also_clears_sha(tmp_pat
 
 
 def test_imported_module_paths_keeps_the_anchor_package(tmp_path: Path) -> None:
-    """`from . import VALUE` must record the package initializer that defines it.
-
-    Recording only alias-derived paths dropped `tests/pkg/__init__.py`, so a
-    merge that broke the initializer looked non-owning and was downgraded to
-    advisory - skipping the revert the workflow gates on.
-    """
     pkg = tmp_path / "tests" / "pkg"
     pkg.mkdir(parents=True)
     (pkg / "__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
@@ -803,7 +732,6 @@ def test_imported_module_paths_keeps_the_anchor_package(tmp_path: Path) -> None:
 
 
 def test_attribution_reverts_when_the_package_initializer_changed(tmp_path: Path) -> None:
-    """The anchor-package signal must reach `attribution_action`, not just the finder."""
     pkg = tmp_path / "tests" / "pkg"
     pkg.mkdir(parents=True)
     (pkg / "__init__.py").write_text("VALUE = 1\n", encoding="utf-8")

@@ -1,16 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""
-Docker live integration tests for Presto.
-
-Setup:
-    make test-docker-up-presto
-
-These tests require a running Presto instance accessible at localhost:18081 by default.
-Set PRESTO_HOST_PORT to target a different host port.
-"""
 
 import os
 
@@ -30,7 +20,6 @@ pytestmark = [
 
 @pytest.fixture
 def presto_adapter():
-    """Create a Presto adapter connected to a local Docker instance."""
     port = int(os.getenv("PRESTO_HOST_PORT", "18081"))
     skip_unless_docker_service("localhost", port, platform="Presto")
     adapter = PrestoAdapter(
@@ -45,10 +34,8 @@ def presto_adapter():
 
 
 class TestLivePrestoConnection:
-    """Test basic Presto connectivity via Docker."""
-
     def test_connection(self, presto_adapter):
-        """Verify we can connect to Presto and run a trivial query."""
+
         connection = presto_adapter.create_connection()
         try:
             assert connection is not None
@@ -56,17 +43,15 @@ class TestLivePrestoConnection:
             presto_adapter.close_connection(connection)
 
     def test_platform_info(self, presto_adapter):
-        """Verify platform info reports correct metadata."""
+
         info = presto_adapter.get_platform_info()
         assert info is not None
         assert info["platform_type"] == "presto"
 
 
 class TestLivePrestoQueryExecution:
-    """Test query execution against a live Presto instance."""
-
     def test_create_schema(self, presto_adapter):
-        """Verify we can create a schema in the memory catalog."""
+
         connection = presto_adapter.create_connection()
         try:
             presto_adapter.execute_query(
@@ -86,7 +71,6 @@ class TestLivePrestoQueryExecution:
             presto_adapter.close_connection(connection)
 
     def test_execute_query(self, presto_adapter):
-        """Verify basic query execution with SELECT 1."""
         connection = presto_adapter.create_connection()
         try:
             result = presto_adapter.execute_query(

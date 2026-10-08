@@ -1,10 +1,3 @@
-"""Tests for benchbox.core.data_fetch.downloader (mocked HTTP).
-
-No network access. Sessions are simulated via tiny stand-ins that
-match the requests-style `get(...).iter_content(...)` API the
-downloader uses.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -24,13 +17,11 @@ pytestmark = [
 
 
 class _Resp:
-    """Stand-in for a requests Response usable as a context manager."""
-
     def __init__(self, status_code: int, body: bytes):
         self.status_code = status_code
         self._body = body
 
-    def __enter__(self):  # noqa: D401
+    def __enter__(self):
         return self
 
     def __exit__(self, *exc):
@@ -42,12 +33,6 @@ class _Resp:
 
 
 class _PartialThenError(_Resp):
-    """Yields a prefix of the body, then raises mid-stream.
-
-    Simulates a connection dropping after some bytes have already been
-    written to the temp file, so the retry must resume via Range.
-    """
-
     def __init__(self, status_code: int, body: bytes, fail_after: int):
         super().__init__(status_code, body)
         self._fail_after = fail_after
@@ -64,8 +49,6 @@ class _PartialThenError(_Resp):
 
 class _Session:
     def __init__(self, responses):
-        # responses items are (status_code, body) tuples, pre-built _Resp
-        # objects (e.g. _PartialThenError), or Exceptions to raise.
         self._responses = list(responses)
         self.calls: list[dict] = []
 
@@ -121,7 +104,7 @@ def test_download_retries_then_succeeds(tmp_path: Path) -> None:
         sleep=lambda s: sleeps.append(s),
     )
     assert out.read_bytes() == body
-    assert sleeps == [1.0]  # one backoff before the success
+    assert sleeps == [1.0]
 
 
 def test_download_retries_exhausted_raises(tmp_path: Path) -> None:
@@ -146,9 +129,7 @@ def test_download_retries_exhausted_raises(tmp_path: Path) -> None:
 
 
 def test_download_resumes_within_call_after_dropped_connection(tmp_path: Path) -> None:
-    # First attempt streams 120 bytes into the temp file then drops; the
-    # retry must resume from byte 120 via a Range request.
-    full = b"abcdef" * 100  # 600 bytes
+    full = b"abcdef" * 100
     dest = tmp_path / "blob"
     sess = _Session(
         [
@@ -165,14 +146,11 @@ def test_download_resumes_within_call_after_dropped_connection(tmp_path: Path) -
         sleep=lambda s: None,
     )
     assert out.read_bytes() == full
-    assert "Range" not in sess.calls[0]["headers"]  # fresh start
-    assert sess.calls[1]["headers"]["Range"] == "bytes=120-"  # resume
+    assert "Range" not in sess.calls[0]["headers"]
+    assert sess.calls[1]["headers"]["Range"] == "bytes=120-"
 
 
 def test_download_restarts_when_server_ignores_range(tmp_path: Path) -> None:
-    # A dropped connection leaves a partial temp file; the retry sends a
-    # Range header but the server answers 200 OK, so the downloader must
-    # discard the partial and restart cleanly.
     full = b"abcdef" * 100
     dest = tmp_path / "blob"
     sess = _Session(
@@ -194,8 +172,6 @@ def test_download_restarts_when_server_ignores_range(tmp_path: Path) -> None:
 
 
 def test_download_publishes_atomically_dest_never_partial(tmp_path: Path) -> None:
-    """The final path must never be observable in a partial state — bytes
-    stream to a temp `.part` file and `dest` appears only on completion."""
     full = b"abcdef" * 100
     dest = tmp_path / "blob"
     seen_dest_during_stream: list[bool] = []
@@ -204,8 +180,6 @@ def test_download_publishes_atomically_dest_never_partial(tmp_path: Path) -> Non
     class _Observing(_Resp):
         def iter_content(self, chunk_size: int):
             for i in range(0, len(self._body), chunk_size):
-                # Mid-stream the final path must not exist yet, but a
-                # process-unique .part temp must.
                 seen_dest_during_stream.append(dest.exists())
                 part_seen_during_stream.append(any(p.name.endswith(".part") for p in tmp_path.iterdir()))
                 yield self._body[i : i + chunk_size]
@@ -221,7 +195,6 @@ def test_download_publishes_atomically_dest_never_partial(tmp_path: Path) -> Non
     assert out.read_bytes() == full
     assert seen_dest_during_stream and not any(seen_dest_during_stream)
     assert all(part_seen_during_stream)
-    # No temp file is left behind after a successful publish.
     assert [p.name for p in tmp_path.iterdir()] == ["blob"]
 
 
@@ -231,8 +204,6 @@ def test_download_mismatch_leaves_dest_absent_and_keeps_rejected(tmp_path: Path)
     sess = _Session([(200, body)])
     with pytest.raises(ChecksumMismatchError) as excinfo:
         download("https://x.test/blob", dest, expected_sha256="0" * 64, session=sess)
-    # The corrupt bytes never land on the final path; they are kept under
-    # a `.rejected` sibling for inspection, and the error points at it.
     assert not dest.exists()
     rejected = tmp_path / "blob.rejected"
     assert rejected.read_bytes() == body

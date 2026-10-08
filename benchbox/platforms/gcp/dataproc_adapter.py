@@ -1,35 +1,6 @@
-"""GCP Dataproc managed Spark platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Google Cloud Dataproc is a managed Apache Spark and Hadoop service that lets
-you process big data using the Spark/Hadoop ecosystem. It offers both
-persistent clusters and ephemeral (single-job) clusters.
-
-Key Features:
-- Managed clusters: Auto-scaling and monitoring
-- Multiple modes: Persistent clusters or ephemeral per-job clusters
-- GCS integration: Native Google Cloud Storage support
-- Cost-effective: Preemptible VMs and per-second billing
-- Metastore support: Dataproc Metastore for Hive metadata
-
-Usage:
-    from benchbox.platforms.gcp import DataprocAdapter
-
-    adapter = DataprocAdapter(
-        project_id="my-project",
-        region="us-central1",
-        cluster_name="my-cluster",
-        gcs_staging_dir="gs://my-bucket/benchbox-data",
-    )
-
-    # Run TPC-H benchmark
-    adapter.create_schema("tpch_sf1")
-    adapter.load_data(["lineitem", "orders", ...], source_dir)
-    result = adapter.execute_query("SELECT * FROM lineitem LIMIT 10")
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -73,8 +44,6 @@ logger = logging.getLogger(__name__)
 
 
 class DataprocJobState:
-    """Dataproc job state constants."""
-
     STATE_UNSPECIFIED = "STATE_UNSPECIFIED"
     PENDING = "PENDING"
     SETUP_DONE = "SETUP_DONE"
@@ -87,34 +56,10 @@ class DataprocJobState:
 
 
 class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
-    """GCP Dataproc managed Spark platform adapter.
-
-    Dataproc is Google Cloud's managed Spark/Hadoop service. It supports
-    both persistent clusters (for ongoing work) and ephemeral clusters
-    (created for a single job and then deleted).
-
-    Execution Model:
-    - Jobs are submitted to Dataproc clusters via the Jobs API
-    - Results are written to GCS and retrieved after job completion
-    - Cluster can be persistent (reused) or ephemeral (per-job)
-
-    Key Features:
-    - Auto-scaling based on workload
-    - Integration with GCS, BigQuery, and Bigtable
-    - Preemptible VMs for cost savings
-    - Dataproc Metastore for Hive-compatible metadata
-
-    Billing:
-    - Cluster pricing: Based on VM types and number of nodes
-    - Per-second billing with 1-minute minimum
-    - Preemptible VMs: ~80% cheaper than standard
-    """
-
     plan_capture_phase_eligible = True
 
     driver_isolation_capability = DriverIsolationCapability.NOT_FEASIBLE
 
-    # CloudSparkConfigMixin: Uses Dataproc-optimized config
     cloud_platform = CloudPlatform.DATAPROC
 
     def __init__(
@@ -135,24 +80,6 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
         table_format: str | None = None,
         **kwargs: Any,
     ) -> None:
-        """Initialize the Dataproc adapter.
-
-        Args:
-            project_id: GCP project ID (required).
-            region: GCP region for the cluster (default: us-central1).
-            cluster_name: Name of existing cluster, or name for new cluster.
-            gcs_staging_dir: GCS path for data staging (required, e.g., gs://bucket/path).
-            database: Hive database name (default: benchbox).
-            master_machine_type: Master node VM type (default: n2-standard-4).
-            worker_machine_type: Worker node VM type (default: n2-standard-4).
-            num_workers: Number of worker nodes (default: 2).
-            use_preemptible_workers: Use preemptible workers (default: False).
-            num_preemptible_workers: Number of preemptible workers (default: 0).
-            image_version: Dataproc image version (default: 2.1-debian11).
-            timeout_minutes: Job timeout in minutes (default: 60).
-            create_ephemeral_cluster: Create cluster per job and delete after (default: False).
-            **kwargs: Additional platform options.
-        """
         if not GOOGLE_CLOUD_AVAILABLE:
             deps_satisfied, missing = check_platform_dependencies("dataproc")
             if not deps_satisfied:
@@ -180,24 +107,20 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
         self.create_ephemeral_cluster = create_ephemeral_cluster
         self.table_format = table_format or "parquet"
 
-        # Initialize staging using cloud-spark shared infrastructure
         self._staging: CloudSparkStaging | None = None
         try:
             self._staging = CloudSparkStaging.from_uri(self.gcs_staging_dir)
         except Exception as e:
             logger.warning(f"Failed to initialize GCS staging: {e}")
 
-        # Clients (lazy initialization)
         self._cluster_client: Any = None
         self._job_client: Any = None
         self._storage_client: Any = None
 
-        # Metrics tracking
         self._query_count = 0
         self._total_job_time_seconds = 0.0
         self._cluster_created_by_us = False
 
-        # Benchmark configuration (set via configure_for_benchmark)
         self._benchmark_type: str | None = None
         self._scale_factor: float = 1.0
         self._spark_config: dict[str, str] = {}
@@ -205,7 +128,6 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
         super().__init__(**kwargs)
 
     def _get_cluster_client(self) -> Any:
-        """Get or create Dataproc cluster controller client."""
         if self._cluster_client is None:
             self._cluster_client = dataproc_v1.ClusterControllerClient(
                 client_options={"api_endpoint": f"{self.region}-dataproc.googleapis.com:443"}
@@ -213,7 +135,6 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
         return self._cluster_client
 
     def _get_job_client(self) -> Any:
-        """Get or create Dataproc job controller client."""
         if self._job_client is None:
             self._job_client = dataproc_v1.JobControllerClient(
                 client_options={"api_endpoint": f"{self.region}-dataproc.googleapis.com:443"}
@@ -221,20 +142,11 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
         return self._job_client
 
     def _get_storage_client(self) -> Any:
-        """Get or create GCS storage client."""
         if self._storage_client is None:
             self._storage_client = storage.Client(project=self.project_id)
         return self._storage_client
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Return platform metadata.
-
-        Args:
-            connection: Not used (Dataproc manages sessions internally).
-
-        Returns:
-            Dict with platform information including name, version, and capabilities.
-        """
         return {
             "platform": "dataproc",
             "display_name": "Google Cloud Dataproc",
@@ -254,18 +166,9 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
         }
 
     def create_connection(self, **kwargs: Any) -> Any:
-        """Verify GCP connectivity and cluster access.
-
-        Returns:
-            Dict with connection status and cluster info.
-
-        Raises:
-            ConfigurationError: If GCP connection fails.
-        """
         client = self._get_cluster_client()
 
         try:
-            # Try to get cluster info
             cluster = client.get_cluster(
                 project_id=self.project_id,
                 region=self.region,
@@ -293,7 +196,6 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
             raise ConfigurationError(f"Failed to connect to Dataproc: {e}") from e
 
     def _create_cluster(self) -> None:
-        """Create a Dataproc cluster."""
         client = self._get_cluster_client()
 
         cluster_config = {
@@ -313,12 +215,11 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
                     "properties": self._spark_config,
                 },
                 "gce_cluster_config": {
-                    "zone_uri": "",  # Auto-select zone
+                    "zone_uri": "",
                 },
             },
         }
 
-        # Add preemptible workers if configured
         if self.use_preemptible_workers and self.num_preemptible_workers > 0:
             cluster_config["config"]["secondary_worker_config"] = {
                 "num_instances": self.num_preemptible_workers,
@@ -333,13 +234,11 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
             cluster=cluster_config,
         )
 
-        # Wait for cluster creation
         result = operation.result()
         self._cluster_created_by_us = True
         logger.info(f"Cluster created: {result.cluster_name}")
 
     def _ensure_cluster_exists(self) -> None:
-        """Ensure the Dataproc cluster exists, creating if necessary."""
         client = self._get_cluster_client()
 
         try:
@@ -352,7 +251,6 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
                 return
             if cluster.status.state.name in ("CREATING", "STARTING"):
                 logger.info(f"Waiting for cluster {self.cluster_name} to be ready...")
-                # Wait for cluster to be ready
                 while True:
                     time.sleep(10)
                     cluster = client.get_cluster(
@@ -373,7 +271,6 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
             raise
 
     def _delete_cluster(self) -> None:
-        """Delete the Dataproc cluster if we created it."""
         if not self._cluster_created_by_us:
             return
 
@@ -392,16 +289,9 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
             logger.warning(f"Failed to delete cluster: {e}")
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create Hive database if it doesn't exist.
-
-        Args:
-            benchmark: Benchmark instance.
-            connection: Active connection metadata; not used by Dataproc.
-        """
         start_time = mono_time()
         database = self.database
 
-        # Create database via a Spark SQL job
         create_db_query = f"CREATE DATABASE IF NOT EXISTS {database}"
 
         self._ensure_cluster_exists()
@@ -414,21 +304,11 @@ class DataprocAdapter(CloudSparkConfigMixin, SparkTuningMixin, PlatformAdapter):
         query: str,
         wait_for_completion: bool = True,
     ) -> tuple[str, str]:
-        """Submit a Spark SQL job to Dataproc.
-
-        Args:
-            query: SQL query to execute.
-            wait_for_completion: Whether to wait for job completion.
-
-        Returns:
-            Tuple of (job_id, final_state).
-        """
         client = self._get_job_client()
 
         job_id = f"benchbox-{uuid.uuid4().hex[:12]}"
         results_path = f"{self.gcs_staging_dir}/results/{job_id}"
 
-        # Create PySpark job that runs the query and saves results
         job_script = f'''
 from pyspark.sql import SparkSession
 
@@ -445,11 +325,9 @@ result.write.mode("overwrite").json("{results_path}")
 spark.stop()
 '''
 
-        # Upload script to GCS
         script_path = f"{self.gcs_staging_dir}/scripts/{job_id}.py"
         self._upload_to_gcs(script_path, job_script)
 
-        # Create job
         job = {
             "placement": {"cluster_name": self.cluster_name},
             "pyspark_job": {
@@ -473,15 +351,8 @@ spark.stop()
             return job_id, "PENDING"
 
     def _upload_to_gcs(self, gcs_path: str, content: str) -> None:
-        """Upload content to GCS.
-
-        Args:
-            gcs_path: Full GCS path (gs://bucket/path).
-            content: Content to upload.
-        """
         client = self._get_storage_client()
 
-        # Parse GCS path
         if gcs_path.startswith("gs://"):
             gcs_path = gcs_path[5:]
         bucket_name, blob_name = gcs_path.split("/", 1)
@@ -491,14 +362,6 @@ spark.stop()
         blob.upload_from_string(content)
 
     def _retrieve_results(self, job_id: str) -> list[dict[str, Any]]:
-        """Retrieve job results from GCS.
-
-        Args:
-            job_id: The job ID.
-
-        Returns:
-            List of result rows as dicts.
-        """
         client = self._get_storage_client()
         results_prefix = f"{self.gcs_prefix}/results/{job_id}/"
 
@@ -509,7 +372,6 @@ spark.stop()
         for blob in blobs:
             if blob.name.endswith(".json"):
                 content = blob.download_as_string()
-                # Spark JSON output is newline-delimited JSON
                 for line in content.decode().strip().split("\n"):
                     if line:
                         results.append(json.loads(line))
@@ -522,16 +384,6 @@ spark.stop()
         connection: Any,
         data_dir: Path,
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Upload benchmark data to GCS and create Hive tables.
-
-        Args:
-            benchmark: Benchmark instance.
-            connection: Active connection metadata; not used by Dataproc.
-            data_dir: Local directory containing table data files.
-
-        Returns:
-            Tuple of table row-count placeholders, elapsed seconds, and table URI metadata.
-        """
         start_time = mono_time()
         source_path = Path(data_dir)
         tables = _resolve_benchmark_table_names(benchmark)
@@ -539,13 +391,11 @@ spark.stop()
         if not source_path.exists():
             raise ConfigurationError(f"Source directory not found: {data_dir}")
 
-        # Check if tables already exist in GCS
         if self._staging and self._staging.tables_exist(tables):
             logger.info("Tables already exist in GCS staging, skipping upload")
             table_uris = {table: self._staging.get_table_uri(table) for table in tables}
             return dict.fromkeys(tables, 0), elapsed_seconds(start_time), {"table_uris": table_uris}
 
-        # Upload using cloud-spark staging infrastructure
         if self._staging:
             logger.info(f"Uploading {len(tables)} tables to GCS staging")
             self._staging.upload_tables(
@@ -554,7 +404,6 @@ spark.stop()
                 file_format=file_format,
             )
 
-        # Create Hive external tables
         self._ensure_cluster_exists()
 
         table_uris = {}
@@ -582,16 +431,6 @@ spark.stop()
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a SQL query on Dataproc.
-
-        Args:
-            connection: Active connection metadata; not used by Dataproc.
-            query: SQL query to execute.
-            query_id: Query identifier.
-
-        Returns:
-            Standard query result dictionary.
-        """
         start_time = mono_time()
         try:
             self._ensure_cluster_exists()
@@ -623,7 +462,6 @@ spark.stop()
             }
 
     def close(self) -> None:
-        """Clean up resources and optionally delete ephemeral cluster."""
         if self._cluster_created_by_us and self.create_ephemeral_cluster:
             self._delete_cluster()
 
@@ -633,11 +471,6 @@ spark.stop()
 
     @staticmethod
     def add_cli_arguments(parser: Any) -> None:
-        """Add Dataproc-specific CLI arguments.
-
-        Args:
-            parser: Argument parser to add arguments to.
-        """
         group = parser.add_argument_group("Dataproc Options")
         group.add_argument(
             "--project-id",
@@ -690,15 +523,6 @@ spark.stop()
 
     @classmethod
     def from_config(cls, config: dict[str, Any]) -> DataprocAdapter:
-        """Create adapter from configuration dict.
-
-        Args:
-            config: Configuration dictionary.
-
-        Returns:
-            Configured DataprocAdapter instance.
-        """
-        # Map CLI args to constructor parameters
         params = {
             "project_id": config.get("project_id"),
             "region": config.get("region", "us-central1"),
@@ -713,13 +537,11 @@ spark.stop()
             "table_format": config.get("table_format"),
         }
 
-        # Generate cluster name if not provided
         if not params["cluster_name"]:
             benchmark = config.get("benchmark", "benchmark")
             scale = config.get("scale_factor", 1)
             params["cluster_name"] = f"benchbox-{benchmark}-sf{scale}-{uuid.uuid4().hex[:6]}"
 
-        # Pass through tuning provenance/config
         for key in [
             "tuning_config",
             "tuning_enabled",
@@ -732,17 +554,5 @@ spark.stop()
 
         return cls(**params)
 
-    # configure_for_benchmark is inherited from CloudSparkConfigMixin
-
-    # apply_primary_keys, apply_foreign_keys, apply_platform_optimizations,
-    # and apply_constraint_configuration are inherited from SparkTuningMixin
-
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Dataproc.
-
-        Dataproc uses Spark SQL for query execution, so we use the Spark dialect.
-
-        Returns:
-            The dialect string "spark".
-        """
         return "spark"

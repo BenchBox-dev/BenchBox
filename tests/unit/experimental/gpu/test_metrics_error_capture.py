@@ -1,9 +1,3 @@
-"""Tests that GPU metrics failure paths log exception details at debug level.
-
-Hermetic: no CUDA/NVML/GPU required - all failure injection goes through
-monkeypatch.
-"""
-
 import logging
 import subprocess
 

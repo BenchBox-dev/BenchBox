@@ -1,15 +1,4 @@
 #!/usr/bin/env python3
-"""Audit skip/xfail markers across the tests/ tree.
-
-Walks every .py file under tests/, extracts every ``@pytest.mark.skip``,
-``@pytest.mark.skipif``, ``@pytest.mark.xfail`` decorator and every inline
-``pytest.skip(...)`` / ``pytest.xfail(...)`` call, and emits a CSV with:
-
-    file, line, marker_type, condition, reason
-
-``reason`` is the text of the ``reason=`` keyword if present, otherwise
-``<none>``. Use ``--missing-only`` to restrict to markers lacking a reason.
-"""
 
 from __future__ import annotations
 
@@ -19,6 +8,19 @@ import csv
 import sys
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Audit skip/xfail markers across the tests/ tree.\n"
+    "\n"
+    "Walks every .py file under tests/, extracts every ``@pytest.mark.skip``,\n"
+    "``@pytest.mark.skipif``, ``@pytest.mark.xfail`` decorator and every inline\n"
+    "``pytest.skip(...)`` / ``pytest.xfail(...)`` call, and emits a CSV with:\n"
+    "\n"
+    "    file, line, marker_type, condition, reason\n"
+    "\n"
+    "``reason`` is the text of the ``reason=`` keyword if present, otherwise\n"
+    "``<none>``. Use ``--missing-only`` to restrict to markers lacking a reason.\n"
+)
+
 MARKERS = {"skip", "skipif", "xfail"}
 
 
@@ -27,7 +29,7 @@ def _literal(node: ast.AST | None) -> str:
         return ""
     try:
         return ast.unparse(node)
-    except Exception:  # pragma: no cover - defensive
+    except Exception:  # pragma: no cover
         return "<unparseable>"
 
 
@@ -89,7 +91,7 @@ def audit_file(path: Path) -> list[tuple[str, int, str, str, str]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--root", default="tests", help="Root directory to walk")
     parser.add_argument("--output", default="-", help="CSV output path (- for stdout)")
     parser.add_argument(

@@ -1,5 +1,3 @@
-"""Credential helpers for Microsoft Fabric Spark."""
-
 from __future__ import annotations
 
 import os
@@ -7,10 +5,6 @@ from typing import Any
 
 
 def build_fabric_spark_config_from_env() -> dict[str, Any]:
-    """Build Fabric Spark adapter config from environment variables.
-
-    Returns only populated values so callers can merge with explicit CLI options.
-    """
     mapping = {
         "workspace_id": "FABRIC_WORKSPACE_ID",
         "lakehouse_id": "FABRIC_LAKEHOUSE_ID",

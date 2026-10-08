@@ -1,5 +1,3 @@
-"""Tests for SQL translation policy metadata in result bundles."""
-
 from __future__ import annotations
 
 import pytest
@@ -98,7 +96,6 @@ def test_strict_translation_mode_resolves_from_supported_option_scopes(options: 
 
 
 def test_variant_comparability_metadata_exports_to_payload() -> None:
-    """Variant comparability rides the execution block into saved artifacts."""
     from benchbox.core.runner.runner import _attach_variant_comparability_metadata
 
     result = make_benchmark_results(
@@ -119,7 +116,6 @@ def test_variant_comparability_metadata_exports_to_payload() -> None:
 
 
 def test_variant_comparability_attach_leaves_other_benchmarks_untouched() -> None:
-    """Benchmarks without the summary keep their execution metadata as-is."""
     from benchbox.core.runner.runner import _attach_variant_comparability_metadata
 
     result = make_benchmark_results(
@@ -136,7 +132,6 @@ def test_variant_comparability_attach_leaves_other_benchmarks_untouched() -> Non
 
 
 def test_variant_comparability_survives_reconstruction() -> None:
-    """Load-then-export must not strip the comparability disclosure."""
     from benchbox.core.results.loader import reconstruct_benchmark_results
 
     result = make_benchmark_results(

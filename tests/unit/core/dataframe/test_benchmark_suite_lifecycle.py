@@ -1,23 +1,4 @@
-"""Unit tests for DataFrame Benchmark Suite lifecycle and data structures.
-
-Tests for:
-- PlatformCategory enum values and distinctness
-- PlatformCapability dataclass fields
-- PLATFORM_CAPABILITIES registry completeness
-- BenchmarkConfig creation, defaults, and edge cases
-- QueryBenchmarkResult statistical properties and serialization
-- PlatformBenchmarkResult aggregation, success tracking, serialization
-- ComparisonSummary structure and serialization
-- SQLComparisonResult speedup calculation
-- SQLVsDataFrameSummary aggregation properties
-- DataFrameBenchmarkSuite initialization and capability lookup
-- Suite-level speedup matrix and query winner computation
-- Suite-level summary generation (get_summary)
-- Export to JSON and markdown formats
-- run_quick_comparison config construction
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -60,11 +41,6 @@ def _real_time_with(**overrides):
 SUITE_TIME = "benchbox.core.dataframe.benchmark_suite.time"
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _make_query_result(
     query_id: str = "Q1",
     platform: str = "polars-df",
@@ -74,7 +50,6 @@ def _make_query_result(
     rows_returned: int = 4,
     error_message: str | None = None,
 ) -> QueryBenchmarkResult:
-    """Build a QueryBenchmarkResult with sensible defaults."""
     return QueryBenchmarkResult(
         query_id=query_id,
         platform=platform,
@@ -92,7 +67,6 @@ def _make_platform_result(
     query_results: list[QueryBenchmarkResult] | None = None,
     config: BenchmarkConfig | None = None,
 ) -> PlatformBenchmarkResult:
-    """Build a PlatformBenchmarkResult with sensible defaults."""
     cfg = config or BenchmarkConfig(scale_factor=0.01)
     cap = PLATFORM_CAPABILITIES.get(platform)
     return PlatformBenchmarkResult(
@@ -103,43 +77,25 @@ def _make_platform_result(
     )
 
 
-# ===========================================================================
-# PlatformCategory enum
-# ===========================================================================
-
-
 class TestPlatformCategory:
-    """Tests for PlatformCategory enum."""
-
     def test_all_expected_categories_exist(self):
-        """Every documented category is present."""
         expected = {"SINGLE_NODE", "GPU_ACCELERATED", "DISTRIBUTED", "MEMORY_EFFICIENT"}
         actual = {member.name for member in PlatformCategory}
         assert actual == expected
 
     def test_category_values_are_distinct(self):
-        """Each category has a unique string value."""
         values = [member.value for member in PlatformCategory]
         assert len(values) == len(set(values))
 
     def test_category_string_values(self):
-        """String values match the expected snake_case convention."""
         assert PlatformCategory.SINGLE_NODE.value == "single_node"
         assert PlatformCategory.GPU_ACCELERATED.value == "gpu_accelerated"
         assert PlatformCategory.DISTRIBUTED.value == "distributed"
         assert PlatformCategory.MEMORY_EFFICIENT.value == "memory_efficient"
 
 
-# ===========================================================================
-# PlatformCapability dataclass
-# ===========================================================================
-
-
 class TestPlatformCapability:
-    """Tests for PlatformCapability dataclass."""
-
     def test_minimal_construction(self):
-        """Can construct with only required fields; defaults apply."""
         cap = PlatformCapability(
             platform_name="test-df",
             family="expression",
@@ -155,7 +111,6 @@ class TestPlatformCapability:
         assert cap.memory_notes == ""
 
     def test_full_construction(self):
-        """All fields can be set explicitly."""
         cap = PlatformCapability(
             platform_name="gpu-df",
             family="pandas",
@@ -173,19 +128,11 @@ class TestPlatformCapability:
         assert cap.memory_notes == "GPU VRAM bound"
 
 
-# ===========================================================================
-# PLATFORM_CAPABILITIES registry
-# ===========================================================================
-
-
 class TestPlatformCapabilitiesRegistry:
-    """Tests for the PLATFORM_CAPABILITIES module-level dict."""
-
     def test_registry_is_non_empty(self):
         assert len(PLATFORM_CAPABILITIES) >= 5
 
     def test_known_platforms_present(self):
-        """polars-df, pandas-df, datafusion-df, pyspark-df must be registered."""
         for name in ("polars-df", "pandas-df", "datafusion-df", "pyspark-df"):
             assert name in PLATFORM_CAPABILITIES, f"{name} missing from registry"
 
@@ -217,7 +164,6 @@ class TestPlatformCapabilitiesRegistry:
         assert cap.supports_gpu is True
 
     def test_every_entry_has_required_fields(self):
-        """Each registry entry must have non-empty platform_name and family."""
         for name, cap in PLATFORM_CAPABILITIES.items():
             assert cap.platform_name == name, f"Key/name mismatch for {name}"
             assert cap.family in ("expression", "pandas"), f"Unexpected family '{cap.family}' for {name}"
@@ -225,14 +171,7 @@ class TestPlatformCapabilitiesRegistry:
             assert isinstance(cap.memory_notes, str)
 
 
-# ===========================================================================
-# BenchmarkConfig
-# ===========================================================================
-
-
 class TestBenchmarkConfig:
-    """Tests for BenchmarkConfig dataclass."""
-
     def test_default_values(self):
         cfg = BenchmarkConfig()
         assert cfg.scale_factor == 0.01
@@ -265,7 +204,6 @@ class TestBenchmarkConfig:
         assert cfg.timeout_seconds == 600.0
 
     def test_zero_scale_factor_allowed(self):
-        """Zero SF is a degenerate but valid config (no data)."""
         cfg = BenchmarkConfig(scale_factor=0.0)
         assert cfg.scale_factor == 0.0
 
@@ -282,16 +220,7 @@ class TestBenchmarkConfig:
         assert cfg.query_ids == ["Q17"]
 
 
-# ===========================================================================
-# QueryBenchmarkResult
-# ===========================================================================
-
-
 class TestQueryBenchmarkResult:
-    """Tests for QueryBenchmarkResult dataclass and computed properties."""
-
-    # --- construction ---
-
     def test_basic_creation(self):
         r = _make_query_result(times=[10.0, 12.0, 11.0])
         assert r.query_id == "Q1"
@@ -307,8 +236,6 @@ class TestQueryBenchmarkResult:
         assert r.error_message == "timeout"
         assert r.iterations == 0
 
-    # --- statistical properties ---
-
     def test_mean_time_ms(self):
         r = _make_query_result(times=[10.0, 20.0, 30.0])
         assert r.mean_time_ms == pytest.approx(20.0)
@@ -323,7 +250,6 @@ class TestQueryBenchmarkResult:
         assert r.std_time_ms == pytest.approx(statistics.stdev(times))
 
     def test_std_time_ms_single(self):
-        """Stdev requires >=2 samples; single returns 0."""
         r = _make_query_result(times=[42.0])
         assert r.std_time_ms == 0.0
 
@@ -350,13 +276,11 @@ class TestQueryBenchmarkResult:
         assert r.p50_time_ms == 0.0
 
     def test_p95_time_ms(self):
-        times = list(range(1, 101))  # 1..100 - 100 values
+        times = list(range(1, 101))
         r = _make_query_result(times=[float(t) for t in times])
-        # idx = int(100 * 0.95) = 95, sorted[95] = 96.0
         assert r.p95_time_ms == 96.0
 
     def test_p95_single_value(self):
-        """With single value, p95 falls back to max."""
         r = _make_query_result(times=[7.0])
         assert r.p95_time_ms == 7.0
 
@@ -374,8 +298,6 @@ class TestQueryBenchmarkResult:
     def test_cv_empty(self):
         r = _make_query_result(times=[])
         assert r.coefficient_of_variation == 0.0
-
-    # --- serialization ---
 
     def test_to_dict_keys(self):
         r = _make_query_result(times=[10.0, 20.0])
@@ -413,14 +335,7 @@ class TestQueryBenchmarkResult:
         assert d["status"] == "SUCCESS"
 
 
-# ===========================================================================
-# PlatformBenchmarkResult
-# ===========================================================================
-
-
 class TestPlatformBenchmarkResult:
-    """Tests for PlatformBenchmarkResult aggregation and serialization."""
-
     def test_empty_query_results(self):
         r = _make_platform_result(query_results=[])
         assert r.total_time_ms == 0.0
@@ -437,7 +352,6 @@ class TestPlatformBenchmarkResult:
         assert r.failed_queries == 0
         assert r.success_rate == 100.0
         assert r.total_time_ms == pytest.approx(qr.mean_time_ms)
-        # Geometric mean of a single value equals the value itself
         assert r.geometric_mean_ms == pytest.approx(qr.mean_time_ms)
 
     def test_multiple_successful_queries(self):
@@ -458,7 +372,6 @@ class TestPlatformBenchmarkResult:
         assert r.successful_queries == 1
         assert r.failed_queries == 1
         assert r.success_rate == pytest.approx(50.0)
-        # Only successful queries contribute to total
         assert r.total_time_ms == pytest.approx(20.0)
 
     def test_all_errors(self):
@@ -510,14 +423,7 @@ class TestPlatformBenchmarkResult:
         assert r.timestamp.tzinfo == timezone.utc
 
 
-# ===========================================================================
-# ComparisonSummary
-# ===========================================================================
-
-
 class TestComparisonSummary:
-    """Tests for ComparisonSummary dataclass."""
-
     def test_construction(self):
         s = ComparisonSummary(
             platforms=["polars-df", "pandas-df"],
@@ -556,14 +462,7 @@ class TestComparisonSummary:
         assert set(d.keys()) == expected_keys
 
 
-# ===========================================================================
-# SQLComparisonResult
-# ===========================================================================
-
-
 class TestSQLComparisonResult:
-    """Tests for SQLComparisonResult speedup calculation."""
-
     def test_speedup_calculated_on_init(self):
         r = SQLComparisonResult(
             query_id="Q1",
@@ -572,7 +471,6 @@ class TestSQLComparisonResult:
             sql_time_ms=100.0,
             df_time_ms=50.0,
         )
-        # speedup = sql / df = 2.0 (DataFrame is 2x faster)
         assert r.speedup == pytest.approx(2.0)
 
     def test_speedup_sql_faster(self):
@@ -586,7 +484,6 @@ class TestSQLComparisonResult:
         assert r.speedup == pytest.approx(0.5)
 
     def test_speedup_zero_times_unchanged(self):
-        """When times are zero, __post_init__ leaves speedup at default 1.0."""
         r = SQLComparisonResult(
             query_id="Q1",
             sql_platform="duckdb",
@@ -619,14 +516,7 @@ class TestSQLComparisonResult:
         assert set(d.keys()) == expected_keys
 
 
-# ===========================================================================
-# SQLVsDataFrameSummary
-# ===========================================================================
-
-
 class TestSQLVsDataFrameSummary:
-    """Tests for SQLVsDataFrameSummary."""
-
     def test_df_wins_percentage(self):
         s = SQLVsDataFrameSummary(
             sql_platform="duckdb",
@@ -693,14 +583,7 @@ class TestSQLVsDataFrameSummary:
         assert d["query_results"][0]["query_id"] == "Q1"
 
 
-# ===========================================================================
-# DataFrameBenchmarkSuite - init / capability lookup
-# ===========================================================================
-
-
 class TestDataFrameBenchmarkSuiteInit:
-    """Tests for DataFrameBenchmarkSuite initialization and config."""
-
     def test_default_config(self):
         suite = DataFrameBenchmarkSuite()
         assert suite.config.scale_factor == 0.01
@@ -725,19 +608,11 @@ class TestDataFrameBenchmarkSuiteInit:
         assert cap is None
 
     def test_query_registry_populated(self):
-        """Suite loads TPC-H query registry on init."""
         suite = DataFrameBenchmarkSuite()
         assert suite._query_registry is not None
 
 
-# ===========================================================================
-# DataFrameBenchmarkSuite - _build_speedup_matrix
-# ===========================================================================
-
-
 class TestSpeedupMatrix:
-    """Tests for DataFrameBenchmarkSuite._build_speedup_matrix."""
-
     def _suite(self) -> DataFrameBenchmarkSuite:
         return DataFrameBenchmarkSuite()
 
@@ -746,11 +621,8 @@ class TestSpeedupMatrix:
         geomeans = {"polars-df": 10.0, "pandas-df": 20.0}
         matrix = suite._build_speedup_matrix(["polars-df", "pandas-df"], geomeans)
 
-        # polars-df vs pandas-df: 20/10 = 2.0
         assert matrix["polars-df"]["pandas-df"] == pytest.approx(2.0)
-        # pandas-df vs polars-df: 10/20 = 0.5
         assert matrix["pandas-df"]["polars-df"] == pytest.approx(0.5)
-        # Self-comparison
         assert matrix["polars-df"]["polars-df"] == pytest.approx(1.0)
         assert matrix["pandas-df"]["pandas-df"] == pytest.approx(1.0)
 
@@ -782,14 +654,7 @@ class TestSpeedupMatrix:
         assert matrix == {}
 
 
-# ===========================================================================
-# DataFrameBenchmarkSuite - _find_query_winners
-# ===========================================================================
-
-
 class TestFindQueryWinners:
-    """Tests for DataFrameBenchmarkSuite._find_query_winners."""
-
     def _suite(self) -> DataFrameBenchmarkSuite:
         return DataFrameBenchmarkSuite()
 
@@ -805,7 +670,6 @@ class TestFindQueryWinners:
 
     def test_two_platforms_different_winners(self):
         suite = self._suite()
-        # polars faster on Q1, pandas faster on Q6
         polars_q1 = _make_query_result(query_id="Q1", platform="polars-df", times=[5.0])
         polars_q6 = _make_query_result(query_id="Q6", platform="polars-df", times=[30.0])
         pandas_q1 = _make_query_result(query_id="Q1", platform="pandas-df", times=[15.0])
@@ -834,14 +698,7 @@ class TestFindQueryWinners:
         assert winners == {}
 
 
-# ===========================================================================
-# DataFrameBenchmarkSuite - get_summary
-# ===========================================================================
-
-
 class TestGetSummary:
-    """Tests for DataFrameBenchmarkSuite.get_summary."""
-
     def _suite(self) -> DataFrameBenchmarkSuite:
         return DataFrameBenchmarkSuite(config=BenchmarkConfig(scale_factor=0.01))
 
@@ -877,25 +734,16 @@ class TestGetSummary:
         assert "pandas-df" in summary.speedup_matrix
 
     def test_summary_with_all_errors(self):
-        """When all queries error, summary should still work (no geomeans)."""
         suite = self._suite()
         q_err = _make_query_result(query_id="Q1", platform="polars-df", times=[], status="ERROR")
         r = _make_platform_result(platform="polars-df", query_results=[q_err])
 
         summary = suite.get_summary([r])
-        # With no geomeans, falls back to first platform
         assert summary.fastest_platform == "polars-df"
         assert summary.total_queries == 1
 
 
-# ===========================================================================
-# DataFrameBenchmarkSuite - export_results
-# ===========================================================================
-
-
 class TestExportResults:
-    """Tests for DataFrameBenchmarkSuite.export_results."""
-
     def _suite(self) -> DataFrameBenchmarkSuite:
         return DataFrameBenchmarkSuite(config=BenchmarkConfig(scale_factor=0.01))
 
@@ -940,7 +788,6 @@ class TestExportResults:
         assert out.exists()
 
     def test_export_json_round_trip(self, tmp_path: Path):
-        """Exported JSON can be loaded and contains correct query data."""
         suite = self._suite()
         results = self._sample_results()
         out = suite.export_results(results, tmp_path / "results.json", format="json")
@@ -952,14 +799,7 @@ class TestExportResults:
         assert qr["mean_time_ms"] == pytest.approx(11.0)
 
 
-# ===========================================================================
-# DataFrameBenchmarkSuite - run_comparison validation
-# ===========================================================================
-
-
 class TestRunComparisonValidation:
-    """Tests for run_comparison input validation (no actual benchmarks)."""
-
     def test_missing_data_dir_raises(self, tmp_path: Path):
         suite = DataFrameBenchmarkSuite()
         nonexistent = tmp_path / "does_not_exist"
@@ -967,14 +807,7 @@ class TestRunComparisonValidation:
             suite.run_comparison(platforms=["polars-df"], data_dir=nonexistent)
 
 
-# ===========================================================================
-# Markdown report generation
-# ===========================================================================
-
-
 class TestMarkdownReport:
-    """Tests for _generate_markdown_report."""
-
     def test_report_contains_sections(self):
         suite = DataFrameBenchmarkSuite(config=BenchmarkConfig(scale_factor=0.01))
         q1_p = _make_query_result(query_id="Q1", platform="polars-df", times=[10.0])
@@ -1003,14 +836,7 @@ class TestMarkdownReport:
         assert "## Speedup Matrix" not in md
 
 
-# ===========================================================================
-# DataFrameComparisonPlotter - construction
-# ===========================================================================
-
-
 class TestDataFrameComparisonPlotterInit:
-    """Tests for DataFrameComparisonPlotter construction."""
-
     def test_empty_results_raises(self):
         from benchbox.core.dataframe.benchmark_suite import DataFrameComparisonPlotter
 
@@ -1027,14 +853,7 @@ class TestDataFrameComparisonPlotterInit:
         assert plotter.theme == "light"
 
 
-# ===========================================================================
-# SQLVsDataFramePlotter - construction
-# ===========================================================================
-
-
 class TestSQLVsDataFramePlotterInit:
-    """Tests for SQLVsDataFramePlotter construction."""
-
     def test_valid_summary_stored(self):
         from benchbox.core.dataframe.benchmark_suite import SQLVsDataFramePlotter
 
@@ -1069,14 +888,7 @@ class TestSQLVsDataFramePlotterInit:
         assert plotter.theme == "dark"
 
 
-# ===========================================================================
-# SQLVsDataFrameBenchmark - _build_summary
-# ===========================================================================
-
-
 class TestSQLVsDataFrameBenchmarkBuildSummary:
-    """Tests for SQLVsDataFrameBenchmark._build_summary."""
-
     def _benchmark(self):
         from benchbox.core.dataframe.benchmark_suite import SQLVsDataFrameBenchmark
 
@@ -1103,8 +915,8 @@ class TestSQLVsDataFrameBenchmarkBuildSummary:
         summary = bm._build_summary("duckdb", "polars-df", results)
 
         assert summary.total_queries == 2
-        assert summary.df_faster_count == 1  # Q1: speedup 2.0 > 1
-        assert summary.sql_faster_count == 1  # Q6: speedup 0.8 < 1
+        assert summary.df_faster_count == 1
+        assert summary.sql_faster_count == 1
         assert summary.average_speedup == pytest.approx(statistics.mean([2.0, 0.8]))
         assert summary.max_speedup == pytest.approx(2.0)
         assert summary.min_speedup == pytest.approx(0.8)
@@ -1160,14 +972,7 @@ class TestSQLVsDataFrameBenchmarkBuildSummary:
         assert "faster" in report
 
 
-# ===========================================================================
-# SQLVsDataFrameBenchmark - execution helpers
-# ===========================================================================
-
-
 class TestSQLVsDataFrameBenchmarkExecution:
-    """Tests for SQL-vs-DataFrame comparison execution helpers."""
-
     def _benchmark(self, query_ids: list[str] | None = None):
         from benchbox.core.dataframe.benchmark_suite import SQLVsDataFrameBenchmark
 
@@ -1188,7 +993,7 @@ class TestSQLVsDataFrameBenchmarkExecution:
                 df_time_ms=80.0,
             )
 
-        bm._compare_query = _fake_compare_query  # type: ignore[method-assign]
+        bm._compare_query = _fake_compare_query
 
         with patch.object(bm, "_build_summary", return_value="summary") as build_summary:
             summary = bm.run_comparison("duckdb", "polars-df", tmp_path)
@@ -1199,8 +1004,8 @@ class TestSQLVsDataFrameBenchmarkExecution:
 
     def test_compare_query_success_records_row_match(self, tmp_path):
         bm = self._benchmark()
-        bm._run_sql_query = MagicMock(return_value=(110.0, 4))  # type: ignore[method-assign]
-        bm._run_df_query = MagicMock(return_value=(90.0, 4))  # type: ignore[method-assign]
+        bm._run_sql_query = MagicMock(return_value=(110.0, 4))
+        bm._run_df_query = MagicMock(return_value=(90.0, 4))
 
         result = bm._compare_query("Q1", "duckdb", "polars-df", tmp_path)
 
@@ -1210,7 +1015,7 @@ class TestSQLVsDataFrameBenchmarkExecution:
 
     def test_compare_query_error_returns_error_result(self, tmp_path):
         bm = self._benchmark()
-        bm._run_sql_query = MagicMock(side_effect=RuntimeError("boom"))  # type: ignore[method-assign]
+        bm._run_sql_query = MagicMock(side_effect=RuntimeError("boom"))
 
         result = bm._compare_query("Q1", "duckdb", "polars-df", tmp_path)
 
@@ -1302,14 +1107,7 @@ class TestSQLVsDataFrameBenchmarkExecution:
                 bm._run_df_query("Q99", "polars-df", tmp_path)
 
 
-# ===========================================================================
-# Plotters and convenience functions
-# ===========================================================================
-
-
 class TestBenchmarkSuiteConvenienceFunctions:
-    """Tests for convenience wrappers and plotters."""
-
     def test_run_quick_comparison_uses_default_datagen_path(self):
         fake_results = [_make_platform_result()]
 
@@ -1417,14 +1215,7 @@ class TestBenchmarkSuiteConvenienceFunctions:
         generate.assert_called_once()
 
 
-# ===========================================================================
-# Sharded parquet table resolution
-# ===========================================================================
-
-
 class TestResolveTablePaths:
-    """Tests for resolve_table_paths used by suite table loading."""
-
     def test_single_file_preferred(self, tmp_path):
         single = tmp_path / "lineitem.parquet"
         single.write_text("stub")

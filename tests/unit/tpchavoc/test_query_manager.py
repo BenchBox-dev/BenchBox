@@ -1,5 +1,3 @@
-"""Tests covering TPCHavocQueryManager with modular variants."""
-
 from __future__ import annotations
 
 import pytest
@@ -43,7 +41,6 @@ def test_invalid_variant_errors(manager: TPCHavocQueryManager):
 
 
 def test_q11_fraction_scales_with_scale_factor(manager: TPCHavocQueryManager):
-    """Q11 variants must render the value threshold as 0.0001/SF like canonical qgen."""
     for scale_factor, literal in [(1.0, "0.0001000000"), (0.1, "0.0010000000"), (10.0, "0.0000100000")]:
         for variant_id in range(1, 11):
             sql = manager.get_query_variant(11, variant_id, scale_factor=scale_factor)
@@ -51,18 +48,12 @@ def test_q11_fraction_scales_with_scale_factor(manager: TPCHavocQueryManager):
 
 
 def test_explicit_params_do_not_suppress_scale_substitution(manager: TPCHavocQueryManager):
-    """Scale tokens are defaults: caller-supplied params must never leak a raw token."""
     sql = manager.get_query_variant(11, 1, params={"unrelated": "value"}, scale_factor=0.1)
     assert "{q11_fraction}" not in sql
     assert "0.0010000000" in sql
 
 
 def test_no_unsubstituted_tokens_in_any_variant(manager: TPCHavocQueryManager):
-    """Every rendered variant must be free of unrendered {token} placeholders.
-
-    Covers both entry points - get_query_variant and the parameterized variant
-    path - since each merges the scale substitution independently.
-    """
     for query_id in manager.get_implemented_queries():
         for variant_id in range(1, 11):
             for sql in (
@@ -73,7 +64,6 @@ def test_no_unsubstituted_tokens_in_any_variant(manager: TPCHavocQueryManager):
 
 
 def test_parameterized_variant_renders_scale_threshold(manager: TPCHavocQueryManager):
-    """get_parameterized_query_variant must also fill the Q11 scale token."""
     sql = manager.get_parameterized_query_variant(11, 1, scale_factor=0.1)
     assert "{q11_fraction}" not in sql
     assert "0.0010000000" in sql

@@ -23,12 +23,12 @@ uv add benchbox --extra fabric
 ## Typical Workflow
 
 ```bash
-# Step 1: load data through Spark
 benchbox run --platform fabric-spark --benchmark tpch --scale 1 --phases generate,load --non-interactive
 
-# Step 2: benchmark query phases through Lakehouse SQL endpoint
 benchbox run --platform fabric-lakehouse --benchmark tpch --scale 1 --phases power,throughput --non-interactive
 ```
+
+Step 1 loads data through Spark. Step 2 runs the query phases through the Lakehouse SQL endpoint.
 
 ## Adapter Configuration
 

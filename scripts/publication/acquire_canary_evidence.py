@@ -1,16 +1,4 @@
 #!/usr/bin/env python3
-"""Acquire and authenticate the current publication evidence bundle.
-
-Acquires real publication evidence (desired manifest, receipts, and drill records)
-for canary verification and drift reconciliation.
-
-Evidence can be acquired from:
-1. The publication journal (refs/heads/publication: state.json + transactions/<id>.json)
-2. The durable GitHub Deployment ledger and Actions artifact
-
-When evidence is unavailable, this tool fails closed (exit 2) unless
---allow-unavailable is set, in which case it records evidence_status: unavailable.
-"""
 
 from __future__ import annotations
 
@@ -26,13 +14,27 @@ from typing import Any, Sequence
 
 from scripts.publication import journal
 
+CLI_DESCRIPTION = (
+    "Acquire and authenticate the current publication evidence bundle.\n"
+    "\n"
+    "Acquires real publication evidence (desired manifest, receipts, and drill records)\n"
+    "for canary verification and drift reconciliation.\n"
+    "\n"
+    "Evidence can be acquired from:\n"
+    "1. The publication journal (refs/heads/publication: state.json + transactions/<id>.json)\n"
+    "2. The durable GitHub Deployment ledger and Actions artifact\n"
+    "\n"
+    "When evidence is unavailable, this tool fails closed (exit 2) unless\n"
+    "--allow-unavailable is set, in which case it records evidence_status: unavailable.\n"
+)
+
 ENVIRONMENT = "independent-publication"
 WORKFLOW_PATH = ".github/workflows/publication-deploy.yml"
 WORKFLOW_NAME = "Publication Control Plane Deployment"
 
 
 class EvidenceUnavailable(RuntimeError):
-    """Raised when publication evidence cannot be authenticated or acquired."""
+    pass
 
 
 def _gh_json(*args: str) -> Any:
@@ -41,7 +43,6 @@ def _gh_json(*args: str) -> Any:
 
 
 def acquire_from_journal(repo_path: Path, ref: str, output_dir: Path) -> dict[str, Any] | None:
-    """Attempt to acquire evidence from the local publication Git journal."""
     journal_state = journal.read_journal_state(repo_path, ref=ref)
     if not journal_state or not journal_state.durable_transaction_id:
         return None
@@ -57,7 +58,6 @@ def acquire_from_journal(repo_path: Path, ref: str, output_dir: Path) -> dict[st
     desired_path = output_dir / "desired-manifest.json"
     desired_path.write_text(json.dumps(tx.desired, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    # If write evidence has deployment details, write deployment-receipt.json
     if tx.write:
         deploy_receipt = {
             "schema_version": 1,
@@ -71,7 +71,6 @@ def acquire_from_journal(repo_path: Path, ref: str, output_dir: Path) -> dict[st
             json.dumps(deploy_receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
 
-    # If verification evidence is present, write live-receipt.json
     if tx.verification:
         live_receipt = {
             "schema_version": 1,
@@ -109,7 +108,6 @@ def acquire_from_journal(repo_path: Path, ref: str, output_dir: Path) -> dict[st
 
 
 def acquire_from_github(repository: str, output_dir: Path) -> dict[str, Any] | None:
-    """Attempt to acquire evidence from GitHub Deployments and Actions artifacts."""
     try:
         deployments = _gh_json("--paginate", f"repos/{repository}/deployments?environment={ENVIRONMENT}&per_page=20")
     except Exception as exc:
@@ -144,7 +142,6 @@ def acquire_from_github(repository: str, output_dir: Path) -> dict[str, Any] | N
         if not artifact_id:
             continue
 
-        # Download artifact zip
         output_dir.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="canary-evidence-") as tmp:
             zip_path = Path(tmp) / "bundle.zip"
@@ -181,10 +178,8 @@ def acquire(
     ref: str = journal.DEFAULT_REF,
     allow_unavailable: bool = False,
 ) -> dict[str, Any]:
-    """Acquire publication evidence from journal or GitHub, failing closed if unavailable."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Try local journal
     try:
         result = acquire_from_journal(repo_path=repo_path, ref=ref, output_dir=output_dir)
         if result:
@@ -192,7 +187,6 @@ def acquire(
     except Exception:
         pass
 
-    # 2. Try GitHub API
     try:
         result = acquire_from_github(repository=repository, output_dir=output_dir)
         if result:
@@ -200,7 +194,6 @@ def acquire(
     except Exception:
         pass
 
-    # If neither yielded evidence
     status = {
         "source": "none",
         "available": False,
@@ -217,7 +210,7 @@ def acquire(
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--repository", required=True, help="GitHub repository (owner/repo)")
     parser.add_argument("--output-dir", required=True, type=Path, help="Target evidence directory")
     parser.add_argument("--repo-path", type=Path, default=Path("."), help="Path to local Git repository")

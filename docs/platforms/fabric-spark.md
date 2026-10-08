@@ -18,11 +18,10 @@ Microsoft Fabric is Microsoft's unified analytics platform providing SaaS Spark,
 ## Installation
 
 ```bash
-# Install with Fabric Spark support
 uv add benchbox --extra fabric-spark
-
-# Dependencies installed: azure-identity, azure-storage-file-datalake, requests
 ```
+
+This installs `azure-identity`, `azure-storage-file-datalake`, and `requests`.
 
 ## Prerequisites
 
@@ -37,31 +36,30 @@ uv add benchbox --extra fabric-spark
 
 ### Environment Variables
 
+`FABRIC_WORKSPACE_ID` and `FABRIC_LAKEHOUSE_ID` are required. `AZURE_TENANT_ID` and `FABRIC_SPARK_POOL` are optional.
+
 ```bash
-# Required
 export FABRIC_WORKSPACE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 export FABRIC_LAKEHOUSE_ID=yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy
 
-# Optional
 export AZURE_TENANT_ID=zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz
 export FABRIC_SPARK_POOL=my-spark-pool
 ```
 
 ### CLI Usage
 
+The first command is basic usage. The second adds the tenant ID for service principal authentication. The third is a dry run that previews queries.
+
 ```bash
-# Basic usage
 benchbox run --platform fabric-spark --benchmark tpch --scale 1.0 \
   --platform-option workspace_id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \
   --platform-option lakehouse_id=yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy
 
-# With tenant ID for service principal auth
 benchbox run --platform fabric-spark --benchmark tpch --scale 1.0 \
   --platform-option workspace_id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \
   --platform-option lakehouse_id=yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy \
   --platform-option tenant_id=zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz
 
-# Dry-run to preview queries
 benchbox run --platform fabric-spark --benchmark tpch --dry-run ./preview \
   --platform-option workspace_id=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx \
   --platform-option lakehouse_id=yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy
@@ -81,32 +79,28 @@ benchbox run --platform fabric-spark --benchmark tpch --dry-run ./preview \
 
 ## Python API
 
+`tenant_id` is optional. `create_schema()` is also optional, because the lakehouse manages schemas automatically. `load_data()` loads data to OneLake and creates Delta tables, `execute_query()` runs the query through Livy, and `close()` cleans up the session.
+
 ```python
 from benchbox.platforms.azure import FabricSparkAdapter
 
-# Initialize with workspace and lakehouse
 adapter = FabricSparkAdapter(
     workspace_id="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
     lakehouse_id="yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy",
-    tenant_id="zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz",  # Optional
+    tenant_id="zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz",
 )
 
-# Verify connection
 adapter.create_connection()
 
-# Create schema (optional, lakehouse manages automatically)
 adapter.create_schema("tpch_benchmark")
 
-# Load data to OneLake and create Delta tables
 adapter.load_data(
     tables=["lineitem", "orders", "customer"],
     source_dir="/path/to/tpch/data",
 )
 
-# Execute query via Livy
 result = adapter.execute_query("SELECT COUNT(*) FROM lineitem")
 
-# Clean up session
 adapter.close()
 ```
 
@@ -185,10 +179,8 @@ https://app.fabric.microsoft.com/groups/.../lakehouses/{LAKEHOUSE_ID}
 
 Or via PowerShell:
 ```powershell
-# List workspaces
 Get-FabricWorkspace
 
-# List lakehouses in workspace
 Get-FabricLakehouse -WorkspaceId $workspaceId
 ```
 

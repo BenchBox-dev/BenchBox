@@ -1,9 +1,6 @@
-"""NL2SQL benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -25,7 +22,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# Platform-specific SQL generation prompts
 PLATFORM_NL2SQL_PROMPTS: dict[str, dict[str, str]] = {
     "snowflake": {
         "system": """You are a SQL expert. Generate valid Snowflake SQL based on the user's natural language query.
@@ -71,8 +67,6 @@ SQL:""",
 
 @dataclass
 class NL2SQLQueryResult:
-    """Result of an NL2SQL query evaluation."""
-
     query_id: str
     natural_language: str
     generated_sql: str
@@ -89,7 +83,6 @@ class NL2SQLQueryResult:
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "query_id": self.query_id,
             "natural_language": self.natural_language,
@@ -110,8 +103,6 @@ class NL2SQLQueryResult:
 
 @dataclass
 class NL2SQLBenchmarkResults:
-    """Results from running the NL2SQL benchmark."""
-
     platform: str
     started_at: datetime
     completed_at: datetime | None = None
@@ -124,7 +115,6 @@ class NL2SQLBenchmarkResults:
     category_breakdown: dict[str, AccuracyMetrics] = field(default_factory=dict)
 
     def add_result(self, result: NL2SQLQueryResult) -> None:
-        """Add a query result."""
         self.query_results.append(result)
         self.accuracy_metrics.add_result(result.match_type)
         self.total_generation_time_ms += result.generation_time_ms
@@ -132,37 +122,31 @@ class NL2SQLBenchmarkResults:
         self.total_cost_estimated += result.cost_estimated
 
     def add_difficulty_result(self, difficulty: QueryDifficulty, match_type: SQLMatchType) -> None:
-        """Add result to difficulty breakdown."""
         key = difficulty.value
         if key not in self.difficulty_breakdown:
             self.difficulty_breakdown[key] = AccuracyMetrics()
         self.difficulty_breakdown[key].add_result(match_type)
 
     def add_category_result(self, category: NL2SQLQueryCategory, match_type: SQLMatchType) -> None:
-        """Add result to category breakdown."""
         key = category.value
         if key not in self.category_breakdown:
             self.category_breakdown[key] = AccuracyMetrics()
         self.category_breakdown[key].add_result(match_type)
 
     def complete(self) -> None:
-        """Mark the benchmark as complete."""
         self.completed_at = datetime.now(timezone.utc)
 
     @property
     def avg_generation_time_ms(self) -> float:
-        """Get average generation time."""
         n = len(self.query_results)
         return self.total_generation_time_ms / n if n > 0 else 0.0
 
     @property
     def avg_execution_time_ms(self) -> float:
-        """Get average execution time."""
         n = len(self.query_results)
         return self.total_execution_time_ms / n if n > 0 else 0.0
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "platform": self.platform,
             "started_at": self.started_at.isoformat(),
@@ -180,22 +164,6 @@ class NL2SQLBenchmarkResults:
 
 
 class NL2SQLBenchmark(BaseBenchmark):
-    """Natural Language to SQL Testing benchmark.
-
-    Tests NL2SQL capabilities of platforms with AI query generation features.
-    Measures accuracy, latency, and cost of natural language query interfaces.
-
-    Supported platforms:
-    - Snowflake Cortex (using COMPLETE for SQL generation)
-    - BigQuery (Gemini for natural language queries)
-    - Databricks (AI Functions for text-to-SQL)
-
-    Example:
-        >>> benchmark = NL2SQLBenchmark()
-        >>> queries = benchmark.get_queries_by_difficulty(QueryDifficulty.MEDIUM)
-        >>> result = benchmark.evaluate_nl2sql(conn, "Count all orders", platform="snowflake")
-    """
-
     SUPPORTED_PLATFORMS = {"snowflake", "bigquery", "databricks"}
 
     def __init__(
@@ -205,14 +173,6 @@ class NL2SQLBenchmark(BaseBenchmark):
         execute_validation: bool = True,
         **kwargs: Any,
     ) -> None:
-        """Initialize the NL2SQL benchmark.
-
-        Args:
-            scale_factor: Scale factor (not used, kept for API compatibility)
-            output_dir: Output directory for results
-            execute_validation: Whether to execute generated SQL for validation
-            **kwargs: Additional configuration
-        """
         super().__init__(scale_factor, output_dir, **kwargs)
 
         self._name = "Natural Language to SQL Testing Framework"
@@ -225,53 +185,31 @@ class NL2SQLBenchmark(BaseBenchmark):
         self.query_manager = NL2SQLQueryManager()
         self.execute_validation = execute_validation
 
-        # Cost estimation per 1K tokens (approximate)
         self.token_costs = {
-            "snowflake": 0.002,  # Cortex pricing varies
+            "snowflake": 0.002,
             "bigquery": 0.001,
             "databricks": 0.003,
         }
 
     @property
     def name(self) -> str:
-        """Get benchmark name."""
         return self._name
 
     @property
     def version(self) -> str:
-        """Get benchmark version."""
         return self._version
 
     @property
     def description(self) -> str:
-        """Get benchmark description."""
         return self._description
 
     def get_supported_platforms(self) -> set[str]:
-        """Get platforms that support NL2SQL."""
         return self.SUPPORTED_PLATFORMS.copy()
 
     def get_queries(self) -> dict[str, str]:
-        """Get all benchmark queries (natural language texts).
-
-        Returns:
-            Dictionary mapping query IDs to natural language questions.
-        """
         return {qid: q.natural_language for qid, q in self.query_manager.get_all_queries().items()}
 
     def get_query(self, query_id: int | str, *, params: dict[str, Any] | None = None) -> str:
-        """Get a specific benchmark query.
-
-        Args:
-            query_id: Query identifier
-            params: Optional parameters (not used)
-
-        Returns:
-            Natural language query string
-
-        Raises:
-            ValueError: If query_id not found
-        """
         query = self.query_manager.get_query(str(query_id))
         if query is None:
             available = ", ".join(self.query_manager.get_query_ids())
@@ -279,47 +217,25 @@ class NL2SQLBenchmark(BaseBenchmark):
         return query.natural_language
 
     def get_expected_sql(self, query_id: str) -> str:
-        """Get the expected SQL for a query.
-
-        Args:
-            query_id: Query identifier
-
-        Returns:
-            Expected SQL string
-
-        Raises:
-            ValueError: If query_id not found
-        """
         query = self.query_manager.get_query(query_id)
         if query is None:
             raise ValueError(f"Unknown query ID: {query_id}")
         return query.expected_sql
 
     def generate_data(self) -> list[str | Path]:
-        """Generate benchmark data.
-
-        This benchmark uses existing TPC-H style tables, so no data generation is needed.
-
-        Returns:
-            Empty list (no data files generated)
-        """
         logger.info("NL2SQL benchmark uses existing TPC-H style tables, no data generation needed")
         return []
 
     def get_queries_by_category(self, category: NL2SQLQueryCategory) -> list[NL2SQLQuery]:
-        """Get queries for a specific category."""
         return self.query_manager.get_queries_by_category(category)
 
     def get_queries_by_difficulty(self, difficulty: QueryDifficulty) -> list[NL2SQLQuery]:
-        """Get queries for a specific difficulty level."""
         return self.query_manager.get_queries_by_difficulty(difficulty)
 
     def get_categories(self) -> list[NL2SQLQueryCategory]:
-        """Get all query categories."""
         return self.query_manager.get_categories()
 
     def get_difficulty_levels(self) -> list[QueryDifficulty]:
-        """Get all difficulty levels."""
         return self.query_manager.get_difficulty_levels()
 
     def _build_nl2sql_prompt(
@@ -327,15 +243,6 @@ class NL2SQLBenchmark(BaseBenchmark):
         query: NL2SQLQuery,
         platform: str,
     ) -> str:
-        """Build the NL2SQL prompt for a platform.
-
-        Args:
-            query: NL2SQL query
-            platform: Target platform
-
-        Returns:
-            Formatted prompt string
-        """
         config = PLATFORM_NL2SQL_PROMPTS.get(platform.lower(), PLATFORM_NL2SQL_PROMPTS["snowflake"])
         template = config["template"]
 
@@ -349,15 +256,6 @@ class NL2SQLBenchmark(BaseBenchmark):
         query: NL2SQLQuery,
         platform: str,
     ) -> str:
-        """Build the platform-specific SQL for NL2SQL generation.
-
-        Args:
-            query: NL2SQL query
-            platform: Target platform
-
-        Returns:
-            SQL statement to generate SQL from natural language
-        """
         config = PLATFORM_NL2SQL_PROMPTS.get(platform.lower())
         if config is None:
             raise ValueError(f"Unsupported platform: {platform}")
@@ -368,7 +266,6 @@ class NL2SQLBenchmark(BaseBenchmark):
         model = config["model"]
 
         if platform.lower() == "snowflake":
-            # Snowflake Cortex COMPLETE
             return f"""
 SELECT {function}(
     '{model}',
@@ -381,7 +278,6 @@ SELECT {function}(
 ) AS generated_sql
 """
         elif platform.lower() == "bigquery":
-            # BigQuery ML.GENERATE_TEXT
             return f"""
 SELECT *
 FROM {function}(
@@ -393,7 +289,6 @@ FROM {function}(
 )
 """
         elif platform.lower() == "databricks":
-            # Databricks ai_query
             return f"""
 SELECT {function}(
     '{model}',
@@ -410,34 +305,20 @@ SELECT {function}(
         result: Any,
         platform: str,
     ) -> str:
-        """Extract generated SQL from platform response.
-
-        Args:
-            result: Query result from platform
-            platform: Target platform
-
-        Returns:
-            Extracted SQL string
-        """
         if result is None or len(result) == 0:
             return ""
 
         row = result[0]
 
-        # Handle different result formats
         if isinstance(row, dict):
-            # Dictionary result
             sql = row.get("generated_sql") or row.get("ml_generate_text_result") or row.get("text") or ""
         elif isinstance(row, (list, tuple)):
-            # Tuple/list result
             sql = str(row[0]) if len(row) > 0 else ""
         else:
             sql = str(row)
 
-        # Clean up the SQL
         sql = sql.strip()
 
-        # Remove markdown code blocks if present
         if sql.startswith("```sql"):
             sql = sql[6:]
         elif sql.startswith("```"):
@@ -448,15 +329,6 @@ SELECT {function}(
         return sql.strip()
 
     def _estimate_tokens(self, text: str) -> int:
-        """Estimate token count for text.
-
-        Args:
-            text: Text to estimate tokens for
-
-        Returns:
-            Estimated token count
-        """
-        # Simple estimation: ~4 characters per token
         return max(1, len(text) // 4)
 
     def evaluate_nl2sql(
@@ -466,17 +338,6 @@ SELECT {function}(
         platform: str | None = None,
         timeout_seconds: int | None = None,
     ) -> NL2SQLQueryResult:
-        """Evaluate a single NL2SQL query.
-
-        Args:
-            connection: Database connection
-            query_id: Query identifier
-            platform: Target platform
-            timeout_seconds: Query timeout
-
-        Returns:
-            NL2SQL query result
-        """
         query = self.query_manager.get_query(query_id)
         if query is None:
             return NL2SQLQueryResult(
@@ -508,7 +369,6 @@ SELECT {function}(
                 error_message=f"Unsupported platform: {platform}",
             )
 
-        # Build and execute NL2SQL query
         nl2sql_sql = self._build_platform_sql(query, platform_lower)
 
         start_time = time.perf_counter()
@@ -533,7 +393,6 @@ SELECT {function}(
                 error_message=f"NL2SQL generation failed: {str(e)}",
             )
 
-        # Evaluate generated SQL
         evaluator = NL2SQLEvaluator(
             connection=connection if self.execute_validation else None,
             case_sensitive=False,
@@ -546,7 +405,6 @@ SELECT {function}(
             execute=self.execute_validation,
         )
 
-        # Estimate tokens and cost
         prompt = self._build_nl2sql_prompt(query, platform_lower)
         input_tokens = self._estimate_tokens(prompt)
         output_tokens = self._estimate_tokens(generated_sql)
@@ -562,7 +420,7 @@ SELECT {function}(
             success=comparison.match_type in {SQLMatchType.EXACT, SQLMatchType.SEMANTIC},
             match_type=comparison.match_type,
             generation_time_ms=generation_time_ms,
-            execution_time_ms=0.0,  # Execution time is in generation
+            execution_time_ms=0.0,
             error_message=comparison.error_message,
             tokens_used=total_tokens,
             cost_estimated=cost,
@@ -577,18 +435,6 @@ SELECT {function}(
         categories: list[NL2SQLQueryCategory] | None = None,
         difficulties: list[QueryDifficulty] | None = None,
     ) -> NL2SQLBenchmarkResults:
-        """Run the NL2SQL benchmark.
-
-        Args:
-            connection: Database connection
-            platform: Target platform
-            query_ids: Optional list of specific queries to run
-            categories: Optional list of categories to test
-            difficulties: Optional list of difficulties to test
-
-        Returns:
-            Benchmark results
-        """
         if platform is None:
             platform = getattr(connection, "platform", "unknown")
 
@@ -597,7 +443,6 @@ SELECT {function}(
             started_at=datetime.now(timezone.utc),
         )
 
-        # Determine which queries to run
         if query_ids is not None:
             queries_to_run = [
                 self.query_manager.get_query(qid) for qid in query_ids if self.query_manager.get_query(qid) is not None
@@ -605,17 +450,14 @@ SELECT {function}(
         else:
             all_queries = list(self.query_manager.get_all_queries().values())
 
-            # Filter by category
             if categories is not None:
                 all_queries = [q for q in all_queries if q.category in categories]
 
-            # Filter by difficulty
             if difficulties is not None:
                 all_queries = [q for q in all_queries if q.difficulty in difficulties]
 
             queries_to_run = all_queries
 
-        # Run queries
         for query in queries_to_run:
             if query is None:
                 continue
@@ -637,7 +479,6 @@ SELECT {function}(
         return results
 
     def export_benchmark_spec(self) -> dict[str, Any]:
-        """Export the benchmark specification."""
         return {
             "name": self.name,
             "version": self.version,

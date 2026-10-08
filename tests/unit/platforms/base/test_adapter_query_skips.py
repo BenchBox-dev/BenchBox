@@ -1,12 +1,3 @@
-"""Unit tests for PlatformAdapter query skip filtering.
-
-Ensures that:
-1. SQL mode (PlatformAdapter) only consumes get_platform_skip_queries.
-2. DataFusion SQL keeps variants that were previously dropped by a conflated skip list.
-3. LakeSail SQL skip remains effective.
-4. DataFrame mode consumes both get_platform_skip_queries and get_df_platform_skip_queries.
-"""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -25,8 +16,6 @@ pytestmark = [
 
 
 class MinimalAdapter(PlatformAdapter):
-    """Minimal concrete implementation of PlatformAdapter for testing."""
-
     def __init__(self, platform_name: str) -> None:
         self._platform_name = platform_name
         super().__init__()
@@ -80,8 +69,6 @@ class MinimalAdapter(PlatformAdapter):
 
 
 class MinimalDFAdapter(BenchmarkExecutionMixin):
-    """Minimal concrete implementation of BenchmarkExecutionMixin for testing."""
-
     def __init__(self, platform_name: str, family: str = "expression") -> None:
         self.platform_name = platform_name
         self.family = family
@@ -100,28 +87,24 @@ class MinimalDFAdapter(BenchmarkExecutionMixin):
 
 
 def test_datafusion_sql_keeps_variants():
-    """Regression test: DataFusion SQL must NOT skip its catalog variants."""
+
     adapter = MinimalAdapter("DataFusion")
     benchmark = ReadPrimitivesBenchmark()
 
-    # The four query IDs that were previously incorrectly skipped in SQL mode
     target_ids = ["list_filter", "list_transform", "list_reduce", "array_distinct"]
 
-    # Mock queries dict as it would come from benchmark.get_queries(dialect='datafusion')
     queries = {qid: f"SELECT * FROM {qid}" for qid in target_ids}
     queries["q1"] = "SELECT 1"
 
-    # Filter through the adapter
     filtered = adapter._filter_queries(queries, benchmark, "read_primitives", {})
 
-    # All target IDs must survive in SQL mode
     for qid in target_ids:
         assert qid in filtered, f"{qid} should NOT be skipped in DataFusion SQL mode"
     assert "q1" in filtered
 
 
 def test_operation_skip_logging_uses_skip_reason_when_error_is_none(monkeypatch):
-    """Operation SKIPPED results carry skip_reason separately from error."""
+
     adapter = MinimalAdapter("pg-duckdb")
     printed: list[str] = []
 
@@ -147,7 +130,7 @@ def test_operation_skip_logging_uses_skip_reason_when_error_is_none(monkeypatch)
 
 
 def test_lakesail_sql_skip_remains_active():
-    """LakeSail SQL skip (empty_build_join) must still work in generic hook."""
+
     adapter = MinimalAdapter("LakeSail")
     benchmark = ReadPrimitivesBenchmark()
 
@@ -159,15 +142,14 @@ def test_lakesail_sql_skip_remains_active():
 
 
 def test_datafusion_df_skips_continue_to_work():
-    """DataFusion DataFrame mode must still skip its unsupported queries."""
+
     adapter = MinimalDFAdapter("DataFusion")
     benchmark = ReadPrimitivesBenchmark()
 
-    # In DF mode, these ARE skipped via get_df_platform_skip_queries
     target_ids = ["list_filter", "list_transform", "list_reduce", "array_distinct"]
 
     skip_ids = adapter._collect_skip_query_ids(benchmark)
-    # _collect_skip_query_ids returns uppercase
+
     upper_targets = {qid.upper() for qid in target_ids}
 
     for qid in upper_targets:
@@ -175,7 +157,7 @@ def test_datafusion_df_skips_continue_to_work():
 
 
 def test_polars_df_skips_maps():
-    """Polars DataFrame mode must skip map queries."""
+
     adapter = MinimalDFAdapter("Polars")
     benchmark = ReadPrimitivesBenchmark()
 
@@ -187,7 +169,7 @@ def test_polars_df_skips_maps():
 
 
 def test_pyspark_df_skips_list_hofs():
-    """PySpark DataFrame mode must skip list higher-order functions."""
+
     adapter = MinimalDFAdapter("PySpark")
     benchmark = ReadPrimitivesBenchmark()
 
@@ -197,12 +179,11 @@ def test_pyspark_df_skips_list_hofs():
     for qid in target_ids:
         assert qid.upper() in skip_ids, f"{qid} should be skipped in PySpark DataFrame mode"
 
-    # PySpark should NOT skip maps anymore as they were moved to Polars bucket
     assert "MAP_CONSTRUCTION" not in skip_ids, "PySpark should support map_construction"
 
 
 def test_datafusion_df_does_not_skip_maps():
-    """DataFusion DataFrame mode should support maps."""
+
     adapter = MinimalDFAdapter("DataFusion")
     benchmark = ReadPrimitivesBenchmark()
 

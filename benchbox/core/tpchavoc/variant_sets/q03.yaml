@@ -107,7 +107,7 @@ variants:
           and l_orderkey = o_orderkey
           and o_orderdate < date '1995-03-15'
           and l_shipdate > date '1995-03-15'
-          and 1 = 0  -- This branch will be empty, just for syntax variation
+          and 1 = 0
     ) combined
     group by
         l_orderkey,

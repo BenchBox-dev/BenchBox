@@ -1,9 +1,6 @@
-"""Unit tests for the DatabaseConnection wrapper class.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import Mock, patch
 
@@ -18,30 +15,27 @@ pytestmark = [
 
 
 class TestDatabaseConnectionInitialization:
-    """Test initialization of DatabaseConnection."""
-
     def test_initialization_with_execute_method(self, duckdb_memory_db):
-        """Test successful initialization with connection that has execute method."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
 
         assert db_conn.connection is duckdb_memory_db
         assert db_conn.dialect is None
 
     def test_initialization_with_dialect(self, duckdb_memory_db):
-        """Test initialization with dialect parameter."""
+
         db_conn = DatabaseConnection(duckdb_memory_db, dialect="duckdb")
 
         assert db_conn.connection is duckdb_memory_db
         assert db_conn.dialect == "duckdb"
 
     def test_initialization_with_none_connection(self):
-        """Test that None connection raises TypeError."""
+
         with pytest.raises(TypeError, match="Connection object cannot be None"):
             DatabaseConnection(None)
 
     def test_initialization_with_invalid_connection(self):
-        """Test that invalid connection raises ValueError."""
-        # an object without cursor or execute methods
+
         invalid_conn = object()
 
         with pytest.raises(
@@ -52,18 +46,14 @@ class TestDatabaseConnectionInitialization:
 
 
 class TestDatabaseConnectionExecute:
-    """Test execute method functionality."""
-
     def test_execute_with_direct_execute_method(self, duckdb_memory_db):
-        """Test execute using connection with direct execute method."""
-        # a test table
+
         duckdb_memory_db.execute("CREATE TABLE test (id INTEGER, name VARCHAR)")
         duckdb_memory_db.execute("INSERT INTO test VALUES (1, 'test1'), (2, 'test2')")
 
         db_conn = DatabaseConnection(duckdb_memory_db)
         result = db_conn.execute("SELECT * FROM test")
 
-        # Verify we got a cursor-like object back
         assert result is not None
         rows = result.fetchall()
         assert len(rows) == 2
@@ -71,15 +61,13 @@ class TestDatabaseConnectionExecute:
         assert rows[1] == (2, "test2")
 
     def test_execute_with_parameters_list(self, duckdb_memory_db):
-        """Test execute with list parameters."""
-        # a test table
+
         duckdb_memory_db.execute("CREATE TABLE test (id INTEGER, name VARCHAR, value DECIMAL)")
 
         db_conn = DatabaseConnection(duckdb_memory_db)
         params = [1, "test", 3.14]
         db_conn.execute("INSERT INTO test VALUES (?, ?, ?)", params)
 
-        # Verify the insert worked
         verify_result = duckdb_memory_db.execute("SELECT * FROM test WHERE id = 1")
         row = verify_result.fetchone()
         assert row[0] == 1
@@ -87,56 +75,52 @@ class TestDatabaseConnectionExecute:
         assert float(row[2]) == 3.14
 
     def test_execute_with_parameters_dict(self, duckdb_memory_db):
-        """Test execute with dictionary parameters."""
-        # a test table
+
         duckdb_memory_db.execute("CREATE TABLE test (id INTEGER, name VARCHAR)")
 
         db_conn = DatabaseConnection(duckdb_memory_db)
         params = {"id": 1, "name": "test"}
         db_conn.execute("INSERT INTO test VALUES ($id, $name)", params)
 
-        # Verify the insert worked
         verify_result = duckdb_memory_db.execute("SELECT * FROM test WHERE id = 1")
         row = verify_result.fetchone()
         assert row == (1, "test")
 
     def test_execute_with_parameters_tuple(self, duckdb_memory_db):
-        """Test execute with tuple parameters."""
-        # a test table
+
         duckdb_memory_db.execute("CREATE TABLE test (id INTEGER, name VARCHAR)")
 
         db_conn = DatabaseConnection(duckdb_memory_db)
         params = (1, "test")
         db_conn.execute("INSERT INTO test VALUES (?, ?)", params)
 
-        # Verify the insert worked
         verify_result = duckdb_memory_db.execute("SELECT * FROM test WHERE id = 1")
         row = verify_result.fetchone()
         assert row == (1, "test")
 
     def test_execute_with_empty_query(self, duckdb_memory_db):
-        """Test that empty query raises ValueError."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
 
         with pytest.raises(ValueError, match="Query cannot be empty or None"):
             db_conn.execute("")
 
     def test_execute_with_none_query(self, duckdb_memory_db):
-        """Test that None query raises ValueError."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
 
         with pytest.raises(ValueError, match="Query cannot be empty or None"):
             db_conn.execute(None)
 
     def test_execute_with_whitespace_only_query(self, duckdb_memory_db):
-        """Test that whitespace-only query raises ValueError."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
 
         with pytest.raises(ValueError, match="Query cannot be empty or None"):
             db_conn.execute("   \n\t   ")
 
     def test_execute_with_sql_error(self, duckdb_memory_db):
-        """Test exception handling when SQL execution fails."""
+
         db_conn = DatabaseConnection(duckdb_memory_db, dialect="duckdb")
 
         with pytest.raises(DatabaseError, match="Error executing query \\(dialect: duckdb\\)"):
@@ -144,7 +128,7 @@ class TestDatabaseConnectionExecute:
 
     @patch("benchbox.core.connection.logger")
     def test_execute_logging_direct_execute(self, mock_logger, duckdb_memory_db):
-        """Test that execute method logs appropriately for direct execute."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
         db_conn.execute("SELECT 1")
 
@@ -152,22 +136,17 @@ class TestDatabaseConnectionExecute:
 
     @patch("benchbox.core.connection.logger")
     def test_execute_logging_truncated_query(self, mock_logger, duckdb_memory_db):
-        """Test that long queries are truncated in log messages."""
         db_conn = DatabaseConnection(duckdb_memory_db)
         long_query = "SELECT 1 WHERE " + "1 = 1 AND " * 20 + "1 = 1"
         db_conn.execute(long_query)
 
-        # Check that the logged message is truncated to 100 characters
         expected_log = f"Executing query with direct execute method: {long_query[:100]}..."
         mock_logger.debug.assert_called_once_with(expected_log)
 
 
 class TestDatabaseConnectionFetchMethods:
-    """Test fetchall and fetchone methods."""
-
     def test_fetchall_success(self, duckdb_memory_db):
-        """Test successful fetchall operation."""
-        # test data
+
         duckdb_memory_db.execute("CREATE TABLE test (id INTEGER, name VARCHAR)")
         duckdb_memory_db.execute("INSERT INTO test VALUES (1, 'row1'), (2, 'row2'), (3, 'row3')")
 
@@ -179,8 +158,7 @@ class TestDatabaseConnectionFetchMethods:
         assert result == [(1, "row1"), (2, "row2"), (3, "row3")]
 
     def test_fetchone_success(self, duckdb_memory_db):
-        """Test successful fetchone operation."""
-        # test data
+
         duckdb_memory_db.execute("CREATE TABLE test (id INTEGER, name VARCHAR)")
         duckdb_memory_db.execute("INSERT INTO test VALUES (1, 'single_row')")
 
@@ -192,8 +170,7 @@ class TestDatabaseConnectionFetchMethods:
         assert result == (1, "single_row")
 
     def test_fetchone_no_more_rows(self, duckdb_memory_db):
-        """Test fetchone when no more rows are available."""
-        # empty table
+
         duckdb_memory_db.execute("CREATE TABLE test (id INTEGER, name VARCHAR)")
 
         db_conn = DatabaseConnection(duckdb_memory_db)
@@ -205,28 +182,21 @@ class TestDatabaseConnectionFetchMethods:
 
 
 class TestDatabaseConnectionTransactionMethods:
-    """Test commit and rollback methods."""
-
     def test_commit_success(self, duckdb_memory_db):
-        """Test successful commit operation."""
         db_conn = DatabaseConnection(duckdb_memory_db)
 
-        # DuckDB auto-commits by default, so this should not raise an error
         db_conn.commit()
 
     def test_rollback_success(self, duckdb_memory_db):
-        """Test successful rollback operation."""
         db_conn = DatabaseConnection(duckdb_memory_db)
 
-        # Start a transaction first
         duckdb_memory_db.execute("BEGIN")
 
-        # DuckDB supports rollback
         db_conn.rollback()
 
     @patch("benchbox.core.connection.logger")
     def test_commit_logging(self, mock_logger, duckdb_memory_db):
-        """Test that commit logs appropriately."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
         db_conn.commit()
 
@@ -234,10 +204,9 @@ class TestDatabaseConnectionTransactionMethods:
 
     @patch("benchbox.core.connection.logger")
     def test_rollback_logging(self, mock_logger, duckdb_memory_db):
-        """Test that rollback logs appropriately."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
 
-        # Start a transaction first
         duckdb_memory_db.execute("BEGIN")
 
         db_conn.rollback()
@@ -246,24 +215,19 @@ class TestDatabaseConnectionTransactionMethods:
 
 
 class TestDatabaseConnectionClose:
-    """Test close method functionality."""
-
     def test_close_success(self, duckdb_memory_db):
-        """Test successful close operation."""
         db_conn = DatabaseConnection(duckdb_memory_db)
 
-        # This should not raise an error
         db_conn.close()
 
     def test_close_multiple_calls(self, duckdb_memory_db):
-        """Test that close can be called multiple times safely."""
         db_conn = DatabaseConnection(duckdb_memory_db)
         db_conn.close()
-        db_conn.close()  # Should not raise an exception
+        db_conn.close()
 
     @patch("benchbox.core.connection.logger")
     def test_close_logging(self, mock_logger, duckdb_memory_db):
-        """Test that close logs appropriately."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
         db_conn.close()
 
@@ -271,39 +235,30 @@ class TestDatabaseConnectionClose:
 
 
 class TestDatabaseConnectionContextManager:
-    """Test context manager functionality."""
-
     def test_context_manager_enter(self, duckdb_memory_db):
-        """Test context manager __enter__ method."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
 
         with db_conn as conn:
             assert conn is db_conn
 
     def test_context_manager_exit_calls_close(self, duckdb_memory_db):
-        """Test context manager __exit__ method calls close."""
         db_conn = DatabaseConnection(duckdb_memory_db)
 
         with db_conn:
             pass
 
-        # Connection should be closed after exiting context
-
     def test_context_manager_with_exception(self, duckdb_memory_db):
-        """Test context manager behavior when exception occurs."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
 
         with pytest.raises(ValueError, match="Test exception"), db_conn:
             raise ValueError("Test exception")
 
-        # Close should still be called even when exception occurs
-
 
 class TestDatabaseConnectionRepresentation:
-    """Test string representation of DatabaseConnection."""
-
     def test_repr_without_dialect(self, duckdb_memory_db):
-        """Test __repr__ method without dialect."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
 
         repr_str = repr(db_conn)
@@ -311,7 +266,7 @@ class TestDatabaseConnectionRepresentation:
         assert "dialect=" not in repr_str
 
     def test_repr_with_dialect(self, duckdb_memory_db):
-        """Test __repr__ method with dialect."""
+
         db_conn = DatabaseConnection(duckdb_memory_db, dialect="duckdb")
 
         repr_str = repr(db_conn)
@@ -320,10 +275,7 @@ class TestDatabaseConnectionRepresentation:
 
 
 class TestDatabaseConnectionIntegration:
-    """Integration tests for DatabaseConnection with different connection types."""
-
     def test_sqlite_like_connection(self):
-        """Test with SQLite-like connection (has execute method)."""
         mock_conn = Mock()
         mock_conn.execute = Mock()
         mock_cursor = Mock()
@@ -335,22 +287,17 @@ class TestDatabaseConnectionIntegration:
 
         db_conn = DatabaseConnection(mock_conn, dialect="sqlite")
 
-        # Test execute
         cursor = db_conn.execute("SELECT * FROM test")
         assert cursor is mock_cursor
 
-        # Test fetchall
         results = db_conn.fetchall(cursor)
         assert results == [("result",)]
 
-        # Test transaction methods
         db_conn.commit()
         db_conn.rollback()
 
-        # Test close
         db_conn.close()
 
-        # Verify all methods were called
         mock_conn.execute.assert_called_once()
         mock_cursor.fetchall.assert_called_once()
         mock_conn.commit.assert_called_once()
@@ -358,7 +305,6 @@ class TestDatabaseConnectionIntegration:
         mock_conn.close.assert_called_once()
 
     def test_postgres_like_connection(self):
-        """Test with PostgreSQL-like connection (has cursor method)."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.execute = Mock()
@@ -369,30 +315,24 @@ class TestDatabaseConnectionIntegration:
         mock_conn.rollback = Mock()
         mock_conn.close = Mock()
 
-        # Strip execute method to force cursor path
         del mock_conn.execute
 
         db_conn = DatabaseConnection(mock_conn, dialect="postgresql")
 
-        # Test execute
         cursor = db_conn.execute("SELECT * FROM test", [1, "param"])
         assert cursor is mock_cursor
 
-        # Test fetch methods
         results = db_conn.fetchall(cursor)
         assert results == [("result",)]
 
         result = db_conn.fetchone(cursor)
         assert result == ("result",)
 
-        # Test transaction methods
         db_conn.commit()
         db_conn.rollback()
 
-        # Test close
         db_conn.close()
 
-        # Verify all methods were called
         mock_conn.cursor.assert_called_once()
         mock_cursor.execute.assert_called_once_with("SELECT * FROM test", [1, "param"])
         mock_cursor.fetchall.assert_called_once()
@@ -402,7 +342,7 @@ class TestDatabaseConnectionIntegration:
         mock_conn.close.assert_called_once()
 
     def test_full_workflow_with_context_manager(self):
-        """Test full workflow using context manager."""
+
         mock_conn = Mock()
         mock_conn.execute = Mock()
         mock_cursor = Mock()
@@ -412,36 +352,30 @@ class TestDatabaseConnectionIntegration:
         mock_conn.close = Mock()
 
         with DatabaseConnection(mock_conn, dialect="duckdb") as db_conn:
-            # Execute query
             cursor = db_conn.execute("SELECT * FROM test")
 
-            # Fetch results
             results = db_conn.fetchall(cursor)
             assert len(results) == 2
 
-            # Commit transaction
             db_conn.commit()
 
-        # Verify close was called automatically
         mock_conn.close.assert_called_once()
 
 
 class TestDatabaseError:
-    """Test DatabaseError exception class."""
-
     def test_database_error_creation(self):
-        """Test creating DatabaseError exception."""
+
         error = DatabaseError("Test error message")
         assert str(error) == "Test error message"
         assert isinstance(error, Exception)
 
     def test_database_error_inheritance(self):
-        """Test that DatabaseError inherits from Exception."""
+
         error = DatabaseError("Test error")
         assert isinstance(error, Exception)
 
     def test_database_error_with_cause(self):
-        """Test DatabaseError with cause chain."""
+
         original_error = ValueError("Original error")
 
         try:
@@ -453,31 +387,24 @@ class TestDatabaseError:
 
 @pytest.mark.unit
 class TestDatabaseConnectionEdgeCases:
-    """Test edge cases and error conditions."""
-
     def test_execute_with_very_long_query(self, duckdb_memory_db):
-        """Test execute with very long query for logging truncation."""
+
         db_conn = DatabaseConnection(duckdb_memory_db)
 
-        # a query longer than 100 characters
         long_query = "SELECT 1 WHERE " + "1 = 1 AND " * 20 + "1 = 1"
 
         with patch("benchbox.core.connection.logger") as mock_logger:
             db_conn.execute(long_query)
 
-            # Check that query was truncated in log
             logged_message = mock_logger.debug.call_args[0][0]
             assert "..." in logged_message
-            assert len(logged_message) <= 150  # Should be truncated
+            assert len(logged_message) <= 150
 
     def test_multiple_parameter_types(self, duckdb_memory_db):
-        """Test execute with various parameter types."""
-        # test table
         duckdb_memory_db.execute("CREATE TABLE test (id INTEGER, name VARCHAR, value DECIMAL)")
 
         db_conn = DatabaseConnection(duckdb_memory_db)
 
-        # Test with different parameter types
         test_cases = [
             ([], "SELECT 1"),
             ([1, "test", 3.14], "INSERT INTO test VALUES (?, ?, ?)"),
@@ -488,27 +415,23 @@ class TestDatabaseConnectionEdgeCases:
             try:
                 db_conn.execute(query, params)
             except Exception:
-                # Some queries might fail due to parameter count mismatch, but that's expected
                 pass
 
     def test_connection_attribute_access(self, duckdb_memory_db):
-        """Test direct access to connection attributes."""
+
         db_conn = DatabaseConnection(duckdb_memory_db, dialect="duckdb")
 
-        # Test that we can access the underlying connection
         assert db_conn.connection is duckdb_memory_db
         assert db_conn.dialect == "duckdb"
 
     def test_error_message_formatting(self, duckdb_memory_db):
-        """Test error message formatting with and without dialect."""
-        # Test without dialect
+
         db_conn = DatabaseConnection(duckdb_memory_db)
         with pytest.raises(DatabaseError) as exc_info:
             db_conn.execute("SELECT * FROM nonexistent_table")
         assert "Error executing query:" in str(exc_info.value)
         assert "dialect:" not in str(exc_info.value)
 
-        # Test with dialect
         db_conn = DatabaseConnection(duckdb_memory_db, dialect="duckdb")
         with pytest.raises(DatabaseError) as exc_info:
             db_conn.execute("SELECT * FROM nonexistent_table")

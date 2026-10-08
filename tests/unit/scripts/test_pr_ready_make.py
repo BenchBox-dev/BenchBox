@@ -1,5 +1,3 @@
-"""Run the real `make pr-ready` with recording shims and check which helper it reaches."""
-
 from __future__ import annotations
 
 import os
@@ -8,8 +6,6 @@ from pathlib import Path
 
 import pytest
 
-# Medium tier: these three tests would take the fast-lane count past its ceiling. The medium tier runs
-# on every merge group, so the change still proves them before it merges.
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -19,7 +15,7 @@ HEAD = "a" * 40
 def _make_pr_ready(
     tmp_path: Path, *assignments: str, gh_output: str = "7 https://github.com/BenchBox-dev/BenchBox/pull/7"
 ) -> tuple[subprocess.CompletedProcess[str], list[str], dict[str, str]]:
-    """Run the real `make pr-ready` with recording `uv` and `gh` shims (`gh pr view` prints `gh_output`)."""
+
     for name, body in (
         ("uv", '#!/bin/sh\nprintf "%s\\n" "$@" > "$RECORD/argv"\nenv | grep "^PR_ARM_" | sort > "$RECORD/env"\n'),
         ("gh", f"#!/bin/sh\necho '{gh_output}'\n"),
@@ -45,7 +41,7 @@ def _make_pr_ready(
 
 
 def test_pr_ready_without_evidence_arms_through_pr_arm(tmp_path: Path) -> None:
-    """A PR number, a URL (resolved to its number) and a hostile value all reach pr-arm as environment values."""
+
     for name, assignments, expected in (
         ("number", ("PR=7",), "7"),
         ("url", ("URL=https://github.com/BenchBox-dev/BenchBox/pull/7",), "7"),
@@ -81,7 +77,7 @@ def test_pr_ready_with_evidence_or_batch_keeps_the_readiness_transaction(tmp_pat
         assert result.returncode == 0, (name, result.stderr)
         assert "scripts/pr_landing.py" in argv and "scripts/pr_arm.py" not in argv, name
         assert env == {}, name
-    # BATCH without EVIDENCE refuses instead of arming through pr-arm.
+
     record = tmp_path / "batch-only"
     record.mkdir()
     result, argv, env = _make_pr_ready(record, "PR=7", f"HEAD={HEAD}", "BATCH=1")

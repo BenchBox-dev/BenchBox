@@ -1,9 +1,6 @@
-"""Shared benchmark mixins for common data generation and loading behavior.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -13,21 +10,16 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
 class DataGenerationMixin:
-    """Shared data generation and CSV loading flow for table-based benchmarks."""
-
     tables: dict[str, Any]
     data_generator: Any
 
     def _get_table_schema(self) -> dict[str, Any]:
-        """Return benchmark table schema mapping used for validation and loading."""
         raise NotImplementedError
 
     def _get_data_loading_batch_size(self) -> int | None:
-        """Return batch size for executemany inserts, or None to load all rows at once."""
         return None
 
     def generate_data(self, tables: Optional[list[str]] = None, output_format: str = "csv") -> dict[str, Any]:
-        """Generate benchmark data files for the requested tables."""
         if output_format != "csv":
             raise ValueError(f"Unsupported output format: {output_format}")
 
@@ -44,7 +36,6 @@ class DataGenerationMixin:
         return self.tables
 
     def load_data_to_database(self, connection: Any, tables: Optional[list[str]] = None) -> None:
-        """Load generated CSV data into a database connection."""
         if not self.tables:
             raise ValueError("No data generated. Call generate_data() first.")
 
@@ -65,7 +56,6 @@ class DataGenerationMixin:
             connection.commit()
 
     def _execute_schema_sql(self, connection: Any) -> None:
-        """Execute CREATE TABLE statements against the connection."""
         schema_sql = self.get_create_tables_sql()
         if hasattr(connection, "executescript"):
             connection.executescript(schema_sql)
@@ -76,7 +66,6 @@ class DataGenerationMixin:
                     cursor.execute(statement)
 
     def _load_single_table(self, connection: Any, table_name: str, table_def: dict, batch_size: int | None) -> None:
-        """Load a single table's CSV data into the database."""
         import csv
 
         file_path = self.tables[table_name]
@@ -107,40 +96,29 @@ class DataGenerationMixin:
 
 
 class QueryCategoryFacadeMixin:
-    """Shared facade delegation for query category accessors."""
-
     _impl: Any
 
     def get_queries_by_category(self, category: str) -> dict[str, str]:
-        """Delegate query-category lookup to the benchmark implementation."""
         return self._impl.get_queries_by_category(category)
 
     def get_query_categories(self) -> list[str]:
-        """Delegate query-category listing to the benchmark implementation."""
         return self._impl.get_query_categories()
 
 
 class OperationCategoryFacadeMixin:
-    """Shared facade delegation for operation category accessors."""
-
     _impl: Any
 
     def get_operations_by_category(self, category: str) -> dict[str, Any]:
-        """Delegate operation-category lookup to the benchmark implementation."""
         return self._impl.get_operations_by_category(category)
 
     def get_operation_categories(self) -> list[str]:
-        """Delegate operation-category listing to the benchmark implementation."""
         return self._impl.get_operation_categories()
 
 
 class QueryFacadeMixin:
-    """Shared facade delegation for basic query retrieval methods."""
-
     _impl: Any
 
     def get_queries(self, dialect: Optional[str] = None) -> dict[str, str]:
-        """Delegate query listing to the benchmark implementation."""
         return self._impl.get_queries(dialect=dialect)
 
     def get_query(
@@ -150,33 +128,19 @@ class QueryFacadeMixin:
         params: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> str:
-        """Delegate query retrieval while preserving params/kwargs compatibility."""
         if params is None:
             return self._impl.get_query(query_id, **kwargs)
         return self._impl.get_query(query_id, params=params, **kwargs)
 
 
 class CursorValidationQueryExecutionMixin:
-    """Shared DBAPI cursor execute flow with row-count validation and query stats.
-
-    Consuming classes must provide:
-    - log_verbose(msg: str) -> None
-    - log_very_verbose(msg: str) -> None
-    - _build_query_result_with_validation(**kwargs) -> dict[str, Any]
-    """
-
     _REQUIRED_METHODS = ("log_verbose", "log_very_verbose", "_build_query_result_with_validation")
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
-        """Validate that concrete consumers provide the cursor execution hooks."""
         super().__init_subclass__(**kwargs)
-        # Skip enforcement on intermediate mixins that aren't concrete adapters.
-        # Concrete adapters will be checked when they are defined.
         if cls.__name__.endswith(("Mixin", "Base")):
             return
         for method_name in CursorValidationQueryExecutionMixin._REQUIRED_METHODS:
-            # Walk the MRO excluding this mixin and the class itself to verify
-            # that some other parent provides the method (not a local stub).
             providers = [
                 c
                 for c in cls.__mro__
@@ -196,24 +160,12 @@ class CursorValidationQueryExecutionMixin:
         connection: Any = None,
         query_id: str | None = None,
     ) -> dict[str, Any]:
-        """Build default query stats payload for cursor-based adapters.
-
-        Platform adapters may override this hook to attach engine telemetry.
-        The default ignores ``connection`` and ``query_id``.
-        """
         return {"execution_time_seconds": execution_time}
 
     def _format_query_error(self, exc: BaseException) -> str:
-        """Return a non-empty error string for a failed DB-API execute."""
         return str(exc) or repr(exc) or type(exc).__name__
 
     def _attach_query_stats(self, result_dict: dict[str, Any], query_stats: dict[str, Any]) -> None:
-        """Attach platform query stats and resource usage to result payload.
-
-        Both keys share the same dict for schema backward compatibility: downstream
-        consumers read from either key depending on context (result schema uses
-        query_statistics, telemetry pipelines use resource_usage).
-        """
         result_dict["query_statistics"] = query_stats
         result_dict["resource_usage"] = query_stats
 
@@ -227,7 +179,6 @@ class CursorValidationQueryExecutionMixin:
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute query via DBAPI cursor with optional row-count validation."""
         start_time = mono_time()
         cursor = connection.cursor()
 

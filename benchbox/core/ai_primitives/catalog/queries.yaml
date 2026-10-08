@@ -1,26 +1,6 @@
 version: 1
 
-# AI/ML Primitives Benchmark Query Catalog
-#
-# This catalog defines SQL queries for testing AI/ML functions across platforms.
-# All queries use TPC-H data for consistency.
-#
-# Categories:
-#   - generative: Text completion, question answering, SQL generation
-#   - nlp: Sentiment analysis, classification, entity extraction
-#   - transform: Summarization, translation, grammar correction
-#   - embedding: Vector embedding generation
-#
-# Platform Support:
-#   - snowflake: Cortex functions (COMPLETE, SUMMARIZE, SENTIMENT, etc.)
-#   - bigquery: ML functions (ML.GENERATE_TEXT, ML.UNDERSTAND_TEXT, etc.)
-#   - databricks: AI functions (ai_query, ai_summarize, etc.)
-#   - duckdb, clickhouse, sqlite, postgresql: Not supported (skip_on)
-
 queries:
-  # ============================================================================
-  # GENERATIVE AI QUERIES
-  # ============================================================================
 
   - id: generative_complete_simple
     category: generative
@@ -215,10 +195,6 @@ queries:
       - redshift
       - synapse
       - fabric
-
-  # ============================================================================
-  # NLP ANALYSIS QUERIES
-  # ============================================================================
 
   - id: nlp_sentiment_single
     category: nlp
@@ -485,10 +461,6 @@ queries:
       - synapse
       - fabric
 
-  # ============================================================================
-  # TEXT TRANSFORMATION QUERIES
-  # ============================================================================
-
   - id: transform_summarize_short
     category: transform
     description: Summarize short customer comments
@@ -688,10 +660,6 @@ queries:
       - redshift
       - synapse
       - fabric
-
-  # ============================================================================
-  # EMBEDDING GENERATION QUERIES
-  # ============================================================================
 
   - id: embedding_single
     category: embedding

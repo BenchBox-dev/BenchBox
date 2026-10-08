@@ -1,11 +1,6 @@
-"""Unit tests for Snowpark Connect adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the PySpark-compatible DataFrame API adapter for Snowflake.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -24,10 +19,8 @@ pytestmark = [
 ]
 
 
-# Mock Snowpark before importing adapter
 @pytest.fixture(autouse=True)
 def mock_snowpark():
-    """Mock Snowpark for all tests."""
     mock_session = MagicMock()
     mock_session_builder = MagicMock()
     mock_session_builder.configs.return_value = mock_session_builder
@@ -62,10 +55,7 @@ def mock_snowpark():
 
 
 class TestSnowparkConnectAdapterInitialization:
-    """Tests for Snowpark Connect adapter initialization."""
-
     def test_init_with_all_required_params(self, mock_snowpark):
-        """Test successful initialization with all required parameters."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -83,7 +73,6 @@ class TestSnowparkConnectAdapterInitialization:
         assert adapter.database == "BENCHBOX"
 
     def test_init_missing_account_raises_error(self, mock_snowpark):
-        """Test that missing account raises ConfigurationError."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         with pytest.raises(ConfigurationError, match="account is required"):
@@ -94,7 +83,6 @@ class TestSnowparkConnectAdapterInitialization:
             )
 
     def test_init_missing_user_raises_error(self, mock_snowpark):
-        """Test that missing user raises ConfigurationError."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         with pytest.raises(ConfigurationError, match="user is required"):
@@ -105,7 +93,6 @@ class TestSnowparkConnectAdapterInitialization:
             )
 
     def test_init_missing_auth_raises_error(self, mock_snowpark):
-        """Test that missing password and private_key_path raises ConfigurationError."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         with pytest.raises(ConfigurationError, match="password or private_key_path"):
@@ -117,7 +104,6 @@ class TestSnowparkConnectAdapterInitialization:
             )
 
     def test_init_with_key_auth(self, mock_snowpark):
-        """Test initialization with private key authentication."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -130,7 +116,6 @@ class TestSnowparkConnectAdapterInitialization:
         assert adapter.password is None
 
     def test_init_with_custom_warehouse_size(self, mock_snowpark):
-        """Test initialization with custom warehouse size."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -143,7 +128,6 @@ class TestSnowparkConnectAdapterInitialization:
         assert adapter.warehouse_size == "XLARGE"
 
     def test_init_with_role(self, mock_snowpark):
-        """Test initialization with specified role."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -157,10 +141,7 @@ class TestSnowparkConnectAdapterInitialization:
 
 
 class TestSnowparkConnectAdapterPlatformInfo:
-    """Tests for platform information retrieval."""
-
     def test_get_platform_info(self, mock_snowpark):
-        """Test get_platform_info returns correct metadata."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -180,7 +161,6 @@ class TestSnowparkConnectAdapterPlatformInfo:
         assert "RDD APIs not supported" in info["limitations"]
 
     def test_get_target_dialect(self, mock_snowpark):
-        """Test get_target_dialect returns snowflake."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -193,10 +173,7 @@ class TestSnowparkConnectAdapterPlatformInfo:
 
 
 class TestSnowparkConnectAdapterConnection:
-    """Tests for Snowpark session management."""
-
     def test_create_connection(self, mock_snowpark):
-        """Test successful session creation."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -205,7 +182,6 @@ class TestSnowparkConnectAdapterConnection:
             password="test_password",
         )
 
-        # Mock the session creation
         mock_session = MagicMock()
         mock_session.sql.return_value.collect.return_value = [("8.0.0",)]
 
@@ -223,7 +199,6 @@ class TestSnowparkConnectAdapterConnection:
         assert result is not None
 
     def test_create_connection_reuses_existing_session(self, mock_snowpark):
-        """Test that existing valid session is reused."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -241,7 +216,6 @@ class TestSnowparkConnectAdapterConnection:
         assert result is mock_session
 
     def test_close_session(self, mock_snowpark):
-        """Test session close."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -260,10 +234,7 @@ class TestSnowparkConnectAdapterConnection:
 
 
 class TestSnowparkConnectAdapterQueryExecution:
-    """Tests for query execution."""
-
     def test_execute_query_without_session_raises_error(self, mock_snowpark):
-        """Test that executing query without session raises ConfigurationError."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -277,7 +248,6 @@ class TestSnowparkConnectAdapterQueryExecution:
             adapter.execute_query(None, "SELECT 1", "Q1")
 
     def test_execute_query_success(self, mock_snowpark):
-        """Test successful query execution."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -301,7 +271,6 @@ class TestSnowparkConnectAdapterQueryExecution:
         mock_session.sql.assert_called_once_with("SELECT COUNT(*) AS count FROM table1")
 
     def test_execute_query_tracks_metrics(self, mock_snowpark):
-        """Test that query execution tracks metrics."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -319,15 +288,11 @@ class TestSnowparkConnectAdapterQueryExecution:
         adapter.execute_query(mock_session, "SELECT 1", "Q1")
 
         assert adapter._query_count == 1
-        # Use >= 0 for cross-platform compatibility (Windows timer resolution)
         assert adapter._total_execution_time_seconds >= 0
 
 
 class TestSnowparkConnectAdapterDataFrame:
-    """Tests for DataFrame operations."""
-
     def test_get_dataframe_without_session_raises_error(self, mock_snowpark):
-        """Test that getting DataFrame without session raises ConfigurationError."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -341,7 +306,6 @@ class TestSnowparkConnectAdapterDataFrame:
             adapter.get_dataframe("lineitem")
 
     def test_get_dataframe_success(self, mock_snowpark):
-        """Test successful DataFrame retrieval."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -361,7 +325,6 @@ class TestSnowparkConnectAdapterDataFrame:
         mock_session.table.assert_called_once_with("lineitem")
 
     def test_execute_dataframe_without_session_raises_error(self, mock_snowpark):
-        """Test that executing DataFrame without session raises ConfigurationError."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -377,7 +340,6 @@ class TestSnowparkConnectAdapterDataFrame:
             adapter.execute_dataframe(mock_df)
 
     def test_execute_dataframe_success(self, mock_snowpark):
-        """Test successful DataFrame execution."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -401,14 +363,6 @@ class TestSnowparkConnectAdapterDataFrame:
 
 
 class TestSnowparkConnectAdapterResolveTableNames:
-    """Tests for _resolve_table_names against real (non-Mock) benchmark shapes.
-
-    TPCH/SSB/CoffeeShop/TPCDS's ``get_table_loading_order`` requires an
-    ``available_tables`` argument (no default) -- a plain MagicMock hides a
-    call-with-no-args bug because it never enforces the signature, so these
-    fakes emulate the real required-arg contract instead.
-    """
-
     class _FakeBenchmarkWithOrdering:
         def get_available_tables(self):
             return ["lineitem", "orders", "customer"]
@@ -457,10 +411,7 @@ class TestSnowparkConnectAdapterResolveTableNames:
 
 
 class TestSnowparkConnectAdapterSchema:
-    """Tests for schema operations."""
-
     def test_create_schema_without_session_raises_error(self, mock_snowpark):
-        """Test that creating schema without session raises ConfigurationError."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -474,7 +425,6 @@ class TestSnowparkConnectAdapterSchema:
             adapter.create_schema(MagicMock(), None)
 
     def test_create_schema_success(self, mock_snowpark):
-        """Test successful schema creation."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -491,14 +441,12 @@ class TestSnowparkConnectAdapterSchema:
 
         elapsed = adapter.create_schema(MagicMock(), mock_session)
 
-        # Should create database and schema
         assert elapsed >= 0
         calls = mock_session.sql.call_args_list
         assert any("CREATE DATABASE IF NOT EXISTS" in str(call) for call in calls)
         assert any("CREATE SCHEMA IF NOT EXISTS" in str(call) for call in calls)
 
     def test_abc_method_signatures_match_platform_adapter(self, mock_snowpark):
-        """Snowpark Connect must preserve the PlatformAdapter call contract."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         for method_name in ("create_schema", "load_data", "execute_query"):
@@ -507,7 +455,6 @@ class TestSnowparkConnectAdapterSchema:
             )
 
     def test_load_data_uses_standard_contract(self, mock_snowpark, tmp_path):
-        """load_data should accept benchmark, connection, data_dir and return the standard tuple."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -535,10 +482,7 @@ class TestSnowparkConnectAdapterSchema:
 
 
 class TestSnowparkConnectAdapterCLI:
-    """Tests for CLI argument handling."""
-
     def test_add_cli_arguments(self, mock_snowpark):
-        """Test CLI arguments are added correctly."""
         import argparse
 
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
@@ -546,14 +490,12 @@ class TestSnowparkConnectAdapterCLI:
         parser = argparse.ArgumentParser()
         SnowparkConnectAdapter.add_cli_arguments(parser)
 
-        # Parse with some arguments
         args = parser.parse_args(["--account", "xy12345", "--user", "testuser"])
 
         assert args.account == "xy12345"
         assert args.user == "testuser"
 
     def test_from_config(self, mock_snowpark):
-        """Test adapter creation from config dict."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         config = {
@@ -576,7 +518,6 @@ class TestSnowparkConnectAdapterCLI:
         assert adapter.role == "MY_ROLE"
 
     def test_from_config_forwards_force_recreate(self, mock_snowpark):
-        """Production construction via from_config must preserve the flag."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         base = {
@@ -589,7 +530,6 @@ class TestSnowparkConnectAdapterCLI:
         assert SnowparkConnectAdapter.from_config(dict(base)).force_recreate is False
 
     def test_load_data_csv_truncates_before_copy_when_forced(self, mock_snowpark, tmp_path):
-        """Forced CSV loads must TRUNCATE before COPY so reruns stay idempotent."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -616,7 +556,6 @@ class TestSnowparkConnectAdapterCLI:
         assert truncate_idx < copy_idx
 
     def test_load_data_csv_full_refresh_by_default(self, mock_snowpark, tmp_path):
-        """Default CSV loads are full refreshes: hygiene plus truncate and FORCE."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -641,10 +580,7 @@ class TestSnowparkConnectAdapterCLI:
 
 
 class TestSnowparkConnectAdapterTuning:
-    """Tests for tuning configuration."""
-
     def test_configure_for_benchmark(self, mock_snowpark):
-        """Test benchmark configuration."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -660,16 +596,9 @@ class TestSnowparkConnectAdapterTuning:
         adapter.configure_for_benchmark(mock_session, "tpch")
 
         assert adapter._benchmark_type == "tpch"
-        # Should disable result cache
         mock_session.sql.assert_called_with("ALTER SESSION SET USE_CACHED_RESULT = FALSE")
 
     def test_configure_for_benchmark_hygiene_never_reaches_ledger(self, mock_snowpark):
-        """Benchmarking hygiene must not masquerade as applied tuning.
-
-        USE_CACHED_RESULT=FALSE runs on every benchmark run, tuned or not;
-        recording it would falsely report baseline runs as applied. With a
-        real ledger attached, the statement still leaves no trace.
-        """
         from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
@@ -690,10 +619,6 @@ class TestSnowparkConnectAdapterTuning:
         assert adapter._applied_tuning_ledger.is_empty()
 
     def test_apply_platform_optimizations_records_nothing(self, mock_snowpark):
-        """Snowpark has no tuning-derived session surface: nothing applies.
-
-        An empty platform config records no statements and no dropped
-        intents, and the run stays honestly noop."""
         from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
         from benchbox.core.tuning.interface import UnifiedTuningConfiguration
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
@@ -711,11 +636,6 @@ class TestSnowparkConnectAdapterTuning:
         assert adapter._applied_tuning_ledger.is_empty()
 
     def test_apply_platform_optimizations_records_dropped_intents(self, mock_snowpark):
-        """Requested optimizations are surfaced as dropped, never applied.
-
-        A Z-ordering request cannot map to a Snowflake session setting, so
-        it lands in the ledger's dropped intents with a reason instead of
-        silently vanishing or falsely reporting applied."""
         from benchbox.core.tuning.applied_ledger import AppliedTuningLedger
         from benchbox.core.tuning.interface import TuningType, UnifiedTuningConfiguration
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
@@ -736,10 +656,7 @@ class TestSnowparkConnectAdapterTuning:
 
 
 class TestSnowparkConnectAdapterConnectionParams:
-    """Tests for connection parameter building."""
-
     def test_build_connection_params_basic(self, mock_snowpark):
-        """Test basic connection parameter building."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -761,7 +678,6 @@ class TestSnowparkConnectAdapterConnectionParams:
         assert params["schema"] == "PUBLIC"
 
     def test_build_connection_params_with_role(self, mock_snowpark):
-        """Test connection parameters include role when specified."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(
@@ -776,7 +692,6 @@ class TestSnowparkConnectAdapterConnectionParams:
         assert params["role"] == "SYSADMIN"
 
     def test_build_connection_params_with_authenticator(self, mock_snowpark):
-        """Test connection parameters include authenticator when specified."""
         from benchbox.platforms.snowpark_connect import SnowparkConnectAdapter
 
         adapter = SnowparkConnectAdapter(

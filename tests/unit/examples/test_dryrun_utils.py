@@ -1,5 +1,3 @@
-"""Coverage-focused tests for shared dry-run utilities."""
-
 from __future__ import annotations
 
 from pathlib import Path

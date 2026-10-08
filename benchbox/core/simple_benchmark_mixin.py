@@ -1,12 +1,6 @@
-"""Shared mixin for simple benchmarks with common run_benchmark and _load_data patterns.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Extracts duplicated query-iteration and table-loading logic from AMPLab, ClickBench, and SSB
-benchmarks into a reusable mixin.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -23,27 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 class SimpleBenchmarkMixin:
-    """Mixin providing shared run_benchmark and _load_data for simple benchmarks.
-
-    Consuming classes must provide:
-    - ``_benchmark_label``: str - human-readable benchmark name for result dicts (e.g. "AMPLab")
-    - ``_table_load_order``: list[str] - ordered table names for _load_data
-    - ``query_manager`` with ``get_all_queries()`` returning dict[str, str]
-    - ``get_query(query_id, *, params=None)`` returning str
-    - ``execute_query(query_id, connection, params=None)`` returning results
-    - ``get_create_tables_sql()`` returning str
-    - ``tables``: dict[str, Any] - mapping of table name to data file path
-    - ``scale_factor``: float
-    - ``_get_table_schema()`` returning dict[str, dict] with "columns" key per table
-    """
-
     _benchmark_label: str
     _table_load_order: list[str]
     _REQUIRED_ATTRIBUTES = ("_benchmark_label", "_table_load_order")
     _REQUIRED_METHODS = ("get_query", "execute_query", "get_create_tables_sql", "_get_table_schema")
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
-        """Validate that concrete consumers provide the simple benchmark contract."""
         super().__init_subclass__(**kwargs)
         if cls.__name__.endswith(("Mixin", "Base")):
             return
@@ -65,16 +44,6 @@ class SimpleBenchmarkMixin:
             )
 
     def run_benchmark(self, connection: Any, queries: list[str] | None = None, iterations: int = 1) -> dict[str, Any]:
-        """Run the complete benchmark with shared query-iteration logic.
-
-        Args:
-            connection: Database connection to use
-            queries: Optional list of query IDs to run. If None, runs all.
-            iterations: Number of times to run each query
-
-        Returns:
-            Dictionary containing benchmark results with per-query timings
-        """
         if queries is None:
             queries = list(self.query_manager.get_all_queries().keys())
 
@@ -123,7 +92,6 @@ class SimpleBenchmarkMixin:
                         }
                     )
 
-            # Calculate average time for successful iterations
             iterations_list: list[dict[str, Any]] = query_results["iterations"]
             successful_iterations = [iter_result for iter_result in iterations_list if iter_result["success"]]
             if successful_iterations:
@@ -139,18 +107,6 @@ class SimpleBenchmarkMixin:
         return results
 
     def _load_data(self, connection: DatabaseConnection) -> None:
-        """Load benchmark data into the database.
-
-        Creates the schema, then loads each table in ``_table_load_order`` from
-        generated CSV files using INSERT statements.
-
-        Args:
-            connection: DatabaseConnection wrapper for database operations
-
-        Raises:
-            ValueError: If data hasn't been generated yet
-            Exception: If data loading fails
-        """
         label = self._benchmark_label
 
         if not self.tables:
@@ -158,7 +114,6 @@ class SimpleBenchmarkMixin:
 
         logger.info("Loading %s data into database...", label)
 
-        # Create database schema first
         try:
             schema_sql = self.get_create_tables_sql()
             if ";" in schema_sql:
@@ -206,16 +161,6 @@ class SimpleBenchmarkMixin:
             raise
 
     def _load_table_data(self, connection: DatabaseConnection, table_name: str, data_file: Path) -> int:
-        """Load data into a database table using simple INSERT statements.
-
-        Args:
-            connection: DatabaseConnection wrapper
-            table_name: Name of the table to load data into
-            data_file: Path to the data file
-
-        Returns:
-            Number of rows loaded
-        """
         table_schema = self._get_table_schema()[table_name]
         num_columns = len(table_schema["columns"])
 
@@ -229,7 +174,7 @@ class SimpleBenchmarkMixin:
 
             for row in reader:
                 if len(row) != num_columns:
-                    continue  # Skip malformed rows
+                    continue
 
                 connection.execute(insert_sql, row)
                 rows_loaded += 1

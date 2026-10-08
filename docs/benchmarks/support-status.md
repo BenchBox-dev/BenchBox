@@ -80,16 +80,3 @@ integrity spec, query count, dataset/source, scales, and DataFrame capability.
 | `tpch_skew` | `experimental` | 22-query TPC-H over skewed distributions; generated; integrity spec; docs; DataFrame-capable. | Non-canonical skew parameters; research workload. |
 | `datavault` | `experimental` | 22-query Data Vault 2.0 variant; generated from TPC-H source; integrity spec; docs; DataFrame-capable. | Modeling-variant research; still on the deprecated core base. |
 | `joinorder_synthetic` | `repo_only` | 113-query synthetic Join Order scaling harness (canonical JOB surface, verbatim); `surface: internal`; no integrity spec; DataFrame-capable; runnable by explicit ID only. | Public/beta promotion would need user docs, an integrity spec, and a separate `surface` decision — out of scope for this matrix. |
-
-## Promotion Candidates and Blockers
-
-Recorded as explicit follow-up work rather than reviewer memory. None of these
-are applied here: this matrix documents status, it does not change it.
-
-- **External-dataset betas (`nyctaxi`, `flightdata`):** promotion is gated on a
-  complete set of reviewed SHA-256 pins for the default external corpus, not
-  on query coverage. Until those maps are populated, generated corpora record
-  observed hashes but remain ineligible for stable promotion.
-- **Experimental families (`tpcds_obt`, `datavault`):** they now inherit
-  `benchbox.base.BaseBenchmark`. Reassess promotion on their own evidence, not
-  on the deprecated internal-base migration.

@@ -1,36 +1,6 @@
-"""ClickHouse post-load schema introspector.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Reads the structured ``system.tables`` catalog (``sorting_key`` /
-``partition_key`` columns) for the tables the applied-tuning ledger touched
-and surfaces them as receipt evidence (TODO
-``tuning-introspection-receipts-20260716`` / design note
-``docs/development/tuning-introspection-receipts.md``).
-
-Bounded (one query, capped, scoped to ``currentDatabase()`` and the ledger's
-tables) and non-fatal (any failure returns an :class:`IntrospectedState` with
-``error`` set). Uses structured catalog columns, never ``SHOW CREATE TABLE``
-DDL text.
-
-ClickHouse applies ``ORDER BY`` / ``PARTITION BY`` at ``CREATE TABLE`` time in
-the schema phase, which is not wrapped by the tuning recording connection. A
-*tuned* ``CREATE TABLE`` is therefore recorded into the applied ledger
-explicitly by ``create_schema`` (``_record_tuned_sort_key_op`` records the
-executed statement as a ``PHASE_DDL`` statement at execute time), so this
-introspector's ``sorting_key`` read can corroborate that recorded intent and
-earn ``applied_verified``. When the tuned DDL also rendered a ``PARTITION BY``,
-the ``partition_key`` read must corroborate too -- both clauses are classified
-independently, so an unapplied partition key keeps the run unverified. The
-*engine-mandatory baseline* ``ORDER BY``
-(primary-key derived or ``tuple()``) is not tuning and is deliberately NOT
-recorded -- a MergeTree table's ``sorting_key`` is always present, so
-corroborating it against nothing would be an unearned upgrade. The ledger's
-other ClickHouse tuning entries remain ``OPTIMIZE TABLE`` (maintenance,
-non-blocking) and session SETs.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -50,22 +20,13 @@ from benchbox.core.tuning.introspection import (
 
 logger = logging.getLogger(__name__)
 
-#: Hard cap on catalog rows read.
 _MAX_TABLE_ROWS = 1000
 
 
 class ClickHouseTuningIntrospector:
-    """Introspect ClickHouse ``system.tables`` keys to corroborate the ledger."""
-
     platform = "clickhouse"
 
     def introspect(self, connection: Any, ledger: AppliedTuningLedger) -> IntrospectedState:
-        """Read ``sorting_key`` / ``partition_key`` from ``system.tables``.
-
-        Returns ``sort_key`` / ``partition_key`` facts for the ledger's tables.
-        Never raises: a failed catalog read degrades to a state carrying
-        ``error``.
-        """
         tables = ledger_tables(ledger)
         try:
             result = connection.execute(
@@ -73,7 +34,7 @@ class ClickHouseTuningIntrospector:
                 f"WHERE database = currentDatabase() LIMIT {_MAX_TABLE_ROWS}"
             )
             rows = list(result) if result is not None else []
-        except Exception as exc:  # introspection must never break a run
+        except Exception as exc:
             logger.debug("clickhouse table introspection degraded: %s", exc)
             return IntrospectedState(platform=self.platform, error=f"system.tables read failed: {exc}")
 
@@ -83,7 +44,7 @@ class ClickHouseTuningIntrospector:
         for row in relevant_rows:
             try:
                 name, sorting_key, partition_key = row[0], row[1], row[2]
-            except Exception:  # pragma: no cover - defensive on row shape
+            except Exception:  # pragma: no cover
                 continue
             if sorting_key:
                 objects.append(

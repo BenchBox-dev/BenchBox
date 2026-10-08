@@ -58,9 +58,9 @@ rather than compete.
 
 ### What stays exactly as-is
 
-All required fields, all guardrail fields, all context fields:
+The following is a field-name inventory, not a serialized task record:
 
-```yaml
+```text
 # Required
 title, worktree, priority, status, description
 
@@ -81,7 +81,7 @@ nothing equivalent. This is your competitive advantage - keep it.
 **1. Add stable `id` field (required)**
 
 ```yaml
-id: motherduck-platform-adapter   # matches filename slug
+id: motherduck-platform-adapter
 ```
 
 Every item gets a stable identifier that matches its filename slug.
@@ -93,9 +93,10 @@ doesn't break references).
 
 ```yaml
 deps:
-  needs: ["fix-dataframe-parameter-parity"]   # I can't start until these are done
+  needs: ["fix-dataframe-parameter-parity"]
 ```
 
+- `needs` lists the items this one cannot start until they are done
 - Uses slugs (stable IDs), not file paths
 - Single source of truth: store only inbound `needs`
 - Reverse edges (`blocks`) are computed by CLI/index generation, never authored
@@ -233,7 +234,6 @@ Agent picks up `motherduck-platform-adapter`. YAML has `w3` ready and
 `w4` blocked (w1, w2 are done; w4 still needs w3).
 
 ```python
-# Agent creates TodoWrite tasks:
 TodoWrite([
     {"content": "Handle md: connection string syntax (w3)",
      "activeForm": "Implementing md: connection string handling",
@@ -243,6 +243,8 @@ TodoWrite([
      "status": "pending"},
 ])
 ```
+
+The agent creates these TodoWrite tasks from the YAML work units.
 
 Agent completes w3, updates YAML (`w3.status: done`), marks w3 completed
 in TodoWrite, moves w4 to in_progress. This is the natural rhythm
@@ -333,10 +335,9 @@ Marks a work unit complete and auto-cascades:
 
 ```bash
 $ uv run _project/scripts/todo_cli.py done motherduck-platform-adapter w3
-# Updates w3.status=done in YAML
-# Reports: w4 is now ready (all deps satisfied)
-# If all work units done: prompts to complete the TODO item
 ```
+
+The command updates `w3.status` to `done` in the YAML and reports that w4 is now ready (all its dependencies are satisfied). If all work units are done, it prompts to complete the TODO item.
 
 ### CLI: `todo_cli.py check-graph`
 
@@ -355,14 +356,14 @@ $ uv run _project/scripts/todo_cli.py check-graph
 
 ### New fields in TODO_SCHEMA.yaml
 
+The `id` field is added to the required fields. The `work` field replaces `tasks`. The `deferred` list is new. The `deps` field replaces `dependencies`.
+
 ```yaml
-# Add to required fields
 id:
   type: string
   pattern: "^[a-z0-9][a-z0-9-]*[a-z0-9]$"
   description: "Stable identifier matching filename slug"
 
-# Replace 'tasks' with 'work'
 work:
   type: array
   items:
@@ -386,7 +387,6 @@ work:
       notes:
         type: string
 
-# New deferred list
 deferred:
   type: array
   items:
@@ -398,7 +398,6 @@ deferred:
       reason:
         type: string
 
-# Replace 'dependencies' with 'deps'
 deps:
   type: object
   properties:
@@ -603,9 +602,11 @@ ready_items:
 blocked_items:
   - id: implement-dataframe-benchmarks
     priority: Medium
-    blocked_by: ["fix-dataframe-parameter-parity"]  # derived from deps.needs
+    blocked_by: ["fix-dataframe-parameter-parity"]
     reason: "1 unresolved dependency"
 ```
+
+`blocked_by` is derived from `deps.needs`.
 
 This is the index agents read first. Instead of loading `by-priority`
 and mentally filtering, they get a pre-computed action list.

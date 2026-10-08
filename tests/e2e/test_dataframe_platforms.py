@@ -1,9 +1,3 @@
-"""End-to-end tests for DataFrame platforms.
-
-Tests execute the benchbox CLI against DataFrame platforms (Pandas, Polars,
-Dask, PySpark) and validate result output files.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,19 +14,11 @@ from tests.integration._cli_e2e_utils import run_cli_command
 pytestmark = pytest.mark.slow
 
 
-# ============================================================================
-# Pandas DataFrame E2E Tests
-# ============================================================================
-
-
 class TestPandasDataFrameE2E:
-    """E2E tests for Pandas DataFrame platform."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_dataframe
     @pytest.mark.e2e_quick
     def test_tpch_full_execution(self, tmp_path: Path) -> None:
-        """Test full TPC-H benchmark execution with Pandas DataFrame at SF 0.01."""
         if not is_dataframe_available("pandas-df"):
             pytest.skip("Pandas not available")
 
@@ -48,13 +34,10 @@ class TestPandasDataFrameE2E:
 
 
 class TestPolarsDataFrameE2E:
-    """E2E tests for Polars DataFrame platform."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_dataframe
     @pytest.mark.e2e_quick
     def test_tpch_full_execution(self, tmp_path: Path) -> None:
-        """Test full TPC-H benchmark execution with Polars DataFrame at SF 0.01."""
         if not is_dataframe_available("polars-df"):
             pytest.skip("Polars not available")
 
@@ -70,14 +53,11 @@ class TestPolarsDataFrameE2E:
 
 
 class TestDaskDataFrameE2E:
-    """E2E tests for Dask DataFrame platform."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_dataframe
     @pytest.mark.slow
     @pytest.mark.stress
     def test_tpch_full_execution(self, tmp_path: Path) -> None:
-        """Test full TPC-H benchmark execution with Dask DataFrame at SF 0.01."""
         if not is_dataframe_available("dask-df"):
             pytest.skip("Dask not available")
 
@@ -95,7 +75,6 @@ class TestDaskDataFrameE2E:
     @pytest.mark.e2e_dataframe
     @pytest.mark.e2e_quick
     def test_dry_run_generates_artifacts(self, tmp_path: Path) -> None:
-        """Test dry-run mode generates expected artifacts."""
         if not is_dataframe_available("dask-df"):
             pytest.skip("Dask not available")
 
@@ -120,20 +99,12 @@ class TestDaskDataFrameE2E:
         assert "Dry run completed" in result.stdout
 
 
-# ============================================================================
-# PySpark DataFrame E2E Tests
-# ============================================================================
-
-
 class TestPySparkDataFrameE2E:
-    """E2E tests for PySpark DataFrame platform."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_dataframe
     @pytest.mark.slow
     @pytest.mark.stress
     def test_tpch_full_execution(self, tmp_path: Path) -> None:
-        """Test full TPC-H benchmark execution with PySpark DataFrame at SF 0.01."""
         if not is_dataframe_available("pyspark-df"):
             pytest.skip("PySpark not available")
 
@@ -145,14 +116,12 @@ class TestPySparkDataFrameE2E:
 
         result = run_benchmark(config, timeout=E2E_BENCHMARK_TIMEOUT)
 
-        # PySpark may have longer startup time
         assert result.returncode == 0, f"CLI failed with:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
     @pytest.mark.e2e
     @pytest.mark.e2e_dataframe
     @pytest.mark.e2e_quick
     def test_dry_run_generates_artifacts(self, tmp_path: Path) -> None:
-        """Test dry-run mode generates expected artifacts."""
         if not is_dataframe_available("pyspark-df"):
             pytest.skip("PySpark not available")
 
@@ -177,20 +146,12 @@ class TestPySparkDataFrameE2E:
         assert "Dry run completed" in result.stdout
 
 
-# ============================================================================
-# cuDF DataFrame E2E Tests (GPU)
-# ============================================================================
-
-
 class TestCuDFDataFrameE2E:
-    """E2E tests for cuDF DataFrame platform (GPU)."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_dataframe
     @pytest.mark.slow
     @pytest.mark.stress
     def test_tpch_full_execution(self, tmp_path: Path) -> None:
-        """Test full TPC-H benchmark execution with cuDF DataFrame at SF 0.01."""
         if not is_gpu_available():
             pytest.skip("NVIDIA GPU with CUDA not available")
         if not is_dataframe_available("cudf-df"):
@@ -210,7 +171,6 @@ class TestCuDFDataFrameE2E:
     @pytest.mark.e2e_dataframe
     @pytest.mark.e2e_quick
     def test_dry_run_generates_artifacts(self, tmp_path: Path) -> None:
-        """Test dry-run mode generates expected artifacts."""
         if not is_gpu_available():
             pytest.skip("NVIDIA GPU with CUDA not available")
         if not is_dataframe_available("cudf-df"):
@@ -237,19 +197,11 @@ class TestCuDFDataFrameE2E:
         assert "Dry run completed" in result.stdout
 
 
-# ============================================================================
-# DataFusion DataFrame E2E Tests
-# ============================================================================
-
-
 class TestDataFusionDataFrameE2E:
-    """E2E tests for DataFusion DataFrame platform."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_dataframe
     @pytest.mark.slow
     def test_tpch_full_execution(self, tmp_path: Path) -> None:
-        """Test full TPC-H benchmark execution with DataFusion DataFrame at SF 0.01."""
         if not is_dataframe_available("datafusion-df"):
             pytest.skip("DataFusion not available")
 
@@ -264,11 +216,6 @@ class TestDataFusionDataFrameE2E:
         assert result.returncode == 0, f"CLI failed with:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
 
-# ============================================================================
-# Parametrized DataFrame Platform Tests
-# ============================================================================
-
-
 @pytest.mark.e2e
 @pytest.mark.e2e_dataframe
 @pytest.mark.e2e_quick
@@ -280,7 +227,6 @@ class TestDataFusionDataFrameE2E:
     ],
 )
 def test_dataframe_platform_dry_run(tmp_path: Path, platform: str) -> None:
-    """Test dry-run mode works for DataFrame platforms with available dependencies."""
     if not is_dataframe_available(platform):
         pytest.skip(f"{platform} not available")
 
@@ -304,7 +250,6 @@ def test_dataframe_platform_dry_run(tmp_path: Path, platform: str) -> None:
     assert result.returncode == 0, f"Dry run failed for {platform}: {result.stdout}"
     assert "Dry run completed" in result.stdout
 
-    # Verify artifacts exist
     artifacts = list(output_dir.glob("*"))
     assert artifacts, f"No artifacts generated for {platform}"
 
@@ -320,7 +265,6 @@ def test_dataframe_platform_dry_run(tmp_path: Path, platform: str) -> None:
     ],
 )
 def test_dataframe_platform_query_subset(tmp_path: Path, platform: str) -> None:
-    """Test DataFrame platforms with query subset."""
     if not is_dataframe_available(platform):
         pytest.skip(f"{platform} not available")
 
@@ -336,25 +280,16 @@ def test_dataframe_platform_query_subset(tmp_path: Path, platform: str) -> None:
     assert result.returncode == 0, f"CLI failed for {platform}: {result.stdout}"
 
 
-# ============================================================================
-# Cross-DataFrame Comparison Tests
-# ============================================================================
-
-
 class TestCrossDataFrameE2E:
-    """E2E tests comparing results across DataFrame platforms."""
-
     @pytest.mark.e2e
     @pytest.mark.e2e_dataframe
     @pytest.mark.slow
     def test_pandas_polars_same_results(self, tmp_path: Path) -> None:
-        """Test that Pandas and Polars produce comparable results for TPC-H Q1."""
         if not is_dataframe_available("pandas-df"):
             pytest.skip("Pandas not available")
         if not is_dataframe_available("polars-df"):
             pytest.skip("Polars not available")
 
-        # Run Pandas
         pandas_config = {
             "platform": "pandas-df",
             "benchmark": "tpch",
@@ -364,7 +299,6 @@ class TestCrossDataFrameE2E:
         pandas_result = run_benchmark(pandas_config, timeout=300)
         assert pandas_result.returncode == 0, f"Pandas failed: {pandas_result.stdout}"
 
-        # Run Polars
         polars_config = {
             "platform": "polars-df",
             "benchmark": "tpch",
@@ -373,5 +307,3 @@ class TestCrossDataFrameE2E:
         }
         polars_result = run_benchmark(polars_config, timeout=300)
         assert polars_result.returncode == 0, f"Polars failed: {polars_result.stdout}"
-
-        # Both should complete successfully

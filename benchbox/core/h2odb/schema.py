@@ -1,5 +1,3 @@
-"""H2O DB benchmark schema definitions."""
-
 from pathlib import Path
 from typing import Any, cast
 
@@ -25,20 +23,7 @@ def get_create_table_sql(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True,
 ) -> str:
-    """Generate CREATE TABLE SQL for a given table.
 
-    Args:
-        table_name: Name of the table to create
-        dialect: SQL dialect to use (standard, postgres, mysql, etc.)
-        enable_primary_keys: Whether to include primary key constraints
-        enable_foreign_keys: Whether to include foreign key constraints
-
-    Returns:
-        CREATE TABLE SQL statement
-
-    Raises:
-        ValueError: If table_name is not valid
-    """
     if table_name not in TABLES:
         raise ValueError(f"Unknown table: {table_name}")
 
@@ -63,16 +48,7 @@ def get_all_create_table_sql(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True,
 ) -> str:
-    """Generate CREATE TABLE SQL for all H2O DB tables.
 
-    Args:
-        dialect: SQL dialect to use
-        enable_primary_keys: Whether to include primary key constraints
-        enable_foreign_keys: Whether to include foreign key constraints
-
-    Returns:
-        Complete SQL schema creation script
-    """
     sql_statements = []
     for table_name in _TABLE_ORDER:
         sql_statements.append(get_create_table_sql(table_name, dialect, enable_primary_keys, enable_foreign_keys))

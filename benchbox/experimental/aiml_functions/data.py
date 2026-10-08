@@ -1,9 +1,6 @@
-"""Sample data generation for AI/ML function benchmarks.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -16,8 +13,6 @@ from typing import Any
 
 @dataclass
 class SampleText:
-    """A sample text for AI/ML function testing."""
-
     id: int
     text_content: str
     category: str
@@ -28,8 +23,6 @@ class SampleText:
 
 @dataclass
 class LongText:
-    """A longer text for summarization testing."""
-
     id: int
     long_text: str
     topic: str
@@ -37,9 +30,6 @@ class LongText:
 
 
 class AIMLDataGenerator:
-    """Generator for AI/ML function benchmark sample data."""
-
-    # Sample review texts with known sentiments
     POSITIVE_TEXTS = [
         "This product exceeded all my expectations! The quality is outstanding and delivery was super fast.",
         "Absolutely love this service. Customer support was incredibly helpful and resolved my issue immediately.",
@@ -79,7 +69,6 @@ class AIMLDataGenerator:
         "Acceptable quality for the price. No complaints but no particular praise either.",
     ]
 
-    # Category-specific texts for classification testing
     CATEGORY_TEXTS = {
         "Technology": [
             "The new AI chip delivers unprecedented performance gains for machine learning workloads.",
@@ -118,7 +107,6 @@ class AIMLDataGenerator:
         ],
     }
 
-    # Long texts for summarization testing
     LONG_TEXT_TEMPLATES = [
         """The evolution of artificial intelligence in enterprise applications has fundamentally transformed how organizations approach business operations and decision-making. Over the past decade, we have witnessed a remarkable shift from theoretical discussions about AI capabilities to practical implementations that deliver measurable value across industries.
 
@@ -155,24 +143,15 @@ However, technology alone cannot solve education's challenges. Effective impleme
         num_samples: int = 100,
         num_long_texts: int = 20,
     ) -> None:
-        """Initialize the data generator.
-
-        Args:
-            seed: Random seed for reproducibility
-            num_samples: Number of sample texts to generate
-            num_long_texts: Number of long texts to generate
-        """
         self.seed = seed
         self.num_samples = num_samples
         self.num_long_texts = num_long_texts
         random.seed(seed)
 
     def generate_sample_data(self) -> list[SampleText]:
-        """Generate sample text data for benchmarking."""
         samples: list[SampleText] = []
         sample_id = 1
 
-        # Generate positive samples
         for text in self.POSITIVE_TEXTS:
             samples.append(
                 SampleText(
@@ -185,7 +164,6 @@ However, technology alone cannot solve education's challenges. Effective impleme
             )
             sample_id += 1
 
-        # Generate negative samples
         for text in self.NEGATIVE_TEXTS:
             samples.append(
                 SampleText(
@@ -198,7 +176,6 @@ However, technology alone cannot solve education's challenges. Effective impleme
             )
             sample_id += 1
 
-        # Generate neutral samples
         for text in self.NEUTRAL_TEXTS:
             samples.append(
                 SampleText(
@@ -211,7 +188,6 @@ However, technology alone cannot solve education's challenges. Effective impleme
             )
             sample_id += 1
 
-        # Generate category-specific samples
         for category, texts in self.CATEGORY_TEXTS.items():
             for text in texts:
                 samples.append(
@@ -225,11 +201,9 @@ However, technology alone cannot solve education's challenges. Effective impleme
                 )
                 sample_id += 1
 
-        # Generate additional samples by combining
         while len(samples) < self.num_samples:
             base_samples = list(samples)
             sample = random.choice(base_samples)
-            # Create variation
             variation = f"{sample.text_content} This is important to note."
             samples.append(
                 SampleText(
@@ -245,7 +219,6 @@ However, technology alone cannot solve education's challenges. Effective impleme
         return samples[: self.num_samples]
 
     def generate_long_texts(self) -> list[LongText]:
-        """Generate long text data for summarization benchmarking."""
         texts: list[LongText] = []
         topics = [
             "Artificial Intelligence",
@@ -263,12 +236,10 @@ However, technology alone cannot solve education's challenges. Effective impleme
                 )
             )
 
-        # Generate variations
         text_id = len(texts) + 1
         while len(texts) < self.num_long_texts:
             base = random.choice(self.LONG_TEXT_TEMPLATES)
             topic = random.choice(topics)
-            # Simple variation: add paragraph break
             variation = base.replace("\n\n", "\n\nFurthermore, ")
             texts.append(
                 LongText(
@@ -283,20 +254,11 @@ However, technology alone cannot solve education's challenges. Effective impleme
         return texts[: self.num_long_texts]
 
     def generate_csv(self, output_path: Path) -> dict[str, Path]:
-        """Generate CSV files for sample data.
-
-        Args:
-            output_path: Directory to write CSV files
-
-        Returns:
-            Dictionary mapping table names to file paths
-        """
         import csv
 
         output_path.mkdir(parents=True, exist_ok=True)
         files: dict[str, Path] = {}
 
-        # Generate sample data CSV
         sample_file = output_path / "aiml_sample_data.csv"
         samples = self.generate_sample_data()
         with open(sample_file, "w", newline="", encoding="utf-8") as f:
@@ -317,7 +279,6 @@ However, technology alone cannot solve education's challenges. Effective impleme
                 )
         files["aiml_sample_data"] = sample_file
 
-        # Generate long texts CSV
         long_file = output_path / "aiml_long_texts.csv"
         long_texts = self.generate_long_texts()
         with open(long_file, "w", newline="", encoding="utf-8") as f:
@@ -337,14 +298,6 @@ However, technology alone cannot solve education's challenges. Effective impleme
         return files
 
     def get_create_table_sql(self, platform: str = "snowflake") -> dict[str, str]:
-        """Get CREATE TABLE statements for each platform.
-
-        Args:
-            platform: Target platform (snowflake, bigquery, databricks)
-
-        Returns:
-            Dictionary mapping table names to CREATE TABLE statements
-        """
         statements: dict[str, str] = {}
 
         if platform.lower() == "snowflake":
@@ -405,7 +358,6 @@ CREATE OR REPLACE TABLE aiml_long_texts (
 )
 """
         else:
-            # Generic SQL
             statements["aiml_sample_data"] = """
 CREATE TABLE IF NOT EXISTS aiml_sample_data (
     id INTEGER,
@@ -428,21 +380,11 @@ CREATE TABLE IF NOT EXISTS aiml_long_texts (
         return statements
 
     def get_insert_sql(self, platform: str = "snowflake") -> list[str]:
-        """Generate INSERT statements for sample data.
-
-        Args:
-            platform: Target platform
-
-        Returns:
-            List of INSERT SQL statements
-        """
         statements: list[str] = []
         samples = self.generate_sample_data()
         long_texts = self.generate_long_texts()
 
-        # Batch inserts
         if platform.lower() in ("snowflake", "databricks"):
-            # Insert sample data
             values = []
             for s in samples:
                 text_escaped = s.text_content.replace("'", "''")
@@ -454,7 +396,6 @@ CREATE TABLE IF NOT EXISTS aiml_long_texts (
                 + ",\n".join(values)
             )
 
-            # Insert long texts
             values = []
             for t in long_texts:
                 text_escaped = t.long_text.replace("'", "''")
@@ -464,7 +405,6 @@ CREATE TABLE IF NOT EXISTS aiml_long_texts (
             )
 
         elif platform.lower() == "bigquery":
-            # BigQuery uses different INSERT syntax
             values = []
             for s in samples:
                 text_escaped = s.text_content.replace("'", "\\'")
@@ -487,7 +427,6 @@ CREATE TABLE IF NOT EXISTS aiml_long_texts (
         return statements
 
     def get_manifest(self) -> dict[str, Any]:
-        """Generate a manifest describing the generated data."""
         samples = self.generate_sample_data()
         long_texts = self.generate_long_texts()
 

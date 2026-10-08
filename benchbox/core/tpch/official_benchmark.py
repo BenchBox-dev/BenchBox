@@ -1,17 +1,3 @@
-"""TPC-H Official Benchmark Implementation.
-
-This module provides the official TPC-H benchmark implementation that follows
-the TPC-H specification exactly, including all three test phases (Power Test,
-Throughput Test, and Maintenance Test) with Power@Size and Throughput@Size.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ H (TPC-H) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-H specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 import contextlib
 from dataclasses import dataclass
 from datetime import datetime
@@ -36,8 +22,6 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 
 @dataclass
 class TPCHOfficialBenchmarkConfig:
-    """Configuration for TPC-H Official Benchmark."""
-
     scale_factor: float = 1.0
     num_streams: int = 2
     seed: Optional[int] = None
@@ -52,8 +36,6 @@ class TPCHOfficialBenchmarkConfig:
 
 @dataclass
 class TPCHOfficialBenchmarkResult:
-    """Result of TPC-H Official Benchmark."""
-
     config: TPCHOfficialBenchmarkConfig
     start_time: str
     end_time: str
@@ -77,8 +59,6 @@ def _close_quietly(connection: Any) -> None:
 
 
 class TPCHOfficialBenchmark:
-    """TPC-H Official Benchmark implementation following TPC-H specification."""
-
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -86,17 +66,6 @@ class TPCHOfficialBenchmark:
         verbose: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Initialize TPC-H Official Benchmark.
-
-        Args:
-            scale_factor: Scale factor for the benchmark (1.0 = ~1GB)
-            output_dir: Directory for benchmark results and audit trail
-            verbose: Enable verbose logging
-            **kwargs: Additional benchmark configuration options
-        """
-        # The wrapper's contract is official runs: default official=True for the
-        # inner benchmark (mirrors TPCDSOfficialBenchmark) so an SF=1
-        # official-wrapper run classifies as official, not UNOFFICIAL_NONSTANDARD.
         benchmark_kwargs = dict(kwargs)
         benchmark_kwargs.setdefault("official", True)
         self.benchmark = TPCHBenchmark(
@@ -118,23 +87,6 @@ class TPCHOfficialBenchmark:
         adapter: Any = None,
         _warn_deprecated: bool = True,
     ) -> TPCHOfficialBenchmarkResult:
-        """Run the complete TPC-H Official Benchmark.
-
-        This method executes all three phases of the TPC-H benchmark according
-        to the official specification and reports Power@Size and Throughput@Size.
-        The composite QphH@Size is not computed because the refresh functions are not run.
-
-        Args:
-            connection_factory: Factory function to create database connections
-            config: Optional benchmark configuration (uses default if not provided)
-
-        Returns:
-            Complete benchmark results
-
-        Raises:
-            RuntimeError: If benchmark execution fails
-            ValueError: If configuration is invalid
-        """
         if config is None:
             config = self.config
 
@@ -247,22 +199,12 @@ class TPCHOfficialBenchmark:
             return result
 
     def validate_compliance(self, result: TPCHOfficialBenchmarkResult) -> bool:
-        """Validate benchmark results against TPC-H specification.
-
-        Args:
-            result: Benchmark results to validate
-
-        Returns:
-            True if compliant with TPC-H specification, False otherwise
-        """
-        # Basic compliance checks
         if not result.success:
             return False
 
         if result.power_at_size <= 0 or result.throughput_at_size <= 0:
             return False
 
-        # Additional specification compliance checks would go here
         return True
 
     def generate_audit_trail(
@@ -270,15 +212,6 @@ class TPCHOfficialBenchmark:
         result: TPCHOfficialBenchmarkResult,
         output_file: Optional[Union[str, Path]] = None,
     ) -> Path:
-        """Generate audit trail for TPC-H certification.
-
-        Args:
-            result: Benchmark results to document
-            output_file: Optional output file path
-
-        Returns:
-            Path to generated audit trail file
-        """
         return generate_official_benchmark_audit_trail(
             result=result,
             benchmark_title="TPC-H",

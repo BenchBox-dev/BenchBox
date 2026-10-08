@@ -46,14 +46,11 @@ When you add a new guard step to the `lint` job in `ci.yml`:
 
 ## Report-all: one CI cycle, every guard's result
 
-The `lint` job runs around fifteen independent guards. Historically the
-job stopped at the first failing step, so a PR that tripped two unrelated
-guards paid one full CI round trip per guard, discovered one at a time.
-Every guard step now sets `continue-on-error: true` so a failure doesn't
-stop the job -- every guard still runs, and each one's own pass/fail is
-still visible as its own step in the Actions UI with its own log and
-timing. What changes is that the *job's* overall result no longer
-silently skips the guards after the first failure.
+The `lint` job runs around fifteen independent guards. Every guard step sets
+`continue-on-error: true` so a failure doesn't stop the job: every guard
+still runs, and each one's pass/fail is visible as its own step in the
+Actions UI with its own log and timing. A PR that trips two unrelated guards
+learns about both in one CI run.
 
 **Naming convention (this is what the aggregation is keyed on, not a
 hand-maintained list):** every independent guard step's `id:` starts with
@@ -72,10 +69,8 @@ would show `success` for every failed-but-continued guard and defeat the
 whole point). It writes a pass/fail table to `$GITHUB_STEP_SUMMARY` and
 exits nonzero if any guard's `outcome` was `failure`. Because
 `lint-guard-summary` itself has no `continue-on-error`, that nonzero exit
-makes the `code-lint` job's own result `failure` -- so the `core` unit
-(which requires `code-lint`) still blocks the merge exactly
-as before. Nothing here softens the gate; it only changes *when* you find
-out a second guard also failed.
+makes the `code-lint` job's own result `failure`. Nothing here softens the
+check; it only changes *when* you find out a second guard also failed.
 
 Deriving the guard set from the `guard-` id prefix (rather than hand-listing
 step ids in the aggregator) is deliberate: a new guard added without the
@@ -96,9 +91,8 @@ into a `$$failed` list instead of `make` aborting at the first nonzero
 exit, then printing a consolidated `❌ FAILED guards:` list and exiting
 nonzero if the list is non-empty. Guard output still streams live as each
 guard runs -- nothing is buffered or captured, only the exit code is
-checked after each command -- so `make ci-lint`'s console output looks the
-same as before, just with the run continuing past a failure instead of
-stopping. Because the `ci-lint` recipe body is now one logical shell line,
+checked after each command. Because the `ci-lint` recipe body is one
+logical shell line,
 the parity test's line-matching normalizes away each guard command's
 trailing `; \` continuation marker before comparing it against the `ci.yml`
 command text -- see `_normalize_recipe_lines` in
@@ -110,184 +104,65 @@ weaken the CI guard itself so a lossier local equivalent can "pass."
 
 ## Guards `ci-lint` skips when it runs on a CI runner itself
 
-Everything above is about the direction "a `ci.yml` guard must also run
-locally." There is a second, separate direction: `make ci-lint` may itself
-run on a real, ephemeral GitHub-hosted runner. The trunk workflow invokes its
-own test and artifact jobs rather than `make ci-lint`; the guard below keeps
-the recipe safe when another hosted workflow invokes it. Most `ci-lint`
+`make ci-lint` may itself run on an ephemeral GitHub-hosted runner. Most
 guards are equally meaningful there, because they inspect the checked-out
-tree, the installed venv, or a registry the repo ships -- none of which
-differ between a laptop and a runner. A couple of guards instead read state
-that only exists on a developer machine, and behave one of two bad ways on a
-runner that lacks it:
+tree, the installed venv, or a registry the repo ships. A couple of guards
+instead read state that only exists on a developer machine, and on a runner
+would either fail for a reason unrelated to the code or pass while checking
+nothing:
 
-- **Fail for a reason that has nothing to do with the code under test.**
-  `agent-identity-check` did exactly this before #1558/#1509: it resolves
-  `git config user.*`, an ephemeral runner has none, and the check treated
-  "no identity" as a hard failure -- reddening every post-merge run for an
-  environment fact, not a defect.
-- **Silently no-op and report success while checking nothing.** This is the
-  more dangerous failure mode: a guard that cannot fail reads as coverage in
-  the Actions log and is never investigated. The old `skill-sync-check` did
-  this before the rsync migration -- it shelled out to `$(SKILL_SYNC)`, a
-  local absolute developer path that plainly did not exist on a runner, hit
-  its own "not installed; skipping" branch, and exited 0. The migrated
-  `skill-sync-check` fails closed instead (a missing wrapper is exit 1), and
-  stays in this table only because `check` needs the developer-local source
-  checkouts that no runner has.
+- `agent-identity-check` resolves `git config user.*`, which an ephemeral
+  runner does not have. `agent-commit-range-check`, which reads the commits a
+  branch actually carries, is the merge-time control and always runs, both in
+  `ci-lint` and in `ci.yml`.
+- `skill-sync-check` needs developer-local skill source checkouts. Its CI
+  coverage comes from `ci.yml`'s `skill-integrity` job, which clones the
+  sources and runs the full preview/apply/verify/check cycle.
 
-`_project/scripts/ci_lint_environment_gate.py` is the single place that
-draws this boundary: a small, declarative `RUNNER_INAPPLICABLE_GUARDS` table
-mapping a guard slug to why it cannot produce a meaningful result on
-`GITHUB_ACTIONS=true`. The `ci-lint` recipe calls it immediately before each
-listed guard and skips only on the exact stdout token `SKIP`:
+The `ci-lint` recipe calls a small gate script before each of these guards
+and skips the guard only when the script prints the exact token `SKIP` and
+`GITHUB_ACTIONS=true`. The decision travels on stdout, not the exit status,
+so a broken or missing gate runs the guard rather than silently dropping it.
+A guard not listed in the gate's table always runs, on a runner exactly as it
+does locally. `GITHUB_ACTIONS` is set by GitHub Actions itself and never
+toggled by hand, so local runs are unaffected.
 
-```sh
-GATE=$(uv run -- python _project/scripts/ci_lint_environment_gate.py <slug> || true)
-if [ "$GATE" != "SKIP" ]; then <guard>; fi
-```
-
-This replaces the guard's own ad hoc `if [ "$$GITHUB_ACTIONS" = "true" ]`
-special-case -- exactly the pattern the old `agent-identity-check` synthetic-identity
-injection was, and the reason a *general* mechanism replaced it rather than
-gaining a second one for `skill-sync-check`.
-
-**The decision travels on stdout, never in the exit status, and the gate fails
-closed.** Using the gate process itself as the `if` condition looks equivalent
-and is not: every way of failing to *reach* a decision -- `uv` absent, a broken
-venv, the script renamed, any traceback -- also exits non-zero, so a broken gate
-would be indistinguishable from a deliberate skip and the guard would vanish
-with nothing recorded in `failed`. That is the same "guard that cannot fail"
-defect the gate exists to remove, one layer up. Anything other than `SKIP` runs
-the guard; the human-readable reason goes to stderr so it still reaches the
-Actions log. `tests/unit/scripts/test_ci_lint_environment_boundary.py::TestGateFailsClosed`
-extracts the recipe's own condition and executes it against an uninvokable gate
-to pin this behaviourally rather than by pattern-matching the shell text.
-
-A guard not listed in the table
-always runs, on a runner exactly as it does locally -- the table is a narrow,
-reasoned allowlist of exceptions, not a generic on/off switch, and adding an
-entry removes real CI coverage inside `make ci-lint`'s own CI invocation
-unless that guard is *also* covered for real somewhere else in CI:
-
-- `agent-identity-check` has no CI-runner equivalent anywhere, by design --
-  see `ci.yml`'s `code-lint` job, which has no counterpart step for the same
-  reason. `agent-commit-range-check` is the real merge-time control (it
-  reads the commits a branch actually carries, not resolved config) and is
-  never in the gate's table; it keeps running unconditionally, in `ci-lint`
-  and in `ci.yml`.
-- `skill-sync-check`'s real CI-side coverage is `ci.yml`'s required
-  `skill-integrity` job. It runs when `.claude/skills/**`, `skill-sync.conf`,
-  or `tools/skill-sync` changes, validates the config/receipt/tool-pin
-  policy, clones the skill sources, runs the full
-  preview/apply/verify/check cycle with the vendored wrapper, and runs
-  instruction/identity controls before the `tooling` unit can pass.
-  Skipping the checkout-dependent `skill-sync-check` inside `ci-lint`'s own
-  CI invocation does not remove coverage that existed there -- it removes a
-  guard that is structurally unable to check anything on a runner.
-
-### Required skill-integrity lane
-
-Skill integrity is a specialized control-plane lane, not generic content and
-not BenchBox product execution. Pure approved rev/mirror changes skip
-product tests because BenchBox does not import or execute skill Markdown.
-Unknown paths, structural config changes, workflow/classifier/policy edits,
-and mixed product changes still run full product CI; mixed changes also run
-skill integrity. Generated skill Markdown has no generic markdownlint or
-spellcheck contract: the required lane proves trusted provenance, byte
-integrity against the per-target manifest, instruction anchors, focused
-wrapper budgets, tracked-artifact hygiene, and commit identity. It does not
-claim that arbitrary prose is semantically safe or human-reviewed.
-
-What the lane proves and does not prove: `verify` proves the committed
-payload is byte-for-byte what the wrapper wrote (hashes, executable bits,
-exact membership, no symlinks, receipt/manifest agreement) -- it does not
-prove the payload matches any catalog revision. Tying bytes to revisions is
-the job of the preview/apply/check cycle the same job runs from freshly
-cloned sources, plus PR review of the receipt's recorded revs. The
-untracked-mirror guard proves tracking state, not content parity.
-
-The tool pin is fixed independently in
-`scripts/skill_sync_ci_policy.py`. A maintainer advances it only with a
-clean preview/apply/check/verify proof and full CI. GitHub classification
-binds to `github.event.pull_request.base.sha`, never a mutable branch tip; if
-`develop` advances during the run, the run still certifies the base it started
-from; the strict up-to-date rule is off, so the PR does not need a refresh.
-
-### Local preflight
+## Local preflight
 
 `make pr-preflight` lints the changed Python files with ruff and runs the tests
-mapped from the changed paths (`_project/scripts/preflight_targets.py`), failed
-tests first. The pre-push hook runs it. Checks that now run only in CI, with
-the command to run each locally: `ty` (`uv run ty check`), import-linter
-(`make lint-imports`), comment policy (`make comment-policy-check`), the
-content guard (`make pr-preflight-fast-tests`), skill integrity
+mapped from the changed paths, failed tests first. The pre-push hook runs it.
+Checks that run only in CI, with the command to run each locally: `ty`
+(`uv run ty check`), import-linter (`make lint-imports`), comment policy
+(`make comment-policy-check`), the content guard
+(`make pr-preflight-fast-tests`), skill integrity
 (`make skill-integrity-check`), UAT hygiene (`make uat-artifact-hygiene`); the
 full fast lane is `make pr-preflight-fast-tests` and every `ci-lint` guard is
 `make ci-lint`.
-
-The preflight does not inspect or consume `STALE`, merge `develop`, call `pr-refresh`
-or `pr-fanout`, push, open a PR, or arm auto-merge. `pr-open` remains the sole
-currency refusal point and `make pr-refresh` remains the one-at-a-time absorb.
-
-`GITHUB_ACTIONS` is never hand-toggled here: it is the platform-set variable
-every GitHub Actions job already has, so local runs (including
-`pr-preflight-fast-tests`) are unaffected -- both listed guards keep running locally
-exactly as before this table existed.
 
 ## `pr-preflight-fast-tests` and the content guard
 
 `make pr-preflight-fast-tests` is the full local fast lane. It always runs
 `pr-content-guard` (YAML/markdown/docs hygiene + artifact hygiene), regardless
-of whether the branch's `needs-code-ci` path-filter decision is true. This
-preserves the fix for docs-plus-code PRs that previously hit those guards for
-the first time in CI. The `needs-code-ci` decision still gates only the
-fast-test pytest run. Direct invocation creates the classifier JSON and path lists when the caller did not
+of whether the branch's `needs-code-ci` path-filter decision is true. The
+`needs-code-ci` decision gates only the fast-test pytest run. Direct invocation creates the classifier JSON and path lists when the caller did not
 supply them. It runs under the shared test lock.
 
-## Hosted merge-gate guard inventory
+## Hosted-only guard inventory
 
-The command-level lint pin above is the detailed contract for `ci.yml`'s
-`code-lint` job. `tests/system/test_ci_lint_parity.py` also inventories
-guard-shaped steps in the independent publication docs lane and the release
-test workflow. Each such step must name a local equivalent or carry a written
-exception in the test's `MERGE_GATE_EXEMPTIONS` table. This keeps a new
-`--check`, `verify`, drift, or guard step from becoming a silent CI-only
-failure. A strict local superset is acceptable; an unclassified hosted guard
-is not.
-
-The conditional `ci-paths` release-content check uses the same `make
-release-check VERSION=X.Y.Z BASE_REF=<immutable-base-sha>` entry point available
-locally. It verifies the prepared version, changelog, lockfile, generator
-markers, and release curation against the specified base. It is a local
-equivalent, so the parity inventory records `release-check` rather than a
-hosted-only exception.
+`tests/system/test_ci_lint_parity.py` also checks guard-shaped steps in other
+merge-gating workflows. Each such step must name a local equivalent or carry
+a written reason in the test's `MERGE_GATE_EXEMPTIONS` table, so a new check
+step cannot become a silent CI-only failure.
 
 The `code-test` step that runs changed tests on the curated release tree has a
 local equivalent:
 `uv run -- python scripts/release_curation_dry_run.py --changed-since origin/develop`.
 With no arguments it runs the full fast selection on that tree.
 
-### Hosted-only guard inventory
-
 Bundled generator integrity has local equivalents. Run
 `uv run -- python scripts/bundled_binary_manifest.py` to check the shipped
 source tree. After `uv build --out-dir /tmp/benchbox-dist`, run
 `uv run -- python scripts/verify_distribution_binaries.py /tmp/benchbox-dist/*.whl /tmp/benchbox-dist/*.tar.gz`
-to compare both distributions with the source manifest. The queue artifact
-job runs the same checks before uploading distributions. An installed wheel
+to compare both distributions with the source manifest. An installed wheel
 can check its own file membership and hashes with
 `python -m benchbox.utils.binary_manifest` from outside the checkout.
-Release authenticity still requires the exact trusted queue artifact and its
-attestation; a manifest consistency check alone does not establish provenance.
-
-The explicit exceptions cover inputs that only exist in their hosted gate:
-
-- cross-platform binary smoke tests and promoted slow/medium regression nodes;
-- fresh-runner skill-source cloning and PR-base ancestry checks;
-- release-branch curation and release-artifact reports; and
-- the audit-SHA comparison against the immutable PR event base.
-
-These are intentionally named in the parity test with the reason they cannot
-be reproduced from a normal checkout. They are not skipped by local validation
-under another name.

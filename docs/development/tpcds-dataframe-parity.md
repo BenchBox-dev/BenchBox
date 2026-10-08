@@ -50,11 +50,11 @@ This command checks the committed value inventory, sampled specification values,
 The TPC-DS cross-surface gate is enforced. It builds SF 0.01 data on the default Power draw and compares all 103 statements on DuckDB with the Polars Expression, Pandas and native DataFusion implementations. CI runs it in two steps of the correctness-gate job:
 
 ```bash
-make tpcds-cross-surface-equivalence-report         # Polars and DataFusion
-make tpcds-pandas-cross-surface-equivalence-report  # Pandas
+make tpcds-cross-surface-equivalence-report
+make tpcds-pandas-cross-surface-equivalence-report
 ```
 
-Each of the two CI steps has a 45 s budget on hosted Ubuntu runners, including the data build and parameter binding (about 10 s). That figure was set from hosted runs, where the pandas step took 26-39 s and the Polars and DataFusion step 14-16 s.
+Each of the two CI steps has a 45 s budget on hosted Ubuntu runners, including the data build and parameter binding.
 
 The direct entry point is equivalent:
 

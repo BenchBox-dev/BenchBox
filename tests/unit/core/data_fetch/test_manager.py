@@ -1,10 +1,3 @@
-"""Tests for benchbox.core.data_fetch.manager.
-
-Exercises the air-gapped path (pre-populated files), the
-download-then-extract path (mocked downloader + ExtractionRequiredError),
-and the checksum mismatch surface.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -35,19 +28,16 @@ pytestmark = [
 ]
 
 
-# ---- named payloads + pre-computed shas (N2: readable diagnostics) ----
-
 ALPHA_PAYLOAD = b"alpha-table-row-bytes"
 BETA_PAYLOAD = b"beta-table-row-bytes"
 
 ALPHA_SHA = hashlib.sha256(ALPHA_PAYLOAD).hexdigest()
 BETA_SHA = hashlib.sha256(BETA_PAYLOAD).hexdigest()
-ARCHIVE_SHA = "00" * 32  # placeholder — fake_downloader doesn't recompute
+ARCHIVE_SHA = "00" * 32
 MANIFEST_HASH_PLACEHOLDER = "a" * 64
 
 
 def _write_manifest(tmp: Path, archive_sha: str = ARCHIVE_SHA) -> Path:
-    """Build a minimal data_manifest.toml with two named tables."""
     body = (
         f'dataset_version    = "test-v1"\n'
         f'manifest_hash      = "{MANIFEST_HASH_PLACEHOLDER}"\n'
@@ -85,9 +75,6 @@ def test_air_gapped_pre_populated_returns_dir(tmp_path: Path) -> None:
 
 
 def test_pre_populated_with_bad_sha_short_circuits_before_download(tmp_path: Path) -> None:
-    """Corrupt cache must surface ChecksumMismatchError WITHOUT touching
-    the downloader. Otherwise the manager would re-download wastefully on
-    every cache-rot event."""
     out_dir = tmp_path / "out"
     out_dir.mkdir()
     (out_dir / "alpha.parquet").write_bytes(b"corrupted contents")
@@ -108,9 +95,6 @@ def test_pre_populated_with_bad_sha_short_circuits_before_download(tmp_path: Pat
 
 
 def test_empty_dir_downloads_then_raises_extraction_required(tmp_path: Path) -> None:
-    """When no per-table files are present, manager downloads but defers
-    extraction to the caller. ExtractionRequiredError carries the archive
-    path so the caller's tar driver can pick it up."""
     manifest_path = _write_manifest(tmp_path)
     out_dir = tmp_path / "out"
     out_dir.mkdir()
@@ -130,7 +114,6 @@ def test_empty_dir_downloads_then_raises_extraction_required(tmp_path: Path) -> 
 
 
 def test_existing_verified_archive_raises_extraction_required_without_redownload(tmp_path: Path) -> None:
-    """Interrupted first-runs can leave a complete archive before extraction."""
     archive_payload = b"complete-archive"
     archive_sha = hashlib.sha256(archive_payload).hexdigest()
     manifest_path = _write_manifest(tmp_path, archive_sha=archive_sha)
@@ -149,17 +132,12 @@ def test_existing_verified_archive_raises_extraction_required_without_redownload
 
 
 def test_post_extraction_returns_dir(tmp_path: Path) -> None:
-    """If the caller extracts the tarball between the download and a
-    second fetch_data call, the manager verifies all per-table sha256s
-    and returns the directory."""
     manifest_path = _write_manifest(tmp_path)
     out_dir = tmp_path / "out"
     out_dir.mkdir()
 
     def extracting_downloader(url, dest, expected_sha256=None):
-        # Simulate the caller running tar extraction inside the downloader
-        # for the purposes of this test — production code does this in
-        # the cutover wiring, NOT inside the downloader.
+
         Path(dest).write_bytes(b"pretend-archive-bytes")
         (out_dir / "alpha.parquet").write_bytes(ALPHA_PAYLOAD)
         (out_dir / "beta.parquet").write_bytes(BETA_PAYLOAD)
@@ -170,16 +148,13 @@ def test_post_extraction_returns_dir(tmp_path: Path) -> None:
 
 
 def test_post_extraction_with_bad_sha_raises_checksum_mismatch(tmp_path: Path) -> None:
-    """If the caller's extractor produces a corrupted file, the
-    post-download verifier catches it via the structured-diagnostic
-    path and raises ChecksumMismatchError naming the offending file."""
     manifest_path = _write_manifest(tmp_path)
     out_dir = tmp_path / "out"
     out_dir.mkdir()
 
     def buggy_extracting_downloader(url, dest, expected_sha256=None):
         Path(dest).write_bytes(b"pretend-archive-bytes")
-        # alpha is corrupt; beta is intact
+
         (out_dir / "alpha.parquet").write_bytes(b"truncated")
         (out_dir / "beta.parquet").write_bytes(BETA_PAYLOAD)
         return Path(dest)
@@ -189,8 +164,6 @@ def test_post_extraction_with_bad_sha_raises_checksum_mismatch(tmp_path: Path) -
     assert "alpha.parquet" in excinfo.value.path
     assert excinfo.value.expected_sha256 == ALPHA_SHA
 
-
-# ---- logical-content verification (opt-in assurance path) ----
 
 _LOGICAL_SCHEMA = {"id": "integer", "val": "character varying"}
 
@@ -209,7 +182,7 @@ def _write_logical_manifest(tmp: Path, con: object, tables: dict[str, list[tuple
         parquet = data_dir / f"{name}.parquet"
         _write_parquet(con, parquet, rows)
         h = logical_table_hash_from_parquet(con=con, parquet_path=parquet, table=name, columns=cols)
-        # A deterministic byte sha for the hot-path field; irrelevant to logical verify.
+
         entries.append(
             TableEntry(
                 name=name,
@@ -262,12 +235,10 @@ def test_verify_logical_content_passes_on_matching_data(tmp_path: Path) -> None:
 
 
 def test_verify_logical_content_survives_reencoded_parquet(tmp_path: Path) -> None:
-    """A byte-different but logically-identical re-write of the Parquet still
-    verifies — the reproducibility guarantee for a non-deterministic rebuild."""
     con = duckdb.connect()
     manifest_path = _write_logical_manifest(tmp_path, con, {"t1": [(2, "b"), (1, "a")]})
     manifest = load_manifest(manifest_path)
-    # Re-write t1 with a different row order / compression; content unchanged.
+
     con.execute("SET threads=1")
     _write_parquet(con, tmp_path / "data" / "t1.parquet", [(1, "a"), (2, "b")])
     assert verify_logical_content(manifest, tmp_path / "data") == []

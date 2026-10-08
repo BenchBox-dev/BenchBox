@@ -1,5 +1,3 @@
-"""Tests for post-merge failure-signature attribution."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -25,7 +23,6 @@ spec.loader.exec_module(sig)
 
 
 def test_dotted_bigquery_style_classname_normalizes() -> None:
-    """#2071/#2068 replay: dotted JUnit classnames resolve to the owning test file."""
     assert sig.failure_id_test_paths(["tests.unit.foo.TestFoo::test_bar"]) == ["tests/unit/foo.py"]
     assert sig.failure_id_test_paths(["tests.unit.foo::test_bar"]) == ["tests/unit/foo.py"]
 
@@ -90,7 +87,6 @@ def _git_repo(path: Path) -> tuple[str, str]:
 
 
 def test_isolated_bad_fix_verification(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """w3: only the blamed commit's own diff drives the verdict."""
     bad, other = _git_repo(tmp_path / "repo")
     monkeypatch.chdir(tmp_path / "repo")
     failing = ["test_owner.py::test_v"]
@@ -159,7 +155,6 @@ def test_diff_reports_only_new_ids(tmp_path: Path) -> None:
 
 
 def test_merge_commit_lists_first_parent_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A merge commit must report its feature-side paths, never an empty diff."""
     repo = tmp_path / "repo"
     repo.mkdir()
     for args in (["init", "-b", "main"], ["config", "user.email", "t@e.com"], ["config", "user.name", "T"]):

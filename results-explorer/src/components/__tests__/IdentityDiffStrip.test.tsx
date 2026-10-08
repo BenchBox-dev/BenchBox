@@ -1,11 +1,3 @@
-/**
- * The engine-and-hardware strip.
- *
- * Answers one question: of the things that could explain a difference in these
- * numbers, which ones actually differ? It must not replace or duplicate the
- * ComparabilityReceipt, and it must never disagree with it.
- */
-
 import { render, screen } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 
@@ -51,9 +43,6 @@ describe("axis selection", () => {
   });
 
   it("reads the same fields the receipt does rather than re-deriving them", () => {
-    // A second, independently-derived summary would eventually disagree with
-    // the receipt about whether an axis differs. Sharing one source makes that
-    // impossible rather than unlikely.
     const results = [run(), run({ result_id: "r2", platform_version: "1.5.0" })];
     const receipt = new Map(buildComparabilityFields(results).map((f) => [f.label, f]));
     for (const field of identityStripFields(results)) {
@@ -100,8 +89,6 @@ describe("marking which axes differ", () => {
 
 describe("runs without CPU data", () => {
   it("renders 'not recorded' rather than guessing a vendor from the architecture", () => {
-    // Most of the historical corpus recorded arch only. A guessed vendor would
-    // fabricate the very axis this strip exists to compare.
     const noCpu = run({
       result_id: "r2",
       environment: { arch: "arm64" },

@@ -1,12 +1,3 @@
-"""Override companions must be excluded from every primary-bundle enumerator.
-
-Regression tests for the review thread on ``benchbox/validation/bundle.py``:
-``generate_corpus_inventory.py`` inherits the companion classification from
-``benchbox.validation.bundle.discover_bundles``, but the hard-coded
-publication enumerators below kept counting ``*.override.json`` as primary
-bundles, so ``BUNDLE_COUNT`` would exceed ``INVENTORY_COUNT``.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -94,7 +85,6 @@ def test_reconciler_corpus_paths_ignore_override(tmp_path: Path, monkeypatch: py
 
 
 def test_parity_override_change_back_maps_bundle_not_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """An override-only change must surface its bundle, never the override itself."""
     repo = _init_repo(tmp_path)
     (repo / BUNDLE).write_text("{}", encoding="utf-8")
     _git(repo, "add", "-A")
@@ -110,7 +100,6 @@ def test_parity_override_change_back_maps_bundle_not_override(tmp_path: Path, mo
 
 
 def test_parity_override_only_change_still_yields_bundle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A PR touching only the override must validate the covered bundle."""
     repo = _init_repo(tmp_path)
     (repo / BUNDLE).write_text("{}", encoding="utf-8")
     _git(repo, "add", "-A")

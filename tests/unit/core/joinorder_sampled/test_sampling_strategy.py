@@ -1,5 +1,3 @@
-"""Track-2 sampled JOB scaling strategy: locked semantics and prototype scope."""
-
 from __future__ import annotations
 
 from fractions import Fraction

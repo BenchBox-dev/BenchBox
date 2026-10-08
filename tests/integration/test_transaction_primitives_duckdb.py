@@ -1,12 +1,6 @@
-"""Integration tests for Transaction Primitives benchmark with DuckDB.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module contains true end-to-end integration tests that execute transaction operations
-against a real DuckDB database, validating the complete execution pipeline.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import duckdb
 import pytest
@@ -24,19 +18,14 @@ pytestmark = [
 @pytest.mark.duckdb
 @pytest.mark.transaction_primitives
 class TestTransactionPrimitivesDuckDBLifecycle:
-    """Test Transaction Primitives lifecycle management with real DuckDB database."""
-
     @pytest.fixture
     def duckdb_conn(self):
-        """Create a temporary DuckDB database."""
         conn = duckdb.connect(":memory:")
         yield conn
         conn.close()
 
     @pytest.fixture
     def loaded_tpch_conn(self, duckdb_conn):
-        """Create DuckDB connection with minimal TPC-H test data."""
-        # Create minimal TPC-H schema (just what we need)
         duckdb_conn.execute("""
             CREATE TABLE orders (
                 o_orderkey INTEGER PRIMARY KEY,
@@ -85,7 +74,6 @@ class TestTransactionPrimitivesDuckDBLifecycle:
             )
         """)
 
-        # Insert minimal test data
         duckdb_conn.execute("""
             INSERT INTO orders VALUES
             (1, 100, 'O', 150.50, '2024-01-01', '1-URGENT', 'Clerk#001', 0, 'test order 1'),
@@ -115,12 +103,9 @@ class TestTransactionPrimitivesDuckDBLifecycle:
 
     @pytest.fixture
     def txn_bench(self, small_scale_factor, temp_dir):
-        """Create Transaction Primitives benchmark instance."""
         return TransactionPrimitives(scale_factor=small_scale_factor, output_dir=temp_dir, quiet=True)
 
     def test_setup_creates_staging_tables(self, txn_bench, loaded_tpch_conn):
-        """Test that setup() creates all staging tables."""
-        # Setup staging tables
         result = txn_bench.setup(loaded_tpch_conn, force=False)
 
         assert result["success"] is True
@@ -128,7 +113,6 @@ class TestTransactionPrimitivesDuckDBLifecycle:
         assert "txn_lineitem" in result["tables_created"]
         assert "txn_customer" in result["tables_created"]
 
-        # Verify tables exist and have data
         txn_orders_count = loaded_tpch_conn.execute("SELECT COUNT(*) FROM txn_orders").fetchone()[0]
         txn_lineitem_count = loaded_tpch_conn.execute("SELECT COUNT(*) FROM txn_lineitem").fetchone()[0]
         txn_customer_count = loaded_tpch_conn.execute("SELECT COUNT(*) FROM txn_customer").fetchone()[0]
@@ -138,10 +122,9 @@ class TestTransactionPrimitivesDuckDBLifecycle:
         assert txn_customer_count == 3
 
     def test_execute_transaction_commit_small(self, txn_bench, loaded_tpch_conn):
-        """Test execution of a small transaction commit operation."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
-        # Execute the operation
         result = txn_bench.execute_operation("transaction_commit_small", loaded_tpch_conn)
 
         assert isinstance(result, OperationResult)
@@ -151,22 +134,19 @@ class TestTransactionPrimitivesDuckDBLifecycle:
         assert result.write_duration_ms > 0
 
     def test_execute_transaction_rollback_small(self, txn_bench, loaded_tpch_conn):
-        """Test execution of a small transaction rollback operation."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
-        # Execute the operation
         result = txn_bench.execute_operation("transaction_rollback_small", loaded_tpch_conn)
 
         assert isinstance(result, OperationResult)
         assert result.success is True
         assert result.validation_passed is True
-        # For rollback operations, validation should confirm 0 rows exist (rollback worked)
-        # Check the count value in the result, not the number of result rows
-        count_value = result.validation_results[0]["sample"][0][0]  # First row, first column (cnt)
+        count_value = result.validation_results[0]["sample"][0][0]
         assert count_value == 0
 
     def test_get_operation_categories(self, txn_bench):
-        """Test that we can get list of operation categories."""
+
         categories = txn_bench.get_operation_categories()
 
         assert "overhead" in categories
@@ -176,54 +156,46 @@ class TestTransactionPrimitivesDuckDBLifecycle:
         assert "advanced" in categories
 
     def test_get_operations_by_category(self, txn_bench):
-        """Test getting operations filtered by category."""
+
         overhead_ops = txn_bench.get_operations_by_category("overhead")
-        assert len(overhead_ops) >= 5  # At least 5 overhead operations
+        assert len(overhead_ops) >= 5
 
         isolation_ops = txn_bench.get_operations_by_category("isolation")
-        assert len(isolation_ops) >= 3  # At least 3 isolation level tests
+        assert len(isolation_ops) >= 3
 
         multi_stmt_ops = txn_bench.get_operations_by_category("multi_statement")
-        assert len(multi_stmt_ops) >= 8  # At least 8 multi-statement tests
+        assert len(multi_stmt_ops) >= 8
 
     def test_reset_restores_staging_tables(self, txn_bench, loaded_tpch_conn):
-        """Test that reset() restores staging tables to original state."""
         txn_bench.setup(loaded_tpch_conn, force=False)
 
-        # Modify staging table
         loaded_tpch_conn.execute(
             "INSERT INTO txn_orders VALUES (999, 999, 'O', 999.0, '2024-12-31', '1-URGENT', 'Clerk#999', 0, 'dirty')"
         )
         dirty_count = loaded_tpch_conn.execute("SELECT COUNT(*) FROM txn_orders WHERE o_orderkey = 999").fetchone()[0]
         assert dirty_count == 1
 
-        # Reset
         txn_bench.reset(loaded_tpch_conn)
 
-        # Verify clean state
         clean_count = loaded_tpch_conn.execute("SELECT COUNT(*) FROM txn_orders WHERE o_orderkey = 999").fetchone()[0]
         assert clean_count == 0
 
-        # Verify original data still exists
         original_count = loaded_tpch_conn.execute("SELECT COUNT(*) FROM txn_orders").fetchone()[0]
         assert original_count == 5
 
     def test_is_setup_detects_uninitialized_state(self, txn_bench, loaded_tpch_conn):
-        """Test that is_setup() correctly detects uninitialized state."""
         assert txn_bench.is_setup(loaded_tpch_conn) is False
 
         txn_bench.setup(loaded_tpch_conn, force=False)
         assert txn_bench.is_setup(loaded_tpch_conn) is True
 
     def test_teardown_removes_staging_tables(self, txn_bench, loaded_tpch_conn):
-        """Test that teardown() removes all staging tables."""
         txn_bench.setup(loaded_tpch_conn, force=False)
         assert txn_bench.is_setup(loaded_tpch_conn) is True
 
         txn_bench.teardown(loaded_tpch_conn)
 
-        # Verify tables don't exist
-        with pytest.raises(Exception):  # DuckDB raises exception for missing table
+        with pytest.raises(Exception):
             loaded_tpch_conn.execute("SELECT COUNT(*) FROM txn_orders")
 
 
@@ -231,23 +203,20 @@ class TestTransactionPrimitivesDuckDBLifecycle:
 @pytest.mark.duckdb
 @pytest.mark.transaction_primitives
 class TestTransactionPrimitivesQuickSanity:
-    """Quick sanity tests for Transaction Primitives - fast smoke tests."""
-
     @pytest.fixture
     def duckdb_conn(self):
-        """Create a temporary DuckDB database."""
         conn = duckdb.connect(":memory:")
         yield conn
         conn.close()
 
     def test_import_and_instantiate(self):
-        """Test that we can import and instantiate Transaction Primitives."""
+
         txn_bench = TransactionPrimitives(scale_factor=0.01, quiet=True)
         assert txn_bench is not None
         assert txn_bench.get_benchmark_info()["name"] == "Transaction Primitives Benchmark"
 
     def test_get_schema(self):
-        """Test that we can get the schema."""
+
         txn_bench = TransactionPrimitives(scale_factor=0.01, quiet=True)
         schema = txn_bench.get_schema()
 
@@ -256,11 +225,10 @@ class TestTransactionPrimitivesQuickSanity:
         assert "txn_customer" in schema
 
     def test_operation_count(self):
-        """Test that we have the expected number of operations."""
+
         txn_bench = TransactionPrimitives(scale_factor=0.01, quiet=True)
         all_ops = txn_bench.get_all_operations()
 
-        # We should have at least 23 operations (8 original + 8 multi-statement + 5 advanced + 2 savepoint)
         assert len(all_ops) >= 23
 
 
@@ -268,19 +236,14 @@ class TestTransactionPrimitivesQuickSanity:
 @pytest.mark.duckdb
 @pytest.mark.transaction_primitives
 class TestTransactionPrimitivesMultiStatement:
-    """Test multi-statement transaction operations."""
-
     @pytest.fixture
     def duckdb_conn(self):
-        """Create a temporary DuckDB database."""
         conn = duckdb.connect(":memory:")
         yield conn
         conn.close()
 
     @pytest.fixture
     def loaded_tpch_conn(self, duckdb_conn):
-        """Create DuckDB connection with minimal TPC-H test data."""
-        # Create minimal TPC-H schema
         duckdb_conn.execute("""
             CREATE TABLE orders (
                 o_orderkey INTEGER PRIMARY KEY,
@@ -329,7 +292,6 @@ class TestTransactionPrimitivesMultiStatement:
             )
         """)
 
-        # Insert minimal test data
         duckdb_conn.execute("""
             INSERT INTO orders VALUES
             (1, 100, 'O', 150.50, '2024-01-01', '1-URGENT', 'Clerk#001', 0, 'test order 1'),
@@ -359,11 +321,10 @@ class TestTransactionPrimitivesMultiStatement:
 
     @pytest.fixture
     def txn_bench(self, small_scale_factor, temp_dir):
-        """Create Transaction Primitives benchmark instance."""
         return TransactionPrimitives(scale_factor=small_scale_factor, output_dir=temp_dir, quiet=True)
 
     def test_execute_mixed_dml_small(self, txn_bench, loaded_tpch_conn):
-        """Test mixed INSERT/UPDATE/DELETE within single transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_mixed_dml_small", loaded_tpch_conn)
@@ -375,7 +336,7 @@ class TestTransactionPrimitivesMultiStatement:
         assert result.validation_results[0]["actual_rows"] == 2
 
     def test_execute_insert_update_chain(self, txn_bench, loaded_tpch_conn):
-        """Test dependent INSERT then UPDATE on same rows within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_insert_update_chain", loaded_tpch_conn)
@@ -387,7 +348,7 @@ class TestTransactionPrimitivesMultiStatement:
         assert result.validation_results[0]["actual_rows"] == 2
 
     def test_execute_delete_insert_same_key(self, txn_bench, loaded_tpch_conn):
-        """Test DELETE then re-INSERT of same primary key within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_delete_insert_same_key", loaded_tpch_conn)
@@ -396,13 +357,12 @@ class TestTransactionPrimitivesMultiStatement:
         assert result.success is True
         assert result.validation_passed is True
         assert result.cleanup_success is True
-        # Verify the replaced row has correct values
         row_data = result.validation_results[0]["sample"][0]
-        assert row_data[0] == 2  # o_custkey should be 2 (replaced value)
-        assert row_data[1] == "replaced"  # o_comment should be 'replaced'
+        assert row_data[0] == 2
+        assert row_data[1] == "replaced"
 
     def test_execute_read_your_writes(self, txn_bench, loaded_tpch_conn):
-        """Test that transaction sees its own uncommitted changes."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_read_your_writes", loaded_tpch_conn)
@@ -411,12 +371,11 @@ class TestTransactionPrimitivesMultiStatement:
         assert result.success is True
         assert result.validation_passed is True
         assert result.cleanup_success is True
-        # Verify the price was doubled (1000.0 * 2 = 2000.0)
         price = result.validation_results[0]["sample"][0][0]
         assert price == 2000.0
 
     def test_execute_insert_with_subquery(self, txn_bench, loaded_tpch_conn):
-        """Test INSERT...SELECT from same table within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_insert_with_subquery", loaded_tpch_conn)
@@ -428,7 +387,7 @@ class TestTransactionPrimitivesMultiStatement:
         assert result.validation_results[0]["actual_rows"] == 2
 
     def test_execute_multi_table_writes(self, txn_bench, loaded_tpch_conn):
-        """Test writes to multiple tables within single transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_multi_table_writes", loaded_tpch_conn)
@@ -437,30 +396,24 @@ class TestTransactionPrimitivesMultiStatement:
         assert result.success is True
         assert result.validation_passed is True
         assert result.cleanup_success is True
-        # Verify JOIN worked - should find 2 orders for customer 9000010
         count = result.validation_results[0]["sample"][0][0]
         assert count == 2
 
     def test_run_all_multi_statement_operations(self, txn_bench, loaded_tpch_conn):
-        """Test running all multi-statement operations in the category."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
-        # Get all multi-statement operations (returns dict: {op_id: operation})
         multi_stmt_ops = txn_bench.get_operations_by_category("multi_statement")
-        assert (
-            len(multi_stmt_ops) >= 6
-        )  # At least 6 tested above (mixed_dml_medium and long_running_mixed not explicitly tested)
+        assert len(multi_stmt_ops) >= 6
 
-        # Run each operation (iterate over keys which are operation IDs)
         success_count = 0
         for i, op_id in enumerate(multi_stmt_ops.keys()):
-            if i >= 6:  # Test first 6 to keep test time reasonable
+            if i >= 6:
                 break
             result = txn_bench.execute_operation(op_id, loaded_tpch_conn)
             if result.success and result.validation_passed:
                 success_count += 1
 
-        # At least 6 should succeed
         assert success_count >= 6
 
 
@@ -468,19 +421,14 @@ class TestTransactionPrimitivesMultiStatement:
 @pytest.mark.duckdb
 @pytest.mark.transaction_primitives
 class TestTransactionPrimitivesIsolation:
-    """Test isolation level transaction operations."""
-
     @pytest.fixture
     def duckdb_conn(self):
-        """Create a temporary DuckDB database."""
         conn = duckdb.connect(":memory:")
         yield conn
         conn.close()
 
     @pytest.fixture
     def loaded_tpch_conn(self, duckdb_conn):
-        """Create DuckDB connection with minimal TPC-H test data."""
-        # Create minimal TPC-H schema
         duckdb_conn.execute("""
             CREATE TABLE orders (
                 o_orderkey INTEGER PRIMARY KEY,
@@ -529,7 +477,6 @@ class TestTransactionPrimitivesIsolation:
             )
         """)
 
-        # Insert minimal test data
         duckdb_conn.execute("""
             INSERT INTO orders VALUES
             (1, 100, 'O', 150.50, '2024-01-01', '1-URGENT', 'Clerk#001', 0, 'test order 1'),
@@ -551,7 +498,6 @@ class TestTransactionPrimitivesIsolation:
 
     @pytest.fixture
     def txn_bench(self, small_scale_factor, temp_dir):
-        """Create Transaction Primitives benchmark instance."""
         return TransactionPrimitives(scale_factor=small_scale_factor, output_dir=temp_dir, quiet=True)
 
 
@@ -559,19 +505,14 @@ class TestTransactionPrimitivesIsolation:
 @pytest.mark.duckdb
 @pytest.mark.transaction_primitives
 class TestTransactionPrimitivesAdvanced:
-    """Test advanced transaction features."""
-
     @pytest.fixture
     def duckdb_conn(self):
-        """Create a temporary DuckDB database."""
         conn = duckdb.connect(":memory:")
         yield conn
         conn.close()
 
     @pytest.fixture
     def loaded_tpch_conn(self, duckdb_conn):
-        """Create DuckDB connection with minimal TPC-H test data."""
-        # Create minimal TPC-H schema
         duckdb_conn.execute("""
             CREATE TABLE orders (
                 o_orderkey INTEGER PRIMARY KEY,
@@ -620,7 +561,6 @@ class TestTransactionPrimitivesAdvanced:
             )
         """)
 
-        # Insert minimal test data
         duckdb_conn.execute("""
             INSERT INTO orders VALUES
             (1, 100, 'O', 150.50, '2024-01-01', '1-URGENT', 'Clerk#001', 0, 'test order 1'),
@@ -642,29 +582,25 @@ class TestTransactionPrimitivesAdvanced:
 
     @pytest.fixture
     def txn_bench(self, small_scale_factor, temp_dir):
-        """Create Transaction Primitives benchmark instance."""
         return TransactionPrimitives(scale_factor=small_scale_factor, output_dir=temp_dir, quiet=True)
 
     def test_execute_truncate_in_transaction(self, txn_bench, loaded_tpch_conn):
-        """Test TRUNCATE within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
-        # Note: This resets txn_orders, so we need to verify it works
         result = txn_bench.execute_operation("transaction_truncate_in_transaction", loaded_tpch_conn)
 
         assert isinstance(result, OperationResult)
         assert result.success is True
         assert result.validation_passed is True
         assert result.cleanup_success is True
-        # After truncate and insert, only 1 row should remain (9970002)
         count = result.validation_results[0]["sample"][0][0]
         assert count == 1
 
-        # Need to reset after this test since it truncates txn_orders
         txn_bench.reset(loaded_tpch_conn)
 
     def test_execute_create_temp_table(self, txn_bench, loaded_tpch_conn):
-        """Test transaction-scoped temporary table creation."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_create_temp_table", loaded_tpch_conn)
@@ -673,12 +609,11 @@ class TestTransactionPrimitivesAdvanced:
         assert result.success is True
         assert result.validation_passed is True
         assert result.cleanup_success is True
-        # Verify 1 row inserted from temp table
         count = result.validation_results[0]["sample"][0][0]
         assert count == 1
 
     def test_execute_with_cte(self, txn_bench, loaded_tpch_conn):
-        """Test complex CTE within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_with_cte", loaded_tpch_conn)
@@ -687,15 +622,12 @@ class TestTransactionPrimitivesAdvanced:
         assert result.success is True
         assert result.validation_passed is True
         assert result.cleanup_success is True
-        # Verify 10 rows inserted and prices doubled
         count, total = result.validation_results[0]["sample"][0]
         assert count == 10
-        # Original sum would be 1000*(1+2+...+10) = 1000*55 = 55000
-        # After doubling: 110000
         assert total == 110000.0
 
     def test_execute_nested_subquery_updates(self, txn_bench, loaded_tpch_conn):
-        """Test UPDATE with nested subqueries within transaction."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
         result = txn_bench.execute_operation("transaction_nested_subquery_updates", loaded_tpch_conn)
@@ -704,21 +636,18 @@ class TestTransactionPrimitivesAdvanced:
         assert result.success is True
         assert result.validation_passed is True
         assert result.cleanup_success is True
-        # All updated rows should have same price (AVG * 1.5)
         distinct_prices = result.validation_results[0]["sample"][0][0]
         assert distinct_prices == 1
 
     def test_execute_rollback_after_error(self, txn_bench, loaded_tpch_conn):
-        """Test automatic rollback behavior after constraint violation."""
+
         txn_bench.setup(loaded_tpch_conn, force=False)
 
-        # This operation just does a simple commit (no actual error in the test)
         result = txn_bench.execute_operation("transaction_rollback_after_error", loaded_tpch_conn)
 
         assert isinstance(result, OperationResult)
         assert result.success is True
         assert result.validation_passed is True
         assert result.cleanup_success is True
-        # Verify 1 row inserted
         count = result.validation_results[0]["sample"][0][0]
         assert count == 1

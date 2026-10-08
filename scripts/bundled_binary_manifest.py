@@ -1,5 +1,3 @@
-"""Generate or check the manifest of the shipped bundled-generator tree."""
-
 from __future__ import annotations
 
 import argparse
@@ -9,7 +7,9 @@ from benchbox.utils.binary_manifest import DEFAULT_ROOT, MANIFEST_NAME, build_bi
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(
+        description="Generate or check the manifest of the shipped bundled-generator tree."
+    )
     parser.add_argument("--root", type=Path, default=DEFAULT_ROOT)
     parser.add_argument("--write", action="store_true")
     args = parser.parse_args(argv)

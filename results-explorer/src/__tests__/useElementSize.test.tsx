@@ -1,20 +1,6 @@
-/**
- * Tests for useElementSize hook.
- *
- * Cases:
- *   (a) ResizeObserver unavailable → falls back to offsetWidth
- *   (b) disconnect() is called on unmount (no leak)
- *   (c) 0×0 resize → size not updated (stays at default)
- *   (d) Same-dimension resize → functional update returns prev (no re-render)
- */
-
 import { render, waitFor, act } from "@testing-library/preact";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useElementSize } from "@/lib/useElementSize";
-
-// ---------------------------------------------------------------------------
-// Wrapper component that attaches the ref to a real DOM node
-// ---------------------------------------------------------------------------
 
 let lastSizeUpdate: { width: number; height: number } | null = null;
 
@@ -23,10 +9,6 @@ function SizedBox({ defaultWidth = 600, defaultHeight = 0 }: { defaultWidth?: nu
   lastSizeUpdate = size;
   return <div ref={ref} data-testid="box" style="width:800px;height:200px" />;
 }
-
-// ---------------------------------------------------------------------------
-// ResizeObserver mock
-// ---------------------------------------------------------------------------
 
 type ROCallback = (entries: ResizeObserverEntry[]) => void;
 let capturedCallback: ROCallback | null = null;
@@ -37,7 +19,6 @@ function installResizeObserver() {
   capturedCallback = null;
   disconnectSpy = vi.fn();
   observeSpy = vi.fn();
-  // Must be a constructor (class), not an arrow function, since the hook uses `new ResizeObserver(...)`.
   class MockResizeObserver {
     constructor(cb: ROCallback) { capturedCallback = cb; }
     observe = observeSpy;
@@ -56,14 +37,7 @@ function fireResize(width: number, height: number) {
   ]);
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe("useElementSize", () => {
-  // -----------------------------------------------------------------------
-  // (a) ResizeObserver unavailable - falls back to offsetWidth
-  // -----------------------------------------------------------------------
 
   describe("(a) ResizeObserver unavailable", () => {
     beforeEach(() => {
@@ -100,10 +74,6 @@ describe("useElementSize", () => {
     });
   });
 
-  // -----------------------------------------------------------------------
-  // (b) disconnect() is called on unmount
-  // -----------------------------------------------------------------------
-
   describe("(b) disconnect on unmount", () => {
     beforeEach(() => installResizeObserver());
     afterEach(() => removeResizeObserver());
@@ -115,10 +85,6 @@ describe("useElementSize", () => {
       expect(disconnectSpy).toHaveBeenCalledOnce();
     });
   });
-
-  // -----------------------------------------------------------------------
-  // (c) 0×0 resize ignored - size stays at default
-  // -----------------------------------------------------------------------
 
   describe("(c) 0×0 resize ignored", () => {
     beforeEach(() => installResizeObserver());
@@ -133,10 +99,6 @@ describe("useElementSize", () => {
       expect(lastSizeUpdate!.height).toBe(400);
     });
   });
-
-  // -----------------------------------------------------------------------
-  // (d) Same-dimension resize → no state change
-  // -----------------------------------------------------------------------
 
   describe("(d) same-dimension resize skips re-render", () => {
     beforeEach(() => installResizeObserver());

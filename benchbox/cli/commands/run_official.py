@@ -1,5 +1,3 @@
-"""Deprecated run-official compatibility command."""
-
 import sys
 
 import click
@@ -47,7 +45,6 @@ def run_official(
     quiet,
     validate_results,
 ):
-    """Run TPC-compliant official benchmark tests. Deprecated; use `benchbox run --official`."""
     try:
         validate_tpc_scale_factor(scale)
     except ValueError:
@@ -82,8 +79,6 @@ def run_official(
             console.print(f"[green]Concurrency: {streams} concurrent stream(s) will run the throughput phase[/green]")
 
     try:
-        # Streams is now a first-class run parameter — forwarded as ``concurrency``
-        # so the run service sets ``BenchmarkConfig.concurrency`` directly.
         ctx.invoke(
             run,
             platform=platform,

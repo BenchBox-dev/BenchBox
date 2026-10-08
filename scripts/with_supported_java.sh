@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Ensure commands run with a PySpark-compatible JDK (17 or 21).
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
@@ -45,19 +44,16 @@ _find_system_java() {
     return 1
 }
 
-# Prefer explicit JAVA_HOME if valid.
 if ! _from_java_home "${JAVA_HOME_SELECTED}"; then
     JAVA_HOME_SELECTED=""
     JAVA_CMD=""
 fi
 
 if [[ -z "${JAVA_CMD}" ]]; then
-    # Try macOS java_home helper first (21, then 17).
     _mac_java_home "21" || _mac_java_home "17"
 fi
 
 if [[ -z "${JAVA_CMD}" ]]; then
-    # Fall back to PATH lookup.
     _find_system_java || true
 fi
 
@@ -76,7 +72,6 @@ if [[ -z "${JAVA_MAJOR}" ]]; then
 fi
 
 if [[ "${JAVA_MAJOR}" != "17" && "${JAVA_MAJOR}" != "21" ]]; then
-    # Last attempt on macOS if both versions available but default command points elsewhere.
     if _mac_java_home "21" || _mac_java_home "17"; then
         JAVA_VERSION_RAW="$("${JAVA_CMD}" -version 2>&1 | head -n1)"
         JAVA_VERSION="$(echo "${JAVA_VERSION_RAW}" | sed -n 's/.*\"\([0-9.]*\)\".*/\1/p')"

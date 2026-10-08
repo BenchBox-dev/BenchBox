@@ -1,9 +1,6 @@
-"""Tests for derived per-platform benchmark compatibility.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -16,10 +13,8 @@ pytestmark = [
 
 
 class TestBenchmarkCompatibility:
-    """Support claims derive from BENCHMARK_GATE rules and stay testable."""
-
     def setup_method(self):
-        """Clear registry cache before each test."""
+
         PlatformRegistry.clear_cache()
 
     def test_blocked_benchmark_reports_reason(self):

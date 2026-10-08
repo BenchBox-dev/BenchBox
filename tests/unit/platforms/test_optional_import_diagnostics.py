@@ -1,5 +1,3 @@
-"""Tests for optional platform import diagnostics."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace

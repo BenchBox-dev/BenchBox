@@ -1,5 +1,3 @@
-"""Utilities for converting TPC-DS query templates to the OBT schema."""
-
 from __future__ import annotations
 
 import random
@@ -33,15 +31,10 @@ def _load_query_specs() -> dict[str, Any]:
 
 _QUERY_SPECS = _load_query_specs()
 
-# Queries that cannot be converted to OBT:
-# - Inventory fact table: Q21, Q22, Q37, Q39, Q72, Q82 (separate fact domain)
-# - Require external dimension tables: Q46, Q64, Q68, Q84 (customer's CURRENT address/demographics)
 BLOCKED_QUERY_IDS = set(_QUERY_SPECS["blocked_query_ids"])
 
-# Column prefix → source table mapping (multi-char prefixes before single-char to avoid shadowing).
 _PREFIX_TO_TABLE = _QUERY_SPECS["prefix_to_table"]
 
-# Dimension table → static role prefix (for tables whose role doesn't depend on the fact column).
 _DIM_STATIC_ROLE = _QUERY_SPECS["dim_static_role"]
 _IDENTIFIER_DEFAULT_FACT_TABLES = _QUERY_SPECS["identifier_default_fact_tables"]
 _CHANNEL_FACT_TABLES = _QUERY_SPECS["channel_fact_tables"]
@@ -50,15 +43,12 @@ _ROLE_PREFIX_MAP = _QUERY_SPECS["role_prefix_map"]
 
 @dataclass(frozen=True)
 class TemplateParameter:
-    """Parameter metadata extracted from a TPC-DS template."""
-
     name: str
     default: str | int | float
-    kind: str  # numeric | string | identifier
+    kind: str
     token: str
 
     def token_expression(self) -> str:
-        """Return a parse-friendly token replacement."""
         if self.kind == "numeric":
             return str(self.numeric_token)
         if self.kind == "string":
@@ -72,7 +62,6 @@ class TemplateParameter:
         return 9_000_000 + int(zlib.crc32(self.token.encode()) % 1_000_000)
 
     def render(self, value: Any | None = None) -> str:
-        """Render the parameter value as SQL literal or identifier."""
         val = self.default if value is None else value
         if isinstance(val, (int, float)):
             return str(val)
@@ -81,8 +70,6 @@ class TemplateParameter:
 
 @dataclass(frozen=True)
 class ConvertedQuery:
-    """Container for converted query text and metadata."""
-
     query_id: int
     template_sql: str
     default_sql: str
@@ -91,8 +78,6 @@ class ConvertedQuery:
 
 
 class ColumnMapper:
-    """Maps source TPC-DS column names to OBT equivalents using schema lineage."""
-
     def __init__(self) -> None:
         lineage = get_column_lineage()
         self.fact_map: dict[tuple[str, str], str] = {}
@@ -154,8 +139,6 @@ class ColumnMapper:
 
 
 class TemplateLoader:
-    """Loads and normalizes raw TPC-DS template text."""
-
     DEFINE_PATTERN = re.compile(r"^define\s+(\w+)\s*=\s*(.*?);\s*$", re.IGNORECASE)
     PARAM_PATTERN = re.compile(r"\[(\w+)\]")
 
@@ -166,8 +149,6 @@ class TemplateLoader:
         if not self.path.exists():
             raise FileNotFoundError(f"Template for query {query_id} not found at {self.path}")
 
-        # Explicit encoding: the read_text default is locale-dependent (cp1252 on
-        # Windows), which mis-decodes any non-ASCII byte in a query file.
         self.raw_text = self.path.read_text(encoding="utf-8")
         self.definitions: dict[str, str] = {}
         self.body_sql: str = ""
@@ -227,7 +208,6 @@ class TemplateLoader:
             return None
 
     def _expand_ulist_defaults(self) -> None:
-        """Expand ulist() parameters by replacing indexed [NAME.N] placeholders with generated values."""
         expanded_names: list[str] = []
         for name, expr in self.definitions.items():
             if name.startswith("_"):
@@ -236,31 +216,26 @@ class TemplateLoader:
                 continue
             values = self._generate_ulist_values(name, expr)
             if values is None:
-                continue  # Unsupported generator - fall back to scalar default
+                continue
             for i, val in enumerate(values, 1):
                 self.body_sql = self.body_sql.replace(f"[{name}.{i}]", str(val))
-            # Also replace bare [NAME] with first value (if present)
             self.body_sql = self.body_sql.replace(f"[{name}]", str(values[0]))
             expanded_names.append(name)
         for name in expanded_names:
             del self.definitions[name]
 
     def _generate_ulist_values(self, name: str, expr: str) -> list[int] | None:
-        """Generate distinct values for a ulist() expression. Returns None for unsupported generators."""
         match = re.match(r"ulist\(random\((\d+),(\d+)", expr, re.IGNORECASE)
         if not match:
-            return None  # dist() or rowcount() - not yet supported
+            return None
         lo, hi = int(match.group(1)), int(match.group(2))
         count_match = re.search(r",\s*(\d+)\)\s*$", expr)
         if not count_match:
             return None
         count = int(count_match.group(1))
-        # zlib.crc32, not hash(): the builtin str hash is salted per process
-        # (PYTHONHASHSEED), which made these "default" ulist values differ
-        # between runs and broke reproducibility of the rendered query text.
         rng = random.Random(self.query_id * 1000 + zlib.crc32(name.encode()) % 10000)
         if hi - lo + 1 < count:
-            return None  # Range too small for unique values
+            return None
         return rng.sample(range(lo, hi + 1), count)
 
     def _parse_parameters(self) -> dict[str, TemplateParameter]:
@@ -301,12 +276,10 @@ class TemplateLoader:
         if expr_lower.startswith("dist") or expr_lower.startswith("sub"):
             return 0, "numeric"
 
-        # Fallback to literal expression
         raw = expr.strip('"')
         return raw, "numeric" if raw.isdigit() else "string"
 
     def substitute_tokens(self, text: str) -> tuple[str, dict[str, TemplateParameter]]:
-        """Replace parameter placeholders with parse-friendly tokens."""
         result = text
         for name, param in self.parameters.items():
             replacement = param.token_expression()
@@ -314,7 +287,6 @@ class TemplateLoader:
         return result, self.parameters
 
     def substitute_defaults(self, text: str) -> str:
-        """Replace placeholders with default literal values."""
         result = text
         for name, param in self.parameters.items():
             result = result.replace(f"[{name}]", param.render())
@@ -323,7 +295,6 @@ class TemplateLoader:
 
 def _gather_aliases(select: exp.Select) -> dict[str, str]:
     aliases: dict[str, str] = {}
-    # sqlglot 28+ uses "from_" instead of "from"
     from_expr = select.args.get("from") or select.args.get("from_")
 
     def _record(target: exp.Expression | None) -> None:
@@ -414,8 +385,6 @@ def _infer_address_role(fact_column: str, fact_table: str) -> str | None:
 
 
 class QueryConverter:
-    """Convert a single TPC-DS template into an OBT-ready query."""
-
     FACT_TABLES = {"store_sales", "web_sales", "catalog_sales", "store_returns", "web_returns", "catalog_returns"}
     DIMENSION_TABLES = {
         "date_dim",
@@ -540,7 +509,6 @@ class QueryConverter:
         select_channels = self._channels_for_aliases(aliases) or channels
         subquery_aliases: dict[str, exp.Subquery] = {}
         joins_arg = select.args.get("joins", [])
-        # sqlglot 28+ uses "from_" instead of "from"
         from_expr = select.args.get("from") or select.args.get("from_")
         if isinstance(from_expr, exp.From) and isinstance(from_expr.this, exp.Subquery) and from_expr.this.alias:
             subquery_aliases[from_expr.this.alias] = from_expr.this
@@ -583,7 +551,6 @@ class QueryConverter:
         if base_aliases:
             table_expr = exp.table_(OBT_TABLE_NAME, alias="obt")
             select.set("joins", [])
-            # sqlglot 28+ uses "from_" instead of "from"
             select.set("from_", exp.From(this=table_expr))
             joins: list[exp.Join] = []
             for alias in extra_aliases:
@@ -610,7 +577,6 @@ class QueryConverter:
                 this=exp.to_identifier(table_name),
                 alias=exp.TableAlias(this=exp.to_identifier(first)),
             )
-            # sqlglot 28+ uses "from_" instead of "from"
             select.set("from_", exp.From(this=table_expr))
             joins = []
             for alias in extra_aliases[1:]:
@@ -629,7 +595,6 @@ class QueryConverter:
 
     @staticmethod
     def _build_channel_predicate(channels: set[str]) -> exp.Expression | None:
-        """Return a predicate that constrains the canonical channel column."""
         if not channels:
             return None
         column = exp.column("channel")
@@ -639,7 +604,6 @@ class QueryConverter:
         return exp.In(this=column, expressions=values)
 
     def _channels_for_aliases(self, aliases: dict[str, str]) -> set[str]:
-        """Return channels implied by the fact table aliases in this select."""
         return {self.CHANNEL_BY_TABLE[table] for table in aliases.values() if table in self.CHANNEL_BY_TABLE}
 
     def _rewrite_columns(
@@ -679,9 +643,6 @@ class QueryConverter:
                 else:
                     column.set("table", None)
 
-    # Mapping from column prefix to (dimension_table, default_role_prefix) for simple dimension lookups.
-    # IMPORTANT: Iteration order matters - "w_" must precede "web_" because both match "web_*" columns,
-    # and warehouse columns (w_warehouse_*) should match "w_" first. Do not reorder these entries.
     _SIMPLE_DIMENSION_PREFIX_MAP: dict[str, tuple[str, str]] = {
         "p_": ("promotion", "promo_"),
         "r_": ("reason", "reason_"),
@@ -693,7 +654,6 @@ class QueryConverter:
         "web_": ("web_site", "web_site_"),
     }
 
-    # Mapping from column prefix to (dimension_table, default_role_prefix) for alias-aware dimension lookups.
     _ALIASED_DIMENSION_PREFIX_MAP: dict[str, tuple[str, str]] = {
         "c_": ("customer", "bill_customer_"),
         "cd_": ("customer_demographics", "bill_cdemo_"),
@@ -702,7 +662,6 @@ class QueryConverter:
         "s_": ("store", "store_"),
     }
 
-    # Mapping from return column prefix to channel for return reference lookups.
     _RETURN_PREFIX_CHANNEL_MAP: dict[str, str] = {
         "sr_": "store",
         "wr_": "web",
@@ -712,42 +671,34 @@ class QueryConverter:
     def _map_unqualified_column(self, name: str, aliases: dict[str, str], role_map: dict[str, str]) -> str | None:
         lowered = name.lower()
 
-        # Try fact table prefixes first
         mapped = self._map_fact_column(lowered)
         if mapped:
             return mapped
 
-        # Item dimension
         if lowered.startswith("i_"):
             alias_for_item = self._alias_for_table(aliases, "item")
             role_prefix = role_map.get(alias_for_item or "", "item_")
             return self.mapper.map_dimension("item", lowered, role_prefix)
 
-        # Date dimension (fall through if not found - column may match later prefixes)
         if lowered.startswith("d_"):
             mapped = self._map_date_dimension_column(lowered, aliases, role_map)
             if mapped:
                 return mapped
 
-        # Return reference columns
         mapped = self._map_return_prefix_column(lowered, role_map, aliases)
         if mapped:
             return mapped
 
-        # Store with numeric suffix (s_store_name1 etc.) - checked before s_ prefix
         if lowered.startswith("s_store_"):
             return self._map_store_numeric_suffix(lowered, aliases, role_map)
 
-        # Alias-aware dimension columns (customer, demographics, address, store)
         mapped = self._map_aliased_dimension_column(lowered, aliases, role_map)
         if mapped:
             return mapped
 
-        # Simple dimension columns (no alias resolution needed)
         return self._map_simple_dimension_column(lowered)
 
     def _map_fact_column(self, lowered: str) -> str | None:
-        """Map a column to a fact table based on its prefix."""
         fact_prefix_map = {
             "ss_": "store_sales",
             "sr_": "store_returns",
@@ -764,13 +715,11 @@ class QueryConverter:
         return None
 
     def _map_date_dimension_column(self, lowered: str, aliases: dict[str, str], role_map: dict[str, str]) -> str | None:
-        """Map a date dimension column with alias-aware role prefix."""
         alias_for_date = self._alias_for_table(aliases, "date_dim")
         role_prefix = role_map.get(alias_for_date or "", "sold_date_")
         return self.mapper.map_dimension("date_dim", lowered, role_prefix)
 
     def _map_return_prefix_column(self, lowered: str, role_map: dict[str, str], aliases: dict[str, str]) -> str | None:
-        """Map return-prefixed columns (sr_, wr_, cr_) via return reference lookup."""
         for prefix, channel in self._RETURN_PREFIX_CHANNEL_MAP.items():
             if lowered.startswith(prefix):
                 mapped = self._map_return_reference(lowered, role_map, aliases, channel=channel)
@@ -781,7 +730,6 @@ class QueryConverter:
     def _map_aliased_dimension_column(
         self, lowered: str, aliases: dict[str, str], role_map: dict[str, str]
     ) -> str | None:
-        """Map dimension columns that require alias resolution for role prefix."""
         for prefix, (dim_table, default_role) in self._ALIASED_DIMENSION_PREFIX_MAP.items():
             if lowered.startswith(prefix):
                 alias = self._alias_for_table(aliases, dim_table)
@@ -790,14 +738,12 @@ class QueryConverter:
         return None
 
     def _map_store_numeric_suffix(self, lowered: str, aliases: dict[str, str], role_map: dict[str, str]) -> str | None:
-        """Map store columns with numeric suffix (e.g., s_store_name1)."""
         base = re.sub(r"\d+$", "", lowered)
         alias_for_store = self._alias_for_table(aliases, "store")
         role_prefix = role_map.get(alias_for_store or "", "store_")
         return self.mapper.map_dimension("store", base, role_prefix)
 
     def _map_simple_dimension_column(self, lowered: str) -> str | None:
-        """Map dimension columns that use a fixed role prefix (no alias resolution)."""
         for prefix, (dim_table, role_prefix) in self._SIMPLE_DIMENSION_PREFIX_MAP.items():
             if lowered.startswith(prefix):
                 return self.mapper.map_dimension(dim_table, lowered, role_prefix)
@@ -994,7 +940,6 @@ class QueryConverter:
         return normalized
 
     def _post_process(self, query_id: int, sql_text: str) -> str:
-        """Apply query-specific fixes after AST rewriting."""
         sql_text = self._post_process_fix_1(query_id, sql_text)
         sql_text = self._post_process_fix_2(query_id, sql_text)
         sql_text = self._post_process_fix_3(query_id, sql_text)
@@ -1003,15 +948,11 @@ class QueryConverter:
         return sql_text
 
     def _post_process_fix_1(self, query_id: int, sql_text: str) -> str:
-        """Query-specific fixes: Q2, Q8, Q14, Q16."""
-        # Q2: Fix CTE column references for week sequence comparison
         if query_id == 2:
-            # The wswscs CTE needs d_week_seq alias - it comes from joining with date_dim
             sql_text = sql_text.replace(
                 "obt.sold_date_d_week_seq,\n    SUM(",
                 "obt.sold_date_d_week_seq AS d_week_seq,\n    SUM(",
             )
-            # Also need to alias in GROUP BY
             sql_text = sql_text.replace(
                 "GROUP BY\n  obt.sold_date_d_week_seq",
                 "GROUP BY\n  d_week_seq",
@@ -1020,7 +961,6 @@ class QueryConverter:
                 "GROUP BY\n    obt.sold_date_d_week_seq",
                 "GROUP BY\n    d_week_seq",
             )
-            # Include year information in the wswscs CTE so we can filter without rejoining
             sql_text = sql_text.replace(
                 "  SELECT\n    obt.sold_date_d_week_seq AS d_week_seq,\n    SUM(",
                 "  SELECT\n    obt.sold_date_d_week_seq AS d_week_seq,\n    obt.sold_date_d_year AS d_year,\n    SUM(",
@@ -1033,7 +973,6 @@ class QueryConverter:
                 "GROUP BY\n    d_week_seq",
                 "GROUP BY\n    d_week_seq,\n    d_year",
             )
-            # Replace the expensive joins in the y/z subqueries with direct filtering on d_year
             wswscs_block = re.compile(
                 r"  FROM tpcds_sales_returns_obt AS obt\n"
                 r"  CROSS JOIN wswscs AS wswscs\n"
@@ -1051,15 +990,11 @@ class QueryConverter:
             sql_text = wswscs_block.sub(_wswscs_replacement, sql_text, count=1)
             sql_text = wswscs_block.sub(_wswscs_replacement, sql_text, count=1)
 
-        # Q8: Value list V1 needs ca_zip column preserved - rewrite the subquery structure
         if query_id == 8:
-            # Fix outer CROSS JOIN SELECT: SELECT bill_addr_ca_zip → SELECT ca_zip
             sql_text = sql_text.replace(
                 "SELECT\n    bill_addr_ca_zip\n  FROM (",
                 "SELECT\n    ca_zip\n  FROM (",
             )
-            # Fix INTERSECT branch: its derived table (A1) only exposes ca_zip, not
-            # bill_addr_ca_zip, so the INTERSECT SELECT must use ca_zip regardless of indentation.
             sql_text = re.sub(
                 r"(\bINTERSECT\b\s+SELECT)\s+bill_addr_ca_zip\s+(FROM\s*\()",
                 r"\1\n    ca_zip\n  \2",
@@ -1070,19 +1005,15 @@ class QueryConverter:
                 "SUBSTRING(bill_addr_ca_zip, 1, 5) AS ca_zip",
             )
 
-        # Q14: Fix cross_items CTE - need to add columns and qualify references
         if query_id == 14:
-            # First fix the cross_items CTE to include needed columns
             sql_text = sql_text.replace(
                 "SELECT\n    obt.item_i_item_sk AS ss_item_sk\n  FROM tpcds_sales_returns_obt AS obt",
                 "SELECT\n    obt.item_i_item_sk AS ss_item_sk,\n    obt.item_i_brand_id AS brand_id,\n    obt.item_i_class_id AS class_id,\n    obt.item_i_category_id AS category_id\n  FROM tpcds_sales_returns_obt AS obt",
             )
-            # Then fix the references to use the CTE
             sql_text = sql_text.replace("= brand_id", "= cross_items.brand_id")
             sql_text = sql_text.replace("= class_id", "= cross_items.class_id")
             sql_text = sql_text.replace("= category_id", "= cross_items.category_id")
 
-        # Q16: NOT EXISTS with return tables - convert to OBT with has_return check
         if query_id == 16:
             sql_text = sql_text.replace(
                 "obt.sale_id = cr1.cr_order_number AND channel = 'catalog'",
@@ -1092,29 +1023,21 @@ class QueryConverter:
         return sql_text
 
     def _post_process_fix_2(self, query_id: int, sql_text: str) -> str:
-        """Query-specific fixes: Q31, Q34/46/68, Q79."""
-        # Q31: Fix CTE references - CTEs produce columns with obt. prefix but are referenced without
         if query_id == 31:
-            # Fix ss CTE output column aliases
             sql_text = sql_text.replace(
                 "obt.bill_addr_ca_county,\n    obt.sold_date_d_qoy,\n    obt.sold_date_d_year,\n    SUM(obt.ext_sales_price) AS store_sales",
                 "obt.bill_addr_ca_county AS ca_county,\n    obt.sold_date_d_qoy AS d_qoy,\n    obt.sold_date_d_year AS d_year,\n    SUM(obt.ext_sales_price) AS store_sales",
             )
-            # Fix ws CTE output column aliases
             sql_text = sql_text.replace(
                 "obt.bill_addr_ca_county,\n    obt.sold_date_d_qoy,\n    obt.sold_date_d_year,\n    SUM(obt.ext_sales_price) AS web_sales",
                 "obt.bill_addr_ca_county AS ca_county,\n    obt.sold_date_d_qoy AS d_qoy,\n    obt.sold_date_d_year AS d_year,\n    SUM(obt.ext_sales_price) AS web_sales",
             )
-            # Update GROUP BY to use original column names
             sql_text = sql_text.replace(
                 "GROUP BY\n    obt.bill_addr_ca_county,\n    obt.sold_date_d_qoy,\n    obt.sold_date_d_year",
                 "GROUP BY\n    ca_county,\n    d_qoy,\n    d_year",
             )
 
-        # Q34, Q46, Q68: Ambiguous columns between obt (main) and subquery (also named obt)
-        # Solution: Rename the inner subquery's obt to sub_obt
         if query_id in {34, 46, 68}:
-            # Rename the inner subquery's obt alias to avoid conflict
             sql_text = sql_text.replace(
                 "CROSS JOIN (\n  SELECT\n    obt.sale_id,\n    obt.ship_customer_sk",
                 "CROSS JOIN (\n  SELECT\n    sub_obt.sale_id AS dn_sale_id,\n    sub_obt.ship_customer_sk AS dn_ship_customer_sk",
@@ -1123,16 +1046,13 @@ class QueryConverter:
                 "FROM tpcds_sales_returns_obt AS obt\n  WHERE\n    (\n      obt.sold_date_sk",
                 "FROM tpcds_sales_returns_obt AS sub_obt\n  WHERE\n    (\n      sub_obt.sold_date_sk",
             )
-            # Fix references inside the subquery
             sql_text = sql_text.replace("obt.store_sk = store_s_store_sk", "sub_obt.store_sk = store_s_store_sk")
             sql_text = sql_text.replace("obt.ship_hdemo_sk", "sub_obt.ship_hdemo_sk")
             sql_text = sql_text.replace("obt.bill_hdemo_sk", "sub_obt.bill_hdemo_sk")
-            # Fix the GROUP BY and HAVING clauses
             sql_text = sql_text.replace(
                 "GROUP BY\n    obt.sale_id,\n    obt.ship_customer_sk",
                 "GROUP BY\n    sub_obt.sale_id,\n    sub_obt.ship_customer_sk",
             )
-            # Add alias for the subquery result
             sql_text = sql_text.replace(
                 ") AS dn\nWHERE",
                 ") AS dn\nWHERE\n  obt.sale_id = dn.dn_sale_id AND obt.ship_customer_sk = dn.dn_ship_customer_sk AND",
@@ -1142,41 +1062,31 @@ class QueryConverter:
             if query_id == 46:
                 sql_text = sql_text.replace("  amt", "  obt.ext_sales_price AS amt")
 
-        # Q79: Same CROSS JOIN → filtered join fix as Q34/Q46/Q68.
-        # The subquery (aliased ms) must be joined on sale_id + ship_customer_sk,
-        # and the inner obt alias must be renamed to avoid ambiguity.
         if query_id == 79:
-            # Rename inner subquery's SELECT columns to avoid ambiguity
             sql_text = sql_text.replace(
                 "CROSS JOIN (\n  SELECT\n    obt.sale_id,\n    obt.ship_customer_sk",
                 "CROSS JOIN (\n  SELECT\n    sub_obt.sale_id AS ms_sale_id,\n    sub_obt.ship_customer_sk AS ms_ship_customer_sk",
             )
-            # Rename inner FROM alias
             sql_text = sql_text.replace(
                 "FROM tpcds_sales_returns_obt AS obt\n  WHERE\n    (\n      obt.sold_date_sk",
                 "FROM tpcds_sales_returns_obt AS sub_obt\n  WHERE\n    (\n      sub_obt.sold_date_sk",
             )
-            # Fix inner subquery column references
             sql_text = sql_text.replace("obt.store_sk = store_s_store_sk", "sub_obt.store_sk = store_s_store_sk")
             sql_text = sql_text.replace("obt.ship_hdemo_sk", "sub_obt.ship_hdemo_sk")
             sql_text = sql_text.replace("obt.coupon_amt", "sub_obt.coupon_amt")
             sql_text = sql_text.replace("obt.net_profit", "sub_obt.net_profit")
-            # Fix inner GROUP BY
             sql_text = sql_text.replace(
                 "GROUP BY\n    obt.sale_id,\n    obt.ship_customer_sk,\n    obt.ship_addr_sk",
                 "GROUP BY\n    sub_obt.sale_id,\n    sub_obt.ship_customer_sk,\n    sub_obt.ship_addr_sk",
             )
-            # Add join condition between outer obt and subquery ms
             sql_text = sql_text.replace(
                 ") AS ms\nWHERE",
                 ") AS ms\nWHERE\n  obt.sale_id = ms.ms_sale_id AND obt.ship_customer_sk = ms.ms_ship_customer_sk AND",
             )
-            # Disambiguate outer SELECT/ORDER BY references
             sql_text = sql_text.replace("  sale_id,\n  amt", "  obt.sale_id,\n  amt")
             sql_text = sql_text.replace("SUBSTRING(store_s_city", "SUBSTRING(obt.store_s_city")
             sql_text = re.sub(r"(?<![a-z_\.])bill_customer_c_", "obt.bill_customer_c_", sql_text)
             sql_text = sql_text.replace("obt.obt.bill_customer_c_", "obt.bill_customer_c_")
-            # Disambiguate bare ship_customer_sk in outer WHERE
             sql_text = sql_text.replace(
                 "ship_customer_sk = obt.bill_customer_c_customer_sk",
                 "obt.ship_customer_sk = obt.bill_customer_c_customer_sk",
@@ -1185,8 +1095,6 @@ class QueryConverter:
         return sql_text
 
     def _post_process_fix_3(self, query_id: int, sql_text: str) -> str:
-        """Query-specific fixes: Q40, Q44, Q45, Q47/57, Q49, Q51."""
-        # Q40: Interval syntax - fix "- 30 AS days"
         if query_id == 40:
             sql_text = re.sub(
                 r"CAST\('(\d{4}-\d{2}-\d{2})' AS DATE\) - (\d+) AS days",
@@ -1199,7 +1107,6 @@ class QueryConverter:
                 sql_text,
             )
 
-        # Q44: Special handling for ranking subqueries
         if query_id == 44:
             sql_text = sql_text.replace(
                 "FROM (\n  SELECT", "FROM tpcds_sales_returns_obt AS obt CROSS JOIN (\n  SELECT", 1
@@ -1207,60 +1114,46 @@ class QueryConverter:
             sql_text = sql_text.replace("AND item_i_item_sk = item_sk", "AND obt.item_sk = asceding.item_sk", 1)
             sql_text = sql_text.replace("AND item_i_item_sk = item_sk", "AND obt.item_sk = descending.item_sk", 1)
 
-        # Q45: Missing ca_city - should be bill_addr_ca_city
         if query_id == 45:
             sql_text = sql_text.replace("ca_city", "bill_addr_ca_city")
 
-        # Q47, Q57: Parameter placeholder creates empty alias "AS ," and CTE column references
         if query_id in {47, 57}:
             sql_text = re.sub(r"\[SELECTONE\]\s*AS\s*,", "[SELECTONE],", sql_text)
             sql_text = re.sub(r"AS\s*,\s*v1\.", ", v1.", sql_text)
-            # For Q47 - fix v1 CTE output columns - add aliases in SELECT only, not GROUP BY
             if query_id == 47:
-                # The v1 CTE SELECT columns need aliases - add all missing ones
                 sql_text = sql_text.replace(
                     "obt.item_i_category,\n    obt.item_i_brand,\n    obt.store_s_store_name,\n    obt.store_s_company_name,\n    obt.sold_date_d_year,\n    obt.sold_date_d_moy,",
                     "obt.item_i_category AS i_category,\n    obt.item_i_brand AS i_brand,\n    obt.store_s_store_name AS s_store_name,\n    obt.store_s_company_name AS s_company_name,\n    obt.sold_date_d_year AS d_year,\n    obt.sold_date_d_moy AS d_moy,",
                 )
-                # Fix GROUP BY - remove aliases (AS not allowed in GROUP BY)
                 sql_text = sql_text.replace(
                     "GROUP BY\n    obt.item_i_category AS i_category,\n    obt.item_i_brand AS i_brand,\n    obt.store_s_store_name AS s_store_name,\n    obt.store_s_company_name AS s_company_name,\n    obt.sold_date_d_year AS d_year,\n    obt.sold_date_d_moy AS d_moy",
                     "GROUP BY\n    obt.item_i_category,\n    obt.item_i_brand,\n    obt.store_s_store_name,\n    obt.store_s_company_name,\n    obt.sold_date_d_year,\n    obt.sold_date_d_moy",
                 )
-                # Also fix the WHERE clause in the outer query - same issue as Q57
                 sql_text = sql_text.replace(
                     "WHERE\n  sold_date_d_year = 1999",
                     "WHERE\n  d_year = 1999",
                 )
             if query_id == 57:
-                # Similar fix for Q57 with call_center instead of store
                 sql_text = sql_text.replace(
                     "SELECT\n    obt.item_i_category,\n    obt.item_i_brand,\n    obt.call_center_cc_name,\n    obt.sold_date_d_year,\n    obt.sold_date_d_moy,",
                     "SELECT\n    obt.item_i_category AS i_category,\n    obt.item_i_brand AS i_brand,\n    obt.call_center_cc_name AS cc_name,\n    obt.sold_date_d_year AS d_year,\n    obt.sold_date_d_moy AS d_moy,",
                 )
-                # Fix GROUP BY
                 sql_text = sql_text.replace(
                     "GROUP BY\n    obt.item_i_category AS i_category,",
                     "GROUP BY\n    obt.item_i_category,",
                 )
-                # Fix WHERE clause - v2 CTE outputs d_year not sold_date_d_year
                 sql_text = sql_text.replace(
                     "WHERE\n  sold_date_d_year = 1999",
                     "WHERE\n  d_year = 1999",
                 )
 
-        # Q49: Missing tables wr and cr - convert to OBT
         if query_id == 49:
             sql_text = sql_text.replace("wr.wr_order_number", "obt.sale_id")
             sql_text = sql_text.replace("wr.wr_item_sk", "obt.item_sk")
             sql_text = sql_text.replace("cr.cr_order_number", "obt.sale_id")
             sql_text = sql_text.replace("cr.cr_item_sk", "obt.item_sk")
 
-        # Q51: Ambiguous item_sk between web and store CTEs - qualify all references
         if query_id == 51:
-            # Fix the CASE expression that tries to coalesce item_sk from both CTEs.
-            # sqlglot <=30.6 renders IS NOT NULL as "NOT x IS NULL"; 30.18+
-            # renders it canonically, so handle both serializations.
             sql_text = sql_text.replace(
                 "CASE WHEN NOT item_sk IS NULL THEN item_sk ELSE item_sk END AS item_sk",
                 "COALESCE(web.item_sk, store.item_sk) AS item_sk",
@@ -1269,28 +1162,22 @@ class QueryConverter:
                 "CASE WHEN item_sk IS NOT NULL THEN item_sk ELSE item_sk END AS item_sk",
                 "COALESCE(web.item_sk, store.item_sk) AS item_sk",
             )
-            # Fix the JOIN ON clause
             sql_text = sql_text.replace(
                 "item_sk = item_sk AND web.d_date = store.d_date",
                 "web.item_sk = store.item_sk AND web.d_date = store.d_date",
             )
-            # Fix sold_date_d_date alias needed for outer reference
             sql_text = sql_text.replace(
                 "obt.sold_date_d_date,\n    SUM(SUM(",
                 "obt.sold_date_d_date AS d_date,\n    SUM(SUM(",
             )
-            # Fix outer query references to use d_date instead of sold_date_d_date
-            # The outer SELECT needs to output d_date consistently
             sql_text = sql_text.replace(
                 "SELECT\n    item_sk,\n    sold_date_d_date,",
                 "SELECT\n    item_sk,\n    d_date,",
             )
-            # Fix window function ORDER BY clauses that still reference sold_date_d_date
             sql_text = sql_text.replace(
                 "ORDER BY sold_date_d_date\n      rows",
                 "ORDER BY d_date\n      rows",
             )
-            # Fix final ORDER BY
             sql_text = sql_text.replace(
                 "ORDER BY\n  item_sk,\n  sold_date_d_date",
                 "ORDER BY\n  item_sk,\n  d_date",
@@ -1299,33 +1186,21 @@ class QueryConverter:
         return sql_text
 
     def _post_process_fix_4(self, query_id: int, sql_text: str) -> str:
-        """Query-specific fixes: Q58, Q59, Q65, Q73, Q66, Q71."""
-        # Q58: Fix scalar subquery to use DISTINCT (OBT has multiple rows per date)
         if query_id == 58:
-            # The innermost subquery returns week_seq for a date, but OBT has many rows per date.
-            # Use MAX() to ensure only one value is returned (all rows have same week_seq for same date)
             sql_text = sql_text.replace(
                 "obt.sold_date_d_week_seq = (\n            SELECT\n              obt.sold_date_d_week_seq\n            FROM tpcds_sales_returns_obt AS obt\n            WHERE\n              obt.sold_date_d_date =",
                 "obt.sold_date_d_week_seq = (\n            SELECT\n              MAX(obt.sold_date_d_week_seq)\n            FROM tpcds_sales_returns_obt AS obt\n            WHERE\n              obt.sold_date_d_date =",
             )
-            # Fix WHERE clause references - need both comparisons
             sql_text = sql_text.replace(
                 "ss_items.item_id = ws_items.item_id\n  AND ss_items.item_id = ws_items.item_id",
                 "ss_items.item_id = cs_items.item_id\n  AND ss_items.item_id = ws_items.item_id",
             )
-            # Fix unqualified item_id in ORDER BY
             sql_text = sql_text.replace(
                 "ORDER BY\n  item_id,",
                 "ORDER BY\n  ss_items.item_id,",
             )
 
-        # Q59: Restructure to avoid cartesian product - query wss CTE directly with store dimension join
         if query_id == 59:
-            # The query creates a massive cartesian product by CROSS JOINing OBT with wss.
-            # Instead, we need to join wss with store dimension info from OBT.
-            # Add store info to the wss CTE and filter by month_seq there.
-
-            # First, add store dimension columns and month_seq to wss CTE
             sql_text = sql_text.replace(
                 "  SELECT\n    obt.sold_date_d_week_seq,\n    obt.store_sk,",
                 "  SELECT\n    obt.sold_date_d_week_seq,\n    obt.store_sk,\n    obt.store_s_store_name,\n    obt.store_s_store_id,\n    obt.sold_date_d_month_seq,",
@@ -1335,7 +1210,6 @@ class QueryConverter:
                 "  GROUP BY\n    obt.sold_date_d_week_seq,\n    obt.store_sk,\n    obt.store_s_store_name,\n    obt.store_s_store_id,\n    obt.sold_date_d_month_seq",
             )
 
-            # Now rewrite the y subquery to just query wss directly
             sql_text = sql_text.replace(
                 """FROM (
   SELECT
@@ -1377,7 +1251,6 @@ class QueryConverter:
 ) AS y, (""",
             )
 
-            # Now rewrite the x subquery similarly
             sql_text = sql_text.replace(
                 """  SELECT
     obt.store_s_store_name AS s_store_name2,
@@ -1425,33 +1298,25 @@ class QueryConverter:
                 "WHERE\n  s_store_id1 = s_store_id2 AND d_week_seq1 = d_week_seq2 - 52",
             )
 
-        # Q65: CTE sc and sb need proper column names
         if query_id == 65:
-            # Fix the CTE output columns
             sql_text = sql_text.replace("sb.ss_store_sk", "sb.store_sk")
             sql_text = sql_text.replace("sc.ss_store_sk", "sc.store_sk")
             sql_text = sql_text.replace("sc.ss_item_sk", "sc.item_sk")
-            # Add aliases to CTE outputs
             sql_text = sql_text.replace(
                 "obt.store_sk,\n    obt.item_sk,",
                 "obt.store_sk AS store_sk,\n    obt.item_sk AS item_sk,",
             )
 
-        # Q73: Ambiguous sale_id and ship_customer_sk between obt and dj subquery
         if query_id == 73:
-            # The subquery dj outputs sale_id and ship_customer_sk which conflict with obt columns
-            # Fix the outer SELECT to use the subquery's column
             sql_text = sql_text.replace(
                 "SELECT\n  bill_customer_c_last_name,\n  bill_customer_c_first_name,\n  bill_customer_c_salutation,\n  bill_customer_c_preferred_cust_flag,\n  sale_id,\n  cnt",
                 "SELECT\n  bill_customer_c_last_name,\n  bill_customer_c_first_name,\n  bill_customer_c_salutation,\n  bill_customer_c_preferred_cust_flag,\n  dj.sale_id,\n  cnt",
             )
-            # Fix WHERE clause - ship_customer_sk is also ambiguous
             sql_text = sql_text.replace(
                 "ship_customer_sk = bill_customer_c_customer_sk",
                 "dj.ship_customer_sk = obt.bill_customer_c_customer_sk",
             )
 
-        # Q66, Q71: Missing time dimension column references
         if query_id == 66:
             sql_text = sql_text.replace("t_time_sk", "sold_time_t_time_sk")
             sql_text = sql_text.replace("sold_time_sold_time_t_time_sk", "sold_time_t_time_sk")
@@ -1470,109 +1335,83 @@ class QueryConverter:
         return sql_text
 
     def _post_process_fix_5(self, query_id: int, sql_text: str) -> str:
-        """Query-specific fixes: Q75, Q77, Q78, Q90, Q94, Q95, Q97."""
-        # Q75: CTE all_sales needs proper column output aliases
         if query_id == 75:
-            # The outer CTE SELECT columns need aliases to match what's expected (d_year, i_brand_id, etc.)
             sql_text = sql_text.replace(
                 "WITH all_sales AS (\n  SELECT\n    sold_date_d_year,\n    item_i_brand_id,\n    item_i_class_id,\n    item_i_category_id,\n    item_i_manufact_id,",
                 "WITH all_sales AS (\n  SELECT\n    sold_date_d_year AS d_year,\n    item_i_brand_id AS i_brand_id,\n    item_i_class_id AS i_class_id,\n    item_i_category_id AS i_category_id,\n    item_i_manufact_id AS i_manufact_id,",
             )
-            # Also fix the GROUP BY to use aliases
             sql_text = sql_text.replace(
                 "GROUP BY\n    sold_date_d_year,\n    item_i_brand_id,\n    item_i_class_id,\n    item_i_category_id,\n    item_i_manufact_id",
                 "GROUP BY\n    d_year,\n    i_brand_id,\n    i_class_id,\n    i_category_id,\n    i_manufact_id",
             )
 
-        # Q77: CTE ss and sr need s_store_sk aliases, ws and wr need wp_web_page_sk aliases
         if query_id == 77:
-            # Fix ss CTE - add s_store_sk alias (matches what main query expects)
             sql_text = sql_text.replace(
                 "WITH ss AS (\n  SELECT\n    obt.store_s_store_sk,",
                 "WITH ss AS (\n  SELECT\n    obt.store_s_store_sk AS s_store_sk,",
             )
-            # Fix sr CTE - add s_store_sk alias
             sql_text = sql_text.replace(
                 "), sr AS (\n  SELECT\n    obt.store_s_store_sk,",
                 "), sr AS (\n  SELECT\n    obt.store_s_store_sk AS s_store_sk,",
             )
-            # The fix that was adding AS store_sk needs to be undone for sr
             sql_text = sql_text.replace(
                 "obt.store_s_store_sk AS store_sk,\n    SUM(obt.return_amount)",
                 "obt.store_s_store_sk AS s_store_sk,\n    SUM(obt.return_amount)",
             )
-            # Fix ws CTE - add wp_web_page_sk alias
             sql_text = sql_text.replace(
                 "), ws AS (\n  SELECT\n    obt.web_page_wp_web_page_sk,",
                 "), ws AS (\n  SELECT\n    obt.web_page_wp_web_page_sk AS wp_web_page_sk,",
             )
-            # Fix wr CTE - add wp_web_page_sk alias
             sql_text = sql_text.replace(
                 "), wr AS (\n  SELECT\n    obt.web_page_wp_web_page_sk,",
                 "), wr AS (\n  SELECT\n    obt.web_page_wp_web_page_sk AS wp_web_page_sk,",
             )
-            # Fix ambiguous call_center_sk in catalog channel SELECT
             sql_text = sql_text.replace(
                 "'catalog channel' AS channel,\n    call_center_sk AS id,",
                 "'catalog channel' AS channel,\n    cs.call_center_sk AS id,",
             )
 
-        # Q78: Ambiguous item_sk - the CTEs (ws, cs, ss) need proper column references
         if query_id == 78:
-            # Fix all unqualified item_sk = item_sk patterns
-            # ws JOIN ON clause (line 80)
             sql_text = sql_text.replace(
                 "ws_sold_year = ss_sold_year\n    AND item_sk = item_sk\n    AND ws_customer_sk",
                 "ws_sold_year = ss_sold_year\n    AND ws.item_sk = ss.item_sk\n    AND ws_customer_sk",
             )
-            # cs JOIN ON clause (line 86)
             sql_text = sql_text.replace(
                 "cs_sold_year = ss_sold_year\n    AND item_sk = item_sk\n    AND cs_customer_sk",
                 "cs_sold_year = ss_sold_year\n    AND ss.item_sk = cs.item_sk\n    AND cs_customer_sk",
             )
-            # WHERE clause - ws section
             sql_text = sql_text.replace(
                 "ws_sold_year = ss_sold_year\n      AND item_sk = item_sk\n      AND ws_customer_sk",
                 "ws_sold_year = ss_sold_year\n      AND ws.item_sk = ss.item_sk\n      AND ws_customer_sk",
             )
-            # WHERE clause - cs section
             sql_text = sql_text.replace(
                 "cs_sold_year = ss_sold_year\n    AND item_sk = item_sk\n    AND cs_customer_sk",
                 "cs_sold_year = ss_sold_year\n    AND cs.item_sk = ss.item_sk\n    AND cs_customer_sk",
             )
 
-        # Q90: Reserved word 'at' as alias
         if query_id == 90:
             sql_text = sql_text.replace(") AS at,", ") AS am_count,")
             sql_text = sql_text.replace("at.", "am_count.")
 
-        # Q94: Missing table wr1
         if query_id == 94:
             sql_text = sql_text.replace(
                 "obt.sale_id = wr1.wr_order_number AND channel = 'web'",
                 "obt.sale_id = obt.sale_id AND obt.has_return = 'Y' AND obt.channel = 'web'",
             )
 
-        # Q95: Missing table ws_wh
         if query_id == 95:
             sql_text = sql_text.replace(
                 "obt.sale_id = ws_wh.ws_order_number AND channel = 'web'",
                 "obt.sale_id = obt.sale_id AND obt.has_return = 'Y' AND obt.channel = 'web'",
             )
 
-        # Q70: The IN subquery does `SELECT store_s_state FROM tmp1` but tmp1 only exposes
-        # `s_state` (aliased from store_s_state).  On strict SQL parsers (e.g. StarRocks)
-        # the unaliased reference is resolved as a correlated outer-query column, which is
-        # rejected outside of a WHERE clause.  Fix by selecting the alias instead.
         if query_id == 70:
             sql_text = sql_text.replace(
                 "SELECT\n        store_s_state\n      FROM (\n        SELECT\n          obt.store_s_state AS s_state",
                 "SELECT\n        s_state\n      FROM (\n        SELECT\n          obt.store_s_state AS s_state",
             )
 
-        # Q97: Ambiguous item_sk between ssci and csci CTEs
         if query_id == 97:
-            # Fix the ambiguous item_sk = item_sk in ON and WHERE clauses
             sql_text = sql_text.replace(
                 "ssci.customer_sk = csci.customer_sk AND item_sk = item_sk",
                 "ssci.customer_sk = csci.customer_sk AND ssci.item_sk = csci.item_sk",

@@ -1,17 +1,3 @@
-"""Spark query rewrite rules for Phase.QUERY_ADAPTER.
-
-Spark rejects three TPC-Havoc variant shapes at parse or analysis time:
-
-- Correlated scalar subqueries in the SELECT list of an aggregated query
-  (``SCALAR_SUBQUERY_IS_IN_GROUP_BY_OR_AGGREGATE_FUNCTION``). The scalar is
-  correlated on the GROUP BY keys and therefore constant per group, so the
-  transformer wraps it in ``first()`` without changing semantics.
-- Empty grouping (``GROUP BY ()``), which the Spark parser rejects. Dropping
-  the empty grouping keeps single-group aggregate semantics.
-- The ``(SELECT 1) AS dual`` UNION ALL leg, which carries no explicit column
-  alias. The transformer adds one.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction
@@ -27,7 +13,6 @@ from benchbox.sql_compat.registry import REGISTRY
 _P = Phase.QUERY_ADAPTER
 _B = "tpchavoc"
 
-# (query_id, rule_slug, description)
 _REWRITES = [
     (
         "1_v1",

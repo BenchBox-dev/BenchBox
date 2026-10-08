@@ -1,11 +1,3 @@
-"""Preflight phase: disk, docker, noisy-neighbor scan.
-
-Mirrors the W1 step of the 2026-05-02 retrospective. Telemetry-first:
-warns liberally, aborts on disk headroom and `free_space_min_gib` unless
-an operator explicitly disables the disk gate, and can opt in to
-local-platform reachability enforcement.
-"""
-
 from __future__ import annotations
 
 import csv
@@ -39,13 +31,6 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def automated_local_platforms() -> tuple[str, ...]:
-    """Derive the UAT-managed local platform set from `docker_assets`.
-
-    Single source of truth: a platform is UAT-managed iff its
-    `DockerPlatformSpec.managed_start_allowed` is true and it has no
-    `fixed_container_names`. Mirrors the rule used by
-    `scripts/uat-bring-up/uat_bring_up.py:automated_platforms`.
-    """
     return tuple(
         sorted(
             platform
@@ -71,24 +56,10 @@ class PreflightResult(PhaseResult):
     local_platforms_attempted: tuple[str, ...] = ()
     disk_budget_summary: str | None = None
     free_space_report: tuple[str, ...] = ()
-    # Typed cause for `aborted` -- "disk_floor", "docker_required", or
-    # "local_platform_unreachable". None when not aborted. Consumers must
-    # branch on this field, never on substrings of `abort_reason` (a
-    # human-facing message that can be reworded without notice) -- see
-    # uat-execute-path-unification w5.
     abort_kind: str | None = None
 
 
 def docker_reachable() -> bool:
-    """Return True iff the resolved container CLI's `ps` succeeds within 5 s.
-
-    A resolution failure (no engine binary on PATH at all) degrades to the
-    same "not reachable" signal as a missing/unresponsive daemon -- this is
-    a soft preflight probe, not the action that needs a hard error (see
-    uat-container-engine-routing w1; `resolve_container_cli()` itself still
-    hard-errors for the actions that actually shell out to build/start/stop
-    a stack).
-    """
     try:
         cli = docker_assets.resolve_container_cli()
         subprocess.run(
@@ -104,7 +75,6 @@ def docker_reachable() -> bool:
 
 
 def docker_data_root() -> Path | None:
-    """Return the resolved engine's host-visible data root, when it reports one."""
     try:
         cli = docker_assets.resolve_container_cli()
         completed = subprocess.run(
@@ -126,7 +96,6 @@ def docker_data_root() -> Path | None:
 
 
 def host_load_1m() -> float | None:
-    """Return the 1-minute load average, or None on platforms without getloadavg."""
     try:
         return os.getloadavg()[0]
     except (AttributeError, OSError):
@@ -134,7 +103,6 @@ def host_load_1m() -> float | None:
 
 
 def requested_platforms_from_config(config: UATConfig) -> tuple[str, ...]:
-    """Resolve the platforms requested by a validated UAT config."""
     platform_groups_default = ("sql",) if config.platforms.uses_implicit_group_default else ()
     return tuple(
         resolve_platforms(
@@ -150,7 +118,6 @@ def preflight_kwargs_from_config(
     *,
     benchmark_runs_dir: str | Path | None = None,
 ) -> dict[str, Any]:
-    """Build the canonical run_preflight kwargs for a validated config."""
     if benchmark_runs_dir is None:
         from tests.uat.phases.execute import default_benchmark_runs_dir
 
@@ -182,14 +149,6 @@ def run_preflight(
     disk_budget_config: UATConfig | None = None,
     docker_manage_platforms: bool = False,
 ) -> PreflightResult:
-    """Execute the preflight phase.
-
-    By default this preserves historical local-service behaviour: missing
-    local services remain execute-phase `skipped_unreachable` cells. When
-    `local_platforms_check` is true, requested platforms are probed before
-    the sweep starts. Automated platforms get one `make uat-bring-up` attempt;
-    non-automated platforms abort with an operator-facing message.
-    """
     free_gib = free_space_gib(free_space_path)
     docker_ok = docker_reachable()
     load_1m = host_load_1m()
@@ -224,17 +183,6 @@ def run_preflight(
                 disk_budget_summary, budget_gate, free_space_min_gib=free_space_min_gib
             )
         except (OSError, ValueError, TypeError, KeyError, csv.Error) as exc:
-            # The estimator CRASHED (bad table row, unreadable TSV, a
-            # malformed config field) -- distinct from the advisory
-            # unknown_cells case above, which stays a warning. TypeError
-            # covers truncated TSV rows: DictReader fills missing fields
-            # with restval=None and float(None) raises TypeError, not
-            # ValueError. Downgrading a crash to a warning would silently
-            # fall back to the flat free_space_min_gib cutoff below and
-            # disable the stronger budget-aware gate with only a stderr
-            # line (uat-disk-gate-always-on w3). Hard-fail preflight
-            # instead, surfacing which exception fired so the operator can
-            # fix the budget table or set an explicit flat floor.
             return PreflightResult(
                 phase="preflight",
                 free_space_gib=free_gib,
@@ -279,9 +227,6 @@ def run_preflight(
     if docker_required and not docker_ok:
         aborted = True
         abort_reason = (abort_reason or "") + ("; docker_required=true but `docker ps` is unreachable")
-        # Disk-floor abort (set above, if any) takes precedence as the typed
-        # cause when both conditions fire in the same run -- it is the more
-        # actionable/primary safety interlock.
         if abort_kind is None:
             abort_kind = "docker_required"
     if load_1m is not None and load_1m > noisy_neighbor_warn_load:
@@ -289,12 +234,6 @@ def run_preflight(
     if not docker_ok and not docker_required:
         warnings.append("docker not reachable (any docker platforms will skip)")
     if docker_manage_platforms and docker_ok and docker_root is None:
-        # `docker info --format {{.DockerRootDir}}` reported a path that does
-        # not exist on this host -- the normal case for a Linux-VM-backed
-        # engine on macOS, where the data root lives inside the VM. That root
-        # is then absent from `collect_disk_roots`, so container-resident
-        # images/volumes are neither budgeted nor free-space-checked. Disclose
-        # it rather than let a silent omission read as "nothing to check".
         warnings.append(
             "container data root is not host-visible (VM-backed engine); "
             "container images/volumes are neither budgeted nor free-space-checked"
@@ -385,7 +324,6 @@ def _run_make_bring_up(platform: str, *, benchmark_runs_dir: str | Path | None =
 
 
 def estimate_disk_budget_summary(config: UATConfig) -> str:
-    """Return the advisory disk-budget line for a config."""
     from tests.uat.preflight_budget import estimate_peak_disk, format_disk_budget
 
     return format_disk_budget(estimate_peak_disk(config))
@@ -393,8 +331,6 @@ def estimate_disk_budget_summary(config: UATConfig) -> str:
 
 @dataclass(frozen=True)
 class DiskBudgetGate:
-    """Preflight disk-budget gate inputs and result."""
-
     budget: DiskBudget
     headroom: DiskHeadroomCheck
     coverage: DiskBudgetCoverage
@@ -406,13 +342,6 @@ def estimate_disk_budget_summary_and_gate(
     *,
     min_free_gib: float,
 ) -> tuple[str, DiskBudgetGate]:
-    """Return the full advisory summary and largest-scale headroom gate.
-
-    The gate carries its own `coverage` because the estimate it gates on is
-    a lower bound over a partially-measured inventory: callers need to know
-    how much of it was measured to report a NON-refusing outcome honestly
-    (`_disk_budget_report`). The refusing outcome needs no such caveat.
-    """
     from tests.uat.preflight_budget import (
         assess_budget_coverage,
         check_disk_headroom,
@@ -438,11 +367,6 @@ def estimate_disk_budget_summary_and_gate(
 
 
 def _disk_budget_coverage_warnings(coverage: DiskBudgetCoverage) -> tuple[str, ...]:
-    """Warnings for whatever the budget table could not measure.
-
-    Split from `run_preflight` so disclosing a new coverage dimension never
-    costs that function another branch (it is at the C901 cap).
-    """
     if not coverage.is_lower_bound:
         return ()
     return (
@@ -454,26 +378,6 @@ def _disk_budget_coverage_warnings(coverage: DiskBudgetCoverage) -> tuple[str, .
 
 
 def _disk_budget_report(summary: str, gate: DiskBudgetGate, *, free_space_min_gib: float) -> str:
-    """Compose the always-printed operator block for the disk-budget gate.
-
-    Coverage is always disclosed. `gate.headroom` is always computed against
-    the estimate ALONE (`estimate_disk_budget_summary_and_gate` calls
-    `check_disk_headroom` with the raw configured `free_space_min_gib`,
-    unadjusted), so when `free_space_min_gib <= 0` disables the gate
-    (`run_preflight`'s own abort checks are guarded by `free_space_min_gib >
-    0`), `gate.headroom.required_gib`/`shortfalls` still describe a
-    requirement that was never going to be enforced. Printing
-    `format_budget_verdict` unmodified in that case would (a) assert "no
-    shortfall"/"fits" against a requirement the free-space table right below
-    it correctly prints as `0.00 GiB`, and (b) vanish entirely with no
-    explanation whenever the estimate exceeded free space, since the verdict
-    line is otherwise gated on `not gate.headroom.shortfalls` and a disabled
-    floor still won't abort. State plainly that the gate is off instead.
-
-    Otherwise the verdict line is added only when the gate did not refuse,
-    because that is the outcome an operator can misread as "measured and
-    fine" -- a refusal is unambiguous.
-    """
     from tests.uat.preflight_budget import format_budget_coverage, format_budget_verdict
 
     lines = [summary, format_budget_coverage(gate.coverage)]
@@ -488,11 +392,6 @@ def _disk_budget_report(summary: str, gate: DiskBudgetGate, *, free_space_min_gi
 
 
 def _required_is_lower_bound(gate: DiskBudgetGate | None, required_gib: float) -> bool:
-    """True when the printed requirement understates real demand.
-
-    False when the gate is disabled (`required_gib == 0`): there is no
-    requirement to understate.
-    """
     return gate is not None and required_gib > 0 and gate.coverage.is_lower_bound
 
 
@@ -503,7 +402,6 @@ def collect_disk_roots(
     docker_manage_platforms: bool = False,
     docker_data_root: str | Path | None = None,
 ) -> tuple[tuple[str, Path], ...]:
-    """Return labeled disk roots that UAT writes or depends on."""
     runs_root = Path(benchmark_runs_dir).expanduser()
     roots: list[tuple[str, Path]] = [
         ("tmp", Path(tempfile.gettempdir()).expanduser()),
@@ -523,7 +421,6 @@ def read_disk_root_free_space(
     *,
     free_space_reader: Callable[[str | Path], float] = free_space_gib,
 ) -> tuple[DiskRootFreeSpace, ...]:
-    """Read free space for each labeled disk root."""
     return tuple(DiskRootFreeSpace(label, path, free_space_reader(path)) for label, path in roots)
 
 
@@ -533,13 +430,6 @@ def format_free_space_report(
     required_gib: float,
     lower_bound: bool = False,
 ) -> tuple[str, ...]:
-    """Return compact preflight table lines for required disk roots.
-
-    `lower_bound=True` renders the requirement as `>= X GiB`. This is the
-    line an operator actually reads, so a requirement derived from a
-    partially-measured budget table must not present itself as an exact
-    figure that free space comfortably clears.
-    """
     marker = ">= " if lower_bound else ""
     return tuple(
         f"Free space: {entry.label:<21} {entry.free_gib:7.2f} GiB "
@@ -549,7 +439,6 @@ def format_free_space_report(
 
 
 def format_disk_headroom_failure(check: DiskHeadroomCheck, budget: DiskBudget | None = None) -> str:
-    """Return a disk-budget gate failure message."""
     from tests.uat.preflight_budget import format_disk_headroom_failure as _format
 
     return _format(check, budget)

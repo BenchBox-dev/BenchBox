@@ -1,5 +1,3 @@
-"""Tests for Redshift query plan parser."""
-
 from __future__ import annotations
 
 import pytest
@@ -13,7 +11,6 @@ pytestmark = [
 ]
 
 
-# Test fixtures - Redshift EXPLAIN output samples
 SIMPLE_SEQ_SCAN = """
 XN Seq Scan on orders  (cost=0.00..15.50 rows=500 width=48)
 """
@@ -78,19 +75,14 @@ XN Limit  (cost=1000000000000.00..1000000000000.00 rows=1 width=0)
 
 
 class TestRedshiftParser:
-    """Tests for RedshiftQueryPlanParser."""
-
     @pytest.fixture
     def parser(self) -> RedshiftQueryPlanParser:
-        """Create parser instance."""
         return RedshiftQueryPlanParser()
 
     def test_parser_platform_name(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test parser has correct platform name."""
         assert parser.platform_name == "redshift"
 
     def test_parse_simple_seq_scan(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test parsing a simple sequential scan."""
         plan = parser.parse_explain_output("q1", SIMPLE_SEQ_SCAN)
 
         assert plan is not None
@@ -103,7 +95,6 @@ class TestRedshiftParser:
         assert plan.estimated_rows == 500
 
     def test_parse_seq_scan_with_filter(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test parsing a sequential scan with filter."""
         plan = parser.parse_explain_output("q2", SEQ_SCAN_WITH_FILTER)
 
         assert plan is not None
@@ -114,7 +105,6 @@ class TestRedshiftParser:
         assert "l_shipdate" in plan.logical_root.filter_expressions[0]
 
     def test_parse_limit_with_child(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test parsing Limit with child operator."""
         plan = parser.parse_explain_output("q3", SIMPLE_LIMIT)
 
         assert plan is not None
@@ -123,7 +113,6 @@ class TestRedshiftParser:
         assert plan.logical_root.children[0].operator_type == LogicalOperatorType.SCAN
 
     def test_parse_aggregate(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test parsing HashAggregate."""
         plan = parser.parse_explain_output("q4", AGGREGATE_WITH_SCAN)
 
         assert plan is not None
@@ -132,7 +121,6 @@ class TestRedshiftParser:
         assert plan.logical_root.children[0].operator_type == LogicalOperatorType.SCAN
 
     def test_parse_hash_join(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test parsing Hash Join with distribution operator."""
         plan = parser.parse_explain_output("q5", SIMPLE_HASH_JOIN)
 
         assert plan is not None
@@ -143,7 +131,6 @@ class TestRedshiftParser:
         assert "o_custkey" in plan.logical_root.join_conditions[0]
 
     def test_parse_left_join(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test parsing Nested Loop Left join."""
         plan = parser.parse_explain_output("q6", LEFT_JOIN)
 
         assert plan is not None
@@ -152,61 +139,51 @@ class TestRedshiftParser:
         assert len(plan.logical_root.children) == 2
 
     def test_parse_sort_with_limit(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test parsing Sort with Limit."""
         plan = parser.parse_explain_output("q7", SORT_WITH_LIMIT)
 
         assert plan is not None
         assert plan.logical_root.operator_type == LogicalOperatorType.LIMIT
         assert len(plan.logical_root.children) == 1
 
-        # Check Sort child
         sort_op = plan.logical_root.children[0]
         assert sort_op.operator_type == LogicalOperatorType.SORT
 
     def test_parse_complex_plan(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test parsing a complex TPC-like query plan."""
         plan = parser.parse_explain_output("q8", COMPLEX_TPC_LIKE)
 
         assert plan is not None
         assert plan.logical_root.operator_type == LogicalOperatorType.LIMIT
 
-        # Should have deeply nested structure
         assert len(plan.logical_root.children) > 0
 
     def test_empty_output_raises_error(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test that empty output returns None (graceful handling)."""
         result = parser.parse_explain_output("q9", "")
         assert result is None
 
     def test_fingerprint_is_computed(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test that plan fingerprint is computed."""
         plan = parser.parse_explain_output("q10", SIMPLE_SEQ_SCAN)
 
         assert plan is not None
         assert plan.plan_fingerprint is not None
-        assert len(plan.plan_fingerprint) == 64  # SHA256 hex length
+        assert len(plan.plan_fingerprint) == 64
 
     def test_operator_id_counter_resets_per_parse(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test that operator IDs reset between parses."""
         plan1 = parser.parse_explain_output("q1", SIMPLE_SEQ_SCAN)
         plan2 = parser.parse_explain_output("q2", SIMPLE_SEQ_SCAN)
 
         assert plan1 is not None
         assert plan2 is not None
-        # Both should have same operator ID pattern since counter resets
+
         assert plan1.logical_root.operator_id == plan2.logical_root.operator_id
 
     def test_serialization_round_trip(self, parser: RedshiftQueryPlanParser) -> None:
-        """Test that plan can be serialized and deserialized."""
         from benchbox.core.results.query_plan_models import QueryPlanDAG
 
         plan = parser.parse_explain_output("q11", SIMPLE_HASH_JOIN)
         assert plan is not None
 
-        # Serialize
         json_str = plan.to_json()
 
-        # Deserialize
         restored = QueryPlanDAG.from_json(json_str)
 
         assert restored.query_id == plan.query_id

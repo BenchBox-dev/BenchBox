@@ -1,12 +1,6 @@
-"""Amazon Redshift platform adapter with S3 integration and data warehouse optimizations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides Redshift-specific optimizations for analytical workloads,
-including COPY command for efficient data loading and distribution key optimization.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -72,8 +66,6 @@ def _compact_metadata(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
-    """Amazon Redshift platform adapter with S3 integration."""
-
     driver_isolation_capability = DriverIsolationCapability.FEASIBLE_CLIENT_ONLY
     supports_external_tables = True
     plan_capture_phase_eligible = True
@@ -84,14 +76,12 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         dependency_packages = get_dependency_group_packages("redshift")
 
-        # Check dependencies - prefer redshift-connector, fallback to psycopg
         if not redshift_connector and not psycopg:
             available, missing = check_platform_dependencies("redshift")
             if not available:
                 error_msg = get_dependency_error_message("redshift", missing)
                 raise ImportError(error_msg)
         else:
-            # Ensure shared helper libraries (e.g., boto3, cloudpathlib) are available
             shared_packages = [pkg for pkg in dependency_packages if pkg != "redshift-connector"]
             if shared_packages:
                 available_shared, missing_shared = check_platform_dependencies("redshift", shared_packages)
@@ -101,7 +91,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         self._dialect = "redshift"
 
-        # Redshift connection configuration
         self.host = config.get("host")
         self.port = config.get("port") if config.get("port") is not None else 5439
         self.database = config.get("database") or "dev"
@@ -109,48 +98,36 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         self.password = config.get("password")
         self.cluster_identifier = config.get("cluster_identifier")
 
-        # Admin database for metadata operations (CREATE/DROP DATABASE, checking database existence)
-        # Redshift requires connecting to an existing database for admin operations
-        # Default: "dev" (Redshift Serverless default database)
         self.admin_database = config.get("admin_database") or "dev"
 
-        # Schema configuration
         self.schema = config.get("schema") or "public"
 
-        # Connection settings
         self.connect_timeout = config.get("connect_timeout") if config.get("connect_timeout") is not None else 10
         self.statement_timeout = config.get("statement_timeout") if config.get("statement_timeout") is not None else 0
         self.sslmode = config.get("sslmode") or "require"
 
-        # WLM settings
         self.wlm_query_slot_count = (
             config.get("wlm_query_slot_count") if config.get("wlm_query_slot_count") is not None else 1
         )
         self.wlm_query_queue_name = config.get("wlm_query_queue_name")
 
-        # SSL configuration (legacy compatibility)
         self.ssl_enabled = config.get("ssl_enabled") if config.get("ssl_enabled") is not None else True
         self.ssl_insecure = config.get("ssl_insecure") if config.get("ssl_insecure") is not None else False
         self.sslrootcert = config.get("sslrootcert")
 
-        # S3 configuration for data loading
-        # Check for staging_root first (set by orchestrator for CloudStagingPath)
         staging_root = config.get("staging_root")
         self.staging_root = staging_root
         if staging_root:
-            # Parse s3://bucket/path format to extract bucket and prefix
             from benchbox.utils.cloud_storage import get_cloud_path_info
 
             path_info = get_cloud_path_info(staging_root)
             if path_info["provider"] == "s3":
                 self.s3_bucket = path_info["bucket"]
-                # Use the path component if provided, otherwise use default
                 self.s3_prefix = path_info["path"].strip("/") if path_info["path"] else "benchbox-data"
                 self.logger.info(f"Using staging location from config: s3://{self.s3_bucket}/{self.s3_prefix}")
             else:
                 raise ValueError(f"Redshift requires S3 (s3://) staging location, got: {path_info['provider']}://")
         else:
-            # Fall back to explicit s3_bucket configuration
             self.s3_bucket = config.get("s3_bucket")
             self.s3_prefix = config.get("s3_prefix") or "benchbox-data"
 
@@ -160,15 +137,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         self.aws_session_token = config.get("aws_session_token")
         self.aws_region = config.get("aws_region") or "us-east-1"
 
-        # Redshift optimization settings
         self.workload_management_config = config.get("wlm_config")
-        # COMPUPDATE controls automatic compression during COPY (PRESET | ON | OFF)
-        # PRESET: Apply compression based on column data types (no sampling)
-        # ON: Apply compression based on data sampling
-        # OFF: Disable automatic compression
         compupdate_raw = config.get("compupdate") or "PRESET"
-        self.compupdate = compupdate_raw.upper()  # Normalize to uppercase
-        # Validate COMPUPDATE value
+        self.compupdate = compupdate_raw.upper()
         valid_compupdate_values = {"ON", "OFF", "PRESET"}
         if self.compupdate not in valid_compupdate_values:
             raise ValueError(
@@ -179,18 +150,12 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         self.auto_vacuum = config.get("auto_vacuum") if config.get("auto_vacuum") is not None else True
         self.auto_analyze = config.get("auto_analyze") if config.get("auto_analyze") is not None else True
 
-        # Result cache control - disable by default for accurate benchmarking
         self.disable_result_cache = config.get("disable_result_cache", True)
 
-        # Last session cache-control receipt (sanitized). Recorded when
-        # session cache validation runs and persisted into platform_compute
-        # as deterministic cache-state evidence. None until validated.
         self._cache_control_receipt: dict[str, Any] | None = None
 
-        # Validation strictness - raise errors if cache control validation fails
         self.strict_validation = config.get("strict_validation", True)
 
-        # Cache deployment type for Serverless vs Provisioned branching
         self.deployment_type = self._detect_deployment_type(self.host or "")
 
         if not all([self.host, self.username, self.password]):
@@ -214,7 +179,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return "Redshift"
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | list[str] | None:
-        """Build opt-in sorted-ingestion SQL for Redshift."""
         mode, method = self.resolve_sorted_ingestion_strategy()
         if mode == "off":
             return None
@@ -235,7 +199,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
     @staticmethod
     def add_cli_arguments(parser) -> None:
-        """Add Redshift-specific CLI arguments."""
 
         rs_group = parser.add_argument_group("Redshift Arguments")
         rs_group.add_argument("--host", type=str, help="Redshift cluster endpoint hostname")
@@ -249,7 +212,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
     @classmethod
     def from_config(cls, config: dict[str, Any]):
-        """Create Redshift adapter from unified configuration."""
         from benchbox.platforms.base.config_utils import build_adapter_config
 
         return cls(
@@ -335,7 +297,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     def _collect_deployment_metadata(
         self, cursor: Any, deployment_type: str, identifier: str | None, region: str | None
     ) -> dict[str, Any]:
-        """Collect API-first deployment metadata, falling back to SQL."""
         metadata: dict[str, Any] = {}
         if deployment_type == "serverless":
             api_fn = self._get_serverless_metadata_api
@@ -431,19 +392,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 cursor.close()
 
     def get_platform_info(self, connection: Any = None) -> dict[str, Any]:
-        """Get Redshift platform information.
-
-        Captures comprehensive Redshift configuration including:
-        - Deployment type (serverless vs provisioned)
-        - Capacity configuration (RPUs for serverless, node type/count for provisioned)
-        - Redshift version
-        - WLM (Workload Management) configuration
-        - AWS region
-        - Encryption and security settings
-
-        Uses fallback chain: AWS API → SQL queries → hostname parsing
-        Gracefully degrades if permissions are insufficient or AWS credentials unavailable.
-        """
         deployment_type = self.deployment_type
         region = self._extract_region_from_hostname(self.host, deployment_type) or self.aws_region
         identifier = self._extract_identifier_from_hostname(self.host, deployment_type)
@@ -487,7 +435,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         connection: Any | None = None,
         platform_info: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Return Redshift-specific normalized cloud/runtime metadata."""
         info = dict(platform_info) if isinstance(platform_info, Mapping) else self.get_platform_info(connection)
         metadata = build_default_normalized_result_metadata(self, connection=connection, platform_info=info)
         config = info.get("configuration") if isinstance(info.get("configuration"), Mapping) else {}
@@ -628,18 +575,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         )
 
     def get_target_dialect(self) -> str:
-        """Return the target SQL dialect for Redshift."""
         return "redshift"
 
     def _detect_deployment_type(self, hostname: str) -> str:
-        """Detect Redshift deployment type from hostname pattern.
-
-        Args:
-            hostname: Redshift endpoint hostname
-
-        Returns:
-            "serverless", "provisioned", or "unknown"
-        """
         if not hostname:
             return "unknown"
 
@@ -651,62 +589,29 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             return "unknown"
 
     def _extract_region_from_hostname(self, hostname: str, deployment_type: str) -> str | None:
-        """Extract AWS region from Redshift hostname.
-
-        Args:
-            hostname: Redshift endpoint hostname
-            deployment_type: "serverless" or "provisioned"
-
-        Returns:
-            AWS region string or None if not found
-        """
         if not hostname:
             return None
 
         parts = hostname.split(".")
         if deployment_type == "serverless":
-            # Format: workgroup.account.region.redshift-serverless.amazonaws.com
             return parts[2] if len(parts) > 2 else None
         elif deployment_type == "provisioned":
-            # Format: cluster.region.redshift.amazonaws.com
             return parts[1] if len(parts) > 1 else None
         return None
 
     def _extract_identifier_from_hostname(self, hostname: str, deployment_type: str) -> str | None:
-        """Extract workgroup name or cluster identifier from hostname.
-
-        Args:
-            hostname: Redshift endpoint hostname
-            deployment_type: "serverless" or "provisioned"
-
-        Returns:
-            Workgroup name, cluster identifier, or None
-        """
         if not hostname:
             return None
 
         parts = hostname.split(".")
-        if deployment_type == "serverless":
-            # Format: workgroup.account.region.redshift-serverless.amazonaws.com
-            return parts[0] if len(parts) > 0 else None
-        elif deployment_type == "provisioned":
-            # Format: cluster.region.redshift.amazonaws.com
+        if deployment_type == "serverless" or deployment_type == "provisioned":
             return parts[0] if len(parts) > 0 else None
         return None
 
     def _get_serverless_metadata_sql(self, cursor: Any) -> dict[str, Any]:
-        """Get Redshift Serverless metadata using SQL queries.
-
-        Args:
-            cursor: Active database cursor
-
-        Returns:
-            Dictionary with serverless metadata (empty if not serverless or queries fail)
-        """
         metadata = {}
 
         try:
-            # Try to query sys_serverless_usage (serverless-only table)
             cursor.execute("""
                 SELECT compute_capacity
                 FROM sys_serverless_usage
@@ -716,28 +621,17 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             result = cursor.fetchone()
 
             if result:
-                # Table exists and has data - this is serverless
                 metadata["current_rpu_capacity"] = result[0] if result[0] is not None else None
                 self.logger.debug("Detected Redshift Serverless via sys_serverless_usage table")
         except Exception as e:
-            # Table doesn't exist or query failed - likely not serverless
             self.logger.debug(f"sys_serverless_usage query failed (not serverless or no permissions): {e}")
 
         return metadata
 
     def _get_provisioned_metadata_sql(self, cursor: Any) -> dict[str, Any]:
-        """Get Redshift Provisioned metadata using SQL queries.
-
-        Args:
-            cursor: Active database cursor
-
-        Returns:
-            Dictionary with provisioned metadata (empty if not provisioned or queries fail)
-        """
         metadata = {}
 
         try:
-            # Query stv_cluster_configuration (provisioned-only table)
             cursor.execute("""
                 SELECT node_type, cluster_version, COUNT(*) as num_nodes
                 FROM stv_cluster_configuration
@@ -753,21 +647,11 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     f"Detected Redshift Provisioned: {metadata['node_type']} x{metadata['number_of_nodes']}"
                 )
         except Exception as e:
-            # Table doesn't exist or query failed - likely not provisioned or no permissions
             self.logger.debug(f"stv_cluster_configuration query failed (not provisioned or no permissions): {e}")
 
         return metadata
 
     def _get_serverless_metadata_api(self, workgroup_name: str, region: str) -> dict[str, Any]:
-        """Get Redshift Serverless metadata using boto3 API.
-
-        Args:
-            workgroup_name: Workgroup name
-            region: AWS region
-
-        Returns:
-            Dictionary with serverless metadata (empty if API call fails)
-        """
         if not boto3:
             self.logger.debug("boto3 not available - skipping Serverless API metadata")
             return {}
@@ -777,11 +661,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         try:
             client = boto3.client("redshift-serverless", region_name=region)
 
-            # Get workgroup details
             response = client.get_workgroup(workgroupName=workgroup_name)
             workgroup = response.get("workgroup", {})
 
-            # Extract essential sizing information
             metadata["workgroup_name"] = workgroup.get("workgroupName")
             metadata["base_capacity_rpu"] = workgroup.get("baseCapacity")
             metadata["max_capacity_rpu"] = workgroup.get("maxCapacity")
@@ -789,13 +671,12 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             metadata["enhanced_vpc_routing"] = workgroup.get("enhancedVpcRouting", False)
             metadata["status"] = workgroup.get("status")
 
-            # Get namespace details for encryption info
             if metadata.get("namespace_name"):
                 try:
                     namespace_response = client.get_namespace(namespaceName=metadata["namespace_name"])
                     namespace = namespace_response.get("namespace", {})
                     metadata["kms_key_id"] = namespace.get("kmsKeyId")
-                    metadata["encrypted"] = True  # Serverless is always encrypted
+                    metadata["encrypted"] = True
                 except Exception as e:
                     self.logger.debug(f"Could not fetch namespace details: {e}")
 
@@ -812,15 +693,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return metadata
 
     def _get_provisioned_metadata_api(self, cluster_identifier: str, region: str) -> dict[str, Any]:
-        """Get Redshift Provisioned metadata using boto3 API.
-
-        Args:
-            cluster_identifier: Cluster identifier
-            region: AWS region
-
-        Returns:
-            Dictionary with provisioned metadata (empty if API call fails)
-        """
         if not boto3:
             self.logger.debug("boto3 not available - skipping Provisioned API metadata")
             return {}
@@ -830,14 +702,12 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         try:
             client = boto3.client("redshift", region_name=region)
 
-            # Get cluster details
             response = client.describe_clusters(ClusterIdentifier=cluster_identifier)
             clusters = response.get("Clusters", [])
 
             if clusters:
                 cluster = clusters[0]
 
-                # Extract essential sizing information
                 metadata["cluster_identifier"] = cluster.get("ClusterIdentifier")
                 metadata["node_type"] = cluster.get("NodeType")
                 metadata["number_of_nodes"] = cluster.get("NumberOfNodes")
@@ -846,7 +716,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 metadata["kms_key_id"] = cluster.get("KmsKeyId")
                 metadata["enhanced_vpc_routing"] = cluster.get("EnhancedVpcRouting", False)
 
-                # Storage capacity
                 total_storage_mb = cluster.get("TotalStorageCapacityInMegaBytes")
                 if total_storage_mb:
                     metadata["total_storage_capacity_mb"] = total_storage_mb
@@ -866,7 +735,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return metadata
 
     def _get_connection_params(self, **connection_config) -> dict[str, Any]:
-        """Get standardized connection parameters."""
         return {
             "host": connection_config.get("host", self.host),
             "port": connection_config.get("port", self.port),
@@ -887,7 +755,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         tcp_keepalive_count: int | None = None,
         **connection_config,
     ) -> Any:
-        """Create a Redshift connection using the configured driver."""
         params = self._get_connection_params(**connection_config)
 
         if redshift_connector:
@@ -904,7 +771,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             if connect_timeout is not None:
                 connect_kwargs["timeout"] = connect_timeout
 
-            # redshift_connector only implements certificate verification modes explicitly.
             if self.ssl_enabled and params["sslmode"] in {"verify-ca", "verify-full"}:
                 connect_kwargs["sslmode"] = params["sslmode"]
 
@@ -922,8 +788,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
             return redshift_connector.connect(**connect_kwargs)
 
-        # psycopg supports keepalives/keepalives_idle/keepalives_interval/keepalives_count
-        # but the old code never passed them; tcp_keepalive params are silently ignored here.
         connect_kwargs = {
             "host": params["host"],
             "port": params["port"],
@@ -942,19 +806,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return psycopg.connect(**connect_kwargs)
 
     def _resolve_connect_timeout(self) -> int:
-        """Determine appropriate connection timeout based on cluster state.
-
-        For provisioned clusters, queries AWS API to detect paused/resuming status
-        and extends the timeout accordingly. For serverless clusters, the compute
-        warmth cannot be queried via API (the workgroup status is always AVAILABLE
-        even when compute is cold), so a fixed extended timeout is used to cover
-        cold-start latency (~15-30s for Serverless).
-
-        Result is cached on the instance so the API is only hit once per adapter.
-
-        Returns:
-            Connection timeout in seconds.
-        """
         if hasattr(self, "_cached_connect_timeout"):
             return self._cached_connect_timeout
 
@@ -963,7 +814,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return timeout
 
     def _compute_connect_timeout(self) -> int:
-        """Internal: compute timeout by checking cluster state via AWS API."""
         if not boto3 or not self.host:
             return self.connect_timeout
 
@@ -997,30 +847,15 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 self.logger.debug(f"Could not check provisioned cluster status: {e}")
 
         elif deployment_type == "serverless":
-            # Serverless compute warmth is not queryable via the AWS API.
-            # The workgroup is always AVAILABLE even when compute is cold (auto-paused).
-            # Use an extended timeout to accommodate cold-start latency.
             self.logger.debug("Serverless cluster: using extended timeout (60s) to cover potential cold-start")
             return max(self.connect_timeout, 60)
 
         return self.connect_timeout
 
     def _long_running_timeout(self, floor: int = 300) -> int:
-        """Timeout for long-running DDL operations (DROP DATABASE, VACUUM, ANALYZE).
-
-        Returns the adaptive timeout with a minimum floor, since these operations
-        routinely exceed normal connection timeouts. Uses the adaptive timeout as a
-        base so that cluster-state awareness (paused, resuming, cold-start) is preserved.
-        """
         return max(self._resolve_connect_timeout(), floor)
 
     def _create_admin_connection(self, **connection_config) -> Any:
-        """Create Redshift connection for admin operations.
-
-        Admin operations (CREATE DATABASE, DROP DATABASE, checking database existence)
-        require connecting to an existing database. This uses self.admin_database
-        (default: "dev") instead of the target database to avoid circular dependencies.
-        """
         connect_timeout = connection_config.pop("connect_timeout", self._resolve_connect_timeout())
         admin_config = connection_config.copy()
         admin_config["database"] = self.admin_database
@@ -1032,24 +867,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         )
 
     def _create_direct_connection(self, **connection_config) -> Any:
-        """Create direct connection to target database for validation.
-
-        Connects directly to the specified database without:
-        - Calling handle_existing_database()
-        - Creating database if missing
-        - Setting database_was_reused flag
-
-        Used by validation framework to check existing database compatibility.
-
-        Args:
-            **connection_config: Connection configuration including database name
-
-        Returns:
-            Database connection object
-
-        Raises:
-            Exception: If connection fails (database doesn't exist, auth fails, etc.)
-        """
         connect_timeout = connection_config.pop("connect_timeout", self._resolve_connect_timeout())
         connection = self._connect_with_driver(
             application_name="BenchBox-Validation",
@@ -1057,11 +874,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             **connection_config,
         )
 
-        # Apply WLM queue settings if configured
         if self.wlm_query_queue_name:
             cursor = connection.cursor()
             try:
-                # Escape single quotes in queue name for SQL safety
                 queue_name_escaped = self.wlm_query_queue_name.replace("'", "''")
                 cursor.execute(f"SET query_group TO '{queue_name_escaped}'")
             finally:
@@ -1070,61 +885,34 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return connection
 
     def check_server_database_exists(self, **connection_config) -> bool:
-        """Check if database exists in Redshift cluster.
-
-        Connects to admin database to query pg_database for the target database.
-        """
         try:
-            # Connect to admin database (not target database)
             connection = self._create_admin_connection()
             cursor = connection.cursor()
 
             database = connection_config.get("database", self.database)
 
-            # Check if database exists
             cursor.execute("SELECT datname FROM pg_database WHERE datname = %s", (database,))
             result = cursor.fetchone()
 
             return result is not None
 
         except Exception:
-            # If we can't connect or check, assume database doesn't exist
             return False
         finally:
             if "connection" in locals() and connection:
                 connection.close()
 
     def drop_database(self, **connection_config) -> None:
-        """Drop database in Redshift cluster.
-
-        Connects to admin database to drop the target database.
-
-        Notes:
-            - DROP DATABASE must run with autocommit enabled.
-            - Redshift doesn't support IF EXISTS for DROP DATABASE, so we check first.
-            - If DROP DATABASE fails with SQLSTATE 55006 (database still has active
-              connections), the method terminates backends again and retries on a
-              fresh connection. redshift_connector v2.1.x enters an aborted
-              transaction state after a failed DDL even with autocommit=True,
-              causing any subsequent DDL on the same connection to fail with
-              error 25001. Opening a new connection guarantees clean driver state.
-        """
         database = connection_config.get("database", self.database)
 
-        # Check if database exists first (Redshift doesn't support IF EXISTS)
         if not self.check_server_database_exists(database=database):
             self.log_verbose(f"Database {database} does not exist - nothing to drop")
             return
 
         try:
-            # Connect to admin database with extended timeout - DROP DATABASE
-            # can take 30-120+ seconds on Redshift depending on cluster state.
             connection = self._create_admin_connection(connect_timeout=self._long_running_timeout())
-            connection.autocommit = True  # Enable autocommit for DROP DATABASE
+            connection.autocommit = True
 
-            # Terminate any existing connections first to avoid "being accessed" errors
-            # and to speed up the DROP.  This is safe because we only kill sessions
-            # attached to the *target* database, not the admin database we're on.
             cursor = connection.cursor()
             self.log_verbose(f"Terminating existing connections to {database}...")
             cursor.execute(
@@ -1136,38 +924,28 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 (database,),
             )
 
-            # Drop the database (quote identifier for SQL safety)
             try:
                 cursor.execute(f'DROP DATABASE "{database}"')
             except Exception as drop_error:
-                # Re-raise if not SQLSTATE 55006 (object_in_use / database has active connections).
-                # Check structured error code first (redshift_connector stores the server dict in
-                # args[0] with key 'C'; psycopg exposes it as pgcode).  Fall back to substring
-                # matching only for unknown exception types so future driver versions don't silently
-                # skip the retry.
                 sqlstate = None
                 first_arg = drop_error.args[0] if drop_error.args else None
                 if isinstance(first_arg, dict):
-                    sqlstate = first_arg.get("C")  # redshift_connector wire-protocol dict
+                    sqlstate = first_arg.get("C")
                 if sqlstate is None:
-                    sqlstate = getattr(drop_error, "pgcode", None)  # psycopg
+                    sqlstate = getattr(drop_error, "pgcode", None)
                 if sqlstate is not None:
                     if sqlstate != "55006":
                         raise
                 else:
-                    # Unknown driver - fall back to message text
                     error_msg = str(drop_error).lower()
                     if "active connection" not in error_msg and "being accessed" not in error_msg:
                         raise
-                # Retry with a fresh connection - redshift_connector can enter an aborted
-                # transaction state after a failed DDL, causing subsequent DDL to fail with
-                # error 25001 even when autocommit=True.  A fresh connection guarantees clean state.
                 self.log_verbose("Database still has active connections after terminate, retrying...")
                 cursor.close()
                 try:
                     connection.close()
                 except Exception:
-                    pass  # best-effort; fresh connection is the goal
+                    pass
                 connection = self._create_admin_connection(connect_timeout=self._long_running_timeout())
                 connection.autocommit = True
                 cursor = connection.cursor()
@@ -1196,36 +974,26 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     pass
 
     def create_connection(self, **connection_config) -> Any:
-        """Create optimized Redshift connection."""
         self.log_operation_start("Redshift connection")
 
-        # Handle existing database using base class method
         self.handle_existing_database(**connection_config)
 
-        # Get connection parameters
         params = self._get_connection_params(**connection_config)
         target_database = params.get("database")
 
-        # Create database if needed (before connecting to it)
-        # Redshift requires connecting to an admin database to create new databases
         if not self.database_was_reused:
-            # Check if target database exists
             database_exists = self.check_server_database_exists(database=target_database)
 
             if not database_exists:
                 self.log_verbose(f"Creating database: {target_database}")
 
-                # Create database using admin connection (connects to self.admin_database)
-                # Note: CREATE DATABASE must run with autocommit enabled (cannot run in transaction block)
                 try:
                     admin_conn = self._create_admin_connection()
-                    admin_conn.autocommit = True  # Enable autocommit for CREATE DATABASE
+                    admin_conn.autocommit = True
                     admin_cursor = admin_conn.cursor()
 
                     try:
-                        # Quote identifier for SQL safety
                         admin_cursor.execute(f'CREATE DATABASE "{target_database}"')
-                        # No commit() needed - autocommit handles it automatically
                         self.logger.info(f"Created database {target_database}")
                     finally:
                         admin_cursor.close()
@@ -1248,23 +1016,16 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 tcp_keepalive_count=3,
                 **connect_config,
             )
-            # Enable autocommit immediately after connection creation (before any SQL operations)
             connection.autocommit = True
 
-            # Apply WLM settings and schema search path
             cursor = connection.cursor()
-            # Integer settings validated in __init__, safe to interpolate
             if self.wlm_query_slot_count > 1:
                 cursor.execute(f"SET wlm_query_slot_count = {int(self.wlm_query_slot_count)}")
             if self.statement_timeout > 0:
                 cursor.execute(f"SET statement_timeout = {int(self.statement_timeout)}")
 
-            # Set search_path to ensure all unqualified table references use correct schema
-            # Critical for database reuse when schema already exists but connection is new
-            # Quote identifier for SQL safety
             cursor.execute(f'SET search_path TO "{self.schema}"')
 
-            # Test connection
             cursor.execute("SELECT version()")
             cursor.fetchone()
             cursor.close()
@@ -1282,48 +1043,35 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             raise
 
     def create_schema(self, benchmark, connection: Any) -> float:
-        """Create schema using Redshift-optimized table definitions."""
         start_time = mono_time()
 
         cursor = connection.cursor()
 
         try:
-            # Create schema if needed (if not using default "public")
-            # Quote identifiers for SQL safety
             if self.schema and self.schema.lower() != "public":
                 self.log_verbose(f"Creating schema: {self.schema}")
                 cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{self.schema}"')
                 self.logger.info(f"Created schema {self.schema}")
 
-            # Set search_path to use the correct schema
             self.log_very_verbose(f"Setting search_path to: {self.schema}")
             cursor.execute(f'SET search_path TO "{self.schema}"')
 
-            # Use common schema creation helper
             schema_sql = self._create_schema_with_tuning(benchmark, source_dialect="standard")
 
-            # Split schema into individual statements and execute
             statements = [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]
 
             for statement in statements:
-                # Normalize table names to lowercase for Redshift consistency
-                # This ensures CREATE, COPY, and SELECT all use the same case
                 statement = self._normalize_table_name_in_sql(statement)
                 is_create_table = statement.upper().startswith("CREATE TABLE")
 
-                # Ensure idempotency with DROP TABLE IF EXISTS
-                # (Redshift doesn't support CREATE OR REPLACE TABLE)
                 if is_create_table:
-                    # Extract table name from CREATE TABLE statement
                     table_name = self._extract_table_name(statement)
                     if table_name:
-                        # Ensure table name is lowercase
                         table_name_lower = table_name.strip('"').lower()
                         drop_statement = f"DROP TABLE IF EXISTS {table_name_lower}"
                         self.log_notice(f"Executing destructive schema reset: {drop_statement}")
                         cursor.execute(drop_statement)
 
-                # Optimize table definition for Redshift
                 statement = self._optimize_table_definition(statement)
                 cursor.execute(statement)
                 self.logger.info(f"Executed schema statement: {statement[:100]}...")
@@ -1339,14 +1087,10 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return elapsed_seconds(start_time)
 
     def _resolve_data_files(self, benchmark, data_dir: Path) -> Any:
-        """Resolve data files from benchmark tables or manifest fallback."""
         return resolve_adapter_data_source(self, benchmark, data_dir)
 
     def _create_s3_client(self):
-        """Create S3 client with explicit error handling."""
         try:
-            # XOR check: reject partial credentials - both key ID and secret must be
-            # provided together, or both omitted (to fall back to environment/IAM).
             if bool(self.aws_access_key_id) != bool(self.aws_secret_access_key):
                 raise ValueError(
                     "Explicit S3 upload credentials require both aws_access_key_id and aws_secret_access_key."
@@ -1366,9 +1110,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     "  3. Environment variables (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY)"
                 )
 
-            # request_checksum_calculation="when_required" prevents botocore from wrapping
-            # upload streams in AwsChunkedWrapper (introduced in botocore 1.35+). Without this,
-            # retried uploads fail with "Need to rewind the stream... but stream is not seekable".
             return session.client(
                 "s3",
                 config=BotocoreConfig(request_checksum_calculation="when_required"),
@@ -1384,8 +1125,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             raise ValueError(f"Failed to create AWS S3 client: {e}") from e
 
     def _upload_file_to_s3(self, s3_client, file_path: Path, table_name: str, file_idx: int) -> str:
-        """Upload a single file to S3 and return the S3 URI."""
-        # Preserve full multi-part suffix for chunked files (e.g., .tbl.1.zst)
         file_stem = file_path.stem
         original_suffix = file_path.suffix
         if "." in file_stem:
@@ -1416,11 +1155,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return f"s3://{self.s3_bucket}/{s3_key}"
 
     def _build_s3_copy_source(self, s3_client, s3_uris: list[str], table_name: str) -> tuple[str, str]:
-        """Build COPY source path and manifest option from S3 URIs.
-
-        Returns:
-            Tuple of (copy_from_path, manifest_option)
-        """
         if len(s3_uris) > 1:
             manifest = {"entries": [{"url": uri, "mandatory": True} for uri in s3_uris]}
             manifest_key = f"{self.s3_prefix}/{table_name}_manifest.json"
@@ -1443,7 +1177,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
     @staticmethod
     def _sanitize_copy_credential(value: str, name: str) -> str:
-        """Reject credential values containing single quotes to prevent COPY SQL injection."""
         if "'" in value:
             raise ValueError(
                 f"Credential '{name}' contains a single-quote character, which is not allowed in COPY SQL."
@@ -1451,7 +1184,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return value
 
     def _get_copy_credentials_clause(self) -> str:
-        """Build credentials clause for Redshift COPY command."""
         if self.iam_role:
             return f"IAM_ROLE '{self._sanitize_copy_credential(self.iam_role, 'iam_role')}'"
         elif self.aws_access_key_id and self.aws_secret_access_key:
@@ -1475,7 +1207,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         data_source: Any | None = None,
         benchmark: Any | None = None,
     ) -> int:
-        """Upload files to S3 and load a single table via COPY command. Returns row count."""
         table_name_lower = table_name.lower()
         parquet_modes = {is_parquet_format(file_path) for file_path in valid_files}
         if len(parquet_modes) > 1:
@@ -1485,14 +1216,12 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             )
         is_parquet_copy = parquet_modes == {True}
 
-        # Upload all files to S3 and collect S3 URIs
         s3_uris = []
         for file_idx, file_path in enumerate(valid_files):
             s3_uris.append(self._upload_file_to_s3(s3_client, file_path, table_name, file_idx))
 
         copy_from_path, manifest_option = self._build_s3_copy_source(s3_client, s3_uris, table_name)
 
-        # Detect compression format from file extension
         compressions = {detect_compression(f) for f in valid_files}
         if "zstd" in compressions:
             compression_option = "ZSTD"
@@ -1503,7 +1232,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         credentials_clause = self._get_copy_credentials_clause()
 
-        # Build and execute COPY command
         qualified_table = f"{self.schema}.{table_name_lower}"
         if is_parquet_copy:
             copy_sql = f"""
@@ -1537,11 +1265,9 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             self.apply_ctas_sort(table_name_lower, effective_tuning, connection)
             self.run_post_load_tunings(table_name_lower, effective_tuning, connection)
 
-        # Get row count
         cursor.execute(f"SELECT COUNT(*) FROM {qualified_table}")
         row_count = cursor.fetchone()[0]
 
-        # Run ANALYZE if configured
         if self.auto_analyze:
             cursor.execute(f"ANALYZE {qualified_table}")
 
@@ -1556,7 +1282,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         data_source: Any | None = None,
         benchmark: Any | None = None,
     ) -> int:
-        """Load a single table via INSERT statements. Returns total rows loaded."""
         table_name_lower = table_name.lower()
         total_rows_loaded = 0
 
@@ -1585,10 +1310,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     if dialect.null_marker is None:
                         escaped_values = ["'" + str(v).replace("'", "''") + "'" for v in values]
                     else:
-                        # Honor the resolved null marker (e.g. "" for TPC-style data) by
-                        # emitting SQL NULL instead of a quoted empty literal. Mirrors the
-                        # Firebolt INSERT path so both fallback loaders treat empty TPC
-                        # cells the same way.
                         escaped_values = [
                             "NULL" if v == dialect.null_marker else "'" + str(v).replace("'", "''") + "'"
                             for v in values
@@ -1602,7 +1323,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                         total_rows_loaded += len(batch_data)
                         batch_data = []
 
-                # Insert remaining batch
                 if batch_data:
                     insert_sql = f"INSERT INTO {table_name_lower} VALUES " + ", ".join(batch_data)
                     cursor.execute(insert_sql)
@@ -1619,7 +1339,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return total_rows_loaded
 
     def _filter_valid_files(self, file_paths) -> list[Path]:
-        """Normalize to list and filter out non-existent or empty files."""
         if not isinstance(file_paths, list):
             file_paths = [file_paths]
         valid_files = []
@@ -1630,7 +1349,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return valid_files
 
     def validate_external_table_requirements(self) -> None:
-        """Validate prerequisites for Redshift external table mode."""
         if not self.s3_bucket:
             raise ValueError(
                 "Redshift external mode requires S3 staging (set --platform-option s3_bucket=<bucket> "
@@ -1644,7 +1362,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
     @staticmethod
     def _map_external_column_type(column_type: str) -> str:
-        """Map benchmark schema types to Redshift Spectrum-compatible types."""
         normalized = str(column_type).strip().upper()
         if not normalized:
             return "VARCHAR(65535)"
@@ -1667,7 +1384,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return "VARCHAR(65535)"
 
     def _build_external_column_list(self, benchmark: Any, table_name: str) -> list[tuple[str, str]]:
-        """Build (name, Spectrum type) column pairs from benchmark schema."""
         if not hasattr(benchmark, "get_schema"):
             raise ValueError(
                 f"Benchmark schema metadata unavailable for '{table_name}'. "
@@ -1697,16 +1413,13 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return column_list
 
     def _build_external_column_definitions(self, benchmark: Any, table_name: str) -> str:
-        """Build external table column definitions from benchmark schema."""
         return ", ".join(
             f"{name} {column_type}" for name, column_type in self._build_external_column_list(benchmark, table_name)
         )
 
     @staticmethod
     def _map_external_column_type_to_glue(spectrum_type: str) -> str:
-        """Map a Spectrum column type to its Glue/Hive catalog type name."""
         upper = spectrum_type.strip().upper()
-        # Hive has no NUMERIC or TIMESTAMP WITH TIME ZONE spellings.
         if upper.startswith("NUMERIC"):
             return "DECIMAL" + upper[len("NUMERIC") :]
         if upper.startswith("TIMESTAMP"):
@@ -1715,7 +1428,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return aliases.get(upper, spectrum_type)
 
     def _create_glue_client(self):
-        """Create a Glue Data Catalog client sharing the S3 upload session config."""
         if not boto3:
             raise ValueError("boto3 is required for Glue catalog registration (Redshift Iceberg external mode).")
         if bool(self.aws_access_key_id) != bool(self.aws_secret_access_key):
@@ -1741,14 +1453,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         columns: list[tuple[str, str]],
         metadata_location: str | None = None,
     ) -> None:
-        """Register an uploaded Iceberg table root in the Glue Data Catalog.
-
-        Redshift Spectrum reads Iceberg tables only through the Glue catalog:
-        ad-hoc ``CREATE EXTERNAL TABLE ... table_type='ICEBERG'`` is not a
-        documented form, so the table must exist in the catalog database that
-        the Redshift external schema points at. Any existing registration is
-        replaced to mirror the recreate semantics of the other formats.
-        """
         try:
             glue_client.delete_table(DatabaseName=database, Name=table_name)
         except Exception as e:
@@ -1779,7 +1483,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         )
 
     def _upload_external_parquet_files_to_s3(self, s3_client: Any, table_name: str, parquet_files: list[Path]) -> str:
-        """Upload table Parquet files and return Spectrum LOCATION prefix."""
         table_name_lower = table_name.lower()
         s3_prefix = f"{self.s3_prefix}/{self.database.lower()}_external/{table_name_lower}"
         for file_path in parquet_files:
@@ -1788,16 +1491,13 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return f"s3://{self.s3_bucket}/{s3_prefix}/"
 
     def _external_s3_table_uri(self, table_name: str) -> tuple[str, str]:
-        """Return the (bucket, key prefix) for an external-mode table."""
         s3_prefix = f"{self.s3_prefix}/{self.database.lower()}_external/{table_name.lower()}"
         return self.s3_bucket, s3_prefix
 
     def _upload_local_file_to_s3(self, s3_client: Any, local_path: Path, bucket: str, key: str) -> None:
-        """Upload one local file to S3."""
         s3_client.upload_file(str(local_path), bucket, key)
 
     def _upload_external_directory_to_s3(self, s3_client: Any, table_name: str, directory: Path) -> str:
-        """Upload a directory tree for external Delta-style registration."""
         s3_bucket, s3_prefix = self._external_s3_table_uri(table_name)
         for file_path in directory.rglob("*"):
             if not file_path.is_file():
@@ -1809,14 +1509,11 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     def create_external_tables(
         self, benchmark: Any, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Upload external-table sources to S3 and register Redshift Spectrum tables."""
         self.validate_external_table_requirements()
         assert self.iam_role is not None
 
         start_time = mono_time()
         table_stats: dict[str, int] = {}
-        # Derive a unique external schema name; warn if the base name already
-        # looks like a previous external-mode artifact to avoid cascading suffixes.
         if self.schema.endswith("_external"):
             self.logger.warning(
                 f"Schema '{self.schema}' already ends with '_external'. "
@@ -1855,8 +1552,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     location = self._upload_external_directory_to_s3(s3_client, table_name_lower, delta_dirs[0])
                     source_format = "delta"
                 elif iceberg_dirs:
-                    # Relocated upload happens in the Iceberg branch below so
-                    # stale file:// graph files never reach S3.
                     location = ""
                     source_format = "iceberg"
                 elif parquet_files:
@@ -1869,12 +1564,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     )
 
                 if source_format == "iceberg":
-                    # Spectrum reads Iceberg only through the Glue catalog, so
-                    # register the uploaded table instead of issuing ad-hoc DDL.
-                    # A byte copy would leave file:// references throughout the
-                    # metadata graph, so relocate it to S3 before uploading.
-                    # The client is created once, on first use, so non-Iceberg
-                    # tables never pay for it.
                     if glue_client is None:
                         glue_client = self._create_glue_client()
                     glue_database = f"{self.database.lower()}_external"
@@ -1937,10 +1626,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     def load_data(
         self, benchmark, connection: Any, data_dir: Path
     ) -> tuple[dict[str, int], float, dict[str, Any] | None]:
-        """Load data using Redshift COPY command with S3 integration."""
-        # Phase clock starts at load_data entry so the returned duration
-        # covers cursor creation, file resolution, and S3 client creation,
-        # matching the pre-template behavior.
         phase_start = mono_time()
         cursor = connection.cursor()
 
@@ -1949,7 +1634,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             if not isinstance(data_source, DataSource):
                 data_source = DataSource(source_type="legacy_test_mapping", tables=data_source)
 
-            # Upload files to S3 and load via COPY command
             if self.s3_bucket and boto3:
                 s3_client = self._create_s3_client()
 
@@ -1970,7 +1654,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 )
 
             else:
-                # Direct loading without S3 (less efficient)
                 self.logger.warning("No S3 bucket configured, using direct INSERT loading")
 
                 def load_via_insert(table_name: str, valid_files: list[Path]) -> int:
@@ -1996,26 +1679,21 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         finally:
             cursor.close()
 
-        # Redshift doesn't provide detailed per-table timings yet
         return table_stats, total_time, None
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply Redshift-specific optimizations based on benchmark type."""
 
         cursor = connection.cursor()
 
         try:
-            # Set session-level optimizations
-            # Use OFF for result cache to ensure accurate benchmark measurements
             cache_setting = "OFF" if self.disable_result_cache else "ON"
             optimization_settings = [
                 f"SET enable_result_cache_for_session TO {cache_setting}",
                 "SET query_group TO 'benchbox'",
-                "SET statement_timeout TO '1800000'",  # 30 minutes
+                "SET statement_timeout TO '1800000'",
             ]
 
             if benchmark_type.lower() in ["olap", "analytics", "tpch", "tpcds"]:
-                # OLAP-specific optimizations
                 optimization_settings.extend(
                     [
                         "SET enable_case_sensitive_identifier TO OFF",
@@ -2030,12 +1708,10 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     cursor.execute(setting)
                     self.logger.debug(f"Applied setting: {setting}")
                 except Exception as e:
-                    # Track if critical cache control setting failed
                     if "enable_result_cache_for_session" in setting:
                         critical_failures.append(setting)
                     self.logger.warning(f"Failed to apply setting {setting}: {e}")
 
-            # Validate cache control settings were successfully applied
             if self.disable_result_cache or critical_failures:
                 self.logger.debug("Validating cache control settings...")
                 validation_result = self.validate_session_cache_control(connection)
@@ -2050,10 +1726,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                         f"Cache control validated successfully: cache_disabled={validation_result['cache_disabled']}"
                     )
             else:
-                # The result cache was explicitly left enabled, so there is no
-                # disabled state to probe. Record the configured enabled state
-                # so the bundle carries enabled-cache evidence instead of an
-                # absent receipt that the submission gate would grandfather.
                 from benchbox.platforms.cloud_shared import (
                     explicit_cache_enabled_receipt,
                     sanitize_cache_control_receipt,
@@ -2063,14 +1735,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     explicit_cache_enabled_receipt("enable_result_cache_for_session", "ON")
                 )
 
-            # Run VACUUM and ANALYZE on all tables if configured.
-            # These operations use a **separate connection** because they are
-            # long-running DDL operations that can trigger socket-level timeouts
-            # (e.g. on paused serverless clusters).  A socket timeout permanently
-            # breaks the underlying TCP connection - rollback() cannot recover it
-            # because the socket itself is dead.  By isolating VACUUM/ANALYZE on
-            # their own connection, a timeout only destroys the disposable
-            # connection while the main benchmark connection stays healthy.
             if self.auto_vacuum or self.auto_analyze:
                 self._run_vacuum_analyze_isolated(connection)
 
@@ -2078,18 +1742,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             cursor.close()
 
     def _run_vacuum_analyze_isolated(self, main_connection: Any) -> None:
-        """Run VACUUM/ANALYZE on a dedicated connection to protect the main one.
-
-        VACUUM and ANALYZE are long-running DDL operations that can trigger
-        socket-level timeouts, especially on paused serverless clusters.
-        A socket timeout permanently breaks the TCP connection, so these
-        operations must be isolated from the benchmark connection.
-
-        Args:
-            main_connection: The main benchmark connection (used only to
-                query the table list; VACUUM/ANALYZE run on a separate conn).
-        """
-        # Query table list using the main connection (fast metadata query)
         main_cursor = main_connection.cursor()
         try:
             main_cursor.execute(f"""
@@ -2104,9 +1756,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         if not tables:
             return
 
-        # Create a separate connection for VACUUM/ANALYZE.
-        # The finally block is the single owner of cleanup - error paths
-        # just return and let finally close the connection.
         maint_conn = None
         try:
             maint_conn = self._connect_with_driver(
@@ -2115,7 +1764,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             )
             maint_conn.autocommit = True
             maint_cursor = maint_conn.cursor()
-            # Set search_path to match the main connection
             maint_cursor.execute(f'SET search_path TO "{self.schema}"')
 
             for _schema, table in tables:
@@ -2145,22 +1793,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     pass
 
     def validate_session_cache_control(self, connection: Any) -> dict[str, Any]:
-        """Validate that session-level cache control settings were successfully applied.
-
-        Args:
-            connection: Active Redshift database connection
-
-        Returns:
-            dict with:
-                - validated: bool - Whether validation passed
-                - cache_disabled: bool - Whether cache is actually disabled
-                - settings: dict - Actual session settings
-                - warnings: list[str] - Any validation warnings
-                - errors: list[str] - Any validation errors
-
-        Raises:
-            ConfigurationError: If cache control validation fails and strict_validation=True
-        """
         from benchbox.platforms.cloud_shared import validate_session_cache_control
 
         return validate_session_cache_control(
@@ -2183,12 +1815,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         connection: Any = None,
         query_id: str | None = None,
     ) -> dict[str, Any]:
-        """Attach Redshift STL/SYS telemetry while the execute cursor is still open.
-
-        ``pg_last_query_id()`` must run before any later EXPLAIN/plan-capture
-        SQL on this session. The core mixin calls this hook immediately after
-        ``fetchall()`` and before validation, which preserves that order.
-        """
         stats = {"execution_time_seconds": execution_time}
         if connection is None:
             return stats
@@ -2209,14 +1835,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute via the core cursor primitive, then attach Redshift plan fields.
-
-        Enumerated deltas vs ``CursorValidationQueryExecutionMixin`` (all hooks):
-        query tags: none; statistics: ``_get_query_statistics`` / ``pg_last_query_id``;
-        plan capture: post-execute ``_merge_plan_capture_into_result``;
-        rollback: none; result digest: none; cursor ownership: mixin-owned;
-        query rewrite: base adapter; job APIs: none.
-        """
         result = super().execute_query(
             connection,
             query,
@@ -2230,41 +1848,32 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             return result
 
         result["translated_query"] = None
-        # Skip live display when capture is on: capture_query_plan already runs EXPLAIN.
         if not self.capture_plans:
             self.display_query_plan_if_enabled(connection, query, query_id)
         self._merge_plan_capture_into_result(result, connection, query, query_id)
         return result
 
     def _extract_table_name(self, statement: str) -> str | None:
-        """Extract table name from CREATE TABLE statement."""
         from benchbox.core.sql_utils import extract_table_name
 
         return extract_table_name(statement)
 
     def _normalize_table_name_in_sql(self, sql: str) -> str:
-        """Normalize table names in SQL to lowercase for Redshift."""
         return normalize_table_name_in_sql(sql)
 
     def _optimize_table_definition(self, statement: str) -> str:
-        """Optimize table definition for Redshift."""
         if not statement.upper().startswith("CREATE TABLE"):
             return statement
 
-        # Include distribution and sort keys for better performance
         if "DISTSTYLE" not in statement.upper():
-            # Include AUTO distribution style (Redshift will choose appropriate distribution)
             statement += " DISTSTYLE AUTO"
 
         if "SORTKEY" not in statement.upper():
-            # Include sort key on first column (simple heuristic)
-            # In production, this would be more sophisticated
             statement += " SORTKEY AUTO"
 
         return statement
 
     def _get_platform_metadata(self, connection: Any) -> dict[str, Any]:
-        """Get Redshift-specific metadata and system information."""
         metadata = {
             "platform": self.platform_name,
             "host": self.host,
@@ -2276,12 +1885,10 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         cursor = connection.cursor()
 
         try:
-            # Get Redshift version
             cursor.execute("SELECT version()")
             result = cursor.fetchone()
             metadata["redshift_version"] = result[0] if result else "unknown"
 
-            # Get cluster information (STV tables unavailable on Serverless)
             try:
                 if self.deployment_type == "serverless":
                     cursor.execute("""
@@ -2318,7 +1925,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             except Exception as e:
                 self.logger.debug(f"Could not query cluster information: {e}")
 
-            # Get current session information
             cursor.execute("""
                 SELECT
                     current_user,
@@ -2337,7 +1943,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     "client_port": result[4],
                 }
 
-            # Get table information
             cursor.execute(f"""
                 SELECT
                     schemaname,
@@ -2372,20 +1977,8 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return metadata
 
     def _get_existing_tables(self, connection: Any) -> list[str]:
-        """Get list of existing tables from Redshift (normalized to lowercase).
-
-        Queries information_schema for tables in the current schema and returns
-        them as lowercase names to match Redshift's identifier normalization.
-
-        Args:
-            connection: Database connection
-
-        Returns:
-            List of table names (lowercase)
-        """
         cursor = connection.cursor()
         try:
-            # Query information_schema for tables in current schema
             cursor.execute(
                 """
                 SELECT table_name
@@ -2395,30 +1988,20 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                 """,
                 (self.schema,),
             )
-            # Return lowercase table names
             return [row[0].lower() for row in cursor.fetchall()]
         finally:
             cursor.close()
 
     def _get_query_statistics(self, connection: Any, query_id: str) -> dict[str, Any]:
-        """Get query statistics from Redshift system tables.
-
-        Note: This retrieves performance telemetry only - not used for validation.
-        Query row count validation uses the actual result set from cursor.fetchall().
-        """
         cursor = connection.cursor()
         try:
-            # Get the actual Redshift query ID for the most recent query
-            # pg_last_query_id() returns the query ID of the last executed query in this session
             cursor.execute("SELECT pg_last_query_id()")
             result = cursor.fetchone()
             if not result or result[0] == -1:
-                # No queries executed yet, or query ran only on leader node
                 return {}
 
             redshift_query_id = result[0]
 
-            # Query system tables for statistics (STL unavailable on Serverless)
             if self.deployment_type == "serverless":
                 cursor.execute(
                     """
@@ -2460,7 +2043,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             result = cursor.fetchone()
 
             if result:
-                # sys_query_history returns status string; stl_query returns aborted int
                 raw_aborted = result[7]
                 if isinstance(raw_aborted, str):
                     aborted = raw_aborted not in ("success", "running")
@@ -2484,14 +2066,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             cursor.close()
 
     def analyze_table(self, connection: Any, table_name: str) -> None:
-        """Run ANALYZE on table for query optimization.
-
-        Raises on failure (does not swallow) so the opt-in statistics phase's
-        gather_statistics() -> run_statistics_phase() caller can detect and
-        record a real failure as status=FAILED. Not reached when auto_analyze
-        is enabled - gather_statistics() overrides to report "auto-on-load"
-        before this method is ever called.
-        """
         cursor = connection.cursor()
         try:
             cursor.execute(f"ANALYZE {table_name.lower()}")
@@ -2499,19 +2073,11 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             cursor.close()
 
     def gather_statistics(self, connection: Any, table_names: list[str]) -> tuple[str, int]:
-        """Statistics-phase hook: with auto_analyze, stats were already built during load.
-
-        The S3 load path runs ANALYZE right after each table's COPY when
-        auto_analyze is enabled (the default), so the statistics phase reports
-        that attribution instead of double-building. With auto_analyze
-        disabled, fall back to the explicit per-table ANALYZE default.
-        """
         if self.auto_analyze:
             return "auto-on-load", 0
         return super().gather_statistics(connection, table_names)
 
     def vacuum_table(self, connection: Any, table_name: str) -> None:
-        """Run VACUUM on table for space reclamation."""
         cursor = connection.cursor()
         try:
             cursor.execute(f"VACUUM {table_name.lower()}")
@@ -2521,7 +2087,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             cursor.close()
 
     def get_query_plan(self, connection: Any, query: str) -> str | None:
-        """Get query execution plan for analysis."""
         cursor = connection.cursor()
         try:
             cursor.execute(f"EXPLAIN {query}")
@@ -2534,13 +2099,11 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             cursor.close()
 
     def get_query_plan_parser(self):
-        """Get Redshift query plan parser."""
         from benchbox.core.query_plans.parsers.redshift import RedshiftQueryPlanParser
 
         return RedshiftQueryPlanParser()
 
     def close_connection(self, connection: Any) -> None:
-        """Close Redshift connection."""
         try:
             if connection and hasattr(connection, "close"):
                 connection.close()
@@ -2550,64 +2113,37 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
     _supported_tuning_type_names = ("DISTRIBUTION", "SORTING", "PARTITIONING")
 
     def generate_tuning_clause(self, table_tuning) -> str:
-        """Generate Redshift-specific tuning clauses for CREATE TABLE statements.
-
-        Redshift supports:
-        - DISTSTYLE (EVEN | KEY | ALL) DISTKEY (column)
-        - SORTKEY (column1, column2, ...) or INTERLEAVED SORTKEY (column1, column2, ...)
-
-        Args:
-            table_tuning: The tuning configuration for the table
-
-        Returns:
-            SQL clause string to be appended to CREATE TABLE statement
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return ""
 
         clauses = []
 
         try:
-            # Import here to avoid circular imports
             from benchbox.core.tuning.interface import TuningType
 
-            # Handle distribution strategy
             distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
             if distribution_columns:
-                # Sort by order and use first column as distribution key
                 sorted_cols = sorted(distribution_columns, key=lambda col: col.order)
                 dist_col = sorted_cols[0]
 
-                # Use KEY distribution style with the specified column
                 clauses.append("DISTSTYLE KEY")
                 clauses.append(f"DISTKEY ({dist_col.name})")
             else:
-                # Default to EVEN distribution if no distribution columns specified
                 clauses.append("DISTSTYLE EVEN")
 
-            # Handle sorting
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
             if sort_columns:
-                # Sort by order for sortkey
                 sorted_cols = sorted(sort_columns, key=lambda col: col.order)
                 column_names = [col.name for col in sorted_cols]
 
-                # Use compound sort key by default (better for most OLAP workloads)
-                # Could be made configurable to choose between COMPOUND and INTERLEAVED
                 sortkey_clause = f"SORTKEY ({', '.join(column_names)})"
                 clauses.append(sortkey_clause)
 
-            # Handle partitioning through table naming/organization (logged but not in CREATE TABLE)
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
             if partition_columns:
-                # Redshift partitioning is typically handled through table design patterns
-                # We'll log the strategy but not add SQL clauses
                 pass
 
-            # Clustering not directly supported in Redshift CREATE TABLE
-
         except ImportError:
-            # If tuning interface not available, return empty string
             pass
 
         return " ".join(clauses)
@@ -2616,9 +2152,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         table_tuning = self.table_tuning_for(effective_config, table_name)
         if table_tuning is None or not table_tuning.has_any_tuning():
             return False
-        # configure_for_benchmark vacuums and analyzes every loaded table on an isolated
-        # connection when auto_vacuum/auto_analyze are on. Only cover what that pass skips,
-        # so a tuned table is not maintained twice on the benchmark connection.
         if self.auto_analyze:
             return False
         physical_table = self.resolve_physical_table(table_name, connection)
@@ -2634,21 +2167,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
         return True
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
-        """Apply tuning configurations to a Redshift table.
-
-        Redshift tuning approach:
-        - DISTRIBUTION: Handled via DISTSTYLE/DISTKEY in CREATE TABLE
-        - SORTING: Handled via SORTKEY in CREATE TABLE
-        - ANALYZE runs after the table loads only when auto_analyze is off (apply_post_load_tunings);
-          configure_for_benchmark vacuums and analyzes every loaded table otherwise
-
-        Args:
-            table_tuning: The tuning configuration to apply
-            connection: Redshift connection
-
-        Raises:
-            ValueError: If the tuning configuration is invalid for Redshift
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
@@ -2657,13 +2175,8 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
 
         cursor = connection.cursor()
         try:
-            # Import here to avoid circular imports
             from benchbox.core.tuning.interface import TuningType
 
-            # Redshift tuning is primarily handled at table creation time
-            # Post-creation optimizations are limited
-
-            # Verify table exists and get current configuration
             cursor.execute(f"""
                 SELECT
                     "schema",
@@ -2683,20 +2196,18 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             if result:
                 current_diststyle = result[2]
                 current_distkey = result[3]
-                current_sortkeys = [sk for sk in result[4:8] if sk]  # Filter out None values
+                current_sortkeys = [sk for sk in result[4:8] if sk]
 
                 self.logger.info(f"Current configuration for {table_name}:")
                 self.logger.info(f"  Distribution style: {current_diststyle}")
                 self.logger.info(f"  Distribution key: {current_distkey}")
                 self.logger.info(f"  Sort keys: {current_sortkeys}")
 
-                # Check if configuration matches desired tuning
                 distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
                 sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
 
                 needs_recreation = False
 
-                # Check distribution configuration
                 if distribution_columns:
                     sorted_cols = sorted(distribution_columns, key=lambda col: col.order)
                     desired_distkey = self.resolve_physical_column(table_name, sorted_cols[0].name, connection)
@@ -2706,7 +2217,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                             f"Distribution key mismatch: current='{current_distkey}', desired='{desired_distkey}'"
                         )
 
-                # Check sort key configuration
                 if sort_columns:
                     sorted_cols = sorted(sort_columns, key=lambda col: col.order)
                     desired_sortkeys = [
@@ -2724,7 +2234,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             else:
                 self.logger.warning(f"Could not find table configuration for {table_name}")
 
-            # Handle partitioning strategy
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
             if partition_columns:
                 sorted_cols = sorted(partition_columns, key=lambda col: col.order)
@@ -2733,7 +2242,6 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
                     f"Partitioning strategy for {table_name}: {', '.join(column_names)} (handled via table design patterns)"
                 )
 
-            # Clustering not directly supported in Redshift
             cluster_columns = table_tuning.get_columns_by_type(TuningType.CLUSTERING)
             if cluster_columns:
                 sorted_cols = sorted(cluster_columns, key=lambda col: col.order)
@@ -2750,34 +2258,14 @@ class RedshiftAdapter(CursorValidationQueryExecutionMixin, PlatformAdapter):
             cursor.close()
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to Redshift.
-
-        Args:
-            unified_config: Unified tuning configuration to apply
-            connection: Redshift connection
-        """
         from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
         apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
-        """Apply Redshift-specific platform optimizations.
-
-        Redshift optimizations include:
-        - Workload Management (WLM) queue configuration
-        - Query group settings for resource allocation
-        - Compression encoding optimization
-        - Statistics collection and maintenance
-
-        Args:
-            platform_config: Platform optimization configuration
-            connection: Redshift connection
-        """
         if not platform_config:
             return
 
-        # Redshift optimizations are typically applied at session or workload level
-        # Store optimizations for use during query execution and maintenance operations
         self.logger.info("Redshift platform optimizations stored for session and workload management")
 
     apply_constraint_configuration = make_informational_constraint_applier(

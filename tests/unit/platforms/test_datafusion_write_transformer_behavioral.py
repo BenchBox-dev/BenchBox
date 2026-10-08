@@ -1,5 +1,3 @@
-"""Behavioral tests for DataFusion bulk-load SQL rewriting."""
-
 from __future__ import annotations
 
 import pytest

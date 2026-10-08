@@ -1,9 +1,3 @@
-"""Configuration types for data organization.
-
-Defines the configuration model for specifying how generated benchmark data
-should be organized (sorted, clustered) when written to Parquet format.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -12,14 +6,11 @@ from typing import Any
 
 
 class SortOrder(Enum):
-    """Sort direction for a column."""
-
     ASC = "asc"
     DESC = "desc"
 
     @classmethod
     def from_string(cls, value: str) -> SortOrder:
-        """Parse from string, case-insensitive."""
         try:
             return cls(value.lower())
         except ValueError:
@@ -28,13 +19,6 @@ class SortOrder(Enum):
 
 @dataclass(frozen=True)
 class SortColumn:
-    """A column to sort by, with direction.
-
-    Attributes:
-        name: Column name matching the TPC schema (e.g., 'l_shipdate').
-        order: Sort direction. Default: ascending.
-    """
-
     name: str
     order: SortOrder = SortOrder.ASC
 
@@ -55,38 +39,12 @@ class SortColumn:
 
 @dataclass
 class DataOrganizationConfig:
-    """Configuration for how to organize generated data.
-
-    Controls sorting, row group sizing, and compression when writing
-    Parquet output from TBL source files.
-
-    Attributes:
-        sort_columns: Columns to sort by, in priority order. Empty means no sorting.
-        partition_by: Partition columns to order first before sort columns.
-        cluster_by: Clustering columns to apply after sort/partition ordering.
-        clustering_method: Clustering algorithm ("z_order" or "hilbert").
-        output_format: Organized output format ("parquet", "delta", or "iceberg").
-        row_group_size: Target row group size in bytes. Controls zone map granularity.
-            Smaller row groups = more granular zone maps = better pruning for selective queries.
-            Default: 128MB (PyArrow default).
-        compression: Parquet compression codec. Default: zstd.
-        table_configs: Per-table overrides keyed by table name (e.g., 'lineitem').
-            If a table has an entry here, it overrides the top-level sort_columns
-            for that table only.
-        table_partition_configs: Per-table partition columns keyed by table name.
-            If a table has an entry here, it overrides top-level partition_by.
-        table_cluster_configs: Per-table clustering columns keyed by table name.
-            If a table has an entry here, it overrides top-level cluster_by.
-        table_clustering_methods: Per-table clustering methods keyed by table name.
-            If a table has an entry here, it overrides top-level clustering_method.
-    """
-
     sort_columns: list[SortColumn] = field(default_factory=list)
     partition_by: list[str] = field(default_factory=list)
     cluster_by: list[str] = field(default_factory=list)
     clustering_method: str = "z_order"
     output_format: str = "parquet"
-    row_group_size: int = 128 * 1024 * 1024  # 128MB
+    row_group_size: int = 128 * 1024 * 1024
     compression: str = "zstd"
     table_configs: dict[str, list[SortColumn]] = field(default_factory=dict)
     table_partition_configs: dict[str, list[str]] = field(default_factory=dict)
@@ -114,7 +72,6 @@ class DataOrganizationConfig:
 
     @property
     def has_sorting(self) -> bool:
-        """Whether any sorting/partitioning is configured (global or per-table)."""
         return (
             bool(self.sort_columns)
             or bool(self.table_configs)
@@ -125,28 +82,15 @@ class DataOrganizationConfig:
         )
 
     def get_sort_columns_for_table(self, table_name: str) -> list[SortColumn]:
-        """Get sort columns for a specific table, with per-table override.
-
-        Args:
-            table_name: Table name (e.g., 'lineitem', 'orders').
-
-        Returns:
-            Sort columns for this table. Per-table config takes priority
-            over global sort_columns. Returns empty list if no sorting
-            is configured for this table.
-        """
         return self.table_configs.get(table_name, self.sort_columns)
 
     def get_partition_columns_for_table(self, table_name: str) -> list[str]:
-        """Get partition columns for a specific table, with per-table override."""
         return self.table_partition_configs.get(table_name, self.partition_by)
 
     def get_cluster_columns_for_table(self, table_name: str) -> list[str]:
-        """Get clustering columns for a specific table, with per-table override."""
         return self.table_cluster_configs.get(table_name, self.cluster_by)
 
     def get_clustering_method_for_table(self, table_name: str) -> str:
-        """Get clustering method for a specific table, with per-table override."""
         return self.table_clustering_methods.get(table_name, self.clustering_method)
 
     def to_dict(self) -> dict[str, Any]:

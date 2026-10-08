@@ -234,16 +234,10 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     }
 
     it("fetches wide rows, display timings, and executions for all cohort IDs in one query each and groups them into DetailResult objects", async () => {
-      // getCohortBasisDetails Promise.all()s the wide-row query,
-      // getQueryDisplayTimings, and getQueryExecutions, in that order.
       mockedQueryRows.mockResolvedValueOnce([
         makeCohortWideRow({ result_id: "r1" }),
         makeCohortWideRow({
           result_id: "r2",
-          // Visibility/compliance exclusions are the kind of business-rule
-          // reason that must survive the bulk read path -- a hidden or
-          // non-compliant result must stay excluded from comparison even
-          // after a user switches measurement basis.
           comparison_exclusion_reason: "hidden_result",
           ranking_exclusion_reason: "hidden_result",
           visibility: "hidden",
@@ -285,11 +279,6 @@ describe("duckdbQueries - SQL targets and parameters", () => {
       expect(r2?.queries).toEqual([
         { query_id: "Q1", duration_ms: 50, status: "pass", run_type: "measurement", iter: 1, stream: null },
       ]);
-      // Regression: a bulk accessor that reimplements DetailResult shape
-      // independently of getDetailResult (rather than sharing its mapping)
-      // can silently hardcode these to null, which lets a hidden/excluded
-      // result reappear as comparable/rankable once a non-default basis is
-      // selected. See platformMeasurementBasis.ts / measurementBasis.ts.
       expect(r2?.comparison_exclusion_reason).toBe("hidden_result");
       expect(r2?.ranking_exclusion_reason).toBe("hidden_result");
       expect(r2?.visibility).toBe("hidden");
@@ -297,10 +286,6 @@ describe("duckdbQueries - SQL targets and parameters", () => {
   });
 
   describe("getDetailResult - physical_mechanisms unknown vs recorded-empty (ADR-2 §3)", () => {
-    // A "wide row" shaped exactly as the real result_detail_metrics view
-    // would hand back to getResultDetailMetrics: NULL becomes `null` here,
-    // and a recorded-but-empty mechanism list becomes duckdb_builder.py's
-    // "" (comma-join of []), not NULL.
     function makeWideRow(overrides: Partial<ResultDetailMetricsRow>): ResultDetailMetricsRow {
       return {
         result_id: "r1",
@@ -356,8 +341,6 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     }
 
     async function fetchDetail(resultId: string, wideRow: ResultDetailMetricsRow) {
-      // getDetailResult() Promise.all()s getResultDetailMetrics,
-      // getQueryDisplayTimings, and getQueryExecutions, in that order.
       mockedQueryRows.mockResolvedValueOnce([wideRow]);
       mockedQueryRows.mockResolvedValueOnce([]);
       mockedQueryRows.mockResolvedValueOnce([]);
@@ -365,10 +348,6 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     }
 
     it("carries CPU identity from the wide row through to the environment", async () => {
-      // Regression: the wide-row type declared cpu_model/cpu_family optional
-      // and RESULT_DETAIL_METRICS_COLUMNS never selected them, so both were
-      // undefined for every result and RunReceipt / ComparabilityReceipt
-      // reported the CPU as not recorded even on snapshots that had it.
       const detail = await fetchDetail(
         "with-cpu",
         makeWideRow({
@@ -390,9 +369,6 @@ describe("duckdbQueries - SQL targets and parameters", () => {
     });
 
     it("selects the CPU columns it reads", async () => {
-      // The defect above was invisible to every behavioural test that built
-      // its own wide row: the projection and the reads drifted apart with
-      // nothing comparing them. This asserts the actual SQL.
       await fetchDetail("sql-check", makeWideRow({ result_id: "sql-check" }));
       const detailSql = String(mockedQueryRows.mock.calls[0]?.[0] ?? "");
       expect(detailSql).toContain("result_detail_metrics");
@@ -670,8 +646,8 @@ describe("getMetaLeaderboardData", () => {
 
   it("returns null when cohort_metadata is empty", async () => {
     mockedQueryRows
-      .mockResolvedValueOnce([]) // meta_leaderboard
-      .mockResolvedValueOnce([]); // cohort_metadata
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
     await expect(getMetaLeaderboardData()).resolves.toBeNull();
   });
 
@@ -740,7 +716,6 @@ describe("getMetaLeaderboardData", () => {
     const data = await getMetaLeaderboardData();
     const duckdb = data!.platforms.find((p) => p.platform_id === "duckdb")!;
     expect(duckdb.ranks["clickbench-sf0.1-power"]?.rank).toBe(1);
-    // All variants are preserved in the per-cohort platforms[] list.
     expect(data!.cohorts[0]!.platforms).toHaveLength(2);
   });
 
@@ -794,7 +769,6 @@ describe("resolveShortId", () => {
   });
 
   it("returns the input unchanged when it is not a short-id-shaped string", async () => {
-    // Full result_ids contain hyphens and are never 8+ contiguous hex chars.
     const fullId = "tpch-duckdb-abcdef12";
     await expect(resolveShortId(fullId)).resolves.toBe(fullId);
     expect(mockedQueryRows).not.toHaveBeenCalled();
@@ -829,7 +803,6 @@ describe("toShortIds", () => {
     const out = await toShortIds(["id-a", "id-b", "id-c"]);
     expect(out).toEqual(["aaaaaaaa", "id-b", "cccccccc"]);
     const [sql, params] = mockedQueryRows.mock.calls[0]!;
-    // 3 inputs → 3 ? placeholders
     expect(sql).toMatch(/IN \(\?, \?, \?\)/);
     expect(params).toEqual(["id-a", "id-b", "id-c"]);
   });

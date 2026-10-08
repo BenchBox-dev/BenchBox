@@ -1,5 +1,3 @@
-"""Throughput UAT cell support: result resolution, validation and the `assert`/`rolling-median` CLI."""
-
 from __future__ import annotations
 
 import argparse

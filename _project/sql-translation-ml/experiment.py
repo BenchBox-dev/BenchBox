@@ -1,5 +1,3 @@
-"""Prepare execution-validated labels without exposing test outcomes to training."""
-
 from __future__ import annotations
 
 import argparse
@@ -142,7 +140,6 @@ def prepare(run: Path) -> None:
                     record["source_row_counts"] = [len(result[1]) for result in expected]
                 except Exception as exc:
                     record.update(eligible=False, error=f"invalid_source: {exc}")
-                # Eligibility and splits precede translators. Locked tests are never labeled.
                 if record["eligible"] and case["split"] != "test":
                     candidates = {}
                     for name in ("sqlglot", "benchbox"):

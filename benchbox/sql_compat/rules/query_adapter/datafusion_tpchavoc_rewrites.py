@@ -1,5 +1,3 @@
-"""Document DataFusion TPC-Havoc query rewrites."""
-
 from __future__ import annotations
 
 from benchbox.core.tpchavoc.dialect_compat import DATAFUSION_EMPTY_GROUP_VARIANT_IDS

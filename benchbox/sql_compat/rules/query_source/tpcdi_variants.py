@@ -1,21 +1,3 @@
-"""TPC-DI query variant rules for Phase.QUERY_SOURCE.
-
-AQ6 uses SUM(SUM(x)) OVER () which ClickHouse does not support; replaced with
-a CROSS JOIN pre-computed grand total.  CLICKHOUSE_AQ6_SQL is a TEMPLATE -
-callers must apply parameters via .format(**params) before executing.
-
-AQ7/AQ8 use SQLite Julian-day expressions and EQ7 cross-references sibling
-subquery aliases. AQ10 also needs an explicit derived-table join key. The
-ClickHouse variants below keep the benchmark semantics while using native
-dateDiff/today expressions and a derived-table projection that ClickHouse can
-resolve.
-
-EQ7 cross-references sibling subquery aliases which StarRocks (MySQL-compatible)
-rejects; replaced by wrapping the UNION ALL in a derived table.
-STARROCKS_EQ7_SQL and DORIS_EQ7_SQL are complete SQL strings with no format
-placeholders.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -35,7 +17,6 @@ _P = Phase.QUERY_SOURCE
 
 
 def _clickhouse_metric_query(query_id: str, params: dict[str, Any] | None = None) -> str:
-    """Build a ClickHouse-safe TPC-DI metric query from its canonical source."""
     from benchbox.core.tpcdi.queries import TPCDIQueryManager
 
     manager = TPCDIQueryManager().analytical_queries
@@ -94,7 +75,6 @@ def _clickhouse_metric_query(query_id: str, params: dict[str, Any] | None = None
 
 
 def build_clickhouse_metric_query(query_id: str, params: dict[str, Any] | None = None) -> str:
-    """Build a parameter-rendered ClickHouse variant for an analytical query."""
     return _clickhouse_metric_query(query_id, params)
 
 
@@ -102,9 +82,6 @@ CLICKHOUSE_AQ7_SQL = _clickhouse_metric_query("AQ7")
 CLICKHOUSE_AQ8_SQL = _clickhouse_metric_query("AQ8")
 CLICKHOUSE_AQ10_SQL = _clickhouse_metric_query("AQ10")
 
-# AQ6: SUM(SUM(x)) OVER () nested window aggregate is unsupported in ClickHouse.
-# Replaced with a CROSS JOIN subquery that pre-computes the grand total.
-# This is a TEMPLATE - apply .format(**params) before executing.
 CLICKHOUSE_AQ6_SQL = """\
 SELECT
     'Industry Sector Performance Analysis' as analysis_name,
@@ -149,11 +126,6 @@ HAVING COUNT(t.TradeID) > {min_trades}
 ORDER BY total_sector_value DESC, avg_sector_pe_ratio ASC
 LIMIT {limit_rows};"""
 
-# EQ7: cross-references sibling subquery aliases (quality_calculation reads
-# quality_metrics columns), which MySQL-compatible engines (StarRocks) reject.
-# Fix: wrap the UNION ALL in a derived table so overall_quality_score is
-# computed from actual columns, not aliases.
-# This is a COMPLETE SQL string - no format placeholders needed.
 STARROCKS_EQ7_SQL = """\
 SELECT
     'ETL Data Quality Score Calculation' AS validation_name,
@@ -216,9 +188,6 @@ FROM (
 ) AS quality_metrics
 ORDER BY (completeness_score * 0.4 + validity_score * 0.3 + consistency_score * 0.3) DESC"""
 
-# DataFusion's optimizer can fail physical planning when repeated aggregate
-# expressions are commoned across a projection. Compute the repeated metrics
-# once in an aggregate subquery and derive the presentation fields outside it.
 DATAFUSION_AQ9_SQL = """\
 SELECT
     'Market Maker and Liquidity Analysis' AS analysis_name,
@@ -296,9 +265,6 @@ FROM (
 ORDER BY market_share_of_volume DESC, bid_ask_spread_pct ASC
 LIMIT 50;"""
 
-# VQ6 has the same optimizer issue when its grouped CASE expression is
-# repeated to calculate both net_position and position_discrepancy. Separate
-# the aggregate, arithmetic, and filter projections.
 DATAFUSION_VQ6_SQL = """\
 SELECT
     'Trade-Holdings Consistency Validation' AS validation_name,
@@ -347,27 +313,15 @@ WHERE ABS(position_discrepancy) > 0
 ORDER BY ABS(position_discrepancy) DESC
 LIMIT 100;"""
 
-# DataFusion uses the same derived-table EQ7 rewrite, with boolean literals
-# rendered for its native BOOLEAN columns.
 DATAFUSION_EQ7_SQL = STARROCKS_EQ7_SQL.replace("IsCurrent = 1", "IsCurrent IS TRUE")
 
-# Doris currently uses the same MySQL-compatible EQ7 rewrite as StarRocks.
-# Keep a Doris-named alias so future dialect drift becomes an explicit edit.
 DORIS_EQ7_SQL = STARROCKS_EQ7_SQL
 CLICKHOUSE_EQ7_SQL = STARROCKS_EQ7_SQL
 
-# BigQuery enforces subquery scope strictly (like the MySQL-compatible
-# engines), so it uses the same derived-table EQ7 rewrite, with boolean
-# literals rendered for its native BOOLEAN columns.
 BIGQUERY_EQ7_SQL = STARROCKS_EQ7_SQL.replace("IsCurrent = 1", "IsCurrent IS TRUE")
 
-# Databricks (Spark SQL) likewise rejects cross-referencing sibling subquery
-# aliases and enforces strict BOOLEAN typing, so it uses the same
-# derived-table EQ7 rewrite with boolean literals.
 DATABRICKS_EQ7_SQL = STARROCKS_EQ7_SQL.replace("IsCurrent = 1", "IsCurrent IS TRUE")
 
-# Snowflake rejects cross-referencing sibling subquery aliases but accepts
-# ``= 1`` flag comparisons, so it uses the derived-table EQ7 rewrite as-is.
 SNOWFLAKE_EQ7_SQL = STARROCKS_EQ7_SQL
 
 for _query_id, _variant_sql, _reason in (

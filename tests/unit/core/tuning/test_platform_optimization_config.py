@@ -1,5 +1,3 @@
-"""Tests for platform optimization strategy configuration."""
-
 from __future__ import annotations
 
 import pytest
@@ -60,7 +58,7 @@ def test_platform_optimization_accepts_hilbert_method() -> None:
 
 def test_platform_optimization_rejects_invalid_sorted_ingestion_mode() -> None:
     with pytest.raises(ValueError, match="Invalid sorted_ingestion_mode"):
-        PlatformOptimizationConfiguration(sorted_ingestion_mode="invalid")  # type: ignore[arg-type]
+        PlatformOptimizationConfiguration(sorted_ingestion_mode="invalid")
 
 
 def test_platform_optimization_rejects_method_when_mode_off() -> None:

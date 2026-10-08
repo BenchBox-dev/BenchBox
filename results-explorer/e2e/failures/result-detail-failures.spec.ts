@@ -3,27 +3,15 @@ import { fixtureIds, waitForDataElement, waitForShell } from "../support/fixture
 
 const TPCH_TUNED_ID = fixtureIds.ids.duckdbTuned;
 
-// Failure tests share the same DuckDB-WASM cold-boot cost as the happy
-// paths but add network interception. Run serially so three parallel
-// chromium contexts do not fight over worker startup and time out.
 test.describe.configure({ mode: "serial" });
 
 test.describe("ResultDetail failure paths", () => {
   test("an unreachable results.duckdb renders a user-visible error rather than a blank page", async ({ page }) => {
-    // Block the snapshot request before the explorer even boots. DuckDB-WASM
-    // bubbles the IOException up through `queryRows` and listResults; the
-    // Home page renders `ErrorMessage` once the promise rejects.
     await page.route("**/results/data/results.duckdb", (route) => route.fulfill({ status: 404 }));
 
     await page.goto("/results/");
     await waitForShell(page);
 
-    // The Home page surfaces the attach failure through the ErrorMessage
-    // component, which renders an explicit heading over a message paragraph
-    // and carries `role="alert"`. Asserting
-    // on role="alert" + the inner heading keeps this tight without
-    // coupling to a Tailwind color literal that the token migration
-    // dropped.
     const errorBox = page.locator("[role='alert']").filter({
       has: page.getByRole("heading", { name: "Could not load results" }),
     });
@@ -33,15 +21,8 @@ test.describe("ResultDetail failure paths", () => {
   test("a failing tuning-config bundle fetch surfaces a visible error", async ({ page }) => {
     await page.goto(`/results/r/${TPCH_TUNED_ID}`);
     await waitForShell(page);
-    // Wait for the detail to render so the Tuning Config section is in
-    // the DOM. The tuned fixture is the only bundle with has_tuning=true.
-    // Routed through the shared helper so the cold-snapshot zero-row race
-    // is retried by re-navigation; the bundle route below is installed
-    // afterwards and so is unaffected by those retries.
     await waitForDataElement(page, page.getByRole("heading", { name: /TPC-H result:\s+DuckDB/ }));
 
-    // The panel reads the tuning block out of the bundle itself now, so fail
-    // that fetch before the user expands the collapsed Tuning Config panel.
     await page.route("**/bundles/*.json", (route) => route.fulfill({ status: 500, body: "simulated bundle failure" }));
 
     await page.getByRole("button", { name: /Show settings/ }).click();

@@ -19,10 +19,8 @@ ParadeDB is a PostgreSQL extension for hybrid search and analytics workloads. It
 ## Quick Start
 
 ```bash
-# Basic TPC-H benchmark
 benchbox run --platform paradedb --benchmark tpch --scale 0.01
 
-# With custom connection
 benchbox run --platform paradedb --benchmark tpch --scale 1.0 \
   --platform-option host=paradedb.example.com \
   --platform-option password=secret
@@ -50,7 +48,6 @@ docker run -d --name paradedb \
   -p 5432:5432 \
   paradedb/paradedb:latest
 
-# Verify extension
 psql -h localhost -U postgres -c "CREATE EXTENSION pg_analytics;"
 ```
 

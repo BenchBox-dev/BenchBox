@@ -1,12 +1,6 @@
-"""Tests for benchbox.mcp.__init__ lazy exports and public API.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-All tests are guarded with pytest.importorskip("mcp") because the module
-raises ImportError if the MCP SDK is not installed.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -76,7 +70,7 @@ class TestMcpLazyExports:
         ["ToolCallContext", "get_metrics_collector", "ExecutionStatus", "ExecutionState", "get_execution_tracker"],
     )
     def test_getattr_removed_dead_exports_raise(self, removed: str):
-        """The observability/execution lazy attrs went away with their modules."""
+
         import benchbox.mcp as mcp_mod
 
         with pytest.raises(AttributeError):

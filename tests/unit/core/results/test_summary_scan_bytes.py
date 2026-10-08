@@ -1,5 +1,3 @@
-"""Summary scan-byte aggregation for query-billed engines."""
-
 from __future__ import annotations
 
 from datetime import datetime

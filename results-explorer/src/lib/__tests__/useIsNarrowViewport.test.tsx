@@ -9,8 +9,6 @@ function Probe({ query }: { query: string }) {
   return null;
 }
 
-/** Fake MediaQueryList whose `matches` can flip after render, firing every
- *  registered "change" listener - the path a real viewport resize takes. */
 function stubResizableViewport(initialMatches: boolean) {
   let matches = initialMatches;
   const listeners = new Set<() => void>();

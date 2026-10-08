@@ -1,5 +1,3 @@
-"""Shared runtime helpers to render ASCII charts from normalized results."""
-
 from __future__ import annotations
 
 import math
@@ -23,12 +21,8 @@ from benchbox.core.visualization.ascii.line_chart import LinePoint
 from benchbox.core.visualization.ascii.scatter_plot import ScatterPoint
 from benchbox.core.visualization.utils import is_power_run_result, natural_query_sort_key
 
-# Percentage change within ±STABLE_THRESHOLD is classified as "stable" (no meaningful regression or improvement).
-# 2% accounts for typical run-to-run variance in OLAP benchmarks at SF≥1.
 _STABLE_THRESHOLD_PCT = 2.0
 
-# Number of best/worst queries shown in summary boxes.
-# 3 balances signal density vs. noise - enough to spot patterns, few enough to scan quickly.
 _SUMMARY_QUERY_COUNT = 3
 
 _SUBTITLE_KEYS = frozenset({"benchmark", "scale_factor", "platform_version", "tuning"})
@@ -43,15 +37,11 @@ _HORIZONTAL_LABEL_THRESHOLD = 6
 
 
 class QueryResultLike(Protocol):
-    """Minimal query contract required by ASCII runtime renderers."""
-
     query_id: str
     execution_time_ms: float | None
 
 
 class NormalizedResultLike(Protocol):
-    """Minimal normalized result contract required by ASCII runtime renderers."""
-
     platform: str
     total_time_ms: float | None
     power_at_size: float | None
@@ -69,18 +59,6 @@ def render_ascii_chart_from_results(
     metadata: dict[str, Any] | None = None,
     subtitle: str | None = None,
 ) -> str | None:
-    """Render one chart from normalized results.
-
-    Returns rendered chart string, or None when the chart is not applicable.
-
-    Args:
-        results: Normalized benchmark results.
-        chart_type: Chart type key (e.g., "performance_bar").
-        options: ChartOptions instance.
-        metadata: Deprecated - use subtitle instead. If provided without
-            subtitle, it is converted via build_chart_subtitle().
-        subtitle: Pre-formatted subtitle string for chart display.
-    """
     if subtitle is None and metadata:
         warnings.warn(
             "render_ascii_chart_from_results(metadata=) is deprecated, use subtitle= instead",
@@ -89,7 +67,6 @@ def render_ascii_chart_from_results(
         )
         from benchbox.core.visualization.utils import build_chart_subtitle
 
-        # Filter to recognized subtitle keys before forwarding
         subtitle_kwargs = {k: v for k, v in metadata.items() if k in _SUBTITLE_KEYS}
         subtitle = build_chart_subtitle(**subtitle_kwargs)
 
@@ -132,7 +109,6 @@ def _render_power_bar(results: list[NormalizedResultLike], options: Any, subtitl
 def _render_power_metric_bars(bar_data: list[BarData], options: Any, subtitle: str | None) -> str:
     if not bar_data:
         raise ValueError("power metric bar chart requires at least one data point")
-    # Higher Power@Size = better performance; mark accordingly (descending sort)
     sorted_data = sorted(bar_data, key=lambda x: x.value, reverse=True)
     sorted_data[0].is_best = True
     if len(sorted_data) > 1:
@@ -618,7 +594,6 @@ def _extract_platform_query_timings(results: list[NormalizedResultLike]) -> list
 
 
 def _natural_sort_key(s: str) -> tuple[float, str]:
-    """Sort key for natural ordering of query IDs (e.g. Q1, Q2, ... Q10)."""
     return natural_query_sort_key(s)
 
 

@@ -1,19 +1,6 @@
-"""FlightData DataFrame queries for Expression and Pandas families.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Implements all 20 FlightData OLAP queries for DataFrame execution on Polars,
-PySpark, DataFusion (expression family) and Pandas and Dask (pandas family).
-
-Queries cover 5 categories:
-- On-time performance (5 queries)
-- Delay analysis (4 queries)
-- Route analytics (4 queries)
-- Temporal patterns (4 queries)
-- Carrier comparisons (3 queries)
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -24,21 +11,9 @@ from typing import Any
 from benchbox.core.dataframe.context import DataFrameContext
 from benchbox.core.dataframe.query import DataFrameQuery, QueryCategory, QueryRegistry
 
-# ---------------------------------------------------------------------------
-# Default parameters
-# ---------------------------------------------------------------------------
-
-# Single source of truth: the generated data covers up to LAST_AVAILABLE_YEAR
-# (benchbox/core/flightdata/downloader_specs.yaml).  The SQL catalog derives
-# its date literals from the same constant via FlightDataBenchmark's
-# query window, so the DataFrame default must match it -- otherwise the
-# window matches zero rows (2024 data vs 2018 window).  Imported at module
-# load; fallback is the last known value from the spec and is covered by
-# the verification that asserts the default year is in the SQL window, so
-# a spec bump without a code bump fails fast.
 try:
     from benchbox.core.flightdata.downloader import LAST_AVAILABLE_YEAR as _LAST_YEAR
-except (ImportError, FileNotFoundError, KeyError, ValueError):  # pragma: no cover - import guard for partial installs
+except (ImportError, FileNotFoundError, KeyError, ValueError):  # pragma: no cover
     _LAST_YEAR = 2024
 
 FLIGHTDATA_DEFAULT_PARAMS: dict[str, Any] = {
@@ -50,13 +25,11 @@ _parameter_overrides: dict[str, Any] | None = None
 
 
 def set_parameter_overrides(overrides: dict[str, Any] | None) -> None:
-    """Set parameter overrides for the current benchmark run."""
     global _parameter_overrides
     _parameter_overrides = overrides
 
 
 def get_flightdata_parameters() -> dict[str, Any]:
-    """Get effective parameters, merging overrides on top of defaults."""
     params = dict(FLIGHTDATA_DEFAULT_PARAMS)
     if _parameter_overrides is not None:
         params.update(_parameter_overrides)
@@ -64,17 +37,6 @@ def get_flightdata_parameters() -> dict[str, Any]:
 
 
 def _round_half_away(ctx: DataFrameContext, value: Any, digits: int) -> Any:
-    """Round half away from zero, matching SQL ROUND on the reference surface.
-
-    Engine-native rounding modes disagree (Polars and numpy/pandas round half
-    to even; DataFusion and PySpark round half up), so identical values landing
-    exactly on a rounding boundary (a whole-minute total of exactly N.5, or an
-    average of exactly N.XX5) would diverge by one output unit. Scaling by an
-    exact power of ten, shifting by one half unit, and flooring reproduces the
-    SQL mode on every engine, including negatives via the sign branch. Only
-    inputs within about one ulp of a boundary can still disagree, far below
-    the coarsest output granularity (whole minutes).
-    """
     lit = ctx.lit
     factor = 10.0**digits
     magnitude = ((value.abs() * lit(factor)) + lit(0.5)).floor() / lit(factor)
@@ -82,7 +44,6 @@ def _round_half_away(ctx: DataFrameContext, value: Any, digits: int) -> Any:
 
 
 def _pandas_round_half_away(values: Any, digits: int) -> Any:
-    """Pandas counterpart of :func:`_round_half_away` (same contract)."""
     import numpy as np
 
     factor = 10.0**digits
@@ -133,11 +94,6 @@ def _pandas_airline_names(ctx: DataFrameContext) -> Any:
         .merge(ctx.get_table("airlines"), left_on="reporting_airline", right_on="code", how="left")
         .rename(columns={"name": "airline_name"})
     )
-
-
-# ===========================================================================
-# Expression Family (Polars, DataFusion, PySpark)
-# ===========================================================================
 
 
 def ontime_by_carrier_expression_impl(ctx: DataFrameContext) -> Any:
@@ -316,9 +272,6 @@ def improvement_trend_expression_impl(ctx: DataFrameContext) -> Any:
             col("_arr_nc").mean().alias("_avg_arr"),
         )
         .with_columns(
-            # NULL-safe denominator: a fully-cancelled group divides by
-            # zero, where SQL yields NULL but a bare division yields NaN
-            # (which sorts first instead of last), so guard to NULL.
             ctx.when(col("_non_cancelled") > lit(0))
             .then(col("_non_cancelled"))
             .otherwise(lit(None))
@@ -412,9 +365,6 @@ def cascade_delays_expression_impl(ctx: DataFrameContext) -> Any:
             .then(col("late_aircraft_delay"))
             .otherwise(lit(None))
             .alias("_cascade_pos"),
-            # Exact integer tenths matching the SQL surface: the tenth-minute
-            # sum is order-independent on every engine, unlike float summation,
-            # and NULL/negative delays contribute 0 exactly as SQL's ELSE 0.
             ctx.when(col("late_aircraft_delay") > lit(0))
             .then(_round_half_away(ctx, col("late_aircraft_delay") * lit(10), 0).cast(int))
             .otherwise(lit(0))
@@ -457,9 +407,6 @@ def weather_impact_expression_impl(ctx: DataFrameContext) -> Any:
             .then(col("weather_delay"))
             .otherwise(lit(None))
             .alias("_weather_pos"),
-            # Exact integer tenths matching the SQL surface (see the
-            # cascade-delays expression impl): the tenth-minute sum is
-            # order-independent on every engine, unlike float summation.
             _round_half_away(ctx, col("weather_delay").fill_null(lit(0)) * lit(10), 0)
             .cast(int)
             .alias("_weather_tenths"),
@@ -504,7 +451,6 @@ def recovery_time_expression_impl(ctx: DataFrameContext) -> Any:
         flights.with_columns(
             (col("dep_delay") - col("arr_delay")).alias("minutes_recovered"),
             (col("arr_delay") < col("dep_delay")).cast(int).alias("recovered_flag"),
-            # Delay bucket mapping to string labels
             ctx.when(col("dep_delay") <= lit(0))
             .then(lit("No departure delay"))
             .when(col("dep_delay") <= lit(15))
@@ -619,9 +565,6 @@ def route_reliability_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .filter(col("total_scheduled") >= lit(100))
         .with_columns(
-            # NULL-safe denominator: a fully-cancelled group divides by
-            # zero, where SQL yields NULL but a bare division yields NaN
-            # (which sorts first instead of last), so guard to NULL.
             ctx.when(col("_non_cancelled") > lit(0))
             .then(col("_non_cancelled"))
             .otherwise(lit(None))
@@ -660,7 +603,6 @@ def distance_delay_expression_impl(ctx: DataFrameContext) -> Any:
 
     return (
         flights.with_columns(
-            # Distance bucket mapping to string labels
             ctx.when(col("distance") < lit(250))
             .then(lit("Short-haul (<250 mi)"))
             .when(col("distance") < lit(500))
@@ -772,9 +714,6 @@ def day_of_week_expression_impl(ctx: DataFrameContext) -> Any:
             col("_operated").sum().alias("_non_cancelled"),
         )
         .with_columns(
-            # NULL-safe denominator: a fully-cancelled group divides by
-            # zero, where SQL yields NULL but a bare division yields NaN
-            # (which sorts first instead of last), so guard to NULL.
             ctx.when(col("_non_cancelled") > lit(0))
             .then(col("_non_cancelled"))
             .otherwise(lit(None))
@@ -843,9 +782,6 @@ def seasonal_trends_expression_impl(ctx: DataFrameContext) -> Any:
             col("_operated").sum().alias("_non_cancelled"),
         )
         .with_columns(
-            # NULL-safe denominator: a fully-cancelled group divides by
-            # zero, where SQL yields NULL but a bare division yields NaN
-            # (which sorts first instead of last), so guard to NULL.
             ctx.when(col("_non_cancelled") > lit(0))
             .then(col("_non_cancelled"))
             .otherwise(lit(None))
@@ -874,7 +810,6 @@ def seasonal_trends_expression_impl(ctx: DataFrameContext) -> Any:
 def holiday_impact_expression_impl(ctx: DataFrameContext) -> Any:
     flights, col, lit = _date_window(ctx)
 
-    # Encode each holiday period as a numeric id (0=regular, 1=thanksgiving, etc.)
     thanksgiving = (col("month") == lit(11)) & (col("day_of_month") >= lit(21)) & (col("day_of_month") <= lit(27))
     christmas = (col("month") == lit(12)) & (col("day_of_month") >= lit(23)) & (col("day_of_month") <= lit(27))
     new_year = ((col("month") == lit(1)) & (col("day_of_month") <= lit(2))) | (
@@ -896,7 +831,6 @@ def holiday_impact_expression_impl(ctx: DataFrameContext) -> Any:
 
     return (
         flights.with_columns(
-            # Holiday period mapping to string labels
             ctx.when(thanksgiving)
             .then(lit("Thanksgiving Week"))
             .when(christmas)
@@ -927,9 +861,6 @@ def holiday_impact_expression_impl(ctx: DataFrameContext) -> Any:
             col("_operated").sum().alias("_non_cancelled"),
         )
         .with_columns(
-            # NULL-safe denominator: a fully-cancelled group divides by
-            # zero, where SQL yields NULL but a bare division yields NaN
-            # (which sorts first instead of last), so guard to NULL.
             ctx.when(col("_non_cancelled") > lit(0))
             .then(col("_non_cancelled"))
             .otherwise(lit(None))
@@ -969,9 +900,6 @@ def time_of_day_expression_impl(ctx: DataFrameContext) -> Any:
             col("_operated").sum().alias("_non_cancelled"),
         )
         .with_columns(
-            # NULL-safe denominator: a fully-cancelled group divides by
-            # zero, where SQL yields NULL but a bare division yields NaN
-            # (which sorts first instead of last), so guard to NULL.
             ctx.when(col("_non_cancelled") > lit(0))
             .then(col("_non_cancelled"))
             .otherwise(lit(None))
@@ -1021,9 +949,6 @@ def carrier_ranking_expression_impl(ctx: DataFrameContext) -> Any:
         )
         .filter(col("total_scheduled") >= lit(1000))
         .with_columns(
-            # NULL-safe denominator: a fully-cancelled group divides by
-            # zero, where SQL yields NULL but a bare division yields NaN
-            # (which sorts first instead of last), so guard to NULL.
             ctx.when(col("_non_cancelled") > lit(0))
             .then(col("_non_cancelled"))
             .otherwise(lit(None))
@@ -1102,7 +1027,6 @@ def market_share_expression_impl(ctx: DataFrameContext) -> Any:
     flights = ctx.get_table("flights")
     col, lit = ctx.col, ctx.lit
 
-    # carrier_totals equivalent
     carrier_totals = (
         flights.join(_airline_names(ctx), left_on="reporting_airline", right_on="a_code", how="left")
         .filter(_date_condition(col, lit, lambda col, lit: col("cancelled") == lit(0)))
@@ -1115,7 +1039,6 @@ def market_share_expression_impl(ctx: DataFrameContext) -> Any:
         )
     )
 
-    # Compute grand_total as a window sum, then derive market share
     return (
         carrier_totals.with_columns(col("flight_count").sum().alias("grand_total"))
         .with_columns(
@@ -1133,11 +1056,6 @@ def market_share_expression_impl(ctx: DataFrameContext) -> Any:
         .sort(["flight_count", "reporting_airline"], descending=[True, False])
         .limit(20)
     )
-
-
-# ===========================================================================
-# Pandas Family (Pandas, cuDF, Dask)
-# ===========================================================================
 
 
 def _pandas_origin_airport(ctx: DataFrameContext, df: Any) -> Any:
@@ -1250,8 +1168,6 @@ _PANDAS_DERIVED = {
     "recovered": ("_recovered", lambda f: (f["arr_delay"] < f["dep_delay"]).astype(int)),
     "cascade": ("_cascade", lambda f: (f["late_aircraft_delay"] > 0).astype(int)),
     "cascade_val": ("_cascade_val", lambda f: f["late_aircraft_delay"].where(f["late_aircraft_delay"] > 0)),
-    # Exact integer tenths matching the SQL surface (see the cascade-delays
-    # expression impl): NULL/negative delays contribute 0 as SQL's ELSE 0.
     "late_tenths": (
         "_late_tenths",
         lambda f: (
@@ -1262,8 +1178,6 @@ _PANDAS_DERIVED = {
     ),
     "weather": ("_weather_flag", lambda f: (f["weather_delay"] > 0).astype(int)),
     "weather_val": ("_weather_val", lambda f: f["weather_delay"].where(f["weather_delay"] > 0)),
-    # Exact integer tenths matching the SQL surface (see the cascade-delays
-    # "late_tenths" derive): NULL delays contribute 0 as SQL's COALESCE.
     "weather_tenths": (
         "_weather_tenths",
         lambda f: (_pandas_round_half_away(f["weather_delay"].fillna(0) * 10, 0)).astype("int64"),
@@ -1305,7 +1219,6 @@ def _make_pandas_impl(row: list[str]) -> Any:
         for name in _csv(derives):
             column, derive = _PANDAS_DERIVED[name]
             filtered[column] = derive(filtered)
-        # SQL GROUP BY keeps NULL keys as a group; pandas drops them unless asked.
         result = filtered.groupby(_csv(group) if "," in group else group, as_index=False, dropna=False).agg(
             **_parse_aggs(aggs)
         )
@@ -1315,8 +1228,6 @@ def _make_pandas_impl(row: list[str]) -> Any:
         _apply_rates(result, rates)
         for column, digits in (item.split(":") for item in rounds.split(";") if item):
             result[column] = _pandas_round_half_away(result[column], int(digits))
-        # Integer half-up division for exact whole-unit totals summed in tenths
-        # (entries ``out:src:div`` compute ``(src + div // 2) // div`` exactly).
         for out, src, div in (item.split(":") for item in halfup.split(";") if item):
             divisor = int(div)
             result[out] = (result[src] + divisor // 2) // divisor
@@ -1398,10 +1309,6 @@ def delay_causes_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ===========================================================================
-# Registry
-# ===========================================================================
-
 FLIGHTDATA_DATAFRAME_QUERIES = QueryRegistry("FlightData DataFrame")
 
 _CATEGORY_CODES = {
@@ -1459,9 +1366,4 @@ for _query in _QUERIES:
 
 
 def get_dataframe_queries() -> QueryRegistry:
-    """Get the FlightData DataFrame query registry.
-
-    Returns:
-        QueryRegistry containing all 20 FlightData DataFrame queries
-    """
     return FLIGHTDATA_DATAFRAME_QUERIES

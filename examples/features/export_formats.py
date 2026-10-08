@@ -1,21 +1,4 @@
 #!/usr/bin/env python3
-"""Demonstrate exporting benchmark results in multiple formats.
-
-This example shows how to:
-- Export results as JSON for programmatic processing
-- Export results as CSV for spreadsheet analysis
-- Export results as HTML for stakeholder reports
-- Choose the right format for your audience
-
-Usage:
-    python features/export_formats.py
-
-Key Concepts:
-    - JSON: Machine-readable, preserves structure, ideal for automation
-    - CSV: Human-readable, easy to import into Excel/Google Sheets
-    - HTML: Formatted reports with visualizations for stakeholders
-    - Format selection based on audience and use case
-"""
 
 from __future__ import annotations
 
@@ -24,7 +7,6 @@ import json
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _EXAMPLES_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_EXAMPLES_DIR))
@@ -34,7 +16,6 @@ from benchbox.tpch import TPCH
 
 
 def run_sample_benchmark():
-    """Run a sample benchmark to generate results for export."""
     print("=" * 70)
     print("GENERATING SAMPLE RESULTS")
     print("=" * 70)
@@ -55,7 +36,7 @@ def run_sample_benchmark():
     results = adapter.run_benchmark(
         benchmark,
         test_execution_type="power",
-        query_subset=["1", "3", "6", "12", "14"],  # Subset for demo
+        query_subset=["1", "3", "6", "12", "14"],
     )
 
     print("✓ Benchmark complete!")
@@ -67,20 +48,6 @@ def run_sample_benchmark():
 
 
 def export_json(results, output_dir: Path):
-    """Export results as JSON.
-
-    JSON format is best for:
-    - Programmatic processing (scripts, CI/CD)
-    - Preserving full result structure
-    - API integration
-    - Automated analysis
-
-    JSON includes:
-    - All query results with timing
-    - Metadata (platform, benchmark, timestamp)
-    - Configuration details
-    - Error information if any
-    """
     print("=" * 70)
     print("EXPORT FORMAT 1: JSON")
     print("=" * 70)
@@ -89,10 +56,8 @@ def export_json(results, output_dir: Path):
     json_file = output_dir / "results.json"
     json_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # Convert results to dictionary
     results_dict = results.model_dump()
 
-    # Write JSON file
     with open(json_file, "w", encoding="utf-8") as f:
         json.dump(results_dict, f, indent=2)
 
@@ -128,19 +93,6 @@ def export_json(results, output_dir: Path):
 
 
 def export_csv(results, output_dir: Path):
-    """Export results as CSV.
-
-    CSV format is best for:
-    - Spreadsheet analysis (Excel, Google Sheets)
-    - Simple data sharing with non-technical users
-    - Quick manual inspection
-    - Import into BI tools
-
-    CSV includes:
-    - One row per query
-    - Key metrics (query name, time, status)
-    - Easy to sort/filter in spreadsheets
-    """
     print("=" * 70)
     print("EXPORT FORMAT 2: CSV")
     print("=" * 70)
@@ -149,14 +101,11 @@ def export_csv(results, output_dir: Path):
     csv_file = output_dir / "results.csv"
     csv_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # Write CSV file
     with open(csv_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
 
-        # Header row
         writer.writerow(["Query Name", "Execution Time (s)", "Status", "Rows Returned"])
 
-        # Data rows
         for query_result in results.query_results:
             writer.writerow(
                 [
@@ -167,7 +116,6 @@ def export_csv(results, output_dir: Path):
                 ]
             )
 
-        # Summary row
         writer.writerow([])
         writer.writerow(["TOTAL", f"{results.total_execution_time:.3f}", f"{results.total_queries} queries", ""])
 
@@ -193,20 +141,6 @@ def export_csv(results, output_dir: Path):
 
 
 def export_html(results, output_dir: Path):
-    """Export results as HTML report.
-
-    HTML format is best for:
-    - Stakeholder reports
-    - Management presentations
-    - Documentation
-    - Sharing results via web/email
-
-    HTML includes:
-    - Formatted tables
-    - Summary statistics
-    - Visual highlighting (fast/slow queries)
-    - Self-contained (no external dependencies)
-    """
     print("=" * 70)
     print("EXPORT FORMAT 3: HTML")
     print("=" * 70)
@@ -215,7 +149,6 @@ def export_html(results, output_dir: Path):
     html_file = output_dir / "results.html"
     html_file.parent.mkdir(parents=True, exist_ok=True)
 
-    # Build HTML content
     html_content = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -342,9 +275,7 @@ def export_html(results, output_dir: Path):
         <tbody>
 """
 
-    # Add query rows
     for query_result in results.query_results:
-        # Color-code based on execution time
         time_class = (
             "fast" if query_result.execution_time < 0.5 else "slow" if query_result.execution_time > 2.0 else ""
         )
@@ -364,7 +295,6 @@ def export_html(results, output_dir: Path):
 </html>
 """
 
-    # Write HTML file
     with open(html_file, "w", encoding="utf-8") as f:
         f.write(html_content)
 
@@ -391,7 +321,6 @@ def export_html(results, output_dir: Path):
 
 
 def show_format_comparison():
-    """Show when to use each export format."""
     print("=" * 70)
     print("FORMAT SELECTION GUIDE")
     print("=" * 70)
@@ -426,7 +355,6 @@ def show_format_comparison():
 
 
 def show_unified_runner_usage():
-    """Show how to export formats using unified_runner.py."""
     print("=" * 70)
     print("USING unified_runner.py")
     print("=" * 70)
@@ -450,7 +378,6 @@ def show_unified_runner_usage():
 
 
 def main() -> int:
-    """Demonstrate export format options."""
     print()
     print("=" * 70)
     print("BENCHBOX FEATURE: EXPORT FORMATS")
@@ -460,23 +387,18 @@ def main() -> int:
     print("different formats for different audiences and use cases.")
     print()
 
-    # Run sample benchmark
     results = run_sample_benchmark()
 
     output_dir = Path("./benchmark_runs/features/export")
 
-    # Export in all formats
     json_file = export_json(results, output_dir)
     csv_file = export_csv(results, output_dir)
     html_file = export_html(results, output_dir)
 
-    # Show comparison
     show_format_comparison()
 
-    # Show unified_runner usage
     show_unified_runner_usage()
 
-    # Summary
     print("=" * 70)
     print("SUMMARY")
     print("=" * 70)

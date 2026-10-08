@@ -176,14 +176,6 @@ def convert_rows(answer: dict[str, Any], sql_types: list[str]) -> list[tuple[Any
 def display_rounded(
     actual: list[tuple[Any, ...]], answer: dict[str, Any], sql_types: list[str]
 ) -> list[tuple[Any, ...]]:
-    """Replace each numeric cell that rounds to its official printed text with the printed value.
-
-    Official answer files print rounded values. A cell is replaced only when rounding
-    it, half up or half to even, to the decimal places its printed text shows gives
-    exactly that text. Rows are paired by position, so a different row count or order
-    leaves the result unchanged. Callers report the comparison of this result as a
-    classification of a strict mismatch; it never turns a mismatch into a match.
-    """
     if len(actual) != len(answer["rows"]):
         return actual
     return [

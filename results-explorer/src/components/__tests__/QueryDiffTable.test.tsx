@@ -109,8 +109,6 @@ describe("buildQueryDiffRows", () => {
         status: "missing",
         baselineSamples: 0,
         candidateSamples: 0,
-        // Shown and marked, never dropped: a query removed for being
-        // unanswerable is one the reader never learns was excluded.
         comparable: false,
       },
     ]);
@@ -228,8 +226,6 @@ describe("QueryDiffTable", () => {
     const table = screen.getByRole("heading", { name: "Query-level differences" }).closest("section");
     expect(table).not.toBeNull();
     expect(table).toHaveTextContent("Baseline: DuckDB");
-    // w4: every state names how many of how many are shown, so an empty
-    // filter is distinguishable from an empty comparison.
     expect(table).toHaveTextContent("Showing 3 of 3 queries.");
     expect(table).toHaveTextContent("Q1");
     expect(table).toHaveTextContent("SQLite");
@@ -239,11 +235,6 @@ describe("QueryDiffTable", () => {
     expect(table).toHaveTextContent("0.50x");
     expect(table).toHaveTextContent("-10 ms");
     expect(table).toHaveTextContent("Faster");
-    // w4 replaced the generic "Missing" badge with an explicit
-    // not-comparable marker. The distinction is real once a non-default
-    // basis is in play: a query can have a published value and still be
-    // unanswerable under, say, warm_pass_2, which "Missing" would have
-    // described wrongly.
     expect(table).toHaveTextContent("Not comparable");
   });
 
@@ -288,8 +279,6 @@ describe("the Top-N limiter", () => {
   });
 
   it("returns everything for 'all', including rows that cannot be compared", () => {
-    // The uncomparable row must survive: dropping it hides an exclusion the
-    // reader is entitled to see.
     expect(applyQueryDiffLimiter(rows, "all", 2)).toHaveLength(5);
   });
 
@@ -313,8 +302,6 @@ describe("the Top-N limiter", () => {
   });
 
   it("never ranks an uncomparable row into a 'largest' view", () => {
-    // It has no magnitude to rank by; including it would push a real result
-    // out of the top N in favour of a row with no value.
     for (const limiter of ["speedups", "slowdowns", "movement"] as const) {
       expect(applyQueryDiffLimiter(rows, limiter, 10).every((r) => r.comparable)).toBe(true);
     }
@@ -327,8 +314,6 @@ describe("the count sentence", () => {
   });
 
   it("keeps the denominator when a filter matches nothing", () => {
-    // "No queries match" without a denominator leaves a reader unable to tell
-    // an empty filter from an empty comparison.
     expect(queryDiffCountSentence(0, 103, "speedups")).toContain("of 103");
     expect(queryDiffCountSentence(0, 103, "speedups")).toContain("largest speedups");
   });

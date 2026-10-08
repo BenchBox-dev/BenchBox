@@ -1,9 +1,6 @@
-"""Tests for the persistent publication metadata store.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -23,11 +20,6 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
-
-
-# ---------------------------------------------------------------------------
-# PublicationRecord
-# ---------------------------------------------------------------------------
 
 
 class TestPublicationRecord:
@@ -64,14 +56,8 @@ class TestPublicationRecord:
             "scale_factor": 1.0,
             "_unknown_future_field": "should-be-ignored",
         }
-        # Should not raise even with an unexpected key
         rec = PublicationRecord.from_dict({k: v for k, v in d.items() if k != "_unknown_future_field"})
         assert rec.pub_id == "abc123"
-
-
-# ---------------------------------------------------------------------------
-# PublicationStore - persistence
-# ---------------------------------------------------------------------------
 
 
 class TestPublicationStore:
@@ -109,7 +95,6 @@ class TestPublicationStore:
         assert data[0]["reference"] == "file:///tmp/published/result.json"
 
     def test_state_survives_process_restart(self, tmp_path):
-        """New store instance reads the same file - simulates process restart."""
         store_path = tmp_path / "published.json"
         store1 = PublicationStore(store_path=store_path)
         store1.add(
@@ -121,7 +106,6 @@ class TestPublicationStore:
             platform="duckdb",
         )
 
-        # New store instance (simulates process restart)
         store2 = PublicationStore(store_path=store_path)
         records = store2.list_all()
         assert len(records) == 1
@@ -129,14 +113,10 @@ class TestPublicationStore:
 
     def test_list_all_sorted_newest_first(self, tmp_path):
         store = PublicationStore(store_path=tmp_path / "published.json")
-        # Use patch to guarantee distinct timestamps so the sort is deterministic
-        # across all platforms (Windows datetime.now() resolution can be ~15 ms).
         from unittest.mock import patch
 
         t1 = "2026-01-01T00:00:00.000000+00:00"
         t2 = "2026-01-01T00:00:00.000001+00:00"
-        # _now_iso is called multiple times per add() (id generation + published_at),
-        # so provide enough values; all tpch calls return t1, tpcds calls return t2.
         with patch("benchbox.core.publishing.store._now_iso", side_effect=[t1, t1, t2, t2]):
             store.add(
                 source_path="/tmp/a.json",
@@ -154,7 +134,6 @@ class TestPublicationStore:
             )
         records = store.list_all()
         assert len(records) == 2
-        # Newest first (b has later timestamp)
         assert records[0].benchmark == "tpcds"
         assert records[1].benchmark == "tpch"
 
@@ -192,7 +171,6 @@ class TestPublicationStore:
         assert store.remove("nonexistent") is False
 
     def test_idempotent_republish_updates_record(self, tmp_path):
-        """Publishing the same bundle to the same destination updates, not duplicates."""
         store = PublicationStore(store_path=tmp_path / "published.json")
         rec1 = store.add(
             source_path="/tmp/result.json",
@@ -204,11 +182,11 @@ class TestPublicationStore:
             source_path="/tmp/result.json",
             destination="/tmp/published",
             reference="file:///tmp/published/result.json",
-            label="maintainer-run",  # updated label
+            label="maintainer-run",
         )
-        assert rec1.pub_id == rec2.pub_id  # same record, not a new one
+        assert rec1.pub_id == rec2.pub_id
         assert store.get(rec1.pub_id).label == "maintainer-run"
-        assert len(store.list_all()) == 1  # no duplicate
+        assert len(store.list_all()) == 1
 
     def test_different_destinations_create_separate_records(self, tmp_path):
         store = PublicationStore(store_path=tmp_path / "published.json")
@@ -233,11 +211,6 @@ class TestPublicationStore:
         assert store.list_all() == []
 
 
-# ---------------------------------------------------------------------------
-# build_reference
-# ---------------------------------------------------------------------------
-
-
 class TestBuildReference:
     def test_local_path_produces_file_uri(self, tmp_path):
         destination = str(tmp_path)
@@ -258,11 +231,6 @@ class TestBuildReference:
         assert ref == "s3://my-bucket/prefix/result.json"
 
 
-# ---------------------------------------------------------------------------
-# _generate_pub_id
-# ---------------------------------------------------------------------------
-
-
 class TestGeneratePubId:
     def test_returns_12_char_hex(self):
         pub_id = _generate_pub_id("/tmp/result.json")
@@ -272,6 +240,5 @@ class TestGeneratePubId:
     def test_different_inputs_produce_different_ids(self):
         id1 = _generate_pub_id("/tmp/a.json")
         id2 = _generate_pub_id("/tmp/b.json")
-        # Not guaranteed to differ due to timestamp, but overwhelmingly likely
         assert isinstance(id1, str)
         assert isinstance(id2, str)

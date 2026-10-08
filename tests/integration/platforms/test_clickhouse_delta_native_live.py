@@ -1,32 +1,6 @@
-"""Docker live capability probe for native ClickHouse Delta Lake reads.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Setup:
-    make test-docker-up-clickhouse
-    # or: docker compose -f docker/clickhouse/docker-compose.yml up -d --wait
-
-ClickHouse reads Delta Lake tables directly through the ``DeltaLake`` table
-engine and the ``deltaLake`` table-function family -- no Parquet conversion
-is required on capable servers. These tests probe a running ClickHouse
-instance (pinned image ``clickhouse/clickhouse-server:25.8``) for that
-capability: server version plus registration of the native Delta functions
-and engine in the system tables, decided with
-:func:`benchbox.platforms.clickhouse.delta_lake.has_native_delta_registration`.
-
-A passing probe means the server registers the integration the builders in
-:mod:`benchbox.platforms.clickhouse.delta_lake` target -- not that a generated
-statement has executed. A failure names the server version so the author can
-tell a missing integration (image too old or minimal build) apart from a
-regression.
-
-This probe asserts registration only: a data-level end-to-end read (create a
-Delta table, query it via ``deltaLake``) needs a table location the container
-can see -- host tmp paths are invisible to the Docker server -- and is tracked
-as follow-up work, not covered here.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -54,14 +28,12 @@ pytestmark = [
 
 @pytest.fixture
 def clickhouse_adapter():
-    """Create a ClickHouse adapter connected to a local Docker instance."""
     skip_unless_docker_service("localhost", 9000, platform="ClickHouse")
     adapter = ClickHouseAdapter(
         host="localhost",
         port=9000,
         deployment_mode="server",
         database="benchbox_test",
-        # Matches docker/clickhouse/docker-compose.yml (CLICKHOUSE_PASSWORD).
         password="benchbox",
     )
     adapter.skip_database_management = True
@@ -74,8 +46,6 @@ def _query_names(connection, sql: str) -> list[str]:
 
 
 class TestNativeDeltaCapability:
-    """Probe the server for the native Delta Lake integration."""
-
     def test_server_version(self, clickhouse_adapter) -> None:
         connection = clickhouse_adapter.create_connection()
         try:
@@ -85,9 +55,6 @@ class TestNativeDeltaCapability:
             clickhouse_adapter.close_connection(connection)
 
     def test_native_delta_support(self, clickhouse_adapter) -> None:
-        # Deliberately stricter than the helper: the helper fail-closes a runtime
-        # decision on base-function-plus-engine presence, while this probe fails loud
-        # on any alias drift so image changes surface here first.
         connection = clickhouse_adapter.create_connection()
         try:
             functions = _query_names(connection, delta_function_probe_sql())
@@ -115,17 +82,9 @@ PUBLIC_DELTA_URL = "https://clickhouse-public-datasets.s3.amazonaws.com/delta_la
 
 
 class TestPublicS3DeltaEndToEnd:
-    """Data-level reads against the public Delta example from the ClickHouse docs.
-
-    Requires container egress to S3. A failure here names the dataset URL so a
-    moved dataset reads as an external change, not a BenchBox regression.
-    """
-
     def test_table_function_read(self, clickhouse_adapter) -> None:
         connection = clickhouse_adapter.create_connection()
         try:
-            # Resolve through the adapter selection, not the builder directly:
-            # the HTTPS S3 URL must classify as S3 and select the native reader.
             reader = clickhouse_adapter.delta_reader_for(connection, PUBLIC_DELTA_URL)
             assert reader.kind == "native"
             assert reader.location_kind == "s3"

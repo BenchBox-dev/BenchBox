@@ -1,11 +1,3 @@
-"""Offline inventory of every concrete adapter coordinate in the platform manifest.
-
-Adapter classes are imported and their real dialect translation runs without
-any vendor SDK connection. The inventory is explicit data: adding or removing
-an adapter in ``get_adapter_imports`` fails conservation until it is classified
-here. Nothing is filtered by SDK availability and nothing is skipped.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -14,11 +6,9 @@ import pytest
 
 from benchbox.core.platform_manifest import get_adapter_imports
 
-# Importing every adapter class pulls in vendor SDK modules and costs well over the fast-lane
-# per-test budget on a cold worker, and 150 fast nodes would exceed the fast-lane count ceiling.
 pytestmark = [pytest.mark.unit, pytest.mark.medium]
 
-# adapter key -> target dialect reported by the real adapter class.
+
 ADAPTER_DIALECTS: dict[str, str] = {
     "duckdb": "duckdb",
     "motherduck": "duckdb",
@@ -71,8 +61,7 @@ ADAPTER_DIALECTS: dict[str, str] = {
     "citus": "postgres",
 }
 
-# Dialects with no sqlglot grammar. They are exempt from SQL translation and
-# must fail loudly under strict translation instead of passing text through.
+
 NON_SQL_DIALECTS = {"influxdb": "line protocol measurements", "dataframe": "expression/schema API"}
 
 DDL_INPUT = "CREATE TABLE t (id INTEGER NOT NULL, name VARCHAR(20), amt DECIMAL(10,2), d DATE, PRIMARY KEY (id))"
@@ -168,7 +157,7 @@ ADAPTER_COORDINATES = {key: (module, class_name) for key, module, class_name in 
 
 
 def _bare_adapter(key: str):
-    """Build an adapter without running __init__ so no SDK or connection is needed."""
+
     module, class_name = ADAPTER_COORDINATES[key]
     adapter = object.__new__(getattr(importlib.import_module(module), class_name))
     adapter._dialect = adapter.get_target_dialect()
@@ -210,7 +199,7 @@ def test_non_sql_platforms_reject_strict_sql_translation(key: str) -> None:
 
 
 def test_polars_structured_schema_without_sql_or_sdk() -> None:
-    """Polars consumes structured schema, not SQL DDL, even without its runtime."""
+
     adapter = _bare_adapter("polars")
     adapter.quiet = True
 
@@ -224,7 +213,7 @@ def test_polars_structured_schema_without_sql_or_sdk() -> None:
 
 
 def test_influx_measurement_schema_and_typed_line_protocol() -> None:
-    """Influx creates measurements on writes instead of executing CREATE TABLE."""
+
     import logging
 
     from benchbox.platforms.influxdb import to_line_protocol
@@ -241,7 +230,7 @@ def test_influx_measurement_schema_and_typed_line_protocol() -> None:
 
 
 def test_snowflake_fixture_stub_does_not_hide_real_cli_options() -> None:
-    """The autouse fixture stubs the option hook; the real one must stay reachable and intact."""
+
     import argparse
 
     from benchbox.platforms.snowflake import SnowflakeAdapter

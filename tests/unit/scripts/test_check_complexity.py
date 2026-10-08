@@ -1,5 +1,3 @@
-"""Behavioral and wiring tests for the quality-gate policy."""
-
 from __future__ import annotations
 
 import importlib.util

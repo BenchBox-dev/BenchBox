@@ -1,5 +1,3 @@
-"""Tests for the normalized execution-environment result contract."""
-
 from __future__ import annotations
 
 import json
@@ -378,7 +376,6 @@ def test_build_environment_payload_preserves_client_link_without_flat_pollution(
     env = NormalizedExecutionEnvironment(client_link=link)
     payload = build_environment_payload(system_profile={"os_type": "Darwin"}, execution_environment=env)
 
-    # client_link must be present as a nested dict
     assert "client_link" in payload
     assert payload["client_link"] == {
         "collection_status": "available",
@@ -387,7 +384,7 @@ def test_build_environment_payload_preserves_client_link_without_flat_pollution(
         "client_cloud": "aws",
         "statement_overhead_ms": {"samples": 5, "min": 1.25, "median": 1.4},
     }
-    # client_link fields must NOT pollute the flat top-level legacy keys on payload
+
     assert "client_region" not in payload
     assert "client_cloud" not in payload
     assert "statement_overhead_ms" not in payload

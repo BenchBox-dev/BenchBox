@@ -1,24 +1,3 @@
-"""Local-artifact hygiene guardrails for benchmark runs with an external root.
-
-The default output root is itself external — it is anchored to the enclosing
-work tree's *parent* — so these guardrails apply to plain runs too, not only to
-runs that pass ``--output`` or set ``BENCHBOX_OUTPUT_DIR``.
-
-Background — the 2026-06-01 incident: a corpus run launched from a pool
-worktree with ``BENCHBOX_OUTPUT_DIR`` pointed at an external root
-(``~/Developer/benchmark_runs``) still accumulated ~4.2 GB of datagen
-artifacts under the *worktree-local* ``benchmark_runs/datagen/``. The
-output-root propagation fix (PR #780) means external-root runs should never
-write into the local ``benchmark_runs/`` again; these helpers detect and
-report loudly if that invariant is ever broken.
-
-The guardrails are *report-only*. They snapshot the worktree-local
-``benchmark_runs`` before
-a run and assert it did not grow afterwards. They never delete or move
-artifacts — surfacing the unexpected local path (and the external root that
-should have received the writes) is the entire job.
-"""
-
 from __future__ import annotations
 
 import os
@@ -33,11 +12,10 @@ LOCAL_RUNS_DIRNAME = str(DEFAULT_BENCHMARK_RUNS_ROOT)
 
 
 class LocalArtifactGrowthError(AssertionError):
-    """Raised when the worktree-local ``benchmark_runs`` grows."""
+    pass
 
 
 def dir_size_bytes(path: Path) -> int:
-    """Return the total size in bytes of all files under ``path`` (0 if absent)."""
     if not path.exists():
         return 0
     if path.is_file():
@@ -48,19 +26,16 @@ def dir_size_bytes(path: Path) -> int:
             if child.is_file() and not child.is_symlink():
                 total += child.stat().st_size
         except OSError:
-            # A file vanishing mid-walk is not a hygiene violation; skip it.
             continue
     return total
 
 
 def _guard_base(cwd: Path | str | None = None) -> Path:
-    """Return the actual worktree root for a guard started from any subdirectory."""
     base = Path(cwd).resolve() if cwd is not None else Path.cwd().resolve()
     return find_work_tree_root(base) or base
 
 
 def local_runs_root(cwd: Path | str | None = None) -> Path:
-    """Return the worktree-local ``benchmark_runs/`` root for ``cwd``."""
     return _guard_base(cwd) / LOCAL_RUNS_DIRNAME
 
 
@@ -69,13 +44,6 @@ def _normalize(path: str | Path) -> Path:
 
 
 def _default_runs_root(base: Path) -> Path | None:
-    """Resolve the default ``benchmark_runs`` root for a run started in ``base``.
-
-    Defers to :func:`benchbox.utils.path_utils.default_benchmark_runs_root` so
-    the anchor cannot drift from the runtime one. Returns ``None`` outside a
-    work tree, where the default is cwd-local by definition and there is
-    nothing external to guard.
-    """
     if find_work_tree_root(base) is None:
         return None
     return default_benchmark_runs_root(base)
@@ -87,18 +55,6 @@ def configured_external_root(
     cwd: Path | str | None = None,
     output: str | Path | None = None,
 ) -> Path | None:
-    """Resolve a configured output root iff it points *outside* the worktree.
-
-    An external root is "configured" when ``--output`` (``output``) is given
-    or ``BENCHBOX_OUTPUT_DIR`` is set to a non-empty value. When neither is
-    set, the *default* root is used — since the default is anchored to the
-    enclosing work tree's parent it is normally external too, so plain runs
-    are covered by the same guardrail rather than being exempt from it.
-
-    The guardrail only applies when the resolved root lies outside the actual
-    worktree, even when UAT was launched from a nested directory. A root inside
-    the worktree returns ``None`` so genuinely local runs are never blocked.
-    """
     env_map = os.environ if env is None else env
     base = _guard_base(cwd)
 
@@ -110,9 +66,6 @@ def configured_external_root(
         if raw is not None and raw.strip():
             candidate = _normalize(raw.strip())
         else:
-            # No explicit root: fall back to the resolved default, which is
-            # anchored to the work tree's parent and is therefore external for
-            # any run launched from inside a checkout.
             candidate = _default_runs_root(base)
 
     if candidate is None:
@@ -121,27 +74,19 @@ def configured_external_root(
     resolved = candidate if candidate.is_absolute() else (base / candidate)
     resolved = resolved.resolve()
     if resolved == base or resolved.is_relative_to(base):
-        # Output root lives inside the worktree — this is a local run.
         return None
     return resolved
 
 
 @dataclass(frozen=True)
 class LocalRunsSnapshot:
-    """Pre-run state of the worktree-local ``benchmark_runs/`` tree."""
-
     root: Path
     total_bytes: int
     file_sizes: dict[str, int]
-    # Per-file identity ``(mtime_ns, inode)`` so a same-size rewrite is still detected:
-    # a generator that truncates and recreates a deterministic file to the same length,
-    # or a stale local leak re-emitted byte-for-byte, leaves the size unchanged but
-    # still represents a local write that the external-root run must not perform.
     file_fingerprints: dict[str, tuple[int, int]]
 
 
 def snapshot_local_runs(cwd: Path | str | None = None) -> LocalRunsSnapshot:
-    """Capture per-file size and identity under ``cwd/benchmark_runs`` for later comparison."""
     root = local_runs_root(cwd)
     file_sizes: dict[str, int] = {}
     file_fingerprints: dict[str, tuple[int, int]] = {}
@@ -163,22 +108,15 @@ def snapshot_local_runs(cwd: Path | str | None = None) -> LocalRunsSnapshot:
 
 
 def _changed_entries(before: LocalRunsSnapshot, after: LocalRunsSnapshot) -> dict[str, int]:
-    """Return paths written during the run, mapped to their byte delta.
-
-    A path is reported when it is new, when its size changed (grew or shrank), or when it
-    was rewritten at the same size (mtime or inode differs). Same-size rewrites carry a
-    delta of 0 but are still violations: any local write under an external-root run is a
-    propagation regression, so this no longer reports only files that grew.
-    """
     changed: dict[str, int] = {}
     for path, size in after.file_sizes.items():
         before_size = before.file_sizes.get(path)
         if before_size is None:
-            changed[path] = size  # new file
+            changed[path] = size
         elif size != before_size:
-            changed[path] = size - before_size  # grew or shrank
+            changed[path] = size - before_size
         elif after.file_fingerprints.get(path) != before.file_fingerprints.get(path):
-            changed[path] = 0  # same-size rewrite
+            changed[path] = 0
     return changed
 
 
@@ -189,15 +127,12 @@ def _format_violation(
     grew_by: int,
     grown: Mapping[str, int],
 ) -> str:
-    """Build a failure message naming the local path AND the external root."""
     lines = [
         "Local benchmark_runs/ was written during an external-root run (output-root propagation regression — see PR #780).",
         f"  unexpected local path: {local_root}",
         f"  configured external root: {external_root}",
         f"  change: {grew_by} bytes across {len(grown)} file(s) (includes same-size rewrites)",
     ]
-    # Surface the largest offenders so the operator can locate the leak fast;
-    # datagen is the historical culprit so it tends to dominate this list.
     top = sorted(grown.items(), key=lambda kv: kv[1], reverse=True)[:5]
     for path, delta in top:
         lines.append(f"    + {delta} bytes: {path}")
@@ -211,14 +146,6 @@ def assert_no_local_growth(
     *,
     cwd: Path | str | None = None,
 ) -> None:
-    """Raise :class:`LocalArtifactGrowthError` if local ``benchmark_runs`` was written.
-
-    Compares ``before`` against a fresh snapshot of the same root. When an
-    external root is configured, *any* write under the worktree-local
-    ``benchmark_runs/`` is a violation — whether it grows a file, adds one, or
-    rewrites one in place at the same size — because the writes should have gone
-    to ``external_root`` instead.
-    """
     after = snapshot_local_runs(cwd if cwd is not None else before.root.parent)
     changed = _changed_entries(before, after)
     grew_by = after.total_bytes - before.total_bytes
@@ -240,15 +167,6 @@ def audit_local_datagen(
     output: str | Path | None = None,
     threshold_bytes: int = 0,
 ) -> str | None:
-    """Audit the live worktree for the incident shape; return a message or None.
-
-    Used by the preflight/UAT gate. When no external root is configured the
-    audit is a no-op (returns ``None``) so default local runs are never
-    blocked. When an external root *is* configured, the worktree-local
-    ``benchmark_runs/datagen`` is measured: anything above ``threshold_bytes``
-    is reported as a violation naming both the local path and the external
-    root. This never deletes or moves anything.
-    """
     base = Path(cwd) if cwd is not None else Path.cwd()
     external_root = configured_external_root(env, cwd=base, output=output)
     if external_root is None:
@@ -292,7 +210,6 @@ def _build_arg_parser():
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry point for the preflight/UAT hygiene gate."""
     parser = _build_arg_parser()
     args = parser.parse_args(argv)
     message = audit_local_datagen(
@@ -311,5 +228,5 @@ def main(argv: list[str] | None = None) -> int:
     return 1
 
 
-if __name__ == "__main__":  # pragma: no cover - exercised via the make gate
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

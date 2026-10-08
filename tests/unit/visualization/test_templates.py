@@ -1,5 +1,3 @@
-"""Unit tests for chart templates."""
-
 from __future__ import annotations
 
 import pytest
@@ -48,7 +46,7 @@ class TestGetTemplate:
         assert get_template("Flagship").name == "flagship"
 
     def test_hyphen_to_underscore(self):
-        # head-to-head should work as head_to_head
+
         template = get_template("head-to-head")
         assert template.name == "head_to_head"
 

@@ -1,23 +1,6 @@
-"""Vector search benchmark data generator.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Generates synthetic unit-normalised float32 embeddings using a seeded
-NumPy RNG so results are fully reproducible across runs.
-
-Scale factor → vector count:
-  SF=0.01  →   10,000 vectors
-  SF=0.1   →  100,000 vectors
-  SF=1     →1,000,000 vectors
-  SF=10    →10,000,000 vectors
-
-The generator also produces a fixed set of 100 pre-generated query
-vectors (stored in the vector_queries table) that are used by benchmark
-queries. This set is independent of the scale factor so query SQL remains
-stable across scales.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -36,23 +19,18 @@ try:
 
     PathLike = Union[Path, CloudPath]
 except ImportError:
-    PathLike = Path  # type: ignore[misc,assignment]
+    PathLike = Path
 
-# Number of query vectors pre-generated regardless of scale factor.
 NUM_QUERY_VECTORS = 100
 
-# Base corpus size at SF=1.0.
 BASE_VECTORS = 1_000_000
 
-# Number of synthetic categories for filtered-search queries.
 NUM_CATEGORIES = 10
 
-# Random seed for reproducibility.
 _SEED = 42
 
 
 def _generate_unit_vectors(n: int, dim: int, rng: np.random.Generator) -> np.ndarray:
-    """Return *n* unit-normalised float32 vectors of dimension *dim*."""
     vecs = rng.standard_normal((n, dim)).astype(np.float32)
     norms = np.linalg.norm(vecs, axis=1, keepdims=True)
     norms = np.where(norms == 0, 1.0, norms)
@@ -60,20 +38,11 @@ def _generate_unit_vectors(n: int, dim: int, rng: np.random.Generator) -> np.nda
 
 
 def _array_to_csv(arr: np.ndarray) -> str:
-    """Format a 1-D float32 array as a DuckDB list literal ``[v1,v2,…]``."""
     vals = ",".join(f"{v:.6g}" for v in arr)
     return f"[{vals}]"
 
 
 class VectorSearchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
-    """Generator for vector search benchmark data.
-
-    Attributes:
-        scale_factor: Controls corpus size (SF=1 → 1 M vectors).
-        output_dir: Directory to write generated CSV files.
-        dimensions: Embedding dimensionality (default 128).
-    """
-
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -104,20 +73,7 @@ class VectorSearchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
         self._manifest_row_counts: dict[str, int] = {}
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
     def generate_data(self, tables: list[str] | None = None) -> dict[str, str]:
-        """Generate vector search data files.
-
-        Args:
-            tables: Optional subset of tables to generate.  If *None*, all
-                    tables are generated (``vectors`` and ``vector_queries``).
-
-        Returns:
-            Dict mapping table name to file path string.
-        """
         table_paths = self._handle_cloud_or_local_generation(
             self.output_dir,
             lambda output_dir: self._generate_local(output_dir, tables),
@@ -125,10 +81,6 @@ class VectorSearchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         )
         self._write_manifest(table_paths)
         return {t: str(p) for t, p in table_paths.items()}
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
     def _generate_local(
         self,
@@ -149,8 +101,6 @@ class VectorSearchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             if "vectors" in tables:
                 file_paths["vectors"] = self._generate_vectors(output_dir, rng)
             if "vector_queries" in tables:
-                # Use a separate RNG stream to keep query vectors stable
-                # regardless of whether corpus vectors were generated.
                 query_rng = np.random.default_rng(_SEED + 1)
                 file_paths["vector_queries"] = self._generate_query_vectors(output_dir, query_rng)
 
@@ -159,7 +109,6 @@ class VectorSearchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             self.output_dir = original_dir
 
     def _generate_vectors(self, output_dir: Path, rng: np.random.Generator) -> Path:
-        """Write the main corpus vectors CSV."""
         num_vectors = max(1, int(BASE_VECTORS * self.scale_factor))
         filename = self.get_compressed_filename("vectors.csv")
         file_path = output_dir / filename
@@ -186,7 +135,6 @@ class VectorSearchDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         return file_path
 
     def _generate_query_vectors(self, output_dir: Path, rng: np.random.Generator) -> Path:
-        """Write the query vectors CSV (always NUM_QUERY_VECTORS rows)."""
         filename = self.get_compressed_filename("vector_queries.csv")
         file_path = output_dir / filename
 

@@ -1,28 +1,6 @@
-"""Regression: DataFusion load_data coerces string table paths to Path.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-``DataSource.tables`` is typed ``dict[str, Any]`` on purpose - the value may be a
-single path, a list of paths, or in-memory rows - and the two providers that read
-straight from a benchmark's generated ``tables`` attribute
-(``BenchmarkTablesSource``/``BenchmarkImplTablesSource``) hand back whatever the
-generator recorded, which is a plain ``str``. ``ManifestFileSource`` hands back
-``Path``.
-
-``DataFusionAdapter.load_data`` normalized only the *shape* of that payload
-(wrapping a scalar in a list) and never the *type*, so a fresh
-``generate -> load`` in one process reached ``_detect_directory_format`` with a
-``str`` and died on ``'str' object has no attribute 'is_dir'``. A second run in
-the same output directory resolved through the manifest instead and passed, which
-is why the Seed Corpus workflow failed only on the DataFusion cells and only on a
-clean runner.
-
-The shared ``normalize_table_paths`` helper exists for exactly this and is
-documented as the funnel adapters must use; postgresql, questdb, mysql_wire and
-the DataFrame mixin already do.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -40,7 +18,7 @@ pytestmark = [
 
 
 def _capturing_adapter(tmp_path: Path, table_path: str):
-    """Build a DataFusionAdapter whose per-table loader records the paths it receives."""
+
     from benchbox.platforms.datafusion import DataFusionAdapter
 
     data_source = DataSource(
@@ -72,7 +50,7 @@ def _capturing_adapter(tmp_path: Path, table_path: str):
 
 
 def test_load_data_coerces_string_table_path_to_path(tmp_path):
-    """A str-valued ``tables`` entry must not raise and must arrive as a Path."""
+
     data_file = tmp_path / "customer.tbl.zst"
     data_file.write_bytes(b"")
 
@@ -84,7 +62,7 @@ def test_load_data_coerces_string_table_path_to_path(tmp_path):
 
 
 def test_load_data_accepts_list_of_string_table_paths(tmp_path):
-    """Chunked tables recorded as a list of strings are coerced element-wise."""
+
     from benchbox.platforms.datafusion import DataFusionAdapter
 
     chunks = []
@@ -123,7 +101,7 @@ def test_load_data_accepts_list_of_string_table_paths(tmp_path):
 
 
 def test_load_data_still_detects_directory_format_from_string_path(tmp_path):
-    """Delta detection must survive the coercion: a str pointing at a Delta dir loads as Delta."""
+
     from benchbox.platforms.datafusion import DataFusionAdapter
 
     delta_dir = tmp_path / "customer"

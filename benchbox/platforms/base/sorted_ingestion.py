@@ -1,14 +1,3 @@
-"""Sorted-ingestion + CTAS-sort helpers for PlatformAdapter.
-
-Extracted from `benchbox.platforms.base.adapter` per the refactor map
-(`docs/development/adapter-refactor-map.md` Slice 2). Covers the
-sorted-ingestion capability matrix, strategy resolution, metadata
-reporting, and the default CTAS-sort execution pipeline.
-
-Platform adapters opt into CTAS sorting by overriding `_build_ctas_sort_sql`;
-default returns None so unsupported platforms are safely skipped.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -34,18 +23,10 @@ _REFERENCED_TABLE_RE = re.compile(
 
 
 class SortedIngestionMixin:
-    """Mixin providing sorted-ingestion + CTAS-sort plumbing for `PlatformAdapter`.
-
-    Expects the host class to expose `platform_name`, `logger`, `dry_run_mode`,
-    `capture_sql`, `log_verbose`, and `get_effective_tuning_configuration`
-    (the last lives on `PlatformAdapter` itself for now; see Slice 2b).
-    """
-
     platform_name: str
     logger: logging.Logger
 
     def get_sorted_ingestion_capability(self) -> dict[str, Any]:
-        """Return sorted-ingestion capability metadata for the current platform."""
         cloud_method_matrix = {
             "snowflake": ["ctas"],
             "databricks": ["ctas", "z_order", "liquid_clustering"],
@@ -67,7 +48,6 @@ class SortedIngestionMixin:
         }
 
     def resolve_sorted_ingestion_strategy(self) -> tuple[str, str]:
-        """Resolve sorted-ingestion mode/method with capability guardrails."""
         capability = self.get_sorted_ingestion_capability()
         supported_methods = capability["supported_methods"]
 
@@ -94,7 +74,6 @@ class SortedIngestionMixin:
         return mode, resolved_method
 
     def get_sorted_ingestion_metadata(self) -> dict[str, Any]:
-        """Return configured/resolved sorted-ingestion metadata for result reporting."""
         effective_config = self.get_effective_tuning_configuration()
         platform_optimizations = getattr(effective_config, "platform_optimizations", None)
         configured_mode = getattr(platform_optimizations, "sorted_ingestion_mode", "off")
@@ -105,7 +84,7 @@ class SortedIngestionMixin:
         resolution_error: str | None = None
         try:
             resolved_mode, resolved_method = self.resolve_sorted_ingestion_strategy()
-        except Exception as exc:  # pragma: no cover - defensive metadata path
+        except Exception as exc:  # pragma: no cover
             resolution_error = str(exc)
 
         applied_tables = getattr(self, "_sorted_ingestion_applied_tables", [])
@@ -124,13 +103,6 @@ class SortedIngestionMixin:
         }
 
     def apply_ctas_sort(self, table_name: str, tuning_config: Any, connection: Any) -> bool:
-        """Apply CTAS-based sorting after a table load when sorting is configured.
-
-        This shared implementation performs table-tuning lookup, sort-column extraction,
-        identifier validation, dry-run SQL capture, and execution. Platform adapters
-        enable CTAS sorting by overriding _build_ctas_sort_sql(); adapters that return
-        ``None`` are treated as unsupported and safely skipped.
-        """
         sort_columns = self._resolve_ctas_sort_columns(table_name, tuning_config)
         if sort_columns is None:
             return False
@@ -166,14 +138,12 @@ class SortedIngestionMixin:
 
     @property
     def _requires_constraint_preserving_ctas_sort(self) -> bool:
-        """Whether CTAS sorting must preserve the existing physical table definition."""
         platform_key = getattr(self, "platform_name", "").strip().lower()
         return platform_key in ("duckdb", "motherduck")
 
     def _build_fk_safe_ctas_sort_sql(
         self, validated_table: str, sorted_columns: list[TuningColumn]
     ) -> list[str] | None:
-        """Build in-place sort SQL that preserves table identity and constraints."""
         temp_table = f"{validated_table}__ctas_sort"
         order_by = ", ".join(f'"{col.name}"' for col in sorted_columns)
         return [
@@ -184,7 +154,6 @@ class SortedIngestionMixin:
         ]
 
     def _resolve_ctas_sort_columns(self, table_name: str, tuning_config: Any) -> list | None:
-        """Resolve sort columns for CTAS sort, returning None if not applicable."""
         if not tuning_config:
             self.logger.debug(f"No tuning config provided for {table_name}; skipping CTAS sort")
             return None
@@ -225,7 +194,6 @@ class SortedIngestionMixin:
         *,
         atomic: bool = False,
     ) -> bool:
-        """Execute CTAS sort statements or capture them in dry-run mode."""
         apply_start = mono_time()
         if not hasattr(self, "_sorted_ingestion_applied_tables"):
             self._sorted_ingestion_applied_tables = []
@@ -273,7 +241,7 @@ class SortedIngestionMixin:
             if transaction_started:
                 try:
                     self._rollback_transaction(connection)
-                except Exception as cleanup_error:  # pragma: no cover - defensive cleanup path
+                except Exception as cleanup_error:  # pragma: no cover
                     rollback_error = cleanup_error
                     self.logger.warning(
                         f"Failed to roll back constraint-preserving CTAS sort for {table_name}: {cleanup_error}"
@@ -299,14 +267,6 @@ class SortedIngestionMixin:
         return True
 
     def _has_populated_fk_dependents(self, connection: Any, validated_table: str) -> bool:
-        """Return whether populated child rows prevent a safe in-place rewrite.
-
-        DuckDB enforces foreign keys during ``DELETE``. A populated parent table
-        therefore cannot be rewritten in place while dependent constraints are
-        attached, and DuckDB does not support ``ALTER TABLE ... DROP CONSTRAINT``.
-        In that case the only safe operation is to leave the existing physical
-        layout unchanged and preserve the dependent rows and constraints.
-        """
         execute_method = getattr(connection, "execute", None)
         if not callable(execute_method):
             return False
@@ -321,7 +281,6 @@ class SortedIngestionMixin:
             child_name = validate_sql_identifier(str(child_table), "referencing table")
             referenced_table = self._referenced_table_from_constraint(str(constraint_text or ""))
             if referenced_table is None:
-                # DuckDB 1.0 reports an empty constraint_text for self-referential FKs.
                 if child_name.lower() != validated_table.lower():
                     continue
             elif referenced_table.lower() != validated_table.lower():
@@ -337,7 +296,6 @@ class SortedIngestionMixin:
 
     @staticmethod
     def _referenced_table_from_constraint(constraint_text: str) -> str | None:
-        """Extract a referenced table from DuckDB 1.0-compatible constraint metadata."""
         match = _REFERENCED_TABLE_RE.search(constraint_text)
         if match is None:
             return None
@@ -348,7 +306,6 @@ class SortedIngestionMixin:
 
     @staticmethod
     def _connection_has_active_transaction(connection: Any) -> bool:
-        """Detect a caller-owned DuckDB transaction without attempting a nested BEGIN."""
         tracked_state = getattr(connection, "transaction_active", None)
         if isinstance(tracked_state, bool):
             return tracked_state
@@ -363,12 +320,10 @@ class SortedIngestionMixin:
             first = execute_method("SELECT txid_current();").fetchone()
             second = execute_method("SELECT txid_current();").fetchone()
         except Exception:
-            # Unknown transaction ownership is not safe for a multi-statement rewrite.
             return True
         return bool(first and second and first[0] == second[0])
 
     def _record_sorted_ingestion_failure(self, statement: str, table: str, error: Exception) -> None:
-        """Record a safely rolled-back or propagated physical sort failure."""
         ledger = getattr(self, "_applied_tuning_ledger", None)
         if ledger is None:
             return
@@ -435,7 +390,6 @@ class SortedIngestionMixin:
         ledger.record_satisfied(intent, index, "sort realized by ORDER BY in CREATE TABLE")
 
     def _record_sorted_ingestion_skip(self, table: str, sorted_columns: list, reason: str) -> None:
-        """Record requested sorted ingestion that was skipped to preserve safety."""
         ledger = getattr(self, "_applied_tuning_ledger", None)
         if ledger is None:
             return
@@ -443,12 +397,10 @@ class SortedIngestionMixin:
 
     @staticmethod
     def _sorted_ingestion_intent(table: str, sorted_columns: list) -> str:
-        """Return a stable textual representation of requested sorted ingestion."""
         columns = ", ".join(column.name for column in sorted_columns)
         return f"sorted_ingestion {table} ORDER BY {columns}"
 
     def _rollback_transaction(self, connection: Any) -> None:
-        """Roll back a transaction started for an in-place rewrite."""
         rollback_method = getattr(connection, "rollback", None)
         if callable(rollback_method):
             rollback_method()
@@ -457,7 +409,6 @@ class SortedIngestionMixin:
 
     @staticmethod
     def _execute_sql_statement(connection: Any, statement: str) -> None:
-        """Execute a SQL statement against execute()-style or cursor()-style connections."""
         execute_method = getattr(connection, "execute", None)
         if callable(execute_method):
             execute_method(statement)
@@ -477,14 +428,4 @@ class SortedIngestionMixin:
         raise TypeError("Connection must provide execute() or cursor().execute() for CTAS sort")
 
     def _build_ctas_sort_sql(self, table_name: str, sort_columns: list[TuningColumn]) -> str | list[str] | None:
-        """Build CTAS SQL used by apply_ctas_sort for this platform.
-
-        Platforms opt in by overriding this hook and returning SQL that rewrites
-        ``table_name`` ordered by ``sort_columns``. The default implementation
-        returns ``None``, which indicates CTAS sorting is unsupported. Adapters
-        may return either a single SQL statement or a list of statements.
-
-        ``sort_columns`` is pre-sorted by ``apply_ctas_sort`` (ascending by
-        ``column.order``). Implementations must not sort again.
-        """
         return None

@@ -1,16 +1,3 @@
-/**
- * Minimal GitHub Pages Deployment Adapter (Slice A feasibility adapter).
- *
- * Runs inside actions/github-script or standalone Node test harness.
- * Interacts with the GitHub Pages REST API:
- * - create: POST /repos/{owner}/{repo}/pages/deployments
- * - status: GET /repos/{owner}/{repo}/pages/deployments/{id}
- * - cancel: POST /repos/{owner}/{repo}/pages/deployments/{id}/cancel
- *
- * Enforces strict input validation, OIDC masking, allowlisted response fields,
- * and secret redaction on error boundaries.
- */
-
 'use strict';
 
 const SHA_HEX_REGEX = /^[0-9a-f]{40}$/i;
@@ -165,9 +152,6 @@ function sanitizeStatusResponse(data) {
   };
 }
 
-// GitHub Pages deployment status enum, grouped by lifecycle class. The provider
-// emits lowercase values; sanitizeStatusResponse upper-cases them, so
-// classification normalizes to the upper-cased form and tolerates either.
 const PAGES_STATUS_TERMINAL_SUCCESS = new Set(['SUCCEED']);
 const PAGES_STATUS_TERMINAL_FAILURE = new Set([
   'DEPLOYMENT_FAILED',
@@ -187,12 +171,6 @@ const PAGES_STATUS_PENDING = new Set([
   'PURGING_CDN',
 ]);
 
-/**
- * Classify a GitHub Pages deployment status value into a lifecycle class:
- * 'terminal-success', 'terminal-failure', 'pending', or 'unknown'. An
- * unrecognized value is 'unknown' so callers can keep polling rather than
- * treat it as either outcome.
- */
 function classifyDeploymentStatus(status) {
   const normalized = (status == null ? '' : String(status)).toUpperCase().trim();
   if (PAGES_STATUS_TERMINAL_SUCCESS.has(normalized)) {

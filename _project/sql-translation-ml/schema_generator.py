@@ -1,5 +1,3 @@
-"""Coverage-scheduled, seeded typed SQL over the TPC-H schema."""
-
 from __future__ import annotations
 
 import random
@@ -105,7 +103,6 @@ def generate(variants: int = 2) -> tuple[list[dict], dict]:
                         value = expression(table, feature, dialect, rng)
                         sql = construct(table, value, form, rng)
                         if variant % 2:
-                            # Formatting is part of the input distribution, not repaired after inference.
                             sql = sql.replace(" FROM ", "\nFROM ")
                         cases.append(record(sql, dialect, family, [feature, form, table.name], "generated"))
     return cases, {

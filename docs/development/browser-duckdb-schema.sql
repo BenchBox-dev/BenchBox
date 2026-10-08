@@ -1,34 +1,6 @@
--- browser-duckdb-schema.sql
--- Frozen DuckDB DDL for the canonical browser metric tables and views.
---
--- Originating TODO: explorer-canonical-browser-duckdb-read-model (W1 deliverable)
--- Locked: 2026-04-18
---
--- Rules:
---   - Base tables are populated by the Python pipeline in one transaction per build.
---   - Views project only bare column references (G-11 compliance).
---   - No arithmetic, aggregation, CASE, or window functions in view projections.
---   - ATTACH ... (READ_ONLY) is enforced at the browser layer; DDL never runs in-browser.
---   - If the column set of `results` changes, bump
---     EXPLORER_READ_MODEL_VERSION in `_project/scripts/explorer_pipeline/contract.py`.
---   - Cohort/ranking identity is derived during publish: raw `benchmark` and
---     `test_type` remain immutable evidence, while canonical aliases
---     (`star_schema` -> `ssb`) and missing phase (`unknown`) are written into
---     ranking/cohort keys. The frontend consumes the versioned read-model
---     contract (`EXPLORER_READ_MODEL_VERSION`); bump it when this file's
---     column set changes.
-
--- ---------------------------------------------------------------------------
--- Metadata table (required by browser read-model version guard)
--- ---------------------------------------------------------------------------
-
 CREATE TABLE IF NOT EXISTS metadata (
     read_model_version INTEGER NOT NULL
 );
-
--- ---------------------------------------------------------------------------
--- Supporting tables (required by result_detail_metrics view)
--- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS result_environment (
     result_id        VARCHAR PRIMARY KEY,
@@ -63,12 +35,6 @@ CREATE TABLE IF NOT EXISTS result_basis_availability (
     varying_pass_queries    VARCHAR
 );
 
--- ---------------------------------------------------------------------------
--- Table 1: results
--- One row per result bundle. Extends the current 19-column stub to cover all
--- user-visible fields across every explorer surface.
--- ---------------------------------------------------------------------------
-
 CREATE TABLE IF NOT EXISTS results (
     result_id            VARCHAR  PRIMARY KEY,
     benchmark            VARCHAR  NOT NULL,
@@ -97,32 +63,14 @@ CREATE TABLE IF NOT EXISTS results (
     execution_mode       VARCHAR,
     tuning_mode          VARCHAR,
     tuning_hash          VARCHAR,
-    -- ADR-1 bundle-emitted tuning identities (display-only, never a join/dedup
-    -- key): canonical requested-config hash and the physical applied-ledger
-    -- hash. NULL for legacy bundles.
     requested_config_hash VARCHAR,
     applied_ledger_hash   VARCHAR,
-    -- ADR-1 tuning verified-state (not_applicable / noop / applied_unverified
-    -- / applied_verified / failed). NULL for legacy bundles; distinct from the
-    -- run/query validation_status column below.
     tuning_validation_status VARCHAR,
-    -- ADR-1 per-statement introspection receipt, carried verbatim from the
-    -- run's `platform.tuning.applied.receipt` as an opaque JSON string and
-    -- rendered read-only by the RunReceipt drill-down. NULL when the run
-    -- published no receipt (introspection did not run, or a legacy bundle).
     applied_receipt      VARCHAR,
-    -- Accepted plausibility overrides ({stem}.override.json companion),
-    -- stored verbatim as display-only badge data: override_rules holds the
-    -- covered rule ids as a canonical JSON array string; the audit fields
-    -- are plain text. NULL / empty when no override was accepted. Never
-    -- parsed, joined on, or re-derived downstream.
     override_rules       VARCHAR,
     override_evidence    VARCHAR,
     override_approver    VARCHAR,
     override_expires     VARCHAR,
-    -- ADR-3 seam: explicit tuning-policy generation marker (display-only,
-    -- never a join/dedup key). NULL for legacy bundles, treated downstream as
-    -- the "pre-seam" generation.
     tuning_policy_generation VARCHAR,
     test_type            VARCHAR,
     validation_status    VARCHAR,
@@ -150,24 +98,10 @@ CREATE TABLE IF NOT EXISTS results (
     plans_published      BOOLEAN  NOT NULL,
     has_tuning           BOOLEAN  NOT NULL,
     bundle_download_url  VARCHAR  NOT NULL,
-    -- ADR-2 section 3: platform-rendered physical tuning mechanisms
-    -- (comma-joined, sorted) and, for platforms that expose one, the physical
-    -- rendering strategy id. NULL when the bundle never recorded a logical
-    -- tuning profile.
     physical_mechanisms   VARCHAR,
     physical_rendering_id VARCHAR,
-    -- Registry-declared product support status for the benchmark
-    -- (stable / beta / experimental / deprecated / document_only /
-    -- repo_only). NULL when the benchmark slug is not in the registry.
-    -- Display-only: the benchmark browser groups and badges on it.
     benchmark_support_status VARCHAR
 );
-
--- ---------------------------------------------------------------------------
--- Table 2: query_display_timings
--- One row per (result_id, query_id). The canonical per-query display timing.
--- display_ms is the median of passing measurement runs; null when all failed.
--- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS query_display_timings (
     result_id    VARCHAR  NOT NULL,
@@ -178,11 +112,6 @@ CREATE TABLE IF NOT EXISTS query_display_timings (
     timing_exclusion_reason VARCHAR,
     PRIMARY KEY (result_id, query_id)
 );
-
--- ---------------------------------------------------------------------------
--- Table 3: query_executions
--- One row per individual query execution run (raw timing data).
--- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS query_executions (
     result_id    VARCHAR  NOT NULL,
@@ -196,13 +125,6 @@ CREATE TABLE IF NOT EXISTS query_executions (
 
 CREATE INDEX IF NOT EXISTS idx_query_executions_result
     ON query_executions (result_id);
-
--- ---------------------------------------------------------------------------
--- View 4: result_detail_metrics (G-11 compliant)
--- Projection over results + result_environment + result_phase_durations.
--- Used by the ResultDetail page to load all detail data in one query.
--- Only bare column references are projected (no arithmetic or aggregation).
--- ---------------------------------------------------------------------------
 
 CREATE VIEW IF NOT EXISTS result_detail_metrics AS
 SELECT
@@ -286,13 +208,6 @@ SELECT
 FROM results r
 LEFT JOIN result_environment e USING (result_id);
 
--- ---------------------------------------------------------------------------
--- Table 5: benchmark_matrix_cells
--- One row per (benchmark, scale_factor, phase, result_id, query_id).
--- Denormalized from query_display_timings so the BenchmarkIndex matrix loads
--- one table scan per cohort instead of joining across all results.
--- ---------------------------------------------------------------------------
-
 CREATE TABLE IF NOT EXISTS benchmark_matrix_cells (
     benchmark    VARCHAR  NOT NULL,
     scale_factor DOUBLE   NOT NULL,
@@ -308,12 +223,6 @@ CREATE TABLE IF NOT EXISTS benchmark_matrix_cells (
 
 CREATE INDEX IF NOT EXISTS idx_matrix_cells_cohort
     ON benchmark_matrix_cells (benchmark, scale_factor, phase);
-
--- ---------------------------------------------------------------------------
--- Table 6: benchmark_rankings
--- One row per (benchmark, scale_factor, phase, result_id).
--- Pre-computed ranking data for the BenchmarkIndex matrix and ranks views.
--- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS benchmark_rankings (
     benchmark          VARCHAR  NOT NULL,
@@ -346,8 +255,6 @@ CREATE TABLE IF NOT EXISTS benchmark_rankings (
     primary_metric     VARCHAR  NOT NULL,
     primary_order      VARCHAR  NOT NULL,
     rank               INTEGER,
-    -- Number of ranking-eligible rows with non-null primary metrics.
-    -- Visible but unranked rows keep rank=NULL and do not increment this total.
     total_in_cohort    INTEGER  NOT NULL,
     cohort_ranked_count INTEGER NOT NULL,
     cohort_ranking_exclusion_reason VARCHAR,
@@ -355,10 +262,6 @@ CREATE TABLE IF NOT EXISTS benchmark_rankings (
     percentile_p90     DOUBLE,
     percentile_p95     DOUBLE,
     percentile_p99     DOUBLE,
-    -- Cohort-relative speedup ratios - pre-materialised so frontends never
-    -- recompute them TS-side.
-    --   speedup_vs_best              ∈ (0, 1]  - best row = 1.0, worse < 1.0.
-    --   speedup_vs_slowest_in_cohort ≥ 1.0     - slowest row = 1.0, better > 1.0.
     speedup_vs_best              DOUBLE,
     speedup_vs_slowest_in_cohort DOUBLE,
     PRIMARY KEY (benchmark, scale_factor, phase, result_id)
@@ -366,12 +269,6 @@ CREATE TABLE IF NOT EXISTS benchmark_rankings (
 
 CREATE INDEX IF NOT EXISTS idx_benchmark_rankings_cohort
     ON benchmark_rankings (benchmark, scale_factor, phase);
-
--- ---------------------------------------------------------------------------
--- View 7: platform_index_rows (G-11 compliant)
--- Projection over results for the PlatformIndex page.
--- Exposes all columns needed by the platform browse surface as bare references.
--- ---------------------------------------------------------------------------
 
 CREATE VIEW IF NOT EXISTS platform_index_rows AS
 SELECT
@@ -420,17 +317,6 @@ SELECT
     storage_tier
 FROM results;
 
--- ---------------------------------------------------------------------------
--- Table 8: cohort_metadata
--- One row per (cohort_key, result_id) - every publishable result variant
--- in the cohort, with its own rank. A platform may appear more than once
--- per cohort (e.g. different tuning_mode or trust_label); the pipeline
--- never dedupes or hides variants. The UI is responsible for any
--- display-time collapsing it wants to do. tuning_mode, trust_label, and
--- short_id are carried alongside so Home can label/group variants
--- without joining benchmark_rankings.
--- ---------------------------------------------------------------------------
-
 CREATE TABLE IF NOT EXISTS cohort_metadata (
     cohort_key     VARCHAR  NOT NULL,
     benchmark      VARCHAR  NOT NULL,
@@ -438,9 +324,6 @@ CREATE TABLE IF NOT EXISTS cohort_metadata (
     phase          VARCHAR  NOT NULL,
     cohort_label   VARCHAR  NOT NULL,
     cohort_href    VARCHAR  NOT NULL,
-    -- Number of ranking-eligible rows with non-null primary metrics in this
-    -- cohort. The table can still preserve additional visible rows with
-    -- rank=NULL, so this may be lower than COUNT(*) per cohort_key.
     platform_count INTEGER  NOT NULL,
     cohort_ranked_count INTEGER NOT NULL,
     cohort_ranking_exclusion_reason VARCHAR,
@@ -472,24 +355,12 @@ CREATE INDEX IF NOT EXISTS idx_cohort_metadata_key
 CREATE INDEX IF NOT EXISTS idx_cohort_metadata_platform
     ON cohort_metadata (cohort_key, platform_id);
 
--- ---------------------------------------------------------------------------
--- Table 9: meta_leaderboard
--- One row per platform - pre-computed cross-cohort summary.
--- avg_rank and n_cohorts are computed by Python (not a view) to satisfy G-11.
--- Serves the Home page hero meta-leaderboard panel.
--- ---------------------------------------------------------------------------
-
 CREATE TABLE IF NOT EXISTS meta_leaderboard (
     platform_id  VARCHAR  PRIMARY KEY,
     platform     VARCHAR  NOT NULL,
     avg_rank     DOUBLE,
     n_cohorts    INTEGER  NOT NULL
 );
-
--- ---------------------------------------------------------------------------
--- Table 10: short_ids
--- short_id -> result_id mapping for compact Compare URLs.
--- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS short_ids (
     short_id   VARCHAR  PRIMARY KEY,

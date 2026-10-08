@@ -1,17 +1,6 @@
-"""Live integration tests: real PySpark + Delta Lake runtime baseline.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These tests start a real local Spark session with the Delta Lake extension
-and verify the runtime foundation the catalog and execution suites build on:
-session configuration, DataFrame write/read round-trips, Delta log and
-version history, and SQL DDL/DML against Delta tables.
-
-Marked ``live_integration``: excluded from the default suite. Requires
-PySpark, delta-spark, and a compatible Java (auto-selected when available).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -34,7 +23,7 @@ pytestmark = [
 
 @pytest.fixture(scope="module")
 def spark(tmp_path_factory, pyspark_test_environment):
-    """Module-scoped real Spark session with Delta support."""
+
     warehouse = tmp_path_factory.mktemp("delta_warehouse")
     session = make_delta_spark_session(warehouse, app_name="benchbox-delta-runtime")
     yield session

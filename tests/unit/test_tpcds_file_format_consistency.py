@@ -1,5 +1,3 @@
-"""Hermetic tests for TPC-DS file format consistency validation."""
-
 from pathlib import Path
 
 import pytest
@@ -37,14 +35,11 @@ def temp_dir(tmp_path: Path) -> Path:
 def test_compressed_streams_disallow_raw_dat_files(temp_dir: Path):
     generator = _make_generator(compression_enabled=True)
 
-    # Populate with valid compressed files
     for name in ("table1.dat.zst", "table2.dat.zst"):
         (temp_dir / name).write_bytes(b"compressed")
 
-    # Should not raise
     generator._validate_file_format_consistency(temp_dir)
 
-    # Introduce raw .dat file to trigger validation error
     (temp_dir / "bad_table.dat").write_text("raw data")
     with pytest.raises(RuntimeError, match="raw .dat files when compression is enabled"):
         generator._validate_file_format_consistency(temp_dir)
@@ -53,20 +48,18 @@ def test_compressed_streams_disallow_raw_dat_files(temp_dir: Path):
 def test_uncompressed_streams_only_dat_files(temp_dir: Path):
     generator = _make_generator(compression_enabled=False)
 
-    # Create non-empty .dat files
     for name in ("table1.dat", "table2.dat"):
         (temp_dir / name).write_text("rows")
 
     generator._validate_file_format_consistency(temp_dir)
 
-    # Validate helper considers non-empty dat files valid
     dat_files = list(temp_dir.glob("*.dat"))
     assert dat_files
 
 
 def test_prune_stale_table_artifacts_removes_conflicting_variants_only(temp_dir: Path):
     generator = _make_generator(compression_enabled=True)
-    generator._known_table_names = lambda: ["store_sales"]  # type: ignore[method-assign]
+    generator._known_table_names = lambda: ["store_sales"]
     generator.parallel = 1
 
     stale_files = [
@@ -94,10 +87,9 @@ def test_prune_stale_table_artifacts_removes_conflicting_variants_only(temp_dir:
 
 def test_prune_stale_table_artifacts_keeps_prefix_neighbor_table_shards(temp_dir: Path):
     generator = _make_generator(compression_enabled=True)
-    generator._known_table_names = lambda: ["customer", "customer_address"]  # type: ignore[method-assign]
+    generator._known_table_names = lambda: ["customer", "customer_address"]
     generator.parallel = 2
 
-    # customer and customer_address shards coexist; pruning customer must not delete customer_address
     (temp_dir / "customer_1_2.dat").write_text("stale")
     keep_neighbor = temp_dir / "customer_address_1_2.dat.zst"
     keep_neighbor.write_text("valid")
@@ -110,7 +102,7 @@ def test_prune_stale_table_artifacts_keeps_prefix_neighbor_table_shards(temp_dir
 
 def test_prune_stale_table_artifacts_removes_compressed_when_uncompressed_mode(temp_dir: Path):
     generator = _make_generator(compression_enabled=False)
-    generator._known_table_names = lambda: ["store_sales"]  # type: ignore[method-assign]
+    generator._known_table_names = lambda: ["store_sales"]
     generator.parallel = 1
 
     stale_compressed = temp_dir / "store_sales.dat.zst"

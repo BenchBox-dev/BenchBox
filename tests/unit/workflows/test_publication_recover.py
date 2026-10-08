@@ -1,5 +1,3 @@
-"""Contract and architecture tests for the publication recovery workflow."""
-
 from __future__ import annotations
 
 import argparse
@@ -35,10 +33,8 @@ def test_recover_workflow_permissions_follow_least_privilege() -> None:
     wf = _workflow()
     jobs = wf["jobs"]
 
-    # Top-level is read-only
     assert wf.get("permissions") == {"contents": "read"}
 
-    # scan: read-only
     assert jobs["scan"]["permissions"] == {"contents": "read", "actions": "read"}
 
     assert set(jobs) == {"scan"}
@@ -62,7 +58,6 @@ def test_recover_workflow_resumes_prepared_rollbacks() -> None:
 def test_recover_workflow_concurrency_scoped_to_act_job() -> None:
     wf = _workflow()
 
-    # Top-level has watchdog group
     assert wf.get("concurrency", {}).get("group") == "publication-watchdog"
 
     assert "pages-deploy" not in WORKFLOW_PATH.read_text(encoding="utf-8")
@@ -85,16 +80,6 @@ def test_recover_workflow_pins_all_actions() -> None:
         )
 
 
-# ---------------------------------------------------------------------------
-# Falsifying Tests for Defect D4:
-# "Kill after local intent commit creation/before remote ref acceptance (zero POSTs),
-# then kill initiating run before POST, after remote success/before response,
-# after ACK/before signing, after signing/before durable;
-# no stale overwrite or fabricated success. Unknown finality forbids compensation.
-# Exercise independently approved legacy recovery with the new journal unreadable."
-# ---------------------------------------------------------------------------
-
-
 def _setup_test_journal(tmp_path: Path) -> tuple[Path, journal.JournalState]:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -113,11 +98,6 @@ def _setup_test_journal(tmp_path: Path) -> tuple[Path, journal.JournalState]:
 
 
 def test_defect_d4_kill_before_write_started_zero_posts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Case 1: Initiating run prepared transaction but died before start-write.
-
-    Watchdog detects STATE_PREPARED, recognizes zero provider writes occurred,
-    and transitions to failure without any Pages POST.
-    """
     repo, init_state = _setup_test_journal(tmp_path)
 
     tx = transaction.Transaction(
@@ -136,7 +116,7 @@ def test_defect_d4_kill_before_write_started_zero_posts(tmp_path: Path, monkeypa
         content={"develop_sha": "d" * 40, "published_results_sha": "p" * 40},
         desired={"manifest_digest": "m" * 64, "generation": 1},
         artifact={"archive_sha256": "s" * 64},
-        write=None,  # Zero writes!
+        write=None,
         state=transaction.STATE_PREPARED,
     )
     j_state = journal.JournalState(
@@ -195,12 +175,6 @@ def test_watchdog_reports_aged_transaction_without_mutation() -> None:
 
 
 def test_defect_d4_unknown_finality_forbids_compensation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Case 2: Kill initiating run before POST or during post uncertainty.
-
-    Watchdog detects STATE_WRITE_STARTED with unknown provider finality.
-    Without barrier evidence, compensation/rollback is FORBIDDEN and quarantined.
-    With barrier evidence, failure is recorded safely.
-    """
     repo, init_state = _setup_test_journal(tmp_path)
 
     tx = transaction.Transaction(
@@ -232,13 +206,11 @@ def test_defect_d4_unknown_finality_forbids_compensation(tmp_path: Path, monkeyp
         tip_commit_oid="tip-oid-2",
     )
 
-    # 1. Without barrier evidence: MUST quarantine, forbidding compensation
     action, status, reason = transaction_executor._resolve_watchdog_action(tx, j_state, barrier_evidence=None)
     assert action == "quarantine"
     assert status == "awaiting_activation_barrier"
     assert "cannot compensate without documented activation barrier" in reason
 
-    # 2. With barrier evidence: allowed to record failure
     action_with_barrier, status_with_barrier, _ = transaction_executor._resolve_watchdog_action(
         tx, j_state, barrier_evidence='{"barrier": "verified_status_404"}'
     )
@@ -247,11 +219,6 @@ def test_defect_d4_unknown_finality_forbids_compensation(tmp_path: Path, monkeyp
 
 
 def test_defect_d4_kill_after_ack_before_signing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Case 3: Kill initiating run after ACK before signing.
-
-    Watchdog detects STATE_WRITE_ACKNOWLEDGED. Resolves action
-    'verify_and_finalize' to probe the live site and complete verification.
-    """
     repo, init_state = _setup_test_journal(tmp_path)
 
     tx = transaction.Transaction(
@@ -289,11 +256,6 @@ def test_defect_d4_kill_after_ack_before_signing(tmp_path: Path, monkeypatch: py
 
 
 def test_defect_d4_kill_after_signing_before_durable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Case 4: Kill initiating run after signing / before durable head advance.
-
-    Watchdog detects STATE_EXTERNALLY_VERIFIED. Resolves action 'finalize'
-    to atomically advance the durable head via journal CAS.
-    """
     repo, init_state = _setup_test_journal(tmp_path)
 
     tx = transaction.Transaction(
@@ -332,15 +294,8 @@ def test_defect_d4_kill_after_signing_before_durable(tmp_path: Path, monkeypatch
 
 
 def test_defect_d4_legacy_recovery_with_unreadable_journal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Case 5: Unreadable or corrupt journal.
-
-    When the new journal is unreadable, watchdog refuses to invent state or
-    fabricate an active transaction; reports corrupt_journal and halts.
-    Legacy recovery in docs.yml runs independently from historical attested checkpoints.
-    """
     repo, _ = _setup_test_journal(tmp_path)
 
-    # Corrupt journal: active transaction declared in state.json but missing from transactions/
     j_state = journal.JournalState(
         target="BenchBox-dev/BenchBox:github-pages",
         next_generation=5,
@@ -363,4 +318,4 @@ def test_defect_d4_legacy_recovery_with_unreadable_journal(tmp_path: Path, monke
         output_json=None,
     )
     rc = transaction_executor.cmd_watchdog_scan(args)
-    assert rc == 1  # Fails closed on corrupt journal
+    assert rc == 1

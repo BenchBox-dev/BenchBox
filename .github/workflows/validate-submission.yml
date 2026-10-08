@@ -9,13 +9,6 @@ on:
       - "results-data/corpus/**"
     types: [opened, synchronize, reopened]
 
-# Fork-PR safety: pull_request_target executes from trusted base context (base branch's
-# workflow file), not the PR's proposed code. This prevents a doctored validator in the
-# PR from spoofing green. We intentionally REPLACE pull_request (do not keep both):
-# keeping both would double-run (waste) and could allow the pull_request trigger's
-# PR-context execution to bypass base-context guarantees or create a confusing green
-# from the wrong trigger. See prior result A2 w2 closes §2.7 self-green.
-
 permissions:
   contents: read
   pull-requests: write
@@ -26,9 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Trusted base checkout: execute validator from BASE_SHA, not PR head.
-      # Payload is read from MERGE_SHA via git show / sparse checkout to /tmp/payload.
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
@@ -41,33 +32,11 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          # BASE_SHA source: github.event.pull_request.base.sha (trusted base SHA)
-          # NOT the merge-base computed from untrusted PR history (which could be
-          # manipulated to narrow the diff). The event's base.sha is the
-          # authoritative GitHub-provided base commit SHA for this PR target branch.
           BASE_SHA="$BASE_SHA_INPUT"
-          # Three-dot vs two-dot semantics:
-          #   BASE_SHA...MERGE_SHA (three dots) = changes on PR branch since merge-base
-          #     with base — the correct PR diff. Two-dot BASE_SHA..MERGE_SHA would diff
-          #     directly between commits, missing merge-base semantics and potentially
-          #     including base-branch changes after divergence. All workflow git diff
-          #     steps MUST use three-dot.
           echo "BASE_SHA=$BASE_SHA" >> "$GITHUB_ENV"
           echo "base_sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
-          # Fetch PR merge commit (GitHub's ephemeral test merge of PR into base)
-          # Fetch depth 1 is sufficient; we only need the merge commit itself.
-          # Fallback when git fetch origin pull/<number>/merge FETCH_HEAD missing
-          # (conflicts): GitHub does not create a merge ref for conflicted PRs.
-          # Fall back to head.sha so validation can still revalidate payload (will
-          # likely fail if conflicts exist, which is correct closed behavior).
           if git fetch origin "pull/${PR_NUMBER}/merge" --depth=1 2>/dev/null; then
             MERGE_SHA=$(git rev-parse FETCH_HEAD)
-            # Parity gate (validator_parity.py --head-sha) needs the PR-head
-            # object too: a --depth=1 merge-ref fetch stores the merge commit
-            # but not parent 2 (PR head), and the base checkout at fetch-depth 0
-            # does not contractually include fork heads. Fetch the head ref
-            # explicitly and fail closed (no `|| true`) when it is missing, then
-            # prove HEAD_SHA resolves before the Validate bundles step runs.
             git fetch origin "pull/${PR_NUMBER}/head" --depth=1
             git cat-file -e "$HEAD_SHA" || {
               echo "::error::HEAD_SHA $HEAD_SHA not found after fetching origin pull/${PR_NUMBER}/head"
@@ -80,11 +49,6 @@ jobs:
           fi
           echo "MERGE_SHA=$MERGE_SHA" >> "$GITHUB_ENV"
           echo "merge_sha=$MERGE_SHA" >> "$GITHUB_OUTPUT"
-          # CORPUS_CHANGED_PATHS_FILE lifecycle: producer step id:corpus-paths writes
-          # /tmp/corpus_changed_paths.txt via git diff against MERGE_SHA file list
-          # (git ls-tree $MERGE_SHA), atomic write, empty-file vs missing-file semantics.
-          # Env export ensures all git diff --name-only --diff-filter=ACMRD steps use
-          # the same resolved SHAs.
           echo "CORPUS_CHANGED_PATHS_FILE=/tmp/corpus_changed_paths.txt" >> "$GITHUB_ENV"
           echo "corpus_changed_paths_file=/tmp/corpus_changed_paths.txt" >> "$GITHUB_OUTPUT"
           echo "Resolved BASE_SHA=$BASE_SHA MERGE_SHA=$MERGE_SHA CORPUS_CHANGED_PATHS_FILE=/tmp/corpus_changed_paths.txt"
@@ -103,23 +67,6 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          # Use resolved MERGE_SHA, not HEAD. Three-dot BASE_SHA...MERGE_SHA.
-          # Self-green defense: validator/workflow changes must not be in submission PR.
-          # This guard is now advisory (execution already trusted via base checkout), but
-          # retained for defense-in-depth and to surface misdirected PRs early.
-          # 6-file guard: scripts/validate_submission.py, benchbox/validation/bundle.py,
-          # benchbox/core/results/query_status.py,
-          # benchbox/core/results/schema_policy.py,
-          # scripts/generate_corpus_inventory.py, and this workflow file itself.
-          #
-          # sync-results-data-to-published.yml mirrors these exact 6 files onto
-          # published-results by design (see that workflow's header comment), so its
-          # auto/results-mirror-* PRs legitimately touch this guard's file set. Waive
-          # the guard for that trusted, unforgeable shape only - same TRUSTED_MIRROR
-          # condition as the "Reject non-maintainer vendor/ additions" step below
-          # (same-repo PR, base=published-results, author=github-actions[bot], head
-          # branch matching auto/results-mirror-*). Any other PR touching these files
-          # - non-mirror, fork, wrong base, or human-authored - is still rejected.
           CHANGED_GUARD=$(git diff --name-only "$BASE_SHA...${MERGE_SHA:-HEAD}" -- \
             scripts/validate_submission.py \
             benchbox/validation/bundle.py \
@@ -186,10 +133,10 @@ jobs:
           echo "No non-maintainer vendor/ additions - proceeding."
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
@@ -201,28 +148,19 @@ jobs:
           CORPUS_CHANGED_PATHS_FILE: ${{ env.CORPUS_CHANGED_PATHS_FILE }}
         run: |
           set -euo pipefail
-          # Producer: id:corpus-paths writes /tmp/corpus_changed_paths.txt via git diff
-          # against MERGE_SHA file list (git ls-tree), atomic write, empty vs missing.
-          # Test harness fallback: when MERGE_SHA unset (isolated posix_shell test),
-          # fall back to HEAD so local git init tests still exercise the allowlist.
           : "${BASE_SHA:?BASE_SHA required}"
           EFFECTIVE_MERGE="${MERGE_SHA:-HEAD}"
           EFFECTIVE_BASE="$BASE_SHA"
           rm -f "$CORPUS_CHANGED_PATHS_FILE.tmp"
           TMP="$CORPUS_CHANGED_PATHS_FILE.tmp"
-          # Gather diffs with three-dot semantics. Use --diff-filter=ACMRD to include deletions.
-          # Test pin: $BASE_SHA...$MERGE_SHA (canonical three-dot) — actual execution uses EFFECTIVE_* fallback for harness.
           CHANGED_BUNDLES_CORPUS=$(git diff --no-renames --name-only --diff-filter=ACMRD "$EFFECTIVE_BASE...$EFFECTIVE_MERGE" -- 'results-data/bundles/**' || true)
           CHANGED_CORPUS_SUBTREE=$(git diff --no-renames --name-only --diff-filter=ACMRD "$EFFECTIVE_BASE...$EFFECTIVE_MERGE" -- 'results-data/corpus/**' || true)
           CHANGED_CORPUS=$(printf '%s\n%s\n' "$CHANGED_BUNDLES_CORPUS" "$CHANGED_CORPUS_SUBTREE" | sed '/^$/d' | sort -u || true)
-          # Atomic write: write to tmp then mv. Ensure empty file if no changes (empty != missing, fails-closed on missing).
           if [ -z "$CHANGED_CORPUS" ]; then
             : > "$TMP"
           else
             printf '%s\n' "$CHANGED_CORPUS" | sort -u > "$TMP"
           fi
-          # Parity: keep all diff entries including deletions (which won't appear in ls-tree at MERGE_SHA) — consumer validation handles them.
-          # Back-map verification via git ls-tree $MERGE_SHA is done in Find changed bundles; corpus file is intentionally raw diff for allowlist.
           mv "$TMP" "$CORPUS_CHANGED_PATHS_FILE"
           echo "Corpus changed paths (MERGE_SHA=$EFFECTIVE_MERGE):"
           if [ -s "$CORPUS_CHANGED_PATHS_FILE" ]; then
@@ -231,8 +169,6 @@ jobs:
             echo "(empty - no corpus changes)"
           fi
           test -f "$CORPUS_CHANGED_PATHS_FILE"
-          # Validate allowlist here as well so isolated posix_shell tests that
-          # execute only this step's run block still exercise the gate (foundation compat).
           uv run -- python scripts/validate_submission.py --corpus-changed-paths "$CORPUS_CHANGED_PATHS_FILE"
 
       - name: Find changed bundles
@@ -245,8 +181,6 @@ jobs:
           set -euo pipefail
           : "${BASE_SHA:?BASE_SHA required}"
           EFFECTIVE_MERGE="${MERGE_SHA:-HEAD}"
-          # All diffs use three-dot $BASE_SHA...$MERGE_SHA (via EFFECTIVE_MERGE fallback) and --diff-filter=ACMRD where deletions matter
-          # Test pin: $BASE_SHA...$MERGE_SHA — actual uses $BASE_SHA...$EFFECTIVE_MERGE for harness fallback
           CHANGED=$(git diff --no-renames --name-only --diff-filter=ACMR "$BASE_SHA...$EFFECTIVE_MERGE" -- ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
             | grep -vi '\.plans\.json$' \
             | grep -vi '\.tuning\.json$' \
@@ -273,13 +207,6 @@ jobs:
 
               deleted_dir="${deleted_bundle%/*}"
               deleted_name="${deleted_bundle##*/}"
-              # Check every case variant, not just the first. Git orders an uppercase
-              # variant ahead of the authoritative lowercase file, so stopping at the
-              # first match lets an unrelated uppercase manifest hide the dangling
-              # lowercase reference. The grep prefilter keeps the shell comparison
-              # cheap in directories with many entries, and comparing paths in the
-              # shell rather than awk avoids depending on how each awk handles a NUL
-              # record separator.
               expected_manifest_lower=$(printf '%s' "$deleted_dir/submission-manifest.json" | tr 'A-Z' 'a-z')
               while IFS= read -r -d '' legacy_manifest; do
                 if [ "$(printf '%s' "$legacy_manifest" | tr 'A-Z' 'a-z')" != "$expected_manifest_lower" ]; then
@@ -366,7 +293,6 @@ jobs:
           if [ -z "$CHANGED" ]; then
             echo "No bundle files changed."
             echo "has_bundles=false" >> "$GITHUB_OUTPUT"
-            # Ensure corpus file still respected even when no bundles
             if [ -s "$CORPUS_CHANGED_PATHS_FILE" ]; then
               echo "Corpus changed but no bundles - will run corpus inventory check"
               echo "has_bundles=corpus-only" >> "$GITHUB_OUTPUT"
@@ -376,15 +302,12 @@ jobs:
             echo "$CHANGED"
             echo "has_bundles=true" >> "$GITHUB_OUTPUT"
             echo "$CHANGED" > /tmp/changed_bundles.txt
-            # Also prepare MERGE_SHA payload via git show / sparse checkout to /tmp/payload
-            # Extract bundles + companions for trusted validation
             rm -rf /tmp/payload
             mkdir -p /tmp/payload
             while IFS= read -r bundle; do
               dir=$(dirname "$bundle")
               mkdir -p "/tmp/payload/$dir"
               git show "$EFFECTIVE_MERGE:$bundle" > "/tmp/payload/$bundle" 2>/dev/null || echo "Warning: cannot extract $bundle at $EFFECTIVE_MERGE" >&2
-              # Extract companions if present at MERGE_SHA
               stem="${bundle%.json}"
               for suffix in ".manifest.json" ".applied.json" ".plans.json" ".tuning.json" ".override.json"; do
                 companion="${stem}${suffix}"
@@ -393,15 +316,10 @@ jobs:
                 fi
               done
             done <<< "$CHANGED"
-            # Rewrite changed_bundles.txt to point at /tmp/payload for validator
             sed 's|^|/tmp/payload/|' /tmp/changed_bundles.txt > /tmp/changed_bundles_payload.txt
             mv /tmp/changed_bundles_payload.txt /tmp/changed_bundles.txt
           fi
 
-      # Positive data-only allowlist (A2 foundation): every corpus file must be a
-      # supported .json data file — regular file, no symlink/executable/hidden.
-      # This runs even when has_bundles==false (corpus-only PR that smuggles a
-      # non-data file like evil.sh or package.json must still fail closed).
       - name: Reject disallowed corpus paths
         id: corpus-allowlist
         env:
@@ -409,16 +327,12 @@ jobs:
           MERGE_SHA: ${{ env.MERGE_SHA }}
         run: |
           set -euo pipefail
-          # Allow test override via vars to avoid shared /tmp races under xdist (covered in foundation)
           CORPUS_PATHS="${CORPUS_CHANGED_PATHS_FILE:-/tmp/corpus_changed_paths.txt}"
           echo "Checking corpus allowlist via $CORPUS_PATHS (MERGE_SHA=$MERGE_SHA)"
           if [ ! -f "$CORPUS_PATHS" ]; then
             echo "::error::CORPUS_CHANGED_PATHS_FILE missing at $CORPUS_PATHS - failing closed"
             exit 1
           fi
-          # validate_submission.py handles empty file (no corpus changes) as pass,
-          # and disallowed paths (evil.sh, package.json, hidden, symlink, traversal) as exit 1
-          # even with no positional bundle args — this gate is independent of has_bundles
           uv run -- python scripts/validate_submission.py --corpus-changed-paths "$CORPUS_PATHS"
 
       - name: Validate bundles
@@ -445,11 +359,6 @@ jobs:
                 ;;
             esac
           fi
-          # Trusted bot-created same-repo mirrors preserve truthful partial maintainer seed
-          # results as non-ranking capability evidence. Community submissions remain strict.
-          # Payload read via git show $MERGE_SHA:path or sparse checkout to /tmp/payload from trusted base checkout (ref: BASE_SHA)
-          # Changed bundles already extracted to /tmp/payload and list points there.
-          # Test harness fallback: when env not set (isolated unit test), use HEAD fallback so script remains runnable.
           _BASE_SHA="${BASE_SHA:-HEAD}"
           _MERGE_SHA="${MERGE_SHA:-HEAD}"
           _HEAD_SHA="${HEAD_SHA:-HEAD}"
@@ -460,13 +369,8 @@ jobs:
           fi
           xargs -d '\n' uv run -- python scripts/validate_submission.py $REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION $CORPUS_ARG --pr-comment /tmp/pr_comment.md < /tmp/changed_bundles.txt \
             | tee /tmp/validation_output.txt
-          # Also run parity validator to compare PR-head vs merge-SHA outcomes (fallback for harness)
           uv run -- python scripts/publication/validator_parity.py --base-sha "$_BASE_SHA" --merge-sha "$_MERGE_SHA" --head-sha "$_HEAD_SHA" --corpus-changed-paths "$_CORPUS_FILE" $REQUIRE_MANIFEST $ALLOW_PARTIAL_VALIDATION
 
-      # Override approval separation: a committed override's approver must
-      # differ from the PR author, and an APPROVED review from that approver
-      # must exist — file content alone never authorizes. Mirror-lane bot
-      # PRs are exempt (allow-partial renders overrides advisory there).
       - name: Check override approvals
         if: steps.validate.outcome == 'success'
         env:
@@ -482,10 +386,6 @@ jobs:
           OVERRIDES=$(git diff --no-renames --name-only --diff-filter=ACMR "$BASE_SHA...$EFFECTIVE_MERGE" -- \
             ':(icase,glob)results-data/bundles/*.override.json' ':(icase,glob)results-data/bundles/**/*.override.json' \
             || true)
-          # Reused artifacts need approval too: touching a bundle covered by
-          # an unchanged override would otherwise inherit the old artifact
-          # with no review on this PR. Enumerate the override sibling of
-          # every changed primary bundle alongside changed overrides.
           CHANGED_BUNDLES=$(git diff --no-renames --name-only --diff-filter=ACMR "$BASE_SHA...$EFFECTIVE_MERGE" -- \
             ':(icase,glob)results-data/bundles/*.json' ':(icase,glob)results-data/bundles/**/*.json' \
             | grep -viE '\.(manifest|plans|tuning|applied|override)\.json$' \
@@ -524,9 +424,6 @@ jobs:
               failed=1
               continue
             fi
-            # The approval must review the current head commit: an APPROVED left
-            # on an earlier push must not satisfy an artifact the approver
-            # never saw.
             approved=$(WANT="$approver" WANT_SHA="$HEAD_SHA" gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" --paginate --slurp 2>/dev/null \
               | WANT="$approver" WANT_SHA="$HEAD_SHA" python3 -c "import json,os,sys; loaded=json.load(sys.stdin); pages=loaded if (isinstance(loaded,list) and loaded and all(isinstance(p,list) for p in loaded)) else [loaded]; all_reviews=[r for page in pages for r in (page if isinstance(page,list) else [page])]; want=os.environ.get('WANT','').lower(); want_sha=os.environ.get('WANT_SHA',''); latest=next((r.get('state') for r in reversed(all_reviews) if (((r.get('user') or {}).get('login')) or '').lower()==want and r.get('state') in ('APPROVED','CHANGES_REQUESTED','DISMISSED') and (not want_sha or r.get('commit_id')==want_sha)), None); print('yes' if latest=='APPROVED' else 'no')" 2>/dev/null || echo no)
             if [ "$approved" != "yes" ]; then
@@ -543,7 +440,6 @@ jobs:
         run: |
           if [ -f "$CORPUS_CHANGED_PATHS_FILE" ] && [ -s "$CORPUS_CHANGED_PATHS_FILE" ]; then
             echo "Corpus files changed - running inventory check against MERGE_SHA payload"
-            # For corpus-only changes, inventory check is the primary gate
           fi
           uv run -- python scripts/generate_corpus_inventory.py --check
 
@@ -557,7 +453,7 @@ jobs:
 
       - name: Upload validation comment artifact
         if: steps.changed.outputs.has_bundles == 'true' && always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: submission-validation-comment
           path: /tmp/pr-comment-artifact/
@@ -567,7 +463,7 @@ jobs:
       - name: Post PR comment (same-repo fast path)
         if: steps.validate.outcome != 'skipped' && always()
         continue-on-error: true
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
             const fs = require('fs');

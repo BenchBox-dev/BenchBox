@@ -1,15 +1,3 @@
-"""Unit tests for the cross-platform result comparator.
-
-Pinned invariants:
-  * STRICT matches every cell exactly.
-  * Row-count mismatch short-circuits to a single divergence row.
-  * Numeric epsilon applies to int/float/Decimal cells only.
-  * ``ordering_required=False`` sorts both inputs before comparing.
-  * NULL == NULL (None and float('nan') collapse to the same sentinel).
-  * Loose Tolerance without rationale is a construction error - enforces
-    the spec-anchoring contract the comparator docstring advertises.
-"""
-
 from __future__ import annotations
 
 from decimal import Decimal
@@ -113,7 +101,7 @@ def test_nan_treated_as_null() -> None:
 
 
 def test_string_trailing_whitespace_stripped() -> None:
-    # DuckDB pads CHAR(N), ClickHouse does not - canonicalize via rstrip.
+
     report = _compare([("foo   ",)], [("foo",)])
     assert report.matched
 
@@ -166,7 +154,6 @@ def test_summary_diverged_caps_at_five_samples() -> None:
 
 
 def test_both_empty_result_sets_match() -> None:
-    """Two empty result sets should match - avoids false positive on queries that return no rows."""
     report = _compare([], [])
     assert report.matched
     assert report.row_count_reference == 0
@@ -175,13 +162,11 @@ def test_both_empty_result_sets_match() -> None:
 
 
 def test_all_null_rows_match() -> None:
-    """Rows composed entirely of NULLs on both sides should match."""
     report = _compare([(None, None, None)], [(None, None, None)])
     assert report.matched
 
 
 def test_empty_vs_nonempty_mismatch() -> None:
-    """An empty reference against a non-empty comparison is a row-count mismatch."""
     report = _compare([], [(1, 2)])
     assert not report.matched
     assert report.divergences[0].row_index == -1

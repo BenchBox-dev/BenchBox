@@ -1,9 +1,6 @@
-"""Tests for base platform adapter functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import inspect
 import sys
@@ -35,8 +32,6 @@ pytestmark = [
 
 
 class MockPlatformAdapter(PlatformAdapter):
-    """Mock platform adapter for testing."""
-
     stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
 
     def add_cli_arguments(self):
@@ -50,7 +45,6 @@ class MockPlatformAdapter(PlatformAdapter):
         return None
 
     def get_platform_info(self, connection=None):
-        """Mock platform info implementation."""
         return {
             "platform_type": "mock",
             "platform_name": "Mock Platform",
@@ -84,30 +78,26 @@ class MockPlatformAdapter(PlatformAdapter):
         }
 
     def apply_table_tunings(self, table_tuning, connection):
-        """Mock table tuning implementation."""
+        pass
 
     def generate_tuning_clause(self, table_tuning):
-        """Mock tuning clause generation."""
         return ""
 
     def apply_unified_tuning(self, unified_config, connection):
-        """Mock unified tuning implementation."""
+        pass
 
     def apply_platform_optimizations(self, platform_config, connection):
-        """Mock platform optimizations implementation."""
+        pass
 
     def apply_constraint_configuration(self, primary_key_config, foreign_key_config, connection):
-        """Mock constraint configuration implementation."""
+        pass
 
 
 class MockPlatformAdapterWithDialect(MockPlatformAdapter):
-    """Mock platform adapter with dialect support for testing."""
-
     def get_target_dialect(self) -> str:
         return "mock_dialect"
 
     def get_platform_info(self, connection=None):
-        """Mock platform info implementation with dialect support."""
         return {
             "platform_type": "mock_dialect",
             "platform_name": "Mock Platform with Dialect",
@@ -121,7 +111,6 @@ class MockPlatformAdapterWithDialect(MockPlatformAdapter):
         }
 
     def run_power_test(self, benchmark, **kwargs):
-        """Mock power test implementation."""
         return {
             "test_type": "power",
             "total_execution_time": 5.0,
@@ -142,7 +131,6 @@ class MockPlatformAdapterWithDialect(MockPlatformAdapter):
         }
 
     def run_throughput_test(self, benchmark, **kwargs):
-        """Mock throughput test implementation."""
         stream_count = kwargs.get("stream_count", 2)
         return {
             "test_type": "throughput",
@@ -164,7 +152,6 @@ class MockPlatformAdapterWithDialect(MockPlatformAdapter):
         }
 
     def run_maintenance_test(self, benchmark, **kwargs):
-        """Mock maintenance test implementation."""
         return {
             "test_type": "maintenance",
             "operations_executed": 4,
@@ -201,25 +188,22 @@ class MockPlatformAdapterWithDialect(MockPlatformAdapter):
         }
 
     def apply_table_tunings(self, table_tuning, connection):
-        """Mock table tuning implementation."""
+        pass
 
     def generate_tuning_clause(self, table_tuning):
-        """Mock tuning clause generation."""
         return ""
 
     def apply_unified_tuning(self, unified_config, connection):
-        """Mock unified tuning implementation."""
+        pass
 
     def apply_platform_optimizations(self, platform_config, connection):
-        """Mock platform optimizations implementation."""
+        pass
 
     def apply_constraint_configuration(self, primary_key_config, foreign_key_config, connection):
-        """Mock constraint configuration implementation."""
+        pass
 
 
 class BenchmarkWithVersionAwareQueries:
-    """Minimal benchmark stub for testing get_queries() kwarg propagation."""
-
     def __init__(self) -> None:
         self.calls: list[dict[str, str | None]] = []
 
@@ -234,8 +218,6 @@ class BenchmarkWithVersionAwareQueries:
 
 
 class BenchmarkWithStrictTranslationFailure:
-    """Benchmark stub whose dialect-aware path raises the strict translation exception."""
-
     def get_queries(self, dialect: str | None = None, base_dialect: str | None = None) -> dict[str, str]:
         if dialect is None:
             return {"Q1": "SELECT fallback"}
@@ -251,8 +233,6 @@ class BenchmarkWithStrictTranslationFailure:
 
 
 class BenchmarkWithUnexpectedTranslationFailure:
-    """Benchmark stub whose dialect-aware path raises an unexpected error."""
-
     def get_queries(self, dialect: str | None = None, base_dialect: str | None = None) -> dict[str, str]:
         if dialect is None:
             return {"Q1": "SELECT fallback"}
@@ -335,10 +315,7 @@ class TestPowerResultConversionHelpers:
 
 
 class TestConnectionConfig:
-    """Test ConnectionConfig functionality."""
-
     def test_default_values(self):
-        """Test default connection configuration values."""
         config = ConnectionConfig()
         assert config.host is None
         assert config.port is None
@@ -349,28 +326,22 @@ class TestConnectionConfig:
         assert config.pool_timeout == 30
 
     def test_env_value_resolution(self):
-        """Test environment variable resolution."""
         config = ConnectionConfig(password="${TEST_PASSWORD}")
 
         with patch.dict("os.environ", {"TEST_PASSWORD": "secret123"}):
             assert config.get_env_value("password") == "secret123"
 
     def test_env_value_no_expansion(self):
-        """Test that regular values are not expanded."""
         config = ConnectionConfig(password="regular_password")
         assert config.get_env_value("password") == "regular_password"
 
     def test_env_value_missing_variable(self):
-        """Test handling of missing environment variables."""
         config = ConnectionConfig(password="${MISSING_VAR}")
         assert config.get_env_value("password", "default") == "default"
 
 
 class TestPlatformAdapter:
-    """Test base PlatformAdapter functionality."""
-
     def test_initialization(self):
-        """Test adapter initialization."""
         adapter = MockPlatformAdapter()
         adapter.platform_config["test_param"] = "value"
         assert adapter.platform_config["test_param"] == "value"
@@ -379,40 +350,33 @@ class TestPlatformAdapter:
         assert adapter.dialect is None
 
     def test_external_table_capability_defaults_disabled(self):
-        """Base adapter defaults to native tables unless subclasses opt in."""
         adapter = MockPlatformAdapter()
         assert adapter.supports_external_tables is False
         assert PlatformAdapter.supports_external_tables is False
 
     def test_create_external_tables_raises_by_default(self, tmp_path):
-        """Base implementation should force adapters to provide external mode behavior."""
         adapter = MockPlatformAdapter()
         with pytest.raises(NotImplementedError, match="does not support external table mode"):
             adapter.create_external_tables(benchmark=Mock(), connection=Mock(), data_dir=tmp_path)
 
     def test_sql_translation_no_dialect(self):
-        """Test SQL translation when no dialect is set."""
         adapter = MockPlatformAdapter()
         sql = "SELECT * FROM table"
         assert adapter.translate_sql(sql) == sql
 
     @patch("sqlglot.transpile")
     def test_sql_translation_with_dialect(self, mock_transpile):
-        """Test SQL translation with dialect set."""
         adapter = MockPlatformAdapter()
         adapter._dialect = "postgresql"
 
         mock_transpile.return_value = ['SELECT * FROM "table"']
 
         result = adapter.translate_sql("SELECT * FROM table", "duckdb")
-        # identify=True for postgresql (not in the clickhouse/postgres exclusion list)
         mock_transpile.assert_called_once_with("SELECT * FROM table", read="duckdb", write="postgresql", identify=True)
-        # translate_sql adds semicolon at the end
         assert result == 'SELECT * FROM "table";'
 
     @patch("sqlglot.transpile")
     def test_sql_translation_error_handling(self, mock_transpile):
-        """Test SQL translation error handling."""
         adapter = MockPlatformAdapter()
         adapter._dialect = "postgresql"
 
@@ -420,31 +384,26 @@ class TestPlatformAdapter:
 
         sql = "SELECT * FROM table"
         result = adapter.translate_sql(sql, "duckdb")
-        assert result == sql  # Should return original SQL on error
+        assert result == sql
 
     def test_connection_test_success(self):
-        """Test successful connection test."""
         adapter = MockPlatformAdapter()
         assert adapter.test_connection() is True
 
     def test_connection_test_failure(self):
-        """Test failed connection test."""
         adapter = MockPlatformAdapter()
 
-        # Mock create_connection to raise an exception
         adapter.create_connection = Mock(side_effect=Exception("Connection failed"))
 
         assert adapter.test_connection() is False
 
     def test_get_connection_from_pool_no_pool(self):
-        """Test getting connection when no pool exists."""
         adapter = MockPlatformAdapter()
         adapter.platform_config["test_param"] = "value"
         connection = adapter.get_connection_from_pool()
         assert connection is not None
 
     def test_get_connection_from_pool_with_pool(self):
-        """Test getting connection from pool."""
         adapter = MockPlatformAdapter()
         mock_pool = Mock()
         mock_connection = Mock()
@@ -456,7 +415,6 @@ class TestPlatformAdapter:
         mock_pool.get_connection.assert_called_once()
 
     def test_execute_all_queries_with_dialect_support(self):
-        """Test _execute_all_queries method with dialect support."""
         adapter = MockPlatformAdapterWithDialect()
 
         class DummyBenchmark:
@@ -484,10 +442,8 @@ class TestPlatformAdapter:
         assert base_dialect == "netezza"
 
     def test_execute_all_queries_without_dialect_support(self):
-        """Test _execute_all_queries method without dialect support."""
-        adapter = MockPlatformAdapter()  # No get_target_dialect method
+        adapter = MockPlatformAdapter()
 
-        # mock benchmark
         mock_benchmark = Mock()
         mock_benchmark.get_queries.return_value = {
             "1": "SELECT TOP 100 * FROM table1",
@@ -495,18 +451,14 @@ class TestPlatformAdapter:
         }
         mock_benchmark.get_platform_skip_queries.return_value = []
 
-        # Mock connection
         mock_connection = Mock()
 
-        # Mock run config
         run_config = {"benchmark_name": "tpch"}
 
         with patch("rich.console.Console"):
             results = adapter._execute_all_queries(mock_benchmark, mock_connection, run_config)
 
-        # Verify benchmark was called without dialect
         mock_benchmark.get_queries.assert_called_once()
-        # Should not have been called with dialect parameter
         args, kwargs = mock_benchmark.get_queries.call_args
         assert "dialect" not in kwargs
         assert isinstance(results, list)
@@ -546,35 +498,28 @@ class TestPlatformAdapter:
         assert "not descending" in result["error"]
 
     def test_execute_all_queries_benchmark_no_dialect_parameter(self):
-        """Test _execute_all_queries when benchmark doesn't support dialect parameter."""
         adapter = MockPlatformAdapterWithDialect()
 
-        # mock benchmark without dialect support
         mock_benchmark = Mock()
         mock_benchmark.get_queries.return_value = {"1": "SELECT TOP 100 * FROM table1"}
         mock_benchmark.get_platform_skip_queries.return_value = []
 
-        # Mock connection
         mock_connection = Mock()
         run_config = {"benchmark_name": "tpch"}
 
         with patch("inspect.signature") as mock_signature:
-            # Mock signature to indicate no dialect parameter
             mock_signature.return_value.parameters = {}
 
             with patch("rich.console.Console"):
                 adapter._execute_all_queries(mock_benchmark, mock_connection, run_config)
 
-            # Should call without dialect since benchmark doesn't support it
             mock_benchmark.get_queries.assert_called_once()
             args, kwargs = mock_benchmark.get_queries.call_args
             assert "dialect" not in kwargs
 
     def test_execute_all_queries_dialect_exception_handling(self):
-        """Test _execute_all_queries handles dialect inspection exceptions gracefully."""
         adapter = MockPlatformAdapterWithDialect()
 
-        # mock benchmark
         mock_benchmark = Mock()
         mock_benchmark.get_queries.return_value = {"1": "SELECT * FROM table1"}
         mock_benchmark.get_platform_skip_queries.return_value = []
@@ -586,13 +531,11 @@ class TestPlatformAdapter:
             with patch("rich.console.Console"):
                 adapter._execute_all_queries(mock_benchmark, mock_connection, run_config)
 
-            # Should fallback to calling without dialect
             mock_benchmark.get_queries.assert_called_once()
             args, kwargs = mock_benchmark.get_queries.call_args
             assert "dialect" not in kwargs
 
     def test_execute_queries_by_type_sets_run_type_for_throughput(self):
-        """_execute_queries_by_type should enforce run_type tagging for throughput rows."""
         adapter = MockPlatformAdapter()
         benchmark = Mock()
         connection = Mock()
@@ -606,7 +549,6 @@ class TestPlatformAdapter:
         assert results[0]["run_type"] == "measurement"
 
     def test_execute_queries_by_type_sets_run_type_for_power(self):
-        """_execute_queries_by_type should enforce run_type tagging for power rows."""
         adapter = MockPlatformAdapter()
         benchmark = Mock()
         connection = Mock()
@@ -620,7 +562,6 @@ class TestPlatformAdapter:
         assert results[0]["run_type"] == "measurement"
 
     def test_execute_queries_by_type_sets_run_type_for_maintenance(self):
-        """_execute_queries_by_type should enforce run_type tagging for maintenance rows."""
         adapter = MockPlatformAdapter()
         benchmark = Mock()
         connection = Mock()
@@ -634,7 +575,6 @@ class TestPlatformAdapter:
         assert results[0]["run_type"] == "measurement"
 
     def test_execute_queries_by_type_combined_preserves_explicit_run_type(self):
-        """Combined runs preserve explicit run_type and backfill missing values."""
         adapter = MockPlatformAdapter()
         benchmark = Mock()
         connection = Mock()
@@ -652,14 +592,12 @@ class TestPlatformAdapter:
         assert results[1]["run_type"] == "measurement"
 
     def test_ensure_query_results_run_type_infers_warmup_from_iteration(self):
-        """Missing run_type should infer warmup when iteration is zero."""
         results = MockPlatformAdapter._ensure_query_results_run_type(
             [{"query_id": "Q1", "status": "SUCCESS", "execution_time_seconds": 0.1, "iteration": 0}]
         )
         assert results[0]["run_type"] == "warmup"
 
     def test_ensure_query_results_run_type_infers_warmup_from_flag(self):
-        """Missing run_type should infer warmup when is_warmup flag is true."""
         results = MockPlatformAdapter._ensure_query_results_run_type(
             [{"query_id": "Q1", "status": "SUCCESS", "execution_time_seconds": 0.1, "is_warmup": True}]
         )
@@ -667,10 +605,7 @@ class TestPlatformAdapter:
 
 
 class TestBenchmarkResults:
-    """Test BenchmarkResults data class."""
-
     def test_benchmark_results_creation(self):
-        """Test creating BenchmarkResults instance."""
         results = make_benchmark_results(
             benchmark_name="test_benchmark",
             platform="test_platform",
@@ -689,19 +624,17 @@ class TestBenchmarkResults:
             table_statistics={"table1": 1000},
             validation_status="PASSED",
         )
-        # Factory sets validation_details={} by default; reset to match dataclass default for this test
         results.validation_details = None
 
         assert results.benchmark_name == "test_benchmark"
         assert results.platform == "test_platform"
         assert results.scale_factor == 1.0
-        assert results.validation_status == "PASSED"  # Default value
-        assert results.validation_details is None  # Default value
+        assert results.validation_status == "PASSED"
+        assert results.validation_details is None
 
 
 @pytest.fixture
 def mock_benchmark():
-    """Create a mock benchmark for testing."""
     benchmark = Mock()
     benchmark.scale_factor = 1.0
     benchmark._name = "test_benchmark"
@@ -710,17 +643,13 @@ def mock_benchmark():
     benchmark.get_queries = Mock(return_value={"q1": "SELECT 1", "q2": "SELECT 2"})
     benchmark.get_create_tables_sql = Mock(return_value="CREATE TABLE test (id INT)")
     benchmark.get_platform_skip_queries = Mock(return_value=[])
-    # Include tables attribute that won't interfere with data generation phase
     benchmark.tables = None
     benchmark._impl = None
-    # Mock create_enhanced_benchmark_result will be set per test
     benchmark.create_enhanced_benchmark_result = Mock()
     return benchmark
 
 
 class TestPlatformAdapterWorkflow:
-    """Test complete platform adapter workflow."""
-
     @pytest.mark.parametrize(
         "requested_type,effective_type,dry_run,capture_plans,expected_power_ms",
         [
@@ -767,7 +696,6 @@ class TestPlatformAdapterWorkflow:
         def execute(_benchmark, _connection, config):
             boundaries.append(clock[0])
             config["_effective_execution_type"] = effective_type
-            # Preparation and serial history lookup are workload time, not query latency.
             for seconds in (3.0, 2.0, 0.5, 5.5, 1.0):
                 clock[0] += seconds
             boundaries.append(clock[0])
@@ -809,7 +737,6 @@ class TestPlatformAdapterWorkflow:
             if effective_type in {"standard", "power"} and not dry_run:
                 assert phase.start_time == epoch.isoformat()
                 assert phase.end_time == (epoch + timedelta(seconds=12)).isoformat()
-            # Existing successful-query aggregate remains separate from wall accounting.
             assert phase.geometric_mean_time == 1.25
         payload = build_result_payload(result)
         assert payload["run"]["total_duration_ms"] == (29000 if capture_plans else 16000)
@@ -823,15 +750,12 @@ class TestPlatformAdapterWorkflow:
             assert payload["phases"]["power_test"]["duration_ms"] == expected_power_ms
 
     def test_run_benchmark_success(self, mock_benchmark, tmp_path):
-        """Test successful benchmark execution."""
         adapter = MockPlatformAdapter()
         mock_benchmark.output_dir = tmp_path
 
-        # Mock file system for data size calculation
         test_file = tmp_path / "test.csv"
         test_file.write_text("test,data\n1,value")
 
-        # Mock create_enhanced_benchmark_result to return correct values
         mock_result = make_benchmark_results(
             benchmark_name="test_benchmark",
             platform="mock",
@@ -860,18 +784,16 @@ class TestPlatformAdapterWorkflow:
         assert result.failed_queries == 0
 
     def test_run_benchmark_with_query_subset(self, mock_benchmark, tmp_path):
-        """Test benchmark execution with query subset."""
         adapter = MockPlatformAdapter()
         mock_benchmark.output_dir = tmp_path
 
-        # Mock create_enhanced_benchmark_result to return correct values for subset
         mock_result = make_benchmark_results(
             benchmark_name="test_benchmark",
             platform="mock",
             scale_factor=1.0,
             execution_id="test_001",
             duration_seconds=10.0,
-            total_queries=1,  # Only 1 query in subset
+            total_queries=1,
             successful_queries=1,
             total_execution_time=0.1,
             average_query_time=0.1,
@@ -889,19 +811,17 @@ class TestPlatformAdapterWorkflow:
         assert result.successful_queries == 1
 
     def test_run_benchmark_with_categories(self, mock_benchmark, tmp_path):
-        """Test benchmark execution with categories."""
         adapter = MockPlatformAdapter()
         mock_benchmark.output_dir = tmp_path
         mock_benchmark.get_queries_by_category = Mock(return_value={"q1": "SELECT 1"})
 
-        # Mock create_enhanced_benchmark_result to return correct values for categories
         mock_result = make_benchmark_results(
             benchmark_name="test_benchmark",
             platform="mock",
             scale_factor=1.0,
             execution_id="test_001",
             duration_seconds=10.0,
-            total_queries=1,  # Only 1 query in category
+            total_queries=1,
             successful_queries=1,
             total_execution_time=0.1,
             average_query_time=0.1,
@@ -919,19 +839,11 @@ class TestPlatformAdapterWorkflow:
         mock_benchmark.get_queries_by_category.assert_called_once_with("category1")
 
     def test_run_benchmark_with_no_tables(self, mock_benchmark, tmp_path):
-        """Test benchmark execution when tables are not pre-populated.
-
-        Data generation is the responsibility of run_benchmark_lifecycle (via
-        _ensure_data_generated), which runs before the adapter is called. The
-        adapter itself does not call generate_data(); it proceeds directly to
-        connection, schema, load, and execute phases.
-        """
         adapter = MockPlatformAdapter()
         mock_benchmark.output_dir = tmp_path
         mock_benchmark.tables = None
         mock_benchmark._impl = None
 
-        # Mock create_enhanced_benchmark_result
         mock_result = make_benchmark_results(
             benchmark_name="test_benchmark",
             platform="mock",
@@ -952,16 +864,13 @@ class TestPlatformAdapterWorkflow:
 
         result = adapter.run_benchmark(mock_benchmark)
 
-        # Adapter must NOT call generate_data - that is runner.py's responsibility
         mock_benchmark.generate_data.assert_not_called()
         assert isinstance(result, BenchmarkResults)
 
     def test_run_benchmark_query_failure(self, mock_benchmark, tmp_path):
-        """Test benchmark execution with query failures."""
         adapter = MockPlatformAdapter()
         mock_benchmark.output_dir = tmp_path
 
-        # Mock execute_query to fail for one query
         def mock_execute_query(connection, query, query_id):
             if query_id == "q1":
                 raise Exception("Query failed")
@@ -974,7 +883,6 @@ class TestPlatformAdapterWorkflow:
 
         adapter.execute_query = mock_execute_query
 
-        # Mock create_enhanced_benchmark_result to return correct failure counts
         mock_result = make_benchmark_results(
             benchmark_name="test_benchmark",
             platform="mock",
@@ -982,7 +890,7 @@ class TestPlatformAdapterWorkflow:
             execution_id="test_001",
             duration_seconds=10.0,
             total_queries=2,
-            successful_queries=1,  # 1 success, 1 failure
+            successful_queries=1,
             failed_queries=1,
             query_results=[
                 {"query_id": "q1", "status": "FAILED", "error": "Query failed"},
@@ -1004,7 +912,6 @@ class TestPlatformAdapterWorkflow:
         assert result.successful_queries == 1
         assert result.failed_queries == 1
 
-        # Check that failed query has error information
         failed_query = next(q for q in result.query_results if q["status"] == "FAILED")
         assert "error" in failed_query
         assert failed_query["query_id"] == "q1"
@@ -1015,7 +922,7 @@ def test_collect_resource_utilization_without_psutil(monkeypatch):
 
     original_import = __import__
 
-    def fake_import(name, *args, **kwargs):  # pragma: no cover - exercised during test
+    def fake_import(name, *args, **kwargs):  # pragma: no cover
         if name == "psutil":
             raise ImportError("psutil not installed")
         return original_import(name, *args, **kwargs)
@@ -1040,10 +947,10 @@ def test_collect_resource_utilization_with_stub(monkeypatch):  # noqa: C901
             def __init__(self, process):
                 self._process = process
 
-            def __enter__(self):  # pragma: no cover - trivial
+            def __enter__(self):  # pragma: no cover
                 return self._process
 
-            def __exit__(self, exc_type, exc, tb):  # pragma: no cover - trivial
+            def __exit__(self, exc_type, exc, tb):  # pragma: no cover
                 return False
 
         def oneshot(self):
@@ -1064,7 +971,7 @@ def test_collect_resource_utilization_with_stub(monkeypatch):  # noqa: C901
         def num_fds(self):
             return 24
 
-        def num_handles(self):  # pragma: no cover - platform specific
+        def num_handles(self):  # pragma: no cover
             return 30
 
         def io_counters(self):
@@ -1212,13 +1119,10 @@ def test_summarize_performance_characteristics_failure_samples_limited():
 
 
 class TestApplyQuerySubsetNormalization:
-    """Direct tests for _apply_query_subset() Q-prefix normalization at the adapter boundary."""
-
     def test_query_subset_accepts_q_prefixed_ids(self):
         adapter = MockPlatformAdapter()
         queries = {"1": "SELECT 1", "37": "SELECT 37", "100": "SELECT 100"}
         result = adapter._apply_query_subset(queries, ["Q37", "Q1"], "test")
-        # Order preserved as given by user, Q-prefix stripped
         assert list(result.keys()) == ["37", "1"]
         assert result["37"] == "SELECT 37"
 
@@ -1247,7 +1151,6 @@ class TestApplyQuerySubsetNormalization:
             adapter._apply_query_subset(queries, ["Q99"], "test")
 
     def test_query_subset_preserves_non_numeric_ids(self):
-        """Non-Qnnn IDs (e.g. 'q-aggregation-1') must not be incorrectly stripped."""
         adapter = MockPlatformAdapter()
         queries = {"q-aggregation-1": "SELECT 1"}
         result = adapter._apply_query_subset(queries, ["q-aggregation-1"], "test")
@@ -1255,21 +1158,16 @@ class TestApplyQuerySubsetNormalization:
 
 
 class TestConsolidatedFunctionality:
-    """Test consolidated functionality added to base platform adapter."""
-
     def test_tpc_methods_consolidation(self):
-        """Test that TPC methods are properly consolidated in base class."""
         adapter = MockPlatformAdapter()
         mock_benchmark = Mock(spec=[])
         mock_connection = Mock()
         assert not hasattr(mock_benchmark, "run_throughput_test")
 
-        # Test that TPC methods exist and can be called
         assert hasattr(adapter, "run_power_test")
         assert hasattr(adapter, "run_throughput_test")
         assert hasattr(adapter, "run_maintenance_test")
 
-        # Test that run_throughput_test delegates to run_power_test when no TPC benchmark
         with patch.object(adapter, "run_power_test") as mock_run_power_test:
             mock_run_power_test.return_value = {"test": "throughput"}
 
@@ -1278,11 +1176,9 @@ class TestConsolidatedFunctionality:
             assert result == {"test": "throughput"}
 
     def test_create_schema_with_tuning_helper(self):
-        """Test the _create_schema_with_tuning helper method."""
         adapter = MockPlatformAdapterWithDialect()
         mock_benchmark = Mock()
 
-        # Test with tuning configuration
         with patch.object(adapter, "get_effective_tuning_configuration") as mock_get_tuning:
             with patch.object(adapter, "get_target_dialect", return_value="postgres"):
                 with patch.object(adapter, "translate_sql", return_value="translated_sql"):
@@ -1298,7 +1194,6 @@ class TestConsolidatedFunctionality:
                     adapter.translate_sql.assert_called_with("original_sql", "standard")
                     assert result == "translated_sql"
 
-        # Test fallback to legacy signature
         adapter2 = MockPlatformAdapterWithDialect()
         mock_benchmark2 = Mock()
 
@@ -1308,7 +1203,6 @@ class TestConsolidatedFunctionality:
                     mock_tuning_config = Mock()
                     mock_get_tuning.return_value = mock_tuning_config
 
-                    # Make the new signature raise TypeError, then return success
                     mock_benchmark2.get_create_tables_sql.side_effect = [
                         TypeError("Signature not supported"),
                         "fallback_sql_original",
@@ -1316,15 +1210,12 @@ class TestConsolidatedFunctionality:
 
                     result = adapter2._create_schema_with_tuning(mock_benchmark2)
 
-                    # Should call twice - first with new signature (fails), then fallback
                     assert mock_benchmark2.get_create_tables_sql.call_count == 2
                     calls = mock_benchmark2.get_create_tables_sql.call_args_list
-                    # First call with new signature
                     assert calls[0].kwargs == {
                         "dialect": "postgres",
                         "tuning_config": mock_tuning_config,
                     }
-                    # Second call without arguments (fallback)
                     assert calls[1].args == ()
                     assert calls[1].kwargs == {}
 
@@ -1332,10 +1223,8 @@ class TestConsolidatedFunctionality:
                     assert result == "fallback_sql"
 
     def test_get_constraint_configuration_helper(self):
-        """Test the _get_constraint_configuration helper method."""
         adapter = MockPlatformAdapter()
 
-        # Test with tuning configuration
         with patch.object(adapter, "get_effective_tuning_configuration") as mock_get_tuning:
             mock_tuning_config = Mock()
             mock_tuning_config.primary_keys.enabled = True
@@ -1347,7 +1236,6 @@ class TestConsolidatedFunctionality:
             assert primary_keys is True
             assert foreign_keys is False
 
-        # Test without tuning configuration
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
             primary_keys, foreign_keys = adapter._get_constraint_configuration()
 
@@ -1355,10 +1243,8 @@ class TestConsolidatedFunctionality:
             assert foreign_keys is False
 
     def test_log_constraint_configuration_helper(self):
-        """Test the _log_constraint_configuration helper method."""
         adapter = MockPlatformAdapter()
 
-        # Test logging with constraints enabled
         with patch.object(adapter.logger, "info") as mock_info:
             with patch.object(adapter.logger, "debug") as mock_debug:
                 adapter._log_constraint_configuration(True, True)
@@ -1370,7 +1256,6 @@ class TestConsolidatedFunctionality:
                     "Schema constraints from tuning config: primary_keys=True, foreign_keys=True"
                 )
 
-        # Test logging with no constraints
         with patch.object(adapter.logger, "info") as mock_info:
             with patch.object(adapter.logger, "debug") as mock_debug:
                 adapter._log_constraint_configuration(False, False)
@@ -1384,7 +1269,6 @@ class TestConsolidatedFunctionality:
                 )
 
     def test_schema_creation_no_translation_needed(self):
-        """Test schema creation when source and target dialect are the same."""
         adapter = MockPlatformAdapterWithDialect()
         mock_benchmark = Mock()
 
@@ -1395,49 +1279,35 @@ class TestConsolidatedFunctionality:
 
                     result = adapter._create_schema_with_tuning(mock_benchmark, source_dialect="duckdb")
 
-                    # Should not call translate_sql when dialects match
                     mock_translate.assert_not_called()
                     assert result == "schema_sql"
 
 
 class TestTimestampFormatting:
-    """Tests for timestamp formatting helper."""
-
     def test_format_timestamp_string_passthrough(self):
-        """Test that string timestamps are passed through unchanged."""
         adapter = MockPlatformAdapter()
         result = adapter._format_timestamp("2025-01-01T12:00:00")
         assert result == "2025-01-01T12:00:00"
 
     def test_format_timestamp_numeric(self):
-        """Test that numeric timestamps are converted to ISO format."""
         adapter = MockPlatformAdapter()
-        # Use a known timestamp
-        timestamp = 1704110400.0  # 2024-01-01T12:00:00 UTC
+        timestamp = 1704110400.0
         result = adapter._format_timestamp(timestamp)
-        # Result should be an ISO format string
         assert "2024" in result or "T" in result
 
     def test_format_timestamp_zero(self):
-        """Test that zero timestamps return current time."""
         adapter = MockPlatformAdapter()
         result = adapter._format_timestamp(0)
-        # Should return a valid timestamp string
         assert "T" in result
 
     def test_format_timestamp_empty_string(self):
-        """Test that empty strings return current time."""
         adapter = MockPlatformAdapter()
         result = adapter._format_timestamp("")
-        # Should return a valid timestamp string
         assert "T" in result
 
 
 class TestValidationStatusDetermination:
-    """Tests for validation status determination logic."""
-
     def test_determine_status_all_passed(self):
-        """Test overall status when all validations pass."""
         adapter = MockPlatformAdapter()
 
         validation_phase = Mock()
@@ -1449,7 +1319,6 @@ class TestValidationStatusDetermination:
         assert result == "PASSED"
 
     def test_determine_status_row_count_failed(self):
-        """Test overall status when row count validation fails."""
         adapter = MockPlatformAdapter()
 
         validation_phase = Mock()
@@ -1461,7 +1330,6 @@ class TestValidationStatusDetermination:
         assert result == "FAILED"
 
     def test_determine_status_schema_failed(self):
-        """Test overall status when schema validation fails."""
         adapter = MockPlatformAdapter()
 
         validation_phase = Mock()
@@ -1473,7 +1341,6 @@ class TestValidationStatusDetermination:
         assert result == "FAILED"
 
     def test_determine_status_integrity_failed(self):
-        """Test overall status when data integrity fails."""
         adapter = MockPlatformAdapter()
 
         validation_phase = Mock()
@@ -1485,7 +1352,6 @@ class TestValidationStatusDetermination:
         assert result == "FAILED"
 
     def test_determine_status_partial(self):
-        """Test overall status when any validation is partial."""
         adapter = MockPlatformAdapter()
 
         validation_phase = Mock()
@@ -1498,10 +1364,7 @@ class TestValidationStatusDetermination:
 
 
 class TestQueryDefinitionExtraction:
-    """Tests for query definition extraction."""
-
     def test_extract_query_definitions(self):
-        """Test extracting query definitions from benchmark queries."""
         adapter = MockPlatformAdapter()
 
         queries = {
@@ -1519,7 +1382,6 @@ class TestQueryDefinitionExtraction:
         assert result["power"]["Q2"].sql == "SELECT * FROM customers"
 
     def test_extract_query_definitions_default_stream(self):
-        """Test extracting query definitions with default stream ID."""
         adapter = MockPlatformAdapter()
 
         queries = {"Q1": "SELECT 1"}
@@ -1532,10 +1394,7 @@ class TestQueryDefinitionExtraction:
 
 
 class TestStandardExecutionPhase:
-    """Tests for standard execution phase creation."""
-
     def test_create_standard_execution_phase(self):
-        """Test creating execution phase from query results."""
         adapter = MockPlatformAdapter()
 
         query_results = [
@@ -1556,7 +1415,6 @@ class TestStandardExecutionPhase:
         assert result[1].run_type == "measurement"
 
     def test_create_standard_execution_phase_defaults(self):
-        """Test creating execution phase with default stream ID."""
         adapter = MockPlatformAdapter()
 
         query_results = [{"execution_time_seconds": 0.5}]
@@ -1565,7 +1423,7 @@ class TestStandardExecutionPhase:
 
         assert len(result) == 1
         assert result[0].stream_id == "standard"
-        assert result[0].query_id == "Q1"  # Default
+        assert result[0].query_id == "Q1"
         assert result[0].run_type == "measurement"
 
     def test_create_standard_execution_phase_keeps_global_order_when_position_is_present(self):
@@ -1587,19 +1445,14 @@ class TestStandardExecutionPhase:
 
 
 class TestThroughputPhaseCreation:
-    """Tests for throughput phase creation."""
-
     def test_create_throughput_phase_none(self):
-        """Test that None throughput result returns None."""
         adapter = MockPlatformAdapter()
         result = adapter._create_throughput_phase(None)
         assert result is None
 
     def test_create_throughput_phase_with_streams(self):
-        """Test creating throughput phase from stream results."""
         adapter = MockPlatformAdapter()
 
-        # Create mock stream results
         stream1 = Mock()
         stream1.stream_id = 0
         stream1.start_time = "2025-01-01T10:00:00"
@@ -1671,7 +1524,6 @@ class TestThroughputPhaseCreation:
         assert result.streams[0].stream_id == 1
 
     def test_create_throughput_phase_infers_warmup_run_type(self):
-        """Throughput query executions infer warmup run_type from iteration metadata."""
         adapter = MockPlatformAdapter()
 
         stream1 = Mock()
@@ -1701,7 +1553,6 @@ class TestThroughputPhaseCreation:
         assert result.streams[0].query_executions[0].run_type == "warmup"
 
     def test_create_throughput_phase_ignores_stream_local_position_for_persistence(self):
-        """Persisted execution_order is the flattened global order, not the stream-local slot."""
         adapter = MockPlatformAdapter()
         stream = Mock()
         stream.stream_id = 0
@@ -1729,7 +1580,6 @@ class TestThroughputPhaseCreation:
         assert result.streams[0].query_executions[0].execution_order == 1
 
     def test_create_throughput_phase_persists_global_order_across_streams(self):
-        """Overlapping stream-local positions must not persist overlapping execution orders."""
         adapter = MockPlatformAdapter()
 
         def _stream(stream_id):
@@ -1764,7 +1614,6 @@ class TestThroughputPhaseCreation:
         assert orders == [1, 2, 3, 4]
 
     def test_create_throughput_phase_preserves_explicit_execution_order(self):
-        """A producer-supplied execution_order keeps governing persistence, as on the standard path."""
         adapter = MockPlatformAdapter()
         stream = Mock()
         stream.stream_id = 0
@@ -1804,7 +1653,6 @@ class TestThroughputPhaseCreation:
     def test_create_throughput_phase_preserves_duration_precision_and_missing_values(
         self, query_result, expected_duration_ms
     ):
-        """Throughput capture must not manufacture or truncate query durations."""
         adapter = MockPlatformAdapter()
         stream = Mock()
         stream.stream_id = 0
@@ -1834,14 +1682,10 @@ class TestThroughputPhaseCreation:
 
 
 class TestGetExistingTables:
-    """Tests for getting existing tables from database."""
-
     def test_get_existing_tables_handles_exception(self):
-        """Test that get_existing_tables handles exceptions gracefully."""
         adapter = MockPlatformAdapter()
         mock_conn = Mock()
 
-        # Mock the execute to raise an exception
         mock_conn.execute.side_effect = Exception("Database error")
 
         result = adapter._get_existing_tables(mock_conn)
@@ -1850,68 +1694,40 @@ class TestGetExistingTables:
 
 
 class TestCalculateDataSize:
-    """Tests for data size calculation."""
-
     def test_calculate_data_size_with_files(self, tmp_path):
-        """Test calculating data size with actual files."""
         adapter = MockPlatformAdapter()
 
-        # Create test files
         test_file = tmp_path / "test.csv"
         test_file.write_text("a,b,c\n1,2,3\n4,5,6\n")
 
         result = adapter._calculate_data_size(tmp_path)
 
-        # Should return a positive value
         assert result >= 0
 
     def test_calculate_data_size_nonexistent_path(self):
-        """Test calculating data size with nonexistent path."""
         adapter = MockPlatformAdapter()
 
         result = adapter._calculate_data_size(Path("/nonexistent/path"))
 
         assert result == 0.0
 
-    # NOTE: Log operation tests removed as they depend on VerbosityMixin
-    # which requires additional setup beyond the mock adapter
-
 
 class TestConnectionFactoryCursorPattern:
-    """Tests for thread-safe cursor pattern in connection factories.
-
-    DuckDB connections are not thread-safe for concurrent query execution.
-    Each stream in throughput/maintenance tests must use a separate cursor
-    obtained via connection.cursor() to enable safe concurrent execution.
-
-    See: https://duckdb.org/docs/stable/guides/python/multiple_threads
-    """
-
     def test_default_connection_factory_creates_cursor(self):
-        """Test that the default connection factory creates a cursor for thread safety.
-
-        The run_throughput_test method creates a _default_connection_factory that
-        should call connection.cursor() to create a thread-safe cursor.
-        """
-        # Create a mock connection with cursor method
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Simulate the _default_connection_factory behavior from adapter.py
         def _default_connection_factory():
             stream_cursor = mock_connection.cursor()
             return stream_cursor
 
-        # Call the factory
         result = _default_connection_factory()
 
-        # Verify cursor() was called
         mock_connection.cursor.assert_called_once()
         assert result is mock_cursor
 
     def test_connection_factory_creates_unique_cursors_per_call(self):
-        """Test that each factory call creates a new cursor for isolation."""
         mock_connection = Mock()
         cursors = [Mock() for _ in range(3)]
         mock_connection.cursor.side_effect = cursors
@@ -1920,32 +1736,21 @@ class TestConnectionFactoryCursorPattern:
             stream_cursor = mock_connection.cursor()
             return stream_cursor
 
-        # Call factory multiple times (simulating multiple streams)
         results = [_default_connection_factory() for _ in range(3)]
 
-        # Each call should create a new cursor
         assert mock_connection.cursor.call_count == 3
         assert results == cursors
-        # Ensure each result is a different cursor
         assert len(set(id(r) for r in results)) == 3
 
     def test_tpch_throughput_connection_factory_uses_cursor(self):
-        """Test TPC-H throughput test connection factory creates cursors.
-
-        Verifies the connection_factory in _execute_tpch_throughput_test
-        calls connection.cursor() for thread-safe concurrent stream execution.
-        """
         from benchbox.platforms.base.adapter import PlatformAdapterConnection
 
-        # Create mock connection with cursor
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Create a mock adapter
         mock_adapter = Mock()
 
-        # Simulate the connection_factory from _execute_tpch_throughput_test
         scale_factor = 0.01
 
         def connection_factory():
@@ -1955,32 +1760,22 @@ class TestConnectionFactoryCursorPattern:
             conn_wrapper.scale_factor = scale_factor
             return conn_wrapper
 
-        # Call the factory
         result = connection_factory()
 
-        # Verify the cursor was created and used
         mock_connection.cursor.assert_called_once()
         assert isinstance(result, PlatformAdapterConnection)
         assert result.benchmark_type == "tpch"
         assert result.scale_factor == scale_factor
 
     def test_tpcds_throughput_connection_factory_uses_cursor(self):
-        """Test TPC-DS throughput test connection factory creates cursors.
-
-        Verifies the connection_factory in _execute_tpcds_throughput_test
-        calls connection.cursor() for thread-safe concurrent stream execution.
-        """
         from benchbox.platforms.base.adapter import PlatformAdapterConnection
 
-        # Create mock connection with cursor
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Create a mock adapter
         mock_adapter = Mock()
 
-        # Simulate the connection_factory from _execute_tpcds_throughput_test
         scale_factor = 1.0
 
         def connection_factory():
@@ -1990,62 +1785,43 @@ class TestConnectionFactoryCursorPattern:
             conn_wrapper.scale_factor = scale_factor
             return conn_wrapper
 
-        # Call the factory
         result = connection_factory()
 
-        # Verify the cursor was created and used
         mock_connection.cursor.assert_called_once()
         assert isinstance(result, PlatformAdapterConnection)
         assert result.benchmark_type == "tpcds"
         assert result.scale_factor == scale_factor
 
     def test_maintenance_test_connection_factory_uses_cursor(self):
-        """Test maintenance test connection factory creates cursors.
-
-        Verifies connection factories in _execute_tpch_maintenance_test and
-        _execute_tpcds_maintenance_test call connection.cursor() for thread safety.
-        """
         from benchbox.platforms.base.adapter import PlatformAdapterConnection
 
-        # Create mock connection with cursor
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Create a mock adapter
         mock_adapter = Mock()
 
-        # Simulate the connection_factory from maintenance tests
         scale_factor = 0.1
 
         def connection_factory():
             stream_cursor = mock_connection.cursor()
             conn_wrapper = PlatformAdapterConnection(stream_cursor, mock_adapter)
-            conn_wrapper.benchmark_type = "tpch"  # or "tpcds"
+            conn_wrapper.benchmark_type = "tpch"
             conn_wrapper.scale_factor = scale_factor
             return conn_wrapper
 
-        # Call the factory multiple times (simulating concurrent maintenance streams)
         results = []
         for _ in range(3):
             mock_cursor = Mock()
             mock_connection.cursor.return_value = mock_cursor
             results.append(connection_factory())
 
-        # Verify each call created a cursor
         assert mock_connection.cursor.call_count == 3
         assert all(isinstance(r, PlatformAdapterConnection) for r in results)
 
     def test_cursor_pattern_prevents_shared_connection_state(self):
-        """Test that cursor pattern isolates connection state between streams.
-
-        Without cursors, concurrent streams would share connection state,
-        leading to race conditions and the 'NULL pointer dereference' error.
-        With cursors, each stream gets its own isolated cursor instance.
-        """
         from concurrent.futures import ThreadPoolExecutor
 
-        # Create mock connection with cursor that creates unique cursor instances
         mock_connection = Mock()
         cursors_created = []
 
@@ -2058,28 +1834,20 @@ class TestConnectionFactoryCursorPattern:
         mock_connection.cursor.side_effect = create_cursor
 
         def stream_work():
-            # Each stream should get its own cursor
             cursor = mock_connection.cursor()
-            # Simulate some work
             cursor.execute("SELECT 1")
             return cursor.cursor_id
 
-        # Run multiple streams concurrently
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = [executor.submit(stream_work) for _ in range(4)]
             cursor_ids = [f.result() for f in futures]
 
-        # Verify each stream got a unique cursor (unique cursor_id)
         assert len(set(cursor_ids)) == 4, "Each stream should get its own cursor"
-        # Verify cursor() was called for each stream
         assert mock_connection.cursor.call_count == 4
-        # Verify all cursors are unique objects
         assert len(cursors_created) == 4
 
 
 class TestMonotonicPhaseTiming:
-    """Regression tests for monotonic phase timing in adapter helpers."""
-
     def test_data_generation_phase_does_not_require_wall_clock(self):
         adapter = MockPlatformAdapter()
         benchmark = SimpleNamespace(tables={"orders": [{"id": 1}, {"id": 2}]})
@@ -2098,8 +1866,6 @@ class TestMonotonicPhaseTiming:
 
 
 class TestReusedDatabaseExternalMode:
-    """Verify _setup_reused_database_phases routes to create_external_tables in external mode."""
-
     def test_reused_db_external_mode_calls_create_external_tables(self):
         adapter = MockPlatformAdapter()
         adapter.table_mode = "external"
@@ -2157,8 +1923,6 @@ class TestReusedDatabaseExternalMode:
 
 
 class TestExecutionMetadataTableMode:
-    """Verify table_mode appears in _build_execution_metadata run_config."""
-
     def test_external_mode_in_execution_metadata(self):
         adapter = MockPlatformAdapter()
         adapter.table_mode = "external"
@@ -2191,39 +1955,19 @@ class TestExecutionMetadataTableMode:
 
 
 class TestBenchmarkIdentityInExecutionMetadata:
-    """Regression tests for benchmark_id propagation contract (w10 of
-    eliminate-non-data-loading-wrong-layer-compensation).
-
-    _build_execution_metadata must prefer run_config["benchmark_name"] (the
-    canonical slug propagated by the runner from BenchmarkConfig.name) over
-    the legacy "benchmark" key so that the live path never infers
-    benchmark_id from object internals.
-    """
-
     def test_benchmark_name_key_sets_benchmark_id(self):
-        """benchmark_name in run_config becomes benchmark_id in execution_metadata."""
         adapter = MockPlatformAdapter()
         metadata, _, _ = adapter._build_execution_metadata({"benchmark_name": "tpch", "scale_factor": 0.01})
         assert metadata.get("benchmark_id") == "tpch"
 
     def test_no_benchmark_identity_in_run_config_produces_none(self):
-        """When neither key is present benchmark_id is None (not inferred)."""
         adapter = MockPlatformAdapter()
         metadata, _, _ = adapter._build_execution_metadata({"scale_factor": 0.01})
         assert metadata.get("benchmark_id") is None
 
 
 class TestTPCExecutionRouting:
-    """Exercise benchmark-family routing for specialized TPC helpers."""
-
     def test_dispatch_paths_have_no_literal_tpc_benchmark_names(self):
-        """No dispatch method routes on a literal TPC benchmark name.
-
-        #914 extracted the power path; the throughput/maintenance/combined dispatch
-        now routes via the same capability registry, so the headline metric ("no
-        literal TPC names in execution.py dispatch") holds across all four methods,
-        not power-only.
-        """
         from benchbox.platforms.base.execution import TestDriversMixin
 
         dispatch_methods = (
@@ -2238,7 +1982,6 @@ class TestTPCExecutionRouting:
             assert '"tpcds"' not in source, f"{method.__name__} routes on a literal benchmark name"
 
     def test_execute_power_test_routes_tpch_via_run_config_benchmark_name(self):
-        # Routing now reads benchmark_name from run_config, not display_name sniffing.
         adapter = MockPlatformAdapter()
         adapter._execute_tpch_power_test = Mock(return_value=[{"query_id": "Q1"}])
         benchmark = SimpleNamespace(_name="adhoc", display_name="adhoc", scale_factor=1.0)
@@ -2251,7 +1994,6 @@ class TestTPCExecutionRouting:
         assert results == [{"query_id": "Q1"}]
 
     def test_execute_throughput_test_routes_tpcds_via_run_config_benchmark_name(self):
-        # Routing now reads benchmark_name from run_config, not display_name sniffing.
         adapter = MockPlatformAdapter()
         adapter._execute_tpcds_throughput_test = Mock(return_value=[{"query_id": "Q99"}])
         benchmark = SimpleNamespace(_name="custom", display_name="custom benchmark")
@@ -2306,7 +2048,6 @@ class TestTPCExecutionRouting:
         assert any("Throughput test not supported" in str(call) for call in mock_console.print.call_args_list)
 
     def test_execute_maintenance_test_routes_tpch_via_run_config_benchmark_name(self):
-        # Routing now reads benchmark_name from run_config, not class_name sniffing.
         adapter = MockPlatformAdapter()
         adapter._execute_tpch_maintenance_test = Mock(return_value=[{"query_id": "RF1"}])
 
@@ -2402,8 +2143,6 @@ class TestTPCExecutionRouting:
 
 
 class TestNormalizeBenchmarkIdDerivedBenchmarks:
-    """Verify normalize_benchmark_id correctly distinguishes derived benchmarks."""
-
     @pytest.mark.parametrize(
         "input_name,expected_id",
         [
@@ -2416,13 +2155,11 @@ class TestNormalizeBenchmarkIdDerivedBenchmarks:
             ("tpch-skew", "tpch_skew"),
             ("tpcds_obt", "tpcds_obt"),
             ("tpcds-obt", "tpcds_obt"),
-            # Parents must still resolve correctly
             ("tpch", "tpch"),
             ("tpc-h", "tpch"),
             ("TPC-H Benchmark", "tpch"),
             ("tpcds", "tpcds"),
             ("tpc-ds", "tpcds"),
-            # Display names with parenthetical suffixes (from benchmark._name)
             ("TPC-H Skew Benchmark (heavy)", "tpch_skew"),
             ("TPC-Havoc Benchmark", "tpchavoc"),
             ("TPC-DS One Big Table Benchmark", "tpcds_obt"),
@@ -2434,8 +2171,6 @@ class TestNormalizeBenchmarkIdDerivedBenchmarks:
 
 
 class TestDerivedBenchmarkRouting:
-    """Verify derived benchmarks (tpchavoc, tpch_skew) are NOT routed to specialized TPC helpers."""
-
     @pytest.mark.parametrize("benchmark_name", ["tpchavoc", "tpch_skew"])
     def test_power_test_routes_tpch_derived_to_generic(self, benchmark_name):
         adapter = MockPlatformAdapter()
@@ -2501,8 +2236,6 @@ class TestDerivedBenchmarkRouting:
 
 
 class TestFallbackEffectiveExecutionType:
-    """Verify fallback paths set _effective_execution_type so result shape is correct."""
-
     @patch("benchbox.platforms.base.adapter.quiet_console")
     def test_throughput_fallback_sets_effective_type_to_power(self, mock_console):
         adapter = MockPlatformAdapter()
@@ -2535,7 +2268,6 @@ class TestFallbackEffectiveExecutionType:
 
     @patch("benchbox.platforms.base.adapter.quiet_console")
     def test_throughput_fallback_does_not_set_flag_for_tpch(self, mock_console):
-        """Specialized TPC-H path should NOT set _effective_execution_type."""
         adapter = MockPlatformAdapter()
         adapter._execute_tpch_throughput_test = Mock(return_value=[])
         run_config = {"benchmark_name": "tpch", "num_streams": 4}
@@ -2546,8 +2278,6 @@ class TestFallbackEffectiveExecutionType:
 
 
 class TestKnownBenchmarkIds:
-    """Verify _normalize_known_benchmark_id recognizes derived benchmarks."""
-
     @pytest.mark.parametrize(
         "name,expected",
         [
@@ -2569,8 +2299,6 @@ class TestKnownBenchmarkIds:
 
 
 class TestBenchmarkFamily:
-    """Verify _benchmark_family() returns correct parent family."""
-
     @pytest.mark.parametrize(
         "bench_id,expected_family",
         [
@@ -2589,8 +2317,6 @@ class TestBenchmarkFamily:
 
 
 class TestNormalizeBenchmarkIdSubstringSafety:
-    """Verify that substring-like names do NOT false-match existing benchmarks."""
-
     @pytest.mark.parametrize(
         "input_name",
         [
@@ -2602,15 +2328,11 @@ class TestNormalizeBenchmarkIdSubstringSafety:
         ],
     )
     def test_substring_names_do_not_match_parents(self, input_name):
-        """Names containing known IDs as substrings must NOT match those IDs."""
         result = normalize_benchmark_id(input_name)
         assert result not in ("tpch", "tpcds", "tpchavoc", "tpch_skew", "tpcds_obt")
 
 
 class TestBuildExecutionPhasesWithEffectiveType:
-    """Integration test: _build_execution_phases produces a PowerTestPhase when
-    _effective_execution_type='power' is set on run_config (the fallback path)."""
-
     def test_fallback_produces_power_test_phase(self):
         adapter = MockPlatformAdapter()
         adapter.capture_plans = False
@@ -2647,7 +2369,6 @@ class TestBuildExecutionPhasesWithEffectiveType:
         assert total_exec_time == pytest.approx(0.8)
 
     def test_throughput_type_without_fallback_skips_power_phase(self):
-        """When execution_type is 'throughput' (no fallback), power_test should be None."""
         adapter = MockPlatformAdapter()
         adapter.capture_plans = False
         adapter.plan_capture_failures = 0
@@ -2677,8 +2398,6 @@ class TestBuildExecutionPhasesWithEffectiveType:
 
 
 class TestTPCHAndTPCDSExecutionHelpers:
-    """Cover warmup, seeded execution, and error conversion in TPC helpers."""
-
     @patch("benchbox.platforms.base.execution.quiet_console")
     @patch("benchbox.core.tpch.power_test.TPCHPowerTest")
     def test_execute_tpch_power_test_records_warmup_and_failures(self, mock_power_test_cls, mock_console):
@@ -2834,8 +2553,6 @@ class TestTPCHAndTPCDSExecutionHelpers:
         class FakeTPCHPowerTest:
             def __init__(self, **kwargs):
                 self.kwargs = kwargs
-                # Force a policy that differs between runs to prove the adapter
-                # consumes resolved config.validation rather than re-deriving it.
                 self.config = SimpleNamespace(validation=len(power_results) == 1)
 
             def run(self):
@@ -3286,8 +3003,6 @@ class TestTPCHAndTPCDSExecutionHelpers:
 
 
 class TestExecuteGenericPowerTest:
-    """Tests for _execute_generic_power_test orchestration."""
-
     def _make_adapter(self):
         return MockPlatformAdapter()
 
@@ -3307,7 +3022,6 @@ class TestExecuteGenericPowerTest:
 
         results = adapter._execute_generic_power_test(Mock(), Mock(), run_config)
 
-        # 1 warmup + 2 measurement = 3 total calls
         assert call_count[0] == 3
         warmup_results = [r for r in results if r["run_type"] == "warmup"]
         measurement_results = [r for r in results if r["run_type"] == "measurement"]
@@ -3331,7 +3045,6 @@ class TestExecuteGenericPowerTest:
 
         results = adapter._execute_generic_power_test(Mock(), Mock(), run_config)
 
-        # Should stop after first failed iteration
         assert call_count[0] == 1
         assert all(r["status"] == "FAILED" for r in results)
         assert any("All queries failed" in str(c) for c in mock_console.print.call_args_list)
@@ -3353,7 +3066,6 @@ class TestExecuteGenericPowerTest:
 
         adapter._execute_generic_power_test(Mock(), Mock(), run_config)
 
-        # fail_fast stops after first iteration with partial failures
         assert call_count[0] == 1
         assert any("fail_fast" in str(c) for c in mock_console.print.call_args_list)
 
@@ -3386,8 +3098,6 @@ class TestExecuteGenericPowerTest:
 
 
 class TestBuildExecutionPhasesVariants:
-    """Tests for _build_execution_phases throughput path and capture_plans."""
-
     def _make_query_results(self, n=2, status="SUCCESS"):
         return [
             {"query_id": f"Q{i}", "execution_time_seconds": float(i), "status": status, "rows_returned": 10}
@@ -3542,8 +3252,6 @@ class TestBuildExecutionPhasesVariants:
 
 
 class TestExceptionPathsForThroughputAndMaintenance:
-    """Error path tests for tpch_throughput, tpcds_maintenance, tpch_maintenance."""
-
     @patch("benchbox.platforms.base.adapter.quiet_console")
     def test_execute_tpch_throughput_test_resets_cached_result_on_exception(self, _mock_console):
         adapter = MockPlatformAdapterWithDialect()
@@ -3617,11 +3325,9 @@ class TestExceptionPathsForThroughputAndMaintenance:
 
 
 class TestDataGenerationPhaseEdgeCases:
-    """Additional edge cases for _create_enhanced_data_generation_phase."""
-
     def test_returns_none_when_benchmark_has_no_tables_attr(self):
         adapter = MockPlatformAdapter()
-        benchmark = SimpleNamespace()  # no 'tables' attribute
+        benchmark = SimpleNamespace()
 
         result = adapter._create_enhanced_data_generation_phase(benchmark)
 
@@ -3663,7 +3369,6 @@ class TestDataGenerationPhaseEdgeCases:
 
     def test_table_with_string_data_skipped(self):
         adapter = MockPlatformAdapter()
-        # String data is skipped (isinstance check: not (hasattr __iter__ and not str))
         benchmark = SimpleNamespace(tables={"t": "some_string_path"})
 
         result = adapter._create_enhanced_data_generation_phase(benchmark)
@@ -3723,8 +3428,6 @@ class TestDialectQuerySelection:
 
 
 class TestStatisticsPhase:
-    """Tests for the opt-in statistics phase (load -> statistics -> query)."""
-
     def test_gather_statistics_prefers_whole_database_analyze(self):
         adapter = MockPlatformAdapter()
         adapter.analyze_tables = Mock()
@@ -3794,16 +3497,11 @@ class TestStatisticsPhase:
         assert adapter.analyze_table.call_count == 2
 
     def test_reset_statistics_default_is_safe_noop(self):
-        """Base adapters have no generic drop-stats primitive; the default must
-        never attempt an operation that could fail or corrupt state - it just
-        reports 'unsupported' and lets the imminent rebuild reflect current data."""
         adapter = MockPlatformAdapter()
 
         assert adapter.reset_statistics(Mock(), ["a", "b"]) == "unsupported"
 
     def test_run_statistics_phase_reset_not_requested_omits_lifecycle_marker(self):
-        """Default behavior (reset=None, i.e. the knob is unused) must stay
-        byte-identical to PR #980: no stats_lifecycle marker at all."""
         adapter = MockPlatformAdapter()
         adapter.analyze_table = Mock()
 
@@ -3828,11 +3526,8 @@ class TestStatisticsPhase:
         assert phase.status == "COMPLETED"
 
     def test_run_statistics_phase_reset_true_falls_back_safely_when_unsupported(self):
-        """An engine with no drop-stats primitive must never fail the run -
-        gather_statistics() still runs and the phase completes normally."""
         adapter = MockPlatformAdapter()
         adapter.analyze_table = Mock()
-        # Base reset_statistics() default: "unsupported", no-op.
 
         phase = adapter.run_statistics_phase(
             Mock(), Mock(), benchmark_name="joinorder", table_names=["title"], reset=True
@@ -3843,8 +3538,6 @@ class TestStatisticsPhase:
         assert phase.stats_lifecycle == "unsupported"
 
     def test_run_statistics_phase_reset_hook_exception_does_not_abort_run(self):
-        """A raising reset_statistics() must never fail the whole statistics
-        phase - degrade to 'unsupported' and continue with the rebuild."""
         adapter = MockPlatformAdapter()
         adapter.analyze_table = Mock()
         adapter.reset_statistics = Mock(side_effect=RuntimeError("cannot drop stats here"))
@@ -3859,9 +3552,6 @@ class TestStatisticsPhase:
         adapter.analyze_table.assert_called_once()
 
     def test_run_statistics_phase_reset_false_records_explicit_persist_marker(self):
-        """reset=False is an explicit warm-stats request: behavior matches the
-        default, but the marker is recorded so a bundle can say the control
-        was deliberately exercised (not merely omitted)."""
         adapter = MockPlatformAdapter()
         adapter.analyze_table = Mock()
         adapter.reset_statistics = Mock()
@@ -3903,9 +3593,6 @@ class TestStatisticsPhase:
         assert phase.tables_analyzed == 2
 
     def test_run_statistics_phase_per_table_timing_unavailable_for_whole_database_analyze(self):
-        """Whole-database analyze_tables() adapters (e.g. DuckDB) have no
-        per-table granularity to report; the breakdown safely stays omitted
-        instead of being force-fabricated."""
         adapter = MockPlatformAdapter()
         adapter.analyze_tables = Mock()
 
@@ -3922,11 +3609,6 @@ class TestStatisticsPhase:
         adapter.analyze_tables.assert_called_once()
 
     def test_run_statistics_phase_per_table_timing_unavailable_when_gather_statistics_overridden(self):
-        """Adapters that override gather_statistics with platform-specific
-        routing (e.g. Redshift's auto-on-load special case) must keep deciding
-        stats_mode themselves: the per-table loop guard defers to their
-        gather_statistics and leaves per_table_ms unset, so it can never
-        double-run ANALYZE or bypass the auto-on-load attribution."""
 
         class AutoOnLoadAdapter(MockPlatformAdapter):
             def gather_statistics(self, connection, table_names):
@@ -3946,13 +3628,9 @@ class TestStatisticsPhase:
         assert phase is not None
         assert phase.per_table_ms is None
         assert phase.stats_mode == "auto-on-load"
-        # The per-table loop must not have run behind the override's back.
         adapter.analyze_table.assert_not_called()
 
     def test_run_statistics_phase_failed_build_still_records_reset_marker(self):
-        """When a reset was requested and the subsequent statistics build fails,
-        the FAILED phase must still carry the stats_lifecycle marker so a bundle
-        records which control produced the (failed) measurement."""
         adapter = MockPlatformAdapter()
         adapter.analyze_table = Mock(side_effect=RuntimeError("ANALYZE exploded"))
         adapter.reset_statistics = Mock(return_value="reset")
@@ -3988,7 +3666,6 @@ class TestStatisticsPhase:
 
         adapter.run_benchmark(mock_benchmark, gather_statistics=True, benchmark_name="tpch")
 
-        # load_data returns {"table1": 100}, so the phase analyzes exactly that table.
         adapter.analyze_table.assert_called_once()
         assert adapter.analyze_table.call_args[0][1] == "table1"
         phases = mock_benchmark.create_enhanced_benchmark_result.call_args.kwargs["phases"]
@@ -4001,10 +3678,6 @@ class TestStatisticsPhase:
     def test_run_benchmark_statistics_benchmark_name_gates_without_setting_benchmark_name(
         self, mock_benchmark, tmp_path
     ):
-        """A caller (the MCP run_benchmark tool) can gate the statistics phase via the
-        dedicated `statistics_benchmark_name` key without ever setting `benchmark_name`
-        itself - that key also drives harness routing (_resolve_benchmark_slug) and
-        must not change based on whether statistics was requested."""
         adapter = MockPlatformAdapter()
         adapter.analyze_table = Mock()
         mock_benchmark.output_dir = tmp_path
@@ -4062,9 +3735,6 @@ class TestStatisticsPhase:
         assert phases.setup.statistics_gathering is None
 
     def test_run_benchmark_threads_stats_reset_through_run_config(self, mock_benchmark, tmp_path):
-        """End-to-end: the reset/persist control travels from run_benchmark's
-        **run_config kwargs (the same path RunConfig.gather_statistics uses)
-        through to the recorded phases.statistics-equivalent phase object."""
         adapter = MockPlatformAdapter()
         adapter.analyze_table = Mock()
         adapter.reset_statistics = Mock(return_value="reset")

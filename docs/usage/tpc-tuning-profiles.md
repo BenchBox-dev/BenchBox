@@ -27,7 +27,7 @@ Each candidate records:
 
 Statuses:
 
-- `existing_baseline`: already present before the recovered TPC tuning audit
+- `existing_baseline`: part of the original checked-in tuning baseline
 - `accepted`: added from query-template evidence
 - `dropped_low_evidence`: intentionally excluded unless future evidence changes
 
@@ -38,7 +38,7 @@ checked-in template.
 
 Logical parity does not require identical physical features.
 
-Databricks guidance rechecked on 2026-05-26:
+Databricks guidance:
 
 - Liquid Clustering replaces table partitioning and ZORDER for Delta layout,
   is GA for Delta Lake on Databricks Runtime 15.2 and above, and is recommended
@@ -93,10 +93,12 @@ unsupported or waived decision. They must not be reported as fully mapped.
 | Databricks | TPC-DS | `examples/tunings/databricks/tpcds_liquid_tuned.yaml` | none | Liquid AUTO workload-intent columns folded from legacy partitioning, clustering, and distribution candidates | none | none |
 | DuckDB | TPC-DS | `examples/tunings/duckdb/tpcds_tuned.yaml` | `STORE_SALES.SS_SOLD_DATE_SK`; `STORE_RETURNS.SR_RETURNED_DATE_SK`; `CATALOG_SALES.CS_SOLD_DATE_SK`; `CATALOG_RETURNS.CR_RETURNED_DATE_SK`; `WEB_SALES.WS_SOLD_DATE_SK`; `WEB_RETURNS.WR_RETURNED_DATE_SK` | none | `STORE_SALES.SS_ITEM_SK,SS_CUSTOMER_SK,SS_STORE_SK,SS_PROMO_SK,SS_TICKET_NUMBER`; `STORE_RETURNS.SR_ITEM_SK,SR_CUSTOMER_SK,SR_STORE_SK,SR_TICKET_NUMBER`; `CATALOG_SALES.CS_ITEM_SK,CS_SHIP_MODE_SK`; `CATALOG_RETURNS.CR_ITEM_SK`; `WEB_SALES.WS_ITEM_SK,WS_WEB_PAGE_SK,WS_WEB_SITE_SK,WS_SHIP_MODE_SK`; `WEB_RETURNS.WR_ITEM_SK`; `DATE_DIM.D_DATE_SK,D_YEAR,D_MOY`; `ITEM.I_ITEM_SK,I_CATEGORY,I_CLASS`; `CUSTOMER.C_CUSTOMER_SK,C_CURRENT_ADDR_SK,C_CURRENT_CDEMO_SK` | none |
 
-The checked-in validator enforces this profile for Databricks and DuckDB:
+BenchBox checks the bundled Databricks and DuckDB templates against this
+profile during development. To check that a tuning file you have edited is
+valid, run `benchbox tuning validate`:
 
 ```bash
-uv run -- python _project/scripts/tuning_profile_check.py --benchmarks tpch,tpcds --platforms databricks,duckdb --strict
+benchbox tuning validate examples/tunings/duckdb/tpch_tuned.yaml --platform duckdb
 ```
 
 ## Result Metadata
@@ -136,10 +138,10 @@ Current Databricks defaults preserve the legacy `*_tuned.yaml` Z-ORDER rendering
 Use `*_liquid_tuned.yaml` to request Liquid AUTO by passing the template as an explicit path (there is no `liquid` keyword; `--tuning tuned` only resolves `<benchmark>_tuned.yaml`):
 
 ```bash
-# Source checkout only: examples/ is not installed with the package, and the
-# packaged templates ship Z-ORDER renderings, not the Liquid variants.
 benchbox run --platform databricks --benchmark tpch --tuning examples/tunings/databricks/tpch_liquid_tuned.yaml
 ```
+
+This command works from a source checkout only: `examples/` is not installed with the package, and the packaged templates ship Z-ORDER renderings, not the Liquid variants.
 
 Liquid templates must not enable ZORDER or carry per-table `partitioning` or
 per-table `distribution` fields; partition and ZORDER-era candidates are folded

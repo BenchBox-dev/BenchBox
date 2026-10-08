@@ -26,10 +26,8 @@ BenchBox supports **two modes** for benchmarking Polars:
 ## Installation
 
 ```bash
-# Install Polars
 pip install polars
 
-# Or with all optional dependencies
 pip install "polars[all]"
 ```
 
@@ -37,11 +35,11 @@ pip install "polars[all]"
 
 ### CLI Options
 
+SQL mode (`polars`) executes queries via Polars `SQLContext`. DataFrame mode (`polars-df`) executes queries via the native expression API:
+
 ```bash
-# SQL Mode - queries executed via Polars SQLContext
 benchbox run --platform polars --benchmark tpch --scale 0.1
 
-# DataFrame Mode - queries executed via native expression API
 benchbox run --platform polars-df --benchmark tpch --scale 0.1
 ```
 
@@ -80,22 +78,22 @@ revert a manually-installed version and how to work around it.
 
 ### Basic Benchmark Run
 
+Run TPC-H using SQL queries (`polars`) or using native expressions (`polars-df`):
+
 ```bash
-# SQL Mode - Run TPC-H using SQL queries
 benchbox run --platform polars --benchmark tpch --scale 0.1
 
-# DataFrame Mode - Run TPC-H using native expressions
 benchbox run --platform polars-df --benchmark tpch --scale 0.1
 ```
 
 ### Compare SQL vs DataFrame Performance
 
+Run the same benchmark through both execution paradigms, then compare the results:
+
 ```bash
-# Same benchmark, different execution paradigms
 benchbox run --platform polars --benchmark tpch --scale 1 --output ./polars-sql
 benchbox run --platform polars-df --benchmark tpch --scale 1 --output ./polars-df
 
-# Compare results
 benchbox compare ./polars-sql ./polars-df
 ```
 
@@ -105,10 +103,8 @@ benchbox compare ./polars-sql ./polars-df
 from benchbox import TPCH
 from benchbox.platforms.polars_platform import PolarsAdapter
 
-# Initialize adapter
 adapter = PolarsAdapter()
 
-# Load and run benchmark
 benchmark = TPCH(scale_factor=0.1)
 benchmark.generate_data()
 adapter.load_benchmark(benchmark)
@@ -121,15 +117,12 @@ results = adapter.run_benchmark(benchmark)
 import polars as pl
 from benchbox import TPCH
 
-# Generate benchmark data
 tpch = TPCH(scale_factor=0.1)
 tpch.generate_data()
 
-# Load data into Polars
 lineitem = pl.scan_csv(tpch.tables["lineitem"], separator="|")
 orders = pl.scan_csv(tpch.tables["orders"], separator="|")
 
-# Run SQL query
 ctx = pl.SQLContext()
 ctx.register("lineitem", lineitem)
 ctx.register("orders", orders)
@@ -151,15 +144,16 @@ print(result)
 Lazy execution builds a query plan and optimizes before execution:
 
 ```python
-# Polars optimizes the entire query plan
 df = (
     pl.scan_csv("lineitem.csv")
     .filter(pl.col("l_quantity") > 10)
     .group_by("l_returnflag")
     .agg(pl.sum("l_quantity"))
-    .collect()  # Execute the optimized plan
+    .collect()
 )
 ```
+
+Polars optimizes the entire query plan, and `.collect()` executes the optimized plan.
 
 Optimizations include:
 - Predicate pushdown
@@ -231,8 +225,9 @@ adapter = PolarsAdapter(streaming=True)
 
 ### Memory Errors
 
+Enable streaming for large datasets:
+
 ```python
-# Enable streaming for large datasets
 adapter = PolarsAdapter(streaming=True)
 ```
 
@@ -241,7 +236,6 @@ adapter = PolarsAdapter(streaming=True)
 Polars SQL supports a subset of SQL. For unsupported features, use the DataFrame API:
 
 ```python
-# Instead of unsupported SQL, use DataFrame API
 result = (
     df.filter(pl.col("column") > 10)
     .group_by("category")
@@ -252,7 +246,6 @@ result = (
 ### Thread Configuration
 
 ```python
-# Limit thread usage
 import polars as pl
 pl.Config.set_global_string_cache()
 ```
@@ -267,8 +260,9 @@ The `polars-df` platform executes TPC-H queries using Polars' native expression 
 
 ### Expression API Example
 
+TPC-H Q1 implemented with Polars expressions:
+
 ```python
-# TPC-H Q1 implemented with Polars expressions
 result = (
     lineitem.filter(col("l_shipdate") <= lit(cutoff_date))
     .group_by("l_returnflag", "l_linestatus")
@@ -293,8 +287,9 @@ result = (
 
 ### Streaming Mode for Large Data
 
+Enable streaming for datasets larger than memory:
+
 ```bash
-# Enable streaming for datasets larger than memory
 benchbox run --platform polars-df --benchmark tpch --scale 100 \
   --platform-option streaming=true
 ```

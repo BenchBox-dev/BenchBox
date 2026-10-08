@@ -1,6 +1,6 @@
-"""Unit tests for benchbox/platforms/base/ddl_helpers.py."""
-
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 
@@ -10,10 +10,7 @@ pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
 ]
-
-# ---------------------------------------------------------------------------
-# strip_with_properties
-# ---------------------------------------------------------------------------
+_REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 class TestStripWithProperties:
@@ -22,7 +19,7 @@ class TestStripWithProperties:
         assert strip_with_properties(sql) == "CREATE TABLE t (a INT)"
 
     def test_nested_function_in_with(self):
-        """bucket(x, 16) contains a ) that a naive [^)]* regex would stop at."""
+
         sql = "CREATE TABLE t (a INT) WITH (partitioning = ARRAY['bucket(x, 16)'])"
         assert strip_with_properties(sql) == "CREATE TABLE t (a INT)"
 
@@ -39,7 +36,7 @@ class TestStripWithProperties:
         assert strip_with_properties(sql) == sql
 
     def test_with_inside_column_default_untouched(self):
-        """WITH appearing inside the column list (e.g. DEFAULT) must not be stripped."""
+
         sql = "CREATE TABLE t (a INT DEFAULT (now()), b TEXT) ENGINE = MergeTree()"
         assert strip_with_properties(sql) == sql
 
@@ -65,11 +62,6 @@ class TestStripWithProperties:
         assert strip_with_properties(sql) == "CREATE TABLE orders (o_id BIGINT, o_date DATE)"
 
 
-# ---------------------------------------------------------------------------
-# strip_primary_keys
-# ---------------------------------------------------------------------------
-
-
 class TestStripPrimaryKeys:
     def test_simple_table_level_pk(self):
         sql = "CREATE TABLE t (a INT, b INT, PRIMARY KEY (a))"
@@ -78,7 +70,7 @@ class TestStripPrimaryKeys:
         assert "a INT" in result
 
     def test_composite_pk_with_expression(self):
-        """PRIMARY KEY ("a", coalesce(b, 0)) — [^)]* stops at first ) in coalesce."""
+
         sql = 'CREATE TABLE t (a TEXT, b INT, PRIMARY KEY ("a", coalesce(b, 0)))'
         result = strip_primary_keys(sql)
         assert "PRIMARY KEY" not in result.upper()
@@ -124,7 +116,7 @@ class TestStripPrimaryKeys:
         assert ",)" not in result
 
     def test_pk_with_leading_comma_cleaned(self):
-        """Leading comma from the preceding column should also be stripped."""
+
         sql = "CREATE TABLE t (a INT, PRIMARY KEY (a))"
         result = strip_primary_keys(sql)
         assert "PRIMARY KEY" not in result.upper()
@@ -135,13 +127,10 @@ class TestStripPrimaryKeys:
         result = strip_primary_keys(sql)
         assert result == "CREATE TABLE t (a INT)"
 
-    def test_comment_literal_primary_key_limitation_is_documented(self):
-        assert "string-literal false positive" in (strip_primary_keys.__doc__ or "")
-
-
-# ---------------------------------------------------------------------------
-# strip_foreign_keys (regression — ensure w4 fix still holds)
-# ---------------------------------------------------------------------------
+    def test_primary_key_helper_input_constraint_is_in_compat_reference(self):
+        reference = (_REPO_ROOT / "benchbox" / "sql_compat" / "README.md").read_text(encoding="utf-8")
+        assert "not SQL string-literal parsers" in reference
+        assert "Callers must apply them only to schema statements" in reference
 
 
 class TestStripForeignKeys:

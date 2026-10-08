@@ -1,11 +1,6 @@
-"""Visualization tools for BenchBox MCP server.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides tools for generating ASCII charts and visualizations from benchmark results.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -81,7 +76,6 @@ MCP_GENERATE_CHART_DESCRIPTION = (
     "MCP output is inline-only: file output and non-ASCII formats are rejected."
 )
 
-# Tool annotations for read-only visualization info tools
 VIZ_READONLY_ANNOTATIONS = ToolAnnotations(
     title="Visualization information",
     read_only_hint=True,
@@ -90,7 +84,6 @@ VIZ_READONLY_ANNOTATIONS = ToolAnnotations(
     open_world_hint=False,
 )
 
-# Tool annotations for inline chart generation
 VIZ_GENERATE_ANNOTATIONS = ToolAnnotations(
     title="Generate inline visualization",
     read_only_hint=True,
@@ -106,10 +99,6 @@ def _generate_ascii_chart(
     file_list: list[str],
     template_name: str | None = None,
 ) -> dict[str, Any]:
-    """Generate ASCII chart from result files.
-
-    Returns chart content as inline string.
-    """
     from benchbox.core.visualization.ascii_api import ChartOptions
     from benchbox.core.visualization.result_plotter import ResultPlotter
 
@@ -215,10 +204,6 @@ def _resolve_and_validate_result_files(
     file_list: list[str],
     results_dir: Path,
 ) -> dict[str, Any] | tuple[list[Path], list[str]]:
-    """Resolve result file paths and validate they exist.
-
-    Returns either an error dict or a tuple of (resolved_paths, file_list).
-    """
     resolved_paths: list[Path] = []
     missing_files: list[str] = []
 
@@ -243,18 +228,15 @@ def _resolve_and_validate_result_files(
 
 
 def _build_chart_suggestions(results: list) -> list[dict[str, str]]:
-    """Build chart type suggestions based on result data characteristics."""
     return [recommendation.as_dict() for recommendation in recommend_charts(results)]
 
 
 def _select_primary_chart(results: list) -> dict[str, str]:
-    """Select the primary recommended chart type based on result characteristics."""
     recommendation = select_primary_chart(results)
     return {"chart_type": recommendation.chart_type, "reason": recommendation.reason}
 
 
 def _suggest_charts_impl(file_list: list[str], resolved_paths: list[Path]) -> dict[str, Any]:
-    """Core implementation for the suggest_charts tool."""
     from benchbox.core.visualization.exceptions import VisualizationError
     from benchbox.core.visualization.result_plotter import ResultPlotter
 
@@ -295,8 +277,6 @@ def _generate_chart_impl(
     chart_type: str,
     template: str | None,
 ) -> dict[str, Any]:
-    """Core implementation for the generate_chart tool."""
-    # Validate chart type if no template
     if template is None and chart_type not in CHART_TYPE_DESCRIPTIONS:
         return make_error(
             ErrorCode.VALIDATION_ERROR,
@@ -304,7 +284,6 @@ def _generate_chart_impl(
             details={"valid_chart_types": list(CHART_TYPE_DESCRIPTIONS.keys())},
         )
 
-    # Validate template if provided
     if template is not None:
         from benchbox.core.visualization.templates import get_template, list_templates
 
@@ -327,18 +306,9 @@ def register_visualization_tools(
     results_dir: PathProvider,
     charts_dir: PathProvider,
 ) -> None:
-    """Register visualization tools with the MCP server."""
 
     @mcp.tool(description=MCP_SUGGEST_CHARTS_DESCRIPTION, annotations=VIZ_READONLY_ANNOTATIONS)
     def suggest_charts(result_files: str) -> dict[str, Any]:
-        """Analyze results and suggest appropriate chart types.
-
-        Args:
-            result_files: Comma-separated list of result filenames
-
-        Returns:
-            Chart suggestions with data profile and primary recommendation.
-        """
         file_list = [f.strip() for f in result_files.split(",") if f.strip()]
         if not file_list:
             return make_error(
@@ -362,32 +332,6 @@ def register_visualization_tools(
         output_dir: str | None = None,
         format: str = "ascii",
     ) -> dict[str, Any]:
-        """Generate chart(s) from benchmark results.
-
-        Args:
-            result_files: Comma-separated list of result filenames
-            chart_type: Semantic BenchBox chart ID from CHART_TYPE_DESCRIPTIONS
-            template: Template name from benchbox.core.visualization.templates
-            output_dir: Custom output directory (relative to charts dir)
-            format: Output format: 'ascii' for terminal-friendly text output
-
-        Returns:
-            Chart generation status with ASCII chart content if format='ascii'.
-
-        ASCII Format Examples:
-            - Single chart: generate_chart(result_files="run1.json", chart_type="performance_bar", format="ascii")
-            - Template: generate_chart(result_files="run1.json,run2.json", template="head_to_head", format="ascii")
-            - Comparison: generate_chart(result_files="duckdb.json,polars.json", chart_type="query_heatmap", format="ascii")
-
-        ASCII charts are rendered inline and returned in the 'content' field. They include:
-            - Unicode box-drawing characters for clean visualization
-            - Best/worst highlighting, legends, and scale indicators
-
-        Output is deliberately ANSI-color-free. MCP responses are protocol
-        payloads consumed by non-terminal clients, where escape sequences are
-        noise rather than formatting, so the renderer is always constructed with
-        ``ChartOptions(use_color=False)``.
-        """
         file_list = [f.strip() for f in result_files.split(",") if f.strip()]
         if not file_list:
             return make_error(
@@ -409,7 +353,7 @@ def register_visualization_tools(
                 details={"output_mode": "inline", "supported_formats": ["ascii"]},
             )
 
-        resolve_path_provider(charts_dir)  # Validate the configured provider without accepting a caller path.
+        resolve_path_provider(charts_dir)
         result = _resolve_and_validate_result_files(file_list, resolve_path_provider(results_dir))
         if isinstance(result, dict):
             return result

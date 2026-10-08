@@ -1,16 +1,3 @@
-"""Run modes, phases, and export formats must mean the same thing everywhere.
-
-These value sets were literals in two or more places and had already drifted:
-`--mode` accepted {sql, dataframe} while MCP accepted {sql, dataframe,
-data_only}; the seven-phase list was written twice inside the CLI and validated
-nowhere in MCP; the export formats were duplicated with two different lengths
-inside one MCP module.
-
-Following the item's anti-pattern note, these tests import the live objects --
-the Click `Choice`, the MCP enum, the core tuple -- and compare sets. They do
-not grep source files for literals.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -33,7 +20,6 @@ pytestmark = [
 
 
 def _click_option_choices(command, option_name: str) -> set[str]:
-    """Return the live Click Choice values for one option."""
     for param in command.params:
         if option_name in param.opts:
             return set(param.type.choices)
@@ -53,21 +39,17 @@ class TestRunModeParity:
         assert set(MCP_MODE_CHOICES) - set(RUN_MODES) == {"data_only"}
 
     def test_data_only_is_an_execution_type_not_a_run_mode(self):
-        """The ratified split: RUN_MODES is a platform capability."""
         assert "data_only" not in RUN_MODES
         assert "data_only" in EXECUTION_TYPES
 
     def test_every_run_mode_is_a_platform_capability(self):
         from benchbox.core.platform_registry import PlatformRegistry
 
-        # supports_mode is the CLI's validation gate; it must understand every
-        # value the CLI is willing to accept.
         for mode in RUN_MODES:
             assert isinstance(PlatformRegistry.supports_mode("duckdb", mode), bool)
 
     @pytest.mark.parametrize("alias", MCP_DATA_ONLY_ALIASES)
     def test_mcp_still_accepts_its_data_only_aliases(self, alias: str):
-        """Removing an accepted value would be a breaking surface change."""
         from benchbox.mcp.schemas import validate_mode
 
         assert validate_mode(alias) == "data_only"
@@ -87,7 +69,6 @@ class TestRunModeParity:
 
 class TestPhaseParity:
     def test_phase_list_is_defined_once(self):
-        """Both CLI validators now read the same tuple."""
         from benchbox.cli.benchmarks import VALID_PHASES as interactive_phases
         from benchbox.cli.commands.run import VALID_PHASES as run_phases
 

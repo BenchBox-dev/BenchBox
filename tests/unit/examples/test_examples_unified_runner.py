@@ -1,9 +1,6 @@
-"""Tests for the unified multi-platform benchmark runner.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import subprocess
 import sys
@@ -34,7 +31,7 @@ _dummy_cli_main.setup_verbose_logging = lambda level, quiet=False: (
         quiet=quiet,
     ),
 )
-_dummy_cli_main.main = lambda: None  # Required by benchbox.cli.__init__
+_dummy_cli_main.main = lambda: None
 
 _dummy_commands = types.ModuleType("benchbox.cli.commands")
 
@@ -65,27 +62,21 @@ sys.modules.setdefault("benchbox.cli.main", _dummy_cli_main)
 sys.modules.setdefault("benchbox.cli.commands", _dummy_commands)
 sys.modules.setdefault("benchbox.cli.commands.platform", types.ModuleType("benchbox.cli.commands.platform"))
 
-# Include the examples directory to the path so we can import the unified runner
 examples_dir = Path(__file__).parent.parent.parent.parent / "examples"
 sys.path.insert(0, str(examples_dir))
-import unified_runner  # noqa: E402
+import unified_runner
 
 from benchbox.core.schemas import BenchmarkConfig, DatabaseConfig
 
 
 class TestUnifiedRunner:
-    """Test suite for the unified runner functionality."""
-
     def test_benchmark_classes_available(self):
-        """Core benchmarks should always be loaded; optional ones are best-effort."""
 
         available = unified_runner._get_benchmark_name_map()
 
-        # Core benchmarks
         assert "tpch" in available
         assert "tpcds" in available
 
-        # Optional benchmarks may be skipped if optional dependencies are missing
         optional = {
             "tpcdi",
             "ssb",
@@ -103,13 +94,11 @@ class TestUnifiedRunner:
         assert set(missing_optional).issubset(optional)
 
     def test_extract_platform_handles_equals_style(self):
-        """`--platform=value` should be recognised when building the parser."""
 
         with patch("unified_runner.sys.argv", ["unified_runner.py", "--platform=duckdb"]):
             assert unified_runner.extract_platform_from_argv() == "duckdb"
 
     def test_parser_does_not_require_platform_for_list_commands(self):
-        """Programmatic parser usage can omit required args when listing."""
 
         with patch("unified_runner.sys.argv", ["unified_runner.py"]):
             parser = unified_runner.create_base_parser()
@@ -121,36 +110,32 @@ class TestUnifiedRunner:
 
     @patch("benchbox.core.platform_registry.PlatformRegistry.get_platform_availability")
     def test_list_platforms_functionality(self, mock_get_availability):
-        """Test --list-platforms functionality."""
+
         mock_get_availability.return_value = {
             "duckdb": True,
             "databricks": False,
             "clickhouse": True,
         }
 
-        # Test that main returns 0 when --list-platforms is used
         with patch("sys.argv", ["unified_runner.py", "--list-platforms"]):
             with patch("benchbox.core.results.display.emit") as mock_emit:
                 result = unified_runner.main()
                 assert result == 0
-                # Check that platform information is printed
                 assert any("duckdb" in str(call) for call in mock_emit.call_args_list)
 
     def test_list_benchmarks_functionality(self):
-        """Test --list-benchmarks functionality."""
-        # Test that main returns 0 when --list-benchmarks is used
+
         with patch("sys.argv", ["unified_runner.py", "--list-benchmarks"]):
             with patch("benchbox.core.results.display.emit") as mock_emit:
                 result = unified_runner.main()
                 assert result == 0
-                # Check that benchmark information is printed
                 calls = [str(call) for call in mock_emit.call_args_list]
                 assert any("tpch" in call for call in calls)
                 assert any("tpcds" in call for call in calls)
                 assert any("Available benchmarks" in call for call in calls)
 
     def test_auto_detect_databricks_config_no_sdk(self):
-        """Test Databricks auto-detection when SDK is not available."""
+
         from benchbox.platforms.databricks import DatabricksAdapter
 
         with patch("benchbox.platforms.databricks.DatabricksAdapter._auto_detect_databricks_config") as mock_detect:
@@ -159,7 +144,7 @@ class TestUnifiedRunner:
             assert result is None
 
     def test_auto_detect_databricks_config_with_sdk(self):
-        """Test Databricks auto-detection when SDK is available."""
+
         from benchbox.platforms.databricks import DatabricksAdapter
 
         with patch("benchbox.platforms.databricks.DatabricksAdapter._auto_detect_databricks_config") as mock_detect:
@@ -173,7 +158,7 @@ class TestUnifiedRunner:
             assert "server_hostname" in result
 
     def test_get_platform_adapter_config_duckdb(self):
-        """Test DuckDB platform adapter configuration."""
+
         args = Namespace(
             benchmark="tpch",
             scale=0.01,
@@ -197,7 +182,7 @@ class TestUnifiedRunner:
                 assert not config["force_recreate"]
 
     def test_get_platform_adapter_config_databricks(self):
-        """Test Databricks platform adapter configuration."""
+
         args = Namespace(
             server_hostname="test.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -216,11 +201,10 @@ class TestUnifiedRunner:
         assert config["http_path"] == "/sql/1.0/warehouses/test"
         assert config["access_token"] == "test_token"
         assert config["catalog"] == "workspace"
-        # Schema is now generated based on benchmark characteristics
         assert "tpch" in config["schema"]
 
     def test_get_platform_adapter_config_clickhouse(self):
-        """Test ClickHouse platform adapter configuration."""
+
         args = Namespace(
             mode="local",
             data_path="/custom/path",
@@ -234,7 +218,7 @@ class TestUnifiedRunner:
         assert config["data_path"] == "/custom/path"
 
     def test_get_benchmark_config(self):
-        """Test benchmark configuration generation."""
+
         args = Namespace(
             scale=1.0,
             verbose=2,
@@ -250,14 +234,14 @@ class TestUnifiedRunner:
             config = unified_runner.get_benchmark_config(args, "duckdb")
 
             assert config["scale_factor"] == 1.0
-            assert config["verbose"]  # verbose > 1
+            assert config["verbose"]
             assert config["force_regenerate"]
             assert config["compress_data"]
             assert config["compression_type"] == "zstd"
             assert "output_dir" in config
 
     def test_console_summary_data(self):
-        """Test console summary data preparation using current helper."""
+
         results = MagicMock()
         results.successful_queries = 22
         results.total_queries = 22
@@ -279,7 +263,7 @@ class TestUnifiedRunner:
         assert result_data["average_query_time"] == 5.5
 
     def test_display_results(self, capsys):
-        """Test result display functionality."""
+
         result_data = {
             "benchmark": "tpch",
             "scale_factor": 0.1,
@@ -305,16 +289,14 @@ class TestUnifiedRunner:
         assert "✅ TPCH benchmark completed!" in captured.out
 
     def test_create_platform_specific_args_duckdb(self):
-        """Test creation of DuckDB-specific arguments via registry."""
+
         import argparse
 
         from benchbox.core.platform_registry import PlatformRegistry
 
         parser = argparse.ArgumentParser()
-        # Use the real registry method to add arguments
         PlatformRegistry.add_platform_arguments(parser, "duckdb")
 
-        # Parse a test command to verify arguments were added
         args = parser.parse_args(["--duckdb-database-path", "/test/path", "--memory-limit", "8GB"])
         assert args.duckdb_database_path == "/test/path"
         assert args.memory_limit == "8GB"
@@ -322,7 +304,7 @@ class TestUnifiedRunner:
     @patch("unified_runner.PlatformRegistry.create_adapter")
     @patch("unified_runner.list_available_platforms")
     def test_main_dry_run_mode(self, mock_list_platforms, mock_create_adapter, tmp_path):
-        """Test main function in dry-run mode."""
+
         mock_list_platforms.return_value = {"duckdb": True}
 
         dry_run_dir = tmp_path / "dry"
@@ -356,7 +338,7 @@ class TestUnifiedRunner:
 
     @patch("unified_runner.list_available_platforms")
     def test_main_unavailable_platform(self, mock_list_platforms):
-        """Test main function with unavailable platform."""
+
         mock_list_platforms.return_value = {"duckdb": False}
 
         test_args = ["unified_runner.py", "--platform", "duckdb", "--benchmark", "tpch"]
@@ -367,7 +349,6 @@ class TestUnifiedRunner:
 
     @patch("unified_runner.list_available_platforms")
     def test_quiet_mode_restores_state(self, mock_list_platforms, tmp_path):
-        """Quiet mode should not leave the global quiet flag toggled."""
 
         from benchbox.utils.printing import is_quiet, set_quiet
 
@@ -404,7 +385,7 @@ class TestUnifiedRunner:
         assert is_quiet() == previous_state
 
     def test_phase_validation(self):
-        """Test that phase validation works correctly."""
+
         valid_phases = [
             "generate",
             "load",
@@ -414,19 +395,16 @@ class TestUnifiedRunner:
             "maintenance",
         ]
 
-        # Test valid phases
         for phase in valid_phases:
             user_phases = [p.strip() for p in phase.split(",") if p.strip()]
             assert all(p in valid_phases for p in user_phases)
 
-        # Test invalid phase should fail
         invalid_phases = ["invalid", "test", "wrong"]
         for phase in invalid_phases:
             user_phases = [p.strip() for p in phase.split(",") if p.strip()]
             assert any(p not in valid_phases for p in user_phases)
 
     def test_determine_test_execution_type_handles_data_only(self):
-        """Ensure helper reports data-only and load-only modes correctly."""
 
         assert unified_runner._determine_test_execution_type(["generate"]) == "data_only"
         assert unified_runner._determine_test_execution_type(["load"]) == "load_only"
@@ -449,7 +427,6 @@ class TestUnifiedRunner:
         mock_profiler,
         mock_export_result,
     ):
-        """Main execution should delegate to run_benchmark_lifecycle for orchestrated runs."""
 
         mock_list_platforms.return_value = {"duckdb": True}
         mock_merge_configs.return_value = {
@@ -531,7 +508,6 @@ class TestUnifiedRunner:
         mock_profiler,
         mock_export_result,
     ):
-        """Multi-phase executions should invoke the lifecycle once per query phase."""
 
         mock_list_platforms.return_value = {"duckdb": True}
         mock_merge_configs.return_value = {
@@ -615,7 +591,6 @@ class TestUnifiedRunner:
         mock_profiler,
         mock_export_result,
     ):
-        """Data-only mode should avoid creating adapters and run lifecycle once."""
 
         mock_merge_configs.return_value = {
             "platform": "duckdb",
@@ -677,7 +652,6 @@ class TestUnifiedRunner:
         mock_profiler,
         mock_export_result,
     ):
-        """Load-only mode should invoke lifecycle once with load_only execution type."""
 
         mock_merge_configs.return_value = {
             "platform": "duckdb",
@@ -744,7 +718,6 @@ class TestUnifiedRunner:
         mock_profiler,
         mock_export_result,
     ):
-        """Validation failures should force a non-zero exit code."""
 
         mock_merge_configs.return_value = {
             "platform": "duckdb",
@@ -792,7 +765,6 @@ class TestUnifiedRunner:
         assert mock_export_result.call_count == 1
 
     def test_empty_phases_produces_error(self):
-        """Passing an empty --phases value should exit with a parsing error."""
 
         with (
             patch("unified_runner.list_available_platforms", return_value={"duckdb": True}),
@@ -817,10 +789,8 @@ class TestUnifiedRunner:
 
 @pytest.mark.integration
 class TestUnifiedRunnerIntegration:
-    """Integration tests for the unified runner (requires actual execution)."""
-
     def test_unified_runner_help(self):
-        """Test that unified runner help works."""
+
         script_path = examples_dir / "unified_runner.py"
         result = subprocess.run([sys.executable, str(script_path), "--help"], capture_output=True, text=True)
 
@@ -830,7 +800,7 @@ class TestUnifiedRunnerIntegration:
         assert "--benchmark" in result.stdout
 
     def test_unified_runner_list_platforms(self):
-        """Test that --list-platforms works."""
+
         script_path = examples_dir / "unified_runner.py"
         result = subprocess.run(
             [sys.executable, str(script_path), "--list-platforms"],

@@ -1,11 +1,3 @@
-"""Row-shape hardening for get_query_plan (query-plan-capture-parser-live-validation w3).
-
-Drivers chunk EXPLAIN output differently (single row vs one row per line vs
-fragmented JSON; decoded dict cells; bytes; None padding). These tests pin
-``join_explain_rows`` and the adapter call sites to identical plan text for
-every shape, so a future driver change cannot silently zero out capture.
-"""
-
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -59,8 +51,7 @@ class TestJoinExplainRows:
         assert join_explain_rows([_Row(), ("line B",)]) == "line A\nline B"
 
     def test_single_key_dict_row_yields_its_value(self):
-        # RealDictCursor-style single-column row: the value is the plan text,
-        # mirroring first-column semantics — not the serialized mapping.
+
         assert join_explain_rows([{"QUERY PLAN": "Seq Scan on t"}]) == "Seq Scan on t"
 
     def test_multi_key_dict_row_serializes_defensively(self):
@@ -164,7 +155,7 @@ class TestAdapterRowShapes:
         assert per_line == single
 
     def test_databricks_empty_returns_none(self, monkeypatch):
-        # Databricks' historical contract: empty output is None (not "").
+
         monkeypatch.setattr("benchbox.platforms.databricks.adapter.databricks", MagicMock(), raising=False)
         from benchbox.platforms.databricks.adapter import DatabricksAdapter
 
@@ -172,9 +163,7 @@ class TestAdapterRowShapes:
         assert adapter.get_query_plan(_FakeConn([]), "SELECT 1") is None
 
     def test_cursor_helper_empty_returns_empty_string(self):
-        # The shared cursor helper preserves the historical "" contract its
-        # DBAPI consumers (Athena, Presto/Trino, Firebolt, Synapse, ...) always
-        # had: only failures yield None.
+
         from benchbox.platforms.base.sql_execution import get_query_plan_from_cursor
 
         assert get_query_plan_from_cursor(_FakeConn([]), "SELECT 1") == ""

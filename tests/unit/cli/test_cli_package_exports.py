@@ -1,9 +1,6 @@
-"""Unit tests for benchbox.cli package exports.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -27,10 +24,6 @@ pytestmark = [
     ],
 )
 def test_public_reexports_accessible_from_benchbox(symbol: str, expected_type: str) -> None:
-    """Public API symbols must be importable from the top-level benchbox package."""
-    # Pre-load benchmark_suite to break the dataframe_queries ↔ benchmark_suite
-    # circular import.  At MCP server runtime these modules are already loaded;
-    # in an isolated test they may not be.
     importlib.import_module("benchbox.core.dataframe.benchmark_suite")
 
     benchbox = importlib.import_module("benchbox")
@@ -43,7 +36,6 @@ _EXPERIMENTAL_SUBSYSTEMS = {"nl2sql", "aiml_functions", "multiregion", "gpu", "l
 
 
 def test_experimental_modules_not_in_benchmark_registry() -> None:
-    """Experimental subsystems must not appear in the public benchmark registry or __all__."""
     import benchbox
 
     registry_modules = {spec.module for spec in benchbox._BENCHMARK_REGISTRY.values()}
@@ -56,7 +48,6 @@ def test_experimental_modules_not_in_benchmark_registry() -> None:
 
 
 def test_benchmarks_submodule_remains_available_as_package_attribute(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Accessing ``benchbox.cli.benchmarks`` should import the real submodule once."""
     monkeypatch.delitem(sys.modules, "benchbox.cli.benchmarks", raising=False)
     monkeypatch.delitem(sys.modules, "benchbox.cli", raising=False)
 

@@ -1,12 +1,6 @@
-"""Generate ASCII charts from comparison results.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides a shared helper for the ``--generate-charts`` CLI flag used by
-``benchbox compare`` and ``benchbox compare-dataframes``.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -19,7 +13,6 @@ from benchbox.core.visualization.result_plotter import NormalizedQuery, Normaliz
 
 logger = logging.getLogger(__name__)
 
-# Chart types generated for comparison output
 _COMPARISON_CHART_TYPES = ("performance_bar", "distribution_box", "query_heatmap")
 
 
@@ -28,16 +21,6 @@ def generate_comparison_charts(
     output_dir: str | Path,
     theme: str = "light",
 ) -> dict[str, Path]:
-    """Render ASCII charts from normalized results and export to text files.
-
-    Args:
-        results: Normalized comparison results (one per platform).
-        output_dir: Directory to write chart ``.txt`` files into.
-        theme: Color theme (``"light"`` or ``"dark"``).
-
-    Returns:
-        Mapping of chart type to exported file path.
-    """
     from benchbox.core.visualization.ascii_api import ChartOptions, render_ascii_chart_from_results
     from benchbox.core.visualization.utils import extract_chart_subtitle
 
@@ -60,11 +43,6 @@ def generate_comparison_charts(
 def normalized_from_unified(
     results: Any,
 ) -> list[NormalizedResult]:
-    """Convert ``UnifiedPlatformResult`` objects to ``NormalizedResult``.
-
-    Args:
-        results: List of :class:`UnifiedPlatformResult` instances.
-    """
     normalized: list[NormalizedResult] = []
     for r in results:
         queries = [
@@ -97,11 +75,6 @@ def normalized_from_unified(
 def normalized_from_dataframe(
     results: Any,
 ) -> list[NormalizedResult]:
-    """Convert ``PlatformBenchmarkResult`` objects to ``NormalizedResult``.
-
-    Args:
-        results: List of :class:`PlatformBenchmarkResult` instances.
-    """
     normalized: list[NormalizedResult] = []
     for r in results:
         queries = [
@@ -134,14 +107,6 @@ def normalized_from_dataframe(
 def normalized_from_sql_vs_df(
     summary: Any,
 ) -> list[NormalizedResult]:
-    """Convert ``SQLVsDataFrameSummary`` to ``NormalizedResult`` pair.
-
-    Creates two NormalizedResult entries - one for the SQL platform and one
-    for the DataFrame platform - so that standard chart types work.
-
-    Args:
-        summary: A :class:`SQLVsDataFrameSummary` instance.
-    """
     sql_queries: list[NormalizedQuery] = []
     df_queries: list[NormalizedQuery] = []
     sql_total = 0.0

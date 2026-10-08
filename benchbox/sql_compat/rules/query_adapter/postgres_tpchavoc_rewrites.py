@@ -1,5 +1,3 @@
-"""Document PostgreSQL-family TPC-Havoc query rewrites."""
-
 from __future__ import annotations
 
 from benchbox.core.tpchavoc.dialect_compat import (

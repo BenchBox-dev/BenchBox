@@ -1,5 +1,3 @@
-"""Multi-worker durable MCP admission-control coverage."""
-
 from __future__ import annotations
 
 from pathlib import Path

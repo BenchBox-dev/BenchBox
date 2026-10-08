@@ -1,7 +1,3 @@
-"""
-Core database-agnostic connection wrapper and protocols.
-"""
-
 import logging
 from typing import Any, Optional, Protocol, Union
 
@@ -27,12 +23,10 @@ class DBConnection(Protocol):
 
 
 class DatabaseError(Exception):
-    """Custom exception for database-related errors."""
+    pass
 
 
 class DatabaseConnection:
-    """Database-agnostic wrapper around DB-API 2.0 connections."""
-
     def __init__(self, connection: DBConnection, dialect: Optional[str] = None) -> None:
         if connection is None:
             raise TypeError("Connection object cannot be None")
@@ -52,7 +46,6 @@ class DatabaseConnection:
         if not query or not str(query).strip():
             raise ValueError("Query cannot be empty or None")
 
-        # Prepare truncated message for logging
         snippet = str(query).strip().replace("\n", " ") if query else ""
         truncated = (snippet[:100] + "...") if len(snippet) > 100 else (snippet + ("..." if snippet else ""))
 
@@ -60,9 +53,9 @@ class DatabaseConnection:
             if hasattr(self.connection, "execute"):
                 logger.debug(f"Executing query with direct execute method: {truncated}")
                 if parameters is None:
-                    self.cursor = self.connection.execute(query)  # type: ignore[call-non-callable]
+                    self.cursor = self.connection.execute(query)
                 else:
-                    self.cursor = self.connection.execute(query, parameters)  # type: ignore[call-non-callable]
+                    self.cursor = self.connection.execute(query, parameters)
                 return self.cursor
 
             if hasattr(self.connection, "cursor"):
@@ -77,12 +70,10 @@ class DatabaseConnection:
 
             raise ValueError("Connection object has neither 'execute' nor 'cursor' method")
         except Exception as e:
-            # Compose a stable, diagnostic-rich error message.
             base = "Error executing query"
             if self.dialect:
                 base += f" (dialect: {self.dialect})"
             error_msg = f"{base}: {e}"
-            # Optionally include the query snippet for additional context
             if snippet:
                 error_msg += f" | Query: {snippet if len(snippet) <= 120 else snippet[:120] + '...'}"
             logger.error(error_msg)
@@ -159,9 +150,3 @@ class DatabaseConnection:
     def __repr__(self) -> str:
         dialect_str = f", dialect={self.dialect}" if self.dialect else ""
         return f"DatabaseConnection({type(self.connection).__name__}{dialect_str})"
-
-
-# Duplicate protocol definition removed
-
-
-# Duplicate protocol definition removed

@@ -1,5 +1,3 @@
-"""TSBS DevOps DataFrame query implementations."""
-
 from __future__ import annotations
 
 from csv import reader

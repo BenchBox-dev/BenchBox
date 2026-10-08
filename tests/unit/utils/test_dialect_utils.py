@@ -1,8 +1,5 @@
-"""Test SQL dialect translation utilities.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from typing import Any, cast
 
@@ -103,7 +100,6 @@ class TestSQLiteDiscountBoundaries:
         )
         connection = sqlite3.connect(":memory:")
         try:
-            # SQLite overflows to REAL here, so the lower bound is 0.0 and the row matches.
             expected = connection.execute(query).fetchall()
             assert expected == [(0,)]
             translated = translate_sql_query(query, target_dialect="sqlite")
@@ -114,7 +110,6 @@ class TestSQLiteDiscountBoundaries:
     def test_bare_dot_decimal_bounds_are_folded(self):
         import sqlite3
 
-        # SQLGlot reads `.06` as `0.06`, so this has the same boundary defect as the public Q6 text.
         query = "SELECT l_discount FROM lineitem WHERE l_discount BETWEEN .06 - .01 AND .06 + .01 ORDER BY l_discount"
         connection = sqlite3.connect(":memory:")
         try:
@@ -166,7 +161,6 @@ class TestSQLiteDiscountBoundaries:
         [
             "SELECT * FROM orders WHERE l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01",
             "SELECT * FROM t WHERE l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01",
-            # Mentioning the table in a string or comment is not reading it.
             "SELECT 'lineitem' AS note FROM t WHERE l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01",
             "SELECT * FROM t /* lineitem */ WHERE l_discount BETWEEN 0.06 - 0.01 AND 0.06 + 0.01",
         ],
@@ -192,9 +186,6 @@ class TestSQLiteDiscountBoundaries:
 
         from benchbox.utils.dialect_utils import _fix_sqlite_unsupported_syntax
 
-        # 0.1 + 0.2 - 0.3 is 5.55e-17 in doubles but exactly 0. A stored 1e-17 lies in that band, so
-        # SQLite's noisy bound matches it and the exact endpoint does not. TPC-H discounts have two
-        # decimals, so this cannot occur in the benchmark data; the behavior is documented, not relied on.
         query = (
             "WITH lineitem AS (SELECT 0.00000000000000001 AS l_discount) SELECT l_discount FROM lineitem "
             "WHERE l_discount BETWEEN (0.0 + 0.0) AND (0.1 + 0.2 - 0.3)"
@@ -209,16 +200,13 @@ class TestSQLiteDiscountBoundaries:
     @pytest.mark.parametrize(
         "rows, low, high, expected",
         [
-            # Doubles lose the 9.0, so SQLite's lower bound is 0.0 and both rows match.
             (
                 (8.0, 9.0),
                 "(10000000000000000000000000000.0 + 9.0 - 10000000000000000000000000000.0)",
                 "(20.0 + 0.0)",
                 [8.0, 9.0],
             ),
-            # Doubles lose the 1e-10, so the lower bound is 0.0 and the zero row matches.
             ((0.0, 0.05), "(100000000.0 + 0.0000000001 - 100000000.0)", "(0.06 + 0.01)", [0.0, 0.05]),
-            # inf - inf is NULL in SQLite, so no row matches.
             ((0.05,), f"(1{'0' * 400}.0 - 1{'0' * 400}.0)", "(0.06 + 0.01)", []),
         ],
     )
@@ -329,86 +317,63 @@ class TestSQLiteDiscountBoundaries:
 
 
 class TestDialectNormalization:
-    """Test dialect normalization for SQLGlot compatibility."""
-
     def test_normalize_netezza_to_postgres(self):
-        """Test that 'netezza' dialect normalizes to 'postgres'."""
         assert normalize_dialect_for_sqlglot("netezza") == "postgres"
         assert normalize_dialect_for_sqlglot("NETEZZA") == "postgres"
         assert normalize_dialect_for_sqlglot("Netezza") == "postgres"
 
     def test_normalize_greenplum_to_postgres(self):
-        """Test that 'greenplum' dialect normalizes to 'postgres'."""
         assert normalize_dialect_for_sqlglot("greenplum") == "postgres"
         assert normalize_dialect_for_sqlglot("GREENPLUM") == "postgres"
 
     def test_normalize_vertica_to_postgres(self):
-        """Test that 'vertica' dialect normalizes to 'postgres'."""
         assert normalize_dialect_for_sqlglot("vertica") == "postgres"
 
     def test_normalize_unknown_dialect_unchanged(self):
-        """Test that unknown dialects pass through unchanged."""
         assert normalize_dialect_for_sqlglot("duckdb") == "duckdb"
         assert normalize_dialect_for_sqlglot("bigquery") == "bigquery"
         assert normalize_dialect_for_sqlglot("snowflake") == "snowflake"
         assert normalize_dialect_for_sqlglot("clickhouse") == "clickhouse"
 
     def test_normalize_empty_string(self):
-        """Test that empty string returns empty string."""
         assert normalize_dialect_for_sqlglot("") == ""
 
 
 class TestSQLTranslation:
-    """Test centralized SQL query translation."""
-
     def test_translate_simple_query(self):
-        """Test basic query translation."""
         query = "SELECT * FROM orders"
         result = translate_sql_query(query, target_dialect="duckdb")
-        assert result  # Should return something
+        assert result
         assert "orders" in result.lower()
 
     def test_translate_to_date_netezza_to_duckdb(self):
-        """Test that TO_DATE() translates correctly from Netezza/Postgres to DuckDB."""
         query = "SELECT TO_DATE('1995-03-15', 'yyyy-MM-dd')"
         result = translate_sql_query(query, target_dialect="duckdb", source_dialect="netezza")
-        # Netezza normalizes to postgres, which should translate TO_DATE properly
-        # DuckDB uses STRPTIME or CAST
         assert "STRPTIME" in result.upper() or "CAST" in result.upper()
         assert "1995-03-15" in result
 
     def test_translate_json_objectagg_postgres_to_duckdb(self):
-        """Test JSON aggregate function translation."""
         query = "SELECT JSON_OBJECTAGG(k, v) FROM t"
         result = translate_sql_query(query, target_dialect="duckdb", source_dialect="postgres")
-        # Postgres JSON_OBJECTAGG should translate to DuckDB JSON_GROUP_OBJECT
         assert "JSON_GROUP_OBJECT" in result.upper()
 
     def test_translate_with_identify_quotes_identifiers(self):
-        """Test that identify=True quotes table names to prevent keyword conflicts."""
         query = "SELECT * FROM orders"
         result = translate_sql_query(query, target_dialect="duckdb", identify=True)
-        # Should quote the identifier
         assert '"orders"' in result or "`orders`" in result or result == query
 
     def test_translate_without_identify(self):
-        """Test translation without identifier quoting."""
         query = "SELECT * FROM orders"
         result = translate_sql_query(query, target_dialect="duckdb", identify=False)
-        # May or may not have quotes depending on SQLGlot's decision
         assert "orders" in result.lower()
 
     def test_translate_fallback_on_invalid_dialect(self):
-        """Test that translation gracefully handles invalid dialects."""
-        # Use an extremely unlikely/invalid dialect that SQLGlot won't recognize
         query = "SELECT * FROM orders"
-        # Should handle gracefully and return something (either translated or original)
         result = translate_sql_query(query, target_dialect="nonexistent_invalid_dialect_12345")
-        assert result  # Should return something, not crash
+        assert result
         assert "orders" in result.lower()
 
     def test_translate_with_preprocessor(self):
-        """Test pre-processor application."""
 
         def uppercase_tables(q: str) -> str:
             return q.replace("orders", "ORDERS")
@@ -418,7 +383,6 @@ class TestSQLTranslation:
         assert "ORDERS" in result
 
     def test_translate_with_multiple_preprocessors(self):
-        """Test multiple pre-processors are applied in order."""
 
         def replace_asterisk(q: str) -> str:
             return q.replace("*", "col1, col2")
@@ -433,7 +397,6 @@ class TestSQLTranslation:
         assert "where" in result.lower()
 
     def test_translate_with_postprocessor(self):
-        """Test post-processor application."""
 
         def add_limit(q: str) -> str:
             return q + " LIMIT 100"
@@ -443,31 +406,24 @@ class TestSQLTranslation:
         assert "LIMIT 100" in result.upper() or "LIMIT" in result.upper()
 
     def test_translate_default_source_dialect_is_netezza(self):
-        """Test that default source dialect is netezza (normalized to postgres)."""
         query = "SELECT 1 AS test_col"
-        # Should not raise error, should use default netezza source
         result = translate_sql_query(query, target_dialect="duckdb")
-        assert result  # Should return something
+        assert result
         assert "test_col" in result.lower() or "1" in result
 
     def test_translate_preserves_query_on_translation_error(self):
-        """Test that original query is returned if translation fails."""
-        # Use an invalid/unsupported source dialect
         query = "SELECT * FROM orders"
         result = translate_sql_query(query, target_dialect="invalid_target_dialect")
-        # Should still return something (likely original query)
         assert result
         assert "orders" in result.lower()
 
     def test_translate_clickhouse_to_duckdb(self):
-        """Test translation from ClickHouse dialect to DuckDB."""
         query = "SELECT * FROM orders LIMIT 10"
         result = translate_sql_query(query, target_dialect="duckdb", source_dialect="clickhouse")
         assert "orders" in result.lower()
         assert "LIMIT" in result.upper() or "limit" in result.lower()
 
     def test_translate_preserves_complex_queries(self):
-        """Test that complex queries with JOINs, WHERE, etc. are handled."""
         query = """
             SELECT o.order_id, c.customer_name
             FROM orders o
@@ -477,14 +433,12 @@ class TestSQLTranslation:
             LIMIT 100
         """
         result = translate_sql_query(query, target_dialect="duckdb")
-        # Should preserve key elements
         assert "order_id" in result.lower()
         assert "customer_name" in result.lower()
         assert "join" in result.lower()
         assert "where" in result.lower()
 
     def test_translate_duckdb_preserves_order_by_all_keyword(self):
-        """Test DuckDB translation keeps ORDER BY ALL as a keyword."""
         query = """
             SELECT r_name, n_name, COUNT(*) AS supplier_count
             FROM region r
@@ -497,7 +451,6 @@ class TestSQLTranslation:
         assert 'ORDER BY "ALL"' not in result.upper()
 
     def test_translate_duckdb_preserves_group_by_all_keyword(self):
-        """Test DuckDB translation keeps GROUP BY ALL as a keyword."""
         query = """
             SELECT n_name, r_name, COUNT(*) AS nation_count
             FROM nation n
@@ -510,12 +463,10 @@ class TestSQLTranslation:
         assert 'GROUP BY "ALL"' not in result.upper()
 
     def test_translate_fix_is_gated_by_original_query_pattern(self):
-        """Test that built-in fix only triggers on explicit ORDER/GROUP BY ALL keyword usage."""
         query = 'SELECT 1 AS "ALL" ORDER BY "ALL"'
         assert _query_has_group_or_order_by_all(query) is False
 
     def test_translate_sqlite_rewrites_interval_and_extract(self):
-        """SQLite translation should remove unsupported INTERVAL and EXTRACT syntax."""
         query = """
             SELECT EXTRACT(YEAR FROM l_shipdate) AS ship_year
             FROM lineitem
@@ -529,7 +480,6 @@ class TestSQLTranslation:
         assert "STRFTIME('%Y'," in result
 
     def test_translate_sqlite_rewrites_time_extract_and_date_trunc(self):
-        """SQLite translation should cover time parts used by ClickBench queries."""
         query = """
             SELECT
                 EXTRACT(HOUR FROM EventTime),
@@ -547,7 +497,6 @@ class TestSQLTranslation:
         assert "STRFTIME('%Y-%m-%d %H:%M:00'," in result
 
     def test_translation_context_records_success_metadata(self):
-        """Successful translation records structured outcome metadata."""
         query = "SELECT * FROM orders"
 
         with sql_translation_context(strict=False) as outcomes:
@@ -561,7 +510,6 @@ class TestSQLTranslation:
         assert outcomes[0].translator == "sqlglot"
 
     def test_translation_context_records_graceful_fallback_metadata(self):
-        """Graceful mode returns source SQL and records fallback category."""
 
         def fail_preprocessor(_query: str) -> str:
             raise RuntimeError("synthetic translation failure")
@@ -581,7 +529,6 @@ class TestSQLTranslation:
         assert outcomes[0].warning_category == "translation_failed"
 
     def test_strict_translation_raises_and_records_failure_metadata(self):
-        """Strict mode fails closed on translation failure."""
 
         def fail_preprocessor(_query: str) -> str:
             raise RuntimeError("synthetic translation failure")
@@ -602,7 +549,6 @@ class TestSQLTranslation:
         assert outcomes[0].error_category == "translation_failed"
 
     def test_summarize_translation_outcomes_compacts_repeated_attempts(self):
-        """Result-bundle metadata summarizes repeated attempts compactly."""
         query = "SELECT * FROM orders"
 
         with sql_translation_context(strict=False) as outcomes:
@@ -621,10 +567,7 @@ class TestSQLTranslation:
 
 
 class TestTranslationScopeMetadata:
-    """Scoped summaries separate schema DDL from repeated workload queries."""
-
     def test_repeated_workload_queries_report_unique_count(self):
-        """Identical query text translated repeatedly counts once as unique."""
         with sql_translation_context(strict=False) as outcomes:
             for _ in range(3):
                 translate_sql_query("SELECT * FROM orders", target_dialect="duckdb", source_dialect="netezza")
@@ -646,7 +589,6 @@ class TestTranslationScopeMetadata:
         assert entry["unique_queries"] == 2
 
     def test_schema_ddl_outcome_is_scoped_and_counted_separately(self):
-        """DDL tagged with the schema scope does not inflate unique queries."""
         ddl = "CREATE TABLE region (r_regionkey INTEGER NOT NULL, r_name CHAR(25) NOT NULL)"
         with sql_translation_context(strict=False) as outcomes:
             translate_sql_query(ddl, target_dialect="bigquery", source_dialect="standard", scope="schema_ddl")
@@ -668,7 +610,6 @@ class TestTranslationScopeMetadata:
         assert ddl_entry["count"] == 1
 
     def test_legacy_outcomes_without_scope_default_to_workload(self):
-        """Outcomes recorded before scope tagging still summarize cleanly."""
         with sql_translation_context(strict=False) as outcomes:
             translate_sql_query("SELECT 1", target_dialect="duckdb", source_dialect="netezza")
 
@@ -680,14 +621,11 @@ class TestTranslationScopeMetadata:
         assert summary["unique_queries_translated"] == 1
 
     def test_unknown_scope_is_rejected(self):
-        """Typos in scope names fail fast instead of corrupting summaries."""
         with pytest.raises(ValueError, match="Unknown SQL translation scope"):
             translate_sql_query("SELECT 1", target_dialect="duckdb", scope="not_a_scope")
 
 
 class TestStandardSourceDdlSnapshots:
-    """Standard-source DDL parses with the postgres grammar, preserving lengths."""
-
     DDL = "CREATE TABLE region (r_regionkey INTEGER NOT NULL, r_name VARCHAR(25) NOT NULL)"
 
     def test_standard_source_preserves_lengths_bigquery(self):
@@ -718,27 +656,20 @@ class TestStandardSourceDdlSnapshots:
 
 
 class TestIntegrationScenarios:
-    """Test real-world integration scenarios."""
-
     def test_read_primitives_translation_scenario(self):
-        """Simulate Read Primitives benchmark translation to DuckDB."""
-        # Example query from Read Primitives using Postgres-style TO_DATE
         query = """
             SELECT COUNT(*) as orders_by_month
             FROM orders
             WHERE o_orderdate = TO_DATE('1995-03-15', 'yyyy-MM-dd')
         """
         result = translate_sql_query(query, target_dialect="duckdb", source_dialect="netezza")
-        # Should translate successfully
         assert result
         assert "orders" in result.lower()
         assert "1995-03-15" in result
 
     def test_tpcds_interval_syntax_scenario(self):
-        """Simulate TPC-DS interval syntax translation."""
 
         def normalize_interval(q: str) -> str:
-            # Simplified version of TPC-DS interval normalization
             import re
 
             pattern = r"\+\s*(\d+)\s+(days?|months?|years?)"
@@ -754,47 +685,35 @@ class TestIntegrationScenarios:
 
 
 class TestPostgresDateArithmetic:
-    """Test PostgreSQL/DataFusion date arithmetic conversion.
-
-    DataFusion and PostgreSQL don't support `date + integer` directly.
-    The fix_postgres_date_arithmetic function converts these to INTERVAL syntax.
-    """
-
     def test_convert_date_plus_integer(self):
-        """Test that d_date + N converts to INTERVAL syntax."""
         query = "SELECT * FROM t WHERE d_date + 5 > NOW()"
         result = fix_postgres_date_arithmetic(query)
         assert "INTERVAL '5' DAY" in result
         assert "+ 5" not in result
 
     def test_convert_qualified_date_column(self):
-        """Test that table.d_date + N converts correctly."""
         query = "SELECT * FROM t WHERE d1.d_date + 30 > d2.d_date"
         result = fix_postgres_date_arithmetic(query)
         assert "d1.d_date + INTERVAL '30' DAY" in result
         assert "+ 30" not in result
 
     def test_convert_date_minus_integer(self):
-        """Test that d_date - N converts to INTERVAL syntax."""
         query = "SELECT * FROM t WHERE d_date - 7 < NOW()"
         result = fix_postgres_date_arithmetic(query)
         assert "INTERVAL '7' DAY" in result
         assert "- 7" not in result
 
     def test_does_not_affect_non_date_columns(self):
-        """Test that non-date columns are not modified."""
         query = "SELECT * FROM t WHERE order_id + 5 > 100"
         result = fix_postgres_date_arithmetic(query)
-        assert result == query  # Should be unchanged
+        assert result == query
 
     def test_tpcds_q72_pattern(self):
-        """Test the actual TPC-DS Q72 pattern that was failing."""
         query = "d3.d_date > d1.d_date + 5"
         result = fix_postgres_date_arithmetic(query)
         assert result == "d3.d_date > d1.d_date + INTERVAL '5' DAY"
 
     def test_multiple_date_arithmetic_expressions(self):
-        """Test multiple date arithmetic expressions in same query."""
         query = "SELECT * FROM t WHERE d_date + 5 > NOW() AND d_date - 10 < NOW()"
         result = fix_postgres_date_arithmetic(query)
         assert "INTERVAL '5' DAY" in result
@@ -803,7 +722,6 @@ class TestPostgresDateArithmetic:
         assert "- 10" not in result
 
     def test_preserves_other_arithmetic(self):
-        """Test that other arithmetic operations are preserved."""
         query = "SELECT price * 2 + tax FROM t WHERE d_date + 5 > NOW()"
         result = fix_postgres_date_arithmetic(query)
         assert "price * 2 + tax" in result
@@ -811,34 +729,17 @@ class TestPostgresDateArithmetic:
 
 
 class TestPostgresIdentifierQuoting:
-    """Test that postgres dialect doesn't use identifier quoting.
-
-    DataFusion/PostgreSQL fold unquoted identifiers to lowercase.
-    With quoted identifiers (identify=True), uppercase like "SR_RETURN_AMT"
-    wouldn't match lowercase schema columns like sr_return_amt.
-    """
-
     def test_postgres_no_identifier_quoting(self):
-        """Test that postgres dialect disables identifier quoting."""
         query = "SELECT SR_RETURN_AMT FROM store_returns"
         result = translate_sql_query(query, target_dialect="postgres", identify=True)
-        # Should NOT have quoted uppercase identifiers
-        # Unquoted SR_RETURN_AMT will be folded to lowercase by the engine
         assert '"SR_RETURN_AMT"' not in result
 
     def test_clickhouse_no_identifier_quoting(self):
-        """Test that clickhouse dialect disables identifier quoting."""
         query = "SELECT SR_RETURN_AMT FROM store_returns"
         result = translate_sql_query(query, target_dialect="clickhouse", identify=True)
-        # ClickHouse also doesn't use quoting
         assert '"SR_RETURN_AMT"' not in result
 
     def test_snowflake_no_identifier_quoting(self):
-        """Test that snowflake dialect disables identifier quoting.
-
-        Snowflake folds unquoted identifiers to UPPERCASE, matching unquoted
-        UPPER DDL; quoted lowercase would not resolve against it.
-        """
         query = "SELECT note FROM company_type"
         result = translate_sql_query(query, target_dialect="snowflake", identify=True)
         assert '"company_type"' not in result
@@ -846,18 +747,12 @@ class TestPostgresIdentifierQuoting:
         assert "company_type" in result
 
     def test_duckdb_uses_identifier_quoting(self):
-        """Test that duckdb dialect uses identifier quoting when requested."""
-        query = "SELECT order FROM orders"  # 'order' is a reserved word
+        query = "SELECT order FROM orders"
         result = translate_sql_query(query, target_dialect="duckdb", identify=True)
-        # DuckDB should quote identifiers to handle reserved words
-        # Note: The exact quoting depends on SQLGlot's behavior
-        assert result  # Should return valid result
+        assert result
 
     def test_postgres_case_folding_scenario(self):
-        """Test real scenario: TPC-DS uppercase columns with lowercase schema."""
-        # This simulates what happens with TPC-DS templates
         query = "SELECT SR_RETURN_AMT, SR_NET_LOSS FROM store_returns WHERE SR_RETURN_AMT > 100"
         result = translate_sql_query(query, target_dialect="postgres", source_dialect="netezza", identify=True)
-        # Result should have unquoted identifiers that will be folded to lowercase
         assert '"SR_RETURN_AMT"' not in result
         assert '"SR_NET_LOSS"' not in result

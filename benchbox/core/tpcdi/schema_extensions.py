@@ -1,5 +1,3 @@
-"""TPC-DI schema extensions for publication-ready coverage."""
-
 from pathlib import Path
 from typing import Any
 
@@ -19,12 +17,10 @@ EXTENSION_TABLES = {entry["key"]: globals()[symbol] for symbol, entry in _EXTENS
 
 
 def get_extended_table_order() -> list[str]:
-    """Get the dependency order for creating extended tables."""
     return list(_EXTENSION_SPECS["table_order"])
 
 
 def get_foreign_key_constraints() -> dict[str, list[dict[str, Any]]]:
-    """Get foreign key constraint definitions for extended tables."""
     return dict(_EXTENSION_SPECS["foreign_key_constraints"])
 
 
@@ -34,7 +30,6 @@ def get_extended_create_table_sql(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True,
 ) -> str:
-    """Generate CREATE TABLE SQL for extended TPC-DI tables."""
     if table_name not in EXTENSION_TABLES:
         raise ValueError(f"Unknown extended table: {table_name}. Available: {', '.join(EXTENSION_TABLES.keys())}")
 
@@ -62,7 +57,6 @@ def get_all_extended_create_table_sql(
     enable_primary_keys: bool = True,
     enable_foreign_keys: bool = True,
 ) -> str:
-    """Generate CREATE TABLE SQL for all extended TPC-DI tables."""
     return "\n\n".join(
         get_extended_create_table_sql(table_name, dialect, enable_primary_keys, enable_foreign_keys)
         for table_name in get_extended_table_order()

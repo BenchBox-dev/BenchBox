@@ -1,10 +1,3 @@
-"""Report slow test modules reached by the PR and nightly workflows.
-
-This is diagnostic while the broad slow lane is being observed. A workflow
-reference to a file is counted only when it appears in a run command, not in
-comments or documentation.
-"""
-
 from __future__ import annotations
 
 import ast

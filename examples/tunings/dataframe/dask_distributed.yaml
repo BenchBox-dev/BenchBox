@@ -1,6 +1,3 @@
-# Dask DataFrame Tuning - Distributed Cluster
-# Configuration for multi-node distributed processing
-
 parallelism:
   worker_count: 4
   threads_per_worker: 4

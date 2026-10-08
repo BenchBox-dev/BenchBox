@@ -1,15 +1,3 @@
-/**
- * Tests for facetMatching tuning-mode semantics.
- *
- * Rows whose bundle never recorded a tuning mode (tuning_mode null/undefined)
- * are an explicit "not-recorded" state:
- *   (a) they never match a real-mode selection,
- *   (b) they match a selection that explicitly includes the not-recorded
- *       sentinel (or the legacy "untuned" token still used by chips/URLs),
- *   (c) real modes keep matching exactly as before (rule changes are gated
- *       on ADR-2 and owned by the facet implementation TODO).
- */
-
 import { describe, expect, it } from "vitest";
 import {
   LEGACY_UNLABELLED_TUNING_MODE,

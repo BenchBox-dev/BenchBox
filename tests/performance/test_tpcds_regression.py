@@ -1,26 +1,9 @@
-"""TPC-DS Regression Tests.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides comprehensive regression tests for TPC-DS components
-to ensure that changes don't break existing functionality and that
-performance characteristics remain stable.
+# TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DS specification.
 
-Tests include:
-- Backward compatibility validation
-- API stability tests
-- Output format consistency
-- Performance regression detection
-- Query correctness validation
-- Parameter generation consistency
-- Stream generation stability
-- Database integration regression
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DS (TPC-DS) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DS specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import contextlib
 import hashlib
@@ -44,11 +27,8 @@ pytestmark = [
 @pytest.mark.regression
 @pytest.mark.tpcds
 class TestTPCDSRegression:
-    """Regression tests for TPC-DS components."""
-
-    # Known good query hashes for regression testing
     KNOWN_QUERY_HASHES = {
-        1: "a1b2c3d4e5f6",  # Placeholder - in real implementation these would be actual hashes
+        1: "a1b2c3d4e5f6",
         2: "b2c3d4e5f6a1",
         3: "c3d4e5f6a1b2",
         5: "d4e5f6a1b2c3",
@@ -61,7 +41,6 @@ class TestTPCDSRegression:
 
     @pytest.fixture
     def benchmark_instance(self):
-        """Create a benchmark instance for regression testing."""
         return TPCDSBenchmark(
             scale_factor=1.0,
             verbose=False,
@@ -69,15 +48,12 @@ class TestTPCDSRegression:
 
     @pytest.fixture
     def query_manager(self):
-        """Create a query manager for regression testing."""
         return TPCDSQueryManager()
 
     @pytest.fixture
     def reference_data_dir(self):
-        """Create directory with reference data for regression testing."""
         temp_dir = Path(tempfile.mkdtemp())
 
-        # reference parameter sets
         reference_params = {
             "test_set_1": {
                 "YEAR": 2000,
@@ -107,41 +83,32 @@ class TestTPCDSRegression:
         return temp_dir
 
     def _compute_query_hash(self, query_text: str) -> str:
-        """Compute a hash for a query text for regression testing."""
-        # Normalize the query text for consistent hashing
         normalized = query_text.strip().lower()
-        # Strip extra whitespace
         normalized = " ".join(normalized.split())
         return hashlib.md5(normalized.encode()).hexdigest()[:12]
 
     def test_query_output_consistency(self, query_manager):
-        """Test that query outputs remain consistent across runs."""
         test_queries = [1, 2, 3, 5, 10, 15, 20]
 
-        # First run
         first_run_queries = {}
         for query_id in test_queries:
             query = query_manager.get_query(query_id)
             first_run_queries[query_id] = query
 
-        # Second run
         second_run_queries = {}
         for query_id in test_queries:
             query = query_manager.get_query(query_id)
             second_run_queries[query_id] = query
 
-        # Queries should be identical between runs
         for query_id in test_queries:
             assert first_run_queries[query_id] == second_run_queries[query_id], (
                 f"Query {query_id} output inconsistent between runs"
             )
 
     def test_parameterized_query_determinism(self, query_manager, reference_data_dir):
-        """Test that parameterized queries are deterministic with same seed."""
         test_queries = [1, 2, 3, 5, 10]
         seed = 42
 
-        # Generate queries multiple times with same seed
         query_results = []
         for _ in range(3):
             run_results = {}
@@ -150,11 +117,9 @@ class TestTPCDSRegression:
                     query = query_manager.get_query(query_id, seed=seed)
                     run_results[query_id] = query
                 except ValueError:
-                    # Skip queries that don't exist
                     continue
             query_results.append(run_results)
 
-        # All runs should produce identical results
         if len(query_results) > 1:
             first_run = query_results[0]
             for i, run in enumerate(query_results[1:], 1):
@@ -165,43 +130,32 @@ class TestTPCDSRegression:
                         )
 
     def test_query_template_stability(self, benchmark_instance):
-        """Test that query templates remain stable."""
-        # Test queries with known variants using benchmark instance (query_manager doesn't support variants)
         multi_variant_queries = [14, 23, 24, 39]
 
         for query_id in multi_variant_queries:
             try:
-                # Test variant 'a'
                 query_a = benchmark_instance.get_query(query_id, variant="a")
                 assert isinstance(query_a, str)
                 assert len(query_a) > 0
 
-                # Test variant 'b'
                 query_b = benchmark_instance.get_query(query_id, variant="b")
                 assert isinstance(query_b, str)
                 assert len(query_b) > 0
 
-                # Variants should be different
                 assert query_a != query_b, f"Query {query_id} variants are identical"
 
-                # Both should contain SELECT
                 assert "SELECT" in query_a.upper()
                 assert "SELECT" in query_b.upper()
 
             except Exception as e:
-                # dsqgen may not support variant syntax (exit code 255 or similar)
                 error_msg = str(e)
                 if "exit code 255" in error_msg or "dsqgen failed" in error_msg or "TPCDSError" in error_msg:
-                    # This is expected - dsqgen doesn't support composite query IDs like "14a"
                     print(f"Note: Query {query_id} variant generation not supported by dsqgen (expected), skipping")
                     continue
                 else:
-                    # Unexpected error - re-raise
                     raise
 
     def test_parameter_domain_stability(self, benchmark_instance):
-        """Test that seed-based query generation is stable."""
-        # Test with different seeds to verify stability
         seeds = [1, 42, 100, 1000]
 
         for seed in seeds:
@@ -210,21 +164,17 @@ class TestTPCDSRegression:
                 assert isinstance(query, str)
                 assert len(query) > 0
 
-                # Verify SQL is valid
                 assert "SELECT" in query.upper()
                 assert "FROM" in query.upper()
 
             except ValueError:
-                # Some queries might not exist
                 pass
 
     def test_stream_generation_reproducibility(self, benchmark_instance):
-        """Test that stream generation is reproducible with same seed."""
         num_streams = 3
         query_range = (1, 10)
         seed = 42
 
-        # Generate streams twice with same seed
         stream_manager_1 = create_standard_streams(
             benchmark_instance.query_manager,
             num_streams=num_streams,
@@ -241,7 +191,6 @@ class TestTPCDSRegression:
         )
         streams_2 = stream_manager_2.generate_streams()
 
-        # Streams should be identical
         assert len(streams_1) == len(streams_2)
 
         for stream_id in streams_1:
@@ -257,16 +206,13 @@ class TestTPCDSRegression:
                 assert query_1.sql == query_2.sql, f"Stream {stream_id}, query {i}: SQL mismatch"
 
     def test_performance_regression_detection(self, benchmark_instance):
-        """Test for performance regressions."""
-        # Define baseline performance thresholds
         performance_thresholds = {
-            "single_query_max_time": 0.05,  # 50ms
-            "parameterized_query_max_time": 0.1,  # 100ms
-            "seeded_query_max_time": 0.2,  # 200ms
-            "batch_queries_max_time": 2.0,  # 2 seconds for 50 queries
+            "single_query_max_time": 0.05,
+            "parameterized_query_max_time": 0.1,
+            "seeded_query_max_time": 0.2,
+            "batch_queries_max_time": 2.0,
         }
 
-        # Test single query performance
         start_time = time.time()
         benchmark_instance.get_query(1)
         single_query_time = time.time() - start_time
@@ -275,7 +221,6 @@ class TestTPCDSRegression:
             f"Single query regression: {single_query_time:.6f}s"
         )
 
-        # Test parameterized query performance
         start_time = time.time()
         benchmark_instance.get_query(1, params={"YEAR": 2000})
         param_query_time = time.time() - start_time
@@ -284,7 +229,6 @@ class TestTPCDSRegression:
             f"Parameterized query regression: {param_query_time:.6f}s"
         )
 
-        # Test seeded query performance
         start_time = time.time()
         benchmark_instance.get_query(1, seed=42)
         seeded_query_time = time.time() - start_time
@@ -293,13 +237,11 @@ class TestTPCDSRegression:
             f"Seeded query regression: {seeded_query_time:.6f}s"
         )
 
-        # Test batch query performance
         start_time = time.time()
-        for i in range(1, 21):  # 20 queries
+        for i in range(1, 21):
             try:
                 benchmark_instance.get_query(i)
             except ValueError:
-                # Skip invalid queries
                 pass
         batch_query_time = time.time() - start_time
 
@@ -308,16 +250,14 @@ class TestTPCDSRegression:
         )
 
     def test_memory_usage_regression(self, benchmark_instance):
-        """Test for memory usage regressions."""
         import gc
         import os
 
         import psutil
 
         process = psutil.Process(os.getpid())
-        initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+        initial_memory = process.memory_info().rss / 1024 / 1024
 
-        # Generate many queries
         queries = []
         for i in range(100):
             query_id = (i % 50) + 1
@@ -325,101 +265,74 @@ class TestTPCDSRegression:
                 query = benchmark_instance.get_query(query_id, seed=42 + i)
                 queries.append(query)
             except ValueError:
-                # Skip invalid queries
                 pass
 
-        peak_memory = process.memory_info().rss / 1024 / 1024  # MB
+        peak_memory = process.memory_info().rss / 1024 / 1024
         memory_increase = peak_memory - initial_memory
 
-        # Memory increase should be reasonable
         assert memory_increase < 100, f"Memory regression: {memory_increase:.2f}MB"
 
-        # Clean up and check for leaks
         del queries
         gc.collect()
 
-        final_memory = process.memory_info().rss / 1024 / 1024  # MB
+        final_memory = process.memory_info().rss / 1024 / 1024
         memory_after_cleanup = final_memory - initial_memory
         memory_leak_mb = memory_after_cleanup
         leak_percentage = memory_after_cleanup / memory_increase if memory_increase > 0 else 0
 
-        # Should clean up most memory
-        # Allow up to 95% retention OR less than 5MB absolute leak (for small variations)
-        # This avoids false positives from Python's memory management and small OS variations
-        # Note: At scale_factor=1.0, working memory is small (~3-5MB), so absolute threshold is more reliable
         assert memory_leak_mb < 5.0 or leak_percentage < 0.95, (
             f"Memory leak regression: {memory_leak_mb:.2f}MB "
             f"({leak_percentage:.1%} of working memory {memory_increase:.2f}MB)"
         )
 
     def test_error_handling_consistency(self, benchmark_instance):
-        """Test that error handling remains consistent."""
-        # Test invalid query ID
         with pytest.raises(ValueError):
             benchmark_instance.get_query(999)
 
-        # Test invalid query ID type
         with pytest.raises((ValueError, TypeError)):
             benchmark_instance.get_query("invalid")
 
-        # Test seed validation
         try:
-            # Test with valid seed
             result = benchmark_instance.get_query(1, seed=42)
-            # Should return a valid query
             assert isinstance(result, str)
             assert len(result) > 0
         except (ValueError, TypeError):
-            # Should not fail with valid seed
             pytest.fail("Valid seed parameter should not raise error")
 
     def test_sql_format_consistency(self, query_manager):
-        """Test that SQL format remains consistent."""
         test_queries = [1, 2, 3, 5, 10]
 
         for query_id in test_queries:
             query = query_manager.get_query(query_id)
 
-            # Basic SQL format checks
             assert "SELECT" in query.upper()
             assert "FROM" in query.upper()
 
-            # Should not contain template parameters
             assert "[" not in query or "]" not in query
 
-            # Should be proper SQL (basic syntax check)
-            assert query.count("(") == query.count(")")  # Balanced parentheses
+            assert query.count("(") == query.count(")")
 
-            # Check parameterized version
             param_query = query_manager.get_query(query_id)
             assert "SELECT" in param_query.upper()
             assert "FROM" in param_query.upper()
 
     def test_configuration_backward_compatibility(self):
-        """Test that configuration options work with simplified API."""
-        # Test basic initialization with scale factor
         benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
 
-        # Should work
         query = benchmark.get_query(1)
         assert isinstance(query, str)
         assert len(query) > 0
 
-        # Test with different scale factor
         benchmark_sf10 = TPCDSBenchmark(scale_factor=10.0, verbose=False)
 
-        # Should also work
         query = benchmark_sf10.get_query(1)
         assert isinstance(query, str)
         assert len(query) > 0
 
     def test_file_format_compatibility(self, benchmark_instance):
-        """Test that file format outputs remain compatible."""
-        # Test stream generation file format
         try:
             stream_files = benchmark_instance.generate_streams(num_streams=2, rng_seed=42)
         except (ImportError, ModuleNotFoundError) as e:
-            # Stream generation may fail if streams module structure changed
             pytest.skip(f"Streams module not available: {e}")
 
         assert len(stream_files) == 2
@@ -430,19 +343,15 @@ class TestTPCDSRegression:
             content = stream_file.read_text()
             assert len(content) > 0
 
-            # Should contain SQL queries
             assert "SELECT" in content
             assert "FROM" in content
 
-            # Should have query comments
             assert "-- Query" in content
 
-            # Should be properly formatted
             lines = content.split("\n")
-            assert len(lines) > 10  # Should have multiple lines
+            assert len(lines) > 10
 
     def test_dialect_translation_consistency(self, benchmark_instance):
-        """Test that dialect translation produces consistent results."""
         dialects = ["netezza", "duckdb", "postgres"]
         query_id = 1
         seed = 42
@@ -454,11 +363,9 @@ class TestTPCDSRegression:
                 query = benchmark_instance.get_query(query_id, seed=seed, dialect=dialect)
                 dialect_results[dialect] = query
             except Exception as e:
-                # Some dialects might not be supported
                 if "not supported" not in str(e).lower():
                     raise e
 
-        # All successful translations should produce valid SQL
         for dialect, query in dialect_results.items():
             assert isinstance(query, str)
             assert len(query) > 0
@@ -466,7 +373,6 @@ class TestTPCDSRegression:
             assert "FROM" in query.upper()
 
     def test_concurrent_access_stability(self, benchmark_instance):
-        """Test that concurrent access doesn't introduce regressions."""
         import queue
         import threading
 
@@ -474,7 +380,6 @@ class TestTPCDSRegression:
         errors = queue.Queue()
 
         def worker_function(worker_id: int):
-            """Worker function for concurrent access testing."""
             try:
                 worker_results = []
                 for i in range(10):
@@ -494,36 +399,29 @@ class TestTPCDSRegression:
             except Exception as e:
                 errors.put({"worker_id": worker_id, "error": str(e)})
 
-        # and start worker threads
         threads = []
         for i in range(5):
             thread = threading.Thread(target=worker_function, args=(i,))
             threads.append(thread)
             thread.start()
 
-        # Wait for completion
         for thread in threads:
             thread.join()
 
-        # Check for errors
         assert errors.empty(), f"Concurrent access errors: {list(errors.queue)}"
 
-        # Verify results
         all_results = []
         while not results.empty():
             all_results.extend(results.get())
 
-        # Should have results from all workers
-        assert len(all_results) == 50  # 5 workers × 10 queries each
+        assert len(all_results) == 50
 
-        # All results should be valid
         for result in all_results:
             assert result["query_length"] > 0
             assert result["has_select"] is True
 
     @pytest.mark.parametrize("scale_factor", [0.01, 0.1, 1.0])
     def test_scale_factor_consistency(self, scale_factor):
-        """Test that different scale factors don't break functionality."""
         if scale_factor < 1.0:
             with pytest.warns(
                 UserWarning,
@@ -540,7 +438,6 @@ class TestTPCDSRegression:
                 verbose=False,
             )
 
-        # Basic functionality should work regardless of scale factor
         query = benchmark.get_query(1)
         assert isinstance(query, str)
         assert len(query) > 0
@@ -554,7 +451,6 @@ class TestTPCDSRegression:
         assert len(seeded_query) > 0
 
     def test_detailed_regression_suite(self, benchmark_instance):
-        """Run a comprehensive regression test suite."""
         regression_results = {
             "api_compatibility": True,
             "performance_regression": False,
@@ -564,26 +460,22 @@ class TestTPCDSRegression:
             "concurrent_access": True,
         }
 
-        # Test key functionality
         try:
-            # API compatibility
             benchmark_instance.get_query(1)
             benchmark_instance.get_query(1, params={"YEAR": 2000})
             benchmark_instance.get_query(1, seed=42)
             benchmark_instance.get_schema()
             benchmark_instance.get_create_tables_sql()
 
-            # Performance test
             start_time = time.time()
             for i in range(1, 21):
                 with contextlib.suppress(ValueError):
                     benchmark_instance.get_query(i)
             execution_time = time.time() - start_time
 
-            if execution_time > 2.0:  # 2 seconds threshold
+            if execution_time > 2.0:
                 regression_results["performance_regression"] = True
 
-            # Memory test
             import gc
             import os
 
@@ -604,7 +496,7 @@ class TestTPCDSRegression:
             peak_memory = process.memory_info().rss / 1024 / 1024
             memory_increase = peak_memory - initial_memory
 
-            if memory_increase > 50:  # 50MB threshold
+            if memory_increase > 50:
                 regression_results["memory_regression"] = True
 
             del queries
@@ -614,7 +506,6 @@ class TestTPCDSRegression:
             regression_results["api_compatibility"] = False
             regression_results["error_handling"] = False
 
-        # Assert no regressions
         assert regression_results["api_compatibility"], "API compatibility regression"
         assert not regression_results["performance_regression"], "Performance regression detected"
         assert not regression_results["memory_regression"], "Memory regression detected"

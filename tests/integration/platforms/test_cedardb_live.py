@@ -1,18 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""
-Docker live integration tests for CedarDB.
-
-Setup:
-    make test-docker-up-cedardb
-    # or: docker compose -f docker/cedardb/docker-compose.yml up -d --wait
-
-These tests require a running CedarDB instance accessible via PostgreSQL wire protocol.
-Set CEDARDB_HOST, CEDARDB_PORT, CEDARDB_USER, CEDARDB_PASSWORD, CEDARDB_DATABASE
-to target a different instance.
-"""
 
 import pytest
 
@@ -27,10 +15,8 @@ pytestmark = [
 
 
 class TestLiveCedarDBConnection:
-    """Test basic CedarDB connectivity via Docker."""
-
     def test_connection(self, live_cedardb_adapter):
-        """Verify we can connect to CedarDB and run a trivial query."""
+
         connection = live_cedardb_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -41,7 +27,7 @@ class TestLiveCedarDBConnection:
             live_cedardb_adapter.close_connection(connection)
 
     def test_platform_info(self, live_cedardb_adapter):
-        """Verify platform info reports CedarDB metadata."""
+
         connection = live_cedardb_adapter.create_connection()
         try:
             info = live_cedardb_adapter.get_platform_info(connection=connection)
@@ -51,7 +37,6 @@ class TestLiveCedarDBConnection:
             live_cedardb_adapter.close_connection(connection)
 
     def test_version_string(self, live_cedardb_adapter):
-        """Verify CedarDB returns a version string via SELECT version()."""
         connection = live_cedardb_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -65,10 +50,8 @@ class TestLiveCedarDBConnection:
 
 
 class TestLiveCedarDBQueryExecution:
-    """Test query execution against a live CedarDB instance."""
-
     def test_execute_select(self, live_cedardb_adapter):
-        """Verify basic SELECT execution via adapter."""
+
         connection = live_cedardb_adapter.create_connection()
         try:
             result = live_cedardb_adapter.execute_query(
@@ -82,7 +65,6 @@ class TestLiveCedarDBQueryExecution:
             live_cedardb_adapter.close_connection(connection)
 
     def test_aggregation_query(self, live_cedardb_adapter):
-        """Execute an aggregation to verify analytical capabilities."""
         connection = live_cedardb_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -94,7 +76,6 @@ class TestLiveCedarDBQueryExecution:
             live_cedardb_adapter.close_connection(connection)
 
     def test_create_and_query_table(self, live_cedardb_adapter):
-        """Create a table, insert rows, query, and clean up."""
         connection = live_cedardb_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -119,11 +100,9 @@ class TestLiveCedarDBQueryExecution:
             live_cedardb_adapter.close_connection(connection)
 
     def test_postgresql_dialect_compatibility(self, live_cedardb_adapter):
-        """Verify PostgreSQL dialect features work (CTE, window functions)."""
         connection = live_cedardb_adapter.create_connection()
         try:
             cursor = connection.cursor()
-            # CTE + window function - standard PostgreSQL syntax
             cursor.execute(
                 """
                 WITH nums AS (
@@ -136,16 +115,14 @@ class TestLiveCedarDBQueryExecution:
             )
             rows = cursor.fetchall()
             assert len(rows) == 5
-            assert rows[-1][1] == 15  # 1+2+3+4+5
+            assert rows[-1][1] == 15
         finally:
             live_cedardb_adapter.close_connection(connection)
 
 
 class TestLiveCedarDBConstraints:
-    """Test primary key and foreign key support (CedarDB-supported tuning types)."""
-
     def test_primary_key_constraint(self, live_cedardb_adapter):
-        """Verify primary key constraints are enforced."""
+
         connection = live_cedardb_adapter.create_connection()
         try:
             cursor = connection.cursor()
@@ -153,7 +130,6 @@ class TestLiveCedarDBConstraints:
             cursor.execute("CREATE TABLE benchbox_pk_test (id INTEGER PRIMARY KEY, name TEXT)")
             cursor.execute("INSERT INTO benchbox_pk_test VALUES (1, 'first')")
 
-            # Inserting a duplicate PK should fail
             with pytest.raises(Exception):
                 cursor.execute("INSERT INTO benchbox_pk_test VALUES (1, 'duplicate')")
                 connection.commit()

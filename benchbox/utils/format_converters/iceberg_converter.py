@@ -1,8 +1,3 @@
-"""Apache Iceberg format converter for BenchBox.
-
-Converts TPC benchmark data from TBL (pipe-delimited) format to Apache Iceberg format.
-"""
-
 from __future__ import annotations
 
 import os
@@ -21,34 +16,13 @@ from benchbox.utils.format_converters.base import (
 
 
 class IcebergConverter(BaseFormatConverter):
-    """Converter for TBL → Apache Iceberg format.
-
-    Apache Iceberg is a table format with metadata/manifest files on top of Parquet.
-    This converter:
-    1. Reads TBL files using PyArrow CSV reader
-    2. Converts to Arrow tables
-    3. Writes to Iceberg using the pyiceberg library with a filesystem catalog
-    4. Supports identity partitioning for partition columns
-    """
-
     def get_file_extension(self) -> str:
-        """Get file extension for Iceberg format (directory-based)."""
-        return ""  # Iceberg uses directories, not file extensions
+        return ""
 
     def get_format_name(self) -> str:
-        """Get human-readable format name."""
         return "Apache Iceberg"
 
     def _validate_partition_columns(self, partition_cols: list[str], schema: dict[str, Any]) -> None:
-        """Validate that partition columns exist in the schema.
-
-        Args:
-            partition_cols: Columns to partition by
-            schema: Table schema definition
-
-        Raises:
-            ConversionError: If any partition column is not in the schema
-        """
         available_columns = {col["name"] for col in schema["columns"]}
         for col in partition_cols:
             if col not in available_columns:
@@ -57,26 +31,16 @@ class IcebergConverter(BaseFormatConverter):
                 )
 
     def _build_partition_spec(self, iceberg_schema: Any, partition_cols: list[str]) -> Any:
-        """Build an Iceberg PartitionSpec from partition columns.
-
-        Args:
-            iceberg_schema: PyIceberg schema
-            partition_cols: List of column names to partition by
-
-        Returns:
-            PartitionSpec with identity transforms for each column
-        """
         from pyiceberg.partitioning import PartitionField, PartitionSpec
         from pyiceberg.transforms import IdentityTransform
 
         partition_fields = []
         for idx, col_name in enumerate(partition_cols):
-            # Find the source field ID from the schema
             source_field = iceberg_schema.find_field(col_name)
             partition_fields.append(
                 PartitionField(
                     source_id=source_field.field_id,
-                    field_id=1000 + idx,  # Partition field IDs start at 1000 by convention
+                    field_id=1000 + idx,
                     transform=IdentityTransform(),
                     name=col_name,
                 )
@@ -141,7 +105,7 @@ class IcebergConverter(BaseFormatConverter):
         try:
             catalog.drop_table(table_identifier)
         except Exception:
-            pass  # Table doesn't exist, that's fine
+            pass
 
         compression_codec = self._COMPRESSION_MAP.get(opts.compression, "snappy")
 
@@ -211,25 +175,6 @@ class IcebergConverter(BaseFormatConverter):
         options: ConversionOptions | None = None,
         progress_callback: Callable[[str, float], None] | None = None,
     ) -> ConversionResult:
-        """Convert TBL files to Iceberg format.
-
-        Supports identity partitioning for specified columns, creating a
-        directory structure managed by Iceberg metadata.
-
-        Args:
-            source_files: List of source TBL file paths (may be sharded)
-            table_name: Name of the table being converted
-            schema: Table schema definition
-            options: Conversion options (uses defaults if None)
-            progress_callback: Optional callback for progress updates
-
-        Returns:
-            ConversionResult with details about the conversion
-
-        Raises:
-            ConversionError: If conversion fails
-            SchemaError: If schema is invalid
-        """
         try:
             import pyiceberg.catalog.sql  # noqa: F401
         except ImportError as e:
@@ -254,7 +199,6 @@ class IcebergConverter(BaseFormatConverter):
         combined_table = self.read_tbl_files(
             source_files, schema, progress_callback, progress_start=0.0, progress_end=0.6
         )
-        # PyArrow's CSV reader ignores nullability constraints; re-cast so nullability matches.
         combined_table = combined_table.cast(arrow_schema)
 
         column_names = [col["name"] for col in schema["columns"]]

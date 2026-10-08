@@ -1,8 +1,6 @@
-// DOM Elements
 const copyButtons = document.querySelectorAll('.copy-btn');
 const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
 
-// Copy to clipboard functionality
 copyButtons.forEach(button => {
     button.addEventListener('click', async () => {
         const targetId = button.getAttribute('data-target');
@@ -15,19 +13,16 @@ copyButtons.forEach(button => {
         try {
             await navigator.clipboard.writeText(textToCopy);
 
-            // Visual feedback
             const originalText = button.textContent;
             button.textContent = 'Copied!';
             button.classList.add('copied');
 
-            // Reset after 2 seconds
             setTimeout(() => {
                 button.textContent = originalText;
                 button.classList.remove('copied');
             }, 2000);
 
         } catch (err) {
-            // Fallback for older browsers
             const textArea = document.createElement('textarea');
             textArea.value = textToCopy;
             textArea.style.position = 'fixed';
@@ -55,7 +50,6 @@ copyButtons.forEach(button => {
     });
 });
 
-// Smooth scrolling for navigation links
 navLinks.forEach(link => {
     link.addEventListener('click', (e) => {
         e.preventDefault();
@@ -64,7 +58,7 @@ navLinks.forEach(link => {
         const targetElement = document.querySelector(targetId);
 
         if (targetElement) {
-            const headerOffset = 80; // Account for fixed header
+            const headerOffset = 80;
             const elementPosition = targetElement.getBoundingClientRect().top;
             const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
 
@@ -76,7 +70,6 @@ navLinks.forEach(link => {
     });
 });
 
-// Navigation background opacity on scroll
 let ticking = false;
 
 function updateNavBackground() {
@@ -101,7 +94,6 @@ function requestTick() {
 
 window.addEventListener('scroll', requestTick);
 
-// Intersection Observer for fade-in animations
 const observerOptions = {
     threshold: 0.1,
     rootMargin: '0px 0px -50px 0px'
@@ -116,7 +108,6 @@ const observer = new IntersectionObserver((entries) => {
     });
 }, observerOptions);
 
-// Observe elements for animation
 document.addEventListener('DOMContentLoaded', () => {
     const animateElements = document.querySelectorAll('.feature-card, .benchmark-card, .install-step');
 
@@ -128,12 +119,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Add mobile menu toggle (for future enhancement)
 function createMobileMenu() {
     const nav = document.querySelector('.nav-container');
     const navLinks = document.querySelector('.nav-links');
 
-    // Create hamburger button
     const hamburger = document.createElement('button');
     hamburger.className = 'mobile-menu-toggle';
     hamburger.innerHTML = `
@@ -150,7 +139,6 @@ function createMobileMenu() {
         padding: 4px;
     `;
 
-    // Style hamburger lines
     hamburger.querySelectorAll('span').forEach(span => {
         span.style.cssText = `
             width: 20px;
@@ -161,16 +149,13 @@ function createMobileMenu() {
         `;
     });
 
-    // Insert hamburger before nav links
     nav.insertBefore(hamburger, navLinks);
 
-    // Toggle mobile menu
     hamburger.addEventListener('click', () => {
         navLinks.classList.toggle('mobile-open');
         hamburger.classList.toggle('active');
     });
 
-    // Show hamburger on mobile
     const mediaQuery = window.matchMedia('(max-width: 768px)');
     function handleMediaQuery(e) {
         if (e.matches) {
@@ -199,7 +184,6 @@ function createMobileMenu() {
     mediaQuery.addListener(handleMediaQuery);
     handleMediaQuery(mediaQuery);
 
-    // Style mobile menu when open
     const style = document.createElement('style');
     style.textContent = `
         .nav-links.mobile-open {
@@ -223,12 +207,9 @@ function createMobileMenu() {
     document.head.appendChild(style);
 }
 
-// Initialize mobile menu
 document.addEventListener('DOMContentLoaded', createMobileMenu);
 
-// Keyboard navigation for accessibility
 document.addEventListener('keydown', (e) => {
-    // Escape key closes mobile menu
     if (e.key === 'Escape') {
         const navLinks = document.querySelector('.nav-links');
         const hamburger = document.querySelector('.mobile-menu-toggle');
@@ -239,12 +220,10 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Performance optimization: Debounce resize events
 let resizeTimeout;
 window.addEventListener('resize', () => {
     clearTimeout(resizeTimeout);
     resizeTimeout = setTimeout(() => {
-        // Handle any resize-specific logic here
         const navLinks = document.querySelector('.nav-links');
         if (window.innerWidth > 768 && navLinks.classList.contains('mobile-open')) {
             navLinks.classList.remove('mobile-open');
@@ -253,7 +232,6 @@ window.addEventListener('resize', () => {
     }, 250);
 });
 
-// Add loading state for code copy operations
 function showLoadingState(button) {
     const originalText = button.textContent;
     button.textContent = 'Copying...';
@@ -265,26 +243,21 @@ function showLoadingState(button) {
     };
 }
 
-// Enhanced copy functionality with loading states
 copyButtons.forEach(button => {
     const originalClickHandler = button.onclick;
     button.addEventListener('click', async (e) => {
         const resetLoading = showLoadingState(button);
 
-        // Small delay to show loading state
         await new Promise(resolve => setTimeout(resolve, 100));
 
         resetLoading();
     });
 });
 
-// Track analytics events (placeholder for future implementation)
 function trackEvent(eventName, properties = {}) {
-    // Placeholder for analytics tracking
     console.log('Event:', eventName, properties);
 }
 
-// Track copy events
 copyButtons.forEach(button => {
     button.addEventListener('click', () => {
         const targetId = button.getAttribute('data-target') || 'code-block';
@@ -292,7 +265,6 @@ copyButtons.forEach(button => {
     });
 });
 
-// Track navigation clicks
 navLinks.forEach(link => {
     link.addEventListener('click', () => {
         const section = link.getAttribute('href');

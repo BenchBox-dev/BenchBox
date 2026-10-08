@@ -1,12 +1,6 @@
-"""TPC-Havoc DataFrame variants for Q10.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Implements 10 structurally diverse variants of TPC-H Q10 (Returned Item Reporting).
-Q10 is a 4-table join finding customers with returned parts and their revenue impact.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -21,12 +15,7 @@ from benchbox.core.tpch.dataframe_queries import (
 from benchbox.core.tpchavoc.dataframe_queries._delegating_variants import make_variant_delegate
 from benchbox.core.tpchavoc.dataframe_queries.loader import JOIN_AGG_SORT, build_yaml_variants
 
-# TPC-H spec output order for Q10.
 _RESULT_COLUMNS = ["c_custkey", "c_name", "revenue", "c_acctbal", "n_name", "c_address", "c_phone", "c_comment"]
-
-# ---------------------------------------------------------------------------
-# v1: baseline
-# ---------------------------------------------------------------------------
 
 
 def q10_v1_expression_impl(ctx: DataFrameContext) -> Any:
@@ -35,11 +24,6 @@ def q10_v1_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q10_v1_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q10_pandas_base(ctx)
-
-
-# ---------------------------------------------------------------------------
-# v2: pre-filter - filter orders and lineitem before joining
-# ---------------------------------------------------------------------------
 
 
 def q10_v2_expression_impl(ctx: DataFrameContext) -> Any:
@@ -97,11 +81,6 @@ def q10_v2_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v3: column prune
-# ---------------------------------------------------------------------------
-
-
 def q10_v3_expression_impl(ctx: DataFrameContext) -> Any:
     customer = ctx.get_table("customer")
     orders = ctx.get_table("orders")
@@ -141,11 +120,6 @@ def q10_v3_expression_impl(ctx: DataFrameContext) -> Any:
 
 def q10_v3_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q10_pandas_base(ctx)
-
-
-# ---------------------------------------------------------------------------
-# v4: intermediate vars
-# ---------------------------------------------------------------------------
 
 
 def q10_v4_expression_impl(ctx: DataFrameContext) -> Any:
@@ -198,11 +172,6 @@ def q10_v4_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v5: pre-compute derived - add revenue column before groupby
-# ---------------------------------------------------------------------------
-
-
 def q10_v5_expression_impl(ctx: DataFrameContext) -> Any:
     customer = ctx.get_table("customer")
     orders = ctx.get_table("orders")
@@ -233,11 +202,6 @@ def q10_v5_expression_impl(ctx: DataFrameContext) -> Any:
 q10_v5_pandas_impl = make_variant_delegate(q10_v4_pandas_impl, name="q10_v5_pandas_impl", module=__name__)
 
 
-# ---------------------------------------------------------------------------
-# v6: chained style
-# ---------------------------------------------------------------------------
-
-
 def q10_v6_expression_impl(ctx: DataFrameContext) -> Any:
     col = ctx.col
     lit = ctx.lit
@@ -261,11 +225,6 @@ def q10_v6_pandas_impl(ctx: DataFrameContext) -> Any:
     return _q10_pandas_base(ctx)
 
 
-# ---------------------------------------------------------------------------
-# v7: join reorder - join orders before customer
-# ---------------------------------------------------------------------------
-
-
 def q10_v7_expression_impl(ctx: DataFrameContext) -> Any:
     customer = ctx.get_table("customer")
     orders = ctx.get_table("orders")
@@ -278,8 +237,6 @@ def q10_v7_expression_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Swapped: start from orders→customer. The join keeps the left key
-    # (o_custkey) and drops c_custkey, so restore it for the spec projection.
     return (
         orders.filter((col("o_orderdate") >= lit(start_date)) & (col("o_orderdate") < lit(end_date)))
         .join(customer, left_on="o_custkey", right_on="c_custkey")
@@ -304,7 +261,6 @@ def q10_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     start_date = params["start_date"]
     end_date = params["end_date"]
 
-    # Start from orders
     filtered_orders = orders[(orders["o_orderdate"] >= start_date) & (orders["o_orderdate"] < end_date)]
     joined = filtered_orders.merge(customer, left_on="o_custkey", right_on="c_custkey")
     filtered_li = lineitem[lineitem["l_returnflag"] == "R"]
@@ -322,11 +278,6 @@ def q10_v7_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v8: filter combination - combine date and returnflag filters
-# ---------------------------------------------------------------------------
-
-
 def q10_v8_expression_impl(ctx: DataFrameContext) -> Any:
     customer = ctx.get_table("customer")
     orders = ctx.get_table("orders")
@@ -342,7 +293,6 @@ def q10_v8_expression_impl(ctx: DataFrameContext) -> Any:
     return (
         customer.join(orders, left_on="c_custkey", right_on="o_custkey")
         .join(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-        # Combine both filters in single call after all joins
         .filter(
             (col("o_orderdate") >= lit(start_date))
             & (col("o_orderdate") < lit(end_date))
@@ -369,7 +319,6 @@ def q10_v8_pandas_impl(ctx: DataFrameContext) -> Any:
 
     joined = customer.merge(orders, left_on="c_custkey", right_on="o_custkey")
     joined = joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
-    # Combined filter
     joined = joined[
         (joined["o_orderdate"] >= start_date) & (joined["o_orderdate"] < end_date) & (joined["l_returnflag"] == "R")
     ]
@@ -386,22 +335,12 @@ def q10_v8_pandas_impl(ctx: DataFrameContext) -> Any:
     )
 
 
-# ---------------------------------------------------------------------------
-# v9: explicit sort
-# ---------------------------------------------------------------------------
-
-
 def q10_v9_expression_impl(ctx: DataFrameContext) -> Any:
     return _q10_expr_base(ctx)
 
 
 def q10_v9_pandas_impl(ctx: DataFrameContext) -> Any:
     return q10_v5_pandas_impl(ctx)
-
-
-# ---------------------------------------------------------------------------
-# v10: alternative formula - revenue = price - price*disc
-# ---------------------------------------------------------------------------
 
 
 def q10_v10_expression_impl(ctx: DataFrameContext) -> Any:
@@ -447,7 +386,6 @@ def q10_v10_pandas_impl(ctx: DataFrameContext) -> Any:
     joined = joined.merge(lineitem, left_on="o_orderkey", right_on="l_orderkey")
     joined = joined[joined["l_returnflag"] == "R"]
     joined = joined.merge(nation, left_on="c_nationkey", right_on="n_nationkey").copy()
-    # Alternative formula
     joined["revenue"] = joined["l_extendedprice"] - joined["l_extendedprice"] * joined["l_discount"]
 
     return (
@@ -459,9 +397,5 @@ def q10_v10_pandas_impl(ctx: DataFrameContext) -> Any:
         .head(20)
     )
 
-
-# ---------------------------------------------------------------------------
-# Registry
-# ---------------------------------------------------------------------------
 
 Q10_VARIANTS = build_yaml_variants(__file__, globals(), 10, JOIN_AGG_SORT)

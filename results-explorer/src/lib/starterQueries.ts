@@ -1,15 +1,3 @@
-/**
- * Starter SQL templates for the Query workbench.
- *
- * Each template reads from the canonical ten-table DuckDB browser schema
- * defined in `docs/development/browser-duckdb-schema.sql`. Templates are
- * grouped by analyst question category so the workbench can render them
- * as section headers. Category coverage mirrors the W5 checklist in
- * `_project/TODO/.../explorer-canonical-browser-duckdb-read-model.yaml`:
- * results, per-query timings, cohort comparisons, trust/tuning
- * breakdowns, and detail drill-down.
- */
-
 export type StarterQueryCategory =
   | "results"
   | "cost_and_deployment"

@@ -1,12 +1,3 @@
-"""Utilities for validating BenchBox dependency definitions.
-
-The dependency cleanup workstream relies on a single source of truth in
-``pyproject.toml`` and a pre-resolved ``uv.lock``. This module loads those files
-and verifies that all declared dependencies have corresponding locked versions
-that satisfy the declared specifiers. The CLI entry point can also emit a short
-compatibility matrix summarising Python support and optional extras.
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -21,28 +12,26 @@ from packaging.version import Version
 
 from benchbox.utils.printing import emit
 
-# Default file locations relative to the repository root
 _PYPROJECT_PATH = Path("pyproject.toml")
 _UV_LOCK_PATH = Path("uv.lock")
 
 
 class DependencyValidationError(RuntimeError):
-    """Raised when dependency validation fails."""
+    pass
 
 
 def _load_toml(path: Path) -> Mapping[str, object]:
-    if not path.exists():  # pragma: no cover - defensive guard
+    if not path.exists():  # pragma: no cover
         raise FileNotFoundError(f"Missing required file: {path}")
     return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
 def _collect_locked_versions(lock_data: Mapping[str, object]) -> dict[str, set[Version]]:
-    """Return a mapping of package name -> locked versions."""
 
     packages: dict[str, set[Version]] = {}
-    package_list: list[object] = list(lock_data.get("package", []))  # type: ignore[arg-type]
+    package_list: list[object] = list(lock_data.get("package", []))
     for pkg in package_list:
-        if not isinstance(pkg, Mapping):  # pragma: no cover - sanity
+        if not isinstance(pkg, Mapping):  # pragma: no cover
             continue
         name_obj = pkg.get("name")
         version_obj = pkg.get("version")
@@ -66,7 +55,6 @@ def _validate_requirement(requirement: Requirement, versions: set[Version]) -> b
         return False
     if requirement.specifier:
         return any(requirement.specifier.contains(version, prereleases=True) for version in versions)
-    # No specifier means any available version is acceptable
     return True
 
 
@@ -80,13 +68,9 @@ def validate_dependency_versions(
     pyproject_data: Mapping[str, object],
     lock_data: Mapping[str, object],
 ) -> list[str]:
-    """Validate that every declared dependency has a satisfying locked version.
-
-    Returns a list of problems discovered (empty list indicates success).
-    """
 
     project_section = pyproject_data.get("project")
-    if not isinstance(project_section, Mapping):  # pragma: no cover - misconfiguration guard
+    if not isinstance(project_section, Mapping):  # pragma: no cover
         raise DependencyValidationError("pyproject.toml missing [project] section")
 
     packages = _collect_locked_versions(lock_data)
@@ -121,7 +105,6 @@ def build_matrix_summary(
     pyproject_data: Mapping[str, object],
     lock_data: Mapping[str, object],
 ) -> dict[str, object]:
-    """Return a summary dictionary used for documentation and CLI output."""
 
     project_section = pyproject_data.get("project")
     optional_deps = {}
@@ -142,7 +125,7 @@ def build_matrix_summary(
 
 def _print_matrix(summary: Mapping[str, object]) -> None:
     python_range = summary.get("python_requires", "unspecified")
-    markers: list[str] = list(summary.get("resolution_markers", []))  # type: ignore[arg-type]
+    markers: list[str] = list(summary.get("resolution_markers", []))
     optional = summary.get("optional_dependencies", {})
 
     emit("Python compatibility")
@@ -200,5 +183,5 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 0
 
 
-if __name__ == "__main__":  # pragma: no cover - exercised via CLI
+if __name__ == "__main__":  # pragma: no cover
     sys.exit(main())

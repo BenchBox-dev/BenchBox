@@ -21,32 +21,33 @@ Fast, isolated tests for individual components without external dependencies.
 
 ```bash
 make test-unit
-# or
 uv run -- python -m pytest -m unit
 ```
+
+The two commands are alternatives.
 
 ### Integration Tests
 Tests that verify interaction between components, may use embedded databases.
 
 ```bash
 make test-integration
-# or
 uv run -- python -m pytest -m "integration and not live_integration"
 ```
+
+The two commands are alternatives.
 
 ### E2E Tests
 End-to-end tests that validate complete benchmark workflows through the CLI.
 
 ```bash
-# Quick E2E tests (dry-run mode)
 uv run -- python -m pytest -m e2e_quick
 
-# Local platform E2E tests (full execution)
 uv run -- python -m pytest -m e2e_local
 
-# All E2E tests
 uv run -- python -m pytest tests/e2e/
 ```
+
+The `e2e_quick` marker runs quick E2E tests in dry-run mode, `e2e_local` runs local platform E2E tests with full execution, and the last command runs all E2E tests.
 
 E2E tests cover:
 - CLI option validation (`--benchmark`, `--scale`, `--phases`, `--queries`, etc.)
@@ -63,12 +64,12 @@ Tests that execute real queries against database engines running in Docker conta
 No cloud credentials needed: just Docker.
 
 ```bash
-# Single platform
 make test-docker-clickhouse
 
-# All Docker platforms
 make test-docker-all
 ```
+
+The first command tests a single platform and the second tests all Docker platforms.
 
 See [Docker Integration Tests](docker-integration-tests.md) for platform list and setup.
 
@@ -77,9 +78,10 @@ Tests that require live database credentials and cloud platforms.
 
 ```bash
 make test-live
-# or
 uv run -- python -m pytest -m live_integration
 ```
+
+The two commands are alternatives.
 
 See [Live Integration Tests](live-integration-tests.md) for detailed setup instructions.
 

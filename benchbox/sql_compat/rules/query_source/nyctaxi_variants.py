@@ -1,11 +1,3 @@
-"""NYC Taxi query variant rules for Phase.QUERY_SOURCE.
-
-StarRocks lacks EXTRACT(DOW …) and EXTRACT(EPOCH FROM interval); ClickHouse
-lacks EXTRACT(DOW …) and EXTRACT(EPOCH FROM interval) as well but uses
-different native replacements.  All SQL constants are TEMPLATES - callers
-must apply date parameters via .format(**params) before executing.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction
@@ -21,12 +13,6 @@ from benchbox.sql_compat.registry import REGISTRY
 _B = "nyctaxi"
 _P = Phase.QUERY_SOURCE
 
-# ---------------------------------------------------------------------------
-# StarRocks variants
-#   EXTRACT(DOW FROM ts)                → DAYOFWEEK(ts) - 1
-#   weekend check IN (0, 6)             → DAYOFWEEK(ts) IN (1, 7)  (Sun=1, Sat=7)
-#   EXTRACT(EPOCH FROM (t2 - t1)) / 60 → TIMESTAMPDIFF(SECOND, t1, t2) / 60
-# ---------------------------------------------------------------------------
 
 STARROCKS_TRIPS_BY_DOW_SQL = """\
             SELECT
@@ -105,12 +91,6 @@ STARROCKS_FHV_BASE_VOLUME_SQL = """\
             ORDER BY trip_count DESC
             LIMIT 25"""
 
-# ---------------------------------------------------------------------------
-# ClickHouse variants
-#   EXTRACT(HOUR FROM ts)              → toHour(ts)
-#   EXTRACT(DOW FROM ts)               → toDayOfWeek(ts) % 7
-#   EXTRACT(EPOCH FROM (t2 - t1)) / 60 → dateDiff('second', t1, t2) / 60
-# ---------------------------------------------------------------------------
 
 CLICKHOUSE_TRIPS_BY_DOW_SQL = """\
             SELECT
@@ -189,9 +169,6 @@ CLICKHOUSE_FHV_BASE_VOLUME_SQL = """\
             ORDER BY trip_count DESC
             LIMIT 25"""
 
-# ---------------------------------------------------------------------------
-# StarRocks rule registrations
-# ---------------------------------------------------------------------------
 
 REGISTRY.register(
     CompatibilityDecision(
@@ -301,9 +278,6 @@ REGISTRY.register(
     query_id="fhv-base-volume",
 )
 
-# ---------------------------------------------------------------------------
-# ClickHouse rule registrations
-# ---------------------------------------------------------------------------
 
 REGISTRY.register(
     CompatibilityDecision(

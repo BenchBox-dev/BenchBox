@@ -1,9 +1,6 @@
-"""System profiling functionality with CLI display features.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from benchbox.cli.display import create_display_manager
 from benchbox.core.schemas import SystemProfile
@@ -21,18 +18,14 @@ console = quiet_console
 
 
 class SystemProfiler(CoreSystemProfiler):
-    """System profiling utilities with CLI display capabilities."""
-
     def __init__(self):
         super().__init__()
         self.console = quiet_console
 
     def display_profile(self, profile: SystemProfile, detailed: bool = False):
-        """Display system profile using standardized display."""
         display = create_display_manager(self.console)
         display.show_system_profile(profile, detailed)
 
-        # Show additional database availability info
         from benchbox.core.platform_registry import PlatformRegistry
 
         available_dbs = PlatformRegistry.get_available_platforms()
@@ -44,7 +37,6 @@ class SystemProfiler(CoreSystemProfiler):
         if not HAS_PSUTIL:
             self.console.print("[dim]Note: Install psutil for more detailed system information[/dim]")
 
-        # Recommendations
         if not available_dbs:
             console.print("\n[yellow]⚠️️  No database libraries detected. Consider installing:[/yellow]")
             console.print("   • DuckDB: [cyan]uv add duckdb[/cyan] (recommended)")

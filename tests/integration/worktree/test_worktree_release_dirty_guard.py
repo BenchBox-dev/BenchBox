@@ -1,5 +1,3 @@
-"""Regression tests for exact, non-destructive worktree lifecycle operations."""
-
 from __future__ import annotations
 
 import os
@@ -14,17 +12,6 @@ import pytest
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.fast,
-    # These drive `make worktree-create` / `make worktree-remove`, which are
-    # maintainer and agent tooling: they run on the maintainer's machine and in
-    # Linux CI, and no Windows support is claimed for them. On Windows CI they
-    # fail in the tooling rather than in the behaviour under test -- `awk:
-    # escape sequence \U treated as plain U`, `fatal: could not create leading
-    # directories` -- so 11 of the 18 have failed every nightly run, taking
-    # Nightly Validation red with them.
-    #
-    # This does drop the 7 that currently pass on Windows. That is the trade,
-    # stated rather than hidden: a module whose subject is a POSIX make target
-    # was not meaningfully covering Windows with the other 11 broken.
     pytest.mark.skipif(
         sys.platform == "win32",
         reason="make worktree-* targets are POSIX shell tooling; not supported on Windows",
@@ -39,7 +26,7 @@ def run(cmd: list[str], cwd: Path, **kwargs) -> subprocess.CompletedProcess[str]
 
 
 def init_feature_repo(path: Path) -> tuple[Path, Path]:
-    """Create an isolated repository with a linked worktree whose path has spaces."""
+
     path.mkdir()
     run(["git", "init", "-q"], path)
     run(["git", "config", "user.email", "test@example.com"], path)
@@ -54,7 +41,7 @@ def init_feature_repo(path: Path) -> tuple[Path, Path]:
 
 
 def init_repo_with_origin(path: Path) -> Path:
-    """Create a local-only origin so creation tests never use the shared clone or network."""
+
     path.mkdir()
     run(["git", "init", "-q"], path)
     run(["git", "config", "user.email", "test@example.com"], path)

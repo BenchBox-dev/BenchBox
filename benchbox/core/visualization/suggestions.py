@@ -1,5 +1,3 @@
-"""Shared result-aware chart recommendation helpers."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -11,8 +9,6 @@ from benchbox.core.visualization.utils import is_power_run_result
 
 @dataclass(frozen=True)
 class VisualizationDataProfile:
-    """Normalized result-set facts used for chart applicability decisions."""
-
     result_count: int
     platforms: tuple[str, ...]
     total_queries: int
@@ -24,7 +20,6 @@ class VisualizationDataProfile:
     pairwise_eligible: bool
 
     def as_mcp_dict(self) -> dict[str, Any]:
-        """Return the MCP-compatible profile shape."""
         return {
             "result_count": self.result_count,
             "platforms": list(self.platforms),
@@ -38,15 +33,12 @@ class VisualizationDataProfile:
 
 @dataclass(frozen=True)
 class ChartRecommendation:
-    """Structured chart recommendation."""
-
     chart_type: str
     reason: str
     priority: str
     applicability: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        """Return the MCP-compatible recommendation shape."""
         result = {
             "chart_type": self.chart_type,
             "reason": self.reason,
@@ -58,7 +50,6 @@ class ChartRecommendation:
 
 
 def build_visualization_profile(results: list[Any]) -> VisualizationDataProfile:
-    """Build a shared profile for result-aware chart decisions."""
     total_queries = sum(len(getattr(result, "queries", []) or []) for result in results)
     has_phase_data = any(
         isinstance((getattr(result, "raw", {}) or {}).get("phases"), dict)
@@ -86,7 +77,6 @@ def build_visualization_profile(results: list[Any]) -> VisualizationDataProfile:
 
 
 def recommend_charts(results: list[Any]) -> list[ChartRecommendation]:
-    """Recommend semantic BenchBox chart IDs for normalized results."""
     profile = build_visualization_profile(results)
     recommendations: list[ChartRecommendation] = []
 
@@ -159,7 +149,6 @@ def recommend_charts(results: list[Any]) -> list[ChartRecommendation]:
 
 
 def select_primary_chart(results: list[Any]) -> ChartRecommendation:
-    """Select the primary chart recommendation."""
     profile = build_visualization_profile(results)
     if profile.has_power_data:
         return ChartRecommendation("power_bar", "Best for power-run or Power@Size results", "high")

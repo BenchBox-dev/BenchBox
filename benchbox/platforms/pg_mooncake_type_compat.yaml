@@ -1,26 +1,3 @@
-# pg_mooncake Column Type Compatibility Matrix
-#
-# Documents which PostgreSQL column types are supported for columnstore tables
-# in pg_mooncake. Columnstore tables store data as Parquet files with Iceberg
-# metadata via DuckDB. Type support is therefore bounded by what DuckDB can
-# represent in Parquet.
-#
-# Version tagging:
-#   The Docker image (mooncakelabs/pg_mooncake:latest) does not pin a version.
-#   This matrix was compiled from the pg_mooncake 0.1.x release notes and
-#   GitHub issues as of 2026-02. To verify live against the installed extension
-#   version, run:
-#     SELECT extversion FROM pg_extension WHERE extname = 'pg_mooncake';
-#   Then compare with https://github.com/Mooncake-Labs/pg_mooncake/releases
-#
-# Status values:
-#   supported   - Works as expected; no known caveats
-#   partial     - Works with caveats; see notes
-#   unsupported - Not representable in the columnstore (DuckDB/Parquet)
-#
-# Parquet mapping column shows the physical Parquet/DuckDB type used for storage.
-# Precision loss or semantic changes are noted where applicable.
-
 pg_mooncake_version_range: "0.1.x"
 generated_from: "pg_mooncake release notes, GitHub issues, and DuckDB Parquet type mapping"
 generated_date: "2026-02-18"
@@ -29,7 +6,6 @@ note: >
   above to confirm the installed version before relying on this matrix.
 
 types:
-  # ── Numeric types ──────────────────────────────────────────────────────────
 
   - pg_type: boolean
     aliases: [bool]
@@ -71,8 +47,6 @@ types:
       digits may lose precision. Use double precision directly if exact decimal
       semantics are not required.
 
-  # ── Character types ────────────────────────────────────────────────────────
-
   - pg_type: text
     status: supported
     parquet_mapping: BYTE_ARRAY (STRING logical type)
@@ -95,13 +69,9 @@ types:
     status: unsupported
     notes: Internal single-byte pseudo-type. Not mappable to Parquet.
 
-  # ── Binary types ───────────────────────────────────────────────────────────
-
   - pg_type: bytea
     status: supported
     parquet_mapping: BYTE_ARRAY
-
-  # ── Date/time types ────────────────────────────────────────────────────────
 
   - pg_type: date
     status: supported
@@ -135,8 +105,6 @@ types:
       Parquet has no native interval type. pg_mooncake does not currently
       provide a serialization path for PostgreSQL interval values.
 
-  # ── Other supported types ──────────────────────────────────────────────────
-
   - pg_type: uuid
     status: supported
     parquet_mapping: FIXED_LEN_BYTE_ARRAY(16) (UUID logical type)
@@ -145,8 +113,6 @@ types:
     status: partial
     parquet_mapping: BYTE_ARRAY (STRING logical type)
     notes: Stored as raw JSON text. JSON operators work via DuckDB's JSON extension.
-
-  # ── Unsupported types ──────────────────────────────────────────────────────
 
   - pg_type: jsonb
     status: unsupported

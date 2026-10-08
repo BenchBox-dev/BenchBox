@@ -160,8 +160,9 @@ The result has these fields: `operation_id`, `success`, `write_duration_ms`, `ro
 ```python
 result = bench.execute_operation("transaction_commit_small", conn)
 print(result.operation_id, result.success, result.validation_passed)
-# transaction_commit_small True True
 ```
+
+This prints `transaction_commit_small True True`.
 
 ### run_benchmark(connection, operation_ids=None, categories=None)
 
@@ -178,8 +179,9 @@ print(result.operation_id, result.success, result.validation_passed)
 ```python
 results = bench.run_benchmark(conn)
 print(len(results), sum(r.success for r in results))
-# 23 18
 ```
+
+This prints `23 18`: the number of results, then the number that succeeded.
 
 ## Operation query methods
 

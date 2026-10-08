@@ -1,5 +1,3 @@
-"""Catalog loader + WriteOperation tests for aggregate-state ops."""
-
 from __future__ import annotations
 
 import io
@@ -157,7 +155,7 @@ operations:
 
 
 def test_real_catalog_exposes_two_aggregate_state_ops() -> None:
-    """The shipped operations.yaml must include both head sketch_df ops."""
+
     cat = load_write_primitives_catalog()
     ids = {op_id for op_id, op in cat.operations.items() if op.aggregate_state is not None}
     assert {"sketch_df_hll_persist_merge", "sketch_df_topk_persist_merge"} <= ids

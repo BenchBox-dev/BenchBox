@@ -1,4 +1,3 @@
-// DOM Elements
 const copyButtons = document.querySelectorAll('.copy-btn');
 const sectionLinks = document.querySelectorAll('a[href^="#"]');
 const sectionNav = document.querySelector('.section-nav');
@@ -57,7 +56,6 @@ window.addEventListener('scroll', scheduleCurrentSectionUpdate, { passive: true 
 window.addEventListener('resize', scheduleCurrentSectionUpdate);
 window.addEventListener('load', updateCurrentSection);
 
-// Copy to clipboard functionality
 copyButtons.forEach(button => {
     button.addEventListener('click', async () => {
         const targetId = button.getAttribute('data-target');
@@ -70,19 +68,16 @@ copyButtons.forEach(button => {
         try {
             await navigator.clipboard.writeText(textToCopy);
 
-            // Visual feedback
             const originalText = button.textContent;
             button.textContent = 'Copied!';
             button.classList.add('copied');
 
-            // Reset after 2 seconds
             setTimeout(() => {
                 button.textContent = originalText;
                 button.classList.remove('copied');
             }, 2000);
 
         } catch (err) {
-            // Fallback for older browsers
             const textArea = document.createElement('textarea');
             textArea.value = textToCopy;
             textArea.style.position = 'fixed';
@@ -110,7 +105,6 @@ copyButtons.forEach(button => {
     });
 });
 
-// Smooth scrolling for same-page links
 sectionLinks.forEach(link => {
     link.addEventListener('click', (e) => {
         e.preventDefault();
@@ -133,7 +127,6 @@ sectionLinks.forEach(link => {
     });
 });
 
-// Intersection Observer for fade-in animations
 const observerOptions = {
     threshold: 0.1,
     rootMargin: '0px 0px -50px 0px'
@@ -148,7 +141,6 @@ const observer = new IntersectionObserver((entries) => {
     });
 }, observerOptions);
 
-// Observe elements for animation
 document.addEventListener('DOMContentLoaded', () => {
     const animateElements = document.querySelectorAll('.feature-card, .benchmark-card, .install-step');
 
@@ -160,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// Add loading state for code copy operations
 function showLoadingState(button) {
     const originalText = button.textContent;
     button.textContent = 'Copying...';
@@ -172,26 +163,21 @@ function showLoadingState(button) {
     };
 }
 
-// Enhanced copy functionality with loading states
 copyButtons.forEach(button => {
     const originalClickHandler = button.onclick;
     button.addEventListener('click', async (e) => {
         const resetLoading = showLoadingState(button);
 
-        // Small delay to show loading state
         await new Promise(resolve => setTimeout(resolve, 100));
 
         resetLoading();
     });
 });
 
-// Track analytics events (placeholder for future implementation)
 function trackEvent(eventName, properties = {}) {
-    // Placeholder for analytics tracking
     console.log('Event:', eventName, properties);
 }
 
-// Track copy events
 copyButtons.forEach(button => {
     button.addEventListener('click', () => {
         const targetId = button.getAttribute('data-target') || 'code-block';
@@ -199,7 +185,6 @@ copyButtons.forEach(button => {
     });
 });
 
-// Track same-page navigation clicks
 sectionLinks.forEach(link => {
     link.addEventListener('click', () => {
         const section = link.getAttribute('href');

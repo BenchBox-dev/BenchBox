@@ -1,5 +1,3 @@
-"""Tests for Redshift query plan capture wiring."""
-
 from unittest.mock import MagicMock
 
 import pytest
@@ -59,7 +57,7 @@ class TestRedshiftPlanCapture:
 
     def test_execute_query_with_capture_adds_plan_fields(self, adapter, monkeypatch):
         conn, cursor = _make_connection()
-        cursor.fetchall.return_value = [(0, "col1")]  # query result rows
+        cursor.fetchall.return_value = [(0, "col1")]
 
         mock_plan = MagicMock()
         mock_plan.plan_fingerprint = "rs_fingerprint"
@@ -128,13 +126,6 @@ class TestRedshiftPlanCapture:
 
 
 class TestRedshiftStrictPlanCapture:
-    """strict_plan_capture must propagate PlanCaptureError from execute_query.
-
-    The capture call sits OUTSIDE execute_query's broad except: a capture
-    failure on a successful query must surface as PlanCaptureError in strict
-    mode, not mislabel the query status=FAILED.
-    """
-
     @staticmethod
     def _make_adapter(monkeypatch, strict):
         monkeypatch.setattr("benchbox.platforms.redshift.redshift_connector", MagicMock(), raising=False)
@@ -170,7 +161,7 @@ class TestRedshiftStrictPlanCapture:
         assert "query_plan" not in result
 
     def test_strict_mode_does_not_mask_real_query_failure(self, monkeypatch):
-        """A genuine SQL error must still return status=FAILED, not raise."""
+
         adapter = self._make_adapter(monkeypatch, strict=True)
         conn = MagicMock()
         conn.cursor.return_value.execute.side_effect = RuntimeError("no such table: t")

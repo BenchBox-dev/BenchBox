@@ -25,17 +25,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -53,7 +53,6 @@ jobs:
           set -euo pipefail
           mkdir -p lane_artifacts/corpus_archive
 
-          # Materialize the accepted-path union (includes published_only blobs).
           uv run python scripts/publication/create_ledger_seed.py \
             --accepted-ref origin/published-results \
             --ledger-seed publication/ledger-seed.json \
@@ -85,8 +84,6 @@ jobs:
           uv run python scripts/publication/create_ledger_seed.py \
             --accepted-ref origin/published-results \
             --output /tmp/ledger-seed.regen.json
-          # `source`/`generated_at` are snapshot metadata; the corpus content
-          # (union + dispositions + digests) must match the committed seed.
           uv run python - <<'PY'
           import json, sys
           keys = ("union", "dispositions", "digests", "published_only", "legacy_overlay", "count")
@@ -99,14 +96,14 @@ jobs:
           print(f"Ledger seed matches origin/published-results ({regen['count']} paths).")
           PY
       - name: Upload corpus archive artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: corpus_archive
           path: lane_artifacts/corpus_archive/
           retention-days: 7
 
       - name: Upload accepted bundles artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: accepted_bundles
           path: publication/ledger-seed.json
@@ -118,23 +115,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
 
       - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: "20"
           cache: npm
@@ -145,7 +142,7 @@ jobs:
         working-directory: results-explorer
 
       - name: Download corpus archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: corpus_archive
           path: downloaded-corpus/
@@ -162,13 +159,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # A7 explorer read model: DuckDB snapshot + copied bundles.
           uv run python _project/scripts/explorer_publish.py build \
             --data-dir results-data/ \
             --output results-explorer/public/data/
-          # A7 explorer SPA (emits index.html + hashed assets).
           npm run build --prefix results-explorer
-          # A6/A7 whole-site tree via hermetic assembler CLI.
           uv run python scripts/publication/assembler.py \
             --output-dir assembled-site \
             --receipt-path /tmp/assembled-site-receipt.json \
@@ -194,7 +188,7 @@ jobs:
             --require-artifact
 
       - name: Upload full site artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: full_site_deployment
           path: assembled-site/
@@ -206,17 +200,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
@@ -228,13 +222,13 @@ jobs:
           exit 1
 
       - name: Download full site deployment
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: full_site_deployment
           path: deployed-site/
 
       - name: Download corpus archive
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           name: corpus_archive
           path: downloaded-corpus/
@@ -254,10 +248,6 @@ jobs:
   rollback:
     name: Roll Forward to Last-Known-Good & Freeze Promotions
     needs: [build, assemble, verify]
-    # M5: any non-success outcome of assemble/verify (failure OR cancellation)
-    # triggers recovery. A `build` failure is deliberately excluded: nothing is
-    # assembled or deployed in that case, so there is no promotion state to
-    # freeze -- the cutover simply did not occur.
     if: >-
       always() && (
         (needs.build.result == 'success' && (needs.assemble.result != 'success' || needs.verify.result != 'success'))
@@ -266,23 +256,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
 
       - name: Install dependencies
         run: uv sync --group dev
 
       - name: Set up Node.js
-        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: "20"
           cache: npm
@@ -308,8 +298,6 @@ jobs:
           fi
           echo "target_sha=$TARGET" >> "$GITHUB_OUTPUT"
           git fetch --no-tags origin "$TARGET"
-          # Roll FORWARD: materialise the known-good tree in a side worktree.
-          # No branch is moved; nothing is checked out over the working tree.
           git worktree add ../known-good "$TARGET"
           echo "Known-good release tree materialised at ../known-good ($TARGET)"
 
@@ -423,14 +411,14 @@ jobs:
           cat rollback-receipt/promotion_failed.json
 
       - name: Upload restored full-site deployment
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: restored_full_site
           path: restored-site/
           retention-days: 90
 
       - name: Upload promotion_failed receipt
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: promotion_failed
           path: rollback-receipt/

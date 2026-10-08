@@ -1,5 +1,3 @@
-"""StarRocks integration smoke tests with stubbed pymysql."""
-
 import pytest
 
 from .common import StarRocksStubState, install_starrocks_stub
@@ -13,7 +11,7 @@ pytestmark = [
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_starrocks_smoke_basic(monkeypatch, tmp_path):
-    """Test basic StarRocks adapter workflow."""
+
     state: StarRocksStubState = install_starrocks_stub(monkeypatch)
 
     from benchbox.platforms.starrocks import StarRocksAdapter
@@ -36,7 +34,7 @@ def test_starrocks_smoke_basic(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_starrocks_smoke_query_execution(monkeypatch, tmp_path):
-    """Test StarRocks query execution."""
+
     state: StarRocksStubState = install_starrocks_stub(monkeypatch)
 
     from benchbox.platforms.starrocks import StarRocksAdapter

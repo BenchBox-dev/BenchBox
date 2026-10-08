@@ -1,5 +1,3 @@
-"""Fast-test coverage for tests/uat/orchestrator.py."""
-
 from __future__ import annotations
 
 import datetime as _dt
@@ -97,7 +95,6 @@ def test_enumerate_is_not_a_public_phase():
 
 
 def test_dry_run_passes_without_public_enumerate(tmp_path: Path):
-    """A valid dry_run sweep no longer exposes enumerate as its own phase."""
     cfg = validate_config(
         {
             "name": "smoke",
@@ -163,19 +160,7 @@ def test_explorer_smoke_uses_package_submissions_dir(tmp_path: Path):
     assert captured["bundles_dir"] == tmp_path / "submissions" / "smoke"
 
 
-# ---------------------------------------------------------------------------
-# uat-fail-advance-consistency w1: report-without-execute must abort.
-# ---------------------------------------------------------------------------
-
-
 def test_report_phase_aborts_when_execute_outcome_missing(tmp_path: Path):
-    """A report phase with no execute phase in this sweep must abort, not print an empty clean report.
-
-    Before this fix, `cells = execute_outcome.results if execute_outcome
-    else []` let the report phase proceed with zero rows and exit 0 -- an
-    empty report reads as a clean sweep. validate/package already abort in
-    this situation; report must match.
-    """
     cfg = validate_config({"name": "report-only", "phases": ["report"]})
 
     result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
@@ -189,7 +174,6 @@ def test_report_phase_aborts_when_execute_outcome_missing(tmp_path: Path):
 
 
 def test_dry_run_report_only_sweep_stays_exit_zero(tmp_path: Path):
-    """Dry-run sweeps skip all phases upstream of the phase-specific branches -- must stay exit 0."""
     cfg = validate_config({"name": "report-only-dry-run", "dry_run": True, "phases": ["report"]})
 
     result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
@@ -199,14 +183,7 @@ def test_dry_run_report_only_sweep_stays_exit_zero(tmp_path: Path):
     assert result.phase_exit_codes == {"report": 0}
 
 
-# ---------------------------------------------------------------------------
-# uat-fail-advance-consistency w2: explorer_smoke corpus failures abort;
-# node-missing is a recorded, visible skip.
-# ---------------------------------------------------------------------------
-
-
 def test_explorer_smoke_corpus_failure_emits_abort_artifacts(tmp_path: Path):
-    """A structured explorer_smoke corpus failure flows through _emit_abort_artifacts, not an uncaught raise."""
     cfg = validate_config(
         {
             "name": "explorer-corpus-fail",
@@ -256,7 +233,6 @@ def test_explorer_smoke_corpus_failure_emits_abort_artifacts(tmp_path: Path):
 
 
 def test_explorer_smoke_node_missing_records_sidecar_status_and_warns(tmp_path: Path, capsys):
-    """node-missing stays exit 0 but is recorded in the accounting sidecar plus a prominent stderr warning."""
     cfg = validate_config(
         {
             "name": "explorer-node-missing",
@@ -306,19 +282,11 @@ def test_explorer_smoke_node_missing_records_sidecar_status_and_warns(tmp_path: 
     stderr = capsys.readouterr().err
     assert "node not on PATH" in stderr
     assert "skipped_no_node" in stderr
-    # The recorded-path warning must claim durable recording, not hedge.
     assert "recorded in the accounting sidecar" in stderr
     assert "NOT durably recorded" not in stderr
 
 
 def test_explorer_smoke_node_missing_warns_not_durably_recorded_without_sidecar(tmp_path: Path, capsys):
-    """When no accounting sidecar exists (no execute phase ran), the warning must say so.
-
-    `update_accounting_sidecar` deliberately refuses to fabricate a sidecar
-    (its presence implies confirmed execute-derived counts), so the stderr
-    warning must state the status was NOT durably recorded instead of
-    implying it was.
-    """
     cfg = validate_config({"name": "explorer-node-missing-no-sidecar", "phases": ["explorer_smoke"]})
     skipped_result = type(
         "ExplorerResult",
@@ -344,12 +312,6 @@ def test_explorer_smoke_node_missing_warns_not_durably_recorded_without_sidecar(
 
 
 def test_package_phase_excludes_failed_cells_result_paths(tmp_path: Path):
-    """w4 regression: a failed official cell's exported JSON must not be packaged/submitted.
-
-    runner.py resolves a result path for official cells regardless of exit
-    code, so the package-phase input filter must check cell.status, not just
-    `result_path is not None`.
-    """
     cfg = validate_config(
         {
             "name": "smoke",
@@ -403,13 +365,6 @@ def test_package_phase_excludes_failed_cells_result_paths(tmp_path: Path):
 
 
 def test_write_cells_jsonl_persists_throughput_check(tmp_path: Path):
-    """w5 regression: throughput_check must survive the cells.jsonl round-trip.
-
-    Before this, CellResult.throughput_check -- the one diagnostic the
-    stream-count guard exists to surface -- was dropped by
-    cells_io.write_cells_jsonl, so a stream-count failure left durable
-    artifacts saying only failed/exit 1 with no explanation.
-    """
     cell = CellResult(
         platform="duckdb",
         benchmark="tpch",
@@ -637,9 +592,6 @@ def test_predictive_disk_floor_aborts_before_launching_oversized_known_cell(tmp_
         free_space_min_gib=3.0,
         budget_table={("duckdb", "tpch", 0.01): row},
         free_space_reader=lambda _path: 4.0,
-        # No benchmark_runs_dir: the reuse probe has no root to resolve, so the
-        # datagen reserve stands and the guard fires. Machine state under
-        # BENCHBOX_OUTPUT_DIR cannot reach this test.
         benchmark_runs_dir=None,
     )
 
@@ -675,7 +627,6 @@ def _passed_cell(platform: str, benchmark: str, scale: float, tmp_path: Path) ->
 
 
 def _complete_datagen(runs_dir: Path, benchmark: str, scale: float) -> Path:
-    """Materialize a finished datagen cache the way a generator leaves one."""
     import json
 
     from benchbox.utils.datagen_version import current_datagen_stamp
@@ -691,12 +642,6 @@ def _complete_datagen(runs_dir: Path, benchmark: str, scale: float) -> Path:
 
 
 def test_cell_datagen_dir_matches_the_cells_own_output_resolution(tmp_path: Path):
-    """UAT passes --output <runs>/datagen, which normalizes by REQUESTED benchmark.
-
-    A custom --output takes precedence over DATA_SOURCE_BENCHMARK sharing, so
-    read_primitives does not land in tpch's directory here even though it
-    consumes TPC-H data through the CLI's shared-root path.
-    """
     tpch = orchestrator._cell_datagen_dir(tmp_path, "tpch", 0.01)
     alias = orchestrator._cell_datagen_dir(tmp_path, "read_primitives", 0.01)
 
@@ -707,7 +652,6 @@ def test_cell_datagen_dir_matches_the_cells_own_output_resolution(tmp_path: Path
 
 
 def test_partial_datagen_cache_does_not_drop_the_reserve(tmp_path: Path):
-    """A directory populated but missing its manifest is an unfinished generation."""
     partial = orchestrator._cell_datagen_dir(tmp_path, "tpch", 0.01)
     assert partial is not None
     partial.mkdir(parents=True)
@@ -720,7 +664,6 @@ def test_partial_datagen_cache_does_not_drop_the_reserve(tmp_path: Path):
 
 
 def test_stamped_datagen_cache_marks_dataset_reusable(tmp_path: Path):
-    """A current-stamped manifest proves the dataset is finished and reusable."""
     import json
 
     from benchbox.utils.datagen_version import current_datagen_stamp
@@ -734,7 +677,6 @@ def test_stamped_datagen_cache_marks_dataset_reusable(tmp_path: Path):
 
 
 def test_failed_cell_does_not_mark_its_datagen_available(tmp_path: Path):
-    """A cell that died before finishing generation must not zero the next reserve."""
     cells = [
         CellResult(
             platform="duckdb",
@@ -773,15 +715,11 @@ def test_failed_cell_does_not_mark_its_datagen_available(tmp_path: Path):
 
     runner("duckdb", "tpch", 0.01, log_dir=tmp_path)
 
-    # The failed cell left no manifest, so the second cell must still reserve
-    # 2.0 datagen + 1.0 floor against 2.5 GiB free and be refused. Treating the
-    # dead cell as having produced the dataset would need only the floor.
     with pytest.raises(orchestrator.DiskFloorAbort, match="predictive disk check failed"):
         runner("clickhouse", "tpch", 0.01, log_dir=tmp_path)
 
 
 def test_existing_datagen_cache_is_not_reserved_again(tmp_path: Path):
-    """A rerun over a finished dataset must not reserve growth it will not create."""
     _complete_datagen(tmp_path, "tpch", 0.01)
 
     def base_runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
@@ -798,17 +736,10 @@ def test_existing_datagen_cache_is_not_reserved_again(tmp_path: Path):
         benchmark_runs_dir=tmp_path,
     )
 
-    # 1.5 GiB free is under the 2.0 datagen reserve but over the 1.0 floor: the
-    # cell is refused unless the finished cache is recognised.
     assert runner("duckdb", "tpch", 0.01, log_dir=tmp_path).status == "passed"
 
 
 def test_alias_workload_keeps_its_own_datagen_reserve(tmp_path: Path):
-    """tpch data on disk must not zero read_primitives' reserve under --output.
-
-    The two land in separate directories during a sweep, so the alias cell has
-    its own generation still to do.
-    """
     _complete_datagen(tmp_path, "tpch", 0.01)
 
     def base_runner(platform: str, benchmark: str, scale: float, **kwargs) -> CellResult:
@@ -828,16 +759,13 @@ def test_alias_workload_keeps_its_own_datagen_reserve(tmp_path: Path):
         benchmark_runs_dir=tmp_path,
     )
 
-    # tpch reuses its finished cache and passes on 1.5 GiB.
     assert runner("duckdb", "tpch", 0.01, log_dir=tmp_path).status == "passed"
 
-    # read_primitives writes elsewhere, so its 2.0 GiB datagen reserve stands.
     with pytest.raises(orchestrator.DiskFloorAbort, match="predictive disk check failed"):
         runner("duckdb", "read_primitives", 0.01, log_dir=tmp_path)
 
 
 def test_datagen_probe_uses_the_sweeps_configured_root(tmp_path: Path):
-    """The probe must read the sweep's root, not an ambient default."""
     configured = tmp_path / "configured"
     unrelated = tmp_path / "unrelated"
     _complete_datagen(unrelated, "tpch", 0.01)
@@ -856,8 +784,6 @@ def test_datagen_probe_uses_the_sweeps_configured_root(tmp_path: Path):
         benchmark_runs_dir=configured,
     )
 
-    # The cache under the unrelated root must not suppress the reserve for the
-    # empty configured root.
     with pytest.raises(orchestrator.DiskFloorAbort, match="predictive disk check failed"):
         runner("duckdb", "tpch", 0.01, log_dir=tmp_path)
 
@@ -866,13 +792,6 @@ def test_datagen_probe_uses_the_sweeps_configured_root(tmp_path: Path):
 
 
 def test_disk_floor_abort_emits_partial_artifacts(tmp_path: Path):
-    """A mid-sweep disk-floor abort still emits the #691 abort-safe artifacts.
-
-    Resume machinery (resume.json manifest) was retired -- see
-    uat-resume-retirement-artifact-durability -- but the abort-safe
-    provenance contract (cells.jsonl + partial report on abort) must
-    keep working.
-    """
     cfg = validate_config(
         {
             "name": "disk-floor-smoke",
@@ -925,11 +844,6 @@ def test_disk_floor_abort_emits_partial_artifacts(tmp_path: Path):
 
 
 def test_disk_floor_abort_threads_real_compatibility_pruned_without_reenumerating(tmp_path: Path):
-    """w5: abort artifacts on a mid-sweep disk-floor trip must use execute's
-    actual enumeration -- threaded onto the DiskFloorAbort exception -- not a
-    second independent re-enumeration (`_compatibility_pruned_for_config`)
-    that could diverge from what execute actually used.
-    """
     cfg = validate_config(
         {
             "name": "disk-floor-compat-smoke",
@@ -965,7 +879,7 @@ def test_disk_floor_abort_threads_real_compatibility_pruned_without_reenumeratin
         result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
 
     assert result.aborted_phase == "execute"
-    assert reenumerate_calls == []  # the disk-floor abort path must not re-enumerate
+    assert reenumerate_calls == []
     assert result.execute_outcome is not None
     assert result.execute_outcome.abort_kind == "disk_floor"
 
@@ -978,15 +892,6 @@ def test_disk_floor_abort_threads_real_compatibility_pruned_without_reenumeratin
 
 
 def test_execute_only_config_still_gets_disk_floor_watch(tmp_path: Path):
-    """An execute-only config (no `preflight` in `phases:`) still aborts on low disk.
-
-    Regression for uat-disk-gate-always-on w1/w4: the mid-sweep per-cell
-    watch and platform-boundary check used to be keyed on
-    `"preflight" in config.phases`, so a legitimate execute-only composition
-    ran with zero disk gating. `free_space_min_gib` defaults to 5.0, so the
-    gate is on by default; there is no `preflight` phase here to have
-    established it.
-    """
     cfg = validate_config(
         {
             "name": "execute-only-disk-smoke",
@@ -1022,13 +927,6 @@ def test_execute_only_config_still_gets_disk_floor_watch(tmp_path: Path):
 
 
 def test_zero_floor_warns_loudly_and_flags_accounting_sidecar(tmp_path: Path, capsys):
-    """`free_space_min_gib: 0` disables the gate but must say so loudly.
-
-    Regression for uat-disk-gate-always-on w2: the explicit opt-out prints a
-    `[disk-gate] DISABLED by config` warning at sweep start and records
-    `disk_gate_disabled: true` in the `cells.jsonl.accounting.json` sidecar
-    so the opt-out is visible without re-reading the YAML.
-    """
     cfg = validate_config(
         {
             "name": "zero-floor-smoke",
@@ -1070,20 +968,10 @@ def test_zero_floor_warns_loudly_and_flags_accounting_sidecar(tmp_path: Path, ca
     assert "[disk-gate] DISABLED by config" in capsys.readouterr().err
     accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
     assert accounting["disk_gate_disabled"] is True
-    # The memory gate was left at its default, so it is NOT flagged.
     assert accounting["memory_gate_disabled"] is False
 
 
 def test_zero_memory_floor_warns_loudly_and_flags_accounting_sidecar(tmp_path: Path, capsys):
-    """`free_memory_min_gib: 0` disables the memory gate and must say so loudly.
-
-    Mirrors the disk gate's opt-out disclosure exactly. Before this,
-    `memory_gate_disabled_warning` existed but had no production caller at
-    all -- the documented `[memory-gate] DISABLED by config` line was never
-    printed and nothing in the evidence artifacts recorded that the gate had
-    been switched off, so a sweep with the gate disabled was
-    indistinguishable from one where it ran and passed.
-    """
     cfg = validate_config(
         {
             "name": "zero-memory-floor-smoke",
@@ -1124,7 +1012,6 @@ def test_zero_memory_floor_warns_loudly_and_flags_accounting_sidecar(tmp_path: P
     assert result.aborted_phase is None
     stderr = capsys.readouterr().err
     assert "[memory-gate] DISABLED by config" in stderr
-    # The disk gate is at its default here, so only the memory warning fires.
     assert "[disk-gate] DISABLED by config" not in stderr
     accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
     assert accounting["memory_gate_disabled"] is True
@@ -1132,13 +1019,6 @@ def test_zero_memory_floor_warns_loudly_and_flags_accounting_sidecar(tmp_path: P
 
 
 def test_memory_floor_abort_records_memory_floor_abort_kind_in_gate_summary(tmp_path: Path):
-    """An execute-phase memory-floor abort is machine-distinguishable from a
-    disk-floor abort in the gate summary, not only by prose.
-
-    `ExecuteOutcome.abort_kind="memory_floor"` was write-only before this:
-    it reached no artifact, so every abort looked identical to a reader of
-    `uat_gate_summary.json`.
-    """
     cfg = validate_config(
         {
             "name": "memory-floor-abort",
@@ -1210,7 +1090,6 @@ def test_gate_summary_abort_kind_is_none_on_a_clean_sweep(tmp_path: Path):
 
 
 def test_execute_free_space_abort_emits_partial_artifacts(tmp_path: Path):
-    """An execute-outcome-reported free-space abort still emits abort artifacts (resume machinery retired)."""
     cfg = validate_config(
         {
             "name": "free-space-smoke",
@@ -1266,12 +1145,6 @@ def test_execute_free_space_abort_emits_partial_artifacts(tmp_path: Path):
 
 
 def test_two_sweeps_in_one_process_land_in_distinct_log_dirs(tmp_path: Path):
-    """Two same-day sweeps (no log_dir_override) land in distinct default dirs.
-
-    Regression test for w3 of uat-resume-retirement-artifact-durability: the
-    default logs_dir_template was {date}-only, so a second same-day sweep of
-    the same config silently overwrote the first run's mode="w" artifacts.
-    """
     cfg = validate_config(
         {
             "name": "collision-smoke",
@@ -1279,8 +1152,6 @@ def test_two_sweeps_in_one_process_land_in_distinct_log_dirs(tmp_path: Path):
             "output": {"logs_dir_template": str(tmp_path / "uat_{date}_{time}")},
         }
     )
-    # Each sweep calls _dt.datetime.now() twice: once for the log-dir stamp
-    # and once for the gate summary's completed_at (uat-release-gate-enforcement w1).
     fixed_times = iter(
         [
             _dt.datetime(2026, 5, 5, 9, 0, 0),
@@ -1302,8 +1173,6 @@ def _source_info() -> orchestrator.RunSourceInfo:
 
 
 def test_sweep_records_container_engine_identity_and_sidecar_field(tmp_path: Path):
-    """uat-container-engine-routing w2: engine identity is logged at sweep
-    start and threaded into the cells.jsonl accounting sidecar."""
     cfg = validate_config(
         {
             "name": "engine-identity",
@@ -1323,8 +1192,6 @@ def test_sweep_records_container_engine_identity_and_sidecar_field(tmp_path: Pat
 
 
 def test_sweep_records_engine_resolution_failure_without_aborting(tmp_path: Path):
-    """A resolution failure (no engine binary at all) is logged, not fatal --
-    a sweep with no Docker-managed platforms never needs one."""
     cfg = validate_config(
         {
             "name": "engine-identity-missing",
@@ -1360,15 +1227,6 @@ def test_write_cells_jsonl_persists_skipped_unreachable_sidecar(tmp_path: Path):
 
 
 def test_write_cells_jsonl_writes_cell_stream_before_accounting_sidecar(tmp_path: Path):
-    """cells.jsonl, then its accounting sidecar, then the finalize marker (w1/w4).
-
-    A crash between the row and sidecar writes must never leave a fresh sidecar
-    beside a stale (or absent) cell stream -- see
-    uat-resume-retirement-artifact-durability w4. The finalize marker is
-    written strictly last (uat-sweep-durability-and-signal-teardown w1) so its
-    presence guarantees both the rows and the sidecar preceded it. Record the
-    path order `atomic_write_text` is called in and assert that ordering.
-    """
     cells_jsonl = tmp_path / "cells.jsonl"
     written_paths: list[Path] = []
     real_atomic_write_text = cells_io.atomic_write_text
@@ -1412,13 +1270,10 @@ def test_abort_artifacts_thread_skipped_unreachable_when_outcome_missing(tmp_pat
         abort_reason="free space 1.0 GiB < cutoff 5.0 GiB",
         skipped_unreachable_count=2,
     )
-    # The abort report must reflect the unreachable cells skipped before the
-    # disk-floor trip, not the zero implied by execute_outcome=None.
     partial = log_dir / "matrix_summary.partial.tsv"
     text = partial.read_text(encoding="utf-8")
     assert "unreachable=2" in text
     assert "# UNREACHABLE_CELLS=2 release_gate_attention=required" in text
-    # And the sidecar carries the count for report regeneration.
     sidecar = (log_dir / "cells.jsonl").with_name("cells.jsonl.accounting.json")
     assert json.loads(sidecar.read_text(encoding="utf-8"))["skipped_unreachable_count"] == 2
 
@@ -1436,9 +1291,6 @@ def test_disk_floor_abort_carries_skipped_unreachable_count():
     def runner(platform, benchmark, scale, **kwargs):
         raise orchestrator.DiskFloorAbort("free space 1.0 GiB < cutoff 5.0 GiB")
 
-    # duckdb is processed first and recorded as skipped-unreachable; the
-    # reachable clickhouse-server stack then trips the disk-floor runner. The
-    # raised abort must carry the already-accumulated unreachable count (1).
     with (
         patch.object(exec_phase, "platform_is_reachable", side_effect=lambda p, **_: p != "duckdb"),
         patch.object(exec_phase, "probe_platform_reachability", side_effect=lambda p, **_: p != "duckdb"),
@@ -1454,7 +1306,6 @@ def test_disk_floor_abort_carries_skipped_unreachable_count():
 
 
 def _startup_fail_clickhouse_docker(argv, **kwargs):
-    """Fake docker runner: clickhouse compose-up fails, everything else succeeds."""
     action = docker_verb(argv)
     compose_file = argv[argv.index("-f") + 1] if "-f" in argv else ""
     if action == "up" and compose_path_ends_with(compose_file, "docker", "clickhouse", "docker-compose.yml"):
@@ -1463,14 +1314,6 @@ def _startup_fail_clickhouse_docker(argv, **kwargs):
 
 
 def test_disk_floor_abort_carries_startup_failed_count(tmp_path: Path):
-    """Mirror of test_disk_floor_abort_carries_skipped_unreachable_count for w3's counter.
-
-    clickhouse-server is processed first: its managed compose-up fails, so
-    its cells accumulate in `startup_failed` (the #700 advance path). The
-    non-Docker duckdb platform then trips the disk-floor runner. The raised
-    abort must carry the already-accumulated startup_failed count (1) via
-    `_annotate_disk_floor_abort`.
-    """
     cfg = validate_config(
         {
             "name": "disk-floor-annotate-startup-failed",
@@ -1497,14 +1340,6 @@ def test_disk_floor_abort_carries_startup_failed_count(tmp_path: Path):
 
 
 def test_disk_floor_abort_threads_startup_failed_count_into_sidecar_and_partial_report(tmp_path: Path):
-    """Orchestrator-level: startup_failed survives the synthesized-outcome disk-floor path.
-
-    run_sweep's DiskFloorAbort handler synthesizes an ExecuteOutcome with an
-    EMPTY startup_failed tuple (the Cell objects are lost crossing the
-    exception boundary), so the abort artifacts must be fed from the
-    exc-annotated `startup_failed_count` instead. Assert the durable
-    accounting sidecar and the partial report TSV both carry the real count.
-    """
     cfg = validate_config(
         {
             "name": "disk-floor-startup-failed-artifacts",
@@ -1539,19 +1374,11 @@ def test_disk_floor_abort_threads_startup_failed_count_into_sidecar_and_partial_
     assert result.aborted_phase == "execute"
     assert result.execute_outcome is not None
     assert result.execute_outcome.abort_kind == "disk_floor"
-    # The durable sidecar carries the exc-annotated count, not the
-    # synthesized outcome's empty tuple.
     accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
     assert accounting["startup_failed_count"] == 1
-    # And the partial report accounts for it (components precede the total).
     partial_text = (tmp_path / "logs" / "matrix_summary.partial.tsv").read_text(encoding="utf-8")
     assert "startup_failed=1" in partial_text
     assert "attempted=1 skipped=0 unreachable=0 startup_failed=1 died_mid_platform=0 total_defined=2" in partial_text
-
-
-# ---------------------------------------------------------------------------
-# cells_io.update_accounting_sidecar unit coverage (review REQUIRED 2).
-# ---------------------------------------------------------------------------
 
 
 def test_update_accounting_sidecar_returns_false_and_creates_no_file_without_sidecar(tmp_path: Path):
@@ -1560,8 +1387,6 @@ def test_update_accounting_sidecar_returns_false_and_creates_no_file_without_sid
     recorded = cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
 
     assert recorded is False
-    # No sidecar is fabricated: presence implies confirmed execute-derived
-    # counts, which a patch-only write could not provide.
     assert not cells_jsonl.with_name("cells.jsonl.accounting.json").exists()
 
 
@@ -1601,14 +1426,7 @@ def test_update_accounting_sidecar_returns_false_on_corrupt_sidecar_without_clob
     recorded = cells_io.update_accounting_sidecar(cells_jsonl, explorer_smoke_status="skipped_no_node")
 
     assert recorded is False
-    # The corrupt sidecar is left untouched for post-mortem inspection, not
-    # overwritten with a fabricated payload.
     assert sidecar.read_text(encoding="utf-8") == "{not valid json"
-
-
-# ---------------------------------------------------------------------------
-# uat-release-gate-enforcement w1: every sweep writes uat_gate_summary.json.
-# ---------------------------------------------------------------------------
 
 
 def _read_gate_summary(log_dir: Path) -> dict:
@@ -1616,7 +1434,6 @@ def _read_gate_summary(log_dir: Path) -> dict:
 
 
 def test_dry_run_sweep_writes_gate_summary_with_dry_run_verdict(tmp_path: Path):
-    """Dry-run sweeps still write the summary; the verdict marks them as non-evidence."""
     cfg = validate_config({"name": "gate-dry", "dry_run": True, "phases": ["preflight", "execute", "report"]})
 
     orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
@@ -1632,13 +1449,6 @@ def test_dry_run_sweep_writes_gate_summary_with_dry_run_verdict(tmp_path: Path):
 
 
 def test_gate_summary_completed_at_is_offset_aware(tmp_path: Path):
-    """#1162 review: completed_at must carry an explicit UTC offset, not a
-    naive local timestamp -- release_readiness_check.py evaluates the
-    committed evidence in a different process (CI), possibly in a different
-    timezone than the operator who ran the sweep. A naive timestamp there
-    gets reinterpreted against the *evaluating* process's local timezone,
-    which can misjudge freshness near the max-age cutoff.
-    """
     cfg = validate_config({"name": "gate-tz", "dry_run": True, "phases": ["preflight", "execute", "report"]})
 
     orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
@@ -1701,17 +1511,6 @@ def test_green_sweep_writes_green_gate_summary_with_accounting(tmp_path: Path):
 
 
 def test_green_sweep_with_unvalidated_cells_reports_unvalidated_count_not_zero(tmp_path: Path):
-    """Regression: uat_gate_summary.json must not silently disagree with matrix_summary.tsv.
-
-    tests.uat.phases.report.write_report already rolls an unvalidated DataFrame
-    cell into ReportSummary.unvalidated_count and the TSV's
-    `# UNVALIDATED_CELLS=N` footer; this pins that
-    orchestrator._accounting_for_gate_summary actually copies that count into
-    PhaseAccounting.unvalidated rather than leaving the gate summary --
-    the one artifact a release gate reads by machine, not by a human scanning
-    rows -- silently asserting 0. The verdict must still be green: unvalidated
-    is not a UAT cell failure.
-    """
     cfg = validate_config(
         {
             "name": "gate-green-unvalidated",
@@ -1766,7 +1565,6 @@ def test_green_sweep_with_unvalidated_cells_reports_unvalidated_count_not_zero(t
     assert payload["verdict"] == "green"
     assert payload["accounting"]["passed"] == 2
     assert payload["accounting"]["attempted"] == 2
-    # The one assertion this test exists for: not 0.
     assert payload["accounting"]["unvalidated"] == 1
 
     tsv_text = (tmp_path / "matrix_summary.tsv").read_text(encoding="utf-8")
@@ -1818,7 +1616,6 @@ def test_failed_cell_sweep_writes_red_gate_summary(tmp_path: Path):
 
 
 def test_aborted_sweep_writes_red_gate_summary_with_abort_fields(tmp_path: Path):
-    """An abort path also lands in the gate summary (partial-report accounting)."""
     cfg = validate_config({"name": "gate-abort", "phases": ["report"]})
 
     result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path)
@@ -1844,7 +1641,6 @@ def test_derive_verdict_matrix():
 
 
 def test_gate_summary_round_trips_and_ignores_unknown_keys(tmp_path: Path):
-    """Forward compat: a later summary with additive fields must still read."""
     from tests.uat import gate_summary
 
     cfg = validate_config({"name": "gate-rt", "dry_run": True, "phases": ["execute"]})
@@ -1859,11 +1655,6 @@ def test_gate_summary_round_trips_and_ignores_unknown_keys(tmp_path: Path):
     summary = gate_summary.read_gate_summary(path)
     assert summary.config_name == "gate-rt"
     assert summary.verdict == "dry_run"
-
-
-# ---------------------------------------------------------------------------
-# uat-release-gate-enforcement w3: combined release-gate evidence aggregation.
-# ---------------------------------------------------------------------------
 
 
 def _stage_summary(name: str, completed_at: str, **overrides):
@@ -1962,7 +1753,6 @@ def test_combined_evidence_red_on_wrong_stage_count_and_ordering_violation():
 
 
 def test_explorer_smoke_stage_not_flagged_when_not_configured():
-    """A stage whose phases list never included explorer_smoke is not held for skipping it."""
     from tests.uat import gate_summary
 
     stages = [
@@ -1982,8 +1772,6 @@ def test_explorer_smoke_stage_not_flagged_when_not_configured():
 
 
 def test_combined_evidence_red_when_stage_names_are_not_the_expected_set():
-    """R1(a): three green summaries from the WRONG configs (or the same config
-    thrice) must never mint release evidence."""
     from tests.uat import gate_summary
 
     same_stage_thrice = [
@@ -2010,8 +1798,6 @@ def test_combined_evidence_red_when_stage_names_are_not_the_expected_set():
 
 
 def test_combined_evidence_red_when_a_stage_has_no_floor_gates():
-    """R1(b): a stage whose config never armed the validator/cross-scale floors
-    is hollow evidence even if every phase exited 0."""
     from tests.uat import gate_summary
 
     stages = [
@@ -2032,16 +1818,6 @@ def test_combined_evidence_red_when_a_stage_has_no_floor_gates():
 
 
 def test_mid_platform_death_surfaces_in_every_machine_readable_rollup(tmp_path: Path):
-    """The threading test this batch keeps needing: a source change whose
-    consumers stay blind is the recurring failure mode here (cf. the
-    `unvalidated` accounting fix). A stack dying mid-platform must be
-    visible in ALL THREE roll-up surfaces built from the same sweep, not
-    just the ExecuteOutcome that produced it:
-
-      - matrix_summary.tsv's footer (human-readable)
-      - uat_gate_summary.json's accounting block (what a release gate reads)
-      - cells.jsonl's accounting sidecar (what `uat report` regenerates from)
-    """
     cfg = validate_config(
         {
             "name": "mid-platform-death-rollup",
@@ -2077,22 +1853,17 @@ def test_mid_platform_death_surfaces_in_every_machine_readable_rollup(tmp_path: 
     with patch.object(orchestrator.exec_phase, "run_execute", return_value=outcome):
         result = orchestrator.run_sweep(cfg, log_dir_override=tmp_path / "logs")
 
-    # 1. matrix_summary.tsv footer.
     tsv = (tmp_path / "logs" / "matrix_summary.tsv").read_text(encoding="utf-8")
     assert "died_mid_platform=3" in tsv
     assert "# DIED_MID_PLATFORM_CELLS=3 release_gate_attention=required" in tsv
 
-    # 2. uat_gate_summary.json accounting.
     gate = json.loads((tmp_path / "logs" / "uat_gate_summary.json").read_text(encoding="utf-8"))
     assert gate["accounting"]["died_mid_platform"] == 3
     assert gate["accounting"]["total_defined"] == 4
-    # A lost platform makes the stage red, not green.
     assert gate["verdict"] == "red"
 
-    # 3. cells.jsonl accounting sidecar (the regeneration input).
     accounting = json.loads((tmp_path / "logs" / "cells.jsonl.accounting.json").read_text(encoding="utf-8"))
     assert accounting["died_mid_platform_count"] == 3
-    # Disjoint from both neighbours -- not laundered into either.
     assert accounting["startup_failed_count"] == 0
     assert accounting["skipped_unreachable_count"] == 0
 
@@ -2100,9 +1871,6 @@ def test_mid_platform_death_surfaces_in_every_machine_readable_rollup(tmp_path: 
 
 
 def test_report_cli_json_surfaces_died_mid_platform_from_the_sidecar(tmp_path: Path, capsys):
-    """`uat report --json` is the fourth reader, and it rebuilds from the
-    sidecar rather than from the live outcome -- so it needs its own wiring
-    or a regenerated report silently loses the count."""
     cells_jsonl = tmp_path / "cells.jsonl"
     cell = CellResult(
         platform="duckdb",

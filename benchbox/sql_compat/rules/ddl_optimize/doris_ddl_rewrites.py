@@ -1,16 +1,3 @@
-"""Apache Doris DDL rewrite rules for Phase.DDL_OPTIMIZE.
-
-Doris OLAP requires substantial DDL transformations beyond what DuckDB generates:
-FOREIGN KEY and PRIMARY KEY constraints must be stripped, TIME must map to VARCHAR(8),
-STRING/TEXT must map to VARCHAR(65533), SMALLINT must map to INT, and DUPLICATE KEY /
-DISTRIBUTED BY HASH clauses must be injected (both required by Doris OLAP).
-
-DorisAdapter._inject_doris_ddl_clauses() is the runtime implementation.
-
-This rule registers the REWRITE_DDL intent for governance - compat_lint enforcement
-only; transformer_id is not resolved at runtime.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.rules._registration import register_ddl_rewrite

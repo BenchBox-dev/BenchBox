@@ -1,5 +1,3 @@
-"""Unit tests for live publication verification and receipt checking."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -43,7 +41,6 @@ class MockHTTPResponse:
 
 
 def test_extract_expected_checksums_various_formats() -> None:
-    # 1. Baseline format
     baseline_fmt = {
         "live_database": {
             "sha256": "aaaa111122223333444455556666777788889999000011112222333344445555",
@@ -55,7 +52,6 @@ def test_extract_expected_checksums_various_formats() -> None:
         extracted["/results/data/results.duckdb"] == "aaaa111122223333444455556666777788889999000011112222333344445555"
     )
 
-    # 2. Receipt format with checksums mapping
     receipt_fmt = {
         "checksums": {
             "/results/data/results.duckdb": "bbbb",
@@ -66,12 +62,10 @@ def test_extract_expected_checksums_various_formats() -> None:
     assert extracted2["/results/data/results.duckdb"] == "bbbb"
     assert extracted2["/index.html"] == "cccc"
 
-    # 3. Direct database_sha256 format
     direct_fmt = {"database_sha256": "dddd"}
     extracted3 = verify_live_mod.extract_expected_checksums(direct_fmt)
     assert extracted3["/results/data/results.duckdb"] == "dddd"
 
-    # 4. Artifact list format
     artifact_fmt = {
         "artifacts": [
             {"path": "/results/data/results.duckdb", "sha256": "eeee"},
@@ -356,20 +350,12 @@ def test_pre_deploy_without_manifests_fails() -> None:
 def test_defect_d3_availability_runs_without_evidence_acquisition(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Falsifying test for Defect D3:
-
-    Delete/expire evidence while service is up:
-    - availability remains measured and OK
-    - content and certification are UNAVAILABLE
-    - certification fails closed (certified is False)
-    """
     monkeypatch.setattr(
         urllib.request,
         "urlopen",
         lambda req, timeout=30: MockHTTPResponse(b"OK", status=200),
     )
 
-    # 1. Run live probe without any evidence or receipts
     probe_report = verify_live_mod.verify_live(
         base_url="https://benchbox.dev",
         endpoints=["/", "/docs/", "/docs/api.html", "/results/", "/results/data/results.duckdb"],
@@ -379,36 +365,26 @@ def test_defect_d3_availability_runs_without_evidence_acquisition(
     assert len(probe_report.probes) == 5
     assert all(p.ok for p in probe_report.probes)
 
-    # 2. Write probe report to diagnostic-reports directory (no evidence/receipts exist)
     reports_dir = tmp_path / "diagnostic-reports"
     reports_dir.mkdir()
     (reports_dir / "availability-report.json").write_text(json.dumps(probe_report.to_dict()))
 
-    # 3. Evaluate 5-dimension operational certification
     cert = verify_live_mod.evaluate_certification_reports(reports_dir)
 
-    # Availability must be measured as PASS
     assert cert.dimensions[verify_live_mod.DIMENSION_AVAILABILITY].status == verify_live_mod.STATUS_PASS
 
-    # Evidence is absent/expired: content identity, reconciliation, independence, and operational recovery are UNAVAILABLE
     assert cert.dimensions[verify_live_mod.DIMENSION_CONTENT_IDENTITY].status == verify_live_mod.STATUS_UNAVAILABLE
     assert cert.dimensions[verify_live_mod.DIMENSION_RECONCILIATION].status == verify_live_mod.STATUS_UNAVAILABLE
     assert cert.dimensions[verify_live_mod.DIMENSION_INDEPENDENCE].status == verify_live_mod.STATUS_UNAVAILABLE
     assert cert.dimensions[verify_live_mod.DIMENSION_OPERATIONAL_RECOVERY].status == verify_live_mod.STATUS_UNAVAILABLE
 
-    # Overall certification MUST fail closed (not certified)
     assert cert.certified is False
 
-    # CLI exits 1
     rc = verify_live_mod.main(["--certify-reports-dir", str(reports_dir)])
     assert rc == 1
 
 
 def test_defect_d3_return_503_fails_availability(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Falsifying test for Defect D3:
-
-    When endpoints return 503 while receipts are valid, availability fails immediately.
-    """
 
     def mock_503(req, timeout=30):
         raise urllib.error.HTTPError(
@@ -432,7 +408,6 @@ def test_defect_d3_return_503_fails_availability(tmp_path: Path, monkeypatch: py
     reports_dir.mkdir()
     (reports_dir / "availability-report.json").write_text(json.dumps(probe_report.to_dict()))
 
-    # Even if reconciliation report was valid
     (reports_dir / "reconciliation-report.json").write_text(json.dumps({"reconciled": True, "violations": []}))
 
     cert = verify_live_mod.evaluate_certification_reports(reports_dir)

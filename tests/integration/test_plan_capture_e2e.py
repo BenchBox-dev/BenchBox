@@ -1,23 +1,3 @@
-"""End-to-end test for the query plan capture pipeline.
-
-Covers the full path without mocks or external credentials:
-  DuckDB in-memory run with capture_plans=True
-  → plan_fingerprint in result dict (64-char SHA-256 hex)
-  → fingerprint stability across two identical runs
-  → render_plan() returns non-empty tree
-  → compare_query_plans() reports fingerprints_match for unchanged plans
-
-``TestPlanCaptureBundlePipeline`` additionally drives the serialization
-round-trip the adapter-level tests above do not: the captured plans are written
-to a result bundle (``<run>.json`` + ``<run>.plans.json``) via the real
-``ResultExporter``, rebuilt from the on-disk companion with the same
-``QueryPlanDAG.from_dict`` deserializer, and fed through the same functions the
-``show-plan`` (``render_plan``) and ``compare-plans`` (``compare_query_plans``)
-commands delegate to. A regression in any intermediate step (result dict → JSON
-bundle → rebuilt plan → render/compare) would be caught here — the gap the
-adapter-level unit tests leave open.
-"""
-
 import re
 
 import pytest
@@ -29,10 +9,6 @@ pytestmark = [
 ]
 
 _FP_RE = re.compile(r"^[a-f0-9]{64}$")
-# Two STRUCTURALLY DISTINCT plans (filter+projection vs aggregate) over the
-# zero-dependency ``range()`` table function, so the fingerprints genuinely
-# differ — making the stability / comparison / per-query assertions discriminate
-# between queries rather than passing on two identical trivial plans.
 _QUERIES = [
     ("q1", "SELECT i FROM range(5) t(i) WHERE i > 2"),
     ("q2", "SELECT count(*) AS c FROM range(5) t(i)"),
@@ -40,7 +16,6 @@ _QUERIES = [
 
 
 def _run_queries(capture_plans: bool) -> dict[str, dict]:
-    """Run _QUERIES through a fresh DuckDB in-memory adapter; return results keyed by query_id."""
     from benchbox.platforms.duckdb import DuckDBAdapter
 
     adapter = DuckDBAdapter(capture_plans=capture_plans)
@@ -61,7 +36,6 @@ def _run_queries(capture_plans: bool) -> dict[str, dict]:
 
 class TestPlanCaptureE2E:
     def test_fingerprints_present_and_well_formed(self):
-        """Each result has a 64-char hex fingerprint."""
         results = _run_queries(capture_plans=True)
         for query_id, _ in _QUERIES:
             result = results[query_id]
@@ -71,7 +45,6 @@ class TestPlanCaptureE2E:
             assert _FP_RE.match(fp), f"plan_fingerprint for {query_id} is not a 64-char hex: {fp!r}"
 
     def test_fingerprints_stable_across_runs(self):
-        """Running the same queries twice produces identical fingerprints."""
         run1 = _run_queries(capture_plans=True)
         run2 = _run_queries(capture_plans=True)
         for query_id, _ in _QUERIES:
@@ -81,7 +54,6 @@ class TestPlanCaptureE2E:
             assert fp1 == fp2, f"Fingerprint for {query_id} changed between runs: {fp1!r} != {fp2!r}"
 
     def test_no_fingerprint_without_capture(self):
-        """capture_plans=False must not produce a fingerprint."""
         results = _run_queries(capture_plans=False)
         for query_id, _ in _QUERIES:
             result = results[query_id]
@@ -90,7 +62,6 @@ class TestPlanCaptureE2E:
             )
 
     def test_render_plan_returns_non_empty_string(self):
-        """render_plan() should return a non-empty ASCII tree string."""
         from benchbox.core.query_plans.visualization import render_plan
 
         results = _run_queries(capture_plans=True)
@@ -101,7 +72,6 @@ class TestPlanCaptureE2E:
             assert isinstance(rendered, str) and rendered.strip(), f"render_plan() returned empty output for {query_id}"
 
     def test_compare_plans_fingerprints_match(self):
-        """compare_query_plans() must report fingerprints_match=True for identical runs."""
         from benchbox.core.query_plans.comparison import compare_query_plans
 
         run1 = _run_queries(capture_plans=True)
@@ -120,12 +90,6 @@ class TestPlanCaptureE2E:
 
 
 def _export_bundle(output_dir, execution_id: str):
-    """Run the trivial workload with capture, export a result bundle, return its main JSON path.
-
-    Mirrors a real ``benchbox run --capture-plans`` without a subprocess: the
-    DuckDB-captured plans flow into a ``BenchmarkResults`` and out through the
-    production ``ResultExporter`` (``<run>.json`` + companion ``<run>.plans.json``).
-    """
     from benchbox.core.results.exporter import ResultExporter
     from tests.fixtures.result_dict_fixtures import make_benchmark_results
 
@@ -165,16 +129,6 @@ def _export_bundle(output_dir, execution_id: str):
 
 
 def _load_bundle_plans(main_json) -> dict[str, tuple[str, object]]:
-    """Read a bundle's companion ``.plans.json`` and rehydrate each plan.
-
-    Returns ``query_id -> (serialized_fingerprint, QueryPlanDAG)``. This is the
-    serialization round-trip the ``show-plan`` / ``compare-plans`` commands rely on:
-    the plan lives in the ``.plans.json`` companion and is rebuilt with the same
-    ``QueryPlanDAG.from_dict`` the loader uses (``verify_fingerprint=True`` by
-    default — it recomputes the fingerprint from the rebuilt tree and only marks the
-    plan VERIFIED when that recompute matches the stored value), then handed to the
-    same comparison / visualization functions the CLI delegates to.
-    """
     import json
 
     from benchbox.core.results.query_plan_models import QueryPlanDAG
@@ -191,18 +145,7 @@ def _load_bundle_plans(main_json) -> dict[str, tuple[str, object]]:
 
 
 class TestPlanCaptureBundlePipeline:
-    """Full pipeline: run -> result bundle -> show-plan / compare-plans round-trip.
-
-    These cover the serialization steps the adapter-level tests skip — captured
-    plans written by the real ``ResultExporter`` and rebuilt from the on-disk
-    bundle — then exercise the same underlying functions ``show-plan`` (render) and
-    ``compare-plans`` (compare) delegate to. (The thin CLI wrappers themselves load
-    the bundle through ``load_result_file``, which is tested separately at the unit
-    level; here the focus is the bundle <-> plan-object serialization contract.)
-    """
-
     def test_bundle_plans_companion_has_well_formed_fingerprints(self, tmp_path):
-        """The exported bundle persists a 64-char hex fingerprint for every query."""
         import json
 
         main_json = _export_bundle(tmp_path / "run1", "run1")
@@ -218,13 +161,6 @@ class TestPlanCaptureBundlePipeline:
             assert _FP_RE.match(fp), f"fingerprint for {query_id} is not 64-char hex: {fp!r}"
 
     def test_serialized_plan_rehydrates_with_verified_structure(self, tmp_path):
-        """A plan rebuilt from the bundle recomputes a fingerprint matching disk.
-
-        ``from_dict`` recomputes the fingerprint from the *rebuilt tree* and marks the
-        plan VERIFIED only when it matches the stored value, so VERIFIED proves the
-        operator tree survived serialization structurally — not merely that a copied
-        scalar round-tripped.
-        """
         from benchbox.core.results.query_plan_models import FingerprintIntegrity
 
         main_json = _export_bundle(tmp_path / "run1", "run1")
@@ -238,18 +174,11 @@ class TestPlanCaptureBundlePipeline:
             )
 
     def test_distinct_queries_have_distinct_fingerprints(self, tmp_path):
-        """The two workload queries serialize different fingerprints.
-
-        Guards the discrimination the comparison/stability tests depend on: if both
-        plans hashed equal, those tests could not distinguish a swapped or duplicated
-        plan from a correct one.
-        """
         rehydrated = _load_bundle_plans(_export_bundle(tmp_path / "run1", "run1"))
         fingerprints = {fp for fp, _plan in rehydrated.values()}
         assert len(fingerprints) == len(_QUERIES), f"queries collapsed to one fingerprint: {fingerprints}"
 
     def test_fingerprints_stable_across_bundles(self, tmp_path):
-        """Two independent runs serialize identical fingerprints per query."""
         plans1 = _load_bundle_plans(_export_bundle(tmp_path / "run1", "run1"))
         plans2 = _load_bundle_plans(_export_bundle(tmp_path / "run2", "run2"))
         assert plans1 and plans1.keys() == plans2.keys()
@@ -257,7 +186,6 @@ class TestPlanCaptureBundlePipeline:
             assert plans1[query_id][0] == plans2[query_id][0], f"fingerprint for {query_id} changed across bundles"
 
     def test_show_plan_renders_from_bundle(self, tmp_path):
-        """show-plan path: rebuild the plan from the bundle, render a non-empty tree."""
         from benchbox.core.query_plans.visualization import render_plan
 
         rehydrated = _load_bundle_plans(_export_bundle(tmp_path / "run1", "run1"))
@@ -267,7 +195,6 @@ class TestPlanCaptureBundlePipeline:
             assert isinstance(rendered, str) and rendered.strip(), f"empty render for {query_id}"
 
     def test_compare_plans_unchanged_across_bundles(self, tmp_path):
-        """compare-plans path: two identical bundles report every plan unchanged."""
         from benchbox.core.query_plans.comparison import compare_query_plans
 
         plans1 = _load_bundle_plans(_export_bundle(tmp_path / "run1", "run1"))

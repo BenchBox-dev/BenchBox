@@ -1,5 +1,3 @@
-"""Parity tests for SQL vs DataFrame result output structure."""
-
 from __future__ import annotations
 
 import io
@@ -85,14 +83,11 @@ def _build_result(mode: str):
 
 
 class ExportParitySqlBenchmark(BaseBenchmark):
-    """Minimal SQL benchmark that exercises PlatformAdapter.run_benchmark()."""
-
     def __init__(self, output_dir: Path):
         self._name = "TPC-H"
         super().__init__(scale_factor=0.01, output_dir=output_dir)
         self.tables = {}
-        # Mirror the classification a real SF=0.01 TPC-H benchmark carries so
-        # the cross-mode contract covers the compliance field both surfaces emit.
+
         self.compliance_class = "unofficial_subscale"
 
     def generate_data(self) -> list[Path]:
@@ -114,8 +109,6 @@ class ExportParitySqlBenchmark(BaseBenchmark):
 
 
 class ExportParitySqlAdapter(PlatformAdapter):
-    """Small concrete SQL adapter for exported bundle parity."""
-
     @staticmethod
     def add_cli_arguments(parser) -> None:
         _ = parser
@@ -207,8 +200,6 @@ class ExportParitySqlAdapter(PlatformAdapter):
 
 
 class ExportParityDataFrameAdapter(BenchmarkExecutionMixin):
-    """Small concrete adapter for exported SQL/DataFrame bundle parity."""
-
     platform_name = "Polars"
     family = "expression"
 
@@ -252,8 +243,6 @@ class ExportParityDataFrameAdapter(BenchmarkExecutionMixin):
 
 
 class ExportParityBenchmark:
-    """TPC-H-shaped benchmark that lets the mixin skip real file loading."""
-
     name = "tpch"
     display_name = "TPC-H"
     scale_factor = 0.01

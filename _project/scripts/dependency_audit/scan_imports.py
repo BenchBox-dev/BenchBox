@@ -1,15 +1,3 @@
-"""Scan source for `import X` / `from X` for every declared dep.
-
-w2 of the dependency audit. Emits a JSON map { package -> [file:line] } so
-later steps can classify each dep as KEEP / FLAG-UNUSED / etc.
-
-Walks benchbox/, scripts/, tests/, docs/ and parses Python files via the `ast`
-module. ast is robust against multi-line `import` statements, conditional
-imports inside try/except, and string-content false positives that grep would
-hit. Markdown/.rst docs are scanned with regex since they may carry code blocks
-demonstrating dependency usage.
-"""
-
 from __future__ import annotations
 
 import ast
@@ -20,10 +8,6 @@ import sys
 import tomllib
 from collections import defaultdict
 
-# Package-name → top-level import-name(s) mapping. Most packages match their
-# install name, but several do not. Update this map whenever you discover a new
-# mismatch. Values are *sets* of import-names; an import-site for any of them
-# counts as a use of the package.
 PKG_TO_IMPORTS: dict[str, set[str]] = {
     "pyyaml": {"yaml"},
     "markdown-it-py": {"markdown_it"},
@@ -126,12 +110,6 @@ def import_to_top(s: str) -> str:
 
 
 def collect_python_imports(root: pathlib.Path, paths: list[str]) -> dict[str, list[str]]:
-    """Return { dotted_module_prefix -> [file:line] } across all .py files.
-
-    For `from X import a, b`, records both the bare `X` and the synthesized
-    `X.a`, `X.b` to make per-package matching reliable for namespace packages
-    like `google.cloud`.
-    """
     out: dict[str, list[str]] = defaultdict(list)
     files: list[pathlib.Path] = []
     for p in paths:
@@ -162,7 +140,6 @@ def collect_python_imports(root: pathlib.Path, paths: list[str]) -> dict[str, li
 
 
 def collect_doc_mentions(root: pathlib.Path) -> dict[str, list[str]]:
-    """Regex-scan docs/ for `import X` / `from X import` in code blocks."""
     out: dict[str, list[str]] = defaultdict(list)
     pat = re.compile(r"^\s*(?:from\s+([A-Za-z0-9_.]+)\s+import|import\s+([A-Za-z0-9_.]+))", re.MULTILINE)
     docs = root / "docs"
@@ -182,16 +159,13 @@ def collect_doc_mentions(root: pathlib.Path) -> dict[str, list[str]]:
 
 
 def package_uses(pkg: str, imports: dict[str, list[str]]) -> list[str]:
-    """Find import-sites for a package using PKG_TO_IMPORTS or a sensible default."""
     candidates = PKG_TO_IMPORTS.get(pkg)
     if candidates is None:
-        # Default heuristic: hyphens → underscores, take everything before any extras
         candidates = {pkg.replace("-", "_")}
     sites: list[str] = []
     for name in candidates:
         if name in imports:
             sites.extend(imports[name])
-        # Also count any submodule that starts with this name
         prefix = name + "."
         for k, v in imports.items():
             if k.startswith(prefix):
@@ -203,13 +177,10 @@ def main() -> int:
     root = pathlib.Path(__file__).resolve().parents[2]
     declared = collect_declared(root)
 
-    # benchbox/scripts/tests are runtime; docs/conf.py + docs/_static for build.
     py_imports = collect_python_imports(root, ["benchbox", "scripts", "tests", "docs/conf.py", "docs/_static"])
-    # _project/ tooling is captured separately so we can flag deps used only by tooling.
     tooling_imports = collect_python_imports(root, ["_project/scripts"])
     doc_imports = collect_doc_mentions(root)
 
-    # Merge - docs are tracked separately for visibility
     all_imports: dict[str, list[str]] = defaultdict(list)
     for k, v in py_imports.items():
         all_imports[k].extend(v)
@@ -245,7 +216,6 @@ def main() -> int:
         encoding="utf-8",
     )
 
-    # Print summary
     no_use = [p for p, sites in pkg_sites.items() if not sites and p not in pkg_doc_only and p not in pkg_tooling_only]
     print(f"declared packages: {len(declared)}")
     print(f"packages with python import sites: {sum(1 for v in pkg_sites.values() if v)}")

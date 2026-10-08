@@ -1,9 +1,6 @@
-"""Conservation and value-proof checks for the required local-engine cases.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -35,7 +32,7 @@ def test_inventory_is_exact_original_four_plus_sqlite() -> None:
 
 
 def test_every_required_case_is_a_node_pytest_collects() -> None:
-    """The inventory is compared with pytest's own collection, not with a copy of itself."""
+
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "--collect-only", "-q", "-o", "addopts=", "-p", "no:cacheprovider", MATRIX],
         cwd=ROOT,
@@ -231,8 +228,7 @@ def test_rows_match_rejects_same_cardinality_wrong_value() -> None:
 
 
 def test_rows_match_rejects_q6_boundary_exclusion_shape() -> None:
-    # A single-row aggregate whose predicate lost boundary rows has the same
-    # cardinality but a smaller value.
+
     with pytest.raises(required.RequiredCaseError, match="Q6"):
         required.check_rows_match([(1272913.9338,)], [(771253.5606,)], "6")
 

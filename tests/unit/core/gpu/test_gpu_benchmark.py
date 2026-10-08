@@ -1,9 +1,6 @@
-"""Tests for GPU benchmark implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from datetime import datetime, timezone
 from unittest.mock import patch
@@ -25,9 +22,8 @@ pytestmark = [
 ]
 
 
-# Check if pandas is available for data generation tests
 try:
-    import pandas  # noqa: F401
+    import pandas
 
     HAS_PANDAS = True
 except ImportError:
@@ -35,10 +31,7 @@ except ImportError:
 
 
 class TestGPUQueryResult:
-    """Tests for GPUQueryResult dataclass."""
-
     def test_basic_creation(self):
-        """Should create query result."""
         result = GPUQueryResult(
             query_id="aggregation_simple",
             success=True,
@@ -51,7 +44,6 @@ class TestGPUQueryResult:
         assert result.row_count == 1000
 
     def test_failed_result(self):
-        """Should create failed result."""
         result = GPUQueryResult(
             query_id="test",
             success=False,
@@ -62,7 +54,6 @@ class TestGPUQueryResult:
         assert result.error_message == "Out of memory"
 
     def test_with_gpu_metrics(self):
-        """Should include GPU metrics."""
         result = GPUQueryResult(
             query_id="test",
             success=True,
@@ -77,7 +68,6 @@ class TestGPUQueryResult:
         assert result.gpu_utilization_percent == 85.0
 
     def test_to_dict(self):
-        """Should convert to dictionary."""
         result = GPUQueryResult(
             query_id="test",
             success=True,
@@ -92,11 +82,8 @@ class TestGPUQueryResult:
 
 
 class TestGPUBenchmarkResults:
-    """Tests for GPUBenchmarkResults dataclass."""
-
     @pytest.fixture
     def gpu_info(self):
-        """Create mock GPU info."""
         return GPUInfo(
             available=True,
             device_count=1,
@@ -111,7 +98,6 @@ class TestGPUBenchmarkResults:
         )
 
     def test_basic_creation(self, gpu_info):
-        """Should create benchmark results."""
         results = GPUBenchmarkResults(
             gpu_info=gpu_info,
             started_at=datetime.now(timezone.utc),
@@ -121,7 +107,6 @@ class TestGPUBenchmarkResults:
         assert results.successful_queries == 0
 
     def test_add_successful_result(self, gpu_info):
-        """Should track successful results."""
         results = GPUBenchmarkResults(
             gpu_info=gpu_info,
             started_at=datetime.now(timezone.utc),
@@ -140,7 +125,6 @@ class TestGPUBenchmarkResults:
         assert results.peak_memory_mb == 10000
 
     def test_add_failed_result(self, gpu_info):
-        """Should track failed results."""
         results = GPUBenchmarkResults(
             gpu_info=gpu_info,
             started_at=datetime.now(timezone.utc),
@@ -156,7 +140,6 @@ class TestGPUBenchmarkResults:
         assert results.failed_queries == 1
 
     def test_add_multiple_results(self, gpu_info):
-        """Should aggregate multiple results."""
         results = GPUBenchmarkResults(
             gpu_info=gpu_info,
             started_at=datetime.now(timezone.utc),
@@ -176,7 +159,6 @@ class TestGPUBenchmarkResults:
         assert results.peak_memory_mb == 12000
 
     def test_success_rate(self, gpu_info):
-        """Should calculate success rate."""
         results = GPUBenchmarkResults(
             gpu_info=gpu_info,
             started_at=datetime.now(timezone.utc),
@@ -186,7 +168,6 @@ class TestGPUBenchmarkResults:
         assert results.success_rate == 0.75
 
     def test_avg_execution_time(self, gpu_info):
-        """Should calculate average execution time."""
         results = GPUBenchmarkResults(
             gpu_info=gpu_info,
             started_at=datetime.now(timezone.utc),
@@ -196,7 +177,6 @@ class TestGPUBenchmarkResults:
         assert results.avg_execution_time_ms == 200.0
 
     def test_complete(self, gpu_info):
-        """Should mark complete."""
         results = GPUBenchmarkResults(
             gpu_info=gpu_info,
             started_at=datetime.now(timezone.utc),
@@ -206,7 +186,6 @@ class TestGPUBenchmarkResults:
         assert results.completed_at is not None
 
     def test_complete_with_metrics(self, gpu_info):
-        """Should include metrics aggregate."""
         results = GPUBenchmarkResults(
             gpu_info=gpu_info,
             started_at=datetime.now(timezone.utc),
@@ -222,7 +201,6 @@ class TestGPUBenchmarkResults:
         assert results.avg_gpu_utilization == 75.0
 
     def test_to_dict(self, gpu_info):
-        """Should convert to dictionary."""
         results = GPUBenchmarkResults(
             gpu_info=gpu_info,
             started_at=datetime.now(timezone.utc),
@@ -237,16 +215,12 @@ class TestGPUBenchmarkResults:
 
 
 class TestGPUBenchmarkQueries:
-    """Tests for GPU benchmark query definitions."""
-
     def test_queries_defined(self):
-        """Should have benchmark queries defined."""
         assert len(GPU_BENCHMARK_QUERIES) > 0
         assert "aggregation_simple" in GPU_BENCHMARK_QUERIES
         assert "join_inner" in GPU_BENCHMARK_QUERIES
 
     def test_query_structure(self):
-        """Should have proper query structure."""
         for query_id, query_def in GPU_BENCHMARK_QUERIES.items():
             assert "name" in query_def
             assert "description" in query_def
@@ -254,7 +228,6 @@ class TestGPUBenchmarkQueries:
             assert "category" in query_def
 
     def test_query_categories(self):
-        """Should have expected categories."""
         categories = set(q["category"] for q in GPU_BENCHMARK_QUERIES.values())
         assert "aggregation" in categories
         assert "join" in categories
@@ -262,46 +235,37 @@ class TestGPUBenchmarkQueries:
 
 
 class TestGPUBenchmark:
-    """Tests for GPUBenchmark class."""
-
     @pytest.fixture
     def gpu_benchmark(self):
-        """Create benchmark instance."""
         return GPUBenchmark(scale_factor=0.1, seed=42)
 
     def test_basic_creation(self, gpu_benchmark):
-        """Should create benchmark."""
         assert gpu_benchmark.name == "GPU Acceleration Benchmark"
         assert gpu_benchmark.version == "1.0"
         assert gpu_benchmark.scale_factor == 0.1
 
     def test_supported_platforms(self, gpu_benchmark):
-        """Should have supported platforms."""
         platforms = gpu_benchmark.get_supported_platforms()
         assert "cudf" in platforms
         assert "dask_cudf" in platforms
 
     def test_get_queries(self, gpu_benchmark):
-        """Should get all queries."""
         queries = gpu_benchmark.get_queries()
         assert len(queries) > 0
         assert "aggregation_simple" in queries
 
     def test_get_query_categories(self, gpu_benchmark):
-        """Should get categories."""
         categories = gpu_benchmark.get_query_categories()
         assert len(categories) > 0
         assert "aggregation" in categories
 
     def test_get_queries_by_category(self, gpu_benchmark):
-        """Should get queries by category."""
         agg_queries = gpu_benchmark.get_queries_by_category("aggregation")
         assert len(agg_queries) >= 2
         assert "aggregation_simple" in agg_queries
 
     @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_is_gpu_available_true(self, mock_detect, gpu_benchmark):
-        """Should detect GPU available."""
         mock_detect.return_value = GPUInfo(
             available=True,
             device_count=1,
@@ -311,13 +275,11 @@ class TestGPUBenchmark:
 
     @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_is_gpu_available_false(self, mock_detect, gpu_benchmark):
-        """Should detect GPU not available."""
         mock_detect.return_value = GPUInfo(available=False)
         assert gpu_benchmark.is_gpu_available() is False
 
     @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_get_gpu_info(self, mock_detect, gpu_benchmark):
-        """Should get GPU info."""
         expected_info = GPUInfo(available=True, device_count=2)
         mock_detect.return_value = expected_info
         info = gpu_benchmark.get_gpu_info()
@@ -325,7 +287,6 @@ class TestGPUBenchmark:
 
     @pytest.mark.skipif(not HAS_PANDAS, reason="pandas not installed")
     def test_generate_data(self, gpu_benchmark, tmp_path):
-        """Should generate sample data."""
         gpu_benchmark.output_dir = tmp_path
         files = gpu_benchmark.generate_data(output_format="csv")
         assert "gpu_benchmark_main" in files
@@ -333,14 +294,12 @@ class TestGPUBenchmark:
 
     @pytest.mark.skipif(not HAS_PANDAS, reason="pandas not installed")
     def test_generate_data_parquet(self, gpu_benchmark, tmp_path):
-        """Should generate parquet data."""
         gpu_benchmark.output_dir = tmp_path
         files = gpu_benchmark.generate_data(output_format="parquet")
         assert "gpu_benchmark_main" in files
 
     @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_export_benchmark_spec(self, mock_detect, gpu_benchmark):
-        """Should export benchmark spec."""
         mock_detect.return_value = GPUInfo(available=True, device_count=1)
         spec = gpu_benchmark.export_benchmark_spec()
         assert spec["name"] == "GPU Acceleration Benchmark"
@@ -351,11 +310,8 @@ class TestGPUBenchmark:
 
 
 class TestGPUBenchmarkScaling:
-    """Tests for benchmark scale factor handling."""
-
     @pytest.mark.skipif(not HAS_PANDAS, reason="pandas not installed")
     def test_scale_factor_affects_data_size(self, tmp_path):
-        """Should scale data with scale factor."""
         small_bm = GPUBenchmark(scale_factor=0.1)
         small_bm.output_dir = tmp_path / "small"
         small_bm.output_dir.mkdir()
@@ -367,7 +323,6 @@ class TestGPUBenchmarkScaling:
         small_files = small_bm.generate_data(output_format="csv")
         large_files = large_bm.generate_data(output_format="csv")
 
-        # Large should produce bigger files
         import os
 
         small_size = os.path.getsize(small_files["gpu_benchmark_main"])
@@ -375,14 +330,7 @@ class TestGPUBenchmarkScaling:
         assert large_size > small_size
 
 
-# ---------------------------------------------------------------------------
-# Additional GPU benchmark coverage
-# ---------------------------------------------------------------------------
-
-
 class TestGPUBenchmarkExtraCoverage:
-    """Extra coverage for GPUBenchmark methods."""
-
     @pytest.fixture
     def gpu_benchmark(self):
         return GPUBenchmark(scale_factor=0.01, seed=42)
@@ -401,16 +349,14 @@ class TestGPUBenchmarkExtraCoverage:
 
     @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_is_gpu_available_uses_cache(self, mock_detect, gpu_benchmark):
-        """Second call to is_gpu_available uses cached _gpu_info."""
         mock_detect.return_value = GPUInfo(available=True, cudf_available=True, device_count=1)
         gpu_benchmark._gpu_info = None
-        _ = gpu_benchmark.is_gpu_available()  # first call populates cache
-        _ = gpu_benchmark.is_gpu_available()  # second call uses cache
-        assert mock_detect.call_count == 1  # should only call detect once
+        _ = gpu_benchmark.is_gpu_available()
+        _ = gpu_benchmark.is_gpu_available()
+        assert mock_detect.call_count == 1
 
     @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_get_gpu_info_uses_cache(self, mock_detect, gpu_benchmark):
-        """Second call to get_gpu_info uses cached _gpu_info."""
         mock_detect.return_value = GPUInfo(available=False)
         gpu_benchmark._gpu_info = None
         _ = gpu_benchmark.get_gpu_info()
@@ -418,17 +364,14 @@ class TestGPUBenchmarkExtraCoverage:
         assert mock_detect.call_count == 1
 
     def test_execute_gpu_query_success(self, gpu_benchmark):
-        """execute_gpu_query with a mock cudf df that supports len()."""
         mock_df = MagicMock()
         mock_df.__len__ = MagicMock(return_value=100)
 
         result = gpu_benchmark.execute_gpu_query(mock_df, "aggregation_simple", "SELECT COUNT(*) FROM data")
         assert isinstance(result, GPUQueryResult)
-        # May succeed or fail depending on dask_sql availability - just check type
 
     @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_run_benchmark_no_gpu_raises(self, mock_detect, gpu_benchmark):
-        """run_benchmark raises RuntimeError when GPU not available."""
         mock_detect.return_value = GPUInfo(available=False)
 
         with pytest.raises(RuntimeError, match="No GPU available"):
@@ -436,7 +379,6 @@ class TestGPUBenchmarkExtraCoverage:
 
     @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_run_benchmark_with_gpu(self, mock_detect, gpu_benchmark):
-        """run_benchmark with GPU available runs all queries."""
         gpu_info = GPUInfo(
             available=True,
             device_count=1,
@@ -456,7 +398,6 @@ class TestGPUBenchmarkExtraCoverage:
 
     @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_run_benchmark_with_query_ids(self, mock_detect, gpu_benchmark):
-        """run_benchmark with specific query_ids."""
         gpu_info = GPUInfo(available=True, device_count=1, cudf_available=True)
         mock_detect.return_value = gpu_info
         gpu_benchmark._gpu_info = gpu_info
@@ -468,7 +409,6 @@ class TestGPUBenchmarkExtraCoverage:
 
     @patch("benchbox.experimental.gpu.benchmark.detect_gpu")
     def test_run_benchmark_with_categories(self, mock_detect, gpu_benchmark):
-        """run_benchmark with category filter."""
         gpu_info = GPUInfo(available=True, device_count=1, cudf_available=True)
         mock_detect.return_value = gpu_info
         gpu_benchmark._gpu_info = gpu_info
@@ -476,10 +416,9 @@ class TestGPUBenchmarkExtraCoverage:
 
         mock_df = MagicMock()
         results = gpu_benchmark.run_benchmark(mock_df, categories=["aggregation"])
-        assert results.total_queries >= 2  # multiple aggregation queries
+        assert results.total_queries >= 2
 
     def test_compare_cpu_vs_gpu(self, gpu_benchmark):
-        """compare_cpu_vs_gpu should return comparison dict."""
         import numpy as np
         import pandas as pd
 

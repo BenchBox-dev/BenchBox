@@ -1,5 +1,3 @@
-"""Coverage tests for TPC-DI dimension/fact generator mixins."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,21 +22,20 @@ def _make_small_generator(tmp_path: Path) -> TPCDIDataGenerator:
         enable_progress=True,
         compression="none",
     )
-    # Keep datasets small so tests stay fast.
+
     gen.base_customers = 12
     gen.base_companies = 8
     gen.base_securities = 15
     gen.base_accounts = 20
     gen.base_trades = 50
-    # Keep output paths stable without compression side effects.
-    gen.compress_existing_file = lambda path, remove_original=True: path  # type: ignore[method-assign]
+
+    gen.compress_existing_file = lambda path, remove_original=True: path
     return gen
 
 
 def test_dimension_generators_cover_all_dimension_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     gen = _make_small_generator(tmp_path)
 
-    # Force memory-check/cleanup branch in DimCompany once.
     state = {"calls": 0}
 
     def _mem_check() -> bool:
@@ -68,7 +65,7 @@ def test_dimension_generators_cover_all_dimension_paths(tmp_path: Path, monkeypa
         assert p.exists()
         assert p.stat().st_size > 0
 
-    assert cleanup_calls  # memory-management branch executed
+    assert cleanup_calls
     assert gen.generation_stats["records_generated"] > 0
     assert gen.generation_stats["chunks_processed"] > 0
 
@@ -80,12 +77,10 @@ def test_fact_generators_cover_sequential_parallel_and_chunk_paths(tmp_path: Pat
     monkeypatch.setattr(gen, "_check_memory_usage", lambda: True)
     monkeypatch.setattr(gen, "_cleanup_memory", lambda: cleanup_calls.append(True))
 
-    # Sequential branch.
     facttrade_seq = Path(gen._generate_facttrade_data())
     assert facttrade_seq.exists()
     assert facttrade_seq.stat().st_size > 0
 
-    # Parallel decision branch in _generate_facttrade_data (without huge output cost).
     gen.base_trades = 100001
     delegated: dict[str, int] = {}
 
@@ -106,7 +101,6 @@ def test_fact_generators_cover_sequential_parallel_and_chunk_paths(tmp_path: Pat
     assert facttrade_parallel.exists()
     assert delegated["num_trades"] > 100000
 
-    # Direct parallel implementation path with manageable size.
     real_parallel = Path(
         gen._generate_facttrade_parallel(
             tmp_path / "FactTradeParallel.tbl",
@@ -120,7 +114,6 @@ def test_fact_generators_cover_sequential_parallel_and_chunk_paths(tmp_path: Pat
     assert real_parallel.exists()
     assert real_parallel.stat().st_size > 0
 
-    # Trade chunk helper.
     chunk = gen._generate_trade_chunk(
         start_id=1,
         end_id=5,
@@ -131,7 +124,6 @@ def test_fact_generators_cover_sequential_parallel_and_chunk_paths(tmp_path: Pat
     )
     assert len(chunk) == 4
 
-    # Remaining fact tables.
     other_facts = [
         Path(gen._generate_factcashbalances_data()),
         Path(gen._generate_factholdings_data()),

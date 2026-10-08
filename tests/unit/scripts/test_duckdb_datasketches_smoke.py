@@ -1,5 +1,3 @@
-"""Unit tests for the DuckDB datasketches extension smoke script."""
-
 import duckdb_datasketches_smoke as smoke
 import pytest
 

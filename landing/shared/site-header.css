@@ -188,12 +188,6 @@
     outline-offset: 2px;
 }
 
-/* Checked state is styled two ways: the pre-JS attribute selector below
-   matches the choice the head script already stamped on <html> before
-   the footer's hard-coded `aria-checked="system"` markup is corrected by
-   `applyTheme()`, and the `aria-checked` selector keeps it in sync once
-   the runtime script has run. A border plus background keeps the
-   selected option distinguishable by more than color alone. */
 .benchbox-site-footer-theme__option[aria-checked="true"],
 html[data-bb-theme-choice="system"] .benchbox-site-footer-theme__option[data-benchbox-theme-option="system"],
 html[data-bb-theme-choice="light"] .benchbox-site-footer-theme__option[data-benchbox-theme-option="light"],

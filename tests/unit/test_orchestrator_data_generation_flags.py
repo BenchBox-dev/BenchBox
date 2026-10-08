@@ -1,5 +1,3 @@
-"""Unit tests for CLI orchestrator data generation flags and detection."""
-
 import types
 from unittest.mock import Mock, patch
 
@@ -35,7 +33,6 @@ def _mk_config(name="tpcds", scale=0.01, **opts):
 def test_no_regenerate_fails_when_data_invalid():
     orchestrator = BenchmarkOrchestrator()
 
-    # Mock benchmark with a validator reporting regeneration needed
     dummy_benchmark = types.SimpleNamespace()
     dummy_benchmark._name = "TPC-DS Benchmark"
     dummy_benchmark.scale_factor = 0.01
@@ -44,14 +41,13 @@ def test_no_regenerate_fails_when_data_invalid():
     dummy_benchmark.generate_data = Mock()
 
     dummy_validator = Mock()
-    # should_regenerate = True (invalid/missing), with simple result object
+
     dv = types.SimpleNamespace(valid=False, issues=["missing tables"])
     dummy_validator.should_regenerate_data.return_value = (True, dv)
 
     dummy_generator = types.SimpleNamespace(validator=dummy_validator, force_regenerate=False)
     dummy_benchmark.data_generator = dummy_generator
 
-    # Patch orchestrator to return our dummy benchmark and avoid platform adapter
     with (
         patch.object(
             BenchmarkOrchestrator,
@@ -67,15 +63,12 @@ def test_no_regenerate_fails_when_data_invalid():
             types.SimpleNamespace(type="duckdb", name="duckdb", options={}, connection_params={}),
         )
 
-        # Expect failure due to no_regenerate
         assert getattr(result, "validation_status", "FAILED") == "FAILED"
 
 
 def test_force_regenerate_flag_passed_to_benchmark():
     orchestrator = BenchmarkOrchestrator()
 
-    # We will inspect the constructor call for benchmark class arguments.
-    # Patch benchmark mapping to a dummy class that records kwargs.
     created_instances = []
     constructed_objects = []
 

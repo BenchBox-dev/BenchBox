@@ -1,9 +1,6 @@
-"""GPU detection and capability checking.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -18,8 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class GPUVendor(Enum):
-    """Supported GPU vendors."""
-
     NVIDIA = "nvidia"
     AMD = "amd"
     INTEL = "intel"
@@ -27,20 +22,16 @@ class GPUVendor(Enum):
 
 
 class GPUComputeCapability(Enum):
-    """NVIDIA CUDA Compute Capability levels."""
-
-    PASCAL = "6.x"  # GTX 10xx, Tesla P100
-    VOLTA = "7.0"  # Tesla V100
-    TURING = "7.5"  # RTX 20xx, Tesla T4
-    AMPERE = "8.x"  # RTX 30xx, A100
-    ADA_LOVELACE = "8.9"  # RTX 40xx
-    HOPPER = "9.0"  # H100
+    PASCAL = "6.x"
+    VOLTA = "7.0"
+    TURING = "7.5"
+    AMPERE = "8.x"
+    ADA_LOVELACE = "8.9"
+    HOPPER = "9.0"
 
 
 @dataclass
 class GPUDevice:
-    """Represents a single GPU device."""
-
     index: int
     name: str
     vendor: GPUVendor
@@ -56,7 +47,6 @@ class GPUDevice:
     utilization_percent: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "index": self.index,
             "name": self.name,
@@ -76,8 +66,6 @@ class GPUDevice:
 
 @dataclass
 class GPUInfo:
-    """Information about all available GPUs."""
-
     available: bool = False
     device_count: int = 0
     devices: list[GPUDevice] = field(default_factory=list)
@@ -94,16 +82,13 @@ class GPUInfo:
 
     @property
     def total_memory_mb(self) -> int:
-        """Get total GPU memory across all devices."""
         return sum(d.memory_total_mb for d in self.devices)
 
     @property
     def total_free_memory_mb(self) -> int:
-        """Get total free GPU memory across all devices."""
         return sum(d.memory_free_mb for d in self.devices)
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "available": self.available,
             "device_count": self.device_count,
@@ -125,8 +110,6 @@ class GPUInfo:
 
 @dataclass
 class GPUCapabilities:
-    """GPU capabilities for benchmark validation."""
-
     info: GPUInfo
     supports_fp16: bool = False
     supports_fp64: bool = False
@@ -142,7 +125,6 @@ class GPUCapabilities:
     compute_tflops_fp16: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "info": self.info.to_dict(),
             "supports_fp16": self.supports_fp16,
@@ -161,7 +143,6 @@ class GPUCapabilities:
 
 
 def _detect_nvidia_smi() -> list[dict[str, Any]]:
-    """Detect NVIDIA GPUs using nvidia-smi."""
     try:
         result = subprocess.run(
             [
@@ -205,8 +186,6 @@ def _detect_nvidia_smi() -> list[dict[str, Any]]:
 
 
 def _detect_cuda_toolkit() -> tuple[bool, str]:
-    """Detect CUDA toolkit installation."""
-    # Check for nvcc (CUDA compiler)
     try:
         result = subprocess.run(
             ["nvcc", "--version"],
@@ -215,7 +194,6 @@ def _detect_cuda_toolkit() -> tuple[bool, str]:
             timeout=5,
         )
         if result.returncode == 0:
-            # Parse version from output like "Cuda compilation tools, release 12.1, V12.1.66"
             for line in result.stdout.split("\n"):
                 if "release" in line.lower():
                     parts = line.split("release")
@@ -226,16 +204,13 @@ def _detect_cuda_toolkit() -> tuple[bool, str]:
     except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
         pass
 
-    # Check for CUDA_HOME or CUDA_PATH environment variable
     cuda_home = os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH")
     if cuda_home and os.path.exists(cuda_home):
-        # Try to get version from version.txt or similar
         version_file = os.path.join(cuda_home, "version.txt")
         if os.path.exists(version_file):
             try:
                 with open(version_file, encoding="utf-8") as f:
                     content = f.read()
-                    # Parse "CUDA Version 12.1.66" format
                     if "CUDA Version" in content:
                         version = content.split("CUDA Version")[1].strip().split()[0]
                         return True, version
@@ -247,14 +222,12 @@ def _detect_cuda_toolkit() -> tuple[bool, str]:
 
 
 def _detect_rapids() -> tuple[bool, str, dict[str, str]]:
-    """Detect RAPIDS installation and available libraries."""
     rapids_available = False
     rapids_version = ""
     libraries: dict[str, str] = {}
 
-    # Check cuDF
     try:
-        import cudf  # type: ignore
+        import cudf
 
         libraries["cudf"] = cudf.__version__
         rapids_available = True
@@ -262,9 +235,8 @@ def _detect_rapids() -> tuple[bool, str, dict[str, str]]:
     except ImportError:
         pass
 
-    # Check cuML
     try:
-        import cuml  # type: ignore
+        import cuml
 
         libraries["cuml"] = cuml.__version__
         rapids_available = True
@@ -273,17 +245,15 @@ def _detect_rapids() -> tuple[bool, str, dict[str, str]]:
     except ImportError:
         pass
 
-    # Check cuGraph
     try:
-        import cugraph  # type: ignore
+        import cugraph
 
         libraries["cugraph"] = cugraph.__version__
     except ImportError:
         pass
 
-    # Check RMM (RAPIDS Memory Manager)
     try:
-        import rmm  # type: ignore
+        import rmm
 
         libraries["rmm"] = rmm.__version__
     except ImportError:
@@ -293,15 +263,9 @@ def _detect_rapids() -> tuple[bool, str, dict[str, str]]:
 
 
 def detect_gpu() -> GPUInfo:
-    """Detect available GPUs and return capability information.
-
-    Returns:
-        GPUInfo with detected GPU information
-    """
     info = GPUInfo()
 
     try:
-        # Try to detect NVIDIA GPUs via nvidia-smi
         nvidia_devices = _detect_nvidia_smi()
 
         if nvidia_devices:
@@ -326,12 +290,10 @@ def detect_gpu() -> GPUInfo:
                 )
                 info.devices.append(device)
 
-        # Detect CUDA toolkit
         cuda_available, cuda_version = _detect_cuda_toolkit()
         info.cuda_available = cuda_available
         info.cuda_version = cuda_version
 
-        # Detect RAPIDS
         rapids_available, rapids_version, libraries = _detect_rapids()
         info.rapids_available = rapids_available
         info.rapids_version = rapids_version
@@ -340,10 +302,9 @@ def detect_gpu() -> GPUInfo:
         info.cuml_available = "cuml" in libraries
         info.cuml_version = libraries.get("cuml", "")
 
-        # If we have cuDF, try to get more detailed GPU info via CUDA runtime
         if info.cudf_available and not info.available:
             try:
-                import cupy  # type: ignore
+                import cupy
 
                 device_count = cupy.cuda.runtime.getDeviceCount()
                 if device_count > 0:
@@ -371,11 +332,6 @@ def detect_gpu() -> GPUInfo:
 
 
 def get_gpu_capabilities() -> GPUCapabilities:
-    """Get GPU capabilities for benchmark configuration.
-
-    Returns:
-        GPUCapabilities with detailed capability information
-    """
     info = detect_gpu()
 
     capabilities = GPUCapabilities(info=info)
@@ -383,11 +339,9 @@ def get_gpu_capabilities() -> GPUCapabilities:
     if not info.available or not info.devices:
         return capabilities
 
-    # Determine capabilities based on compute capability
     primary_device = info.devices[0]
     cc = primary_device.compute_capability
 
-    # Parse compute capability (e.g., "8.6" -> major=8, minor=6)
     try:
         if "." in cc:
             major, minor = map(int, cc.split("."))
@@ -396,19 +350,14 @@ def get_gpu_capabilities() -> GPUCapabilities:
     except (ValueError, AttributeError):
         major, _minor = 0, 0
 
-    # FP16 support (Pascal and later)
     capabilities.supports_fp16 = major >= 6
 
-    # FP64 support (depends on card - Tesla cards have full FP64)
     capabilities.supports_fp64 = major >= 6
 
-    # Tensor cores (Volta and later)
     capabilities.supports_tensor_cores = major >= 7
 
-    # Multi-GPU support
     capabilities.supports_multi_gpu = info.device_count > 1
 
-    # Estimate memory bandwidth based on known architectures
     if "A100" in primary_device.name or "A10" in primary_device.name:
         capabilities.memory_bandwidth_gbps = 2039 if "A100" in primary_device.name else 600
     elif "H100" in primary_device.name:

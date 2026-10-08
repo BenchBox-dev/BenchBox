@@ -1,38 +1,7 @@
 name: Corpus Drift Check
 
-# Canary for the public results corpus.
-#
-# `sync-results-data-to-published.yml` refreshes develop's curated maintainer
-# subset and shared corrections on `published-results` while preserving the
-# complete archive. That refresh failed silently once already: on 2026-08-03 GitHub delivered
-# no push events for three consecutive develop merges (045a6c90fc, 37370ce5e4,
-# 703a269f7a) -- not even `Develop post-merge`, which fires on every push. One
-# of those was #1467, the commit that sanitized the corpus. The mirror never
-# opened, nothing alerted, and `published-results` served 183 bundles carrying
-# private absolute paths for a day until an unrelated review found it.
-#
-# Every drift guard in this repo is push-triggered, so every one of them shares
-# that failure mode. This canary is deliberately SCHEDULED: a cron run does not
-# depend on the delivery of any particular push event, so it still fires for a
-# commit whose push was dropped.
-#
-# It only reports. Opening the mirror stays a human step
-# (`gh workflow run sync-results-data-to-published.yml`) so a stale public
-# corpus is loud without this workflow gaining write access to a public branch.
-#
-# Direction matters. A two-way `git diff published develop` also surfaces
-# published-only paths (accepted archive submissions that intentionally need
-# not exist in develop's curated seed). Recommending a wipe-based full
-# mirror for those paths would *delete* public content. This canary classifies:
-#   - develop-ahead / content-changed alone: fail + recommend overlay mirror
-#   - published-only alone: report as info, never recommend a destructive mirror
-#   - mixed (develop-ahead AND published-only): fail for the stale paths, but
-#     never recommend a wipe-based full mirror; point at the union-overlay sync
-#     that preserves published-only community submissions
-
 on:
   schedule:
-    # Daily, offset from the other canaries to spread scheduler load.
     - cron: "37 6 * * *"
   workflow_dispatch:
 
@@ -49,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out develop
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
           ref: develop
           fetch-depth: 0
@@ -57,23 +26,16 @@ jobs:
       - name: Compare the mirrored corpus paths (directional)
         run: |
           set -euo pipefail
-          # Explicit refspec so origin/published-results is a named ref, not only FETCH_HEAD.
           git fetch --no-tags --depth=1 origin published-results:refs/remotes/origin/published-results
 
           PUB=origin/published-results
           DEV=HEAD
 
-          # Fail clearly rather than silently passing an empty comparison.
           if ! git cat-file -e "${PUB}:results-data" 2>/dev/null; then
             echo "::error::published-results has no results-data/ tree"
             exit 2
           fi
 
-          # Compare the shared corpus content, not the derived inventory.
-          # Two-tree compare (no dots): published-results is an orphan branch
-          # with no merge-base with develop. Each branch regenerates its own
-          # inventory, and published-results intentionally retains archive-only
-          # bundles, so the inventory is expected to differ after a union overlay.
           PATHSPECS=(
             'results-data/bundles'
             'results-data/CORPUS_NOTES.md'
@@ -82,10 +44,6 @@ jobs:
             'results-data/validate_corpus.py'
           )
 
-          # A = published, B = develop. Diff filter is relative to A→B.
-          #  A: paths present on develop only (or added) — develop is ahead.
-          #  D: paths present on published only — would be deleted by a full mirror.
-          #  M: content differs on both sides — develop is ahead with updates.
           DEVELOP_AHEAD=$(git diff --name-only --diff-filter=A "${PUB}" "${DEV}" -- "${PATHSPECS[@]}" || true)
           PUBLISHED_ONLY=$(git diff --name-only --diff-filter=D "${PUB}" "${DEV}" -- "${PATHSPECS[@]}" || true)
           CONTENT_CHANGED=$(git diff --name-only --diff-filter=M "${PUB}" "${DEV}" -- "${PATHSPECS[@]}" || true)
@@ -122,11 +80,6 @@ jobs:
           printf '%s\n' "${STALE_PATHS}" | head -40
           echo ""
           if [[ -n "${PUBLISHED_ONLY}" ]]; then
-            # Mixed drift: develop is ahead AND published has community-only
-            # paths. Never recommend a wipe-based full mirror of
-            # results-data/bundles — that deletes public content. The sync
-            # workflow applies a union overlay (checkout develop's files
-            # without git-rm of the tree) so published-only paths survive.
             echo "Published-only paths also exist (see notice above)."
             echo "Develop-ahead can be mirrored with the union-overlay sync that"
             echo "overwrites develop's files under results-data/bundles without"
@@ -143,16 +96,13 @@ jobs:
           exit 1
 
       - name: Install uv for the published-tip privacy scan
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78
         with:
           enable-cache: true
 
       - name: Privacy scan published-results tip for plaintext path leaks
         run: |
           set -euo pipefail
-          # Detector lives on develop; scanned bytes come from published-results.
-          # Report-only for the canary surface: exit non-zero on any leak so the
-          # scheduled run is loud, without granting write access to the public branch.
           git fetch --no-tags --depth=1 origin published-results:refs/remotes/origin/published-results
           PUB=origin/published-results
           if ! git cat-file -e "${PUB}:results-data/bundles" 2>/dev/null; then

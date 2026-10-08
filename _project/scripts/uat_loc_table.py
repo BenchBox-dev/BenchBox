@@ -1,43 +1,4 @@
 #!/usr/bin/env python3
-"""Enforce the UAT framework's per-bucket + total production-LOC ceilings.
-
-uat-spec-module-loc-ceiling-gate (supersedes uat-spec-module-loc-table-autogen):
-the UAT spec's charter argument needs one thing from the tree -- has UAT grown
-out of charter? -- and that question is answered by MAGNITUDE, not by an exact
-line count.
-
-The previous design answered it by committing an exact `wc -l` per module plus a
-generated per-bucket summary into `_project/specs/uat-framework.md`, checked
-byte-for-byte. That fixed staleness but made every UAT change rewrite the spec:
-all 11 commits touching the spec after the autogen landed (#1258) were 100%
-generated numbers, zero prose. Worse, the per-bucket summary is a handful of
-SHARED lines, so PRs touching completely disjoint UAT modules still conflicted
-there -- and conflicted again on every replayed commit during a rebase. It was
-the sole merge conflict across PRs #1618/#1627/#1631 simultaneously.
-
-So the numbers are no longer committed. `_project/specs/uat-loc-budget.json`
-commits CEILINGS instead, and this script measures the tree and fails when a
-bucket (or the total) exceeds its ceiling. An ordinary UAT change moves a number
-that nobody stores, so it produces no spec diff and no conflict. The file only
-changes when someone deliberately raises a ceiling -- which is exactly the
-charter decision the table existed to prompt, now explicit and enforced rather
-than eyeballed in a doc that was stale by default.
-
-This mirrors the repo's existing budget-gate pattern
-(`_project/evals/agent-instructions/scenarios.json`: committed `budgets`,
-measured actuals) and the Ruff C901 cap.
-
-What this script still owns:
-
-* the module -> bucket map below (unchanged: it reproduces, does not redefine,
-  the spec table's module set); and
-* a coverage drift guard -- the bucket map and the spec table cannot silently
-  disagree about which modules exist.
-
-Usage:
-    uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py            # report
-    uv run --project _project/scripts -- python _project/scripts/uat_loc_table.py --check    # gate (CI)
-"""
 
 from __future__ import annotations
 
@@ -51,11 +12,6 @@ SPEC_PATH = REPO_ROOT / "_project" / "specs" / "uat-framework.md"
 BUDGET_PATH = REPO_ROOT / "_project" / "specs" / "uat-loc-budget.json"
 UAT_DIR = REPO_ROOT / "tests" / "uat"
 
-# Module -> bucket map (the pinned "which modules / which bucket" definition,
-# reproduced from the spec table -- NOT redefined here). Module names are the
-# spec table's keys; paths resolve under tests/uat/. Order within a bucket is
-# cosmetic; the label order is the report's display order. Labels are the keys
-# of `budgets.buckets` in uat-loc-budget.json.
 BUCKETS: list[tuple[str, list[str]]] = [
     ("plumbing (orchestrator/config/`_cli`)", ["orchestrator.py", "config.py", "_cli.py"]),
     (
@@ -80,18 +36,14 @@ BUCKETS: list[tuple[str, list[str]]] = [
     ("package init markers", ["__init__.py", "phases/__init__.py"]),
 ]
 
-# Every module that must appear in the table exactly once (drift guard: the
-# table and the bucket map cannot silently disagree on the module set).
 ALL_MODULES: list[str] = [name for _label, names in BUCKETS for name in names]
 
 
 def loc(module: str) -> int:
-    """Raw line count for a module under tests/uat/ (the spec table's rule)."""
     return len((UAT_DIR / module).read_text(encoding="utf-8").splitlines())
 
 
 def _module_name_from_row(row: str) -> str | None:
-    """Extract the ``module`` key from a table data row, or None if not one."""
     cells = row.split("|")
     if len(cells) < 4:
         return None
@@ -112,7 +64,6 @@ def _validate_table_coverage(text: str) -> None:
 
 
 def load_budgets() -> tuple[dict[str, int], int]:
-    """Return (per-bucket ceilings, total ceiling) from the committed budget file."""
     try:
         raw = json.loads(BUDGET_PATH.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -139,7 +90,6 @@ def load_budgets() -> tuple[dict[str, int], int]:
 
 
 def measure() -> tuple[dict[str, int], int]:
-    """Return (per-bucket measured LOC, total measured LOC) for the tree."""
     measured = {label: sum(loc(n) for n in names) for label, names in BUCKETS}
     return measured, sum(measured.values())
 

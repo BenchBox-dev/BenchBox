@@ -1,5 +1,3 @@
-"""Tests for the reference usage transcript audit."""
-
 from __future__ import annotations
 
 import importlib.util

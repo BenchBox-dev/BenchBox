@@ -1,10 +1,3 @@
-"""Behavioral tests for PlatformRegistry: registration, lookup, filtering, capabilities.
-
-Targets uncovered paths in core/platform_registry.py to push line coverage
-from ~70% toward 85%.  Tests exercise real registry methods (no mocking of
-the registry itself) and assert on concrete values.
-"""
-
 import copy
 import json
 import subprocess
@@ -123,11 +116,6 @@ EXPECTED_ADAPTER_REGISTRATION_ORDER = (
 )
 
 
-# ---------------------------------------------------------------------------
-# Alias resolution
-# ---------------------------------------------------------------------------
-
-
 class TestAliasResolution:
     def test_resolve_sqlite3_alias(self):
         assert PlatformRegistry.resolve_platform_name("sqlite3") == "sqlite"
@@ -152,7 +140,6 @@ class TestAliasResolution:
         aliases = PlatformRegistry.get_all_aliases()
         assert isinstance(aliases, dict)
         assert "sqlite3" in aliases
-        # Mutating the returned dict should not affect the registry
         aliases["bogus_alias"] = "bogus"
         assert "bogus_alias" not in PlatformRegistry.get_all_aliases()
 
@@ -172,11 +159,6 @@ class TestAliasResolution:
         assert PlatformRegistry.resolve_platform_name(alias) == canonical
 
 
-# ---------------------------------------------------------------------------
-# Adapter registration & lookup
-# ---------------------------------------------------------------------------
-
-
 class TestAdapterRegistration:
     def setup_method(self):
         PlatformRegistry.clear_cache()
@@ -192,7 +174,6 @@ class TestAdapterRegistration:
         assert cls is DuckDBAdapter
 
     def test_get_adapter_class_resolves_alias(self):
-        """sqlite3 alias should resolve to the sqlite adapter class."""
         cls = PlatformRegistry.get_adapter_class("sqlite3")
         assert cls.__name__.lower().startswith("sqlite")
 
@@ -201,12 +182,9 @@ class TestAdapterRegistration:
             PlatformRegistry.get_adapter_class("nosuchplatform_xyz")
 
     def test_register_adapter_clears_availability_cache(self):
-        """Registering a new adapter should invalidate the availability cache."""
-        # Prime the cache
         PlatformRegistry.get_platform_availability()
         assert PlatformRegistry._availability_cache is not None
 
-        # Register a dummy adapter (use an existing one to avoid import issues)
         from benchbox.platforms.duckdb import DuckDBAdapter
 
         PlatformRegistry.register_adapter("duckdb", DuckDBAdapter)
@@ -218,7 +196,7 @@ class TestAdapterRegistration:
 
         monkeypatch.setattr(PlatformRegistry, "_adapters", {})
         with pytest.raises(TypeError, match="must subclass PlatformAdapter"):
-            PlatformRegistry.register_adapter("duckdb", NotAnAdapter)  # type: ignore[arg-type]
+            PlatformRegistry.register_adapter("duckdb", NotAnAdapter)
 
     def test_registration_rejects_alias_or_builtin_without_adapter(self, monkeypatch):
         from benchbox.platforms.duckdb import DuckDBAdapter
@@ -262,11 +240,6 @@ class TestAdapterRegistration:
             assert issubclass(adapter_class, PlatformAdapter)
 
 
-# ---------------------------------------------------------------------------
-# Availability detection
-# ---------------------------------------------------------------------------
-
-
 class TestPlatformAvailability:
     def setup_method(self):
         PlatformRegistry.clear_cache()
@@ -286,11 +259,6 @@ class TestPlatformAvailability:
         avail2 = PlatformRegistry.get_platform_availability()
         assert avail1 == avail2
         assert avail1 is not avail2
-
-
-# ---------------------------------------------------------------------------
-# Platform info
-# ---------------------------------------------------------------------------
 
 
 class TestPlatformInfo:
@@ -326,11 +294,6 @@ class TestPlatformInfo:
         assert isinstance(reqs, str)
 
 
-# ---------------------------------------------------------------------------
-# Filtering by category and adoption
-# ---------------------------------------------------------------------------
-
-
 class TestPlatformFiltering:
     def test_get_platforms_by_category_analytical(self):
         analytical = PlatformRegistry.get_platforms_by_category("analytical")
@@ -355,11 +318,6 @@ class TestPlatformFiltering:
     def test_get_platforms_by_adoption_nonexistent_returns_empty(self):
         result = PlatformRegistry.get_platforms_by_adoption("ultra_rare")
         assert result == []
-
-
-# ---------------------------------------------------------------------------
-# Capabilities & modes
-# ---------------------------------------------------------------------------
 
 
 class TestPlatformCapabilities:
@@ -395,13 +353,7 @@ class TestPlatformCapabilities:
     def test_get_dual_mode_platforms(self):
         dual = PlatformRegistry.get_dual_mode_platforms()
         assert isinstance(dual, list)
-        # datafusion supports both SQL and DataFrame
         assert "datafusion" in dual
-
-
-# ---------------------------------------------------------------------------
-# Deployment capabilities
-# ---------------------------------------------------------------------------
 
 
 class TestDeploymentCapabilities:
@@ -466,25 +418,16 @@ class TestDeploymentCapabilities:
 
     @pytest.mark.parametrize("platform", ["snowflake", "databricks", "polars", "sqlite"])
     def test_platforms_without_deployment_modes_accept_only_local(self, platform: str):
-        # Decision: a platform that declares no deployment modes keeps the
-        # implicit ``local`` deployment, so ``<platform>:local`` is accepted
-        # as the bare name while any other suffix is rejected.
         assert PlatformRegistry.get_available_deployment_modes(platform) == []
         assert PlatformRegistry.supports_deployment_mode(platform, "local") is True
         assert PlatformRegistry.supports_deployment_mode(platform, "cloud") is False
         assert PlatformRegistry.supports_deployment_mode(platform, "managed") is False
 
     def test_requires_cloud_storage_for_deployment_motherduck(self):
-        # MotherDuck managed deployment does not require cloud storage
         assert PlatformRegistry.requires_cloud_storage_for_deployment("motherduck") is False
 
     def test_requires_cloud_storage_for_deployment_unknown(self):
         assert PlatformRegistry.requires_cloud_storage_for_deployment("nosuchplatform_xyz") is False
-
-
-# ---------------------------------------------------------------------------
-# Platform family & inheritance
-# ---------------------------------------------------------------------------
 
 
 class TestPlatformFamilyAndInheritance:
@@ -501,16 +444,10 @@ class TestPlatformFamilyAndInheritance:
         assert PlatformRegistry.get_inherited_platform("motherduck") == "duckdb"
 
     def test_get_inherited_platform_duckdb_returns_none(self):
-        """DuckDB is a root platform, it does not inherit from anything."""
         assert PlatformRegistry.get_inherited_platform("duckdb") is None
 
     def test_get_inherited_platform_unknown_returns_none(self):
         assert PlatformRegistry.get_inherited_platform("nosuchplatform_xyz") is None
-
-
-# ---------------------------------------------------------------------------
-# Platform conflicts
-# ---------------------------------------------------------------------------
 
 
 class TestPlatformConflicts:
@@ -529,11 +466,6 @@ class TestPlatformConflicts:
     def test_unknown_platform_has_no_conflicts(self):
         conflicts = PlatformRegistry.get_platform_conflicts("nosuchplatform_xyz")
         assert conflicts == []
-
-
-# ---------------------------------------------------------------------------
-# _extract_requirement_package (static helper)
-# ---------------------------------------------------------------------------
 
 
 class TestExtractRequirementPackage:
@@ -557,16 +489,10 @@ class TestExtractRequirementPackage:
         assert PlatformRegistry._extract_requirement_package("") is None
 
     def test_none_input(self):
-        # Not a documented scenario but exercises the guard clause
         assert PlatformRegistry._extract_requirement_package(None) is None
 
     def test_whitespace_only_returns_none(self):
         assert PlatformRegistry._extract_requirement_package("   ") is None
-
-
-# ---------------------------------------------------------------------------
-# Typed platform manifest and drift behavior
-# ---------------------------------------------------------------------------
 
 
 class TestPlatformManifest:

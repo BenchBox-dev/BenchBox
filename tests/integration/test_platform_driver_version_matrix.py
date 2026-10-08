@@ -1,5 +1,3 @@
-"""Integration matrix tests for multi-version supported adapters and unsupported path regression."""
-
 from __future__ import annotations
 
 import pytest
@@ -11,11 +9,6 @@ pytestmark = [
     pytest.mark.fast,
 ]
 
-
-# --------------------------------------------------------------------------- #
-# Matrix: verify every adapter that declares a non-default capability actually
-# has the class attribute set correctly at import time.
-# --------------------------------------------------------------------------- #
 
 _SUPPORTED_ADAPTERS = [
     ("benchbox.platforms.duckdb", "DuckDBAdapter", DriverIsolationCapability.SUPPORTED),
@@ -68,7 +61,7 @@ _NOT_APPLICABLE_ADAPTERS = [
 
 
 def _import_adapter(module_path: str, class_name: str):
-    """Dynamically import an adapter class."""
+
     import importlib
 
     mod = importlib.import_module(module_path)
@@ -115,14 +108,7 @@ def test_not_applicable_adapters(module_path, class_name):
     assert adapter_cls.driver_isolation_capability == DriverIsolationCapability.NOT_APPLICABLE
 
 
-# --------------------------------------------------------------------------- #
-# Regression: unsupported isolation requests fail fast with actionable errors
-# --------------------------------------------------------------------------- #
-
-
 class TestUnsupportedIsolationFailFast:
-    """Verify that requesting isolation on non-SUPPORTED adapters fails with correct messages."""
-
     @pytest.mark.parametrize(
         "module_path,class_name",
         _FEASIBLE_CLIENT_ONLY_ADAPTERS,
@@ -150,17 +136,12 @@ class TestUnsupportedIsolationFailFast:
     )
     def test_supported_adapters_allow_isolation(self, module_path, class_name, _expected):
         adapter_cls = _import_adapter(module_path, class_name)
-        # Should not raise
+
         check_isolation_capability(adapter_cls, class_name, "isolated-site-packages")
 
 
-# --------------------------------------------------------------------------- #
-# DataFusion: verify driver_version_actual is populated from live module
-# --------------------------------------------------------------------------- #
-
-
 def test_datafusion_sql_adapter_populates_driver_version_actual():
-    """Verify DataFusion SQL adapter sets driver_version_actual from live import."""
+
     from benchbox.platforms.datafusion import DataFusionAdapter
 
     adapter = DataFusionAdapter(database_path=":memory:")
@@ -170,7 +151,7 @@ def test_datafusion_sql_adapter_populates_driver_version_actual():
 
 
 def test_datafusion_df_adapter_populates_driver_version_actual():
-    """Verify DataFusion DataFrame adapter sets driver_version_actual from live import."""
+
     from benchbox.platforms.dataframe.datafusion_df import DataFusionDataFrameAdapter
 
     adapter = DataFusionDataFrameAdapter()
@@ -179,13 +160,8 @@ def test_datafusion_df_adapter_populates_driver_version_actual():
     assert info["driver_version_actual"] == info["version"]
 
 
-# --------------------------------------------------------------------------- #
-# DuckDB: verify driver_version_actual is populated from live module (L1)
-# --------------------------------------------------------------------------- #
-
-
 def test_duckdb_adapter_populates_driver_version_actual():
-    """Verify DuckDB adapter sets driver_version_actual from live import."""
+
     from benchbox.platforms.duckdb import DuckDBAdapter
 
     adapter = DuckDBAdapter(database_path=":memory:")
@@ -194,12 +170,6 @@ def test_duckdb_adapter_populates_driver_version_actual():
     assert info["driver_version_actual"] == info["platform_version"]
 
 
-# --------------------------------------------------------------------------- #
-# Auto-discovery: ensure every registered adapter declares an explicit
-# driver_isolation_capability (catches new platforms that forget).
-# --------------------------------------------------------------------------- #
-
-# Collect all adapters from the hardcoded lists for the known-set
 _ALL_KNOWN_ADAPTERS = (
     {class_name for _, class_name, *_ in _SUPPORTED_ADAPTERS}
     | {class_name for _, class_name in _FEASIBLE_CLIENT_ONLY_ADAPTERS}
@@ -209,13 +179,7 @@ _ALL_KNOWN_ADAPTERS = (
 
 
 def test_all_registered_adapters_declare_capability():
-    """Every registered adapter must have a driver_isolation_capability (own or inherited).
 
-    Adapters that inherit from a parent with an explicit declaration (e.g.
-    PgDuckDBAdapter → PostgreSQLAdapter) are valid - the capability propagates
-    through MRO.  Only adapters whose MRO chain never sets the attribute beyond
-    the base PlatformAdapter default are flagged.
-    """
     from benchbox.core.platform_registry import PlatformRegistry
 
     missing = []
@@ -224,7 +188,7 @@ def test_all_registered_adapters_declare_capability():
             adapter_cls = PlatformRegistry.get_adapter_class(platform_name)
         except (ValueError, ImportError):
             continue
-        # Walk the MRO (skip PlatformAdapter and object) to find an explicit declaration.
+
         has_explicit = any(
             "driver_isolation_capability" in vars(cls)
             for cls in type.mro(adapter_cls)

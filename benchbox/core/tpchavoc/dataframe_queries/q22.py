@@ -1,12 +1,3 @@
-"""TPC-Havoc DataFrame variants for Q22.
-
-Q22 is a global-sales-opportunity query: a materialized average account
-balance over selected countries, then customers above that average with
-no orders. The variants keep the canonical output while varying the
-average-balance materialization, the anti-join formulation, and filter
-structure.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -58,9 +49,6 @@ def _q22_expr_avg_sum_count(coded: Any, ctx: DataFrameContext, col: Any, lit: An
     total = ctx.scalar(stats.select("total"))
     count = ctx.scalar(stats.select("n"))
     if count is None or count == 0:
-        # No positive-balance customers for these country codes: the
-        # canonical mean is null, so the threshold must be null too (an
-        # empty result), not a ZeroDivisionError.
         return None
     return total / count
 
@@ -169,7 +157,6 @@ def _make_q22_expression_impl(variant: int) -> VariantImpl:
         if variant == 9:
             return _q22_expr_main(coded, with_orders, avg_balance, col, lit, country_codes, distinct_count=True)
 
-        # variant 10: unique-via-groupby for the ordered-customer set
         with_orders = orders.group_by("o_custkey").agg(col("o_orderkey").count().alias("n_orders")).select("o_custkey")
         return _q22_expr_main(coded, with_orders, avg_balance, col, lit, country_codes)
 
@@ -239,9 +226,6 @@ def _make_q22_pandas_impl(variant: int) -> VariantImpl:
             count = eligible["c_acctbal"].count()
             total = total.compute() if hasattr(total, "compute") else total
             count = count.compute() if hasattr(count, "compute") else count
-            # No positive-balance customers: pandas mean() is NaN on empty,
-            # so mirror NaN (comparisons are False -> empty result), not a
-            # ZeroDivisionError.
             avg_balance = total / count if count else float("nan")
             return _q22_pandas_main(coded, orders, avg_balance, country_codes)
 
@@ -294,7 +278,6 @@ def _make_q22_pandas_impl(variant: int) -> VariantImpl:
         if variant == 9:
             return _q22_pandas_main(coded, orders, avg_balance, country_codes, distinct_count=True)
 
-        # variant 10: ordered-customer set via groupby instead of unique
         from benchbox.core.dataframe.compat import _to_list
 
         grouped_orders = orders.groupby("o_custkey").size().index

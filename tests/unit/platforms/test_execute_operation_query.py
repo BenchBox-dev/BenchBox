@@ -1,9 +1,6 @@
-"""Tests for operation-query connection adaptation in the base execution path.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from types import SimpleNamespace
 from typing import Any
@@ -22,8 +19,6 @@ pytestmark = [
 
 
 class _MockOpAdapter(PlatformAdapter):
-    """Minimal adapter exposing the operation execution path."""
-
     stream_connection_capability = StreamConnectionCapability.SHARED_CURSOR
 
     def add_cli_arguments(self):
@@ -67,8 +62,6 @@ class _MockOpAdapter(PlatformAdapter):
 
 
 class _FakeOperationBenchmark(OperationExecutor):
-    """OperationExecutor double that records the connection it receives."""
-
     def __init__(self):
         self.seen_connections: list[Any] = []
 
@@ -94,8 +87,6 @@ class _FakeOperationBenchmark(OperationExecutor):
 
 
 class _DbapiStyleConnection:
-    """DBAPI connection shape (SnowflakeConnection-like): cursor() but no execute()."""
-
     def cursor(self):
         return Mock()
 
@@ -104,7 +95,7 @@ class TestExecuteOperationQueryConnectionAdaptation:
     def test_execute_capable_connection_passes_through_unwrapped(self):
         adapter = _MockOpAdapter()
         benchmark = _FakeOperationBenchmark()
-        raw = Mock()  # Mock exposes .execute
+        raw = Mock()
         result = adapter._execute_operation_query(benchmark, raw, "op_1")
         assert benchmark.seen_connections == [raw]
         assert result["status"] == "SUCCESS"
@@ -122,7 +113,7 @@ class TestExecuteOperationQueryConnectionAdaptation:
         assert result["status"] == "SUCCESS"
 
     def test_client_style_handle_without_execute_is_wrapped(self):
-        """BigQuery Client shape: query() but neither execute() nor cursor()."""
+
         adapter = _MockOpAdapter()
         benchmark = _FakeOperationBenchmark()
 

@@ -1,5 +1,3 @@
-"""Unit tests for corpus promotion verification fail-closed behavior."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -24,21 +22,21 @@ def _isolate_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, with_inven
     monkeypatch.setattr(promotion_mod, "REPO_ROOT", fake_root)
     monkeypatch.setattr(promotion_mod, "INVENTORY_FILE", inventory)
     monkeypatch.setattr(explorer_compat, "check_schema_compatibility", lambda versions=None: {9: []})
-    # Keep promotion unit tests focused on inventory/site fail-closed paths.
+
     monkeypatch.setattr(promotion_mod, "check_corpus_bijection", lambda **kwargs: [])
     monkeypatch.setattr(promotion_mod, "scan_directory_for_privacy", lambda site_dir: [])
     return fake_root
 
 
 def test_shadow_without_site_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """--shadow must fail when publication/out/site is absent."""
+
     _isolate_repo(tmp_path, monkeypatch, with_inventory=True)
     rc = promotion_mod.main(["--shadow"])
     assert rc != 0
 
 
 def test_shadow_without_inventory_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """--shadow must fail when corpus-inventory.json is missing (no skip)."""
+
     fake_root = _isolate_repo(tmp_path, monkeypatch, with_inventory=False)
     site = fake_root / "publication" / "out" / "site"
     site.mkdir(parents=True)

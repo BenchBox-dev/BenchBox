@@ -1,5 +1,3 @@
-"""Default platform hook registrations for the BenchBox CLI."""
-
 from __future__ import annotations
 
 import os
@@ -97,7 +95,6 @@ def _register_clickhouse() -> None:
         info: PlatformInfo | None,
     ) -> DatabaseConfig:
         name = info.display_name if info else "ClickHouse"
-        # Ensure local mode has a sensible default path
         if options.get("deployment_mode") == "local" and not options.get("data_path"):
             db_dir = resolve_benchmark_runs_dir() / "databases"
             db_dir.mkdir(parents=True, exist_ok=True)
@@ -120,7 +117,6 @@ def _register_clickhouse() -> None:
 
 
 def _register_clickhouse_local() -> None:
-    """Register CLI option specs for the ``clickhouse-local`` first-class platform."""
     PlatformHookRegistry.register_option_specs(
         "clickhouse-local",
         PlatformOptionSpec(
@@ -160,7 +156,6 @@ def _register_clickhouse_local() -> None:
 
 
 def _register_clickhouse_server() -> None:
-    """Register CLI option specs for the ``clickhouse-server`` first-class platform."""
     PlatformHookRegistry.register_option_specs(
         "clickhouse-server",
         PlatformOptionSpec(
@@ -316,13 +311,6 @@ _register_sqlite()
 
 
 def _register_specs_on_all_platforms(*specs: PlatformOptionSpec) -> None:
-    """Register well-known option specs on every platform missing them.
-
-    Shared by the ``driver_version`` and plan-capture registrations below:
-    platform-specific modules own their own keys, while adapter-level knobs
-    are accepted everywhere. First registration wins; existing keys are left
-    untouched.
-    """
     metadata = PlatformRegistry.get_all_platform_metadata()
     for platform_name in metadata:
         existing_specs = PlatformHookRegistry.list_option_specs(platform_name)
@@ -332,14 +320,6 @@ def _register_specs_on_all_platforms(*specs: PlatformOptionSpec) -> None:
 
 
 def _register_well_known_options() -> None:
-    """Register adapter-level knobs as `--platform-option` keys on every platform.
-
-    Covers the ``driver_version`` driver keys and the plan-capture settings
-    (``plan_max_depth``, ``plan_capture_timeout_seconds`` — see
-    ``benchbox/platforms/base/adapter.py``). Defaults stay ``None`` so unset
-    keys are omitted from parsed options and the adapter falls back to its
-    own defaults.
-    """
     _register_specs_on_all_platforms(
         PlatformOptionSpec(
             name="driver_version",

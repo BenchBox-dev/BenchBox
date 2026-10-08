@@ -3,19 +3,10 @@ import { splitVersion } from "@/lib/versionLabel";
 
 interface VersionLabelProps {
   version: string | null | undefined;
-  /** Render as a plain span rather than the bordered metadata chip. */
   plain?: boolean;
   class?: string;
 }
 
-/**
- * The site-wide treatment for a platform or driver version.
- *
- * Leads with the release core and elides a prerelease/build suffix, which is
- * both the longest and the least comparable part of the value. The full
- * version stays in the accessible name and the title, and one click expands
- * it in place, so nothing is lost - only deferred.
- */
 export function VersionLabel({ version, plain = false, class: extraClass = "" }: VersionLabelProps) {
   const [expanded, setExpanded] = useState(false);
   const parts = splitVersion(version);

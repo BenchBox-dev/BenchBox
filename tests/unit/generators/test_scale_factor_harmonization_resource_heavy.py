@@ -1,5 +1,3 @@
-"""Resource-heavy scale-factor harmonization tests."""
-
 from __future__ import annotations
 
 import json

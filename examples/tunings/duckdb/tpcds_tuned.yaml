@@ -1,7 +1,3 @@
-# DuckDB TPC-DS Tuned Configuration
-# This configuration enables all DuckDB-supported optimizations for TPC-DS benchmark
-# Provides maximum performance with constraints and table-level tunings enabled
-
 primary_keys:
   enabled: true
   enforce_uniqueness: true

@@ -28,10 +28,12 @@ Polars is the default expression-family adapter and excels at single-node perfor
 from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
 
 adapter = PolarsDataFrameAdapter(
-    streaming=True,      # Enable streaming for large datasets
-    rechunk=True,        # Rechunk for better memory layout
+    streaming=True,
+    rechunk=True,
 )
 ```
+
+`streaming=True` enables streaming for large datasets. `rechunk=True` rechunks data for a better memory layout.
 
 **Best Practices:**
 - Use `ctx.scalar()` instead of `.collect()[0, 0]` for single-value extraction
@@ -51,10 +53,12 @@ Pandas is the reference Pandas-family implementation.
 from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
 
 adapter = PandasDataFrameAdapter(
-    copy_on_write=True,              # Enable CoW for Pandas 2.0+
-    dtype_backend="pyarrow",         # Use PyArrow backend
+    copy_on_write=True,
+    dtype_backend="pyarrow",
 )
 ```
+
+`copy_on_write=True` enables copy-on-write for Pandas 2.0+. `dtype_backend="pyarrow"` uses the PyArrow backend.
 
 **Best Practices:**
 - Enable CoW for read-heavy workloads with many intermediate operations
@@ -74,12 +78,14 @@ PySpark excels at distributed processing and large-scale data.
 from benchbox.platforms.dataframe.pyspark_df import PySparkDataFrameAdapter
 
 adapter = PySparkDataFrameAdapter(
-    master="local[*]",           # Use all cores locally
-    driver_memory="8g",          # Increase driver memory
-    shuffle_partitions=200,      # Tune for your data size
-    enable_aqe=True,             # Enable Adaptive Query Execution
+    master="local[*]",
+    driver_memory="8g",
+    shuffle_partitions=200,
+    enable_aqe=True,
 )
 ```
+
+`master="local[*]"` uses all cores locally. `driver_memory` increases driver memory. `shuffle_partitions` should be tuned for your data size. `enable_aqe=True` enables Adaptive Query Execution.
 
 **Best Practices:**
 - Use `ctx.scalar()` instead of `.collect()[0][0]` for single values
@@ -99,24 +105,24 @@ DataFusion provides SQL-like optimization with expression-family syntax.
 from benchbox.platforms.dataframe.datafusion_df import DataFusionDataFrameAdapter
 
 adapter = DataFusionDataFrameAdapter(
-    repartition_joins=True,      # Enable parallel hash joins
-    parquet_pushdown=True,       # Push predicates to Parquet scan
-    batch_size=8192,             # Row batch size
+    repartition_joins=True,
+    parquet_pushdown=True,
+    batch_size=8192,
 )
 ```
+
+`repartition_joins=True` enables parallel hash joins. `parquet_pushdown=True` pushes predicates into the Parquet scan. `batch_size` sets the row batch size.
 
 ## Common Optimization Patterns
 
 ### Scalar Extraction
 
 When extracting a single value (e.g., for use in a subsequent filter), use the
-optimized `scalar()` method:
+optimized `scalar()` method. The first line is the inefficient form, and the second is the optimized form:
 
 ```python
-# Before (inefficient)
 total = df.select(col("value").sum()).collect()[0, 0]
 
-# After (optimized)
 total = ctx.scalar(df.select(col("value").sum()))
 ```
 
@@ -128,27 +134,23 @@ This uses platform-native methods for efficient scalar extraction:
 
 ### Filter Push-down
 
-Write queries that allow predicate push-down to file scans:
+Write queries that allow predicate push-down to file scans. The first example filters early, before the join (good). The second filters after the expensive operation (avoid):
 
 ```python
-# Good: Filter early, before joins
 filtered = lineitem.filter(col("l_shipdate") >= lit(start_date))
 result = filtered.join(orders, ...)
 
-# Avoid: Filter after expensive operations
 result = lineitem.join(orders, ...).filter(col("l_shipdate") >= lit(start_date))
 ```
 
 ### Column Pruning
 
-Select only needed columns early in the query:
+Select only needed columns early in the query. The first example selects columns early (good). The second carries unnecessary columns through the joins (avoid):
 
 ```python
-# Good: Select columns early
 subset = lineitem.select("l_orderkey", "l_quantity", "l_extendedprice")
 result = subset.join(orders.select("o_orderkey", "o_orderdate"), ...)
 
-# Avoid: Carrying unnecessary columns through joins
 result = lineitem.join(orders, ...).select("l_orderkey", "l_quantity", ...)
 ```
 
@@ -174,28 +176,24 @@ For datasets larger than available memory:
 
 ## Profiling Queries
 
-BenchBox provides built-in profiling for DataFrame queries:
+BenchBox provides built-in profiling for DataFrame queries. The profile gives a timing breakdown, and a query plan on lazy platforms only:
 
 ```python
-# Execute with profiling
 result, profile = adapter.execute_query_profiled(ctx, query)
 
-# Access timing breakdown
 print(f"Planning time: {profile.planning_time_ms}ms")
 print(f"Execution time: {profile.execution_time_ms}ms")
 print(f"Peak memory: {profile.peak_memory_mb}MB")
 
-# Get query plan (lazy platforms only)
 if profile.query_plan:
     print(profile.query_plan.plan_text)
 ```
 
 ## Tuning Configuration
 
-Use YAML tuning configurations for reproducible optimization:
+Use YAML tuning configurations for reproducible optimization. This example is saved as `tuning/performance.yaml`:
 
 ```yaml
-# tuning/performance.yaml
 platform: polars-df
 settings:
   streaming:

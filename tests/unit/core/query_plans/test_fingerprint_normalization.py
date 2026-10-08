@@ -1,16 +1,6 @@
 # Copyright 2026 Joe Harris / BenchBox Project
-#
 # Licensed under the MIT License. See LICENSE file in the project root for details.
 
-"""Unit tests for opt-in literal normalization in plan fingerprints.
-
-The default ``plan_fingerprint`` embeds filter/join/projection literals verbatim,
-so two runs with different benchmark seeds produce different fingerprints for
-structurally identical plans (a false-positive "plan changed" signal). The
-opt-in ``normalize_literals`` path masks numeric/string literals to
-``<NUM>``/``<STR>`` so seed-varied plans share a fingerprint, while leaving the
-default behaviour and all identifier fields untouched.
-"""
 
 from __future__ import annotations
 
@@ -40,7 +30,6 @@ pytestmark = [
 
 
 def _scan(filter_expr: str | None = None, **kwargs) -> LogicalOperator:
-    """A SCAN operator over ``lineitem`` with an optional filter predicate."""
     return LogicalOperator(
         operator_type=LogicalOperatorType.SCAN,
         operator_id="scan_1",
@@ -56,20 +45,16 @@ def _dag(root: LogicalOperator, query_id: str = "q1") -> QueryPlanDAG:
 
 class TestStructuralSignatureNormalization:
     def test_numeric_literal_difference_collapses_when_normalized(self):
-        """Filters differing only by a numeric literal share a normalized signature."""
         a = _scan("l_quantity < 1234.56")
         b = _scan("l_quantity < 2345.67")
 
-        # Default (literal-sensitive) signatures differ...
         assert a.get_structural_signature() != b.get_structural_signature()
-        # ...but normalized signatures are identical.
         assert a.get_structural_signature(normalize_literals=True) == b.get_structural_signature(
             normalize_literals=True
         )
         assert "<NUM>" in a.get_structural_signature(normalize_literals=True)
 
     def test_string_literal_difference_collapses_when_normalized(self):
-        """Filters differing only by a quoted string literal normalize equal."""
         a = _scan("l_shipmode = 'AIR'")
         b = _scan("l_shipmode = 'RAIL'")
 
@@ -80,15 +65,12 @@ class TestStructuralSignatureNormalization:
         assert "<STR>" in a.get_structural_signature(normalize_literals=True)
 
     def test_default_signature_unchanged_by_new_parameter(self):
-        """normalize_literals=False (default) is byte-identical to the legacy call."""
         op = _scan("l_quantity < 1234.56")
         assert op.get_structural_signature() == op.get_structural_signature(normalize_literals=False)
-        # The literal is preserved verbatim in the default signature.
         assert "1234.56" in op.get_structural_signature()
         assert "<NUM>" not in op.get_structural_signature()
 
     def test_projection_columns_are_not_altered(self):
-        """Projection identifiers (no literals) are unchanged by normalization."""
         op = LogicalOperator(
             operator_type=LogicalOperatorType.PROJECT,
             operator_id="proj_1",
@@ -97,7 +79,6 @@ class TestStructuralSignatureNormalization:
         assert op.get_structural_signature(normalize_literals=True) == op.get_structural_signature()
 
     def test_projection_literal_is_masked_but_column_kept(self):
-        """A computed-constant projection masks the literal yet keeps the column name."""
         op = LogicalOperator(
             operator_type=LogicalOperatorType.PROJECT,
             operator_id="proj_1",
@@ -109,15 +90,12 @@ class TestStructuralSignatureNormalization:
         assert "0.05" not in normalized
 
     def test_identifiers_with_trailing_digits_not_masked(self):
-        """Column/alias identifiers ending in digits keep their digits."""
         op = _scan("t1.l_orderkey1 > 5")
         normalized = op.get_structural_signature(normalize_literals=True)
         assert "t1.l_orderkey1" in normalized, normalized
-        # The standalone literal 5 IS masked.
         assert "> <NUM>" in normalized
 
     def test_table_and_grouping_identifiers_not_normalized(self):
-        """table_name / group_by_keys are identifiers and must survive normalization."""
         op = LogicalOperator(
             operator_type=LogicalOperatorType.AGGREGATE,
             operator_id="agg_1",
@@ -126,17 +104,11 @@ class TestStructuralSignatureNormalization:
             children=[_scan("o_totalprice > 1000")],
         )
         normalized = op.get_structural_signature(normalize_literals=True)
-        # v2 encoding (qpc-03): identifiers survive as structured field values.
         parsed = json.loads(normalized)
         assert parsed["table"] == "orders"
         assert parsed["group"] == ["o_orderstatus"]
 
     def test_aggregation_hex_literal_collapses_when_normalized(self):
-        """aggregation_functions/group_by_keys/sort_keys and filter/join/projection now share
-        ONE canonical numeric pattern (_NUMERIC_LITERAL_RE), applied via _normalize_literal_text
-        and _mask_literals respectively. A hex/underscore/dotted literal buried in an aggregate
-        call must mask exactly as it does in a filter expression, so two seed-varied hex
-        constants produce the same normalized signature on every surface."""
         a = LogicalOperator(
             operator_type=LogicalOperatorType.AGGREGATE,
             operator_id="agg_1",
@@ -153,11 +125,6 @@ class TestStructuralSignatureNormalization:
         )
 
     def test_ordinal_column_references_survive_normalization_in_group_by(self):
-        """DuckDB ordinal refs (#0/#1) in group_by_keys must not be masked - they point at
-        a specific (possibly differently-numbered) column, a genuine structural difference,
-        not a literal constant. (sort_keys wraps each entry in a Python dict repr before
-        normalizing, which quotes - and so fully masks - every field including ordinals;
-        that's a separate, pre-existing quirk unrelated to this hardening pass.)"""
         op = LogicalOperator(
             operator_type=LogicalOperatorType.AGGREGATE,
             operator_id="agg_1",
@@ -168,12 +135,6 @@ class TestStructuralSignatureNormalization:
         assert "#1" in normalized
 
     def test_ordinal_column_references_survive_normalization_in_projection_and_filter(self):
-        """DuckDB ordinal refs (#0/#1) in projection/filter expressions (the _mask_literals
-        surface) must not be masked either: two plans that project or filter on GENUINELY
-        DIFFERENT positional columns are a real structural change, not a literal difference,
-        and must NOT collapse to the same normalized signature. Regression for the gap where
-        only the aggregation/group/sort surface excluded '#' from the numeric boundary, so
-        projection ordinals '#0,#1' and '#0,#2' hashed identically under normalization."""
         proj_a = LogicalOperator(
             operator_type=LogicalOperatorType.PROJECT,
             operator_id="proj_1",
@@ -190,7 +151,6 @@ class TestStructuralSignatureNormalization:
             "genuinely different projection ordinals must not collapse under normalization"
         )
 
-        # Same protection on the filter surface, while an actual literal still normalizes.
         filt_a = _scan("#0 > 5")
         filt_b = _scan("#1 > 5")
         assert filt_a.get_structural_signature(normalize_literals=True) != filt_b.get_structural_signature(
@@ -199,22 +159,12 @@ class TestStructuralSignatureNormalization:
         assert "> <NUM>" in filt_a.get_structural_signature(normalize_literals=True)
 
     def test_escaped_apostrophe_string_literal_masks_as_one_token(self):
-        """A doubled single quote is an escaped apostrophe INSIDE the literal, not the
-        end of the string. Without treating '' as an escape, 'O''Brien' would split
-        into two adjacent string literals ('O' + 'Brien'), leaving <STR><STR> - the
-        split itself residual value-dependent syntax - in the "normalized" signature,
-        so two seed-varied names could still normalize to different signatures."""
         op = _scan("c_name = 'O''Brien'")
         normalized = op.get_structural_signature(normalize_literals=True)
         assert normalized.count("<STR>") == 1, normalized
         assert "<STR><STR>" not in normalized
 
     def test_signed_numeric_literal_collapses_regardless_of_sign(self):
-        """A threshold that crosses zero across seeds (e.g. -5 vs 5) must still
-        normalize to the SAME signature. Masking only the digit run (leaving a bare
-        sign character outside the placeholder) would leave -<NUM> and <NUM> as
-        distinct tokens - literal-sensitive residue defeating the whole point of
-        cross-seed normalization."""
         negative = _scan("l_tax_credit > -5")
         positive = _scan("l_tax_credit > 5")
 
@@ -224,12 +174,8 @@ class TestStructuralSignatureNormalization:
         )
 
     def test_spaced_minus_operator_is_not_absorbed_as_a_sign(self):
-        """A '-' separated from its operand by whitespace is a binary operator, not a
-        literal's sign, and must stay OUTSIDE the masked token (only the two numeric
-        operands are masked)."""
         op = _scan("l_discount = 0.05 - 0.01")
         normalized = op.get_structural_signature(normalize_literals=True)
-        # v2 encoding (qpc-03): the masked predicate is a filter field value.
         parsed = json.loads(normalized)
         assert parsed["filters"] == ["l_discount = <NUM> - <NUM>"], normalized
 
@@ -246,13 +192,6 @@ class TestStructuralSignatureNormalization:
         ],
     )
     def test_adversarial_numeric_literal_forms_collapse_when_normalized(self, literal_a, literal_b):
-        """Scientific/hex/underscore/dotted numeric literals mask atomically.
-
-        These forms previously escaped ``\\b\\d+(?:\\.\\d+)?\\b`` entirely (hex,
-        underscore, leading/trailing dot) or were corrupted mid-token (scientific,
-        e.g. ``1.2E-3`` -> ``<NUM>.2E-<NUM>``), leaving residual literal-dependent
-        text in the "normalized" signature.
-        """
         a = _scan(literal_a)
         b = _scan(literal_b)
         assert a.get_structural_signature() != b.get_structural_signature()
@@ -262,7 +201,6 @@ class TestStructuralSignatureNormalization:
         assert normalized_a.count("<NUM>") == 1, normalized_a
 
     def test_scientific_literal_masked_as_single_atomic_token(self):
-        """1.2E-3 must mask as ONE <NUM> token, not corrupt into <NUM>.2E-<NUM>."""
         op = _scan("l_tax = 1.2E-3")
         normalized = op.get_structural_signature(normalize_literals=True)
         assert normalized.count("<NUM>") == 1, normalized
@@ -270,7 +208,6 @@ class TestStructuralSignatureNormalization:
         assert ".2E-" not in normalized
 
     def test_normalization_recurses_into_children(self):
-        """Child operator literals are masked too (signature is recursive)."""
         a = LogicalOperator(
             operator_type=LogicalOperatorType.LIMIT,
             operator_id="limit_1",
@@ -291,7 +228,6 @@ class TestStructuralSignatureNormalization:
 
 class TestComputePlanFingerprint:
     def test_dag_fingerprint_normalized_matches_across_literals(self):
-        """QueryPlanDAG.compute_plan_fingerprint(normalize_literals=True) is seed-stable."""
         a = _dag(_scan("l_quantity < 1234.56"))
         b = _dag(_scan("l_quantity < 2345.67"))
 
@@ -301,43 +237,31 @@ class TestComputePlanFingerprint:
         )
 
     def test_default_plan_fingerprint_unchanged(self):
-        """The stored plan_fingerprint equals the explicit non-normalized computation."""
         dag = _dag(_scan("l_quantity < 1234.56"))
         assert dag.plan_fingerprint == dag.compute_plan_fingerprint(normalize_literals=False)
 
     def test_normalized_fingerprint_property_cached_and_matches_method(self):
-        """normalized_fingerprint matches the method and returns a cached object.
-
-        Asserts the public contract only: SHA256 hexdigests are not interned, so an
-        ``is`` identity check across two accesses proves the value is cached rather
-        than recomputed each time.
-        """
         dag = _dag(_scan("l_quantity < 1234.56"))
         first = dag.normalized_fingerprint
         assert first == dag.compute_plan_fingerprint(normalize_literals=True)
-        assert dag.normalized_fingerprint is first  # cached (not recomputed)
+        assert dag.normalized_fingerprint is first
 
     def test_normalized_fingerprint_stable_across_seeds(self):
-        """Two seed-varied DAGs share normalized_fingerprint but differ by default."""
         a = _dag(_scan("l_shipmode = 'AIR'"))
         b = _dag(_scan("l_shipmode = 'RAIL'"))
         assert a.plan_fingerprint != b.plan_fingerprint
         assert a.normalized_fingerprint == b.normalized_fingerprint
 
     def test_refresh_fingerprint_invalidates_normalized_cache(self):
-        """After a tree mutation + refresh, normalized_fingerprint tracks the new tree."""
         dag = _dag(_scan("l_quantity < 100"))
-        before = dag.normalized_fingerprint  # populate cache against the original tree
-        dag.logical_root.table_name = "orders"  # a structural change the mask cannot hide
+        before = dag.normalized_fingerprint
+        dag.logical_root.table_name = "orders"
         dag.refresh_fingerprint()
         after = dag.normalized_fingerprint
-        # The cache was invalidated: the property reflects the mutated tree, not the
-        # stale pre-refresh value, and still equals a fresh masked computation.
         assert after != before
         assert after == dag.compute_plan_fingerprint(normalize_literals=True)
 
     def test_module_level_compute_honors_normalize_literals(self):
-        """The standalone compute_plan_fingerprint() honors the flag too."""
         a = _scan("l_quantity < 1234.56")
         b = _scan("l_quantity < 2345.67")
         assert compute_plan_fingerprint(a) != compute_plan_fingerprint(b)
@@ -353,13 +277,11 @@ class TestPlanMetadataNormalization:
         return SimpleNamespace(platform="duckdb", platform_version="1.0", query_results=[query_result])
 
     def test_metadata_default_uses_literal_sensitive_fingerprint(self):
-        """Without the flag, two seeds record different fingerprints (the bug)."""
         meta_a = create_plan_metadata_from_results(self._results(_dag(_scan("l_quantity < 1234.56"))))
         meta_b = create_plan_metadata_from_results(self._results(_dag(_scan("l_quantity < 2345.67"))))
         assert meta_a.plan_fingerprints["q1"] != meta_b.plan_fingerprints["q1"]
 
     def test_metadata_normalized_is_seed_stable(self):
-        """With normalize_literals=True, the recorded fingerprints match across seeds."""
         meta_a = create_plan_metadata_from_results(
             self._results(_dag(_scan("l_quantity < 1234.56"))), normalize_literals=True
         )
@@ -369,14 +291,12 @@ class TestPlanMetadataNormalization:
         assert meta_a.plan_fingerprints["q1"] == meta_b.plan_fingerprints["q1"]
 
     def test_metadata_normalized_differs_from_default(self):
-        """The normalized fingerprint is genuinely a different value from the default."""
         plan = _dag(_scan("l_quantity < 1234.56"))
         default_meta = create_plan_metadata_from_results(self._results(plan))
         normalized_meta = create_plan_metadata_from_results(self._results(plan), normalize_literals=True)
         assert default_meta.plan_fingerprints["q1"] != normalized_meta.plan_fingerprints["q1"]
 
     def test_metadata_records_its_normalization_scheme(self):
-        """PlanMetadata.normalization_scheme records which mode produced its fingerprints."""
         plan = _dag(_scan("l_quantity < 1234.56"))
         default_meta = create_plan_metadata_from_results(self._results(plan))
         normalized_meta = create_plan_metadata_from_results(self._results(plan), normalize_literals=True)
@@ -385,20 +305,12 @@ class TestPlanMetadataNormalization:
 
 
 class TestCrossModeMixingRegression:
-    """update_plan_versions/merge_plan_metadata must refuse to compare fingerprints
-    recorded under different normalization_scheme values - a literal-sensitive
-    fingerprint and a literal-normalized one for the SAME plan are different
-    values, so naively diffing them reports every query as "changed"
-    (update_plan_versions) or silently keeps whichever side wrote last
-    (merge_plan_metadata), neither of which is a real signal."""
-
     @staticmethod
     def _results(query_plan: QueryPlanDAG) -> SimpleNamespace:
         query_result = {"query_id": query_plan.query_id, "query_plan": query_plan}
         return SimpleNamespace(platform="duckdb", platform_version="1.0", query_results=[query_result])
 
     def test_update_plan_versions_rejects_cross_scheme_comparison(self):
-        """Same plan, recorded once literal and once normalized -> mismatch error, not a false version bump."""
         plan = _dag(_scan("l_quantity < 1234.56"))
         literal_meta = create_plan_metadata_from_results(self._results(plan))
         normalized_meta = create_plan_metadata_from_results(self._results(plan), normalize_literals=True)
@@ -407,7 +319,6 @@ class TestCrossModeMixingRegression:
             update_plan_versions(literal_meta, normalized_meta)
 
     def test_merge_plan_metadata_rejects_cross_scheme_comparison(self):
-        """Merging a literal-scheme base with a normalized-scheme overlay must raise, not silently mix."""
         plan = _dag(_scan("l_quantity < 1234.56"))
         literal_meta = create_plan_metadata_from_results(self._results(plan))
         normalized_meta = create_plan_metadata_from_results(self._results(plan), normalize_literals=True)
@@ -416,14 +327,12 @@ class TestCrossModeMixingRegression:
             merge_plan_metadata(literal_meta, normalized_meta)
 
     def test_update_plan_versions_same_scheme_still_works(self):
-        """The mismatch guard doesn't block the common same-scheme case."""
         prev = create_plan_metadata_from_results(self._results(_dag(_scan("l_quantity < 100"))))
         current = create_plan_metadata_from_results(self._results(_dag(_scan("l_quantity < 999"))))
         update_plan_versions(prev, current)
         assert current.plan_versions["q1"] == 2
 
     def test_merge_plan_metadata_same_scheme_still_works(self):
-        """The mismatch guard doesn't block merging two normalized-scheme metadata instances."""
         base = create_plan_metadata_from_results(
             self._results(_dag(_scan("l_quantity < 100"), query_id="q1")), normalize_literals=True
         )
@@ -435,12 +344,11 @@ class TestCrossModeMixingRegression:
         assert set(merged.plan_fingerprints) == {"q1", "q2"}
 
     def test_mismatch_guard_skips_when_either_side_has_no_fingerprints(self):
-        """A fresh/empty accumulator's default scheme must not block combining with real data."""
         empty = PlanMetadata()
         real = create_plan_metadata_from_results(
             self._results(_dag(_scan("l_quantity < 100"))), normalize_literals=True
         )
 
-        update_plan_versions(empty, real)  # must not raise
-        merged = merge_plan_metadata(empty, real)  # must not raise
+        update_plan_versions(empty, real)
+        merged = merge_plan_metadata(empty, real)
         assert merged.plan_fingerprints == real.plan_fingerprints

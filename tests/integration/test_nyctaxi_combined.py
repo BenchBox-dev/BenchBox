@@ -1,12 +1,6 @@
-"""Integration tests for NYC Taxi multi-type benchmark with DuckDB.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests Green Taxi, HVFHV, and cross-type queries executing correctly against
-a real in-memory DuckDB database populated with synthetic data.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 import urllib.request
@@ -27,7 +21,6 @@ pytestmark = [
 ]
 
 
-# Block real network downloads in all integration tests - force synthetic data path.
 @pytest.fixture(autouse=True)
 def no_network_downloads(monkeypatch):
     def _raise(*args, **kwargs):
@@ -38,33 +31,25 @@ def no_network_downloads(monkeypatch):
 
 @pytest.fixture(scope="module")
 def multi_type_db():
-    """Create a DuckDB database with Yellow, Green, and HVFHV synthetic data.
-
-    Module-scoped to avoid regenerating data for each test (data generation
-    takes ~3-4 seconds per type at SF=0.01).
-    """
     with tempfile.TemporaryDirectory() as tmpdir:
         conn = duckdb.connect(":memory:")
 
-        # Generate data for all three types
         with patch.object(urllib.request, "urlretrieve", side_effect=OSError("no network")):
             benchmark = NYCTaxiBenchmark(
                 scale_factor=0.01,
                 output_dir=tmpdir,
                 year=2019,
-                months=[1, 2],  # Two months for cross-type temporal queries
+                months=[1, 2],
                 seed=42,
                 taxi_types=[TaxiType.YELLOW, TaxiType.GREEN, TaxiType.HVFHV],
             )
             benchmark.generate_data()
 
-        # Create all tables
         sql = benchmark.get_create_tables_sql(dialect="duckdb")
         for stmt in sql.strip().split(";"):
             if stmt.strip():
                 conn.execute(stmt.strip())
 
-        # Load data using DuckDB's native CSV reader (much faster than INSERT)
         for table_name, csv_path in benchmark.tables.items():
             conn.execute(f"COPY {table_name} FROM '{csv_path}' (HEADER TRUE, DELIMITER ',')")
 
@@ -75,8 +60,6 @@ def multi_type_db():
 @pytest.mark.duckdb
 @pytest.mark.nyctaxi
 class TestMultiTypeSchemaCreation:
-    """Tests that all three taxi type tables are created correctly."""
-
     def test_all_tables_exist(self, multi_type_db):
         tables = {
             row[0]
@@ -121,8 +104,6 @@ class TestMultiTypeSchemaCreation:
 @pytest.mark.duckdb
 @pytest.mark.nyctaxi
 class TestGreenTaxiQueries:
-    """Tests for Green Taxi-specific queries executing on real data."""
-
     def test_green_borough_trips_query(self, multi_type_db):
         sql = """
             SELECT z.borough, COUNT(*) as trip_count
@@ -136,7 +117,6 @@ class TestGreenTaxiQueries:
         """
         result = multi_type_db.execute(sql).fetchall()
         assert len(result) > 0
-        # All boroughs should be real borough names
         for row in result:
             assert row[0] in ("Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island", "EWR")
 
@@ -156,7 +136,6 @@ class TestGreenTaxiQueries:
         assert trip_types.issubset({1, 2})
 
     def test_all_green_queries_execute(self, multi_type_db):
-        """Every green query in GREEN_QUERIES should execute without error."""
         for qid, qdef in GREEN_QUERIES.items():
             sql = qdef["sql"].strip().format(start_date="2019-01-01", end_date="2019-03-01")
             result = multi_type_db.execute(sql).fetchall()
@@ -166,8 +145,6 @@ class TestGreenTaxiQueries:
 @pytest.mark.duckdb
 @pytest.mark.nyctaxi
 class TestHVFHVQueries:
-    """Tests for HVFHV-specific queries executing on real data."""
-
     def test_hvfhv_shared_ride_rate_query(self, multi_type_db):
         sql = """
             SELECT
@@ -182,7 +159,6 @@ class TestHVFHVQueries:
         """
         result = multi_type_db.execute(sql).fetchall()
         assert len(result) > 0
-        # Each row should have valid license num
         valid_licenses = {"HV0002", "HV0003", "HV0004", "HV0005"}
         for row in result:
             assert row[0] in valid_licenses
@@ -204,11 +180,6 @@ class TestHVFHVQueries:
         assert len(result) > 0
 
     def test_all_hvfhv_queries_execute(self, multi_type_db):
-        """Every HVFHV query in HVFHV_QUERIES should execute without error.
-
-        HVFHV_QUERIES includes hvfhv-wait-time-analysis which uses PERCENTILE_CONT.
-        This is supported in DuckDB but may return no rows if data is sparse.
-        """
         for qid, qdef in HVFHV_QUERIES.items():
             sql = qdef["sql"].strip().format(start_date="2019-01-01", end_date="2019-03-01")
             result = multi_type_db.execute(sql).fetchall()
@@ -218,8 +189,6 @@ class TestHVFHVQueries:
 @pytest.mark.duckdb
 @pytest.mark.nyctaxi
 class TestCrossTypeQueries:
-    """Tests for cross-type comparison queries executing on multi-type data."""
-
     def test_cross_market_share_query(self, multi_type_db):
         sql = """
             WITH monthly_counts AS (
@@ -247,7 +216,6 @@ class TestCrossTypeQueries:
         """
         result = multi_type_db.execute(sql).fetchall()
         assert len(result) > 0
-        # Market shares should sum to ~100% per month
         taxi_types_seen = {row[1] for row in result}
         assert taxi_types_seen == {"yellow", "green", "hvfhv"}
 
@@ -332,7 +300,6 @@ class TestCrossTypeQueries:
         assert all(0 <= h <= 23 for h in hours)
 
     def test_all_cross_type_queries_execute(self, multi_type_db):
-        """Every cross-type query in CROSS_TYPE_QUERIES should execute without error."""
         for qid, qdef in CROSS_TYPE_QUERIES.items():
             sql = qdef["sql"].strip().format(start_date="2019-01-01", end_date="2019-12-31")
             result = multi_type_db.execute(sql).fetchall()
@@ -342,10 +309,7 @@ class TestCrossTypeQueries:
 @pytest.mark.duckdb
 @pytest.mark.nyctaxi
 class TestBenchmarkMultiTypeIntegration:
-    """Tests for NYCTaxiBenchmark with taxi_types parameter."""
-
     def test_benchmark_default_is_yellow_only(self, tmp_path):
-        """Default benchmark (no taxi_types) loads only Yellow data."""
         with patch.object(urllib.request, "urlretrieve", side_effect=OSError("no network")):
             bm = NYCTaxiBenchmark(
                 scale_factor=0.01,
@@ -363,7 +327,6 @@ class TestBenchmarkMultiTypeIntegration:
         assert "hvfhv_trips" not in table_names
 
     def test_benchmark_multi_type_generates_all_files(self, tmp_path):
-        """Multi-type benchmark generates CSV files for all active types."""
         with patch.object(urllib.request, "urlretrieve", side_effect=OSError("no network")):
             bm = NYCTaxiBenchmark(
                 scale_factor=0.01,
@@ -380,7 +343,6 @@ class TestBenchmarkMultiTypeIntegration:
         assert (tmp_path / "hvfhv_trips.csv").exists()
 
     def test_benchmark_multi_type_query_manager_has_all_queries(self, tmp_path):
-        """Multi-type benchmark includes all query sets in the query manager."""
         with patch.object(urllib.request, "urlretrieve", side_effect=OSError("no network")):
             bm = NYCTaxiBenchmark(
                 scale_factor=0.01,
@@ -390,7 +352,6 @@ class TestBenchmarkMultiTypeIntegration:
                 taxi_types=[TaxiType.YELLOW, TaxiType.GREEN, TaxiType.HVFHV],
             )
 
-        # Should have yellow + green + hvfhv + cross-type queries
         count = bm.query_manager.get_query_count()
         from benchbox.core.nyctaxi.queries import CROSS_TYPE_QUERIES, GREEN_QUERIES, HVFHV_QUERIES, QUERIES
 
@@ -398,7 +359,6 @@ class TestBenchmarkMultiTypeIntegration:
         assert count == expected
 
     def test_yellow_only_benchmark_unchanged(self, tmp_path):
-        """Yellow-only benchmark behavior is unchanged from pre-expansion."""
         with patch.object(urllib.request, "urlretrieve", side_effect=OSError("no network")):
             bm = NYCTaxiBenchmark(
                 scale_factor=0.01,
@@ -412,6 +372,5 @@ class TestBenchmarkMultiTypeIntegration:
         assert len(queries) == 25
         assert "trips-per-hour" in queries
         assert "full-scan-count" in queries
-        # Should NOT include multi-type queries
         assert "green-borough-trips" not in queries
         assert "hvfhv-shared-ride-rate" not in queries

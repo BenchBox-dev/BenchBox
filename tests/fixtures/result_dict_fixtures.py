@@ -1,12 +1,6 @@
-"""Factories for v2.x JSON result dictionaries and NormalizedResult objects.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides shared test data factories to replace ~60 inline constructions
-scattered across the test suite.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -43,11 +37,6 @@ def make_v2_result_dict(
     queries: list[dict[str, Any]] | None = None,
     **extras: Any,
 ) -> dict[str, Any]:
-    """Build a v2.x result JSON dict with sensible defaults.
-
-    Override any field via keyword args.  Unrecognized kwargs are merged
-    into the top level of the dict.
-    """
     platform_block: dict[str, Any] = {"name": platform}
     if platform_version:
         platform_block["version"] = platform_version
@@ -89,7 +78,6 @@ def make_v2_result_dict(
 
 
 def write_v2_result_file(path: Path, **kwargs: Any) -> dict[str, Any]:
-    """Create a v2.x result JSON file on disk.  Returns the dict written."""
     data = make_v2_result_dict(**kwargs)
     path.write_text(json.dumps(data), encoding="utf-8")
     return data
@@ -113,12 +101,6 @@ def make_normalized_result(
     raw: dict[str, Any] | None = None,
     platform_version: str | None = None,
 ) -> Any:
-    """Build a NormalizedResult with sensible defaults for visualization tests.
-
-    If *platform_version* is set and ``raw`` does not already contain a
-    ``"platform"`` key, a ``{"platform": {"name": ..., "version": ...}}``
-    block is injected automatically.
-    """
     from benchbox.core.visualization.result_plotter import NormalizedResult
 
     effective_raw = dict(raw) if raw is not None else {}
@@ -145,13 +127,11 @@ def make_normalized_result(
 
 @pytest.fixture
 def v2_result_dict():
-    """Factory fixture returning the ``make_v2_result_dict`` callable."""
     return make_v2_result_dict
 
 
 @pytest.fixture
 def v2_result_file(tmp_path: Path):
-    """Factory fixture that writes a result file and returns ``(path, data)``."""
     counter = [0]
 
     def _create(**kwargs: Any) -> tuple[Path, dict[str, Any]]:
@@ -184,7 +164,6 @@ def make_benchmark_results(
     concurrency_level: Optional[int] = None,
     **extras: Any,
 ) -> BenchmarkResults:
-    """Create a fully-populated BenchmarkResults instance for tests."""
 
     field_names = set(BenchmarkResults.__dataclass_fields__.keys())
 
@@ -204,14 +183,12 @@ def make_benchmark_results(
         "execution_metadata": execution_metadata or {},
     }
 
-    # Pass through known dataclass fields supplied via extras.
     for key, value in extras.items():
         if key in field_names:
             init_kwargs[key] = value
 
     result = BenchmarkResults(**init_kwargs)
 
-    # Attach optional metadata used by legacy CLI tests.
     result._benchmark_id_override = benchmark_id
     result.summary_metrics = summary_metrics or {}
     if query_subset is not None:
@@ -219,7 +196,6 @@ def make_benchmark_results(
     if concurrency_level is not None:
         result.concurrency_level = concurrency_level
 
-    # Allow additional loose attributes (e.g., benchmark_version) expected by tests.
     for key, value in extras.items():
         if key not in field_names:
             setattr(result, key, value)
@@ -229,11 +205,4 @@ def make_benchmark_results(
 
 @pytest.fixture
 def make_results():
-    """Factory fixture for creating BenchmarkResults with sensible defaults.
-
-    Usage::
-
-        def test_something(make_results):
-            result = make_results(platform="snowflake", total_queries=22)
-    """
     return make_benchmark_results

@@ -1,19 +1,3 @@
-"""Microsoft Fabric Warehouse DDL rewrite rules for Phase.DDL_OPTIMIZE.
-
-Fabric Warehouse requires schema-qualified table names ([schema].[table]) in
-CREATE TABLE statements. DuckDB-generated DDL omits the schema prefix; the adapter
-injects it at runtime using the configured schema.
-
-FabricWarehouseAdapter._optimize_table_definition() is the runtime implementation.
-
-This rule registers the REWRITE_DDL intent for governance - compat_lint enforcement
-only; transformer_id is not resolved at runtime.
-
-Note: the schema prefix injection depends on runtime adapter state (self.schema) and
-cannot be expressed as a static DDL rule — the registration is a governance marker,
-not a static rewrite.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.rules._registration import register_ddl_rewrite

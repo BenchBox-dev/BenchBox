@@ -1,5 +1,3 @@
-"""Platform mapping for logical workload tuning profiles."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -44,8 +42,6 @@ LOCALITY_ROLES = frozenset({JOIN_LOCALITY, FACT_DIMENSION_JOIN, HIGH_SELECTIVITY
 
 @dataclass(frozen=True)
 class PlatformTuningMapping:
-    """Physical mapping decision for one logical tuning candidate."""
-
     platform: str
     tuning_types: tuple[str, ...]
     physical_mechanisms: tuple[str, ...]
@@ -66,15 +62,11 @@ def map_candidate_to_platform(
     *,
     physical_rendering_id: str | None = None,
 ) -> PlatformTuningMapping:
-    """Map a logical tuning candidate to one platform's physical tuning vocabulary."""
     from benchbox.core.tuning.capability_registry import WORKLOAD_PROFILE_MAPPED_PLATFORMS
 
     platform_key = platform.lower().replace("_", "-")
     roles = set(candidate.roles)
 
-    # WORKLOAD_PROFILE_MAPPED_PLATFORMS is the capability registry's record of
-    # which platforms this mapper implements -- single source of truth shared
-    # with the registry rather than redeclared as an implicit if/elif chain.
     if platform_key not in WORKLOAD_PROFILE_MAPPED_PLATFORMS:
         return PlatformTuningMapping(
             platform=platform_key,

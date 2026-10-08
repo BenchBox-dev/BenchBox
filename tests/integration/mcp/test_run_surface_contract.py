@@ -1,5 +1,3 @@
-"""Cross-surface checks for the shared MCP platform-option contract."""
-
 from __future__ import annotations
 
 import pytest

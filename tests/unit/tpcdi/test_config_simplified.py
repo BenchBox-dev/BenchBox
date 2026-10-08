@@ -1,20 +1,9 @@
-"""Tests for simplified TPC-DI configuration system.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module tests the unified TPCDIConfig class and convenience functions including:
-- TPCDIConfig creation and validation
-- Configuration parameter adjustment
-- Convenience configuration functions
-- Dictionary serialization/deserialization
-- Scale factor adjustments
-- Performance profiling
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 import multiprocessing
@@ -43,10 +32,7 @@ from benchbox.utils.path_utils import resolve_benchmark_runs_dir
 @pytest.mark.unit
 @pytest.mark.tpcdi
 class TestTPCDIConfig:
-    """Test TPCDIConfig functionality."""
-
     def test_default_config_creation(self):
-        """Test creation of TPCDIConfig with defaults."""
         config = TPCDIConfig()
 
         assert config.scale_factor == 1.0
@@ -60,7 +46,6 @@ class TestTPCDIConfig:
         assert config.log_level == "INFO"
 
     def test_config_with_custom_values(self):
-        """Test TPCDIConfig with custom values."""
         output_dir = Path("/tmp/custom_output")
 
         config = TPCDIConfig(
@@ -86,27 +71,21 @@ class TestTPCDIConfig:
         assert config.log_level == "DEBUG"
 
     def test_config_post_init_validation(self):
-        """Test configuration validation in __post_init__."""
-        # Test default output directory creation - should use benchmark_runs structure
         config = TPCDIConfig()
-        # Default output dir is now benchmark_runs/datagen/tpcdi_sf{scale_factor}
         assert config.output_dir == resolve_benchmark_runs_dir() / "datagen" / "tpcdi_sf1"
 
-        # Test max_workers validation
         config = TPCDIConfig(max_workers=0)
         assert config.max_workers == 1
 
         config = TPCDIConfig(max_workers=20)
         assert config.max_workers == 16
 
-        # Test chunk_size validation
         config = TPCDIConfig(chunk_size=500)
         assert config.chunk_size == 1000
 
         config = TPCDIConfig(chunk_size=100000)
         assert config.chunk_size == 50000
 
-        # Test scale_factor validation
         config = TPCDIConfig(scale_factor=0)
         assert config.scale_factor == 1.0
 
@@ -114,23 +93,18 @@ class TestTPCDIConfig:
         assert config.scale_factor == 1.0
 
     def test_config_parallel_settings(self):
-        """Test parallel processing settings."""
-        # When parallel is disabled, max_workers should be 1
         config = TPCDIConfig(enable_parallel=False)
         assert config.max_workers == 1
 
-        # When parallel is enabled, max_workers should be reasonable
         config = TPCDIConfig(enable_parallel=True)
         cpu_count = multiprocessing.cpu_count()
         expected_max = min(8, cpu_count + 2)
         assert config.max_workers == expected_max
 
-        # Custom max_workers should be respected when parallel is enabled
         config = TPCDIConfig(enable_parallel=True, max_workers=4)
         assert config.max_workers == 4
 
     def test_get_streaming_config(self):
-        """Test streaming configuration extraction."""
         config = TPCDIConfig(chunk_size=5000, max_workers=4, enable_parallel=True)
 
         streaming_config = config.get_streaming_config()
@@ -141,7 +115,6 @@ class TestTPCDIConfig:
         assert streaming_config["buffer_size"] == 8192
 
     def test_get_validation_config(self):
-        """Test validation configuration extraction."""
         config = TPCDIConfig(enable_validation=True, strict_validation=True)
 
         validation_config = config.get_validation_config()
@@ -152,7 +125,6 @@ class TestTPCDIConfig:
         assert validation_config["enable_performance_monitoring"] is True
 
     def test_get_etl_config(self):
-        """Test ETL configuration extraction."""
         config = TPCDIConfig(enable_parallel=True, max_workers=6, chunk_size=8000, optimize_memory=True)
 
         etl_config = config.get_etl_config()
@@ -166,7 +138,6 @@ class TestTPCDIConfig:
         assert etl_config["memory_optimization"] is True
 
     def test_get_batch_config(self):
-        """Test batch configuration extraction."""
         config = TPCDIConfig(
             enable_parallel=True,
             max_workers=4,
@@ -184,14 +155,12 @@ class TestTPCDIConfig:
         assert batch_config["strict_mode"] is False
 
     def test_create_directories(self):
-        """Test directory creation."""
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "test_output"
             config = TPCDIConfig(output_dir=output_dir)
 
             config.create_directories()
 
-            # Check that directories were created
             assert output_dir.exists()
             assert (output_dir / "source").exists()
             assert (output_dir / "staging").exists()
@@ -199,7 +168,6 @@ class TestTPCDIConfig:
             assert (output_dir / "logs").exists()
 
     def test_get_performance_profile(self):
-        """Test performance profile determination."""
         config = TPCDIConfig(enable_parallel=False)
         assert config.get_performance_profile() == "single_threaded"
 
@@ -216,32 +184,26 @@ class TestTPCDIConfig:
         assert config.get_performance_profile() == "maximum"
 
     def test_adjust_for_scale_factor(self):
-        """Test scale factor adjustments."""
-        # Small scale factor
         config = TPCDIConfig(scale_factor=0.1, chunk_size=2000, max_workers=8)
         config.adjust_for_scale_factor()
 
-        assert config.chunk_size == 1000  # max(1000, 2000 * 0.5)
-        assert config.max_workers == 4  # min(4, 8)
+        assert config.chunk_size == 1000
+        assert config.max_workers == 4
 
-        # Medium scale factor
         config = TPCDIConfig(scale_factor=5.0, chunk_size=10000, max_workers=8)
         config.adjust_for_scale_factor()
 
-        assert config.chunk_size == 12000  # min(20000, 10000 * 1.2)
-        assert config.max_workers == 9  # min(12, 8 + 1)
+        assert config.chunk_size == 12000
+        assert config.max_workers == 9
 
-        # Large scale factor
         config = TPCDIConfig(scale_factor=10.0, chunk_size=10000, max_workers=8)
         config.adjust_for_scale_factor()
 
-        assert config.chunk_size == 15000  # min(25000, 10000 * 1.5)
-        assert config.max_workers == 10  # min(16, 8 + 2)
+        assert config.chunk_size == 15000
+        assert config.max_workers == 10
         assert config.optimize_memory is True
 
     def test_get_memory_settings(self):
-        """Test memory optimization settings."""
-        # With memory optimization enabled
         config = TPCDIConfig(optimize_memory=True)
         memory_settings = config.get_memory_settings()
 
@@ -250,7 +212,6 @@ class TestTPCDIConfig:
         assert memory_settings["use_memory_efficient_dtypes"] is True
         assert memory_settings["limit_concurrent_operations"] is True
 
-        # With memory optimization disabled
         config = TPCDIConfig(optimize_memory=False)
         memory_settings = config.get_memory_settings()
 
@@ -260,7 +221,6 @@ class TestTPCDIConfig:
         assert memory_settings["limit_concurrent_operations"] is False
 
     def test_to_dict(self):
-        """Test configuration serialization to dictionary."""
         config = TPCDIConfig(
             scale_factor=2.0,
             enable_parallel=True,
@@ -286,7 +246,6 @@ class TestTPCDIConfig:
         assert "performance_profile" in config_dict
 
     def test_from_dict(self):
-        """Test configuration deserialization from dictionary."""
         config_dict = {
             "scale_factor": 3.0,
             "output_dir": "/tmp/test_output",
@@ -312,22 +271,19 @@ class TestTPCDIConfig:
         assert config.log_level == "WARNING"
 
     def test_from_dict_with_unknown_keys(self):
-        """Test from_dict with unknown keys."""
         config_dict = {
             "scale_factor": 2.0,
             "unknown_key": "value",
             "another_unknown": 123,
         }
 
-        # Should ignore unknown keys and use defaults for missing ones
         config = TPCDIConfig.from_dict(config_dict)
 
         assert config.scale_factor == 2.0
-        assert config.enable_parallel is False  # Default value
+        assert config.enable_parallel is False
         assert not hasattr(config, "unknown_key")
 
     def test_for_development(self):
-        """Test development configuration creation."""
         config = TPCDIConfig.for_development()
 
         assert config.scale_factor == 0.1
@@ -340,23 +296,21 @@ class TestTPCDIConfig:
         assert config.log_level == "DEBUG"
 
     def test_for_production(self):
-        """Test production configuration creation."""
         config = TPCDIConfig.for_production(scale_factor=5.0)
 
         assert config.scale_factor == 5.0
-        assert config.enable_parallel is False  # Parallel is opt-in
-        assert config.chunk_size >= 15000  # Should be adjusted for scale
+        assert config.enable_parallel is False
+        assert config.chunk_size >= 15000
         assert config.enable_validation is True
         assert config.strict_validation is True
         assert config.optimize_memory is True
         assert config.log_level == "INFO"
 
     def test_for_performance_testing(self):
-        """Test performance testing configuration creation."""
         config = TPCDIConfig.for_performance_testing(scale_factor=10.0)
 
         assert config.scale_factor == 10.0
-        assert config.enable_parallel is False  # Parallel is opt-in
+        assert config.enable_parallel is False
         assert config.max_workers == multiprocessing.cpu_count()
         assert config.chunk_size == 25000
         assert config.enable_validation is False
@@ -368,38 +322,31 @@ class TestTPCDIConfig:
 @pytest.mark.unit
 @pytest.mark.tpcdi
 class TestConfigConvenienceFunctions:
-    """Test configuration convenience functions."""
-
     def test_get_simple_config(self):
-        """Test get_simple_config function."""
         config = get_simple_config(scale_factor=2.0, parallel=True, validation=False)
 
         assert config.scale_factor == 2.0
         assert config.enable_parallel is True
         assert config.enable_validation is False
 
-        # Test with defaults
         config = get_simple_config()
         assert config.scale_factor == 1.0
         assert config.enable_parallel is True
         assert config.enable_validation is True
 
     def test_get_fast_config(self):
-        """Test get_fast_config function."""
         config = get_fast_config(scale_factor=3.0)
 
         assert config.scale_factor == 3.0
-        assert config.enable_parallel is False  # Parallel is opt-in
+        assert config.enable_parallel is False
         assert config.enable_validation is False
         assert config.strict_validation is False
         assert config.optimize_memory is False
 
-        # Test with default scale factor
         config = get_fast_config()
         assert config.scale_factor == 1.0
 
     def test_get_safe_config(self):
-        """Test get_safe_config function."""
         config = get_safe_config(scale_factor=4.0)
 
         assert config.scale_factor == 4.0
@@ -408,7 +355,6 @@ class TestConfigConvenienceFunctions:
         assert config.strict_validation is True
         assert config.optimize_memory is True
 
-        # Test with default scale factor
         config = get_safe_config()
         assert config.scale_factor == 1.0
 
@@ -416,15 +362,10 @@ class TestConfigConvenienceFunctions:
 @pytest.mark.unit
 @pytest.mark.tpcdi
 class TestConfigLogging:
-    """Test configuration logging setup."""
-
     def test_log_level_configuration(self):
-        """Test log level configuration."""
-        # Test different log levels
         log_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
         for level in log_levels:
-            # Reset logging configuration before test
             for handler in logging.root.handlers[:]:
                 logging.root.removeHandler(handler)
             logging.root.setLevel(logging.NOTSET)
@@ -432,26 +373,20 @@ class TestConfigLogging:
             config = TPCDIConfig(log_level=level)
             assert config.log_level == level
 
-            # Check that logging is configured (basic test)
             logger = logging.getLogger()
             assert logger.level <= getattr(logging, level)
 
     def test_invalid_log_level(self):
-        """Test invalid log level handling."""
-        # Reset logging configuration before test
         for handler in logging.root.handlers[:]:
             logging.root.removeHandler(handler)
         logging.root.setLevel(logging.NOTSET)
 
         TPCDIConfig(log_level="INVALID")
 
-        # Should use default INFO level
         logger = logging.getLogger()
         assert logger.level == logging.INFO
 
     def test_log_level_case_insensitive(self):
-        """Test log level case insensitivity."""
-        # Reset logging configuration before test
         for handler in logging.root.handlers[:]:
             logging.root.removeHandler(handler)
         logging.root.setLevel(logging.NOTSET)
@@ -459,7 +394,6 @@ class TestConfigLogging:
         config = TPCDIConfig(log_level="debug")
         assert config.log_level == "debug"
 
-        # Check that logging is configured correctly
         logger = logging.getLogger()
         assert logger.level <= logging.DEBUG
 
@@ -467,10 +401,7 @@ class TestConfigLogging:
 @pytest.mark.integration
 @pytest.mark.tpcdi
 class TestConfigIntegration:
-    """Integration tests for configuration system."""
-
     def test_config_roundtrip_serialization(self):
-        """Test configuration roundtrip serialization."""
         original_config = TPCDIConfig(
             scale_factor=5.0,
             enable_parallel=True,
@@ -482,13 +413,10 @@ class TestConfigIntegration:
             log_level="WARNING",
         )
 
-        # Serialize to dict
         config_dict = original_config.to_dict()
 
-        # Deserialize back
         restored_config = TPCDIConfig.from_dict(config_dict)
 
-        # Compare key attributes
         assert restored_config.scale_factor == original_config.scale_factor
         assert restored_config.enable_parallel == original_config.enable_parallel
         assert restored_config.max_workers == original_config.max_workers
@@ -499,28 +427,23 @@ class TestConfigIntegration:
         assert restored_config.log_level == original_config.log_level
 
     def test_config_with_directory_operations(self):
-        """Test configuration with actual directory operations."""
         with tempfile.TemporaryDirectory() as temp_dir:
             output_dir = Path(temp_dir) / "tpcdi_test"
 
             config = TPCDIConfig(output_dir=output_dir)
 
-            # Create directories
             config.create_directories()
 
-            # Verify all directories exist
             assert output_dir.exists()
             assert (output_dir / "source").exists()
             assert (output_dir / "staging").exists()
             assert (output_dir / "warehouse").exists()
             assert (output_dir / "logs").exists()
 
-            # Test directory permissions (basic check)
             assert output_dir.is_dir()
             assert (output_dir / "source").is_dir()
 
     def test_config_performance_profiles(self):
-        """Test configuration performance profiles."""
         profiles = [
             (TPCDIConfig(enable_parallel=False), "single_threaded"),
             (TPCDIConfig(enable_parallel=True, max_workers=2), "light"),
@@ -533,8 +456,6 @@ class TestConfigIntegration:
             assert config.get_performance_profile() == expected_profile
 
     def test_config_scale_adjustments(self):
-        """Test configuration scale factor adjustments."""
-        # Test various scale factors
         scale_factors = [0.1, 1.0, 5.0, 10.0, 20.0]
 
         for scale in scale_factors:
@@ -542,18 +463,15 @@ class TestConfigIntegration:
 
             config.adjust_for_scale_factor()
 
-            # Verify adjustments are reasonable
             assert config.chunk_size >= 1000
             assert config.chunk_size <= 50000
             assert config.max_workers >= 1
             assert config.max_workers <= 16
 
-            # Large scale factors should optimize memory
             if scale >= 10.0:
                 assert config.optimize_memory is True
 
     def test_config_with_all_convenience_functions(self):
-        """Test all convenience functions work together."""
         configs = [
             get_simple_config(),
             get_fast_config(),
@@ -564,14 +482,12 @@ class TestConfigIntegration:
         ]
 
         for config in configs:
-            # All configs should be valid
             assert isinstance(config, TPCDIConfig)
             assert config.scale_factor > 0
             assert config.chunk_size >= 1000
             assert config.max_workers >= 1
             assert config.output_dir is not None
 
-            # Test that all config methods work
             assert isinstance(config.get_streaming_config(), dict)
             assert isinstance(config.get_validation_config(), dict)
             assert isinstance(config.get_etl_config(), dict)

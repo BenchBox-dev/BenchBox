@@ -1,5 +1,3 @@
-"""Utilities for subprocess-based BenchBox CLI testing."""
-
 from __future__ import annotations
 
 import os
@@ -19,11 +17,11 @@ def run_cli_command(
     env: Mapping[str, str] | None = None,
     timeout: float = DEFAULT_TIMEOUT,
 ) -> subprocess.CompletedProcess[str]:
-    """Execute the BenchBox CLI in a subprocess and capture its output."""
+
     command = [sys.executable, "-m", CLI_MODULE, *args]
 
     effective_env: MutableMapping[str, str] = os.environ.copy()
-    # Force UTF-8 encoding on Windows to handle emoji characters
+
     effective_env["PYTHONUTF8"] = "1"
     if env:
         effective_env.update(env)

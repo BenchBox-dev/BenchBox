@@ -62,10 +62,8 @@ attribute access such as `result.power_size` describe an object model that
 ### Installation Requirements
 
 ```bash
-# Install BenchBox with TPC-DS support
 uv add benchbox[tpcds]
 
-# Or install from source
 git clone https://github.com/your-repo/benchbox
 cd benchbox
 uv pip install -e .[tpcds]
@@ -144,7 +142,6 @@ dialect; `dialect=` applies to the power and maintenance phases only. For suppor
 ```python
 from benchbox.tpcds import TPCDSBenchmark
 
-# Create benchmark with configuration
 benchmark = TPCDSBenchmark(
     scale_factor=10.0,
     output_dir="/path/to/results",
@@ -152,7 +149,6 @@ benchmark = TPCDSBenchmark(
     parallel=4
 )
 
-# Run complete benchmark
 result = benchmark.run_official_benchmark(
     connection,
     adapter=adapter,
@@ -167,8 +163,9 @@ result = benchmark.run_official_benchmark(
 
 ### Individual Phases
 
+The first call runs the Power Test only. The second runs the Throughput Test only.
+
 ```python
-# Power Test only
 result = benchmark.run_official_benchmark(
     connection_string="your_connection",
     power_test=True,
@@ -176,7 +173,6 @@ result = benchmark.run_official_benchmark(
     maintenance_test=False
 )
 
-# Throughput Test only
 result = benchmark.run_official_benchmark(
     connection_string="your_connection",
     num_streams=8,
@@ -188,8 +184,9 @@ result = benchmark.run_official_benchmark(
 
 ### Custom Configuration
 
+This example uses advanced-level configuration:
+
 ```python
-# Advanced-level configuration
 result = benchmark.run_official_benchmark(
     connection_string="your_connection",
     num_streams=6,
@@ -234,10 +231,8 @@ result = benchmark.run_official_benchmark(
 The Power Test measures single-stream query processing power by executing all 99 TPC-DS queries sequentially.
 
 ```python
-# Power Test execution
 power_result = benchmark._run_power_test(connection_string, dialect)
 
-# Access Power Test results
 print(f"Execution Time: {power_result.execution_time:.2f}s")
 print(f"Successful Queries: {len([q for q in power_result.queries if q.success])}")
 print(f"Power@Size: {result.power_size:.2f}")
@@ -254,10 +249,8 @@ print(f"Power@Size: {result.power_size:.2f}")
 The Throughput Test measures concurrent query processing capability by executing multiple streams of queries simultaneously.
 
 ```python
-# Throughput Test execution
 throughput_result = benchmark._run_throughput_test(connection_string, num_streams, dialect)
 
-# Access Throughput Test results
 print(f"Concurrent Streams: {num_streams}")
 print(f"Total Queries: {len(throughput_result.queries)}")
 print(f"Throughput@Size: {result.throughput_size:.2f}")
@@ -343,18 +336,20 @@ After running the Maintenance Test, **you must reload the database** before runn
 
 #### Complete Code Example
 
-Here's how to properly structure your benchmark workflow with database reload:
+Here's how to properly structure your benchmark workflow with database reload. The workflow has three steps:
+
+1. Run the Power and Throughput tests on clean data.
+2. Reload the database before the Maintenance Test, so the maintenance operations start with clean data.
+3. Run the Maintenance Test, which permanently modifies the data. The database then contains modified data.
 
 ```python
 from benchbox.tpcds import TPCDS
 from benchbox.platforms.duckdb import DuckDBAdapter
 from pathlib import Path
 
-# Generate TPC-DS data
 benchmark = TPCDS(scale_factor=1.0, output_dir=Path("./tpcds_data"))
 benchmark.generate_data()
 
-# Step 1: Run Power and Throughput tests on clean data
 print("Step 1: Running Power and Throughput tests on clean database...")
 adapter = DuckDBAdapter(database_path="tpcds.duckdb", force_recreate=True)
 
@@ -364,18 +359,14 @@ print(f"Power Test: {power_result.total_execution_time:.2f}s")
 throughput_result = adapter.run_benchmark(benchmark, test_execution_type="throughput")
 print(f"Throughput Test: {throughput_result.total_execution_time:.2f}s")
 
-# Step 2: RELOAD database before Maintenance Test
-# This ensures we start with clean data for maintenance operations
 print("\n⚠️  Reloading database before Maintenance Test...")
 adapter = DuckDBAdapter(database_path="tpcds.duckdb", force_recreate=True)
 
-# Step 3: Run Maintenance Test (permanently modifies data)
 print("\nStep 3: Running Maintenance Test (will modify database)...")
 maintenance_result = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
 print(f"Maintenance Test: {maintenance_result.total_execution_time:.2f}s")
 print(f"Operations executed: {maintenance_result.total_queries}")
 
-# WARNING: Database now contains modified data
 print("\n" + "=" * 70)
 print("⚠️  WARNING: DATABASE HAS BEEN MODIFIED")
 print("=" * 70)
@@ -392,17 +383,16 @@ print("=" * 70)
 
 #### CLI Usage
 
-Run the Maintenance Test using the BenchBox CLI:
+Run the Maintenance Test using the BenchBox CLI. The first command is the complete workflow up to the Throughput
+Test. The second reloads the database before running maintenance:
 
 ```bash
-# Complete workflow with proper reload sequence
 benchbox run \
   --platform duckdb \
   --benchmark tpcds \
   --scale 1.0 \
   --phases generate,load,power,throughput
 
-# Reload database before maintenance
 benchbox run \
   --platform duckdb \
   --benchmark tpcds \
@@ -424,15 +414,12 @@ benchbox run \
 #### Access Maintenance Test Results
 
 ```python
-# Run maintenance test
 maintenance_result = adapter.run_benchmark(benchmark, test_execution_type="maintenance")
 
-# Access detailed results
 print(f"Total operations: {maintenance_result.total_queries}")
 print(f"Total time: {maintenance_result.total_execution_time:.2f}s")
 print(f"Average operation time: {maintenance_result.average_query_time:.2f}s")
 
-# Individual operation timings
 for query_result in maintenance_result.query_results:
     print(f"{query_result.query_id}: {query_result.execution_time:.3f}s")
 ```
@@ -451,7 +438,6 @@ for query_result in maintenance_result.query_results:
 The implementation calculates Power@Size and Throughput@Size. It does not calculate the composite QphDS@Size (see [QphDS@Size (not exported)](#qphds-size-not-exported)):
 
 ```python
-# Access calculated metrics
 result = benchmark.run_official_benchmark(connection_string)
 
 print(f"Power@Size: {result.power_size:.2f}")
@@ -475,12 +461,10 @@ Throughput@Size = (99 × Num_Streams × 3600 × Scale_Factor) / Throughput_Test_
 The implementation also provides detailed metrics for each phase:
 
 ```python
-# Power Test metrics
 power_metrics = result.power_test.metrics
 print(f"Average Query Time: {power_metrics['avg_query_time']:.3f}s")
 print(f"Success Rate: {power_metrics['successful_queries'] / power_metrics['total_queries'] * 100:.1f}%")
 
-# Throughput Test metrics
 throughput_metrics = result.throughput_test.metrics
 print(f"Queries per Stream: {throughput_metrics['queries_per_stream']}")
 print(f"Concurrent Efficiency: {throughput_metrics.get('concurrent_efficiency', 'N/A')}")
@@ -535,14 +519,11 @@ The benchmark generates systematic reports in multiple formats automatically:
 ### Accessing Reports
 
 ```python
-# Reports are automatically generated
 result = benchmark.run_official_benchmark(connection_string)
 
-# Reports location
 reports_dir = benchmark.output_dir / "reports"
 print(f"Reports generated in: {reports_dir}")
 
-# List generated reports
 for report_file in reports_dir.glob("*"):
     print(f"  - {report_file.name}")
 ```
@@ -552,10 +533,8 @@ for report_file in reports_dir.glob("*"):
 ```python
 from benchbox.core.tpcds.reporting import TPCDSReportGenerator
 
-# Create custom report generator
 generator = TPCDSReportGenerator(output_dir="/custom/path", verbose=True)
 
-# Generate specific reports
 reports = generator.generate_complete_report(result)
 ```
 
@@ -566,20 +545,17 @@ reports = generator.generate_complete_report(result)
 The benchmark includes systematic validation to ensure TPC-DS compliance:
 
 ```python
-# Validation is automatic
 result = benchmark.run_official_benchmark(
     connection_string=connection_string,
     result_validation=True
 )
 
-# Check validation results
 validation = result.validation_results
 print(f"Overall Valid: {validation['overall_valid']}")
 print(f"Power Test Valid: {validation['power_test_valid']}")
 print(f"Throughput Test Valid: {validation['throughput_test_valid']}")
 print(f"Maintenance Test Valid: {validation['maintenance_test_valid']}")
 
-# Check for issues
 if validation['issues']:
     print("Validation Issues:")
     for issue in validation['issues']:
@@ -602,7 +578,6 @@ The validation framework checks:
 ### Manual Validation
 
 ```python
-# Access detailed validation information
 for phase_name, phase_result in [
     ("Power Test", result.power_test),
     ("Throughput Test", result.throughput_test),
@@ -618,16 +593,12 @@ for phase_name, phase_result in [
 ### Custom Database Integration
 
 ```python
-# Custom database connection handling
 class CustomDatabaseBenchmark(TPCDSBenchmark):
     def run_official_benchmark(self, **kwargs):
-        # Custom pre-processing
         self.setup_custom_database()
 
-        # Run benchmark
         result = super().run_official_benchmark(**kwargs)
 
-        # Custom post-processing
         self.cleanup_custom_database()
 
         return result
@@ -635,30 +606,32 @@ class CustomDatabaseBenchmark(TPCDSBenchmark):
 
 ### Performance Tuning
 
+For large scale factors, increase the number of parallel processes (`parallel=8`). For many streams, use high
+concurrency (`num_streams=16`). Skip the Maintenance Test if you do not need it.
+
 ```python
-# Optimize for large scale factors
 benchmark = TPCDSBenchmark(
     scale_factor=100.0,
-    parallel=8,  # More parallel processes
+    parallel=8,
     verbose=True
 )
 
-# Optimize for many streams
 result = benchmark.run_official_benchmark(
     connection_string=connection_string,
-    num_streams=16,  # High concurrency
+    num_streams=16,
     power_test=True,
     throughput_test=True,
-    maintenance_test=False  # Skip if not needed
+    maintenance_test=False
 )
 ```
 
 ### Integration with CI/CD
 
+The example fails the job when `qphds_size` drops below a minimum threshold. The value of 100 is an example.
+
 ```python
 import sys
 
-# CI/CD integration
 def run_benchmark_ci():
     benchmark = TPCDSBenchmark(scale_factor=0.1, verbose=False)
 
@@ -669,8 +642,7 @@ def run_benchmark_ci():
             result_validation=True
         )
 
-        # Check minimum performance threshold
-        if result.throughput_size < 100:  # Example threshold
+        if result.throughput_size < 100:
             print("Performance regression detected!")
             sys.exit(1)
 
@@ -685,7 +657,6 @@ def run_benchmark_ci():
 ### Batch Processing
 
 ```python
-# Run multiple benchmarks
 scale_factors = [0.1, 1.0, 10.0]
 results = []
 
@@ -694,7 +665,6 @@ for sf in scale_factors:
     result = benchmark.run_official_benchmark(connection_string)
     results.append((sf, result.throughput_size))
 
-# Analyze scaling behavior
 for sf, throughput in results:
     print(f"Scale Factor {sf}: Throughput@Size = {throughput:.2f}")
 ```
@@ -705,47 +675,45 @@ for sf, throughput in results:
 
 #### 1. Database Connection Issues
 
+If the connection fails, check the connection string format, verify that the database is running, and check the
+credentials.
+
 ```python
-# Test connection before benchmark
 try:
     result = benchmark.run_official_benchmark(connection_string)
 except Exception as e:
     print(f"Connection failed: {e}")
-    # Check connection string format
-    # Verify database is running
-    # Check credentials
 ```
 
 #### 2. Memory Issues with Large Scale Factors
 
+For large scale factors, reduce the number of parallel processes (`parallel=1`) and monitor memory usage:
+
 ```python
-# Optimize for large scale factors
 benchmark = TPCDSBenchmark(
     scale_factor=100.0,
-    parallel=1,  # Reduce parallel processes
+    parallel=1,
     verbose=True
 )
 
-# Monitor memory usage
 import psutil
 print(f"Memory usage: {psutil.virtual_memory().percent}%")
 ```
 
 #### 3. Query Timeouts
 
+Increase the timeout for slow queries. The value is in seconds, so 7200 is 2 hours:
+
 ```python
-# Increase timeout for slow queries
-benchmark.timeout_seconds = 7200  # 2 hours
+benchmark.timeout_seconds = 7200
 ```
 
 #### 4. Incomplete Results
 
 ```python
-# Check for partial results
 if not result.power_test or not result.throughput_test:
     print("Warning: Incomplete benchmark results")
 
-# Check validation results
 if result.validation_results.get('issues'):
     print("Validation issues found:")
     for issue in result.validation_results['issues']:
@@ -754,20 +722,21 @@ if result.validation_results.get('issues'):
 
 ### Debug Mode
 
+Enable debug logging and verbose benchmark execution:
+
 ```python
-# Enable debug mode
 import logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Verbose benchmark execution
 benchmark = TPCDSBenchmark(scale_factor=0.01, verbose=True)
 result = benchmark.run_official_benchmark(connection_string)
 ```
 
 ### Error Recovery
 
+This function retries a failed run, waiting 60 seconds between attempts:
+
 ```python
-# Implement error recovery
 def robust_benchmark_run(connection_string, max_retries=3):
     for attempt in range(max_retries):
         try:
@@ -778,22 +747,24 @@ def robust_benchmark_run(connection_string, max_retries=3):
             print(f"Attempt {attempt + 1} failed: {e}")
             if attempt == max_retries - 1:
                 raise
-            time.sleep(60)  # Wait before retry
+            time.sleep(60)
 ```
 
 ## Best Practices
 
 ### 1. Scale Factor Selection
 
+Choose a scale factor that matches the purpose. The approximate data sizes are 10MB for `development`, 100MB for
+`testing`, 1GB for `small`, 10GB for `medium`, 100GB for `large` and 1TB for `enterprise`.
+
 ```python
-# Choose appropriate scale factor
 scale_factors = {
-    "development": 0.01,    # ~10MB
-    "testing": 0.1,         # ~100MB
-    "small": 1.0,           # ~1GB
-    "medium": 10.0,         # ~10GB
-    "large": 100.0,         # ~100GB
-    "enterprise": 1000.0    # ~1TB
+    "development": 0.01,
+    "testing": 0.1,
+    "small": 1.0,
+    "medium": 10.0,
+    "large": 100.0,
+    "enterprise": 1000.0
 }
 
 benchmark = TPCDSBenchmark(scale_factor=scale_factors["testing"])
@@ -801,8 +772,9 @@ benchmark = TPCDSBenchmark(scale_factor=scale_factors["testing"])
 
 ### 2. Resource Management
 
+The context manager cleans up the temporary directory automatically, so the `finally` block has nothing to do:
+
 ```python
-# Proper resource management
 with tempfile.TemporaryDirectory() as temp_dir:
     benchmark = TPCDSBenchmark(
         scale_factor=1.0,
@@ -812,9 +784,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
 
     try:
         result = benchmark.run_official_benchmark(connection_string)
-        # Process results
     finally:
-        # Cleanup is automatic with context manager
         pass
 ```
 
@@ -824,7 +794,6 @@ with tempfile.TemporaryDirectory() as temp_dir:
 import time
 import psutil
 
-# Monitor benchmark performance
 start_time = time.time()
 start_memory = psutil.virtual_memory().used
 
@@ -843,7 +812,6 @@ print(f"Memory usage: {(end_memory - start_memory) / 1024 / 1024:.1f}MB")
 import json
 from datetime import datetime
 
-# Archive results for historical analysis
 def archive_results(result):
     archive_data = {
         "timestamp": datetime.now().isoformat(),
@@ -859,21 +827,22 @@ def archive_results(result):
 
 ### 5. Continuous Benchmarking
 
+The loop runs every hour (`time.sleep(3600)`) against your own baseline `qphds_size`, and alerts when the result falls
+more than 5% below it:
+
 ```python
-# Set up continuous benchmarking
 def continuous_benchmark():
     benchmark = TPCDSBenchmark(scale_factor=1.0, verbose=False)
 
-    baseline_throughput = 500.0  # Your baseline
+    baseline_throughput = 500.0
 
     while True:
         result = benchmark.run_official_benchmark(connection_string)
 
-        # Check for performance regression
-        if result.throughput_size < baseline_throughput * 0.95:  # 5% tolerance
+        if result.throughput_size < baseline_throughput * 0.95:
             alert_performance_regression(result)
 
-        time.sleep(3600)  # Run every hour
+        time.sleep(3600)
 ```
 
 ## Conclusion

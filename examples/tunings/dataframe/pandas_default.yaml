@@ -1,6 +1,3 @@
-# Pandas DataFrame Tuning - Default Configuration
-# Sensible defaults for general-purpose workloads
-
 data_types:
   dtype_backend: numpy_nullable
   enable_string_cache: false

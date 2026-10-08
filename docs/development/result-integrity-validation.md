@@ -13,7 +13,7 @@ BenchBox includes a three-tier integrity validator for benchmark result JSON fil
 |----------|-------|
 | Module | `benchbox.core.results.integrity_validator` |
 | Specs | `benchbox.core.results.benchmark_specs` |
-| CLI script | `_project/scripts/validate_results.py` |
+| CLI script | `validate_results.py` maintainer script (source checkout only) |
 | MCP tool | `validate_results` (in `benchbox.mcp.tools.analytics`) |
 | Tests | `tests/unit/core/results/test_integrity_validator.py` |
 
@@ -151,14 +151,24 @@ The validator returns an `IntegrityReport` dataclass:
 ```python
 @dataclass
 class IntegrityReport:
-    file: str                           # File path validated
-    benchmark_id: str                   # Benchmark identifier
-    platform: str                       # Platform name
-    scale_factor: float                 # Scale factor
-    overall_status: CheckStatus         # Worst status across all checks
-    checks: list[CheckResult]           # Individual check results
-    summary: dict[str, int]             # Counts by status (PASS, WARN, FAIL)
+    file: str
+    benchmark_id: str
+    platform: str
+    scale_factor: float
+    overall_status: CheckStatus
+    checks: list[CheckResult]
+    summary: dict[str, int]
 ```
+
+The fields are:
+
+- `file`: the file path validated.
+- `benchmark_id`: the benchmark identifier.
+- `platform`: the platform name.
+- `scale_factor`: the scale factor.
+- `overall_status`: the worst status across all checks.
+- `checks`: the individual check results.
+- `summary`: counts by status (PASS, WARN, FAIL).
 
 **Helper methods:**
 - `report.passed()` - Returns `True` if overall status is PASS
@@ -169,12 +179,20 @@ Each `CheckResult` contains:
 ```python
 @dataclass
 class CheckResult:
-    category: CheckCategory   # STRUCTURAL, COMPLETENESS, or BELIEVABILITY
-    name: str                 # Check identifier (e.g., "query_count_math")
-    status: CheckStatus       # PASS, WARN, or FAIL
-    message: str              # Human-readable description
-    details: dict | None      # Optional structured details
+    category: CheckCategory
+    name: str
+    status: CheckStatus
+    message: str
+    details: dict | None
 ```
+
+The fields are:
+
+- `category`: STRUCTURAL, COMPLETENESS, or BELIEVABILITY.
+- `name`: the check identifier, for example `query_count_math`.
+- `status`: PASS, WARN, or FAIL.
+- `message`: a human-readable description.
+- `details`: optional structured details.
 
 ## Convenience Functions
 
@@ -183,12 +201,12 @@ The module provides two convenience functions for common use cases:
 ```python
 from benchbox.core.results.integrity_validator import validate_file, validate_directory
 
-# Single file
 report = validate_file(Path("results/tpch_duckdb_sf1.json"))
 
-# Directory (returns list of reports)
 reports = validate_directory(Path("results/"), pattern="*.json")
 ```
+
+`validate_file` validates a single file. `validate_directory` validates a directory and returns a list of reports.
 
 Both functions handle invalid JSON gracefully - returning a FAIL report rather than raising exceptions.
 
@@ -196,7 +214,7 @@ Both functions handle invalid JSON gracefully - returning a FAIL report rather t
 
 | Interface | Usage |
 |-----------|-------|
-| **CLI script** | `uv run _project/scripts/validate_results.py <path> [options]` |
+| **CLI script** | `validate_results.py <path> [options]` maintainer script, in a source checkout |
 | **MCP tool** | `validate_results(result_file="...", verbose=True)` |
 | **Python API** | `from benchbox.core.results.integrity_validator import validate_file` |
 

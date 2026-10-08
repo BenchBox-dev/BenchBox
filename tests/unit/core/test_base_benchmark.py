@@ -1,19 +1,15 @@
-"""Unit tests for the BaseBenchmark abstract class.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from benchbox.core.base_benchmark import BaseBenchmark  # Adjust import path as needed
+from benchbox.core.base_benchmark import BaseBenchmark
 from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.results.result_factory import build_enhanced_benchmark_result
 
-# Mark all tests in this file as unit tests
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -21,8 +17,6 @@ pytestmark = [
 
 
 class MockBenchmark(BaseBenchmark):
-    """A minimal concrete implementation of BaseBenchmark for testing."""
-
     def __init__(self, scale_factor=1.0, **kwargs):
         super().__init__(scale_factor=scale_factor, **kwargs)
         self._name = "Mock Benchmark"
@@ -31,7 +25,6 @@ class MockBenchmark(BaseBenchmark):
         self._resources = []
 
     def generate_data(self, tables=None, output_format="memory"):
-        """Generate mock data for testing."""
         result = {}
         mock_tables = tables or ["table1", "table2"]
         for table in mock_tables:
@@ -39,14 +32,12 @@ class MockBenchmark(BaseBenchmark):
         return result
 
     def get_query(self, query_id):
-        """Return a mock query for the given ID."""
         queries = self.get_all_queries()
         if query_id not in queries:
             raise ValueError(f"Query ID {query_id} not found")
         return queries[query_id]
 
     def get_all_queries(self):
-        """Return all available mock queries."""
         return {
             1: "SELECT * FROM table1",
             2: "SELECT * FROM table2 WHERE id > 5",
@@ -54,20 +45,15 @@ class MockBenchmark(BaseBenchmark):
         }
 
     def execute_query(self, query_id, connection, params=None):
-        """Execute a mock query."""
         self.get_query(query_id)
-        # In a real implementation, we would execute the query on the connection
-        # Here we just simulate it
         return [{"id": i, "result": f"value_{i}"} for i in range(5)]
 
     def cleanup(self):
-        """Clean up any resources used by the base_benchmark."""
         self._resources = []
 
 
 @pytest.fixture
 def mock_db_connection():
-    """Create a mock database connection for testing."""
     conn = MagicMock()
     cursor = MagicMock()
     conn.cursor.return_value = cursor
@@ -78,28 +64,24 @@ def mock_db_connection():
 
 @pytest.fixture
 def base_benchmark():
-    """Create a MockBenchmark instance for testing."""
     return MockBenchmark(scale_factor=1.0)
 
 
-# Test category 1: Initialization and Configuration Tests
 class TestInitialization:
-    """Tests for benchmark initialization."""
-
     def test_basic_initialization(self):
-        """Test that MockBenchmark can be initialized with default parameters."""
+
         benchmark = MockBenchmark()
         assert benchmark.scale_factor == 1.0
         assert benchmark._name == "Mock Benchmark"
         assert benchmark._version == "1.0.0"
 
     def test_custom_scale_factor(self):
-        """Test initialization with a custom scale factor."""
+
         benchmark = MockBenchmark(scale_factor=5.0)
         assert benchmark.scale_factor == 5.0
 
     def test_invalid_scale_factor(self):
-        """Test that initialization with an invalid scale factor raises ValueError."""
+
         with pytest.raises(ValueError, match="Scale factor must be positive"):
             MockBenchmark(scale_factor=-1.0)
 
@@ -107,23 +89,18 @@ class TestInitialization:
             MockBenchmark(scale_factor=0)
 
     def test_custom_config(self):
-        """Test initialization with custom configuration parameters."""
+
         benchmark = MockBenchmark(scale_factor=2.0, custom_param="value")
         assert benchmark.scale_factor == 2.0
         assert benchmark.config.get("custom_param") == "value"
 
 
-# Test category 2: Abstract Method Tests
 class TestAbstractMethods:
-    """Tests for abstract method requirements."""
-
     def test_cannot_instantiate_abstract(self):
-        """Test that BaseBenchmark cannot be instantiated directly."""
         with pytest.raises(TypeError, match="abstract"):
             BaseBenchmark(scale_factor=1.0)
 
     def test_abstract_methods_defined(self):
-        """Verify that all required abstract methods are defined in BaseBenchmark."""
         abstract_methods = [
             method
             for method in dir(BaseBenchmark)
@@ -132,7 +109,6 @@ class TestAbstractMethods:
             and getattr(BaseBenchmark, method).__isabstractmethod__
         ]
 
-        # These should match the abstract methods defined in BaseBenchmark
         expected_abstract_methods = [
             "generate_data",
             "get_query",
@@ -144,24 +120,21 @@ class TestAbstractMethods:
             assert method in abstract_methods, f"Expected abstract method {method} not found"
 
 
-# Test category 3: Metadata Access Tests
 class TestMetadata:
-    """Tests for metadata property access."""
-
     def test_name_access(self, base_benchmark):
-        """Test retrieval of benchmark name."""
+
         assert base_benchmark.name == "Mock Benchmark"
 
     def test_version_access(self, base_benchmark):
-        """Test retrieval of benchmark version."""
+
         assert base_benchmark.version == "1.0.0"
 
     def test_description_access(self, base_benchmark):
-        """Test retrieval of benchmark description."""
+
         assert base_benchmark.description == "A mock benchmark for testing"
 
     def test_metadata_immutability(self, base_benchmark):
-        """Test that metadata attributes are read-only."""
+
         with pytest.raises(AttributeError):
             base_benchmark.name = "New Name"
 
@@ -172,55 +145,42 @@ class TestMetadata:
             base_benchmark.description = "New description"
 
 
-# Test category 4: Resource Management Tests
 class TestResourceManagement:
-    """Tests for resource management functionality."""
-
     def test_cleanup(self, base_benchmark):
-        """Test that cleanup method properly releases resources."""
-        # Set up resources
+
         base_benchmark._resources = ["resource1", "resource2"]
 
-        # Cleanup
         base_benchmark.cleanup()
 
-        # Verify resources are released
         assert base_benchmark._resources == []
 
     def test_context_manager(self):
-        """Test using MockBenchmark as a context manager."""
+
         with MockBenchmark(scale_factor=1.0) as benchmark:
-            # Use the benchmark
             benchmark._resources = ["resource1"]
             assert len(benchmark._resources) == 1
 
-        # After context exit, resources should be cleaned up
         assert benchmark._resources == []
 
     def test_context_manager_with_exception(self):
-        """Test context manager behavior during exceptions."""
+
         benchmark = None
         try:
             with MockBenchmark(scale_factor=1.0) as benchmark:
                 benchmark._resources = ["resource1"]
                 raise RuntimeError("Test exception")
         except RuntimeError:
-            # Even after an exception, resources should be cleaned up
             assert benchmark._resources == []
 
 
-# Test category 6: Error Handling Tests
 class TestErrorHandling:
-    """Tests for error handling behaviors."""
-
     def test_invalid_query_id(self, base_benchmark):
-        """Test behavior with invalid query IDs."""
+
         with pytest.raises(ValueError, match="Query ID .* not found"):
             base_benchmark.get_query(999)
 
     def test_query_execution_error(self, base_benchmark, mock_db_connection):
-        """Test response to query execution errors."""
-        # Make the mock connection raise an exception during execution
+
         mock_db_connection.cursor.return_value.execute.side_effect = Exception("DB Error")
 
         with patch.object(base_benchmark, "execute_query", side_effect=Exception("DB Error")):
@@ -228,17 +188,14 @@ class TestErrorHandling:
                 base_benchmark.execute_query(1, mock_db_connection)
 
 
-# Test category 7: Query Management Tests
 class TestQueryManagement:
-    """Tests for query management functionality."""
-
     def test_get_query(self, base_benchmark):
-        """Test retrieving individual queries by ID."""
+
         query = base_benchmark.get_query(1)
         assert query == "SELECT * FROM table1"
 
     def test_get_all_queries(self, base_benchmark):
-        """Test retrieving all available queries."""
+
         queries = base_benchmark.get_all_queries()
         assert len(queries) == 3
         assert 1 in queries
@@ -246,17 +203,14 @@ class TestQueryManagement:
         assert 3 in queries
 
     def test_nonexistent_query(self, base_benchmark):
-        """Test behavior with nonexistent query IDs."""
+
         with pytest.raises(ValueError):
             base_benchmark.get_query(999)
 
 
-# Test category 8: Data Generation Tests
 class TestDataGeneration:
-    """Tests for data generation functionality."""
-
     def test_generate_data_default(self, base_benchmark):
-        """Test data generation with default parameters."""
+
         data = base_benchmark.generate_data()
         assert "table1" in data
         assert "table2" in data
@@ -264,15 +218,13 @@ class TestDataGeneration:
         assert len(data["table2"]) == 10
 
     def test_generate_specific_tables(self, base_benchmark):
-        """Test generating data for specific tables."""
+
         data = base_benchmark.generate_data(tables=["table1"])
         assert "table1" in data
         assert "table2" not in data
 
     def test_scale_factor_effect(self):
-        """Test relationship between scale factor and data volume."""
 
-        # Create a custom mock benchmark that respects scale factor
         class ScaledMockBenchmark(MockBenchmark):
             def generate_data(self, tables=None, output_format="memory"):
                 result = {}
@@ -282,7 +234,6 @@ class TestDataGeneration:
                     result[table] = [{"id": i, "value": f"test_{i}"} for i in range(row_count)]
                 return result
 
-        # Test with different scale factors
         benchmark1 = ScaledMockBenchmark(scale_factor=1.0)
         data1 = benchmark1.generate_data()
         assert len(data1["table1"]) == 10
@@ -293,10 +244,7 @@ class TestDataGeneration:
 
 
 class TestMinimalResultHelper:
-    """Tests for the minimal benchmark result convenience helper."""
-
     def test_create_minimal_benchmark_result_populates_core_fields(self, base_benchmark):
-        """Minimal helper should return a fully-typed BenchmarkResults instance."""
 
         result = base_benchmark.create_minimal_benchmark_result(
             validation_status="FAILED",
@@ -319,12 +267,10 @@ class TestMinimalResultHelper:
         assert result.execution_metadata["reason"] == "test"
         assert result.execution_metadata["benchmark_id"] == "mock_benchmark"
         assert result.system_profile == {"cpu": "M2"}
-        # execution_phases is None because phases parameter is dict but field expects ExecutionPhases dataclass
         assert result.execution_phases is None
         assert result.execution_id == "custom-id"
 
     def test_create_minimal_benchmark_result_defaults(self, base_benchmark):
-        """Defaults should produce a minimal but complete result."""
 
         result = base_benchmark.create_minimal_benchmark_result(validation_status="INTERRUPTED")
 
@@ -340,7 +286,6 @@ class TestMinimalResultHelper:
 
 
 def test_create_minimal_benchmark_result_propagates_duration_seconds(base_benchmark):
-    """Explicit duration should be preserved in the resulting BenchmarkResults."""
 
     result = base_benchmark.create_minimal_benchmark_result(
         validation_status="FAILED",
@@ -352,7 +297,6 @@ def test_create_minimal_benchmark_result_propagates_duration_seconds(base_benchm
 
 
 def test_create_enhanced_benchmark_result_per_table_timings(base_benchmark):
-    """per_table_timings kwarg should map total_ms into per-table load_time_ms."""
 
     result = base_benchmark.create_enhanced_benchmark_result(
         platform="duckdb",
@@ -373,7 +317,6 @@ def test_create_enhanced_benchmark_result_per_table_timings(base_benchmark):
 
 
 def test_create_enhanced_benchmark_result_per_table_timings_missing_table(base_benchmark):
-    """Tables absent from per_table_timings should default load_time_ms to 0 (omitted)."""
 
     result = base_benchmark.create_enhanced_benchmark_result(
         platform="duckdb",
@@ -384,14 +327,11 @@ def test_create_enhanced_benchmark_result_per_table_timings_missing_table(base_b
         per_table_timings={"lineitem": {"total_ms": 950}},
     )
 
-    # lineitem has timing - emitted as dict
     assert result.table_statistics["lineitem"] == {"rows": 6000000, "load_time_ms": 950}
-    # nation has no timing - load_time_ms=0 → only rows emitted
     assert result.table_statistics["nation"] == {"rows": 25}
 
 
 def test_create_enhanced_benchmark_result_per_table_timings_float_format(base_benchmark):
-    """Non-dict timing values (e.g. fabric_spark legacy) should not raise; load_time_ms defaults to 0."""
 
     result = base_benchmark.create_enhanced_benchmark_result(
         platform="fabric_spark",
@@ -399,14 +339,13 @@ def test_create_enhanced_benchmark_result_per_table_timings_float_format(base_be
         duration_seconds=1.0,
         data_loading_time=1.0,
         table_statistics={"sales": 100000},
-        per_table_timings={"sales": 1.5},  # float, not dict - pre-fix fabric_spark format
+        per_table_timings={"sales": 1.5},
     )
 
-    assert result.table_statistics["sales"] == {"rows": 100000}  # no load_time_ms - graceful fallback
+    assert result.table_statistics["sales"] == {"rows": 100000}
 
 
 def test_result_factory_build_enhanced_benchmark_result_matches_base_behavior(base_benchmark):
-    """Shared result factory should preserve BaseBenchmark's enhanced-result behavior."""
 
     kwargs = {
         "platform": "duckdb",
@@ -430,7 +369,6 @@ def test_result_factory_build_enhanced_benchmark_result_matches_base_behavior(ba
 
 
 def test_result_factory_build_enhanced_handles_non_dict_per_table_timings(base_benchmark):
-    """Shared result factory should gracefully handle legacy non-dict per-table timing values."""
 
     result = build_enhanced_benchmark_result(
         benchmark=base_benchmark,
@@ -447,7 +385,6 @@ def test_result_factory_build_enhanced_handles_non_dict_per_table_timings(base_b
 
 
 def test_result_factory_malformed_total_ms_degrades_to_zero(base_benchmark):
-    """None or non-numeric total_ms values must omit load_time_ms without raising."""
 
     result = build_enhanced_benchmark_result(
         benchmark=base_benchmark,
@@ -469,7 +406,6 @@ def test_result_factory_malformed_total_ms_degrades_to_zero(base_benchmark):
 
 
 def test_result_factory_non_dict_timings_container_degrades_to_zero(base_benchmark):
-    """A truthy non-dict per_table_timings must not raise; all timings omitted."""
 
     result = build_enhanced_benchmark_result(
         benchmark=base_benchmark,
