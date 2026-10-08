@@ -9,7 +9,9 @@
       "from_item": "clickhouse-tuned-template-benefit-measurement-20261005",
       "id": 1,
       "reason": "finish needs a registered batch; serial mode has none and this session holds no owner_generation.",
-      "resolution": "open",
+      "resolution": "dismissed",
+      "resolved_at": "2026-10-08T15:38:52Z",
+      "resolved_reason": "Superseded: the measurement is recorded in the item context and the ADR-3 addendum (PR #2766 merged). This item is not in a registered batch, so it is closed through the ordinary serial claim and finish path; no batch owner is needed.",
       "summary": "Measurement done (matrix + SSB/TPC-H reruns + Q10 envelope series); evidence in closeout; needs batch owner to finish."
     }
   ],
@@ -86,6 +88,14 @@
       "client": "claude-code",
       "op": "update",
       "op_id": "559be272df6c447f8a604b93b50c4bad",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T15:38:52Z",
+      "client": "claude-code",
+      "op": "dismiss",
+      "op_id": "edb7a6265c2f4fc2a2c51b979c30ebc6",
       "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
