@@ -1,0 +1,25 @@
+{
+  "acceptance": [
+    "A test fails if any shipped *_tuned.yaml (packaged or examples) has no evidence state.",
+    "A CLI test shows the warning for a run that uses an unmeasured template, and no warning for a measured one.",
+    "The result JSON carries the state under platform.tuning, and the Explorer shows it.",
+    "A test shows requested_config_hash is unchanged for every existing template."
+  ],
+  "context": "Source: tuning-evidence plan (2026-10-08), plan step 3. Covers muse F1 (narrowed: label, not quarantine) and muse F13 (a label replaces an expiry date). ADR-3 records template changes in requested_config_hash, and TUNING_POLICY_GENERATION marks policy eras that the Explorer warns across (agy F-09, already handled).",
+  "description": "## Problem\nEvery shipped `*_tuned.yaml` looks equally trustworthy. Nothing tells a user that the Databricks, Snowflake and DuckDB templates have never been measured against `notuning`, or that the ClickHouse decisions hold only at SF1.\n\n## Change\nImplement the owner's D3 decision (`tuning-evidence-tuned-mode-promise-20261008`). Assuming D3 picks the label:\n- A machine-readable evidence state per template: measured-keep, measured-adjust or unmeasured. Each state records scale, memory rung, engine version and a link to the evidence.\n- Initial states: ClickHouse TPC-H, SSB and TPC-DS are measured at SF1 and provisional; every other template is unmeasured.\n- The result records the state under `platform.tuning`.\n- The console prints a one-line warning when a run uses an unmeasured template.\n- The results Explorer and reports show the state.\n\n## Decision gates\n- Where the state lives: prefer one registry file, so a measurement updates one place, over a block in each template. If a per-template block is chosen instead, say why.\n- The state is metadata and must not enter `requested_config_hash`. If the design forces it in, stop and ask, because changing the hash splits existing comparisons.\n- If D3 chose quarantine, rewrite this item to match before starting.\n\n## Guardrails (must preserve)\n- Runs are never blocked because of the state; there is no hard gate.\n- `requested_config_hash` values of existing templates do not change.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`. Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
+  "links": [
+    "benchbox/core/tuning/templates",
+    "examples/tunings",
+    "benchbox/cli/commands/run.py"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:32:37Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "781fc7c347444c35bf05e05268b6e4c4",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    }
+  ]
+}
