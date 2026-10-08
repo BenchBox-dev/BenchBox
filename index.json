@@ -4483,6 +4483,13 @@
       "status": "open",
       "title": "comment-policy-strict can never pass: flags vendored, binary, and out-of-scope files"
     },
+    "comment-scanner-mdx-jsx-support": {
+      "claim": null,
+      "needs": [],
+      "priority": "medium",
+      "status": "open",
+      "title": "Extend comment scanner for MDX files to check top-level JSX comments and imports"
+    },
     "comment-scanner-stdin-piped-interpreter-adapter": {
       "claim": null,
       "needs": [],

@@ -1,0 +1,18 @@
+{
+  "acceptance": [
+    "JSX comment syntax ({/* ... */}) in .mdx files is detected and flagged by the comment policy checker.",
+    "Unit test added to tests/unit/scripts/test_comment_policy.py verifying MDX JSX comment detection."
+  ],
+  "context": "Follow-up item 8 from comment-checker-review-followups. Currently listed as a known gap in docs/development/comment-policy.md.",
+  "description": ".mdx pages map directly to the Markdown scanner in scripts/comment_syntax.py, meaning that top-level MDX import statements and JSX comments ({/* comment */}) outside fenced Markdown code blocks bypass the checker. Parse top-level MDX constructs with a JavaScript/TypeScript scanner or AST parser to inspect comments outside code fences.",
+  "sessions": [
+    {
+      "actor": "mcp:antigravity-client:joe@joe-mac-mini.local:8dff0892e031f17231e04e2e",
+      "at": "2026-10-08T23:34:33Z",
+      "client": "antigravity-client",
+      "op": "create",
+      "op_id": "ee368d8ecf494beb89a9b02941873fa3",
+      "session_id": "2c188abafba54577ab5700a7c822554e"
+    }
+  ]
+}
