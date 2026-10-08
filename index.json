@@ -15160,7 +15160,7 @@
         "pvm-s2-sf10-memory-time-probe"
       ],
       "priority": "medium-high",
-      "status": "open",
+      "status": "blocked",
       "title": "Add the Polars matrix spec with interleaved runs, engine setups, correctness evidence and fair analysis"
     },
     "pvm-s4-run-polars-matrix": {
