@@ -20755,6 +20755,13 @@
       "status": "open",
       "title": "Review moved vendor prices and commit refreshed pricing evidence so t3:drift can pass"
     },
+    "t3-perf-compare-delta-floor-20261008": {
+      "claim": null,
+      "needs": [],
+      "priority": "high",
+      "status": "open",
+      "title": "Add an absolute-delta floor to benchbox compare --fail-on-regression so sub-15ms queries stop tripping the perf gate"
+    },
     "table-format-integration-ci-coverage": {
       "claim": null,
       "needs": [],
