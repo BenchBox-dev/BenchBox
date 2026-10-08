@@ -1,14 +1,4 @@
 #!/usr/bin/env python3
-"""Fail-closed exact-refresh certification classifier.
-
-Evidence generation only. This module never skips a CI job and never publishes
-a required status context. Callers inject event, Git, ruleset, Check Run, and
-Actions-run data so unit tests do not touch the network.
-
-Version 1 permits at most one shadow-eligible refresh after a trusted full
-certification. Missing, stale, ambiguous, or untrusted input returns
-``full_required``.
-"""
 
 import argparse
 import hashlib
@@ -20,10 +10,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+CLI_DESCRIPTION = (
+    "Fail-closed exact-refresh certification classifier.\n"
+    "\n"
+    "Evidence generation only. This module never skips a CI job and never publishes\n"
+    "a required status context. Callers inject event, Git, ruleset, Check Run, and\n"
+    "Actions-run data so unit tests do not touch the network.\n"
+    "\n"
+    "Version 1 permits at most one shadow-eligible refresh after a trusted full\n"
+    "certification. Missing, stale, ambiguous, or untrusted input returns\n"
+    "``full_required``.\n"
+)
+
 DECISION_SHADOW = "shadow_eligible"
 DECISION_FULL = "full_required"
 
-# Stable reason codes. Tests pin this set so a deleted predicate is visible.
 REASON_NOT_SYNCHRONIZE = "not_synchronize"
 REASON_MISSING_EVENT_SHA = "missing_event_sha"
 REASON_AFTER_HEAD_MISMATCH = "after_head_mismatch"
@@ -159,8 +160,6 @@ class ActionsRunInfo:
 
 @dataclass(frozen=True)
 class ClassificationRequest:
-    """All classifier inputs. None of these are read from checkout HEAD."""
-
     action: str
     before: str
     after: str
@@ -423,8 +422,6 @@ def pred_prior_full_checks(req: ClassificationRequest, out: Classification) -> s
         run = _run_by_id(req.actions_runs, check.run_id)
         if run is None:
             return REASON_PRIOR_CHECK_UNBOUND
-        # Bind the check to the certified feature head. The prior run's base is
-        # the old PR base, not the current event base (parent2).
         if run.head_sha != parent1 or not _is_sha(run.base_sha):
             return REASON_PRIOR_CHECK_UNBOUND
         if run.certification_kind != CERTIFICATION_FULL:
@@ -477,7 +474,6 @@ def pred_paths(req: ClassificationRequest, _out: Classification) -> str | None:
     return None
 
 
-# Named, ordered eligibility predicates. Tests pin this list.
 ELIGIBILITY_PREDICATES: tuple[tuple[str, Predicate], ...] = (
     ("event_shas", pred_event_shas),
     ("synchronize", pred_synchronize),
@@ -501,7 +497,6 @@ ELIGIBILITY_PREDICATES: tuple[tuple[str, Predicate], ...] = (
 
 
 def classify(request: ClassificationRequest) -> Classification:
-    """Return a typed decision. Never raises on malformed caller data."""
 
     out = Classification(decision=DECISION_FULL, pr_number=request.pr_number)
     try:
@@ -595,7 +590,6 @@ def request_from_mapping(raw: Mapping[str, Any]) -> ClassificationRequest:
 
 
 def merge_tree_write_tree(parent1: str, parent2: str) -> tuple[str | None, str | None]:
-    """Return (tree_sha, error). Used by later workflows; tests inject trees."""
 
     try:
         completed = subprocess.run(
@@ -613,7 +607,7 @@ def merge_tree_write_tree(parent1: str, parent2: str) -> tuple[str | None, str |
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--input", type=Path, help="Classification request JSON")
     parser.add_argument("--json-out", type=Path, help="Write the decision JSON")
     args = parser.parse_args(argv)

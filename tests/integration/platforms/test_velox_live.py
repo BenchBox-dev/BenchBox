@@ -1,24 +1,3 @@
-"""Live integration tests for the Apache Gluten + Velox platform adapter.
-
-These tests require the Velox Docker environment from docker/velox/.
-They are skipped when the required environment variables are not set.
-
-Two ways to run these tests:
-
-  (1) Adapter-only (host connects to a containerized Spark-Connect server):
-        cd docker/velox && docker compose up -d velox-connect
-        VELOX_ENDPOINT=sc://localhost:50051 \\
-          uv run -- python -m pytest tests/integration/platforms/test_velox_live.py -v
-
-  (2) All-in-one (run entirely inside the Docker container):
-        docker run --rm benchbox-velox:test \\
-          python -m pytest tests/integration/platforms/test_velox_live.py \\
-          -m live_integration -q
-
-When running inside the all-in-one container, set VELOX_GLUTEN_JAR to the
-jar path (e.g., /opt/gluten.jar) and VELOX_DEPLOYMENT=local.
-"""
-
 from __future__ import annotations
 
 import os
@@ -29,7 +8,6 @@ VELOX_ENDPOINT = os.environ.get("VELOX_ENDPOINT", "sc://localhost:50051")
 VELOX_GLUTEN_JAR = os.environ.get("VELOX_GLUTEN_JAR", "")
 VELOX_DEPLOYMENT = os.environ.get("VELOX_DEPLOYMENT", "remote")
 
-# Skip unless explicitly enabled via env var to avoid accidental live runs in CI.
 _LIVE_ENABLED = bool(os.environ.get("VELOX_LIVE_TESTS"))
 
 pytestmark = [
@@ -43,7 +21,7 @@ pytestmark = [
 ]
 
 try:
-    from pyspark.sql import SparkSession  # noqa: F401
+    from pyspark.sql import SparkSession
 
     PYSPARK_AVAILABLE = True
 except ImportError:
@@ -52,8 +30,6 @@ except ImportError:
 
 @pytest.mark.skipif(not PYSPARK_AVAILABLE, reason="PySpark not installed")
 class TestVeloxSQLSmoke:
-    """Smoke tests for VeloxAdapter against a live Gluten-enabled Spark session."""
-
     @pytest.fixture
     def adapter(self):
         from benchbox.platforms.velox import VeloxAdapter
@@ -73,12 +49,10 @@ class TestVeloxSQLSmoke:
             pass
 
     def test_connection(self, adapter):
-        """Verify the Spark session connects without error."""
         connection = adapter.create_connection()
         adapter.close_connection(connection)
 
     def test_select_one(self, adapter):
-        """SELECT 1 should execute and return one row."""
         connection = adapter.create_connection()
         result = adapter.execute_query(connection, "SELECT 1 AS value", query_id="Q0", benchmark_type="tpch")
         assert result["status"] == "SUCCESS"
@@ -86,7 +60,6 @@ class TestVeloxSQLSmoke:
         adapter.close_connection(connection)
 
     def test_platform_info_fields(self, adapter):
-        """Platform info should include required Velox fields."""
         connection = adapter.create_connection()
         info = adapter.get_platform_info(connection=connection)
         adapter.close_connection(connection)
@@ -99,11 +72,6 @@ class TestVeloxSQLSmoke:
         assert "platform_version" in info
 
     def test_tpch_q1_velox_active(self, adapter):
-        """TPC-H Q1 EXPLAIN must contain VeloxColumnar nodes (live mode).
-
-        This is the primary acceptance gate: if Gluten is wired correctly,
-        the query plan includes VeloxColumnar* operators and velox_active is True.
-        """
         connection = adapter.create_connection()
         try:
             info = adapter.get_platform_info(connection=connection)
@@ -112,8 +80,6 @@ class TestVeloxSQLSmoke:
                 f"Probe plan: {info.get('velox_probe_plan', '(not captured)')}"
             )
 
-            # Execute a simple aggregation (resembles TPC-H Q1 structure) and
-            # check the plan for native nodes.
             connection.sql(
                 "CREATE TABLE IF NOT EXISTS velox_smoke_t "
                 "(l_quantity DOUBLE, l_extendedprice DOUBLE, l_discount DOUBLE) "
@@ -135,12 +101,10 @@ class TestVeloxSQLSmoke:
             adapter.close_connection(connection)
 
     def test_query_plan_annotated(self, adapter):
-        """get_query_plan should return a non-empty string with annotation header."""
         connection = adapter.create_connection()
         plan = adapter.get_query_plan(connection, "SELECT 1 AS n")
         adapter.close_connection(connection)
 
         assert isinstance(plan, str)
         assert len(plan) > 0
-        # Should always have one of the annotation lines
         assert "Velox native execution" in plan

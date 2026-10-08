@@ -1,5 +1,3 @@
-"""Regression tests for cwd-safe chDB imports."""
-
 from __future__ import annotations
 
 import os
@@ -13,7 +11,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 def test_import_chdb_restores_cwd_when_native_load_fails(tmp_path):
-    """A failed native load must not strand the process in chDB's package dir."""
+
     original_cwd = os.getcwd()
     package_dir = tmp_path / "site-packages" / "chdb"
     package_dir.mkdir(parents=True)

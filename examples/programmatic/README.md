@@ -20,29 +20,26 @@ All examples in the parent directories demonstrate programmatic usage. This READ
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.tpch import TPCH
 
-# 1. Create benchmark
 benchmark = TPCH(
     scale_factor=0.01,
     output_dir="./data",
     force_regenerate=False
 )
 
-# 2. Generate data
 benchmark.generate_data()
 
-# 3. Create platform adapter
 adapter = DuckDBAdapter(database_path=":memory:")
 
-# 4. Run benchmark
 results = adapter.run_benchmark(
     benchmark,
     test_execution_type="power"
 )
 
-# 5. Access results
 print(f"Total time: {results.total_execution_time:.2f}s")
 print(f"Queries: {results.total_queries}")
 ```
+
+The steps are: create the benchmark, generate data, create a platform adapter, run the benchmark, and access the results.
 
 ## Reference Examples
 
@@ -71,54 +68,46 @@ See: [use_cases/](../use_cases/) directory
 ### Benchmark Creation
 
 ```python
-# TPC-H
 from benchbox.tpch import TPCH
 benchmark = TPCH(scale_factor=0.1, output_dir="./data")
 
-# TPC-DS
 from benchbox.tpcds import TPCDS
 benchmark = TPCDS(scale_factor=0.1, output_dir="./data")
 
-# Other benchmarks available:
-# - TPCDI, SSB, ClickBench, AMPLab, H2ODB, JoinOrder, ReadPrimitives, WritePrimitives, TPCHavoc, CoffeeShop
 ```
+
+Other benchmarks are available: TPCDI, SSB, ClickBench, AMPLab, H2ODB, JoinOrder, ReadPrimitives, WritePrimitives, TPCHavoc and CoffeeShop.
 
 ### Platform Adapters
 
 ```python
-# DuckDB
 from benchbox.platforms.duckdb import DuckDBAdapter
 adapter = DuckDBAdapter(database_path=":memory:")
 
-# SQLite
 from benchbox.platforms.sqlite import SQLiteAdapter
 adapter = SQLiteAdapter(database_path="./db.sqlite")
 
-# ClickHouse
 from benchbox.platforms.clickhouse import ClickHouseAdapter
 adapter = ClickHouseAdapter(host="localhost", port=9000)
 
-# Cloud platforms: Databricks, BigQuery, Snowflake, Redshift
-# See getting_started/cloud/ for examples
 ```
+
+Cloud platforms (Databricks, BigQuery, Snowflake and Redshift) are also supported. See `getting_started/cloud/` for examples.
 
 ### Running Benchmarks
 
 ```python
-# Full benchmark
 results = adapter.run_benchmark(
     benchmark,
     test_execution_type="power"
 )
 
-# Query subset
 results = adapter.run_benchmark(
     benchmark,
     test_execution_type="power",
     query_subset=["1", "6", "12"]
 )
 
-# With custom configuration
 results = adapter.run_benchmark(
     benchmark,
     test_execution_type="throughput",
@@ -126,25 +115,26 @@ results = adapter.run_benchmark(
 )
 ```
 
+The first call runs the full benchmark, the second runs a query subset, and the third uses a custom configuration (four throughput streams).
+
 ### Result Processing
 
 ```python
-# Access overall metrics
 print(results.total_execution_time)
 print(results.total_queries)
 print(results.successful_queries)
 print(results.average_query_time)
 
-# Iterate over query results
 for query_result in results.query_results:
     print(f"{query_result.query_name}: {query_result.execution_time:.3f}s")
 
-# Export results
-results_dict = results.model_dump()  # Convert to dictionary
+results_dict = results.model_dump()
 import json
 with open("results.json", "w") as f:
     json.dump(results_dict, f, indent=2)
 ```
+
+The first group of lines reads the overall metrics, the loop iterates over the query results, and the last lines export the results (`model_dump()` converts them to a dictionary).
 
 ## Common Patterns
 
@@ -181,23 +171,25 @@ from benchbox.base import BaseBenchmark
 
 class MyBenchmark(BaseBenchmark):
     def generate_data(self):
-        # Custom data generation
         pass
 
     def get_query(self, query_id, params=None):
-        # Custom query retrieval
         pass
 ```
+
+`generate_data` is where you implement custom data generation, and `get_query` is where you implement custom query retrieval.
 
 ## Integration Examples
 
 ### Jupyter Notebooks
 
-```python
-# Install in notebook
-!uv pip install benchbox
+Install BenchBox in the notebook environment first:
 
-# Import and run
+```bash
+uv pip install benchbox
+```
+
+```python
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.tpch import TPCH
 
@@ -207,7 +199,6 @@ benchmark.generate_data()
 adapter = DuckDBAdapter(database_path=":memory:")
 results = adapter.run_benchmark(benchmark, test_execution_type="power")
 
-# Visualize results
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -219,6 +210,8 @@ df = pd.DataFrame([
 df.plot(x="query", y="time", kind="bar")
 plt.show()
 ```
+
+The last lines visualize the results as a bar chart.
 
 ### FastAPI Integration
 
@@ -261,7 +254,6 @@ def run_performance_test():
     adapter = DuckDBAdapter(database_path=":memory:")
     results = adapter.run_benchmark(benchmark, test_execution_type="power")
 
-    # Store results
     import json
     with open("/tmp/results.json", "w") as f:
         json.dump(results.model_dump(), f)

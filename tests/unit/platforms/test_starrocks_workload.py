@@ -1,13 +1,6 @@
-"""Unit tests for StarRocks workload translation helpers.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Exercises the regex-based query rewriters independently of a live server so
-regressions in SQL translation (identifier quoting, SUBSTRING dialect, subquery
-alias injection) surface at test time rather than only during integration runs.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -24,8 +17,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 @pytest.fixture
 def mixin() -> StarRocksWorkloadMixin:
-    # The translation helpers depend only on class attributes, so instantiating
-    # the bare mixin via __new__ is sufficient and avoids the full adapter stack.
+
     return StarRocksWorkloadMixin.__new__(StarRocksWorkloadMixin)
 
 
@@ -82,10 +74,10 @@ class TestTranslateAnsiSubstring:
         )
 
     def test_nested_function_emits_warning(self, mixin, caplog):
-        # Nested parens defeat the main regex; detector must log a warning.
+
         with caplog.at_level("WARNING", logger="benchbox.platforms.starrocks.workload"):
             out = mixin._translate_ansi_substring("SUBSTRING(LOWER(col) FROM 1 FOR 3)")
-        # Query is returned unchanged when translation does not match.
+
         assert "LOWER(col)" in out
         assert any("ANSI 'FROM" in rec.message for rec in caplog.records)
 
@@ -104,7 +96,7 @@ class TestQuoteReservedAliases:
         assert mixin._quote_reserved_aliases(q) == q
 
     def test_literal_contents_not_quoted(self, mixin):
-        # "AS rank" inside a string literal must not be rewritten.
+
         q = "SELECT 'prefix AS rank suffix' AS total FROM t"
         assert mixin._quote_reserved_aliases(q) == q
 
@@ -120,7 +112,7 @@ class TestInjectMissingSubqueryAliases:
         assert mixin._inject_missing_subquery_aliases(q) == q
 
     def test_implicit_alias_is_respected(self, mixin):
-        # Implicit alias (no AS keyword) - must not inject.
+
         q = "SELECT * FROM (SELECT 1 AS x) sq"
         assert mixin._inject_missing_subquery_aliases(q) == q
 
@@ -139,14 +131,13 @@ class TestInjectMissingSubqueryAliases:
         assert "AS `_sq0`" in out
 
     def test_union_follows_subquery(self, mixin):
-        # UNION is a keyword after the closing paren → alias must be injected.
+
         q = "SELECT * FROM (SELECT 1) UNION SELECT 2"
         out = mixin._inject_missing_subquery_aliases(q)
         assert "AS `_sq0`" in out
 
     def test_multiple_subqueries_get_distinct_aliases(self, mixin):
-        # Two comma-joined derived tables - both are FROM-list subqueries and must
-        # receive distinct injected aliases.
+
         q = "SELECT * FROM (SELECT 1), (SELECT 2)"
         out = mixin._inject_missing_subquery_aliases(q)
         assert "AS `_sq0`" in out
@@ -161,16 +152,14 @@ class TestOptimizeTableDefinition:
         assert "DUPLICATE KEY" not in out
 
     def test_falls_back_to_duplicate_key_when_pk_not_leading(self, mixin):
-        # PK references a column that isn't the first in schema order →
-        # must fall back to DUPLICATE KEY.
+
         ddl = "CREATE TABLE t (\n  name VARCHAR(50),\n  id INT NOT NULL,\n  PRIMARY KEY (id)\n)"
         out = mixin._optimize_table_definition(ddl)
         assert "DUPLICATE KEY" in out
         assert "PRIMARY KEY" not in out
 
     def test_timestamp_column_name_preserved(self, mixin):
-        # Case-sensitive guard: lowercase 'timestamp' as a column name must
-        # not be rewritten to DATETIME.
+
         ddl = "CREATE TABLE t (id INT, timestamp VARCHAR(20))"
         out = mixin._optimize_table_definition(ddl)
         assert "timestamp VARCHAR(20)" in out
@@ -183,19 +172,11 @@ class TestOptimizeTableDefinition:
 
 
 class TestStreamLoadEmptyAsNull:
-    """Lock the legacy StarRocks default: comma CSV treats empty as NULL.
-
-    Regression guard for the resolver migration: an earlier draft gated empty=NULL
-    on dialect.null_marker, which silently flipped behaviour for unannotated comma
-    CSVs (resolver returns null_marker=None for them).
-    """
-
     def test_pipe_delimited_tpc_keeps_empty_literal(self):
         assert _stream_load_treats_empty_as_null("|") is False
 
     def test_unannotated_comma_csv_still_treats_empty_as_null(self):
-        # The regression: this was True under the old delimiter-based code,
-        # would have flipped to False if we kept dialect.null_marker as the gate.
+
         assert _stream_load_treats_empty_as_null(",") is True
 
     def test_tab_delimited_keeps_empty_literal(self):

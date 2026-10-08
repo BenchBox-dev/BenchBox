@@ -35,20 +35,22 @@ BenchBox supports benchmarking DataFrame libraries using their native APIs inste
 | **Databricks** | `databricks-df` | Expression | Production-ready | [Databricks DataFrame](databricks-dataframe.md) |
 
 ```bash
-# Quick start with DataFrame platforms
-benchbox run --platform polars-df --benchmark tpch --scale 0.1    # Recommended - fast
-benchbox run --platform pandas-df --benchmark tpch --scale 0.1    # Familiar API
-benchbox run --platform dask-df --benchmark tpch --scale 0.1      # Distributed
-benchbox run --platform cudf-df --benchmark tpch --scale 0.1      # GPU (Linux only)
-benchbox run --platform pyspark-df --benchmark tpch --scale 0.1   # Spark ecosystem
-benchbox run --platform lakesail-df --benchmark tpch --scale 0.1  # Sail (fast Spark)
+benchbox run --platform polars-df --benchmark tpch --scale 0.1
+benchbox run --platform pandas-df --benchmark tpch --scale 0.1
+benchbox run --platform dask-df --benchmark tpch --scale 0.1
+benchbox run --platform cudf-df --benchmark tpch --scale 0.1
+benchbox run --platform pyspark-df --benchmark tpch --scale 0.1
+benchbox run --platform lakesail-df --benchmark tpch --scale 0.1
 benchbox run --platform datafusion-df --benchmark tpch --scale 0.1
-benchbox run --platform databricks-df --benchmark tpch --scale 0.1  # Databricks Connect
+benchbox run --platform databricks-df --benchmark tpch --scale 0.1
 
-# Compare SQL vs DataFrame on same workload
-benchbox run --platform polars --benchmark tpch --scale 0.1       # SQL mode
-benchbox run --platform polars-df --benchmark tpch --scale 0.1    # DataFrame mode
+benchbox run --platform polars --benchmark tpch --scale 0.1
+benchbox run --platform polars-df --benchmark tpch --scale 0.1
 ```
+
+Polars is the recommended starting point because it is fast. Pandas offers a familiar API. Dask is distributed. cuDF runs on GPUs and works on Linux only. PySpark fits the Spark ecosystem. LakeSail runs on Sail, a fast Spark-compatible engine. Databricks uses Databricks Connect.
+
+The last two commands compare SQL and DataFrame execution on the same workload: `--platform polars` is SQL mode and `--platform polars-df` is DataFrame mode.
 
 ## SQL Platforms
 
@@ -151,25 +153,24 @@ These platforms are included in the base BenchBox installation with no additiona
 ### Local Platforms (No Setup Required)
 
 ```bash
-# DuckDB - Default, included in base install
 benchbox run --platform duckdb --benchmark tpch --scale 0.01
 
-# SQLite - Included in base install
 benchbox run --platform sqlite --benchmark tpch --scale 0.01
 ```
+
+DuckDB is the default and is included in the base install. SQLite is also included in the base install.
 
 ### Cloud Platforms (Credentials Required)
 
 ```bash
-# Databricks - Requires DATABRICKS_TOKEN and DATABRICKS_HOST
 benchbox run --platform databricks --benchmark tpch --scale 1.0
 
-# BigQuery - Requires GOOGLE_APPLICATION_CREDENTIALS
 benchbox run --platform bigquery --benchmark tpch --scale 1.0
 
-# Snowflake - Requires SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, SNOWFLAKE_ACCOUNT
 benchbox run --platform snowflake --benchmark tpch --scale 1.0
 ```
+
+Databricks requires `DATABRICKS_TOKEN` and `DATABRICKS_HOST`. BigQuery requires `GOOGLE_APPLICATION_CREDENTIALS`. Snowflake requires `SNOWFLAKE_USER`, `SNOWFLAKE_PASSWORD` and `SNOWFLAKE_ACCOUNT`.
 
 ## Future Platforms
 
@@ -214,7 +215,6 @@ clickhouse-local-mode
 clickhouse-server
 clickhouse-cloud
 clickhouse-migration
-workaround-index
 postgresql
 pg_duckdb
 pg_mooncake

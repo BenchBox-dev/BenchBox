@@ -14,7 +14,6 @@ ROOT = Path(__file__).resolve().parents[2]
 REPO = "BenchBox-dev/BenchBox"
 PUBLICATION_BRANCH = "publication"
 
-# Journal updates require contents write only; PR/workflow writes are not required
 REQUIRED_JOURNAL_PERMISSIONS = {"contents": "write"}
 REQUIRED_LEGACY_APP_PERMISSIONS = {"contents": "write", "pull_requests": "write", "workflows": "write"}
 REQUIRED_APP_PERMISSIONS = REQUIRED_JOURNAL_PERMISSIONS
@@ -25,7 +24,6 @@ def run(*args: str) -> str:
 
 
 def check_permissions(perms: dict[str, str], role: str = "journal") -> list[str]:
-    """Check that token/app permissions satisfy the least-privilege contract for the given role."""
     errors: list[str] = []
     required = REQUIRED_JOURNAL_PERMISSIONS if role == "journal" else REQUIRED_LEGACY_APP_PERMISSIONS
     for name, level in required.items():
@@ -43,7 +41,6 @@ def check_branch_protection(
     *,
     gh_output: str | None = None,
 ) -> list[str]:
-    """Verify that the publication metadata ref has branch protection blocking force-push and deletion."""
     errors: list[str] = []
     try:
         if gh_output is None:
@@ -64,22 +61,18 @@ def check_branch_protection(
 
 
 def check_live_app_and_branch(role: str = "journal") -> list[str]:
-    """Verify live GitHub App installation, token minting, and publication branch protection."""
     errors: list[str] = []
 
-    # 1. Check publication branch on origin
     try:
         remote_heads = run("git", "ls-remote", "--heads", "origin", PUBLICATION_BRANCH)
         if not remote_heads:
             errors.append(f"Live check: branch '{PUBLICATION_BRANCH}' does not exist on origin")
         else:
-            # Check branch protection rules
             protection_errors = check_branch_protection(REPO, PUBLICATION_BRANCH)
             errors.extend(protection_errors)
     except Exception as e:
         errors.append(f"Live check git ls-remote error: {e}")
 
-    # 2. Check GitHub App credentials and installation
     app_id = os.environ.get("PUBLICATION_APP_ID")
     pem_content = os.environ.get("PUBLICATION_APP_PRIVATE_KEY")
 

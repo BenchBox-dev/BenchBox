@@ -1,19 +1,3 @@
-"""G-2 driver: visible_metrics.yaml registry validation against DuckDB build.
-
-Drives from `_project/planning/visible_metrics.yaml`. For every metric row we
-assert:
-
-  * The target (table, column) exists in the build's DuckDB schema.
-  * `derived` rows reference a canonical Python function that actually
-    imports (the canonical parity oracle must be live code, not a stale path).
-  * `raw_copy` rows declare a source_field string.
-
-Value-level parity for the most critical derived metrics is covered by
-TestDerivedMetricParity in test_duckdb_browser_contract.py. This file guards
-the registry itself - if someone renames a column or moves a function,
-visible_metrics.yaml fails fast.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -40,7 +24,6 @@ def registry() -> dict:
 
 @pytest.fixture(scope="module")
 def db_columns(tmp_path_factory: pytest.TempPathFactory) -> dict[str, set[str]]:
-    """Build a pipeline DB once and return {table_or_view: set(column_names)}."""
     base = tmp_path_factory.mktemp("registry_db")
     data_dir = base / "data"
     bundles_dir = data_dir / "bundles"
@@ -80,7 +63,6 @@ class TestRegistryStructure:
 
 class TestRegistryMatchesSchema:
     def test_every_metric_target_column_exists(self, registry: dict, db_columns: dict[str, set[str]]) -> None:
-        """Every (table, column) in the registry exists in the built DuckDB."""
         missing: list[str] = []
         for metric in registry["metrics"]:
             table = metric["table"]
@@ -94,14 +76,11 @@ class TestRegistryMatchesSchema:
 
 
 class TestDerivedCanonicalRefsImport:
-    """Every `derived` canonical_ref must resolve to importable Python."""
-
     def _unique_refs(self, registry: dict) -> list[str]:
         refs: set[str] = set()
         for metric in registry["metrics"]:
             if metric["kind"] != "derived":
                 continue
-            # Strip parenthetical suffix like "(second return value)" or "(bundle_url_prefix)".
             raw = metric["canonical_ref"].split("(", 1)[0].strip()
             refs.add(raw)
         return sorted(refs)
@@ -110,7 +89,6 @@ class TestDerivedCanonicalRefsImport:
         failures: list[str] = []
         for ref in self._unique_refs(registry):
             parts = ref.split(".")
-            # Find the longest import-able module prefix, treat remainder as attribute walk.
             module = None
             attrs: list[str] = []
             for i in range(len(parts), 0, -1):
@@ -134,8 +112,6 @@ class TestDerivedCanonicalRefsImport:
 
 
 class TestRegistryCoverage:
-    """The registry must cover every metric-bearing table with at least one entry per kind-relevant column set."""
-
     REQUIRED_TABLES = {
         "results",
         "query_display_timings",
@@ -148,13 +124,11 @@ class TestRegistryCoverage:
     }
 
     def test_registry_covers_every_metric_bearing_table(self, registry: dict) -> None:
-        """Every canonical metric-bearing table is represented in the registry."""
         by_table = {metric["table"] for metric in registry["metrics"]}
         missing = self.REQUIRED_TABLES - by_table
         assert not missing, f"registry missing required tables: {sorted(missing)}"
 
     def test_every_registry_table_exists_in_schema(self, registry: dict, db_columns: dict[str, set[str]]) -> None:
-        """No registry entry points at a table that the build no longer creates."""
         referenced = {m["table"] for m in registry["metrics"]}
         unknown = [t for t in referenced if t not in db_columns]
         assert not unknown, f"registry references tables absent from DB: {sorted(unknown)}"

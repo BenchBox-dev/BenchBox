@@ -1,39 +1,3 @@
-"""
-Generate visualization parity fixtures for CLI↔explorer contract tests.
-
-Each fixture file captures the canonical Python computation for one chart math
-helper and is checked into git as the contract. The Vitest parity suite
-(`results-explorer/src/__tests__/parity/chartMath.parity.test.ts`) loads these
-files and asserts that the TypeScript helpers in `chartMath.ts` produce
-byte-identical results (within 1e-9 for floats).
-
-Usage
------
-Generate (overwrites existing fixtures):
-    uv run python tests/parity/generate_visualization_fixtures.py
-
-Or run via Make:
-    make parity-fixtures   # regenerate and overwrite
-    make parity-check      # regenerate into tmpdir, fail if diff
-
-Each function here MUST mirror the TypeScript counterpart exactly:
-  Python source              → TS source
-  -------------------------------------------------------
-  colorForCell               → results-explorer/src/lib/chartMath.ts
-  lightnessForCell           → results-explorer/src/lib/chartMath.ts
-  speedupRatio               → results-explorer/src/lib/chartMath.ts
-  deltaPct                   → results-explorer/src/lib/chartMath.ts
-  sortByMagnitudeDesc        → results-explorer/src/lib/chartMath.ts
-  perQuerySpeedup            → results-explorer/src/lib/chartMath.ts
-  geomeanMs                  → results-explorer/src/lib/chartMath.ts
-  computePercentile          → results-explorer/src/lib/chartMath.ts
-  computeBoxStats            → results-explorer/src/lib/chartMath.ts
-  computeECDFPoints          → results-explorer/src/lib/chartMath.ts
-  computeRankTable           → results-explorer/src/lib/chartMath.ts
-  (also: _display_geomean_ms, _compute_percentile in
-   _project/scripts/explorer_pipeline/transformer.py)
-"""
-
 from __future__ import annotations
 
 import json
@@ -48,18 +12,7 @@ sys.path.insert(0, str(REPO_ROOT))
 FIXTURES_DIR = pathlib.Path(__file__).parent / "fixtures"
 
 
-# ---------------------------------------------------------------------------
-# Python reference implementations (must match chartMath.ts exactly)
-# ---------------------------------------------------------------------------
-
-
 def color_for_cell(ms: float | None, min_in_col: float | None) -> int | None:
-    """
-    HSL hue for a heatmap cell.
-
-    log10(ratio) → hue mapped 120 (green/fastest) → 0 (red/10× slower).
-    Mirrors: results-explorer/src/lib/chartMath.ts colorForCell
-    """
     if ms is None or min_in_col is None or min_in_col <= 0 or ms <= 0:
         return None
     ratio = max(1.0, min(10.0, ms / min_in_col))
@@ -68,12 +21,6 @@ def color_for_cell(ms: float | None, min_in_col: float | None) -> int | None:
 
 
 def lightness_for_cell(ms: float | None, min_in_col: float | None) -> str | None:
-    """
-    Grayscale lightness percentage for high-contrast mode.
-
-    Returns "95%" (fastest) → "25%" (10× slower), or None for invalid inputs.
-    Mirrors: results-explorer/src/lib/chartMath.ts lightnessForCell
-    """
     if ms is None or min_in_col is None or min_in_col <= 0 or ms <= 0:
         return None
     ratio = max(1.0, min(10.0, ms / min_in_col))
@@ -82,50 +29,24 @@ def lightness_for_cell(ms: float | None, min_in_col: float | None) -> str | None
 
 
 def speedup_ratio(baseline_ms: float | None, this_ms: float | None) -> float | None:
-    """
-    Per-baseline speedup: baseline_ms / this_ms.
-
-    > 1: this result is faster; < 1: slower; = 1: same.
-    Mirrors: results-explorer/src/lib/chartMath.ts speedupRatio
-    """
     if baseline_ms is None or this_ms is None or baseline_ms <= 0 or this_ms <= 0:
         return None
     return baseline_ms / this_ms
 
 
 def vs_slowest_ratio(this_ms: float | None, slowest_ms: float | None) -> float | None:
-    """
-    Slowest-relative ratio: slowest_ms / this_ms.
-
-    > 1: this result is faster than slowest; = 1: this IS the slowest.
-    Mirrors: results-explorer/src/lib/chartMath.ts vsSlowestRatio
-    """
     if this_ms is None or slowest_ms is None or this_ms <= 0 or slowest_ms <= 0:
         return None
     return slowest_ms / this_ms
 
 
 def delta_pct(this_ms: float | None, baseline_ms: float | None) -> float | None:
-    """
-    Percent change of this_ms relative to baseline_ms.
-
-    (this_ms - baseline_ms) / baseline_ms * 100
-    Negative = faster; positive = slower.
-    Mirrors: results-explorer/src/lib/chartMath.ts deltaPct
-    """
     if this_ms is None or baseline_ms is None or baseline_ms <= 0 or this_ms <= 0:
         return None
     return ((this_ms - baseline_ms) / baseline_ms) * 100
 
 
 def sort_by_magnitude_desc(groups: list[tuple[str, list[dict[str, Any]]]]) -> list[tuple[str, list[dict[str, Any]]]]:
-    """
-    Sort query groups by max(|deltaPct|) descending.
-
-    Mirrors: results-explorer/src/lib/chartMath.ts sortByMagnitudeDesc
-    Note: Python's sort is stable; JS Array.prototype.sort is also stable in
-    ES2019+. Both are guaranteed stable so tie-breaking order is deterministic.
-    """
     return sorted(
         groups,
         key=lambda g: max(abs(e["deltaPct"]) for e in g[1]),
@@ -134,12 +55,6 @@ def sort_by_magnitude_desc(groups: list[tuple[str, list[dict[str, Any]]]]) -> li
 
 
 def per_query_speedup(valid_ms: list[float]) -> float | None:
-    """
-    Within-query spread: slowest / fastest across a set of results.
-
-    Always >= 1 when valid. Returns None for empty or all-zero inputs.
-    Mirrors: results-explorer/src/lib/chartMath.ts perQuerySpeedup
-    """
     if not valid_ms:
         return None
     fastest = min(valid_ms)
@@ -150,13 +65,6 @@ def per_query_speedup(valid_ms: list[float]) -> float | None:
 
 
 def geomean_ms(values: list[float | None]) -> float | None:
-    """
-    Geometric mean of non-null positive values.
-
-    exp(mean(log(v) for v in positives))
-    Mirrors: results-explorer/src/lib/chartMath.ts geomeanMs
-    Also matches: _project/scripts/explorer_pipeline/transformer.py _display_geomean_ms
-    """
     valid = [v for v in values if v is not None and v > 0]
     if not valid:
         return None
@@ -164,12 +72,6 @@ def geomean_ms(values: list[float | None]) -> float | None:
 
 
 def compute_percentile(values: list[float], p: float) -> float | None:
-    """
-    Linear-interpolation percentile.
-
-    Mirrors: results-explorer/src/lib/chartMath.ts computePercentile
-             (and textcharts.percentile_ladder.compute_percentile)
-    """
     if not values:
         return None
     sorted_vals = sorted(values)
@@ -187,11 +89,6 @@ def compute_percentile(values: list[float], p: float) -> float | None:
 def platform_percentile_stats(
     display_ms_values: list[float],
 ) -> dict[str, float | None] | None:
-    """
-    PercentileStats from a list of display_ms values.
-
-    Mirrors: _project/scripts/explorer_pipeline/transformer._platform_percentile_stats
-    """
     positive = [v for v in display_ms_values if v is not None and v > 0]
     if not positive:
         return None
@@ -204,17 +101,6 @@ def platform_percentile_stats(
 
 
 def compute_box_stats(values: list[float | None]) -> dict[str, float | None] | None:
-    """
-    Five-number summary {min, q1, median, q3, max}.
-
-    NOTE: the explorer deliberately reports raw min/max, not IQR-whiskered
-    extremes - this is a conscious divergence from
-    textcharts.box_plot.compute_quartiles, which returns whisker_low/whisker_high
-    and a separate outliers list. The explorer visualization shows the true
-    data extent; outliers are not collapsed into the whiskers.
-
-    Mirrors: results-explorer/src/lib/chartMath.ts computeBoxStats
-    """
     valid = [v for v in values if v is not None and v > 0 and math.isfinite(v)]
     if not valid:
         return None
@@ -232,17 +118,6 @@ def compute_rank_table(
     query_ids: list[str],
     timings_by_platform: list[dict[str, float | None]],
 ) -> dict[str, list[int | None]]:
-    """
-    Per-query ordinal ranks across platforms (1 = fastest).
-
-    Standard competition ranking: ties share the lower rank, the rank after a
-    tie group jumps by the group size (e.g. 1, 1, 3).  Null/zero/negative
-    timings receive rank None.
-
-    Mirrors: results-explorer/src/lib/chartMath.ts computeRankTable.
-    Python's `sorted` and JS's `Array.sort` are both stable (CPython / ES2019+),
-    so relative order of equal-ms entries matches on both sides.
-    """
     ranks: dict[str, list[int | None]] = {}
     n_platforms = len(timings_by_platform)
     for qid in query_ids:
@@ -263,24 +138,12 @@ def compute_rank_table(
 
 
 def compute_ecdf_points(values: list[float | None]) -> list[dict[str, float]]:
-    """
-    Empirical CDF points: for n sorted positive values, yield
-    [{x: xi, y: (i+1)/n * 100}].
-
-    Mirrors: results-explorer/src/lib/chartMath.ts computeECDFPoints
-             (and textcharts.cdf_chart ECDF plotting logic)
-    """
     valid = [v for v in values if v is not None and v > 0 and math.isfinite(v)]
     if not valid:
         return []
     sorted_vals = sorted(valid)
     n = len(sorted_vals)
     return [{"x": x, "y": ((i + 1) / n) * 100} for i, x in enumerate(sorted_vals)]
-
-
-# ---------------------------------------------------------------------------
-# Fixture builders
-# ---------------------------------------------------------------------------
 
 
 def _write_fixture(name: str, cases: list[dict[str, Any]]) -> None:
@@ -490,7 +353,6 @@ def build_delta_pct_fixture() -> None:
 
 
 def build_sort_by_magnitude_fixture() -> None:
-    """Fixture for sortByMagnitudeDesc - covers stable sort and ties."""
     groups_input = [
         ("Q1", [{"deltaPct": 10.0}, {"deltaPct": -5.0}]),
         ("Q2", [{"deltaPct": 50.0}]),
@@ -498,7 +360,6 @@ def build_sort_by_magnitude_fixture() -> None:
         ("Q4", [{"deltaPct": 1.0}]),
     ]
     sorted_groups = sort_by_magnitude_desc(groups_input)
-    # Encode as serialisable form
     cases = [
         {
             "id": "four_queries",
@@ -690,10 +551,6 @@ _TPCH_22Q_SAMPLE = [
 
 
 def _write_percentile_ladder_fixture() -> None:
-    """
-    Combined fixture covering both computePercentile (raw values/p → result)
-    and _platform_percentile_stats (display_ms_values → PercentileStats).
-    """
     raw_cases: list[dict[str, Any]] = [
         {
             "id": "single_value",
@@ -846,7 +703,6 @@ def build_box_stats_fixture() -> None:
 
 
 def build_rank_table_fixture() -> None:
-    """Fixture for computeRankTable - covers no-ties, ties, nulls, realistic TPCH."""
     no_ties = {
         "query_ids": ["Q1", "Q2", "Q3"],
         "timings": [
@@ -971,18 +827,8 @@ def build_cdf_ecdf_fixture() -> None:
     print(f"  wrote {label}")
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-
 def build_chart_ids_fixture() -> None:
-    """Emit the canonical list of CLI chart IDs from chart_types.py _CHART_SPECS.
-
-    The parity test reads this file instead of regex-matching the Python source,
-    so any Python syntax change inside _CHART_SPECS won't silently break the test.
-    """
-    from benchbox.core.visualization.chart_types import ALL_CHART_TYPES  # noqa: PLC0415
+    from benchbox.core.visualization.chart_types import ALL_CHART_TYPES
 
     ids = list(ALL_CHART_TYPES)
     out = FIXTURES_DIR / "chart_ids.json"
@@ -990,10 +836,6 @@ def build_chart_ids_fixture() -> None:
     print(f"  wrote {out.name} ({len(ids)} ids)")
 
 
-# Convention: builder functions are named build_<chart_name>_fixture.
-# The chart_name must match the "chart" field written into the fixture JSON
-# (used by the TS parity suite to map fixture file → helper). Keep entries
-# in the same order as _CHART_SPECS in chart_types.py.
 BUILDERS = [
     build_heatmap_color_fixture,
     build_lightness_for_cell_fixture,
@@ -1012,7 +854,7 @@ BUILDERS = [
 
 
 def main(out_dir: pathlib.Path | None = None) -> None:
-    global FIXTURES_DIR  # noqa: PLW0603
+    global FIXTURES_DIR
     if out_dir is not None:
         FIXTURES_DIR = out_dir
     FIXTURES_DIR.mkdir(parents=True, exist_ok=True)

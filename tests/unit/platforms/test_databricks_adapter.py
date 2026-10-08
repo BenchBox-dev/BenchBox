@@ -1,9 +1,6 @@
-"""Tests for Databricks platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import tempfile
 from pathlib import Path
@@ -19,7 +16,6 @@ from benchbox.platforms.databricks.adapter import _select_databricks_warehouse
 
 
 def _first_copy_sql(cursor) -> str:
-    """Return the first COPY INTO statement executed; column resolution may DESCRIBE first."""
     return next(str(c.args[0]) for c in cursor.execute.call_args_list if "COPY INTO" in str(c.args[0]))
 
 
@@ -32,18 +28,13 @@ pytestmark = [
 
 @pytest.fixture(autouse=True)
 def databricks_dependencies():
-    """Mock Databricks dependency check to simulate installed extras."""
 
-    # Patch where check_platform_dependencies is actually called (in the adapter module)
     with patch("benchbox.platforms.databricks.adapter.check_platform_dependencies", return_value=(True, [])):
         yield
 
 
 class TestDatabricksAdapter:
-    """Test Databricks platform adapter functionality."""
-
     def test_initialization_success(self):
-        """Test successful adapter initialization."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -61,7 +52,6 @@ class TestDatabricksAdapter:
             assert adapter.schema == "test_schema"
 
     def test_initialization_with_defaults(self):
-        """Test initialization with default configuration."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -75,7 +65,6 @@ class TestDatabricksAdapter:
             assert adapter.delta_auto_compact is True
 
     def test_initialization_missing_driver(self):
-        """Test initialization when Databricks dependencies are missing."""
         with (
             patch(
                 "benchbox.platforms.databricks.adapter.check_platform_dependencies",
@@ -88,16 +77,14 @@ class TestDatabricksAdapter:
         assert "Missing dependencies for databricks platform" in str(excinfo.value)
 
     def test_initialization_missing_required_config(self):
-        """Test initialization with missing required configuration."""
         from benchbox.core.exceptions import ConfigurationError
 
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             with pytest.raises(ConfigurationError, match="Databricks configuration is incomplete"):
-                DatabricksAdapter()  # Missing required fields
+                DatabricksAdapter()
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_get_connection_params(self, mock_databricks_sql):
-        """Test connection parameter configuration."""
         adapter = DatabricksAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -111,17 +98,15 @@ class TestDatabricksAdapter:
         assert params["http_path"] == "/sql/1.0/warehouses/test"
         assert params["access_token"] == "test_token"
 
-        # Test with overrides
         override_params = adapter._get_connection_params(
             server_hostname="override.databricks.com", access_token="override_token"
         )
         assert override_params["server_hostname"] == "override.databricks.com"
         assert override_params["access_token"] == "override_token"
-        assert override_params["http_path"] == "/sql/1.0/warehouses/test"  # Should keep original
+        assert override_params["http_path"] == "/sql/1.0/warehouses/test"
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_from_config_with_explicit_schema(self, mock_databricks_sql):
-        """Test from_config() with explicitly provided schema name."""
         config = {
             "server_hostname": "test.cloud.databricks.com",
             "http_path": "/sql/1.0/warehouses/test",
@@ -134,68 +119,51 @@ class TestDatabricksAdapter:
 
         adapter = DatabricksAdapter.from_config(config)
 
-        # Should use the explicitly provided schema name
         assert adapter.schema == "my_explicit_schema"
         assert adapter.catalog == "test_catalog"
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_from_config_with_none_schema_generates_name(self, mock_databricks_sql):
-        """Test from_config() with None schema auto-generates schema name.
-
-        This is a regression test for the Databricks harmonization fix.
-        When --schema is not provided (default=None), the adapter should
-        auto-generate an intelligent schema name based on benchmark, scale,
-        and tuning configuration, NOT fall back to 'benchbox'.
-
-        See: databricks_harmonization_summary.md
-        """
         config = {
             "server_hostname": "test.cloud.databricks.com",
             "http_path": "/sql/1.0/warehouses/test",
             "access_token": "test_token",
             "catalog": "test_catalog",
-            "schema": None,  # This is what CLI provides when --schema is not specified
+            "schema": None,
             "benchmark": "tpcds",
             "scale_factor": 1,
         }
 
         adapter = DatabricksAdapter.from_config(config)
 
-        # Should auto-generate schema name, NOT use 'benchbox' fallback
         assert adapter.schema != "benchbox", (
             "Schema should be auto-generated, not fall back to 'benchbox'. "
             "This indicates a regression in the schema name generation logic."
         )
-        # Should contain benchmark name
         assert "tpcds" in adapter.schema, (
             f"Generated schema name '{adapter.schema}' should contain benchmark name 'tpcds'"
         )
-        # Should contain scale factor
         assert "sf1" in adapter.schema, f"Generated schema name '{adapter.schema}' should contain scale factor 'sf1'"
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_from_config_without_schema_key_generates_name(self, mock_databricks_sql):
-        """Test from_config() without schema key auto-generates schema name."""
         config = {
             "server_hostname": "test.cloud.databricks.com",
             "http_path": "/sql/1.0/warehouses/test",
             "access_token": "test_token",
             "catalog": "test_catalog",
-            # schema key not provided at all
             "benchmark": "tpch",
             "scale_factor": 10,
         }
 
         adapter = DatabricksAdapter.from_config(config)
 
-        # Should auto-generate schema name, NOT use 'benchbox' fallback
         assert adapter.schema != "benchbox"
         assert "tpch" in adapter.schema
         assert "sf10" in adapter.schema
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_from_config_schema_generation_with_tuning(self, mock_databricks_sql):
-        """Test schema name generation includes tuning configuration."""
         config = {
             "server_hostname": "test.cloud.databricks.com",
             "http_path": "/sql/1.0/warehouses/test",
@@ -211,37 +179,24 @@ class TestDatabricksAdapter:
 
         adapter = DatabricksAdapter.from_config(config)
 
-        # Should include tuning config name in generated schema
         assert adapter.schema != "benchbox"
         assert "tpcds" in adapter.schema
         assert "optimized" in adapter.schema or "tuning" in adapter.schema
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_from_config_with_benchbox_default_generates_name(self, mock_databricks_sql):
-        """Test from_config() with 'benchbox' default schema auto-generates.
-
-        This is a regression test for credentials file containing schema: benchbox.
-        When schema is 'benchbox' (the default from credentials), and benchmark
-        context is available, the adapter should auto-generate a proper schema name
-        instead of using the default.
-
-        Previously, the credentials default was incorrectly treated as an explicit
-        override, causing all tables to be created in the 'benchbox' schema instead
-        of properly named schemas like 'tpcds_sf1_notuning_uniq_check'.
-        """
         config = {
             "server_hostname": "test.cloud.databricks.com",
             "http_path": "/sql/1.0/warehouses/test",
             "access_token": "test_token",
             "catalog": "workspace",
-            "schema": "benchbox",  # This is the default from credentials file
+            "schema": "benchbox",
             "benchmark": "tpcds",
             "scale_factor": 1,
         }
 
         adapter = DatabricksAdapter.from_config(config)
 
-        # Should auto-generate schema name, NOT use 'benchbox' default
         assert adapter.schema != "benchbox", (
             "Schema should be auto-generated, not use 'benchbox' default from credentials"
         )
@@ -249,7 +204,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_admin_connection(self, mock_databricks_sql):
-        """Test admin connection creation."""
         mock_connection = Mock()
         mock_databricks_sql.connect.return_value = mock_connection
 
@@ -270,14 +224,12 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_check_server_database_exists_true(self, mock_databricks_sql):
-        """Test database existence check when catalog/schema exists."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
-        # Mock SHOW CATALOGS and SHOW SCHEMAS responses
         mock_cursor.fetchall.side_effect = [
-            [["test_catalog"], ["other_catalog"]],  # SHOW CATALOGS
-            [["benchbox"], ["other_schema"]],  # SHOW SCHEMAS IN test_catalog
+            [["test_catalog"], ["other_catalog"]],
+            [["benchbox"], ["other_schema"]],
         ]
         mock_databricks_sql.connect.return_value = mock_connection
 
@@ -291,15 +243,12 @@ class TestDatabricksAdapter:
         exists = adapter.check_server_database_exists()
 
         assert exists is True
-        # Should call both SHOW CATALOGS and SHOW SCHEMAS
         mock_cursor.execute.assert_any_call("SHOW CATALOGS")
         mock_cursor.execute.assert_any_call("SHOW SCHEMAS IN test_catalog")
-        # Connection is closed in finally block
         mock_connection.close.assert_called_once()
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_check_server_database_exists_false(self, mock_databricks_sql):
-        """Test database existence check when catalog doesn't exist."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -320,7 +269,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_check_server_database_exists_connection_error(self, mock_databricks_sql):
-        """Test database existence check with connection error."""
         mock_databricks_sql.connect.side_effect = Exception("Connection failed")
 
         adapter = DatabricksAdapter(
@@ -335,7 +283,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_drop_database(self, mock_databricks_sql):
-        """Test catalog/schema dropping."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -350,14 +297,11 @@ class TestDatabricksAdapter:
 
         adapter.drop_database()
 
-        # Should drop schema (Databricks doesn't drop catalogs, only schemas)
         mock_cursor.execute.assert_called_with("DROP SCHEMA IF EXISTS test_catalog.benchbox CASCADE")
-        # Connection is closed in finally block
         mock_connection.close.assert_called_once()
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_connection_success(self, mock_databricks_sql):
-        """Test successful connection creation."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -372,18 +316,15 @@ class TestDatabricksAdapter:
             schema="test_schema",
         )
 
-        # Mock handle_existing_database
         with patch.object(adapter, "handle_existing_database"):
             connection = adapter.create_connection()
 
         assert connection == mock_connection
         mock_databricks_sql.connect.assert_called_once()
 
-        # Check catalog and schema context were set on the connection itself
-        # (pooled connections never pass through create_schema())
         expected_calls = [
             call("USE CATALOG test_catalog"),
-            call("SELECT 1"),  # Connection test
+            call("SELECT 1"),
             call("CREATE SCHEMA IF NOT EXISTS test_catalog.test_schema"),
             call("USE SCHEMA test_schema"),
         ]
@@ -394,13 +335,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_connection_skips_create_schema_when_reused(self, mock_databricks_sql):
-        """Reused catalogs/schemas must connect with USE only.
-
-        CREATE SCHEMA IF NOT EXISTS is still authorized when the schema
-        exists, so principals with USE SCHEMA but no catalog-level
-        CREATE SCHEMA would fail every reconnect. USE CATALOG + USE SCHEMA
-        still run on every connection for pooled-connection correctness.
-        """
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -456,13 +390,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_connection_defers_context_when_creating_catalog(self, mock_databricks_sql):
-        """Fresh catalog creation must not select the catalog first.
-
-        When create_catalog is set and the database was not reused,
-        create_schema() owns catalog creation: USE CATALOG would fail with
-        CATALOG_NOT_FOUND before it runs, so the connection issues no
-        context statements at all.
-        """
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -488,7 +415,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_connection_failure(self, mock_databricks_sql):
-        """Test connection creation failure."""
         mock_databricks_sql.connect.side_effect = Exception("Connection failed")
 
         adapter = DatabricksAdapter(
@@ -503,7 +429,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_schema(self, mock_databricks_sql):
-        """Test schema creation with Unity Catalog."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -520,10 +445,9 @@ class TestDatabricksAdapter:
             access_token="test_token",
             catalog="test_catalog",
             schema="test_schema",
-            create_catalog=True,  # Enable catalog creation for this test
+            create_catalog=True,
         )
 
-        # Mock translate_sql method
         with patch.object(adapter, "translate_sql") as mock_translate:
             mock_translate.return_value = (
                 "CREATE TABLE table1 (id BIGINT, name STRING);\nCREATE TABLE table2 (id BIGINT, data STRING);"
@@ -534,11 +458,9 @@ class TestDatabricksAdapter:
         assert isinstance(schema_time, float)
         assert schema_time >= 0
 
-        # Should execute catalog and schema setup
         setup_calls = list(mock_cursor.execute.call_args_list)
         setup_sqls = [str(call) for call in setup_calls]
 
-        # Should include catalog creation, schema creation, and table creation
         assert any("CREATE CATALOG" in sql for sql in setup_sqls)
         assert any("CREATE SCHEMA" in sql for sql in setup_sqls)
 
@@ -546,19 +468,15 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_load_data_with_delta_tables(self, mock_databricks_sql):
-        """Test data loading using Delta Lake format."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Mock SHOW TABLES query (returns test_table)
         mock_cursor.fetchall.return_value = [("test_schema", "test_table", False)]
-        # Mock row count query
         mock_cursor.fetchone.return_value = (100,)
 
         mock_benchmark = Mock()
 
-        # Create temporary test file
         with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8") as f:
             f.write("id,name\n1,test1\n2,test2\n")
             temp_path = Path(f.name)
@@ -583,7 +501,6 @@ class TestDatabricksAdapter:
             assert "test_table" in table_stats
             assert table_stats["test_table"] == 100
 
-            # Should execute COPY INTO statements without temporary views or insert-select
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
             assert any("COPY INTO TEST_TABLE" in call for call in execute_calls)
             assert all("CREATE OR REPLACE TEMPORARY VIEW" not in call for call in execute_calls)
@@ -594,7 +511,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_create_external_tables_uses_parquet_location(self, mock_databricks_sql):
-        """External mode should register LOCATION-based Parquet tables."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -633,7 +549,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_external_table_mode_requires_staging_configuration(self, mock_databricks_sql):
-        """External mode should require explicit staging configuration."""
         adapter = DatabricksAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -647,7 +562,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_configure_for_benchmark_olap(self, mock_databricks_sql):
-        """Test OLAP benchmark configuration without default Spark optimizations."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -661,23 +575,19 @@ class TestDatabricksAdapter:
 
         adapter.configure_for_benchmark(mock_connection, "olap")
 
-        # Should execute cache control setting by default
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
         assert len(execute_calls) == 2, "Should set and read back cache control"
         assert "use_cached_result = false" in execute_calls[0]
 
-        # Should create cursor to apply cache control
         mock_connection.cursor.assert_called_once()
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_configure_for_benchmark_with_delta_optimization(self, mock_databricks_sql):
-        """Test benchmark configuration with user-provided Spark configs."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
         mock_cursor.fetchone.return_value = ("use_cached_result", "false")
 
-        # Create adapter with custom Spark configs
         adapter = DatabricksAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
@@ -687,7 +597,6 @@ class TestDatabricksAdapter:
             delta_auto_compact=True,
         )
 
-        # Manually provide spark_configs to test user-provided config path
         adapter.spark_configs = {
             "spark.databricks.delta.optimizeWrite.enabled": "true",
             "spark.databricks.delta.autoCompact.enabled": "true",
@@ -695,14 +604,12 @@ class TestDatabricksAdapter:
 
         adapter.configure_for_benchmark(mock_connection, "tpch")
 
-        # Should execute user-provided Spark configs
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
         assert any("spark.databricks.delta.optimizeWrite.enabled" in call for call in execute_calls)
         assert any("spark.databricks.delta.autoCompact.enabled" in call for call in execute_calls)
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_execute_query_success(self, mock_databricks_sql):
-        """Test successful query execution."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -722,14 +629,12 @@ class TestDatabricksAdapter:
         assert result["rows_returned"] == 2
         assert result["first_row"] == (1, "test")
         assert isinstance(result["execution_time_seconds"], float)
-        # Note: query_statistics not returned by actual implementation
 
         mock_cursor.execute.assert_called_with("SELECT * FROM test")
         mock_cursor.close.assert_called_once()
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_execute_query_failure(self, mock_databricks_sql):
-        """Test query execution failure."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -754,17 +659,10 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_execute_query_splits_multi_statement_batch(self, mock_databricks_sql):
-        """The SQL execution API takes one statement per execute.
-
-        Operation batches (DELETE+INSERT pairs, the 3-statement SCD2 stage
-        batch) run statement-by-statement; the last statement's rows win.
-        """
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
         mock_cursor.fetchone.return_value = ("use_cached_result", "false")
-        # Fresh sessions first emit SET use_cached_result = false (session
-        # cache disable), then the batch statements in order.
         mock_cursor.fetchall.side_effect = [[], [], [(60,)]]
 
         adapter = DatabricksAdapter(
@@ -791,7 +689,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_execute_query_accepts_stream_cursor(self, mock_databricks_sql):
-        """TPC power harness passes a per-stream cursor without cursor()."""
         mock_cursor = Mock(spec=["execute", "fetchall", "fetchone", "close"])
         mock_cursor.fetchone.return_value = ("use_cached_result", "false")
         mock_cursor.fetchall.return_value = [(1,)]
@@ -811,34 +708,29 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_get_query_statistics(self, mock_databricks_sql):
-        """Test query statistics retrieval (method not implemented)."""
         adapter = DatabricksAdapter(
             server_hostname="test.cloud.databricks.com",
             http_path="/sql/1.0/warehouses/test",
             access_token="test_token",
         )
 
-        # Method doesn't exist in actual implementation
         assert not hasattr(adapter, "_get_query_statistics")
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_get_platform_metadata(self, mock_databricks_sql):
-        """Test platform metadata collection."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Mock query responses: current_version() probe first, then version() fallback,
-        # then current catalog/schema. None forces the sanitized version() path.
         mock_cursor.fetchone.side_effect = [
-            None,  # SELECT current_version() (unsupported in this fixture)
-            ["Spark 3.4.1"],  # SELECT version() fallback
-            ["test_catalog", "test_schema"],  # Current catalog and schema
+            None,
+            ["Spark 3.4.1"],
+            ["test_catalog", "test_schema"],
         ]
 
         mock_cursor.fetchall.side_effect = [
-            [["TABLE1", 1000, 1024000, "DELTA", "2024-01-01"]],  # Table info
-            [["memory: 8GB", "cores: 4", "cluster_type: sql_warehouse"]],  # Cluster info
+            [["TABLE1", 1000, 1024000, "DELTA", "2024-01-01"]],
+            [["memory: 8GB", "cores: 4", "cluster_type: sql_warehouse"]],
         ]
 
         adapter = DatabricksAdapter(
@@ -864,7 +756,6 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_optimize_table_delta(self, mock_databricks_sql):
-        """Test Delta table optimization."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
@@ -877,16 +768,13 @@ class TestDatabricksAdapter:
 
         adapter.optimize_table(mock_connection, "test_table")
 
-        # Should execute OPTIMIZE command for Delta tables
         execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
         assert any("OPTIMIZE TEST_TABLE" in call for call in execute_calls)
-        # Note: VACUUM is handled by separate vacuum_table method
 
         mock_cursor.close.assert_called_once()
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_close_connection(self, mock_databricks_sql):
-        """Test connection closing."""
         mock_connection = Mock()
 
         adapter = DatabricksAdapter(
@@ -900,7 +788,6 @@ class TestDatabricksAdapter:
         mock_connection.close.assert_called_once()
 
     def test_supports_tuning_type(self):
-        """Test tuning type support checking."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -908,7 +795,6 @@ class TestDatabricksAdapter:
                 access_token="test_token",
             )
 
-            # Mock TuningType
             with patch("benchbox.core.tuning.interface.TuningType") as mock_tuning_type:
                 mock_tuning_type.PARTITIONING = "partitioning"
                 mock_tuning_type.CLUSTERING = "clustering"
@@ -921,7 +807,6 @@ class TestDatabricksAdapter:
                 assert adapter.supports_tuning_type(mock_tuning_type.SORTING) is False
 
     def test_generate_tuning_clause_with_partitioning(self):
-        """Test tuning clause generation with partitioning."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -929,11 +814,9 @@ class TestDatabricksAdapter:
                 access_token="test_token",
             )
 
-            # Mock table tuning with partitioning
             mock_tuning = Mock()
             mock_tuning.has_any_tuning.return_value = True
 
-            # Mock partitioning column
             mock_column = Mock()
             mock_column.name = "partition_key"
             mock_column.order = 1
@@ -955,7 +838,6 @@ class TestDatabricksAdapter:
                 assert "PARTITIONED BY (partition_key)" in clause
 
     def test_generate_tuning_clause_with_clustering(self):
-        """Test tuning clause generation with clustering."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -963,11 +845,9 @@ class TestDatabricksAdapter:
                 access_token="test_token",
             )
 
-            # Mock table tuning with clustering
             mock_tuning = Mock()
             mock_tuning.has_any_tuning.return_value = True
 
-            # Mock clustering column
             mock_column = Mock()
             mock_column.name = "cluster_key"
             mock_column.order = 1
@@ -989,7 +869,6 @@ class TestDatabricksAdapter:
                 assert "CLUSTER BY (cluster_key)" in clause
 
     def test_generate_tuning_clause_none(self):
-        """Test tuning clause generation with None input."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -1002,12 +881,10 @@ class TestDatabricksAdapter:
 
     @patch("benchbox.platforms.databricks.adapter.databricks_sql")
     def test_apply_table_tunings_with_clustering(self, mock_databricks_sql):
-        """Test applying table tunings with clustering."""
         mock_connection = Mock()
         mock_cursor = Mock()
         mock_connection.cursor.return_value = mock_cursor
 
-        # Mock DESCRIBE EXTENDED response
         mock_cursor.fetchall.return_value = [
             ["col_name", "data_type", "comment"],
             ["Provider", "DELTA", None],
@@ -1020,12 +897,10 @@ class TestDatabricksAdapter:
             access_token="test_token",
         )
 
-        # Mock table tuning
         mock_tuning = Mock()
         mock_tuning.table_name = "test_table"
         mock_tuning.has_any_tuning.return_value = True
 
-        # Mock clustering column
         mock_column = Mock()
         mock_column.name = "cluster_key"
         mock_column.order = 1
@@ -1045,14 +920,12 @@ class TestDatabricksAdapter:
 
             adapter.apply_table_tunings(mock_tuning, mock_connection)
 
-            # Should execute clustering optimization via Z-ORDER
             execute_calls = [str(call) for call in mock_cursor.execute.call_args_list]
             assert any("OPTIMIZE test_table ZORDER BY" in call for call in execute_calls)
 
         mock_cursor.close.assert_called()
 
     def test_apply_unified_tuning(self):
-        """Test unified tuning configuration application."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -1067,13 +940,11 @@ class TestDatabricksAdapter:
             mock_unified_config.platform_optimizations = Mock()
             mock_unified_config.table_tunings = {}
 
-            # Should not raise exception
             with patch.object(adapter, "apply_constraint_configuration"):
                 with patch.object(adapter, "apply_platform_optimizations"):
                     adapter.apply_unified_tuning(mock_unified_config, mock_connection)
 
     def test_apply_platform_optimizations_with_delta_features(self):
-        """Test platform optimizations with Delta Lake features."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -1086,11 +957,9 @@ class TestDatabricksAdapter:
             mock_connection = Mock()
             mock_platform_config = Mock()
 
-            # Should not raise exception - Delta optimizations handled in configure_for_benchmark
             adapter.apply_platform_optimizations(mock_platform_config, mock_connection)
 
     def test_apply_constraint_configuration(self):
-        """Test constraint configuration application."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -1104,13 +973,10 @@ class TestDatabricksAdapter:
             mock_foreign_key_config = Mock()
             mock_foreign_key_config.enabled = False
 
-            # Should not raise exception - constraints are informational in Databricks
             adapter.apply_constraint_configuration(mock_primary_key_config, mock_foreign_key_config, mock_connection)
 
     def test_authentication_methods(self):
-        """Test different authentication methods."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
-            # Test access token authentication
             adapter1 = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
                 http_path="/sql/1.0/warehouses/test",
@@ -1121,7 +987,6 @@ class TestDatabricksAdapter:
             assert adapter1.http_path == "/sql/1.0/warehouses/test"
 
     def test_unity_catalog_configuration(self):
-        """Test Unity Catalog configuration options."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -1138,8 +1003,6 @@ class TestDatabricksAdapter:
 
 
 class TestDatabricksSqlGenerationHelpers:
-    """Exercise helper-heavy SQL generation and staging behavior."""
-
     def test_select_databricks_warehouse_prefers_running_then_available(self):
         logger = Mock()
         running = Mock()
@@ -1240,7 +1103,6 @@ class TestDatabricksSqlGenerationHelpers:
             )
 
     def test_get_column_list_for_table_reads_schema_table_objects(self):
-        """Data Vault returns Table objects, not dicts; their columns must still resolve."""
         from benchbox.core.datavault.schema import Column, DataType, Table
 
         adapter = self._column_list_adapter()
@@ -1255,7 +1117,6 @@ class TestDatabricksSqlGenerationHelpers:
         assert adapter._get_column_list_for_table(benchmark, "hub_region") == " (hk_region, r_regionkey)"
 
     def test_get_column_list_for_table_falls_back_to_describe_for_tables_outside_schema(self):
-        """Transaction Primitives and TPC-DS OBT load base tables their get_schema() omits."""
         adapter = self._column_list_adapter()
         benchmark = Mock()
         benchmark.get_schema.return_value = {"txn_orders": {"columns": [{"name": "o_orderkey"}]}}
@@ -1297,7 +1158,6 @@ class TestDatabricksSqlGenerationHelpers:
         ],
     )
     def test_real_benchmark_schemas_resolve_copy_columns(self, benchmark_id, scale, table):
-        """Guard against schema-shape drift for benchmarks whose loaded tables appear in get_schema()."""
         from benchbox.core.benchmark_registry import get_benchmark_class
 
         adapter = self._column_list_adapter()
@@ -1376,12 +1236,6 @@ class TestDatabricksSqlGenerationHelpers:
         ]
 
     def test_load_single_table_adds_null_value_for_sentinel_marker(self):
-        """A truthy csv_null_marker must become COPY INTO nullValue.
-
-        Benchmarks with NOT NULL schemas over gappy CSV data (ClickBench)
-        need empty fields to stay empty strings; only the sentinel literal
-        may load as NULL.
-        """
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -1451,8 +1305,6 @@ class TestDatabricksSqlGenerationHelpers:
 
 
 class TestNormalizeDatabricksQuery:
-    """Test _normalize_databricks_query execution normalizations."""
-
     def _make_adapter(self, **kwargs):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             defaults = {
@@ -1464,28 +1316,23 @@ class TestNormalizeDatabricksQuery:
             return DatabricksAdapter(**defaults)
 
     def test_duplicate_output_names_gain_suffix(self):
-        """Second occurrence of a duplicate output name is suffixed."""
         adapter = self._make_adapter()
         result = adapter._normalize_databricks_query("SELECT a.syear, b.syear, a.cnt FROM t AS a, t AS b")
         assert "syear_2" in result
         assert "cnt" in result
 
     def test_unique_outputs_unchanged(self):
-        """Queries without duplicates pass through byte-identical."""
         adapter = self._make_adapter()
         query = "SELECT a, b FROM t WHERE c = 1"
         assert adapter._normalize_databricks_query(query) == query
 
     def test_division_routes_through_try_divide(self):
-        """Zero divisors return NULL instead of raising DIVIDE_BY_ZERO."""
         adapter = self._make_adapter()
         result = adapter._normalize_databricks_query("SELECT x / y FROM t")
         assert "TRY_DIVIDE" in result
 
 
 class TestConvertToDeltaTable:
-    """Test _convert_to_delta_table SQL transformation."""
-
     def _make_adapter(self, **kwargs):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             defaults = {
@@ -1510,7 +1357,6 @@ class TestConvertToDeltaTable:
         adapter = self._make_adapter()
         result = adapter._convert_to_delta_table("CREATE TABLE t (a INT, b STRING)")
         assert "USING DELTA" in result
-        # USING DELTA should appear after the closing paren
         paren_idx = result.index(")")
         delta_idx = result.index("USING DELTA")
         assert delta_idx > paren_idx
@@ -1521,11 +1367,6 @@ class TestConvertToDeltaTable:
         assert result.count("USING DELTA") == 1
 
     def test_ctas_places_using_delta_before_as_select(self):
-        """CTAS has no column list: USING DELTA precedes AS SELECT.
-
-        Scanning for the column-list close paren lands inside the query
-        (a subquery close paren) or appends at the end, both invalid.
-        """
         adapter = self._make_adapter()
         result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT * FROM (SELECT 1 AS id) s")
         assert "USING DELTA" in result
@@ -1536,7 +1377,6 @@ class TestConvertToDeltaTable:
         assert result.index("USING DELTA") < result.index("AS SELECT")
 
     def test_ctas_tblproperties_precede_as_select(self):
-        """Table clauses must sit before the terminal AS query on CTAS."""
         adapter = self._make_adapter(delta_auto_optimize=True)
         result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT 1 AS id")
         props_idx = result.index("TBLPROPERTIES")
@@ -1545,20 +1385,17 @@ class TestConvertToDeltaTable:
         assert "SELECT 1 AS id TBLPROPERTIES" not in result
 
     def test_ctas_with_join_using_keeps_using_delta(self):
-        """JOIN ... USING (cols) is not a format clause: USING DELTA stays."""
         adapter = self._make_adapter()
         result = adapter._convert_to_delta_table("CREATE TABLE t AS SELECT * FROM a JOIN b USING (id)")
         assert "USING DELTA" in result
         assert "USING (id)" in result
 
     def test_using_named_columns_do_not_suppress_using_delta(self):
-        """Columns named using_* must not read as a format clause."""
         adapter = self._make_adapter()
         result = adapter._convert_to_delta_table("CREATE TABLE t (id INT, using_status STRING)")
         assert "USING DELTA" in result
 
     def test_cte_ctas_places_clauses_before_with(self):
-        """CTE-based CTAS anchors clauses before AS WITH, not in the CTE."""
         adapter = self._make_adapter()
         result = adapter._convert_to_delta_table("CREATE TABLE t AS WITH cte AS (SELECT 1 AS id) SELECT * FROM cte")
         using_idx = result.index("USING DELTA")
@@ -1582,7 +1419,6 @@ class TestConvertToDeltaTable:
         adapter = self._make_adapter()
         sql = "CREATE TABLE t (a INT) TBLPROPERTIES ('x'='y')"
         result = adapter._convert_to_delta_table(sql)
-        # Should NOT add a second TBLPROPERTIES block
         assert result.count("TBLPROPERTIES") == 1
 
     def test_non_create_table_passthrough(self):
@@ -1594,15 +1430,12 @@ class TestConvertToDeltaTable:
         adapter = self._make_adapter()
         sql = "CREATE TABLE t (a DECIMAL(10,2), b VARCHAR(100))"
         result = adapter._convert_to_delta_table(sql)
-        # Should still find the right closing paren
         assert "USING DELTA" in result
         assert "DECIMAL(10,2)" in result
         assert "VARCHAR(100)" in result
 
 
 class TestFixDatabricksSqlSyntax:
-    """Test _fix_databricks_sql_syntax NULLS FIRST/LAST removal."""
-
     def _make_adapter(self):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             return DatabricksAdapter(
@@ -1643,13 +1476,10 @@ class TestFixDatabricksSqlSyntax:
         adapter = self._make_adapter()
         sql = "CREATE TABLE t (id INT) ORDER BY id NULLS LAST"
         result = adapter._fix_databricks_sql_syntax(sql)
-        # NULLS LAST outside a PRIMARY KEY should be preserved
         assert result == sql
 
 
 class TestBuildCtasSortSql:
-    """Test _build_ctas_sort_sql for various sorted ingestion methods."""
-
     def _make_adapter(self):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             return DatabricksAdapter(
@@ -1702,8 +1532,6 @@ class TestBuildCtasSortSql:
 
 
 class TestResolveClusteringStrategy:
-    """Test _resolve_databricks_clustering_strategy precedence logic."""
-
     def _make_adapter(self):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             return DatabricksAdapter(
@@ -1804,8 +1632,6 @@ class TestResolveClusteringStrategy:
 
 
 class TestDeltaOperationsSql:
-    """Test Delta table operations SQL generation (OPTIMIZE, VACUUM, ANALYZE)."""
-
     def _make_adapter(self, **kwargs):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             defaults = {
@@ -1897,14 +1723,11 @@ class TestDeltaOperationsSql:
         cursor = Mock()
         cursor.execute.side_effect = Exception("access denied")
         conn.cursor.return_value = cursor
-        # Should not raise - just log warning
         adapter.analyze_table(conn, "region")
         cursor.execute.assert_called_once_with("ANALYZE TABLE REGION COMPUTE STATISTICS")
 
 
 class TestConfigValidation:
-    """Test configuration validation and initialization edge cases."""
-
     def test_missing_only_server_hostname(self):
         from benchbox.core.exceptions import ConfigurationError
 
@@ -1946,7 +1769,6 @@ class TestConfigValidation:
                 DatabricksAdapter()
 
     def test_alternative_config_keys_host_and_token(self):
-        """Test 'host' and 'token' alternative keys for server_hostname and access_token."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 host="alt.cloud.databricks.com",
@@ -2016,8 +1838,6 @@ class TestConfigValidation:
 
 
 class TestIsCloudUri:
-    """Test _is_cloud_uri static method."""
-
     def test_s3_uri(self):
         assert DatabricksAdapter._is_cloud_uri("s3://bucket/path") is True
 
@@ -2038,8 +1858,6 @@ class TestIsCloudUri:
 
 
 class TestDetectShardedFiles:
-    """Test _detect_sharded_files logic for multi-part file detection."""
-
     def _make_adapter(self):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             return DatabricksAdapter(
@@ -2049,7 +1867,6 @@ class TestDetectShardedFiles:
             )
 
     def test_detects_compressed_sharded_file(self, tmp_path):
-        # Create sharded files: lineitem.tbl.1.zst, lineitem.tbl.2.zst
         (tmp_path / "lineitem.tbl.1.zst").write_bytes(b"data1")
         (tmp_path / "lineitem.tbl.2.zst").write_bytes(b"data2")
 
@@ -2079,8 +1896,6 @@ class TestDetectShardedFiles:
 
 
 class TestManifestPatternForName:
-    """Test _manifest_pattern_for_name static method."""
-
     def test_compressed_sharded_name(self):
         base, ext = DatabricksAdapter._manifest_pattern_for_name("lineitem.tbl.1.zst")
         assert base == "lineitem.tbl"
@@ -2098,8 +1913,6 @@ class TestManifestPatternForName:
 
 
 class TestDetectManifestWildcard:
-    """Test _detect_manifest_wildcard for wildcard pattern generation."""
-
     def _make_adapter(self):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             return DatabricksAdapter(
@@ -2134,8 +1947,6 @@ class TestDetectManifestWildcard:
 
 
 class TestEnsureUcVolumeExists:
-    """Test _ensure_uc_volume_exists SQL generation and error handling."""
-
     def _make_adapter(self):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             return DatabricksAdapter(
@@ -2201,7 +2012,7 @@ class TestEnsureUcVolumeExists:
         def side_effect(sql):
             nonlocal call_count
             call_count += 1
-            if call_count == 2:  # Volume creation
+            if call_count == 2:
                 raise Exception("access denied to create volume")
 
         cursor.execute.side_effect = side_effect
@@ -2211,8 +2022,6 @@ class TestEnsureUcVolumeExists:
 
 
 class TestGetExistingTables:
-    """Test _get_existing_tables SQL generation."""
-
     def _make_adapter(self, catalog="test_catalog", schema="test_schema"):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             return DatabricksAdapter(
@@ -2253,8 +2062,6 @@ class TestGetExistingTables:
 
 
 class TestUnityCatalogNaming:
-    """Test three-level naming: catalog.schema.table in generated SQL."""
-
     def _make_adapter(self, catalog="analytics", schema="benchmarks"):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             return DatabricksAdapter(
@@ -2294,7 +2101,6 @@ class TestUnityCatalogNaming:
         assert calls[1] == "SHOW SCHEMAS IN dev"
 
     def test_create_schema_without_catalog_creation(self):
-        """Schema creation SQL should use catalog.schema pattern."""
         adapter = self._make_adapter(catalog="workspace", schema="tpch_sf1")
         conn = Mock()
         cursor = Mock()
@@ -2313,7 +2119,6 @@ class TestUnityCatalogNaming:
         assert "USE SCHEMA tpch_sf1" in calls
 
     def test_create_schema_with_catalog_creation(self):
-        """When create_catalog=True, both catalog and schema creation SQL."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter(
                 server_hostname="test.cloud.databricks.com",
@@ -2337,14 +2142,10 @@ class TestUnityCatalogNaming:
         calls = [c.args[0] for c in cursor.execute.call_args_list]
         assert "CREATE CATALOG IF NOT EXISTS new_catalog" in calls
         assert "CREATE SCHEMA IF NOT EXISTS new_catalog.new_schema" in calls
-        # One-shot creation state clears so later connections take the
-        # normal USE CATALOG / USE SCHEMA path instead of deferring again.
         assert adapter.create_catalog is False
 
 
 class TestCopyIntoSqlGeneration:
-    """Test COPY INTO SQL generation for various data formats."""
-
     def _make_adapter(self, **kwargs):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             defaults = {
@@ -2358,7 +2159,6 @@ class TestCopyIntoSqlGeneration:
             return DatabricksAdapter(**defaults)
 
     def test_copy_into_tbl_format_uses_pipe_delimiter(self):
-        """TPC .tbl files should use pipe delimiter."""
         adapter = self._make_adapter()
         benchmark = Mock()
         benchmark.get_schema.return_value = {"lineitem": {"columns": [{"name": "l_orderkey"}, {"name": "l_partkey"}]}}
@@ -2383,9 +2183,8 @@ class TestCopyIntoSqlGeneration:
         assert "'header'='false'" in copy_sql
 
     def test_copy_into_csv_format_uses_comma_delimiter(self):
-        """CSV files should use comma delimiter."""
         adapter = self._make_adapter()
-        benchmark = Mock(spec=[])  # No get_schema
+        benchmark = Mock(spec=[])
         cursor = Mock()
         cursor.fetchone.return_value = (500,)
         conn = Mock()
@@ -2406,7 +2205,6 @@ class TestCopyIntoSqlGeneration:
         assert "'delimiter'=','" in copy_sql
 
     def test_copy_into_with_uc_volume_uri(self):
-        """COPY INTO should use the UC Volume URI directly."""
         adapter = self._make_adapter()
         benchmark = Mock(spec=[])
         cursor = Mock()
@@ -2428,7 +2226,6 @@ class TestCopyIntoSqlGeneration:
         assert "'dbfs:/Volumes/main/bench/data/region.tbl'" in copy_sql
 
     def test_copy_into_with_wildcard_for_sharded(self):
-        """A bare glob with no expandable files must fail loudly, never reach COPY INTO."""
         adapter = self._make_adapter()
         benchmark = Mock(spec=[])
         cursor = Mock()
@@ -2522,8 +2319,6 @@ class TestCopyIntoSqlGeneration:
 
 
 class TestGetPlatformInfo:
-    """Test get_platform_info metadata collection."""
-
     def _make_adapter(self, **kwargs):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             defaults = {
@@ -2574,7 +2369,6 @@ class TestGetPlatformInfo:
         cursor.fetchone.return_value = ["Runtime 14.3 LTS"]
 
         with patch.object(adapter, "get_effective_tuning_configuration", return_value=None):
-            # Patch out the SDK import to avoid ImportError in warehouse metadata section
             with patch.dict("sys.modules", {"databricks.sdk": None}):
                 info = adapter.get_platform_info(connection=conn)
 
@@ -2583,8 +2377,6 @@ class TestGetPlatformInfo:
 
 
 class TestResolveDataFiles:
-    """Test _resolve_databricks_data_files resolution logic."""
-
     def _make_adapter(self):
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             return DatabricksAdapter(
@@ -2619,10 +2411,7 @@ class TestResolveDataFiles:
             "orders": Path("/data/orders.tbl"),
             "lineitem": Path("/data/lineitem.tbl"),
         }
-        # Manifest metadata must survive the normalization step so the COPY INTO
-        # delimiter resolver still sees it downstream.
         assert result.table_metadata == {"orders": {"csv_delimiter": "|"}}
-        # Resolver-owned object must not be mutated by the normalization step.
         assert data_source.tables == {
             "orders": [Path("/data/orders.tbl")],
             "lineitem": [Path("/data/lineitem.tbl")],
@@ -2659,8 +2448,6 @@ class TestResolveDataFiles:
 
 
 class TestSelectDatabricksWarehouseEdgeCases:
-    """Additional edge cases for _select_databricks_warehouse."""
-
     def test_all_deleted_returns_none(self):
         logger = Mock()
         d1 = Mock(name="del1", state="DELETED")
@@ -2679,13 +2466,9 @@ class TestSelectDatabricksWarehouseEdgeCases:
 
 
 class TestFromConfigEdgeCases:
-    """Test from_config placeholder detection and auto-detection paths."""
-
     def test_placeholder_hostname_triggers_auto_detect(self):
-        """Config with placeholder hostname should trigger auto-detection."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             with patch.object(DatabricksAdapter, "_auto_detect_databricks_config", return_value=None):
-                # Should fail because auto-detect returns None and credentials are placeholders
                 from benchbox.core.exceptions import ConfigurationError
 
                 with pytest.raises(ConfigurationError):
@@ -2698,7 +2481,6 @@ class TestFromConfigEdgeCases:
                     )
 
     def test_from_config_with_explicit_schema_override(self):
-        """Explicit non-default schema should be preserved even with benchmark context."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter.from_config(
                 {
@@ -2713,7 +2495,6 @@ class TestFromConfigEdgeCases:
         assert adapter.schema == "my_custom_schema"
 
     def test_from_config_without_benchmark_context_uses_default(self):
-        """Without benchmark context, schema falls back to provided or 'benchbox'."""
         with patch("benchbox.platforms.databricks.adapter.databricks_sql"):
             adapter = DatabricksAdapter.from_config(
                 {

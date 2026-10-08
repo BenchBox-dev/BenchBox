@@ -1,5 +1,3 @@
-"""Performance regression test for query plan comparison BFS traversal."""
-
 from __future__ import annotations
 
 import time
@@ -20,7 +18,7 @@ pytestmark = [
 
 
 def _build_chain_plan(length: int) -> QueryPlanDAG:
-    """Create a linear chain of logical operators."""
+
     child = None
     for i in reversed(range(length)):
         child = LogicalOperator(
@@ -33,7 +31,7 @@ def _build_chain_plan(length: int) -> QueryPlanDAG:
 
 
 def test_comparison_runs_within_time_budget() -> None:
-    """Ensure large plan comparisons remain efficient after deque optimization."""
+
     comparator = QueryPlanComparator()
     plan_left = _build_chain_plan(200)
     plan_right = _build_chain_plan(200)
@@ -44,4 +42,4 @@ def test_comparison_runs_within_time_budget() -> None:
         assert comparison.similarity.overall_similarity == 1.0
     duration = time.perf_counter() - start
 
-    assert duration < 1.0  # seconds
+    assert duration < 1.0

@@ -1,5 +1,3 @@
-"""Tests for the sqlglot repro-retirement upgrade trigger."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -34,7 +32,7 @@ checker = _load_script()
 class TestVersionParsing:
     def test_parses_locked_version(self):
         text = 'name = "sqlglot"\nversion = "30.18.0"\n'
-        assert checker._LOCK_VERSION_RE.search(text).group(1) == "30.18.0"  # type: ignore[union-attr]
+        assert checker._LOCK_VERSION_RE.search(text).group(1) == "30.18.0"
 
     def test_live_lockfile_has_version(self):
         assert checker.locked_sqlglot_version(None) is not None
@@ -70,7 +68,7 @@ class TestNoUpgradePath:
         monkeypatch.setattr(checker, "merge_base", fake_merge_base)
         monkeypatch.setattr(checker, "locked_sqlglot_version", lambda ref=None: "30.18.0")
         assert checker.main(["--base-ref", "origin/release"]) == 0
-        # A ref that differs from merge_base's default proves --base-ref is forwarded.
+
         assert seen["ref"] == "origin/release"
 
     def test_crash_without_summary_fails_closed(self, monkeypatch, capsys):

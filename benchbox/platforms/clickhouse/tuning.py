@@ -1,5 +1,3 @@
-"""Tuning utilities for ClickHouse."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
@@ -16,8 +14,6 @@ if TYPE_CHECKING:
 
 
 class ClickHouseTuningMixin:
-    """Implement tuning primitives for ClickHouse."""
-
     physical_identifier_case = "lower"
 
     def _catalog_names(self, connection: Any, sql: str) -> list[str] | None:
@@ -68,11 +64,6 @@ class ClickHouseTuningMixin:
     def get_effective_tuning_configuration(
         self,
     ) -> UnifiedTuningConfiguration | None:
-        """Override to create ClickHouse-specific tuning configuration.
-
-        ClickHouse requires primary keys even in no-tuning mode, so we create
-        a configuration that reflects ClickHouse's requirements.
-        """
         from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
         base_config = super().get_effective_tuning_configuration()
@@ -82,50 +73,24 @@ class ClickHouseTuningMixin:
                 base_config.primary_keys.enabled = True
             return base_config
 
-        # Create ClickHouse-specific configuration
         config = UnifiedTuningConfiguration()
-        config.primary_keys.enabled = True  # Always required for ClickHouse
-        config.foreign_keys.enabled = False  # Default for no-tuning mode
+        config.primary_keys.enabled = True
+        config.foreign_keys.enabled = False
 
         return config
 
     def configure_for_benchmark(self, connection: Any, benchmark_type: str) -> None:
-        """Apply ClickHouse-specific optimizations based on benchmark type.
 
-        Per ADR-3 (docs/development/tuning-adr-003-baseline-and-single-renderer.md)
-        baseline policy: the basic settings below (memory/timeout/thread
-        limits, cache control, join_use_nulls) are harness-operational, not
-        optimization -- they apply in every mode so results are measured
-        consistently and against standard-SQL semantics. The OLAP session
-        pack (grace_hash join, spill thresholds, aggregation-in-order) is a
-        curated performance profile, so it applies only on the TUNED path.
-        Before this fix it fired only when tuning was DISABLED -- "notuning"
-        shipped a curated OLAP profile while an explicit `--tuning tuned` run
-        got none of it, exactly backwards from what the labels promise (see
-        ADR-3's "notuning is not a baseline today" finding).
-        """
-
-        # Basic settings that are always safe to apply, in every tuning mode.
         settings = {
             "max_memory_usage": self._parse_memory_setting(self.max_memory_usage),
             "max_execution_time": self.max_execution_time,
             "max_threads": self.max_threads,
-            "use_uncompressed_cache": 0,  # DISABLED - causes 20-30x memory bloat for OLAP workloads
+            "use_uncompressed_cache": 0,
             "enable_optimize_predicate_expression": 1,
-            # Enable correlated subqueries for TPC-H queries 2, 4, 17, 20, 21, 22
-            # Experimental in ClickHouse v25.5.x (chdb 3.6.0), enabled by default in v25.8+
             "allow_experimental_correlated_subqueries": 1,
-            # ClickHouse's default (0) fills unmatched LEFT/RIGHT JOIN rows with
-            # column-type defaults (0, '') instead of NULL - a departure from
-            # SQL-standard outer-join semantics. This is a correctness/semantics
-            # setting, not a performance one, so unlike the OLAP pack below it must
-            # apply in every mode: an anti-join query (LEFT JOIN ... WHERE x IS
-            # NULL) needs standard NULL semantics on both baseline and tuned runs
-            # for results to be comparable and standard-SQL-correct.
             "join_use_nulls": 1,
         }
 
-        # Apply cache control settings for accurate benchmarking
         if self.disable_result_cache:
             settings.update(
                 {
@@ -135,36 +100,25 @@ class ClickHouseTuningMixin:
                 }
             )
 
-        # Only apply the OLAP session pack on the tuned path (see docstring).
         if self.tuning_enabled and benchmark_type.lower() in [
             "olap",
             "analytics",
             "tpch",
             "tpcds",
         ]:
-            # OLAP optimizations with local ClickHouse validation
             olap_settings = {
-                "max_bytes_in_join": int(
-                    self._parse_memory_setting(self.max_memory_usage) * 0.5
-                ),  # 50% of memory for JOINs - Q5 multi-table join at SF1 needs 2.72 GiB
+                "max_bytes_in_join": int(self._parse_memory_setting(self.max_memory_usage) * 0.5),
                 "optimize_aggregation_in_order": 1,
                 "group_by_two_level_threshold": 100000,
-                # Disk spilling for graceful degradation - aggressive thresholds
-                "max_bytes_before_external_group_by": int(
-                    self._parse_memory_setting(self.max_memory_usage) * 0.5
-                ),  # Spill at 50% (reduced from 75%)
-                "max_bytes_before_external_sort": int(
-                    self._parse_memory_setting(self.max_memory_usage) * 0.5
-                ),  # Spill at 50% (reduced from 75%)
+                "max_bytes_before_external_group_by": int(self._parse_memory_setting(self.max_memory_usage) * 0.5),
+                "max_bytes_before_external_sort": int(self._parse_memory_setting(self.max_memory_usage) * 0.5),
             }
 
             settings.update(olap_settings)
 
-        # Apply settings with local ClickHouse validation
         critical_failures = []
         for setting, value in settings.items():
             success = self._apply_setting_with_validation(connection, setting, value)
-            # Track if critical cache control settings failed
             if not success and setting in [
                 "use_query_cache",
                 "enable_writes_to_query_cache",
@@ -172,7 +126,6 @@ class ClickHouseTuningMixin:
             ]:
                 critical_failures.append(setting)
 
-        # Validate cache control settings were successfully applied
         if self.disable_result_cache or critical_failures:
             self.logger.debug("Validating cache control settings...")
             validation_result = self.validate_session_cache_control(connection)
@@ -185,22 +138,6 @@ class ClickHouseTuningMixin:
                 )
 
     def validate_session_cache_control(self, connection: Any) -> dict[str, Any]:
-        """Validate that session-level cache control settings were successfully applied.
-
-        Args:
-            connection: Active ClickHouse database connection
-
-        Returns:
-            dict with:
-                - validated: bool - Whether validation passed
-                - cache_disabled: bool - Whether cache is actually disabled
-                - settings: dict - Actual session settings
-                - warnings: list[str] - Any validation warnings
-                - errors: list[str] - Any validation errors
-
-        Raises:
-            ConfigurationError: If cache control validation fails and strict_validation=True
-        """
         result = {
             "validated": False,
             "cache_disabled": False,
@@ -210,7 +147,6 @@ class ClickHouseTuningMixin:
         }
 
         try:
-            # Query current session settings for cache control
             query = """
                 SELECT name, value
                 FROM system.settings
@@ -219,16 +155,13 @@ class ClickHouseTuningMixin:
             """
             rows = connection.execute(query)
 
-            # Parse results into settings dict
             for row in rows:
                 setting_name = row[0]
                 setting_value = str(row[1])
                 result["settings"][setting_name] = setting_value
 
-            # Determine expected values based on configuration
             expected_cache_value = "0" if self.disable_result_cache else "1"
 
-            # Validate all three cache settings
             cache_settings = ["use_query_cache", "enable_writes_to_query_cache", "enable_reads_from_query_cache"]
             all_validated = True
 
@@ -251,7 +184,6 @@ class ClickHouseTuningMixin:
                     f"Cache control validated: all cache settings={expected_cache_value} (expected {expected_cache_value})"
                 )
             else:
-                # Raise error if strict validation mode enabled
                 if self.strict_validation:
                     raise ConfigurationError(
                         "ClickHouse session cache control validation failed - "
@@ -260,16 +192,13 @@ class ClickHouseTuningMixin:
                     )
 
         except Exception as e:
-            # If this is our ConfigurationError, re-raise it
             if isinstance(e, ConfigurationError):
                 raise
 
-            # Otherwise log validation error
             error_msg = f"Validation query failed: {e}"
             result["errors"].append(error_msg)
             self.logger.error(f"Cache control validation error: {e}")
 
-            # Raise if strict mode and query failed
             if self.strict_validation:
                 raise ConfigurationError(
                     "Failed to validate ClickHouse cache control settings",
@@ -279,7 +208,6 @@ class ClickHouseTuningMixin:
         return result
 
     def _parse_memory_setting(self, memory_str: str) -> int:
-        """Parse memory setting string to bytes."""
         if isinstance(memory_str, int):
             return memory_str
 
@@ -294,23 +222,11 @@ class ClickHouseTuningMixin:
             return int(memory_str)
 
     def _apply_setting_with_validation(self, connection: Any, setting: str, value: Any) -> bool:
-        """Apply ClickHouse setting with local mode validation.
-
-        Args:
-            connection: ClickHouse connection
-            setting: Setting name
-            value: Setting value
-
-        Returns:
-            bool: True if setting was applied successfully, False otherwise
-        """
-        # Known problematic settings in local ClickHouse
         local_incompatible_settings = {
             "join_algorithm",
             "enable_multiple_joins_emulation",
         }
 
-        # Skip known incompatible settings in local mode
         if self.deployment_mode == "local" and setting in local_incompatible_settings:
             self.logger.debug(f"Skipping {setting} in local mode (known incompatible)")
             return False
@@ -321,7 +237,6 @@ class ClickHouseTuningMixin:
             self.logger.debug(f"Set {setting} = {value}")
             return True
         except Exception as e:
-            # Suppress warnings for known problematic settings in local mode
             if self.deployment_mode == "local" and setting in local_incompatible_settings:
                 self.logger.debug(f"Setting {setting} not available in local mode: {e}")
             else:
@@ -329,7 +244,6 @@ class ClickHouseTuningMixin:
             return False
 
     def _format_setting_value(self, value: Any) -> Any:
-        """Format ClickHouse SET values, quoting string literals."""
         if not isinstance(value, str):
             return value
         if len(value) >= 2 and value[0] in {"'", '"'} and value[-1] == value[0]:
@@ -339,7 +253,6 @@ class ClickHouseTuningMixin:
     _supported_tuning_type_names = ("PARTITIONING", "SORTING", "CLUSTERING", "DISTRIBUTION")
 
     def supports_tuning_type(self, tuning_type) -> bool:
-        """Check if ClickHouse supports a specific tuning type."""
         return supports_named_tuning_type(tuning_type, self._supported_tuning_type_names)
 
     def _optimize_after_load_enabled(self) -> bool:
@@ -356,21 +269,6 @@ class ClickHouseTuningMixin:
         return True
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
-        """Apply ClickHouse-specific table tunings.
-
-        ClickHouse tuning approach:
-        - PARTITIONING: Handled via PARTITION BY in CREATE TABLE
-        - SORTING: Handled via ORDER BY in CREATE TABLE
-        - CLUSTERING: Folded into the ORDER BY key at CREATE TABLE time
-        - DISTRIBUTION: Handled via distributed engine settings
-
-        Args:
-            table_tuning: TableTuning configuration object
-            connection: ClickHouse connection
-
-        Raises:
-            ValueError: If the tuning configuration is invalid for ClickHouse
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
@@ -378,7 +276,6 @@ class ClickHouseTuningMixin:
         self.logger.info(f"Applying ClickHouse tunings for table: {table_name}")
 
         try:
-            # Import here to avoid circular imports
             from benchbox.core.tuning.interface import TuningType
 
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
@@ -395,7 +292,6 @@ class ClickHouseTuningMixin:
                     f"Clustering for table {table_name}: {', '.join(column_names)} (folded into ORDER BY at CREATE TABLE time)"
                 )
 
-            # Log partitioning strategy (must be defined at CREATE TABLE time)
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
             if partition_columns:
                 sorted_cols = sorted(partition_columns, key=lambda col: col.order)
@@ -404,7 +300,6 @@ class ClickHouseTuningMixin:
                     f"Partitioning strategy for table {table_name}: {', '.join(column_names)} (defined at CREATE TABLE time)"
                 )
 
-            # Log distribution strategy (handled by engine settings)
             distribution_columns = table_tuning.get_columns_by_type(TuningType.DISTRIBUTION)
             if distribution_columns:
                 sorted_cols = sorted(distribution_columns, key=lambda col: col.order)
@@ -419,32 +314,11 @@ class ClickHouseTuningMixin:
             raise ValueError(f"Failed to apply tunings to ClickHouse table {table_name}: {e}") from e
 
     def apply_unified_tuning(self, unified_config: UnifiedTuningConfiguration, connection: Any) -> None:
-        """Apply unified tuning configuration to ClickHouse.
-
-        Args:
-            unified_config: Unified tuning configuration to apply
-            connection: ClickHouse connection
-        """
         from benchbox.platforms.base.tuning_config import apply_standard_unified_tuning
 
         apply_standard_unified_tuning(self, unified_config, connection)
 
     def apply_platform_optimizations(self, platform_config: PlatformOptimizationConfiguration, connection: Any) -> None:
-        """Apply ClickHouse-specific platform optimizations.
-
-        `PlatformOptimizationConfiguration` only models the Databricks/BigQuery
-        style knobs (z-ordering, liquid clustering, auto-optimize, bloom
-        filters, materialized views) -- none of which apply to ClickHouse.
-        ClickHouse's own session settings (memory, threads, join algorithm,
-        cache control) are applied separately via `configure_for_benchmark`,
-        which has direct adapter attributes to read rather than a
-        `platform_config` blob. This hook is therefore an intentional no-op
-        for ClickHouse today.
-
-        Args:
-            platform_config: Platform optimization configuration
-            connection: ClickHouse connection
-        """
         if not platform_config:
             return
         self.logger.debug("No ClickHouse-specific platform optimizations to apply")

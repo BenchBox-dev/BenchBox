@@ -1,10 +1,6 @@
-"""
-Copyright 2026 Joe Harris / BenchBox Project
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Performance and scalability tests for TPC-DI Phase 4: Scalability Testing.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 import os
@@ -29,31 +25,24 @@ from benchbox.core.tpcdi.benchmark import TPCDIBenchmark
 from benchbox.core.tpcdi.config import TPCDIConfig
 
 
-@pytest.mark.slow  # Data generation rate thresholds are flaky at small scale factors
+@pytest.mark.slow
 @pytest.mark.performance
 class TestTPCDIScalabilityPerformance:
-    """Performance and scalability tests for TPC-DI benchmark."""
-
     @pytest.fixture
     def temp_dir(self):
-        """Create a temporary directory for test outputs."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             yield Path(tmp_dir)
 
     @pytest.fixture
     def test_database(self):
-        """Create an in-memory SQLite database for testing."""
         conn = sqlite3.connect(":memory:")
         conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("PRAGMA cache_size = 10000")  # Optimize for performance testing
+        conn.execute("PRAGMA cache_size = 10000")
         conn.execute("PRAGMA temp_store = MEMORY")
         yield conn
         conn.close()
 
     def test_multi_scale_factor_performance_analysis(self, temp_dir, test_database):
-        """Comprehensive performance analysis across multiple scale factors."""
-        # Test scale factors: 10, 100, 500, 1000 (as specified in Phase 4 requirements)
-        # Using smaller values for practical testing, but structure scales to larger values
         scale_factors = [0.01, 0.1, 0.5, 1.0]
         performance_results = {}
 
@@ -71,26 +60,21 @@ class TestTPCDIScalabilityPerformance:
             benchmark = TPCDIBenchmark(config=config)
             process = psutil.Process(os.getpid())
 
-            # Performance metrics collection
-            start_memory = process.memory_info().rss / 1024 / 1024  # MB
+            start_memory = process.memory_info().rss / 1024 / 1024
             overall_start = time.time()
 
-            # Phase 1: Schema Creation Performance
             schema_start = time.time()
             benchmark.create_schema(test_database, "sqlite")
             schema_time = time.time() - schema_start
             schema_memory = process.memory_info().rss / 1024 / 1024
 
-            # Phase 2: Data Generation Performance
             data_gen_start = time.time()
             benchmark.generate_data()
             data_gen_time = time.time() - data_gen_start
             data_gen_memory = process.memory_info().rss / 1024 / 1024
 
-            # Get the table mapping from the benchmark after data generation
             data_files = benchmark.tables
 
-            # Calculate total data size
             total_data_size = 0
             file_count = 0
             for file_path in data_files.values():
@@ -100,7 +84,6 @@ class TestTPCDIScalabilityPerformance:
                     file_count += 1
             total_data_mb = total_data_size / (1024 * 1024)
 
-            # Phase 3: ETL Processing Performance
             etl_start = time.time()
             etl_results = benchmark.run_enhanced_etl_pipeline(
                 test_database,
@@ -111,7 +94,6 @@ class TestTPCDIScalabilityPerformance:
             etl_time = time.time() - etl_start
             etl_memory = process.memory_info().rss / 1024 / 1024
 
-            # Phase 4: Query Performance Sampling
             query_start = time.time()
             query_results = self._test_query_performance_sample(benchmark, test_database)
             query_time = time.time() - query_start
@@ -120,29 +102,23 @@ class TestTPCDIScalabilityPerformance:
             peak_memory = max(schema_memory, data_gen_memory, etl_memory)
             memory_efficiency = total_data_mb / max(peak_memory - start_memory, 0.1)
 
-            # Store comprehensive performance metrics
             performance_results[scale_factor] = {
-                # Timing metrics
                 "overall_time": overall_time,
                 "schema_time": schema_time,
                 "data_generation_time": data_gen_time,
                 "etl_processing_time": etl_time,
                 "query_sample_time": query_time,
-                # Data metrics
                 "data_files_generated": file_count,
                 "total_data_size_mb": total_data_mb,
                 "data_generation_rate_mbps": total_data_mb / max(data_gen_time, 0.001),
-                # ETL metrics
                 "etl_success": etl_results["success"],
                 "etl_records_processed": etl_results.get("total_records_processed", 0),
                 "etl_processing_rate_rps": etl_results.get("total_records_processed", 0) / max(etl_time, 0.001),
                 "etl_quality_score": etl_results.get("quality_score", 0),
-                # Memory metrics
                 "start_memory_mb": start_memory,
                 "peak_memory_mb": peak_memory,
                 "memory_growth_mb": peak_memory - start_memory,
                 "memory_efficiency_mb_per_mb": memory_efficiency,
-                # Query metrics
                 "query_sample_results": query_results,
                 "successful_queries": sum(1 for q in query_results if q.get("success", False)),
                 "average_query_time": sum(q.get("execution_time_seconds", 0) for q in query_results)
@@ -153,21 +129,15 @@ class TestTPCDIScalabilityPerformance:
                 f"Scale {scale_factor}: {overall_time:.2f}s total, {total_data_mb:.1f}MB data, {etl_results.get('total_records_processed', 0)} ETL records"
             )
 
-            # Clear database for next iteration
             self._clear_test_database(test_database)
 
-        # Analysis and validation of scaling characteristics
         self._analyze_scaling_characteristics(performance_results)
         self._validate_performance_thresholds(performance_results)
 
-        # Save performance baseline for regression testing
         self._save_performance_baseline(performance_results, temp_dir)
 
-        # Test passes - all validations successful
-
     def _test_query_performance_sample(self, benchmark: TPCDIBenchmark, connection) -> list[dict]:
-        """Test performance of a sample of queries."""
-        test_queries = [1, 2, 3, 4, 5]  # Sample queries for performance testing
+        test_queries = [1, 2, 3, 4, 5]
         query_results = []
 
         cursor = connection.cursor()
@@ -203,15 +173,12 @@ class TestTPCDIScalabilityPerformance:
         return query_results
 
     def _clear_test_database(self, connection):
-        """Clear test database for next iteration."""
         try:
             cursor = connection.cursor()
 
-            # Get all table names
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [row[0] for row in cursor.fetchall()]
 
-            # Drop all tables
             for table in tables:
                 cursor.execute(f"DROP TABLE IF EXISTS {table}")
 
@@ -220,7 +187,6 @@ class TestTPCDIScalabilityPerformance:
             print(f"Warning: Error clearing database: {e}")
 
     def _analyze_scaling_characteristics(self, results: dict[str, dict]):
-        """Analyze scaling characteristics across scale factors."""
         scale_factors = sorted(results.keys())
 
         print("\n=== SCALING ANALYSIS ===")
@@ -234,7 +200,6 @@ class TestTPCDIScalabilityPerformance:
 
             sf_ratio = next_sf / current_sf
 
-            # Analyze different scaling aspects
             scaling_metrics = {
                 "data_size": next_result["total_data_size_mb"] / max(current["total_data_size_mb"], 0.001),
                 "etl_records": next_result["etl_records_processed"] / max(current["etl_records_processed"], 1),
@@ -248,7 +213,6 @@ class TestTPCDIScalabilityPerformance:
                 efficiency = sf_ratio / ratio if ratio > 0 else 0
                 print(f"  {metric}: {ratio:.2f}x scaling (efficiency: {efficiency:.2f})")
 
-            # Validate reasonable scaling
             assert scaling_metrics["data_size"] >= sf_ratio * 0.5, (
                 f"Data size scaling too low: {scaling_metrics['data_size']:.2f}"
             )
@@ -257,51 +221,38 @@ class TestTPCDIScalabilityPerformance:
             )
 
     def _validate_performance_thresholds(self, results: dict[str, dict]):
-        """Validate performance meets acceptable thresholds."""
         print("\n=== PERFORMANCE VALIDATION ===")
 
         for scale_factor, metrics in results.items():
             print(f"\nScale Factor {scale_factor}:")
 
-            # ETL must succeed
             assert metrics["etl_success"], f"ETL failed at scale factor {scale_factor}"
 
-            # Data generation rate should be reasonable
-            # Note: Very small scale factors have significant fixed overhead (setup, file I/O latency)
-            # which makes the data rate appear artificially low. Use scaled thresholds.
             if scale_factor >= 0.5:
-                min_data_rate = 3.0  # MB/s minimum for larger datasets
+                min_data_rate = 3.0
             elif scale_factor >= 0.1:
-                min_data_rate = 1.0  # MB/s minimum for medium datasets
+                min_data_rate = 1.0
             else:
-                min_data_rate = 0.3  # MB/s minimum for tiny datasets (dominated by fixed overhead)
+                min_data_rate = 0.3
             assert metrics["data_generation_rate_mbps"] >= min_data_rate, (
                 f"Data generation too slow at SF {scale_factor}: {metrics['data_generation_rate_mbps']:.2f} MB/s"
             )
 
-            # ETL processing rate validation
-            # Note: Very small scale factors may process minimal records, making rate metrics unreliable
-            # Only validate rate if we processed a reasonable number of records
             if metrics["etl_records_processed"] >= 100:
-                min_etl_rate = 50  # records/s minimum for larger datasets
+                min_etl_rate = 50
                 assert metrics["etl_processing_rate_rps"] >= min_etl_rate, (
                     f"ETL processing too slow at SF {scale_factor}: {metrics['etl_processing_rate_rps']:.1f} rec/s"
                 )
             else:
-                # For very small datasets, just verify some records were processed
                 print(
                     f"  ETL Rate: {metrics['etl_processing_rate_rps']:.1f} rec/s (not validated, only {metrics['etl_records_processed']} records)"
                 )
 
-            # Memory growth (delta from start_memory) should be reasonable.
-            # Calibrated at 100MB base (2x observed max of ~4MB + floor), which subtracts out
-            # the ~350MB of OS/Python/xdist baseline so regressions are actually detectable.
             max_growth_mb = 1000 * scale_factor + 100
             assert metrics["memory_growth_mb"] <= max_growth_mb, (
                 f"Memory growth too high at SF {scale_factor}: {metrics['memory_growth_mb']:.1f}MB"
             )
 
-            # At least half of sample queries should succeed
             query_success_rate = metrics["successful_queries"] / max(len(metrics["query_sample_results"]), 1)
             assert query_success_rate >= 0.5, f"Too many query failures at SF {scale_factor}: {query_success_rate:.1%}"
 
@@ -311,10 +262,8 @@ class TestTPCDIScalabilityPerformance:
             print(f"  Query Success: {query_success_rate:.1%} ✅")
 
     def _save_performance_baseline(self, results: dict[str, dict], output_dir: Path):
-        """Save performance baseline for regression testing."""
         baseline_file = output_dir / "tpcdi_scalability_baseline.json"
 
-        # Create summary for baseline
         baseline_summary = {
             "timestamp": datetime.now().isoformat(),
             "scale_factors_tested": list(results.keys()),
@@ -340,7 +289,6 @@ class TestTPCDIScalabilityPerformance:
             print(f"Warning: Could not save performance baseline: {e}")
 
     def test_data_generation_performance_detailed(self, temp_dir, test_database):
-        """Detailed analysis of data generation performance characteristics."""
         scale_factors = [0.01, 0.1, 0.5]
         generation_profiles = {}
 
@@ -355,10 +303,8 @@ class TestTPCDIScalabilityPerformance:
 
             benchmark = TPCDIBenchmark(config=config)
 
-            # Detailed timing of data generation phases
             generation_start = time.time()
 
-            # Monitor resource usage during generation
             process = psutil.Process(os.getpid())
             start_memory = process.memory_info().rss / 1024 / 1024
 
@@ -367,10 +313,8 @@ class TestTPCDIScalabilityPerformance:
             generation_time = time.time() - generation_start
             end_memory = process.memory_info().rss / 1024 / 1024
 
-            # Get the table mapping from the benchmark after data generation
             data_files = benchmark.tables
 
-            # Analyze generated files
             file_analysis = {}
             total_size = 0
 
@@ -380,7 +324,6 @@ class TestTPCDIScalabilityPerformance:
                     size_bytes = path_obj.stat().st_size
                     total_size += size_bytes
 
-                    # Count records (approximate)
                     try:
                         with open(path_obj, encoding="utf-8") as f:
                             line_count = sum(1 for _ in f)
@@ -406,7 +349,6 @@ class TestTPCDIScalabilityPerformance:
                 "file_analysis": file_analysis,
             }
 
-        # Validate generation performance scaling
         for i in range(len(scale_factors) - 1):
             current_sf = scale_factors[i]
             next_sf = scale_factors[i + 1]
@@ -417,29 +359,22 @@ class TestTPCDIScalabilityPerformance:
             size_ratio = next_profile["total_size_mb"] / max(current_profile["total_size_mb"], 0.001)
             sf_ratio = next_sf / current_sf
 
-            # Data size should scale reasonably with scale factor
             assert size_ratio >= sf_ratio * 0.5, f"Data generation scaling issue: {size_ratio:.2f} vs {sf_ratio:.2f}"
             assert size_ratio <= sf_ratio * 2.0, f"Data generation over-scaling: {size_ratio:.2f} vs {sf_ratio:.2f}"
 
     def test_etl_processing_bottleneck_analysis(self, temp_dir, test_database):
-        """Analyze ETL processing bottlenecks and performance characteristics."""
         config = TPCDIConfig(scale_factor=0.1, output_dir=temp_dir, enable_parallel=True, max_workers=4)
 
         benchmark = TPCDIBenchmark(config=config)
         process = psutil.Process(os.getpid())
 
-        # Set up benchmark
         benchmark.create_schema(test_database, "sqlite")
         benchmark.generate_data()
 
-        # Profile ETL pipeline phases
         benchmark._initialize_connection_dependent_systems(test_database, "sqlite")
 
         phase_profiles = {}
 
-        # Test each ETL phase individually for bottleneck analysis
-
-        # 1. Enhanced Data Processing
         start_time = time.time()
         start_memory = process.memory_info().rss / 1024 / 1024
 
@@ -448,7 +383,6 @@ class TestTPCDIScalabilityPerformance:
             success = data_processing_result.get("success", False)
             records = data_processing_result.get("total_records", 0)
         except Exception as e:
-            # Private method may fail when called directly outside full pipeline
             print(f"Warning: data_processing phase failed (private method): {e}")
             success = False
             records = 0
@@ -460,7 +394,6 @@ class TestTPCDIScalabilityPerformance:
             "records": records,
         }
 
-        # 2. SCD Processing
         start_time = time.time()
         start_memory = process.memory_info().rss / 1024 / 1024
 
@@ -473,7 +406,6 @@ class TestTPCDIScalabilityPerformance:
             "records": scd_result.get("records_processed", 0),
         }
 
-        # 3. Canonical Parallel Transforms (the retained parallel path)
         start_time = time.time()
         start_memory = process.memory_info().rss / 1024 / 1024
 
@@ -487,7 +419,6 @@ class TestTPCDIScalabilityPerformance:
             "batches": parallel_result.get("records_processed", 0),
         }
 
-        # 4. Incremental Loading
         start_time = time.time()
         start_memory = process.memory_info().rss / 1024 / 1024
 
@@ -500,7 +431,6 @@ class TestTPCDIScalabilityPerformance:
             "records": incremental_result.get("records_loaded", 0),
         }
 
-        # 5. Data Quality Monitoring
         start_time = time.time()
         start_memory = process.memory_info().rss / 1024 / 1024
 
@@ -513,7 +443,6 @@ class TestTPCDIScalabilityPerformance:
             "rules": quality_result.get("rules_executed", 0),
         }
 
-        # Analyze bottlenecks
         total_time = sum(profile["time"] for profile in phase_profiles.values())
 
         print("\n=== ETL PHASE PERFORMANCE ANALYSIS ===")
@@ -525,9 +454,6 @@ class TestTPCDIScalabilityPerformance:
                 f"Success: {profile['success']}"
             )
 
-        # Validate phase performance
-        # Note: Some phases may fail when called as private methods outside the full pipeline
-        # We check that at least some phases succeeded to validate bottleneck analysis works
         successful_phases = sum(1 for profile in phase_profiles.values() if profile["success"])
         total_phases = len(phase_profiles)
 
@@ -543,25 +469,22 @@ class TestTPCDIScalabilityPerformance:
                 print(f"Note: Phase {phase_name} failed (may be due to private method limitations)")
 
     def test_query_execution_performance_comprehensive(self, temp_dir, test_database):
-        """Comprehensive query execution performance analysis."""
         config = TPCDIConfig(scale_factor=0.1, output_dir=temp_dir, enable_parallel=True, max_workers=4)
 
         benchmark = TPCDIBenchmark(config=config)
 
-        # Set up benchmark with substantial data for query testing
         benchmark.create_schema(test_database, "sqlite")
         benchmark.generate_data()
 
         etl_results = benchmark.run_enhanced_etl_pipeline(
             test_database,
             dialect="sqlite",
-            enable_data_quality_monitoring=False,  # Focus on query performance
+            enable_data_quality_monitoring=False,
         )
 
         assert etl_results["success"], "ETL must succeed for query performance testing"
 
-        # Test expanded set of queries for comprehensive analysis
-        test_queries = list(range(1, 11))  # Test queries 1-10
+        test_queries = list(range(1, 11))
         query_performance = {}
 
         cursor = test_database.cursor()
@@ -572,7 +495,6 @@ class TestTPCDIScalabilityPerformance:
             try:
                 query_sql = benchmark.get_query(query_id, dialect="sqlite")
 
-                # Multiple execution runs for stable timing
                 execution_times = []
                 for _run in range(3):
                     start_time = time.time()
@@ -607,12 +529,10 @@ class TestTPCDIScalabilityPerformance:
                 }
                 print(f"Query {query_id}: FAILED - {str(e)}")
 
-        # Performance analysis
         successful_queries = [q for q, perf in query_performance.items() if perf.get("success")]
 
         assert len(successful_queries) >= len(test_queries) * 0.7, "Too many query failures"
 
-        # Identify performance categories
         fast_queries = [q for q in successful_queries if query_performance[q]["avg_execution_time"] < 1.0]
         medium_queries = [q for q in successful_queries if 1.0 <= query_performance[q]["avg_execution_time"] < 5.0]
         slow_queries = [q for q in successful_queries if query_performance[q]["avg_execution_time"] >= 5.0]
@@ -622,19 +542,9 @@ class TestTPCDIScalabilityPerformance:
         print(f"  Medium (1-5s): {len(medium_queries)} queries")
         print(f"  Slow (>=5s): {len(slow_queries)} queries")
 
-        # Ensure reasonable performance distribution
         assert len(fast_queries) + len(medium_queries) >= len(successful_queries) * 0.8, "Too many slow queries"
 
     def test_parallel_processing_scalability_analysis(self, temp_dir, test_database):
-        """Canonical parallel transforms must stage identical work at every width.
-
-        Parallel TPC-DI ETL lives in ``_transform_source_data_parallel``
-        (driven by ``enable_parallel``/``max_workers``), not in the removed
-        synthetic batch scheduler. Scaling the worker count must preserve
-        staged semantics exactly: same record totals, same tables, same
-        rows. Timing is reported for analysis only - tiny fixtures cannot
-        meaningfully assert speedup.
-        """
         worker_configurations = [1, 2, 4]
         setup_config = TPCDIConfig(
             scale_factor=0.1,
@@ -673,7 +583,6 @@ class TestTPCDIScalabilityPerformance:
                 "staged_tables": staged_tables,
             }
 
-        # Analyze scalability characteristics
         print("\n=== PARALLEL TRANSFORM SCALABILITY ===")
 
         baseline = scalability_results[1]

@@ -1,5 +1,3 @@
-"""Unit tests for Cost Optimization Engine."""
-
 from __future__ import annotations
 
 import pytest
@@ -23,10 +21,8 @@ pytestmark = [
 
 
 class TestSavingsEstimate:
-    """Tests for SavingsEstimate dataclass."""
-
     def test_basic_savings(self):
-        """Test basic savings estimate creation."""
+
         savings = SavingsEstimate(
             amount=1000.0,
             currency="USD",
@@ -40,7 +36,7 @@ class TestSavingsEstimate:
         assert savings.confidence == ConfidenceLevel.HIGH
 
     def test_savings_with_range(self):
-        """Test savings estimate with range."""
+
         savings = SavingsEstimate(
             amount=1000.0,
             range_low=800.0,
@@ -53,7 +49,7 @@ class TestSavingsEstimate:
         assert savings.percentage == 25.0
 
     def test_to_dict(self):
-        """Test dictionary conversion."""
+
         savings = SavingsEstimate(
             amount=1234.567,
             currency="USD",
@@ -64,7 +60,7 @@ class TestSavingsEstimate:
 
         result = savings.to_dict()
 
-        assert result["amount"] == 1234.57  # Rounded
+        assert result["amount"] == 1234.57
         assert result["currency"] == "USD"
         assert result["period"] == "annual"
         assert result["confidence"] == "medium"
@@ -72,10 +68,8 @@ class TestSavingsEstimate:
 
 
 class TestImplementationGuide:
-    """Tests for ImplementationGuide dataclass."""
-
     def test_basic_guide(self):
-        """Test basic implementation guide creation."""
+
         guide = ImplementationGuide(
             steps=["Step 1", "Step 2", "Step 3"],
         )
@@ -85,7 +79,7 @@ class TestImplementationGuide:
         assert guide.risks == []
 
     def test_full_guide(self):
-        """Test guide with all fields."""
+
         guide = ImplementationGuide(
             steps=["Step 1", "Step 2"],
             prerequisites=["Prereq 1"],
@@ -100,7 +94,7 @@ class TestImplementationGuide:
         assert guide.estimated_time == "1-2 weeks"
 
     def test_to_dict(self):
-        """Test dictionary conversion."""
+
         guide = ImplementationGuide(
             steps=["Step 1"],
             risks=["Risk 1"],
@@ -112,14 +106,12 @@ class TestImplementationGuide:
         assert result["steps"] == ["Step 1"]
         assert result["risks"] == ["Risk 1"]
         assert result["estimated_time"] == "1 day"
-        assert "prerequisites" not in result  # Empty list not included
+        assert "prerequisites" not in result
 
 
 class TestRecommendation:
-    """Tests for Recommendation dataclass."""
-
     def test_basic_recommendation(self):
-        """Test basic recommendation creation."""
+
         rec = Recommendation(
             id="test-rec-1",
             title="Test Recommendation",
@@ -133,10 +125,10 @@ class TestRecommendation:
         assert rec.id == "test-rec-1"
         assert rec.title == "Test Recommendation"
         assert rec.category == OptimizationCategory.PLATFORM_TIER
-        assert rec.priority == 50  # Default
+        assert rec.priority == 50
 
     def test_recommendation_with_config(self):
-        """Test recommendation with current/recommended config."""
+
         rec = Recommendation(
             id="test-rec-2",
             title="Config Change",
@@ -155,7 +147,7 @@ class TestRecommendation:
         assert rec.recommended_config["edition"] == "standard"
 
     def test_to_dict(self):
-        """Test dictionary conversion."""
+
         rec = Recommendation(
             id="test-rec-3",
             title="Test",
@@ -178,10 +170,8 @@ class TestRecommendation:
 
 
 class TestOptimizationReport:
-    """Tests for OptimizationReport dataclass."""
-
     def test_empty_report(self):
-        """Test empty optimization report."""
+
         report = OptimizationReport()
 
         assert report.recommendations == []
@@ -189,7 +179,7 @@ class TestOptimizationReport:
         assert report.currency == "USD"
 
     def test_report_with_recommendations(self):
-        """Test report with recommendations."""
+
         rec1 = Recommendation(
             id="rec-1",
             title="Rec 1",
@@ -222,7 +212,7 @@ class TestOptimizationReport:
         assert report.platform == "snowflake"
 
     def test_get_by_category(self):
-        """Test filtering recommendations by category."""
+
         rec1 = Recommendation(
             id="rec-1",
             title="Tier Rec",
@@ -263,7 +253,7 @@ class TestOptimizationReport:
         assert len(region_recs) == 0
 
     def test_get_quick_wins(self):
-        """Test getting quick win recommendations."""
+
         rec_trivial = Recommendation(
             id="rec-trivial",
             title="Trivial",
@@ -294,19 +284,16 @@ class TestOptimizationReport:
 
         report = OptimizationReport(recommendations=[rec_trivial, rec_low, rec_high])
 
-        # Default: LOW and below
         quick_wins = report.get_quick_wins()
         assert len(quick_wins) == 2
-        # Should be sorted by savings descending
-        assert quick_wins[0].id == "rec-low"  # $500
-        assert quick_wins[1].id == "rec-trivial"  # $100
+        assert quick_wins[0].id == "rec-low"
+        assert quick_wins[1].id == "rec-trivial"
 
-        # Only TRIVIAL
         trivial_wins = report.get_quick_wins(max_effort=ImplementationEffort.TRIVIAL)
         assert len(trivial_wins) == 1
 
     def test_to_dict(self):
-        """Test dictionary conversion."""
+
         report = OptimizationReport(
             recommendations=[],
             total_potential_savings=1500.0,
@@ -321,18 +308,14 @@ class TestOptimizationReport:
 
 
 class TestCostOptimizer:
-    """Tests for CostOptimizer class."""
-
     @pytest.fixture
     def optimizer(self):
-        """Create a cost optimizer instance."""
         return CostOptimizer()
 
     @pytest.fixture
     def snowflake_cost(self):
-        """Create a sample Snowflake benchmark cost."""
         return BenchmarkCost(
-            total_cost=150.0,  # $150 per run
+            total_cost=150.0,
             currency="USD",
             phase_costs=[
                 PhaseCost(
@@ -340,7 +323,7 @@ class TestCostOptimizer:
                     total_cost=100.0,
                     query_count=22,
                     query_costs=[
-                        QueryCost(compute_cost=50.0),  # High-cost query
+                        QueryCost(compute_cost=50.0),
                         QueryCost(compute_cost=10.0),
                         QueryCost(compute_cost=10.0),
                         QueryCost(compute_cost=10.0),
@@ -359,7 +342,6 @@ class TestCostOptimizer:
 
     @pytest.fixture
     def snowflake_config(self):
-        """Create sample Snowflake platform config."""
         return {
             "platform": "snowflake",
             "edition": "enterprise",
@@ -368,14 +350,13 @@ class TestCostOptimizer:
         }
 
     def test_analyze_snowflake_tier(self, optimizer, snowflake_cost, snowflake_config):
-        """Test Snowflake tier optimization detection."""
+
         report = optimizer.analyze(
             benchmark_cost=snowflake_cost,
             platform_config=snowflake_config,
             annual_runs=12,
         )
 
-        # Should have tier recommendation
         tier_recs = report.get_by_category(OptimizationCategory.PLATFORM_TIER)
         assert len(tier_recs) >= 1
 
@@ -385,14 +366,13 @@ class TestCostOptimizer:
         assert tier_rec.platform == "snowflake"
 
     def test_analyze_snowflake_region(self, optimizer, snowflake_cost, snowflake_config):
-        """Test Snowflake region optimization detection."""
+
         report = optimizer.analyze(
             benchmark_cost=snowflake_cost,
             platform_config=snowflake_config,
             annual_runs=12,
         )
 
-        # Should have region recommendation (EU is more expensive than US)
         region_recs = report.get_by_category(OptimizationCategory.REGION)
         assert len(region_recs) >= 1
 
@@ -400,25 +380,20 @@ class TestCostOptimizer:
         assert region_rec.savings.amount > 0
 
     def test_analyze_high_cost_queries(self, optimizer, snowflake_cost, snowflake_config):
-        """Test high-cost query detection."""
+
         report = optimizer.analyze(
             benchmark_cost=snowflake_cost,
             platform_config=snowflake_config,
             annual_runs=12,
         )
 
-        # Should detect the $50 query as high-cost (50% of phase cost)
         query_recs = report.get_by_category(OptimizationCategory.QUERY)
         assert len(query_recs) >= 1
 
     def test_analyze_reserved_capacity(self, optimizer, snowflake_cost, snowflake_config):
-        """Test reserved capacity recommendation for high spend."""
-        # With 12 annual runs at $150 each = $1800/year
-        # This is below $10K threshold, so no recommendation expected
 
-        # Increase cost to trigger recommendation
         high_cost = BenchmarkCost(
-            total_cost=1000.0,  # $1000 per run
+            total_cost=1000.0,
             currency="USD",
             platform_details={"platform": "snowflake"},
         )
@@ -426,10 +401,9 @@ class TestCostOptimizer:
         report = optimizer.analyze(
             benchmark_cost=high_cost,
             platform_config=snowflake_config,
-            annual_runs=12,  # $12K/year
+            annual_runs=12,
         )
 
-        # Should have reserved capacity recommendation
         pricing_recs = report.get_by_category(OptimizationCategory.PRICING_MODEL)
         assert len(pricing_recs) >= 1
 
@@ -438,21 +412,21 @@ class TestCostOptimizer:
         assert pricing_rec.savings.amount > 0
 
     def test_analyze_bigquery(self, optimizer):
-        """Test BigQuery optimization analysis."""
+
         bigquery_cost = BenchmarkCost(
             total_cost=50.0,
             currency="USD",
             platform_details={
                 "platform": "bigquery",
                 "pricing_details": {
-                    "total_bytes_processed": 10 * (1024**4),  # 10 TB
+                    "total_bytes_processed": 10 * (1024**4),
                 },
             },
         )
 
         bigquery_config = {
             "platform": "bigquery",
-            "location": "australia-southeast1",  # Higher pricing region
+            "location": "australia-southeast1",
         }
 
         report = optimizer.analyze(
@@ -461,16 +435,14 @@ class TestCostOptimizer:
             annual_runs=12,
         )
 
-        # Should have region recommendation (Australia more expensive than US)
         region_recs = report.get_by_category(OptimizationCategory.REGION)
         assert len(region_recs) >= 1
 
-        # Should have partitioning recommendation (10 TB scanned)
         data_recs = report.get_by_category(OptimizationCategory.DATA_MANAGEMENT)
         assert len(data_recs) >= 1
 
     def test_analyze_redshift(self, optimizer):
-        """Test Redshift optimization analysis."""
+
         redshift_cost = BenchmarkCost(
             total_cost=100.0,
             currency="USD",
@@ -479,9 +451,9 @@ class TestCostOptimizer:
 
         redshift_config = {
             "platform": "redshift",
-            "node_type": "dc2.large",  # Standard node type
+            "node_type": "dc2.large",
             "node_count": 2,
-            "region": "eu-west-1",  # More expensive region
+            "region": "eu-west-1",
         }
 
         report = optimizer.analyze(
@@ -490,16 +462,11 @@ class TestCostOptimizer:
             annual_runs=12,
         )
 
-        # Should have region recommendation (EU more expensive than US)
         region_recs = report.get_by_category(OptimizationCategory.REGION)
         assert len(region_recs) >= 1
 
     def test_analyze_redshift_retired_node_no_sizing_rec(self, optimizer):
-        """Test Redshift retired node types yield no sizing recommendation."""
-        # DS2 nodes were retired and removed from the pricing table, so a
-        # config naming one resolves to the $1.00 unknown-node fallback.
-        # The optimizer must not build a migration recommendation on a
-        # fallback price.
+
         redshift_cost = BenchmarkCost(
             total_cost=100.0,
             currency="USD",
@@ -523,7 +490,7 @@ class TestCostOptimizer:
         assert len(sizing_recs) == 0
 
     def test_analyze_databricks(self, optimizer):
-        """Test Databricks optimization analysis."""
+
         databricks_cost = BenchmarkCost(
             total_cost=200.0,
             currency="USD",
@@ -543,16 +510,14 @@ class TestCostOptimizer:
             annual_runs=12,
         )
 
-        # Should have tier recommendation (Enterprise -> Premium)
         tier_recs = report.get_by_category(OptimizationCategory.PLATFORM_TIER)
         assert len(tier_recs) >= 1
 
-        # Should have workload recommendation (all_purpose -> jobs)
         sizing_recs = report.get_by_category(OptimizationCategory.RESOURCE_SIZING)
         assert len(sizing_recs) >= 1
 
     def test_analyze_empty_cost(self, optimizer):
-        """Test analysis with minimal cost data."""
+
         empty_cost = BenchmarkCost(
             total_cost=0.0,
             currency="USD",
@@ -561,27 +526,25 @@ class TestCostOptimizer:
 
         report = optimizer.analyze(
             benchmark_cost=empty_cost,
-            platform_config={"platform": "duckdb"},  # Local platform
+            platform_config={"platform": "duckdb"},
             annual_runs=12,
         )
 
-        # Should return empty report (no applicable optimizations)
         assert isinstance(report, OptimizationReport)
 
     def test_total_potential_savings(self, optimizer, snowflake_cost, snowflake_config):
-        """Test that total potential savings is calculated correctly."""
+
         report = optimizer.analyze(
             benchmark_cost=snowflake_cost,
             platform_config=snowflake_config,
             annual_runs=12,
         )
 
-        # Total should be sum of all recommendation savings
         expected_total = sum(r.savings.amount for r in report.recommendations)
         assert report.total_potential_savings == expected_total
 
     def test_recommendations_sorted_by_priority(self, optimizer, snowflake_cost, snowflake_config):
-        """Test that recommendations are sorted by priority descending."""
+
         report = optimizer.analyze(
             benchmark_cost=snowflake_cost,
             platform_config=snowflake_config,
@@ -593,7 +556,7 @@ class TestCostOptimizer:
             assert priorities == sorted(priorities, reverse=True)
 
     def test_report_metadata(self, optimizer, snowflake_cost, snowflake_config):
-        """Test that report includes metadata."""
+
         report = optimizer.analyze(
             benchmark_cost=snowflake_cost,
             platform_config=snowflake_config,
@@ -606,15 +569,12 @@ class TestCostOptimizer:
 
 
 class TestCostOptimizerEdgeCases:
-    """Edge case tests for CostOptimizer."""
-
     @pytest.fixture
     def optimizer(self):
-        """Create a cost optimizer instance."""
         return CostOptimizer()
 
     def test_unknown_platform(self, optimizer):
-        """Test analysis for unknown platform."""
+
         cost = BenchmarkCost(
             total_cost=100.0,
             platform_details={"platform": "unknown_db"},
@@ -625,11 +585,10 @@ class TestCostOptimizerEdgeCases:
             platform_config={"platform": "unknown_db"},
         )
 
-        # Should return report without errors
         assert isinstance(report, OptimizationReport)
 
     def test_already_optimized_snowflake(self, optimizer):
-        """Test analysis when Snowflake is already on Standard edition."""
+
         cost = BenchmarkCost(
             total_cost=100.0,
             platform_details={"platform": "snowflake"},
@@ -637,9 +596,9 @@ class TestCostOptimizerEdgeCases:
 
         config = {
             "platform": "snowflake",
-            "edition": "standard",  # Already lowest tier
+            "edition": "standard",
             "cloud": "aws",
-            "region": "us-east-1",  # Already cheapest region
+            "region": "us-east-1",
         }
 
         report = optimizer.analyze(
@@ -647,16 +606,15 @@ class TestCostOptimizerEdgeCases:
             platform_config=config,
         )
 
-        # Should not have tier or region recommendations
         tier_recs = report.get_by_category(OptimizationCategory.PLATFORM_TIER)
         region_recs = report.get_by_category(OptimizationCategory.REGION)
         assert len(tier_recs) == 0
         assert len(region_recs) == 0
 
     def test_low_spend_no_reserved_recommendation(self, optimizer):
-        """Test that reserved capacity is not recommended for low spend."""
+
         cost = BenchmarkCost(
-            total_cost=50.0,  # $50/run * 12 = $600/year (below $10K threshold)
+            total_cost=50.0,
             platform_details={"platform": "snowflake"},
         )
 
@@ -670,7 +628,7 @@ class TestCostOptimizerEdgeCases:
         assert len(pricing_recs) == 0
 
     def test_no_query_costs_no_query_recommendations(self, optimizer):
-        """Test that no query recommendations when no query costs available."""
+
         cost = BenchmarkCost(
             total_cost=100.0,
             phase_costs=[
@@ -678,7 +636,7 @@ class TestCostOptimizerEdgeCases:
                     phase_name="test",
                     total_cost=100.0,
                     query_count=10,
-                    query_costs=None,  # No individual query costs
+                    query_costs=None,
                 ),
             ],
             platform_details={"platform": "snowflake"},
@@ -694,10 +652,8 @@ class TestCostOptimizerEdgeCases:
 
 
 class TestConfidenceLevels:
-    """Tests for confidence levels in recommendations."""
-
     def test_tier_recommendations_high_confidence(self):
-        """Test that tier recommendations have high confidence."""
+
         optimizer = CostOptimizer()
         cost = BenchmarkCost(
             total_cost=100.0,
@@ -718,7 +674,7 @@ class TestConfidenceLevels:
             assert tier_recs[0].savings.confidence == ConfidenceLevel.HIGH
 
     def test_query_recommendations_low_confidence(self):
-        """Test that query optimization recommendations have low confidence."""
+
         optimizer = CostOptimizer()
         cost = BenchmarkCost(
             total_cost=100.0,
@@ -728,7 +684,7 @@ class TestConfidenceLevels:
                     total_cost=100.0,
                     query_count=5,
                     query_costs=[
-                        QueryCost(compute_cost=50.0),  # 50% of cost
+                        QueryCost(compute_cost=50.0),
                         QueryCost(compute_cost=10.0),
                         QueryCost(compute_cost=10.0),
                         QueryCost(compute_cost=10.0),
@@ -750,10 +706,8 @@ class TestConfidenceLevels:
 
 
 class TestImplementationEffortLevels:
-    """Tests for implementation effort levels."""
-
     def test_databricks_workload_low_effort(self):
-        """Test that Databricks workload change is low effort."""
+
         optimizer = CostOptimizer()
         cost = BenchmarkCost(
             total_cost=100.0,
@@ -775,7 +729,7 @@ class TestImplementationEffortLevels:
             assert workload_recs[0].effort == ImplementationEffort.LOW
 
     def test_region_change_high_effort(self):
-        """Test that region changes are high effort."""
+
         optimizer = CostOptimizer()
         cost = BenchmarkCost(
             total_cost=100.0,
@@ -786,7 +740,7 @@ class TestImplementationEffortLevels:
             "platform": "snowflake",
             "edition": "standard",
             "cloud": "aws",
-            "region": "eu-west-1",  # More expensive region
+            "region": "eu-west-1",
         }
 
         report = optimizer.analyze(benchmark_cost=cost, platform_config=config)

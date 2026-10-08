@@ -1,14 +1,3 @@
-"""Query result validation engine.
-
-This module provides functionality for validating query execution results by comparing
-actual row counts against expected results. It integrates with the expected results
-registry to provide comprehensive validation across all benchmarks.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -16,8 +5,6 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-# Import expected_results to trigger provider registration
-# This ensures TPC-H and TPC-DS providers are available when QueryValidator is instantiated
 import benchbox.core.expected_results  # noqa: F401
 from benchbox.core.expected_results.models import ValidationMode, ValidationResult
 from benchbox.core.expected_results.registry import LoadOutcome, get_registry
@@ -27,12 +14,6 @@ from benchbox.core.expected_results.tpch_results import (
 
 logger = logging.getLogger(__name__)
 
-# Per-benchmark parameter-sensitive query-id sets consulted by the
-# non-reference-seed relaxation in validate_query_result(). These queries carry
-# a canonical EXACT expectation (validated against the answer file at the
-# reference seed) and are relaxed to their RANGE bounds / LOOSE tolerance only
-# when a caller signals a non-reference seed. Benchmarks with no entry here
-# (e.g. TPC-DS) always validate against their declared mode.
 _PARAMETER_SENSITIVE_QUERY_IDS_BY_BENCHMARK: dict[str, frozenset[str]] = {
     "tpch": _TPCH_PARAMETER_SENSITIVE_QUERY_IDS,
     "tpc-h": _TPCH_PARAMETER_SENSITIVE_QUERY_IDS,
@@ -66,29 +47,13 @@ def _warn_stream_seed_override_once(benchmark_type: str, requested_mode: Validat
 
 
 def get_parameter_sensitive_query_ids(benchmark_type: str) -> frozenset[str]:
-    """Return the parameter-sensitive query-id set for a benchmark, if any.
-
-    Empty frozenset for benchmarks with no known parameter-sensitive queries
-    (e.g. TPC-DS today) -- the exclusion check in validate_query_result()
-    never fires for them.
-    """
     return _PARAMETER_SENSITIVE_QUERY_IDS_BY_BENCHMARK.get(benchmark_type.lower(), frozenset())
 
 
-# Thread-local reference-seed determination. Set by the TPC-H power/throughput
-# drivers (benchbox.core.tpch.power_test, benchbox.core.tpch.throughput_test)
-# immediately before executing a query, and read here to decide whether a
-# parameter-sensitive query's EXACT-mode mismatch should be excluded instead
-# of failed. Thread-local (not a plain module global) because throughput
-# streams execute concurrently, one thread per stream (see
-# benchbox.core.throughput.runner.StreamRunner) -- a single shared global
-# would let one stream's context leak into a concurrently-running stream's
-# validation call.
 _reference_seed_state = threading.local()
 
 
 def _set_thread_context(state: threading.local, attribute: str, value: object) -> None:
-    """Set one named value on a thread-local context container."""
     setattr(state, attribute, value)
 
 
@@ -97,43 +62,30 @@ def set_reference_seed_context(is_reference_seed: bool | None) -> None:
 
 
 def get_reference_seed_context() -> bool | None:
-    """Return the current thread's reference-seed determination, if set."""
     return getattr(_reference_seed_state, "is_reference_seed", None)
 
 
 def clear_reference_seed_context() -> None:
-    """Reset the current thread's reference-seed context to unset (None)."""
     _reference_seed_state.is_reference_seed = None
 
 
-# Thread-local TPC-DS validation-mode run context. Set by the requesting run
-# (per thread when runs execute concurrently against the shared registry
-# cache) and read here at validation time, so one run's policy can never leak
-# into another run through module globals or cached answer objects. Mirrors
-# the reference-seed context above -- throughput streams validate
-# concurrently, one thread per stream, and cached answer data is
-# policy-independent.
 _validation_mode_state = threading.local()
 
 
 def set_validation_mode_context(mode: ValidationMode | None) -> None:
-    """Set the current thread's TPC-DS validation mode for this run."""
     _validation_mode_state.validation_mode = mode
 
 
 def get_validation_mode_context() -> ValidationMode | None:
-    """Return the current thread's validation-mode run context, if set."""
     return getattr(_validation_mode_state, "validation_mode", None)
 
 
 def clear_validation_mode_context() -> None:
-    """Reset the current thread's validation-mode run context to unset (None)."""
     _validation_mode_state.validation_mode = None
 
 
 @contextmanager
 def validation_mode_context(mode: ValidationMode | None) -> Iterator[None]:
-    """Apply a TPC-DS validation policy for one operation and restore its caller."""
     if mode is None:
         yield
         return
@@ -146,24 +98,7 @@ def validation_mode_context(mode: ValidationMode | None) -> Iterator[None]:
 
 
 class QueryValidator:
-    """Validator for query execution results.
-
-    This class validates query results by comparing actual row counts against
-    expected results from the registry. It supports:
-    - Exact row count validation for fixed-cardinality queries
-    - Loose tolerance-based validation for designated parameter-sensitive queries
-    - Range-based validation for designated parameter-sensitive queries
-    - Graceful handling of queries without expected results
-
-    Automatically ensures all providers are registered on initialization.
-    """
-
     def __init__(self):
-        """Initialize the validator with the global registry.
-
-        Explicitly ensures all expected results providers are registered.
-        """
-        # Explicitly ensure providers are registered (idempotent)
         from benchbox.core.expected_results import register_all_providers
 
         register_all_providers()
@@ -172,12 +107,6 @@ class QueryValidator:
 
     @staticmethod
     def _resolve_tpcds_run_mode(benchmark_type: str) -> ValidationMode | None:
-        """Resolve the requesting run's TPC-DS validation policy.
-
-        Per-thread run context wins; otherwise the run-shared configuration
-        (benchmark-runner config, then BENCHBOX_QUERY_VALIDATION_MODE).
-        Returns None for non-TPC-DS benchmarks (their cached modes apply).
-        """
         if benchmark_type.lower() != "tpcds":
             return None
         context_mode = get_validation_mode_context()
@@ -188,52 +117,22 @@ class QueryValidator:
         return get_query_validation_mode()
 
     def _normalize_query_id(self, benchmark_type: str, query_id: str | int) -> str:
-        """Normalize query ID to string format for consistent lookups.
-
-        Uses robust regex-based extraction to handle various ID formats:
-        - Integers: 1 → "1"
-        - String numerics: "15" → "15"
-        - Prefixed: "Q1", "query15" → "1", "15"
-        - TPC-H variants: "15a", "Q15b" → "15" (strip variant)
-        - TPC-DS variants: "14a", "23b" → "14a", "23b" (PRESERVE variant)
-
-        For TPC-H, extracts the leading integer (variants are stripped).
-        For TPC-DS, preserves variant suffixes (14a, 23b, etc.) because
-        answer files exist for each variant separately.
-        For other benchmarks, returns the ID as-is (converted to string).
-
-        Args:
-            benchmark_type: Type of benchmark
-            query_id: Raw query identifier (int or string)
-
-        Returns:
-            Normalized query ID as string
-        """
         import re
 
-        # Convert to string
         query_id_str = str(query_id)
 
-        # For TPC-DS, preserve variant letters (14a, 23b, 39a, etc.)
         if benchmark_type.lower() in ("tpcds", "tpc-ds"):
-            # Match pattern: optional prefix + digits + optional variant letter
-            # Examples: "14a" → "14a", "Q23b" → "23b", "14" → "14"
             match = re.search(r"(\d+)([a-d]?)", query_id_str)
             if match:
-                query_num = str(int(match.group(1)))  # Strip leading zeros
-                variant = match.group(2)  # Preserve variant letter if present
+                query_num = str(int(match.group(1)))
+                variant = match.group(2)
                 return f"{query_num}{variant}"
 
-        # For TPC-H, extract leading integer (strip variants)
         elif benchmark_type.lower() in ("tpch", "tpc-h"):
-            # Extract the first sequence of digits from the query ID
-            # Handles: "1", "Q1", "query15", "15a", "Q15b", "01" (leading zeros stripped)
             match = re.search(r"(\d+)", query_id_str)
             if match:
-                # Convert to int then back to string to strip leading zeros: "01" → "1"
                 return str(int(match.group(1)))
 
-        # For other benchmarks or if no digits found, return as-is
         return query_id_str
 
     def validate_query_result(
@@ -244,32 +143,11 @@ class QueryValidator:
         scale_factor: float | None = None,
         stream_id: int | None = None,
     ) -> ValidationResult:
-        """Validate a query result against expected row count.
-
-        Args:
-            benchmark_type: Type of benchmark (e.g., "tpch", "tpcds")
-            query_id: Query identifier (e.g., 1, "1", "2a", "query14")
-            actual_row_count: Actual number of rows returned by the query
-            scale_factor: Scale factor used for the query (defaults to 1.0)
-            stream_id: Stream identifier for multi-stream benchmarks (e.g., 0, 1, 2...)
-                      Used to select stream-specific expected results. None indicates stream 0
-                      or single-stream execution.
-
-        Returns:
-            ValidationResult with validation status and details
-
-        Raises:
-            ValueError: If actual_row_count is negative
-        """
-        # Validate non-negative row count
         if actual_row_count < 0:
             raise ValueError(f"actual_row_count must be non-negative, got {actual_row_count} for query '{query_id}'")
 
-        # Always convert query_id to string for type consistency in ValidationResult
         query_id_str = str(query_id)
 
-        # Normalize query_id for lookups in expected results
-        # Benchmarks may use int keys but expected results use string keys
         query_id_normalized = self._normalize_query_id(benchmark_type, query_id)
 
         if get_reference_seed_context() is False and benchmark_type.lower() in _NON_REFERENCE_SEED_EXCLUDED_BENCHMARKS:
@@ -287,8 +165,6 @@ class QueryValidator:
                 ),
             )
 
-        # Get expected result from registry with the classified load outcome.
-        # A provider failure or timeout is never reported as a normal skip.
         expected_result, load_outcome = self.registry.get_expected_result_detailed(
             benchmark_type, query_id_normalized, scale_factor, stream_id
         )
@@ -318,11 +194,6 @@ class QueryValidator:
                 error_message=error_msg,
             )
 
-        # Apply the requesting run's TPC-DS validation policy at the run
-        # boundary. Cached answer data is policy-independent, so the effective
-        # mode is resolved per validation (per-thread run context, then
-        # run-shared config/env) on a copy -- the cached object is never
-        # mutated, and one run's policy can never leak into another run.
         if expected_result is not None and benchmark_type.lower() == "tpcds":
             run_mode = self._resolve_tpcds_run_mode(benchmark_type)
             if run_mode is not None and run_mode != expected_result.validation_mode:
@@ -330,9 +201,7 @@ class QueryValidator:
 
                 expected_result = dataclasses.replace(expected_result, validation_mode=run_mode)
 
-        # If no expected result found, skip validation with warning
         if expected_result is None:
-            # Stream-aware warning message
             if stream_id is not None and stream_id > 0:
                 warning_msg = (
                     f"Query '{query_id}' executed on stream {stream_id}. "
@@ -346,7 +215,7 @@ class QueryValidator:
                 )
 
             return ValidationResult(
-                is_valid=True,  # Don't fail on unknown queries
+                is_valid=True,
                 query_id=query_id_str,
                 expected_row_count=None,
                 actual_row_count=actual_row_count,
@@ -354,18 +223,6 @@ class QueryValidator:
                 warning_message=warning_msg,
             )
 
-        # Parameter-sensitive TPC-H queries (Q11/13/16/18/20)
-        # carry a canonical EXACT expectation because their answer-file
-        # cardinality is known under the reference seed. When a caller has
-        # signalled a NON-reference seed (set_reference_seed_context(False)) the
-        # query ran under different substitution parameters, so the exact count
-        # no longer applies: relax to the query's RANGE bounds (or LOOSE
-        # tolerance) instead of an exact comparison. This still fails a 0-row or
-        # out-of-range result while accepting spec-sanctioned variance -- a real
-        # bound, not the old unconditional skip. Reference-seed context (True)
-        # and callers that never set it (None -- qgen defaults, TPC-DS,
-        # DataFrame validation) fall through to the EXACT dispatch below, so a
-        # reference-seed regression is still caught exactly.
         if get_reference_seed_context() is False and query_id_normalized in get_parameter_sensitive_query_ids(
             benchmark_type
         ):
@@ -381,20 +238,15 @@ class QueryValidator:
                 )
             return expected_result.validate_loose(actual_row_count, scale_factor)
 
-        # Get expected count (handles formulas and scale factors)
         expected_count = expected_result.get_expected_count(scale_factor)
 
-        # CRITICAL SAFEGUARD: Handle EXACT mode with missing expected count
-        # This occurs when a query variant (e.g., "14a") has an ExpectedQueryResult registered
-        # but the expected_count lookup fails (e.g., variant not in row_counts dict).
-        # Without this safeguard, EXACT mode would incorrectly fail validation.
         if expected_result.validation_mode == ValidationMode.EXACT and expected_count is None:
             return ValidationResult(
-                is_valid=True,  # Don't fail - gracefully skip
+                is_valid=True,
                 query_id=query_id_str,
                 expected_row_count=None,
                 actual_row_count=actual_row_count,
-                validation_mode=ValidationMode.SKIP,  # Downgrade to SKIP
+                validation_mode=ValidationMode.SKIP,
                 warning_message=(
                     f"Query '{query_id}' has EXACT validation mode but no expected count available. "
                     f"Validation skipped. This may indicate a variant lookup issue or missing answer file. "
@@ -402,7 +254,6 @@ class QueryValidator:
                 ),
             )
 
-        # Perform validation based on mode
         if expected_result.validation_mode == ValidationMode.SKIP:
             return ValidationResult(
                 is_valid=True,
@@ -425,11 +276,9 @@ class QueryValidator:
             )
 
         elif expected_result.validation_mode == ValidationMode.LOOSE:
-            # Use the validate_loose method from ExpectedQueryResult
             return expected_result.validate_loose(actual_row_count, scale_factor)
 
         else:
-            # Should never reach here due to enum validation
             return ValidationResult(
                 is_valid=False,
                 query_id=query_id_str,
@@ -440,16 +289,6 @@ class QueryValidator:
             )
 
     def _validate_exact(self, query_id: str, expected_count: int | None, actual_count: int) -> ValidationResult:
-        """Validate that row count matches exactly.
-
-        Args:
-            query_id: Query identifier
-            expected_count: Expected row count
-            actual_count: Actual row count
-
-        Returns:
-            ValidationResult
-        """
         if expected_count is None:
             return ValidationResult(
                 is_valid=False,
@@ -494,17 +333,6 @@ class QueryValidator:
     def _validate_range(
         self, query_id: str, min_count: int | None, max_count: int | None, actual_count: int
     ) -> ValidationResult:
-        """Validate that row count is within an acceptable range.
-
-        Args:
-            query_id: Query identifier
-            min_count: Minimum acceptable row count
-            max_count: Maximum acceptable row count
-            actual_count: Actual row count
-
-        Returns:
-            ValidationResult
-        """
         if min_count is None or max_count is None:
             return ValidationResult(
                 is_valid=False,
@@ -521,7 +349,7 @@ class QueryValidator:
             return ValidationResult(
                 is_valid=True,
                 query_id=query_id,
-                expected_row_count=None,  # No single expected count for ranges
+                expected_row_count=None,
                 actual_row_count=actual_count,
                 validation_mode=ValidationMode.RANGE,
             )
@@ -535,7 +363,7 @@ class QueryValidator:
                     f"  Actual:   {actual_count:,} rows\n"
                     f"  Difference: {difference:+,} rows (below minimum by {abs(difference_percent):.1f}%)"
                 )
-            else:  # actual_count > max_count
+            else:
                 difference = actual_count - max_count
                 difference_percent = (difference / max_count * 100.0) if max_count > 0 else 0.0
                 error_msg = (

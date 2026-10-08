@@ -1,16 +1,6 @@
-"""Tests for the shared staged-load template used by cloud adapters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Redshift and Snowflake independently implemented the same per-table
-staged-load loop with behavioral drift: Snowflake keyed stats uppercase
-while Redshift keyed lowercase, and Snowflake truncated failure text to 100
-characters while Redshift logged it in full. ``run_staged_table_loads``
-owns the mechanics; these tests pin the preserved per-platform behavior
-(casing, fail-fast, timings) and the unified full-text error reporting.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -38,7 +28,7 @@ def _adapter() -> MagicMock:
 
 @contextmanager
 def _frozen_clock(ticks: list[float]):
-    """Patch both clock namespaces (module import + clock source)."""
+
     clock = iter(ticks)
     with (
         patch("benchbox.platforms.base.data_loading.mono_time", side_effect=clock),
@@ -48,10 +38,8 @@ def _frozen_clock(ticks: list[float]):
 
 
 class TestStagedLoadTemplate:
-    """Shared mechanics with caller-owned platform behavior."""
-
     def test_records_stats_with_caller_key_folding(self):
-        """Redshift folds lower, Snowflake folds upper; the template honors both."""
+
         adapter = _adapter()
         tables = {"LineItem": [Path("/tmp/a.tbl")], "Orders": [Path("/tmp/b.tbl")]}
 
@@ -77,7 +65,7 @@ class TestStagedLoadTemplate:
         assert set(upper_stats) == {"LINEITEM", "ORDERS"}
 
     def test_skipped_tables_record_zero_without_timings_by_default(self):
-        """Empty tables record zero; Redshift callers get no timings payload."""
+
         adapter = _adapter()
         stats, total, timings = run_staged_table_loads(
             adapter,
@@ -93,7 +81,7 @@ class TestStagedLoadTemplate:
         assert total >= 0
 
     def test_skipped_tables_record_zero_timings_when_requested(self):
-        """Snowflake shape: skips carry the same key with a zero timing entry."""
+
         adapter = _adapter()
         stats, _, timings = run_staged_table_loads(
             adapter,
@@ -108,7 +96,7 @@ class TestStagedLoadTemplate:
         assert timings == {"GHOST": {"total_ms": 0}}
 
     def test_failure_logs_full_error_text(self):
-        """The drift fix: no truncation of the failure cause."""
+
         adapter = _adapter()
         adapter.logger = MagicMock()
         long_cause = "x" * 500
@@ -128,7 +116,7 @@ class TestStagedLoadTemplate:
         assert "..." not in message
 
     def test_continue_on_failure_by_default(self):
-        """Redshift semantics: a failed table does not abort later tables."""
+
         adapter = _adapter()
         calls: list[str] = []
 
@@ -151,7 +139,7 @@ class TestStagedLoadTemplate:
         assert stats == {"bad": 0, "good": 7}
 
     def test_fail_fast_reraises_after_recording_zeros(self):
-        """Snowflake semantics: full refreshes abort on a failed table."""
+
         adapter = _adapter()
         with pytest.raises(RuntimeError, match="boom"):
             run_staged_table_loads(
@@ -165,7 +153,7 @@ class TestStagedLoadTemplate:
             )
 
     def test_on_table_loaded_hook_runs_after_success(self):
-        """CTAS sorting and similar post-load work run inside the loop."""
+
         adapter = _adapter()
         seen: list[tuple[str, str, int]] = []
         stats, _, timings = run_staged_table_loads(
@@ -183,7 +171,7 @@ class TestStagedLoadTemplate:
         assert set(timings or {}) == {"ORDERS"}
 
     def test_custom_log_sinks_preserve_verbose_gating(self):
-        """Snowflake keeps verbose-gated success lines through the hooks."""
+
         adapter = _adapter()
         adapter.logger = MagicMock()
         success_lines: list[str] = []
@@ -204,7 +192,7 @@ class TestStagedLoadTemplate:
         assert len(summary_lines) == 1
 
     def test_custom_start_description(self):
-        """Redshift's direct branch keeps its distinct start wording."""
+
         adapter = _adapter()
         adapter.log_verbose = MagicMock()
         run_staged_table_loads(
@@ -221,14 +209,13 @@ class TestStagedLoadTemplate:
         assert line == "Direct loading data for table: orders"
 
     def test_post_load_hook_counts_inside_per_table_timing(self):
-        """CTAS-style post-load work is measured as part of the table load."""
+
         adapter = _adapter()
         success_lines: list[str] = []
 
         def on_table_loaded(table: str, key: str, count: int) -> None:
             del table, key, count
 
-        # phase clock, per-table start, per-table end, phase end.
         with _frozen_clock([1000.0, 1001.0, 1002.0, 1003.0]):
             _, _, timings = run_staged_table_loads(
                 adapter,
@@ -246,12 +233,10 @@ class TestStagedLoadTemplate:
         assert "in 1.00s" in success_lines[0]
 
     def test_caller_phase_start_covers_setup_time(self):
-        """A caller-owned clock keeps setup work inside the phase total."""
+
         adapter = _adapter()
         summary_lines: list[str] = []
 
-        # per-table start, per-table end, phase end; phase starts at
-        # caller setup (990.0), before the loop-entry clock would run.
         with _frozen_clock([1001.0, 1001.5, 1010.0]):
             _, total, _ = run_staged_table_loads(
                 adapter,
@@ -269,11 +254,10 @@ class TestStagedLoadTemplate:
         assert "in 20.00s" in summary_lines[0]
 
     def test_phase_total_defaults_to_loop_entry_without_caller_clock(self):
-        """Callers that pass nothing keep the template's loop-entry clock."""
+
         adapter = _adapter()
         summary_lines: list[str] = []
 
-        # phase clock, per-table start, per-table end, phase end.
         with _frozen_clock([1000.0, 1001.0, 1001.5, 1002.0]):
             _, total, _ = run_staged_table_loads(
                 adapter,

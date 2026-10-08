@@ -1,9 +1,6 @@
-"""Coverage-focused tests for Databricks credentials module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -23,11 +20,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 MODULE = "benchbox.platforms.databricks.credentials"
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _cred_manager(existing: dict | None = None) -> MagicMock:
     m = MagicMock()
     m.get_platform_credentials.return_value = existing
@@ -40,7 +32,7 @@ def _console() -> MagicMock:
 
 
 def _mock_sql_modules(connect_return=None, connect_side_effect=None):
-    """Return (mock_db_pkg, mock_sql) with connect wired up."""
+
     mock_cursor = MagicMock()
     mock_cursor.fetchall.return_value = [(1,)]
     mock_conn = MagicMock()
@@ -53,11 +45,6 @@ def _mock_sql_modules(connect_return=None, connect_side_effect=None):
     mock_db_pkg = MagicMock()
     mock_db_pkg.sql = mock_sql
     return mock_db_pkg, mock_sql, mock_conn, mock_cursor
-
-
-# ---------------------------------------------------------------------------
-# validate_databricks_credentials
-# ---------------------------------------------------------------------------
 
 
 class TestValidateDatabricksCredentials:
@@ -150,11 +137,6 @@ class TestValidateDatabricksCredentials:
         assert ok is False
         assert "Connection failed" in err
         assert "network timeout" in err
-
-
-# ---------------------------------------------------------------------------
-# _auto_detect_databricks
-# ---------------------------------------------------------------------------
 
 
 class TestAutoDetectDatabricks:
@@ -266,11 +248,6 @@ class TestAutoDetectDatabricks:
         if result is not None:
             assert result.get("server_hostname") == "workspace.cloud.databricks.com"
             assert result.get("http_path") == "/sql/1.0/warehouses/abc123"
-
-
-# ---------------------------------------------------------------------------
-# setup_databricks_credentials
-# ---------------------------------------------------------------------------
 
 
 class TestSetupDatabricksCredentials:
@@ -441,11 +418,6 @@ class TestSetupDatabricksCredentials:
             setup_databricks_credentials(mgr, console)
 
         mock_validate.assert_called_once()
-
-
-# ---------------------------------------------------------------------------
-# _prompt_default_output_location
-# ---------------------------------------------------------------------------
 
 
 class TestPromptDefaultOutputLocation:

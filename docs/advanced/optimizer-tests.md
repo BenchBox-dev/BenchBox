@@ -239,10 +239,8 @@ ORDER BY l_quantity * l_extendedprice * (1 - l_discount) * (1 + l_tax) DESC
 ```python
 from benchbox.core.read_primitives.queries import ReadPrimitivesQueryManager
 
-# Initialize query manager
 query_manager = ReadPrimitivesQueryManager()
 
-# Get all optimizer test queries
 optimizer_queries = [
     "optimizer_exists_to_semijoin",
     "optimizer_distinct_elimination",
@@ -259,12 +257,11 @@ optimizer_queries = [
     "optimizer_runtime_filter"
 ]
 
-# Execute all optimizer queries
 for query_id in optimizer_queries:
     query_sql = query_manager.get_query(query_id)
-    # Execute against TPC-H database and measure performance
-    # ... analyze query plans and optimization effectiveness
 ```
+
+Execute each query against a TPC-H database and measure its performance, then analyze the query plans to judge optimization effectiveness.
 
 ## Testing and Validation
 

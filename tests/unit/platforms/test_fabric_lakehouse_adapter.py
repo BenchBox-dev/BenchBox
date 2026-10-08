@@ -1,5 +1,3 @@
-"""Unit tests for Fabric Lakehouse SQL adapter."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -19,7 +17,7 @@ pytestmark = [
 
 @pytest.fixture()
 def lakehouse_stubs(monkeypatch):
-    """Stub pyodbc and dependency checks for deterministic unit tests."""
+
     mock_pyodbc = Mock()
     mock_pyodbc.connect = Mock()
     mock_pyodbc.Error = Exception
@@ -32,7 +30,7 @@ def lakehouse_stubs(monkeypatch):
 
 @pytest.fixture()
 def lakehouse_adapter(lakehouse_stubs):
-    """Create adapter with valid baseline configuration."""
+
     return FabricLakehouseAdapter(
         workspace="workspace-abc",
         lakehouse="lakehouse_db",

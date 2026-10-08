@@ -19,8 +19,6 @@ describe("query labels", () => {
   });
 
   it("deduplicates duplicate query IDs so callers can use them as React keys", () => {
-    // Defensive contract: RankTable, QueryHeatmap, and QueryHistogram all
-    // iterate this output as React keys. A duplicate would collide.
     expect(sortQueryIds(["Q3", "Q1", "Q1", "Q2", "Q3", "Q1"])).toStrictEqual([
       "Q1",
       "Q2",

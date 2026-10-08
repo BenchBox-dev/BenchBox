@@ -1,23 +1,4 @@
 #!/usr/bin/env python3
-"""Demonstrate system performance monitoring during benchmarks.
-
-This example shows how to:
-- Monitor CPU usage during benchmark execution
-- Track memory consumption
-- Identify resource bottlenecks
-- Estimate system requirements for different scale factors
-- Profile query execution
-
-Usage:
-    python features/performance_monitoring.py
-
-Key Concepts:
-    - System resource profiling
-    - CPU usage tracking per query
-    - Memory usage monitoring
-    - Resource requirement estimation
-    - Performance bottleneck identification
-"""
 
 from __future__ import annotations
 
@@ -25,7 +6,6 @@ import sys
 import time
 from pathlib import Path
 
-# Add parent directory to path for imports
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _EXAMPLES_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_EXAMPLES_DIR))
@@ -44,20 +24,12 @@ except ImportError:
 
 
 def get_system_info():
-    """Get current system information.
-
-    This provides context for interpreting benchmark results:
-    - CPU count and frequency
-    - Total memory available
-    - Current system load
-    """
     print("=" * 70)
     print("SYSTEM INFORMATION")
     print("=" * 70)
     print()
 
     if PSUTIL_AVAILABLE:
-        # CPU information
         cpu_count = psutil.cpu_count(logical=False)
         cpu_count_logical = psutil.cpu_count(logical=True)
         cpu_freq = psutil.cpu_freq()
@@ -68,7 +40,6 @@ def get_system_info():
         if cpu_freq:
             print(f"  Frequency:      {cpu_freq.current:.0f} MHz (max: {cpu_freq.max:.0f} MHz)")
 
-        # Memory information
         memory = psutil.virtual_memory()
         memory_gb = memory.total / (1024**3)
 
@@ -77,7 +48,6 @@ def get_system_info():
         print(f"  Available: {memory.available / (1024**3):.1f} GB")
         print(f"  Used:      {memory.percent}%")
 
-        # Disk information
         disk = psutil.disk_usage("/")
         print("\nDisk:")
         print(f"  Total:     {disk.total / (1024**3):.1f} GB")
@@ -90,8 +60,6 @@ def get_system_info():
 
 
 class ResourceMonitor:
-    """Monitor system resources during benchmark execution."""
-
     def __init__(self):
         self.start_time = None
         self.start_memory = None
@@ -99,21 +67,18 @@ class ResourceMonitor:
         self.measurements = []
 
     def start(self):
-        """Start monitoring resources."""
         self.start_time = time.time()
         if PSUTIL_AVAILABLE:
             self.start_memory = psutil.virtual_memory().used
-            # Take an initial CPU reading (need time interval)
             self.start_cpu_percent = psutil.cpu_percent(interval=0.1)
 
     def record(self, label: str):
-        """Record current resource usage."""
         if not PSUTIL_AVAILABLE:
             return
 
         elapsed = time.time() - self.start_time
         current_memory = psutil.virtual_memory().used
-        memory_delta = (current_memory - self.start_memory) / (1024**2)  # MB
+        memory_delta = (current_memory - self.start_memory) / (1024**2)
         cpu_percent = psutil.cpu_percent(interval=0.1)
 
         self.measurements.append(
@@ -121,7 +86,6 @@ class ResourceMonitor:
         )
 
     def report(self):
-        """Generate resource usage report."""
         if not self.measurements:
             return
 
@@ -146,7 +110,6 @@ class ResourceMonitor:
 
 
 def demonstrate_basic_monitoring():
-    """Demonstrate basic resource monitoring during a benchmark."""
     print("=" * 70)
     print("BASIC RESOURCE MONITORING")
     print("=" * 70)
@@ -155,7 +118,6 @@ def demonstrate_basic_monitoring():
     monitor = ResourceMonitor()
     monitor.start()
 
-    # Create benchmark
     print("Creating benchmark...")
     benchmark = TPCH(
         scale_factor=0.01,
@@ -164,34 +126,29 @@ def demonstrate_basic_monitoring():
     )
     monitor.record("Benchmark created")
 
-    # Generate data
     print("Generating data...")
     benchmark.generate_data()
     monitor.record("Data generated")
 
-    # Create adapter
     print("Creating adapter...")
     adapter = DuckDBAdapter(database_path=":memory:")
     monitor.record("Adapter created")
 
-    # Run benchmark
     print("Running benchmark...")
     results = adapter.run_benchmark(
         benchmark,
         test_execution_type="power",
-        query_subset=["1", "3", "6"],  # Subset for faster demo
+        query_subset=["1", "3", "6"],
     )
     monitor.record("Benchmark completed")
 
     print(f"✓ Benchmark complete ({results.total_queries} queries)")
     print()
 
-    # Show resource report
     monitor.report()
 
 
 def show_memory_estimation():
-    """Show how to estimate memory requirements."""
     print("=" * 70)
     print("MEMORY REQUIREMENT ESTIMATION")
     print("=" * 70)
@@ -227,7 +184,6 @@ def show_memory_estimation():
 
 
 def show_cpu_usage_patterns():
-    """Show typical CPU usage patterns."""
     print("=" * 70)
     print("CPU USAGE PATTERNS")
     print("=" * 70)
@@ -264,7 +220,6 @@ def show_cpu_usage_patterns():
 
 
 def show_performance_bottlenecks():
-    """Show how to identify performance bottlenecks."""
     print("=" * 70)
     print("IDENTIFYING PERFORMANCE BOTTLENECKS")
     print("=" * 70)
@@ -322,7 +277,6 @@ def show_performance_bottlenecks():
 
 
 def show_profiling_tools():
-    """Show tools for performance profiling."""
     print("=" * 70)
     print("PROFILING TOOLS")
     print("=" * 70)
@@ -367,7 +321,6 @@ adapter.execute(\"\"\"
 
 
 def main() -> int:
-    """Demonstrate performance monitoring features."""
     print()
     print("=" * 70)
     print("BENCHBOX FEATURE: PERFORMANCE MONITORING")
@@ -377,25 +330,18 @@ def main() -> int:
     print("benchmark execution to identify bottlenecks and optimize performance.")
     print()
 
-    # Show system information
     get_system_info()
 
-    # Demonstrate basic monitoring
     demonstrate_basic_monitoring()
 
-    # Show memory estimation
     show_memory_estimation()
 
-    # Show CPU patterns
     show_cpu_usage_patterns()
 
-    # Show bottlenecks
     show_performance_bottlenecks()
 
-    # Show profiling tools
     show_profiling_tools()
 
-    # Summary
     print("=" * 70)
     print("SUMMARY")
     print("=" * 70)

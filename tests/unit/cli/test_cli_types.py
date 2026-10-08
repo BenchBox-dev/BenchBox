@@ -1,9 +1,6 @@
-"""Unit tests for CLI types and data structures.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from datetime import datetime
 
@@ -21,10 +18,8 @@ pytestmark = [
 
 @pytest.mark.unit
 class TestQueryResult:
-    """Test QueryResult data structure."""
-
     def test_query_result_creation(self):
-        """Test basic QueryResult creation."""
+
         result = QueryResult(
             query_id="q1",
             query_name="Simple Select",
@@ -44,7 +39,7 @@ class TestQueryResult:
         assert result.resource_usage is None
 
     def test_query_result_with_error(self):
-        """Test QueryResult creation with error information."""
+
         result = QueryResult(
             query_id="q2",
             query_name="Failed Query",
@@ -60,7 +55,7 @@ class TestQueryResult:
         assert result.execution_time_ms == 0.0
 
     def test_query_result_with_resource_usage(self):
-        """Test QueryResult with resource usage information."""
+
         resource_usage = {
             "memory_peak_mb": 256.0,
             "cpu_time_ms": 50.0,
@@ -83,10 +78,8 @@ class TestQueryResult:
 
 @pytest.mark.unit
 class TestBenchmarkResults:
-    """Test BenchmarkResults helper construction and extension fields."""
-
     def test_benchmark_results_creation(self):
-        """Test basic BenchmarkResults creation via helper."""
+
         result = make_benchmark_results(benchmark_id="tpch_001", benchmark_name="TPC-H", scale_factor=1.0)
 
         assert isinstance(result, BenchmarkResults)
@@ -104,7 +97,7 @@ class TestBenchmarkResults:
         assert result.benchmark_version is None
 
     def test_benchmark_results_with_custom_values(self):
-        """Test BenchmarkResults with custom extras and overrides."""
+
         query_results = [
             QueryResult(
                 query_id="q1",
@@ -156,10 +149,9 @@ class TestBenchmarkResults:
         assert result.successful_queries == 2
 
     def test_benchmark_results_add_query_result(self):
-        """Test adding query results to BenchmarkResults."""
+
         result = make_benchmark_results(benchmark_id="test_001", benchmark_name="Test Benchmark")
 
-        # Include a query result
         query_result = QueryResult(
             query_id="q1",
             query_name="Test Query",
@@ -178,17 +170,15 @@ class TestBenchmarkResults:
 
 
 def test_cli_types_module_removed() -> None:
-    """Legacy CLI type compatibility module is no longer available."""
+
     with pytest.raises(ModuleNotFoundError):
         __import__("benchbox.cli.types")
 
 
 @pytest.mark.unit
 class TestBenchmarkConfig:
-    """Test BenchmarkConfig data structure."""
-
     def test_benchmark_config_creation(self):
-        """Test basic BenchmarkConfig creation."""
+
         config = BenchmarkConfig(name="tpch", display_name="TPC-H")
 
         assert config.name == "tpch"
@@ -199,7 +189,7 @@ class TestBenchmarkConfig:
         assert config.options == {}
 
     def test_benchmark_config_with_custom_values(self):
-        """Test BenchmarkConfig with custom values."""
+
         config = BenchmarkConfig(
             name="tpcds",
             display_name="TPC-DS",
@@ -220,8 +210,7 @@ class TestBenchmarkConfig:
         }
 
     def test_benchmark_config_validation(self):
-        """Test BenchmarkConfig parameter validation."""
-        # Test that we can create configs with different valid parameters
+
         configs = [
             BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.001),
             BenchmarkConfig(name="tpcds", display_name="TPC-DS", scale_factor=100.0),
@@ -237,11 +226,8 @@ class TestBenchmarkConfig:
 
 @pytest.mark.unit
 class TestDataStructureInteractions:
-    """Test interactions between different data structures."""
-
     def test_complete_benchmark_workflow(self):
-        """Test complete workflow using all data structures."""
-        # config
+
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -250,10 +236,8 @@ class TestDataStructureInteractions:
             options={"database_type": "duckdb"},
         )
 
-        # benchmark result
         result = make_benchmark_results(benchmark_id="test_workflow", benchmark_name=config.display_name)
 
-        # Include query results
         for i in range(3):
             query_result = QueryResult(
                 query_id=f"q{i + 1}",
@@ -265,7 +249,6 @@ class TestDataStructureInteractions:
             )
             result.query_results.append(query_result)
 
-        # Set summary metrics
         total_time = sum(qr.execution_time_ms for qr in result.query_results)
         result.summary_metrics = {
             "total_time_ms": total_time,
@@ -275,19 +258,17 @@ class TestDataStructureInteractions:
 
         result.validation_status = "PASSED"
 
-        # Verify the complete workflow
         assert result.benchmark_name == config.display_name
         assert len(result.query_results) == 3
-        assert result.summary_metrics["total_time_ms"] == 60.0  # 10 + 20 + 30
+        assert result.summary_metrics["total_time_ms"] == 60.0
         assert result.summary_metrics["avg_time_ms"] == 20.0
         assert result.summary_metrics["query_count"] == 3
         assert result.validation_status == "PASSED"
 
     def test_error_handling_workflow(self):
-        """Test workflow with errors and mixed results."""
+
         result = make_benchmark_results(benchmark_id="error_test", benchmark_name="Error Test Benchmark")
 
-        # Include successful query
         success_query = QueryResult(
             query_id="q1",
             query_name="Success Query",
@@ -297,7 +278,6 @@ class TestDataStructureInteractions:
             status="SUCCESS",
         )
 
-        # Include failed query
         error_query = QueryResult(
             query_id="q2",
             query_name="Error Query",
@@ -308,7 +288,6 @@ class TestDataStructureInteractions:
             error_message="Table 'invalid_table' doesn't exist",
         )
 
-        # Include timeout query
         timeout_query = QueryResult(
             query_id="q3",
             query_name="Timeout Query",
@@ -320,7 +299,6 @@ class TestDataStructureInteractions:
 
         result.query_results.extend([success_query, error_query, timeout_query])
 
-        # Calculate metrics
         successful_queries = [qr for qr in result.query_results if qr.status == "SUCCESS"]
         failed_queries = [qr for qr in result.query_results if qr.status == "ERROR"]
         timeout_queries = [qr for qr in result.query_results if qr.status == "TIMEOUT"]
@@ -335,7 +313,6 @@ class TestDataStructureInteractions:
 
         result.validation_status = "PARTIAL"
 
-        # Verify error handling
         assert result.summary_metrics["total_queries"] == 3
         assert result.summary_metrics["successful_queries"] == 1
         assert result.summary_metrics["failed_queries"] == 1

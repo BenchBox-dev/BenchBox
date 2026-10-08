@@ -1,5 +1,3 @@
-"""Coverage tests for Dask DataFrame adapter."""
-
 from __future__ import annotations
 
 import importlib
@@ -261,13 +259,7 @@ def test_resource_envelope_diagnostic_ignores_unrelated_errors():
 
 
 def test_q10_not_preemptively_skipped_on_dask_local_envelope():
-    """The TPC-H Q10 dask skip guard was removed (dask-q10-guard-staleness).
 
-    Dask 2026.3.0 makes the dask-expr optimizer mandatory, so Q10's projection-
-    pushed graph fits the default local envelope (validated at SF1 via parquet +
-    CSV: 37,967 groups, no OOM). Q10 must no longer be preemptively skipped, and
-    the guard machinery must be gone — while the generic worker-death catch stays.
-    """
     adapter = _make_adapter()
     adapter.use_distributed = True
     adapter.scheduler_address = None
@@ -276,10 +268,9 @@ def test_q10_not_preemptively_skipped_on_dask_local_envelope():
     skip_query_ids = adapter._collect_skip_query_ids(benchmark)
     assert "Q10" not in skip_query_ids
 
-    # The preemptive Q10 guard machinery is removed...
     assert not hasattr(adapter, "_guarded_resource_query_diagnostic")
     assert not hasattr(adapter, "_tpch_q10_resource_envelope_diagnostic")
-    # ...but the generic resource-envelope worker-death safety net remains.
+
     assert adapter._resource_envelope_diagnostic("compute", RuntimeError("exit code 137")) is not None
 
 
@@ -310,7 +301,6 @@ def test_read_csv_parquet_datetime_timedelta_concat_and_counts(monkeypatch, tmp_
     monkeypatch.setattr(mod, "has_trailing_delimiter", lambda _p, _d, _n: True)
     monkeypatch.setattr(mod, "pd", pd)
 
-    # null_marker="" signals TPC-style data (resolver-backed gate replaces is_tpc_format).
     out = adapter.read_csv(tmp_path / "x.tbl", delimiter="|", header=None, names=["a", "b"], null_marker="")
     assert TRAILING_DUMMY_COLUMN not in out.columns
     assert adapter.read_parquet(tmp_path / "x.parquet")[0] == "pq"

@@ -1,54 +1,3 @@
-"""Run TPC-H on Microsoft Fabric Spark (SaaS unified analytics).
-
-Microsoft Fabric is Microsoft's unified analytics platform providing SaaS Spark,
-Data Factory, Power BI, and more. This adapter integrates with Fabric's Spark
-pools via the Livy API for benchmark execution.
-
-Key Features:
-    - SaaS: Fully managed, no infrastructure to configure
-    - OneLake: Unified storage with automatic lakehouse semantics
-    - Entra ID: Azure Active Directory authentication
-    - Delta Lake: Native Delta format support
-    - Livy: Apache Livy REST API for Spark session management
-
-Prerequisites:
-    1. Microsoft Fabric workspace with Spark capabilities
-    2. Lakehouse created in the workspace
-    3. Azure Entra ID authentication configured:
-       - az login (interactive)
-       - Service principal (for automation)
-       - Managed identity (on Azure VMs)
-
-Required environment variables:
-    FABRIC_WORKSPACE_ID    Fabric workspace GUID
-    FABRIC_LAKEHOUSE_ID    Lakehouse GUID
-
-Optional environment variables:
-    AZURE_TENANT_ID        Azure tenant ID (for service principal auth)
-    FABRIC_SPARK_POOL      Spark pool name (uses workspace default if not set)
-
-Installation:
-    uv add benchbox --extra fabric-spark
-
-Usage:
-    export FABRIC_WORKSPACE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-    export FABRIC_LAKEHOUSE_ID=yyyyyyyy-yyyy-yyyy-yyyy-yyyyyyyyyyyy
-
-    python examples/getting_started/cloud/fabric_spark_tpch.py
-
-    # Preview without execution
-    python examples/getting_started/cloud/fabric_spark_tpch.py --dry-run ./preview
-
-Cost Estimation:
-    Fabric uses Capacity Units (CU) for billing. Spark compute is charged per CU-second.
-    - F2 SKU: ~$0.36/hour
-    - F4 SKU: ~$0.72/hour
-    - F8 SKU: ~$1.44/hour
-
-    TPC-H SF=0.01 (~10MB): ~$0.10 for full benchmark
-    TPC-H SF=1.0 (~1GB): ~$1.00 for full benchmark
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -65,13 +14,6 @@ _OUTPUT_DIR = _PROJECT_ROOT / "benchmark_runs" / "getting_started" / "fabric_spa
 
 
 def _require_env(var_name: str) -> str:
-    """Require a Fabric environment variable.
-
-    Azure credentials should be configured via:
-    - Azure CLI: az login
-    - Environment variables for service principal
-    - Managed identity (on Azure VMs)
-    """
     value = os.getenv(var_name)
     if not value:
         raise RuntimeError(
@@ -81,40 +23,6 @@ def _require_env(var_name: str) -> str:
 
 
 def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig]:
-    """Build benchmark and database configurations for Fabric Spark.
-
-    Fabric Spark Concepts:
-
-    1. WORKSPACE
-       - Container for Fabric items
-       - Contains lakehouses, notebooks, pipelines
-       - Capacity assigned at workspace level
-       - Billing rolled up by workspace
-
-    2. LAKEHOUSE
-       - Unified storage for files and tables
-       - OneLake as underlying storage
-       - Delta Lake format for tables
-       - SQL analytics endpoint available
-
-    3. LIVY API
-       - Apache Livy REST interface for Spark
-       - Session-based execution model
-       - Supports Spark SQL and PySpark
-       - Statements executed within sessions
-
-    4. AUTHENTICATION
-       - Azure Entra ID (Azure AD)
-       - DefaultAzureCredential chain
-       - az login for development
-       - Service principal for automation
-
-    5. COST MODEL
-       - Capacity Units (CU) billing
-       - Spark charged per CU-second
-       - OneLake storage separate
-       - Capacity pausing available
-    """
     benchmark_config = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -130,10 +38,8 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
         type="fabric-spark",
         name="fabric_spark_tpch",
         options={
-            # Required configuration
             "workspace_id": workspace_id,
             "lakehouse_id": lakehouse_id,
-            # Optional configuration
             "tenant_id": os.getenv("AZURE_TENANT_ID"),
             "spark_pool_name": os.getenv("FABRIC_SPARK_POOL"),
         },
@@ -143,14 +49,6 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
 
 
 def run_example(scale_factor: float = 0.01, *, dry_run_output: Path | None = None) -> None:
-    """Execute TPC-H benchmark on Microsoft Fabric Spark.
-
-    Fabric Spark is ideal for:
-    - SaaS Spark with zero infrastructure
-    - Microsoft ecosystem integration
-    - OneLake unified storage
-    - Delta Lake native support
-    """
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     benchmark_config, database_config = _build_configs(scale_factor)
 
@@ -166,7 +64,6 @@ def run_example(scale_factor: float = 0.01, *, dry_run_output: Path | None = Non
         print()
         print("Cost estimation (Fabric CU pricing):")
         print(f"- TPC-H SF={scale_factor}:")
-        # Rough estimate based on F4 SKU (~$0.72/hour)
         minutes_per_query = 2 if scale_factor >= 1.0 else 1
         cost_per_query = (minutes_per_query / 60) * 0.72
         total_cost = cost_per_query * 22

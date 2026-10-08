@@ -1,5 +1,3 @@
-"""Integration tests for read-only worktree audit using synthetic offline fixture repositories."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -45,7 +43,6 @@ def _git(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> str:
 
 
 def init_repo(path: Path) -> Path:
-    """Initialize a local repository with develop branch and a commit."""
     path.mkdir(parents=True, exist_ok=True)
     _git(["init", "-q"], path)
     _git(["config", "user.email", "test@example.com"], path)
@@ -139,13 +136,11 @@ def test_fixture_gone_upstream_squash_merged(tmp_path: Path):
     repo = init_repo(tmp_path / "repo")
     wt = add_worktree(repo, "fix/feature-squash", tmp_path / "wt_squash")
 
-    # Make commit on worktree
     (wt / "change.txt").write_text("feature change\n", encoding="utf-8")
     _git(["add", "change.txt"], wt)
     _git(["commit", "-m", "feature change"], wt)
     pr_head_sha = _git(["rev-parse", "HEAD"], wt)
 
-    # Simulate squash merge on develop
     (repo / "change.txt").write_text("feature change\n", encoding="utf-8")
     _git(["add", "change.txt"], repo)
     _git(["commit", "-m", "Squash merge PR #1914 (#1914)"], repo)
@@ -187,19 +182,16 @@ def test_fixture_post_merge_commits_unintegrated(tmp_path: Path):
     repo = init_repo(tmp_path / "repo")
     wt = add_worktree(repo, "fix/feature-post-merge", tmp_path / "wt_post")
 
-    # 1. First commit on worktree (the PR head)
     (wt / "change1.txt").write_text("change 1\n", encoding="utf-8")
     _git(["add", "change1.txt"], wt)
     _git(["commit", "-m", "feature change 1"], wt)
     pr_head_sha = _git(["rev-parse", "HEAD"], wt)
 
-    # 2. Squash merge to develop
     (repo / "change1.txt").write_text("change 1\n", encoding="utf-8")
     _git(["add", "change1.txt"], repo)
     _git(["commit", "-m", "Squash merge PR #1920 (#1920)"], repo)
     merge_commit_sha = _git(["rev-parse", "HEAD"], repo)
 
-    # 3. Post-merge commit added to branch in worktree
     (wt / "change2.txt").write_text("unintegrated change 2\n", encoding="utf-8")
     _git(["add", "change2.txt"], wt)
     _git(["commit", "-m", "unintegrated post-merge commit"], wt)
@@ -243,13 +235,11 @@ def test_fixture_squash_source_tip_not_ancestor(tmp_path: Path):
     _git(["commit", "-m", "ancestry test"], wt)
     branch_tip = _git(["rev-parse", "HEAD"], wt)
 
-    # Squash commit on develop
     (repo / "ancestry.txt").write_text("test\n", encoding="utf-8")
     _git(["add", "ancestry.txt"], repo)
     _git(["commit", "-m", "Squash PR #1925"], repo)
     merge_sha = _git(["rev-parse", "HEAD"], repo)
 
-    # Assert branch tip is NOT an ancestor of develop (by definition of squash merge)
     is_anc = audit_mod.is_ancestor(branch_tip, merge_sha, repo)
     assert is_anc is False
 
@@ -278,7 +268,6 @@ def test_fixture_squash_source_tip_not_ancestor(tmp_path: Path):
         canned_prs=canned_prs,
     )
 
-    # Contract invariant: still classifies as verified-integrated because merge_commit_sha is reachable
     assert cls.state == "verified-integrated"
     assert cls.item_classification == "finish candidate"
 
@@ -286,10 +275,6 @@ def test_fixture_squash_source_tip_not_ancestor(tmp_path: Path):
 def test_make_worktree_audit_json_output(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
 ):
-    # Test JSON output formatting and schema via main() offline entrypoint (Spec §10).
-    # main() audits Path.cwd(), so run it from a small fixture repository:
-    # auditing the live checkout makes this test's runtime grow with the
-    # host's worktree count (it hit the 120 s timeout on a loaded machine).
     repo = init_repo(tmp_path / "repo")
     wt = add_worktree(repo, "fix/feature-json", tmp_path / "wt_json")
     monkeypatch.chdir(repo)
@@ -304,8 +289,6 @@ def test_make_worktree_audit_json_output(
     assert "report_authority" in data
     assert data["report_authority"]["is_deletion_authority"] is False
     assert "snapshot_path" in data
-    # The report covers exactly the fixture repository, never the host's
-    # ambient worktrees: independence from host worktree count is the point.
     paths = [Path(w["worktree"]["path"]).resolve() for w in data["worktrees"]]
     assert paths == [wt.resolve()]
 
@@ -318,13 +301,11 @@ def test_fixture_primary_clone(tmp_path: Path):
     _git(["add", "file.txt"], wt)
     _git(["commit", "-m", "commit in linked wt"], wt)
 
-    # 1. Audit run from repo root (primary clone)
     report_from_primary = audit_mod.audit_worktrees(repo_root=repo)
     paths_from_primary = [w["worktree"]["path"] for w in report_from_primary["worktrees"]]
     assert str(repo.resolve()) not in paths_from_primary
     assert any(wt.resolve() == Path(p).resolve() for p in paths_from_primary)
 
-    # 2. Audit run from linked worktree path
     report_from_linked = audit_mod.audit_worktrees(repo_root=wt)
     paths_from_linked = [w["worktree"]["path"] for w in report_from_linked["worktrees"]]
     assert str(repo.resolve()) not in paths_from_linked
@@ -340,7 +321,6 @@ def test_fixture_merge_commit_not_yet_reachable(tmp_path: Path):
     _git(["commit", "-m", "work commit"], wt)
     branch_head_sha = _git(["rev-parse", "HEAD"], wt)
 
-    # Create a separate commit that is not reachable from develop
     _git(["checkout", "-b", "other-branch"], repo)
     (repo / "other.txt").write_text("other\n", encoding="utf-8")
     _git(["add", "other.txt"], repo)
@@ -427,10 +407,8 @@ def test_fixture_gone_upstream_no_pr_evidence(tmp_path: Path):
 
 
 def test_fixture_missing_directory(tmp_path: Path):
-    """Spec §10 fixture: registered in git worktree list but path missing on disk."""
     repo = init_repo(tmp_path / "repo")
     wt = add_worktree(repo, "fix/feature-missing", tmp_path / "wt_missing")
-    # Delete the directory from disk while keeping git registration
     import shutil
 
     shutil.rmtree(wt)
@@ -452,7 +430,6 @@ def test_fixture_missing_directory(tmp_path: Path):
 
 
 def test_fixture_unregistered_path(tmp_path: Path):
-    """Spec §10 fixture: path on disk not registered in git worktree list."""
     repo = init_repo(tmp_path / "repo")
     unregistered_dir = tmp_path / "unregistered_dir"
     unregistered_dir.mkdir()
@@ -481,7 +458,6 @@ def test_fixture_unregistered_path(tmp_path: Path):
 
 
 def test_fixture_prunable_worktree(tmp_path: Path):
-    """Spec §10 fixture: worktree entry marked prunable by git."""
     repo = init_repo(tmp_path / "repo")
     wt = audit_mod.WorktreeInfo(
         path=str(tmp_path / "prunable_wt"),
@@ -510,7 +486,6 @@ def test_fixture_prunable_worktree(tmp_path: Path):
 
 
 def test_fixture_gone_upstream_unmerged_pr(tmp_path: Path):
-    """Spec §10 fixture: branch gone-upstream but PR closed without merge."""
     repo = init_repo(tmp_path / "repo")
     add_worktree(repo, "fix/feature-closed-unmerged", tmp_path / "wt_closed")
 
@@ -542,7 +517,6 @@ def test_fixture_gone_upstream_unmerged_pr(tmp_path: Path):
 
 
 def test_fixture_wrong_base_pr(tmp_path: Path):
-    """Spec §10 fixture: PR merged into a non-structural feature branch."""
     repo = init_repo(tmp_path / "repo")
     wt = add_worktree(repo, "fix/feature-wrong-base", tmp_path / "wt_wrong_base")
     (wt / "change.txt").write_text("change\n", encoding="utf-8")
@@ -579,7 +553,6 @@ def test_fixture_wrong_base_pr(tmp_path: Path):
 
 
 def test_fixture_old_but_active_worktree(tmp_path: Path):
-    """Spec §10 fixture: active clean worktree with commit older than 30 days."""
     repo = init_repo(tmp_path / "repo")
     wt = add_worktree(repo, "fix/feature-old", tmp_path / "wt_old")
     (wt / "old.txt").write_text("old work\n", encoding="utf-8")
@@ -609,7 +582,6 @@ def test_fixture_old_but_active_worktree(tmp_path: Path):
 
 
 def test_fixture_incomplete_collection_error(tmp_path: Path):
-    """Spec §10 fixture: API error or timeout resolves fail-closed to unavailable."""
     repo = init_repo(tmp_path / "repo")
     add_worktree(repo, "fix/feature-api-err", tmp_path / "wt_api_err")
 

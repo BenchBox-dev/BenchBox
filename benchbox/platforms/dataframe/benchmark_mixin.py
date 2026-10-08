@@ -1,12 +1,6 @@
-"""Benchmark execution mixin for DataFrame adapters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides the BenchmarkExecutionMixin that adds run_benchmark()
-capability to DataFrame adapters, enabling unified interface with SQL adapters.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -69,11 +63,6 @@ console = quiet_console
 
 
 def _benchmark_defines_hook(benchmark: Any | None, hook_name: str) -> bool:
-    """Return True when a benchmark explicitly defines a hook.
-
-    This accepts real class-defined hooks and explicitly configured mock hooks,
-    while rejecting synthetic MagicMock attributes created via ``__getattr__``.
-    """
     if benchmark is None:
         return False
 
@@ -101,11 +90,6 @@ def _benchmark_defines_hook(benchmark: Any | None, hook_name: str) -> bool:
 
 
 def _benchmark_manages_dataframe_loading(benchmark: Any | None) -> bool:
-    """Return True when a benchmark explicitly owns DataFrame loading.
-
-    Use class-level hook detection so dynamic test doubles such as MagicMock do
-    not accidentally appear to implement the hook via ``__getattr__``.
-    """
     if not _benchmark_defines_hook(benchmark, "skip_dataframe_data_loading"):
         return False
 
@@ -113,36 +97,14 @@ def _benchmark_manages_dataframe_loading(benchmark: Any | None) -> bool:
 
 
 def _benchmark_supports_dataframe_workload(benchmark: Any | None) -> bool:
-    """Return True when a benchmark defines a custom DataFrame workload hook.
-
-    Use class-level hook detection so dynamic test doubles such as MagicMock do
-    not accidentally appear to implement the hook via ``__getattr__``.
-    """
     return _benchmark_defines_hook(benchmark, "execute_dataframe_workload")
 
 
 def _benchmark_provides_dataframe_queries(benchmark: Any | None) -> bool:
-    """Return True when a benchmark defines a DataFrame query provider hook."""
     return benchmark_provides_dataframe_queries(benchmark)
 
 
 def dataframe_compliance_class(benchmark_instance: object | None, benchmark_config: object) -> str | None:
-    """Resolve the compliance class a DataFrame result must carry.
-
-    The SQL path gets this for free: `result_factory.build_enhanced_benchmark_result`
-    reads `benchmark.compliance_class` off the benchmark instance. Both DataFrame
-    builders construct `BenchmarkInfoInput` themselves and omitted the field, and
-    they build from the CONFIG rather than the instance, so threading `official`
-    through the config -- as PR #1770 did -- could never reach them.
-
-    The effect was not cosmetic. `benchbox submit` refuses a TPC-DS bundle whose
-    compliance class is unofficial, so no DataFrame result could ever be
-    published, however the user invoked it.
-
-    Prefer the instance, which has already run the classifier. Fall back to
-    classifying from the config so a caller that passes no instance still gets a
-    truthful value rather than silence.
-    """
     from_instance = getattr(benchmark_instance, "compliance_class", None)
     if from_instance is not None:
         return _compliance_value(from_instance)
@@ -168,22 +130,10 @@ def dataframe_compliance_class(benchmark_instance: object | None, benchmark_conf
 
 
 def _compliance_value(compliance_class: object) -> str:
-    """Plain wire string for a compliance class, enum or already-a-string.
-
-    `str()` on the enum yields `TpcdsComplianceClass.UNOFFICIAL_SUBSCALE`, not
-    `unofficial_subscale`, and the submit and admission gates compare against
-    the plain value. The SQL path emits the plain value, so this must too.
-    """
     return str(getattr(compliance_class, "value", compliance_class))
 
 
 def no_dataframe_queries_message(benchmark_id: str, query_filter: set[str] | None) -> str:
-    """Explain why zero queries were discovered, and what the user can do.
-
-    The two causes need different advice: an over-narrow `--queries` filter is
-    the user's to correct, whereas a benchmark with no DataFrame query source
-    at all is a coverage gap they cannot fix from the command line.
-    """
     if query_filter:
         return (
             f"No DataFrame queries matched {sorted(query_filter)} for benchmark {benchmark_id!r}. "
@@ -198,16 +148,12 @@ def no_dataframe_queries_message(benchmark_id: str, query_filter: set[str] | Non
 
 @dataclass
 class DataFramePhases:
-    """Phases for DataFrame benchmark execution."""
-
     load: bool = True
     execute: bool = True
 
 
 @dataclass
 class DataFrameRunOptions:
-    """Options for DataFrame benchmark execution."""
-
     ignore_memory_warnings: bool = False
     force_regenerate: bool = False
     prefer_parquet: bool = True
@@ -217,8 +163,6 @@ class DataFrameRunOptions:
 
 
 class DataLoadingError(RuntimeError):
-    """Raised when DataFrame data loading fails critically."""
-
     def __init__(
         self,
         message: str,
@@ -251,13 +195,6 @@ def _describe_query_parameters(benchmark_config: Any) -> str | None:
 
 
 def _client_host_profile(system_profile: Any) -> dict[str, Any]:
-    """Return the client-host profile dict for a DataFrame run.
-
-    Collected the same way the SQL path collects it, so both families produce
-    the same client_host field set. A caller-supplied mapping is honoured as
-    is. A typed SystemProfile is serialized from the supplied snapshot rather
-    than replaced with a fresh observation of the current host.
-    """
     if system_profile is not None:
         return system_profile_snapshot(system_profile)
     from benchbox.utils.system_info import get_system_info
@@ -266,12 +203,6 @@ def _client_host_profile(system_profile: Any) -> dict[str, Any]:
 
 
 def _client_link_block_for_dataframe(benchmark_config: Any, options_map: dict[str, Any]) -> dict[str, Any] | None:
-    """Build the region-only ``client_link`` block for a DataFrame run.
-
-    Returns None when no locality is known, keeping laptop/local runs
-    free of empty blocks. Discovery must never break a benchmark run, so
-    surprise errors degrade to no block (same rule as the SQL path).
-    """
     client_config = {
         **options_map,
         "client_region": getattr(benchmark_config, "client_region", None) or options_map.get("client_region"),
@@ -279,7 +210,7 @@ def _client_link_block_for_dataframe(benchmark_config: Any, options_map: dict[st
     }
     try:
         region_info = discover_client_region(client_config)
-    except Exception as exc:  # noqa: BLE001 - discovery must never break a run
+    except Exception as exc:
         logger.warning("DataFrame client-link discovery failed: %r", exc)
         return None
     if not region_info.get("client_region") and not region_info.get("client_cloud"):
@@ -296,32 +227,15 @@ def _client_link_block_for_dataframe(benchmark_config: Any, options_map: dict[st
 
 
 class BenchmarkExecutionMixin:
-    """Mixin providing run_benchmark() for DataFrame adapters.
-
-    This mixin adds unified benchmark execution capability to DataFrame
-    adapters, enabling them to be used interchangeably with SQL adapters.
-
-    The adapter must provide:
-    - platform_name: str property
-    - family: str property ("expression" or "pandas")
-    - create_context() method
-    - load_table() method
-    - execute_query() method
-    - get_platform_info() method (optional)
-    """
-
-    # Default: most DataFrame adapters have no versioned driver package.
-    # Subclasses like DataFusionDataFrameAdapter override to SUPPORTED.
     driver_isolation_capability: DriverIsolationCapability = DriverIsolationCapability.NOT_APPLICABLE
     is_dataframe_adapter: bool = True
 
-    # These must be provided by the adapter class
     platform_name: str
     family: str
 
     @abstractmethod
     def create_context(self) -> Any:
-        """Create execution context."""
+        pass
 
     @abstractmethod
     def load_table(
@@ -336,12 +250,7 @@ class BenchmarkExecutionMixin:
         data_source: Any | None = None,
         benchmark: Any | None = None,
     ) -> int:
-        """Load a table into context.
-
-        ``benchmark`` (when provided) lets adapters consult the schema's column
-        types - e.g. to avoid date-parsing an integer datekey column named like a
-        date.
-        """
+        pass
 
     @abstractmethod
     def execute_query(
@@ -350,18 +259,12 @@ class BenchmarkExecutionMixin:
         query: DataFrameQuery,
         query_id: str | None = None,
     ) -> dict[str, Any]:
-        """Execute a query."""
+        pass
 
     def get_platform_info(self) -> dict[str, Any]:
-        """Get platform information. Override in subclass for details."""
         return {"platform": self.platform_name, "family": self.family}
 
     def _enrich_with_driver_metadata(self, info: dict[str, Any]) -> None:
-        """Add driver runtime contract metadata to a platform info dict.
-
-        Call this from subclass get_platform_info() implementations to propagate
-        driver version/isolation metadata set by the adapter factory.
-        """
         for attr in (
             "driver_version_requested",
             "driver_version_resolved",
@@ -384,32 +287,12 @@ class BenchmarkExecutionMixin:
         monitor: Any | None = None,
         **run_config: Any,
     ) -> BenchmarkResults:
-        """Run a benchmark using DataFrame mode execution.
-
-        This method provides a unified interface matching SQL adapters,
-        allowing DataFrame adapters to be used interchangeably.
-
-        Args:
-            benchmark: Benchmark instance with query definitions
-            benchmark_config: Optional explicit benchmark configuration.
-                             If not provided, extracted from benchmark instance.
-            system_profile: System profile for resource information
-            data_dir: Directory containing benchmark data files
-            phases: Which phases to execute (default: load and execute)
-            options: DataFrame-specific execution options
-            monitor: Performance monitor for tracking
-            **run_config: Additional configuration options
-
-        Returns:
-            BenchmarkResults with execution details
-        """
         phases = phases or DataFramePhases()
         if isinstance(options, dict):
             options = DataFrameRunOptions(**options)
         else:
             options = options or DataFrameRunOptions()
 
-        # Extract benchmark_config from benchmark if not provided
         if benchmark_config is None:
             benchmark_config = self._extract_benchmark_config(benchmark, run_config)
 
@@ -419,10 +302,8 @@ class BenchmarkExecutionMixin:
         logger.info(f"Starting DataFrame benchmark: {benchmark_config.name}")
         logger.info(f"Platform: {platform_name}, Scale Factor: {scale_factor}")
 
-        # Build platform info using standardized extractor
         platform_info = build_platform_info(self, execution_mode="dataframe")
 
-        # Create result builder
         builder = ResultBuilder(
             benchmark=BenchmarkInfoInput(
                 name=benchmark_config.name,
@@ -436,21 +317,8 @@ class BenchmarkExecutionMixin:
         )
         builder.mark_started()
         builder.set_validation_status("NOT_RUN")
-        # Record the client host, exactly as the SQL adapters do in
-        # benchbox/platforms/base/adapter.py::_build_execution_metadata.
-        #
-        # The DataFrame families descend from this mixin rather than from that
-        # adapter, so without this call `result.system_profile` stays unset,
-        # `_build_environment_block` produces an empty client_host, and
-        # `_compact` drops it -- which is why every DataFrame bundle published
-        # only a `platform_runtime` block and no host at all.
         builder.set_system_profile(_client_host_profile(system_profile))
 
-        # Reset per-run plan-capture failure state (qpc-05 / F4.4 follow-up):
-        # ExpressionFamilyAdapter doesn't inherit the SQL mixin's
-        # _reset_plan_capture_stats, so a reused adapter instance would
-        # otherwise accumulate plan_capture_errors across runs and keep
-        # _plan_capture_warning_emitted permanently True after the first run.
         self.plan_capture_errors: list[dict[str, Any]] = []
         self._plan_capture_warning_emitted = False
 
@@ -468,38 +336,29 @@ class BenchmarkExecutionMixin:
             )
         )
 
-        # DataFrame engines have no SQL connection to probe, so only the
-        # region half of client_link is collected here (status partial:
-        # region known, overhead unmeasurable) rather than silently
-        # dropping the block when locality is known.
         client_link = _client_link_block_for_dataframe(benchmark_config, options_map)
         if client_link is not None:
             builder.set_execution_environment({"client_link": client_link})
 
-        # Initialize result tracking
         query_results: list[dict[str, Any]] = []
         table_stats: dict[str, int] = {}
         load_time = 0.0
 
         try:
-            # Pre-execution memory check
             if not options.ignore_memory_warnings:
                 memory_check = check_sufficient_memory(benchmark_config.name, scale_factor, platform_name.lower())
                 if not memory_check.is_safe:
                     warning = format_memory_warning(memory_check)
                     raise InsufficientMemoryError(warning)
 
-            # Scale factor validation
             is_valid, sf_warning = validate_scale_factor(scale_factor, platform_name.lower())
             if sf_warning:
                 logger.warning(sf_warning)
 
-            # Create execution context
             ctx = self.create_context()
 
             skip_data_loading = _benchmark_manages_dataframe_loading(benchmark)
 
-            # Load phase
             if phases.load and not skip_data_loading:
                 load_start = mono_time()
                 try:
@@ -513,7 +372,6 @@ class BenchmarkExecutionMixin:
                     load_time = elapsed_seconds(load_start)
                     logger.info(f"Data loading completed in {load_time:.2f}s")
 
-                    # Add table stats to builder
                     for table_name, stats in per_table_stats.items():
                         builder.add_table_stats(
                             table_name,
@@ -528,7 +386,6 @@ class BenchmarkExecutionMixin:
                 except DataLoadingError as load_err:
                     load_time = elapsed_seconds(load_start)
 
-                    # Add failed table stats to builder
                     for table_name, stats in load_err.per_table_stats.items():
                         builder.add_table_stats(
                             table_name,
@@ -550,7 +407,6 @@ class BenchmarkExecutionMixin:
                 logger.info("Skipping DataFrame table loading for benchmark-managed workload")
                 builder.set_phase_status("data_loading", "SKIPPED")
 
-            # Execute phase
             if phases.execute:
                 query_results = self._execute_queries_phase(
                     ctx=ctx,
@@ -571,7 +427,6 @@ class BenchmarkExecutionMixin:
                 if validation_summary.details.get("checked") or validation_summary.details.get("errors"):
                     builder.set_phase_status("validation", validation_summary.status)
 
-                # Add query results to builder
                 for qr in query_results:
                     builder.add_query_result(normalize_query_result(qr))
 
@@ -603,14 +458,6 @@ class BenchmarkExecutionMixin:
             return builder.build()
 
     def _attach_applied_tuning_ledger(self, builder: Any) -> None:
-        """Feed the applied-tuning ledger into ``builder`` before it builds.
-
-        Delegates to ``TuningConfigurableMixin._write_applied_tuning_ledger``
-        (present on every real DataFrame adapter) so the built ``BenchmarkResults``
-        carries ``applied_tuning_ledger`` + ``applied_ledger_hash`` + the honest
-        ``tuning_validation_status`` through the existing export path. Guarded so
-        non-tuning stub adapters (which lack the tuning mixin) are a no-op.
-        """
         writer = getattr(self, "_write_applied_tuning_ledger", None)
         if callable(writer):
             writer(builder)
@@ -623,23 +470,6 @@ class BenchmarkExecutionMixin:
         scale_factor: float | None = None,
         options: DataFrameRunOptions | None = None,
     ) -> Any:
-        """Create a context and load a benchmark's data into it, then return it.
-
-        This uses the exact production data path :meth:`run_benchmark` uses
-        (``_extract_benchmark_config`` + ``_load_data_phase``) but stops short of
-        executing any query. It is for callers that need a production-faithful
-        DataFrame context yet drive query execution themselves - e.g. the
-        cross-surface SQL<->DataFrame equivalence gates, which must compare each
-        backend's real loaded dtypes against the SQL reference.
-
-        Only benchmarks whose data loads in a discrete phase are supported. A
-        benchmark that manages its own loading (``skip_dataframe_data_loading()``,
-        e.g. write/transaction-style benchmarks) interleaves loading with its
-        ``execute_dataframe_workload`` and has no standalone preloaded context, so
-        :meth:`run_benchmark` skips ``_load_data_phase`` for it; calling the
-        generic loader here would fail or preload a wrong context. Raise loudly
-        instead of returning a silently-empty one.
-        """
         if _benchmark_manages_dataframe_loading(benchmark):
             raise ValueError(
                 f"{type(benchmark).__name__} manages its own DataFrame loading "
@@ -655,12 +485,9 @@ class BenchmarkExecutionMixin:
         return ctx
 
     def _extract_benchmark_config(self, benchmark: Any, run_config: dict[str, Any]) -> BenchmarkConfig:
-        """Extract BenchmarkConfig from benchmark instance or run_config."""
-        # Check if benchmark has config attribute
         if hasattr(benchmark, "config") and isinstance(benchmark.config, BenchmarkConfig):
             return benchmark.config
 
-        # Build from benchmark attributes and run_config
         name = getattr(benchmark, "_name", getattr(benchmark, "name", type(benchmark).__name__.lower()))
         display_name = getattr(benchmark, "display_name", name.upper())
         scale_factor = run_config.get("scale_factor", getattr(benchmark, "scale_factor", 1.0))
@@ -677,7 +504,6 @@ class BenchmarkExecutionMixin:
 
     @staticmethod
     def _normalize_table_paths(tables: dict[str, Any]) -> dict[str, Path | list[Path]]:
-        """Normalize table paths to Path objects."""
         normalized: dict[str, Path | list[Path]] = {}
         for name, path in tables.items():
             if isinstance(path, list):
@@ -690,7 +516,6 @@ class BenchmarkExecutionMixin:
 
     @staticmethod
     def _find_missing_paths(paths: dict[str, Path | list[Path]]) -> dict[str, list[Path]]:
-        """Find data paths that don't exist on disk."""
         missing: dict[str, list[Path]] = {}
         for table_name, file_path in paths.items():
             file_list = file_path if isinstance(file_path, list) else [file_path]
@@ -702,7 +527,6 @@ class BenchmarkExecutionMixin:
 
     @staticmethod
     def _raise_missing_paths_error(missing_paths: dict[str, list[Path]]) -> None:
-        """Raise DataLoadingError with per-table stats for missing files."""
         per_table_stats: dict[str, TableLoadingStats] = {}
         for table_name, paths in missing_paths.items():
             missing_list = ", ".join(str(p) for p in paths[:5])
@@ -726,7 +550,6 @@ class BenchmarkExecutionMixin:
         benchmark_instance: Any,
         options: DataFrameRunOptions,
     ) -> dict[str, Path | list[Path]]:
-        """Resolve data paths from benchmark instance tables, preferring parquet when configured."""
         parquet_dir = None
         if options.prefer_parquet:
             first_path = next(iter(benchmark_instance.tables.values()))
@@ -759,14 +582,6 @@ class BenchmarkExecutionMixin:
         options: DataFrameRunOptions,
         loader: DataFrameDataLoader,
     ) -> dict[str, Path | list[Path]]:
-        """Resolve data paths from available sources (tables, data_dir, or generation).
-
-        Priority order (highest to lowest):
-        1. benchmark_instance.tables - authoritative if populated (even after force_regenerate,
-           since generate_data() populates .tables as a side effect)
-        2. data_dir discovery - scan filesystem for data files
-        3. benchmark_instance.generate_data() - last resort, generate from scratch
-        """
         data_paths: dict[str, Path | list[Path]] = {}
 
         if options.force_regenerate and benchmark_instance and hasattr(benchmark_instance, "generate_data"):
@@ -790,7 +605,6 @@ class BenchmarkExecutionMixin:
         return data_paths
 
     def _generate_benchmark_data(self, benchmark_instance: Any) -> dict[str, Path | list[Path]]:
-        """Generate benchmark data and return normalized table paths."""
         logger.info("Generating benchmark data...")
         benchmark_instance.generate_data()
         if hasattr(benchmark_instance, "tables") and benchmark_instance.tables:
@@ -802,11 +616,6 @@ class BenchmarkExecutionMixin:
         benchmark_config: BenchmarkConfig,
         benchmark_instance: Any | None,
     ) -> tuple[dict[str, list[str]], str | None]:
-        """Resolve column name mappings and CSV delimiter for the benchmark.
-
-        Returns:
-            Tuple of (column_names_map, csv_delimiter)
-        """
         benchmark_id = normalize_benchmark_id(benchmark_config.name)
         if benchmark_id != "tpch" and benchmark_instance is not None:
             source_benchmark = getattr(benchmark_instance, "get_data_source_benchmark", lambda: None)()
@@ -819,9 +628,6 @@ class BenchmarkExecutionMixin:
         if benchmark_id == "tpch":
             column_names_map.update(get_tpch_column_names())
 
-        # Only a real string attribute counts: getattr on a Mock benchmark
-        # fabricates a child mock for any name, which would otherwise ride
-        # through as the delimiter override and corrupt every CSV load.
         csv_delimiter = getattr(benchmark_instance, "csv_delimiter", None)
         if not isinstance(csv_delimiter, str):
             csv_delimiter = None
@@ -836,18 +642,6 @@ class BenchmarkExecutionMixin:
         csv_delimiter: str | None,
         benchmark: Any | None = None,
     ) -> tuple[dict[str, int], dict[str, TableLoadingStats]]:
-        """Load all tables into the execution context.
-
-        ``benchmark`` (when provided) is passed through to ``load_table`` so
-        adapters can consult the schema's column types - e.g. to avoid parsing an
-        integer datekey column named like a date as a date.
-
-        Returns:
-            Tuple of (table_stats, per_table_loading_stats)
-
-        Raises:
-            DataLoadingError: If any tables fail to load.
-        """
         table_stats: dict[str, int] = {}
         per_table_stats: dict[str, TableLoadingStats] = {}
 
@@ -903,11 +697,6 @@ class BenchmarkExecutionMixin:
         data_dir: Path | None,
         options: DataFrameRunOptions,
     ) -> tuple[dict[str, int], dict[str, TableLoadingStats]]:
-        """Load benchmark data into DataFrame context.
-
-        Returns:
-            Tuple of (table_stats, per_table_loading_stats)
-        """
         platform_name = self.platform_name.lower()
 
         loader = DataFrameDataLoader(
@@ -940,7 +729,6 @@ class BenchmarkExecutionMixin:
             logger.info(f"Using prepared data: {len(prepared_paths)} tables")
             return prepared_paths
 
-        # Resolve data paths from available sources
         data_paths = self._resolve_data_paths(benchmark_instance, data_dir, options, loader)
 
         if not data_paths:
@@ -949,7 +737,6 @@ class BenchmarkExecutionMixin:
         if options.prefer_parquet:
             data_paths = _prepare_data_or_raise()
 
-        # Verify paths exist, regenerate if needed
         missing_paths = self._find_missing_paths(data_paths)
         if missing_paths and benchmark_instance and hasattr(benchmark_instance, "generate_data"):
             logger.info("Missing data files detected, regenerating benchmark data...")
@@ -961,18 +748,12 @@ class BenchmarkExecutionMixin:
         if missing_paths:
             self._raise_missing_paths_error(missing_paths)
 
-        # Resolve schema and delimiter info
         column_names_map, csv_delimiter = self._resolve_column_names_and_delimiter(benchmark_config, benchmark_instance)
 
-        # Load tables into context
         loaded = self._load_tables_into_context(
             ctx, data_paths, column_names_map, csv_delimiter, benchmark=benchmark_instance
         )
 
-        # Fold the physical write-layout the loader actually applied (its
-        # honest ``applied_write_layout`` signal) into the applied-tuning ledger
-        # as POST_LOAD statements. Guarded: a no-op for non-tuning adapters or
-        # when no non-default layout was applied.
         if hasattr(self, "_fold_write_layout_into_ledger"):
             self._fold_write_layout_into_ledger(getattr(loader, "applied_write_layout", None))
 
@@ -986,14 +767,6 @@ class BenchmarkExecutionMixin:
         monitor: Any | None,
         run_options: DataFrameRunOptions | None = None,
     ) -> list[dict[str, Any]]:
-        """Execute DataFrame queries, scoping scale-dependent parameter defaults.
-
-        Canonical TPC-H Q11 renders its value threshold as ``0.0001 / SF``.
-        Unseeded DataFrame runs read the SF=1 default unless the scale factor is
-        declared, so set it for TPC-H-family benchmarks for the duration of query
-        execution (mirroring the SQL run path's ``{q11_fraction}`` rendering) and
-        reset it afterwards on every path.
-        """
         from benchbox.core.tpch.dataframe_queries import set_scale_factor_for_benchmark
 
         benchmark_id = normalize_benchmark_id(benchmark_config.name)
@@ -1018,13 +791,6 @@ class BenchmarkExecutionMixin:
         monitor: Any | None,
         run_options: DataFrameRunOptions | None = None,
     ) -> list[dict[str, Any]]:
-        """Execute DataFrame queries with warmup and measurement iterations.
-
-        Follows TPC power test methodology:
-        1. Warmup iterations (default 1): Prime caches, not included in results
-        2. Measurement iterations (default 3): Timed runs, results aggregated
-        """
-        # Get warmup and iteration counts from config options
         config_options = getattr(benchmark_config, "options", {}) or {}
         warmup_iterations_raw = config_options.get("power_warmup_iterations")
         measurement_iterations_raw = config_options.get("power_iterations")
@@ -1039,7 +805,6 @@ class BenchmarkExecutionMixin:
 
         query_filter = self._build_query_filter(benchmark_config)
 
-        # Benchmark-specific DataFrame workload hook for non-query style benchmarks
         if _benchmark_supports_dataframe_workload(benchmark_instance):
             return benchmark_instance.execute_dataframe_workload(
                 ctx=ctx,
@@ -1052,7 +817,6 @@ class BenchmarkExecutionMixin:
 
         skip_query_ids = self._collect_skip_query_ids(benchmark_instance)
 
-        # Get initial query set to determine total count
         initial_queries = self._filter_queries(
             self._get_queries_for_benchmark(benchmark_config, benchmark_instance, stream_id=0),
             skip_query_ids,
@@ -1080,7 +844,6 @@ class BenchmarkExecutionMixin:
         query_results: list[dict[str, Any]] = list(skipped_results)
         executed_query_ids: list[str] = []
 
-        # Execute warmup iterations (emit results)
         self._run_warmup_iterations(
             ctx=ctx,
             warmup_iterations=warmup_iterations,
@@ -1091,7 +854,6 @@ class BenchmarkExecutionMixin:
             query_results=query_results,
         )
 
-        # Execute measurement iterations
         self._run_measurement_iterations(
             ctx=ctx,
             measurement_iterations=measurement_iterations,
@@ -1114,15 +876,13 @@ class BenchmarkExecutionMixin:
 
     @staticmethod
     def _build_query_filter(benchmark_config: BenchmarkConfig) -> set[str] | None:
-        """Normalize query subset into a bidirectional filter set (Q1 <-> 1)."""
         return build_dataframe_query_filter_from_config(benchmark_config)
 
     def _collect_skip_query_ids(self, benchmark_instance: Any | None) -> set[str]:
-        """Collect all query IDs to skip from benchmark and platform-specific sources."""
         skip_query_ids: set[str] = set()
 
         if benchmark_instance and hasattr(benchmark_instance, "get_dataframe_skip_queries"):
-            raw_skip_ids = benchmark_instance.get_dataframe_skip_queries()  # type: ignore[no-untyped-call]
+            raw_skip_ids = benchmark_instance.get_dataframe_skip_queries()
             skip_query_ids = {str(query_id).strip().upper() for query_id in raw_skip_ids}
 
         if (
@@ -1142,7 +902,6 @@ class BenchmarkExecutionMixin:
             platform_skip_ids = benchmark_instance.get_platform_skip_queries(self.platform_name)
             skip_query_ids |= {str(query_id).strip().upper() for query_id in platform_skip_ids}
 
-        # Platform-specific skips for DataFrame mode only
         if (
             hasattr(self, "platform_name")
             and benchmark_instance
@@ -1159,7 +918,6 @@ class BenchmarkExecutionMixin:
         skip_query_ids: set[str],
         query_filter: set[str] | None,
     ) -> list[DataFrameQuery]:
-        """Apply skip and filter sets to a query list."""
         if skip_query_ids:
             queries = [q for q in queries if q.query_id.upper() not in skip_query_ids]
         if query_filter:
@@ -1168,7 +926,6 @@ class BenchmarkExecutionMixin:
 
     @staticmethod
     def _build_skipped_results(filtered_skip_query_ids: set[str]) -> list[dict[str, Any]]:
-        """Build result entries for skipped queries."""
         if not filtered_skip_query_ids:
             return []
         return [
@@ -1191,19 +948,6 @@ class BenchmarkExecutionMixin:
         benchmark_id: str = "",
         query_filter: set[str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Handle the case where no executable queries are found.
-
-        Two very different situations reach here and only one is legitimate.
-
-        Queries existed and were deliberately skipped as unsupported: that is
-        recorded, with a DF_SKIP_SUMMARY row, and the run continues.
-
-        Nothing was found to run at all: that is a defect, and returning an
-        empty list let the caller mark power_test COMPLETED and emit a bundle
-        reporting 0/0 queries with exit 0 -- a run that executed nothing and
-        looked like a clean pass. Sixty such bundles are in the public corpus,
-        every one from a benchmark family with no DataFrame query source.
-        """
         logger.warning("No queries found for execution")
         if skipped_results:
             skipped_categories = self._count_query_categories(filtered_skip_query_ids)
@@ -1237,7 +981,6 @@ class BenchmarkExecutionMixin:
         query_filter: set[str] | None,
         query_results: list[dict[str, Any]],
     ) -> None:
-        """Execute warmup iterations, appending results to query_results."""
         if warmup_iterations <= 0:
             return
 
@@ -1303,7 +1046,6 @@ class BenchmarkExecutionMixin:
         query_results: list[dict[str, Any]],
         executed_query_ids: list[str],
     ) -> None:
-        """Execute measurement iterations, appending results to query_results and executed_query_ids."""
         capture_plans = bool(getattr(benchmark_config, "capture_plans", False))
         profiled_runner = getattr(self, "execute_query_profiled", None)
         supports_profiled = callable(profiled_runner)
@@ -1370,7 +1112,6 @@ class BenchmarkExecutionMixin:
         stream_id: int,
         monitor: Any | None,
     ) -> dict[str, Any]:
-        """Execute a single measurement query, optionally with monitoring and plan capture."""
 
         def _run() -> dict[str, Any]:
             try:
@@ -1384,8 +1125,6 @@ class BenchmarkExecutionMixin:
                         raw_result["query_plan"] = self._structure_dataframe_plan(
                             profile.query_plan, str(query.query_id)
                         )
-                    # Surface capture cost separately (excluded from execution time),
-                    # matching the SQL platforms' plan_capture_time_ms field.
                     if profile.plan_capture_time_ms:
                         raw_result["plan_capture_time_ms"] = profile.plan_capture_time_ms
                 else:
@@ -1410,23 +1149,6 @@ class BenchmarkExecutionMixin:
         return _run()
 
     def _structure_dataframe_plan(self, captured_plan: Any, query_id: str) -> Any:
-        """Promote a captured DataFrame plan to a structured QueryPlanDAG when a
-        registered parser can parse its text (qpc-06 w4 / F3.2).
-
-        DataFrame profiling captures a text-only ``QueryPlan`` (platform,
-        plan_text, hints) which — stored verbatim into the ``query_plan`` slot —
-        silently forks the companion schema by platform family (text blob vs the
-        SQL adapters' structured DAG). Here the captured ``plan_text`` is routed
-        through the platform's registered parser (DataFusion is the one with a
-        DataFrame-native parser today); on success the real ``QueryPlanDAG`` is
-        returned with ``plan_text`` preserved as ``raw_explain_output``. When no
-        parser is registered for the platform or parsing fails, the original
-        text-only plan is returned unchanged as an explicit fallback — the
-        ``plan_format`` discriminator on the companion entry (see
-        ``_build_plan_entry``) then marks it ``text`` so consumers fail
-        informatively rather than mis-reading it as a DAG.
-        """
-        # Already structured (defensive: a future adapter may capture a DAG).
         if isinstance(captured_plan, QueryPlanDAG):
             return captured_plan
 
@@ -1435,12 +1157,6 @@ class BenchmarkExecutionMixin:
         if not plan_text or not platform:
             return captured_plan
 
-        # Capture failures are recorded as a sentinel QueryPlan (plan_type
-        # "error", or plan_text like "Plan capture not available"/"Could not
-        # capture plan: ..."). A parser's fallback path can accept
-        # operator-looking lines as an OTHER node, silently promoting a
-        # failed capture into a fake plan_format="dag" entry - skip parsing
-        # and fall back to the text-only plan instead.
         plan_type = getattr(captured_plan, "plan_type", None)
         if plan_type == "error" or plan_text.startswith(("Plan capture not available", "Could not capture plan:")):
             return captured_plan
@@ -1453,15 +1169,13 @@ class BenchmarkExecutionMixin:
 
         try:
             dag = parser.parse_explain_output(query_id, plan_text)
-        except Exception as exc:  # noqa: BLE001 - parser failure must fall back, never abort
+        except Exception as exc:
             logger.debug("DataFrame plan parse failed for %s on %s: %s", query_id, platform, exc)
             return captured_plan
 
         if dag is None:
             return captured_plan
 
-        # Preserve the original plan text for debugging without clobbering any
-        # raw output the parser already set.
         if getattr(dag, "raw_explain_output", None) is None:
             dag.raw_explain_output = plan_text
         return dag
@@ -1472,7 +1186,6 @@ class BenchmarkExecutionMixin:
         executed_unique_ids: set[str],
         filtered_skip_query_ids: set[str],
     ) -> None:
-        """Append a DF_SKIP_SUMMARY entry to query_results."""
         query_results.append(
             {
                 "query_id": "DF_SKIP_SUMMARY",
@@ -1498,7 +1211,6 @@ class BenchmarkExecutionMixin:
         iteration_results: list[dict[str, Any]],
         benchmark_config: BenchmarkConfig,
     ) -> None:
-        """Print summary for a completed measurement iteration."""
         from benchbox.core.results.metrics import TPCMetricsCalculator
 
         total_queries = len(iteration_results)
@@ -1522,7 +1234,6 @@ class BenchmarkExecutionMixin:
         else:
             display_name = str(benchmark_config.name).upper()
 
-        # Power@Size is only defined for TPC benchmarks
         is_tpc = benchmark_id in ("tpch", "tpcds")
         power_at_size = None
         if is_tpc and successful_count == total_queries and exec_times:
@@ -1555,12 +1266,10 @@ class BenchmarkExecutionMixin:
         benchmark_instance: Any | None,
         stream_id: int | None = None,
     ) -> list[DataFrameQuery]:
-        """Get DataFrame queries for a benchmark in proper execution order."""
         return get_dataframe_queries_for_benchmark(benchmark_config, benchmark_instance, stream_id)
 
     @staticmethod
     def _get_tpch_queries(stream_id: int) -> list[DataFrameQuery]:
-        """Get TPC-H DataFrame queries in stream-permuted order."""
         return get_tpch_dataframe_queries(stream_id)
 
     @staticmethod
@@ -1569,7 +1278,6 @@ class BenchmarkExecutionMixin:
         benchmark_instance: Any | None,
         stream_id: int,
     ) -> list[DataFrameQuery]:
-        """Get TPC-DS DataFrame queries in stream-permuted order with variant resolution."""
         return get_tpcds_dataframe_queries(benchmark_config, benchmark_instance, stream_id)
 
     @staticmethod

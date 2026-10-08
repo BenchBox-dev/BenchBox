@@ -1,15 +1,3 @@
-/* /prompts/ landing route — state + rendering for the prompt builder.
- *
- * Reads `window.__BENCHBOX_PROMPT_CATALOG__` (set by catalog.generated.js),
- * syncs selection state to URL query parameters, filters platform options
- * by selected interface + deployment, and renders prompt / MCP output
- * blocks. No framework — plain vanilla JS so the page stays a static
- * deploy under `landing/`.
- *
- * URL parameters:
- *   goal, surface, interface, deployment, platform, platformA, platformB,
- *   benchmark, scale.
- */
 (function () {
     "use strict";
 
@@ -102,8 +90,6 @@
         var scaleIds = catalog.scales.map(function (s) { return String(s); });
         var scaleIdx = scaleIds.indexOf(scaleStr);
         if (scaleIdx === -1) {
-            // Match legacy numeric aliases (e.g. "1" -> "1.0") so bookmarked
-            // URLs from before string-id normalisation still resolve.
             var scaleNum = parseFloat(scaleStr);
             if (isFinite(scaleNum)) {
                 for (var i = 0; i < scaleIds.length; i++) {
@@ -113,16 +99,13 @@
         }
         state.scale = scaleIdx !== -1 ? scaleIds[scaleIdx] : String(defaults.scale);
 
-        // benchmark must support selected interface
         if (!benchmarksForInterface(state["interface"]).some(function (b) { return b.id === state.benchmark; })) {
             var bb = benchmarksForInterface(state["interface"])[0] || catalog.benchmarks[0];
             state.benchmark = bb.id;
         }
 
-        // platform filtering
         var pool = platformsForFilters(state["interface"], state.deployment);
         if (pool.length === 0) {
-            // fall back: relax deployment first
             state.deployment = defaults.deployment;
             pool = platformsForFilters(state["interface"], state.deployment);
         }
@@ -165,7 +148,6 @@
 
         if (state.goal === "compare") {
             fillSelect($("sel-platformA"), pool, state.platformA);
-            // exclude A from B options if possible
             var poolB = pool.filter(function (p) { return p.id !== state.platformA; });
             if (poolB.length === 0) poolB = pool;
             fillSelect($("sel-platformB"), poolB, state.platformB);
@@ -175,7 +157,6 @@
     }
 
     function renderOutput(state) {
-        // Decide which output blocks to show by surface
         var isCompare = state.goal === "compare";
         var platform = isCompare ? state.platformA : state.platform;
         var platformB = isCompare ? state.platformB : null;
@@ -205,7 +186,6 @@
             scale: state.scale
         }) + modeFlag : null;
 
-        // MCP setup block
         var mcpTomlLines = [
             "[mcp_servers.benchbox]",
             'command = "uv"',
@@ -213,17 +193,12 @@
         ];
         $("mcp-setup-text").textContent = mcpTomlLines.join("\n");
 
-        // block-prompt text: shell-oriented agent prompt for CLI, MCP workflow prompt for MCP surface.
         if (state.surface === "mcp") {
             $("prompt-text").textContent = buildMcpPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, needsCredentials);
         } else {
             $("prompt-text").textContent = buildAgentPrompt(state, platform, platformB, platformEntry, platformBEntry, benchmarkEntry, cliCmd, dryRun, dryRunB, depChecks, needsCredentials);
         }
 
-        // Visibility rules:
-        // - Agent prompt: always shown.
-        // - MCP setup: shown for surface=MCP.
-        // - Credential safety: shown when selected deployment needs connection secrets.
         $("block-prompt").hidden = false;
         $("block-mcp-setup").hidden = state.surface !== "mcp";
 

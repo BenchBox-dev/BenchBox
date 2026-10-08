@@ -33,7 +33,7 @@ consumers use GNU Make's evaluated target graph.
 | `make/inventory.json` | Locally generated target, alias, prerequisite, recipe, variable, macro, statement-order, default-goal, and include-order contract, derived wholly from the `Makefile`, its included modules, and the migration files below | Never edit or commit it; only `make/check_makefile_inventory.py --write` writes it |
 | `make/monolith-baseline.json` | Durable inventory of the committed pre-split monolith: 198 targets, 195 public targets, and default goal `test` | Do not regenerate during ordinary Make changes; changing this migration proof requires a separate architectural decision |
 | `make/migration-proof.json` | Compact hashes, counts, include order, and reviewed delta for the initial split | The normal inventory writer never changes this file; preserve it with the monolith baseline as historical evidence |
-| `make/check_makefile_inventory.py` | Inventory reader, writer, and historical verifier | Keep it with the release-retained Make runtime so the public guard remains executable after curation |
+| `make/check_makefile_inventory.py` | Inventory reader, writer, and historical verifier | Keep it under `make/` with the other Make files so `make makefile-inventory-check` keeps working |
 
 Cross-module prerequisites stay explicit in target headers. A module must not
 invoke another module by reaching into its file; it invokes the public target.
@@ -60,29 +60,6 @@ bootstrap variable nevertheless freezes the root path before includes append to
 that built-in list, preventing future ordering-dependent path drift. It is a
 repository-reserved variable and is not a supported user customization point.
 
-The pre-split root had 2,752 lines. The modular root has 1,726 lines and the six
-included modules have 1,043 lines. The extra lines are the guarded bootstrap,
-six include directives, inventory target, and its intentional help entry; the
-expanded semantic statement stream otherwise matches the baseline exactly.
-
-## Release curation
-
-The top-level `make/` directory is release runtime, not `_project` tooling. It
-is retained on curated release branches alongside `Makefile`; release-cut still
-removes `_project` in full. Keeping the modules, inventories, proof, and checker
-together prevents a curated `Makefile` from becoming unparsable and keeps
-`make makefile-inventory-check` usable on the released tree.
-
-Tests that load curated-out `_project` scripts must be curated or degrade
-explicitly. The release recipe removes the complexity-checker test. The Make
-inventory test now loads its retained checker, while the two platform-registry
-cases that need the development-only platform-manifest generator skip when that
-generator is absent; the rest of that behavioral file remains release coverage.
-The release curation tests materialize the retained Make runtime, execute its
-help and inventory targets, fail when a required module is omitted, verify the
-remaining `_project`-dependent test is removed, and collect both retained test
-files against the curated shape.
-
 ## Drift guard
 
 Run:
@@ -105,17 +82,10 @@ untracked `make/inventory.json`. The inventory records:
   rules after include expansion.
 
 The check fails when the Make sources cannot be inventoried safely (a missing
-include, an include cycle, unsupported top-level syntax) or when the migration
-proof no longer matches the monolith baseline.
+include, an include cycle, unsupported top-level syntax) or when
+`make/migration-proof.json` no longer matches `make/monolith-baseline.json`.
 
-The separate migration proof records the six ordered includes, the
-non-overridable `BENCHBOX_MAKEFILE_ROOT` bootstrap, the public phony
-`makefile-inventory-check` target and help line, and the release-curation entry
-required by the complexity test that still depends on `_project`. Its normalized
-semantic hash equals the monolith's hash; the reviewed target delta changes the
-baseline counts from 198/195 to 199/196.
-
-That evidence does not freeze the Make interface; changing a target, prerequisite,
+The inventory does not freeze the Make interface; changing a target, prerequisite,
 or recipe needs no manifest update. Pull requests that change `Makefile` or
 `make/` get an informational public-target and recipe diff against their base
 in the CI step summary (`make/interface_summary.py`). To write the evaluated
@@ -141,6 +111,33 @@ Later intentional Make changes are expected to diverge from that historical
 comparison; the immutable proof metadata remains valid and auditable without a
 third full inventory copy.
 
+## Local timing records
+
+Gate-style targets append one JSON line per run to `~/.benchbox/make-timings.jsonl`.
+Set `BENCHBOX_MAKE_TIMINGS_FILE` to use another file. Set `BENCHBOX_MAKE_TIMINGS=0`
+(or `off`, `false`, `no`) to stop recording; the targets then run exactly as before.
+The file lives outside the repository and is never committed.
+
+Each record has schema `make_timing_v1` and these fields: `target`, `started_at`
+and `ended_at` (UTC, ISO 8601), `duration_seconds` (monotonic clock), `exit_code`
+(`128` plus the signal number when the command was killed by a signal), `cwd` (the
+worktree), `branch`, `head` (short SHA), `host`, and `make_goals` (the goals given
+to that `make` invocation). It holds no environment variables, arguments or
+command output. A nested `$(MAKE)` call of a timed target writes its own record.
+
+`MAKE_TIMED_TARGETS` in the root `Makefile` is the single list of timed targets.
+Each listed target runs its recipe under `scripts/make_timing_shell.sh` through a
+target-specific `SHELL`, so recipe text is unchanged. A target belongs in the list
+only if it has no prerequisites and a single logical recipe line, because every
+recipe line runs through the shell and writes a record; a test enforces this.
+Writing a record is best effort: if the file cannot be written, a one-line warning
+goes to stderr and the target keeps its own exit status.
+
+`make make-timings-report` prints the run count, failure count, median, p90 and
+maximum per target for the last `MAKE_TIMINGS_DAYS` days (default 30), then the
+`MAKE_TIMINGS_SLOWEST` slowest runs (default 5). The tests set
+`BENCHBOX_MAKE_TIMINGS=0` so test runs never write to the real file.
+
 ## Change and rollback cases
 
 | Change | Required action | Rollback |
@@ -148,15 +145,14 @@ third full inventory copy.
 | Add a target inside an existing domain | Add it to the owning module, add help if public | Revert the target and help entry together |
 | Move a target from root to a module | First prove no root-literal consumer remains; move comments, variables, rule, and recipe as one block; `make makefile-inventory-check` must still pass | Move the exact block back to its original parse position and remove an empty module |
 | Add a module | Add one mandatory rooted include at the intended parse position and update this ownership table | Move its blocks back, remove the include, then remove the module |
-| Emergency rollback of this split | Restore the six module bodies at their include positions, delete the include lines and `BENCHBOX_MAKEFILE_ROOT`, then remove the guard target/help line | The resulting Makefile should reproduce `monolith-baseline.json` exactly |
 
 ## Alternatives rejected
 
 - **Split by line count.** Rejected because it cuts coupled variables/macros
   away from recipes and ignores literal-root consumers.
-- **Move every target and update all parsers at once.** Rejected because the
-  authorized scope excludes most literal-parser tests and would combine a
-  compatibility migration with the structural refactor.
+- **Move every target and update all parsers at once.** Rejected because it
+  would combine a compatibility migration of the literal-parser tests with the
+  structural refactor.
 - **Optional or wildcard includes.** Rejected because missing or misspelled
   modules can silently remove public targets.
 - **A generated monolithic root mirror.** Rejected because it creates two

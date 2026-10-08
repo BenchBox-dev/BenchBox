@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Classify changed paths for the develop PR CI umbrella."""
 
 from __future__ import annotations
 
@@ -13,15 +12,10 @@ from typing import Iterable, cast
 
 from skill_sync_ci_policy import compare_repository_manifest
 
+CLI_DESCRIPTION = "Classify changed paths for the develop PR CI umbrella."
+
 DEFAULT_RULES = Path(".github/path-filters.yml")
-# The three buckets every ruleset must define. Any other top-level key in
-# path-filters.yml is treated as an "extra group" (see `extra_group_keys`)
-# and automatically grows a `<group>-needed` / `<group>-paths` output pair —
-# add a new gated job by adding a YAML key, not by touching this script.
 CORE_RULE_KEYS = {"safe-content", "content-guard", "code-ci"}
-# The workflow uses a semantic output name for the source-path gate while the
-# rules file keeps the job-oriented `explorer-tokens` key. Treat the alias as
-# a first-class extra group so output declarations stay in lockstep.
 GROUP_ALIASES = {"explorer-paths": "explorer-tokens"}
 LIST_NAMES = {
     "changed": "changed_paths",
@@ -50,7 +44,6 @@ def unquote_yaml_scalar(value: str) -> str:
 
 
 def load_rules(path: Path) -> dict[str, list[str]]:
-    """Load the simple filter YAML shape without depending on PyYAML."""
     rules: dict[str, list[str]] = {}
     current_key: str | None = None
 
@@ -87,24 +80,11 @@ def matches_any(path: str, patterns: Iterable[str]) -> bool:
 
 
 def extra_group_keys(rules: dict[str, list[str]]) -> list[str]:
-    """Names of optional path-filter groups beyond the three core buckets.
-
-    Each name becomes a `<name>_paths` / `<name>_needed` decision key, a
-    `<name>-needed` GitHub Actions output, and a `<name>.txt` helper list —
-    all derived generically so a new gated job (e.g. `packaging`, `viz`)
-    only requires a new key in path-filters.yml, not a script change. The
-    small alias map above lets a job use a clearer output name when its rule
-    key is intentionally job-oriented.
-    """
     groups = [key for key in rules if key not in CORE_RULE_KEYS]
     return [*groups, *(alias for alias, source in GROUP_ALIASES.items() if source in rules)]
 
 
 def git_changed_paths(base_ref: str) -> list[str]:
-    # Include deletions (D) so a PR that only deletes a code file is
-    # still classified as a code change. Without D, removing a Python
-    # module while adding a markdown file would land in safe-content
-    # and skip lint/test even though it removes executable code.
     result = subprocess.run(
         ["git", "diff", "--name-only", "--diff-filter=ACDMRT", f"{base_ref}...HEAD"],
         check=True,
@@ -147,9 +127,6 @@ def classify_paths(
     content_paths = [path for path in changed_paths if matches_any(path, content_patterns)]
     specialized_paths = [path for path in changed_paths if matches_any(path, specialized_patterns)]
     explicit_code_paths = [path for path in changed_paths if matches_any(path, code_patterns)]
-    # Explicit code and semantic trust-boundary decisions win over every
-    # narrower class. Otherwise an allowlisted specialized path is excluded
-    # from both code and unknown; an unmatched path remains fail-closed code.
     code_paths = [
         path
         for path in changed_paths
@@ -193,12 +170,8 @@ def classify_paths(
         matched = [path for path in changed_paths if matches_any(path, rules[source_group])]
         decision[f"{group_id}_paths"] = matched
         decision[f"{group_id}_needed"] = bool(matched)
-    # `explorer-paths` is an output alias, not a nested `explorer/paths`
-    # namespace. Normalize its generic path key to the public JSON/list name.
     if "explorer_paths_paths" in decision:
         decision["explorer_paths"] = decision.pop("explorer_paths_paths")
-    # Record which extra groups exist so downstream writers (GitHub output,
-    # helper lists) can loop over them without re-deriving from raw rules.
     decision["extra_group_ids"] = [group.replace("-", "_") for group in group_keys]
 
     return decision
@@ -220,10 +193,6 @@ def write_github_output(path: Path, decision: dict[str, object]) -> None:
         f"skill-integrity-only={bool_text(decision.get('skill_integrity_only'))}",
         f"estimated-runner-minutes-saved={decision['estimated_runner_minutes_saved']}",
     ]
-    # Extra path-filter groups (packaging, viz, ...): one `<group>-needed`
-    # boolean output per group defined in path-filters.yml, so ci.yml jobs
-    # can gate on `needs.ci-paths.outputs.<group>-needed` without this
-    # script hardcoding each group's name.
     for group_id in cast(list[str], decision.get("extra_group_ids", [])):
         output_name = group_id.replace("_", "-")
         lines.append(f"{output_name}-needed={bool_text(decision[f'{group_id}_needed'])}")
@@ -279,7 +248,7 @@ def write_lists(directory: Path, decision: dict[str, object]) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--rules", type=Path, default=DEFAULT_RULES)
     parser.add_argument("--base-ref", help="Git ref to diff against, for example origin/develop")
     parser.add_argument("--changed-file", type=Path, help="Read changed paths from a newline-delimited file")

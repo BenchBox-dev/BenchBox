@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Replay Explorer math and privacy evidence without production transformers.
-
-This script deliberately imports only the documented visualization-fixture
-helpers and the canonical public-path detector.  It does not import the
-Explorer transformer or frontend chart helpers.
-"""
 
 from __future__ import annotations
 
@@ -37,7 +31,6 @@ sys.path.insert(0, str(REPO_ROOT))
 
 
 def _git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
-    """Run Git in the repository without invoking a shell."""
     return subprocess.run(
         ["git", *args],
         cwd=REPO_ROOT,
@@ -48,7 +41,6 @@ def _git(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
 
 
 def _content_receipt(paths: list[Path]) -> str:
-    """Hash relative names and bytes into a squash-stable tree receipt."""
     receipt = hashlib.sha256()
     for path in paths:
         relative = path.relative_to(REPO_ROOT).as_posix()
@@ -60,7 +52,6 @@ def _content_receipt(paths: list[Path]) -> str:
 
 
 def _expected_blobs(paths: list[str]) -> dict[str, str]:
-    """Return regular-file blob IDs for replay inputs at the measured commit."""
     entries: dict[str, str] = {}
     listing = _git("ls-tree", "-r", EXPECTED_MEASUREMENT_SHA, "--", *paths).stdout.splitlines()
     for line in listing:
@@ -75,7 +66,6 @@ def _expected_blobs(paths: list[str]) -> dict[str, str]:
 
 
 def _verify_blobs(expected: dict[str, str]) -> None:
-    """Compare worktree bytes with measured blobs, even for skip-worktree paths."""
     paths = list(expected)
     actual_ids = _git("hash-object", "--no-filters", "--", *paths).stdout.splitlines()
     if len(actual_ids) != len(paths):
@@ -86,7 +76,6 @@ def _verify_blobs(expected: dict[str, str]) -> None:
 
 
 def _verify_input_provenance(bundle_root: Path) -> dict[str, Any]:
-    """Fail closed unless every local replay input matches the measured tree."""
     try:
         repository_root = Path(_git("rev-parse", "--show-toplevel").stdout.strip()).resolve(strict=True)
     except (OSError, subprocess.CalledProcessError) as exc:
@@ -139,17 +128,12 @@ def _verify_input_provenance(bundle_root: Path) -> dict[str, Any]:
 
 
 def _load_math_helpers() -> tuple[Callable[[list[float]], float | None], Callable[[list[float]], Any]]:
-    """Import measured-tree math helpers only after provenance is verified."""
     from tests.parity.generate_visualization_fixtures import geomean_ms, platform_percentile_stats
 
     return geomean_ms, platform_percentile_stats
 
 
 def _load_public_path_detector() -> Any:
-    """Load the canonical detector without importing the unrelated CLI package."""
-    # BenchBox's package initializer imports optional CLI dependencies that the
-    # replay itself does not need.  Supply only anonymization.py's direct
-    # sibling dependency, then execute that canonical source file.
     platform_spec = importlib.util.spec_from_file_location(
         "benchbox.core.results.platform_options", REPO_ROOT / "benchbox/core/results/platform_options.py"
     )
@@ -170,7 +154,6 @@ def _load_public_path_detector() -> Any:
 
 
 def _verify_snapshot(snapshot: Path) -> tuple[str, int]:
-    """Bind historical replay to the exact snapshot used for certification."""
     size = snapshot.stat().st_size
     digest = hashlib.sha256()
     with snapshot.open("rb") as source:
@@ -240,7 +223,6 @@ def _privacy_scan_bundles(bundle_root: Path, find_public_path_leaks: Callable[[A
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             unreadable.append(f"{path.name}: {type(exc).__name__}")
             continue
-        # The report intentionally preserves only field paths, never values.
         fields.extend(f"{path.name}.{field}" for field in find_public_path_leaks(payload))
     return {
         "files_scanned": len(files),

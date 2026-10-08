@@ -1,11 +1,14 @@
-"""Deprecated calculate-qphh compatibility command."""
-
 import click
 
 from benchbox.cli.shared import console
 
 
-@click.command("calculate-qphh", hidden=True, deprecated=True)
+@click.command(
+    "calculate-qphh",
+    hidden=True,
+    deprecated=True,
+    help=("Calculate Power@Size and Throughput@Size. Deprecated; use `benchbox metrics qphh`."),
+)
 @click.option("--power-results", type=click.Path(exists=True), required=True, help="Path to power results JSON")
 @click.option(
     "--throughput-results",
@@ -17,7 +20,6 @@ from benchbox.cli.shared import console
 @click.option("--format", "output_format", type=click.Choice(["text", "json"], case_sensitive=False), default="text")
 @click.option("--output", "output_file", type=click.Path(), help="Save output to file")
 def calculate_qphh(power_results, throughput_results, scale_factor, output_format, output_file):
-    """Calculate Power@Size and Throughput@Size. Deprecated; use `benchbox metrics qphh`."""
     console.print(
         "[yellow]DeprecationWarning: 'benchbox calculate-qphh' is deprecated. "
         "Use 'benchbox metrics qphh' instead.[/yellow]\n"

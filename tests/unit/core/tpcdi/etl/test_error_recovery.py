@@ -1,12 +1,6 @@
-"""Unit tests for TPC-DI ETL error recovery module.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests ErrorClassifier, RetryManager, ErrorRecoveryManager, and
-supporting dataclasses from benchbox/core/tpcdi/etl/error_recovery.py.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -36,8 +30,6 @@ pytestmark = [
 
 
 class TestErrorClassifier:
-    """Tests for ErrorClassifier.classify_error."""
-
     @pytest.fixture
     def classifier(self) -> ErrorClassifier:
         return ErrorClassifier()
@@ -100,8 +92,6 @@ class TestErrorClassifier:
 
 
 class TestRetryManager:
-    """Tests for RetryManager.should_retry and calculate_delay."""
-
     @pytest.fixture
     def default_manager(self) -> RetryManager:
         return RetryManager()
@@ -196,7 +186,6 @@ class TestRetryManager:
         policy = RetryPolicy(strategy=RetryStrategy.FIXED_DELAY, base_delay_seconds=10.0, jitter=True)
         manager = RetryManager(policy)
         delay = manager.calculate_delay(0)
-        # With 10% jitter, delay should be roughly in [9.0, 11.0]
         assert 8.0 <= delay <= 12.0
 
     def test_should_retry_checks_non_retryable_patterns(self) -> None:
@@ -227,8 +216,6 @@ class TestRetryManager:
 
 
 class TestErrorRecoveryManager:
-    """Tests for ErrorRecoveryManager."""
-
     @pytest.fixture
     def manager(self) -> ErrorRecoveryManager:
         connection = MagicMock()
@@ -301,8 +288,6 @@ class TestErrorRecoveryManager:
         assert "errors_by_severity" in stats
 
     def test_get_recovery_statistics(self, manager: ErrorRecoveryManager) -> None:
-        # Create checkpoints with distinct batch/operation to ensure unique IDs
-        # (checkpoint IDs are time-based to the second, so same-second calls may collide)
         manager.create_checkpoint("op1", batch_id=1, checkpoint_type="SAVEPOINT")
         manager.create_checkpoint("op1", batch_id=2, checkpoint_type="COMMIT")
         stats = manager.get_recovery_statistics()
@@ -314,7 +299,6 @@ class TestErrorRecoveryManager:
         ctx = {"operation_name": "op", "batch_id": 1}
         manager.handle_error(error, ctx)
         cleaned = manager.cleanup_old_errors(retention_hours=24)
-        # Fresh errors should not be cleaned up
         assert cleaned == 0
         assert len(manager.error_log) == 1
 
@@ -324,7 +308,6 @@ class TestErrorRecoveryManager:
         error = ValueError("syntax error")
         ctx = {"operation_name": "op", "batch_id": 1}
         manager.handle_error(error, ctx)
-        # Manually backdate the error to simulate staleness
         manager.error_log[0].timestamp = datetime.now() - timedelta(hours=48)
         cleaned = manager.cleanup_old_errors(retention_hours=24)
         assert cleaned == 1
@@ -347,7 +330,6 @@ class TestErrorRecoveryManager:
                 raise TimeoutError("timeout")
             return "ok"
 
-        # Use a policy with IMMEDIATE retry so tests run fast
         policy = RetryPolicy(max_attempts=3, strategy=RetryStrategy.IMMEDIATE, jitter=False)
         result = manager.execute_with_recovery(
             flaky,
@@ -367,18 +349,11 @@ class TestErrorRecoveryManager:
             )
 
     def test_export_error_report(self, manager: ErrorRecoveryManager, tmp_path) -> None:
-        """export_error_report should write a JSON file when it can acquire the lock.
-
-        Note: export_error_report internally acquires error_lock and then calls
-        get_error_statistics() which also acquires error_lock, causing a deadlock.
-        We patch get_error_statistics to bypass this implementation-level issue and
-        test the export logic itself.
-        """
         from unittest.mock import patch
 
         error = TimeoutError("timeout")
         ctx = {"operation_name": "export_test", "batch_id": 99}
-        manager.error_log.append(manager._create_error_record(error, ctx))  # add without lock
+        manager.error_log.append(manager._create_error_record(error, ctx))
 
         output = tmp_path / "report.json"
         with patch.object(manager, "get_error_statistics", return_value={"total_errors": 1}):

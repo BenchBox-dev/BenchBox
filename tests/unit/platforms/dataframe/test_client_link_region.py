@@ -1,13 +1,3 @@
-"""DataFrame runs must surface known client locality instead of dropping it.
-
-The SQL adapters collect ``environment.client_link`` post-benchmark, but the
-DataFrame families descend from ``BenchmarkExecutionMixin`` and never ran
-that path, so ``--client-region``/``--client-cloud`` (and IMDS-observed
-placement) were silently ignored there. DataFrame engines have no SQL
-connection to probe, so only the region half is collected (status partial:
-region known, overhead unmeasurable).
-"""
-
 from __future__ import annotations
 
 from types import SimpleNamespace

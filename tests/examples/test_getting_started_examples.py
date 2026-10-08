@@ -1,5 +1,3 @@
-"""Tests for the additive getting-started example scripts."""
-
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -53,7 +51,7 @@ def test_duckdb_tpch_power_generates_data(monkeypatch: pytest.MonkeyPatch, tmp_p
 def test_duckdb_tpch_power_dry_run_invokes_helper(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     from examples.getting_started.local import duckdb_tpch_power as script
 
-    def explode_run(*args, **kwargs):  # pragma: no cover - should not be invoked
+    def explode_run(*args, **kwargs):  # pragma: no cover
         raise AssertionError("run_benchmark should not execute during dry run")
 
     monkeypatch.setattr(script.DuckDBAdapter, "run_benchmark", explode_run, raising=False)
@@ -277,9 +275,6 @@ def test_bigquery_dry_run_saves_output(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert captured["database_config"].type == "bigquery"
 
 
-# Firebolt Core tests
-
-
 def test_firebolt_core_runs_with_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     from examples.getting_started.cloud import firebolt_core_tpch as script
 
@@ -303,7 +298,6 @@ def test_firebolt_core_runs_with_defaults(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert called["phases_to_run"] == ["generate", "load", "power"]
     assert called["config"].name == "tpch"
     assert called["database_config"].type == "firebolt"
-    # Core mode uses URL, not credentials
     assert "url" in called["database_config"].options
 
 
@@ -331,9 +325,6 @@ def test_firebolt_core_dry_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> Non
     assert captured["benchmark_config"].test_execution_type == "power"
     assert captured["database_config"].type == "firebolt"
     assert captured["output_dir"] == preview_dir
-
-
-# Firebolt Cloud tests
 
 
 def test_firebolt_cloud_requires_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -407,9 +398,6 @@ def test_firebolt_cloud_dry_run(monkeypatch: pytest.MonkeyPatch, tmp_path) -> No
     assert captured["benchmark_config"].test_execution_type == "power"
     assert captured["database_config"].type == "firebolt"
     assert captured["output_dir"] == preview_dir
-
-
-# Athena tests
 
 
 def test_athena_requires_env(monkeypatch: pytest.MonkeyPatch) -> None:

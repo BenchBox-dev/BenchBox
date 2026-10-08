@@ -1,5 +1,3 @@
-"""Unit tests for CLI benchmark orchestrator validation flow."""
-
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -34,8 +32,6 @@ def _mk_system_profile():
 
 
 class TestBenchmarkOrchestratorValidation:
-    """Validate that the orchestrator delegates validation work to the core runner."""
-
     def setup_method(self):
         self.orchestrator = BenchmarkOrchestrator()
 

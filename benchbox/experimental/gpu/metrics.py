@@ -1,9 +1,6 @@
-"""GPU metrics collection for benchmarking.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -19,8 +16,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class GPUMetrics:
-    """GPU metrics snapshot."""
-
     timestamp: datetime
     device_index: int
     memory_used_mb: int = 0
@@ -38,13 +33,11 @@ class GPUMetrics:
 
     @property
     def memory_utilization(self) -> float:
-        """Calculate memory utilization as a fraction (0-1)."""
         if self.memory_total_mb == 0:
             return 0.0
         return self.memory_used_mb / self.memory_total_mb
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "device_index": self.device_index,
@@ -65,8 +58,6 @@ class GPUMetrics:
 
 @dataclass
 class GPUMetricsAggregate:
-    """Aggregated GPU metrics over a time period."""
-
     device_index: int
     start_time: datetime
     end_time: datetime
@@ -83,7 +74,6 @@ class GPUMetricsAggregate:
     total_pcie_rx_bytes: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "device_index": self.device_index,
             "start_time": self.start_time.isoformat(),
@@ -104,19 +94,11 @@ class GPUMetricsAggregate:
 
 
 class GPUMetricsCollector:
-    """Collects GPU metrics during benchmark execution."""
-
     def __init__(
         self,
         device_indices: list[int] | None = None,
         sample_interval_seconds: float = 0.5,
     ):
-        """Initialize metrics collector.
-
-        Args:
-            device_indices: GPU device indices to monitor (None for all)
-            sample_interval_seconds: Sampling interval in seconds
-        """
         self.device_indices = device_indices
         self.sample_interval = sample_interval_seconds
         self._samples: list[GPUMetrics] = []
@@ -127,7 +109,6 @@ class GPUMetricsCollector:
         self._lock = threading.Lock()
 
     def start(self) -> None:
-        """Start collecting metrics in background thread."""
         if self._collection_thread is not None and self._collection_thread.is_alive():
             logger.warning("Metrics collection already running")
             return
@@ -146,7 +127,6 @@ class GPUMetricsCollector:
         logger.debug("Started GPU metrics collection")
 
     def stop(self) -> None:
-        """Stop collecting metrics."""
         self._stop_event.set()
         if self._collection_thread is not None:
             self._collection_thread.join(timeout=2.0)
@@ -155,19 +135,10 @@ class GPUMetricsCollector:
         logger.debug(f"Stopped GPU metrics collection, collected {len(self._samples)} samples")
 
     def get_samples(self) -> list[GPUMetrics]:
-        """Get collected samples."""
         with self._lock:
             return list(self._samples)
 
     def get_aggregate(self, device_index: int = 0) -> GPUMetricsAggregate | None:
-        """Get aggregated metrics for a device.
-
-        Args:
-            device_index: GPU device index
-
-        Returns:
-            Aggregated metrics or None if no samples
-        """
         with self._lock:
             device_samples = [s for s in self._samples if s.device_index == device_index]
 
@@ -200,7 +171,6 @@ class GPUMetricsCollector:
         )
 
     def _collect_loop(self) -> None:
-        """Background collection loop."""
         while not self._stop_event.is_set():
             try:
                 samples = self._collect_sample()
@@ -212,11 +182,9 @@ class GPUMetricsCollector:
             self._stop_event.wait(self.sample_interval)
 
     def _collect_sample(self) -> list[GPUMetrics]:
-        """Collect a single sample from all GPUs."""
         samples = []
         timestamp = datetime.now(timezone.utc)
 
-        # Try nvidia-smi first
         nvidia_metrics = self._collect_nvidia_smi()
         if nvidia_metrics:
             for device_idx, metrics in nvidia_metrics.items():
@@ -230,9 +198,8 @@ class GPUMetricsCollector:
                     )
             return samples
 
-        # Try cupy/rmm as fallback
         try:
-            import cupy  # type: ignore
+            import cupy
 
             device_count = cupy.cuda.runtime.getDeviceCount()
             for i in range(device_count):
@@ -256,7 +223,6 @@ class GPUMetricsCollector:
         return samples
 
     def _collect_nvidia_smi(self) -> dict[int, dict[str, Any]]:
-        """Collect metrics using nvidia-smi."""
         try:
             result = subprocess.run(
                 [
@@ -313,31 +279,18 @@ class GPUMetricsCollector:
 
 
 class GPUMemoryTracker:
-    """Track GPU memory allocations during benchmark."""
-
     def __init__(self, device_index: int = 0):
-        """Initialize memory tracker.
-
-        Args:
-            device_index: GPU device to track
-        """
         self.device_index = device_index
         self._allocations: list[dict[str, Any]] = []
         self._start_memory_mb: int = 0
         self._peak_memory_mb: int = 0
 
     def start(self) -> None:
-        """Start tracking memory."""
         self._allocations = []
         self._start_memory_mb = self._get_current_memory_mb()
         self._peak_memory_mb = self._start_memory_mb
 
     def record(self, label: str) -> None:
-        """Record current memory state.
-
-        Args:
-            label: Label for this checkpoint
-        """
         current = self._get_current_memory_mb()
         self._peak_memory_mb = max(self._peak_memory_mb, current)
         self._allocations.append(
@@ -351,7 +304,6 @@ class GPUMemoryTracker:
         )
 
     def get_summary(self) -> dict[str, Any]:
-        """Get memory tracking summary."""
         current = self._get_current_memory_mb()
         return {
             "device_index": self.device_index,
@@ -363,16 +315,14 @@ class GPUMemoryTracker:
         }
 
     def _get_current_memory_mb(self) -> int:
-        """Get current GPU memory usage."""
         try:
-            import cupy  # type: ignore
+            import cupy
 
             mem_info = cupy.cuda.Device(self.device_index).mem_info
             free_mem, total_mem = mem_info
             return (total_mem - free_mem) // (1024 * 1024)
         except Exception as cupy_err:
             logger.debug(f"cupy memory probe failed, trying nvidia-smi fallback: {cupy_err}")
-            # Try nvidia-smi fallback
             try:
                 result = subprocess.run(
                     [

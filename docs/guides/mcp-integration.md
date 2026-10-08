@@ -32,9 +32,10 @@ uv sync --extra mcp
 Before configuring your AI agent, verify the MCP server works:
 
 ```bash
-# Start the server (it will wait for input)
 uv run python -m benchbox.mcp
 ```
+
+The server starts and waits for input.
 
 The server should start without errors. Press `Ctrl+C` to stop.
 
@@ -74,18 +75,21 @@ Choose your AI assistant below for setup instructions.
 Add BenchBox as an MCP server using the Claude Code CLI:
 
 ```bash
-# Using benchbox-mcp entry point (recommended if in PATH)
 claude mcp add benchbox --scope project -- benchbox-mcp
 
-# With custom MCP paths
 claude mcp add benchbox --scope project -- benchbox-mcp --results-dir /tmp/benchbox-results
 
-# Using uv (works from any directory with BenchBox installed)
 claude mcp add benchbox --scope project -- uv run python -m benchbox.mcp
 
-# User-scoped (available in all your projects)
 claude mcp add benchbox --scope user -- benchbox-mcp
 ```
+
+The commands, in order:
+
+- Use the `benchbox-mcp` entry point (recommended if it is in your PATH).
+- Pass custom MCP paths, here the results directory.
+- Use `uv`, which works from any directory with BenchBox installed.
+- Register the server user-scoped, so it is available in all your projects.
 
 #### Manual Configuration
 
@@ -120,12 +124,12 @@ Or using uv if `benchbox-mcp` isn't in PATH:
 #### Verifying Installation
 
 ```bash
-# List configured servers
 claude mcp list
 
-# Check server status in Claude Code
 /mcp
 ```
+
+`claude mcp list` lists the configured servers. `/mcp` checks the server status inside Claude Code.
 
 ---
 
@@ -138,15 +142,14 @@ claude mcp list
 Add BenchBox as an MCP server using the Codex CLI:
 
 ```bash
-# Using the benchbox-mcp entry point (recommended)
 codex mcp add benchbox -- benchbox-mcp
 
-# With custom MCP paths
 codex mcp add benchbox -- benchbox-mcp --results-dir /tmp/benchbox-results
 
-# Or using uv if benchbox-mcp isn't in PATH
 codex mcp add benchbox -- uv run python -m benchbox.mcp
 ```
+
+The first command uses the `benchbox-mcp` entry point (recommended). The second passes custom MCP paths. The third uses `uv` if `benchbox-mcp` isn't in your PATH.
 
 #### Manual Configuration
 
@@ -161,17 +164,16 @@ args = []
 #### Verifying Installation
 
 ```bash
-# List configured servers
 codex mcp list
 
-# Show specific server config
 codex mcp show benchbox
 ```
+
+The first command lists configured servers, and the second shows the configuration of one server.
 
 #### Managing Servers
 
 ```bash
-# Remove a server
 codex mcp remove benchbox
 ```
 

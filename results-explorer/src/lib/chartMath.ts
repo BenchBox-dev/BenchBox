@@ -1,28 +1,5 @@
-/**
- * chartMath.ts - Pure chart computation helpers.
- *
- * All visualization math lives here so it can be:
- *   1. Called by SVG components without DOM/JSX dependencies.
- *   2. Loaded by the Vitest parity suite and compared against Python
- *      reference values in `tests/parity/fixtures/`.
- *
- * Rules:
- *   - No imports from Preact, no JSX, no DOM APIs.
- *   - Every export must have a Python equivalent in the CLI pipeline or
- *     `benchbox/core/visualization/` - document where.
- *   - Float comparison tolerance: 1e-9 (Python and JS IEEE-754 agree at
- *     this precision for these formulas).
- */
-
 import { HEAT_MIN_RATIO, HEAT_MAX_RATIO } from "@/lib/chartTheme";
 import { isValidTimingValue, validTimingValues } from "@/lib/displayEligibility";
-
-// ---------------------------------------------------------------------------
-// Latency magnitude scale
-// Explorer-only SVG layout policy for lower-is-better latency bars. The CLI
-// ASCII bar chart remains linear; the browser switches to log scale when a slow
-// outlier would otherwise collapse faster platforms into unreadable slivers.
-// ---------------------------------------------------------------------------
 
 export const LATENCY_LOG_SCALE_THRESHOLD = 10;
 
@@ -92,11 +69,6 @@ export function latencyScaleTicks(scale: LatencyBarScale): number[] {
     return [0, 0.25, 0.5, 0.75, 1].map((fraction) => fraction * scale.domainMax);
   }
 
-  // Always include both endpoint ticks so the right edge of the bar chart
-  // has a labelled terminal value. Without this, ranges like 0.2-2 ms or
-  // 100k-50M ms would be plotted against an unlabelled endpoint and the
-  // axis could be misread. Canonical powers of ten remain for interior
-  // labelling; dedupe collapses any duplicates at the endpoints.
   const interior = LATENCY_LOG_TICKS_MS.filter(
     (ms) => ms >= scale.domainMin * 0.99 && ms <= scale.domainMax * 1.01,
   );
@@ -112,27 +84,10 @@ export function latencyScaleTicks(scale: LatencyBarScale): number[] {
   return ticks;
 }
 
-// ---------------------------------------------------------------------------
-// Shared log latency axis
-// Used by SVG views that plot latency distributions on a log2 ms axis.
-// ---------------------------------------------------------------------------
-
-/**
- * Decade ticks. Kept as the coarsest rung for callers that want them, but a
- * latency axis is rarely a whole decade wide: a run whose queries all land
- * between 7 ms and 29 ms falls inside one decade, and a decade-only axis then
- * carries a single label, which is not an axis.
- */
 export const LOG_LATENCY_TICKS_MS = [0.1, 1, 10, 100, 1000, 10000];
 
-/**
- * Subdivisions of each decade, used when whole decades do not label the axis.
- * Wider than the usual 1-2-5 because latency ranges inside one decade are the
- * common case here: 22-55 ms would otherwise carry two labels.
- */
 const LOG_LATENCY_TICK_MANTISSAS = [1, 1.5, 2, 3, 5, 7];
 
-/** Most labels a latency axis should carry before they crowd each other. */
 const MAX_LOG_LATENCY_TICKS = 8;
 
 export interface LogLatencyScale {
@@ -176,21 +131,12 @@ export function logLatencyFraction(ms: number, scale: LogLatencyScale): number {
   return (logLatencyValue(ms, scale.floorMs) - scale.logMin) / scale.logRange;
 }
 
-/**
- * Ticks for a log latency axis, coarsest set that still labels the axis.
- *
- * Tries decades first, then 1-2-5 within each decade, and only then the axis
- * endpoints. A caller gets at least two labels whenever the scale spans a
- * range at all, so no chart renders an axis with one number on it.
- */
 export function logLatencyTicks(scale: LogLatencyScale, tolerance = 0.05): number[] {
   const inRange = (ms: number, slack: number) =>
     ms >= scale.floorMs &&
     logLatencyValue(ms, scale.floorMs) >= scale.logMin - slack &&
     logLatencyValue(ms, scale.floorMs) <= scale.logMax + slack;
 
-  // Decades get the caller's tolerance: it absorbs float wobble on the exact
-  // powers of ten a padded scale is often built around.
   const decades = LOG_LATENCY_TICKS_MS.filter((ms) => inRange(ms, tolerance));
   if (decades.length >= 3) return decades;
 
@@ -200,17 +146,9 @@ export function logLatencyTicks(scale: LogLatencyScale, tolerance = 0.05): numbe
   for (let exponent = lowestDecade; exponent <= highestDecade; exponent += 1) {
     for (const mantissa of LOG_LATENCY_TICK_MANTISSAS) {
       const ms = mantissa * 10 ** exponent;
-      // Subdivided rungs must be strictly inside the domain. A rung admitted
-      // on tolerance alone is drawn past the end of the axis, where its label
-      // runs off the edge of the drawing.
       if (inRange(ms, 0)) subdivided.push(ms);
     }
   }
-  // A sparse subdivision (fewer than 4 rungs) can still under-cover the
-  // domain: the fixed mantissa grid finds "10 ms" and "15 ms" inside an
-  // 8-18 ms padded domain and stops there, leaving the top third of the
-  // axis bare. Evenly spaced, nicely rounded ticks over the real domain
-  // fill that gap without abandoning round numbers.
   const domainMin = Math.max(scale.floorMs, 2 ** scale.logMin);
   const domainMax = 2 ** scale.logMax;
   if (subdivided.length < 4 && Number.isFinite(domainMin) && Number.isFinite(domainMax) && domainMax > domainMin) {
@@ -220,13 +158,10 @@ export function logLatencyTicks(scale: LogLatencyScale, tolerance = 0.05): numbe
 
   if (subdivided.length >= 2) return thinTicks(subdivided, MAX_LOG_LATENCY_TICKS);
 
-  // Nothing lands inside the range - a very narrow span such as 11-13 ms.
-  // Label its ends rather than one arbitrary rung, or nothing at all.
   if (!Number.isFinite(domainMin) || !Number.isFinite(domainMax) || domainMax <= domainMin) return subdivided;
   return [domainMin, Math.sqrt(domainMin * domainMax), domainMax];
 }
 
-/** Rounds a rough step to a "nice" 1-2-5-10 multiple of a power of ten. */
 function niceStep(roughStep: number): number {
   if (!(roughStep > 0)) return 1;
   const magnitude = 10 ** Math.floor(Math.log10(roughStep));
@@ -235,13 +170,6 @@ function niceStep(roughStep: number): number {
   return niceResidual * magnitude;
 }
 
-/**
- * Evenly spaced, nicely rounded ticks across a real (non-log) domain.
- * Used for narrow latency ranges where the fixed decade/mantissa grid
- * (LOG_LATENCY_TICKS_MS / LOG_LATENCY_TICK_MANTISSAS) is too sparse: e.g. an
- * 8-18 ms domain lands on only "10 ms" and "15 ms" from that grid, leaving
- * the top third of the axis unlabeled even though the axis extends to 18 ms.
- */
 function niceLinearTicks(min: number, max: number, targetCount: number): number[] {
   if (!(max > min)) return [min];
   const step = niceStep((max - min) / Math.max(1, targetCount - 1));
@@ -253,7 +181,6 @@ function niceLinearTicks(min: number, max: number, targetCount: number): number[
   return raw;
 }
 
-/** Keeps the first and last tick and drops interior ones evenly until it fits. */
 function thinTicks(ticks: readonly number[], max: number): number[] {
   if (ticks.length <= max) return [...ticks];
   const stride = Math.ceil((ticks.length - 1) / (max - 1));
@@ -263,21 +190,6 @@ function thinTicks(ticks: readonly number[], max: number): number[] {
   return kept;
 }
 
-// ---------------------------------------------------------------------------
-// Heatmap color math
-// Python reference: benchbox/core/visualization/ascii/heatmap.py
-// (log10-ratio → hue mapping)
-// ---------------------------------------------------------------------------
-
-/**
- * Compute the HSL hue for a heat cell.
- *
- * Uses log10(ms / minInCol) clamped to [0, log10(10)] = [0, 1]:
- *   ratio = 1  → hue 120 (green, fastest)
- *   ratio = 10 → hue 0   (red, 10× slower or more)
- *
- * Returns null for missing/invalid inputs so the caller can skip coloring.
- */
 export function colorForCell(ms: number | null, minInCol: number | null): number | null {
   if (!isValidTimingValue(ms) || !isValidTimingValue(minInCol)) return null;
   const ratio = Math.max(HEAT_MIN_RATIO, Math.min(HEAT_MAX_RATIO, ms / minInCol));
@@ -285,12 +197,6 @@ export function colorForCell(ms: number | null, minInCol: number | null): number
   return Math.round(120 * (1 - t));
 }
 
-/**
- * Compute the grayscale lightness for a high-contrast cell.
- *
- * Returns a CSS percentage value string: "95%" (fastest) → "25%" (10× slower).
- * Returns null for missing/invalid inputs.
- */
 export function lightnessForCell(ms: number | null, minInCol: number | null): string | null {
   if (!isValidTimingValue(ms) || !isValidTimingValue(minInCol)) return null;
   const ratio = Math.max(HEAT_MIN_RATIO, Math.min(HEAT_MAX_RATIO, ms / minInCol));
@@ -298,100 +204,21 @@ export function lightnessForCell(ms: number | null, minInCol: number | null): st
   return `${Math.round(95 - 70 * t)}%`;
 }
 
-// ---------------------------------------------------------------------------
-// Speedup math
-// Two distinct speedup concepts - use the right one for the context:
-//
-//   vsSlowestRatio(thisMs, slowestMs)  - "how much faster am I than the slowest?"
-//     Always >= 1 for valid inputs.  Used by summary cards and the per-query
-//     breakdown table on the Compare page (both anchored to the slowest value).
-//     Python reference:
-//       _project.scripts.explorer_pipeline.compare_math.speedup_vs_slowest
-//       (direction-aware variant invoked with higher_is_better=False).
-//
-//   speedupRatio(baselineMs, thisMs)   - "how do I compare to a chosen baseline?"
-//     Can be < 1 (slower) or > 1 (faster).  Used by NormalizedSpeedupChart
-//     where the user picks any result as the baseline.
-//     Python reference:
-//       _project.scripts.explorer_pipeline.compare_math.baseline_speedup_ratio
-//       (also matches benchbox/core/visualization/ascii/normalized_speedup.py).
-// ---------------------------------------------------------------------------
-
-/**
- * Compute slowest_ms / this_ms - the "vs slowest" speedup for summary cards
- * and per-query breakdown rows.
- *
- *   = 1  when this result is also the slowest
- *   > 1  when this result is faster than the slowest (always >= 1)
- *
- * Returns null when either input is null, zero, or negative.
- *
- * @param thisMs     Canonical display_ms for the result being shown.
- * @param slowestMs  Largest display_ms across all results for this benchmark.
- */
 export function vsSlowestRatio(thisMs: number | null, slowestMs: number | null): number | null {
   if (!isValidTimingValue(thisMs) || !isValidTimingValue(slowestMs)) return null;
   return slowestMs / thisMs;
 }
 
-// ---------------------------------------------------------------------------
-// Python reference: benchbox/core/visualization/ascii/normalized_speedup.py
-// ---------------------------------------------------------------------------
-
-/**
- * Compute per-baseline speedup: baseline_ms / this_ms.
- *
- *   > 1: this result is faster than the baseline
- *   < 1: this result is slower than the baseline
- *   = 1: identical
- *
- * Returns null when either input is null, zero, or negative.
- *
- * @param baselineMs  Canonical display_ms for the chosen baseline result.
- * @param thisMs      Canonical display_ms for the result being compared.
- */
 export function speedupRatio(baselineMs: number | null, thisMs: number | null): number | null {
   if (!isValidTimingValue(baselineMs) || !isValidTimingValue(thisMs)) return null;
   return baselineMs / thisMs;
 }
 
-// ---------------------------------------------------------------------------
-// Delta percent math
-// Python reference:
-//   _project.scripts.explorer_pipeline.compare_math.delta_pct
-//   (also matches benchbox/core/visualization/ascii/diverging_bar.py).
-// ---------------------------------------------------------------------------
-
-/**
- * Compute the percent change of `thisMs` relative to `baselineMs`.
- *
- *   (thisMs - baselineMs) / baselineMs * 100
- *
- *   negative: faster than baseline
- *   positive: slower than baseline
- *
- * Returns null when either input is null, zero, or negative.
- */
 export function deltaPct(thisMs: number | null, baselineMs: number | null): number | null {
   if (!isValidTimingValue(thisMs) || !isValidTimingValue(baselineMs)) return null;
   return ((thisMs - baselineMs) / baselineMs) * 100;
 }
 
-// ---------------------------------------------------------------------------
-// Group sort by magnitude
-// Python reference: benchbox/core/visualization/ascii/diverging_bar.py
-// (sort by max-abs-delta so biggest changes appear first)
-// ---------------------------------------------------------------------------
-
-/**
- * Sort query groups by the maximum absolute metric value in each group,
- * descending.  Used by DivergingBarChart to surface the largest
- * regressions/improvements at the top.
- *
- * @param groups    Map entries: [queryId, entries[]] where each entry has a
- *                  `deltaPct` numeric field.
- * @returns         A new array sorted by max(|deltaPct|) descending.
- */
 export function sortByMagnitudeDesc<T extends { deltaPct: number }>(groups: [string, T[]][]): [string, T[]][] {
   return [...groups].sort((a, b) => {
     const maxA = Math.max(...a[1].map((e) => Math.abs(e.deltaPct)));
@@ -400,23 +227,6 @@ export function sortByMagnitudeDesc<T extends { deltaPct: number }>(groups: [str
   });
 }
 
-// ---------------------------------------------------------------------------
-// Per-query spread (slowest / fastest within a set of results for one query)
-// Python reference:
-//   _project.scripts.explorer_pipeline.compare_math.per_query_speedup_spread
-// ---------------------------------------------------------------------------
-
-/**
- * Compute the within-query speedup spread: slowest_ms / fastest_ms.
- *
- * Represents how much faster the fastest result for a given query is than the
- * slowest.  Always >= 1 when valid.
- *
- * @param validMs  Array of positive display_ms values for a single query
- *                 across multiple results.  Caller must filter nulls first.
- * @returns        slowest / fastest, or null when the array is empty or all
- *                 zero.
- */
 export function perQuerySpeedup(validMs: number[]): number | null {
   const valid = validTimingValues(validMs);
   if (valid.length === 0) return null;
@@ -425,39 +235,11 @@ export function perQuerySpeedup(validMs: number[]): number | null {
   return slowest / fastest;
 }
 
-// ---------------------------------------------------------------------------
-// Geometric mean
-// Python reference: _project/scripts/explorer_pipeline/transformer.py
-//   _display_geomean_ms: math.exp(sum(math.log(v) for v in values) / len(values))
-// ---------------------------------------------------------------------------
-
-/**
- * Compute the geometric mean of an array of values.
- *
- * Matches the Python `_display_geomean_ms` implementation exactly:
- *   exp(mean(log(v) for v in positive_values))
- *
- * Null and non-positive values are silently excluded.  Returns null when no
- * valid positive values exist.
- *
- * @param values  Mixed array of display_ms values (may contain nulls).
- */
 export function geomeanMs(values: (number | null)[]): number | null {
   const valid = validTimingValues(values);
   if (valid.length === 0) return null;
   return Math.exp(valid.reduce((sum, v) => sum + Math.log(v), 0) / valid.length);
 }
-
-// ---------------------------------------------------------------------------
-// Box plot statistics
-// Python reference: tests/parity/generate_visualization_fixtures.compute_box_stats
-//
-// NOTE: this deliberately diverges from textcharts.box_plot.compute_quartiles.
-// That function returns IQR-whiskered whisker_low/whisker_high and a separate
-// outliers list.  The explorer visualization instead shows the raw data extent
-// (sorted[0], sorted[-1]) with no outlier handling - quartiles still use the
-// same linear-interpolation percentile, so Q1/median/Q3 match the CLI exactly.
-// ---------------------------------------------------------------------------
 
 export interface BoxStats {
   min: number;
@@ -467,15 +249,6 @@ export interface BoxStats {
   max: number;
 }
 
-/**
- * Compute five-number summary (min, Q1, median, Q3, max) from an array of values.
- *
- * Quartiles use the same linear-interpolation percentile as ``computePercentile``,
- * matching ``textcharts.percentile_ladder.compute_percentile``.  Min/max are the
- * raw extremes of the valid input - no IQR whiskering, no outlier detection.
- *
- * Null and non-positive values are excluded.  Returns null when no valid values.
- */
 export function computeBoxStats(values: (number | null)[]): BoxStats | null {
   const valid = validTimingValues(values);
   if (valid.length === 0) return null;
@@ -489,21 +262,6 @@ export function computeBoxStats(values: (number | null)[]): BoxStats | null {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Empirical CDF points
-// Python reference: tests/parity/generate_visualization_fixtures.compute_ecdf_points
-// (also mirrors the ECDF plotting step inside textcharts.cdf_chart)
-// ---------------------------------------------------------------------------
-
-/**
- * Compute empirical CDF points from an array of values.
- *
- * For n sorted positive values [x1, ..., xn], returns n points where:
- *   point i: { x: xi, y: (i+1)/n * 100 }  (y in percent)
- *
- * Null, non-positive, and non-finite values are excluded.
- * Returns an empty array when no valid values exist.
- */
 export function computeECDFPoints(values: (number | null)[]): { x: number; y: number }[] {
   const valid = validTimingValues(values);
   if (valid.length === 0) return [];
@@ -512,32 +270,6 @@ export function computeECDFPoints(values: (number | null)[]): { x: number; y: nu
   return sorted.map((x, i) => ({ x, y: ((i + 1) / n) * 100 }));
 }
 
-// ---------------------------------------------------------------------------
-// Percentile computation
-// Python reference: _project/scripts/explorer_pipeline/transformer.py
-//   _compute_percentile - mirrors textcharts.percentile_ladder.compute_percentile
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Rank-table ranking
-// Python reference: tests/parity/generate_visualization_fixtures.compute_rank_table
-// Standard competition ranking (1, 1, 3): ties share the lower rank, the
-// rank after a tie group jumps by the size of the group.
-// ---------------------------------------------------------------------------
-
-/**
- * Compute per-query ordinal ranks across platforms.
- *
- * Input: per-query, a row of (platform_index, display_ms | null).  A null,
- *        zero, or negative value means "did not run / failed" and receives
- *        rank null (rendered as -).  Positive values are sorted ascending
- *        (fastest = rank 1).  Equal values receive equal rank.
- *
- * The result mirrors the Python reference exactly - ties are the known
- * divergence risk between Python's `sorted` and JS `Array.sort`, both of
- * which are stable per ES2019+/CPython, so relative order of equal ms
- * values is preserved on both sides.
- */
 export function computeRankTable(
   queryIds: string[],
   timingsByPlatform: Record<string, number | null>[],
@@ -562,17 +294,6 @@ export function computeRankTable(
   return ranks;
 }
 
-/**
- * Compute the p-th percentile of an array using linear interpolation.
- *
- * Matches ``textcharts.percentile_ladder.compute_percentile`` exactly:
- *   k = (p / 100) * (n - 1)
- *   result = values[floor(k)] * (ceil(k) - k) + values[ceil(k)] * (k - floor(k))
- *
- * @param values  Non-empty sorted or unsorted array of numeric values.
- * @param p       Percentile in range [0, 100].
- * @returns       Interpolated percentile value, or null for empty input - callers must handle null.
- */
 export function computePercentile(values: number[], p: number): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, b) => a - b);
@@ -585,45 +306,8 @@ export function computePercentile(values: number[], p: number): number | null {
   return sorted[f]! * (c - k) + sorted[c]! * (k - f);
 }
 
-// ---------------------------------------------------------------------------
-// Diverging ratio scale (multi-run heatmap)
-//
-// NO PYTHON COUNTERPART, deliberately. `chartMath.parity.test.ts` asserts the
-// helpers above are byte-identical to their Python references; this one is
-// additive and has no reference to match, because the multi-run heatmap is a
-// browser-only surface with no ASCII equivalent. Stated here so a future reader
-// does not go looking for the Python side and conclude it was lost.
-// ---------------------------------------------------------------------------
-
-/**
- * Ratio at which the diverging scale saturates, in either direction.
- *
- * 4x matches the point where per-query differences stop being informative and
- * start being outliers: beyond it the cell is already unambiguous, and letting
- * the ramp keep going would compress everything nearer parity into a narrow
- * band of indistinguishable colour.
- */
 export const DIVERGING_RATIO_CLAMP = 4;
 
-/**
- * Map a baseline-relative ratio to [-1, 1] for a two-hue diverging scale.
- *
- *   ratio < 1  (faster than baseline) -> negative
- *   ratio = 1  (parity)               -> 0, the neutral midpoint
- *   ratio > 1  (slower than baseline) -> positive
- *
- * SYMMETRIC IN LOG SPACE, which is the property that makes the chart honest: a
- * 2x slowdown and a 2x speedup are the same distance from the midpoint in
- * opposite directions. On a linear ratio scale they would not be -- 0.5 is 0.5
- * below parity while 2.0 is 1.0 above it -- so a linear mapping would render
- * slowdowns as visually larger than the equivalent speedups.
- *
- * Returns null for a ratio that is not a positive finite number, so an
- * unanswerable cell can be rendered as unrecorded rather than as parity.
- * Defaulting it to 0 would paint "we do not know" in the same colour as
- * "identical to baseline", which is the specific misreading this chart must
- * not invite.
- */
 export function divergingRatioPosition(
   ratio: number | null | undefined,
   clamp: number = DIVERGING_RATIO_CLAMP,
@@ -635,17 +319,6 @@ export function divergingRatioPosition(
   return Math.max(-1, Math.min(1, position));
 }
 
-/**
- * How much the runs disagree on a query, as the spread of their ratios.
- *
- * Log-space again, for the same reason: the disagreement between 0.5x and 2.0x
- * is the same magnitude as between 1x and 4x, and a linear spread would rank
- * the second as twice the first.
- *
- * Returns null when fewer than two runs produced a usable ratio -- a query only
- * one run could answer has no disagreement to measure, and reporting 0 would
- * rank it as perfect consensus.
- */
 export function queryDisagreementSpread(ratios: readonly (number | null | undefined)[]): number | null {
   const usable = ratios.filter(
     (r): r is number => r !== null && r !== undefined && Number.isFinite(r) && r > 0,

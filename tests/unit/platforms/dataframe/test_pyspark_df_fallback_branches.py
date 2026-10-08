@@ -1,14 +1,6 @@
-"""Fast fallback-branch tests for PySparkDataFrameAdapter miss clusters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers the paths unreachable with PySpark installed: the to_polars()
-conversion fallbacks (no toArrow attribute, raising toArrow, missing
-polars), the not-installed constructor guard, and the module-level
-import-fallback aliases via reload.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -31,7 +23,7 @@ _SESSION_SKIP_REASON = pyspark_skip_reason() or "PySpark is usable"
 
 
 def _adapter_without_session():
-    # Construction is lazy: no SparkSession starts until first use.
+
     return mod.PySparkDataFrameAdapter(master="local[1]", app_name="BenchBox-Fallback-Tests")
 
 
@@ -71,7 +63,7 @@ def test_init_raises_without_pyspark(monkeypatch: pytest.MonkeyPatch):
 
 
 def test_module_fallback_aliases_without_pyspark(monkeypatch: pytest.MonkeyPatch):
-    """The not-installed import fallback binds Any aliases and None F."""
+
     import typing
 
     monkeypatch.setattr("benchbox.platforms.pyspark.PYSPARK_AVAILABLE", False)
@@ -88,7 +80,7 @@ def test_module_fallback_aliases_without_pyspark(monkeypatch: pytest.MonkeyPatch
 
 @pytest.mark.skipif(_REQUIRES_PYSPARK_SESSION, reason=_SESSION_SKIP_REASON)
 def test_window_count_star_uses_lit_one(pyspark_test_environment, monkeypatch):
-    """COUNT(*) renders F.count(F.lit(1)) over the window spec."""
+
     pytest.importorskip("pyspark")
     from pyspark.sql.column import Column
 

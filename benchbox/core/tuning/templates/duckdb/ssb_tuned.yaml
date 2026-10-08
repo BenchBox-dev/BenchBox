@@ -1,7 +1,3 @@
-# DuckDB SSB Tuned Configuration
-# This configuration enables all DuckDB-supported optimizations for Star Schema Benchmark
-# Provides maximum performance with constraints and table-level tunings enabled
-
 primary_keys:
   enabled: true
   enforce_uniqueness: true

@@ -50,7 +50,6 @@ adapter = PrestoAdapter(
     catalog="hive",
     schema="default",
     username="presto",
-    # password="secret",  # Optional basic auth
 )
 
 benchmark = TPCH(scale_factor=1.0)
@@ -59,10 +58,11 @@ results = benchmark.run_with_platform(adapter)
 print(f"Completed in {results.duration_seconds:.2f}s")
 ```
 
+The adapter also accepts an optional `password` for basic auth.
+
 ### CLI Usage
 
 ```bash
-# Minimal PrestoDB run (assumes presto-python-client installed)
 benchbox run --platform presto --benchmark tpch --scale 1.0 \
   --platform-option host=presto-coordinator.example.com \
   --platform-option catalog=hive \

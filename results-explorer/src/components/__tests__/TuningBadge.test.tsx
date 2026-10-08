@@ -1,20 +1,3 @@
-/**
- * Tests for TuningBadge component.
- *
- * Cases:
- *   (a) Known tuning modes render expected label and CSS class
- *   (b) Unknown tuning modes fall back to "Custom tuning" yellow badge
- *   (c) All modes have a title attribute (tooltip)
- *   (d) tuningLabel() helper returns correct label for dropdown reuse
- *   (e) Color semantics: tuned=green, notuning=gray, auto=blue
- *   (f) null/undefined and the not-recorded sentinel render the neutral
- *       "Not recorded" badge (never "Custom tuning")
- *   (g) tuned-fallback (ADR-2) renders its own warning-tone badge, distinct
- *       from both "Tuned" and the generic unknown-mode fallback
- *   (h) custom is a pinned vocabulary entry, but its public claim depends on
- *       execution-derived applied tuning evidence
- */
-
 import { render } from "@testing-library/preact";
 import { describe, expect, it } from "vitest";
 import { TuningBadge, tuningLabel } from "@/components/TuningBadge";

@@ -1,5 +1,3 @@
-"""Tests for Vortex file handling paths and loading behavior."""
-
 from __future__ import annotations
 
 import sys
@@ -17,7 +15,6 @@ pytestmark = [
 
 
 def test_vortex_file_handler_reads_using_string_path(monkeypatch, tmp_path):
-    """Vortex bindings require a plain string path for read()."""
 
     class _ArrowTable:
         num_rows = 1
@@ -50,7 +47,6 @@ def test_vortex_file_handler_reads_using_string_path(monkeypatch, tmp_path):
 
 
 def test_vortex_file_handler_falls_back_to_vortex_open(monkeypatch, tmp_path):
-    """Use vortex.open(path) when vortex.io.read is unavailable."""
 
     class _ArrowTable:
         num_rows = 1

@@ -1,5 +1,3 @@
-"""MCP-specific CLI entrypoint and argument parsing."""
-
 from __future__ import annotations
 
 import argparse
@@ -11,7 +9,6 @@ from benchbox.mcp import run_server
 
 
 def _http_port(value: str) -> int:
-    """Parse an HTTP port with an argparse-friendly error."""
     port = int(value)
     if not 1 <= port <= 65535:
         raise argparse.ArgumentTypeError("port must be between 1 and 65535")
@@ -19,7 +16,6 @@ def _http_port(value: str) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build parser for MCP server startup options."""
     parser = argparse.ArgumentParser(
         prog="benchbox-mcp",
         description="Run the BenchBox MCP server.",
@@ -78,13 +74,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    """Parse CLI arguments for MCP startup."""
     parser = build_parser()
     return parser.parse_args(list(argv) if argv is not None else None)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Parse MCP CLI args and run the server."""
     args = parse_args(argv)
     runtime_paths = resolve_runtime_paths(
         results_dir=args.results_dir,

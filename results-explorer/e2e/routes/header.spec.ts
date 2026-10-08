@@ -19,12 +19,6 @@ const GLOBAL_LABELS = getHeaderVisibleLabels();
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "../../..");
 
-// Static surfaces share `landing/shared/site-header.css` via the
-// `benchbox-site-header` class contract. Results consumes the same contract
-// through a Preact mirror in components/Layout.tsx that imports the same
-// canonical labels/hrefs/CTA from src/components/headerContract.ts. This test
-// loads each static HTML file directly and asserts label/href parity so any
-// drift in either side fails the build.
 const STATIC_SURFACES: ReadonlyArray<{ surface: string; path: string }> = [
   { surface: "landing", path: "landing/index.html" },
   { surface: "prompts", path: "landing/prompts/index.html" },
@@ -134,10 +128,6 @@ test.describe("Global header", () => {
 });
 
 test.describe("Global header cross-surface parity", () => {
-  // Reads `landing/index.html`, `landing/prompts/index.html` and
-  // `docs/_templates/page.html` directly so the parity gate covers every
-  // public surface that consumes the shared `benchbox-site-header` contract
-  // without needing additional servers in the e2e harness.
   for (const { surface, path } of STATIC_SURFACES) {
     test(`static surface ${surface} matches the shared global header contract`, async ({ page }) => {
       const html = readStaticSurface(path);
@@ -162,13 +152,6 @@ test.describe("Global header cross-surface parity", () => {
     });
   }
 
-  // Docs surface is built from a Sphinx Jinja template
-  // (`docs/_templates/page.html`) whose `aria-current` markers are
-  // conditional on `is_blog_page`. Loading the raw template bypasses Jinja
-  // evaluation and exposes both branches, so this assertion is restricted to
-  // fully-static surfaces. The labels/hrefs gate above still runs against
-  // the Sphinx template, so any drift in the docs header still trips a
-  // parity failure.
   const STATIC_AUTHORED_SURFACES = STATIC_SURFACES.filter(({ surface }) => surface !== "docs");
 
   test("static authored surfaces mark the expected aria-current link", async ({ page }) => {

@@ -1,5 +1,3 @@
-"""Timing policy enforcement with wall-clock allowlist."""
-
 from __future__ import annotations
 
 import argparse

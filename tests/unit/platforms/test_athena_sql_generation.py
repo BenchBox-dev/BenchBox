@@ -1,12 +1,6 @@
-"""Tests for Athena SQL generation branches - uncovered by existing test suite.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets: _build_ctas_sort_sql, _convert_to_external_table staging path,
-CTAS SQL content, configure_for_benchmark SQL.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, Mock, patch, patch as _patch
 
@@ -19,7 +13,7 @@ pytestmark = [
 
 
 def _make_adapter(**kwargs):
-    """Create an AthenaAdapter without real credentials."""
+
     with (
         patch.dict(
             "sys.modules",
@@ -96,7 +90,7 @@ class TestAthenaConvertToExternalTableStagingPath:
             )
             sql = "CREATE TABLE orders (id INT, amount DECIMAL)"
             converted = adapter._convert_to_external_table(sql, is_staging=True)
-            # Staging tables use text format
+
             assert "EXTERNAL TABLE" in converted.upper()
             assert "TEXTFILE" in converted.upper() or "DELIMITED" in converted.upper()
 
@@ -159,16 +153,13 @@ class TestAthenaConfigureForBenchmark:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
 
-        # Should not raise
         adapter.configure_for_benchmark(mock_conn, "tpch")
-        # Some adapters set query parameters - verify cursor was used
-        # (Athena configure_for_benchmark may be a no-op, that's OK)
 
 
 class TestAthenaGetTargetDialect:
     def test_returns_trino(self):
         adapter = _make_adapter()
-        # Athena uses Trino/Presto dialect
+
         dialect = adapter.get_target_dialect()
         assert isinstance(dialect, str)
         assert len(dialect) > 0
@@ -176,7 +167,7 @@ class TestAthenaGetTargetDialect:
 
 class TestAthenaCtasSqlContent:
     def test_ctas_sql_contains_format_parquet(self):
-        """The CTAS conversion method generates SQL with format='PARQUET'."""
+
         with (
             patch.dict(
                 "sys.modules",
@@ -202,10 +193,8 @@ class TestAthenaCtasSqlContent:
 
             s3_mock = MagicMock()
 
-            # Call _convert_staging_to_parquet
             adapter._convert_staging_to_parquet(mock_cursor, [("lineitem", 100)], s3_mock)
 
-            # Verify the CTAS SQL contained format='PARQUET'
             executed_sql = [call.args[0] for call in mock_cursor.execute.call_args_list if call.args]
             ctas_calls = [sql for sql in executed_sql if "CREATE TABLE" in sql]
             assert any("format" in sql.lower() and "parquet" in sql.lower() for sql in ctas_calls)

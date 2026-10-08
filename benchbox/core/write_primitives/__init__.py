@@ -1,11 +1,6 @@
-"""Write Primitives benchmark package.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests fundamental database write operations using TPC-H schema.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from benchbox.core.write_primitives.benchmark import (
     OperationResult,
@@ -49,7 +44,6 @@ __all__ = [
     "OperationResult",
     "WritePrimitivesDataGenerator",
     "WriteOperationsManager",
-    # DataFrame operations
     "WriteOperationType",
     "DataFrameWriteCapabilities",
     "DataFrameWriteResult",

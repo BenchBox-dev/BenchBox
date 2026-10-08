@@ -1,9 +1,6 @@
-"""AI/ML SQL function query management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -15,8 +12,6 @@ from .functions import AIMLFunctionCategory, AIMLFunctionRegistry
 
 @dataclass
 class AIMLQuery:
-    """A benchmark query for an AI/ML function."""
-
     query_id: str
     function_id: str
     category: AIMLFunctionCategory
@@ -28,11 +23,9 @@ class AIMLQuery:
     timeout_seconds: int = 120
 
     def get_query(self, platform: str) -> str | None:
-        """Get the query for a specific platform."""
         return self.platform_queries.get(platform.lower())
 
     def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary."""
         return {
             "query_id": self.query_id,
             "function_id": self.function_id,
@@ -46,17 +39,12 @@ class AIMLQuery:
 
 
 class AIMLQueryManager:
-    """Manager for AI/ML benchmark queries."""
-
     def __init__(self) -> None:
-        """Initialize the query manager."""
         self._registry = AIMLFunctionRegistry()
         self._queries: dict[str, AIMLQuery] = {}
         self._build_queries()
 
     def _build_queries(self) -> None:
-        """Build benchmark queries from the function registry."""
-        # Sentiment Analysis Queries
         self._queries["sentiment_single"] = AIMLQuery(
             query_id="sentiment_single",
             function_id="sentiment_analysis",
@@ -145,7 +133,6 @@ ORDER BY category
             },
         )
 
-        # Classification Queries
         self._queries["classification_single"] = AIMLQuery(
             query_id="classification_single",
             function_id="text_classification",
@@ -210,7 +197,6 @@ LIMIT 50
             },
         )
 
-        # Summarization Queries
         self._queries["summarization_single"] = AIMLQuery(
             query_id="summarization_single",
             function_id="summarization",
@@ -266,7 +252,6 @@ LIMIT 10
             },
         )
 
-        # LLM Completion Queries
         self._queries["completion_simple"] = AIMLQuery(
             query_id="completion_simple",
             function_id="completion",
@@ -333,7 +318,6 @@ LIMIT 10
             },
         )
 
-        # Embedding Queries
         self._queries["embedding_single"] = AIMLQuery(
             query_id="embedding_single",
             function_id="embedding",
@@ -419,7 +403,6 @@ LIMIT 10
             },
         )
 
-        # Translation Queries
         self._queries["translation_single"] = AIMLQuery(
             query_id="translation_single",
             function_id="translation",
@@ -466,7 +449,6 @@ LIMIT 50
             },
         )
 
-        # Entity Extraction Queries
         self._queries["extraction_single"] = AIMLQuery(
             query_id="extraction_single",
             function_id="entity_extraction",
@@ -496,30 +478,23 @@ WHERE id = 1
         )
 
     def get_query(self, query_id: str) -> AIMLQuery | None:
-        """Get a query by ID."""
         return self._queries.get(query_id)
 
     def get_all_queries(self) -> dict[str, AIMLQuery]:
-        """Get all queries."""
         return self._queries.copy()
 
     def get_queries_by_category(self, category: AIMLFunctionCategory) -> list[AIMLQuery]:
-        """Get all queries in a category."""
         return [q for q in self._queries.values() if q.category == category]
 
     def get_queries_for_platform(self, platform: str) -> list[AIMLQuery]:
-        """Get all queries that have implementations for a platform."""
         platform_lower = platform.lower()
         return [q for q in self._queries.values() if platform_lower in q.platform_queries]
 
     def get_query_ids(self) -> list[str]:
-        """Get all query IDs."""
         return list(self._queries.keys())
 
     def get_categories(self) -> list[AIMLFunctionCategory]:
-        """Get all query categories."""
         return list(set(q.category for q in self._queries.values()))
 
     def export_queries(self) -> dict[str, Any]:
-        """Export all queries as a dictionary."""
         return {query_id: query.to_dict() for query_id, query in self._queries.items()}

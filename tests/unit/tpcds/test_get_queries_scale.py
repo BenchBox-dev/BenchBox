@@ -1,10 +1,3 @@
-"""``get_queries`` must render the same SQL as ``get_query`` for the data's scale factor.
-
-dsqgen derives some values from the scale (row-count thresholds, for example), so rendering at a
-different scale gives SQL that does not match the generated data. Q9 and Q44 are two of the
-templates whose SQL changes with scale.
-"""
-
 import pytest
 
 pytestmark = [

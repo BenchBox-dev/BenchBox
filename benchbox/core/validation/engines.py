@@ -1,12 +1,3 @@
-"""
-Core validation logic for BenchBox.
-
-This module provides comprehensive validation for generated benchmark data,
-including preflight validation of data completeness and post-loading validation
-of database state. This is the core validation logic that can be used
-independently of any CLI or interface layer.
-"""
-
 from __future__ import annotations
 
 import json
@@ -20,31 +11,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ValidationResult:
-    """Result of a validation check.
-
-    Attributes:
-        is_valid: True if validation passed, False otherwise
-        errors: List of error messages (validation failures that prevent operation)
-        warnings: List of warning messages (concerns that don't prevent operation)
-        details: Additional context about the validation (benchmark type, scale factor, etc.)
-        remote_manifest: Remote data manifest (for upload validation only).
-            When UploadValidationEngine validates existing remote data, this contains
-            the parsed remote manifest from cloud storage (e.g., dbfs:/Volumes/.../manifest.json).
-            Used to extract file URIs for data reuse without re-uploading.
-            None for non-upload validations (preflight, post-generation, post-load).
-
-    Example:
-        # Upload validation with remote manifest
-        result = engine.validate_remote_data(remote_path, local_manifest_path)
-        if result.is_valid and result.remote_manifest:
-            tables = result.remote_manifest.get("tables", {})
-            # Use remote data without re-uploading
-
-        # Other validations without remote manifest
-        result = engine.validate_preflight_conditions(benchmark, scale, output_dir)
-        # result.remote_manifest is None
-    """
-
     is_valid: bool
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -54,8 +20,6 @@ class ValidationResult:
 
 @dataclass
 class ValidationSummary:
-    """Summary of all validation results."""
-
     total_validations: int
     passed_validations: int
     failed_validations: int
@@ -64,8 +28,6 @@ class ValidationSummary:
 
 @dataclass
 class BenchmarkExpectations:
-    """Defines expected data characteristics for each benchmark."""
-
     expected_table_count: int = 0
     critical_tables: list[str] = field(default_factory=list)
     dimension_tables: list[str] = field(default_factory=list)
@@ -74,9 +36,6 @@ class BenchmarkExpectations:
 
 
 class DataValidationEngine:
-    """Core validation engine for benchmark data files and manifests."""
-
-    # Benchmark expectations registry
     BENCHMARK_EXPECTATIONS = {
         "tpcds": BenchmarkExpectations(
             expected_table_count=25,
@@ -164,34 +123,20 @@ class DataValidationEngine:
     }
 
     def __init__(self):
-        """Initialize the validation engine."""
+        pass
 
     def validate_preflight_conditions(
         self, benchmark_type: str, scale_factor: float, output_dir: Path
     ) -> ValidationResult:
-        """
-        Validate conditions before data generation.
-
-        Args:
-            benchmark_type: Type of benchmark (e.g., 'tpcds', 'tpch')
-            scale_factor: Scale factor for the benchmark
-            output_dir: Directory where data will be generated
-
-        Returns:
-            ValidationResult with preflight validation status
-        """
         errors = []
         warnings = []
 
-        # Validate benchmark type
         if benchmark_type not in self.BENCHMARK_EXPECTATIONS:
             errors.append(f"Unsupported benchmark type: {benchmark_type}")
 
-        # Validate scale factor
         if scale_factor <= 0:
             errors.append("Scale factor must be positive")
 
-        # Validate output directory
         if not output_dir.exists():
             try:
                 output_dir.mkdir(parents=True, exist_ok=True)
@@ -200,10 +145,9 @@ class DataValidationEngine:
         elif not output_dir.is_dir():
             errors.append(f"Output path exists but is not a directory: {output_dir}")
 
-        # Check disk space (basic check)
         try:
             stat = output_dir.stat()
-            if hasattr(stat, "st_size"):  # Basic existence check
+            if hasattr(stat, "st_size"):
                 pass
         except Exception as e:
             warnings.append(f"Could not verify output directory status: {e}")
@@ -220,19 +164,9 @@ class DataValidationEngine:
         )
 
     def validate_generated_data(self, manifest_path: Path) -> ValidationResult:
-        """
-        Validate generated benchmark data using manifest.
-
-        Args:
-            manifest_path: Path to the data generation manifest
-
-        Returns:
-            ValidationResult with data validation status
-        """
         errors = []
         warnings = []
 
-        # Check manifest exists
         if not manifest_path.exists():
             return ValidationResult(
                 is_valid=False,
@@ -240,7 +174,6 @@ class DataValidationEngine:
                 warnings=warnings,
             )
 
-        # Load and parse manifest
         try:
             with open(manifest_path, encoding="utf-8") as f:
                 manifest = json.load(f)
@@ -257,35 +190,27 @@ class DataValidationEngine:
                 warnings=warnings,
             )
 
-        # A manifest that lists no tables, or only tables without files, is
-        # invalid for every benchmark, with or without table-count expectations:
-        # nothing can load from it.
         if not any((manifest.get("tables") or {}).values()):
             errors.append("Manifest lists no tables; data generation produced no usable output")
 
-        # Get benchmark expectations
         benchmark_type = manifest.get("benchmark", "").lower()
         expectations = self.BENCHMARK_EXPECTATIONS.get(benchmark_type)
 
         if not expectations:
             warnings.append(f"No validation expectations defined for benchmark: {benchmark_type}")
         else:
-            # Validate table count
             table_errors, table_warnings = self._validate_table_count(manifest, expectations)
             errors.extend(table_errors)
             warnings.extend(table_warnings)
 
-            # Validate critical tables
             critical_errors, critical_warnings = self._validate_critical_tables(manifest, expectations)
             errors.extend(critical_errors)
             warnings.extend(critical_warnings)
 
-            # Validate file sizes
             file_errors, file_warnings = self._validate_file_sizes(manifest, expectations, manifest_path.parent)
             errors.extend(file_errors)
             warnings.extend(file_warnings)
 
-            # Validate row counts
             row_errors, row_warnings = self._validate_row_counts(manifest, expectations)
             errors.extend(row_errors)
             warnings.extend(row_warnings)
@@ -304,7 +229,6 @@ class DataValidationEngine:
     def _validate_table_count(
         self, manifest: dict[str, Any], expectations: BenchmarkExpectations
     ) -> tuple[list[str], list[str]]:
-        """Validate the number of tables generated."""
         errors = []
         warnings = []
 
@@ -324,7 +248,6 @@ class DataValidationEngine:
     def _validate_critical_tables(
         self, manifest: dict[str, Any], expectations: BenchmarkExpectations
     ) -> tuple[list[str], list[str]]:
-        """Validate that critical tables are present."""
         errors = []
         warnings = []
 
@@ -343,7 +266,6 @@ class DataValidationEngine:
         expectations: BenchmarkExpectations,
         data_dir: Path,
     ) -> tuple[list[str], list[str]]:
-        """Validate file sizes against manifest declarations."""
         errors = []
         warnings = []
 
@@ -361,15 +283,13 @@ class DataValidationEngine:
 
                 actual_size = file_path.stat().st_size
 
-                # Check minimum size
                 if actual_size < min_size:
                     warnings.append(
                         f"Table {table_name} file size ({actual_size} bytes) below minimum size threshold ({min_size} bytes)"
                     )
 
-                # Check size consistency (allow 5% variance)
                 size_diff = abs(actual_size - expected_size)
-                tolerance = max(1024, expected_size * 0.05)  # 5% or at least 1KB
+                tolerance = max(1024, expected_size * 0.05)
 
                 if size_diff > tolerance:
                     warnings.append(
@@ -381,7 +301,6 @@ class DataValidationEngine:
     def _validate_row_counts(
         self, manifest: dict[str, Any], expectations: BenchmarkExpectations
     ) -> tuple[list[str], list[str]]:
-        """Validate row counts in generated data."""
         errors = []
         warnings = []
 
@@ -400,28 +319,14 @@ class DataValidationEngine:
 
 
 class DatabaseValidationEngine:
-    """Core validation engine for database state after data loading."""
-
     def __init__(self):
-        """Initialize the database validation engine."""
+        pass
 
     def validate_loaded_data(self, connection: Any, benchmark_type: str, scale_factor: float) -> ValidationResult:
-        """
-        Validate database state after data loading.
-
-        Args:
-            connection: Database connection object
-            benchmark_type: Type of benchmark (e.g., 'tpcds', 'tpch')
-            scale_factor: Scale factor for the benchmark
-
-        Returns:
-            ValidationResult with database validation status
-        """
         errors = []
         warnings = []
 
         try:
-            # Get expected tables for benchmark
             expectations = DataValidationEngine.BENCHMARK_EXPECTATIONS.get(benchmark_type)
             if not expectations:
                 warnings.append(f"No validation expectations for benchmark: {benchmark_type}")
@@ -429,15 +334,12 @@ class DatabaseValidationEngine:
             else:
                 expected_tables = expectations.critical_tables
 
-            # Get actual tables from database
             actual_tables = self._get_table_list(connection)
 
-            # Validate table presence
             missing_tables = set(expected_tables) - set(actual_tables)
             if missing_tables:
                 errors.append(f"Missing tables in database: {', '.join(sorted(missing_tables))}")
 
-            # Validate row counts for existing tables
             for table in expected_tables:
                 if table in actual_tables:
                     try:
@@ -464,10 +366,8 @@ class DatabaseValidationEngine:
         )
 
     def _get_table_list(self, connection: Any) -> list[str]:
-        """Get list of tables from database connection."""
         cursor = connection.cursor()
 
-        # Try standard SQL first
         try:
             cursor.execute("""
                 SELECT table_name
@@ -478,25 +378,21 @@ class DatabaseValidationEngine:
         except Exception:
             pass
 
-        # Try SQLite-specific query
         try:
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             return [row[0].lower() for row in cursor.fetchall()]
         except Exception:
             pass
 
-        # Try DuckDB-specific query
         try:
             cursor.execute("SHOW TABLES")
             return [row[0].lower() for row in cursor.fetchall()]
         except Exception:
             pass
 
-        # If all fail, return empty list
         return []
 
     def _get_table_row_count(self, connection: Any, table_name: str) -> int:
-        """Get row count for a specific table."""
         cursor = connection.cursor()
         cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
         result = cursor.fetchone()

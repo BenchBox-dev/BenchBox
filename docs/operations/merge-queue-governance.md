@@ -29,7 +29,7 @@ Seven status checks are required on `develop`: six always-reporting unit jobs in
 
 The public-site visual comparison runs only when a render input changed. It compares against the exact protected base SHA, captured by `.github/workflows/docs.yml` on every push to `develop`. The comparison is advisory until the public site is in production: the job still runs and uploads its report, but a difference or a missing baseline does not block a merge. It becomes a required check again when the site is in production.
 
-The pull request that switches the public-site renderer from Sphinx to Astro needs an exact-head approval for its PR head, and the baseline producer must publish an Astro-rendered baseline for its merge commit. The steps are in the Renderer-switch pull request section of [Results Explorer browser testing](../development/results-explorer-browser-testing.md).
+The pull request that switches the public-site renderer from Sphinx to Astro needs an exact-head approval for its PR head, and the baseline producer must publish an Astro-rendered baseline for its merge commit. The steps are in the Renderer-switch pull request section of [Public-site visual baseline](public-site-visual-baseline.md).
 
 ---
 
@@ -45,7 +45,7 @@ Slow-marked reproducer jobs remain required PR CI through the `core` unit, becau
 
 ### A. Submitting & Arming a PR
 
-Developers submit and arm PRs through repository standard Makefile targets:
+Developers submit and arm PRs through repository standard Makefile targets. `make pr-open` opens the PR against `develop` with a currency check. When the PR is ready for merge, `make pr-ready` runs the exact readiness transaction and arms it:
 
 ```bash
 make pr-open

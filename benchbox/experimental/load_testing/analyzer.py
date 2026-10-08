@@ -1,10 +1,3 @@
-"""Concurrency analysis tools for load test results.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
-
 from __future__ import annotations
 
 import logging
@@ -22,9 +15,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class QueueAnalysis:
-    """Analysis of query queueing behavior."""
-
-    # Wait time statistics (milliseconds)
     min_wait_ms: float
     max_wait_ms: float
     avg_wait_ms: float
@@ -34,19 +24,15 @@ class QueueAnalysis:
     p99_wait_ms: float
     stdev_wait_ms: float
 
-    # Queue depth
     max_queue_depth: int
     avg_queue_depth: float
 
-    # Time in queue vs execution
-    queue_time_ratio: float  # Queue time / Total time
+    queue_time_ratio: float
 
-    # Queueing indicators
     queueing_detected: bool
-    queueing_severity: str  # "none", "mild", "moderate", "severe"
+    queueing_severity: str
 
     def __post_init__(self) -> None:
-        """Determine queueing severity."""
         if self.avg_wait_ms < 10:
             self.queueing_severity = "none"
             self.queueing_detected = False
@@ -63,69 +49,44 @@ class QueueAnalysis:
 
 @dataclass
 class ContentionAnalysis:
-    """Analysis of resource contention patterns."""
-
-    # Timing variability
     latency_stdev_ms: float
-    latency_cv: float  # Coefficient of variation
+    latency_cv: float
 
-    # Slow queries
     slow_query_count: int
     slow_query_ratio: float
     slowest_query_ms: float
 
-    # Failure patterns
     failure_rate: float
     timeout_count: int
     connection_error_count: int
 
-    # Contention indicators
     contention_detected: bool
-    contention_type: str  # "none", "resource", "lock", "connection", "unknown"
-    contention_severity: str  # "none", "mild", "moderate", "severe"
+    contention_type: str
+    contention_severity: str
 
-    # Recommendations
     recommendations: list[str] = field(default_factory=list)
 
 
 @dataclass
 class ScalingAnalysis:
-    """Analysis of how performance scales with concurrency."""
-
-    # Scaling metrics
     concurrency_levels: list[int]
-    throughput_at_level: dict[int, float]  # Concurrency -> queries/sec
-    latency_at_level: dict[int, float]  # Concurrency -> avg latency ms
+    throughput_at_level: dict[int, float]
+    latency_at_level: dict[int, float]
 
-    # Linear scaling analysis
-    scaling_efficiency: float  # 1.0 = perfect linear scaling
+    scaling_efficiency: float
     optimal_concurrency: int
-    saturation_point: int | None  # Where performance starts degrading
+    saturation_point: int | None
 
-    # Amdahl's law estimation
-    parallelizable_fraction: float  # Estimated parallelizable portion
+    parallelizable_fraction: float
 
-    # Scaling characteristics
-    scaling_type: str  # "linear", "sublinear", "saturation", "degradation"
+    scaling_type: str
 
 
 class LoadAnalyzer:
-    """Analyzes concurrent load test results for patterns and bottlenecks."""
-
     def __init__(self, result: ConcurrentLoadResult):
-        """Initialize analyzer with load test results.
-
-        Args:
-            result: Results from ConcurrentLoadExecutor
-        """
         self._result = result
 
     def analyze_queue(self) -> QueueAnalysis:
-        """Analyze queueing behavior from the load test.
-
-        Returns:
-            Queue analysis with wait time statistics
-        """
         wait_times_ms = []
         execution_times_ms = []
 
@@ -137,7 +98,6 @@ class LoadAnalyzer:
                 execution_times_ms.append(exec_time)
 
         if not wait_times_ms:
-            # No queue tracking data
             return QueueAnalysis(
                 min_wait_ms=0,
                 max_wait_ms=0,
@@ -170,19 +130,11 @@ class LoadAnalyzer:
             max_queue_depth=self._result.max_concurrency_reached,
             avg_queue_depth=len(self._result.streams) / max(1, self._result.total_duration_seconds),
             queue_time_ratio=total_queue_time / (total_queue_time + total_exec_time) if total_exec_time > 0 else 0,
-            queueing_detected=False,  # Set by __post_init__
-            queueing_severity="none",  # Set by __post_init__
+            queueing_detected=False,
+            queueing_severity="none",
         )
 
     def analyze_contention(self, slow_threshold_multiplier: float = 3.0) -> ContentionAnalysis:
-        """Analyze resource contention patterns.
-
-        Args:
-            slow_threshold_multiplier: Queries taking > multiplier * median are slow
-
-        Returns:
-            Contention analysis with bottleneck identification
-        """
         latencies_ms = []
         timeout_count = 0
         connection_errors = 0
@@ -223,7 +175,6 @@ class LoadAnalyzer:
         mean_latency = statistics.mean(latencies_ms)
         cv = stdev / mean_latency if mean_latency > 0 else 0
 
-        # Determine contention type and severity
         contention_type = "none"
         contention_severity = "none"
         recommendations = []
@@ -277,22 +228,12 @@ class LoadAnalyzer:
         )
 
     def analyze_scaling(self, results_by_concurrency: dict[int, ConcurrentLoadResult] | None = None) -> ScalingAnalysis:
-        """Analyze how performance scales with concurrency.
-
-        Args:
-            results_by_concurrency: Optional dict mapping concurrency -> results.
-                If not provided, uses data from single result.
-
-        Returns:
-            Scaling analysis with efficiency metrics
-        """
         if results_by_concurrency is None:
             return self._analyze_scaling_single()
 
         return self._analyze_scaling_multi(results_by_concurrency)
 
     def _analyze_scaling_single(self) -> ScalingAnalysis:
-        """Scaling analysis from a single concurrency result."""
         concurrency_levels = [self._result.max_concurrency_reached]
         throughput_at_level = {self._result.max_concurrency_reached: self._result.overall_throughput}
 
@@ -312,7 +253,6 @@ class LoadAnalyzer:
         )
 
     def _analyze_scaling_multi(self, results_by_concurrency: dict[int, ConcurrentLoadResult]) -> ScalingAnalysis:
-        """Full scaling analysis from multiple concurrency levels."""
         concurrency_levels = sorted(results_by_concurrency.keys())
         throughput_at_level: dict[int, float] = {}
         latency_at_level: dict[int, float] = {}
@@ -350,12 +290,10 @@ class LoadAnalyzer:
 
     @staticmethod
     def _collect_latencies(result: ConcurrentLoadResult) -> list[float]:
-        """Collect all query latencies in milliseconds from a load result."""
         return [ex.latency_seconds * 1000 for stream in result.streams for ex in stream.query_executions]
 
     @staticmethod
     def _compute_scaling_efficiency(concurrency_levels: list[int], throughput_at_level: dict[int, float]) -> float:
-        """Calculate average scaling efficiency across concurrency levels."""
         if len(concurrency_levels) < 2:
             return 1.0
         base_level = concurrency_levels[0]
@@ -371,7 +309,6 @@ class LoadAnalyzer:
 
     @staticmethod
     def _find_saturation_point(concurrency_levels: list[int], throughput_at_level: dict[int, float]) -> int | None:
-        """Find the concurrency level where throughput stops increasing (<10% gain)."""
         for i, level in enumerate(concurrency_levels[:-1]):
             next_level = concurrency_levels[i + 1]
             if throughput_at_level[next_level] < throughput_at_level[level] * 1.1:
@@ -382,7 +319,6 @@ class LoadAnalyzer:
     def _estimate_parallelizable_fraction(
         concurrency_levels: list[int], throughput_at_level: dict[int, float]
     ) -> float:
-        """Estimate parallelizable fraction using Amdahl's law."""
         if len(concurrency_levels) < 2:
             return 0.5
         max_level = max(concurrency_levels)
@@ -396,11 +332,6 @@ class LoadAnalyzer:
         return 0.5
 
     def get_summary(self) -> dict:
-        """Get a summary of all analyses.
-
-        Returns:
-            Dictionary with analysis summaries
-        """
         queue_analysis = self.analyze_queue()
         contention_analysis = self.analyze_contention()
         scaling_analysis = self.analyze_scaling()

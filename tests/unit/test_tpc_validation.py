@@ -1,9 +1,6 @@
-"""Unit tests for TPC validation system.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import Mock
 
@@ -25,7 +22,6 @@ from benchbox.core.tpc_validation import (
     create_sample_test_results,
 )
 
-# Mark all tests in this file as unit tests
 pytestmark = [
     pytest.mark.unit,
     pytest.mark.fast,
@@ -33,10 +29,7 @@ pytestmark = [
 
 
 class TestValidationReport:
-    """Test ValidationReport functionality."""
-
     def test_validation_report_creation(self):
-        """Test ValidationReport creation and basic functionality."""
         report = ValidationReport(
             benchmark_name="TPC-H",
             scale_factor=1.0,
@@ -51,10 +44,8 @@ class TestValidationReport:
         assert len(report.validator_results) == 0
 
     def test_add_issue(self):
-        """Test adding issues to validation report."""
         report = ValidationReport()
 
-        # Include error issue
         report.add_issue("ERROR", "Test error message", {"key": "value"}, "test_validator")
 
         assert len(report.issues) == 1
@@ -65,7 +56,6 @@ class TestValidationReport:
         assert report.overall_result == ValidationResult.FAILED
 
     def test_get_issues_by_level(self):
-        """Test filtering issues by level."""
         report = ValidationReport()
 
         report.add_issue("ERROR", "Error message", validator_name="test1")
@@ -81,7 +71,6 @@ class TestValidationReport:
         assert all(issue.level == "WARNING" for issue in warning_issues)
 
     def test_get_issues_by_validator(self):
-        """Test filtering issues by validator."""
         report = ValidationReport()
 
         report.add_issue("ERROR", "Error 1", validator_name="validator1")
@@ -95,7 +84,6 @@ class TestValidationReport:
         assert len(validator2_issues) == 1
 
     def test_to_dict(self):
-        """Test converting report to dictionary."""
         report = ValidationReport(benchmark_name="TPC-H", scale_factor=1.0)
         report.add_issue("ERROR", "Test error", {"key": "value"}, "test_validator")
 
@@ -110,10 +98,7 @@ class TestValidationReport:
 
 
 class TestCompletenessValidator:
-    """Test CompletenessValidator functionality."""
-
     def test_completeness_validator_success(self):
-        """Test successful completeness validation."""
         config = {
             "required_queries": {"TPC-H": [1, 2, 3]},
             "required_tables": ["customer", "orders"],
@@ -144,7 +129,6 @@ class TestCompletenessValidator:
         assert len(report.issues) == 0
 
     def test_completeness_validator_missing_queries(self):
-        """Test completeness validation with missing queries."""
         config = {
             "required_queries": {"TPC-H": [1, 2, 3, 4]},
             "required_tables": [],
@@ -162,7 +146,6 @@ class TestCompletenessValidator:
             "query_results": {
                 "1": {"status": "success", "execution_time_seconds": 1.0, "row_count": 100},
                 "2": {"status": "success", "execution_time_seconds": 2.0, "row_count": 200},
-                # Missing queries 3 and 4
             },
             "data_generation": {"generated_tables": []},
             "metrics": {},
@@ -176,7 +159,6 @@ class TestCompletenessValidator:
         assert any("Missing required queries" in issue.message for issue in report.issues)
 
     def test_completeness_validator_missing_tables(self):
-        """Test completeness validation with missing tables."""
         config = {
             "required_queries": {},
             "required_tables": ["customer", "orders", "lineitem"],
@@ -192,9 +174,7 @@ class TestCompletenessValidator:
             "test_start_time": "2023-01-01T10:00:00Z",
             "test_end_time": "2023-01-01T11:00:00Z",
             "query_results": {},
-            "data_generation": {
-                "generated_tables": ["customer", "orders"]  # Missing lineitem
-            },
+            "data_generation": {"generated_tables": ["customer", "orders"]},
             "metrics": {},
             "maintenance_operations": {},
         }
@@ -207,10 +187,7 @@ class TestCompletenessValidator:
 
 
 class TestQueryResultValidator:
-    """Test QueryResultValidator functionality."""
-
     def test_query_result_validator_success(self):
-        """Test successful query result validation."""
         config = {
             "max_execution_time": 3600,
             "min_row_count": 0,
@@ -243,7 +220,6 @@ class TestQueryResultValidator:
         assert len(report.issues) == 0
 
     def test_query_result_validator_failed_query(self):
-        """Test query result validation with failed query."""
         validator = QueryResultValidator()
         report = ValidationReport()
 
@@ -265,7 +241,6 @@ class TestQueryResultValidator:
         assert any("failed with status" in issue.message for issue in report.issues)
 
     def test_query_result_validator_timeout(self):
-        """Test query result validation with timeout."""
         config = {"max_execution_time": 10}
 
         validator = QueryResultValidator(config)
@@ -275,7 +250,7 @@ class TestQueryResultValidator:
             "query_results": {
                 "1": {
                     "status": "success",
-                    "execution_time_seconds": 15.0,  # Exceeds max_execution_time
+                    "execution_time_seconds": 15.0,
                     "row_count": 100,
                     "results": [],
                 }
@@ -290,10 +265,7 @@ class TestQueryResultValidator:
 
 
 class TestTimingValidator:
-    """Test TimingValidator functionality."""
-
     def test_timing_validator_success(self):
-        """Test successful timing validation."""
         validator = TimingValidator()
         report = ValidationReport()
 
@@ -316,12 +288,11 @@ class TestTimingValidator:
         assert len(report.issues) == 0
 
     def test_timing_validator_invalid_timestamps(self):
-        """Test timing validation with invalid timestamps."""
         validator = TimingValidator()
         report = ValidationReport()
 
         test_results = {
-            "test_start_time": "2023-01-01T11:00:00Z",  # After end time
+            "test_start_time": "2023-01-01T11:00:00Z",
             "test_end_time": "2023-01-01T10:00:00Z",
             "query_results": {},
         }
@@ -333,15 +304,14 @@ class TestTimingValidator:
         assert any("end time before start time" in issue.message for issue in report.issues)
 
     def test_timing_validator_excessive_total_time(self):
-        """Test timing validation with excessive total time."""
-        config = {"max_total_time": 3600}  # 1 hour
+        config = {"max_total_time": 3600}
 
         validator = TimingValidator(config)
         report = ValidationReport()
 
         test_results = {
             "test_start_time": "2023-01-01T10:00:00Z",
-            "test_end_time": "2023-01-01T13:00:00Z",  # 3 hours later
+            "test_end_time": "2023-01-01T13:00:00Z",
             "query_results": {},
         }
 
@@ -353,10 +323,7 @@ class TestTimingValidator:
 
 
 class TestDataIntegrityValidator:
-    """Test DataIntegrityValidator functionality."""
-
     def test_data_integrity_validator_success(self):
-        """Test successful data integrity validation."""
         validator = DataIntegrityValidator()
         report = ValidationReport()
 
@@ -381,7 +348,6 @@ class TestDataIntegrityValidator:
         assert len(report.issues) == 0
 
     def test_data_integrity_validator_failed_operation(self):
-        """Test data integrity validation with failed operation."""
         validator = DataIntegrityValidator()
         report = ValidationReport()
 
@@ -404,7 +370,6 @@ class TestDataIntegrityValidator:
         assert any("failed integrity validation" in issue.message for issue in report.issues)
 
     def test_data_integrity_validator_no_operations(self):
-        """Test data integrity validation with no operations."""
         validator = DataIntegrityValidator()
         report = ValidationReport()
 
@@ -412,14 +377,11 @@ class TestDataIntegrityValidator:
 
         result = validator.validate(test_results, report)
 
-        assert result == ValidationResult.PASSED  # No operations to validate
+        assert result == ValidationResult.PASSED
 
 
 class TestMetricsValidator:
-    """Test MetricsValidator functionality."""
-
     def test_metrics_validator_success(self):
-        """Test successful metrics validation."""
         config = {
             "required_metrics": ["avg_query_time", "total_query_time"],
             "metric_ranges": {"avg_query_time": {"min": 0.0, "max": 300.0}},
@@ -448,7 +410,6 @@ class TestMetricsValidator:
         assert len(report.issues) == 0
 
     def test_metrics_validator_missing_metrics(self):
-        """Test metrics validation with missing required metrics."""
         config = {
             "required_metrics": [
                 "avg_query_time",
@@ -465,7 +426,6 @@ class TestMetricsValidator:
             "metrics": {
                 "avg_query_time": 4.15,
                 "total_query_time": 8.3,
-                # Missing "missing_metric"
             },
             "query_results": {},
             "test_start_time": "2023-01-01T10:00:00Z",
@@ -479,7 +439,6 @@ class TestMetricsValidator:
         assert any("Required metric missing" in issue.message for issue in report.issues)
 
     def test_metrics_validator_out_of_range(self):
-        """Test metrics validation with out-of-range values."""
         config = {
             "required_metrics": [],
             "metric_ranges": {"avg_query_time": {"min": 0.0, "max": 5.0}},
@@ -489,9 +448,7 @@ class TestMetricsValidator:
         report = ValidationReport()
 
         test_results = {
-            "metrics": {
-                "avg_query_time": 10.0  # Exceeds maximum
-            },
+            "metrics": {"avg_query_time": 10.0},
             "query_results": {},
             "test_start_time": "2023-01-01T10:00:00Z",
             "test_end_time": "2023-01-01T11:00:00Z",
@@ -505,10 +462,7 @@ class TestMetricsValidator:
 
 
 class TestComplianceChecker:
-    """Test ComplianceChecker functionality."""
-
     def test_compliance_checker_tpch_success(self):
-        """Test successful TPC-H compliance validation."""
         validator = ComplianceChecker()
         report = ValidationReport()
 
@@ -530,14 +484,13 @@ class TestComplianceChecker:
         assert len(report.issues) == 0
 
     def test_compliance_checker_tpch_missing_queries(self):
-        """Test TPC-H compliance validation with missing queries."""
         validator = ComplianceChecker()
         report = ValidationReport()
 
         test_results = {
             "benchmark_name": "TPC-H",
             "scale_factor": 1.0,
-            "query_results": {str(i): {"status": "success"} for i in range(1, 20)},  # Missing queries 20-22
+            "query_results": {str(i): {"status": "success"} for i in range(1, 20)},
             "test_isolation": {"isolated": True},
             "reproducibility": {
                 "seed": 12345,
@@ -553,7 +506,6 @@ class TestComplianceChecker:
         assert any("requires all 22 queries" in issue.message for issue in report.issues)
 
     def test_compliance_checker_tpcds_success(self):
-        """Test successful TPC-DS compliance validation."""
         validator = ComplianceChecker()
         report = ValidationReport()
 
@@ -576,7 +528,6 @@ class TestComplianceChecker:
         assert len(report.issues) == 0
 
     def test_compliance_checker_unknown_benchmark(self):
-        """Test compliance validation with unknown benchmark."""
         validator = ComplianceChecker()
         report = ValidationReport()
 
@@ -600,10 +551,7 @@ class TestComplianceChecker:
 
 
 class TestCertificationChecker:
-    """Test CertificationChecker functionality."""
-
     def test_certification_checker_ready(self):
-        """Test certification readiness validation - ready status."""
         config = {
             "required_documentation": ["test_report", "environment_spec"],
             "performance_thresholds": {"avg_query_time": 100.0},
@@ -613,9 +561,7 @@ class TestCertificationChecker:
         report = ValidationReport()
 
         test_results = {
-            "metrics": {
-                "avg_query_time": 50.0  # Below threshold
-            },
+            "metrics": {"avg_query_time": 50.0},
             "documentation": {
                 "test_report": "path/to/test_report.pdf",
                 "environment_spec": "path/to/env_spec.json",
@@ -631,7 +577,6 @@ class TestCertificationChecker:
         assert len(report.issues) == 0
 
     def test_certification_checker_not_ready(self):
-        """Test certification readiness validation - not ready status."""
         config = {
             "required_documentation": ["test_report", "environment_spec"],
             "performance_thresholds": {},
@@ -642,13 +587,8 @@ class TestCertificationChecker:
 
         test_results = {
             "metrics": {},
-            "documentation": {
-                "test_report": "path/to/test_report.pdf"
-                # Missing environment_spec
-            },
-            "query_results": {
-                "1": {"status": "failed"}  # Failed query
-            },
+            "documentation": {"test_report": "path/to/test_report.pdf"},
+            "query_results": {"1": {"status": "failed"}},
             "reproducibility": {"seed": 12345, "environment": "test_env"},
         }
 
@@ -659,7 +599,6 @@ class TestCertificationChecker:
         assert len(report.issues) > 0
 
     def test_certification_checker_conditional(self):
-        """Test certification readiness validation - conditional status."""
         config = {
             "required_documentation": ["test_report"],
             "performance_thresholds": {"avg_query_time": 10.0},
@@ -669,9 +608,7 @@ class TestCertificationChecker:
         report = ValidationReport()
 
         test_results = {
-            "metrics": {
-                "avg_query_time": 50.0  # Above threshold
-            },
+            "metrics": {"avg_query_time": 50.0},
             "documentation": {"test_report": "path/to/test_report.pdf"},
             "query_results": {"1": {"status": "success"}},
             "reproducibility": {"seed": 12345, "environment": "test_env"},
@@ -686,10 +623,7 @@ class TestCertificationChecker:
 
 
 class TestAuditTrail:
-    """Test AuditTrail functionality."""
-
     def test_audit_trail_logging(self):
-        """Test audit trail event logging."""
         audit_trail = AuditTrail()
 
         audit_trail.log_event("test_event", "Test event description", {"key": "value"})
@@ -703,7 +637,6 @@ class TestAuditTrail:
         assert summary["events"][0]["details"] == {"key": "value"}
 
     def test_audit_trail_reproducibility_hash(self):
-        """Test reproducibility hash generation."""
         audit_trail = AuditTrail()
 
         test_results = {
@@ -716,29 +649,23 @@ class TestAuditTrail:
         hash1 = audit_trail.generate_reproducibility_hash(test_results)
         hash2 = audit_trail.generate_reproducibility_hash(test_results)
 
-        # Same input should produce same hash
         assert hash1 == hash2
-        assert len(hash1) == 64  # SHA256 hash length
+        assert len(hash1) == 64
 
-        # Different input should produce different hash
         test_results["scale_factor"] = 2.0
         hash3 = audit_trail.generate_reproducibility_hash(test_results)
         assert hash1 != hash3
 
 
 class TestTPCResultValidator:
-    """Test TPCResultValidator main functionality."""
-
     def test_tpc_result_validator_creation(self):
-        """Test TPCResultValidator creation and configuration."""
         validator = TPCResultValidator()
 
-        assert len(validator.validators) == 7  # All validators initialized
+        assert len(validator.validators) == 7
         assert validator.audit_trail is not None
         assert validator.logger is not None
 
     def test_tpc_result_validator_validation(self):
-        """Test full validation process."""
         validator = TPCResultValidator()
         test_results = create_sample_test_results()
 
@@ -753,20 +680,16 @@ class TestTPCResultValidator:
         assert "total_queries" in report.execution_summary
 
     def test_tpc_result_validator_save_load_report(self, tmp_path):
-        """Test saving and loading validation reports."""
         validator = TPCResultValidator()
         test_results = create_sample_test_results()
 
-        # Generate report
         report = validator.validate(test_results, ValidationLevel.STANDARD)
 
-        # Save report
         report_path = tmp_path / "test_report.json"
         validator.save_report(report, report_path)
 
         assert report_path.exists()
 
-        # Load report
         loaded_report = validator.load_report(report_path)
 
         assert loaded_report.validation_id == report.validation_id
@@ -778,7 +701,6 @@ class TestTPCResultValidator:
         assert len(loaded_report.validator_results) == len(report.validator_results)
 
     def test_tpc_result_validator_default_config(self):
-        """Test default configuration generation."""
         validator = TPCResultValidator()
         config = validator.create_default_config()
 
@@ -792,7 +714,6 @@ class TestTPCResultValidator:
         assert "certification" in config["validators"]
 
     def test_tpc_result_validator_with_config(self):
-        """Test TPCResultValidator with custom configuration."""
         config = {
             "validators": {
                 "completeness": {"required_queries": {"TPC-H": list(range(1, 23))}},
@@ -809,31 +730,24 @@ class TestTPCResultValidator:
         assert len(report.validator_results) == 7
 
     def test_tpc_result_validator_validator_exception(self):
-        """Test handling of validator exceptions."""
         validator = TPCResultValidator()
 
-        # a mock validator that raises an exception
         mock_validator = Mock()
         mock_validator.name = "mock_validator"
         mock_validator.validate.side_effect = Exception("Test exception")
 
-        # Replace one validator with the mock
         validator.validators[0] = mock_validator
 
         test_results = create_sample_test_results()
         report = validator.validate(test_results, ValidationLevel.STANDARD)
 
-        # Should handle the exception gracefully
         assert "mock_validator" in report.validator_results
         assert report.validator_results["mock_validator"] == ValidationResult.FAILED
         assert any("failed with exception" in issue.message for issue in report.issues)
 
 
 class TestCreateSampleTestResults:
-    """Test sample test results creation."""
-
     def test_create_sample_test_results(self):
-        """Test sample test results creation."""
         sample_results = create_sample_test_results()
 
         assert sample_results["benchmark_name"] == "TPC-H"
@@ -845,20 +759,17 @@ class TestCreateSampleTestResults:
         assert "metrics" in sample_results
         assert "reproducibility" in sample_results
 
-        # Check query results structure
         query_results = sample_results["query_results"]
         assert len(query_results) == 2
         assert all("status" in qr for qr in query_results.values())
         assert all("execution_time_seconds" in qr for qr in query_results.values())
         assert all("row_count" in qr for qr in query_results.values())
 
-        # Check data generation structure
         data_generation = sample_results["data_generation"]
         assert "generation_time" in data_generation
         assert "generated_tables" in data_generation
-        assert len(data_generation["generated_tables"]) == 8  # Standard TPC-H tables
+        assert len(data_generation["generated_tables"]) == 8
 
-        # Check metrics structure
         metrics = sample_results["metrics"]
         assert "avg_query_time" in metrics
         assert "total_query_time" in metrics

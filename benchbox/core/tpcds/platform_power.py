@@ -1,5 +1,3 @@
-"""TPC-DS platform-adapter power-test harness."""
-
 from __future__ import annotations
 
 import contextlib
@@ -27,7 +25,6 @@ def execute_tpcds_power_test(
     make_connection_adapter: PowerConnectionAdapterFactory,
     console: Any,
 ) -> list[dict[str, Any]]:
-    """Execute TPC-DS Power Test using the production TPCDSPowerTest implementation."""
     from benchbox.core.expected_results.tpcds_results import set_config_validation_mode
     from benchbox.core.tpcds.power_test import TPCDSPowerTest
 

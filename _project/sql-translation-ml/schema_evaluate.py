@@ -1,5 +1,3 @@
-"""Freeze a schema-based challenge corpus, then evaluate immutable checkpoints."""
-
 from __future__ import annotations
 
 import argparse
@@ -77,7 +75,6 @@ def prepare(run: Path, training: Path, variants: int) -> None:
             cases.append(record(query["sql"], dialect, query["id"], query["feature_tags"], "independent"))
     write_json(run / "capabilities.json", coverage)
     write_json(run / "fixtures.json", {str(seed): rows(seed) for seed in SEEDS})
-    # Freeze every attempted source before validation; rejected cases stay visible.
     with (run / "cases.jsonl").open("w") as stream:
         for case in cases:
             stream.write(json.dumps(case, ensure_ascii=False) + "\n")

@@ -1,9 +1,3 @@
-/**
- * Verifies the snapshot read-model version guard. The guard converts stale
- * or pre-version snapshots from a deep Binder Error into an actionable
- * init-time failure naming the found and required versions.
- */
-
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   _EXPECTED_READ_MODEL_VERSION_FOR_TEST,
@@ -12,8 +6,6 @@ import {
 } from "@/db";
 
 interface QueryResult {
-  // Readiness probes read `result_id` / `n` off the row directly; the version
-  // guard reads `read_model_version` via toJSON().
   toArray(): {
     result_id?: string;
     n?: number;
@@ -157,9 +149,6 @@ describe("read-model version guard", () => {
             ],
           };
         }
-        // Readiness now also runs a completeness probe (COUNT(*) vs the
-        // materialized column) and a keyed probe (ORDER BY result_id DESC,
-        // then WHERE result_id = ...), so answer both shapes consistently.
         if (/COUNT\(\*\)/i.test(sql)) {
           return { toArray: () => [{ n: 1, toJSON: () => ({}) }] };
         }
@@ -185,10 +174,6 @@ describe("read-model version guard", () => {
     expect(queries[2]).toBe("SELECT result_id FROM bench.results LIMIT 1");
   });
 
-  // A v2 snapshot has results.funding but NOT the funding projections in
-  // platform_index_rows / benchmark_rankings that the card surfaces now read.
-  // Before the v3 bump such a snapshot passed this guard and then failed deep
-  // inside a card query as a Binder Error. It must be refused up front.
   it("refuses a v2 snapshot, which lacks the funding projections the cards read", async () => {
     const conn = makeConn(2);
     await expect(

@@ -1,5 +1,3 @@
-"""Tests for Databricks liquid clustering tuning behavior."""
-
 from __future__ import annotations
 
 from unittest.mock import Mock, patch
@@ -270,13 +268,7 @@ def test_platform_metadata_includes_clustering_strategy_and_operations(_mock_wor
 
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")
 def test_mcp_clustering_options_reach_the_effective_resolver(_mock_databricks_sql):
-    """MCP intent must survive `from_config`, not just be forwarded to it.
 
-    `from_config` rebuilds its constructor config from an explicit key list, so
-    raw `databricks_clustering_strategy` / `liquid_clustering_columns` kwargs are
-    dropped. Only the translated `tuning_config` becomes
-    `unified_tuning_configuration`, which is what the resolver reads.
-    """
     from benchbox.core.run_service import translate_platform_options_for_adapter as _prepare_adapter_platform_options
     from benchbox.mcp.schemas import validate_platform_options
 
@@ -333,7 +325,7 @@ def test_mcp_columns_alone_infer_liquid_clustering_at_the_resolver(_mock_databri
 
 @patch("benchbox.platforms.databricks.adapter.databricks_sql")
 def test_absent_mcp_clustering_options_resolve_to_none(_mock_databricks_sql):
-    """Nothing requested means no clustering: plain OPTIMIZE compaction never implies ZORDER BY."""
+
     adapter = DatabricksAdapter.from_config(
         {
             "benchmark": "tpch",

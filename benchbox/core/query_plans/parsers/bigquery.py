@@ -1,32 +1,3 @@
-"""BigQuery query plan parser.
-
-BigQuery has no ``EXPLAIN`` statement; the execution plan is only available
-*after* a query runs, from the Job Statistics API as
-``job.query_plan`` — a list of ``QueryPlanEntry`` (stage) objects. The
-:class:`benchbox.platforms.bigquery.BigQueryAdapter` serializes that list to JSON
-and hands it to this parser (see ``BigQueryAdapter._capture_bq_plan``); this
-parser therefore consumes the JSON of the stage list, not EXPLAIN text.
-
-Each stage entry (camelCase as emitted by the REST API / ``to_api_repr``)
-carries::
-
-    {
-      "name": "S00: Input",
-      "id": "0",
-      "steps": [{"kind": "READ", "substeps": ["$1:o_orderkey", "FROM orders"]}],
-      "recordsRead": "150000",
-      "recordsWritten": "150000",
-      "status": "COMPLETE",
-      "inputStages": []
-    }
-
-Stages form a DAG via ``inputStages`` (the ids of the stages that feed into this
-one — i.e. its children). The root is the terminal stage that no other stage
-reads from (typically the ``Output`` stage). Operator type is derived from the
-stage ``name`` (after stripping the ``Snn:`` prefix), falling back to the
-``kind`` of the stage's steps.
-"""
-
 from __future__ import annotations
 
 import json
@@ -48,10 +19,6 @@ _STAGE_PREFIX_RE = re.compile(r"^S\d+:\s*", re.IGNORECASE)
 
 
 class BigQueryQueryPlanParser(QueryPlanParser):
-    """Parser for BigQuery ``job.query_plan`` stage lists (JSON-serialized)."""
-
-    # Ordered (substring, type) pairs matched against the lower-cased stage name
-    # (and step kinds); first match wins, so specific names precede generic ones.
     _OPERATOR_KEYWORDS: tuple[tuple[str, LogicalOperatorType], ...] = (
         ("join", LogicalOperatorType.JOIN),
         ("aggregate", LogicalOperatorType.AGGREGATE),
@@ -99,7 +66,6 @@ class BigQueryQueryPlanParser(QueryPlanParser):
 
     @staticmethod
     def _extract_stages(payload: Any) -> list[dict[str, Any]]:
-        """Accept either a bare stage list or a ``{"queryPlan": [...]}`` wrapper."""
         if isinstance(payload, dict):
             payload = payload.get("queryPlan") or payload.get("query_plan") or []
         if not isinstance(payload, list):
@@ -122,27 +88,17 @@ class BigQueryQueryPlanParser(QueryPlanParser):
         return [str(item) for item in inputs]
 
     def _find_root_id(self, stages: list[dict[str, Any]], by_id: dict[str, dict[str, Any]]) -> str:
-        """The root is the terminal stage no other stage reads from.
-
-        A plan can expose more than one unreferenced stage (e.g. a trailing
-        no-op/repartition stage alongside the real Output stage), so the root is
-        chosen as the unreferenced stage whose subtree reaches the most stages,
-        falling back to the highest stage id on a tie. This avoids rooting the
-        DAG at a dangling stage and silently dropping the real result subtree.
-        """
         referenced: set[str] = set()
         for stage in stages:
             referenced.update(self._input_ids(stage))
         roots = [self._stage_id(stage) for stage in stages if self._stage_id(stage) not in referenced]
         if not roots:
-            # Cyclic / self-referential plan: fall back to the highest-id stage.
             return max(by_id, key=self._numeric_sort_key)
         if len(roots) == 1:
             return roots[0]
         return max(roots, key=lambda rid: (self._reachable_count(rid, by_id), self._numeric_sort_key(rid)))
 
     def _reachable_count(self, stage_id: str, by_id: dict[str, dict[str, Any]]) -> int:
-        """Number of stages reachable from ``stage_id`` via ``inputStages``."""
         seen: set[str] = set()
         stack = [stage_id]
         while stack:
@@ -225,7 +181,6 @@ class BigQueryQueryPlanParser(QueryPlanParser):
         for keyword, logical_type in cls._OPERATOR_KEYWORDS:
             if keyword in normalized:
                 return logical_type
-        # Fall back to the kinds of the stage's steps (e.g. READ / AGGREGATE / JOIN).
         steps = stage.get("steps")
         if isinstance(steps, list):
             kinds = (

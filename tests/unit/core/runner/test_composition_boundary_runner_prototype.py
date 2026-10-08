@@ -1,5 +1,3 @@
-"""Executable characterization prototype for runner adapter injection."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -16,7 +14,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 def test_run_service_adapter_factory_is_a_core_composition_boundary() -> None:
-    """The core service receives an adapter factory instead of importing platforms."""
     config = MagicMock(spec=BenchmarkConfig)
     config.options = {}
     adapter = object()
@@ -49,7 +46,6 @@ def test_run_service_adapter_factory_is_a_core_composition_boundary() -> None:
 
 
 def test_runner_accepts_prebuilt_adapter_without_factory_lookup() -> None:
-    """The runner's explicit adapter seam is usable before its fallback is deleted."""
     adapter = SimpleNamespace(is_dataframe_adapter=False)
     benchmark = object()
     benchmark_config = SimpleNamespace(scale_factor=0.01)
@@ -73,7 +69,6 @@ def test_runner_accepts_prebuilt_adapter_without_factory_lookup() -> None:
 
 
 def test_runner_fallback_looks_up_adapter_when_none_is_supplied() -> None:
-    """The current fallback still calls get_platform_adapter when no adapter is injected."""
     adapter = SimpleNamespace(is_dataframe_adapter=False)
     benchmark = object()
     benchmark_config = SimpleNamespace(scale_factor=0.01)

@@ -56,8 +56,6 @@ const cta = shellCta();
   const header = document.querySelector<HTMLElement>("[data-site-header]");
   const toggle = header?.querySelector<HTMLButtonElement>("[data-site-header-toggle]");
 
-  // Collapsing the panel at a narrow width can blur its focused link before the
-  // media-query change runs, so remember whether focus was in the panel.
   let panelFocus = false;
 
   function inPanel(target: EventTarget | null) {

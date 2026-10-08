@@ -1,23 +1,4 @@
 #!/usr/bin/env python3
-"""Validate integrity of benchmark result JSON files.
-
-Usage:
-    uv run _project/scripts/validate_results.py <path> [options]
-
-Arguments:
-    path         Result file (.json) or directory
-
-Options:
-    --json           Machine-readable JSON output
-    --verbose        Show all checks including PASSes (default: WARN+FAIL only)
-    --fail-on-warn   Exit 1 if any WARNs present (default: only FAILs cause exit 2)
-    --benchmark STR  Filter to benchmark (directory mode only)
-
-Exit codes:
-    0 = all PASS (or WARN-only without --fail-on-warn)
-    1 = warnings present with --fail-on-warn
-    2 = one or more FAILures
-"""
 
 from __future__ import annotations
 
@@ -26,7 +7,6 @@ import json
 import sys
 from pathlib import Path
 
-# Ensure project root is importable
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from benchbox.core.results.integrity_validator import (
@@ -37,7 +17,6 @@ from benchbox.core.results.integrity_validator import (
 
 
 def _print_report(report: IntegrityReport, *, verbose: bool = False) -> None:
-    """Print a single report in tabular format."""
     print(f"File: {Path(report.file).name}")
     print(
         f"Benchmark: {report.benchmark_id} | "
@@ -54,7 +33,6 @@ def _print_report(report: IntegrityReport, *, verbose: bool = False) -> None:
 
 
 def _print_aggregate(reports: list[IntegrityReport]) -> None:
-    """Print aggregate summary for directory mode."""
     total = len(reports)
     pass_count = sum(1 for r in reports if r.overall_status.value == "PASS")
     warn_count = sum(1 for r in reports if r.overall_status.value == "WARN")
@@ -83,7 +61,6 @@ def main() -> int:
     else:
         reports = validate_directory(target)
 
-    # Filter by benchmark if requested
     if args.benchmark:
         bm = args.benchmark.lower()
         reports = [r for r in reports if bm in r.benchmark_id.lower() or bm in r.platform.lower()]
@@ -122,7 +99,6 @@ def main() -> int:
         if len(reports) > 1:
             _print_aggregate(reports)
 
-    # Determine exit code
     has_fails = any(r.overall_status.value == "FAIL" for r in reports)
     has_warns = any(r.overall_status.value == "WARN" for r in reports)
 

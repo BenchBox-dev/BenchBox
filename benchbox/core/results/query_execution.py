@@ -1,94 +1,3 @@
-"""Boundary adapters for the canonical :class:`QueryExecution` contract.
-
-The runtime has historically exchanged several dictionary shapes.  This module
-is the single field/unit map between those shapes and ``QueryExecution``:
-
-=========================  =========================  ========================
-Semantic field             legacy/runtime aliases     compact schema-v2 key
-=========================  =========================  ========================
-identity                   query_id, id, query         id
-duration (canonical ms)    execution_time_ms,          ms
-                            execution_time_seconds,
-                            execution_time, duration
-                            (seconds)
-rows                       rows_returned, rows,        rows
-                            result_count
-status                     status                     status
-iteration                  iteration, iter            iter
-stream                     stream_id, stream          stream
-execution order            execution_order           (not serialized)
-stream query position      position (operational)    (not serialized)
-role / phase               run_type, runType /        run_type / test_type
-                            test_type
-digest                     result_digest, digest      digest
-row-count evidence         row_count_validation      row_count_validation
-error                      error_message, error,      errors[] companion
-                            message / error_type
-plan                       query_plan and plan fields .plans.json companion
-=========================  =========================  ========================
-
-``None`` and a missing key never become zero, false, or an empty collection.
-Compact v2 intentionally omits null optional values.  Numeric zero, boolean
-false, and empty dictionaries are retained when the schema has a key for them.
-When aliases are simultaneously populated they must agree; the adapter rejects
-conflicts instead of relying on truthiness or field order.  ``position`` is not
-an alias for ``execution_order``: throughput streams use it as a stream-local
-slot, while the canonical execution order is the ordering of the flattened
-result.  The throughput phase consumes ``position`` explicitly; generic result
-normalization ignores it as operational metadata.
-
-Unknown-field policy is boundary-specific.  Compact-v2 rows are canonical
-artifacts, so every key must be in ``COMPACT_V2_QUERY_FIELDS``; unknown keys are
-rejected as schema drift.  Legacy runtime mappings may additionally carry only
-the presentation/execution fields in ``LEGACY_IGNORED_EXTRA_FIELDS``.  Those
-named fields are intentionally ignored because compact-v2 has no representation
-for them.  Every other unknown legacy key is rejected.  Neither boundary has a
-generic extension metadata bag: a new correctness field requires an explicit
-typed model and adapter change.
-
-Migration inventory (2026-08-08)
---------------------------------
-
-Producer paths inspected:
-
-* ``core.results.builder.ResultBuilder`` (SQL and DataFrame normalized input;
-  seconds plus integer-millisecond compatibility aliases) now serializes the
-  canonical model through this adapter.
-* ``platforms.base.result_capture.ResultCaptureMixin`` (standard/enhanced,
-  validation, failure, and dry-run results) constructs or validates canonical
-  executions before preserving its public seconds dictionary.
-* ``platforms.base.sql_execution.execute_sql_query`` (DB-API SQL success via
-  ResultCaptureMixin and local failure path) uses that same seconds boundary.
-* ``platforms.base.spark_execution_mixin.SparkQueryExecutionMixin`` (DataFrame
-  execution) delegates to ResultCaptureMixin, so it shares the contract.
-* ``platforms.base.execution.TestDriversMixin`` remains a compatibility-dict
-  aggregator; its output is normalized at ResultBuilder/schema boundaries.
-
-Consumer paths inspected:
-
-* ``core.results.schema`` and ``core.results.loader`` are the authoritative v2
-  serializer/deserializer and now use the compact adapters here.  Structured
-  plans remain in the existing ``.plans.json`` companion.
-* ``core.analysis.comparison`` now consumes canonical milliseconds through the
-  legacy adapter; its former duration normalizer is only a compatibility name.
-* ``platforms.base.result_capture`` performance reporting uses the adapter and
-  no longer guesses units from magnitude.
-* ``core.results.exporter`` (CSV/YAML/HTML compatibility exports),
-  ``core.results.normalizer`` (historical v1/v2 read model), and
-  ``core.results.database`` (SQLite history schema) still consume their
-  purpose-specific dictionary/row shapes.  They do not establish alias
-  precedence for schema-v2 and are intentionally not rewritten in this slice.
-* Plan companion building in ``core.results.schema`` consumes the normalized
-  model but retains the existing typed/dict/text plan compatibility policy.
-
-The legacy dictionary can be removed only after every PlatformAdapter producer
-returns QueryExecution, BenchmarkResults.query_results is typed accordingly,
-the compatibility exporters and result database have dedicated typed adapters,
-and fixture/parity gates prove old public artifacts still load.  Until then,
-new producers must use these adapters rather than add another result dataclass
-or metadata bag.
-"""
-
 from __future__ import annotations
 
 import math
@@ -122,11 +31,6 @@ COMPACT_V2_QUERY_FIELDS = frozenset(
     }
 )
 
-# Historical producer dictionaries may carry these presentation or execution
-# details even though they are not part of the canonical correctness contract
-# or compact-v2 query row.  They are deliberately ignored at this boundary;
-# all other unknown mapping keys fail closed so a misspelled correctness field
-# cannot disappear silently.
 LEGACY_IGNORED_EXTRA_FIELDS = frozenset(
     {
         "aborted",
@@ -141,7 +45,6 @@ LEGACY_IGNORED_EXTRA_FIELDS = frozenset(
         "columns",
         "comparison",
         "connection_id",
-        # Throughput containment metadata on refused maintenance results.
         "contained",
         "cost_estimated",
         "cost_usd",
@@ -185,7 +88,6 @@ LEGACY_IGNORED_EXTRA_FIELDS = frozenset(
         "operation",
         "operation_type",
         "optimization_time",
-        # Throughput containment metadata on refused maintenance results.
         "outstanding_stream_ids",
         "p50_time_ms",
         "p95_time_ms",
@@ -195,8 +97,6 @@ LEGACY_IGNORED_EXTRA_FIELDS = frozenset(
         "platform",
         "platform_metrics",
         "platform_type",
-        # Throughput producers use this as a stream-local query slot. It is
-        # intentionally distinct from the flattened canonical execution order.
         "position",
         "query_info",
         "query_name",
@@ -286,7 +186,7 @@ LEGACY_QUERY_FIELDS = frozenset(
 
 
 class QueryExecutionContractError(ValueError):
-    """Raised when a query-result boundary contains invalid or conflicting data."""
+    pass
 
 
 def _finite_non_negative_number(field: str, raw_value: Any) -> float:
@@ -308,12 +208,6 @@ def normalize_duration_ms(
     execution_time: Any = None,
     duration: Any = None,
 ) -> float | None:
-    """Normalize explicit duration representations to milliseconds.
-
-    The legacy bare ``execution_time`` key is seconds.  This is not inferred
-    from magnitude: it is the unit emitted by ``BenchmarkResultBuilder`` and
-    consumed by the plotting/reporting compatibility paths.
-    """
     normalized: list[tuple[str, float]] = []
     for field, raw_value, multiplier in (
         ("execution_time_ms", execution_time_ms, 1.0),
@@ -341,12 +235,6 @@ def normalize_duration_ms(
                 f"{reference_field}={reference_ms} ms, {field}={value_ms} ms"
             )
 
-    # Runtime builder dictionaries intentionally contain precise seconds plus
-    # integer-truncated milliseconds.  Once every representation has passed
-    # the consistency check, prefer the most precise explicitly-unit-tagged
-    # seconds value.  This keeps 0.9 ms positive instead of accepting the pair
-    # and then returning the lossy 0 ms compatibility alias.  Priority among
-    # seconds aliases is deterministic and mirrors their canonicality.
     for preferred_field in ("execution_time_seconds", "execution_time", "duration"):
         for field, value_ms in normalized:
             if field == preferred_field:
@@ -355,7 +243,6 @@ def normalize_duration_ms(
 
 
 def _legacy_duration_ms(source: Mapping[str, Any]) -> float | None:
-    """Normalize only the duration aliases from a validated legacy mapping."""
     duration_ms_alias = _resolve_alias(
         source,
         "millisecond duration",
@@ -371,13 +258,6 @@ def _legacy_duration_ms(source: Mapping[str, Any]) -> float | None:
 
 
 def query_duration_ms_from_legacy(value: Any) -> float | None:
-    """Normalize duration aliases without validating unrelated result fields.
-
-    Field-specific compatibility consumers such as performance summaries need
-    canonical unit and alias handling, but must not fail because an unrelated
-    legacy field is malformed. The complete ``QueryExecution`` adapter remains
-    the fail-closed boundary for constructing or serializing canonical results.
-    """
     return _legacy_duration_ms(legacy_query_execution_mapping(value))
 
 
@@ -425,7 +305,6 @@ def _coerce_integer(field: str, raw_value: Any) -> int:
 
 
 def normalize_non_negative_integer(field: str, raw_value: Any) -> int:
-    """Return an integer contract field, rejecting bool, fractions, and negatives."""
     value = _coerce_integer(field, raw_value)
     if value < 0:
         raise QueryExecutionContractError(f"{field} must be non-negative, got {raw_value!r}")
@@ -433,7 +312,6 @@ def normalize_non_negative_integer(field: str, raw_value: Any) -> int:
 
 
 def normalize_row_count_validation(value: Any, *, rows_returned: int | None) -> dict[str, Any] | None:
-    """Validate and normalize public per-query row-count evidence."""
     if value is None:
         return None
     if not isinstance(value, Mapping):
@@ -487,7 +365,6 @@ def normalize_row_count_validation(value: Any, *, rows_returned: int | None) -> 
 
 
 def normalize_status(raw_status: Any) -> str:
-    """Normalize status aliases identically for typed and dictionary construction."""
     if raw_status is None:
         return "UNKNOWN"
     if isinstance(raw_status, bool):
@@ -514,12 +391,6 @@ def normalize_stream_id(raw_value: Any) -> str | int | None:
 
 
 def validate_query_execution(execution: QueryExecution) -> QueryExecution:
-    """Return a validated canonical replacement for a possibly mutated model.
-
-    QueryExecution remains mutable for compatibility with existing phase and
-    load-testing code.  Every serialization boundary therefore calls this
-    function so post-construction mutation cannot bypass the owned contract.
-    """
     from benchbox.core.results.models import QueryExecution
 
     if not isinstance(execution, QueryExecution):
@@ -550,13 +421,6 @@ def validate_query_execution(execution: QueryExecution) -> QueryExecution:
 
 
 def legacy_query_execution_mapping(value: Any) -> Mapping[str, Any]:
-    """Expose a supported legacy result object as a mapping.
-
-    QueryExecution, dataclass, Pydantic, and legacy attribute-object inputs are
-    accepted to keep public constructors compatible.  Attribute extraction is
-    limited to the explicit contract fields below; adding a producer field
-    requires an adapter decision rather than an open-ended ``__dict__`` copy.
-    """
     from benchbox.core.results.models import QueryExecution
 
     if isinstance(value, QueryExecution):
@@ -630,7 +494,6 @@ def query_execution_from_legacy_dict(
     default_stream_id: int | str | None = None,
     normalize_query_id: Callable[[str | int], str] | None = None,
 ) -> QueryExecution:
-    """Convert a runtime/legacy dictionary to canonical ``QueryExecution``."""
     from benchbox.core.results.models import (
         QUERY_RUN_TYPE_MEASUREMENT,
         QUERY_RUN_TYPE_WARMUP,
@@ -737,11 +600,6 @@ def query_execution_to_legacy_dict(
     include_legacy_seconds_alias: bool = False,
     error_field: str = "error_message",
 ) -> dict[str, Any]:
-    """Convert canonical execution to the runtime compatibility dictionary.
-
-    Optional values are omitted when ``None``.  False, zero, and empty
-    collections are emitted unchanged.
-    """
     if error_field not in {"error_message", "error"}:
         raise ValueError(f"Unsupported error field: {error_field!r}")
     execution = validate_query_execution(execution)
@@ -783,13 +641,10 @@ def query_execution_to_legacy_dict(
 
 
 def query_execution_from_compact_v2(value: Mapping[str, Any]) -> QueryExecution:
-    """Convert one canonical compact schema-v2 query row to QueryExecution."""
     unknown = set(value) - COMPACT_V2_QUERY_FIELDS
     if unknown:
         raise QueryExecutionContractError(f"Unknown compact schema-v2 query fields: {sorted(unknown)!r}")
     source = dict(value)
-    # Historical v2 rows omitted status because queries[] contained successes
-    # only.  The loader's errors[] reconciliation handles failures separately.
     source.setdefault("status", "SUCCESS")
     execution = query_execution_from_legacy_dict(source)
     execution.row_count_validation = normalize_row_count_validation(
@@ -800,7 +655,6 @@ def query_execution_from_compact_v2(value: Mapping[str, Any]) -> QueryExecution:
 
 
 def query_execution_to_compact_v2(execution: QueryExecution) -> dict[str, Any]:
-    """Convert QueryExecution to the compact schema-v2 query-row shape."""
     execution = validate_query_execution(execution)
     result: dict[str, Any] = {"id": execution.query_id}
     if execution.execution_time_ms is not None:

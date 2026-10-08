@@ -1,5 +1,3 @@
-"""A run stops before measuring when a benchmark's query tables were not loaded."""
-
 import logging
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -52,7 +50,6 @@ def test_benchmarks_skipping_data_loading_are_not_checked():
 
 
 def test_public_obt_wrapper_exposes_the_contract():
-    """The guard and orchestration read these from the object the CLI and API run."""
     from benchbox.tpcds_obt import TPCDSOBT
 
     assert TPCDSOBT.REQUIRED_LOADED_TABLES == ("tpcds_sales_returns_obt",)
@@ -74,7 +71,6 @@ def test_manifest_reuse_rejects_the_source_manifest_for_own_output_benchmarks():
 
 
 def test_duckdb_run_over_an_empty_manifest_fails_instead_of_validating_vacuously(tmp_path):
-    """A stale manifest listing no tables must not produce a passing, empty run."""
     import json
 
     pytest.importorskip("duckdb")
@@ -97,11 +93,6 @@ def test_duckdb_run_over_an_empty_manifest_fails_instead_of_validating_vacuously
 
 
 def test_none_requirements_reject_loads_without_rows():
-    """REQUIRED_LOADED_TABLES=None is checked like the empty case.
-
-    A None pin names no tables, so a zero-row load must fail instead of
-    returning early and validating vacuously.
-    """
     benchmark = SimpleNamespace(REQUIRED_LOADED_TABLES=None)
     with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
         require_loaded_tables(benchmark, {})
@@ -112,23 +103,18 @@ def test_none_requirements_reject_loads_without_rows():
 
 @pytest.mark.parametrize("required", ["lineitem", 42, {"lineitem": 1}])
 def test_non_collection_requirements_reject_vacuous_loads(required):
-    """Non-collection pins carry no table list, so they fail closed like empty."""
     benchmark = SimpleNamespace(REQUIRED_LOADED_TABLES=required)
     with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
         require_loaded_tables(benchmark, {"t": 0})
 
 
 def test_partial_load_passes_but_warns_on_zero_row_tables(caplog):
-    """Without a pinned list, >=1 table with rows passes while the zero-row
-    tables are logged for visibility instead of failing the run."""
     with caplog.at_level(logging.WARNING, logger="benchbox.core.loaded_tables"):
         require_loaded_tables(SimpleNamespace(), {"loaded": 50, "failed": 0})
     assert any("failed" in record.message for record in caplog.records)
 
 
 def test_mock_benchmark_does_not_silently_skip_checks():
-    """A Mock auto-creates SKIP_DATA_LOADING as a truthy attribute; the
-    shared helper must ignore it so mock benchmarks cannot disable checks."""
     benchmark = MagicMock()
     assert is_data_loading_skipped(benchmark) is False
     with pytest.raises(RuntimeError, match="no rows were loaded for any table"):
@@ -152,7 +138,6 @@ def test_skip_helper_honors_instance_flag_on_real_objects_only():
 
 
 def test_all_load_paths_share_one_skip_helper():
-    """Every load path must read the flag through the single shared helper."""
     import benchbox.core.loaded_tables as loaded_tables
     import benchbox.platforms.base.adapter as adapter_module
     import benchbox.platforms.base.data_loading as data_loading_module

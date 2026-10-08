@@ -1,12 +1,3 @@
-"""Unit tests for scripts/publication/compare_db_digest.py.
-
-The G2 root-neutrality gate compares a rebuilt root results.duckdb against
-the live production database. Exact bytes can never match (wall-clock
-generated_at stamp, 1-ULP float drift across runners), so the gate hashes
-canonical logical content. These tests pin that contract: build-stamp and
-float noise compare equal, real content changes do not.
-"""
-
 from __future__ import annotations
 
 import importlib.util

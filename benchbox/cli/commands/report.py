@@ -1,9 +1,6 @@
-"""Report command for historical result analysis and platform rankings.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -20,24 +17,41 @@ from benchbox.core.results.database import (
 from benchbox.core.results.regression_policy import is_meaningful_improvement
 
 
-@click.group("report")
+@click.group(
+    "report",
+    help=(
+        "Historical result analysis and platform rankings.\n"
+        "\n"
+        "Commands for analyzing benchmark results over time, generating platform\n"
+        "rankings, and detecting performance regressions.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report rankings --benchmark TPC-H --scale-factor 1\n"
+        "    benchbox report trends --platform DuckDB --benchmark TPC-H\n"
+        "    benchbox report regressions\n"
+        "    benchbox report import benchmark_runs/results/\n"
+        "    benchbox report stats"
+    ),
+)
 def report() -> None:
-    """Historical result analysis and platform rankings.
-
-    Commands for analyzing benchmark results over time, generating platform
-    rankings, and detecting performance regressions.
-
-    \b
-    Examples:
-        benchbox report rankings --benchmark TPC-H --scale-factor 1
-        benchbox report trends --platform DuckDB --benchmark TPC-H
-        benchbox report regressions
-        benchbox report import benchmark_runs/results/
-        benchbox report stats
-    """
+    pass
 
 
-@report.command("rankings")
+@report.command(
+    "rankings",
+    help=(
+        "Generate platform rankings for a benchmark.\n"
+        "\n"
+        "Ranks platforms based on performance metrics from historical results.\n"
+        "Shows trend indicators comparing current to previous period.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report rankings --benchmark TPC-H --scale-factor 1\n"
+        "    benchbox report rankings -b TPC-DS -s 10 --metric power_at_size"
+    ),
+)
 @click.option(
     "--benchmark",
     "-b",
@@ -83,16 +97,6 @@ def rankings(
     lookback_days: int,
     db_path: Path | None,
 ) -> None:
-    """Generate platform rankings for a benchmark.
-
-    Ranks platforms based on performance metrics from historical results.
-    Shows trend indicators comparing current to previous period.
-
-    \b
-    Examples:
-        benchbox report rankings --benchmark TPC-H --scale-factor 1
-        benchbox report rankings -b TPC-DS -s 10 --metric power_at_size
-    """
     db = ResultDatabase(db_path)
     config = RankingConfig(
         metric=metric,
@@ -107,7 +111,6 @@ def rankings(
         console.print(f"[yellow]No results found for {benchmark} at scale factor {scale_factor}[/yellow]")
         return
 
-    # Display rankings table
     table = Table(title=f"{benchmark} Platform Rankings (SF={scale_factor})")
     table.add_column("Rank", style="cyan", justify="right")
     table.add_column("Platform", style="green")
@@ -122,7 +125,6 @@ def rankings(
         trend_icon = _get_trend_icon(r.trend)
         change_str = f"{r.trend_change:+.1f}%" if r.trend_change is not None else "-"
 
-        # Format score based on metric
         if metric == "geometric_mean":
             score_str = f"{r.score:.1f} ms"
         elif metric == "power_at_size":
@@ -144,7 +146,19 @@ def rankings(
     console.print(table)
 
 
-@report.command("trends")
+@report.command(
+    "trends",
+    help=(
+        "Show performance trends over time.\n"
+        "\n"
+        "Displays period-over-period performance changes for a platform,\n"
+        "highlighting any regressions (>10% slowdown).\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report trends --platform DuckDB --benchmark TPC-H --scale-factor 1"
+    ),
+)
 @click.option("--platform", "-p", required=True, help="Platform name")
 @click.option("--benchmark", "-b", required=True, help="Benchmark name")
 @click.option("--scale-factor", "-s", type=float, required=True, help="Scale factor")
@@ -163,15 +177,6 @@ def trends(
     period_days: int,
     db_path: Path | None,
 ) -> None:
-    """Show performance trends over time.
-
-    Displays period-over-period performance changes for a platform,
-    highlighting any regressions (>10% slowdown).
-
-    \b
-    Examples:
-        benchbox report trends --platform DuckDB --benchmark TPC-H --scale-factor 1
-    """
     db = ResultDatabase(db_path)
     trends_list = db.get_performance_trends(platform, benchmark, scale_factor, periods, period_days)
 
@@ -179,7 +184,6 @@ def trends(
         console.print(f"[yellow]No trend data found for {platform}/{benchmark} SF={scale_factor}[/yellow]")
         return
 
-    # Display trends table
     table = Table(title=f"Performance Trends: {platform} / {benchmark} (SF={scale_factor})")
     table.add_column("Period", style="cyan")
     table.add_column("Avg (ms)", justify="right")
@@ -213,7 +217,20 @@ def trends(
     console.print(table)
 
 
-@report.command("regressions")
+@report.command(
+    "regressions",
+    help=(
+        "Detect performance regressions across all platforms.\n"
+        "\n"
+        "Scans all platforms and benchmarks for significant performance\n"
+        "slowdowns compared to the previous period.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report regressions\n"
+        "    benchbox report regressions --threshold 15 --lookback-days 14"
+    ),
+)
 @click.option("--threshold", type=float, default=10.0, help="Regression threshold percentage")
 @click.option("--lookback-days", type=int, default=30, help="Comparison period in days")
 @click.option(
@@ -226,16 +243,6 @@ def regressions(
     lookback_days: int,
     db_path: Path | None,
 ) -> None:
-    """Detect performance regressions across all platforms.
-
-    Scans all platforms and benchmarks for significant performance
-    slowdowns compared to the previous period.
-
-    \b
-    Examples:
-        benchbox report regressions
-        benchbox report regressions --threshold 15 --lookback-days 14
-    """
     db = ResultDatabase(db_path)
     regressions_list = db.detect_regressions(threshold, lookback_days)
 
@@ -243,7 +250,6 @@ def regressions(
         console.print("[green]No performance regressions detected![/green]")
         return
 
-    # Display regressions table
     table = Table(title="Performance Regressions Detected", style="red")
     table.add_column("Platform", style="yellow")
     table.add_column("Benchmark")
@@ -269,7 +275,25 @@ def regressions(
     console.print(f"\n[yellow]Found {len(regressions_list)} regression(s) exceeding {threshold}% threshold[/yellow]")
 
 
-@report.command("import")
+@report.command(
+    "import",
+    help=(
+        "Import benchmark results from a directory.\n"
+        "\n"
+        "Scans a directory for JSON result files and imports them into the\n"
+        "historical database for analysis.\n"
+        "\n"
+        "By default, unofficial TPC-DS results (subscale or non-standard scale factor)\n"
+        "are excluded from the database to prevent contamination of comparative rankings.\n"
+        "Use --include-unofficial to import them explicitly.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report import benchmark_runs/results/\n"
+        '    benchbox report import ./results --pattern "*.json"\n'
+        "    benchbox report import ./results --include-unofficial"
+    ),
+)
 @click.argument("directory", type=click.Path(exists=True, path_type=Path))
 @click.option("--pattern", default="**/*.json", help="Glob pattern for result files")
 @click.option(
@@ -289,21 +313,6 @@ def import_results(
     db_path: Path | None,
     include_unofficial: bool,
 ) -> None:
-    """Import benchmark results from a directory.
-
-    Scans a directory for JSON result files and imports them into the
-    historical database for analysis.
-
-    By default, unofficial TPC-DS results (subscale or non-standard scale factor)
-    are excluded from the database to prevent contamination of comparative rankings.
-    Use --include-unofficial to import them explicitly.
-
-    \b
-    Examples:
-        benchbox report import benchmark_runs/results/
-        benchbox report import ./results --pattern "*.json"
-        benchbox report import ./results --include-unofficial
-    """
     db = ResultDatabase(db_path)
 
     with console.status("Importing results..."):
@@ -321,22 +330,25 @@ def import_results(
         console.print(f"[yellow]Skipped (duplicates/invalid): {skipped}[/yellow]")
 
 
-@report.command("stats")
+@report.command(
+    "stats",
+    help=(
+        "Show database summary statistics.\n"
+        "\n"
+        "Displays overview of stored results including counts, platforms,\n"
+        "and date ranges.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report stats"
+    ),
+)
 @click.option(
     "--db-path",
     type=click.Path(path_type=Path),
     help="Path to result database",
 )
 def stats(db_path: Path | None) -> None:
-    """Show database summary statistics.
-
-    Displays overview of stored results including counts, platforms,
-    and date ranges.
-
-    \b
-    Examples:
-        benchbox report stats
-    """
     db = ResultDatabase(db_path)
     summary = db.get_summary_stats()
 
@@ -359,7 +371,6 @@ def stats(db_path: Path | None) -> None:
 
     console.print(table)
 
-    # Show platforms if available
     platforms = db.get_platforms()
     if platforms:
         console.print(f"\n[cyan]Platforms:[/cyan] {', '.join(platforms)}")
@@ -369,7 +380,19 @@ def stats(db_path: Path | None) -> None:
         console.print(f"[cyan]Benchmarks:[/cyan] {', '.join(benchmarks)}")
 
 
-@report.command("list")
+@report.command(
+    "list",
+    help=(
+        "List stored benchmark results.\n"
+        "\n"
+        "Shows recent results with optional platform and benchmark filters.\n"
+        "\n"
+        "\b\n"
+        "Examples:\n"
+        "    benchbox report list\n"
+        "    benchbox report list --platform DuckDB --limit 10"
+    ),
+)
 @click.option("--platform", "-p", help="Filter by platform")
 @click.option("--benchmark", "-b", help="Filter by benchmark")
 @click.option("--limit", type=int, default=20, help="Maximum results to show")
@@ -384,15 +407,6 @@ def list_results(
     limit: int,
     db_path: Path | None,
 ) -> None:
-    """List stored benchmark results.
-
-    Shows recent results with optional platform and benchmark filters.
-
-    \b
-    Examples:
-        benchbox report list
-        benchbox report list --platform DuckDB --limit 10
-    """
     db = ResultDatabase(db_path)
     results = db.query_results(platform=platform, benchmark=benchmark, limit=limit)
 
@@ -429,7 +443,6 @@ def list_results(
 
 
 def _get_metric_header(metric: str) -> str:
-    """Get column header for metric."""
     headers = {
         "geometric_mean": "Geomean",
         "power_at_size": "Power@Size",
@@ -439,11 +452,10 @@ def _get_metric_header(metric: str) -> str:
 
 
 def _get_trend_icon(trend: str) -> str:
-    """Get trend indicator icon."""
     icons = {
-        "up": "[green]\u2191[/green]",  # Up arrow
-        "down": "[red]\u2193[/red]",  # Down arrow
-        "stable": "[blue]\u2194[/blue]",  # Horizontal arrow
+        "up": "[green]\u2191[/green]",
+        "down": "[red]\u2193[/red]",
+        "stable": "[blue]\u2194[/blue]",
         "new": "[yellow]NEW[/yellow]",
     }
     return icons.get(trend, "-")

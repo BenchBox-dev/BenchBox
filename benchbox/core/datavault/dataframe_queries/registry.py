@@ -1,9 +1,6 @@
-"""Data Vault DataFrame query registry.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -13,7 +10,7 @@ DATAVAULT_DATAFRAME_QUERIES = QueryRegistry("datavault")
 
 
 def get_datavault_query(query_id: str) -> DataFrameQuery | None:
-    """Get a Data Vault DataFrame query by ID."""
+
     return DATAVAULT_DATAFRAME_QUERIES.get(query_id)
 
 
@@ -21,10 +18,10 @@ def list_datavault_queries(
     family: str | None = None,
     category: QueryCategory | None = None,
 ) -> list[DataFrameQuery]:
-    """List Data Vault DataFrame queries with optional filtering."""
+
     return DATAVAULT_DATAFRAME_QUERIES.list_queries(family=family, category=category)
 
 
 def register_query(query: DataFrameQuery) -> None:
-    """Register a Data Vault DataFrame query."""
+
     DATAVAULT_DATAFRAME_QUERIES.register(query)

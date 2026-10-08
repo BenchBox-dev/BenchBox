@@ -24,24 +24,23 @@ Modern query optimizers are expected to recognize semantically equivalent querie
 **Example**: These three queries are semantically identical but may perform very differently:
 
 ```sql
--- Variant 1: Correlated subquery
 SELECT c_name, c_acctbal
 FROM customer
 WHERE c_acctbal > (SELECT AVG(c_acctbal) FROM customer);
 
--- Variant 2: WITH clause
 WITH avg_balance AS (SELECT AVG(c_acctbal) AS avg_bal FROM customer)
 SELECT c_name, c_acctbal
 FROM customer, avg_balance
 WHERE c_acctbal > avg_bal;
 
--- Variant 3: Window function
 SELECT c_name, c_acctbal
 FROM (
     SELECT c_name, c_acctbal, AVG(c_acctbal) OVER () AS avg_bal
     FROM customer
 ) WHERE c_acctbal > avg_bal;
 ```
+
+The three queries use a correlated subquery, a `WITH` clause and a window function, in that order.
 
 A mature optimizer should recognize these equivalences and produce similar plans. TPC-Havoc systematically tests whether this holds across hundreds of query variations.
 
@@ -92,28 +91,24 @@ This process repeats for all 22 TPC-H queries, yielding **220 total query varian
 ```python
 from benchbox import TPCHavoc
 
-# Initialize benchmark (inherits TPC-H data and schema)
 benchmark = TPCHavoc(scale_factor=1.0)
 
-# Generate TPC-H data (same as TPC-H benchmark)
 benchmark.generate_data()
 
-# Load to database
 import duckdb
 conn = duckdb.connect(":memory:")
 benchmark.load_data_to_database(conn)
 
-# Get original TPC-H Query 1
 original_q1 = benchmark.get_query("Q1")
 
-# Get all 10 variants of Query 1
 variants_q1 = [benchmark.get_query(f"Q1_V{i}") for i in range(1, 11)]
 
-# Run and compare performance
 for i, variant in enumerate(variants_q1, 1):
     result = conn.execute(variant).fetchdf()
     print(f"Q1_V{i}: {len(result)} rows")
 ```
+
+This example initializes the benchmark (which inherits TPC-H data and schema), generates and loads the data, fetches the original TPC-H Query 1 and all 10 variants of Query 1, and then runs the variants and compares them.
 
 ## Use Cases
 
@@ -126,9 +121,8 @@ from benchbox import TPCHavoc
 import time
 
 benchmark = TPCHavoc(scale_factor=1.0)
-conn = setup_database()  # Your database connection
+conn = setup_database()
 
-# Test Query 8 variants (complex 8-way join)
 results = {}
 for variant_id in range(1, 11):
     query = benchmark.get_query(f"Q8_V{variant_id}")
@@ -139,11 +133,12 @@ for variant_id in range(1, 11):
 
     results[f"Q8_V{variant_id}"] = elapsed
 
-# Analyze variance
 times = list(results.values())
 print(f"Min: {min(times):.2f}s, Max: {max(times):.2f}s")
 print(f"Variance: {max(times) / min(times):.2f}x")
 ```
+
+`setup_database()` stands for your own database connection. The example tests the Query 8 variants (an 8-way join) and reports the variance across them.
 
 **Expected Result**: Low variance (< 2x) indicates robust optimizer
 **Problem Indicator**: High variance (> 5x) reveals optimizer weaknesses
@@ -153,15 +148,14 @@ print(f"Variance: {max(times) / min(times):.2f}x")
 Catch optimizer regressions between database versions:
 
 ```bash
-# Baseline (current version)
 benchbox run --benchmark tpchavoc --platform postgres --scale 1.0 --output baseline.json
 
-# After upgrade (new version)
 benchbox run --benchmark tpchavoc --platform postgres --scale 1.0 --output new.json
 
-# Compare results, failing on a 50% regression
 benchbox compare baseline.json new.json --fail-on-regression 50%
 ```
+
+The first run is the baseline on the current database version, and the second runs after the upgrade. The `compare` command fails if any result regresses by more than 50%.
 
 ### 3. Cross-Database Optimizer Comparison
 
@@ -179,7 +173,6 @@ databases = {
     "Snowflake": snowflake_connection
 }
 
-# Run same variants on different databases
 for db_name, conn in databases.items():
     benchmark.load_data_to_database(conn)
 
@@ -210,16 +203,17 @@ pattern_performance = defaultdict(list)
 for query_num in range(1, 23):
     for variant_num in range(1, 11):
         query_id = f"Q{query_num}_V{variant_num}"
-        pattern = benchmark.get_variant_pattern(variant_num)  # "CTE", "Window Function", etc.
+        pattern = benchmark.get_variant_pattern(variant_num)
 
         elapsed = measure_query(query_id)
         pattern_performance[pattern].append(elapsed)
 
-# Analyze which patterns are fastest/slowest
 for pattern, times in pattern_performance.items():
     avg_time = sum(times) / len(times)
     print(f"{pattern}: {avg_time:.3f}s average")
 ```
+
+`get_variant_pattern` returns the pattern name, such as "CTE" or "Window Function". The loop finds which patterns are fastest and slowest on average.
 
 ## Key Features
 
@@ -270,18 +264,16 @@ TPC-Havoc inherits all TPC-H infrastructure:
 ## CLI Usage
 
 ```bash
-# Run all TPC-Havoc queries
 benchbox run --benchmark tpchavoc --platform duckdb --scale 1.0
 
-# Run specific query variants
 benchbox run --benchmark tpchavoc --platform clickhouse-local --queries Q1_V1,Q1_V2,Q1_V3
 
-# Run all variants of one query (list them explicitly; there is no pattern option)
 benchbox run --benchmark tpchavoc --platform duckdb --queries Q8_V1,Q8_V2,Q8_V3
 
-# Variance across variants is reported in the result bundle
 benchbox run --benchmark tpchavoc --platform snowflake
 ```
+
+The commands run all queries, specific variants, and all variants of one query. There is no pattern option, so list the variants explicitly. The last command shows that variance across variants is reported in the result bundle.
 
 ## Performance Characteristics
 
@@ -337,23 +329,28 @@ TPC-Havoc is under active development. Current limitations:
 
 ```python
 class TPCHavoc(BaseBenchmark):
-    """TPC-Havoc optimizer stress testing benchmark."""
 
     def __init__(self, scale_factor: float = 1.0, output_dir: Optional[str] = None):
-        """Initialize TPC-Havoc benchmark (inherits from TPC-H)."""
+        pass
 
     def get_query(self, query_id: str, *, params: Optional[dict] = None) -> str:
-        """Get a query variant by ID (e.g., 'Q1', 'Q1_V5', 'Q8_V10')."""
+        pass
 
     def get_all_variants(self, query_num: int) -> dict[str, str]:
-        """Get all 10 variants for a specific query number (1-22)."""
+        pass
 
     def get_variant_description(self, query_id: str) -> str:
-        """Get description of the transformation pattern used."""
+        pass
 
     def validate_variant(self, query_id: str, connection) -> bool:
-        """Validate that variant produces results identical to original."""
+        pass
 ```
+
+- `TPCHavoc(...)` initializes the benchmark and inherits from TPC-H.
+- `get_query` returns a query variant by ID, such as `Q1`, `Q1_V5` or `Q8_V10`.
+- `get_all_variants` returns all 10 variants for a query number from 1 to 22.
+- `get_variant_description` describes the transformation pattern used.
+- `validate_variant` checks that the variant produces results identical to the original.
 
 ## Related Benchmarks
 

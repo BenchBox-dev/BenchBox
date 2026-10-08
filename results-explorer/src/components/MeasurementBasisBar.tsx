@@ -13,39 +13,15 @@ import {
   type PassSelection,
 } from "@/lib/measurementBasis";
 
-/**
- * The shared measurement-basis control for a cross-run comparison.
- *
- * ONE bar for the whole comparison, not one per run. That is the visible form
- * of the model's central invariant: a comparison spanning more than one run
- * reads every run through the same basis, because reading one run's min
- * against another's median measures the statistic rather than the engine.
- * The lock affordance says so in words, so the guarantee is legible on the
- * page and not just in the type system.
- */
 export interface MeasurementBasisBarProps {
   basis: MeasurementBasis;
   onBasisChange: (basis: MeasurementBasis) => void;
-  /** Pass selections this comparison's runs can actually serve. */
   availablePasses: readonly PassSelection[];
-  /** How many queries the figures are computed over, after intersection. */
   comparableQueryCount: number;
-  /** Total logical queries before the shared-query-set rule dropped any. */
   totalQueryCount: number;
-  /** How many runs share this basis. */
   runCount: number;
-  /**
-   * True when the current pass selection resolves to a single execution, so
-   * median and min are the same number.
-   */
   statisticCollapsed: boolean;
-  /** Why a basis is unavailable, when one is. */
   unavailableReason?: Parameters<typeof basisUnavailableLabel>[0] | null;
-  /**
-   * "bar" (default) is the standalone full-width panel. "card" drops the
-   * panel chrome and stacks label over controls, so the bar can sit beside
-   * the other comparison-wide controls in one row.
-   */
   layout?: "bar" | "card";
 }
 
@@ -141,14 +117,6 @@ export function MeasurementBasisBar({
           />
         </div>
 
-        {/*
-          The collapsed state is its OWN branch, never a `disabled` attribute
-          computed from a boolean. A disabled select still renders as a
-          control, and a truthiness bug would leave it interactive while
-          presenting a choice the data cannot express -- failing open, silently.
-          Rendering different markup cannot fail that way: there is no control
-          to interact with.
-        */}
         {statisticCollapsed ? (
           <div>
             <span class="text-xs font-medium text-[var(--bb-data-fg-primary)]">Statistic</span>

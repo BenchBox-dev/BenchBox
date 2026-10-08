@@ -7,17 +7,6 @@ import { fmtGeomean } from "@/utils";
 import { formatCpuIdentityProvenance } from "@/lib/hardwareProvenance";
 import { formatMemoryGb } from "@/lib/displayLabels";
 
-/**
- * Standings for a three-to-four run comparison.
- *
- * A multi-run selection is a ranking problem, not a diff: the reader wants an
- * order and a margin, which 309 undifferentiated diff rows cannot give them.
- *
- * Every geomean here is computed over the SAME intersected query set, and the
- * caption states its size and how it was chosen. A standings table whose rows
- * were each averaged over a different query set would be an ordering of
- * incomparable numbers presented as a ranking.
- */
 export interface MultiRunStandingsProps {
   results: DetailResult[];
   baselineIndex: number;
@@ -31,19 +20,14 @@ export interface StandingRow {
   hardware: string;
   cpuEvidence: string;
   geomeanMs: number | null;
-  /** Ratio against the baseline: <1 faster, >1 slower. */
   ratioToBaseline: number | null;
   queriesWon: number;
   isBaseline: boolean;
-  /** Inside the tie band against the baseline, so neither faster nor slower may be claimed. */
   tied: boolean;
-  /** Inside a tie band with other runs for its rank position. */
   rankTied: boolean;
-  /** Competition rank ("1", "T-1", or "—" when unranked). */
   rank: string;
 }
 
-/** Queries every selected run can answer. */
 export function sharedQueryIdsFor(results: readonly DetailResult[]): string[] {
   const all = new Set<string>();
   for (const r of results) for (const t of r.display_timings) all.add(t.query_id);
@@ -117,8 +101,6 @@ export function buildStandings(
     };
   });
 
-  // Rank by geomean, faster first. Rows without a geomean sort last rather
-  // than being dropped -- a run that could not be reduced is still selected.
   rows.sort((a, b) => {
     if (a.geomeanMs === null && b.geomeanMs === null) return 0;
     if (a.geomeanMs === null) return 1;
@@ -126,8 +108,6 @@ export function buildStandings(
     return a.geomeanMs - b.geomeanMs;
   });
 
-  // Assign competition rank: tied rows receive "T-1", unranked rows receive "—".
-  // Tie groups are formed against the fixed group leader to prevent transitive chaining.
   let i = 0;
   while (i < rows.length) {
     const leader = rows[i]!;

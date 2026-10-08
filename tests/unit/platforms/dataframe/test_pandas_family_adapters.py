@@ -1,13 +1,6 @@
-"""Unit tests for Pandas Family DataFrame adapters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests for cuDF and Dask DataFrame adapters that extend PandasFamilyAdapter.
-These tests focus on platform registration and factory functions since the actual
-adapters require their respective libraries to be installed.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -27,24 +20,17 @@ pytestmark = [
 ]
 
 
-# =============================================================================
-# Platform Registration Tests
-# =============================================================================
-
-
 class TestPandasFamilyPlatformRegistration:
-    """Tests for Pandas family platform registration."""
-
     def test_cudf_df_is_dataframe_platform(self):
-        """Test that cudf-df is recognized as a DataFrame platform."""
+
         assert is_dataframe_platform("cudf-df") is True
 
     def test_dask_df_is_dataframe_platform(self):
-        """Test that dask-df is recognized as a DataFrame platform."""
+
         assert is_dataframe_platform("dask-df") is True
 
     def test_case_insensitive_platform_check(self):
-        """Test that platform checks are case-insensitive."""
+
         assert is_dataframe_platform("CUDF-DF") is True
         assert is_dataframe_platform("CuDF-Df") is True
         assert is_dataframe_platform("DASK-DF") is True
@@ -52,27 +38,24 @@ class TestPandasFamilyPlatformRegistration:
 
 
 class TestPandasFamilyPlatformListing:
-    """Tests for listing Pandas family platforms."""
-
     def test_list_includes_cudf_df(self):
-        """Test that cudf-df is included in platform list."""
+
         platforms = list_available_dataframe_platforms()
 
         assert "cudf-df" in platforms
         assert platforms["cudf-df"] == CUDF_AVAILABLE
 
     def test_list_includes_dask_df(self):
-        """Test that dask-df is included in platform list."""
+
         platforms = list_available_dataframe_platforms()
 
         assert "dask-df" in platforms
         assert platforms["dask-df"] == DASK_AVAILABLE
 
     def test_list_has_all_expected_platforms(self):
-        """Test that all expected DataFrame platforms are listed."""
+
         platforms = list_available_dataframe_platforms()
 
-        # All DataFrame platforms (both pandas and expression family)
         expected = {
             "polars-df",
             "pandas-df",
@@ -86,43 +69,34 @@ class TestPandasFamilyPlatformListing:
 
 
 class TestPandasFamilyRequirements:
-    """Tests for Pandas family platform requirements."""
-
     def test_cudf_df_requirements_contain_cudf(self):
-        """Test that cudf-df requirements mention cudf."""
+
         req = get_dataframe_requirements("cudf-df")
 
         assert "cudf" in req.lower()
 
     def test_cudf_df_requirements_mention_gpu(self):
-        """Test that cudf-df requirements mention GPU/CUDA."""
+
         req = get_dataframe_requirements("cudf-df")
 
         assert "gpu" in req.lower() or "cuda" in req.lower()
 
     def test_dask_df_requirements_contain_dask(self):
-        """Test that dask-df requirements mention dask."""
+
         req = get_dataframe_requirements("dask-df")
 
         assert "dask" in req.lower()
 
     def test_dask_df_requirements_mention_distributed(self):
-        """Test that dask-df requirements mention distributed."""
+
         req = get_dataframe_requirements("dask-df")
 
         assert "distributed" in req.lower()
 
 
-# =============================================================================
-# Platform Hook Registration Tests
-# =============================================================================
-
-
 class TestPandasFamilyPlatformHooks:
-    """Tests for platform hook registration of new adapters."""
-
     def test_cudf_df_device_id_option_registered(self):
-        """Test that cudf-df device_id option is registered."""
+
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if CUDF_AVAILABLE:
@@ -130,7 +104,7 @@ class TestPandasFamilyPlatformHooks:
             assert "device_id" in specs
 
     def test_cudf_df_spill_to_host_option_registered(self):
-        """Test that cudf-df spill_to_host option is registered."""
+
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if CUDF_AVAILABLE:
@@ -138,7 +112,7 @@ class TestPandasFamilyPlatformHooks:
             assert "spill_to_host" in specs
 
     def test_dask_df_n_workers_option_registered(self):
-        """Test that dask-df n_workers option is registered."""
+
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if DASK_AVAILABLE:
@@ -146,7 +120,7 @@ class TestPandasFamilyPlatformHooks:
             assert "n_workers" in specs
 
     def test_dask_df_threads_per_worker_option_registered(self):
-        """Test that dask-df threads_per_worker option is registered."""
+
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if DASK_AVAILABLE:
@@ -154,7 +128,7 @@ class TestPandasFamilyPlatformHooks:
             assert "threads_per_worker" in specs
 
     def test_dask_df_use_distributed_option_registered(self):
-        """Test that dask-df use_distributed option is registered."""
+
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if DASK_AVAILABLE:
@@ -162,7 +136,7 @@ class TestPandasFamilyPlatformHooks:
             assert "use_distributed" in specs
 
     def test_dask_df_scheduler_address_option_registered(self):
-        """Test that dask-df scheduler_address option is registered."""
+
         from benchbox.cli.platform_hooks import PlatformHookRegistry
 
         if DASK_AVAILABLE:
@@ -170,23 +144,16 @@ class TestPandasFamilyPlatformHooks:
             assert "scheduler_address" in specs
 
 
-# =============================================================================
-# Factory Integration Tests
-# =============================================================================
-
-
 class TestPandasFamilyFactory:
-    """Tests for DataFrame adapter factory with Pandas family adapters."""
-
     def test_unknown_platform_raises_value_error(self):
-        """Test that unknown platform raises ValueError."""
+
         from benchbox.platforms import get_dataframe_adapter
 
         with pytest.raises(ValueError, match="Unknown DataFrame platform"):
             get_dataframe_adapter("unknown-df")
 
     def test_cudf_df_in_factory_mapping(self):
-        """Test that cudf-df is in the factory mapping."""
+
         from benchbox.platforms import get_dataframe_adapter
 
         if not CUDF_AVAILABLE:
@@ -197,7 +164,7 @@ class TestPandasFamilyFactory:
             assert adapter is not None
 
     def test_dask_df_in_factory_mapping(self, monkeypatch):
-        """Test that dask-df is in the factory mapping."""
+
         from benchbox.platforms import get_dataframe_adapter
 
         if not DASK_AVAILABLE:
@@ -214,28 +181,21 @@ class TestPandasFamilyFactory:
                 adapter.close()
 
 
-# =============================================================================
-# Adapter Module Import Tests
-# =============================================================================
-
-
 class TestAdapterModuleAvailability:
-    """Tests for adapter module availability flags."""
-
     def test_cudf_available_flag_is_boolean(self):
-        """Test that CUDF_AVAILABLE is a boolean."""
+
         from benchbox.platforms.dataframe import CUDF_AVAILABLE as available
 
         assert isinstance(available, bool)
 
     def test_dask_available_flag_is_boolean(self):
-        """Test that DASK_AVAILABLE is a boolean."""
+
         from benchbox.platforms.dataframe import DASK_AVAILABLE as available
 
         assert isinstance(available, bool)
 
     def test_cudf_adapter_class_import(self):
-        """Test that CuDFDataFrameAdapter can be imported."""
+
         from benchbox.platforms.dataframe import CuDFDataFrameAdapter
 
         if CUDF_AVAILABLE:
@@ -243,13 +203,12 @@ class TestAdapterModuleAvailability:
             adapter = CuDFDataFrameAdapter()
             assert adapter.platform_name == "cuDF"
         else:
-            # Class exists but instantiation fails
             assert CuDFDataFrameAdapter is not None
             with pytest.raises(ImportError):
                 CuDFDataFrameAdapter()
 
     def test_dask_adapter_class_import(self):
-        """Test that DaskDataFrameAdapter can be imported."""
+
         from benchbox.platforms.dataframe import DaskDataFrameAdapter
 
         if DASK_AVAILABLE:
@@ -257,43 +216,35 @@ class TestAdapterModuleAvailability:
             adapter = DaskDataFrameAdapter(use_distributed=False)
             assert adapter.platform_name == "Dask"
         else:
-            # Class exists but instantiation fails
             assert DaskDataFrameAdapter is not None
             with pytest.raises(ImportError):
                 DaskDataFrameAdapter()
 
 
-# =============================================================================
-# Module Export Tests
-# =============================================================================
-
-
 class TestModuleExports:
-    """Tests for module __all__ exports."""
-
     def test_platforms_init_exports_cudf_adapter(self):
-        """Test that platforms __init__ exports CuDFDataFrameAdapter."""
+
         from benchbox import platforms
 
         assert hasattr(platforms, "CuDFDataFrameAdapter")
         assert hasattr(platforms, "CUDF_AVAILABLE")
 
     def test_platforms_init_exports_dask_adapter(self):
-        """Test that platforms __init__ exports DaskDataFrameAdapter."""
+
         from benchbox import platforms
 
         assert hasattr(platforms, "DaskDataFrameAdapter")
         assert hasattr(platforms, "DASK_AVAILABLE")
 
     def test_dataframe_init_exports_cudf_adapter(self):
-        """Test that dataframe __init__ exports CuDFDataFrameAdapter."""
+
         from benchbox.platforms import dataframe
 
         assert hasattr(dataframe, "CuDFDataFrameAdapter")
         assert hasattr(dataframe, "CUDF_AVAILABLE")
 
     def test_dataframe_init_exports_dask_adapter(self):
-        """Test that dataframe __init__ exports DaskDataFrameAdapter."""
+
         from benchbox.platforms import dataframe
 
         assert hasattr(dataframe, "DaskDataFrameAdapter")

@@ -1,27 +1,4 @@
 #!/usr/bin/env python3
-"""Aggregate one merge unit's job results into a single pass/fail.
-
-Used by the always-reporting unit result jobs in ``ci.yml``. Feed it the
-``toJson(needs)`` of the result job and one ``--expect NAME=true|false`` per
-gated job:
-
-* ``NAME=true``: the job was required; its result must be ``success``.
-* ``NAME=false``: the job was not required; its result must be ``skipped``
-  (or ``success`` when it ran anyway).
-
-A skipped required job is a failure, not a pass, so a path filter or a broken
-``if:`` can never silently green a tier. ``--always NAME`` marks jobs that
-must succeed on every run. ``--must-succeed`` is a synonym kept for
-readability. Any ``failure`` result always fails.
-
-A ``cancelled`` upstream is not a failure: it means a newer run superseded
-this one (``ci.yml`` cancels in-progress runs), so the aggregate must
-conclude cancelled rather than leave a red check on the commit. The
-``ci.yml`` aggregate steps map a cancelled-only outcome to
-``SUPERSEDED_EXIT_CODE`` and cancel their own run, which flips the aggregate
-job's conclusion from failure to cancelled. Any ``failure`` alongside a
-cancellation still fails the unit.
-"""
 
 from __future__ import annotations
 
@@ -29,22 +6,38 @@ import argparse
 import json
 import sys
 
+CLI_DESCRIPTION = (
+    "Aggregate one merge unit's job results into a single pass/fail.\n"
+    "\n"
+    "Used by the always-reporting unit result jobs in ``ci.yml``. Feed it the\n"
+    "``toJson(needs)`` of the result job and one ``--expect NAME=true|false`` per\n"
+    "gated job:\n"
+    "\n"
+    "* ``NAME=true``: the job was required; its result must be ``success``.\n"
+    "* ``NAME=false``: the job was not required; its result must be ``skipped``\n"
+    "  (or ``success`` when it ran anyway).\n"
+    "\n"
+    "A skipped required job is a failure, not a pass, so a path filter or a broken\n"
+    "``if:`` can never silently green a tier. ``--always NAME`` marks jobs that\n"
+    "must succeed on every run. ``--must-succeed`` is a synonym kept for\n"
+    "readability. Any ``failure`` result always fails.\n"
+    "\n"
+    "A ``cancelled`` upstream is not a failure: it means a newer run superseded\n"
+    "this one (``ci.yml`` cancels in-progress runs), so the aggregate must\n"
+    "conclude cancelled rather than leave a red check on the commit. The\n"
+    "``ci.yml`` aggregate steps map a cancelled-only outcome to\n"
+    "``SUPERSEDED_EXIT_CODE`` and cancel their own run, which flips the aggregate\n"
+    "job's conclusion from failure to cancelled. Any ``failure`` alongside a\n"
+    "cancellation still fails the unit.\n"
+    ""
+)
+
 OK_WHEN_NOT_REQUIRED = {"skipped", "success"}
 
-#: Exit code when upstreams were cancelled but nothing failed. The ``ci.yml``
-#: aggregate steps treat this as "superseded, not failed" and cancel their own
-#: run so the aggregate job concludes cancelled instead of failed.
 SUPERSEDED_EXIT_CODE = 3
 
 
 def evaluate(needs: dict[str, dict], expectations: dict[str, bool], always: list[str]) -> tuple[list[str], list[str]]:
-    """Return ``(problems, cancelled)``.
-
-    ``problems`` holds human-readable failures; empty means the unit passes
-    unless upstreams were cancelled. ``cancelled`` names the upstream jobs
-    whose result was ``cancelled`` (``NAME=cancelled``); a cancelled upstream
-    is never reported as a failure.
-    """
     problems: list[str] = []
     cancelled: list[str] = []
 
@@ -92,7 +85,7 @@ def parse_expectation(text: str) -> tuple[str, bool]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--unit", required=True, help="Unit name, used only in messages")
     parser.add_argument("--needs", required=True, help="toJson(needs) of the result job")
     parser.add_argument("--expect", action="append", default=[], type=parse_expectation, metavar="NAME=BOOL")

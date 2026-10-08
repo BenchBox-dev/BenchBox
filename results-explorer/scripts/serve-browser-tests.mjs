@@ -1,18 +1,4 @@
 #!/usr/bin/env node
-/**
- * Static server used by the Playwright `webServer` block.
- *
- * Serves the built explorer from `dist/` under `/results/` while routing
- * `/results/data/` to the requested fixture directory. The default remains
- * `test-fixtures/.generated/data/`; UAT can set E2E_FIXTURE_DIR for a
- * log-dir-scoped data mount. The curated corpus under `public/data/` is never
- * touched - that is the architecture decision recorded in
- * `docs/development/browser-test-architecture.md` (Decision 2).
- *
- * The server also sets `Accept-Ranges: bytes` and honors a single `Range`
- * header so Playwright-level tests can verify the RG-2 range-read contract
- * that the browser DuckDB-WASM `ATTACH` depends on.
- */
 
 import { createReadStream, statSync, existsSync } from "node:fs";
 import { createServer } from "node:http";
@@ -107,7 +93,6 @@ const sendFile = (req, res, absPath, logPath, statusCode = 200) => {
   const headers = {
     "Content-Type": mimeFor(absPath),
     "Accept-Ranges": "bytes",
-    // DuckDB-WASM needs SharedArrayBuffer; production headers mirror these.
     "Cross-Origin-Embedder-Policy": "require-corp",
     "Cross-Origin-Opener-Policy": "same-origin",
     "Cross-Origin-Resource-Policy": "cross-origin",
@@ -180,27 +165,14 @@ const servePagesArtifact = (req, res, pathname) => {
   return writeNotFound(res, pathname);
 };
 
-// Any path whose extension *isn't* a known static asset is treated as an
-// SPA route and falls back to index.html. Result IDs in URLs can contain
-// dots (e.g. `tpch-duckdb-sf0.01-...`) so a naive `extname() === ""` check
-// sends those to 404. Matching against the MIME whitelist keeps asset
-// misses as 404 while letting SPA routes resolve.
-
-// Per-path transfer log so Playwright can assert range-read behaviour that
-// originates inside the DuckDB-WASM worker - sync XHR from a dedicated
-// worker is not reliably captured by `page.on("response")`, so we account
-// server-side instead. Cleared on `POST /__test/transfers/reset`.
 const transferLog = [];
 
 const handler = (req, res) => {
-  // Strip query string but keep the pathname for routing.
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
   const pathname = decodeURIComponent(url.pathname);
 
   if (pagesShaped) return servePagesArtifact(req, res, pathname);
 
-  // Test-only transfer-log endpoints. Not exposed in production builds -
-  // this server is only used by the e2e harness.
   if (pathname === "/__test/transfers") {
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify(transferLog));
@@ -213,7 +185,6 @@ const handler = (req, res) => {
     return;
   }
 
-  // `/results/data/*` → fixture dir (the only mount that diverges from dist).
   if (pathname.startsWith("/results/data/")) {
     const rel = pathname.slice("/results/data/".length);
     const abs = safeJoin(fixtureDir, rel);
@@ -221,7 +192,6 @@ const handler = (req, res) => {
     return sendFile(req, res, abs, pathname);
   }
 
-  // `/results/` → dist/
   if (pathname === "/results" || pathname === "/results/") {
     return sendFile(req, res, join(distDir, "index.html"));
   }
@@ -237,7 +207,6 @@ const handler = (req, res) => {
     return writeNotFound(res, abs);
   }
 
-  // Root redirect for convenience.
   if (pathname === "/") {
     res.writeHead(302, { Location: "/results/" });
     res.end();

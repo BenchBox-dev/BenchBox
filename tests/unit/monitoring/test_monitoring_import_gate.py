@@ -1,11 +1,3 @@
-"""Tests for the monitoring optional-import gate.
-
-Verifies that runner.py and progress.py degrade gracefully when
-benchbox.monitoring is not importable - i.e. when _MONITORING_AVAILABLE
-is False. The DataFrame mixin takes an optional monitor and guards its
-use, covered by the mixin execution tests.
-"""
-
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -19,10 +11,7 @@ pytestmark = [
 
 
 class TestRunnerMonitoringGate:
-    """runner.py falls back to monitor=None when monitoring is unavailable."""
-
     def test_no_monitor_created_when_monitoring_unavailable(self):
-        """With _MONITORING_AVAILABLE=False, run_benchmark_lifecycle leaves monitor=None."""
         import benchbox.core.runner.runner as runner_mod
 
         mock_results = MagicMock()
@@ -61,11 +50,9 @@ class TestRunnerMonitoringGate:
                 phases=phases,
             )
 
-        # attach_snapshot_to_result must not be called - monitor is None
         mock_attach.assert_not_called()
 
     def test_monitor_none_skips_resource_monitoring(self):
-        """ResourceMonitor is not started when monitor is None."""
         import benchbox.core.runner.runner as runner_mod
 
         mock_results = MagicMock()
@@ -107,10 +94,7 @@ class TestRunnerMonitoringGate:
 
 
 class TestProgressMonitoringGate:
-    """BenchmarkProgress.monitor is None when monitoring is unavailable."""
-
     def test_monitor_is_none_when_monitoring_unavailable(self):
-        """With _MONITORING_AVAILABLE=False, BenchmarkProgress.monitor stays None."""
         from rich.console import Console
 
         import benchbox.cli.progress as progress_mod
@@ -123,7 +107,6 @@ class TestProgressMonitoringGate:
         assert progress.monitor is None
 
     def test_monitor_created_when_monitoring_available(self):
-        """With _MONITORING_AVAILABLE=True, BenchmarkProgress.monitor is set."""
         from rich.console import Console
 
         import benchbox.cli.progress as progress_mod
@@ -136,7 +119,6 @@ class TestProgressMonitoringGate:
         assert progress.monitor is not None
 
     def test_monitor_is_none_when_explicitly_disabled(self):
-        """enable_monitoring=False always yields monitor=None regardless of availability."""
         from rich.console import Console
 
         import benchbox.cli.progress as progress_mod

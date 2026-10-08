@@ -1,9 +1,6 @@
-"""Unit tests for CPU identity handling in benchbox/core/system.py.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -49,11 +46,6 @@ class TestGetCpuModel:
         with (
             patch("benchbox.core.system.HAS_PSUTIL", False),
             patch("benchbox.core.system.platform.machine", return_value="arm64"),
-            # platform.processor() is the fallback path exercised right after
-            # detect_cpu_info() fails; on a real machine it returns a genuine
-            # (platform-dependent) CPU string, not an empty value, so it must
-            # be patched too or this test only passes by accident on
-            # platforms where the real processor() happens to be "".
             patch("benchbox.core.system.platform.processor", return_value=""),
             patch("benchbox.core.system.detect_cpu_info", return_value=(None, None)),
         ):

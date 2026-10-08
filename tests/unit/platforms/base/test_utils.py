@@ -1,5 +1,3 @@
-"""Tests for platform base utility helpers."""
-
 from __future__ import annotations
 
 import sys
@@ -18,7 +16,7 @@ class _FakeStdin:
     def __init__(self, is_tty: bool) -> None:
         self._is_tty = is_tty
 
-    def isatty(self) -> bool:  # pragma: no cover - invoked by tests
+    def isatty(self) -> bool:  # pragma: no cover
         return self._is_tty
 
 
@@ -57,7 +55,7 @@ def test_tty_detection_without_env(monkeypatch):
 def test_interactive_path(monkeypatch):
     saved_pytest = _remove_pytest()
     monkeypatch.delenv("BENCHBOX_NON_INTERACTIVE", raising=False)
-    # Also unset CI environment variables that would force non-interactive mode
+
     for ci_var in ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "TRAVIS", "JENKINS_URL", "BUILDKITE", "CIRCLECI"]:
         monkeypatch.delenv(ci_var, raising=False)
     monkeypatch.setattr(sys, "stdin", _FakeStdin(is_tty=True), raising=False)

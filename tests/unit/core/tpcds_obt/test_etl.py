@@ -62,7 +62,6 @@ def test_union_query_contains_channel_literal() -> None:
 
 
 def _make_fake_transform(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TPCDSOBTTransformer:
-    """Return a TPCDSOBTTransformer wired to FakeDuckDB with source files stubbed out."""
     fake_duckdb = FakeDuckDB(tmp_path)
     transformer = TPCDSOBTTransformer(duckdb_module=fake_duckdb)
 
@@ -77,7 +76,6 @@ def _make_fake_transform(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TPC
 
 
 def test_transform_with_fake_duckdb_writes_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Explicit dat format: transformer writes manifest with correct fields."""
     transformer = _make_fake_transform(tmp_path, monkeypatch)
 
     result = transformer.transform(
@@ -102,7 +100,6 @@ def test_transform_with_fake_duckdb_writes_manifest(tmp_path: Path, monkeypatch:
 
 
 def test_transform_default_format_is_parquet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """transform() with no output_format argument should produce a .parquet artifact."""
     transformer = _make_fake_transform(tmp_path, monkeypatch)
 
     result = transformer.transform(
@@ -122,13 +119,6 @@ def test_transform_default_format_is_parquet(tmp_path: Path, monkeypatch: pytest
 
 
 def test_parquet_output_materially_smaller_than_dat(tmp_path: Path) -> None:
-    """Parquet output must be materially smaller than the equivalent .dat for a nullable OBT schema.
-
-    Uses a real (tiny) DuckDB run with a synthetic in-memory table so we measure actual
-    columnar encoding vs pipe-delimited text.  The assertion is intentionally lenient
-    (parquet < 80 % of dat) to avoid flakiness while still catching an accidental
-    fallback to row-oriented encoding.
-    """
     import os
 
     import duckdb
@@ -136,8 +126,6 @@ def test_parquet_output_materially_smaller_than_dat(tmp_path: Path) -> None:
     dat_path = tmp_path / "obt_test.dat"
     parquet_path = tmp_path / "obt_test.parquet"
 
-    # Build a tiny synthetic table with many NULLable columns (mirrors OBT null density).
-    # 500 rows × 20 columns where ~60 % of cells are NULL to exercise null suppression.
     cols_ddl = ", ".join(f"c{i} VARCHAR" for i in range(20))
     col_exprs = ", ".join(
         f"CASE WHEN (row_number() OVER () + {i}) % 5 < 3 THEN NULL ELSE 'value_{i}' END AS c{i}" for i in range(20)

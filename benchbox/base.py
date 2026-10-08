@@ -1,9 +1,6 @@
-"""Base class for all benchmarks.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 from abc import ABC, abstractmethod
@@ -33,75 +30,37 @@ else:
 
 
 class GeneratorOutputDirMixin:
-    """Keep nested data-generator output paths in sync with ``output_dir``.
-
-    Several benchmarks construct a nested data/download generator in
-    ``__init__`` that captures ``output_dir`` at construction time. When the
-    runner or orchestrator later assigns a resolved output root to
-    ``benchmark.output_dir`` (for example from an explicit CLI ``--output`` or a
-    shared data source), those nested generators must follow so generated data
-    lands under the configured root instead of a stale ``cwd``-local default.
-
-    Classes opt in by mixing this in and listing the relevant attribute names in
-    :attr:`OUTPUT_DIR_GENERATOR_ATTRS`. The mixin must precede other bases so its
-    ``output_dir`` data descriptor governs assignment.
-    """
-
-    #: Instance attribute names holding nested generators to keep in sync.
     OUTPUT_DIR_GENERATOR_ATTRS: tuple[str, ...] = ("data_generator",)
 
     @property
     def output_dir(self) -> Any:
-        """Return the resolved output directory handler."""
         return getattr(self, "_output_dir", None)
 
     @output_dir.setter
     def output_dir(self, value: Optional[Union[str, Path]]) -> None:
-        """Set the output directory and propagate it to nested generators."""
-        # None means "not configured yet"; _resolve_output_dir rejects it later.
         self._output_dir = None if value is None else create_path_handler(value)
         self._sync_output_dir_to_generators(self._output_dir)
-        # The mixin precedes BaseBenchmark in the MRO, so mirror BaseBenchmark's
-        # _impl forwarding here too: a class combining this mixin with the
-        # public wrapper pattern would otherwise leave its _impl unsynced.
         impl = self.__dict__.get("_impl")
         if impl is not None and hasattr(impl, "output_dir"):
             impl.output_dir = value
 
     def _sync_output_dir_to_generators(self, path: Any) -> None:
-        """Point each opted-in nested generator at ``path`` when present."""
         for attr in self.OUTPUT_DIR_GENERATOR_ATTRS:
-            # Only touch concrete instance attributes so lazily-constructed
-            # generator properties are not triggered prematurely.
             generator = self.__dict__.get(attr)
             if generator is None or not hasattr(generator, "output_dir"):
                 continue
             generator.output_dir = path
-            # Benchmarks that reuse TPC-H data nest a second generator.
             nested = getattr(generator, "tpch_generator", None)
             if nested is not None and hasattr(nested, "output_dir"):
                 nested.output_dir = path
 
 
 class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
-    """Base class for all benchmarks.
-
-    All benchmarks inherit from this class.
-    """
-
     api_surface = BENCHMARK_API_SURFACE
     run_with_platform_api_surface = RUN_WITH_PLATFORM_API_SURFACE
 
-    #: Lower-case identifier of the benchmark whose datagen output this class
-    #: reuses (e.g. ``"tpch"``), or ``None`` when it generates its own data.
-    #: Declared at class level so the orchestrator can resolve the shared
-    #: datagen root BEFORE construction and inject it into ``__init__``,
-    #: instead of constructing first and mutating ``output_dir`` afterward.
     DATA_SOURCE_BENCHMARK: ClassVar[Optional[str]] = None
 
-    #: Set only for benchmarks whose queries need schema objects but no data files.
-    #: This is distinct from DATA_SOURCE_BENCHMARK=None, which normally means
-    #: that the benchmark generates its own data.
     SKIP_DATA_LOADING: ClassVar[bool] = False
 
     def __init__(
@@ -110,17 +69,9 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         output_dir: Optional[Union[str, Path]] = None,
         **kwargs: Any,
     ) -> None:
-        """Initialize a benchmark.
-
-        Args:
-            scale_factor: Scale factor (1.0 = standard size)
-            output_dir: Data output directory
-            **kwargs: Additional options
-        """
         if scale_factor <= 0:
             raise ValueError("Scale factor must be positive")
 
-        # Validate that scale factors >= 1 are whole integers
         if scale_factor >= 1 and scale_factor != int(scale_factor):
             raise ValueError(
                 f"Scale factors >= 1 must be whole integers. Got: {scale_factor}. "
@@ -131,63 +82,36 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         self.scale_factor = scale_factor
 
         if output_dir is None:
-            # Resolve the datagen root through the shared helper so an explicit
-            # BENCHBOX_OUTPUT_DIR is honored at construction time, before nested
-            # data generators capture the path. When no env override is set this
-            # falls back to Path.cwd()/benchmark_runs/datagen, preserving the
-            # historical default for ordinary local runs.
             benchmark_name = self._get_benchmark_name().lower()
             self.output_dir = get_benchmark_runs_datagen_path(benchmark_name, scale_factor)
         else:
-            # Support both local and cloud storage paths
             self.output_dir = create_path_handler(output_dir)
 
-        # Verbosity and quiet handling (normalize bool/int)
         verbose_value = kwargs.pop("verbose", 0)
         quiet_value = kwargs.pop("quiet", False)
         verbosity_settings = compute_verbosity(verbose_value, quiet_value)
         self.apply_verbosity(verbosity_settings)
 
-        # Logger for core benchmarks
         self.logger = logging.getLogger(f"benchbox.core.{self._get_benchmark_name()}")
 
-        # Store remaining kwargs as attributes
         for key, value in kwargs.items():
             setattr(self, key, value)
 
     def cleanup(self) -> None:
-        """Release benchmark-owned resources when a wrapper is discarded.
-
-        The deprecated internal base exposed this no-op lifecycle hook, and
-        older core implementations may call ``super().cleanup()`` after
-        releasing their own generators. Keep the hook on the public base while
-        those implementations migrate so the compatibility boundary remains
-        behaviorally neutral.
-        """
+        pass
 
     @property
     def output_dir(self) -> Any:
-        """Return the resolved output directory handler."""
         return getattr(self, "_output_dir", None)
 
     @output_dir.setter
     def output_dir(self, value: Optional[Union[str, Path]]) -> None:
-        """Set output directory and forward to _impl when acting as a wrapper."""
-        # None means "not configured yet"; _resolve_output_dir rejects it later.
         self._output_dir = None if value is None else create_path_handler(value)
         impl = self.__dict__.get("_impl")
         if impl is not None and hasattr(impl, "output_dir"):
             impl.output_dir = value
 
     def _validate_scale_factor_type(self, scale_factor: float) -> None:
-        """Validate scale factor is a number (int or float).
-
-        Args:
-            scale_factor: Scale factor to validate
-
-        Raises:
-            TypeError: If scale_factor is not a number
-        """
         if not isinstance(scale_factor, (int, float)):
             raise TypeError(f"scale_factor must be a number, got {type(scale_factor).__name__}")
 
@@ -198,15 +122,6 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         output_dir: Optional[Union[str, Path]],
         **kwargs,
     ):
-        """Common initialization pattern for benchmark implementations.
-
-        Args:
-            implementation_class: The benchmark implementation class to instantiate
-            scale_factor: Scale factor for the benchmark
-            output_dir: Directory to output generated data files
-            **kwargs: Additional implementation-specific options
-        """
-        # Extract verbose and force_regenerate from kwargs to avoid passing them twice
         verbose = kwargs.pop("verbose", False)
         force_regenerate = kwargs.pop("force_regenerate", False)
 
@@ -220,19 +135,12 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
 
     @property
     def tables(self) -> dict:
-        """Table-to-path mappings.
-
-        Delegates to ``_impl.tables`` when a wrapper benchmark holds an
-        implementation object; otherwise returns the instance's own ``_tables``
-        dict (empty dict when unset).
-        """
         if hasattr(self, "_impl") and hasattr(self._impl, "tables"):
             return self._impl.tables
         return getattr(self, "_tables", {})
 
     @tables.setter
     def tables(self, value: dict) -> None:
-        """Set table-to-path mappings on the implementation or wrapper."""
         if hasattr(self, "_impl"):
             self._impl.tables = value
         else:
@@ -240,31 +148,26 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
 
     @property
     def csv_delimiter(self) -> "str | None":
-        """CSV delimiter. Delegates to _impl if present."""
         if hasattr(self, "_impl") and hasattr(self._impl, "csv_delimiter"):
             return self._impl.csv_delimiter
         return getattr(self, "_csv_delimiter", None)
 
     @property
     def csv_null_marker(self) -> "str | None":
-        """CSV null marker. Delegates to _impl if present."""
         if hasattr(self, "_impl") and hasattr(self._impl, "csv_null_marker"):
             return self._impl.csv_null_marker
         return getattr(self, "_csv_null_marker", None)
 
     @csv_null_marker.setter
     def csv_null_marker(self, value: "str | None") -> None:
-        """Allow subclasses without _impl to override the marker per instance."""
         self._csv_null_marker = value
 
     def get_csv_loading_config(self, table_name: str) -> "list[str] | None":
-        """Get CSV loading configuration. Delegates to _impl if present."""
         if hasattr(self, "_impl") and hasattr(self._impl, "get_csv_loading_config"):
             return self._impl.get_csv_loading_config(table_name)
         return None
 
     def _get_benchmark_name(self) -> str:
-        """Return the canonical registry ID for this benchmark class."""
         class_name = self.__class__.__name__
 
         try:
@@ -276,103 +179,45 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         if benchmark_id is not None:
             return benchmark_id
 
-        # Keep unregistered tests and downstream custom benchmarks working.
         if class_name.endswith("Benchmark"):
             return class_name[:-9].lower()
 
         return class_name.lower()
 
     def get_data_source_benchmark(self) -> Optional[str]:
-        """Return the canonical source benchmark when data is shared.
-
-        Benchmarks that reuse data generated by another benchmark (for example,
-        ``Primitives`` reusing ``TPC-H`` datasets) should set the
-        :attr:`DATA_SOURCE_BENCHMARK` class attribute (preferred — it lets the
-        orchestrator resolve the shared root before construction) or override
-        this method. Benchmarks that produce their own data return ``None``
-        (default).
-
-        Delegates to _impl if present and _impl provides this method.
-        """
         if hasattr(self, "_impl") and hasattr(self._impl, "get_data_source_benchmark"):
             return self._impl.get_data_source_benchmark()
         return self.DATA_SOURCE_BENCHMARK
 
     @abstractmethod
     def generate_data(self) -> list[Union[str, Path]]:
-        """Generate benchmark data.
-
-        Returns:
-            List of data file paths
-        """
+        pass
 
     @abstractmethod
     def get_queries(self) -> dict[str, str]:
-        """Get all benchmark queries.
-
-        Returns:
-            Dictionary mapping query IDs to query strings
-        """
+        pass
 
     @abstractmethod
     def get_query(self, query_id: Union[int, str], *, params: Optional[dict[str, Any]] = None) -> str:
-        """Get a benchmark query.
-
-        Args:
-            query_id: Query ID
-            params: Optional parameters
-
-        Returns:
-            Query string with parameters resolved
-
-        Raises:
-            ValueError: If query_id is invalid
-        """
+        pass
 
     def _load_data(self, connection: DatabaseConnection) -> None:
-        """Load benchmark data into database.
-
-        Each benchmark implements this method for its data loading.
-
-        Args:
-            connection: Database connection
-
-        Raises:
-            NotImplementedError: If not implemented by subclass
-        """
-        # Default implementation - benchmarks should override
-        # Non-abstract for backward compatibility
-        # Raises NotImplementedError if not overridden
         raise NotImplementedError(
             f"{self.__class__.__name__} must implement _load_data() method to support database execution functionality"
         )
 
     def setup_database(self, connection: DatabaseConnection) -> None:
-        """Set up database with schema and data.
-
-        Creates necessary database schema and loads
-        benchmark data into the database.
-
-        Args:
-            connection: Database connection to set up
-
-        Raises:
-            ValueError: If data generation fails
-            Exception: If database setup fails
-        """
         logger = logging.getLogger(__name__)
 
         try:
             logger.info("Setting up database schema and loading data...")
             start_time = mono_time()
 
-            # Generate data if not already generated
             if not hasattr(self, "_data_generated") or not self._data_generated:
                 logger.info("Generating benchmark data...")
                 self.generate_data()
                 self._data_generated = True
 
-            # Load data into database
             self._load_data(connection)
 
             setup_time = elapsed_seconds(start_time)
@@ -389,39 +234,16 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         params: Optional[dict[str, Any]] = None,
         fetch_results: bool = False,
     ) -> dict[str, Any]:
-        """Execute single query and return timing and results.
-
-        Args:
-            query_id: ID of the query to execute
-            connection: Database connection to execute query on
-            params: Optional parameters for query customization
-            fetch_results: Whether to fetch and return query results
-
-        Returns:
-            Dictionary containing:
-                - query_id: Executed query ID
-                - execution_time: Time taken to execute query in seconds
-                - query_text: Executed query text
-                - results: Query results if fetch_results=True, otherwise None
-                - row_count: Number of rows returned (if results fetched)
-
-        Raises:
-            ValueError: If query_id is invalid
-            Exception: If query execution fails
-        """
         logger = logging.getLogger(__name__)
 
         try:
-            # Get the query text
             query_text = self.get_query(query_id, params=params)
 
             logger.debug(f"Executing query {query_id}")
             start_time = mono_time()
 
-            # Execute the query
             cursor = connection.execute(query_text)
 
-            # Fetch results if requested
             results = None
             row_count = 0
             if fetch_results:
@@ -453,48 +275,24 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         fetch_results: bool = False,
         setup_database: bool = True,
     ) -> dict[str, Any]:
-        """Run the complete benchmark suite.
-
-        Args:
-            connection: Database connection to execute queries on
-            query_ids: Optional list of specific query IDs to run (defaults to all)
-            fetch_results: Whether to fetch and return query results
-            setup_database: Whether to set up the database first
-
-        Returns:
-            Dictionary containing:
-                - benchmark_name: Name of the benchmark
-                - total_execution_time: Total time for all queries
-                - total_queries: Number of queries executed
-                - successful_queries: Number of queries that succeeded
-                - failed_queries: Number of queries that failed
-                - query_results: List of individual query results
-                - setup_time: Time taken for database setup (if performed)
-
-        Raises:
-            Exception: If benchmark execution fails
-        """
         logger = logging.getLogger(__name__)
 
         benchmark_start_time = mono_time()
         setup_time = 0.0
 
         try:
-            # Set up database if requested
             if setup_database:
                 logger.info("Setting up database for benchmark...")
                 setup_start_time = mono_time()
                 self.setup_database(connection)
                 setup_time = elapsed_seconds(setup_start_time)
 
-            # Determine which queries to run
             if query_ids is None:
                 all_queries = self.get_queries()
                 query_ids = list(all_queries.keys())
 
             logger.info(f"Running benchmark with {len(query_ids)} queries...")
 
-            # Execute all queries
             query_results = []
             successful_queries = 0
             failed_queries = 0
@@ -508,7 +306,6 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
                 except Exception as e:
                     logger.error(f"Query {query_id} failed: {str(e)}")
                     failed_queries += 1
-                    # Include failed query in results
                     query_results.append(
                         {
                             "query_id": query_id,
@@ -522,7 +319,6 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
 
             total_execution_time = elapsed_seconds(benchmark_start_time) - setup_time
 
-            # Calculate summary statistics
             query_times = [r["execution_time_seconds"] for r in query_results if "error" not in r]
 
             benchmark_result = {
@@ -548,60 +344,15 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
             raise
 
     def run_with_platform(self, platform_adapter: SQLBenchmarkExecutor, **run_config: Any) -> "BenchmarkResults":
-        """Run complete benchmark using platform-specific optimizations.
-
-        This method provides a unified interface for running benchmarks
-        using database platform adapters that handle connection management,
-        data loading optimizations, and query execution.
-
-        This is the standard method that all benchmarks should support for
-        integration with the CLI and other orchestration tools.
-
-        Args:
-            platform_adapter: Platform adapter instance (e.g., DuckDBAdapter)
-            **run_config: Configuration options:
-                - categories: List of query categories to run (if benchmark supports)
-                - query_subset: List of specific query IDs to run
-                - connection: Connection configuration
-                - benchmark_type: Type hint for optimizations ('olap', 'oltp', etc.)
-
-        Returns:
-            BenchmarkResults object with execution results
-
-        Example:
-            from benchbox.platforms import DuckDBAdapter
-
-            benchmark = SomeBenchmark(scale_factor=0.1)
-            adapter = DuckDBAdapter()
-            results = benchmark.run_with_platform(adapter)
-        """
-        # Set default benchmark type based on benchmark characteristics
         default_benchmark_type = self._get_default_benchmark_type()
         run_config.setdefault("benchmark_type", default_benchmark_type)
 
-        # Execute using the platform adapter
         return as_sql_benchmark_executor(platform_adapter).run_benchmark(self, **run_config)
 
     def _get_default_benchmark_type(self) -> str:
-        """Get the default benchmark type for platform optimizations.
-
-        Subclasses can override this to specify their workload characteristics.
-
-        Returns:
-            Default benchmark type ('olap', 'oltp', 'mixed', 'analytics')
-        """
-        # Most benchmarks in BenchBox are OLAP-focused
         return "olap"
 
     def format_results(self, benchmark_result: dict[str, Any]) -> str:
-        """Format benchmark results for display.
-
-        Args:
-            benchmark_result: Result dictionary from run_benchmark()
-
-        Returns:
-            Formatted string representation of the results
-        """
         lines = []
         lines.append(f"Benchmark: {benchmark_result['benchmark_name']}")
         lines.append("=" * 50)
@@ -633,14 +384,6 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         return "\n".join(lines)
 
     def _format_time(self, seconds: float) -> str:
-        """Format execution time for display.
-
-        Args:
-            seconds: Time in seconds
-
-        Returns:
-            Formatted time string
-        """
         if seconds < 1:
             return f"{seconds * 1000:.1f}ms"
         elif seconds < 60:
@@ -651,20 +394,6 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
             return f"{minutes}m {remaining_seconds:.1f}s"
 
     def translate_query(self, query_id: Union[int, str], dialect: str) -> str:
-        """Translate a query to a specific SQL dialect.
-
-        Args:
-            query_id: The ID of the query to translate
-            dialect: The target SQL dialect
-
-        Returns:
-            The translated query string
-
-        Raises:
-            ValueError: If the query_id is invalid
-            ImportError: If sqlglot is not installed
-            ValueError: If the dialect is not supported
-        """
         if sqlglot is None:
             raise ImportError("sqlglot is required for query translation. Install it with `pip install sqlglot`.")
 
@@ -672,12 +401,9 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
 
         query = self.get_query(query_id)
 
-        # Normalize dialect for SQLGlot compatibility
         normalized_dialect = normalize_dialect_for_sqlglot(dialect)
 
-        # Apply translation for specific SQL syntax
         try:
-            # Use identify=True to quote identifiers and prevent reserved keyword conflicts
             translated = sqlglot.transpile(query, read="postgres", write=normalized_dialect, identify=True)[0]
             return translated
         except (ValueError, AttributeError) as e:
@@ -685,14 +411,11 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
 
     @property
     def benchmark_name(self) -> str:
-        """Get the human-readable benchmark name."""
-        # Try to get from implementation first, then fallback to class name
         if hasattr(self, "_impl"):
             if hasattr(self._impl, "_name"):
                 return self._impl._name
             elif hasattr(self._impl, "benchmark_name"):
                 return self._impl.benchmark_name
-        # For classes without _impl (like core implementation classes)
         return getattr(self, "_name", type(self).__name__)
 
     def _create_result_builder(
@@ -702,7 +425,6 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         normalize_benchmark_id: Any,
         **kwargs: Any,
     ) -> Any:
-        """Create and configure the ResultBuilder with benchmark and platform info."""
         from benchbox.core.results.builder import (
             BenchmarkInfoInput,
             ResultBuilder,
@@ -766,7 +488,6 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         duration_seconds: Optional[float] = None,
         **kwargs: Any,
     ) -> None:
-        """Populate builder with query results, metadata, and ancillary config."""
         for qr in query_results:
             builder.add_query_result(normalize_query_result(qr))
 
@@ -795,7 +516,6 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         )
 
     def _apply_phases_to_builder(self, builder: Any, phases: Any, ExecutionPhases: type) -> None:
-        """Apply execution phase information to the builder."""
         phases_obj = phases if isinstance(phases, ExecutionPhases) else None
         if phases_obj:
             builder.set_execution_phases(phases_obj)
@@ -816,7 +536,6 @@ class BaseBenchmark(BenchmarkResultValidationMixin, VerbosityMixin, ABC):
         performance_characteristics: Optional[dict[str, Any]],
         **kwargs: Any,
     ) -> None:
-        """Attach performance snapshot data to the built result."""
         snapshot_payload = kwargs.get("performance_snapshot")
         if snapshot_payload is not None:
             try:

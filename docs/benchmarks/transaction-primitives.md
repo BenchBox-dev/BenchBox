@@ -38,14 +38,14 @@ This benchmark is designed for databases with robust transaction support (Postgr
 
 ## Quick Start
 
+Setup requires TPC-H data to be loaded first, then creates the transaction staging tables:
+
 ```python
 from benchbox import TransactionPrimitives
 import duckdb
 
-# Initialize benchmark
 bench = TransactionPrimitives(scale_factor=0.01)
 
-# Setup requires TPC-H data first
 from benchbox import TPCH
 tpch = TPCH(scale_factor=0.01)
 tpch.generate_data()
@@ -53,10 +53,8 @@ tpch.generate_data()
 conn = duckdb.connect(":memory:")
 tpch.load_data_to_database(conn)
 
-# Setup transaction staging tables
 bench.setup(conn)
 
-# Execute a transaction operation
 result = bench.execute_operation("transaction_commit_small", conn)
 print(f"Success: {result.success}")
 print(f"Rows affected: {result.rows_affected}")
@@ -188,15 +186,13 @@ Unlike Write Primitives, Transaction Primitives does not create audit log tables
 
 ## CLI Integration
 
+The commands below list the available benchmarks, run Transaction Primitives on DuckDB (which offers only limited transaction testing), and run specific operations. There are no `--categories` or `--operations` options. Select individual operations with `--queries`.
+
 ```bash
-# List available benchmarks
 benchbox benchmarks list
 
-# Run Transaction Primitives benchmark (using DuckDB for limited transaction testing)
 benchbox run --benchmark transaction_primitives --platform duckdb --scale 0.01
 
-# Run specific operations (there are no --categories/--operations options;
-# select individual operations with --queries)
 benchbox run --benchmark transaction_primitives --platform duckdb \
     --queries transaction_commit_small,transaction_rollback_small
 ```
@@ -212,17 +208,19 @@ benchbox run --benchmark transaction_primitives --platform duckdb \
 
 #### Constructor
 
-```python
+```text
 TransactionPrimitives(
     scale_factor: float = 1.0,
-    output_dir: str = "_project/data",
+    output_dir: str | Path | None = None,
     quiet: bool = False
 )
 ```
 
 **Parameters**:
 - `scale_factor`: TPC-H scale factor (must match TPC-H data)
-- `output_dir`: Directory for data files
+- `output_dir`: Directory for data files. Defaults to the shared TPC-H data
+  directory, `benchmark_runs/datagen/tpch_<scale>` (or under
+  `BENCHBOX_OUTPUT_DIR` when set)
 - `quiet`: Suppress verbose logging
 
 #### Lifecycle Methods
@@ -327,8 +325,7 @@ Result object returned by `execute_operation` and `run_benchmark`.
 from benchbox import TPCH, TransactionPrimitives
 import duckdb
 
-# 1. Load TPC-H data
-tpch = TPCH(scale_factor=0.01, output_dir="_project/data")
+tpch = TPCH(scale_factor=0.01)
 tpch.generate_data()
 
 conn = duckdb.connect(":memory:")
@@ -337,22 +334,28 @@ tpch.load_data_to_database(conn)
 
 ### Setup Staging Tables
 
+This is step 2 of the walkthrough, after loading TPC-H data:
+
 ```python
-# 2. Setup Transaction Primitives staging tables
 bench = TransactionPrimitives(scale_factor=0.01)
 setup_result = bench.setup(conn, force=True)
 
 print(f"Setup: {setup_result['success']}")
 print(f"Tables created: {setup_result['tables_created']}")
-# Output:
-# Setup: True
-# Tables created: ['transaction_ops_orders', 'transaction_ops_lineitem']
+```
+
+Expected output:
+
+```text
+Setup: True
+Tables created: ['transaction_ops_orders', 'transaction_ops_lineitem']
 ```
 
 ### Execute Single Operation
 
+`execute_operation` validates the result automatically.
+
 ```python
-# 3. Execute with automatic validation
 result = bench.execute_operation("transaction_commit_small", conn)
 
 print(f"Operation: {result.operation_id}")
@@ -360,26 +363,29 @@ print(f"Success: {result.success}")
 print(f"Rows affected: {result.rows_affected}")
 print(f"Duration: {result.write_duration_ms:.2f}ms")
 print(f"Validation passed: {result.validation_passed}")
+```
 
-# Output:
-# Operation: transaction_commit_small
-# Success: True
-# Rows affected: 10
-# Duration: 15.34ms
-# Validation passed: True
+Expected output (the duration varies):
+
+```text
+Operation: transaction_commit_small
+Success: True
+Rows affected: 10
+Duration: 15.34ms
+Validation passed: True
 ```
 
 ### Run Full Benchmark
 
+This runs all transaction operations and then prints the per-operation results:
+
 ```python
-# 4. Run all transaction operations
 results = bench.run_benchmark(conn)
 
 print(f"Total operations: {len(results)}")
 successful = [r for r in results if r.success]
 print(f"Successful: {len(successful)}/{len(results)}")
 
-# Analyze results
 for result in results:
     status = "✅" if result.success else "❌"
     print(f"{status} {result.operation_id}: {result.write_duration_ms:.2f}ms")
@@ -392,7 +398,6 @@ for result in results:
 **Full transaction support** - Recommended for Transaction Primitives benchmark.
 
 ```bash
-# Run Transaction Primitives on PostgreSQL
 benchbox run --benchmark transaction_primitives --platform postgresql --scale 0.01
 ```
 
@@ -482,7 +487,6 @@ tpch.load_data_to_database(conn)
 **Solution**: Skip savepoint operations for these platforms:
 
 ```python
-# Filter out savepoint operations
 ops = bench.get_all_operations()
 supported_ops = [op_id for op_id in ops if "savepoint" not in op_id]
 results = bench.run_benchmark(conn, operation_ids=supported_ops)
@@ -508,9 +512,8 @@ results = bench.run_benchmark(conn, operation_ids=supported_ops)
 2. **Lock contention**: Concurrent transactions causing waits
 3. **Disk I/O**: Transaction durability requires disk writes
 
-**Optimization**:
+**Optimization**: Use smaller scale factors for faster testing.
 ```python
-# Use smaller scale factors for faster testing
 bench = TransactionPrimitives(scale_factor=0.001)
 ```
 
@@ -539,10 +542,8 @@ Transaction Primitives was split from Write Primitives v2 to separate concerns:
 ## Testing
 
 ```bash
-# Run integration tests
 uv run -- python -m pytest tests/integration/test_transaction_primitives_duckdb.py -v
 
-# Test basic functionality
 uv run -- python -c "from benchbox import TransactionPrimitives; bench = TransactionPrimitives(0.01); print(bench.get_benchmark_info())"
 ```
 

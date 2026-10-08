@@ -51,24 +51,23 @@ benchbox run --platform duckdb --benchmark tpch \
 This works for any platform, not just DuckDB:
 
 ```bash
-# Snowflake connector
 benchbox run --platform snowflake --benchmark tpch \
   --platform-option driver_version=3.12.0 \
   --platform-option driver_auto_install=true \
   --output s3://my-bucket/results/
 
-# Polars DataFrame engine
 benchbox run --platform polars-df --benchmark tpch \
   --platform-option driver_version=1.36.1 \
   --platform-option driver_auto_install=true
 
-# ClickHouse Cloud (clickhouse-connect HTTP driver)
 benchbox run --platform clickhouse-cloud --benchmark tpch \
   --platform-option driver_version=0.10.0 \
   --platform-option driver_auto_install=true \
   --platform-option host=your-instance.clickhouse.cloud \
   --platform-option password=your-password
 ```
+
+The examples pin the Snowflake connector, the Polars DataFrame engine, and the ClickHouse Cloud driver (the `clickhouse-connect` HTTP driver).
 
 ### Pattern 2: uv run --with (inline override)
 
@@ -84,9 +83,10 @@ If you want every `uv run` to use a specific version permanently:
 
 ```bash
 uv add "duckdb==1.5.0" --allow-prereleases
-# Re-lock and run normally
 benchbox run --platform duckdb --benchmark tpch
 ```
+
+After `uv add` updates the lock file, run BenchBox normally.
 
 This mutates `uv.lock` and is appropriate when you want a stable, reproducible
 environment rather than a one-off test.
@@ -103,9 +103,10 @@ For scripts and CI pipelines, check the result JSON:
 
 ```bash
 jq '.execution.driver_version_actual' result.json
-# or
 jq '.platform.client_version' result.json
 ```
+
+Use either command.
 
 Both fields record the version that ran. `driver_version_actual` reflects what
 `importlib.metadata` reported from the live process; `client_version` is populated by

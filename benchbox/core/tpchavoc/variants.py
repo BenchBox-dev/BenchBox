@@ -1,5 +1,3 @@
-"""TPC-Havoc query variant registry."""
-
 from __future__ import annotations
 
 from benchbox.core.tpchavoc.variant_base import StaticSQLVariant, VariantGenerator

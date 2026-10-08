@@ -26,12 +26,12 @@ This directory contains complete, production-ready examples demonstrating how to
 
 **Usage:**
 ```bash
-# Generate baseline (run once on main branch)
 python use_cases/ci_regression_test.py --save-baseline baseline.json
 
-# Test for regressions (run in CI)
 python use_cases/ci_regression_test.py --baseline baseline.json
 ```
+
+Generate the baseline once on the main branch with the first command. Run the second command in CI to test for regressions.
 
 **See also:** [ci_regression_test_github.yml](ci_regression_test_github.yml) for GitHub Actions workflow
 
@@ -50,12 +50,12 @@ python use_cases/ci_regression_test.py --baseline baseline.json
 
 **Usage:**
 ```bash
-# Evaluate local platforms
 python use_cases/platform_evaluation.py --platforms duckdb,sqlite
 
-# Add cloud platforms
 python use_cases/platform_evaluation.py --platforms duckdb,databricks,bigquery --dry-run
 ```
+
+The first command evaluates local platforms. The second adds cloud platforms.
 
 ---
 
@@ -72,12 +72,12 @@ python use_cases/platform_evaluation.py --platforms duckdb,databricks,bigquery -
 
 **Usage:**
 ```bash
-# Run full tuning workflow
 python use_cases/incremental_tuning.py
 
-# Custom scale factor
 python use_cases/incremental_tuning.py --scale 1.0
 ```
+
+The first command runs the full tuning workflow. The second uses a custom scale factor.
 
 ---
 
@@ -94,12 +94,12 @@ python use_cases/incremental_tuning.py --scale 1.0
 
 **Usage:**
 ```bash
-# Preview costs
 python use_cases/cost_optimization.py --platform bigquery --dry-run
 
-# See cost strategies
 python use_cases/cost_optimization.py
 ```
+
+The first command previews costs. The second shows cost strategies.
 
 ---
 
@@ -132,23 +132,26 @@ python use_cases/cost_optimization.py
 ## Integration Patterns
 
 ### GitHub Actions
+Add this step to `.github/workflows/performance.yml`.
+
 ```yaml
-# .github/workflows/performance.yml
 - name: Performance Test
   run: python use_cases/ci_regression_test.py --baseline baseline.json
 ```
 
 ### GitLab CI
+Add this job to `.gitlab-ci.yml`.
+
 ```yaml
-# .gitlab-ci.yml
 performance_test:
   script:
     - python use_cases/ci_regression_test.py --baseline baseline.json
 ```
 
 ### Jenkins
+Add this stage to your `Jenkinsfile`.
+
 ```groovy
-// Jenkinsfile
 stage('Performance Test') {
     sh 'python use_cases/ci_regression_test.py --baseline baseline.json'
 }

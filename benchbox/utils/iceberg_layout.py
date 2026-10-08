@@ -1,16 +1,6 @@
-"""Apache Iceberg local table-layout helpers for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Centralizes the "is this directory an Iceberg table, and which metadata file
-is current" predicate so adapters and validation code share one definition
-instead of re-implementing the metadata-directory check per module. Also
-hosts the metadata-graph relocator used when a locally built table is
-staged to cloud storage: copying the tree is not enough because metadata,
-manifest lists, and manifests embed the original ``file://`` URIs.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -24,7 +14,6 @@ _FIRST_NUMBER = re.compile(r"(\d+)")
 
 
 def is_iceberg_directory(path: str | Path) -> bool:
-    """Return whether a local path is an Iceberg table directory."""
     path = Path(path)
     metadata = path / "metadata"
     if not path.is_dir() or not metadata.is_dir():
@@ -33,26 +22,11 @@ def is_iceberg_directory(path: str | Path) -> bool:
 
 
 def _metadata_sort_key(metadata_file: Path) -> tuple[int, str]:
-    """Order metadata files by version number, then by name.
-
-    PyIceberg writes zero-padded sequence prefixes (``00000-<uuid>``) while
-    Hadoop-catalog tables use ``v<N>.metadata.json`` without padding, so raw
-    lexicographic order picks ``v9`` over ``v10``. The first digit run is the
-    version in both layouts.
-    """
     match = _FIRST_NUMBER.search(metadata_file.name)
     return (int(match.group(1)), metadata_file.name) if match else (10**18, metadata_file.name)
 
 
 def resolve_iceberg_metadata_file(path: str | Path) -> Path | None:
-    """Return the current Iceberg metadata file for a table directory, if any.
-
-    Honors ``metadata/version-hint.text`` (the authoritative current-version
-    pointer for Hadoop-catalog tables) by resolving ``v<N>.metadata.json``,
-    falling back to the highest-versioned ``*.metadata.json``. Returns None
-    when the path is not an Iceberg table directory or holds no metadata
-    files (e.g. a hint-only directory).
-    """
     path = Path(path)
     metadata = path / "metadata"
     if not path.is_dir() or not metadata.is_dir():
@@ -78,19 +52,9 @@ _METADATA_VERSION_RE = re.compile(r"(\d+)-.*\.metadata\.json")
 
 @dataclass
 class RelocatedIcebergGraph:
-    """An Iceberg metadata graph rewritten for a new table location.
-
-    Data files are byte-identical and are NOT staged here — upload them
-    unchanged. Only the graph files (metadata JSON, manifest list,
-    manifests) are rewritten into ``staging_dir``.
-    """
-
     metadata_location: str
-    """Destination URI of the rewritten current metadata file."""
     graph_files: dict[str, Path] = field(default_factory=dict)
-    """Destination-relative path -> local staged file, for every rewritten graph file."""
     data_files: list[str] = field(default_factory=list)
-    """Table-relative paths of data files to upload unchanged."""
 
 
 def relocate_iceberg_table(
@@ -98,31 +62,6 @@ def relocate_iceberg_table(
     dest_uri: str,
     staging_dir: str | Path,
 ) -> RelocatedIcebergGraph:
-    """Rewrite a local Iceberg table's metadata graph for a new location URI.
-
-    A plain file copy leaves ``file://`` data and manifest references inside
-    the metadata JSON, manifest lists, and manifests, so cloud engines cannot
-    read the staged table. This rebuilds the graph with PyIceberg's own
-    manifest writers: manifest entries are re-emitted with destination data
-    URIs (sizes and statistics preserved — the data files themselves are
-    untouched), followed by a new manifest list and a new current metadata
-    file. Only the current snapshot is relocated; the staged copy is a new
-    single-snapshot table, so snapshot and metadata logs are reset.
-
-    Args:
-        table_dir: Local Iceberg table directory to relocate.
-        dest_uri: Destination table URI prefix (e.g. ``s3://bucket/prefix``).
-            Data files are expected at the same relative paths beneath it.
-        staging_dir: Local directory receiving the rewritten graph files
-            under ``metadata/``.
-
-    Returns:
-        RelocatedIcebergGraph with the destination metadata URI, staged
-        graph files, and the table-relative data files to upload unchanged.
-
-    Raises:
-        ValueError: If ``table_dir`` is not an Iceberg table directory.
-    """
     from pyiceberg.io.pyarrow import PyArrowFileIO
     from pyiceberg.manifest import read_manifest_list, write_manifest, write_manifest_list
     from pyiceberg.serializers import ToOutputFile

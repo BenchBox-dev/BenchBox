@@ -80,8 +80,8 @@ This proposal extends existing BenchBox mechanisms rather than replacing them:
   contracts.
 - `benchbox/core/expected_results/` supplies expected-result and digest mechanisms that can support score
   admission, but the new suite needs more than one exact-equality oracle.
-- `docs/development/benchbox-results-platform-strategy.md` defines comparable result cohorts and deliberately
-  avoids a weighted cross-context composite. The new scores are a new, explicitly versioned product
+- The Results Explorer groups results into comparable cohorts and deliberately avoids a weighted
+  cross-context composite. The new scores are a new, explicitly versioned product
   surface; they do not reinterpret the Explorer's existing meta-leaderboard.
 - `docs/development/adr/adr-client-link-locality-disclosure.md` requires client cloud and region disclosure
   plus a post-run statement-overhead probe. Score evidence inherits that contract. The score does not
@@ -487,75 +487,6 @@ Publication is mechanically gated. A ranked bundle must identify a frozen method
 reference-vector ID, and the exact frozen manifest hash. Development and pilot bundles remain provisional
 and unranked; CI and ingestion reject any bundle whose identities do not match the qualified set.
 
-## Review findings incorporated
-
-Adversarial reviews changed the proposal in these material ways:
-
-- benchmark-count weighting was replaced with capability and lineage blocks;
-- experimental benchmarks became first-class candidates with stronger admission gates;
-- a portable no-skip query core was rejected as the only score because it discards advanced SQL coverage;
-- fixed canonical datasets and scalable synthetic datasets were separated into versioned size vectors;
-- concurrency became an explicit measured dimension, with a ladder and published curve rather than one
-  asserted constant;
-- advanced windows, applied analytics, complex types, approximate accuracy, temporal behavior, and
-  non-vacuity fixtures were added to the qualification contract;
-- JOB and full TPC-Havoc were removed from the default throughput mix while remaining important Power or
-  diagnostic workloads;
-- a fully geometric hierarchy replaced mixed arithmetic/geometric aggregation;
-- the M4/16 GB example became a reference candidate subject to resource and variance qualification.
-
-Two challenges were rejected. First, experimental workloads are not excluded merely because they are
-experimental; their purpose is directly relevant and admission evidence addresses their maturity. Second,
-all benchmarks do not receive equal top-level weight, because TPC-H, TPC-Havoc, and TPC-H Skew share data
-and query ancestry and would otherwise dominate independent evidence.
-
-### External review adjudication
-
-Claude Sonnet and Muse independently reviewed this proposed ADR and its tracker sequence. Each reported
-finding was resolved as follows. `NARROW` means the underlying risk was accepted but the proposed remedy was
-made platform-neutral or aligned with the score's atomic model.
-
-| Reviewer finding | Disposition | Resolution |
-| --- | --- | --- |
-| Muse F-CRIT-001: ambiguous skip and failure states | ACCEPT | The manifest now has explicit evidence states; only `passed` scores, and unsupported required work invalidates the named profile. |
-| Muse F-CRIT-002: timed-out threads can leak work | NARROW | Scored runs require cancellation plus a drain barrier or isolation; a failed drain quarantines the execution context. No one database-specific timeout mechanism is mandated. |
-| Muse F-CRIT-003: fixture and non-vacuity work was under-specified | ACCEPT | Fixture, oracle-engine, and TPC-Havoc equivalence work are separate tasks, and the manifest depends on all three. |
-| Muse F-CRIT-004: reference thresholds could be selected after seeing results | ACCEPT | A separate qualification-policy task freezes numerical gates before pilot measurements. |
-| Muse F-REQ-005: block weights could exceed the TPC-H lineage cap | NARROW | Effective lineage weights are summed across blocks and must be demonstrated before manifest freeze; the provisional top-level block percentages need not be discarded yet. |
-| Muse F-REQ-006: reference-independent ranking was too broad | ACCEPT | Equivalence is limited to scalar-multiple vectors; a non-proportional vector must be rejected or cause a major-version recalibration. |
-| Muse F-REQ-007: Power and Throughput can have different members at the same size | NARROW | Score type and its member-manifest hash are cohort identity; membership belongs in the score manifest rather than the dataset profile. |
-| Muse F-REQ-008: cache state was not reproducible | ACCEPT | Each platform needs a recorded, verified cache-state procedure; otherwise it can qualify only for an honestly named achievable state. |
-| Muse F-REQ-009: repetition aggregation allowed partial interpretation | NARROW | Every predeclared repetition must be complete and failures cannot be discarded. Atomic measures remain queries for Power and complete family batches for Throughput, rather than redefining an atom as the whole suite. |
-| Muse F-REQ-010: missing TODO dependency edges | NARROW | Manifest schema now depends on the oracle/fixture/equivalence tasks. A direct multi-system-to-oracle edge is unnecessary because both runners and the manifest provide that dependency transitively. |
-| Muse F-REQ-011: publication ordering lacked a mechanical gate | ACCEPT | Ranked publication must verify the frozen methodology, qualified reference, and frozen manifest hashes. |
-| Muse F-REQ-012: generator, data-slice, renderer, and clock provenance gaps | NARROW | Generator/tool versions, post-translation SQL, source objects, rows, hashes, and timing source are recorded. BenchBox revision already binds the timing implementation, so the clock alias is evidence rather than a separate comparison dimension. |
-| Muse F-REQ-013: runnable and scored sets were conflated | ACCEPT | The inventory now defines admitted and excluded sets, reason codes, and fail-closed skip drift. |
-| Muse F-REQ-014: unsupported Full-profile leaves could block forever | ACCEPT | Every leaf must gain a fixture, be explicitly removed with weight reallocation, or move to a named extension before freeze. |
-| Muse F-REQ-015: “materially different systems” was undefined | ACCEPT | The pilot requires embedded, client-server, and distributed or managed-warehouse execution archetypes, with exceptions requiring evidence. |
-| Muse F-NIT-016: timing boundaries were not auditable | ACCEPT | Monotonic total time is required; optional planning, execution, and fetch components and non-overlapping setup/scored phases are evidence. |
-| Muse F-CONS-017: query counts could still influence within-block weight | ACCEPT | Leaf and lineage weights are explicit; duplicate-capability queries cannot create weight. |
-| Muse F-CONS-018: the client could be the throughput bottleneck | ACCEPT | Client-headroom thresholds are preregistered and client-limited points cannot become headlines. |
-| Claude ADR-SCORE-01: lineage arithmetic was absent | ACCEPT | The capability-matrix task must publish the complete effective-weight audit before manifest work. |
-| Claude ADR-SCORE-02: thread containment was unachievable as written | NARROW | The contract permits process isolation or platform cancellation, but always requires a bounded drain and quarantine on failure. |
-| Claude ADR-SCORE-03: accepted locality policy was omitted | ACCEPT | The ADR now inherits the locality ADR, overhead probe, disclosure, and comparison behavior. |
-| Claude ADR-SCORE-04: reference-equivalence test could be vacuous | NARROW | Golden tests require a proportional alternative that preserves order and a non-proportional vector that is rejected; two arbitrary physical references are not assumed equivalent. |
-| Claude ADR-SCORE-05: manifest could precede oracle design | ACCEPT | The dependency is reversed so the manifest consumes the completed contracts. |
-| Claude ADR-SCORE-06: the advanced-oracle task was overloaded | ACCEPT | It is split into oracle-engine, fixture/non-vacuity, and TPC-Havoc-equivalence items. |
-| Claude ADR-SCORE-07: public-manifest-specific tuning was undisclosed | ACCEPT | The cohort key gains a benchmark-specialization attestation, and freeze/publication policy must label and filter such results. |
-| Claude ADR-SCORE-08: an embedded reference may bias Throughput | ACCEPT | Qualification compares embedded and client-server reference candidates and reports rank sensitivity before selection. |
-| Claude ADR-SCORE-09: Power should ship independently | REBUT | Version 1 is intentionally a coherent two-metric methodology with shared identities and gates. Splitting release milestones would permit a partial product under the same version before the requested concurrency metric is sound. |
-| Claude ADR-SCORE-10: `benchbox/core/manifest/` does not exist | REBUT | The exact reviewed revision contains that package, including `models.py`, `io.py`, and `io_specs.yaml`; the tracker link is valid. |
-
-Muse's additional cost, energy, tenancy, and data-freshness concerns do not become hidden score dimensions.
-Cost and energy may be published as diagnostics; isolation and quota policy belong to execution qualification;
-and fixed datasets are deliberately immutable for reproducibility rather than freshness claims. Its cross-engine
-null, NaN, timestamp, collation, and complex-value semantics concern is accepted into the oracle contract.
-Claude's hardware-unit continuity and shared-host resource-accounting concerns are accepted into reference
-qualification and topology evidence. Both reviewers' suggestion to make the diagnostic surface primary is
-accepted in presentation—the Explorer must show blocks and evidence next to the headline—but not as a reason
-to remove the two headline metrics requested here. Holdout and sensitivity gates test whether those headlines
-add stable information before publication.
-
 ## Alternatives rejected
 
 ### One universal numeric scale factor
@@ -569,10 +500,22 @@ vectors are more honest.
 Rejected because throughput changes materially with session count and saturation. `C` is part of the score
 name and immutable cohort identity.
 
+### Assert one concurrency constant
+
+Rejected because no single session count represents every platform and profile. Qualification measures a
+concurrency ladder and the public result keeps the curve.
+
 ### Weight every benchmark or query equally
 
-Rejected because correlated suites and large variant catalogs would dominate by enumeration. Capability
-and lineage weights preserve diversity without rewarding duplication.
+Rejected because correlated suites and large variant catalogs would dominate by enumeration. TPC-H,
+TPC-Havoc, and TPC-H Skew share data and query ancestry and would otherwise outweigh independent evidence.
+Capability and lineage weights preserve diversity without rewarding duplication.
+
+### Exclude experimental benchmarks
+
+Rejected because their purpose, covering syntax, function, skew, and physical-model diversity, is directly
+relevant to the score. They are first-class candidates with stronger admission gates, and admission
+evidence addresses their maturity.
 
 ### Score only queries supported by every platform
 
@@ -585,6 +528,11 @@ created to cover. Named Core and Full profiles make support explicit.
 Rejected because some workloads model optimizer robustness or exhaustive syntax variation rather than a
 realistic concurrent session. Throughput membership follows modeled concurrent use, as Geekbench 7 limits
 multi-core membership to workloads whose applications are meaningfully multi-threaded.
+
+### Mix arithmetic and geometric aggregation
+
+Rejected because an arithmetic step lets one exceptional block dominate the composite and loses ratio-scale
+properties. The hierarchy is geometric at every level.
 
 ### Use paired-query robustness penalties in the headline
 
@@ -601,6 +549,20 @@ correctness, and variance evidence must determine whether it qualifies.
 
 Rejected because rank aggregation does not preserve a “twice the score means twice the performance”
 interpretation, and existing cohorts do not carry the scored manifest and correctness contract.
+
+### Fold cost, energy, tenancy, or freshness into the score
+
+Rejected because each would become a hidden score dimension. Cost and energy may be published as
+diagnostics; isolation and quota policy belong to execution qualification; and fixed datasets are
+deliberately immutable for reproducibility rather than freshness claims. Cross-engine null, NaN, timestamp,
+collation, and complex-value semantics belong to the oracle contract. Hardware-unit continuity and
+shared-host resource accounting belong to reference qualification and topology evidence.
+
+### Publish only block scores, without headlines
+
+Rejected because the two headline metrics are the summary users need. The Explorer must show blocks and
+evidence next to the headline, and holdout and sensitivity gates test whether the headlines add stable
+information before publication.
 
 ## Consequences
 
@@ -652,27 +614,3 @@ This ADR may move from Proposed to Accepted only when:
 10. Publication mechanically rejects a non-frozen methodology, unqualified reference, manifest mismatch,
     or undisclosed benchmark-specific tuning; documentation states that these are BenchBox synthetic
     metrics, not official TPC results.
-
-## Implementation ownership
-
-The tracker sequence rooted at `benchbox-score-workload-contracts` owns implementation and qualification.
-No task may publish a headline score before the methodology-freeze item has satisfied every acceptance gate
-above.
-
-| Order | Tracker item | Depends on |
-| ---: | --- | --- |
-| 1 | `benchbox-score-workload-contracts` | — |
-| 2 | `benchbox-score-capability-matrix` | Workload contracts |
-| 3 | `benchbox-score-advanced-oracles` | Capability matrix |
-| 4 | `benchbox-score-advanced-fixtures` | Capability matrix |
-| 5 | `benchbox-score-tpchavoc-equivalence` | Capability matrix and oracle engine |
-| 6 | `benchbox-score-manifest-schema` | Oracle engine, advanced fixtures, and TPC-Havoc equivalence |
-| 7 | `benchbox-score-qualification-policy` | Manifest schema |
-| 8 | `benchbox-score-calculator` | Manifest schema |
-| 9 | `benchbox-score-power-runner` | Manifest schema |
-| 10 | `benchbox-score-throughput-runner` | Manifest schema |
-| 11 | `benchbox-score-size-profile-pilot` | Power runner and qualification policy |
-| 12 | `benchbox-score-concurrency-pilot` | Throughput runner, size-profile pilot, and qualification policy |
-| 13 | `benchbox-score-multisystem-pilot` | Calculator, both runners, and both profile pilots |
-| 14 | `benchbox-score-methodology-freeze` | Multi-system pilot |
-| 15 | `benchbox-score-explorer-publication` | Methodology freeze |

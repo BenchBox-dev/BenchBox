@@ -27,10 +27,11 @@ These databases are accessed through fixtures defined in `tests/fixtures/databas
 
 ```python
 def test_example(tpch_test_db):
-    # Use the TPC-H test database
     result = tpch_test_db.execute("SELECT COUNT(*) FROM customer").fetchone()
     assert result[0] > 0
 ```
+
+The fixture `tpch_test_db` provides the TPC-H test database.
 
 Available fixtures:
 - `basic_test_db` - Connection to basic_test.duckdb

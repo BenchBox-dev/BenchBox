@@ -1,21 +1,3 @@
-/**
- * chartRegistry.ts - Explorer chart type registry.
- *
- * Mirrors the canonical semantic chart list in
- * ``benchbox/core/visualization/chart_types.py`` (_CHART_SPECS).
- *
- * Policy: new chart types are added to ``chart_types.py`` first; this
- * file follows.  A parity test (chartRegistry.parity.test.ts) asserts
- * the two lists are in sync (bidirectional).
- *
- * Each entry carries:
- *   - id              matching the Python chart_types.py name
- *   - title           human-readable display name
- *   - description     matches chart_types.py ChartTypeSpec.description
- *   - requires        data requirements (used by pages to gate rendering)
- *   - cli_equivalent  name in chart_types.py (always === id for now)
- */
-
 import type { BenchmarkSummary, DetailResult, PlatformRow } from "@/types";
 import { canonicalPhase } from "@/lib/displayLabels";
 import {
@@ -24,13 +6,6 @@ import {
   type ChartDatasetEligibilityClass,
 } from "@/lib/displayEligibility";
 
-/**
- * Narrow shape consumed by historical/trend charts (TimeSeries, summary_box).
- *
- * Both `ManifestEntry` and DuckDB `ResultRow`/`PlatformIndexRowRow` satisfy
- * this structurally, so pages can hand over DuckDB query results directly
- * without reshaping.
- */
 export interface ChartHistoricalEntry {
   result_id: string;
   benchmark: string;
@@ -43,21 +18,13 @@ export interface ChartHistoricalEntry {
 }
 
 export interface DataRequirements {
-  /** Needs a BenchmarkSummary artifact (benchmark × platform matrix). */
   requiresSummary?: boolean;
-  /** Needs ≥2 results (comparison-mode charts: diverging_bar, speedup, etc.). */
   requiresTwoResults?: boolean;
-  /** Needs normalized_cost_usd to be populated on ≥1 normalized platform. */
   requiresCostData?: boolean;
-  /** Needs power_score to be populated on ≥1 platform. */
   requiresPowerScore?: boolean;
-  /** Needs phase_durations to be populated on ≥1 platform. */
   requiresPhaseDurations?: boolean;
-  /** Needs ≥2 ManifestEntries per platform (trend/history charts). */
   requiresHistorical?: boolean;
-  /** Needs a per-query timings matrix. */
   requiresQueryTimings?: boolean;
-  /** Needs percentile_stats to be populated on ≥1 platform. */
   requiresPercentileStats?: boolean;
 }
 
@@ -76,17 +43,13 @@ export interface ChartQuestionGroup {
 }
 
 export interface ChartRegistryEntry {
-  /** Canonical ID - matches chart_types.py ALL_CHART_TYPES entry. */
   id: string;
   title: string;
   shortTitle: string;
   description: string;
-  /** Analytical question this chart answers in Explorer navigation. */
   questionGroup: ChartQuestionGroupId;
-  /** Dataset eligibility class enforced before rendering chart data points. */
   eligibilityClass: ChartDatasetEligibilityClass;
   requires: DataRequirements;
-  /** Python CLI equivalent chart type name (always === id). */
   cli_equivalent: string;
 }
 
@@ -132,10 +95,6 @@ export const CHART_QUESTION_GROUP_BY_ID: Readonly<Record<ChartQuestionGroupId, C
     ChartQuestionGroupId,
     ChartQuestionGroup
   >;
-
-// ---------------------------------------------------------------------------
-// Registry - must stay in sync with chart_types.py _CHART_SPECS order
-// ---------------------------------------------------------------------------
 
 export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   {
@@ -196,11 +155,6 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
     description: "Scatter plot of normalized cost vs performance with cost-status empty states",
     questionGroup: "cost",
     eligibilityClass: "cost_safe",
-    // Adding `requiresCostData` makes the chart unavailable when no platform
-    // in the cohort has normalized_cost_usd. Without this gate the Cost tab
-    // would render an empty selectable panel and force the user to discover
-    // "no cost recorded" by clicking through. The empty state is now
-    // surfaced one level up: the tab itself disappears for cost-less cohorts.
     requires: { requiresSummary: true, requiresCostData: true },
     cli_equivalent: "cost_scatter",
   },
@@ -309,14 +263,11 @@ export const CHART_REGISTRY: readonly ChartRegistryEntry[] = [
   },
 ] as const;
 
-/** Canonical chart type IDs - must match chart_types.py ALL_CHART_TYPES. */
 export const ALL_CHART_IDS: readonly string[] = CHART_REGISTRY.map((e) => e.id);
 
-/** Quick-lookup map from id → entry. */
 export const CHART_REGISTRY_BY_ID: Readonly<Record<string, ChartRegistryEntry>> =
   Object.fromEntries(CHART_REGISTRY.map((e) => [e.id, e]));
 
-/** Returns true when the id is a known chart type. */
 export function isValidChartId(id: string): boolean {
   return id in CHART_REGISTRY_BY_ID;
 }
@@ -326,14 +277,12 @@ export type ChartContext =
   | {
       kind: "compare";
       results: DetailResult[];
-      /** Canonical `benchmark_rankings.primary_metric`, loaded from DuckDB. */
       primaryMetric?: "power_score" | "display_geomean_ms";
     }
   | {
       kind: "detail";
       detail: DetailResult;
       historical?: ChartHistoricalEntry[];
-      /** Canonical `benchmark_rankings.primary_metric`, loaded from DuckDB. */
       primaryMetric?: "power_score" | "display_geomean_ms";
     };
 
@@ -498,9 +447,6 @@ function getChartCapabilities(context: ChartContext): ChartCapabilities {
 }
 
 function contextSupportsEntry(entry: ChartRegistryEntry, context: ChartContext): boolean {
-  // time_series needs a historical ManifestEntry[] trend across run dates, which
-  // neither compare nor detail contexts provide - they are single-point-in-time.
-  // The summary context owns historical data when it's present.
   if (context.kind === "compare") {
     return entry.id !== "time_series";
   }

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Verify canonical JoinOrder corpus backfill bundles."""
 
 from __future__ import annotations
 
@@ -17,6 +16,9 @@ EXPECTED_MEASUREMENT_RUNS = 3
 EXPECTED_MEASUREMENT_ROWS = EXPECTED_LOGICAL_QUERY_COUNT * EXPECTED_MEASUREMENT_RUNS
 DEFAULT_STAGED_DIR = Path("~/Developer/benchmark_runs/submissions/uat_joinorder_canonical_corpus_20260512").expanduser()
 DEFAULT_CORPUS_DIR = Path("results-data/bundles")
+
+
+CLI_DESCRIPTION = "Verify canonical JoinOrder corpus backfill bundles."
 
 
 def _discover_bundles(root: Path) -> list[Path]:
@@ -118,7 +120,7 @@ def _validate_bundle(bundle_path: Path, root: Path, expected_identity: dict[str,
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--staged-dir", type=Path, default=DEFAULT_STAGED_DIR)
     parser.add_argument("--corpus-dir", type=Path, default=DEFAULT_CORPUS_DIR)
     parser.add_argument("--skip-staged", action="store_true")

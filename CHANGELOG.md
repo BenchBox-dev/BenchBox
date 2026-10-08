@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now waits, up to 10 minutes, for background merges to finish before the first
   query, and the wait is not counted as load time. Don't compare tuned
   ClickHouse timings recorded before this change with results after it.
+- CLI help, MCP descriptions and benchmark descriptions use explicit metadata.
+  Python API references retain public contracts independently of source docstrings.
+  Generated query implementations and regional price resolvers no longer assign
+  explanatory `__doc__` text. Code that reads those docstrings should use query
+  metadata or the API reference; callable names, signatures and query behavior
+  are preserved.
+
 - **Tuning maintenance runs after the load.** ClickHouse `OPTIMIZE TABLE ...
   FINAL`, Redshift `ANALYZE` and `VACUUM`, Databricks Delta `OPTIMIZE` and
   `ANALYZE`, and Snowflake `RESUME RECLUSTER` ran before any data was loaded,
@@ -1068,13 +1075,10 @@ BenchBox v0.1.0 is the **initial public release** of the database benchmarking f
 ### Quick Start
 
 ```bash
-# Install
 pip install benchbox
 
-# Run TPC-H on DuckDB
 benchbox run --platform duckdb --benchmark tpch --scale 0.01
 
-# Run with DataFrame API
 benchbox run --platform polars-df --benchmark tpch --scale 0.01
 ```
 

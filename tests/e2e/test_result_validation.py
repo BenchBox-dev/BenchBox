@@ -1,8 +1,3 @@
-"""End-to-end tests for result validation.
-
-Tests validate that benchmark result files have the correct structure and content.
-"""
-
 from __future__ import annotations
 
 import json
@@ -23,16 +18,8 @@ from tests.e2e.utils import (
 pytestmark = pytest.mark.fast
 
 
-# ============================================================================
-# Result Structure Validation Tests
-# ============================================================================
-
-
 class TestResultStructure:
-    """Tests for result structure validation."""
-
     def test_valid_result_passes_validation(self) -> None:
-        """Test that a valid result passes validation."""
         valid_result = {
             "benchmark_name": "TPC-H",
             "platform": "duckdb",
@@ -54,27 +41,23 @@ class TestResultStructure:
         assert len(errors) == 0
 
     def test_missing_required_field_fails(self) -> None:
-        """Test that missing required fields fail validation."""
         invalid_result = {
             "benchmark_name": "TPC-H",
             "platform": "duckdb",
-            # Missing: scale_factor, execution_id, timestamp, duration_seconds, etc.
         }
 
         is_valid, errors = validate_result_structure(invalid_result)
         assert not is_valid
         assert len(errors) > 0
 
-        # Check that missing fields are reported
         missing_fields = {e.field for e in errors}
         assert "scale_factor" in missing_fields or any("scale_factor" in e.message for e in errors)
 
     def test_null_required_field_fails(self) -> None:
-        """Test that null required fields fail validation."""
         invalid_result = {
             "benchmark_name": "TPC-H",
             "platform": "duckdb",
-            "scale_factor": None,  # Null instead of value
+            "scale_factor": None,
             "execution_id": "test-123",
             "timestamp": "2024-01-15T10:30:00Z",
             "duration_seconds": 45.5,
@@ -88,7 +71,6 @@ class TestResultStructure:
         assert any("scale_factor" in e.field for e in errors)
 
     def test_invalid_timestamp_format_fails(self) -> None:
-        """Test that invalid timestamp format fails validation."""
         invalid_result = {
             "benchmark_name": "TPC-H",
             "platform": "duckdb",
@@ -106,14 +88,13 @@ class TestResultStructure:
         assert any("timestamp" in e.field for e in errors)
 
     def test_negative_duration_fails(self) -> None:
-        """Test that negative duration fails validation."""
         invalid_result = {
             "benchmark_name": "TPC-H",
             "platform": "duckdb",
             "scale_factor": 0.01,
             "execution_id": "test-123",
             "timestamp": "2024-01-15T10:30:00Z",
-            "duration_seconds": -10,  # Negative duration
+            "duration_seconds": -10,
             "total_queries": 22,
             "successful_queries": 22,
             "failed_queries": 0,
@@ -124,7 +105,6 @@ class TestResultStructure:
         assert any("duration" in e.field for e in errors)
 
     def test_query_count_mismatch_fails(self) -> None:
-        """Test that mismatched query counts fail validation."""
         invalid_result = {
             "benchmark_name": "TPC-H",
             "platform": "duckdb",
@@ -134,7 +114,7 @@ class TestResultStructure:
             "duration_seconds": 45.5,
             "total_queries": 22,
             "successful_queries": 20,
-            "failed_queries": 1,  # 20 + 1 != 22
+            "failed_queries": 1,
             "query_results": [],
         }
 
@@ -143,16 +123,8 @@ class TestResultStructure:
         assert any("count" in e.field or "count" in e.message.lower() for e in errors)
 
 
-# ============================================================================
-# Query Execution Validation Tests
-# ============================================================================
-
-
 class TestQueryExecutionValidation:
-    """Tests for query execution validation."""
-
     def test_valid_query_execution_passes(self) -> None:
-        """Test that valid query execution passes validation."""
         query_exec = {
             "query_id": "Q1",
             "status": "SUCCESS",
@@ -160,11 +132,9 @@ class TestQueryExecutionValidation:
             "rows_returned": 100,
         }
 
-        # Should not raise
         assert_query_execution_valid(query_exec)
 
     def test_missing_query_id_fails(self) -> None:
-        """Test that missing query_id fails validation."""
         query_exec = {
             "status": "SUCCESS",
             "execution_time_ms": 150,
@@ -174,7 +144,6 @@ class TestQueryExecutionValidation:
             assert_query_execution_valid(query_exec)
 
     def test_empty_query_id_fails(self) -> None:
-        """Test that empty query_id fails validation."""
         query_exec = {
             "query_id": "",
             "status": "SUCCESS",
@@ -185,7 +154,6 @@ class TestQueryExecutionValidation:
             assert_query_execution_valid(query_exec)
 
     def test_invalid_status_fails(self) -> None:
-        """Test that invalid status fails validation."""
         query_exec = {
             "query_id": "Q1",
             "status": "INVALID_STATUS",
@@ -196,25 +164,22 @@ class TestQueryExecutionValidation:
             assert_query_execution_valid(query_exec)
 
     def test_negative_execution_time_fails(self) -> None:
-        """Test that negative execution time fails validation."""
         query_exec = {
             "query_id": "Q1",
             "status": "SUCCESS",
-            "execution_time_ms": -100,  # Negative
+            "execution_time_ms": -100,
         }
 
         with pytest.raises(AssertionError):
             assert_query_execution_valid(query_exec)
 
     def test_failed_query_no_time_required(self) -> None:
-        """Test that failed queries don't require execution time."""
         query_exec = {
             "query_id": "Q1",
             "status": "FAILED",
             "error_message": "Query failed",
         }
 
-        # Should not raise - execution_time_ms not required for failed queries
         assert_query_execution_valid(query_exec, require_positive_time=False)
 
     @pytest.mark.parametrize(
@@ -222,37 +187,25 @@ class TestQueryExecutionValidation:
         ["SUCCESS", "FAILED", "ERROR", "TIMEOUT", "SKIPPED"],
     )
     def test_valid_statuses_accepted(self, status: str) -> None:
-        """Test that all valid statuses are accepted."""
         query_exec = {
             "query_id": "Q1",
             "status": status,
             "execution_time_ms": 100 if status == "SUCCESS" else 0,
         }
 
-        # Should not raise for any valid status
         assert_query_execution_valid(query_exec, require_positive_time=False)
 
 
-# ============================================================================
-# Phase Timing Validation Tests
-# ============================================================================
-
-
 class TestPhaseTimingValidation:
-    """Tests for phase timing validation."""
-
     def test_valid_phase_timing_passes(self) -> None:
-        """Test that valid phase timing passes validation."""
         phase = {
             "duration_ms": 5000,
             "status": "completed",
         }
 
-        # Should not raise
         assert_phase_timing_valid(phase, "test_phase")
 
     def test_missing_duration_fails(self) -> None:
-        """Test that missing duration_ms fails validation."""
         phase = {
             "status": "completed",
         }
@@ -261,7 +214,6 @@ class TestPhaseTimingValidation:
             assert_phase_timing_valid(phase, "test_phase")
 
     def test_negative_duration_fails(self) -> None:
-        """Test that negative duration fails validation."""
         phase = {
             "duration_ms": -100,
         }
@@ -270,25 +222,15 @@ class TestPhaseTimingValidation:
             assert_phase_timing_valid(phase, "test_phase")
 
     def test_zero_duration_allowed_when_not_required_positive(self) -> None:
-        """Test that zero duration is allowed when require_positive_duration=False."""
         phase = {
             "duration_ms": 0,
         }
 
-        # Should not raise with require_positive_duration=False
         assert_phase_timing_valid(phase, "test_phase", require_positive_duration=False)
 
 
-# ============================================================================
-# Execution Phases Validation Tests
-# ============================================================================
-
-
 class TestExecutionPhasesValidation:
-    """Tests for execution phases structure validation."""
-
     def test_valid_execution_phases_passes(self) -> None:
-        """Test that valid execution phases pass validation."""
         result = {
             "benchmark_name": "TPC-H",
             "platform": "duckdb",
@@ -325,12 +267,11 @@ class TestExecutionPhasesValidation:
         assert is_valid, f"Validation failed: {errors}"
 
     def test_invalid_power_test_duration_fails(self) -> None:
-        """Test that invalid power_test duration fails validation."""
         result = {
             "execution_phases": {
                 "setup": {},
                 "power_test": {
-                    "duration_ms": -100,  # Invalid negative duration
+                    "duration_ms": -100,
                     "query_executions": [],
                 },
             },
@@ -341,13 +282,12 @@ class TestExecutionPhasesValidation:
         assert any("power_test" in e.field for e in errors)
 
     def test_invalid_throughput_streams_fails(self) -> None:
-        """Test that invalid throughput test num_streams fails validation."""
         result = {
             "execution_phases": {
                 "setup": {},
                 "throughput_test": {
                     "duration_ms": 10000,
-                    "num_streams": -1,  # Invalid negative
+                    "num_streams": -1,
                     "streams": [],
                 },
             },
@@ -358,37 +298,27 @@ class TestExecutionPhasesValidation:
         assert any("num_streams" in e.field for e in errors)
 
 
-# ============================================================================
-# Result Validator Class Tests
-# ============================================================================
-
-
 class TestResultValidatorClass:
-    """Tests for ResultValidator class."""
-
     def test_validator_collects_all_errors(self) -> None:
-        """Test that validator collects all errors in one pass."""
         invalid_result = {
-            "benchmark_name": "",  # Empty
-            "platform": "",  # Empty
-            "scale_factor": -1,  # Negative
-            "execution_id": "",  # Empty
-            "timestamp": "invalid",  # Invalid format
-            "duration_seconds": -10,  # Negative
+            "benchmark_name": "",
+            "platform": "",
+            "scale_factor": -1,
+            "execution_id": "",
+            "timestamp": "invalid",
+            "duration_seconds": -10,
             "total_queries": 10,
             "successful_queries": 5,
-            "failed_queries": 3,  # 5 + 3 != 10
+            "failed_queries": 3,
         }
 
         validator = ResultValidator(invalid_result)
         is_valid = validator.validate_all()
 
         assert not is_valid
-        # Should have collected multiple errors
         assert len(validator.errors) > 1
 
     def test_validator_reusable(self) -> None:
-        """Test that validator can be reused with different data."""
         valid_result = {
             "benchmark_name": "TPC-H",
             "platform": "duckdb",
@@ -405,21 +335,12 @@ class TestResultValidatorClass:
         assert validator.validate_all()
         assert len(validator.errors) == 0
 
-        # Validate again - errors should be cleared
         assert validator.validate_all()
         assert len(validator.errors) == 0
 
 
-# ============================================================================
-# Load and Validate Result File Tests
-# ============================================================================
-
-
 class TestLoadResultFile:
-    """Tests for loading and validating result files."""
-
     def test_load_valid_json_file(self, tmp_path: Path) -> None:
-        """Test loading a valid JSON result file."""
         result_data = {
             "benchmark_name": "TPC-H",
             "platform": "duckdb",
@@ -439,14 +360,12 @@ class TestLoadResultFile:
         assert loaded == result_data
 
     def test_load_nonexistent_file_raises(self, tmp_path: Path) -> None:
-        """Test that loading nonexistent file raises FileNotFoundError."""
         nonexistent = tmp_path / "nonexistent.json"
 
         with pytest.raises(FileNotFoundError):
             load_result_json(nonexistent)
 
     def test_load_invalid_json_raises(self, tmp_path: Path) -> None:
-        """Test that loading invalid JSON raises JSONDecodeError."""
         invalid_file = tmp_path / "invalid.json"
         invalid_file.write_text("not valid json {{{")
 
@@ -454,7 +373,6 @@ class TestLoadResultFile:
             load_result_json(invalid_file)
 
     def test_load_and_validate_file(self, tmp_path: Path) -> None:
-        """Test loading and validating a result file end-to-end."""
         result_data = {
             "benchmark_name": "TPC-H",
             "platform": "duckdb",
@@ -477,9 +395,6 @@ class TestLoadResultFile:
         assert_benchmark_result_valid(loaded)
 
 
-# ============================================================================
-# Parametrized Validation Tests
-# ============================================================================
 @pytest.mark.parametrize(
     "timestamp",
     [
@@ -490,7 +405,6 @@ class TestLoadResultFile:
     ],
 )
 def test_valid_timestamp_formats(timestamp: str) -> None:
-    """Test that various valid timestamp formats are accepted."""
     result = {
         "benchmark_name": "TPC-H",
         "platform": "duckdb",
@@ -512,7 +426,6 @@ def test_valid_timestamp_formats(timestamp: str) -> None:
     [0.01, 0.1, 1, 10, 100, 1000],
 )
 def test_valid_scale_factors(scale_factor: float) -> None:
-    """Test that various valid scale factors are accepted."""
     result = {
         "benchmark_name": "TPC-H",
         "platform": "duckdb",

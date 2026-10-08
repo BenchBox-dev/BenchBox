@@ -1,9 +1,3 @@
-"""Tests for JoinOrder benchmark data generator.
-
-Verifies initialization, lookup/dimension/relationship table generation,
-CSV file output, row count scaling, and size estimation.
-"""
-
 from __future__ import annotations
 
 import csv
@@ -19,9 +13,6 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Initialization
-# ---------------------------------------------------------------------------
 class TestJoinOrderGeneratorInit:
     def test_default_init(self, tmp_path: Path):
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
@@ -46,7 +37,7 @@ class TestJoinOrderGeneratorInit:
         assert gen.very_verbose is False
 
     def test_default_output_dir_when_none(self):
-        # scale_factor_utils is only available at benchmark runtime
+
         pytest.importorskip("benchbox.utils.scale_factor")
         gen = JoinOrderGenerator(scale_factor=1.0)
         assert "joinorder" in str(gen.output_dir)
@@ -62,9 +53,6 @@ class TestJoinOrderGeneratorInit:
         assert len(gen.base_row_counts) > 10
 
 
-# ---------------------------------------------------------------------------
-# Lookup table generation
-# ---------------------------------------------------------------------------
 class TestLookupTables:
     @pytest.fixture()
     def gen(self, tmp_path: Path) -> JoinOrderGenerator:
@@ -106,9 +94,6 @@ class TestLookupTables:
         assert set(data.keys()) == expected
 
 
-# ---------------------------------------------------------------------------
-# Dimension table generation
-# ---------------------------------------------------------------------------
 class TestDimensionTables:
     @pytest.fixture()
     def gen(self, tmp_path: Path) -> JoinOrderGenerator:
@@ -130,18 +115,18 @@ class TestDimensionTables:
 
     def test_title_has_expected_columns(self, gen: JoinOrderGenerator, lookup_data: dict):
         data = gen._generate_dimension_tables(lookup_data)
-        # Title tuple: (id, title, imdb_index, kind_id, production_year, ...)
+
         row = data["title"][0]
         assert len(row) == 12
-        assert isinstance(row[0], int)  # id
-        assert isinstance(row[1], str)  # title
+        assert isinstance(row[0], int)
+        assert isinstance(row[1], str)
 
     def test_name_has_expected_columns(self, gen: JoinOrderGenerator, lookup_data: dict):
         data = gen._generate_dimension_tables(lookup_data)
         row = data["name"][0]
         assert len(row) == 9
-        assert isinstance(row[0], int)  # id
-        assert isinstance(row[1], str)  # name
+        assert isinstance(row[0], int)
+        assert isinstance(row[1], str)
 
     def test_all_dimension_tables_present(self, gen: JoinOrderGenerator, lookup_data: dict):
         data = gen._generate_dimension_tables(lookup_data)
@@ -154,9 +139,6 @@ class TestDimensionTables:
             assert rows[0][0] == 1, f"{table_name} first ID not 1"
 
 
-# ---------------------------------------------------------------------------
-# Relationship table generation
-# ---------------------------------------------------------------------------
 class TestRelationshipTables:
     @pytest.fixture()
     def gen(self, tmp_path: Path) -> JoinOrderGenerator:
@@ -205,9 +187,6 @@ class TestRelationshipTables:
         assert set(data.keys()) == expected
 
 
-# ---------------------------------------------------------------------------
-# CSV writing
-# ---------------------------------------------------------------------------
 class TestWriteTableData:
     def test_writes_csv_file(self, tmp_path: Path):
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
@@ -238,9 +217,6 @@ class TestWriteTableData:
         assert '""hi""' in content
 
 
-# ---------------------------------------------------------------------------
-# Row count and size estimation
-# ---------------------------------------------------------------------------
 class TestRowCountAndSizeEstimation:
     def test_get_table_row_count_scales(self, tmp_path: Path):
         gen = JoinOrderGenerator(scale_factor=2.0, output_dir=tmp_path)
@@ -262,9 +238,6 @@ class TestRowCountAndSizeEstimation:
         assert gen2.get_total_size_estimate() > gen1.get_total_size_estimate()
 
 
-# ---------------------------------------------------------------------------
-# End-to-end: generate_data
-# ---------------------------------------------------------------------------
 class TestGenerateData:
     def test_generates_all_table_files(self, tmp_path: Path):
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
@@ -276,7 +249,7 @@ class TestGenerateData:
     def test_generated_csv_files_have_content(self, tmp_path: Path):
         gen = JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
         gen.generate_data()
-        # Check a lookup table (fixed size)
+
         kind_type_csv = tmp_path / "kind_type.csv"
         assert kind_type_csv.exists()
         lines = kind_type_csv.read_text().strip().split("\n")
@@ -290,15 +263,10 @@ class TestGenerateData:
             assert count > 0, f"{table_name} has 0 rows in manifest"
 
 
-# ---------------------------------------------------------------------------
-# New relationship table methods (5 tables added for DataFusion compatibility)
-# ---------------------------------------------------------------------------
 class TestNewRelationshipTables:
     @pytest.fixture()
     def gen(self, tmp_path: Path) -> JoinOrderGenerator:
         return JoinOrderGenerator(scale_factor=0.001, output_dir=tmp_path)
-
-    # --- _generate_movie_link ---
 
     def test_movie_link_row_count(self, gen: JoinOrderGenerator):
         rows = gen._generate_movie_link(count=50, max_title_id=100)
@@ -324,8 +292,6 @@ class TestNewRelationshipTables:
             assert 1 <= row[1] <= max_id, f"movie_id {row[1]} out of range"
             assert 1 <= row[2] <= max_id, f"linked_movie_id {row[2]} out of range"
 
-    # --- _generate_person_info ---
-
     def test_person_info_row_count(self, gen: JoinOrderGenerator):
         rows = gen._generate_person_info(count=30, max_name_id=50)
         assert len(rows) == 30
@@ -349,8 +315,6 @@ class TestNewRelationshipTables:
         for row in rows:
             assert 1 <= row[1] <= max_id
 
-    # --- _generate_complete_cast ---
-
     def test_complete_cast_row_count(self, gen: JoinOrderGenerator):
         rows = gen._generate_complete_cast(count=20, max_title_id=50)
         assert len(rows) == 20
@@ -368,8 +332,6 @@ class TestNewRelationshipTables:
         for row in rows:
             assert 1 <= row[2] <= 4, f"subject_id {row[2]} out of 1-4 range"
             assert 1 <= row[3] <= 4, f"status_id {row[3]} out of 1-4 range"
-
-    # --- _generate_aka_name ---
 
     def test_aka_name_row_count(self, gen: JoinOrderGenerator):
         rows = gen._generate_aka_name(count=25, max_name_id=50)
@@ -394,8 +356,6 @@ class TestNewRelationshipTables:
         for row in rows:
             assert isinstance(row[2], str) and len(row[2]) > 0
 
-    # --- _generate_aka_title ---
-
     def test_aka_title_row_count(self, gen: JoinOrderGenerator):
         rows = gen._generate_aka_title(count=15, max_title_id=50)
         assert len(rows) == 15
@@ -418,8 +378,6 @@ class TestNewRelationshipTables:
         rows = gen._generate_aka_title(count=10, max_title_id=50)
         for row in rows:
             assert isinstance(row[2], str) and len(row[2]) > 0
-
-    # --- integration: all 5 new tables appear in _generate_relationship_tables ---
 
     def test_new_tables_present_in_relationship_tables(self, gen: JoinOrderGenerator):
         lookup = gen._generate_lookup_tables()

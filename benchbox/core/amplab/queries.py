@@ -1,20 +1,6 @@
-"""AMPLab Big Data Benchmark query management.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides the standard AMPLab benchmark queries, which test
-big data processing systems using web analytics workloads.
-
-The queries include:
-1. Scan Query - Filter and aggregate uservisits data
-2. Join Query - Join uservisits with rankings
-3. UDF Query - Complex analytics with user-defined functions
-
-For more information see:
-- https://amplab.cs.berkeley.edu/benchmark/
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from typing import Any
 
@@ -22,28 +8,20 @@ from benchbox.core.query_manager import ParameterizedQueryManager
 
 
 class AMPLabQueryManager(ParameterizedQueryManager):
-    """Manager for AMPLab benchmark queries."""
-
     def __init__(self) -> None:
-        """Initialize the AMPLab query manager."""
+
         self._queries = self._load_queries()
 
     def _load_queries(self) -> dict[str, str]:
-        """Load all AMPLab benchmark queries.
 
-        Returns:
-            Dictionary mapping query IDs to SQL text
-        """
         queries = {}
 
-        # Query 1: Scan Query - filter and aggregate user visits
         queries["1"] = """
 SELECT pageURL, pageRank
 FROM rankings
 WHERE pageRank > {pagerank_threshold};
 """
 
-        # Query 1A: Alternative scan query with aggregation
         queries["1a"] = """
 SELECT
     COUNT(*) as total_pages,
@@ -53,7 +31,6 @@ FROM rankings
 WHERE pageRank > {pagerank_threshold};
 """
 
-        # Query 2: Join Query - join uservisits with rankings
         queries["2"] = """
 SELECT
     sourceIP,
@@ -67,7 +44,6 @@ ORDER BY totalRevenue DESC
 LIMIT {limit_rows};
 """
 
-        # Query 2A: Alternative join query
         queries["2a"] = """
 SELECT
     uv.destURL,
@@ -83,7 +59,6 @@ ORDER BY r.pageRank DESC
 LIMIT {limit_rows};
 """
 
-        # Query 3: UDF Query - complex text analytics
         queries["3"] = """
 SELECT
     sourceIP,
@@ -99,7 +74,6 @@ ORDER BY total_revenue DESC
 LIMIT {limit_rows};
 """
 
-        # Query 3A: Text analysis on documents
         queries["3a"] = """
 SELECT
     url,
@@ -118,7 +92,6 @@ ORDER BY content_length DESC
 LIMIT {limit_rows};
 """
 
-        # Query 4: Complex analytics query
         queries["4"] = """
 SELECT
     countryCode,
@@ -136,7 +109,6 @@ ORDER BY total_revenue DESC
 LIMIT {limit_rows};
 """
 
-        # Query 5: Cross-table analytics
         queries["5"] = """
 SELECT
     uv.countryCode,
@@ -158,27 +130,15 @@ LIMIT {limit_rows};
         return queries
 
     def _generate_default_params(self, query_id: str) -> dict[str, Any]:
-        """Generate default parameters for a query.
 
-        Args:
-            query_id: Query identifier
-
-        Returns:
-            Dictionary of parameter names to default values
-        """
-        # Default parameters used in AMPLab specification
         defaults = {
-            # Thresholds
             "pagerank_threshold": 1000,
             "min_revenue": 1.0,
             "min_visits": 10,
             "min_content_length": 1000,
-            # Dates
             "start_date": "2000-01-01",
             "end_date": "2000-01-03",
-            # Limits
             "limit_rows": 100,
-            # Search terms
             "search_term": "database",
             "keyword1": "web",
             "keyword2": "data",

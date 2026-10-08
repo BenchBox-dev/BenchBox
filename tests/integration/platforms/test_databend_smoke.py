@@ -1,5 +1,3 @@
-"""Databend integration smoke tests with stubbed databend-driver."""
-
 import pytest
 
 from .common import create_smoke_benchmark, install_databend_stub, run_smoke_benchmark
@@ -13,7 +11,7 @@ pytestmark = [
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_databend_smoke_basic(monkeypatch, tmp_path):
-    """Test basic Databend adapter workflow: connect, get info, close."""
+
     state = install_databend_stub(monkeypatch)
 
     from benchbox.platforms.databend import DatabendAdapter
@@ -37,7 +35,6 @@ def test_databend_smoke_basic(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_databend_smoke_schema_creation(monkeypatch, tmp_path):
-    """Test Databend schema creation (CREATE DATABASE, CREATE TABLE)."""
     state = install_databend_stub(monkeypatch)
 
     from benchbox.platforms.databend import DatabendAdapter
@@ -56,7 +53,6 @@ def test_databend_smoke_schema_creation(monkeypatch, tmp_path):
         assert isinstance(schema_time, float)
         assert schema_time >= 0
 
-        # Verify DDL statements were issued
         ddl_statements = [s for s in state.statements if "CREATE" in s.upper()]
         assert len(ddl_statements) > 0, "Expected CREATE statements to be executed"
     finally:
@@ -66,7 +62,7 @@ def test_databend_smoke_schema_creation(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_databend_smoke_data_loading(monkeypatch, tmp_path):
-    """Test Databend data loading via INSERT batching."""
+
     state = install_databend_stub(monkeypatch)
 
     from benchbox.platforms.databend import DatabendAdapter
@@ -87,9 +83,8 @@ def test_databend_smoke_data_loading(monkeypatch, tmp_path):
         assert isinstance(load_time, float)
         assert load_time >= 0
         assert "lineitem" in table_stats
-        assert table_stats["lineitem"] == 2  # Two rows in the smoke CSV
+        assert table_stats["lineitem"] == 2
 
-        # Verify INSERT statements were issued
         assert len(state.inserts) > 0, "Expected INSERT statements to be executed"
     finally:
         adapter.close_connection(connection)
@@ -98,7 +93,7 @@ def test_databend_smoke_data_loading(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_databend_smoke_query_execution(monkeypatch, tmp_path):
-    """Test Databend query execution with timing."""
+
     state = install_databend_stub(monkeypatch)
 
     from benchbox.platforms.databend import DatabendAdapter
@@ -127,7 +122,7 @@ def test_databend_smoke_query_execution(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_databend_smoke_full_workflow(monkeypatch, tmp_path):
-    """Test full Databend workflow: schema, load, configure, query."""
+
     state = install_databend_stub(monkeypatch)
 
     from benchbox.platforms.databend import DatabendAdapter
@@ -144,14 +139,12 @@ def test_databend_smoke_full_workflow(monkeypatch, tmp_path):
 
     assert metadata["platform_type"] == "databend"
     assert metadata["platform_name"] == "Databend"
-    # Schema, load, and configure statements should have been executed
     assert len(state.statements) > 0
 
 
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_databend_smoke_cleanup(monkeypatch, tmp_path):
-    """Test Databend cleanup (DROP TABLE)."""
     state = install_databend_stub(monkeypatch)
 
     from benchbox.platforms.databend import DatabendAdapter
@@ -165,7 +158,6 @@ def test_databend_smoke_cleanup(monkeypatch, tmp_path):
 
     connection = adapter.create_connection()
     try:
-        # Execute a DROP TABLE to verify cleanup works
         connection.exec("DROP TABLE IF EXISTS `lineitem`")
         drop_statements = [s for s in state.statements if "DROP" in s.upper()]
         assert len(drop_statements) > 0, "Expected DROP statement to be executed"
@@ -176,7 +168,7 @@ def test_databend_smoke_cleanup(monkeypatch, tmp_path):
 @pytest.mark.integration
 @pytest.mark.platform_smoke
 def test_databend_requires_connection_config(monkeypatch):
-    """Test that Databend adapter requires host or DSN."""
+
     install_databend_stub(monkeypatch)
 
     from benchbox.core.exceptions import ConfigurationError

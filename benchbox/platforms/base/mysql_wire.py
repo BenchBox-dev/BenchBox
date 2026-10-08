@@ -1,5 +1,3 @@
-"""Shared helpers for MySQL-wire platform adapters."""
-
 from __future__ import annotations
 
 import sys
@@ -10,7 +8,6 @@ from benchbox.utils.sql_identifier import is_valid_sql_identifier
 
 
 def _skip_comment(sql: str, i: int, n: int) -> int | None:
-    """Return next index if sql[i] starts a comment, else None."""
     if sql[i] == "-" and i + 1 < n and sql[i + 1] == "-":
         i += 2
         while i < n and sql[i] != "\n":
@@ -25,7 +22,6 @@ def _skip_comment(sql: str, i: int, n: int) -> int | None:
 
 
 def _skip_quoted(sql: str, i: int, n: int, quote: str) -> int:
-    """Return next index after closing quote for literal or identifier starting at i."""
     i += 1
     while i < n:
         if sql[i] == "\\" and i + 1 < n:
@@ -41,7 +37,6 @@ def _skip_quoted(sql: str, i: int, n: int, quote: str) -> int:
 
 
 def split_sql_statements(sql: str) -> list[str]:
-    """Split SQL on semicolons outside string literals, identifiers, and comments."""
     statements: list[str] = []
     current: list[str] = []
     i = 0
@@ -74,8 +69,6 @@ def split_sql_statements(sql: str) -> list[str]:
 
 
 class MySqlWireConnectionWrapper:
-    """Add connection.execute(sql) support around cursor-based MySQL clients."""
-
     optimize_contains_create = False
     reject_create_or_replace = False
 
@@ -123,8 +116,6 @@ class MySqlWireConnectionWrapper:
 
 
 class MySqlWireLifecycleMixin:
-    """Common database, schema, query-plan, and health plumbing."""
-
     database_identifier_max_length = 128
     connection_operation_name = "MySQL-wire connection"
     database_exists_rethrow_error_code: int | None = None
@@ -143,7 +134,6 @@ class MySqlWireLifecycleMixin:
         validate_row_count: bool = True,
         stream_id: int | None = None,
     ) -> dict[str, Any]:
-        """Execute a single query through the shared SQL execution helper."""
         from benchbox.platforms.base.sql_execution import execute_sql_query as default_execute_sql_query
 
         module = sys.modules.get(type(self).__module__)
@@ -268,25 +258,7 @@ class MySqlWireLifecycleMixin:
             raise
 
     def new_stream_connection(self, connection: Any, *, benchmark_type: str | None = None) -> Any:
-        """Open an independent MySQL-wire connection for one throughput stream.
-
-        Connects straight through ``_connect_database`` (which selects the
-        benchmark database at connect time, preserving catalog identity)
-        instead of repeating ``create_connection``: the one-time setup there
-        (``handle_existing_database`` with its ``force_recreate`` drop path,
-        database creation) must run exactly once on the shared connection,
-        never per stream. The benchmark-type session tuning is still
-        reapplied per stream via ``configure_for_benchmark`` (Doris cache and
-        memory SETs, SingleStore query-cache/packet SETs - equivalence
-        dimension 4). The caller closes the returned connection in the
-        stream's own ``finally`` block (dimension 6).
-
-        Args:
-            connection: The adapter's shared platform connection. Not reused.
-            benchmark_type: Benchmark tuning vocabulary (replay skipped when
-                omitted).
-        """
-        del connection  # not reused: INDEPENDENT_CONNECTION always opens a fresh session
+        del connection
         conn = self._connect_database()
         try:
             cursor = conn.cursor()
@@ -295,16 +267,13 @@ class MySqlWireLifecycleMixin:
                 cursor.fetchone()
             finally:
                 cursor.close()
-            # Replay only when the caller supplies benchmark_type (the
-            # throughput drivers always do); other callers keep their previous
-            # behavior.
             if benchmark_type is not None:
                 self.configure_for_benchmark(conn, benchmark_type)
             return self._wrap_database_connection(conn)
         except Exception:
             try:
                 conn.close()
-            except Exception as close_error:  # noqa: BLE001 - preserve setup failure
+            except Exception as close_error:
                 self.logger.debug("Failed to close stream connection after setup error: %r", close_error)
             raise
 
@@ -543,8 +512,6 @@ class MySqlWireLifecycleMixin:
 
 
 class NoOpTableTuningMixin:
-    """No-op tuning hooks for engines where DDL/session setup carries tuning."""
-
     def apply_table_tunings(self, table_tuning: Any, connection: Any) -> None:
         return None
 

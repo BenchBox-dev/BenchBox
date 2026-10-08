@@ -1,5 +1,3 @@
-"""Dependency guards for the optional MCP integration."""
-
 import tomllib
 from pathlib import Path
 

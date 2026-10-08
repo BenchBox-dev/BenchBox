@@ -1,5 +1,3 @@
-"""DataFrame-maintenance-backed TPC-DI ETL backend implementation."""
-
 from __future__ import annotations
 
 import logging
@@ -16,8 +14,6 @@ from benchbox.core.dataframe.maintenance_interface import DataFrameMaintenanceOp
 
 logger = logging.getLogger(__name__)
 
-# Statement-terminating or comment tokens are never valid inside a predicate
-# (mirrors SQLETLBackend._validate_sql_where_clause).
 _UNSAFE_CONDITION_TOKENS = (";", "--", "/*", "*/")
 _FORBIDDEN_CONDITION_KEYWORDS = frozenset(
     {
@@ -36,14 +32,12 @@ _COLUMN_NAME_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 def _validate_condition_column(column: str) -> str:
-    """Validate a dict-condition column name, mirroring the SQL backend."""
     if not _COLUMN_NAME_PATTERN.fullmatch(column):
         raise ValueError(f"Unsafe column name in SCD2 expire condition: {column!r}")
     return column
 
 
 def _check_condition_text(normalized: str) -> str:
-    """Reject unsafe tokens/keywords in a raw SQL predicate string."""
     if any(token in normalized for token in _UNSAFE_CONDITION_TOKENS):
         raise ValueError("Unsafe SQL tokens are not allowed in SCD2 expire condition")
     if any(re.search(rf"\b{keyword}\b", normalized.upper()) for keyword in _FORBIDDEN_CONDITION_KEYWORDS):
@@ -52,12 +46,8 @@ def _check_condition_text(normalized: str) -> str:
 
 
 def _render_literal(value: Any) -> str:
-    """Render a Python scalar as a SQL literal for maintenance predicates."""
     if isinstance(value, bool):
         return "TRUE" if value else "FALSE"
-    # SCD2 conditions are built from pandas frames, so numpy scalars are the
-    # norm (business keys arrive as np.int64, flags as np.bool_): normalize
-    # them to Python scalars before dispatch.
     try:
         import numpy as np
 
@@ -85,14 +75,6 @@ def _render_literal(value: Any) -> str:
 
 
 def _condition_to_sql(condition: str | Any) -> str:
-    """Normalize an SCD2 expire condition to a SQL predicate string.
-
-    String conditions are interpolated verbatim into the maintenance SQL
-    after the same unsafe-token/keyword screening the SQL backend applies
-    (column names are the caller's responsibility); dict conditions are
-    rendered to ``"col" = <literal>`` equality clauses with validated column
-    names.
-    """
     if isinstance(condition, str):
         if not condition.strip():
             raise ValueError("SCD2 expire condition cannot be empty")
@@ -112,8 +94,6 @@ def _condition_to_sql(condition: str | Any) -> str:
 
 
 class DataFrameETLBackend:
-    """TPC-DI ETL backend delegating writes to maintenance operations."""
-
     def __init__(
         self,
         *,
@@ -126,26 +106,14 @@ class DataFrameETLBackend:
         self.table_root = Path(table_root) if table_root is not None else None
 
     def _resolve_table_path(self, table_name: str) -> Path | str:
-        """Resolve a logical table name to a maintenance-ops table path.
-
-        Without a configured root the bare table name is passed through,
-        preserving historical behavior. With a root, tables stay under it
-        instead of scattering relative directories into the caller CWD.
-        """
         if self.table_root is None:
             return table_name
         return self.table_root / table_name
 
     def create_schema(self) -> None:
-        """No-op for DataFrame platforms where table paths are materialized lazily."""
         return
 
     def load_dataframes(self, staged_data: dict[str, pd.DataFrame], batch_type: str) -> dict[str, Any]:
-        """Load DataFrames using maintenance INSERT operations.
-
-        ``batch_type`` is currently reserved for backend-specific partitioning
-        or lineage metadata and is intentionally unused in this implementation.
-        """
         _ = batch_type
         load_results: dict[str, Any] = {"records_loaded": 0, "tables_updated": []}
         for table_name, dataframe in staged_data.items():
@@ -160,11 +128,6 @@ class DataFrameETLBackend:
         return load_results
 
     def validate_results(self) -> dict[str, Any]:
-        """Return DataFrame-mode validation metadata.
-
-        DataFrame ETL currently reports validation as not executed rather than
-        inferring a synthetic quality score from SQL-only checks.
-        """
         return {
             "validation_queries": {},
             "data_quality_issues": [],
@@ -177,13 +140,6 @@ class DataFrameETLBackend:
         }
 
     def _adapter_accepts_sql_predicates(self) -> bool:
-        """Whether the maintenance adapter consumes SQL predicate text.
-
-        Adapters declaring ``accepts_sql_predicates=False`` (e.g. Iceberg,
-        whose parser handles single unquoted comparisons only) receive native
-        dict conditions and native update values instead. Unknown adapters
-        default to the SQL path, preserving current behavior.
-        """
         get_capabilities = getattr(self.maintenance_ops, "get_capabilities", None)
         if get_capabilities is None:
             return True
@@ -194,7 +150,6 @@ class DataFrameETLBackend:
             return True
 
     def execute_scd2_expire(self, table_name: str, condition: str | Any, updates: dict[str, Any]) -> dict[str, Any]:
-        """Expire current rows using UPDATE maintenance operation."""
         if not updates:
             return {"success": True, "rows_affected": 0}
         if not self._adapter_accepts_sql_predicates():
@@ -216,13 +171,11 @@ class DataFrameETLBackend:
         return {"success": True, "rows_affected": int(result.rows_affected)}
 
     def execute_scd2_insert(self, table_name: str, dataframe: pd.DataFrame) -> dict[str, Any]:
-        """Insert new SCD2 rows using INSERT maintenance operation."""
         result = self.maintenance_ops.insert_rows(self._resolve_table_path(table_name), dataframe, mode="append")
         if not result.success:
             raise RuntimeError(result.error_message or f"Failed to insert SCD2 rows for table {table_name}")
         return {"success": True, "rows_affected": int(result.rows_affected)}
 
     def read_current_dimension(self, table_name: str) -> pd.DataFrame | None:
-        """Return current dimension rows when backend has native read support."""
         _ = table_name
         return None

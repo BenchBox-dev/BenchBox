@@ -1,5 +1,3 @@
-"""Contract tests for the release workflow's UAT charter guard."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -47,8 +45,6 @@ def test_uat_charter_guard_is_fail_closed_and_uses_committed_candidates() -> Non
 
 def test_canonical_uat_charter_candidates_exist_on_develop() -> None:
     assert (REPO_ROOT / "tests/uat/CHARTER.md").is_file()
-    # release-cut intentionally removes the development-only _project tree;
-    # the release workflow still accepts this path when it is present on
-    # develop, but release-tree fast tests must not require it.
+
     if (REPO_ROOT / "_project" / "decisions").is_dir():
         assert (REPO_ROOT / "_project/release-evidence/README.md").is_file()

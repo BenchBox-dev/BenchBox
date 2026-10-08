@@ -1,9 +1,3 @@
-"""Tests for TransactionPrimitivesBenchmark.execute_operation().
-
-Verifies platform_key dispatch, sql_override injection, SKIPPED status
-for None platform overrides, connection validation, and error handling.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,20 +15,13 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _make_benchmark(tmp_path: Path) -> TransactionPrimitivesBenchmark:
-    """Return a benchmark instance with a mocked operations_manager."""
     bench = TransactionPrimitivesBenchmark(scale_factor=0.01, output_dir=tmp_path)
     bench.operations_manager = MagicMock()
     return bench
 
 
 def _make_operation(**overrides) -> WriteOperation:
-    """Return a minimal WriteOperation with sensible defaults."""
     defaults = {
         "id": "op1",
         "category": "insert",
@@ -50,11 +37,10 @@ def _make_operation(**overrides) -> WriteOperation:
 
 
 def _make_connection(rowcount: int = 1) -> MagicMock:
-    """Return a mock database connection."""
     conn = MagicMock()
     exec_result = MagicMock()
     exec_result.rowcount = rowcount
-    # fetchall for validation queries
+
     exec_result.fetchall.return_value = []
     conn.execute.return_value = exec_result
     return conn
@@ -70,9 +56,6 @@ def test_transaction_commit_large_cleanup_covers_inserted_range() -> None:
     assert "l_comment = 'tx_large'" in (operation.cleanup_sql or "")
 
 
-# ---------------------------------------------------------------------------
-# Connection validation
-# ---------------------------------------------------------------------------
 class TestConnectionValidation:
     def test_raises_on_none_connection(self, tmp_path: Path):
         bench = _make_benchmark(tmp_path)
@@ -87,9 +70,6 @@ class TestConnectionValidation:
             bench.execute_operation("op1", "not_a_connection")
 
 
-# ---------------------------------------------------------------------------
-# Basic execution (no overrides)
-# ---------------------------------------------------------------------------
 class TestBasicExecution:
     def test_returns_success_result(self, tmp_path: Path):
         bench = _make_benchmark(tmp_path)
@@ -101,7 +81,7 @@ class TestBasicExecution:
         assert result.success is True
         assert result.operation_id == "op1"
         assert result.rows_affected == 5
-        assert result.status is None  # normal success has no status
+        assert result.status is None
 
     def test_executes_write_sql(self, tmp_path: Path):
         bench = _make_benchmark(tmp_path)
@@ -115,11 +95,10 @@ class TestBasicExecution:
         conn.execute.assert_called_once_with("INSERT INTO orders VALUES (99)")
 
     def test_rows_affected_sentinel_when_none(self, tmp_path: Path):
-        """If platform doesn't return rowcount, rows_affected is -1."""
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation()
         conn = MagicMock()
-        exec_result = MagicMock(spec=[])  # no rowcount attribute
+        exec_result = MagicMock(spec=[])
         exec_result.fetchall = MagicMock(return_value=[])
         conn.execute.return_value = exec_result
 
@@ -151,9 +130,6 @@ class TestBasicExecution:
         conn.rollback.assert_called_once()
 
 
-# ---------------------------------------------------------------------------
-# sql_override kwarg
-# ---------------------------------------------------------------------------
 class TestSqlOverride:
     def test_sql_override_replaces_write_sql(self, tmp_path: Path):
         bench = _make_benchmark(tmp_path)
@@ -165,7 +141,6 @@ class TestSqlOverride:
         conn.execute.assert_called_once_with("overridden SQL")
 
     def test_sql_override_takes_priority_over_platform_key(self, tmp_path: Path):
-        """sql_override wins even when a platform_key override also exists."""
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation(
             write_sql="original SQL",
@@ -178,9 +153,6 @@ class TestSqlOverride:
         conn.execute.assert_called_once_with("direct override")
 
 
-# ---------------------------------------------------------------------------
-# platform_key kwarg
-# ---------------------------------------------------------------------------
 class TestPlatformKeyDispatch:
     def test_uses_platform_override_when_key_matches(self, tmp_path: Path):
         bench = _make_benchmark(tmp_path)
@@ -214,7 +186,6 @@ class TestPlatformKeyDispatch:
         )
         conn = _make_connection()
 
-        # No platform_key kwarg
         bench.execute_operation("op1", conn)
 
         conn.execute.assert_called_once_with("generic SQL")
@@ -246,7 +217,6 @@ class TestPlatformKeyDispatch:
         ],
     )
     def test_rewrites_generate_series_for_cloud_dialects(self, tmp_path: Path, platform_key: str, expected: str):
-        """Snowflake and BigQuery have neither unnest nor generate_series (verified live)."""
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation(
             write_sql="""
@@ -284,12 +254,8 @@ class TestPlatformKeyDispatch:
         assert "SET TRANSACTION ISOLATION LEVEL" not in executed_sql
 
 
-# ---------------------------------------------------------------------------
-# SKIPPED status (None platform override)
-# ---------------------------------------------------------------------------
 class TestSkippedStatus:
     def test_returns_skipped_when_override_is_none(self, tmp_path: Path):
-        """An operation with None in platform_overrides for the platform → SKIPPED result."""
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation(
             platform_overrides={"datafusion": None},
@@ -362,7 +328,6 @@ class TestSkippedStatus:
         conn.execute.assert_not_called()
 
     def test_skipped_result_has_skip_reason_field(self, tmp_path: Path):
-        """The skip_reason field carries the human-readable skip reason; error stays None."""
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation(
             id="tricky_op",
@@ -401,7 +366,6 @@ class TestSkippedStatus:
         conn.execute.assert_not_called()
 
     def test_non_none_override_is_not_skipped(self, tmp_path: Path):
-        """A platform_overrides entry with an actual SQL string must NOT be skipped."""
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation(
             platform_overrides={"datafusion": "SELECT 1"},
@@ -414,9 +378,6 @@ class TestSkippedStatus:
         assert result.success is True
 
 
-# ---------------------------------------------------------------------------
-# OperationResult.status field
-# ---------------------------------------------------------------------------
 class TestOperationResultStatus:
     def test_status_none_on_normal_success(self, tmp_path: Path):
         bench = _make_benchmark(tmp_path)
@@ -439,16 +400,13 @@ class TestOperationResultStatus:
         assert result.status == "SKIPPED"
 
 
-# ---------------------------------------------------------------------------
-# Auto-setup behavior
-# ---------------------------------------------------------------------------
 class TestAutoSetup:
     def test_auto_setup_triggered_when_requires_setup_and_not_ready(self, tmp_path: Path):
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation(requires_setup=True)
 
         conn = MagicMock()
-        # is_setup → False (staging tables missing) → triggers auto-setup
+
         bench.is_setup = MagicMock(return_value=False)
         bench.setup = MagicMock()
         exec_result = MagicMock()
@@ -471,12 +429,8 @@ class TestAutoSetup:
         bench.setup.assert_not_called()
 
 
-# ---------------------------------------------------------------------------
-# platform_fallback_key kwarg (shared-dialect override inheritance)
-# ---------------------------------------------------------------------------
 class TestPlatformFallbackKey:
     def test_fallback_null_override_skips(self, tmp_path: Path):
-        """A duckdb null override skips DuckLake via fallback (SAVEPOINT case)."""
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation(
             write_sql="SAVEPOINT sp1",
@@ -511,11 +465,10 @@ class TestPlatformFallbackKey:
 
         result = bench.execute_operation("op1", conn, platform_key="ducklake", platform_fallback_key="duckdb")
 
-        assert result.status is None  # executed, not skipped
+        assert result.status is None
         conn.execute.assert_called_once_with("engine SQL")
 
     def test_no_fallback_keeps_catalog_default(self, tmp_path: Path):
-        """Without a fallback key the old exact-match behavior is unchanged."""
         bench = _make_benchmark(tmp_path)
         bench.operations_manager.get_operation.return_value = _make_operation(
             write_sql="generic SQL",
@@ -529,8 +482,6 @@ class TestPlatformFallbackKey:
 
 
 class TestFailedPlatformPayload:
-    """A FAILED adapter payload must fail the op, never read as executed."""
-
     def test_failed_write_reports_failed(self, tmp_path: Path):
         from types import SimpleNamespace
 

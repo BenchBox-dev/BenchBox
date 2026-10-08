@@ -1,11 +1,6 @@
-"""Tests for QuestDB platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the QuestDBAdapter for QuestDB time-series database support.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
@@ -25,7 +20,6 @@ pytestmark = [
 
 @pytest.fixture()
 def questdb_stubs(monkeypatch):
-    """Patch psycopg objects so tests don't require the real driver."""
     mock_psycopg = Mock()
     mock_psycopg.__version__ = "3.1.0"
 
@@ -35,10 +29,7 @@ def questdb_stubs(monkeypatch):
 
 
 class TestQuestDBAdapter:
-    """Unit tests for QuestDB adapter wiring and SQL handling."""
-
     def test_initialization_defaults(self, questdb_stubs):
-        """Adapter should initialize with QuestDB defaults when stubs are present."""
         adapter = QuestDBAdapter()
 
         assert adapter.platform_name == "QuestDB"
@@ -52,7 +43,6 @@ class TestQuestDBAdapter:
         assert adapter.skip_database_management is True
 
     def test_initialization_with_config(self, questdb_stubs):
-        """Adapter should accept custom configuration."""
         adapter = QuestDBAdapter(
             host="questdb.example.com",
             pg_port=8813,
@@ -70,7 +60,6 @@ class TestQuestDBAdapter:
         assert adapter.password == "secret"
 
     def test_get_connection_params(self, questdb_stubs):
-        """Connection parameters should include all required fields."""
         adapter = QuestDBAdapter(
             host="questdb.example.com",
             pg_port=8813,
@@ -90,7 +79,6 @@ class TestQuestDBAdapter:
         assert params["connect_timeout"] == 15
 
     def test_get_connection_params_no_password(self, questdb_stubs):
-        """Connection parameters should omit password when not provided."""
         adapter = QuestDBAdapter(password=None)
 
         params = adapter._get_connection_params()
@@ -98,7 +86,6 @@ class TestQuestDBAdapter:
         assert "password" not in params
 
     def test_create_connection_sets_autocommit(self, questdb_stubs):
-        """Connection should enable autocommit mode (required by QuestDB)."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = (1,)
@@ -114,7 +101,6 @@ class TestQuestDBAdapter:
         assert mock_conn.autocommit is True
 
     def test_create_connection_verifies_connectivity(self, questdb_stubs):
-        """Connection should verify connectivity with SELECT 1."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = (1,)
@@ -129,7 +115,6 @@ class TestQuestDBAdapter:
         mock_cursor.execute.assert_called_with("SELECT 1")
 
     def test_get_platform_info_basic(self, questdb_stubs):
-        """Platform info should include QuestDB details."""
         adapter = QuestDBAdapter(
             host="questdb.example.com",
             pg_port=8812,
@@ -146,7 +131,6 @@ class TestQuestDBAdapter:
         assert info["dialect"] == QUESTDB_DIALECT
 
     def test_get_platform_info_with_connection(self, questdb_stubs):
-        """Platform info should include version when connection is available."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = ("7.3.10",)
@@ -159,7 +143,6 @@ class TestQuestDBAdapter:
         assert info["version"] == "7.3.10"
 
     def test_execute_query_success(self, questdb_stubs):
-        """Query execution should return correct result structure."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [(1, "test"), (2, "test2")]
@@ -176,7 +159,6 @@ class TestQuestDBAdapter:
         assert isinstance(result["execution_time_seconds"], float)
 
     def test_execute_query_failure(self, questdb_stubs):
-        """Query execution failure should return error info."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.side_effect = Exception("Query failed")
@@ -193,7 +175,6 @@ class TestQuestDBAdapter:
         assert result["error_type"] == "Exception"
 
     def test_get_query_plan(self, questdb_stubs):
-        """Query plan should use EXPLAIN."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [
@@ -211,7 +192,6 @@ class TestQuestDBAdapter:
         mock_cursor.execute.assert_called_with("EXPLAIN SELECT * FROM test WHERE id > 5")
 
     def test_get_query_plan_failure(self, questdb_stubs):
-        """Query plan failure returns None so capture records explain_failed."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.side_effect = Exception("EXPLAIN not supported")
@@ -224,17 +204,14 @@ class TestQuestDBAdapter:
         assert plan is None
 
     def test_configure_for_benchmark(self, questdb_stubs):
-        """Configure should not raise errors (QuestDB has no session-level settings)."""
         mock_conn = Mock()
 
         adapter = QuestDBAdapter()
 
-        # Should not raise
         adapter.configure_for_benchmark(mock_conn, "olap")
         adapter.configure_for_benchmark(mock_conn, "oltp")
 
     def test_validate_identifier_valid(self, questdb_stubs):
-        """Valid identifiers should pass validation."""
         adapter = QuestDBAdapter()
 
         assert adapter._validate_identifier("my_table") is True
@@ -243,7 +220,6 @@ class TestQuestDBAdapter:
         assert adapter._validate_identifier("tbl123") is True
 
     def test_validate_identifier_invalid(self, questdb_stubs):
-        """Invalid identifiers should fail validation."""
         adapter = QuestDBAdapter()
 
         assert adapter._validate_identifier("") is False
@@ -254,7 +230,6 @@ class TestQuestDBAdapter:
         assert adapter._validate_identifier("tbl.schema") is False
 
     def test_adapt_drop_table_adds_if_exists(self, questdb_stubs):
-        """DROP TABLE without IF EXISTS should be adapted."""
         adapter = QuestDBAdapter()
 
         result = adapter._adapt_drop_table("DROP TABLE lineitem")
@@ -262,7 +237,6 @@ class TestQuestDBAdapter:
         assert "lineitem" in result
 
     def test_adapt_drop_table_preserves_if_exists(self, questdb_stubs):
-        """DROP TABLE with IF EXISTS should remain unchanged."""
         adapter = QuestDBAdapter()
 
         original = "DROP TABLE IF EXISTS lineitem"
@@ -270,7 +244,6 @@ class TestQuestDBAdapter:
         assert result == original
 
     def test_close_connection(self, questdb_stubs):
-        """Close should close the connection without errors."""
         mock_conn = Mock()
 
         adapter = QuestDBAdapter()
@@ -279,22 +252,17 @@ class TestQuestDBAdapter:
         mock_conn.close.assert_called_once()
 
     def test_close_connection_handles_error(self, questdb_stubs):
-        """Close should handle connection errors gracefully."""
         mock_conn = Mock()
         mock_conn.close.side_effect = Exception("Connection already closed")
 
         adapter = QuestDBAdapter()
-        # Should not raise
         adapter.close_connection(mock_conn)
 
     def test_close_connection_none(self, questdb_stubs):
-        """Close should handle None connection gracefully."""
         adapter = QuestDBAdapter()
-        # Should not raise
         adapter.close_connection(None)
 
     def test_check_database_exists_true(self, questdb_stubs):
-        """Database exists check should return True when QuestDB is reachable."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = (1,)
@@ -306,7 +274,6 @@ class TestQuestDBAdapter:
         assert adapter.check_database_exists() is True
 
     def test_check_database_exists_false(self, questdb_stubs):
-        """Database exists check should return False when QuestDB is unreachable."""
         questdb_stubs.connect.side_effect = Exception("Connection refused")
 
         adapter = QuestDBAdapter()
@@ -314,13 +281,11 @@ class TestQuestDBAdapter:
         assert adapter.check_database_exists() is False
 
     def test_get_database_path_returns_none(self, questdb_stubs):
-        """Database path should be None (server-based)."""
         adapter = QuestDBAdapter()
 
         assert adapter.get_database_path() is None
 
     def test_table_exists_true(self, questdb_stubs):
-        """Table exists should return True when table is found."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = ("lineitem",)
@@ -331,7 +296,6 @@ class TestQuestDBAdapter:
         assert adapter.table_exists(mock_conn, "lineitem") is True
 
     def test_table_exists_false(self, questdb_stubs):
-        """Table exists should return False when table is not found."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchone.return_value = None
@@ -342,7 +306,6 @@ class TestQuestDBAdapter:
         assert adapter.table_exists(mock_conn, "nonexistent") is False
 
     def test_table_exists_invalid_identifier(self, questdb_stubs):
-        """Table exists should return False for invalid identifiers."""
         mock_conn = Mock()
 
         adapter = QuestDBAdapter()
@@ -350,7 +313,6 @@ class TestQuestDBAdapter:
         assert adapter.table_exists(mock_conn, "invalid;name") is False
 
     def test_drop_table(self, questdb_stubs):
-        """Drop table should execute DROP TABLE IF EXISTS."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -361,15 +323,12 @@ class TestQuestDBAdapter:
         mock_cursor.execute.assert_called_with('DROP TABLE IF EXISTS "test_table"')
 
     def test_drop_table_invalid_identifier(self, questdb_stubs):
-        """Drop table should reject invalid identifiers."""
         mock_conn = Mock()
 
         adapter = QuestDBAdapter()
-        # Should not raise, but should warn and skip
         adapter.drop_table(mock_conn, "invalid;name")
 
     def test_from_config_defaults(self, questdb_stubs):
-        """from_config should use QuestDB defaults."""
         config = {}
 
         adapter = QuestDBAdapter.from_config(config)
@@ -381,7 +340,6 @@ class TestQuestDBAdapter:
         assert adapter.database == "qdb"
 
     def test_from_config_custom_values(self, questdb_stubs):
-        """from_config should accept custom configuration."""
         config = {
             "host": "questdb.example.com",
             "pg_port": 8813,
@@ -401,7 +359,6 @@ class TestQuestDBAdapter:
         assert adapter.database == "custom_db"
 
     def test_from_config_port_fallback(self, questdb_stubs):
-        """from_config should use 'port' as fallback for 'pg_port'."""
         config = {"port": 8813}
 
         adapter = QuestDBAdapter.from_config(config)
@@ -409,7 +366,6 @@ class TestQuestDBAdapter:
         assert adapter.pg_port == 8813
 
     def test_from_config_passes_tuning_config(self, questdb_stubs):
-        """from_config should pass through tuning configuration."""
         config = {
             "tuning_enabled": True,
             "verbose_enabled": True,
@@ -421,12 +377,6 @@ class TestQuestDBAdapter:
         assert adapter.platform_config.get("tuning_enabled") is True
 
     def test_from_config_passes_tuning_provenance(self, questdb_stubs):
-        """from_config must forward tuning_source/tuning_source_file (ADR-1)
-        the same way it already forwards tuning_enabled/tuning_config -- a
-        --tuning tuned QuestDB run should be able to compute a requested hash
-        and still export tuning_source/source_file instead of silently
-        falling back to the legacy "auto" bridge for a real YAML template run.
-        """
         config = {
             "tuning_enabled": True,
             "tuning_source": "explicit_file",
@@ -439,7 +389,6 @@ class TestQuestDBAdapter:
         assert adapter.tuning_source_file == "examples/tunings/questdb/tpch_tuned.yaml"
 
     def test_create_schema_skips_foreign_keys(self, questdb_stubs):
-        """Schema creation should skip foreign key constraints."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -456,7 +405,6 @@ class TestQuestDBAdapter:
             )
             adapter.create_schema(mock_benchmark, mock_conn)
 
-        # Should have executed CREATE statements but not the FOREIGN KEY one
         executed_calls = [str(call) for call in mock_cursor.execute.call_args_list]
         executed_text = " ".join(executed_calls)
         assert "CREATE TABLE t1" in executed_text
@@ -464,7 +412,6 @@ class TestQuestDBAdapter:
         assert "FOREIGN KEY" not in executed_text
 
     def test_rest_api_tbl_strips_trailing_delimiter(self, questdb_stubs, tmp_path):
-        """REST API upload strips trailing '|' from TPC .tbl rows before sending."""
         adapter = QuestDBAdapter(host="localhost", http_port=9000)
         data_file = tmp_path / "lineitem.tbl"
         data_file.write_text("1|2|\n3|4|\n", encoding="utf-8")
@@ -490,7 +437,6 @@ class TestQuestDBAdapter:
         assert b"1|2|\n" not in captured_body["content"]
 
     def test_rest_api_csv_passes_data_verbatim(self, questdb_stubs, tmp_path):
-        """REST API upload sends CSV rows unchanged (no stripping for non-TPC)."""
         adapter = QuestDBAdapter(host="localhost", http_port=9000)
         data_file = tmp_path / "hits.csv"
         data_file.write_bytes(b"1,hello\n2,world\n")
@@ -514,7 +460,6 @@ class TestQuestDBAdapter:
         assert b"2,world\n" in captured_body["content"]
 
     def test_cursor_closed_on_execute_query_failure(self, questdb_stubs):
-        """Cursor should be closed even when query execution raises."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = Exception("Query failed")
@@ -526,7 +471,6 @@ class TestQuestDBAdapter:
         mock_cursor.close.assert_called_once()
 
     def test_cursor_closed_on_execute_query_success(self, questdb_stubs):
-        """Cursor should be closed after successful query execution."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.fetchall.return_value = [(1,)]
@@ -538,7 +482,6 @@ class TestQuestDBAdapter:
         mock_cursor.close.assert_called_once()
 
     def test_cursor_closed_on_create_schema_failure(self, questdb_stubs):
-        """Cursor should be closed when schema creation fails mid-statement."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = [None, KeyboardInterrupt("interrupted")]
@@ -554,7 +497,6 @@ class TestQuestDBAdapter:
         mock_cursor.close.assert_called_once()
 
     def test_create_schema_raises_on_create_table_failure(self, questdb_stubs):
-        """create_schema should raise RuntimeError when CREATE TABLE statements fail."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_cursor.execute.side_effect = Exception("Syntax error")
@@ -570,7 +512,6 @@ class TestQuestDBAdapter:
             adapter.create_schema(Mock(), mock_conn)
 
     def test_create_schema_strips_fk_constraints(self, questdb_stubs):
-        """create_schema should strip FK constraints but keep the CREATE TABLE statement."""
         mock_conn = Mock()
         mock_cursor = Mock()
         mock_conn.cursor.return_value = mock_cursor
@@ -583,34 +524,28 @@ class TestQuestDBAdapter:
             )
             adapter.create_schema(Mock(), mock_conn)
 
-        # The CREATE TABLE should still be executed (FK stripped, not dropped)
         mock_cursor.execute.assert_called_once()
         executed_sql = mock_cursor.execute.call_args[0][0]
         assert "CREATE TABLE" in executed_sql
         assert "FOREIGN KEY" not in executed_sql
 
     def test_platform_registry_requirements_include_requests(self):
-        """QuestDB platform metadata should include REST dependency guidance."""
         info = PlatformRegistry.get_platform_info("questdb")
         assert info is not None
         assert "requests>=2.28.0" in info.requirements
         assert info.installation_command == "uv add benchbox --extra questdb"
 
     def test_handle_existing_database_dry_run(self, questdb_stubs):
-        """handle_existing_database should return early in dry_run mode without connection."""
         adapter = QuestDBAdapter()
         adapter.dry_run = True
         adapter.database_was_reused = None
 
         adapter.handle_existing_database()
 
-        # No connection should be attempted
         questdb_stubs.connect.assert_not_called()
-        # database_was_reused should remain unchanged
         assert adapter.database_was_reused is None
 
     def test_handle_existing_database_force_recreate(self, questdb_stubs):
-        """handle_existing_database should set database_was_reused=False when force_recreate=True."""
         adapter = QuestDBAdapter()
         adapter.force_recreate = True
 
@@ -620,7 +555,6 @@ class TestQuestDBAdapter:
         questdb_stubs.connect.assert_not_called()
 
     def test_handle_existing_database_empty_tables(self, questdb_stubs):
-        """handle_existing_database should set database_was_reused=False when no tables exist."""
         mock_cursor = MagicMock()
         mock_cursor.__enter__.return_value = mock_cursor
         mock_cursor.fetchall.return_value = []
@@ -628,7 +562,6 @@ class TestQuestDBAdapter:
         mock_conn.cursor.return_value = mock_cursor
         questdb_stubs.connect.return_value = mock_conn
 
-        # Create a mock benchmark with expected tables
         mock_benchmark = Mock()
         mock_benchmark.tables = {"region": None, "nation": None, "lineitem": None}
 
@@ -641,16 +574,13 @@ class TestQuestDBAdapter:
         mock_conn.close.assert_called_once()
 
     def test_handle_existing_database_full_tables_match(self, questdb_stubs):
-        """handle_existing_database should set database_was_reused=True when all expected tables exist."""
         mock_cursor = MagicMock()
         mock_cursor.__enter__.return_value = mock_cursor
-        # Return all expected tables
         mock_cursor.fetchall.return_value = [("region",), ("nation",), ("lineitem",)]
         mock_conn = Mock()
         mock_conn.cursor.return_value = mock_cursor
         questdb_stubs.connect.return_value = mock_conn
 
-        # Create a mock benchmark with expected tables
         mock_benchmark = Mock()
         mock_benchmark.tables = {"region": None, "nation": None, "lineitem": None}
 
@@ -665,16 +595,13 @@ class TestQuestDBAdapter:
         mock_conn.close.assert_called_once()
 
     def test_handle_existing_database_partial_stale_tables(self, questdb_stubs):
-        """handle_existing_database should set database_was_reused=False when expected tables are missing."""
         mock_cursor = MagicMock()
         mock_cursor.__enter__.return_value = mock_cursor
-        # Return only some tables (e.g., from a different benchmark run)
-        mock_cursor.fetchall.return_value = [("region",), ("nation",)]  # Missing lineitem
+        mock_cursor.fetchall.return_value = [("region",), ("nation",)]
         mock_conn = Mock()
         mock_conn.cursor.return_value = mock_cursor
         questdb_stubs.connect.return_value = mock_conn
 
-        # Create a mock benchmark with expected tables
         mock_benchmark = Mock()
         mock_benchmark.tables = {"region": None, "nation": None, "lineitem": None}
 
@@ -687,8 +614,6 @@ class TestQuestDBAdapter:
         mock_conn.close.assert_called_once()
 
     def test_handle_existing_database_connection_error(self, questdb_stubs):
-        """handle_existing_database should set database_was_reused=False on connection error."""
-        # Simulate connection error
         questdb_stubs.Error = Exception
         questdb_stubs.connect.side_effect = questdb_stubs.Error("Connection refused")
 
@@ -703,7 +628,6 @@ class TestQuestDBAdapter:
         assert adapter.database_was_reused is False
 
     def test_handle_existing_database_psycopg_none_raises(self, monkeypatch):
-        """handle_existing_database should raise clear error if psycopg is not available."""
         monkeypatch.setattr(questdb_module, "psycopg", None)
 
         adapter = QuestDBAdapter.__new__(QuestDBAdapter)
@@ -715,12 +639,10 @@ class TestQuestDBAdapter:
             adapter.handle_existing_database()
 
     def test_handle_existing_database_benchmark_not_set(self, questdb_stubs):
-        """handle_existing_database should treat as fresh database when benchmark attr is absent."""
         mock_conn = Mock()
         questdb_stubs.connect.return_value = mock_conn
 
         adapter = QuestDBAdapter()
-        # Deliberately leave adapter.benchmark unset (not populated by run_enhanced_benchmark)
 
         adapter.handle_existing_database()
 
@@ -728,11 +650,6 @@ class TestQuestDBAdapter:
         mock_conn.close.assert_called_once()
 
     def test_handle_existing_database_empty_tables_dict(self, questdb_stubs):
-        """handle_existing_database should treat as fresh database when benchmark.tables is empty.
-
-        Benchmarks like clickbench initialize tables={} before data download; the method
-        cannot infer expected table names and falls back to fresh-database behavior.
-        """
         mock_conn = Mock()
         questdb_stubs.connect.return_value = mock_conn
 
@@ -749,20 +666,15 @@ class TestQuestDBAdapter:
 
 
 class TestQuestDBTlsUrls:
-    """Tests for TLS/HTTPS URL construction in QuestDB adapter."""
-
     def test_use_tls_defaults_to_false(self, questdb_stubs):
-        """use_tls defaults to False (HTTP)."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000)
         assert adapter.use_tls is False
 
     def test_use_tls_can_be_enabled(self, questdb_stubs):
-        """use_tls=True is stored on the adapter."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000, use_tls=True)
         assert adapter.use_tls is True
 
     def test_imp_url_uses_http_by_default(self, questdb_stubs, tmp_path):
-        """Import endpoint URL uses HTTP scheme by default."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000)
         mock_requests = Mock()
         mock_response = Mock(status_code=200, text="| Rows imported | 1 |")
@@ -778,7 +690,6 @@ class TestQuestDBTlsUrls:
             assert url == "http://myhost:9000/imp"
 
     def test_imp_url_uses_https_when_tls_enabled(self, questdb_stubs, tmp_path):
-        """Import endpoint URL uses HTTPS when use_tls=True."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000, use_tls=True)
         mock_requests = Mock()
         mock_response = Mock(status_code=200, text="| Rows imported | 1 |")
@@ -794,7 +705,6 @@ class TestQuestDBTlsUrls:
             assert url == "https://myhost:9000/imp"
 
     def test_exec_url_uses_https_when_tls_enabled(self, questdb_stubs):
-        """Exec endpoint URL uses HTTPS when use_tls=True."""
         adapter = QuestDBAdapter(host="myhost", http_port=9000, use_tls=True)
         mock_requests = Mock()
         mock_response = Mock(status_code=200)
@@ -807,7 +717,6 @@ class TestQuestDBTlsUrls:
             assert url == "https://myhost:9000/exec"
 
     def test_from_config_passes_use_tls(self, questdb_stubs):
-        """from_config propagates use_tls to adapter instance."""
         config = {
             "host": "localhost",
             "use_tls": True,

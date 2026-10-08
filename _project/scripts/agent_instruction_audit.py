@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-"""Deterministic audit for BenchBox's active agent instruction surface."""
 
 from __future__ import annotations
 
@@ -46,8 +45,6 @@ CANONICAL_REVIEW_POLICY_IDS = {
 }
 CANONICAL_REVIEW_ANCHORS = {
     "REVIEW-AUTH-001": (
-        # Keep these as stable semantic fragments rather than sentence-level
-        # wording. The shared skill has both legacy and streamlined mirrors.
         "read-only",
         "local capture",
         "review-only",
@@ -69,10 +66,6 @@ CANONICAL_REVIEW_ANCHORS = {
         "dropped open gate, is a plan defect",
     ),
 }
-# The author/committer anchors are load-bearing: the audit previously pinned
-# only the trailer semantics, so the canonical skill could require a human
-# *committer* while the shipped gate allowed a signing service there, and
-# `agent-instructions-check` would still report the surface as valid.
 CANONICAL_COMMIT_ANCHORS = {
     "COMMIT-IDENTITY-001": (
         "Co-Authored-By",
@@ -113,7 +106,6 @@ AGENT_WRITE_ANCHORS = {
         "never hand a green, reviewed pr back",
         "re-enqueue after a spurious ejection",
         "fix and push after a real failure",
-        # The limits on merging: dropping any of these would widen what an agent may merge unasked.
         "owner-only action",
         "a denied permission",
         "production publish or release",
@@ -134,14 +126,6 @@ AGENT_COMMENT_POLICY_ANCHORS = {
         "resolve every finding while enforcement is advisory",
     )
 }
-# Agent-facing text must not tell an agent or operator to stop and hand a finished PR back to a
-# human. A PR that passed its checks and required review is merged by the agent; the narrow cases
-# that do need a human are listed in [WRITE-CLOSEOUT-001]. This is a phrase regression check, not
-# semantic assurance: it catches the known wordings, matched on whole paragraphs with Markdown
-# emphasis stripped so line wrapping and **bold** cannot hide them. There is deliberately no
-# per-line exemption; a legitimate sentence that trips a pattern is reworded or the pattern narrowed
-# in a reviewed change. Scripts that print guidance (Makefile, pr_landing.py) join this list as they
-# are fixed.
 HANDBACK_TEXT = (
     "AGENTS.md",
     "CONTRIBUTING.md",
@@ -177,8 +161,10 @@ _MARKDOWN_EMPHASIS = re.compile(r"[*_`]")
 _LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s")
 
 
+CLI_DESCRIPTION = "Deterministic audit for BenchBox's active agent instruction surface."
+
+
 def _paragraphs(text: str) -> list[tuple[int, str]]:
-    """Split Markdown into (first line number, flattened text), one entry per paragraph or list item."""
     paragraphs: list[tuple[int, list[str]]] = []
     current: tuple[int, list[str]] | None = None
     for number, line in enumerate(text.splitlines(), start=1):
@@ -226,22 +212,9 @@ RETIRED_REVIEW_DOCS = (
 AUTHORITY_CONFLICT_MARKERS = ("this file wins", "canonical, unabridged", "conflicts resolve in favor of this")
 AGENT_NAMES = {"chatgpt", "claude", "codex", "gemini", "openai"}
 AGENT_EMAILS = {"noreply@anthropic.com", "noreply@openai.com"}
-# Scopes that legitimately carry the user's own identity. Anything else is an
-# override worth surfacing -- see audit_identity_overrides.
 GLOBAL_IDENTITY_SCOPES = frozenset({"global", "system"})
-# [COMMIT-IDENTITY-001] binds authorship. A commit-signing service may hold the
-# committer slot -- cloud agent sessions SSH-sign with a key registered to this
-# address, and a committer email that does not match it makes the signature
-# unverifiable -- but only behind a human author, so attribution stays honest.
 SIGNING_SERVICE_EMAILS = {"noreply@anthropic.com"}
-# Trailers that attribute authorship to an agent. The trailer identity is parsed
-# and run through the same name-or-email predicate used for authors: matching on
-# the vendor address alone let `Co-Authored-By: Claude <claude@example.com>`
-# through both this guard and the commit-msg hook, which is precisely the
-# attribution [COMMIT-IDENTITY-001] exists to reject.
 AGENT_TRAILER_RE = re.compile(r"^[ \t]*co-authored-by:[ \t]*(.+)$", re.IGNORECASE | re.MULTILINE)
-# `Display Name <address>`; the address is optional so a malformed trailer still
-# resolves to a name rather than silently parsing as neither.
 TRAILER_IDENTITY_RE = re.compile(r"^(?P<name>[^<]*?)\s*(?:<(?P<email>[^>]*)>)?\s*$")
 AGENT_SESSION_TRAILER_RE = re.compile(
     r"^[ \t]*(claude|codex|gemini|chatgpt)-session:[ \t]*(.+)$", re.IGNORECASE | re.MULTILINE
@@ -260,12 +233,10 @@ def _read(project: Path, relative: str) -> str:
 
 
 def _tag(check: str, errors: Iterable[str]) -> list[str]:
-    """Prefix each message with the check that produced it."""
     return [f"{check}: {error}" for error in errors]
 
 
 def failing_checks(errors: Iterable[str]) -> list[str]:
-    """Distinct check names present in *errors*, in first-seen order."""
     seen: list[str] = []
     for error in errors:
         check = error.split(":", 1)[0]
@@ -410,11 +381,6 @@ def _is_agent_identity(name: str, email: str) -> bool:
 
 
 def _trailer_is_agent(trailer: str) -> bool:
-    """Apply the author name-or-email predicate to a `Co-Authored-By` value.
-
-    An agent that signs with a non-vendor address (`Claude <claude@example.com>`)
-    is recognised by name, exactly as it would be in the author slot.
-    """
     match = TRAILER_IDENTITY_RE.match(trailer.strip())
     if match is None:
         return False
@@ -438,21 +404,6 @@ def audit_git_identity(project: Path) -> list[str]:
     author_name, author_email = identities["author"]
     author_is_human = bool(author_name and author_email) and not _is_agent_identity(author_name, author_email)
 
-    # No resolvable identity is not a violation. This check exists to reject a
-    # *known agent* identity, and an absent one is nothing to judge - so
-    # failing here says only "this environment has no git config", which is the
-    # normal state of an ephemeral CI runner. `make ci-lint` runs this target
-    # and `develop-post-merge.yml` runs ci-lint, so treating absence as an error
-    # made every post-merge run red with "unable to resolve Git author
-    # identity" once #1523 removed the step that injected a placeholder
-    # identity to keep the check runnable.
-    #
-    # That injection was removed for the right reason - a check fed a known-good
-    # identity can never fail - but the inverse is just as useless: a check that
-    # always fails where no identity exists. Locally the absence cannot occur in
-    # a way that matters, because git refuses to commit without one. The real
-    # merge-time control is agent-commit-range-check, which inspects the commits
-    # the branch actually carries.
     if not all(name and email for name, email in identities.values()):
         return []
 
@@ -460,8 +411,6 @@ def audit_git_identity(project: Path) -> list[str]:
     for role, (name, email) in identities.items():
         if not _is_agent_identity(name, email):
             continue
-        # A signing service behind a human author keeps signatures verifiable
-        # without misattributing the work; an agent author is never acceptable.
         if role == "committer" and author_is_human and email.strip().casefold() in SIGNING_SERVICE_EMAILS:
             continue
         errors.append(
@@ -473,25 +422,6 @@ def audit_git_identity(project: Path) -> list[str]:
 
 
 def audit_identity_overrides(project: Path) -> list[str]:
-    """Non-fatal warnings for a Git identity that displaces the user's global one.
-
-    Detection only, and deliberately so. The audit never writes config and runs
-    after configuration may already have changed, so this cannot stop a
-    concurrent session from contaminating a shared clone -- it only makes the
-    contamination visible. Prevention belongs to worktree-scoped identity set at
-    claim time, not here.
-
-    `local` is the scope that bites: from inside a linked worktree, `--local`
-    resolves to the *common* config, so a single write there reauthors the
-    primary clone and every worktree it owns at once. `worktree` and `command`
-    are reported too, because any of them silently displaces the global identity
-    while looking like it came from the user's own settings.
-
-    Human values warn rather than fail: a repo-local human identity is a normal,
-    supported setup, and making it fatal would turn a visibility aid into a
-    compatibility break that also drowns out the known-agent check in
-    `audit_git_identity`, which stays fatal.
-    """
     result = subprocess.run(
         [
             "git",
@@ -524,18 +454,9 @@ def audit_identity_overrides(project: Path) -> list[str]:
 
 
 def audit_commit_range(project: Path, base_ref: str) -> list[str]:
-    """Merge-time guard over the commits a branch actually carries.
-
-    `audit_git_identity` reads the resolved config, which on a CI runner is the
-    runner's own identity and says nothing about what the branch contains. This
-    walks `base_ref..HEAD` instead, so an agent-authored commit produced in some
-    other session cannot reach a protected branch unnoticed.
-    """
     if os.environ.get("BENCHBOX_ALLOW_AGENT_GIT_IDENTITY") == "1":
         return []
 
-    # Separators are written as git's own %xNN escapes: a literal NUL cannot be
-    # passed through argv, and commit messages may contain anything else.
     unit, record = "\x1f", "\x00"
     result = subprocess.run(
         ["git", "-C", str(project), "log", "--format=%H%x1f%an%x1f%ae%x1f%B%x00", f"{base_ref}..HEAD"],
@@ -573,23 +494,7 @@ def audit_commit_range(project: Path, base_ref: str) -> list[str]:
 
 
 def audit_dependency_caps(project: Path) -> list[str]:
-    """Forbid AGENTS.md restating dependency version caps.
-
-    Bounds are already owned mechanically three times over: `pyproject.toml`
-    declares them with rationale inline, `uv lock` enforces them at install,
-    and `scripts/check_dependency_bounds.py --fail-on=cap-reached` blocks in
-    `test.yml` and `release.yml`. `docs/development/dependency-compatibility.md`
-    explains them. None of that needs an agent to be told anything.
-
-    AGENTS.md restated the list anyway, and it drifted -- advertising
-    `pyarrow<24` long after the manifest moved to `<25`. A synchronization
-    check would have to run forever to keep that duplicate honest. The
-    duplicate is gone; this invariant guards its absence, so the drift class
-    cannot return through a well-meaning convenience edit.
-    """
     agents = _read(project, "AGENTS.md")
-    # No per-line exemption: an exemption keyed on the pointer text would be
-    # defeated by putting the caps on the same line as the pointer.
     offenders = re.findall(r"`([A-Za-z0-9][A-Za-z0-9._-]*\s*<=?\s*[0-9][0-9A-Za-z_.]*)`", agents)
     if offenders:
         return [
@@ -649,19 +554,10 @@ def audit_scenarios(scenarios: list[dict[str, Any]], policy_text: str) -> list[s
     return errors
 
 
-# Fraction of a budget at which the surface is reported as nearly full. #1541
-# added 88 bytes to a 16000-byte ceiling and reddened develop for everyone with
-# no prior signal; a headroom band turns "over budget" from a cliff into a slope.
 HEADROOM_WARNING_RATIO = 0.97
 
 
 def budget_headroom_warnings(metrics: Metrics, budgets: dict[str, Any]) -> list[str]:
-    """Warn when a budgeted metric is close to its ceiling but not yet over it.
-
-    Deliberately a warning, never an error: the budget itself stays the gate.
-    A second failing threshold would just be a lower budget, and the point is to
-    give the next docs change lead time, not to move the wall in.
-    """
     warnings: list[str] = []
     measured = [
         ("active instruction bytes", metrics.active_bytes, budgets["active_bytes"]),
@@ -675,24 +571,21 @@ def budget_headroom_warnings(metrics: Metrics, budgets: dict[str, Any]) -> list[
 
 
 def audit_docs_placement(project: Path) -> list[str]:
-    """Keep agent governance out of the published contributor handbook."""
     errors: list[str] = []
     development = project / "docs/development"
     if development.is_dir():
         leaked = sorted(path.relative_to(project).as_posix() for path in development.glob("agent-*.md"))
         if leaked:
             errors.append("agent governance files must live under docs/agent/, not " + ", ".join(leaked))
-    conf = project / "docs/conf.py"
-    if conf.exists():
-        match = re.search(r"exclude_patterns\s*=\s*\[(.*?)\]", conf.read_text(encoding="utf-8"), re.S)
-        excluded = match.group(1) if match else ""
-        if not re.search(r"[\"']agent[\"']", excluded):
-            errors.append("docs/conf.py must exclude the docs/agent/ tree from Sphinx")
+    exclusions = project / "docs/publish-exclusions.txt"
+    if exclusions.exists():
+        entries = {line.strip() for line in exclusions.read_text(encoding="utf-8").splitlines()}
+        if "agent/" not in entries:
+            errors.append("docs/publish-exclusions.txt must exclude the docs/agent/ tree from the published site")
     return errors
 
 
 def audit_handback_wording(project: Path) -> list[str]:
-    """Fail agent-facing text that hands a finished PR back to a human."""
     errors: list[str] = []
     compiled = {label: re.compile(pattern, re.IGNORECASE) for label, pattern in HANDBACK_PATTERNS.items()}
     paths: list[Path] = []
@@ -713,14 +606,6 @@ def audit_handback_wording(project: Path) -> list[str]:
 
 
 def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
-    """Run every non-Git check and return its errors tagged with the check name.
-
-    Each message is prefixed `<check>: ` so a caller - in particular the
-    pre-commit hook, which invokes this through one entry point - can say which
-    check failed. Before that, a byte-budget failure surfaced under a hook named
-    "reject stale agent Git identity", which sent at least one investigation
-    after a Git config problem that did not exist.
-    """
     errors: list[str] = []
     metrics = collect_metrics(project)
     budgets = corpus["budgets"]
@@ -781,7 +666,7 @@ def audit(project: Path, corpus: dict[str, Any]) -> tuple[Metrics, list[str]]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--project", type=Path, default=ROOT)
     parser.add_argument("--corpus", type=Path, default=DEFAULT_CORPUS)
     parser.add_argument("--json", action="store_true", dest="as_json")
@@ -821,9 +706,6 @@ def main() -> int:
             print(f"WARNING: {warning}")
         for error in errors:
             print(f"ERROR: {error}")
-    # Warnings are deliberately excluded from the exit status: they report a
-    # condition the user may have chosen on purpose, and a gate that fails on
-    # every repo-local human identity would be routinely bypassed.
     return 0 if not errors else 1
 
 

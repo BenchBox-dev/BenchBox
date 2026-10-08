@@ -1,15 +1,4 @@
-"""Unit tests for the vector search benchmark module.
-
-Covers:
-  - Data generator (synthetic embedding generation, reproducibility)
-  - Query manager (all 6 queries, dialect variants)
-  - Schema DDL generation (dialect-specific embedding types)
-  - Metrics utilities (recall@k, latency percentiles, QPS)
-  - Benchmark class (construction, API surface)
-  - Registry integration (benchmark discoverable via benchbox module)
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -25,14 +14,7 @@ pytestmark = [
 ALL_QUERY_IDS = ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6"]
 
 
-# ---------------------------------------------------------------------------
-# Generator tests
-# ---------------------------------------------------------------------------
-
-
 class TestVectorSearchDataGenerator:
-    """Tests for VectorSearchDataGenerator."""
-
     def test_imports(self):
         from benchbox.core.vector_search.generator import VectorSearchDataGenerator
 
@@ -42,12 +24,11 @@ class TestVectorSearchDataGenerator:
         from benchbox.core.vector_search.generator import VectorSearchDataGenerator
 
         gen = VectorSearchDataGenerator(
-            scale_factor=0.001,  # tiny - keeps test fast
+            scale_factor=0.001,
             output_dir=tmp_path,
             dimensions=4,
             compression_enabled=False,
         )
-        # Override base_vectors to make it truly tiny
         from benchbox.core.vector_search import generator as _gmod
 
         orig = _gmod.BASE_VECTORS
@@ -83,8 +64,8 @@ class TestVectorSearchDataGenerator:
 
         assert path.exists()
         lines = path.read_text().splitlines()
-        assert lines[0] == "id|embedding|category|doc_id"  # header
-        assert len(lines) == 6  # 1 header + 5 data rows
+        assert lines[0] == "id|embedding|category|doc_id"
+        assert len(lines) == 6
         assert gen._manifest_row_counts["vectors"] == 5
 
     def test_query_vectors_fixed_count(self, tmp_path):
@@ -106,11 +87,10 @@ class TestVectorSearchDataGenerator:
 
         assert path.exists()
         lines = path.read_text().splitlines()
-        assert len(lines) == NUM_QUERY_VECTORS + 1  # +1 for header
+        assert len(lines) == NUM_QUERY_VECTORS + 1
         assert gen._manifest_row_counts["vector_queries"] == NUM_QUERY_VECTORS
 
     def test_reproducibility(self, tmp_path):
-        """Two generators with the same seed produce identical files."""
         import numpy as np
 
         from benchbox.core.vector_search.generator import VectorSearchDataGenerator
@@ -141,7 +121,6 @@ class TestVectorSearchDataGenerator:
         assert _make_vectors(dir_a) == _make_vectors(dir_b)
 
     def test_embedding_values_are_unit_normalised(self, tmp_path):
-        """Each embedding row in the CSV should encode a unit vector."""
         import math
 
         import numpy as np
@@ -166,7 +145,7 @@ class TestVectorSearchDataGenerator:
             _gmod.BASE_VECTORS = orig
 
         for line in path.read_text().splitlines()[1:]:
-            emb_str = line.split("|")[1]  # e.g. [0.1,0.2,...]
+            emb_str = line.split("|")[1]
             vals = [float(v) for v in emb_str.strip("[]").split(",")]
             norm = math.sqrt(sum(v * v for v in vals))
             assert abs(norm - 1.0) < 1e-4, f"Not unit-normalised: norm={norm}"
@@ -193,14 +172,7 @@ class TestVectorSearchDataGenerator:
         assert manifest.exists()
 
 
-# ---------------------------------------------------------------------------
-# Query manager tests
-# ---------------------------------------------------------------------------
-
-
 class TestVectorSearchQueryManager:
-    """Tests for VectorSearchQueryManager."""
-
     def test_imports(self):
         from benchbox.core.vector_search.queries import VectorSearchQueryManager
 
@@ -349,14 +321,7 @@ class TestVectorSearchQueryManager:
         assert "ASC" in sql
 
 
-# ---------------------------------------------------------------------------
-# Schema tests
-# ---------------------------------------------------------------------------
-
-
 class TestVectorSearchSchema:
-    """Tests for schema DDL generation."""
-
     def test_imports(self):
         from benchbox.core.vector_search.schema import TABLES, get_all_create_table_sql
 
@@ -442,14 +407,7 @@ class TestVectorSearchSchema:
         assert "FLOAT[128]" not in ddl_768
 
 
-# ---------------------------------------------------------------------------
-# Metrics tests
-# ---------------------------------------------------------------------------
-
-
 class TestVectorSearchMetrics:
-    """Tests for recall@k, latency percentiles, and QPS utilities."""
-
     def test_search_result_oracle_accepts_ordered_rows(self):
         from benchbox.core.vector_search.metrics import validate_search_result
 
@@ -497,7 +455,6 @@ class TestVectorSearchMetrics:
     def test_recall_truncates_to_k(self):
         from benchbox.core.vector_search.metrics import recall_at_k
 
-        # Only first k items from each list matter
         gt = [1, 2, 3, 100, 200]
         approx = [1, 2, 3, 99, 199]
         assert recall_at_k(gt, approx, k=3) == 1.0
@@ -549,14 +506,7 @@ class TestVectorSearchMetrics:
         assert mean_latency([]) == 0.0
 
 
-# ---------------------------------------------------------------------------
-# Benchmark class tests
-# ---------------------------------------------------------------------------
-
-
 class TestVectorSearchBenchmark:
-    """Tests for VectorSearchBenchmark class construction and API."""
-
     def test_core_benchmark_imports(self):
         from benchbox.core.vector_search import VectorSearchBenchmark
 
@@ -719,14 +669,7 @@ class TestVectorSearchBenchmark:
             VectorSearchBenchmark(scale_factor=-1.0, output_dir=tmp_path)
 
 
-# ---------------------------------------------------------------------------
-# Top-level wrapper tests
-# ---------------------------------------------------------------------------
-
-
 class TestVectorSearchWrapper:
-    """Tests for the top-level VectorSearch wrapper class."""
-
     def test_wrapper_imports(self):
         from benchbox.vector_search import VectorSearch
 
@@ -759,14 +702,7 @@ class TestVectorSearchWrapper:
             benchmark.validate_query_result("q1", [(1, 0.8), (2, 0.9)])
 
 
-# ---------------------------------------------------------------------------
-# Registry integration tests
-# ---------------------------------------------------------------------------
-
-
 class TestRegistryIntegration:
-    """Tests that vector_search is properly registered."""
-
     def test_benchmark_class_name_registered(self):
         from benchbox.core.benchmark_registry import BENCHMARK_CLASS_NAMES
 

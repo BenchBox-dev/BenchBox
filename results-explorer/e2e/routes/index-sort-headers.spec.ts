@@ -81,11 +81,8 @@ test.describe("Index sortable headers", () => {
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
 
-    // The query matrix is a collapsed Analysis card by default now.
     await openAnalysisCard(page, "query_heatmap");
     const table = page.getByRole("table", { name: /tpch SF0\.01 power results/i });
-    // The heading is shell-rendered; gate on real rows in the table under test
-    // before reading row order.
     await waitForResultRows(page, table, 3);
     const rows = table.locator("tbody tr[data-testid]");
     await expect.poll(() => rows.count()).toBeGreaterThanOrEqual(3);
@@ -94,20 +91,11 @@ test.describe("Index sortable headers", () => {
     await platformHeader.getByRole("button", { name: /Platform/ }).click();
 
     await expect(platformHeader).toHaveAttribute("aria-sort", "ascending");
-    // QueryHeatmap sorts by platform. Duplicate platform rows now carry the
-    // version, date, trust source, and public ID needed to distinguish them,
-    // so compare only the platform portion of each visible identity. The
-    // matrix card renders its streamlined (non-selectable) variant, so
-    // there is no leading checkbox column: platform is column 0.
     const platforms = (await platformCellLabels(rows, 0)).map((label) => label.split(" · ")[0] ?? label);
     expect(platforms).toEqual([...platforms].sort((a, b) => a.localeCompare(b)));
   });
 
   test("BenchmarkIndex list headers update aria-sort and row order", async ({ page }) => {
-    // Matrix, Ranks, and List are sections of one page now, not mutually
-    // exclusive states behind a toggle - List needs no click to reveal it,
-    // so scope to its section rather than "the first table" (Matrix's grid
-    // now precedes it in document order).
     await page.goto("/results/tpch/?sf=0.01&phase=power");
     await waitForShell(page);
     await waitForDataLoaded(page, /TPC-H Results/);
@@ -120,7 +108,6 @@ test.describe("Index sortable headers", () => {
     await platformHeader.getByRole("button", { name: /Platform/ }).click();
 
     await expect(platformHeader).toHaveAttribute("aria-sort", "ascending");
-    // Column 0 is the compare checkbox now; platform identity is column 1.
     const platforms = await platformCellLabels(rows, 1);
     const platformName = (label: string) => label.split(" · ", 1)[0] ?? label;
     expect(platforms).toEqual([...platforms].sort((a, b) => platformName(a).localeCompare(platformName(b))));

@@ -14,6 +14,8 @@ The BenchBox blog features benchmarking insights, performance analysis, and upda
 
 ## Recent Posts
 
+October 07, 2026 - [2026-10-07-site-redesign](/blog/2026-10-07-site-redesign.html)
+
 September 15, 2026 - [2026-09-15-results-explorer-introduction](/blog/2026-09-15-results-explorer-introduction.html)
 
 August 31, 2026 - [2026-08-31-v0-4-0-release-overview](/blog/2026-08-31-v0-4-0-release-overview.html)

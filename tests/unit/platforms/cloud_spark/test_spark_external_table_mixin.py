@@ -1,14 +1,6 @@
-"""Tests for SparkExternalTableMixin shared by managed Spark adapters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Covers the shared --table-mode external flow with a stub adapter: staging
-validation, format resolution, fresh upload versus reuse, registration and
-row-count collection, and every error envelope. Per-adapter registration
-hooks are tested against the real adapters in their platform directories.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -28,8 +20,6 @@ pytestmark = [
 
 
 class StubSparkAdapter(SparkExternalTableMixin):
-    """Minimal adapter exercising the shared external-table flow."""
-
     def __init__(self, **overrides):
         self.platform_name = "stub-spark"
         self.database = "benchbox"

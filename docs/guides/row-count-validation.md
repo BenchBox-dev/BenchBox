@@ -26,17 +26,16 @@ Row count validation is **automatically enabled** for supported benchmarks (TPC-
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox import TPCH
 
-# Validation is enabled by default
 adapter = DuckDBAdapter()
 benchmark = TPCH(scale_factor=1.0)
 
-# Run benchmark - validation happens automatically
 results = adapter.run_benchmark(benchmark)
 
-# Check validation results in output
 for query_result in results['queries']:
     print(f"Query {query_result['query_id']}: {query_result.get('row_count_validation_status', 'N/A')}")
 ```
+
+Validation is enabled by default, and it runs automatically when the benchmark runs. The loop checks the validation status of each query result.
 
 ### Validation Output
 
@@ -48,11 +47,12 @@ Each query result includes validation metadata when validation is performed:
     "status": "SUCCESS",
     "execution_time": 0.123,
     "rows_returned": 4,
-    "expected_row_count": 4,  # ← Expected count from answer files
-    "row_count_validation_status": "PASSED",  # ← Validation result
-    # ... other fields
+    "expected_row_count": 4,
+    "row_count_validation_status": "PASSED",
 }
 ```
+
+`expected_row_count` is the expected count from the answer files, and `row_count_validation_status` is the validation result. A real result contains other fields as well.
 
 ## Validation Statuses
 
@@ -90,9 +90,46 @@ Validation was skipped because no expected result is available for this query/sc
 **Common reasons:**
 - Scale factor other than 1.0 (expected results only available for SF=1.0 currently)
 - Query variant not in answer files
-- Answer files not available locally and download failed or was disabled
+- Answer files are unavailable and the provider reports `FileNotFoundError`,
+  including a disabled download or an on-demand download that returned no files
   - run `benchbox download-answers` to pre-populate the cache
 - Non-standard benchmark
+
+### Missing Expectations and Provider Errors
+
+`SKIPPED` means no row-count comparison was certified. Query execution can
+remain `SUCCESS` while its `row_count_validation` block is `SKIPPED` and carries
+a warning. An explicit SKIP expectation, an absent answer set or query lookup,
+and a nonzero TPC reference stream use this unevaluated result.
+
+A registered EXACT expectation whose count lookup returns `None` also becomes
+SKIP with an `EXACT validation mode but no expected count available` warning.
+This is the current defensive lookup behavior; it does not establish that the
+returned rows are correct. Normal `ExpectedQueryResult` construction requires
+an exact count or a formula for EXACT mode, so a constructor rejection is a
+separate error, not this downgrade.
+
+Expected-results failures are classified. A provider `FileNotFoundError` is
+cached as absent answer data. The on-demand downloader currently converts its
+failures to no files, which the loader reports as `FileNotFoundError`; those
+failures therefore also become unevaluated skips. Other provider exceptions
+produce a failed validation result and may retry on a later request. A waiter
+timeout also fails validation while the background load continues. Neither an
+invalid SKIP-mode result nor a provider timeout is published as normal SKIPPED
+validation: the adapter records a failed query and validation error.
+
+Canonical query-result serialization preserves expected/actual counts and
+warning/error text. It downgrades PASSED evidence without an expected count to
+SKIPPED. Consequently, a successfully evaluated RANGE check, whose result has
+no single expected count, also appears as SKIPPED after this normalization.
+Inspect the available evidence; execution success alone is not correctness
+certification.
+
+TPC-DS DataFrame runs use a separate validation boundary because their expected
+row counts are not seed-aligned. Successful queries receive SKIPPED row-count
+evidence and an UNCERTAIN validation summary; execution failures remain visible
+as PARTIAL. SQL reference-stream validation does not certify those DataFrame
+streams.
 
 ## Supported Benchmarks
 
@@ -121,16 +158,16 @@ Expected results sourced from official TPC-DS answer sets for SF=1.0.
 The validation system handles various query ID formats automatically:
 
 ```python
-# All of these map to Query 1:
-validator.validate_query_result("tpch", 1, actual_row_count=4)        # Integer
-validator.validate_query_result("tpch", "1", actual_row_count=4)      # String
-validator.validate_query_result("tpch", "Q1", actual_row_count=4)     # Q-prefix
-validator.validate_query_result("tpch", "query1", actual_row_count=4) # query-prefix
+validator.validate_query_result("tpch", 1, actual_row_count=4)
+validator.validate_query_result("tpch", "1", actual_row_count=4)
+validator.validate_query_result("tpch", "Q1", actual_row_count=4)
+validator.validate_query_result("tpch", "query1", actual_row_count=4)
 
-# Query variants (extract base query number):
-validator.validate_query_result("tpch", "15a", actual_row_count=1)    # Variant → Q15
-validator.validate_query_result("tpch", "Q15b", actual_row_count=1)   # Variant → Q15
+validator.validate_query_result("tpch", "15a", actual_row_count=1)
+validator.validate_query_result("tpch", "Q15b", actual_row_count=1)
 ```
+
+The first four calls all map to Query 1: an integer, a string, a `Q` prefix and a `query` prefix. The last two are query variants, which use the base query number and map to Q15.
 
 ### Manual Validation
 
@@ -161,39 +198,35 @@ else:
 Full validation support with exact expected row counts:
 
 ```python
-# SF=1.0: All queries validated
 results = adapter.run_benchmark(
     TPCH(scale_factor=1.0),
-    validate_row_counts=True  # Default
+    validate_row_counts=True
 )
 ```
+
+At SF=1.0 all queries are validated. `validate_row_counts=True` is the default.
 
 #### Other Scale Factors
 
 **Scale-independent queries** (e.g., TPC-H Q1) use SF=1.0 expectations:
 
 ```python
-# SF=10: Q1 still validates (scale-independent)
 validator.validate_query_result("tpch", "1", actual_row_count=4, scale_factor=10.0)
-# → Uses SF=1.0 expectation (4 rows) - PASSED
 
-# SF=10: Q2 validation skipped (scale-dependent)
 validator.validate_query_result("tpch", "2", actual_row_count=1000, scale_factor=10.0)
-# → No SF=10.0 expectations - SKIPPED
 ```
+
+At SF=10, Q1 still validates because it is scale-independent. It uses the SF=1.0 expectation (4 rows) and the result is PASSED. Q2 is scale-dependent and there are no SF=10.0 expectations, so its validation is SKIPPED.
 
 ### Disabling Validation
 
 If you need to disable validation:
 
 ```python
-# Option 1: Disable at adapter level (not yet implemented - validation is always on)
-# This will be added in future versions if needed
-
-# Option 2: Ignore validation results
 results = adapter.run_benchmark(benchmark)
-# Simply don't check row_count_validation_status fields
 ```
+
+There are two options. Option 1, disabling validation at the adapter level, is not yet implemented, because validation is always on. It may be added in a future version if needed. Option 2 is to ignore validation results by not checking the `row_count_validation_status` fields.
 
 ## How It Works
 
@@ -252,14 +285,14 @@ results = adapter.run_benchmark(benchmark)
 The validation system is thread-safe for concurrent query execution:
 
 ```python
-# Safe to run throughput tests with concurrent queries
 results = adapter.run_throughput_test(
     benchmark=benchmark,
-    connection=connection,  # shared connection; each stream gets its own session
-    num_streams=4,  # 4 concurrent query streams
+    connection=connection,
+    num_streams=4,
 )
-# Each stream can validate concurrently without conflicts
 ```
+
+Throughput tests with concurrent queries are safe. The streams share one connection, and each stream gets its own session. `num_streams=4` runs 4 concurrent query streams, and each stream can validate concurrently without conflicts.
 
 **Implementation:**
 - Registry uses `threading.Lock` to protect cache and provider registry
@@ -306,12 +339,14 @@ To populate the cache before your first benchmark run (e.g., in a CI
 environment without internet access during the run itself):
 
 ```bash
-benchbox download-answers                        # Both TPC-H and TPC-DS
-benchbox download-answers --benchmark tpch       # TPC-H only
-benchbox download-answers --benchmark tpcds      # TPC-DS only
-benchbox download-answers --force                # Re-download even if cached
-benchbox download-answers --show-cache-dir       # Print cache location and exit
+benchbox download-answers
+benchbox download-answers --benchmark tpch
+benchbox download-answers --benchmark tpcds
+benchbox download-answers --force
+benchbox download-answers --show-cache-dir
 ```
+
+The commands download both TPC-H and TPC-DS answers, TPC-H only, TPC-DS only, re-download even if cached, and print the cache location and exit.
 
 ### Disabling Automatic Downloads
 
@@ -357,7 +392,6 @@ See `.github/workflows/upload-answers.yml` for the expected archive layout.
 
 2. **SQL translation issue**
    ```python
-   # Check translated SQL
    sql = benchmark.get_query(query_id=1, dialect="duckdb")
    print(sql)
    ```
@@ -387,10 +421,11 @@ See `.github/workflows/upload-answers.yml` for the expected archive layout.
 
 **Solution**:
 ```python
-# Manually trigger provider registration
 from benchbox.core.expected_results import register_all_providers
 register_all_providers()
 ```
+
+This triggers provider registration manually.
 
 ### Query ID Not Found
 
@@ -414,35 +449,36 @@ class ExpectedQueryResult:
     query_id: str
     scale_factor: float | None = None
     expected_row_count: int | None = None
-    expected_row_count_min: int | None = None  # For non-deterministic queries
+    expected_row_count_min: int | None = None
     expected_row_count_max: int | None = None
-    row_count_formula: str | None = None      # E.g., "SF * 100"
+    row_count_formula: str | None = None
     validation_mode: ValidationMode = ValidationMode.EXACT
     scale_independent: bool = False
     notes: str | None = None
 ```
+
+`expected_row_count_min` and `expected_row_count_max` are for non-deterministic queries. `row_count_formula` holds an expression such as `"SF * 100"`.
 
 ### Validation Modes
 
 1. **EXACT**: Row count must match exactly
    ```python
    expected_row_count = 4
-   actual_row_count = 4  # ✅ PASS
-   actual_row_count = 5  # ❌ FAIL
+   actual_row_count = 4
+   actual_row_count = 5
    ```
+   An actual count of 4 passes. An actual count of 5 fails.
 
 2. **RANGE**: Row count must be within min/max range (for non-deterministic queries)
    ```python
    expected_row_count_min = 100
    expected_row_count_max = 150
-   actual_row_count = 125  # ✅ PASS
-   actual_row_count = 200  # ❌ FAIL
+   actual_row_count = 125
+   actual_row_count = 200
    ```
+   An actual count of 125 passes. An actual count of 200 fails.
 
-3. **SKIP**: Validation is skipped
-   ```python
-   # Used when no expected result is available
-   ```
+3. **SKIP**: Validation is skipped. It is used when no expected result is available.
 
 ### Formula-Based Expectations (Future)
 
@@ -451,10 +487,12 @@ For scale-dependent queries, formulas can express expected count:
 ```python
 ExpectedQueryResult(
     query_id="example",
-    row_count_formula="SF * 1000",  # Scales with scale factor
+    row_count_formula="SF * 1000",
     scale_independent=False
 )
 ```
+
+The formula scales with the scale factor.
 
 Currently, only exact row counts are used. Formulas are evaluated using safe AST parsing (no `eval()`).
 
@@ -463,26 +501,24 @@ Currently, only exact row counts are used. Formulas are evaluated using safe AST
 ### 1. Validate at SF=1.0 First
 
 ```python
-# Establish correctness at SF=1.0
 correctness_results = adapter.run_benchmark(
     TPCH(scale_factor=1.0),
     validate_row_counts=True
 )
 
-# All queries should PASS
 assert all(q['row_count_validation_status'] == 'PASSED' for q in correctness_results['queries'])
 
-# Then scale up for performance testing
 performance_results = adapter.run_benchmark(
     TPCH(scale_factor=100),
-    validate_row_counts=True  # Scale-independent queries still validate
+    validate_row_counts=True
 )
 ```
+
+The first run establishes correctness at SF=1.0, and all queries should PASS. Then scale up for performance testing. Scale-independent queries still validate at the larger scale.
 
 ### 2. Check Validation Status in CI/CD
 
 ```python
-# In automated tests
 results = adapter.run_benchmark(benchmark)
 
 failed_validations = [
@@ -496,24 +532,28 @@ if failed_validations:
     raise AssertionError(f"{len(failed_validations)} queries failed validation")
 ```
 
+Use this pattern in automated tests.
+
 ### 3. Document Validation Skips
 
 ```python
-# If running at SF≠1.0, document that validation is limited
 print("Running at SF=10.0:")
 print("- Scale-independent queries: VALIDATED")
 print("- Scale-dependent queries: SKIPPED (no SF=10.0 expectations)")
 ```
 
+If you run at a scale factor other than 1.0, document that validation is limited.
+
 ### 4. Use Validation for Debugging
 
 ```python
-# When investigating performance issues, check correctness first
 if query_result['row_count_validation_status'] != 'PASSED':
     print(f"⚠️ Query may be incorrect - investigate before performance tuning")
     print(f"  Expected: {query_result['expected_row_count']} rows")
     print(f"  Actual: {query_result['rows_returned']} rows")
 ```
+
+When you investigate performance issues, check correctness first.
 
 ## Future Enhancements
 
@@ -526,8 +566,7 @@ Planned improvements to row count validation:
 5. **Differential Validation**: Compare results across platforms
 6. **Configuration Options**: Toggle validation on/off per query or benchmark
 
-> **Note**: On-demand answer file download for wheel installs (item 7 from the
-> original list) has been implemented. See the
+> **Note**: Wheel installs can download answer files on demand. See the
 > [Installation and Answer File Availability](#installation-and-answer-file-availability)
 > section above.
 
@@ -537,8 +576,3 @@ Planned improvements to row count validation:
 - TPC-DS Specification: https://www.tpc.org/tpcds/
 - BenchBox Architecture: docs/design/architecture.md
 - Issue Tracking: Report validation bugs on GitHub
-
----
-
-*Generated as part of Phase D: Testing & Documentation*
-*Implementation Phases A-C: Bug fixes, security, robustness*

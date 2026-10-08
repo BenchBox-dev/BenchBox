@@ -1,13 +1,3 @@
-// ---------------------------------------------------------------------------
-// StackedPhase - stacked horizontal bar chart of benchmark phase durations
-//
-// One stacked bar per platform, segments = benchmark phases.
-// Phase data comes from PlatformRow.phase_durations (pipeline-emitted,
-// extracted from the bundle's phases block).
-//
-// Python reference: textcharts.stacked_bar.StackedBar
-// ---------------------------------------------------------------------------
-
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { barRowLayout, chartFrame } from "@/lib/chartFrame";
@@ -15,7 +5,6 @@ import { PHASE_COLORS } from "@/lib/chartTheme";
 import { formatDurationSeconds } from "@/lib/metricFormatters";
 import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from "@/lib/runIdentity";
 
-// Phase display names (bundle phase name → human-readable)
 const PHASE_LABELS: Record<string, string> = {
   data_generation: "DataGen",
   schema_creation: "Schema",
@@ -25,7 +14,6 @@ const PHASE_LABELS: Record<string, string> = {
   throughput_test: "Throughput",
 };
 
-// Canonical phase display order
 const PHASE_ORDER = [
   "data_generation",
   "schema_creation",
@@ -77,9 +65,6 @@ export function StackedPhase({ summary }: Props) {
     );
   }
 
-  // Which phases appear across any row, in canonical order.  Unknown phases
-  // (not in PHASE_ORDER) are appended so they render with the fallback color
-  // instead of contributing to `total` while being silently omitted.
   const knownInUse = PHASE_ORDER.filter((ph) =>
     rows.some((r) => r.phase_durations![ph] !== undefined),
   );
@@ -183,7 +168,6 @@ export function StackedPhase({ summary }: Props) {
         />
       </svg>
 
-      {/* Legend */}
       <div class="mt-1.5 flex flex-wrap gap-3 text-xs text-[var(--bb-data-fg-muted)]">
         {allPhases.map((phase) => (
           <span key={phase} class="flex items-center gap-1">

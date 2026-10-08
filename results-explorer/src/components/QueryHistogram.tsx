@@ -1,13 +1,4 @@
 import { formatRunIdentitiesForCohort } from "@/lib/runIdentity";
-// ---------------------------------------------------------------------------
-// QueryHistogram - responsive grouped bars of per-query latency
-//
-// Each bar = one query's display_ms value for a platform.
-// Multiple platforms → grouped bars per query.
-// Auto-splits into panels of MAX_PER_PANEL queries when count > MAX_PER_PANEL.
-//
-// Python reference: textcharts.histogram.Histogram (bar chart, not frequency histogram)
-// ---------------------------------------------------------------------------
 
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
@@ -18,7 +9,6 @@ import { formatTimingExclusion, platformTimingValue } from "@/lib/displayEligibi
 import { formatLatencyMs } from "@/lib/metricFormatters";
 
 const MAX_PER_PANEL = 33;
-/** Narrowest bar that still reads as a bar rather than a hairline. */
 const MIN_BAR_W = 3;
 const BAR_GAP = 3;
 const AXIS_W = 44;
@@ -28,7 +18,6 @@ const PADDING_TOP = 8;
 
 interface Props {
   summary: BenchmarkSummary;
-  /** When true, keeps query_ids in caller-provided order (e.g. limiter ranking). */
   preserveOrder?: boolean;
 }
 
@@ -47,10 +36,6 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
   const sortedQueryIds = preserveOrder ? query_ids : sortQueryIds(query_ids);
   const maxMs = Math.max(1, ...platforms.flatMap((p) => sortedQueryIds.map((qid) => platformTimingValue(p, qid) ?? 0)));
 
-  // A query group holds one bar per platform, so how many groups fit is a
-  // function of the cohort size, not just the query count. Splitting on query
-  // count alone let a wide cohort clamp its bars to a floor wider than the
-  // group itself, and each group then painted over its neighbours.
   const minGroupW = platforms.length * MIN_BAR_W + BAR_GAP;
   const perPanel = Math.max(1, Math.min(MAX_PER_PANEL, Math.floor((w - AXIS_W) / minGroupW)));
 
@@ -86,21 +71,12 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
   }
 
   function renderPanel(qids: string[], panelIdx: number) {
-    // Only positive timings contribute to the y-scale; null/0 represent
-    // "did not run" and render as a tiny hatched tick so they're visibly
-    // distinct from a genuine fast-but-present result.
 
     const n = qids.length;
     const groupW = (w - AXIS_W) / n;
     const innerW = groupW - BAR_GAP;
-    // The minimum bar width is a preference, not a guarantee: a cohort large
-    // enough that even one query group cannot hold a bar per platform at that
-    // width would otherwise overrun its own slot and paint over its neighbours.
-    // Past that point the bars go thin rather than the groups colliding.
     const idealBarW = innerW / platforms.length;
     const barW = idealBarW >= MIN_BAR_W ? Math.floor(idealBarW) : Math.max(0.5, idealBarW);
-    // A label needs roughly this much room at 9 units; below it, label every
-    // other group rather than overprinting them.
     const labelStride = groupW >= 22 ? 1 : Math.ceil(22 / Math.max(groupW, 1));
 
     return (
@@ -118,7 +94,6 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
           role="img"
           aria-label={`Query latency histogram${panels.length > 1 ? ` (panel ${panelIdx + 1})` : ""}`}
         >
-          {/* Y-axis guides */}
           {[0, 0.25, 0.5, 0.75, 1].map((f) => {
             const y = PADDING_TOP + (1 - f) * CHART_H;
             return (
@@ -133,7 +108,6 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
             );
           })}
 
-          {/* Bars */}
           {qids.map((qid, qi) => {
             const groupX = AXIS_W + qi * groupW + BAR_GAP / 2;
             return (
@@ -147,8 +121,6 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
                     const reason = formatTimingExclusion(
                       p.timing_eligibility[qid]?.timing_exclusion_reason ?? (raw === 0 ? "zero_timing" : "missing_timing"),
                     );
-                    // Render a 2px dash at the x-axis so "missing" reads
-                    // as distinct from "fast but present".
                     return (
                       <line
                         key={p.result_id}
@@ -194,7 +166,6 @@ export function QueryHistogram({ summary, preserveOrder = false }: Props) {
             );
           })}
 
-          {/* Axes */}
           <line x1={AXIS_W} y1={PADDING_TOP} x2={AXIS_W} y2={PADDING_TOP + CHART_H} stroke="var(--bb-chart-grid)" stroke-width={1} />
           <line
             x1={AXIS_W}

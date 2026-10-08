@@ -1,20 +1,8 @@
-"""TPC-DS parameter extraction from dsqgen binary output.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Extracts substitution parameter values from dsqgen-generated SQL so that DataFrame
-query implementations can use identical parameters to their SQL counterparts for
-a given seed, scale factor, and stream combination.
+# TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
 
-The extraction approach is generic: rather than writing per-query extractors for all
-99 TPC-DS queries, we compare dsqgen output for the requested seed against the
-default seed, and produce an override dict that maps query_id -> param_dict
-matching the structure of TPCDS_DEFAULT_PARAMS.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark(TM) DS (TPC-DS) - Copyright (c) Transaction Processing Performance Council
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -24,10 +12,6 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# Common parameter patterns found across TPC-DS queries.
-# Each pattern maps a regex against SQL text to extract a (key, value) pair.
-# These are applied generically to any query - the TPCDS_DEFAULT_PARAMS dict
-# determines which keys are relevant for each query_id.
 
 _YEAR_PATTERN = re.compile(r"d_year\s*=\s*(\d{4})", re.IGNORECASE)
 _MONTH_PATTERN = re.compile(r"d_moy\s*=\s*(\d+)", re.IGNORECASE)
@@ -62,8 +46,6 @@ _MONTH_SEQ_PATTERN = re.compile(r"d_month_seq\s*=\s*(\d+)", re.IGNORECASE)
 _GMT_OFFSET_PATTERN = re.compile(r"s_gmt_offset\s*=\s*(-?\d+(?:\.\d+)?)", re.IGNORECASE)
 _INCOME_BAND_PATTERN = re.compile(r"ib_lower_bound\s*[>=]+\s*(\d+)", re.IGNORECASE)
 
-# Keys intentionally unsupported by generic extraction. These rely on richer
-# dsqgen logic or contextual expressions that are out-of-scope for this layer.
 _INTENTIONALLY_UNSUPPORTED_KEYS = {
     "agg_field",
     "agg_column",
@@ -137,25 +119,6 @@ def extract_tpcds_parameters(
     stream_id: Optional[int] = None,
     query_ids: list[int] | None = None,
 ) -> dict[int, dict[str, Any]]:
-    """Extract TPC-DS substitution parameters from dsqgen output.
-
-    Runs the dsqgen binary with the given seed/SF/stream and parses the
-    generated SQL to extract parameter values. Only extracts parameters
-    for keys that exist in TPCDS_DEFAULT_PARAMS.
-
-    Args:
-        seed: Random number generator seed.
-        scale_factor: Scale factor for parameter calculations.
-        stream_id: Stream identifier for multi-stream execution.
-        query_ids: Specific queries to extract (default: all 1-99).
-
-    Returns:
-        Dict mapping query_id to parameter dict. Only includes queries
-        where extraction succeeded and produced non-empty results.
-
-    Raises:
-        RuntimeError: If dsqgen binary is not available.
-    """
     from benchbox.core.tpcds.c_tools import DSQGenBinary
     from benchbox.core.tpcds.dataframe_queries.parameters import TPCDS_DEFAULT_PARAMS
 
@@ -166,7 +129,6 @@ def extract_tpcds_parameters(
         query_ids = list(range(1, 100))
 
     for query_id in query_ids:
-        # Skip queries with no default params
         if query_id not in TPCDS_DEFAULT_PARAMS:
             continue
 
@@ -186,35 +148,27 @@ def extract_tpcds_parameters(
 
 
 def _parse_int_g1(m: re.Match) -> int:
-    """Parse group(1) as int."""
     return int(m.group(1))
 
 
 def _parse_float_g1(m: re.Match) -> float:
-    """Parse group(1) as float."""
     return float(m.group(1))
 
 
 def _parse_str_g1(m: re.Match) -> str:
-    """Return group(1) as-is."""
     return m.group(1)
 
 
 def _parse_int_list_g1(m: re.Match) -> list[int] | None:
-    """Parse group(1) as a list of ints; return None if empty."""
     result = _parse_int_list(m.group(1))
     return result if result else None
 
 
 def _parse_str_list_g1(m: re.Match) -> list[str] | None:
-    """Parse group(1) as a list of quoted strings; return None if empty."""
     result = _parse_str_list(m.group(1))
     return result if result else None
 
 
-# Declarative extraction table: (key_name, compiled_pattern, parser_fn).
-# The parser receives the Match object and returns a value to store.
-# A None return means "skip this key" (e.g. empty list).
 _PARAM_EXTRACTORS: list[tuple[str, re.Pattern[str], Any]] = [
     ("year", _YEAR_PATTERN, _parse_int_g1),
     ("month", _MONTH_PATTERN, _parse_int_g1),
@@ -244,15 +198,11 @@ _PARAM_EXTRACTORS: list[tuple[str, re.Pattern[str], Any]] = [
     ("income_band", _INCOME_BAND_PATTERN, _parse_int_g1),
 ]
 
-# Alias groups: one pattern populates multiple output keys.
-# (alias_keys, compiled_pattern, parser_fn)
 _PARAM_ALIAS_EXTRACTORS: list[tuple[tuple[str, ...], re.Pattern[str], Any]] = [
     (("categories", "item_categories"), _CATEGORIES_PATTERN, _parse_str_list_g1),
     (("manufact_ids", "manufacturer_ids"), _MANUFACTURERS_PATTERN, _parse_int_list_g1),
 ]
 
-# Preferred-key groups: the first matching key in expected_keys wins.
-# (candidate_keys, compiled_pattern, parser_fn)
 _PARAM_PREFERRED_EXTRACTORS: list[tuple[tuple[str, ...], re.Pattern[str], Any]] = [
     (("cd_gender", "gender"), _GENDER_PATTERN, _parse_str_g1),
     (("cd_marital_status", "marital_status"), _MARITAL_PATTERN, _parse_str_g1),
@@ -261,10 +211,6 @@ _PARAM_PREFERRED_EXTRACTORS: list[tuple[tuple[str, ...], re.Pattern[str], Any]] 
 
 
 def _extract_common_params(sql: str, expected_keys: set[str]) -> dict[str, Any]:
-    """Extract parameters from SQL using common TPC-DS patterns.
-
-    Only extracts values for keys that are expected (present in defaults).
-    """
     result: dict[str, Any] = {}
 
     _extract_simple_params(sql, expected_keys, result)
@@ -276,7 +222,6 @@ def _extract_common_params(sql: str, expected_keys: set[str]) -> dict[str, Any]:
 
 
 def _extract_simple_params(sql: str, expected_keys: set[str], result: dict[str, Any]) -> None:
-    """Extract simple 1:1 key -> pattern -> parser parameters."""
     for key, pattern, parser in _PARAM_EXTRACTORS:
         if key not in expected_keys:
             continue
@@ -288,7 +233,6 @@ def _extract_simple_params(sql: str, expected_keys: set[str], result: dict[str, 
 
 
 def _extract_alias_params(sql: str, expected_keys: set[str], result: dict[str, Any]) -> None:
-    """Extract alias groups: one pattern populates all matching expected keys."""
     for alias_keys, pattern, parser in _PARAM_ALIAS_EXTRACTORS:
         if not any(k in expected_keys for k in alias_keys):
             continue
@@ -302,7 +246,6 @@ def _extract_alias_params(sql: str, expected_keys: set[str], result: dict[str, A
 
 
 def _extract_preferred_params(sql: str, expected_keys: set[str], result: dict[str, Any]) -> None:
-    """Extract preferred-key groups: first matching expected key gets the value."""
     for candidates, pattern, parser in _PARAM_PREFERRED_EXTRACTORS:
         if not any(k in expected_keys for k in candidates):
             continue
@@ -317,7 +260,6 @@ def _extract_preferred_params(sql: str, expected_keys: set[str], result: dict[st
 
 
 def _extract_hour_ranges(sql: str, expected_keys: set[str], result: dict[str, Any]) -> None:
-    """Extract hour range parameters using finditer (multi-match extraction)."""
     if "hours" not in expected_keys:
         return
     ranges = [(int(match.group(1)), int(match.group(2))) for match in _HOUR_RANGE_PATTERN.finditer(sql)]
@@ -326,12 +268,10 @@ def _extract_hour_ranges(sql: str, expected_keys: set[str], result: dict[str, An
 
 
 def get_supported_parameter_keys() -> set[str]:
-    """Return parameter keys currently supported by generic extraction."""
     return set(_SUPPORTED_PARAMETER_KEYS)
 
 
 def get_unsupported_parameter_keys() -> set[str]:
-    """Return known parameter keys that currently fall back to static defaults."""
     from benchbox.core.tpcds.dataframe_queries.parameters import TPCDS_DEFAULT_PARAMS
 
     all_keys = {key for query_params in TPCDS_DEFAULT_PARAMS.values() for key in query_params}
@@ -339,7 +279,6 @@ def get_unsupported_parameter_keys() -> set[str]:
 
 
 def get_parameter_key_coverage() -> list[dict[str, Any]]:
-    """Return key coverage inventory ranked by query impact and support status."""
     from benchbox.core.tpcds.dataframe_queries.parameters import TPCDS_DEFAULT_PARAMS
 
     counts: dict[str, int] = {}
@@ -360,8 +299,6 @@ def get_parameter_key_coverage() -> list[dict[str, Any]]:
     return sorted(coverage, key=lambda item: (-item["queries"], item["key"]))
 
 
-# -- Cache -----------------------------------------------------------------
-
 _cache: dict[tuple[int, float, Optional[int]], dict[int, dict[str, Any]]] = {}
 
 
@@ -372,23 +309,6 @@ def get_tpcds_extracted_parameters(
     *,
     use_cache: bool = True,
 ) -> dict[int, dict[str, Any]]:
-    """Get TPC-DS parameters extracted from dsqgen, with caching.
-
-    This is the primary entry point. Results are cached per
-    (seed, scale_factor, stream_id) to avoid redundant binary invocations.
-
-    Args:
-        seed: Random number generator seed.
-        scale_factor: Scale factor for parameter calculations.
-        stream_id: Stream identifier.
-        use_cache: Whether to use cached results.
-
-    Returns:
-        Dict mapping query_id to parameter dict.
-
-    Raises:
-        RuntimeError: If dsqgen binary is not available.
-    """
     cache_key = (seed, scale_factor, stream_id)
     if use_cache and cache_key in _cache:
         return _cache[cache_key]
@@ -400,5 +320,4 @@ def get_tpcds_extracted_parameters(
 
 
 def clear_cache() -> None:
-    """Clear the parameter extraction cache."""
     _cache.clear()

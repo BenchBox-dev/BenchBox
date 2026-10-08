@@ -204,17 +204,14 @@ Two things we would revisit:
 ## Try it yourself
 
 ```bash
-# Generate at SF=1 and check the resulting data size for an affected benchmark
 $ benchbox run --platform duckdb --benchmark coffeeshop --scale 1 --phases generate
 
-# Compare to a spec-defined benchmark
 $ benchbox run --platform duckdb --benchmark tpch --scale 1 --phases generate
 
-# Preview what a run would do without executing it
 $ benchbox run --dry-run ./preview --platform duckdb --benchmark amplab --scale 1
 ```
 
-The `--phases generate` flag stops after data generation, which is useful for sanity-checking output sizes before running queries.
+The first command generates data at SF=1 for an affected benchmark so you can check the resulting data size. The second does the same for a spec-defined benchmark for comparison. The third previews what a run would do without executing it. The `--phases generate` flag stops after data generation, which is useful for sanity-checking output sizes before running queries.
 
 ---
 

@@ -53,29 +53,24 @@ previews without generating data or running queries.
 
 ### Complete DuckDB Example (Recommended)
 
-This example shows the complete workflow using DuckDB, the recommended database for BenchBox:
+This example shows the complete workflow using DuckDB, the recommended database for BenchBox. It uses an in-memory connection for speed, a scale factor of 0.01 (about a 10 MB dataset), DuckDB's efficient CSV reader to load data, and runs the first 5 queries:
 
 ```python
 import duckdb
 from benchbox import TPCH
 import time
 
-# Setup DuckDB connection (in-memory for speed)
 conn = duckdb.connect(":memory:")
 
-# Initialize TPC-H benchmark
-tpch = TPCH(scale_factor=0.01)  # 10MB dataset
+tpch = TPCH(scale_factor=0.01)
 
-# Generate data
 print("Generating TPC-H data...")
 data_files = tpch.generate_data()
 print(f"Generated {len(data_files)} tables")
 
-# Create database schema
 ddl = tpch.get_create_tables_sql()
 conn.execute(ddl)
 
-# Load data using DuckDB's efficient CSV reader
 print("Loading data into DuckDB...")
 for file_path in data_files:
     table_name = file_path.stem
@@ -85,9 +80,8 @@ for file_path in data_files:
     """)
     print(f"  Loaded {table_name}")
 
-# Run queries and measure performance
 print("\nExecuting TPC-H queries:")
-for query_id in range(1, 6):  # First 5 queries
+for query_id in range(1, 6):
     query_sql = tpch.get_query(query_id)
 
     start_time = time.time()
@@ -102,14 +96,14 @@ print("Benchmark complete!")
 
 ### Simple TPC-H Example
 
+The scale factor of 0.01 produces about a 10 MB dataset. The data file sizes are printed in MB:
+
 ```python
 from benchbox import TPCH
 import time
 
-# Initialize benchmark
-tpch = TPCH(scale_factor=0.01)  # 10MB dataset
+tpch = TPCH(scale_factor=0.01)
 
-# Generate data
 print("Generating TPC-H data...")
 start_time = time.time()
 data_files = tpch.generate_data()
@@ -117,11 +111,10 @@ generation_time = time.time() - start_time
 
 print(f"Generated {len(data_files)} tables in {generation_time:.2f} seconds")
 for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
-    file_size = file_path.stat().st_size / (1024 * 1024)  # MB
+    table_name = file_path.stem
+    file_size = file_path.stat().st_size / (1024 * 1024)
     print(f"  {table_name}: {file_size:.2f} MB")
 
-# Get sample queries
 print("\nSample queries:")
 for query_id in [1, 3, 6]:
     query = tpch.get_query(query_id)
@@ -133,14 +126,12 @@ for query_id in [1, 3, 6]:
 ```python
 from benchbox import TPCH, SSB, ReadPrimitives
 
-# Initialize different benchmarks
 benchmarks = {
     "TPC-H": TPCH(scale_factor=0.01),
     "SSB": SSB(scale_factor=0.01),
     "Primitives": ReadPrimitives(scale_factor=0.001)
 }
 
-# Compare characteristics
 print("Benchmark Comparison:")
 print(f"{'Benchmark':<12} {'Queries':<8} {'Tables':<8} {'Purpose'}")
 print("-" * 50)
@@ -162,17 +153,17 @@ for name, benchmark in benchmarks.items():
 
 ### Query Translation Example
 
+This example translates a query to several dialects, using supported platforms:
+
 ```python
 from benchbox import TPCH
 
 tpch = TPCH(scale_factor=0.01)
 
-# Get original query
 original_query = tpch.get_query(1)
 print("Original Query (ANSI SQL):")
 print(original_query[:200] + "...\n")
 
-# Translate to different dialects (using supported platforms)
 dialects = ["duckdb", "clickhouse", "snowflake", "bigquery"]
 
 for dialect in dialects:
@@ -189,17 +180,19 @@ During development and debugging, running full benchmark suites is time-prohibit
 
 ### CLI Usage
 
+The commands below do the following, in order:
+- Run a single query for debugging (about 5 seconds, compared with 11 minutes for the full TPC-H suite).
+- Run multiple queries in a specific order.
+- Debug a failing query with verbose output.
+- Test critical production queries only.
+
 ```bash
-# Run single query for debugging (5 seconds vs 11 minutes for full TPC-H)
 benchbox run --platform duckdb --benchmark tpch --queries "6" --phases power
 
-# Run multiple queries in specific order
 benchbox run --platform postgres --benchmark tpch --queries "1,6,17" --phases power
 
-# Debug failing query with verbose output
 benchbox run --platform duckdb --benchmark tpcds --queries "42" --verbose --phases power
 
-# Test critical production queries only
 benchbox run --platform clickhouse-local --benchmark tpch --queries "1,6,12,17" --phases power
 ```
 
@@ -211,24 +204,19 @@ The CLI `--queries` parameter maps to `query_subset` in the programmatic API:
 from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox import TPCH
 
-# Initialize benchmark and adapter
 tpch = TPCH(scale_factor=0.01)
 adapter = DuckDBAdapter()
 
-# Load data
 adapter.load_benchmark_data(tpch)
 
-# Configure selective query execution
 run_config = {
-    "query_subset": ["1", "6", "17"],  # Only run these queries
+    "query_subset": ["1", "6", "17"],
     "timeout": 60,
     "verbose": True
 }
 
-# Execute subset
 results = adapter.run_standard_queries(tpch, run_config)
 
-# Process results
 for result in results:
     print(f"Query {result['query_id']}: {result['execution_time']:.2f}s")
 ```
@@ -251,7 +239,7 @@ BenchBox provides advanced execution modes for systematic performance testing wi
 
 ### Power Run Iterations Example
 
-Execute multiple test iterations to gather statistical confidence:
+Execute multiple test iterations to gather statistical confidence. Power iterations are a plain loop over stream IDs. Each `TPCHPowerTest` run executes the 22 queries in that stream's permutation against a real connection and reports Power@Size. The loop runs 5 test iterations, and validation is off (`validation=False`) because answer sets exist for stream 0 only:
 
 ```python
 import statistics
@@ -261,13 +249,8 @@ import duckdb
 from benchbox import TPCH
 from benchbox.core.tpch.power_test import TPCHPowerTest
 
-# Set up TPC-H benchmark
 tpch = TPCH(scale_factor=0.01)
 
-# Power iterations are a plain loop over stream IDs: each TPCHPowerTest
-# run executes the 22 queries in that stream's permutation against a real
-# connection and reports Power@Size. (The former PowerRunExecutor wrapper
-# is removed; see adr-concurrency-public-api-reconciliation.)
 connection = duckdb.connect(":memory:")
 data_files = tpch.generate_data()
 connection.execute(tpch.get_create_tables_sql())
@@ -280,20 +263,19 @@ for file_path in data_files:
 
 print("Starting power run with multiple iterations...")
 power_values = []
-for stream_id in range(5):  # 5 test iterations
+for stream_id in range(5):
     power_test = TPCHPowerTest(
         benchmark=tpch,
         connection=connection,
         scale_factor=0.01,
         stream_id=stream_id,
         verbose=True,
-        validation=False,  # answer sets exist for stream 0 only
+        validation=False,
     )
     iteration = power_test.run()
     assert iteration.success, iteration.errors
     power_values.append(iteration.power_at_size)
 
-# Display statistical results
 print(f"\nPower Run Results:")
 print(f"Total iterations: {len(power_values)}")
 print(f"\nStatistical Analysis:")
@@ -304,7 +286,6 @@ if len(power_values) > 1:
 print(f"Min Power@Size: {min(power_values):.2f}")
 print(f"Max Power@Size: {max(power_values):.2f}")
 
-# Access individual iteration results
 print(f"\n Per-Iteration Results:")
 for i, power_at_size in enumerate(power_values, 1):
     print(f"Iteration {i}: Power@Size={power_at_size:.2f}")
@@ -312,7 +293,7 @@ for i, power_at_size in enumerate(power_values, 1):
 
 ### Concurrent Query Execution Example
 
-Execute queries concurrently to test throughput and scalability:
+Execute queries concurrently to test throughput and scalability. One throughput test owns all of its streams: the connection factory hands each stream its session, and `StreamRunner` executes them concurrently with fail-closed accounting. The example generates and loads the data before opening throughput sessions, and runs 3 concurrent streams (`num_streams=3`):
 
 ```python
 import duckdb
@@ -320,17 +301,10 @@ import duckdb
 from benchbox import TPCH
 from benchbox.core.tpch.throughput_test import TPCHThroughputTest
 
-# Set up benchmark
 tpch = TPCH(scale_factor=0.01)
 
-# One throughput test owns all of its streams: the connection factory
-# hands each stream its session, and StreamRunner executes them
-# concurrently with fail-closed accounting. (The former
-# ConcurrentQueryExecutor wrapper is removed; see
-# adr-concurrency-public-api-reconciliation.)
 connection = duckdb.connect(":memory:")
 
-# Generate and load the data before opening throughput sessions.
 data_files = tpch.generate_data()
 connection.execute(tpch.get_create_tables_sql())
 for file_path in data_files:
@@ -344,21 +318,18 @@ throughput_test = TPCHThroughputTest(
     benchmark=tpch,
     connection_factory=lambda: connection.cursor(),
     scale_factor=0.01,
-    num_streams=3,  # Run 3 concurrent streams
+    num_streams=3,
     verbose=True,
 )
 
-# Execute concurrent queries
 print("Starting concurrent query execution...")
 result = throughput_test.run()
 assert result.success, result.errors
 
-# Display throughput results
 print(f"\nConcurrent Query Results:")
 print(f"Streams: {result.streams_successful}/{result.streams_executed} successful")
 print(f"Total duration: {result.total_time:.3f}s")
 
-# Per-stream analysis
 print(f"\n Per-Stream Results:")
 for stream_result in result.stream_results:
     print(f"Stream {stream_result.stream_id}: "
@@ -375,7 +346,6 @@ from benchbox.utils import ExecutionConfigHelper
 
 config_helper = ExecutionConfigHelper()
 
-# Show all available profiles
 profiles = ['quick', 'standard', 'thorough', 'stress']
 
 for profile_name in profiles:
@@ -391,11 +361,9 @@ for profile_name in profiles:
     if concurrent_config['enabled']:
         print(f"  Max concurrent streams: {concurrent_config['max_concurrent']}")
 
-# Apply a profile
 print(f"\nApplying 'thorough' profile...")
 config_helper.apply_performance_profile('thorough')
 
-# View current settings
 summary = config_helper.get_execution_summary()
 print(f"Current power run settings: {summary['power_run']['total_iterations']} total iterations")
 print(f"Current concurrent settings: {summary['concurrent_queries']['max_streams']} max streams")
@@ -409,20 +377,16 @@ Automatically optimize settings based on system resources:
 import psutil
 from benchbox.utils import ExecutionConfigHelper
 
-# Create config helper
 config_helper = ExecutionConfigHelper()
 
-# Get system specifications
 cpu_cores = psutil.cpu_count()
 memory_gb = psutil.virtual_memory().total / (1024**3)
 
 print(f"System specs: {cpu_cores} CPU cores, {memory_gb:.1f}GB RAM")
 
-# Apply system optimization
 print("Optimizing configuration for system resources...")
 config_helper.optimize_for_system(cpu_cores=cpu_cores, memory_gb=memory_gb)
 
-# Show configured settings
 summary = config_helper.get_execution_summary()
 
 print(f"\nOptimized Settings:")
@@ -448,16 +412,13 @@ from benchbox.cli.config import ConfigManager
 from benchbox.utils import ExecutionConfigHelper, create_sample_execution_config
 from pathlib import Path
 
-# Create sample configuration file
 sample_path = Path("sample_benchbox_config.yaml")
 print(f"Creating sample configuration at: {sample_path}")
 create_sample_execution_config(sample_path)
 
-# Load configuration
 config_manager = ConfigManager(config_path=sample_path)
 config_helper = ExecutionConfigHelper(config_manager)
 
-# Modify power run settings
 print("Configuring custom power run settings...")
 power_settings = config_helper.get_power_run_settings()
 power_settings.iterations = 7
@@ -465,7 +426,6 @@ power_settings.warm_up_iterations = 2
 power_settings.timeout_per_iteration_minutes = 90
 config_helper.update_power_run_settings(power_settings)
 
-# Modify concurrent query settings
 print("Configuring custom concurrent query settings...")
 concurrent_settings = config_helper.get_concurrent_queries_settings()
 concurrent_settings.enabled = True
@@ -473,19 +433,16 @@ concurrent_settings.max_concurrent = 4
 concurrent_settings.query_timeout_seconds = 450
 config_helper.update_concurrent_queries_settings(concurrent_settings)
 
-# Validate configuration
 print("Validating configuration...")
 is_valid = config_helper.validate_execution_config()
 if is_valid:
     print("✅ Configuration is valid")
 
-    # Save configuration
     config_helper.save_config()
     print(f"✅ Configuration saved to {sample_path}")
 else:
     print("❌ Configuration validation failed")
 
-# Display execution summary
 summary = config_helper.get_execution_summary()
 print(f"\nExecution Summary:")
 print(f"Power Run: {summary['power_run']['total_iterations']} total iterations, "
@@ -493,13 +450,12 @@ print(f"Power Run: {summary['power_run']['total_iterations']} total iterations, 
 print(f"Concurrent: {'enabled' if summary['concurrent_queries']['enabled'] else 'disabled'}, "
       f"{summary['concurrent_queries']['max_streams']} max streams")
 
-# Cleanup
 sample_path.unlink(missing_ok=True)
 ```
 
 ### Complete Workflow Example
 
-Combine all features for systematic performance testing:
+Combine all features for systematic performance testing. The example applies the `standard` profile (balanced testing), then optimizes for the current system. Its three phases are power run testing (multiple iterations for statistical confidence), concurrent query testing (throughput and scalability), and a comprehensive analysis:
 
 ```python
 import statistics
@@ -511,19 +467,15 @@ from benchbox.core.tpch.power_test import TPCHPowerTest
 from benchbox.core.tpch.throughput_test import TPCHThroughputTest
 from benchbox.utils import ExecutionConfigHelper
 
-# Initialize configuration
 config_helper = ExecutionConfigHelper()
 
-# Apply appropriate profile based on testing goals
-config_helper.apply_performance_profile('standard')  # Balanced testing
+config_helper.apply_performance_profile('standard')
 
-# Optimize for current system
 import psutil
 cpu_cores = psutil.cpu_count()
 memory_gb = psutil.virtual_memory().total / (1024**3)
 config_helper.optimize_for_system(cpu_cores, memory_gb)
 
-# Set up benchmark
 tpch = TPCH(scale_factor=0.01)
 connection = duckdb.connect(":memory:")
 data_files = tpch.generate_data()
@@ -537,7 +489,6 @@ for file_path in data_files:
 
 print("Starting systematic benchmark testing...")
 
-# 1. Power Run Testing (Multiple iterations for statistical confidence)
 print("\nPhase 1: Power Run Testing")
 power_values = []
 for stream_id in range(3):
@@ -553,7 +504,6 @@ print(f"  - Average Power@Size: {statistics.mean(power_values):.2f}")
 print(f"  - Std Deviation: {statistics.stdev(power_values):.2f}")
 print(f"  - Confidence: {len(power_values)}/{len(power_values)} iterations")
 
-# 2. Concurrent Query Testing (Throughput and scalability)
 print("\nPhase 2: Concurrent Query Testing")
 throughput_test = TPCHThroughputTest(benchmark=tpch,
                                      connection_factory=lambda: connection.cursor(),
@@ -570,7 +520,6 @@ print(f"  - Streams: {concurrent_result.streams_successful}/{concurrent_result.s
 print(f"  - Success Rate: {successful}/{executed}")
 print(f"  - Concurrent Streams: {len(concurrent_result.stream_results)}")
 
-# 3. Comprehensive Analysis
 print("\n Phase 3: Performance Analysis")
 print(f"Benchmark Summary:")
 print(f"  - Scale Factor: 0.01")
@@ -595,7 +544,6 @@ from benchbox.cli.system import SystemProfiler
 from benchbox.cli.database import DatabaseConfig
 from benchbox.core.config import BenchmarkConfig
 
-# Setup and execute dry run
 dry_run = DryRunExecutor(Path("./preview"))
 result = dry_run.execute_dry_run(
     benchmark_config=BenchmarkConfig(name="tpch", scale_factor=0.01),
@@ -611,21 +559,20 @@ print(f"Memory estimate: {result.resource_estimates.estimated_memory_mb} MB")
 
 ### CLI Dry Run Examples
 
+The examples below are a basic TPC-H dry run, a dry run with tuning enabled, and a preview of multiple benchmarks:
+
 ```bash
-# Basic TPC-H dry run
 benchbox run --dry-run ./tpch_preview \
   --platform duckdb \
   --benchmark tpch \
   --scale 0.1
 
-# Dry run with tuning enabled
 benchbox run --dry-run ./tpcds_tuned_preview \
   --platform duckdb \
   --benchmark tpcds \
   --scale 0.01 \
   --tuning
 
-# Preview multiple benchmarks
 for benchmark in tpch tpcds ssb primitives; do
   echo "Previewing $benchmark..."
   benchbox run --dry-run ./preview_${benchmark} \
@@ -637,6 +584,8 @@ done
 
 ### Dry Run Output Analysis
 
+Usage: `analyze_dry_run_output("./tpch_preview")`.
+
 ```python
 import json
 from pathlib import Path
@@ -645,20 +594,17 @@ def analyze_dry_run_output(dry_run_dir: str):
     with open(Path(dry_run_dir) / "summary.json", 'r') as f:
         summary = json.load(f)
 
-    # Extract key information
     system = summary["system_profile"]
     benchmark = summary["benchmark_config"]
 
     print(f"System: {system['os']} ({system['memory_gb']:.1f} GB)")
     print(f"Benchmark: {benchmark['name']} (scale: {benchmark['scale_factor']})")
 
-    # Analyze queries
     queries_dir = Path(dry_run_dir) / "queries"
     if queries_dir.exists():
         query_files = list(queries_dir.glob("*.sql"))
         print(f"Extracted {len(query_files)} queries")
 
-        # Analyze complexity for first few queries
         for query_file in query_files[:3]:
             with open(query_file, 'r') as f:
                 content = f.read()
@@ -666,19 +612,19 @@ def analyze_dry_run_output(dry_run_dir: str):
                 complexity = "High" if joins > 3 else "Medium" if joins > 1 else "Low"
                 print(f"  {query_file.name}: {joins} joins, complexity: {complexity}")
 
-# Usage: analyze_dry_run_output("./tpch_preview")
 ```
 
 **Full example:** `examples/dry_run/analyze_dry_run_output.py`
 
 ### Query Extraction and Validation
 
+The `lint_with_sqlfluff` function requires `pip install sqlfluff`.
+
 ```python
 from pathlib import Path
 import subprocess
 
 def validate_extracted_queries(dry_run_dir: str, target_dialect: str = "duckdb"):
-    """Basic validation of extracted SQL queries."""
     queries_dir = Path(dry_run_dir) / "queries"
     valid_queries = 0
 
@@ -686,7 +632,6 @@ def validate_extracted_queries(dry_run_dir: str, target_dialect: str = "duckdb")
         with open(query_file, 'r') as f:
             content = f.read()
 
-        # Basic checks
         if (content.strip() and
             'SELECT' in content.upper() and
             content.count('(') == content.count(')')):
@@ -698,7 +643,6 @@ def validate_extracted_queries(dry_run_dir: str, target_dialect: str = "duckdb")
     print(f"Valid queries: {valid_queries}/{len(list(queries_dir.glob('*.sql')))}")
 
 def lint_with_sqlfluff(dry_run_dir: str):
-    """Lint queries with sqlfluff (requires: pip install sqlfluff)."""
     queries_dir = Path(dry_run_dir) / "queries"
     for query_file in queries_dir.glob("*.sql"):
         result = subprocess.run([
@@ -718,16 +662,13 @@ import json
 from pathlib import Path
 
 def generate_benchmark_documentation(benchmark_name: str, output_dir: str = "./docs"):
-    """Generate benchmark documentation from dry run output."""
     dry_run_dir = f"./temp_dry_run_{benchmark_name}"
 
-    # Execute dry run
     subprocess.run([
         "benchbox", "run", "--dry-run", dry_run_dir,
         "--platform", "duckdb", "--benchmark", benchmark_name, "--scale", "0.01"
     ], check=True)
 
-    # Load results and generate markdown
     with open(Path(dry_run_dir) / "summary.json", 'r') as f:
         summary = json.load(f)
 
@@ -739,7 +680,6 @@ def generate_benchmark_documentation(benchmark_name: str, output_dir: str = "./d
         f"- **Table Count**: {len(summary.get('schema_info', {}).get('tables', {}))}"
     ]
 
-    # Add resource requirements if available
     if "resource_estimates" in summary:
         resources = summary["resource_estimates"]
         doc_content.extend([
@@ -748,18 +688,15 @@ def generate_benchmark_documentation(benchmark_name: str, output_dir: str = "./d
             f"- **Storage**: ~{resources.get('estimated_storage_mb', 'N/A')} MB"
         ])
 
-    # Write documentation
     doc_file = Path(output_dir) / f"{benchmark_name.lower()}_benchmark.md"
     doc_file.parent.mkdir(parents=True, exist_ok=True)
     doc_file.write_text('\n'.join(doc_content))
 
-    # Cleanup
     import shutil
     shutil.rmtree(dry_run_dir)
 
     return doc_file
 
-# Generate docs for multiple benchmarks
 for benchmark in ["tpch", "primitives", "ssb"]:
     generate_benchmark_documentation(benchmark, "./generated_docs")
 ```
@@ -775,7 +712,6 @@ import sys
 from pathlib import Path
 
 def validate_benchmark_changes():
-    """Validate critical benchmarks using dry run in CI/CD."""
     critical_benchmarks = [
         {"name": "tpch", "scale": 0.001},
         {"name": "primitives", "scale": 0.001},
@@ -789,7 +725,6 @@ def validate_benchmark_changes():
         dry_run_dir = f"./ci_validation_{benchmark['name']}"
 
         try:
-            # Run dry run
             subprocess.run([
                 "benchbox", "run", "--dry-run", dry_run_dir,
                 "--platform", "duckdb",
@@ -797,7 +732,6 @@ def validate_benchmark_changes():
                 "--scale", str(benchmark['scale'])
             ], capture_output=True, text=True, check=True)
 
-            # Validate results
             with open(Path(dry_run_dir) / "summary.json", 'r') as f:
                 summary = json.load(f)
 
@@ -822,12 +756,10 @@ def validate_benchmark_changes():
             validation_results.append({"benchmark": benchmark['name'], "passed": False})
             print(f"  ❌ Error: {e}")
         finally:
-            # Cleanup
             import shutil
             if Path(dry_run_dir).exists():
                 shutil.rmtree(dry_run_dir)
 
-    # Check results
     passed = all(r['passed'] for r in validation_results)
     print(f"Validation {'✅ PASSED' if passed else '❌ FAILED'}")
     return passed
@@ -844,35 +776,32 @@ if __name__ == "__main__":
 
 ### DuckDB Complete Example
 
+This example uses a scale factor of 0.1 (about a 100 MB dataset):
+
 ```python
 import duckdb
 from benchbox import TPCH
 import time
 
 def benchmark_duckdb_tpch():
-    """Complete TPC-H benchmark with DuckDB."""
 
-    # Setup
     conn = duckdb.connect(":memory:")
-    tpch = TPCH(scale_factor=0.1)  # 100MB dataset
+    tpch = TPCH(scale_factor=0.1)
 
     print("Setting up TPC-H benchmark with DuckDB...")
 
-    # Generate data
     print("1. Generating data...")
     data_files = tpch.generate_data()
 
-    # Create schema
     print("2. Creating tables...")
     schema_sql = tpch.get_create_tables_sql()
     for statement in schema_sql.split(';'):
         if statement.strip():
             conn.execute(statement)
 
-    # Load data
     print("3. Loading data...")
     for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+        table_name = file_path.stem
         start_load = time.time()
         conn.execute(f"""
             INSERT INTO {table_name}
@@ -880,11 +809,9 @@ def benchmark_duckdb_tpch():
         """)
         load_time = time.time() - start_load
 
-        # Get row count
         row_count = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
         print(f"   {table_name}: {row_count:,} rows ({load_time:.2f}s)")
 
-    # Run benchmark queries
     print("4. Running TPC-H queries...")
     results = {}
 
@@ -912,7 +839,6 @@ def benchmark_duckdb_tpch():
             }
             print(f" FAILED: {e}")
 
-    # Summary
     successful_queries = [q for q, r in results.items() if r["success"]]
     total_time = sum(r["execution_time"] for r in results.values() if r["success"])
 
@@ -923,7 +849,6 @@ def benchmark_duckdb_tpch():
 
     return results
 
-# Run the benchmark
 if __name__ == "__main__":
     results = benchmark_duckdb_tpch()
 ```
@@ -937,6 +862,8 @@ if __name__ == "__main__":
 
 ### ClickHouse Integration Example
 
+The example loads data with ClickHouse's optimized CSV loading (`INSERT ... FORMAT CSV`), then optimizes the tables and tests a query.
+
 > **Note**: For PostgreSQL/MySQL integration examples, see the [Development Roadmap](../development/roadmap.md) - platform adapters are planned.
 
 ```python
@@ -945,48 +872,39 @@ from benchbox import TPCH
 from pathlib import Path
 
 def setup_clickhouse_tpch(host: str = 'localhost', port: int = 9000):
-    """Setup TPC-H benchmark in ClickHouse."""
 
-    # Connect to ClickHouse
     client = Client(host=host, port=port)
 
     tpch = TPCH(scale_factor=0.01)
 
     try:
-        # Generate data
         print("Generating TPC-H data...")
         data_files = tpch.generate_data()
 
-        # Create database
         print("Creating ClickHouse database...")
         client.execute("CREATE DATABASE IF NOT EXISTS benchbox")
         client.execute("USE benchbox")
 
-        # Create tables
         print("Creating ClickHouse schema...")
         schema_sql = tpch.get_create_tables_sql(dialect="clickhouse")
         for statement in schema_sql.split(';'):
             if statement.strip():
                 client.execute(statement)
 
-        # Load data
         print("Loading data into ClickHouse...")
         for file_path in data_files:
-            table_name = file_path.stem  # Get filename without extension
+            table_name = file_path.stem
             print(f"  Loading {table_name}...")
 
-            # ClickHouse optimized CSV loading
             with open(file_path, 'rb') as f:
                 client.execute(
                     f"INSERT INTO {table_name} FORMAT CSV",
                     f.read()
                 )
 
-            # Get row count
             row_count = client.execute(f"SELECT COUNT(*) FROM {table_name}")[0][0]
             print(f"    {row_count:,} rows loaded")
 
-        # Optimize tables
         print("Optimizing tables...")
         for file_path in data_files:
             table_name = file_path.stem
@@ -994,7 +912,6 @@ def setup_clickhouse_tpch(host: str = 'localhost', port: int = 9000):
 
         print("ClickHouse TPC-H setup complete!")
 
-        # Test a query
         print("Testing Query 1...")
         query_1 = tpch.get_query(1, dialect="clickhouse")
         result = client.execute(query_1)
@@ -1004,7 +921,6 @@ def setup_clickhouse_tpch(host: str = 'localhost', port: int = 9000):
         print(f"Error: {e}")
         raise
 
-# Usage
 if __name__ == "__main__":
     setup_clickhouse_tpch(host='localhost', port=9000)
 ```
@@ -1013,6 +929,8 @@ if __name__ == "__main__":
 
 ### SQLite Example with Performance Measurement
 
+The example runs a subset of queries because SQLite may not support all TPC-H features. The queries `[1, 3, 6, 12]` are simpler ones that work well with SQLite:
+
 ```python
 import sqlite3
 from benchbox import TPCH
@@ -1020,40 +938,32 @@ import time
 import csv
 
 def benchmark_sqlite_tpch():
-    """TPC-H benchmark with SQLite and performance measurement."""
 
-    # Setup
     conn = sqlite3.connect(":memory:")
     cursor = conn.cursor()
     tpch = TPCH(scale_factor=0.01)
 
-    # Generate and load data
     print("Setting up TPC-H in SQLite...")
     data_files = tpch.generate_data()
 
-    # Create tables
     schema_sql = tpch.get_create_tables_sql()
     cursor.executescript(schema_sql)
 
-    # Load data with progress tracking
     total_rows = 0
     for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+        table_name = file_path.stem
         print(f"Loading {table_name}...", end="")
         start_time = time.time()
 
         with open(file_path, 'r') as f:
             reader = csv.reader(f, delimiter='|')
 
-            # Get column info
             cursor.execute(f"PRAGMA table_info({table_name})")
             columns = [col[1] for col in cursor.fetchall()]
             placeholders = ','.join(['?' for _ in columns])
 
-            # Insert data
             rows_inserted = 0
             for row in reader:
-                # Handle empty values
                 row = [None if x == '' else x for x in row]
                 cursor.execute(f"INSERT INTO {table_name} VALUES ({placeholders})", row)
                 rows_inserted += 1
@@ -1064,7 +974,6 @@ def benchmark_sqlite_tpch():
 
     print(f"Total: {total_rows:,} rows loaded")
 
-    # Create indexes
     print("Creating indexes...")
     index_commands = [
         "CREATE INDEX idx_lineitem_orderkey ON lineitem(l_orderkey)",
@@ -1077,8 +986,7 @@ def benchmark_sqlite_tpch():
 
     conn.commit()
 
-    # Run subset of queries (SQLite may not support all TPC-H features)
-    test_queries = [1, 3, 6, 12]  # Simpler queries that work well with SQLite
+    test_queries = [1, 3, 6, 12]
     results = {}
 
     print("Running selected TPC-H queries...")
@@ -1110,7 +1018,6 @@ def benchmark_sqlite_tpch():
     conn.close()
     return results
 
-# Run benchmark
 if __name__ == "__main__":
     results = benchmark_sqlite_tpch()
 ```
@@ -1123,6 +1030,8 @@ if __name__ == "__main__":
 
 ### Comprehensive Performance Analysis
 
+In `run_scale_factor_analysis`, the data size is reported in MB. The load step is a placeholder: load the generated data into the connection between the two timing statements so that `data_load_time` measures it.
+
 ```python
 from benchbox import TPCH, ReadPrimitives
 import time
@@ -1134,19 +1043,16 @@ class PerformanceBenchmark:
         self.results = {}
 
     def measure_resource_usage(self, func):
-        """Decorator to measure CPU and memory usage."""
         def wrapper(*args, **kwargs):
-            # Initial measurements
             process = psutil.Process()
-            initial_memory = process.memory_info().rss / 1024 / 1024  # MB
+            initial_memory = process.memory_info().rss / 1024 / 1024
             initial_cpu_percent = process.cpu_percent()
 
             start_time = time.time()
             result = func(*args, **kwargs)
             end_time = time.time()
 
-            # Final measurements
-            final_memory = process.memory_info().rss / 1024 / 1024  # MB
+            final_memory = process.memory_info().rss / 1024 / 1024
             final_cpu_percent = process.cpu_percent()
 
             return {
@@ -1158,7 +1064,6 @@ class PerformanceBenchmark:
         return wrapper
 
     def run_query_performance_test(self, benchmark, connection, query_ids, iterations=5):
-        """Run performance test for specific queries."""
         results = {}
 
         for query_id in query_ids:
@@ -1168,7 +1073,6 @@ class PerformanceBenchmark:
             for i in range(iterations):
                 query_sql = benchmark.get_query(query_id)
 
-                # Measure execution
                 start_time = time.time()
                 cursor = connection.execute(query_sql)
                 result = cursor.fetchall()
@@ -1180,7 +1084,6 @@ class PerformanceBenchmark:
                     "row_count": len(result)
                 })
 
-            # Calculate statistics
             times = [r["execution_time"] for r in query_results]
             results[query_id] = {
                 "iterations": query_results,
@@ -1196,32 +1099,24 @@ class PerformanceBenchmark:
         return results
 
     def run_scale_factor_analysis(self, benchmark_class, scale_factors, connection_factory):
-        """Test performance across different scale factors."""
         scale_results = {}
 
         for sf in scale_factors:
             print(f"Testing scale factor {sf}...")
 
-            # Initialize benchmark
             benchmark = benchmark_class(scale_factor=sf)
 
-            # Generate data and measure time
             start_time = time.time()
             data_files = benchmark.generate_data()
             generation_time = time.time() - start_time
 
-            # Calculate total data size
-            total_size = sum(f.stat().st_size for f in data_files.values()) / 1024 / 1024  # MB
+            total_size = sum(f.stat().st_size for f in data_files.values()) / 1024 / 1024
 
-            # Setup database connection
             conn = connection_factory()
 
-            # Load data
             start_time = time.time()
-            # ... load data into connection ...
             load_time = time.time() - start_time
 
-            # Test representative queries
             query_results = self.run_query_performance_test(
                 benchmark, conn, [1, 3, 6], iterations=3
             )
@@ -1237,12 +1132,9 @@ class PerformanceBenchmark:
 
         return scale_results
 
-# Usage example
 def run_systematic_analysis():
-    """Run systematic performance analysis."""
     benchmark_tool = PerformanceBenchmark()
 
-    # Test different scale factors
     scale_factors = [0.001, 0.01, 0.1]
 
     def create_duckdb_connection():
@@ -1254,7 +1146,6 @@ def run_systematic_analysis():
         TPCH, scale_factors, create_duckdb_connection
     )
 
-    # Print summary
     print("\nScale Factor Analysis Results:")
     print(f"{'Scale Factor':<12} {'Data Size':<10} {'Gen Time':<10} {'Load Time':<10} {'Avg Query':<10}")
     print("-" * 60)
@@ -1273,6 +1164,8 @@ if __name__ == "__main__":
 
 ### Regression Testing Example
 
+The baseline uses 5 iterations per query, and the regression test uses 3 iterations. The script exits with an error code when regressions are detected, which makes it usable in CI/CD:
+
 ```python
 from benchbox import ReadPrimitives
 import json
@@ -1285,25 +1178,21 @@ class RegressionTester:
         self.baseline_data = self.load_baseline()
 
     def load_baseline(self):
-        """Load performance baseline from file."""
         if self.baseline_file.exists():
             with open(self.baseline_file, 'r') as f:
                 return json.load(f)
         return {}
 
     def save_baseline(self, data):
-        """Save performance baseline to file."""
         with open(self.baseline_file, 'w') as f:
             json.dump(data, f, indent=2)
 
     def create_baseline(self, connection_factory):
-        """Create new performance baseline."""
         print("Creating performance baseline...")
 
         read_primitives = ReadPrimitives(scale_factor=0.01)
         baseline_data = {}
 
-        # Test performance-critical queries
         critical_queries = [
             "aggregation_basic",
             "join_inner_simple",
@@ -1313,15 +1202,13 @@ class RegressionTester:
 
         conn = connection_factory()
 
-        # Setup data
         self._setup_primitives_data(primitives, conn)
 
-        # Measure baseline performance
         for query_id in critical_queries:
             print(f"  Measuring {query_id}...")
 
             times = []
-            for _ in range(5):  # 5 iterations for baseline
+            for _ in range(5):
                 query_sql = primitives.get_query(query_id)
 
                 start_time = time.time()
@@ -1346,7 +1233,6 @@ class RegressionTester:
         return baseline_data
 
     def run_regression_test(self, connection_factory, threshold=0.15):
-        """Run regression test against baseline."""
         if not self.baseline_data:
             raise ValueError("No baseline data available. Create baseline first.")
 
@@ -1355,7 +1241,6 @@ class RegressionTester:
         read_primitives = ReadPrimitives(scale_factor=0.01)
         conn = connection_factory()
 
-        # Setup data
         self._setup_primitives_data(primitives, conn)
 
         regressions = []
@@ -1364,9 +1249,8 @@ class RegressionTester:
         for query_id, baseline in self.baseline_data.items():
             print(f"  Testing {query_id}...")
 
-            # Measure current performance
             times = []
-            for _ in range(3):  # 3 iterations for regression test
+            for _ in range(3):
                 query_sql = primitives.get_query(query_id)
 
                 start_time = time.time()
@@ -1377,12 +1261,10 @@ class RegressionTester:
             current_avg = sum(times) / len(times)
             baseline_avg = baseline["avg_time"]
 
-            # Calculate change
             change_percent = (current_avg - baseline_avg) / baseline_avg * 100
 
             print(f"    Current: {current_avg:.3f}s (baseline: {baseline_avg:.3f}s, change: {change_percent:+.1f}%)")
 
-            # Check for regression or improvement
             if change_percent > threshold * 100:
                 regressions.append({
                     "query_id": query_id,
@@ -1400,7 +1282,6 @@ class RegressionTester:
 
         conn.close()
 
-        # Report results
         print(f"\nRegression Test Results:")
         print(f"  Threshold: ±{threshold*100:.0f}%")
 
@@ -1424,27 +1305,21 @@ class RegressionTester:
         }
 
     def _setup_primitives_data(self, primitives, conn):
-        """Setup primitives data in connection."""
-        # Generate and load data
         data_files = primitives.generate_data()
 
-        # Create schema
         schema_sql = primitives.get_create_tables_sql()
         for statement in schema_sql.split(';'):
             if statement.strip():
                 conn.execute(statement)
 
-        # Load data
         for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+            table_name = file_path.stem
             conn.execute(f"""
                 INSERT INTO {table_name}
                 SELECT * FROM read_csv('{file_path}', header=false, delimiter='|')
             """)
 
-# Usage example
 def run_regression_testing():
-    """Run regression testing workflow."""
 
     def create_duckdb_connection():
         import duckdb
@@ -1452,14 +1327,11 @@ def run_regression_testing():
 
     tester = RegressionTester()
 
-    # Create baseline if it doesn't exist
     if not tester.baseline_data:
         tester.create_baseline(create_duckdb_connection)
 
-    # Run regression test
     results = tester.run_regression_test(create_duckdb_connection)
 
-    # Exit with error code if regressions detected (for CI/CD)
     import sys
     if results["has_regressions"]:
         print("REGRESSION TEST FAILED")
@@ -1493,13 +1365,10 @@ FEATURE_PATTERNS = {
 }
 
 def analyze_tpcds_queries():
-    """Analyze TPC-DS queries for complexity and features."""
 
     tpcds = TPCDS(scale_factor=0.01)
-    # Get all queries
     queries = tpcds.get_queries()
 
-    # Analyze each query
     analysis_results = {}
 
     for query_id, query_sql in queries.items():
@@ -1524,7 +1393,6 @@ def analyze_tpcds_queries():
             "subquery_count": subquery_count
         }
 
-    # Summary statistics
     complexities = [r["complexity_score"] for r in analysis_results.values()]
     join_counts = [r["join_count"] for r in analysis_results.values()]
 
@@ -1533,7 +1401,6 @@ def analyze_tpcds_queries():
     print(f"  Average complexity: {sum(complexities)/len(complexities):.1f}")
     print(f"  Average joins per query: {sum(join_counts)/len(join_counts):.1f}")
 
-    # Most complex queries
     complex_queries = sorted(
         analysis_results.items(),
         key=lambda x: x[1]["complexity_score"],
@@ -1553,6 +1420,8 @@ if __name__ == "__main__":
 
 ### Multi-Database Comparison
 
+The comparison runs a subset of queries that works on all databases. Data loading is simplified for the demo: the SQLite loader inserts only the first 1000 rows of each table, and a real run would use proper CSV loading. Each query runs 3 times to compute an average:
+
 ```python
 from benchbox import TPCH
 import duckdb
@@ -1561,9 +1430,7 @@ import concurrent.futures
 import statistics
 
 def compare_databases():
-    """Compare TPC-H performance across different databases."""
 
-    # Database setup functions
     def setup_duckdb():
         conn = duckdb.connect(":memory:")
         return conn, "duckdb"
@@ -1574,11 +1441,9 @@ def compare_databases():
 
     database_setups = [setup_duckdb, setup_sqlite]
 
-    # Initialize benchmark
     tpch = TPCH(scale_factor=0.01)
     data_files = tpch.generate_data()
 
-    # Test queries (subset that works on all databases)
     test_queries = [1, 3, 6, 12]
 
     results = {}
@@ -1588,7 +1453,6 @@ def compare_databases():
         print(f"Testing {db_name.upper()}...")
 
         try:
-            # Setup schema
             schema_sql = tpch.get_create_tables_sql(dialect=db_name)
             if db_name == "sqlite":
                 conn.executescript(schema_sql)
@@ -1597,23 +1461,20 @@ def compare_databases():
                     if statement.strip():
                         conn.execute(statement)
 
-            # Load data (simplified for demo)
             load_data_for_database(conn, db_name, data_files)
 
-            # Run queries
             db_results = {}
             for query_id in test_queries:
                 print(f"  Query {query_id}...", end="")
 
                 query_sql = tpch.get_query(query_id, dialect=db_name)
 
-                # Run multiple times for average
                 times = []
                 for _ in range(3):
                     start_time = time.time()
                     if db_name == "duckdb":
                         result = conn.execute(query_sql).fetchall()
-                    else:  # sqlite
+                    else:
                         cursor = conn.cursor()
                         cursor.execute(query_sql)
                         result = cursor.fetchall()
@@ -1636,7 +1497,6 @@ def compare_databases():
         finally:
             conn.close()
 
-    # Compare results
     print(f"\nDatabase Comparison Results:")
     print(f"{'Query':<8} {'DuckDB':<10} {'SQLite':<10} {'Speedup':<10}")
     print("-" * 40)
@@ -1654,30 +1514,26 @@ def compare_databases():
     return results
 
 def load_data_for_database(conn, db_name, data_files):
-    """Load data into database (simplified version)."""
     if db_name == "duckdb":
         for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+            table_name = file_path.stem
             conn.execute(f"""
                 INSERT INTO {table_name}
                 SELECT * FROM read_csv('{file_path}', header=false, delimiter='|')
             """)
     elif db_name == "sqlite":
-        # Simplified SQLite loading (in practice, would use proper CSV loading)
         import csv
         for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+            table_name = file_path.stem
             with open(file_path, 'r') as f:
                 reader = csv.reader(f, delimiter='|')
-                # Get column count
                 cursor = conn.cursor()
                 cursor.execute(f"PRAGMA table_info({table_name})")
                 column_count = len(cursor.fetchall())
                 placeholders = ','.join(['?' for _ in range(column_count)])
 
-                # Insert rows (limit for demo)
                 for i, row in enumerate(reader):
-                    if i >= 1000:  # Limit for demo
+                    if i >= 1000:
                         break
                     row = [None if x == '' else x for x in row]
                     cursor.execute(f"INSERT INTO {table_name} VALUES ({placeholders})", row)
@@ -1695,8 +1551,9 @@ if __name__ == "__main__":
 
 ### GitHub Actions Workflow
 
+Save this workflow as `.github/workflows/performance-test.yml`:
+
 ```yaml
-# .github/workflows/performance-test.yml
 name: Performance Regression Tests
 
 on:
@@ -1736,13 +1593,9 @@ jobs:
 
 ### Performance Test Script for CI/CD
 
-```python
-#!/usr/bin/env python3
-"""
-Performance regression test script for CI/CD pipelines.
-Usage: uv run -- python scripts/run_performance_tests.py
-"""
+This script is a performance regression test for CI/CD pipelines. Run it with `uv run -- python scripts/run_performance_tests.py`. `CI_SCALE_FACTOR = 0.001` is very small for fast CI runs, and `REGRESSION_THRESHOLD = 0.20` is a 20% regression threshold. Each query is warmed up and then measured over 3 iterations. The script loads a baseline if one exists, and on a regression it saves the results and exits with failure:
 
+```python
 import json
 import sys
 import time
@@ -1751,24 +1604,19 @@ from benchbox import ReadPrimitives
 import duckdb
 
 def run_performance_tests():
-    """Run performance tests suitable for CI/CD."""
 
-    # Configuration
-    CI_SCALE_FACTOR = 0.001  # Very small for fast CI runs
-    REGRESSION_THRESHOLD = 0.20  # 20% regression threshold
+    CI_SCALE_FACTOR = 0.001
+    REGRESSION_THRESHOLD = 0.20
     BASELINE_FILE = "baseline_performance.json"
     RESULTS_FILE = "performance_results.json"
 
     print("Starting BenchBox performance regression tests...")
 
-    # Initialize benchmark
     read_primitives = ReadPrimitives(scale_factor=CI_SCALE_FACTOR)
 
-    # Setup database
     conn = duckdb.connect(":memory:")
     setup_database(primitives, conn)
 
-    # Define critical queries for regression testing
     critical_queries = [
         "aggregation_basic",
         "join_inner_simple",
@@ -1776,18 +1624,15 @@ def run_performance_tests():
         "sort_small_result"
     ]
 
-    # Run tests
     current_results = {}
     print(f"Running {len(critical_queries)} critical queries...")
 
     for query_id in critical_queries:
         print(f"  Testing {query_id}...", end="")
 
-        # Warm up
         query_sql = primitives.get_query(query_id)
         conn.execute(query_sql).fetchall()
 
-        # Measure performance (3 iterations)
         times = []
         for _ in range(3):
             start_time = time.time()
@@ -1806,7 +1651,6 @@ def run_performance_tests():
 
     conn.close()
 
-    # Load baseline if it exists
     baseline_path = Path(BASELINE_FILE)
     if baseline_path.exists():
         with open(baseline_path, 'r') as f:
@@ -1820,7 +1664,6 @@ def run_performance_tests():
             for reg in regressions:
                 print(f"  - {reg['query_id']}: {reg['change_percent']:+.1f}% slower")
 
-            # Save results and exit with failure
             save_results(current_results, RESULTS_FILE, regressions)
             sys.exit(1)
         else:
@@ -1830,31 +1673,25 @@ def run_performance_tests():
         with open(baseline_path, 'w') as f:
             json.dump(current_results, f, indent=2)
 
-    # Save current results
     save_results(current_results, RESULTS_FILE)
     print(f" Performance tests completed successfully!")
 
 def setup_database(primitives, conn):
-    """Setup database with primitives data."""
-    # Generate data
     data_files = primitives.generate_data()
 
-    # Create schema
     schema_sql = primitives.get_create_tables_sql()
     for statement in schema_sql.split(';'):
         if statement.strip():
             conn.execute(statement)
 
-    # Load data
     for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+        table_name = file_path.stem
         conn.execute(f"""
             INSERT INTO {table_name}
             SELECT * FROM read_csv('{file_path}', header=false, delimiter='|')
         """)
 
 def check_regressions(current_results, baseline_results, threshold):
-    """Check for performance regressions."""
     regressions = []
 
     for query_id, current in current_results.items():
@@ -1877,7 +1714,6 @@ def check_regressions(current_results, baseline_results, threshold):
     return regressions
 
 def save_results(results, filename, regressions=None):
-    """Save test results to file."""
     output = {
         "results": results,
         "summary": {
@@ -1912,7 +1748,6 @@ from typing import Dict, Union
 import csv
 
 class SimpleBenchmark(BaseBenchmark):
-    """Simple custom benchmark for demonstration."""
 
     def __init__(self, scale_factor: float = 1.0, output_dir: Path = None):
         super().__init__(scale_factor, output_dir)
@@ -1923,10 +1758,8 @@ class SimpleBenchmark(BaseBenchmark):
         }
 
     def generate_data(self) -> Dict[str, Path]:
-        """Generate simple test data."""
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate test_table data
         test_file = self.output_dir / "test_table.csv"
         row_count = int(1000 * self.scale_factor)
 
@@ -1941,17 +1774,14 @@ class SimpleBenchmark(BaseBenchmark):
         return {"test_table": test_file}
 
     def get_queries(self) -> Dict[Union[int, str], str]:
-        """Get all benchmark queries."""
         return self._queries.copy()
 
     def get_query(self, query_id: Union[int, str]) -> str:
-        """Get specific query."""
         if query_id not in self._queries:
             raise ValueError(f"Query '{query_id}' not found")
         return self._queries[query_id]
 
     def get_create_tables_sql(self) -> str:
-        """Get DDL for benchmark tables."""
         return """
         CREATE TABLE test_table (
             id INTEGER,
@@ -1960,34 +1790,26 @@ class SimpleBenchmark(BaseBenchmark):
         );
         """
 
-# Usage example
 def test_custom_benchmark():
-    """Test the custom benchmark."""
     import duckdb
 
-    # Initialize custom benchmark
     benchmark = SimpleBenchmark(scale_factor=0.1)
 
-    # Generate data
     data_files = benchmark.generate_data()
     print(f"Generated {len(data_files)} data files")
 
-    # Setup database
     conn = duckdb.connect(":memory:")
 
-    # Create tables
     ddl = benchmark.get_create_tables_sql("duckdb")
     conn.execute(ddl)
 
-    # Load data
     for file_path in data_files:
-    table_name = file_path.stem  # Get filename without extension
+        table_name = file_path.stem
         conn.execute(f"""
             INSERT INTO {table_name}
             SELECT * FROM read_csv('{file_path}', header=false)
         """)
 
-    # Run queries
     queries = benchmark.get_queries()
     for query_id, query_sql in queries.items():
         result = conn.execute(query_sql).fetchall()

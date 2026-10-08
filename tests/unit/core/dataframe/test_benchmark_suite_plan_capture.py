@@ -1,13 +1,3 @@
-"""Wiring tests for DataFrame-suite plan capture.
-
-The benchmark suite's ``capture_plans`` config and ``QueryBenchmarkResult.query_plan``
-field existed but the run path never populated them. These tests pin the wiring:
-for supported lazy platforms a plan is captured once, from a separate untimed
-execute after the benchmark loop, so explain() cost never leaks into a measured
-iteration; eager platforms skip capture entirely; failures degrade to None, and
-``capture_plans=False`` captures nothing.
-"""
-
 import pytest
 
 from benchbox.core.dataframe.benchmark_suite import (
@@ -22,8 +12,6 @@ pytestmark = [
 
 
 class _FakeLazy:
-    """Minimal Polars-LazyFrame stand-in: explain() + collect() with an event log."""
-
     def __init__(self, events, plan_text="PLAN"):
         self._events = events
         self._plan_text = plan_text
@@ -83,8 +71,7 @@ class TestSuitePlanCapture:
         result = suite._benchmark_query("Q1", context=object(), family="expression", platform_name="polars-df")
         assert result.status == "SUCCESS"
         assert result.query_plan == "MY-PLAN"
-        # Exactly one collect per measured iteration, followed by the untimed
-        # capture (Polars capture issues two explains: optimized + logical).
+
         assert events == ["collect", "collect", "explain", "explain"]
         assert query.execute_calls == 3
         assert len(result.execution_times_ms) == 2
@@ -99,8 +86,7 @@ class TestSuitePlanCapture:
         assert query.execute_calls == 2
 
     def test_eager_platform_skips_capture_without_extra_execute(self):
-        # pandas-df is not lazy-capable: no extra execute may fire, since it
-        # would be a full materialization that could never yield a plan.
+
         events: list = []
         suite, query = _make_suite(_FakeLazy(events, "MY-PLAN"))
         result = suite._benchmark_query("Q1", context=object(), family="pandas", platform_name="pandas-df")

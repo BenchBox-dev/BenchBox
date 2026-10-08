@@ -1,19 +1,3 @@
-"""Unit tests for TPC patterns module.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-
-NOTE: This module previously tested a generic concurrent-stream execution
-framework (StreamExecutor, QueryPermutator, ParameterManager,
-TransactionManager, ErrorHandler, ProgressTracker, ResultAggregator,
-BenchmarkTestRunner, and related dataclasses/utilities) that has been removed
-as part of the concurrency-executor consolidation. That framework was never
-wired into the TPC-H or TPC-DS execution paths -- the only external consumer
-of ``benchbox.core.tpc_patterns`` imports ``generate_official_benchmark_audit_trail``,
-which is what remains in the module and is covered below.
-"""
-
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -47,10 +31,7 @@ class _FakeResult:
 
 
 class TestGenerateOfficialBenchmarkAuditTrail:
-    """Test the shared official-benchmark audit trail writer."""
-
     def test_writes_audit_trail_with_default_output_file(self, tmp_path):
-        """When output_file is omitted, a timestamped file is created under config.output_dir."""
         result = _FakeResult(config=_FakeConfig(output_dir=tmp_path))
 
         output_path = generate_official_benchmark_audit_trail(
@@ -75,7 +56,6 @@ class TestGenerateOfficialBenchmarkAuditTrail:
         assert "Errors:" not in content
 
     def test_writes_audit_trail_with_explicit_output_file(self, tmp_path):
-        """An explicit output_file overrides the default naming/location."""
         result = _FakeResult(config=_FakeConfig(output_dir=None))
         explicit_path = tmp_path / "nested" / "custom_audit.txt"
 
@@ -91,7 +71,6 @@ class TestGenerateOfficialBenchmarkAuditTrail:
         assert "TPC-DS Official Benchmark Audit Trail" in output_path.read_text(encoding="utf-8")
 
     def test_writes_errors_section_when_present(self, tmp_path):
-        """Errors accumulated on the result are listed in the audit trail."""
         result = _FakeResult(config=_FakeConfig(output_dir=tmp_path), success=False, errors=["stream 0 failed"])
 
         output_path = generate_official_benchmark_audit_trail(
@@ -106,7 +85,6 @@ class TestGenerateOfficialBenchmarkAuditTrail:
         assert "stream 0 failed" in content
 
     def test_falls_back_to_cwd_benchmark_results_when_no_output_dir(self, tmp_path, monkeypatch):
-        """With no output_dir and no output_file, the file lands under cwd/benchmark_results."""
         monkeypatch.chdir(tmp_path)
         result = _FakeResult(config=_FakeConfig(output_dir=None))
 

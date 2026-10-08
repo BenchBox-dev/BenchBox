@@ -6,23 +6,11 @@ test.describe("Home", () => {
     await page.goto("/results/");
     await waitForShell(page);
 
-    // Recent Results table header - a stable landmark that only renders
-    // once the DuckDB snapshot has attached and listResults() resolves.
     await waitForDataLoaded(page, /Recent Results/i);
 
-    // Assert the headline only AFTER the data wait. The loading skeleton and
-    // the loaded hero deliberately share one headline, so asserting before the
-    // wait would resolve against the skeleton and prove nothing about the
-    // loaded page - which is exactly how this test passed while never once
-    // exercising loaded Home content.
     await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
 
     const summary = page.getByRole("region", { name: "Corpus summary" });
-    // Corpus Summary labels are count-aware: when the fixture corpus has
-    // exactly one item, the label must read singular ("leaderboard ranking"),
-    // otherwise plural ("leaderboard rankings"). The route gate enforces both
-    // forms via the regex below so changes to fixture counts cannot reintroduce
-    // grammatically wrong copy like "1 leaderboard rankings".
     for (const label of [
       /^supported benchmarks?$/,
       /^published runs?$/,
@@ -75,8 +63,6 @@ test.describe("Home", () => {
     await page.goto("/results/");
     await waitForDataLoaded(page, /Recent Results/i);
 
-    // The Home page lists each benchmark as a pill link; clicking one
-    // must leave the base path intact.
     const tpchLink = page.getByRole("link", { name: /^TPC-H$/ }).first();
     await expect(tpchLink).toBeVisible();
     await tpchLink.click();

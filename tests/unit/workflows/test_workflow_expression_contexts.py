@@ -1,15 +1,3 @@
-"""Regression guard for two workflow-file rejections that failed every
-triggering run: an unknown context inside a `run:` comment, and the `runner`
-context in job-level `env`.
-
-It does not certify every GitHub evaluation point. Only `runner`, `env`,
-`steps`, and `job` are flagged at job level, and `needs`, `matrix`,
-`secrets`, and `vars` are permitted there without verifying GitHub resolves
-each one in that position. Typo-shaped properties (github.event_pull_request)
-and unquoted function arguments pass by design: this checks the head
-identifier only. Property-level typo detection belongs to actionlint.
-"""
-
 from __future__ import annotations
 
 import re
@@ -43,7 +31,6 @@ KNOWN_CONTEXTS = {
     "needs",
     "inputs",
 }
-# Functions and literals that may start an expression without being a context.
 NON_CONTEXT_WORDS = {
     "always",
     "success",
@@ -62,8 +49,6 @@ NON_CONTEXT_WORDS = {
     "false",
     "null",
 }
-# Contexts GitHub does not provide in job-level `env` (evaluated before a runner
-# is assigned).
 JOB_ENV_FORBIDDEN = {"runner", "env", "steps", "job"}
 
 EXPRESSION = re.compile(r"\$\{\{(.*?)\}\}", re.DOTALL)

@@ -13,11 +13,9 @@ export type StatusRole =
   | "generic";
 
 interface StatusBadgeProps {
-  /** Semantic role; rendered into data-role for testing and overrides. */
   role?: StatusRole;
   tone?: StatusTone;
   title?: string;
-  /** Optional leading icon / dot. */
   leading?: ComponentChildren;
   class?: string;
   children: ComponentChildren;

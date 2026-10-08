@@ -1,14 +1,6 @@
-"""Unit tests for Doris Stream Load header and response guards.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Pins _stream_load_headers output (Expect/format defaults, delimiter and
-TPC quote-trimming conditionals) and _handle_stream_load_response behavior
-(non-200 rejection, failed-status rejection with message, silent partial
-load refusal at max_filter_ratio=0, and warning-then-accept otherwise).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -100,7 +92,6 @@ class TestStreamLoadResponse:
 
 
 def test_zstd_data_files_open_without_the_zstd_command(tmp_path, monkeypatch):
-    """Doris decompresses .zst in-process, so a host without the zstd command must still load them."""
     zstandard = pytest.importorskip("zstandard")
     from benchbox.platforms import doris as doris_module
     from benchbox.platforms.base import data_loading

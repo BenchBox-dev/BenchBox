@@ -101,7 +101,7 @@ def test_valid_successor_manifest():
 
 
 def test_reject_invalid_generation_and_parent():
-    # Generation 0 invalid
+
     m0 = PublicationManifest(
         generation=0,
         parent_sha=None,
@@ -117,7 +117,6 @@ def test_reject_invalid_generation_and_parent():
     errors = validate_manifest_dict(m0.to_dict())
     assert any("generation must be a positive integer" in e for e in errors)
 
-    # Generation 2 with parent_sha None invalid
     m2_no_parent = PublicationManifest(
         generation=2,
         parent_sha=None,
@@ -133,7 +132,6 @@ def test_reject_invalid_generation_and_parent():
     errors = validate_manifest_dict(m2_no_parent.to_dict())
     assert any("parent_sha must be a 40-char hex string" in e for e in errors)
 
-    # Generation 2 with mismatched parent_generation
     m2_bad_parent_gen = PublicationManifest(
         generation=2,
         parent_sha="0" * 40,
@@ -151,8 +149,7 @@ def test_reject_invalid_generation_and_parent():
 
 
 def test_accept_retired_generation_gap_parent():
-    # A voided pre-send reservation retires its number: generation 5 may
-    # follow durable generation 3 directly.
+
     m5_gap = PublicationManifest(
         generation=5,
         parent_sha="0" * 40,
@@ -168,7 +165,6 @@ def test_accept_retired_generation_gap_parent():
     errors = validate_manifest_dict(m5_gap.to_dict())
     assert not any("parent_generation" in e for e in errors)
 
-    # A parent at or beyond the generation is still rejected.
     m5_bad_parent = PublicationManifest(
         generation=5,
         parent_sha="0" * 40,

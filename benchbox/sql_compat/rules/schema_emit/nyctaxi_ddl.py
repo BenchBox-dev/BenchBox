@@ -1,15 +1,3 @@
-"""NYC Taxi DDL compatibility rules for Phase.SCHEMA_EMIT.
-
-_generate_create_table in core/nyctaxi/schema.py branches on dialect to emit
-engine-specific DDL.  Three policy branches are registered here; the DuckDB
-partition-comment branch is legitimate storage-layout rendering and is covered
-by the @compat_local decorator on _generate_create_table.
-
-  clickhouse              → REWRITE_DDL (tier-2): MergeTree + ORDER BY + PARTITION BY
-  postgres / postgresql   → REWRITE_DDL (tier-2): PARTITION BY RANGE for partitioned tables
-  timescale               → REWRITE_DDL (tier-2): PARTITION BY RANGE (timescale extends pg)
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction
@@ -21,10 +9,6 @@ from benchbox.sql_compat.decision import (
     SupportLevel,
 )
 from benchbox.sql_compat.registry import REGISTRY
-
-# ---------------------------------------------------------------------------
-# ClickHouse: ENGINE = MergeTree + ORDER BY + optional PARTITION BY toYYYYMM
-# ---------------------------------------------------------------------------
 
 REGISTRY.register(
     CompatibilityDecision(
@@ -49,17 +33,6 @@ REGISTRY.register(
     benchmark="nyctaxi",
 )
 
-# ---------------------------------------------------------------------------
-# PostgreSQL: PARTITION BY RANGE for tables that have a partition_by column
-#
-# W16 wiring note: _generate_create_table applies PARTITION BY RANGE only when
-# time_partitioning AND "partition_by" in table_def. taxi_zones has no
-# partition_by, so legacy will NOT rewrite it. The tier-2 rules below register
-# REWRITE_DDL for all tables; the harness wiring in W16 must either:
-#   (a) call harness with "REWRITE_DDL" only for tables where the rewrite fires, or
-#   (b) add tier-1 NATIVE overrides for non-partitioned tables
-# to avoid false shadow-mode divergence for taxi_zones.
-# ---------------------------------------------------------------------------
 
 _POSTGRES_DDL = CompatibilityDecision(
     rule_id="schema_emit.postgres.nyctaxi.all.range_partition_ddl",
@@ -110,9 +83,6 @@ REGISTRY.register(
     benchmark="nyctaxi",
 )
 
-# ---------------------------------------------------------------------------
-# TimescaleDB: same PARTITION BY RANGE transform (TimescaleDB extends PostgreSQL)
-# ---------------------------------------------------------------------------
 
 REGISTRY.register(
     CompatibilityDecision(

@@ -6,7 +6,6 @@ interface DataTableProps {
   ariaLabel?: string;
   ariaColCount?: number;
   caption?: ComponentChildren;
-  /** When true, wraps the table in a horizontally scrollable region with sticky first column support. */
   scrollable?: boolean;
   class?: string;
   children: ComponentChildren;
@@ -18,7 +17,6 @@ interface RunIdentityLabelProps {
   class?: string;
 }
 
-/** A table-sized run label whose text is already resolved by runIdentity. */
 export function RunIdentityLabel({ label, href, class: extraClass = "" }: RunIdentityLabelProps) {
   const className = `font-medium ${extraClass}`;
   if (href) {
@@ -35,7 +33,6 @@ export function RunIdentityLabel({ label, href, class: extraClass = "" }: RunIde
   );
 }
 
-/** Explains the marker used for rows that retain evidence but cannot be ranked. */
 export function RankingEligibilityLegend() {
   return (
     <p
@@ -71,7 +68,6 @@ export function DataTable({ ariaLabel, ariaColCount, caption, scrollable = false
 }
 
 interface TableHeadProps {
-  /** Apply sticky top positioning. The Panel must define overflow boundaries. */
   sticky?: boolean;
   class?: string;
   children: ComponentChildren;

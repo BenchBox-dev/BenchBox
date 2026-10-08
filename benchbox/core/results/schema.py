@@ -1,18 +1,3 @@
-"""Schema v2.x utilities for benchmark result export.
-
-This module provides construction and validation of the BenchBox result export format
-(schema version 2.x). All exporters and downstream tooling should rely on these helpers
-to ensure the canonical layout stays consistent.
-
-Schema v2 Design Principles:
-1. Single Source of Truth - No duplication
-2. Progressive Detail - Summary first, then details
-3. Omit Empty - No null placeholders, no unused sections
-4. Clear Separation - Identity / Config / Results / Phases
-5. Flat Where Possible - Reduce nesting depth
-6. Consistent Units - All times in milliseconds
-"""
-
 from __future__ import annotations
 
 import logging
@@ -72,7 +57,6 @@ _DRIVER_PLATFORM_KEYS = [tuple(item) for item in _SCHEMA_SPECS["driver_platform_
 
 
 def order_dict(d: dict[str, Any], key_order: list[str]) -> dict[str, Any]:
-    """Return dict with keys ordered for stable JSON diffs."""
     from collections import OrderedDict
 
     ordered: OrderedDict[str, Any] = OrderedDict()
@@ -86,12 +70,10 @@ def order_dict(d: dict[str, Any], key_order: list[str]) -> dict[str, Any]:
 
 
 def _normalize_query_result(qr: Any) -> QueryExecution:
-    """Normalize a supported result boundary to canonical QueryExecution."""
     return query_execution_from_legacy_dict(qr, default_iteration=1, default_stream_id=0)
 
 
 def _round_duration_ms_for_export(value: float) -> float:
-    """Round milliseconds for schema-v2 export without erasing measured sub-ms durations."""
     rounded = round(value, 1)
     if value <= 0 or rounded > 0:
         return rounded
@@ -99,16 +81,10 @@ def _round_duration_ms_for_export(value: float) -> float:
 
 
 class SchemaV2ValidationError(ValueError):
-    """Raised when schema-v2 validation fails."""
+    pass
 
 
 class SchemaV2Validator:
-    """Validates schema-v2 structure.
-
-    Required keys: version, run, benchmark, platform, summary, queries
-    Optional keys: environment, tables, errors, cost, export
-    """
-
     REQUIRED_KEYS = REQUIRED_TOP_KEYS
     OPTIONAL_KEYS = (
         "version",
@@ -132,21 +108,17 @@ class SchemaV2Validator:
     SUMMARY_REQUIRED = ("queries", "timing")
 
     def validate(self, payload: dict[str, Any]) -> None:
-        """Raise ``SchemaV2ValidationError`` when the payload lacks required structure."""
         version = result_schema_version_value(payload)
-        # Check top-level keys
         missing_top = [key for key in self.REQUIRED_KEYS if key not in payload and key != "result_schema_version"]
         if version is None and "result_schema_version" in self.REQUIRED_KEYS:
             missing_top.insert(0, "result_schema_version")
         if missing_top:
             raise SchemaV2ValidationError(f"schema v2.0 payload missing keys: {missing_top}")
 
-        # Validate version using the named runtime policy.
         version_decision = RUNTIME_SCHEMA_POLICY.evaluate(version)
         if not version_decision.accepted:
             raise SchemaV2ValidationError(version_decision.error_message())
 
-        # Validate run block
         run = payload.get("run", {})
         if not isinstance(run, Mapping):
             raise SchemaV2ValidationError("run block must be a mapping")
@@ -154,7 +126,6 @@ class SchemaV2Validator:
         if missing_run:
             raise SchemaV2ValidationError(f"run block missing keys: {missing_run}")
 
-        # Validate benchmark block
         benchmark = payload.get("benchmark", {})
         if not isinstance(benchmark, Mapping):
             raise SchemaV2ValidationError("benchmark block must be a mapping")
@@ -162,7 +133,6 @@ class SchemaV2Validator:
         if missing_benchmark:
             raise SchemaV2ValidationError(f"benchmark block missing keys: {missing_benchmark}")
 
-        # Validate platform block
         platform = payload.get("platform", {})
         if not isinstance(platform, Mapping):
             raise SchemaV2ValidationError("platform block must be a mapping")
@@ -170,7 +140,6 @@ class SchemaV2Validator:
         if missing_platform:
             raise SchemaV2ValidationError(f"platform block missing keys: {missing_platform}")
 
-        # Validate summary block
         summary = payload.get("summary", {})
         if not isinstance(summary, Mapping):
             raise SchemaV2ValidationError("summary block must be a mapping")
@@ -178,7 +147,6 @@ class SchemaV2Validator:
         if missing_summary:
             raise SchemaV2ValidationError(f"summary block missing keys: {missing_summary}")
 
-        # Validate queries is a list
         queries = payload.get("queries")
         if not isinstance(queries, list):
             raise SchemaV2ValidationError("queries must be a list")
@@ -195,30 +163,14 @@ class SchemaV2Validator:
             except QueryExecutionContractError as exc:
                 raise SchemaV2ValidationError(f"queries[{index}].row_count_validation is invalid: {exc}") from exc
 
-        # Check for unexpected top-level keys
         unexpected = set(payload.keys()) - set(self.REQUIRED_KEYS) - set(self.OPTIONAL_KEYS)
         if unexpected:
             raise SchemaV2ValidationError(f"schema v2.0 payload contains unexpected keys: {sorted(unexpected)}")
 
 
 def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets: bool = True) -> dict[str, Any]:
-    """Build the current schema-v2 result payload from BenchmarkResults.
-
-    Args:
-        result: A BenchmarkResults instance from the lifecycle runner.
-
-    Returns:
-        A dictionary conforming to schema v2.0 and ready for JSON serialization.
-
-    The compact query format:
-        {"id": "Q1", "ms": 632.9, "rows": 100}
-        {"id": "1", "ms": 189.2, "rows": 4, "iter": 1}
-        {"id": "11", "ms": 376.8, "rows": 91, "stream": 1}
-    """
-    # Extract query data
     query_times_ms, queries_list, errors_list, iterations_set, streams_set = _build_query_results_section(result)
 
-    # Compute timing statistics
     measurement_queries = [q for q in queries_list if q.get("run_type") == "measurement"]
     total_queries = len(measurement_queries)
     successful_queries = len([q for q in measurement_queries if q.get("status") == "SUCCESS"])
@@ -236,26 +188,19 @@ def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets:
     driver_metadata = _collect_driver_metadata(result)
     platform = _build_platform_section(result, driver_metadata, sanitize_platform_secrets=sanitize_platform_secrets)
 
-    # Build environment block
     environment = _build_environment_block(result)
 
-    # Build tables block (compact)
     tables = _build_tables_block(result.table_statistics)
 
-    # Build config and phases blocks
     config_block = _build_config_block(result)
     phases_block = _build_phases_block(result)
 
-    # Add table loading errors if present
     if result.execution_phases:
         table_errors = _extract_table_errors(result.execution_phases)
         errors_list.extend(table_errors)
 
-    # Build the payload
     payload: dict[str, Any] = {
         "result_schema_version": SCHEMA_VERSION,
-        # Keep the historical alias during the schema-v2 compatibility window;
-        # loaders require both aliases to agree when both are present.
         "version": SCHEMA_VERSION,
         "run": order_dict(
             run, ["id", "timestamp", "total_duration_ms", "query_time_ms", "iterations", "streams", "query_subset"]
@@ -284,7 +229,6 @@ def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets:
         "queries": queries_list,
     }
 
-    # Add optional sections (only if non-empty)
     if environment:
         payload["environment"] = environment
     if tables:
@@ -304,7 +248,6 @@ def build_result_payload(result: BenchmarkResults, *, sanitize_platform_secrets:
 def _build_query_results_section(
     result: BenchmarkResults,
 ) -> tuple[list[float], list[dict[str, Any]], list[dict[str, Any]], set[int], set[int]]:
-    """Extract and normalize query results into timing data, query list, and errors."""
     query_times_ms: list[float] = []
     queries_list: list[dict[str, Any]] = []
     errors_list: list[dict[str, Any]] = []
@@ -361,17 +304,6 @@ def _build_query_results_section(
 
 
 def _aggregate_scan_bytes(result: BenchmarkResults) -> dict[str, Any] | None:
-    """Aggregate query-billed byte totals from in-memory executions for summary visibility.
-
-    Compact schema-v2 query rows intentionally omit resource telemetry, so totals
-    are computed here before stripping and surfaced as ``summary.cost``. Supports
-    BigQuery (bytes_billed/bytes_processed), Athena (data_scanned_bytes), and
-    Synapse serverless (bytes_processed). Returns None when no execution carries
-    byte metrics, keeping bundles for local platforms byte-identical. Zero-byte
-    measurements (for example cache hits) are real observations and are emitted.
-    Totals cover every execution carrying byte metrics regardless of status,
-    matching the cost calculator's unfiltered phase collection.
-    """
     preserved = result.cost_summary.get("scan_bytes") if isinstance(result.cost_summary, Mapping) else None
     if isinstance(preserved, Mapping) and preserved:
         return dict(preserved)
@@ -380,8 +312,6 @@ def _aggregate_scan_bytes(result: BenchmarkResults) -> dict[str, Any] | None:
     total_scanned = 0
     billed_seen = False
     scanned_seen = False
-    # Normalize through the shared contract so legacy dicts and QueryExecution
-    # inputs share one resource_usage shape; row counts here are small.
     for qr in result.query_results or []:
         try:
             execution = _normalize_query_result(qr)
@@ -418,7 +348,6 @@ def _build_summary_section(
     failed_count: int,
     skipped_queries: int = 0,
 ) -> dict[str, Any]:
-    """Build the summary block of the payload."""
     timing_stats = _compute_timing_stats(query_times_ms)
 
     summary: dict[str, Any] = {
@@ -457,7 +386,6 @@ def _build_run_section(
     iterations_set: set[int],
     streams_set: set[int],
 ) -> dict[str, Any]:
-    """Build the run block of the payload."""
     run: dict[str, Any] = {
         "id": result.execution_id,
         "timestamp": result.timestamp.isoformat() if result.timestamp else datetime.now().isoformat(),
@@ -472,7 +400,6 @@ def _build_run_section(
 
 
 def _build_benchmark_section(result: BenchmarkResults) -> dict[str, Any]:
-    """Build the benchmark block of the payload."""
     benchmark_name = _shorten_benchmark_name(result.benchmark_name)
     section: dict[str, Any] = {
         "id": result.benchmark_id,
@@ -495,7 +422,6 @@ def _build_benchmark_section(result: BenchmarkResults) -> dict[str, Any]:
 
 
 def _dataset_identity_fields(result: BenchmarkResults) -> dict[str, str]:
-    """Return canonical dataset identity fields for data-manifest benchmarks."""
     captured_identity = {
         "dataset_version": getattr(result, "dataset_version", None),
         "manifest_hash": getattr(result, "manifest_hash", None),
@@ -515,7 +441,7 @@ def _dataset_identity_fields(result: BenchmarkResults) -> dict[str, str]:
             return {}
         repo_root = Path(__file__).resolve().parents[3]
         manifest = load_manifest(repo_root / str(manifest_rel))
-    except Exception as exc:  # pragma: no cover - identity is best-effort for export
+    except Exception as exc:  # pragma: no cover
         logger.warning("Unable to load dataset identity for %s: %s", benchmark_id, exc)
         return {}
     return {
@@ -531,7 +457,6 @@ def _build_platform_section(
     *,
     sanitize_platform_secrets: bool = True,
 ) -> dict[str, Any]:
-    """Build the platform block of the payload."""
     platform_name = str(result.platform).replace(" (DataFrame)", "")
     platform: dict[str, Any] = {"name": platform_name}
     config: dict[str, Any] = {}
@@ -560,21 +485,10 @@ def _build_platform_section(
             if getattr(result, "platform_raw_metadata", None) is not None
             else getattr(result, "platform_metadata", None)
         ),
-        # Credential redaction is a boundary invariant for every exported
-        # result, including explicitly private/internal artifacts. The
-        # flag still controls public anonymization elsewhere, but it must
-        # not turn raw adapter config/metadata or normalized deployment/
-        # cloud/compute/storage blocks into a credential egress channel.
         sanitize_raw_config=True,
     )
 
     if config:
-        # `platform.config` is the flattened adapter-config view; the normalized
-        # deployment/cloud/compute/storage blocks are the canonical one. Drop the
-        # sub-blocks the normalized blocks actually carry, so a consumer cannot
-        # read a stale or contradictory copy. `config` itself stays whole for the
-        # raw_config fallback and for deployment inference above, both of which
-        # are meant to see the adapter's config verbatim.
         public_config = _prune_duplicated_platform_config(config, metadata_payload.get("compute"))
         if public_config:
             platform["config"] = public_config
@@ -604,7 +518,6 @@ def _build_platform_section(
 
 
 def _add_comparisons_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
-    """Add pg_duckdb vs native DuckDB comparison to payload if available (omit-empty)."""
     nc = getattr(result, "native_comparison", None)
     if nc is None:
         return
@@ -629,7 +542,6 @@ def _add_comparisons_section(payload: dict[str, Any], result: BenchmarkResults) 
 
 
 def _add_cost_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
-    """Add cost summary to payload if available."""
     if not result.cost_summary:
         return
     normalized_cost = result.cost_summary.get("normalized_cost")
@@ -646,23 +558,10 @@ def _add_cost_section(payload: dict[str, Any], result: BenchmarkResults) -> None
 
 
 def _normalized_cost_allows_direct_total(normalized_cost: Any) -> bool:
-    """Historic name for the bundle round-trip contract.
-
-    Delegates to the canonical :func:`benchbox.core.cost.models.normalized_cost_allows_direct_total`
-    so every cost consumer gates on one definition.
-    """
     return normalized_cost_allows_direct_total(normalized_cost)
 
 
 def _add_provenance_section(payload: dict[str, Any], result: BenchmarkResults) -> None:
-    """Add an optional provenance block (funding / source) to the payload.
-
-    Emitted only when the result declares funding or a source hint, mirroring the
-    other optional sections (environment/tables/errors). When neither is present
-    the payload is byte-identical to a pre-provenance run, so existing bundles and
-    fixtures are unaffected. Values are normalized through the canonical
-    vocabulary so an out-of-band value can never reach the bundle.
-    """
     from benchbox.core.results.provenance import normalize_funding, normalize_source
 
     funding = getattr(result, "funding", None)
@@ -679,7 +578,6 @@ def _add_provenance_section(payload: dict[str, Any], result: BenchmarkResults) -
 
 
 def _add_execution_section(payload: dict[str, Any], result: BenchmarkResults, driver_metadata: dict[str, Any]) -> None:
-    """Add execution context section to payload."""
     if result.execution_context:
         exec_block = _build_execution_from_context(result, driver_metadata)
         if exec_block:
@@ -691,7 +589,6 @@ def _add_execution_section(payload: dict[str, Any], result: BenchmarkResults, dr
             payload["execution"] = exec_block
 
 
-# Simple ctx-key → exec-block-key passthrough fields for _build_execution_from_context.
 _EXEC_CTX_PASSTHROUGH = [
     ("entry_point", "entry_point"),
     ("invocation_timestamp", "timestamp"),
@@ -706,7 +603,6 @@ _EXEC_CTX_VALUE = ["validation_mode", "query_subset", "tuning_mode"]
 
 
 def _build_execution_from_context(result: BenchmarkResults, driver_metadata: dict[str, Any]) -> dict[str, Any]:
-    """Build execution block from execution_context."""
     exec_block: dict[str, Any] = {}
     ctx = result.execution_context
 
@@ -751,7 +647,6 @@ def _build_execution_from_context(result: BenchmarkResults, driver_metadata: dic
 
 
 def _build_execution_fallback(result: BenchmarkResults, driver_metadata: dict[str, Any]) -> dict[str, Any]:
-    """Build execution block when no execution_context is available."""
     exec_block: dict[str, Any] = {}
     mode_value = None
     if isinstance(result.execution_metadata, Mapping):
@@ -767,7 +662,6 @@ def _build_execution_fallback(result: BenchmarkResults, driver_metadata: dict[st
 
 
 def _resolve_execution_mode(result: BenchmarkResults, ctx: dict[str, Any]) -> Any:
-    """Resolve the execution mode from context, metadata, or platform_info."""
     if ctx.get("mode"):
         return ctx["mode"]
     if isinstance(result.execution_metadata, Mapping):
@@ -780,7 +674,6 @@ def _resolve_execution_mode(result: BenchmarkResults, ctx: dict[str, Any]) -> An
 
 
 def _collect_driver_metadata(result: BenchmarkResults) -> dict[str, Any]:
-    """Collect driver metadata from result fields and compatibility fallbacks."""
     metadata: dict[str, Any] = {}
 
     for key in DRIVER_METADATA_KEYS:
@@ -797,7 +690,6 @@ def _collect_driver_metadata(result: BenchmarkResults) -> dict[str, Any]:
             metadata[key] = value
 
     platform_info = result.platform_info if isinstance(result.platform_info, Mapping) else {}
-    # Compatibility aliases from platform_info.
     aliases = {
         "driver_package": ("driver_package",),
         "driver_version_requested": ("driver_version_requested",),
@@ -820,22 +712,13 @@ def _collect_driver_metadata(result: BenchmarkResults) -> dict[str, Any]:
 
 
 def _collect_engine_version_metadata(result: BenchmarkResults) -> dict[str, Any]:
-    """Collect engine/service version metadata from result fields and fallbacks.
-
-    Engine version is the database service/runtime version, which may differ from
-    the Python driver/client version. For coupled platforms (DuckDB, DataFusion),
-    engine version equals driver version. For decoupled platforms (Snowflake, etc.),
-    engine version is probed from connection or API metadata.
-    """
     metadata: dict[str, Any] = {}
 
-    # Direct result fields (set by adapter or runner).
     for key in ENGINE_VERSION_KEYS:
         value = getattr(result, key, None)
         if value:
             metadata[key] = value
 
-    # Fallback: check execution_metadata.
     if not metadata.get("engine_version"):
         execution_metadata = result.execution_metadata if isinstance(result.execution_metadata, Mapping) else {}
         for key in ENGINE_VERSION_KEYS:
@@ -844,7 +727,6 @@ def _collect_engine_version_metadata(result: BenchmarkResults) -> dict[str, Any]
                 if value:
                     metadata[key] = value
 
-    # Fallback: check platform_info.
     if not metadata.get("engine_version"):
         platform_info = result.platform_info if isinstance(result.platform_info, Mapping) else {}
         for key in ENGINE_VERSION_KEYS:
@@ -857,7 +739,6 @@ def _collect_engine_version_metadata(result: BenchmarkResults) -> dict[str, Any]
 
 
 def _inject_driver_metadata(exec_block: dict[str, Any], driver_metadata: dict[str, Any]) -> None:
-    """Inject driver metadata into execution block."""
     for key in DRIVER_METADATA_KEYS:
         value = driver_metadata.get(key)
         if value:
@@ -865,7 +746,6 @@ def _inject_driver_metadata(exec_block: dict[str, Any], driver_metadata: dict[st
 
 
 def _inject_translation_metadata(exec_block: dict[str, Any], result: BenchmarkResults) -> None:
-    """Inject SQL translation outcome metadata into the execution block."""
     if not isinstance(result.execution_metadata, Mapping):
         return
     translation = result.execution_metadata.get("translation")
@@ -874,7 +754,6 @@ def _inject_translation_metadata(exec_block: dict[str, Any], result: BenchmarkRe
 
 
 def _inject_variant_comparability_metadata(exec_block: dict[str, Any], result: BenchmarkResults) -> None:
-    """Inject read_primitives variant comparability into the execution block."""
     if not isinstance(result.execution_metadata, Mapping):
         return
     comparability = result.execution_metadata.get("variant_comparability")
@@ -888,7 +767,6 @@ def _shorten_benchmark_name(name: str) -> str:
     return name
 
 
-# Fields that fall back from ctx → run_cfg (use_is_not_none=True for seed).
 _CONFIG_CTX_OR_RUN = ["seed", "phases", "query_subset"]
 _CONFIG_RUN_ONLY = [
     "platform_options",
@@ -911,7 +789,6 @@ def _build_config_block(result: BenchmarkResults) -> dict[str, Any]:
     if isinstance(result.execution_metadata, Mapping):
         run_cfg = result.execution_metadata.get("run_config") or {}
 
-    # Compression has special merging logic
     compression = None
     if ctx.get("compression_type") or run_cfg.get("compression"):
         if ctx.get("compression_type"):
@@ -921,7 +798,6 @@ def _build_config_block(result: BenchmarkResults) -> dict[str, Any]:
     if compression:
         config["compression"] = compression
 
-    # Fields that prefer ctx, fall back to run_cfg
     for key in _CONFIG_CTX_OR_RUN:
         value = ctx.get(key)
         if value is None:
@@ -929,12 +805,10 @@ def _build_config_block(result: BenchmarkResults) -> dict[str, Any]:
         if value is not None:
             config[key] = value
 
-    # Fields sourced only from run_cfg
     for key in _CONFIG_RUN_ONLY:
         if run_cfg.get(key):
             config[key] = run_cfg[key]
 
-    # Execution mode for reproducibility
     exec_mode = None
     if isinstance(result.execution_metadata, Mapping):
         exec_mode = result.execution_metadata.get("mode")
@@ -1003,8 +877,6 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
                 "status": _validation_phase_status(setup.validation.row_count_validation, result.validation_status),
                 "duration_ms": setup.validation.duration_ms,
             }
-        # Opt-in statistics phase (omit when not run). stats_mode records where
-        # statistics time landed: explicit / auto-on-load / unsupported.
         if setup.statistics_gathering:
             stats = setup.statistics_gathering
             phases["statistics"] = {
@@ -1015,10 +887,6 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
             }
             if stats.error_message:
                 phases["statistics"]["error_message"] = stats.error_message
-            # Opt-in cold-stats vs warm-stats control and per-table timing
-            # breakdown (both additive/omitted-when-empty; absent entirely
-            # when the reset/persist knob was not used or no breakdown was
-            # collected, so unmodified runs stay byte-identical).
             if stats.stats_lifecycle:
                 phases["statistics"]["stats_lifecycle"] = stats.stats_lifecycle
             if stats.per_table_ms:
@@ -1028,8 +896,6 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
 
     if result.execution_phases and result.execution_phases.power_test:
         power_test = result.execution_phases.power_test
-        # FAILED when only the error sentinel ran (no real queries were generated/executed).
-        # COMPLETED when at least one real query execution was attempted (even if it failed).
         real_executions = [qe for qe in power_test.query_executions if qe.query_id != "power_test_error"]
         power_test_status = "COMPLETED" if real_executions else "FAILED"
         phases["power_test"] = {
@@ -1039,8 +905,6 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
     if result.execution_phases and result.execution_phases.throughput_test:
         phases["throughput_test"] = _throughput_phase_payload(result.execution_phases.throughput_test)
 
-    # pg_mooncake heap-to-columnstore migration phase (omit when not run).
-    # per_table_stats intentionally excluded - summary-level only per schema v2 design.
     if result.execution_phases and result.execution_phases.migration:
         m = result.execution_phases.migration
         phases["migration"] = {
@@ -1067,7 +931,6 @@ def _build_phases_block(result: BenchmarkResults) -> dict[str, Any]:
 
 
 def _throughput_phase_payload(throughput: Any) -> dict[str, Any]:
-    """Serialize additive throughput stream outcomes into schema v2."""
     payload: dict[str, Any] = {
         "status": "COMPLETED" if throughput.success else "FAILED",
         "duration_ms": throughput.duration_ms,
@@ -1098,30 +961,6 @@ def compute_plan_capture_stats(
     *,
     existing_errors: list[dict[str, Any]] | None = None,
 ) -> tuple[int, int, list[dict[str, Any]]]:
-    """Compute plan capture statistics from a list of query result dicts.
-
-    Produces iteration-stable counts keyed on unique query IDs so the metrics
-    do not inflate with warmup/measurement iteration count.  Both the SQL adapter
-    and the DataFrame mixin call this function so their result fields are always
-    computed with the same logic.
-
-    Args:
-        query_results: Query result dicts containing ``query_id``, ``status``,
-            optional ``run_type``, and optionally ``query_plan``.
-        capture_plans: Whether plan capture was requested for this run.
-        existing_errors: When provided (SQL path), filter these rich error dicts
-            to only include entries whose ``query_id`` maps to a failed capture.
-            When None (DataFrame path), generate minimal error dicts.
-
-    Returns:
-        Tuple of ``(plans_captured, capture_failures, capture_errors)`` where:
-
-        - *plans_captured*: unique query IDs with a plan in **any** execution.
-        - *capture_failures*: unique query IDs that succeeded in the measurement
-          phase but had no plan captured across any execution.  Always 0 when
-          ``capture_plans`` is False.
-        - *capture_errors*: per-query-id failure detail dicts.
-    """
     ids_with_plan: set[str] = {
         str(qr.get("query_id", "")) for qr in query_results if isinstance(qr, dict) and qr.get("query_plan") is not None
     }
@@ -1137,8 +976,6 @@ def compute_plan_capture_stats(
         and str(qr.get("status", "")).upper() == "SUCCESS"
         and str(qr.get("run_type", "")) == "measurement"
     }
-    # For power-style runs, prefer measurement-only semantics. For standard
-    # runs where run_type is absent, fall back to all successes.
     successful_ids: set[str]
     if measurement_success_ids:
         successful_ids = measurement_success_ids
@@ -1163,13 +1000,6 @@ def compute_plan_capture_stats(
 
 
 def _resolve_companion_max_depth(result: Any) -> int:
-    """Effective plan depth for the persisted `.plans.json` companion.
-
-    Reads the run's configured ``plan_max_depth`` platform option (settable via
-    ``--platform-option plan_max_depth=N``) from the stored run config so the
-    companion honors the same bound as the capture-time size estimate.
-    Falls back to ``DEFAULT_PLAN_MAX_DEPTH`` when unset or unparsable.
-    """
     metadata = getattr(result, "execution_metadata", None)
     run_cfg = metadata.get("run_config") if isinstance(metadata, Mapping) else None
     platform_options = run_cfg.get("platform_options") if isinstance(run_cfg, Mapping) else None
@@ -1183,7 +1013,6 @@ def _resolve_companion_max_depth(result: Any) -> int:
 
 
 def _build_plan_entry(qr: dict[str, Any], *, max_depth: int = DEFAULT_PLAN_MAX_DEPTH) -> dict[str, Any]:
-    """Serialize a single query result's captured plan into a `.plans.json` entry."""
     query_plan = qr.get("query_plan")
     plan_fingerprint = qr.get("plan_fingerprint")
     plan_fingerprint_normalized = qr.get("plan_fingerprint_normalized")
@@ -1192,11 +1021,6 @@ def _build_plan_entry(qr: dict[str, Any], *, max_depth: int = DEFAULT_PLAN_MAX_D
     plan_entry: dict[str, Any] = {}
     if plan_fingerprint:
         plan_entry["fingerprint"] = plan_fingerprint
-        # Surface the fingerprint encoding version at the entry level (not only
-        # buried in the nested plan dict) so a consumer reading the companion
-        # entry can tell whether two fingerprints are comparable without
-        # rehydrating the full plan (qpc-03). Sourced from the plan object when
-        # present; a bare fingerprint with no plan object is left unversioned.
         fingerprint_version = getattr(query_plan, "fingerprint_version", None)
         if fingerprint_version is not None:
             plan_entry["fingerprint_version"] = fingerprint_version
@@ -1205,14 +1029,6 @@ def _build_plan_entry(qr: dict[str, Any], *, max_depth: int = DEFAULT_PLAN_MAX_D
     if capture_time is not None:
         plan_entry["capture_time_ms"] = round(capture_time, 1)
 
-    # `to_dict()` (when the object defines one) is the intentional serialization:
-    # for QueryPlanDAG it applies depth protection at the run's configured
-    # plan_max_depth (DEFAULT_PLAN_MAX_DEPTH when unset) and omits
-    # internal-only fields like fingerprint_integrity. Checking
-    # is_dataclass() first would always win (QueryPlanDAG is a dataclass) and
-    # fall through to plain asdict(), bypassing both of those and leaking
-    # fingerprint_integrity into the companion file. Only QueryPlanDAG takes a
-    # max_depth argument; other duck-typed serializers keep the bare call.
     if isinstance(query_plan, QueryPlanDAG):
         plan_entry["plan"] = query_plan.to_dict(max_depth=max_depth)
     elif hasattr(query_plan, "to_dict"):
@@ -1224,13 +1040,6 @@ def _build_plan_entry(qr: dict[str, Any], *, max_depth: int = DEFAULT_PLAN_MAX_D
     else:
         plan_entry["plan"] = str(query_plan)
 
-    # plan_format discriminator (qpc-06 / F3.2): two platform families used to
-    # write differently-shaped "plan" objects with no marker -- a structured
-    # QueryPlanDAG (SQL adapters and DataFrame plans routed through a registered
-    # parser) vs a text-only DataFrame QueryPlan fallback. Tag each entry so a
-    # consumer can tell whether "plan" is a rehydratable DAG (has a
-    # ``logical_root``) or opaque text, and fail informatively instead of
-    # blindly calling QueryPlanDAG.from_dict on a text plan.
     serialized_plan = plan_entry["plan"]
     plan_entry["plan_format"] = (
         "dag" if isinstance(serialized_plan, dict) and "logical_root" in serialized_plan else "text"
@@ -1240,36 +1049,6 @@ def _build_plan_entry(qr: dict[str, Any], *, max_depth: int = DEFAULT_PLAN_MAX_D
 
 
 def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
-    """Build companion plans file payload.
-
-    Returns None if no plans were captured.
-
-    Args:
-        result: A BenchmarkResults instance.
-
-    Returns:
-        Dictionary for plans companion file, or None if no plans.
-
-    Multi-stream keying:
-        ``capture_query_plan``'s documented contract is one plan record per
-        ``(query_id, stream_id)`` - streams are NOT deduplicated, so a query_id
-        that ran in more than one stream has more than one captured-plan row.
-        Keying this payload by bare ``query_id`` alone would collapse those rows
-        to a single last-writer-wins entry. Rows are grouped by ``query_id``
-        first; a group with exactly one plan-bearing row keeps the simple bare
-        ``query_id`` key (the common single-stream case, unchanged format), and
-        a group with more than one row uses a ``"{query_id}#{stream_id}"``
-        composite key per row so every stream's plan survives.
-
-        A combined run (e.g. power then throughput) executes the same public
-        query id in BOTH phases, and each phase's stream_id counter starts at
-        its own 0 - so a power row and a throughput row for the same query_id
-        can share the exact same stream_id too. When stream_id alone does not
-        disambiguate every row in a group, ``test_type`` (already carried on
-        every row - see ``_build_query_results_section``) is appended to the
-        composite key so cross-phase collisions never silently overwrite each
-        other, on top of the same-phase multi-stream case above.
-    """
     if not result.query_plans_captured or result.query_plans_captured == 0:
         return None
 
@@ -1283,17 +1062,11 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     plans_by_query: dict[str, Any] = {}
     errors_list: list[dict[str, Any]] = []
 
-    # One bound for the whole companion: the run's configured plan_max_depth,
-    # so `--platform-option plan_max_depth=N` shrinks the persisted bundle the
-    # same way it shrinks the capture-time size estimate.
     max_depth = _resolve_companion_max_depth(result)
 
     for query_id, rows in rows_by_query_id.items():
         multi_stream = len(rows) > 1
         stream_ids = [qr.get("stream_id", 0) for qr in rows]
-        # stream_id alone disambiguates the group only if every row's stream_id
-        # is distinct; a cross-phase collision (same query_id AND stream_id from
-        # two different test_types) needs test_type appended too.
         stream_id_disambiguates = len(set(stream_ids)) == len(stream_ids)
         for qr in rows:
             if not multi_stream:
@@ -1304,7 +1077,6 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
                 key = f"{query_id}#{qr.get('stream_id', 0)}:{qr.get('test_type', '')}"
             plans_by_query[key] = _build_plan_entry(qr, max_depth=max_depth)
 
-    # Add plan capture errors
     for error in result.plan_capture_errors or []:
         errors_list.append(
             {
@@ -1329,7 +1101,6 @@ def build_plans_payload(result: BenchmarkResults) -> dict[str, Any] | None:
 
 
 def _payload_has_truncation_marker(node: Any) -> bool:
-    """Report whether a built plans payload contains depth truncation."""
     if isinstance(node, dict):
         if "truncated_at_depth" in node:
             return True
@@ -1339,30 +1110,16 @@ def _payload_has_truncation_marker(node: Any) -> bool:
     return False
 
 
-# "packaged_resource" is emitted by the packaged-template discovery tier
-# (feat/tuning-template-packaging); those runs load a real YAML template, so
-# the legacy source bridge must label them "yaml", not "auto".
 _YAML_TUNING_SOURCES = frozenset({"explicit_file", "auto_discovered", "packaged_resource"})
 
 
 def _legacy_tuning_source_bridge(tuning_source: str | None, tuning_source_file: str | None) -> str:
-    """Map the raw TuningSource enum value to the legacy yaml/auto bridge.
-
-    Kept for one schema generation so any external consumer of the documented
-    ``platform.tuning.source``/``.hash`` keys (docs/reference/result-formats.md)
-    keeps working while it migrates to the richer ``tuning_source``/
-    ``requested_config_hash`` fields. Note this is NOT the explorer ingest
-    pipeline: it reads tuning facets from ``data["config"]``
-    (``_project/scripts/explorer_pipeline/transformer.py``), never from
-    ``platform.tuning``. See ADR-1.
-    """
     if tuning_source in _YAML_TUNING_SOURCES or (tuning_source is None and tuning_source_file):
         return "yaml"
     return "auto"
 
 
 def _non_default_platform_optimizations(platform_optimizations: dict[str, Any]) -> dict[str, Any]:
-    """Diff a requested platform_optimizations dict against class defaults."""
     from benchbox.core.tuning.interface import PlatformOptimizationConfiguration
 
     defaults = PlatformOptimizationConfiguration().to_dict()
@@ -1370,14 +1127,6 @@ def _non_default_platform_optimizations(platform_optimizations: dict[str, Any]) 
 
 
 def _requested_tuning_sections(tuning_applied: dict[str, Any]) -> dict[str, Any]:
-    """Build the ``requested`` block from the real UnifiedTuningConfiguration structure.
-
-    Replaces the old dead ``indexes``/``statistics``/``configuration`` clause
-    extraction, which never matched any key ``UnifiedTuningConfiguration.to_dict()``
-    actually produces (its keys are ``primary_keys``, ``foreign_keys``,
-    ``unique_constraints``, ``check_constraints``, ``platform_optimizations``,
-    ``table_tunings``).
-    """
     requested: dict[str, Any] = {}
 
     constraints = {
@@ -1402,7 +1151,6 @@ def _requested_tuning_sections(tuning_applied: dict[str, Any]) -> dict[str, Any]
 
 
 def _tuning_types_present(tuning_applied: dict[str, Any]) -> list[str]:
-    """Summarize which tuning categories are actually active (for summary counts)."""
     types_present: set[str] = set()
 
     for key in ("primary_keys", "foreign_keys", "unique_constraints", "check_constraints"):
@@ -1426,16 +1174,6 @@ def _tuning_types_present(tuning_applied: dict[str, Any]) -> list[str]:
 
 
 def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
-    """Build companion tuning file payload.
-
-    Returns None if no tuning was applied.
-
-    Args:
-        result: A BenchmarkResults instance.
-
-    Returns:
-        Dictionary for tuning companion file, or None if no tuning.
-    """
     if not result.tunings_applied:
         return None
 
@@ -1448,41 +1186,25 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
         "run_id": result.execution_id,
     }
 
-    # Source information. tuning_source is the raw TuningSource enum value
-    # (e.g. "auto_discovered", "wizard", "fallback"); source_file is a
-    # repo-relative path or "<basename>:<content-hash>" template reference -
-    # never a raw local filesystem path (ADR-1 / must_preserve).
     tuning_source = getattr(result, "tuning_source", None)
     if tuning_source:
         payload["tuning_source"] = tuning_source
     if result.tuning_source_file:
         payload["source_file"] = result.tuning_source_file
-    # Legacy bridge key (one generation) - see _legacy_tuning_source_bridge.
     payload["source"] = _legacy_tuning_source_bridge(tuning_source, result.tuning_source_file)
 
-    # requested_config_hash (ADR-1): canonical SHA-256 over the requested
-    # UnifiedTuningConfiguration.to_dict(). "hash" is a legacy bridge alias
-    # for the same value, kept for one generation.
     if result.tuning_config_hash:
         payload["requested_config_hash"] = result.tuning_config_hash
         payload["hash"] = result.tuning_config_hash
 
-    # applied_ledger_hash (ADR-1 physical-identity): distinct from the requested
-    # hash above - SHA-256 over the ordered executed-statement list. None until
-    # the applied ledger recorded at least one executed statement.
     applied_ledger_hash = getattr(result, "applied_ledger_hash", None)
     if applied_ledger_hash:
         payload["applied_ledger_hash"] = applied_ledger_hash
 
-    # tuning_policy_generation (ADR-3 seam): the explicit generation marker for
-    # the tuning policy this run was produced under. Emitted only when tuning is
-    # present (mirrors the hashes above). Bundles predating this field carry no
-    # value; the explorer treats absence as the "pre-seam" generation.
     from benchbox.core.tuning.policy_generation import TUNING_POLICY_GENERATION
 
     payload["tuning_policy_generation"] = TUNING_POLICY_GENERATION
 
-    # Validation status
     validation_status = _derived_validation_status(result)
     if validation_status:
         payload["validation_status"] = validation_status
@@ -1498,15 +1220,8 @@ def build_tuning_payload(result: BenchmarkResults) -> dict[str, Any] | None:
     return payload
 
 
-# Keys of the requested-tuning payload that only ever described the companion
-# file itself, not the run: the companion's own schema version and the run id
-# that its filename already carried. The bundle owns both at the top level, so
-# they are dropped from the inlined copy rather than duplicated.
 _TUNING_COMPANION_ENVELOPE_KEYS = frozenset({"version", "result_schema_version", "run_id"})
 
-# Keys of the requested-tuning payload that the ``platform.tuning`` summary
-# already emits. Dropped from the inlined ``requested`` sub-block so one field
-# has one home and a consumer cannot read two copies that disagree.
 _TUNING_SUMMARY_OWNED_KEYS = frozenset(
     {
         "tuning_source",
@@ -1526,23 +1241,6 @@ def inline_tuning_artifacts(
     tuning_payload: dict[str, Any] | None,
     applied_payload: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """Fold the requested-tuning and applied-ledger artifacts into the bundle.
-
-    Both artifacts are also written as ``.tuning.json`` / ``.applied.json``
-    companions. Inlining them makes the bundle self-describing: the tuning a run
-    requested (``platform.tuning.requested``, ``platform.tuning.source_file``)
-    and the tuning it physically applied (``platform.tuning.applied``) are
-    readable without stitching three files together, which is what
-    ``validate_submission``, ``validate_corpus``, and the explorer pipeline each
-    had to implement separately.
-
-    Both artifacts must already be scrubbed for the caller's export mode. This
-    function only moves values; it never redacts, and it must not be handed a raw
-    ledger for a public export. ``ResultExporter`` owns that policy in
-    ``_build_export_tuning_payload`` / ``_build_export_applied_payload``.
-
-    Returns the same payload for call-site convenience.
-    """
     if not tuning_payload and not applied_payload:
         return payload
 
@@ -1552,9 +1250,6 @@ def inline_tuning_artifacts(
 
     tuning_block = platform_block.get("tuning")
     if not isinstance(tuning_block, dict):
-        # `_build_tuning_summary` emits nothing for a loaded result that recorded
-        # no tuning facts. The applied ledger still has to reach the bundle, so
-        # open the block here.
         tuning_block = {}
         platform_block["tuning"] = tuning_block
 
@@ -1569,9 +1264,6 @@ def inline_tuning_artifacts(
             and key not in _TUNING_SUMMARY_OWNED_KEYS
             and key != "source_file"
         }
-        # `build_tuning_payload` nests the requested configuration under
-        # "requested"; flatten that one level so the block is not
-        # `tuning.requested.requested`.
         nested = requested.pop("requested", None)
         if isinstance(nested, dict):
             requested.update(nested)
@@ -1581,13 +1273,6 @@ def inline_tuning_artifacts(
     if applied_payload:
         applied = dict(applied_payload)
         ledger_hash = applied.pop("applied_ledger_hash", None)
-        # The ledger hash belongs to the summary, which asserts it as the run's
-        # physical tuning identity; a second copy inside `applied` invites the
-        # two to diverge. Promote it when the summary has none: a run can apply
-        # tuning without a requested configuration (an adapter executing layout
-        # operations off a platform option), and `_build_tuning_summary` emits
-        # nothing at all in that case, so popping unconditionally would drop the
-        # only record of what was applied.
         if ledger_hash and not tuning_block.get("applied_ledger_hash"):
             tuning_block["applied_ledger_hash"] = ledger_hash
         if applied:
@@ -1597,27 +1282,9 @@ def inline_tuning_artifacts(
 
 
 def build_applied_ledger_payload(result: BenchmarkResults) -> dict[str, Any] | None:
-    """Build the applied-tuning ledger companion (``.applied.json``) payload.
-
-    Returns the ``result.applied_tuning_ledger`` dict verbatim - the
-    ``AppliedTuningLedger.to_payload()`` output produced BY the execution path
-    (``status``, ``applied_ledger_hash``, ``statements``, ``dropped``) - or
-    ``None`` when no ledger was captured. Never reconstructed from the requested
-    config: this is the physical record of what actually executed (ADR-1).
-
-    Args:
-        result: A BenchmarkResults instance.
-
-    Returns:
-        The applied-ledger companion payload, or None if none was captured.
-    """
     payload = getattr(result, "applied_tuning_ledger", None)
     if not payload:
         return None
-    # Nothing was actually captured (no executed statements, no dropped intents,
-    # no reused-DB drift_check) -> no companion, mirroring build_tuning_payload's
-    # "nothing to record" None. A reused DB re-applies no tuning DDL (empty
-    # statements/dropped) but its drift_check must still ship (ADR-001 addendum).
     if (
         not payload.get("statements")
         and not payload.get("dropped")
@@ -1629,7 +1296,6 @@ def build_applied_ledger_payload(result: BenchmarkResults) -> dict[str, Any] | N
 
 
 def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
-    """Compute timing statistics from a list of query times in milliseconds."""
     if not times_ms:
         return {
             "total_ms": 0,
@@ -1650,7 +1316,6 @@ def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
         "max_ms": _round_duration_ms_for_export(max_ms),
     }
 
-    # Compute geometric mean
     if all(t > 0 for t in times_ms):
         try:
             geo_mean = statistics.geometric_mean(times_ms)
@@ -1658,7 +1323,6 @@ def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
         except (statistics.StatisticsError, ValueError):
             pass
 
-    # Compute percentiles and stdev if we have enough samples
     if len(times_ms) >= 3:
         try:
             stdev = statistics.stdev(times_ms)
@@ -1675,8 +1339,6 @@ def _compute_timing_stats(times_ms: list[float]) -> dict[str, Any]:
 
 
 def _build_tpc_metrics(result: BenchmarkResults) -> dict[str, Any] | None:
-    """Build TPC metrics block if available."""
-    # Official TPC composite metrics are suppressed for unofficial compliance classes
     compliance_class = getattr(result, "compliance_class", None)
     if compliance_class in UNOFFICIAL_COMPLIANCE_CLASSES:
         return {"suppressed": True, "reason": f"compliance_class={compliance_class}"}
@@ -1687,8 +1349,6 @@ def _build_tpc_metrics(result: BenchmarkResults) -> dict[str, Any] | None:
         metrics["power_at_size"] = result.power_at_size
     if result.throughput_at_size is not None:
         metrics["throughput_at_size"] = result.throughput_at_size
-    # Note: geometric_mean_ms is in summary.timing (computed from query times),
-    # not here. TPC metrics block contains only TPC-specific metrics.
 
     return metrics if metrics else None
 
@@ -1724,10 +1384,6 @@ def _untuned_tuning_summary(result: BenchmarkResults) -> dict[str, Any]:
     if tuning_source or source_file or config_hash:
         summary["source"] = _legacy_tuning_source_bridge(tuning_source, source_file)
     else:
-        # A loaded legacy bundle that stated only `source: "auto"` (no hash,
-        # no tuning source) keeps that source on re-export. The value is
-        # carried on the result by the loader and re-emitted verbatim here;
-        # no hash is invented for it.
         legacy_source = getattr(result, "tuning_legacy_source", None)
         if legacy_source in ("yaml", "auto"):
             summary["source"] = legacy_source
@@ -1738,7 +1394,6 @@ def _untuned_tuning_summary(result: BenchmarkResults) -> dict[str, Any]:
 
 
 def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any]:
-    """Build tuning summary for platform block."""
     if not result.tunings_applied:
         return _untuned_tuning_summary(result)
 
@@ -1748,43 +1403,24 @@ def _build_tuning_summary(result: BenchmarkResults) -> dict[str, Any]:
     tuning_source = getattr(result, "tuning_source", None)
     if tuning_source:
         summary["tuning_source"] = tuning_source
-    # Legacy bridge key (one generation) - see _legacy_tuning_source_bridge.
     summary["source"] = _legacy_tuning_source_bridge(tuning_source, result.tuning_source_file)
 
-    # requested_config_hash (ADR-1), with a "hash" legacy bridge alias.
     if result.tuning_config_hash:
         summary["requested_config_hash"] = result.tuning_config_hash
         summary["hash"] = result.tuning_config_hash
 
-    # applied_ledger_hash (ADR-1 physical-identity): what was physically applied,
-    # distinct from the requested_config_hash above.
     applied_ledger_hash = getattr(result, "applied_ledger_hash", None)
     if applied_ledger_hash:
         summary["applied_ledger_hash"] = applied_ledger_hash
 
-    # validation_status (ADR-1 honest verified-state): the execution-derived
-    # applied-ledger status -- not_applicable / noop / applied_unverified /
-    # applied_verified / failed. applied_verified is earned only via the post-load
-    # introspection receipt's corroboration (the receipt itself rides in the
-    # .applied.json companion). Surfaced in this main-bundle summary -- mirroring
-    # the .tuning.json companion's field -- so the explorer, which reads only the
-    # main bundle, can display the verification state. Absent for legacy bundles
-    # predating the applied ledger; the explorer treats absence as "unknown".
     validation_status = _derived_validation_status(result)
     if validation_status:
         summary["validation_status"] = validation_status
 
-    # tuning_policy_generation (ADR-3 seam): the explicit generation marker for
-    # the tuning policy this run was produced under. Emitted only when tuning is
-    # present (mirrors the hashes above). Bundles predating this field carry no
-    # value; the explorer treats absence as the "pre-seam" generation and warns
-    # (never blocks) on a cross-generation tuned comparison.
     from benchbox.core.tuning.policy_generation import TUNING_POLICY_GENERATION
 
     summary["tuning_policy_generation"] = TUNING_POLICY_GENERATION
 
-    # Counts: replaces the old dead clauses_applied counter (which counted
-    # indexes/statistics/configuration keys that to_dict() never produces).
     table_tunings = tuning_applied.get("table_tunings") or {}
     tuning_types = _tuning_types_present(tuning_applied)
     if table_tunings or tuning_types:
@@ -1820,7 +1456,6 @@ def _extract_tuning_profile_metadata(result: BenchmarkResults) -> dict[str, Any]
 
 
 def _build_environment_block(result: BenchmarkResults) -> dict[str, Any]:
-    """Build environment block with legacy flat keys plus normalized metadata."""
     return build_environment_payload(
         system_profile=getattr(result, "system_profile", None),
         execution_environment=getattr(result, "execution_environment", None),
@@ -1828,7 +1463,6 @@ def _build_environment_block(result: BenchmarkResults) -> dict[str, Any]:
 
 
 def _build_tables_block(table_statistics: dict[str, Any] | None) -> dict[str, Any]:
-    """Build compact tables block."""
     if not table_statistics:
         return {}
 
@@ -1848,20 +1482,17 @@ def _build_tables_block(table_statistics: dict[str, Any] | None) -> dict[str, An
             if entry:
                 tables[table_name] = entry
         elif isinstance(stats, int):
-            # Simple row count
             tables[table_name] = {"rows": stats}
 
     return tables
 
 
 def _extract_table_errors(execution_phases: Any) -> list[dict[str, Any]]:
-    """Extract table loading errors from execution phases."""
     errors: list[dict[str, Any]] = []
 
     if execution_phases is None:
         return errors
 
-    # Handle dataclass or dict
     if is_dataclass(execution_phases):
         phases = asdict(execution_phases)
     elif isinstance(execution_phases, dict):
@@ -1896,7 +1527,6 @@ def _extract_table_errors(execution_phases: Any) -> list[dict[str, Any]]:
 
 
 def _extract_platform_config(platform_info: dict[str, Any]) -> dict[str, Any]:
-    """Extract relevant platform configuration, excluding version and variant."""
     if not platform_info:
         return {}
 
@@ -1916,42 +1546,24 @@ def _extract_platform_config(platform_info: dict[str, Any]) -> dict[str, Any]:
     config: dict[str, Any] = {}
 
     def extract_recursive(d: dict[str, Any]) -> None:
-        """Recursively extract config, flattening nested 'configuration' keys."""
         for key, value in d.items():
             if key.lower() in exclude_keys or value is None:
                 continue
-            # Skip empty values
             if isinstance(value, str) and not value:
                 continue
             if isinstance(value, (list, dict)) and not value:
                 continue
-            # Flatten nested configuration
             if key == "configuration" and isinstance(value, dict):
                 extract_recursive(value)
             else:
                 config[key] = value
 
     extract_recursive(platform_info)
-    # Adapters keep secrets out of platform_info by convention, but nothing
-    # enforced it - a convention slip would ride into platform.config and the
-    # raw_config fallback verbatim. Filter structurally at the boundary.
     return sanitize_platform_options(config)
 
 
-# Per-adapter warehouse/cluster metadata mappings. ``platform.compute`` holds the
-# same facts in normalized form with ``source`` / ``collection_status``
-# provenance, so a copy here is a third representation that can contradict it --
-# it is what let a Databricks bundle assert ``cluster_size: "Medium"`` (an adapter
-# constructor default) beside an observed ``warehouse_size: "2X-Small"``. Pruned
-# only when a normalized compute block actually exists: adapters without a
-# normalized-metadata hook (ClickHouse, which records `system_settings` and
-# `build_options` here) have no other structured home for it.
 _PLATFORM_CONFIG_COMPUTE_KEYS = frozenset({"compute_configuration", "cluster_info"})
 
-# Ledgers of what tuning physically executed. The applied-tuning ledger is the
-# record of that (ADR-1) and `platform.raw_config` keeps the adapter's own copy,
-# so a third copy in `platform.config` fractured the single source of truth for
-# whether an OPTIMIZE ran.
 _PLATFORM_CONFIG_LAYOUT_KEYS = frozenset(
     {
         "applied_layout_operations",
@@ -1966,19 +1578,6 @@ def _prune_duplicated_platform_config(
     config: dict[str, Any],
     normalized_compute: Any = None,
 ) -> dict[str, Any]:
-    """Drop ``platform.config`` entries a normalized platform block already owns.
-
-    Pruning happens at the export boundary rather than in
-    ``_extract_platform_config`` so the unpruned mapping is still available to
-    the ``raw_config`` fallback and to deployment inference, which exist to read
-    the adapter's configuration verbatim.
-
-    The compute mappings are pruned only when ``normalized_compute`` carries
-    content. Not every adapter has a normalized-metadata hook: ClickHouse records
-    its `system_settings` and `build_options` under `compute_configuration` and
-    publishes no `platform.compute` at all, so pruning unconditionally would move
-    engine settings that shape the result out of the block consumers read.
-    """
     drop = set(_PLATFORM_CONFIG_LAYOUT_KEYS)
     if isinstance(normalized_compute, Mapping) and any(
         key not in {"source", "collection_status"} and value is not None for key, value in normalized_compute.items()

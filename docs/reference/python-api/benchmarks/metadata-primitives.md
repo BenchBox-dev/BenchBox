@@ -5,7 +5,7 @@
 
 Python API reference for the Metadata Primitives benchmark.
 
-Metadata Primitives times a database's catalog introspection: the `INFORMATION_SCHEMA` views and the platform's catalog commands. It generates no data. It runs 62 queries in ten categories against a connection you supply, and can create wide tables, view hierarchies, complex types, large catalogs, constraints and access-control grants to see how introspection scales. Every statement on this page was checked against the released 0.4.1 wheel with DuckDB, and the one side effect on other platforms was checked with a recording stand-in for the connection.
+Metadata Primitives times a database's catalog introspection: the `INFORMATION_SCHEMA` views and the platform's catalog commands. It generates no data. It runs 62 queries in ten categories against a connection you supply, and can create wide tables, view hierarchies, complex types, large catalogs, constraints and access-control grants to see how introspection scales.
 
 ## `benchbox.MetadataPrimitives`
 
@@ -185,7 +185,7 @@ A query that fails on the database, or that the `dialect` does not support, does
 
 The result has `total_queries`, `successful_queries`, `failed_queries`, `total_time_ms`, `results` (a list of `MetadataQueryResult`), `category_summary` (per category: `total_queries`, `successful`, `failed`, `total_time_ms`, `avg_time_ms`, `min_time_ms` and `max_time_ms`), `acl_mutation_results` and `acl_mutation_summary`.
 
-**Side effect on most platforms:** when `dialect` is given and is not `duckdb`, `sqlite`, `datafusion`, `spark` or `polars`, `run_benchmark()` also creates roles and a table, grants and revokes privileges, and drops the roles after the selected queries, whatever `categories` or `query_ids` say. Against a recording stand-in connection with `dialect="postgres"` and one selected query, it ran 12 such operations (`CREATE ROLE`, `GRANT`, `REVOKE` and `DROP ROLE`, three each) and a `CREATE TABLE`, and reported them in `acl_mutation_results`. With `dialect="duckdb"` it ran only the selected query. Do not point it at a shared platform with a dialect name unless those statements are acceptable there.
+**Side effect on most platforms:** when `dialect` is given and is not `duckdb`, `sqlite`, `datafusion`, `spark` or `polars`, `run_benchmark()` also creates roles and a table, grants and revokes privileges, and drops the roles after the selected queries, whatever `categories` or `query_ids` say. For example, with `dialect="postgres"` and one selected query, it runs 12 such operations (`CREATE ROLE`, `GRANT`, `REVOKE` and `DROP ROLE`, three each) and a `CREATE TABLE`, and reports them in `acl_mutation_results`. With `dialect="duckdb"` it runs only the selected query. Do not point it at a shared platform with a dialect name unless those statements are acceptable there.
 
 ### Complexity methods
 

@@ -1,5 +1,3 @@
-"""Coverage-focused tests for TSBS benchmark loading paths."""
-
 from __future__ import annotations
 
 import csv

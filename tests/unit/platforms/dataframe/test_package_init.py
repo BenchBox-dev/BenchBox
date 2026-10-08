@@ -19,8 +19,7 @@ def test_dataframe_package_exports_and_flags():
 
 
 def test_dataframe_package_optional_exports_are_defined():
-    # Optional adapters may be None when dependencies are unavailable,
-    # but the attribute must exist (either a class or None).
+
     for name in (
         "CuDFDataFrameAdapter",
         "DaskDataFrameAdapter",

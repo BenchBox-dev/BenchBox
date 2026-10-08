@@ -1,5 +1,3 @@
-"""Tests for benchbox.core.reports module."""
-
 import pytest
 
 from benchbox.core.reports import generate_report

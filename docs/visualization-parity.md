@@ -22,11 +22,11 @@ Each file is a JSON contract for one chart math helper:
 | `delta_pct.json` | `deltaPct` | `benchbox/core/visualization/ascii/diverging_bar.py` |
 | `sort_by_magnitude_desc.json` | `sortByMagnitudeDesc` | same |
 | `per_query_speedup.json` | `perQuerySpeedup` | N/A - no Python CLI chart; originated in `Compare.tsx`, unified via `chartMath.ts` |
-| `geomean_ms.json` | `geomeanMs` | `_project/scripts/explorer_pipeline/transformer.py` `_display_geomean_ms` |
-| `box_stats.json` | `computeBoxStats` | `_project/scripts/explorer_pipeline/transformer.py` `_compute_box_stats` |
-| `cdf_ecdf.json` | `computeECDFPoints` | `_project/scripts/explorer_pipeline/transformer.py` `_compute_ecdf` |
-| `rank_table.json` | `computeRankTable` | `_project/scripts/explorer_pipeline/transformer.py` `_compute_ranks` |
-| `percentile_ladder.json` | `computePercentile` | `_project/scripts/explorer_pipeline/transformer.py` `_compute_percentile` |
+| `geomean_ms.json` | `geomeanMs` | Explorer publish pipeline, `transformer.py` `_display_geomean_ms` |
+| `box_stats.json` | `computeBoxStats` | Explorer publish pipeline, `transformer.py` `_compute_box_stats` |
+| `cdf_ecdf.json` | `computeECDFPoints` | Explorer publish pipeline, `transformer.py` `_compute_ecdf` |
+| `rank_table.json` | `computeRankTable` | Explorer publish pipeline, `transformer.py` `_compute_ranks` |
+| `percentile_ladder.json` | `computePercentile` | Explorer publish pipeline, `transformer.py` `_compute_percentile` |
 
 ## Policy
 
@@ -42,20 +42,21 @@ When you add a new chart type:
 
 ## Workflow for changing a computation
 
-If you change how a number is calculated (either Python or TS side):
+If you change how a number is calculated (either Python or TS side), follow these steps:
+
+1. Modify the Python implementation.
+2. Regenerate fixtures with `make parity-fixtures`. This changes the contract.
+3. Run `make parity-check` to confirm that the fixtures now match.
+4. Run Vitest. The new fixture values must pass on the TS side too.
+5. Commit the fixture diff. Reviewers must approve the numeric change.
 
 ```bash
-# 1. Modify the Python implementation
-# 2. Regenerate fixtures - this changes the contract:
 make parity-fixtures
 
-# 3. Run parity-check to confirm fixtures now match
 make parity-check
 
-# 4. Run Vitest - new fixture values must pass the TS side too
 cd results-explorer && npm test -- chartMath.parity
 
-# 5. Commit the fixture diff - reviewers must approve the numeric change
 git add tests/parity/fixtures/
 ```
 
@@ -63,9 +64,12 @@ git add tests/parity/fixtures/
 
 ## Verifying parity without regenerating
 
+`make parity-check` is the Python side: it regenerates into a temporary directory, diffs, and fails if different. The
+`npm test` command is the TS side: all fixture cases must pass.
+
 ```bash
-make parity-check      # Python side: regenerate into tmpdir, diff, fail if different
-cd results-explorer && npm test -- chartMath.parity   # TS side: all fixture cases pass
+make parity-check
+cd results-explorer && npm test -- chartMath.parity
 ```
 
 ## Float tolerance
@@ -90,11 +94,11 @@ When `make parity-check` fails in CI, use this decision tree:
 
 Check `git diff` to see if the Python function or the TS helper was modified.
 
-**2. Python changed intentionally** (you updated the math in `generate_visualization_fixtures.py` or the referenced Python module):
+**2. Python changed intentionally** (you updated the math in `generate_visualization_fixtures.py` or the referenced Python module): regenerate the fixtures from the new Python source, confirm that no drift remains, and check that the TS side still passes.
 ```bash
-make parity-fixtures      # regenerate fixtures from new Python source
-make parity-check         # confirm no remaining drift
-cd results-explorer && npm test -- chartMath.parity   # TS must still pass
+make parity-fixtures
+make parity-check
+cd results-explorer && npm test -- chartMath.parity
 ```
 
 **3. TypeScript changed intentionally** (you updated a helper in `chartMath.ts`):

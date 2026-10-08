@@ -1,19 +1,3 @@
-"""The DataFrame families must record the same client host the SQL adapters do.
-
-Regression cover for `dataframe-client-host-capture-gap`: every DataFrame
-result published an environment block containing only `platform_runtime`. No
-`client_host` at all -- no os, arch, python, cpu_count, memory_gb or CPU
-identity. 0 of 107 sampled raw DataFrame results carried it, and all 43
-DataFrame bundles in the published corpus lacked it.
-
-The cause was structural rather than a missing call. SQL adapters descend from
-`benchbox/platforms/base/adapter.py`, whose `_build_execution_metadata` collects
-a system profile; the DataFrame families descend from
-`BenchmarkExecutionMixin` instead and never ran that path, so
-`result.system_profile` stayed unset and `_build_environment_block` produced an
-empty block that `_compact` then dropped.
-"""
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -53,10 +37,7 @@ def test_capture_time_cpu_detection_records_measured_evidence(monkeypatch: pytes
 
 
 def test_dataframe_and_sql_record_the_same_client_host_fields() -> None:
-    # The SQL path builds its profile from get_system_info().to_dict()
-    # (base/adapter.py -> result_capture._build_execution_metadata). Comparing
-    # the KEY SETS is the point: the two hierarchies drifted silently once, and
-    # only a test that spans both notices it happening again.
+
     sql_host = _client_host(get_system_info().to_dict())
     dataframe_host = _client_host(_client_host_profile(None))
     assert set(dataframe_host) == set(sql_host)

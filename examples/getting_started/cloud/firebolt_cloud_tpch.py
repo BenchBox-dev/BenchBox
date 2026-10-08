@@ -1,40 +1,3 @@
-"""Run TPC-H on Firebolt Cloud (managed service).
-
-Firebolt Cloud is a managed analytics database with vectorized query execution
-optimized for sub-second analytics. It uses OAuth client credentials for
-authentication and requires an active engine for query execution.
-
-Prerequisites:
-    1. Firebolt Cloud account at https://www.firebolt.io
-    2. Service account with client credentials (client_id + client_secret)
-    3. Engine created and running (engines auto-stop after inactivity)
-    4. Database created in your account
-
-Required environment variables:
-    FIREBOLT_CLIENT_ID       Service account client ID
-    FIREBOLT_CLIENT_SECRET   Service account client secret
-    FIREBOLT_ACCOUNT         Account name (from Firebolt console URL)
-    FIREBOLT_ENGINE          Engine name to use for queries
-
-Optional environment variables:
-    FIREBOLT_DATABASE        Database name (default: benchbox)
-    FIREBOLT_API_ENDPOINT    API endpoint (default: api.app.firebolt.io)
-
-Installation:
-    uv add benchbox --extra firebolt
-
-Usage:
-    export FIREBOLT_CLIENT_ID=your_client_id
-    export FIREBOLT_CLIENT_SECRET=your_secret
-    export FIREBOLT_ACCOUNT=your_account
-    export FIREBOLT_ENGINE=your_engine
-
-    python examples/getting_started/cloud/firebolt_cloud_tpch.py
-
-    # Preview without execution
-    python examples/getting_started/cloud/firebolt_cloud_tpch.py --dry-run ./preview
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -51,11 +14,6 @@ _OUTPUT_DIR = _PROJECT_ROOT / "benchmark_runs" / "getting_started" / "firebolt_c
 
 
 def _require_env(var_name: str) -> str:
-    """Require a Firebolt Cloud environment variable.
-
-    Firebolt Cloud credentials should NEVER be hardcoded. Always use
-    environment variables or a secrets manager.
-    """
     value = os.getenv(var_name)
     if not value:
         raise RuntimeError(
@@ -65,33 +23,6 @@ def _require_env(var_name: str) -> str:
 
 
 def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig]:
-    """Build benchmark and database configurations for Firebolt Cloud.
-
-    Firebolt Cloud Concepts:
-
-    1. AUTHENTICATION
-       - OAuth 2.0 with client credentials flow
-       - Create service account in Firebolt console
-       - client_id and client_secret for authentication
-       - Account name identifies your Firebolt organization
-
-    2. ENGINE
-       - Compute resource for running queries
-       - Must be started before queries can execute
-       - Auto-stops after period of inactivity
-       - Size determines query performance and cost
-
-    3. DATABASE
-       - Container for tables and data
-       - Created via Firebolt console or SQL
-       - Must exist before running benchmark
-
-    4. COST MODEL
-       - Pay for engine runtime (per-second billing)
-       - Engine size determines hourly rate
-       - Data storage billed separately
-       - Engines auto-stop to minimize costs
-    """
     benchmark_config = BenchmarkConfig(
         name="tpch",
         display_name="TPC-H",
@@ -104,15 +35,11 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
         type="firebolt",
         name="firebolt_cloud_tpch",
         options={
-            # OAuth client credentials (required)
             "client_id": _require_env("FIREBOLT_CLIENT_ID"),
             "client_secret": _require_env("FIREBOLT_CLIENT_SECRET"),
-            # Account and engine (required)
             "account_name": _require_env("FIREBOLT_ACCOUNT"),
             "engine_name": _require_env("FIREBOLT_ENGINE"),
-            # Database (optional, defaults to benchbox)
             "database": os.getenv("FIREBOLT_DATABASE", "benchbox"),
-            # API endpoint (optional, for regional deployments)
             "api_endpoint": os.getenv("FIREBOLT_API_ENDPOINT", "api.app.firebolt.io"),
         },
     )
@@ -121,14 +48,6 @@ def _build_configs(scale_factor: float) -> tuple[BenchmarkConfig, DatabaseConfig
 
 
 def run_example(scale_factor: float = 0.01, *, dry_run_output: Path | None = None) -> None:
-    """Execute TPC-H benchmark on Firebolt Cloud.
-
-    Firebolt Cloud provides:
-    - Managed infrastructure (no Docker needed)
-    - Multi-node scaling for large workloads
-    - Enterprise features (RBAC, audit logs)
-    - Production-grade reliability
-    """
     _OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     benchmark_config, database_config = _build_configs(scale_factor)
 

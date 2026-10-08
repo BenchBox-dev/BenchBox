@@ -1,10 +1,3 @@
-"""UAT platform/benchmark compatibility policy.
-
-This is intentionally UAT-local policy, not runtime SQL compatibility. Runtime
-`benchbox.sql_compat` rules describe SQL translation/execution behavior, while
-these rules explain why a UAT matrix cell is not attempted at all.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -160,9 +153,9 @@ _RELEASE_GATE_RUNTIME_ENVELOPES = _PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES | {
 _RELEASE_GATE_STAGES_UNUSED_RUNTIME_ENVELOPES = frozenset(_PG_FAMILY_RELEASE_GATE_RUNTIME_ENVELOPES)
 
 _RELEASE_GATE_RUNTIME_ENVELOPE_EVIDENCE = {
-    ("datafusion", "datavault"): "docs/operations/uat-framework.md: DataVault evidence (2026-08-25)",
-    ("sqlite", "tpcds"): "docs/operations/uat-framework.md: SQLite TPC-DS evidence (2026-08-25)",
-    ("sqlite", "tpcds_obt"): "PR #1904; docs/operations/uat-framework.md: SQLite OBT evidence (2026-08-25)",
+    ("datafusion", "datavault"): "docs/operations/uat-release-campaign.md: DataFusion DataVault (2026-08-25)",
+    ("sqlite", "tpcds"): "docs/operations/uat-release-campaign.md: SQLite TPC-DS (2026-08-25)",
+    ("sqlite", "tpcds_obt"): "PR #1904; docs/operations/uat-release-campaign.md: SQLite TPC-DS OBT (2026-08-25)",
 }
 
 
@@ -173,7 +166,6 @@ def compatibility_rule_for(
     *,
     include_release_gate_runtime_envelopes: bool = False,
 ) -> CompatibilityRule | None:
-    """Return the rule that blocks a platform/benchmark pair, if any."""
     native_reason = _NATIVE_MODEL_BENCHMARK_GATES.get((platform, benchmark))
     if native_reason:
         return _benchmark_gate_rule(

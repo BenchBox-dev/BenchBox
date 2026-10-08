@@ -1,5 +1,3 @@
-"""Tests for consumer-specific result schema policies."""
-
 from __future__ import annotations
 
 import pytest
@@ -95,7 +93,7 @@ def test_normalizer_policy_names_fallback_reason_for_unknown_v2() -> None:
 
 
 def test_producer_payload_boundary_redacts_platform_metadata_sentinels() -> None:
-    """Producer schema path must apply the multi-source credential boundary."""
+
     import json
     from datetime import datetime
 

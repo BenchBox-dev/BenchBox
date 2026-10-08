@@ -1,5 +1,3 @@
-"""Redshift integration smoke tests using stubbed connector and boto3."""
-
 import pytest
 
 from benchbox.platforms.redshift import RedshiftAdapter
@@ -33,11 +31,10 @@ def test_redshift_smoke_run(monkeypatch, tmp_path):
 
     stats, metadata, stub_state = run_smoke_benchmark(adapter, benchmark, tmp_path)
 
-    # Redshift adapter returns lowercase table names in stats
     assert stats["lineitem"] == stub_state.row_counts["LINEITEM"]
     assert stub_state.copies, "Expected COPY commands"
     assert stub_state.uploads, "Expected S3 uploads"
-    # Redshift adapter uses autocommit mode for benchmark workloads
+
     assert stub_state.commits == 0, "Expected no explicit commits with autocommit enabled"
     assert metadata["platform_name"] == "Redshift"
 

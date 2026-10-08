@@ -72,9 +72,6 @@ visualization/overview.md
 :caption: Contributing
 
 contributing-results.md
-operations/release-guide.md
-operations/dev-loop-worktrees.md
-operations/results-phase-2-runbook.md
 ```
 
 ```{toctree}

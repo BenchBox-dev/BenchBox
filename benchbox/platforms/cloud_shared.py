@@ -1,12 +1,6 @@
-"""Shared utilities for cloud platform adapters.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Consolidates duplicated patterns across Redshift, Snowflake, and other
-cloud platforms to reduce copy-paste maintenance burden.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -20,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 def empty_cache_control_receipt() -> dict[str, Any]:
-    """Return the unset session cache-control receipt shape."""
     return {
         "validated": False,
         "cache_disabled": False,
@@ -31,13 +24,6 @@ def empty_cache_control_receipt() -> dict[str, Any]:
 
 
 def sanitize_cache_control_receipt(receipt: Any) -> dict[str, Any] | None:
-    """Return a bundle-safe copy of a session cache-control receipt.
-
-    Normalizes the two decision booleans strictly (a truthy ``"False"``
-    string must never read as disabled) and stringifies settings and
-    messages so adapter internals cannot smuggle arbitrary payloads into
-    result bundles. Returns ``None`` for non-dict input.
-    """
     if not isinstance(receipt, dict):
         return None
     clean = empty_cache_control_receipt()
@@ -54,14 +40,6 @@ def sanitize_cache_control_receipt(receipt: Any) -> dict[str, Any] | None:
 
 
 def explicit_cache_enabled_receipt(setting_key: str, enabled_value: str) -> dict[str, Any]:
-    """Return the deterministic receipt for an explicitly enabled result cache.
-
-    When the operator sets ``disable_result_cache=False`` the adapter applies
-    the enabled state by configuration, so there is no disabled state to
-    probe: the enabled outcome is known without a session query. Recording it
-    keeps cache-enabled runs from serializing to an absent receipt, which the
-    submission gate would otherwise grandfather as legacy evidence.
-    """
     receipt = empty_cache_control_receipt()
     receipt["validated"] = True
     receipt["settings"] = {setting_key: enabled_value}
@@ -86,27 +64,6 @@ def validate_session_cache_control(
     adapter_logger: logging.Logger | None = None,
     value_column_index: int = 0,
 ) -> dict[str, Any]:
-    """Validate that session-level cache control settings were applied.
-
-    Shared implementation for Redshift/Snowflake/etc. cache validation.
-
-    Args:
-        connection: Active database connection with cursor() support.
-        query: SQL query that returns the current cache setting value.
-        setting_key: Name of the setting in the result dict (e.g. ``USE_CACHED_RESULT``).
-        disabled_value: Value when cache is off (e.g. ``"off"`` or ``"FALSE"``).
-        enabled_value: Value when cache is on (e.g. ``"on"`` or ``"TRUE"``).
-        normalize: ``"lower"`` or ``"upper"`` - how to normalize the raw value.
-        platform_name: Human-readable platform name for error messages.
-        disable_result_cache: Whether the adapter expects cache to be disabled.
-        strict_validation: If True, raise ConfigurationError on mismatch.
-        adapter_logger: Optional logger; falls back to module logger.
-        value_column_index: Index of the value column in the query result row (default: 0).
-
-    Returns:
-        Dict with ``validated``, ``cache_disabled``, ``settings``,
-        ``warnings``, and ``errors`` keys.
-    """
     log = adapter_logger or logger
     cursor = connection.cursor()
     result: dict[str, Any] = empty_cache_control_receipt()
@@ -173,35 +130,6 @@ def rewrite_tpcdi_sqlite_idioms(
     julianday_replacement: str,
     relative_date_replacement: str,
 ) -> str:
-    """Rewrite TPC-DI SQL Server/SQLite idioms for engines without them.
-
-    Shared core behind the BigQuery and Databricks TPC-DI rewrites:
-
-    - BIT flag columns (IsCurrent, TT_IS_SELL, HolidayFlag) compare ``= 1``
-      / ``= 0`` against BOOLEAN columns; ``flag_true``/``flag_false`` are
-      ``re.sub`` replacement templates where ``\\1``/``\\2`` are the column
-      name and optional backtick (e.g. ``r"\\1\\2 = TRUE"``).
-    - ``DATE('now')`` becomes ``CURRENT_DATE()`` and
-      ``DATE('now', '-N days')`` is rendered with
-      ``relative_date_replacement``, an ``re.sub`` replacement template
-      where ``\\1`` is the day count (e.g. BigQuery needs
-      ``r"DATE_SUB(CURRENT_DATE(), INTERVAL \\1 DAY)"`` while Spark-style
-      ``DATE_SUB(CURRENT_DATE(), N)`` takes a bare integer).
-    - ``JULIANDAY(d)`` is rendered with ``julianday_replacement``, an
-      ``re.sub`` replacement template where ``\\1`` is the inner expression
-      (e.g. ``r"(UNIX_DATE(\\1) + 2440588)"``).
-
-    Args:
-        query: TPC-DI SQL text with SQLite idioms.
-        flag_true: Replacement for ``<flag> = 1`` comparisons.
-        flag_false: Replacement for ``<flag> = 0`` comparisons.
-        julianday_replacement: Engine-specific JULIANDAY rendering.
-        relative_date_replacement: Engine-specific DATE('now', '-N days') rendering.
-
-    Returns:
-        Query with portable equivalents. Day-number arithmetic is
-        preserved; in differences the added constants cancel exactly.
-    """
     query = re.sub(
         rf"\b({_TPCDI_FLAG_COLUMNS})(`?)\s*=\s*1\b",
         flag_true,
@@ -214,8 +142,6 @@ def rewrite_tpcdi_sqlite_idioms(
         query,
         flags=re.IGNORECASE,
     )
-    # Iterate to fixpoint so nested forms such as
-    # JULIANDAY(DATE('now')) resolve inside-out.
     for _ in range(3):
         rewritten = re.sub(
             r"DATE\s*\(\s*'now'\s*,\s*'-(\d+)\s+days?'\s*\)",
@@ -242,7 +168,6 @@ def rewrite_tpcdi_sqlite_idioms(
 
 
 def rewrite_tpcdi_for_bigquery(query: str) -> str:
-    """TPC-DI SQLite idioms with BigQuery's JULIANDAY rendering."""
     return rewrite_tpcdi_sqlite_idioms(
         query,
         flag_true=r"\1\2 = TRUE",
@@ -256,23 +181,12 @@ _LEADING_SQL_COMMENTS_RE = re.compile(r"\A(?:\s|--[^\n]*(?:\n|\Z)|/\*.*?\*/)*", 
 
 
 def split_leading_sql_comments(statement: str) -> tuple[str, str]:
-    """Split leading whitespace/comments from a SQL statement chunk.
-
-    Schema builders emit decorative header blocks (``--`` lines, or ``/* */``
-    after dialect translation) that survive naive ``";"`` splitting, so a
-    chunk can start with comments before the real ``CREATE TABLE``.
-    Converters that gate on ``startswith("CREATE")`` miss those chunks
-    (BigQuery then sends an unqualified CREATE; Snowflake and Databricks
-    skip their idempotent ``OR REPLACE`` rewrite). Match against the
-    returned remainder instead, and re-attach the prefix unchanged.
-    """
     match = _LEADING_SQL_COMMENTS_RE.match(statement)
     prefix = match.group(0) if match else ""
     return prefix, statement[len(prefix) :]
 
 
 def rewrite_tpcdi_for_databricks(query: str) -> str:
-    """TPC-DI SQLite idioms with Databricks' JULIANDAY rendering."""
     return rewrite_tpcdi_sqlite_idioms(
         query,
         flag_true=r"\1\2 IS TRUE",

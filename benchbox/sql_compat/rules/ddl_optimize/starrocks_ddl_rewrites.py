@@ -1,15 +1,3 @@
-"""StarRocks DDL rewrite rules for Phase.DDL_OPTIMIZE.
-
-StarRocks uses a custom DDL dialect incompatible with DuckDB's output.  It
-requires an explicit table model (DUPLICATE KEY or PRIMARY KEY), uses backtick-
-quoted identifiers, and rejects AUTO_INCREMENT, ENGINE=, and FOREIGN KEY clauses.
-
-StarRocksWorkload._optimize_table_definition() is the runtime implementation for
-these transformations. This platform-wide rule registers the REWRITE_DDL intent
-for governance - compat_lint enforcement only; transformer_id is not resolved at
-runtime.
-"""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.rules._registration import register_ddl_rewrite

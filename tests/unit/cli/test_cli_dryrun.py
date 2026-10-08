@@ -1,9 +1,6 @@
-"""Tests for CLI dry run functionality.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import json
 import shutil
@@ -26,30 +23,28 @@ pytestmark = [
 
 
 class TestBenchmarkNameNormalization:
-    """Test benchmark name normalization and aliases."""
-
     def test_normalize_lowercase(self):
-        """Test that names are lowercased."""
+
         assert normalize_benchmark_name("TPCH") == "tpch"
         assert normalize_benchmark_name("TPCDS") == "tpcds"
         assert normalize_benchmark_name("SSB") == "ssb"
 
     def test_normalize_tpch_aliases(self):
-        """Test TPC-H aliases."""
+
         assert normalize_benchmark_name("tpc-h") == "tpch"
         assert normalize_benchmark_name("TPC-H") == "tpch"
         assert normalize_benchmark_name("tpc_h") == "tpch"
         assert normalize_benchmark_name("TPC_H") == "tpch"
 
     def test_normalize_tpcds_aliases(self):
-        """Test TPC-DS aliases."""
+
         assert normalize_benchmark_name("tpc-ds") == "tpcds"
         assert normalize_benchmark_name("TPC-DS") == "tpcds"
         assert normalize_benchmark_name("tpc_ds") == "tpcds"
         assert normalize_benchmark_name("TPC_DS") == "tpcds"
 
     def test_normalize_tpcds_obt_aliases(self):
-        """Test TPC-DS OBT aliases."""
+
         assert normalize_benchmark_name("tpcdsobt") == "tpcds_obt"
         assert normalize_benchmark_name("tpcds-obt") == "tpcds_obt"
         assert normalize_benchmark_name("tpc-ds-obt") == "tpcds_obt"
@@ -58,7 +53,7 @@ class TestBenchmarkNameNormalization:
         assert normalize_benchmark_name("TPCDSOBT") == "tpcds_obt"
 
     def test_normalize_ssb_aliases(self):
-        """Test SSB aliases."""
+
         assert normalize_benchmark_name("star-schema") == "ssb"
         assert normalize_benchmark_name("starschema") == "ssb"
         assert normalize_benchmark_name("star_schema") == "ssb"
@@ -66,14 +61,13 @@ class TestBenchmarkNameNormalization:
         assert normalize_benchmark_name("STAR-SCHEMA") == "ssb"
 
     def test_normalize_canonical_names_unchanged(self):
-        """Test that canonical names are not changed."""
         assert normalize_benchmark_name("tpch") == "tpch"
         assert normalize_benchmark_name("tpcds") == "tpcds"
         assert normalize_benchmark_name("ssb") == "ssb"
         assert normalize_benchmark_name("tpcds_obt") == "tpcds_obt"
 
     def test_benchmark_aliases_dict_exists(self):
-        """Test that BENCHMARK_ALIASES contains expected entries."""
+
         assert "tpc-h" in BENCHMARK_ALIASES
         assert "tpc-ds" in BENCHMARK_ALIASES
         assert "tpcdsobt" in BENCHMARK_ALIASES
@@ -82,28 +76,24 @@ class TestBenchmarkNameNormalization:
 
 
 class TestGenerateCliCommand:
-    """Test the generate_cli_command function for CLI command generation."""
-
     def test_minimal_command(self):
-        """Test command generation with minimal required parameters."""
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01)
         assert "benchbox run" in cmd
         assert "--platform duckdb" in cmd
         assert "--benchmark tpch" in cmd
-        # Default scale should be omitted
         assert "--scale" not in cmd
 
     def test_non_default_scale(self):
-        """Test that non-default scale factor is included."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=1.0)
         assert "--scale 1.0" in cmd
 
     def test_phases_included_when_not_default(self):
-        """Test that phases are included when not the default 'power'."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(
@@ -112,100 +102,96 @@ class TestGenerateCliCommand:
         assert "--phases generate,load,power" in cmd
 
     def test_phases_omitted_when_default(self):
-        """Test that phases are omitted when just ['power']."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, phases=["power"])
         assert "--phases" not in cmd
 
     def test_queries_included(self):
-        """Test that query subset is included."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, queries=["Q1", "Q6", "Q17"])
         assert "--queries Q1,Q6,Q17" in cmd
 
     def test_tuning_included_when_not_notuning(self):
-        """Test that tuning mode is included when not 'notuning'."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, tuning="tuned")
         assert "--tuning tuned" in cmd
 
     def test_tuning_omitted_when_notuning(self):
-        """Test that tuning is omitted when 'notuning'."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, tuning="notuning")
         assert "--tuning" not in cmd
 
     def test_seed_included(self):
-        """Test that seed is included when specified."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, seed=42)
         assert "--seed 42" in cmd
 
     def test_output_included(self):
-        """Test that output directory is included."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="athena", benchmark="tpch", scale=0.01, output="s3://bucket/path/")
         assert "--output s3://bucket/path/" in cmd
 
     def test_table_format_included(self):
-        """Test that table format is included."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, table_format="parquet")
         assert "--table-format parquet" in cmd
 
     def test_compression_included(self):
-        """Test that compression is included."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, compression="zstd:9")
         assert "--compression zstd:9" in cmd
 
     def test_mode_included(self):
-        """Test that execution mode is included."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="polars", benchmark="tpch", scale=0.01, mode="dataframe")
         assert "--mode dataframe" in cmd
 
     def test_force_included(self):
-        """Test that force mode is included."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, force="datagen")
         assert "--force datagen" in cmd
 
     def test_official_flag_included(self):
-        """Test that official flag is included."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="snowflake", benchmark="tpch", scale=1.0, official=True)
         assert "--official" in cmd
 
     def test_capture_plans_included(self):
-        """Test that capture-plans flag is included."""
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, capture_plans=True)
         assert "--capture-plans" in cmd
 
     def test_strict_translation_included(self):
-        """Test that strict-translation flag is included."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, strict_translation=True)
         assert "--strict-translation" in cmd
 
     def test_stats_reset_omitted_when_unset(self):
-        """Tri-state --stats-reset must be absent entirely when not passed
-        (None), so the reconstructed command stays byte-identical to a default
-        PR #980 run."""
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01)
@@ -232,14 +218,13 @@ class TestGenerateCliCommand:
         assert "--stats-per-table-timing" in cmd
 
     def test_validation_included(self):
-        """Test that validation mode is included."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, validation="loose")
         assert "--validation loose" in cmd
 
     def test_verbose_level_1(self):
-        """Test that -v is included for verbose level 1."""
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, verbose=1)
@@ -247,14 +232,12 @@ class TestGenerateCliCommand:
         assert "-vv" not in cmd
 
     def test_verbose_level_2(self):
-        """Test that -vv is included for verbose level 2 or higher."""
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, verbose=2)
         assert "-vv" in cmd
 
     def test_verbose_level_0_not_included(self):
-        """Test that verbose flag is not included for level 0."""
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(platform="duckdb", benchmark="tpch", scale=0.01, verbose=0)
@@ -262,7 +245,7 @@ class TestGenerateCliCommand:
         assert "-vv" not in cmd
 
     def test_multiline_format(self):
-        """Test that command uses multiline format with backslash continuation."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(
@@ -272,10 +255,10 @@ class TestGenerateCliCommand:
             phases=["generate", "load", "power"],
             tuning="tuned",
         )
-        assert " \\\n    " in cmd  # Verify multiline continuation
+        assert " \\\n    " in cmd
 
     def test_full_command_generation(self):
-        """Test command generation with all options."""
+
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(
@@ -297,7 +280,6 @@ class TestGenerateCliCommand:
             verbose=2,
         )
 
-        # Verify all parameters are present
         assert "--platform athena" in cmd
         assert "--benchmark tpch" in cmd
         assert "--scale 1.0" in cmd
@@ -317,34 +299,27 @@ class TestGenerateCliCommand:
 
 
 class TestDryRunExecutor:
-    """Test the DryRunExecutor class."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.executor = DryRunExecutor(output_dir=self.temp_dir)
 
     def teardown_method(self):
-        """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_dry_run_executor_initialization(self, tmp_path: Path):
-        """Test DryRunExecutor initialization."""
-        # Test with output directory
+
         output_dir = tmp_path / "output"
         executor = DryRunExecutor(output_dir=output_dir)
         assert executor.output_dir == output_dir
 
-        # Test without output directory (should use temp)
         executor_temp = DryRunExecutor()
         assert executor_temp.output_dir.exists()
 
     @patch("benchbox.cli.dryrun.console")
     def test_execute_dry_run_data_only(self, mock_console):
-        """Test dry run execution for data-only mode."""
+
         from datetime import datetime
 
-        # test config
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -352,7 +327,6 @@ class TestDryRunExecutor:
             test_execution_type="data_only",
         )
 
-        # test system profile
         system_profile = SystemProfile(
             os_name="Linux",
             os_version="6.6",
@@ -367,7 +341,6 @@ class TestDryRunExecutor:
             timestamp=datetime.now(),
         )
 
-        # Mock benchmark instance
         with patch.object(self.executor, "_get_benchmark_instance") as mock_get_bench:
             mock_benchmark = Mock()
             mock_benchmark._name = "tpch"
@@ -375,10 +348,8 @@ class TestDryRunExecutor:
             mock_benchmark.get_query.return_value = "SELECT COUNT(*) FROM customer"
             mock_get_bench.return_value = mock_benchmark
 
-            # Execute dry run
             result = self.executor.execute_dry_run(config, system_profile, None)
 
-            # Verify result structure
             assert result is not None
             assert hasattr(result, "benchmark_config")
             assert hasattr(result, "database_config")
@@ -387,13 +358,11 @@ class TestDryRunExecutor:
 
     @patch("benchbox.cli.dryrun.console")
     def test_execute_dry_run_with_database(self, mock_console):
-        """Test dry run execution with database configuration."""
+
         from datetime import datetime
 
-        # test config
         config = BenchmarkConfig(name="tpch", display_name="TPC-H", scale_factor=0.01)
 
-        # test system profile
         system_profile = SystemProfile(
             os_name="Linux",
             os_version="6.6",
@@ -408,20 +377,17 @@ class TestDryRunExecutor:
             timestamp=datetime.now(),
         )
 
-        # test database config
         database_config = Mock()
         database_config.type = "duckdb"
         database_config.options = {"tuning_enabled": True}
         database_config.connection_params = {}
         database_config.execution_mode = "sql"
-        # Mock model_dump() properly
         database_config.model_dump.return_value = {
             "type": "duckdb",
             "options": {"tuning_enabled": True},
             "connection_params": {},
         }
 
-        # Mock benchmark instance
         with patch.object(self.executor, "_get_benchmark_instance") as mock_get_bench:
             mock_benchmark = Mock()
             mock_benchmark._name = "tpch"
@@ -429,16 +395,14 @@ class TestDryRunExecutor:
             mock_benchmark.get_query.return_value = "SELECT * FROM lineitem LIMIT 100"
             mock_get_bench.return_value = mock_benchmark
 
-            # Execute dry run
             result = self.executor.execute_dry_run(config, system_profile, database_config)
 
-            # Verify result structure includes database config
             assert result.database_config is not None
             assert result.database_config["type"] == "duckdb"
             assert result.database_config["options"]["tuning_enabled"] is True
 
     def test_get_platform_config_with_database(self):
-        """Test platform config generation with database."""
+
         from datetime import datetime
 
         system_profile = SystemProfile(
@@ -460,7 +424,6 @@ class TestDryRunExecutor:
         database_config.name = "test_db"
         database_config.options = {"tuning_enabled": False}
         database_config.connection_params = {}
-        # Mock model_dump() properly
         database_config.model_dump.return_value = {
             "type": "duckdb",
             "name": "test_db",
@@ -470,15 +433,13 @@ class TestDryRunExecutor:
 
         config = self.executor._get_platform_config(database_config, system_profile)
 
-        # Verify platform config structure
         assert isinstance(config, dict)
-        # options are nested in the config dict
         assert config["options"]["tuning_enabled"] is False
         assert "memory_limit" in config
         assert "thread_limit" in config
 
     def test_get_platform_config_data_only(self):
-        """Test platform config generation for data-only mode."""
+
         from datetime import datetime
 
         system_profile = SystemProfile(
@@ -497,14 +458,11 @@ class TestDryRunExecutor:
 
         config = self.executor._get_platform_config(None, system_profile)
 
-        # Verify data-only platform config
         assert isinstance(config, dict)
         assert config == {"data_only": True}
 
     @patch("benchbox.cli.dryrun.console")
     def test_display_dry_run_results(self, mock_console):
-        """Test dry run results display."""
-        # mock result
         result = Mock()
         result.benchmark_config = {
             "name": "tpch",
@@ -531,25 +489,22 @@ class TestDryRunExecutor:
         result.tuning_config = None
         result.estimated_resources = None
         result.execution_mode = "sql"
-        result.ddl_preview = None  # No DDL tuning clauses to display
-        result.post_load_statements = None  # No post-load operations
+        result.ddl_preview = None
+        result.post_load_statements = None
 
-        # Include queries attribute for display - should be dict, not list
         result.queries = {"Q1": "SELECT 1", "Q2": "SELECT 2", "Q3": "SELECT 3"}
 
-        # Display results - should complete without raising
         try:
             self.executor.display_dry_run_results(result)
         except Exception as exc:
             pytest.fail(f"display_dry_run_results raised {type(exc).__name__}: {exc}")
 
     def test_save_dry_run_results(self):
-        """Test saving dry run results to files."""
+
         from datetime import datetime
 
         from benchbox.cli.dryrun import DryRunResult
 
-        # proper DryRunResult instance
         result = DryRunResult(
             benchmark_config={"name": "tpch", "scale_factor": 0.01},
             database_config={"type": "duckdb"},
@@ -560,14 +515,11 @@ class TestDryRunExecutor:
             timestamp=datetime.now(),
         )
 
-        # Save results
         saved_files = self.executor.save_dry_run_results(result, "test_prefix")
 
-        # Verify files were saved
         assert isinstance(saved_files, dict)
         assert "json" in saved_files
 
-        # Verify JSON file content
         json_file = saved_files["json"]
         assert Path(json_file).exists()
 
@@ -579,11 +531,9 @@ class TestDryRunExecutor:
 
     @patch("benchbox.cli.dryrun.console")
     def test_preview_query_execution(self, mock_console):
-        """Test query execution preview functionality."""
-        # test queries
+
         queries = ["Q1", "Q2", "Q3"]
 
-        # Mock benchmark
         mock_benchmark = Mock()
         mock_benchmark.get_query.side_effect = [
             "SELECT COUNT(*) FROM customer",
@@ -591,13 +541,11 @@ class TestDryRunExecutor:
             "SELECT l_orderkey, SUM(l_quantity) FROM lineitem GROUP BY l_orderkey",
         ]
 
-        # basic preview manually (method doesn't exist in actual implementation)
         preview = {
             "query_count": len(queries),
             "queries": [{"id": q, "sql": mock_benchmark.get_query(q)} for q in queries],
         }
 
-        # Verify preview structure
         assert isinstance(preview, dict)
         assert "query_count" in preview
         assert preview["query_count"] == 3
@@ -605,55 +553,44 @@ class TestDryRunExecutor:
         assert len(preview["queries"]) == 3
 
     def test_estimate_execution_time(self):
-        """Test execution time estimation."""
-        # Test with different configurations
+
         config = {"scale_factor": 0.01, "query_count": 22}
 
-        # basic time estimate manually (method doesn't exist in actual implementation)
         scale_factor = config.get("scale_factor", 1.0)
         query_count = config.get("query_count", 22)
-        base_time = scale_factor * query_count * 2  # 2 seconds per query per scale factor
+        base_time = scale_factor * query_count * 2
         time_estimate = f"{int(base_time)} seconds" if base_time < 60 else f"{int(base_time // 60)} minutes"
 
-        # Verify estimate is reasonable
         assert isinstance(time_estimate, str)
         assert "minute" in time_estimate or "second" in time_estimate
 
     def test_estimate_data_size(self):
-        """Test data size estimation."""
-        # mock benchmark with scale_factor
+
         mock_benchmark = Mock()
         mock_benchmark.scale_factor = 0.1
         benchmark_name = "tpch"
 
-        # Test the actual method signature
         size_estimate = self.executor._estimate_data_size(mock_benchmark, benchmark_name)
 
-        # Verify size estimate
         assert isinstance(size_estimate, (int, float))
         assert size_estimate > 0
 
 
 class TestDryRunResultHandling:
-    """Test dry run result handling and formatting."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
 
     def teardown_method(self):
-        """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_dry_run_result_json_serialization(self):
-        """Test that dry run results can be serialized to JSON."""
+
         from datetime import datetime
 
         from benchbox.cli.dryrun import DryRunResult
 
         executor = DryRunExecutor(output_dir=self.temp_dir)
 
-        # proper DryRunResult instance
         result = DryRunResult(
             benchmark_config={
                 "name": "tpch",
@@ -672,11 +609,9 @@ class TestDryRunResultHandling:
             timestamp=datetime.now(),
         )
 
-        # Save and verify JSON serialization works
         saved_files = executor.save_dry_run_results(result, "serialization_test")
         json_file = saved_files["json"]
 
-        # Verify file can be read back
         with open(json_file, encoding="utf-8") as f:
             data = json.load(f)
             assert data["benchmark_config"]["name"] == "tpch"
@@ -684,12 +619,11 @@ class TestDryRunResultHandling:
             assert data["database_config"]["type"] == "duckdb"
 
     def test_dry_run_with_compression_settings(self):
-        """Test dry run with compression settings."""
+
         from datetime import datetime
 
         executor = DryRunExecutor(output_dir=self.temp_dir)
 
-        # config with compression
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -713,7 +647,6 @@ class TestDryRunResultHandling:
             timestamp=datetime.now(),
         )
 
-        # Mock benchmark instance
         with patch.object(executor, "_get_benchmark_instance") as mock_get_bench:
             mock_benchmark = Mock()
             mock_benchmark._name = "tpch"
@@ -721,29 +654,23 @@ class TestDryRunResultHandling:
             mock_benchmark.get_query.return_value = "SELECT 1"
             mock_get_bench.return_value = mock_benchmark
 
-            # Execute dry run
             result = executor.execute_dry_run(config, system_profile, None)
 
-            # Verify compression settings are included
             assert result.benchmark_config["compress_data"] is True
             assert result.benchmark_config["compression_type"] == "zstd"
             assert result.benchmark_config["compression_level"] == 5
 
 
 class TestDryRunErrorHandling:
-    """Test dry run error handling and edge cases."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.executor = DryRunExecutor(output_dir=self.temp_dir)
 
     def teardown_method(self):
-        """Clean up test fixtures."""
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_dry_run_with_invalid_benchmark(self):
-        """Test dry run with invalid benchmark configuration."""
+
         from datetime import datetime
 
         config = BenchmarkConfig(name="invalid", display_name="Invalid")
@@ -761,24 +688,17 @@ class TestDryRunErrorHandling:
             timestamp=datetime.now(),
         )
 
-        # Mock benchmark instance to raise exception
         with patch.object(self.executor, "_get_benchmark_instance") as mock_get_bench:
             mock_get_bench.side_effect = ValueError("Unknown benchmark: invalid")
 
-            # Execute dry run - should handle error gracefully and return result with warnings
             result = self.executor.execute_dry_run(config, system_profile, None)
 
-            # Should return result with warnings instead of raising
             assert result is not None
             assert len(result.warnings) > 0
             assert "Unknown benchmark: invalid" in str(result.warnings)
 
     @pytest.mark.skipif(sys.platform == "win32", reason="Path handling differs on Windows")
     def test_dry_run_with_missing_output_dir(self, tmp_path):
-        """Test dry run when output directory cannot be created."""
-        # Fail-fast is the expected behavior. The invalid path sits under a
-        # regular FILE so creation fails for every uid - root can mkdir
-        # /invalid, which made the old absolute-path probe root-sensitive.
         blocker = tmp_path / "blocker"
         blocker.write_text("")
         with pytest.raises(OSError):
@@ -786,7 +706,7 @@ class TestDryRunErrorHandling:
 
     @patch("benchbox.cli.dryrun.console")
     def test_dry_run_with_empty_query_list(self, mock_console):
-        """Test dry run with benchmark that has no queries."""
+
         from datetime import datetime
 
         config = BenchmarkConfig(name="empty", display_name="Empty")
@@ -804,37 +724,29 @@ class TestDryRunErrorHandling:
             timestamp=datetime.now(),
         )
 
-        # Mock benchmark with empty query list
         with patch.object(self.executor, "_get_benchmark_instance") as mock_get_bench:
             mock_benchmark = Mock()
             mock_benchmark._name = "empty"
             mock_benchmark.get_query_list.return_value = []
             mock_get_bench.return_value = mock_benchmark
 
-            # Execute dry run
             result = self.executor.execute_dry_run(config, system_profile, None)
 
-            # Should handle empty query list - but the method returns None on error
-            # This is the current behavior
             assert result.query_preview is None
 
 
 @pytest.mark.unit
 class TestDryRunExecutorCoverageGaps:
-    """Test coverage gaps in DryRunExecutor."""
-
     def setup_method(self):
-        """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.output_dir = Path(self.temp_dir)
 
     def teardown_method(self):
-        """Clean up test fixtures."""
         if self.temp_dir and Path(self.temp_dir).exists():
             shutil.rmtree(self.temp_dir)
 
     def test_dryrun_with_benchmark_config(self):
-        """Test dry run with benchmark config."""
+
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -849,13 +761,11 @@ class TestDryRunExecutorCoverageGaps:
             mock_bench.get_query_list.return_value = []
             mock_get.return_value = mock_bench
 
-            # Should handle execution without error
             result = executor.execute_dry_run(config, system_profile, None)
-            # Result can be None on error or a DryRunResult object
             assert result is None or hasattr(result, "query_preview")
 
     def test_dryrun_exception_in_query_list(self):
-        """Test exception handling when getting query list."""
+
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -870,12 +780,11 @@ class TestDryRunExecutorCoverageGaps:
             mock_bench.get_query_list.side_effect = RuntimeError("Query error")
             mock_get.return_value = mock_bench
 
-            # Should handle exception gracefully
             result = executor.execute_dry_run(config, system_profile, None)
-            assert result is None or result is not None  # Either valid outcome
+            assert result is None or result is not None
 
     def test_dryrun_schema_extraction(self):
-        """Test schema extraction in dry run."""
+
         config = BenchmarkConfig(
             name="tpch",
             display_name="TPC-H",
@@ -892,13 +801,10 @@ class TestDryRunExecutorCoverageGaps:
             mock_get.return_value = mock_bench
 
             result = executor.execute_dry_run(config, system_profile, None)
-            # Schema should be processed without error
             assert result is None or result is not None
 
 
 class TestDryRunDisplayConfigurationSummary:
-    """Test that _display_configuration_summary shows data layout and tuning rows."""
-
     def _make_result(self, options=None, benchmark_overrides=None, tuning_config=None):
         from benchbox.core.schemas import DryRunResult
 
@@ -991,10 +897,7 @@ class TestDryRunDisplayConfigurationSummary:
 
 
 class TestDryRunDisplayBehavioral:
-    """Behavioral coverage for branch-heavy dry-run rendering helpers."""
-
     def test_ddl_preview_summary_shows_distribute_by(self):
-        """The Tuning summary line surfaces distribute_by (not dead keys)."""
         from io import StringIO
 
         from rich.console import Console
@@ -1054,7 +957,6 @@ class TestDryRunDisplayBehavioral:
         return buf.getvalue()
 
     def test_display_dry_run_results_renders_dataframe_preview_and_maintenance_ops(self):
-        """DataFrame previews should filter internal entries and show maintenance SQL separately."""
         long_query = "pl.scan_parquet('lineitem.parquet').filter(pl.col('l_quantity') > 10)\n" * 20
         result = self._make_result(
             database_config={"type": "polars-df", "name": "Polars"},
@@ -1087,7 +989,6 @@ class TestDryRunDisplayBehavioral:
         assert "DataFrame Schema" in output
 
     def test_display_dry_run_results_renders_tuning_ddl_post_load_resources_and_warnings(self):
-        """Dry-run results should include tuning, DDL, post-load SQL, resource pressure, and warnings."""
         result = self._make_result(
             schema_sql="CREATE TABLE orders (id INT);",
             tuning_config={
@@ -1155,7 +1056,6 @@ class TestDryRunDisplayBehavioral:
         assert "First warning" in output
 
     def test_display_helper_formatters_cover_stream_and_maintenance_paths(self):
-        """Helper methods should format execution and stream identifiers consistently."""
         from io import StringIO
 
         from rich.console import Console
@@ -1191,8 +1091,6 @@ class TestDryRunDisplayBehavioral:
 
 
 class TestGenerateCliCommandNewParams:
-    """Test the new parameters added to generate_cli_command."""
-
     def test_platform_options_rendered(self):
         from benchbox.cli.dryrun import generate_cli_command
 
@@ -1323,7 +1221,6 @@ class TestGenerateCliCommandNewParams:
         assert "--global-cache" not in cmd
 
     def test_compression_zstd_not_silently_dropped(self):
-        """Regression: --compression zstd was previously silently dropped."""
         from benchbox.cli.dryrun import generate_cli_command
 
         cmd = generate_cli_command(
@@ -1400,12 +1297,6 @@ class TestGenerateCliCommandClientLink:
 
 
 class TestGenerateCliCommandCompleteness:
-    """Introspection test: assert generate_cli_command covers all behavior-affecting CLI params."""
-
-    # Params that are cosmetic/output-only and intentionally excluded from generate_cli_command
-    # ``concurrency`` is a hidden internal forwarding param for ``run-official``
-    # (``--streams`` -> ``--concurrency``) and intentionally not surfaced in
-    # ``generate_cli_command``.
     COSMETIC_PARAMS = frozenset(
         {
             "dry_run",
@@ -1421,14 +1312,12 @@ class TestGenerateCliCommandCompleteness:
         }
     )
 
-    # Params whose Click name differs from the generate_cli_command kwarg name
     CLICK_TO_KWARG_RENAMES = {
         "platform_option_pairs": "platform_options",
         "benchmark_option_pairs": "benchmark_options",
     }
 
     def test_completeness(self):
-        """Every behavior-affecting Click param on `run` has a corresponding kwarg in generate_cli_command."""
         import inspect
 
         import click
@@ -1436,7 +1325,6 @@ class TestGenerateCliCommandCompleteness:
         from benchbox.cli.commands.run import run
         from benchbox.cli.dryrun import generate_cli_command
 
-        # Get Click command's parameter names (excluding the context)
         click_params = set()
         assert isinstance(run, click.Command)
         for param in run.params:
@@ -1444,17 +1332,14 @@ class TestGenerateCliCommandCompleteness:
                 continue
             click_params.add(param.name)
 
-        # Get generate_cli_command's parameter names
         sig = inspect.signature(generate_cli_command)
         gen_params = set(sig.parameters.keys())
 
-        # Apply renames
         normalized_click = set()
         for p in click_params:
             renamed = self.CLICK_TO_KWARG_RENAMES.get(p, p)
             normalized_click.add(renamed)
 
-        # The set of Click params minus cosmetic ones should be a subset of generate_cli_command params
         behavior_params = normalized_click - self.COSMETIC_PARAMS
         missing = behavior_params - gen_params
 

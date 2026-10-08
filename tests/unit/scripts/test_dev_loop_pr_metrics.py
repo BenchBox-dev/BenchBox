@@ -1,5 +1,3 @@
-"""Regression tests for develop PR metric collection and timeout alignment."""
-
 from __future__ import annotations
 
 import importlib.util
@@ -771,7 +769,6 @@ def test_acceptance_validator_holds_incomplete_cohort_and_replays() -> None:
 
 
 def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The validator can pass: guards against a firewall that never opens."""
     import copy
     import hashlib
     import json as _json2
@@ -820,9 +817,6 @@ def test_acceptance_validator_accepts_complete_record(monkeypatch: pytest.Monkey
         "_commit_parent",
         lambda commit: base_freeze if commit == head else real_commit_parent(commit),
     )
-    # The synthetic registration binds head to a single-parent freeze proof,
-    # so the live parent count (a merge ref in PR checkouts, parentless in a
-    # depth-1 checkout) must not leak into the verdict either.
     real_has_second_parent = metrics._has_second_parent
     monkeypatch.setattr(
         metrics,
@@ -944,12 +938,6 @@ def test_acceptance_validator_rejects_weakened_frozen_requirements(monkeypatch: 
 
 
 def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Squash-orphaned freeze evidence stays mechanically checked.
-
-    The durable registration commit satisfies the ancestor gate while
-    original_commit preserves the freeze-only boundary; tampering with
-    either copy must fail.
-    """
     import json as _json4
 
     DURABLE = "a" * 40
@@ -1191,7 +1179,6 @@ def test_acceptance_binding_preserves_original_freeze_commit(monkeypatch: pytest
 
 
 def test_acceptance_binding_rejects_branch_local_durable_anchor(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A durable acceptance record cannot establish its own publication ancestry."""
     import json as _json5
 
     DURABLE = "a" * 40
@@ -1235,7 +1222,6 @@ def test_acceptance_binding_rejects_branch_local_durable_anchor(monkeypatch: pyt
 
 
 def test_acceptance_cli_forwards_selected_acceptance_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """The CLI entry forwards the selected acceptance path to the history-anchor read."""
     seen: dict = {}
     real_binding = metrics._check_acceptance_binding
 
@@ -1282,7 +1268,6 @@ def test_acceptance_cli_forwards_selected_acceptance_path(monkeypatch: pytest.Mo
 
 
 def test_commit_diff_names_parses_nul_delimited_output(monkeypatch: pytest.MonkeyPatch) -> None:
-    """NUL-delimited diff names survive non-ASCII pathnames unquoted."""
     assert metrics._commit_diff_names("0" * 40, "0" * 40) is None
 
     class _Proc:

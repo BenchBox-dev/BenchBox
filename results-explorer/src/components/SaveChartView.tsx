@@ -7,15 +7,11 @@ import {
 } from "@/lib/dashboards";
 
 interface SaveChartViewProps {
-  /** Registry chart id when the button targets one chart card (tabs layout passes the open chart). */
   chartId?: string | null;
-  /** Chart title used as the default saved-view name. */
   chartTitle: string;
-  /** Deep-link anchor appended to the saved URL (card anchors in long layout). */
   anchorId?: string;
 }
 
-/** Save the current chart view (URL state included) into a user dashboard. */
 export function SaveChartView({ chartId = null, chartTitle, anchorId }: SaveChartViewProps) {
   const [dashboards, setDashboards] = useState<Dashboard[]>(() => loadDashboards());
   const [dashboardId, setDashboardId] = useState<string>("");

@@ -1,32 +1,4 @@
 #!/usr/bin/env python3
-"""Operational receipts and capacity/retention auditor (A11 w2).
-
-Audits operational exercise receipts, storage capacity, retention policies, and
-drill freshness. It never fabricates a receipt, a capacity measurement, or a
-retention policy. Every input must be supplied as a real file (or, for capacity,
-a real directory to measure). A missing required input fails closed (exit 1 for
-a policy violation, exit 2 for a config/parse error).
-
-1. Capacity Limits (GitHub Pages rejects AT the limit, so comparisons are >=):
-   - Total Pages publication tree size < 1 GiB (1,073,741,824 B); warn at 800 MiB.
-   - Maximum individual file size < 100 MiB (104,857,600 B).
-2. Retention Rules (from the retention-policy.json ``source`` field, which must
-   cite the governing workflow ``retention-days`` or contract clause):
-   - Transient build/test artifacts: <= 7 days retention.
-   - Attested receipts & audit logs: >= 30 days retention.
-   - Rollback checkpoints & disaster recovery states: >= 90 days retention.
-3. Operational Drills (each receipt required on disk; a missing receipt is a
-   MISSING violation, never a synthesized pass):
-   - Automated rollback drill receipt freshness (<= max-age-days, default 30).
-   - Emergency takedown drill receipt freshness (<= max-age-days).
-   - Incident response drill receipt freshness (<= max-age-days).
-
-Exit codes:
-  0 - All operational receipts, capacity bounds, and retention policies verified.
-  1 - Verification failure (capacity limit exceeded, expired/missing drill,
-      retention policy violation).
-  2 - Configuration, file reading, or argument error.
-"""
 
 from __future__ import annotations
 
@@ -44,9 +16,9 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HEX_64_RE = re.compile(r"^(sha256:)?[0-9a-f]{64}$", re.IGNORECASE)
 
-MAX_TOTAL_PAGES_BYTES = 1024 * 1024 * 1024  # 1 GiB
-WARNING_TOTAL_PAGES_BYTES = 800 * 1024 * 1024  # 800 MiB
-MAX_INDIVIDUAL_FILE_BYTES = 100 * 1024 * 1024  # 100 MiB
+MAX_TOTAL_PAGES_BYTES = 1024 * 1024 * 1024
+WARNING_TOTAL_PAGES_BYTES = 800 * 1024 * 1024
+MAX_INDIVIDUAL_FILE_BYTES = 100 * 1024 * 1024
 
 MAX_TRANSIENT_RETENTION_DAYS = 7
 MIN_RECEIPT_RETENTION_DAYS = 30
@@ -63,11 +35,10 @@ RETENTION_FILE = "retention-policy.json"
 
 
 class ReceiptsConfigError(ValueError):
-    """Raised for a configuration or parse error in operational inputs."""
+    pass
 
 
 def _validate_artifact_evidence(evidence: Any) -> list[str]:
-    """Validate immutable workflow-artifact provenance carried by a receipt."""
     if not isinstance(evidence, dict):
         return ["evidence must be an object"]
     errors: list[str] = []
@@ -89,8 +60,6 @@ def _validate_artifact_evidence(evidence: Any) -> list[str]:
 
 @dataclass
 class CapacityAudit:
-    """Audit of publication artifact storage capacity."""
-
     total_size_bytes: int
     max_total_bytes: int = MAX_TOTAL_PAGES_BYTES
     warning_total_bytes: int = WARNING_TOTAL_PAGES_BYTES
@@ -108,8 +77,6 @@ class CapacityAudit:
 
 @dataclass
 class RetentionAudit:
-    """Audit of artifact retention configuration."""
-
     transient_retention_days: int | None = None
     receipt_retention_days: int | None = None
     rollback_checkpoint_retention_days: int | None = None
@@ -123,10 +90,8 @@ class RetentionAudit:
 
 @dataclass
 class DrillReceiptStatus:
-    """Verification status of an operational exercise drill receipt."""
-
     drill_type: str
-    status: str  # VERIFIED, EXPIRED, MISSING, INVALID, FAILED
+    status: str
     receipt_id: str | None = None
     executed_at: str | None = None
     age_days: float | None = None
@@ -140,8 +105,6 @@ class DrillReceiptStatus:
 
 @dataclass
 class OperationalReceiptsReport:
-    """Structured report on operational exercises, capacity, and retention."""
-
     valid: bool = True
     capacity: CapacityAudit = field(default_factory=lambda: CapacityAudit(total_size_bytes=0))
     retention: RetentionAudit = field(default_factory=RetentionAudit)
@@ -163,7 +126,6 @@ class OperationalReceiptsReport:
 
 
 def parse_iso_timestamp(ts_str: str) -> datetime | None:
-    """Parse an ISO-8601 UTC timestamp string."""
     if not ts_str:
         return None
     cleaned = ts_str.strip().replace("Z", "+00:00")
@@ -193,7 +155,6 @@ def audit_capacity(
     largest_file_path: str = "",
     measured: bool = False,
 ) -> CapacityAudit:
-    """Evaluate storage capacity against Pages limits (rejection is AT the limit)."""
     warnings: list[str] = []
     violations: list[str] = []
     passed = True
@@ -236,10 +197,6 @@ def audit_retention(
     rollback_days: int | None,
     source: str = "",
 ) -> RetentionAudit:
-    """Evaluate artifact retention policies against minimum requirements.
-
-    A missing value (``None``) is itself a violation - the policy must state it.
-    """
     violations: list[str] = []
     passed = True
 
@@ -291,7 +248,6 @@ def audit_drill_receipt(
     max_age_days: float = DEFAULT_MAX_AGE_DAYS,
     now_dt: datetime | None = None,
 ) -> DrillReceiptStatus:
-    """Evaluate an operational drill receipt for freshness and status."""
     now = now_dt or datetime.now(timezone.utc)
 
     if not receipt_data:
@@ -403,7 +359,6 @@ def audit_drill_receipt(
 
 
 def measure_local_directory_capacity(path: Path) -> tuple[int, int, str]:
-    """Measure total size, largest file size, and largest file path of a directory."""
     if not path.exists():
         raise ReceiptsConfigError(f"capacity measurement path does not exist: {path}")
 
@@ -436,12 +391,6 @@ def audit_operational_receipts(
     max_age_days: float = DEFAULT_MAX_AGE_DAYS,
     now_dt: datetime | None = None,
 ) -> OperationalReceiptsReport:
-    """Audit all operational exercise receipts, capacity, and retention rules.
-
-    ``receipts_dir`` is required and must contain the three drill receipts, a
-    retention policy, and either a capacity audit file or (via ``pages_dir``) a
-    real directory to measure.
-    """
     now = now_dt or datetime.now(timezone.utc)
 
     if receipts_dir is None:
@@ -463,7 +412,6 @@ def audit_operational_receipts(
     takedown_data = _load_optional(TAKEDOWN_DRILL_FILE)
     incident_data = _load_optional(INCIDENT_DRILL_FILE)
 
-    # Capacity: measure a real directory or read a real audit file. Never invent.
     cap_data = _load_optional(CAPACITY_FILE)
     if pages_dir is not None:
         total_bytes, largest_file_bytes, largest_file_path = measure_local_directory_capacity(pages_dir)
@@ -493,7 +441,6 @@ def audit_operational_receipts(
         all_violations.extend(capacity_audit.violations)
     all_warnings.extend(capacity_audit.warnings)
 
-    # Retention: real policy file only.
     ret_data = _load_optional(RETENTION_FILE)
     if ret_data is None:
         retention_audit = RetentionAudit(passed=False)

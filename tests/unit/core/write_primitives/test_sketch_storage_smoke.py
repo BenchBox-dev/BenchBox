@@ -1,5 +1,3 @@
-"""Coverage guardrails for the on-demand sketch storage smoke script."""
-
 from __future__ import annotations
 
 import re
@@ -46,7 +44,6 @@ def _script_sketch_byte_labels() -> set[tuple[str, str]]:
 
 
 def test_sketch_storage_smoke_covers_catalog_sketch_byte_validations() -> None:
-    """Every catalog sketch_bytes bound needs a matching smoke output label."""
 
     expected = _catalog_sketch_byte_labels()
     actual = _script_sketch_byte_labels()

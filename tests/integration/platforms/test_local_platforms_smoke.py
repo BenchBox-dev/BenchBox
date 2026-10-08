@@ -1,5 +1,3 @@
-"""Smoke coverage for local DuckDB and SQLite adapters."""
-
 from pathlib import Path
 from typing import Callable
 

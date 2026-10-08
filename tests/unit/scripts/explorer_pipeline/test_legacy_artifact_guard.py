@@ -1,20 +1,3 @@
-"""G-8 exit gate: no legacy metric-bearing JSON artifacts survive a pipeline build.
-
-Asserts two invariants:
-
-1. A freshly-built output directory contains ONLY the canonical artifacts
-   (``results.duckdb`` and ``bundles/``). No ``manifest.json``,
-   ``meta_leaderboard.json``, ``short_ids.json``, ``results_schema.json``,
-   or directories for ``details/``, ``compare/``, ``benchmarks/``.
-
-2. No explorer page or component fetches from ``/results/data/bundles/``
-   at runtime. Bundles are a download-only affordance.
-
-Stale artifacts from earlier pipeline versions are removed by the pipeline's
-output-dir sweep, so even if the caller reuses an older output dir, the
-contract holds.
-"""
-
 from __future__ import annotations
 
 import json
@@ -61,12 +44,10 @@ class TestPipelineOutputIsMetricFree:
         assert not survivors, f"pipeline emitted disallowed metric directories: {survivors}"
 
     def test_only_canonical_artifacts_emitted(self, built_output: Path) -> None:
-        """Output dir must contain exactly: results.duckdb + bundles/ (everything else is legacy)."""
         actual = {p.name for p in built_output.iterdir()}
         assert actual == {"results.duckdb", "bundles"}, f"unexpected output-dir members: {actual}"
 
     def test_stale_artifacts_are_swept_on_rebuild(self, tmp_path: Path) -> None:
-        """Rebuilding over a polluted output dir removes legacy files and dirs."""
         data_dir = tmp_path / "data"
         bundles_dir = data_dir / "bundles"
         bundles_dir.mkdir(parents=True)
@@ -74,7 +55,6 @@ class TestPipelineOutputIsMetricFree:
 
         output = tmp_path / "out"
         output.mkdir(parents=True)
-        # Pollute output with legacy files and dirs
         for name in LEGACY_FILES:
             (output / name).write_text("{}", encoding="utf-8")
         for name in LEGACY_DIRS:
@@ -90,8 +70,6 @@ class TestPipelineOutputIsMetricFree:
 
 
 class TestSourceTreeDoesNotFetchMetricJson:
-    """No page or component fetches legacy metric-bearing JSON paths."""
-
     FORBIDDEN_PATH_PATTERNS = (
         "/results/data/benchmarks/",
         "/results/data/details/",

@@ -31,19 +31,14 @@ benchbox show-plan --run <results.json> --query-id <id> [OPTIONS]
 ### Examples
 
 ```bash
-# Show plan as tree
 benchbox show-plan --run results.json --query-id q05
 
-# Show summary statistics only
 benchbox show-plan --run results.json --query-id 1 --format summary
 
-# Export plan as JSON
 benchbox show-plan --run results.json --query-id q05 --format json
 
-# Compact tree view without properties
 benchbox show-plan --run results.json --query-id q05 --compact --no-properties
 
-# Limit tree depth
 benchbox show-plan --run results.json --query-id q05 --max-depth 3
 ```
 
@@ -77,13 +72,10 @@ benchbox plan-history --query-id <id> --history-dir <path> [OPTIONS]
 ### Examples
 
 ```bash
-# Show plan history for query q05
 benchbox plan-history --query-id q05 --history-dir ./plan_history
 
-# Check for plan instability
 benchbox plan-history --query-id q05 --history-dir ./plan_history --check-flapping
 
-# Show more entries
 benchbox plan-history --query-id q05 --history-dir ./plan_history --limit 50
 ```
 

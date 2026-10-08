@@ -1,5 +1,3 @@
-"""Modular TPC-DS benchmark orchestration package."""
-
 from .config import MaintenanceTestConfig, ThroughputTestConfig
 from .phases import BenchmarkPhase
 from .results import (

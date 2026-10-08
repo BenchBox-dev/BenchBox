@@ -72,11 +72,6 @@ export async function recoverCompareResults<T>(
   limit: number,
   dependencies: CompareRecoveryDependencies<T>,
 ): Promise<CompareRecoveryResult<T> | null> {
-  // Do not apply the comparison limit until aliases have resolved. A short ID
-  // and its long-form alias consume one slot, not two. Resolve at most two
-  // limit-sized batches: that covers the supported short + full ID alias pair
-  // for every retained result without allowing crafted URLs to fan out an
-  // unbounded number of DuckDB reads.
   const initialPlan = planCompareIds(rawIds, rawIds.length);
   const normalizedLimit = Math.max(0, Math.floor(limit));
   if (normalizedLimit === 0) {
@@ -108,8 +103,6 @@ export async function recoverCompareResults<T>(
       }),
     );
     processedCount += batch.length;
-    // Match the page effect's original boundary: once an ID-resolution batch
-    // finishes, do not begin more reads for a superseded URL or unmounted component.
     if (dependencies.isCancelled?.()) return null;
     for (const entry of resolvedBatch) {
       if (entry.resolvedId !== null && resolvedSeen.has(entry.resolvedId)) {
@@ -180,8 +173,6 @@ export async function recoverCompareResults<T>(
         return false;
       });
     } catch {
-      // Preserve the existing per-result recovery path when the optional
-      // membership optimization is unavailable.
       if (dependencies.isCancelled?.()) return null;
     }
   }

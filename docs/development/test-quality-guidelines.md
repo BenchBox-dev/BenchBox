@@ -13,24 +13,21 @@ This document defines standards for writing effective, maintainable tests in Ben
 
 ### 1. Enum/Constant Count Tests
 
-**Bad**: Testing that a collection has a specific count.
+**Bad**: Testing that a collection has a specific count. The test breaks whenever tables are added or removed.
 
 ```python
-# BAD - breaks when tables are added/removed
 def test_table_count():
     assert len(TABLES) == 21
 ```
 
-**Good**: Test structural properties or specific members.
+**Good**: Test structural properties or specific members. These tests check behavior, not an implementation detail, and the second one checks a specific requirement.
 
 ```python
-# GOOD - tests behavior, not implementation detail
 def test_all_tables_have_required_columns():
     for table in TABLES:
         assert table.has_primary_key()
         assert "created_at" in table.column_names
 
-# GOOD - tests specific requirements
 def test_required_tables_present():
     required = {"users", "orders", "products"}
     assert required.issubset(set(TABLES.keys()))
@@ -38,25 +35,21 @@ def test_required_tables_present():
 
 ### 2. Tautological Assertions
 
-**Bad**: Asserting something that would raise an exception anyway.
+**Bad**: Asserting something that would raise an exception anyway. `import_module` raises `ImportError` on failure and never returns `None`, and a constructor raises on failure, so both assertions below are redundant.
 
 ```python
-# BAD - import_module raises ImportError on failure, never returns None
 module = importlib.import_module("mypackage")
-assert module is not None  # Redundant
+assert module is not None
 
-# BAD - constructor raises on failure
 obj = MyClass()
-assert obj is not None  # Redundant
+assert obj is not None
 ```
 
-**Good**: Remove redundant assertions or replace with meaningful ones.
+**Good**: Remove redundant assertions or replace with meaningful ones. A bare import already fails with a clear `ImportError` message, and the second example verifies behavior after construction.
 
 ```python
-# GOOD - just import (failure = ImportError with clear message)
 importlib.import_module("mypackage")
 
-# GOOD - verify behavior after construction
 obj = MyClass()
 assert obj.is_initialized
 assert obj.config == expected_config
@@ -67,7 +60,6 @@ assert obj.config == expected_config
 **Bad**: Checking type without verifying content.
 
 ```python
-# BAD - doesn't verify the dict has expected content
 result = get_stats()
 assert isinstance(result, dict)
 ```
@@ -75,7 +67,6 @@ assert isinstance(result, dict)
 **Good**: Verify structure or content.
 
 ```python
-# GOOD - verifies both type and content
 result = get_stats()
 assert isinstance(result, dict)
 assert "row_count" in result
@@ -84,20 +75,18 @@ assert result["row_count"] >= 0
 
 ### 4. Constant Equality Tests
 
-**Bad**: Testing that a constant equals its expected value.
+**Bad**: Testing that a constant equals its expected value. The test just duplicates the constant definition.
 
 ```python
-# BAD - just duplicates the constant definition
 def test_default_scale():
     assert DEFAULT_SCALE == 0.01
 ```
 
-**Good**: Test that the constant is used correctly.
+**Good**: Test that the constant is used correctly. This test passes no `scale_factor` argument, so it shows the default is actually applied.
 
 ```python
-# GOOD - tests that default is actually applied
 def test_default_scale_applied():
-    benchmark = TPCH()  # No scale_factor arg
+    benchmark = TPCH()
     assert benchmark.scale_factor == 0.01
 ```
 
@@ -106,7 +95,6 @@ def test_default_scale_applied():
 **Bad**: Testing format/structure instead of behavior.
 
 ```python
-# BAD - tests format, not correctness
 def test_query_format():
     query = generate_query(1)
     assert query.startswith("SELECT")
@@ -117,7 +105,6 @@ def test_query_format():
 **Good**: Test that the query works correctly.
 
 ```python
-# GOOD - tests actual behavior
 def test_query_returns_expected_rows():
     query = generate_query(1)
     result = conn.execute(query)
@@ -126,19 +113,17 @@ def test_query_returns_expected_rows():
 
 ## Valid Uses of `is not None`
 
-Sometimes `assert x is not None` is appropriate:
+Sometimes `assert x is not None` is appropriate. In the first example the function legitimately returns `None` for invalid input, because the parser returns `None` for unparseable input. In the second, the field is optional but should be present in this test case, even though some users might not have an email.
 
 ```python
-# VALID - function legitimately returns None for invalid input
 plan = parser.parse(malformed_input)
-if plan is not None:  # Parser returns None for unparseable input
+if plan is not None:
     assert plan.logical_root is not None
 ```
 
 ```python
-# VALID - optional field that should be present in this test case
 result = get_user(user_id)
-assert result.email is not None  # Some users might not have email
+assert result.email is not None
 ```
 
 The key distinction: use `is not None` when `None` is a valid return value that you want to explicitly check for, not when the function would raise an exception instead.
@@ -184,9 +169,10 @@ design and the validation matrix contributors must rerun before changing it.
 
 ### Naming Convention
 
-```python
+Naming template and illustrative function signatures:
+
+```text
 def test_<what>_<condition>_<expected_result>():
-    """Optional docstring explaining why this test exists."""
     ...
 
 # Examples:
@@ -195,19 +181,21 @@ def test_connection_timeout_raises_error():
 def test_empty_table_generates_no_rows():
 ```
 
-### Docstrings
+### Test intent
 
-Add docstrings when the test name isn't self-explanatory:
+Use names and assertions that state the behavior being checked. Keep explanatory
+prose in test documentation, following the comment policy in `docs/development/comment-policy.md`.
+Do not add source comments or docstrings.
+
+For example, a TPC-H scale-factor test can name the required customer count:
 
 ```python
-def test_sf10_customer_count():
-    """TPC-H spec requires exactly 1.5M customers at SF=10.
-
-    This is a compliance requirement, not an arbitrary count.
-    Ref: TPC-H Specification v3.0.1, Section 4.2.2
-    """
+def test_tpch_sf10_customer_count_is_1500000():
     assert get_customer_count(scale_factor=10) == 1_500_000
 ```
+
+Record the governing requirement in the relevant test documentation: TPC-H
+Specification v3.0.1, Section 4.2.2 requires 1.5 million customers at SF=10.
 
 ## Coverage vs. Quality
 

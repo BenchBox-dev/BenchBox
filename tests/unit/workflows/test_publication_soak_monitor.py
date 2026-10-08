@@ -1,5 +1,3 @@
-"""Contract tests for the publication soak monitor workflow."""
-
 from __future__ import annotations
 
 import re
@@ -29,9 +27,6 @@ def test_soak_monitor_is_dispatch_only() -> None:
 
 def test_soak_monitor_never_cancels_a_sample() -> None:
     wf = _load_yaml(MONITOR_PATH)
-    # Every scheduled sample must execute: GitHub replaces a queued run in a
-    # fixed concurrency group even with cancel-in-progress: false, and a
-    # replaced sample would be indistinguishable from a missed required sample.
     assert "concurrency" not in wf, "a queued sample replaced by a later tick would restart the soak window"
 
 
@@ -53,9 +48,6 @@ def test_soak_monitor_defers_while_transaction_in_flight() -> None:
     steps = wf["jobs"]["sample"]["steps"]
     text = "\n".join(str(step.get("run", "")) for step in steps)
 
-    # The live site may already serve the new bytes after Pages activation
-    # while the durable head still attests the previous transaction; comparing
-    # in that window would record a false digest mismatch.
     assert "active_transaction_id" in text
     assert "deferred" in text
     assert "content identity is unknown" in text

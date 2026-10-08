@@ -1,27 +1,6 @@
-"""Trino platform adapter with distributed SQL query engine optimizations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Provides Trino-specific optimizations for analytical workloads,
-including connector catalog support, session properties, and query optimization.
-
-Trino is the leading open-source distributed SQL query engine, widely used
-by companies like Netflix, Airbnb, and Lyft for data lake analytics.
-
-IMPORTANT: This adapter supports Trino only, NOT PrestoDB (Meta's Presto fork).
-
-While Trino and PrestoDB share a common ancestry (Trino was formerly PrestoSQL),
-they have diverged significantly since the 2019 fork:
-- Different Python drivers (trino vs presto-python-client)
-- Different HTTP headers (X-Trino-* vs X-Presto-*)
-- Diverging SQL syntax and function implementations
-- Different system metadata table schemas
-
-For AWS managed Presto/Trino workloads, use the Athena adapter instead.
-For Starburst Enterprise (commercial Trino), this adapter is fully compatible.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -43,25 +22,6 @@ except ImportError:
 
 
 class TrinoAdapter(PrestoTrinoAdapterBase):
-    """Trino platform adapter for distributed SQL query execution.
-
-    Trino is a distributed SQL query engine designed for interactive analytics
-    against data sources of all sizes. It supports querying data from multiple
-    sources including Hive, Iceberg, Delta Lake, and cloud storage.
-
-    Key Features:
-    - Distributed query execution across multiple workers
-    - Federated queries across multiple data sources
-    - Session properties for query optimization
-    - Support for Iceberg, Delta, and Hive table formats
-
-    Compatibility:
-    - Trino (open-source): Fully supported
-    - Starburst Enterprise: Fully supported (commercial Trino distribution)
-    - PrestoDB (Meta): NOT supported - use presto-python-client directly
-    - AWS Athena: Use AthenaAdapter instead (managed Presto/Trino service)
-    """
-
     physical_identifier_case = "lower"
 
     plan_capture_phase_eligible = True
@@ -74,7 +34,6 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
     unavailable_catalog_marker = "does not exist on the Trino server"
     default_username = "trino"
     table_format_choices = ("memory", "hive", "iceberg", "delta")
-    # Hive and Iceberg connectors accept an explicit format declaration.
     ddl_format_property_formats = ("hive", "iceberg")
     target_dialect = "trino"
     from_config_optional_fields = (*PrestoTrinoAdapterBase.from_config_optional_fields, "timezone", "encoding")
@@ -118,7 +77,6 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
         return params
 
     def _get_connection_params(self) -> dict[str, Any]:
-        """Get connection parameters for Trino."""
         params: dict[str, Any] = {
             "host": self.host,
             "port": self.port,
@@ -128,22 +86,18 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
             "http_scheme": self.http_scheme,
         }
 
-        # Add authentication if password is provided
         if self.password and BasicAuthentication:
             params["auth"] = BasicAuthentication(self.username, self.password)
 
-        # SSL verification
         if self.http_scheme == "https":
             if self.ssl_cert_path:
                 params["verify"] = self.ssl_cert_path
             else:
                 params["verify"] = self.verify_ssl
 
-        # Timezone
         if self.timezone:
             params["timezone"] = self.timezone
 
-        # Encoding (spooling protocol)
         if self.encoding:
             params["encoding"] = self.encoding
 
@@ -153,32 +107,24 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
         return params
 
     def drop_database(self, **connection_config) -> None:
-        """Drop schema in Trino catalog.
-
-        Trino uses DROP SCHEMA for removing schemas.
-        """
         schema = connection_config.get("schema", self.schema)
         catalog = connection_config.get("catalog", self.catalog)
 
-        # Validate identifiers to prevent SQL injection
         if not self._validate_identifier(catalog) or not self._validate_identifier(schema):
             raise ValueError(f"Invalid catalog or schema identifier: {catalog}.{schema}")
 
-        # Check if schema exists first
         if not self.check_server_database_exists(schema=schema, catalog=catalog):
             self.log_verbose(f"Schema {catalog}.{schema} does not exist - nothing to drop")
             return
 
         try:
             params = self._get_connection_params()
-            # Connect to a different schema to drop the target
             params["schema"] = "information_schema"
 
             conn = trino.dbapi.connect(**params)
             cursor = conn.cursor()
 
             try:
-                # Drop all tables first (Trino requires CASCADE or empty schema)
                 cursor.execute(f"DROP SCHEMA IF EXISTS {catalog}.{schema} CASCADE")
                 self.logger.info(f"Dropped schema {catalog}.{schema}")
             finally:
@@ -189,15 +135,6 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
             raise RuntimeError(f"Failed to drop Trino schema {catalog}.{schema}: {e}") from e
 
     def generate_tuning_clause(self, table_tuning) -> str:
-        """Generate Trino-specific tuning clauses for CREATE TABLE statements.
-
-        Trino table properties depend on the connector:
-        - memory: Limited properties
-        - hive: PARTITIONED BY, BUCKETED BY, SORTED BY
-        - iceberg: partitioning, sorted_by
-
-        For most production use cases, Iceberg is recommended.
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return ""
 
@@ -206,7 +143,6 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
         try:
             from benchbox.core.tuning.interface import TuningType
 
-            # Handle partitioning
             partition_columns = table_tuning.get_columns_by_type(TuningType.PARTITIONING)
             if partition_columns and self.table_format in ("hive", "iceberg"):
                 sorted_cols = sorted(partition_columns, key=lambda col: col.order)
@@ -215,11 +151,9 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
                 if self.table_format == "hive":
                     clauses.append(f"PARTITIONED BY ({', '.join(column_names)})")
                 elif self.table_format == "iceberg":
-                    # Iceberg uses WITH properties
                     partition_spec = ", ".join([f"'{col}'" for col in column_names])
                     clauses.append(f"partitioning = ARRAY[{partition_spec}]")
 
-            # Handle sorting
             sort_columns = table_tuning.get_columns_by_type(TuningType.SORTING)
             if sort_columns and self.table_format == "iceberg":
                 sorted_cols = sorted(sort_columns, key=lambda col: col.order)
@@ -237,19 +171,12 @@ class TrinoAdapter(PrestoTrinoAdapterBase):
         return ""
 
     def apply_table_tunings(self, table_tuning, connection: Any) -> None:
-        """Apply tuning configurations to a Trino table.
-
-        Trino tuning is primarily handled at table creation time.
-        Post-creation optimization is limited.
-        """
         if not table_tuning or not table_tuning.has_any_tuning():
             return
 
         table_name = self.resolve_physical_table(table_tuning.table_name, connection)
         self.logger.info(f"Applying Trino tunings for table: {table_name}")
 
-        # Trino tuning is primarily handled at table creation time
-        # Log the configuration for informational purposes
         try:
             from benchbox.core.tuning.interface import TuningType
 
@@ -274,7 +201,6 @@ try:
 
     PlatformHookRegistry.register_config_builder("trino", TrinoAdapter.build_platform_config)
 except ImportError:
-    # Platform hooks may not be available in all contexts
     pass
 
 _build_trino_config = TrinoAdapter.build_platform_config

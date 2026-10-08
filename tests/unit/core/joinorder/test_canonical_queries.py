@@ -1,5 +1,3 @@
-"""Execute canonical JoinOrder queries against the tiny fixture."""
-
 from __future__ import annotations
 
 import json

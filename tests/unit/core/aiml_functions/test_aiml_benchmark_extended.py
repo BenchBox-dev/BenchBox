@@ -1,17 +1,6 @@
-"""Extended coverage tests for AIMLFunctionsBenchmark.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Targets paths in benchbox/experimental/aiml_functions/benchmark.py
-not covered by test_aiml_functions_benchmark.py, including:
-- get_queries() default (delegates to snowflake)
-- get_all_queries(platform=None) fallback
-- execute_query() unknown/unavailable query paths
-- AIMLBenchmarkResults.to_dict() with no completed_at
-- AIMLBenchmarkResults zero-query success_rate/avg
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -33,10 +22,7 @@ pytestmark = [
 
 
 class TestAIMLBenchmarkResultsEdgeCases:
-    """Edge-case tests for AIMLBenchmarkResults."""
-
     def test_to_dict_without_complete(self) -> None:
-        """to_dict should handle None completed_at gracefully."""
         results = AIMLBenchmarkResults(
             platform="snowflake",
             started_at=datetime.now(timezone.utc),
@@ -45,7 +31,6 @@ class TestAIMLBenchmarkResultsEdgeCases:
         assert d["completed_at"] is None
 
     def test_to_dict_zero_queries_success_rate(self) -> None:
-        """success_rate and avg should be 0 when no queries run."""
         results = AIMLBenchmarkResults(
             platform="snowflake",
             started_at=datetime.now(timezone.utc),
@@ -74,14 +59,11 @@ class TestAIMLBenchmarkResultsEdgeCases:
 
 
 class TestAIMLFunctionsBenchmarkGetQueries:
-    """Tests for get_queries() and get_all_queries() fallback paths."""
-
     @pytest.fixture
     def bm(self) -> AIMLFunctionsBenchmark:
         return AIMLFunctionsBenchmark(scale_factor=1.0, seed=42)
 
     def test_get_queries_returns_snowflake_queries(self, bm: AIMLFunctionsBenchmark) -> None:
-        """get_queries() without platform should return Snowflake queries."""
         queries = bm.get_queries()
         assert isinstance(queries, dict)
         assert len(queries) > 0
@@ -93,7 +75,6 @@ class TestAIMLFunctionsBenchmarkGetQueries:
             assert len(v) > 0
 
     def test_get_all_queries_no_platform_uses_fallback(self, bm: AIMLFunctionsBenchmark) -> None:
-        """get_all_queries(platform=None) picks first available platform SQL."""
         queries = bm.get_all_queries(platform=None)
         assert isinstance(queries, dict)
         assert len(queries) > 0
@@ -105,42 +86,34 @@ class TestAIMLFunctionsBenchmarkGetQueries:
 
 
 class TestAIMLFunctionsBenchmarkExecuteQuery:
-    """Tests for execute_query with mock connections."""
-
     @pytest.fixture
     def bm(self) -> AIMLFunctionsBenchmark:
         return AIMLFunctionsBenchmark(scale_factor=1.0, seed=42)
 
     def test_execute_query_unknown_id_returns_failure(self, bm: AIMLFunctionsBenchmark) -> None:
-        """Unknown query ID should return a failed result, not raise."""
         conn = MagicMock()
         result = bm.execute_query(conn, "no_such_query", platform="snowflake")
         assert result.success is False
         assert "Unknown" in result.error_message
 
     def test_execute_query_unavailable_platform_returns_failure(self, bm: AIMLFunctionsBenchmark) -> None:
-        """Query not available on platform should return a failed result."""
         conn = MagicMock()
         result = bm.execute_query(conn, "sentiment_single", platform="mysql")
         assert result.success is False
         assert "platform" in result.error_message.lower() or "not available" in result.error_message.lower()
 
     def test_execute_query_infers_platform_from_connection(self, bm: AIMLFunctionsBenchmark) -> None:
-        """When platform=None, should use conn.platform attribute if present."""
         conn = MagicMock()
         conn.platform = "snowflake"
-        # This will try to run actual SQL which fails - but result should carry the platform
         result = bm.execute_query(conn, "sentiment_single")
         assert result.platform == "snowflake"
 
     def test_execute_query_uses_unknown_when_no_platform_attr(self, bm: AIMLFunctionsBenchmark) -> None:
-        """When connection has no platform attribute, uses 'unknown'."""
-        conn = MagicMock(spec=[])  # No attributes
+        conn = MagicMock(spec=[])
         result = bm.execute_query(conn, "no_such_query")
         assert result.platform == "unknown"
 
     def test_execute_query_success_with_fetchall_result(self, bm: AIMLFunctionsBenchmark) -> None:
-        """Successful execution should capture row count via fetchall."""
         conn = MagicMock()
         result_mock = MagicMock()
         result_mock.fetchall.return_value = [("row1",), ("row2",)]
@@ -151,7 +124,6 @@ class TestAIMLFunctionsBenchmarkExecuteQuery:
         assert result.row_count == 2
 
     def test_execute_query_success_with_rowcount_result(self, bm: AIMLFunctionsBenchmark) -> None:
-        """Successful execution should capture row count via rowcount when no fetchall."""
         conn = MagicMock()
         result_mock = MagicMock(spec=["rowcount"])
         result_mock.rowcount = 5
@@ -162,7 +134,6 @@ class TestAIMLFunctionsBenchmarkExecuteQuery:
         assert result.row_count == 5
 
     def test_execute_query_captures_execution_error(self, bm: AIMLFunctionsBenchmark) -> None:
-        """Execution exceptions should be captured in the result."""
         conn = MagicMock()
         conn.execute.side_effect = RuntimeError("function not found")
 
@@ -172,8 +143,6 @@ class TestAIMLFunctionsBenchmarkExecuteQuery:
 
 
 class TestAIMLFunctionsBenchmarkDescription:
-    """Tests for benchmark description properties."""
-
     def test_description_property(self) -> None:
         bm = AIMLFunctionsBenchmark()
         assert isinstance(bm.description, str)
@@ -186,8 +155,6 @@ class TestAIMLFunctionsBenchmarkDescription:
 
 
 class TestAIMLQueryResultToDict:
-    """Tests for AIMLQueryResult.to_dict."""
-
     def test_to_dict_fields(self) -> None:
         r = AIMLQueryResult(
             query_id="q1",
@@ -211,8 +178,6 @@ class TestAIMLQueryResultToDict:
 
 
 class TestAIMLBenchmarkResultsComplete:
-    """Tests for AIMLBenchmarkResults.complete and add_result failed branch."""
-
     def test_complete_sets_completed_at(self) -> None:
         results = AIMLBenchmarkResults(
             platform="snowflake",
@@ -241,8 +206,6 @@ class TestAIMLBenchmarkResultsComplete:
 
 
 class TestAIMLFunctionsBenchmarkAdditional:
-    """Additional coverage tests for AIMLFunctionsBenchmark."""
-
     @pytest.fixture
     def bm(self) -> AIMLFunctionsBenchmark:
         return AIMLFunctionsBenchmark(scale_factor=1.0, seed=42)
@@ -271,7 +234,6 @@ class TestAIMLFunctionsBenchmarkAdditional:
             bm.get_query("no_such_id", platform="snowflake")
 
     def test_get_query_raises_when_no_platform(self, bm: AIMLFunctionsBenchmark) -> None:
-        # Get a real query ID first
         qid = bm.get_queries_for_platform("snowflake")[0]
         with pytest.raises(ValueError, match="Platform must be specified"):
             bm.get_query(qid, platform=None)
@@ -298,16 +260,13 @@ class TestAIMLFunctionsBenchmarkAdditional:
             bm.generate_data(output_format="parquet")
 
     def test_generate_data_csv_format(self, bm: AIMLFunctionsBenchmark, tmp_path) -> None:
-        """generate_data with csv format should produce file paths."""
         bm.output_dir = tmp_path
         result = bm.generate_data(output_format="csv")
         assert isinstance(result, dict)
         assert len(result) > 0
 
     def test_generate_data_with_table_filter(self, bm: AIMLFunctionsBenchmark, tmp_path) -> None:
-        """generate_data with tables filter should return subset."""
         bm.output_dir = tmp_path
-        # Get first table name from unfiltered result
         all_files = bm.generate_data(output_format="csv")
         if all_files:
             first_table = list(all_files.keys())[0]
@@ -315,30 +274,25 @@ class TestAIMLFunctionsBenchmarkAdditional:
             assert first_table in filtered
 
     def test_setup_tables_with_mock_connection(self, bm: AIMLFunctionsBenchmark) -> None:
-        """setup_tables should try to create tables and insert data."""
         from unittest.mock import MagicMock
 
         conn = MagicMock()
         conn.execute.return_value = None
         result = bm.setup_tables(conn, platform="snowflake")
         assert isinstance(result, dict)
-        # Should have attempted creates
         assert conn.execute.called
 
     def test_run_benchmark_with_mock_connection(self, bm: AIMLFunctionsBenchmark) -> None:
-        """run_benchmark should return AIMLBenchmarkResults."""
         from unittest.mock import MagicMock, patch
 
         conn = MagicMock()
         conn.execute.return_value = MagicMock(fetchall=MagicMock(return_value=[]))
 
-        # Skip setup_data to avoid CSV generation
         result = bm.run_benchmark(conn, platform="snowflake", setup_data=False)
         assert result is not None
         assert result.platform == "snowflake"
 
     def test_run_benchmark_with_query_ids_filter(self, bm: AIMLFunctionsBenchmark) -> None:
-        """run_benchmark with specific query_ids should run only those."""
         from unittest.mock import MagicMock
 
         conn = MagicMock()
@@ -349,7 +303,6 @@ class TestAIMLFunctionsBenchmarkAdditional:
         assert result.total_queries <= 1
 
     def test_run_benchmark_with_categories_filter(self, bm: AIMLFunctionsBenchmark) -> None:
-        """run_benchmark with categories filter should run category queries."""
         from unittest.mock import MagicMock
 
         from benchbox.experimental.aiml_functions.benchmark import AIMLFunctionCategory

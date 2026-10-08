@@ -1,7 +1,3 @@
-# Databricks TPC-Havoc Tuned Configuration
-# This configuration enables all Databricks-supported optimizations for TPC-Havoc benchmark
-# Includes Delta Lake features, Z-ordering, auto-optimize, and all constraint types
-
 primary_keys:
   enabled: true
   enforce_uniqueness: true

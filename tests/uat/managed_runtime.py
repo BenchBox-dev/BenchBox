@@ -1,5 +1,3 @@
-"""Shared managed-container probes and resource admission for UAT."""
-
 from __future__ import annotations
 
 import os
@@ -30,7 +28,6 @@ RecordEvent = Callable[..., None]
 def resolve_starrocks_memory_limit(
     configured: str | None = STARROCKS_DEFAULT_MEMORY_LIMIT, *, env: dict[str, str] | None = None
 ) -> tuple[str, int]:
-    """Resolve the explicit StarRocks managed-UAT memory request."""
     environment = os.environ if env is None else env
     raw = environment.get(STARROCKS_MEMORY_LIMIT_ENV_VAR, configured)
     if raw is None:
@@ -42,7 +39,6 @@ def resolve_starrocks_memory_limit(
 
 
 def compose_environment(config: UATConfig, spec: docker_assets.DockerPlatformSpec, runs_dir: Path) -> dict[str, str]:
-    """Build one managed-compose environment from the sweep configuration."""
     starrocks_limit = (
         resolve_starrocks_memory_limit(config.preflight.starrocks_memory_limit)[0]
         if spec.platform == "starrocks"
@@ -87,7 +83,6 @@ def check_application_readiness(
     retry_interval_s: float = 0.0,
     sleep_fn: Callable[[float], None] | None = None,
 ) -> str | None:
-    """Require an engine-level probe when the platform registers one."""
     command = _readiness_command(spec, project_name)
     if command is None:
         return None
@@ -130,7 +125,6 @@ def reconcile_starrocks_resources(
     record_event: RecordEvent,
     log_dir: Path | None,
 ) -> str | None:
-    """Apply the Compose memory request where Mocker drops it from config."""
     if config.dry_run or spec.platform != "starrocks" or docker_assets.resolve_container_cli() != "mocker":
         return None
     selected, selected_bytes = resolve_starrocks_memory_limit(config.preflight.starrocks_memory_limit)
@@ -198,7 +192,6 @@ def check_memory_admission(
     log_dir: Path | None,
     memory_reader: Callable[[], MemorySnapshot],
 ) -> str | None:
-    """Reuse the runtime-limit admission contract for ClickHouse and StarRocks."""
     if platform not in {"clickhouse-server", "starrocks"}:
         return None
     if platform == "starrocks":

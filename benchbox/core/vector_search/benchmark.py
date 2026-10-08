@@ -1,20 +1,6 @@
-"""Vector search benchmark core implementation.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Implements the BaseBenchmark interface for benchmarking vector/embedding
-similarity search across OLAP platforms that support array operations.
-
-The benchmark covers:
-  - kNN exact cosine similarity search
-  - kNN exact L2-distance search
-  - Filtered kNN search (metadata predicate + distance order)
-  - Large-k recall-ground-truth generation
-  - ANN search (same SQL; relies on HNSW index from load phase)
-  - Multi-category filtered search
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -35,25 +21,10 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 if TYPE_CHECKING:
     from benchbox.core.tuning.interface import UnifiedTuningConfiguration
 
-# Default embedding dimensionality; overridable via constructor kwarg.
 DEFAULT_DIMENSIONS = 128
 
 
 class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, DataGenerationMixin, BaseBenchmark):
-    """Vector search benchmark implementation.
-
-    Tests similarity-search performance across OLAP databases that support
-    array/vector operations.  Primary target: DuckDB with built-in
-    ``array_cosine_similarity`` / ``array_distance`` functions.  Dialect
-    variants are available for pgvector, ClickHouse, and Snowflake.
-
-    Attributes:
-        scale_factor: Controls corpus size (SF=1 → ~1 M vectors).
-        dimensions: Embedding dimensionality (default 128).
-        query_manager: Manages all six benchmark queries.
-        data_generator: Produces reproducible synthetic embedding data.
-    """
-
     def __init__(
         self,
         scale_factor: float = 1.0,
@@ -62,14 +33,6 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
         dimensions: int = DEFAULT_DIMENSIONS,
         **config: Any,
     ) -> None:
-        """Initialise the vector search benchmark.
-
-        Args:
-            scale_factor: Data scale (SF=0.01 → ~10 K vectors, SF=1 → ~1 M).
-            output_dir: Directory for generated data files.
-            dimensions: Embedding vector dimension count (default 128).
-            **config: Forwarded to BaseBenchmark / mixins.
-        """
         config = dict(config)
         quiet = config.pop("quiet", False)
 
@@ -92,19 +55,13 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
         )
 
         self.tables: dict[str, Path] = {}
-        # _csv_delimiter backs the BaseBenchmark.csv_delimiter read-only property
         self._csv_delimiter: str = "|"
         self.csv_has_header: bool = True
-
-    # ------------------------------------------------------------------
-    # Schema / DDL
-    # ------------------------------------------------------------------
 
     def _get_table_schema(self) -> dict[str, dict]:
         return TABLES
 
     def get_schema(self, dialect: str = "duckdb") -> dict[str, dict]:
-        """Return the table schema dictionary."""
         return TABLES
 
     def get_create_tables_sql(
@@ -112,25 +69,12 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
         dialect: str = "duckdb",
         tuning_config: Optional[UnifiedTuningConfiguration] = None,
     ) -> str:
-        """Return CREATE TABLE SQL for both vector search tables.
-
-        Args:
-            dialect: Target SQL dialect (duckdb, postgresql, snowflake, …).
-            tuning_config: Unified tuning config (used for constraint flags).
-
-        Returns:
-            DDL script as a single string.
-        """
         enable_primary_keys, _ = extract_constraint_flags(tuning_config)
         return get_all_create_table_sql(
             dialect=dialect,
             dimensions=self.dimensions,
             enable_primary_keys=enable_primary_keys,
         )
-
-    # ------------------------------------------------------------------
-    # Query access
-    # ------------------------------------------------------------------
 
     def get_query(
         self,
@@ -140,22 +84,6 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
         dialect: Optional[str] = None,
         platform_version: str | None = None,
     ) -> str:
-        """Return SQL for *query_id*.
-
-        Args:
-            query_id: Q1-Q6.
-            params: Not supported - vector search queries are static.
-            dialect: SQL dialect override (postgresql, clickhouse, snowflake).
-                     Returns DuckDB SQL when *None*.
-            platform_version: Optional engine version string used by
-                version-gated compat rules.
-
-        Returns:
-            SQL string.
-
-        Raises:
-            ValueError: If *query_id* is not valid or params are provided.
-        """
         if params is not None:
             raise ValueError(
                 "Vector search queries are static and do not accept parameters. "
@@ -164,23 +92,6 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
         return self.query_manager.get_query(str(query_id), dialect=dialect, platform_version=platform_version)
 
     def get_queries(self, dialect: Optional[str] = None, platform_version: str | None = None) -> dict[str, str]:
-        """Return all queries, optionally in a platform-specific dialect.
-
-        Vector search queries use platform-specific functions (e.g.
-        ``array_cosine_similarity`` vs ``<=>`` vs ``cosineDistance``) that
-        sqlglot cannot translate.  This method therefore uses the query
-        manager's built-in dialect variants rather than sqlglot translation.
-
-        Args:
-            dialect: SQL dialect override (postgresql, clickhouse, snowflake).
-                     Returns DuckDB SQL when *None* or when the dialect has
-                     no explicit variant defined.
-            platform_version: Optional engine version string used by
-                version-gated compat rules.
-
-        Returns:
-            Dict mapping Q1-Q6 to SQL strings.
-        """
         return self.query_manager.get_all_queries(dialect=dialect, platform_version=platform_version)
 
     def get_all_queries(
@@ -188,25 +99,12 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
         dialect: Optional[str] = None,
         platform_version: str | None = None,
     ) -> dict[str, str]:
-        """Return all queries, optionally applying compat-gated dialect variants."""
         return self.query_manager.get_all_queries(dialect=dialect, platform_version=platform_version)
 
     def supported_dialects(self) -> list[str]:
-        """Return list of dialects with explicit variant SQL."""
         return self.query_manager.supported_dialects()
 
-    # ------------------------------------------------------------------
-    # Query execution
-    # ------------------------------------------------------------------
-
     def validate_query_result(self, query_id: Union[int, str], rows: Sequence[Sequence[object]]) -> None:
-        """Validate materialized rows returned by a platform adapter.
-
-        The generic adapter execution path does not call this benchmark's
-        ``run_benchmark`` method. Adapters use this opt-in hook after their
-        timed query execution to apply the same structural oracle to the
-        production CLI/MCP path.
-        """
         validate_search_result(str(query_id), rows)
 
     def execute_query(
@@ -218,24 +116,6 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
         dialect: Optional[str] = None,
         platform_version: str | None = None,
     ) -> Any:
-        """Execute a vector search query on *connection*.
-
-        Args:
-            query_id: Q1-Q6.
-            connection: Database connection (must support ``.execute()`` or
-                        ``.cursor()``).
-            params: Not supported - vector search queries are static.
-            dialect: SQL dialect override (postgresql, clickhouse, snowflake).
-                     Returns DuckDB SQL when *None*.
-            platform_version: Optional engine version string used by
-                version-gated compat rules.
-
-        Returns:
-            Query result rows.
-
-        Raises:
-            ValueError: If *query_id* is not recognised or params are provided.
-        """
         sql = self.get_query(query_id, dialect=dialect, params=params, platform_version=platform_version)
 
         if hasattr(connection, "execute"):
@@ -248,10 +128,6 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
         else:
             raise ValueError(f"Unsupported connection type: {type(connection)}")
 
-    # ------------------------------------------------------------------
-    # Benchmark runner
-    # ------------------------------------------------------------------
-
     def run_benchmark(
         self,
         connection: Any,
@@ -261,20 +137,6 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
         dialect: Optional[str] = None,
         platform_version: str | None = None,
     ) -> dict[str, Any]:
-        """Run the complete vector search benchmark.
-
-        Args:
-            connection: Database connection.
-            queries: Optional subset of query IDs.  Runs all six if *None*.
-            iterations: How many times each query is executed.
-            dialect: SQL dialect override (postgresql, clickhouse, snowflake).
-                     Uses DuckDB SQL when *None*.
-            platform_version: Optional engine version string used by
-                version-gated compat rules.
-
-        Returns:
-            Dict with timing and metadata for each query.
-        """
         if queries is None:
             queries = list(self.query_manager.ALL_QUERY_IDS)
 
@@ -358,11 +220,7 @@ class VectorSearchBenchmark(GeneratorOutputDirMixin, TranslatableQueryMixin, Dat
         return results
 
 
-# ---------------------------------------------------------------------------
-# Register benchmark-specific CLI option specs
-# ---------------------------------------------------------------------------
-
-from benchbox.core.hooks.benchmark_hooks import (  # noqa: E402
+from benchbox.core.hooks.benchmark_hooks import (
     BenchmarkHookRegistry,
     BenchmarkOptionSpec,
     parse_int,

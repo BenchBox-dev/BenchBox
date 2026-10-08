@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Hermetic lane artifact builders and deterministic whole-site assembler (A4 w1, w3).
-
-Builds immutable, content-addressed lane artifacts for prose, API docs, Explorer,
-publisher, and corpus read models, then assembles them into a unified shadow site
-tree with strict path ownership.
-"""
 
 from __future__ import annotations
 
@@ -18,6 +12,14 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+CLI_DESCRIPTION = (
+    "Hermetic lane artifact builders and deterministic whole-site assembler (A4 w1, w3).\n"
+    "\n"
+    "Builds immutable, content-addressed lane artifacts for prose, API docs, Explorer,\n"
+    "publisher, and corpus read models, then assembles them into a unified shadow site\n"
+    "tree with strict path ownership.\n"
+)
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -28,22 +30,21 @@ class LaneArtifact:
     size_bytes: int
     source_path: str
     output_prefix: str
-    file_manifest: dict[str, str] = field(default_factory=dict)  # rel_path -> sha256
+    file_manifest: dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
 class PathOwnershipError(Exception):
-    """Raised when multiple publication lanes claim ownership of the same output path."""
+    pass
 
 
 class DigestMismatchError(Exception):
-    """Raised when a lane source tree does not match the declared artifact identity."""
+    pass
 
 
 def compute_file_sha256(path: Path) -> str:
-    """Compute SHA-256 digest of a single file."""
     h = hashlib.sha256()
     with open(path, "rb") as f:
         while chunk := f.read(65536):
@@ -52,7 +53,6 @@ def compute_file_sha256(path: Path) -> str:
 
 
 def compute_tree_digest(tree_dir: Path) -> tuple[str, int, dict[str, str]]:
-    """Compute tree digest, total byte size, and file-by-file manifest for a directory."""
     if not tree_dir.exists():
         return hashlib.sha256(b"").hexdigest(), 0, {}
 
@@ -79,7 +79,6 @@ def compute_tree_digest(tree_dir: Path) -> tuple[str, int, dict[str, str]]:
 
 
 def verify_lane_digest(artifact: LaneArtifact, src_dir: Path) -> tuple[str, int, dict[str, str]]:
-    """Verify src_dir against declared digest/manifest/size; return computed identity."""
     computed_digest, computed_size, computed_manifest = compute_tree_digest(src_dir)
 
     if not artifact.digest or artifact.digest != computed_digest:
@@ -110,15 +109,12 @@ def verify_lane_digest(artifact: LaneArtifact, src_dir: Path) -> tuple[str, int,
 
 
 class SiteAssembler:
-    """Assembles lane artifacts into a deterministic, unified site tree with path ownership."""
-
     def __init__(self, output_dir: Path, receipt_path: Path | None = None) -> None:
         self.output_dir = output_dir
         self.receipt_path = receipt_path or (output_dir.parent / f"{output_dir.name}-receipt.json")
-        self.claimed_paths: dict[str, str] = {}  # rel_path -> lane_name
+        self.claimed_paths: dict[str, str] = {}
 
     def mount_lane_artifact(self, artifact: LaneArtifact, src_dir: Path) -> None:
-        """Mount files from a lane artifact into the output directory, enforcing path ownership."""
         if not src_dir.exists():
             raise FileNotFoundError(f"Source directory for lane '{artifact.lane_name}' not found: {src_dir}")
 
@@ -151,7 +147,6 @@ class SiteAssembler:
         shutil.copyfile(src, dest_path)
 
     def assemble(self, artifacts: list[tuple[LaneArtifact, Path]]) -> tuple[dict[str, Any], Path]:
-        """Assemble all artifacts and write a receipt outside the hashed output tree."""
         if self.output_dir.exists():
             shutil.rmtree(self.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -184,7 +179,6 @@ class SiteAssembler:
 
 
 def _parse_lane_spec(spec: str) -> tuple[str, Path, str]:
-    """Parse ``name=NAME,src=SRC,prefix=PREFIX`` into components."""
     parts: dict[str, str] = {}
     for chunk in spec.split(","):
         if "=" not in chunk:
@@ -210,7 +204,7 @@ def build_lane_artifact(name: str, src: Path, prefix: str) -> LaneArtifact:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--receipt-path", type=Path, required=True)
     parser.add_argument(

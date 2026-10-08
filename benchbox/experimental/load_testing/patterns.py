@@ -1,9 +1,6 @@
-"""Workload patterns for concurrent load testing.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import math
 from abc import ABC, abstractmethod
@@ -12,71 +9,39 @@ from dataclasses import dataclass
 
 
 def _require_at_least(name: str, value: float, minimum: float, expectation: str) -> None:
-    """Raise ValueError unless a numeric pattern argument meets its floor."""
     if value < minimum:
         raise ValueError(f"{name} must be {expectation}")
 
 
 @dataclass
 class WorkloadPhase:
-    """A phase in the workload pattern."""
-
     concurrency: int
     duration_seconds: float
     phase_name: str = ""
     roles: dict[str, int] | None = None
-    # Optional per-role stream targets for role-aware execution.
-    # Maps a stream role (e.g. "writer") to the desired concurrent stream
-    # count during this phase. When None, the phase is undifferentiated
-    # and executors fill `concurrency` streams with the default workload.
 
 
 class WorkloadPattern(ABC):
-    """Base class for workload patterns.
-
-    Workload patterns define how concurrency changes over time during a test.
-    """
+    @abstractmethod
+    def get_phases(self) -> list[WorkloadPhase]: ...
 
     @abstractmethod
-    def get_phases(self) -> list[WorkloadPhase]:
-        """Get all phases in this workload pattern."""
-        ...
-
-    @abstractmethod
-    def get_concurrency_at(self, elapsed_seconds: float) -> int:
-        """Get target concurrency at a given point in time."""
-        ...
+    def get_concurrency_at(self, elapsed_seconds: float) -> int: ...
 
     @property
     @abstractmethod
-    def total_duration(self) -> float:
-        """Total duration of the workload pattern in seconds."""
-        ...
+    def total_duration(self) -> float: ...
 
     @property
     @abstractmethod
-    def max_concurrency(self) -> int:
-        """Maximum concurrency level in this pattern."""
-        ...
+    def max_concurrency(self) -> int: ...
 
     def iter_phases(self) -> Iterator[WorkloadPhase]:
-        """Iterate over phases."""
         yield from self.get_phases()
 
 
 class SteadyPattern(WorkloadPattern):
-    """Steady load pattern - constant concurrency throughout.
-
-    Useful for baseline performance measurement and sustained load testing.
-    """
-
     def __init__(self, concurrency: int, duration_seconds: float):
-        """Initialize steady pattern.
-
-        Args:
-            concurrency: Number of concurrent streams
-            duration_seconds: Duration to maintain the load
-        """
         if concurrency < 1:
             raise ValueError("concurrency must be at least 1")
         if duration_seconds <= 0:
@@ -109,12 +74,6 @@ class SteadyPattern(WorkloadPattern):
 
 
 class BurstPattern(WorkloadPattern):
-    """Burst load pattern - alternating between low and high load.
-
-    Useful for testing how systems handle sudden load increases and
-    recover during quiet periods.
-    """
-
     def __init__(
         self,
         base_concurrency: int,
@@ -123,15 +82,6 @@ class BurstPattern(WorkloadPattern):
         quiet_duration_seconds: float,
         num_bursts: int,
     ):
-        """Initialize burst pattern.
-
-        Args:
-            base_concurrency: Concurrency during quiet periods
-            burst_concurrency: Concurrency during burst periods
-            burst_duration_seconds: Duration of each burst
-            quiet_duration_seconds: Duration between bursts
-            num_bursts: Number of burst cycles
-        """
         if base_concurrency < 1:
             raise ValueError("base_concurrency must be at least 1")
         if burst_concurrency < base_concurrency:
@@ -152,7 +102,6 @@ class BurstPattern(WorkloadPattern):
     def get_phases(self) -> list[WorkloadPhase]:
         phases = []
         for i in range(self._num_bursts):
-            # Quiet period (except before first burst)
             if i > 0 and self._quiet_duration > 0:
                 phases.append(
                     WorkloadPhase(
@@ -161,7 +110,6 @@ class BurstPattern(WorkloadPattern):
                         phase_name=f"quiet_{i}",
                     )
                 )
-            # Burst period
             phases.append(
                 WorkloadPhase(
                     concurrency=self._burst,
@@ -181,16 +129,13 @@ class BurstPattern(WorkloadPattern):
         if elapsed_seconds >= total:
             return 0
 
-        # First burst has no quiet period before it
         if elapsed_seconds < self._burst_duration:
             return self._burst
 
-        # Subsequent cycles
         remaining = elapsed_seconds - self._burst_duration
         cycle_index = int(remaining / cycle_duration) + 1
 
         if cycle_index >= self._num_bursts:
-            # Check if in last burst
             (self._num_bursts - 1) * cycle_duration + self._burst_duration - cycle_duration
             if elapsed_seconds >= total - self._burst_duration:
                 return self._burst
@@ -211,12 +156,6 @@ class BurstPattern(WorkloadPattern):
 
 
 class RampUpPattern(WorkloadPattern):
-    """Ramp-up load pattern - gradually increasing concurrency.
-
-    Useful for finding the breaking point of a system and understanding
-    how performance degrades under increasing load.
-    """
-
     def __init__(
         self,
         start_concurrency: int,
@@ -225,15 +164,6 @@ class RampUpPattern(WorkloadPattern):
         step_count: int | None = None,
         hold_duration_seconds: float = 0,
     ):
-        """Initialize ramp-up pattern.
-
-        Args:
-            start_concurrency: Starting concurrency level
-            end_concurrency: Target concurrency level
-            ramp_duration_seconds: Duration of the ramp-up period
-            step_count: Number of discrete steps (None for smooth ramp)
-            hold_duration_seconds: Duration to hold at each step
-        """
         if start_concurrency < 1:
             raise ValueError("start_concurrency must be at least 1")
         if end_concurrency < start_concurrency:
@@ -253,10 +183,9 @@ class RampUpPattern(WorkloadPattern):
 
     def get_phases(self) -> list[WorkloadPhase]:
         if self._step_count is None:
-            # Smooth ramp - single phase with interpolated concurrency
             return [
                 WorkloadPhase(
-                    concurrency=self._end,  # Max for resource estimation
+                    concurrency=self._end,
                     duration_seconds=self._ramp_duration + self._hold_duration,
                     phase_name="ramp_up",
                 )
@@ -277,7 +206,6 @@ class RampUpPattern(WorkloadPattern):
                 )
             )
 
-        # Final step at end concurrency
         if phases[-1].concurrency != self._end:
             phases.append(
                 WorkloadPhase(
@@ -299,11 +227,9 @@ class RampUpPattern(WorkloadPattern):
             return self._end
 
         if self._step_count is None:
-            # Smooth interpolation
             progress = elapsed_seconds / self._ramp_duration
             return self._start + int((self._end - self._start) * progress)
 
-        # Stepped ramp
         time_per_step = self._ramp_duration / self._step_count
         step_index = min(int(elapsed_seconds / time_per_step), self._step_count - 1)
         concurrency_step = (self._end - self._start) / self._step_count
@@ -319,12 +245,6 @@ class RampUpPattern(WorkloadPattern):
 
 
 class SpikePattern(WorkloadPattern):
-    """Spike load pattern - sudden high load followed by return to baseline.
-
-    Useful for testing system resilience to sudden load spikes
-    and recovery behavior.
-    """
-
     def __init__(
         self,
         baseline_concurrency: int,
@@ -333,15 +253,6 @@ class SpikePattern(WorkloadPattern):
         spike_duration_seconds: float,
         post_spike_duration_seconds: float,
     ):
-        """Initialize spike pattern.
-
-        Args:
-            baseline_concurrency: Normal concurrency level
-            spike_concurrency: Spike concurrency level
-            pre_spike_duration_seconds: Duration before the spike
-            spike_duration_seconds: Duration of the spike
-            post_spike_duration_seconds: Duration after the spike (recovery)
-        """
         if baseline_concurrency < 1:
             raise ValueError("baseline_concurrency must be at least 1")
         if spike_concurrency < baseline_concurrency:
@@ -410,18 +321,7 @@ class SpikePattern(WorkloadPattern):
 
 
 class StepPattern(WorkloadPattern):
-    """Step load pattern - discrete concurrency levels held for fixed durations.
-
-    Useful for systematic load testing at specific concurrency levels
-    to gather metrics at each level.
-    """
-
     def __init__(self, steps: list[tuple[int, float]]):
-        """Initialize step pattern.
-
-        Args:
-            steps: List of (concurrency, duration_seconds) tuples
-        """
         if not steps:
             raise ValueError("steps list cannot be empty")
 
@@ -465,12 +365,6 @@ class StepPattern(WorkloadPattern):
 
 
 class WavePattern(WorkloadPattern):
-    """Sinusoidal wave pattern - smooth oscillation between min and max concurrency.
-
-    Useful for testing behavior under gradually changing load,
-    simulating natural usage patterns.
-    """
-
     def __init__(
         self,
         min_concurrency: int,
@@ -478,14 +372,6 @@ class WavePattern(WorkloadPattern):
         period_seconds: float,
         num_periods: int = 1,
     ):
-        """Initialize wave pattern.
-
-        Args:
-            min_concurrency: Minimum concurrency level
-            max_concurrency: Maximum concurrency level
-            period_seconds: Duration of one complete wave cycle
-            num_periods: Number of wave cycles to execute
-        """
         _require_at_least("min_concurrency", min_concurrency, 1, "at least 1")
         if max_concurrency < min_concurrency:
             raise ValueError("max_concurrency must be >= min_concurrency")
@@ -499,7 +385,6 @@ class WavePattern(WorkloadPattern):
         self._num_periods = num_periods
 
     def get_phases(self) -> list[WorkloadPhase]:
-        # Wave is continuous, represent as single phase with max for resource estimation
         return [
             WorkloadPhase(
                 concurrency=self._max,
@@ -514,11 +399,9 @@ class WavePattern(WorkloadPattern):
         if elapsed_seconds >= self._period * self._num_periods:
             return 0
 
-        # Sinusoidal oscillation: starts at min, peaks at max at period/2
         amplitude = (self._max - self._min) / 2
         midpoint = (self._max + self._min) / 2
 
-        # Use cosine starting at -1 so we begin at min
         position = (elapsed_seconds / self._period) * 2 * math.pi
         value = midpoint - amplitude * math.cos(position)
 
@@ -534,15 +417,6 @@ class WavePattern(WorkloadPattern):
 
 
 class MultiWriterPattern(WorkloadPattern):
-    """Concurrent-writer pattern: N writers plus M readers ("multiplayer").
-
-    Models the multi-client concurrent-writer story: several writers issue
-    INSERT/UPDATE statements against one table while readers run SELECTs.
-    The writer and reader phases overlap in time so lock contention,
-    snapshot isolation, and write-serialization behavior are exercised.
-    Readers scale down first so the run ends with writers draining.
-    """
-
     def __init__(
         self,
         writers: int,
@@ -550,14 +424,6 @@ class MultiWriterPattern(WorkloadPattern):
         duration_seconds: float,
         drain_seconds: float = 5.0,
     ) -> None:
-        """Initialize the multi-writer pattern.
-
-        Args:
-            writers: Number of concurrent writer streams.
-            readers: Number of concurrent reader streams.
-            duration_seconds: Overlapped read/write duration.
-            drain_seconds: Writer-only drain tail after readers stop.
-        """
         _require_at_least("writers", writers, 1, "at least 1")
         _require_at_least("readers", readers, 1, "at least 1")
         if duration_seconds <= 0:
@@ -590,14 +456,6 @@ class MultiWriterPattern(WorkloadPattern):
         return phases
 
     def writers_in_phase(self, phase_name: str) -> int:
-        """Return the writer stream target for a phase of this pattern.
-
-        Args:
-            phase_name: Phase to inspect ("read-write" or "write-drain").
-
-        Raises:
-            ValueError: If the phase name is unknown for this pattern.
-        """
         if phase_name == "read-write":
             return self._writers
         if phase_name == "write-drain":
@@ -607,14 +465,6 @@ class MultiWriterPattern(WorkloadPattern):
         raise ValueError(f"unknown MultiWriterPattern phase: {phase_name!r}")
 
     def readers_in_phase(self, phase_name: str) -> int:
-        """Return the reader stream target for a phase of this pattern.
-
-        Args:
-            phase_name: Phase to inspect ("read-write" or "write-drain").
-
-        Raises:
-            ValueError: If the phase name is unknown for this pattern.
-        """
         if phase_name == "read-write":
             return self._readers
         if phase_name == "write-drain":
@@ -642,10 +492,8 @@ class MultiWriterPattern(WorkloadPattern):
 
     @property
     def writer_count(self) -> int:
-        """Number of writer streams."""
         return self._writers
 
     @property
     def reader_count(self) -> int:
-        """Number of reader streams."""
         return self._readers

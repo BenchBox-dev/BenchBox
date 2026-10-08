@@ -1,18 +1,3 @@
-// ---------------------------------------------------------------------------
-// DistributionBox - horizontal box plots of per-query latency distribution
-//
-// One box-and-whisker per platform, stacked vertically.
-// Whiskers = raw min / max; box = Q1-Q3; vertical line = median.
-// X axis: log2-scale latency (ms).
-//
-// Data: computed from BenchmarkSummary.platforms[i].timings values via
-//       computeBoxStats.  Quartiles match textcharts.percentile_ladder.
-//       compute_percentile; min/max are raw extremes (no IQR whiskering or
-//       outlier detection - see chartMath.ts for the divergence rationale).
-// Parity: tests/parity/fixtures/box_stats.json (generator: compute_box_stats
-//         in tests/parity/generate_visualization_fixtures.py).
-// ---------------------------------------------------------------------------
-
 import type { BenchmarkSummary } from "@/types";
 import { useElementSize } from "@/lib/useElementSize";
 import { axisLabelAnchor, barRowLayout, chartFrame } from "@/lib/chartFrame";
@@ -24,8 +9,6 @@ import { formatRunIdentityLabelsForCohort, preserveUniqueAfterTruncation } from 
 
 const LABEL_W = 200;
 const ROW_H = 48;
-// +12px over the tick-label row for the axis title (see the x-axis title
-// below, matching the "Normalized cost (USD)" convention in CostScatter).
 const AXIS_H = 36;
 const PADDING_TOP = 12;
 const PADDING_RIGHT = 12;
@@ -43,12 +26,6 @@ export function DistributionBox({ summary }: Props) {
   const cohortLabels = formatRunIdentityLabelsForCohort(
     summary.platforms.map((platform) => ({ ...platform, scale_factor: summary.scale_factor })),
   );
-  // Truncation budget = 26 chars (LABEL_W=200 px / ~7.5 px per char at the
-  // 13px label size, which matches the speed-and-throughput table beside it).
-  // When truncation would collapse otherwise-unique cohort identities to the same
-  // prefix (e.g. four "DataFusion v53.0.0 …"), preserveUniqueAfterTruncation
-  // preserves the distinguishing suffix (date or short id) inside the same
-  // budget. Audit finding #7.
   const rawLabels = summary.platforms.map((p, i) => cohortLabels[i]?.disambiguated ?? p.platform);
   const displayLabels = preserveUniqueAfterTruncation(rawLabels, 26);
   const rows = summary.platforms
@@ -103,7 +80,6 @@ export function DistributionBox({ summary }: Props) {
 
           return (
             <g key={row.label}>
-              {/* Platform label */}
               <text
                 x={layout.labelAbove ? 0 : LABEL_W - 6}
                 y={y + layout.labelBaseline}
@@ -114,7 +90,6 @@ export function DistributionBox({ summary }: Props) {
                 {row.label}
               </text>
 
-              {/* Whisker (min-max) */}
               <line
                 x1={xFor(min)}
                 y1={midY}
@@ -124,12 +99,9 @@ export function DistributionBox({ summary }: Props) {
                 stroke-width={1.5}
                 stroke-dasharray="3 2"
               />
-              {/* Min cap */}
               <line x1={xFor(min)} y1={midY - 5} x2={xFor(min)} y2={midY + 5} stroke={row.color} stroke-width={1.5} />
-              {/* Max cap */}
               <line x1={xFor(max)} y1={midY - 5} x2={xFor(max)} y2={midY + 5} stroke={row.color} stroke-width={1.5} />
 
-              {/* IQR box (Q1-Q3) */}
               <rect
                 x={xFor(q1)}
                 y={midY - boxH / 2}
@@ -142,7 +114,6 @@ export function DistributionBox({ summary }: Props) {
                 rx={2}
               />
 
-              {/* Median line */}
               <line
                 x1={xFor(median)}
                 y1={midY - boxH / 2}
@@ -152,7 +123,6 @@ export function DistributionBox({ summary }: Props) {
                 stroke-width={2.5}
               />
 
-              {/* Separator */}
               {ri < rows.length - 1 && (
                 <line
                   x1={0}
@@ -167,7 +137,6 @@ export function DistributionBox({ summary }: Props) {
           );
         })}
 
-        {/* X-axis */}
         <g transform={`translate(0, ${PADDING_TOP + rows.length * layout.rowHeight})`}>
           <line x1={layout.plotX} y1={0} x2={layout.plotX + plotW} y2={0} stroke="var(--bb-chart-grid)" stroke-width={1} />
           {xTicks.map((ms, index) => {

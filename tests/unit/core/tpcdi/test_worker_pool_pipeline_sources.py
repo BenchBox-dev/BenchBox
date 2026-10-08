@@ -1,5 +1,3 @@
-"""Coverage-focused tests for remaining TPC-DI worker/pipeline/source modules."""
-
 from __future__ import annotations
 
 from datetime import datetime
@@ -71,7 +69,6 @@ def test_pipeline_historical_incremental_and_helpers(monkeypatch):
     conn = FakeConnection()
     pipeline = TPCDIETLPipeline(connection=conn, benchmark=SimpleNamespace())
 
-    # historical success path
     monkeypatch.setattr(pipeline, "_load_dimension_tables", lambda _b, _sf: 10)
     monkeypatch.setattr(pipeline, "_load_fact_tables", lambda _b, _sf: 20)
     monkeypatch.setattr(pipeline, "_create_performance_indexes", lambda: None)
@@ -79,7 +76,6 @@ def test_pipeline_historical_incremental_and_helpers(monkeypatch):
     assert result.success is True
     assert result.total_records_processed == 30
 
-    # historical failure path
     def raise_dim(_b, _sf):
         raise RuntimeError("fail")
 
@@ -87,7 +83,6 @@ def test_pipeline_historical_incremental_and_helpers(monkeypatch):
     result_fail = pipeline.run_historical_load(scale_factor=0.01)
     assert result_fail.success is False
 
-    # incremental + scd processing path
     monkeypatch.setattr(pipeline, "_process_dimension_changes", lambda _b, _d, _sf: 7)
     monkeypatch.setattr(pipeline, "_process_fact_increments", lambda _b, _d, _sf: 9)
     inc = pipeline.run_incremental_load(batch_id=2, scale_factor=0.01)
@@ -98,7 +93,6 @@ def test_pipeline_historical_incremental_and_helpers(monkeypatch):
     conn.raise_on_execute = True
     assert pipeline.run_scd_processing(conn, "DimCustomer", 3) == 0
 
-    # index creation tolerates per-index errors
     conn.raise_on_execute = False
     called = {"count": 0}
 
@@ -108,7 +102,7 @@ def test_pipeline_historical_incremental_and_helpers(monkeypatch):
             raise RuntimeError("idx")
         return _FetchOne((None,))
 
-    conn.execute = flaky_execute  # type: ignore[method-assign]
+    conn.execute = flaky_execute
     pipeline._create_performance_indexes()
 
 
@@ -133,13 +127,11 @@ def test_source_generators_basic_and_output_files(tmp_path: Path, monkeypatch):
     assert gen.start_date <= gen.end_date
     assert "Technology" in gen.industries
 
-    # lightweight direct generators
     c = Path(gen._generate_customer_extract())
     a = Path(gen._generate_account_extract())
     t = Path(gen._generate_trade_extract())
     assert c.exists() and a.exists() and t.exists()
 
-    # orchestrators
     all_paths = gen.generate_all_source_data()
     assert set(all_paths) == {"oltp_system", "hr_system", "crm_system", "external_data"}
 
@@ -147,7 +139,6 @@ def test_source_generators_basic_and_output_files(tmp_path: Path, monkeypatch):
     assert "oltp_customer_extract.csv" in info
     assert gen.generate_data_quality_issues(str(c), issue_rate=0.1) == str(c)
 
-    # parallel metrics/error branches and context manager hooks
     gen.enable_parallel = False
     assert gen.get_parallel_generation_metrics()["error"] == "Parallel generation not enabled"
     gen.enable_parallel = True
@@ -158,12 +149,11 @@ def test_source_generators_basic_and_output_files(tmp_path: Path, monkeypatch):
         enable_parallel_batches=False,
     )
     gen.generation_context = SimpleNamespace(get_generation_summary=lambda: {"ok": True})
-    gen.shutdown_worker_pools = lambda: None  # type: ignore[method-assign]
+    gen.shutdown_worker_pools = lambda: None
     assert "configuration" in gen.get_parallel_generation_metrics()
     with gen as managed:
         assert managed is gen
 
-    # branch that chooses non-chunked extract (chunk path intentionally not invoked)
     gen.enable_parallel = True
     gen.parallel_config = SimpleNamespace(chunk_size=999999)
     assert Path(gen._generate_customer_extract_parallel()).exists()

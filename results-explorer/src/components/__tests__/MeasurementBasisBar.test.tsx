@@ -1,13 +1,3 @@
-/**
- * The shared measurement-basis bar.
- *
- * One bar for the whole comparison is the visible form of the model's central
- * invariant: every run is read through the same basis. These tests pin the two
- * behaviours w2 calls out specifically -- the lock affordance, and the
- * collapsed statistic rendering as its own branch rather than a disabled
- * control that could fail open.
- */
-
 import { render, screen } from "@testing-library/preact";
 import { describe, expect, it, vi } from "vitest";
 
@@ -46,9 +36,6 @@ describe("the shared basis lock", () => {
   });
 
   it("says why queries were excluded when the shared set is smaller", () => {
-    // The count alone is not enough: a reader seeing 102 of 103 needs to know
-    // the missing query left EVERY run's geomean, not just the one that could
-    // not answer it.
     renderBar({ comparableQueryCount: 102, totalQueryCount: 103 });
     expect(screen.getByText(/1 query is excluded from every run/)).toBeTruthy();
   });
@@ -67,10 +54,6 @@ describe("the statistic control", () => {
   });
 
   it("renders a locked display, not a control, when the statistic collapses", () => {
-    // w2 is explicit: not a `disabled` attribute computed from a boolean. A
-    // disabled select still renders as a control, and a truthiness bug would
-    // leave it interactive while presenting a choice the data cannot express.
-    // Asserting the control is ABSENT is what makes that unable to fail open.
     renderBar({ statisticCollapsed: true });
     expect(screen.queryByLabelText("Measurement statistic")).toBeNull();
     expect(screen.getByTestId("statistic-locked")).toBeTruthy();
@@ -82,8 +65,6 @@ describe("the statistic control", () => {
   });
 
   it("keeps the pass control usable while the statistic is locked", () => {
-    // Collapsing the statistic must not disable the whole bar: changing the
-    // pass selection is exactly how a reader escapes the collapsed state.
     renderBar({ statisticCollapsed: true });
     expect(screen.getByLabelText("Measurement passes")).toBeTruthy();
   });

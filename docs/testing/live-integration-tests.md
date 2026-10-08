@@ -97,45 +97,39 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 
 ### 3. Verify Setup
 
-Test that credentials are configured correctly:
+Test that credentials are configured correctly. The first command checks what would run (dry run). The second runs a single platform test:
 
 ```bash
-# Check what would run (dry-run)
 make test-live-databricks --dry-run
 
-# Run a single platform test
 make test-live-databricks
 ```
 
 ## Running Tests
 
 ### Run All Live Tests
+This runs all platforms and requires all credentials:
 ```bash
-# Run all platforms (requires all credentials)
 make test-live-all
 ```
 
 ### Run Individual Platforms
+The commands below run Databricks only, Snowflake only, and BigQuery only:
 ```bash
-# Databricks only
 make test-live-databricks
 
-# Snowflake only
 make test-live-snowflake
 
-# BigQuery only
 make test-live-bigquery
 ```
 
 ### Run with pytest Directly
+The commands below run all live tests, one platform's tests, and one test file:
 ```bash
-# All live tests
 uv run -- python -m pytest -m live_integration -v
 
-# Specific platform
 uv run -- python -m pytest -m live_databricks -v
 
-# Specific test file
 uv run -- python -m pytest tests/integration/platforms/test_databricks_live.py -v
 ```
 
@@ -219,15 +213,12 @@ Create dedicated service accounts with minimal permissions:
 
 **Problem**: All tests show `SKIPPED`
 
-**Solution**: Check that required environment variables are set:
+**Solution**: Check that required environment variables are set. The commands below check Databricks, Snowflake, and BigQuery in that order:
 ```bash
-# Databricks
 echo $DATABRICKS_TOKEN
 
-# Snowflake
 echo $SNOWFLAKE_PASSWORD
 
-# BigQuery
 echo $GOOGLE_APPLICATION_CREDENTIALS
 ```
 
@@ -264,15 +255,12 @@ echo $GOOGLE_APPLICATION_CREDENTIALS
 
 **Impact**: Usually benign - schemas with timestamps avoid conflicts
 
-**Solution**: Manually drop test schemas if needed:
+**Solution**: Manually drop test schemas if needed. The statements below apply to Databricks, Snowflake, and BigQuery in that order, and are identical across the three:
 ```sql
--- Databricks
 DROP SCHEMA IF EXISTS benchbox_test_1234567890 CASCADE;
 
--- Snowflake
 DROP SCHEMA IF EXISTS benchbox_test_1234567890 CASCADE;
 
--- BigQuery
 DROP SCHEMA IF EXISTS benchbox_test_1234567890 CASCADE;
 ```
 
@@ -280,15 +268,15 @@ DROP SCHEMA IF EXISTS benchbox_test_1234567890 CASCADE;
 
 ### GitHub Actions
 
-Tests can run in CI with secrets:
+Tests can run in CI with secrets. In this workflow, `workflow_dispatch` is a manual trigger and the cron schedule runs weekly on Sunday:
 
 ```yaml
 name: Live Integration Tests
 
 on:
-  workflow_dispatch:  # Manual trigger only
+  workflow_dispatch:
   schedule:
-    - cron: '0 0 * * 0'  # Weekly on Sunday
+    - cron: '0 0 * * 0'
 
 jobs:
   test-databricks:
@@ -329,28 +317,24 @@ jobs:
 
 ### Testing Without Credentials
 
-Regular smoke tests don't require credentials:
+Regular smoke tests don't require credentials and use stubs. Either command runs them:
 ```bash
-# Run smoke tests (use stubs)
 make test-smoke
-# or
 uv run -- python -m pytest -m platform_smoke -v
 ```
 
 ### Debugging Live Tests
 
-Enable verbose output:
+Enable verbose pytest output, and capture logs with the second command:
 ```bash
-# Verbose pytest output
 uv run -- python -m pytest -m live_databricks -vv -s
 
-# Capture logs
 uv run -- python -m pytest -m live_databricks -v --log-cli-level=DEBUG
 ```
 
 ## Additional Resources
 
-- [BenchBox Documentation](../../README.md)
+- [BenchBox Documentation](../index.md)
 - [Platform Setup Guide](../platforms/index.md)
 - [Databricks SQL Warehouse Docs](https://docs.databricks.com/aws/en/compute/sql-warehouse/create)
 - [Snowflake Connection Docs](https://docs.snowflake.com/en/user-guide/admin-account-identifier)
@@ -359,7 +343,7 @@ uv run -- python -m pytest -m live_databricks -v --log-cli-level=DEBUG
 ## Support
 
 For issues or questions:
-- [GitHub Issues](https://github.com/joeharris76/benchbox/issues)
+- [GitHub Issues](https://github.com/BenchBox-dev/BenchBox/issues)
 - Review test output for specific error messages
 - Check platform-specific documentation
 

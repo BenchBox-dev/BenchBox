@@ -1,10 +1,5 @@
-"""Debug logging in DatabaseManager.create_config must never carry raw
-credential values: structured/JSON handlers serialize the ``extra`` dict in
-full, so the log path gets the same redaction as exported result metadata.
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 from types import SimpleNamespace

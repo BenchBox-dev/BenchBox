@@ -520,32 +520,31 @@ BenchBox needs three explicit user contracts, but they do NOT all ship at once.
 
 The static build pipeline transforms canonical schema-v2 bundles into:
 
-1. **`manifest.json`** - Global navigation index. Target schema (fields marked
-   `*` are Phase 1 launched; unmarked fields are required additions per the
-   fidelity gap work):
+1. **`manifest.json`** - Global navigation index. Target schema (the recorded planning annotations below distinguish
+   fields previously marked as launched from required additions):
    ```json
    {
      "results": [
        {
-         "id": "tpch-duckdb-sf1-20260315",          // *
-         "benchmark": "tpch",                         // *
-         "platform": "duckdb",                        // *
-         "scale_factor": 1.0,                         // *
-         "run_date": "2026-03-15",                    // *
-         "total_duration_s": 1.234,                   // * (wall-clock; secondary metric)
-         "geomean_ms": 56.2,                          // target: canonical comparison metric
-         "query_count": 22,                           // *
-         "trust_label": "maintainer-run",             // *
-         "visibility": "public-curated",              // *
-         "driver_version": "1.1.0",                  // *
-         "platform_version": "1.1.0",                // target
-         "execution_mode": "sql",                     // target: "sql" | "dataframe"
-         "tuning_mode": "tuned",                      // target: "tuned" | "notuning" | "auto"
-         "tuning_hash": "abc123",                     // target: stable hash for cross-compare grouping
-         "test_type": "power",                        // target: "power" | "throughput"
-         "validation_status": "passed",               // target: "passed" | "failed" | "skipped"
-         "cost_usd": null,                            // target: null if unavailable
-         "bundle_path": "bundles/tpch-duckdb-sf1-20260315.json"  // *
+         "id": "tpch-duckdb-sf1-20260315",
+         "benchmark": "tpch",
+         "platform": "duckdb",
+         "scale_factor": 1.0,
+         "run_date": "2026-03-15",
+         "total_duration_s": 1.234,
+         "geomean_ms": 56.2,
+         "query_count": 22,
+         "trust_label": "maintainer-run",
+         "visibility": "public-curated",
+         "driver_version": "1.1.0",
+         "platform_version": "1.1.0",
+         "execution_mode": "sql",
+         "tuning_mode": "tuned",
+         "tuning_hash": "abc123",
+         "test_type": "power",
+         "validation_status": "passed",
+         "cost_usd": null,
+         "bundle_path": "bundles/tpch-duckdb-sf1-20260315.json"
        }
      ],
      "benchmarks": ["tpch", "tpcds", "ssb"],
@@ -553,6 +552,30 @@ The static build pipeline transforms canonical schema-v2 bundles into:
      "generated_at": "2026-03-29T00:00:00Z"
    }
    ```
+
+   Recorded planning annotations:
+
+   | Field | Status | Meaning |
+   | --- | --- | --- |
+   | `id` | Recorded as launched | — |
+   | `benchmark` | Recorded as launched | — |
+   | `platform` | Recorded as launched | — |
+   | `scale_factor` | Recorded as launched | — |
+   | `run_date` | Recorded as launched | — |
+   | `total_duration_s` | Recorded as launched | wall-clock; secondary metric |
+   | `geomean_ms` | Required addition | canonical comparison metric |
+   | `query_count` | Recorded as launched | — |
+   | `trust_label` | Recorded as launched | — |
+   | `visibility` | Recorded as launched | — |
+   | `driver_version` | Recorded as launched | — |
+   | `platform_version` | Required addition | — |
+   | `execution_mode` | Required addition | "sql" \| "dataframe" |
+   | `tuning_mode` | Required addition | "tuned" \| "notuning" \| "auto" |
+   | `tuning_hash` | Required addition | stable hash for cross-compare grouping |
+   | `test_type` | Required addition | "power" \| "throughput" |
+   | `validation_status` | Required addition | "passed" \| "failed" \| "skipped" |
+   | `cost_usd` | Required addition | null if unavailable |
+   | `bundle_path` | Recorded as launched | — |
 
 2. **Per-result detail JSON** - Full query timings + metadata for result pages.
    Target query record:

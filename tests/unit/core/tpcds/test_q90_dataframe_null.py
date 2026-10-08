@@ -1,5 +1,3 @@
-"""Regression coverage for TPC-DS Q90's guarded division on both DataFrame families."""
-
 from __future__ import annotations
 
 import pytest

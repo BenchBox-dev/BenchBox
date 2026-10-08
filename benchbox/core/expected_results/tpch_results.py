@@ -19,31 +19,12 @@ TPCH_RANGE_ROW_COUNT_BOUNDS: dict[str, tuple[int, int]] = {
     "20": (131, 231),
 }
 
-# Q16 retains the model's default ±50% tolerance because its full parameter
-# domain is combinatorial and no defensible exhaustive RANGE bound is available.
 TPCH_LOOSE_QUERY_IDS: frozenset[str] = frozenset({"16"})
 
-# The bounded correctness gate still excludes this set from its separate
-# reference-seed value oracle; the runtime row-count validator relaxes these
-# queries from EXACT to the RANGE/LOOSE specifications here only under a
-# non-reference seed, instead of skipping them.
 PARAMETER_SENSITIVE_QUERY_IDS: frozenset[str] = frozenset(TPCH_RANGE_ROW_COUNT_BOUNDS) | TPCH_LOOSE_QUERY_IDS
 
 
 def get_tpch_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedResults | None:
-    """Get expected results for TPC-H queries at a given scale factor.
-
-    This function loads expected row counts from TPC-H answer files (SF=1.0 only currently).
-    For scale factors other than 1.0, returns None to trigger graceful validation skip.
-    Scale-independent queries can still be validated via registry fallback to SF=1.0.
-
-    Args:
-        scale_factor: Scale factor (currently only 1.0 is supported from answer files)
-
-    Returns:
-        BenchmarkExpectedResults with all TPC-H query expectations, or None if SF != 1.0
-    """
-    # Only SF=1.0 is supported - return None for others to trigger graceful SKIP
     if scale_factor != 1.0:
         logger.info(
             f"TPC-H expected results only available for SF=1.0. "
@@ -52,20 +33,13 @@ def get_tpch_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedRes
         )
         return None
 
-    # Load row counts from answer files (SF=1.0)
     row_counts = load_tpch_expected_results(scale_factor=1.0)
-    # Load stored reference VALUE digests (SF=1.0, pinned reference seed). Backs the
-    # bounded correctness gate's value oracle; absent queries fall back to row-count
-    # only. Keyed by the same query IDs as the row counts.
     value_digests = load_tpch_value_digests(scale_factor=1.0)
 
-    # Build ExpectedQueryResult objects
     query_results = {}
 
-    # Queries that are scale-independent (same result count regardless of scale factor)
     scale_independent_queries = {
-        "1": True,  # Groups by L_RETURNFLAG, L_LINESTATUS (4 combinations)
-        # Most other queries are scale-dependent
+        "1": True,
     }
 
     for query_id, row_count in row_counts.items():
@@ -116,7 +90,6 @@ def get_tpch_expected_results(scale_factor: float = 1.0) -> BenchmarkExpectedRes
     )
 
 
-# Register the provider with the global registry
 from benchbox.core.expected_results.registry import register_benchmark_provider
 
 register_benchmark_provider("tpch", get_tpch_expected_results)

@@ -1,9 +1,4 @@
 #!/usr/bin/env python3
-"""Blog content validation tool.
-
-Validates blog posts, drafts, and style guides against editorial and voice rules
-defined in _blog/STYLE_GUIDE.md and _blog/VOICE_REFERENCE.md.
-"""
 
 from __future__ import annotations
 
@@ -16,8 +11,6 @@ from pathlib import Path
 
 
 class Severity(str, Enum):
-    """Severity levels for content validation findings."""
-
     ERROR = "error"
     WARNING = "warning"
     INFO = "info"
@@ -25,8 +18,6 @@ class Severity(str, Enum):
 
 @dataclass(frozen=True)
 class Finding:
-    """A single validation finding."""
-
     file_path: Path
     line_number: int
     category: str
@@ -38,30 +29,22 @@ class Finding:
 
 @dataclass
 class ValidationResult:
-    """Validation result for a single file."""
-
     file_path: Path
     findings: list[Finding] = field(default_factory=list)
 
     @property
     def has_errors(self) -> bool:
-        """True if any findings have ERROR severity."""
         return any(f.severity == Severity.ERROR for f in self.findings)
 
     @property
     def has_warnings(self) -> bool:
-        """True if any findings have WARNING severity."""
         return any(f.severity == Severity.WARNING for f in self.findings)
 
     @property
     def is_valid(self) -> bool:
-        """True if there are no errors."""
         return not self.has_errors
 
 
-# Patterns for validation rules
-
-# Error-level rules
 RE_EM_DASH = re.compile(r"\u2014")
 RE_EN_DASH = re.compile(r"\u2013")
 RE_PLATFORM_WINNER = re.compile(
@@ -72,7 +55,6 @@ RE_PLATFORM_WINNER = re.compile(
     re.IGNORECASE,
 )
 
-# Warning-level rules
 RE_SUPERLATIVE = re.compile(
     r"\b(revolutionary|game-changing|mind-blowing|groundbreaking|unmatched performance|"
     r"blazing(?:ly)? fast|lightning fast|infinitely faster)\b",
@@ -88,7 +70,6 @@ RE_BANNED_HEDGE = re.compile(
     re.IGNORECASE,
 )
 
-# LLM writing tells and conversational residue
 RE_LLM_CONVERSATIONAL = re.compile(
     r"^\s*(?:>\s*)*(?:good point|you're right|certainly!|sure thing|as mentioned earlier)\b",
     re.IGNORECASE,
@@ -113,16 +94,13 @@ RE_LLM_FORMULAIC_CONCLUSION = re.compile(
     re.IGNORECASE,
 )
 
-# Content-ok override pattern: <!-- content-ok: category --> or <!-- content-ok -->
 RE_CONTENT_OK = re.compile(r"<!--\s*content-ok(?::\s*([a-zA-Z0-9_-]+))?\s*-->")
 
-# Allowed negation patterns that are not denial couplets
 RE_ALLOWED_NEGATION = re.compile(
     r"\b(not yet supported|not supported yet|not supported|not_run|not run)\b",
     re.IGNORECASE,
 )
 
-# Affirmation-plus-denial couplet patterns
 RE_SAME_LINE_AFFIRM_DENY = re.compile(
     r"[.?!;]\s+(?:It|They|This|We|That|[A-Z][a-zA-Z0-9_-]*)\s+(?:is not|are not|was not|were not|does not|do not|did not|cannot)\b",
     re.IGNORECASE,
@@ -136,18 +114,15 @@ RE_LINE_START_DENIAL = re.compile(
     re.IGNORECASE,
 )
 
-# Guide files where Avoid/Don't examples are legitimate
 GUIDE_FILENAME_PATTERNS = ("STYLE_GUIDE.md", "VOICE_REFERENCE.md", "PUBLISHING.md", "_guide.md", "_reference.md")
 
 
 def is_guide_file(path: Path) -> bool:
-    """Check if the given path is a style guide or voice reference."""
     name = path.name.lower()
     return any(name.endswith(pattern.lower()) for pattern in GUIDE_FILENAME_PATTERNS)
 
 
 def extract_content_ok_categories(text: str) -> set[str]:
-    """Extract content-ok override categories from a line or comment."""
     categories: set[str] = set()
     for match in RE_CONTENT_OK.finditer(text):
         cat = match.group(1)
@@ -159,8 +134,6 @@ def extract_content_ok_categories(text: str) -> set[str]:
 
 
 class GuideContextTracker:
-    """Tracks state within style guide files to avoid false positives on negative examples."""
-
     def __init__(self, is_guide: bool) -> None:
         self.is_guide = is_guide
         self.in_dont_block = False
@@ -169,7 +142,6 @@ class GuideContextTracker:
         self.table_avoid_col_indices: set[int] = set()
 
     def update_line(self, line: str, stripped: str) -> None:
-        """Update tracker state based on current line content."""
         if not self.is_guide:
             return
         if stripped.startswith("#"):
@@ -203,13 +175,11 @@ class GuideContextTracker:
             self.table_avoid_col_indices = set()
 
     def should_skip_prose(self) -> bool:
-        """Check if current state requires skipping all prose checks."""
         if not self.is_guide:
             return False
         return self.in_dont_block or self.in_before_block or self.in_anti_patterns_section
 
     def filter_prose_line(self, line: str, stripped: str) -> str | None:
-        """Filter Avoid cells from a table row or return full line if appropriate."""
         if self.should_skip_prose():
             return None
         if not self.is_guide:
@@ -224,7 +194,6 @@ class GuideContextTracker:
 
 
 def check_punctuation(line: str, idx: int, path: Path, is_guide: bool) -> list[Finding]:
-    """Check for forbidden em-dashes and en-dashes."""
     findings: list[Finding] = []
     em_match = RE_EM_DASH.search(line)
     if em_match and not (is_guide and ("U+2014" in line or "Prohibited" in line or "Punctuation Rules" in line)):
@@ -257,7 +226,6 @@ def check_punctuation(line: str, idx: int, path: Path, is_guide: bool) -> list[F
 
 
 def check_platform_winner(line: str, idx: int, path: Path) -> list[Finding]:
-    """Check for platform-winner verdict claims."""
     match = RE_PLATFORM_WINNER.search(line)
     if match:
         return [
@@ -275,7 +243,6 @@ def check_platform_winner(line: str, idx: int, path: Path) -> list[Finding]:
 
 
 def check_marketing_and_superlatives(line: str, idx: int, path: Path) -> list[Finding]:
-    """Check for unsourced superlatives and marketing hype."""
     match = RE_SUPERLATIVE.search(line)
     if match:
         return [
@@ -293,7 +260,6 @@ def check_marketing_and_superlatives(line: str, idx: int, path: Path) -> list[Fi
 
 
 def check_vendor_sermons(line: str, idx: int, path: Path) -> list[Finding]:
-    """Check for vendor critique sermons."""
     match = RE_VENDOR_SERMON.search(line)
     if match:
         return [
@@ -311,7 +277,6 @@ def check_vendor_sermons(line: str, idx: int, path: Path) -> list[Finding]:
 
 
 def check_first_person(line: str, idx: int, path: Path) -> list[Finding]:
-    """Check for first-person singular pronouns in post prose."""
     findings: list[Finding] = []
     for match in RE_FIRST_PERSON.finditer(line):
         findings.append(
@@ -329,7 +294,6 @@ def check_first_person(line: str, idx: int, path: Path) -> list[Finding]:
 
 
 def check_banned_hedges(line: str, idx: int, path: Path) -> list[Finding]:
-    """Check for banned hedge phrases."""
     match = RE_BANNED_HEDGE.search(line)
     if match:
         return [
@@ -347,7 +311,6 @@ def check_banned_hedges(line: str, idx: int, path: Path) -> list[Finding]:
 
 
 def check_llm_writing_tells(line: str, idx: int, path: Path) -> list[Finding]:
-    """Check for conversational residue, cliché openers, and AI vocabulary."""
     findings: list[Finding] = []
     conv_match = RE_LLM_CONVERSATIONAL.search(line)
     if conv_match:
@@ -431,7 +394,6 @@ def check_affirmation_denial_couplet(
     idx: int,
     path: Path,
 ) -> list[Finding]:
-    """Advisory check for affirmation-plus-denial singleton couplets."""
     if stripped.startswith("#") or RE_ALLOWED_NEGATION.search(line):
         return []
 
@@ -485,15 +447,6 @@ def check_affirmation_denial_couplet(
 
 
 def validate_file(file_path: Path | str, repo_root: Path | str | None = None) -> ValidationResult:
-    """Validate a single markdown file against blog voice and style rules.
-
-    Args:
-        file_path: Path to the markdown file.
-        repo_root: Optional root directory of the repository.
-
-    Returns:
-        ValidationResult containing all findings.
-    """
     path = Path(file_path)
     result = ValidationResult(file_path=path)
 
@@ -555,11 +508,9 @@ def validate_file(file_path: Path | str, repo_root: Path | str | None = None) ->
 
         guide_tracker.update_line(line, stripped)
 
-        # Rule 1: Punctuation (em-dash and en-dash) - Error
         if not is_suppressed("punctuation"):
             result.findings.extend(check_punctuation(line, idx, path, is_guide))
 
-        # Skip prose rules inside code blocks
         if in_code_block:
             last_prose_line = None
             continue
@@ -571,35 +522,27 @@ def validate_file(file_path: Path | str, repo_root: Path | str | None = None) ->
 
         clean_prose = re.sub(r"`[^`]*`", "", prose_line)
 
-        # Rule 2: Platform winner verdicts - Error
         if not is_suppressed("platform_winner") and not is_suppressed("platform_advocacy"):
             result.findings.extend(check_platform_winner(clean_prose, idx, path))
 
-        # Rule 3: Unsourced superlatives / marketing hype - Warning
         if not is_suppressed("unsourced_superlatives") and not is_suppressed("marketing"):
             result.findings.extend(check_marketing_and_superlatives(clean_prose, idx, path))
 
-        # Rule 4: Vendor-fix sermons - Warning
         if not is_suppressed("vendor_sermons") and not is_suppressed("restricted_vendor"):
             result.findings.extend(check_vendor_sermons(clean_prose, idx, path))
 
-        # Rule 5: First-person singular in post prose - Warning
         if not is_guide and not is_suppressed("first_person") and not is_suppressed("voice"):
             result.findings.extend(check_first_person(clean_prose, idx, path))
 
-        # Rule 6: Banned hedges - Warning
         if not is_suppressed("banned_hedges") and not is_suppressed("hedging"):
             result.findings.extend(check_banned_hedges(clean_prose, idx, path))
 
-        # Rule 7: LLM writing tells and conversational residue - Warning
         if not is_suppressed("llm_tells") and not is_suppressed("ai_tells"):
             result.findings.extend(check_llm_writing_tells(clean_prose, idx, path))
 
-        # Rule 8: Affirmation-plus-denial couplet advisory check - Info
         if not is_guide and not is_suppressed("couplet"):
             result.findings.extend(check_affirmation_denial_couplet(clean_prose, stripped, last_prose_line, idx, path))
 
-        # Update last prose line for adjacent line couplet detection
         if stripped and not stripped.startswith(("#", "```", "|", "- ", "* ", ">")):
             last_prose_line = clean_prose.strip()
         else:
@@ -613,16 +556,6 @@ def validate_content(
     patterns: list[str] | None = None,
     verbose: bool = False,
 ) -> list[ValidationResult]:
-    """Validate all markdown files matching patterns under root directory.
-
-    Args:
-        root: Root directory to search.
-        patterns: List of glob patterns (default: ["_blog/**/*.md"]).
-        verbose: If True, prints detailed progress.
-
-    Returns:
-        List of ValidationResult objects.
-    """
     root_path = Path(root)
     if patterns is None:
         patterns = ["_blog/**/*.md"]
@@ -643,7 +576,6 @@ def validate_content(
 
 
 def format_finding(finding: Finding) -> str:
-    """Format a single finding for terminal display."""
     color = {
         Severity.ERROR: "\033[31mERROR\033[0m",
         Severity.WARNING: "\033[33mWARN\033[0m",
@@ -657,7 +589,6 @@ def format_finding(finding: Finding) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI entry point for blog content validation."""
     parser = argparse.ArgumentParser(
         description="Validate blog content and drafts against voice, tone, and editorial rules."
     )

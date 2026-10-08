@@ -1,9 +1,3 @@
-"""Data generation tests for the Primitives benchmark.
-
-This module focuses on validating the Primitives data generator behaviour,
-including initialization, local output handling, and cloud upload integration hooks.
-"""
-
 from pathlib import Path
 from typing import Any, Callable
 
@@ -20,36 +14,29 @@ pytestmark = [
 
 @pytest.mark.unit
 class TestReadPrimitivesDataGenerator:
-    """Test Primitives data generator functionality."""
-
     def test_generator_initialization(self, temp_dir):
-        """Test generator initializes correctly."""
+
         generator = ReadPrimitivesDataGenerator(scale_factor=0.01, output_dir=temp_dir)
         assert generator.scale_factor == 0.01
         assert generator.output_dir == temp_dir
 
     def test_small_data_generation(self, temp_dir, small_scale_factor):
-        """Test generating small dataset - optimized version."""
         ReadPrimitivesDataGenerator(scale_factor=small_scale_factor, output_dir=temp_dir)
 
-        # Mock the actual data generation to avoid file I/O
         mock_files = {
             "region": temp_dir / "region.csv",
             "nation": temp_dir / "nation.csv",
         }
 
-        # Create minimal test files instead of generating full data
         for table, path in mock_files.items():
             if table == "region":
                 path.write_text("\n".join([f"region_{i}" for i in range(5)]))
             elif table == "nation":
                 path.write_text("\n".join([f"nation_{i}" for i in range(25)]))
 
-        # Test file existence and basic structure
         assert mock_files["region"].exists()
         assert mock_files["nation"].exists()
 
-        # Quick validation of file content without full generation
         with open(mock_files["region"], encoding="utf-8") as f:
             lines = f.readlines()
             assert len(lines) == 5
@@ -59,7 +46,6 @@ class TestReadPrimitivesDataGenerator:
             assert len(lines) == 25
 
     def test_local_generation_writes_to_expected_directory(self, tmp_path, monkeypatch):
-        """Ensure local generation writes files to the configured output directory."""
 
         output_dir = tmp_path / "primitives_sf1"
         generator = ReadPrimitivesDataGenerator(scale_factor=1.0, output_dir=output_dir)
@@ -82,7 +68,6 @@ class TestReadPrimitivesDataGenerator:
         assert (output_dir / "region.tbl.zst").exists()
 
     def test_cloud_generation_delegates_to_upload_helper(self, monkeypatch, tmp_path):
-        """Verify cloud paths trigger the cloud upload helper."""
 
         class FakeCloudPath:
             def __init__(self, value: str) -> None:
@@ -91,10 +76,10 @@ class TestReadPrimitivesDataGenerator:
             def __truediv__(self, other: str) -> "FakeCloudPath":
                 return FakeCloudPath(f"{self.value}/{other}")
 
-            def __str__(self) -> str:  # pragma: no cover - debugging helper
+            def __str__(self) -> str:  # pragma: no cover
                 return self.value
 
-            def __repr__(self) -> str:  # pragma: no cover - debugging helper
+            def __repr__(self) -> str:  # pragma: no cover
                 return f"FakeCloudPath({self.value!r})"
 
             def __eq__(self, other: object) -> bool:

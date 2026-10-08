@@ -38,11 +38,11 @@ Two classifications do most of the work:
 | Shared run engine below CLI and MCP | `internal` | `benchbox/core/run_service.py` (the `__all__` list is the cross-surface import contract) |
 | MCP tools | `beta-public`, deliberately scoped | `benchbox/mcp/`; every omitted CLI control carries a tier in the `docs/reference/mcp.md` omission ledger |
 | Result JSON bundles (schema-versioned product data) | `beta-public` | `benchbox/core/results/schema_policy.py`, `benchbox/core/results/schema.py` |
-| Explorer browser store (DuckDB + summaries, built from bundles) | `generated` | `_project/scripts/explorer_pipeline/`; reproducible from source bundles plus pipeline code |
+| Explorer browser store (DuckDB + summaries, built from bundles) | `generated` | Explorer publish pipeline (repository tooling); reproducible from source bundles plus pipeline code |
 | Public result submissions and their validation behavior | `beta-public` | `scripts/validate_submission.py`, `docs/reference/hosted-results-contract.md`, `docs/contributing-results.md` |
 | Semantic chart IDs shared by CLI, MCP, templates, and Explorer | `beta-public` | `benchbox/core/visualization/chart_types.py`, `results-explorer/src/lib/chartRegistry.ts`, `tests/parity/fixtures/chart_ids.json` |
 | `benchbox.experimental` namespace | `experimental` | Ships in the wheel for convenience, outside the supported product surface |
-| `_project/` scripts, audits, TODOs, ADRs | `repo-only` | Contributor tooling, not a user API |
+| Maintainer scripts, audits, and planning records | `repo-only` | Maintainer tooling, not a user API |
 
 There are currently 22 benchmarks across TPC standards, academic, industry,
 real-world, time-series, primitives, AI/ML, and experimental categories
@@ -181,7 +181,6 @@ carries contract obligations from the map:
 | `docs/` | User, concept, reference, and contributor documentation | Varies by page; the map governs |
 | `tests/` | Unit, integration, end-to-end, parity, and live suites | Verification gates per map row |
 | `examples/` | Runnable examples, notebooks, tuning files | Illustrative, not contractual |
-| `_project/` | Operations, audits, project tooling, TODO state | `repo-only` |
 
 ## Related documentation
 

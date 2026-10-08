@@ -59,15 +59,14 @@ Dask partitions DataFrames into chunks and builds a task graph for lazy executio
 ## Installation
 
 ```bash
-# Install Dask DataFrame support
 uv add benchbox --extra dask
 
-# Or with pip
 pip install "benchbox[dask]"
 
-# For distributed execution
 pip install "dask[distributed]"
 ```
+
+The last command installs `dask[distributed]` for distributed execution.
 
 ### Verify Installation
 
@@ -78,22 +77,20 @@ python -c "import dask.dataframe as dd; print('Dask DataFrame ready')"
 ## Quick Start
 
 ```bash
-# Run TPC-H on Dask DataFrame platform
 benchbox run --platform dask-df --benchmark tpch --scale 0.1
 
-# Configure workers for local execution
 benchbox run --platform dask-df --benchmark tpch --scale 1 \
   --platform-option n_workers=4 \
   --platform-option threads_per_worker=2
 
-# Use distributed scheduler
 benchbox run --platform dask-df --benchmark tpch --scale 10 \
   --platform-option use_distributed=true
 
-# Connect to existing cluster
 benchbox run --platform dask-df --benchmark tpch --scale 100 \
   --platform-option scheduler_address=tcp://scheduler:8786
 ```
+
+The four commands run, in order: the default local setup, local execution with configured workers, the distributed scheduler, and a connection to an existing cluster.
 
 ## Configuration Options
 
@@ -172,10 +169,11 @@ Dask excels at out-of-core and distributed workloads:
 
 Dask uses Pandas-compatible API with lazy evaluation:
 
+This is TPC-H Q1, the Pricing Summary Report, for Dask. `lineitem` is a Dask DataFrame, and `.compute()` triggers the computation.
+
 ```python
-# TPC-H Q1: Pricing Summary Report (Dask)
 def q1_pandas_impl(ctx: DataFrameContext) -> Any:
-    lineitem = ctx.get_table("lineitem")  # Dask DataFrame
+    lineitem = ctx.get_table("lineitem")
 
     cutoff = date(1998, 12, 1) - timedelta(days=90)
     filtered = lineitem[lineitem["l_shipdate"] <= cutoff]
@@ -196,7 +194,7 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
             "l_orderkey": "count"
         })
         .sort_values(["l_returnflag", "l_linestatus"])
-        .compute()  # Trigger computation
+        .compute()
     )
 
     return result
@@ -207,30 +205,28 @@ def q1_pandas_impl(ctx: DataFrameContext) -> Any:
 ```python
 from benchbox.platforms.dataframe import DaskDataFrameAdapter
 
-# Create adapter for local execution
 adapter = DaskDataFrameAdapter(
     working_dir="./benchmark_data",
     n_workers=4,
     threads_per_worker=2
 )
 
-# Or connect to distributed cluster
 adapter = DaskDataFrameAdapter(
     working_dir="./benchmark_data",
     use_distributed=True,
     scheduler_address="tcp://scheduler:8786"
 )
 
-# Create context and load tables
 ctx = adapter.create_context()
 adapter.load_tables(ctx, data_dir="./tpch_data")
 
-# Execute query
 from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
 query = TPCH_DATAFRAME_QUERIES.get_query("Q1")
 result = adapter.execute_query(ctx, query)
 print(result)
 ```
+
+The first adapter runs locally. The second connects to a distributed cluster.
 
 ## Distributed Cluster Setup
 
@@ -239,7 +235,6 @@ print(result)
 ```python
 from dask.distributed import Client, LocalCluster
 
-# Create local cluster
 cluster = LocalCluster(
     n_workers=4,
     threads_per_worker=2,
@@ -247,7 +242,6 @@ cluster = LocalCluster(
 )
 client = Client(cluster)
 
-# Run benchmark
 adapter = DaskDataFrameAdapter(
     use_distributed=True,
     scheduler_address=client.scheduler.address
@@ -257,27 +251,26 @@ adapter = DaskDataFrameAdapter(
 ### Remote Cluster
 
 ```bash
-# On scheduler machine
 dask scheduler
 
-# On worker machines
 dask worker tcp://scheduler:8786
 
-# In BenchBox
 benchbox run --platform dask-df --benchmark tpch --scale 100 \
   --platform-option scheduler_address=tcp://scheduler:8786
 ```
 
+Run `dask scheduler` on the scheduler machine and `dask worker` on the worker machines, then run BenchBox with the scheduler address.
+
 ### Kubernetes
 
 ```bash
-# Using Dask Kubernetes operator
 helm install dask dask/dask
 
-# Connect to the scheduler
 benchbox run --platform dask-df --benchmark tpch --scale 1000 \
   --platform-option scheduler_address=tcp://dask-scheduler:8786
 ```
+
+Install the cluster with the Dask Kubernetes Helm chart, then connect BenchBox to the scheduler.
 
 ## Troubleshooting
 
@@ -297,8 +290,10 @@ distributed.worker - WARNING - Memory use is high but worker has no data to stor
 
 **Check partition count:**
 ```python
-ddf.npartitions  # Should be 2-4x number of workers
+ddf.npartitions
 ```
+
+The partition count should be 2-4 times the number of workers.
 
 **Repartition if needed:**
 ```python

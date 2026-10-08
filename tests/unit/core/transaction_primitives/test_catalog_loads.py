@@ -1,10 +1,3 @@
-"""Tests for the Transaction Primitives operations catalog loader.
-
-Verifies the catalog version, operation inventory, category coverage, and
-that every operation ships executable validation queries. Service-free, so
-these live here (unit/fast) rather than behind the live_integration gate.
-"""
-
 from __future__ import annotations
 
 import pytest

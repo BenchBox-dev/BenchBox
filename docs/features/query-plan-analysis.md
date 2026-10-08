@@ -21,14 +21,13 @@ BenchBox supports capturing, analyzing, and comparing query execution plans acro
 
 ## Quick Start
 
+The commands run a benchmark with plan capture, view a specific plan, and compare plans between two runs.
+
 ```bash
-# 1. Run benchmark with plan capture
 benchbox run --platform duckdb --benchmark tpch --scale 1 --capture-plans
 
-# 2. View a specific plan
 benchbox show-plan --run benchmark_runs/latest/results.json --query-id q05
 
-# 3. Compare plans between two runs
 benchbox compare run_before.json run_after.json --include-plans
 ```
 
@@ -117,8 +116,7 @@ successfully-executed queries on the measurement connection and merges the resul
   `is_dml_query` write guard, so writes are captured without being re-executed a second time.
 - **Capture once per query.** Each distinct executed query is captured exactly once — a plan is a
   property of `(query, schema, engine)`, not of an execution. `--plan-config queries:<ids>`
-  restricts *which* queries are captured. The old per-iteration / per-stream sampling options
-  (`sample:` / `first:`) have been retired: under capture-once-per-query they had no meaning.
+  restricts *which* queries are captured.
 
 The single genuine exception is **BigQuery**: it has no `EXPLAIN` statement (the real plan and
 stage timing are only available from the executed `QueryJob`), so it sets
@@ -141,15 +139,10 @@ query (side-effect-only)?
 | Fabric Warehouse | Isolatable (`EXPLAIN`) | Standalone plan, no loss |
 | Lakesail | Isolatable (`EXPLAIN EXTENDED`) | Standalone static plan, no loss |
 
-Policy decision: **option B (harvest from the measured job)** for BigQuery, carved
-out narrowly and explicitly. A dry-run/estimated-only capture (option A) would lose
-actual-execution detail, and a real re-run would cost bytes (money) and duplicate
-the measured query, so capture reads the already-executed job's `query_plan` via
-`_capture_bq_plan` with `BigQueryQueryPlanParser` — no second paid execution.
-`get_query_plan()` returns `None` per the `str | None` base contract, so generic
-`capture_query_plan` degrades to `explain_failed` instead of crashing. The
-exception must not justify inline capture for any EXPLAIN-based engine: those keep
-exactly one (isolated) capture path.
+For BigQuery, BenchBox reads the plan from the already-executed job's `query_plan`,
+so capture keeps actual-execution detail and never runs the query a second time
+(which would cost money). If the completed job exposes no plan stages, capture
+reports `explain_failed`. Every other engine uses the isolated `EXPLAIN` path.
 
 #### Mid-run data mutation: capture before the mutation
 
@@ -273,13 +266,12 @@ benchbox show-plan \
 
 ### Visualization Options
 
-Control tree display:
+Control tree display. The first command is a compact view without operator properties. The second limits the tree
+depth for very complex plans.
 
 ```bash
-# Compact view without operator properties
 benchbox show-plan --run results.json --query-id q05 --compact --no-properties
 
-# Limit tree depth for very complex plans
 benchbox show-plan --run results.json --query-id q05 --max-depth 3
 ```
 
@@ -428,18 +420,14 @@ from benchbox.core.results.models import BenchmarkResults
 from benchbox.core.query_plans.comparison import compare_query_plans
 from benchbox.core.query_plans.visualization import render_plan
 
-# Load results
 with open('results.json') as f:
     results = BenchmarkResults.from_dict(json.load(f))
 
-# Get a query execution
 query_exec = results.phases['power'].queries[0]
 plan = query_exec.query_plan
 
-# Render plan
 print(render_plan(plan))
 
-# Compare two plans
 comparison = compare_query_plans(plan1, plan2)
 print(f"Similarity: {comparison.similarity.overall_similarity:.1%}")
 print(f"Type mismatches: {comparison.similarity.type_mismatches}")
@@ -451,7 +439,6 @@ Traverse plan trees programmatically:
 
 ```python
 def count_scans(plan):
-    """Count total scan operations in plan."""
     def count_in_operator(op):
         count = 1 if op.operator_type == LogicalOperatorType.SCAN else 0
         if op.children:
@@ -461,23 +448,21 @@ def count_scans(plan):
 
     return count_in_operator(plan.logical_root)
 
-# Analyze plans
 num_scans = count_scans(query_exec.query_plan)
 print(f"Total scans: {num_scans}")
 ```
 
 ### Plan Fingerprints
 
-Use fingerprints for fast plan comparison:
+Use fingerprints for fast plan comparison. The example checks whether two plans are identical, groups queries by
+plan, and finds queries that share the same plan.
 
 ```python
-# Check if plans are identical
 if plan1.plan_fingerprint == plan2.plan_fingerprint:
     print("Plans are identical")
 else:
     print("Plans differ")
 
-# Group queries by plan
 plans_by_fingerprint = {}
 for query_exec in all_queries:
     fp = query_exec.query_plan.plan_fingerprint
@@ -485,7 +470,6 @@ for query_exec in all_queries:
         plans_by_fingerprint[fp] = []
     plans_by_fingerprint[fp].append(query_exec.query_id)
 
-# Find queries with same plan
 for fp, query_ids in plans_by_fingerprint.items():
     if len(query_ids) > 1:
         print(f"Queries {query_ids} share same plan")
@@ -502,12 +486,10 @@ for fp, query_ids in plans_by_fingerprint.items():
 2. Platform doesn't support plan capture
 3. Parser error (check logs for details)
 
-**Solution**:
+**Solution**: ensure `--capture-plans` is included, and check which platforms support capture:
 ```bash
-# Ensure --capture-plans is included
 benchbox run --platform duckdb --benchmark tpch --scale 1 --capture-plans
 
-# Check which platforms support capture
 benchbox platforms
 ```
 
@@ -584,16 +566,16 @@ To compare costs/estimates, examine the JSON export directly.
 
 ### Cross-Platform Analysis
 
+The first two commands run the same benchmark on different platforms. The `compare` commands compare the plans, and
+the second shows only the most-changed plans.
+
 ```bash
-# Run same benchmark on different platforms
 benchbox run --platform duckdb --benchmark tpch --scale 1 --capture-plans
 benchbox run --platform datafusion --benchmark tpch --scale 1 --capture-plans
 
-# Compare plans
 benchbox compare benchmark_runs/duckdb_*/results.json \
   benchmark_runs/datafusion_*/results.json --include-plans
 
-# Show only the most-changed plans
 benchbox compare benchmark_runs/duckdb_*/results.json \
   benchmark_runs/datafusion_*/results.json \
   --include-plans --plan-threshold 0.9
@@ -601,13 +583,13 @@ benchbox compare benchmark_runs/duckdb_*/results.json \
 
 ### Regression Testing
 
+This is an automated regression check. The `if` block checks the exit code of `benchbox compare`.
+
 ```bash
-# Automated regression check
 benchbox compare baseline.json current.json \
   --include-plans --plan-threshold 0.95 \
   --format json > regression_report.json
 
-# Check exit code
 if [ $? -ne 0 ]; then
     echo "Plan regressions detected!"
     exit 1
@@ -669,10 +651,6 @@ literal-sensitive, for users who intentionally track filter-threshold changes):
 - **Cross-run metadata:** `create_plan_metadata_from_results(..., normalize_literals=True)`
   records the normalized fingerprint per query for seed-independent comparison.
 
-A `benchbox run --normalize-plan-literals` flag to surface the normalized fingerprint
-directly in the result bundle is planned; today the normalized fingerprint is
-available through the API above and the metadata helper.
-
 **Recommended use:**
 - Within a single run: deduplicate identical plans across concurrent streams
 - Cross-run regression detection: flag queries where the fingerprint changed between runs on the same engine version
@@ -699,9 +677,11 @@ constants share a normalized fingerprint.
 
 The capability is also available programmatically:
 
+`plan_fingerprint` is literal-sensitive (the default). `normalized_fingerprint` is literal-normalized.
+
 ```python
-plan.plan_fingerprint          # literal-sensitive (default)
-plan.normalized_fingerprint    # literal-normalized
+plan.plan_fingerprint
+plan.normalized_fingerprint
 plan.compute_plan_fingerprint(normalize_literals=True)
 ```
 

@@ -1,5 +1,3 @@
-"""Tests for HiveExternalTableMixin shared by Trino and Presto adapters."""
-
 import pytest
 
 from benchbox.platforms.base.external_table_mixin import HiveExternalTableMixin
@@ -11,8 +9,6 @@ pytestmark = [
 
 
 class ConcreteAdapter(HiveExternalTableMixin):
-    """Minimal concrete adapter for testing the mixin."""
-
     def __init__(self, staging_root=None, catalog="hive", schema="default"):
         self.staging_root = staging_root
         self.catalog = catalog
@@ -37,7 +33,7 @@ class TestValidateExternalTableRequirements:
 
     def test_passes_when_staging_root_set(self):
         adapter = ConcreteAdapter(staging_root="s3://bucket/path")
-        adapter.validate_external_table_requirements()  # Should not raise
+        adapter.validate_external_table_requirements()
 
 
 class TestMapExternalColumnType:
@@ -129,13 +125,11 @@ class TestBuildExternalLocation:
     def test_escapes_single_quotes(self):
         adapter = ConcreteAdapter(staging_root="s3://bucket/it's-a-path")
         loc = adapter._build_external_location("orders")
-        assert "''" in loc  # Escaped
+        assert "''" in loc
         assert "it''s-a-path" in loc
 
 
 class TestTrinoPrestoMixinParity:
-    """Verify both Trino and Presto inherit from the same mixin."""
-
     def test_trino_uses_mixin(self):
         try:
             from benchbox.platforms.trino import TrinoAdapter

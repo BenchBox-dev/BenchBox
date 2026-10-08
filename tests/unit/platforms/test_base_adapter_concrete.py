@@ -1,22 +1,3 @@
-"""Tests for concrete (non-abstract) methods of PlatformAdapter using real DuckDB connections.
-
-Covers:
-- _collect_resource_utilization: system info collection with real values
-- _summarize_performance_characteristics: edge cases beyond existing tests
-- get_platform_info: base and DuckDB-specific implementations
-- validate_platform_capabilities: platform capability validation
-- close_connection: connection lifecycle
-- capture_query_plan: plan capture via DuckDB (real EXPLAIN)
-- _record_plan_capture_failure: error tracking
-- _build_query_result_with_validation: result dict construction
-- _build_query_failure_result: failure result construction
-- Table management via DuckDB: table creation, querying, schema operations
-- PlanCaptureError: error dataclass behavior
-- _extract_table_names / _resolve_benchmark_table_names: utility helpers
-- Dry-run mode: enable/disable/capture lifecycle
-- validate_platform_dependencies: dependency checking
-"""
-
 from __future__ import annotations
 
 import os
@@ -44,20 +25,15 @@ pytestmark = [
 ]
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture()
 def duckdb_adapter():
-    """Create a DuckDB adapter with in-memory database."""
+
     return DuckDBAdapter(database_path=":memory:", memory_limit="256MB")
 
 
 @pytest.fixture()
 def connection(duckdb_adapter):
-    """Create a real in-memory DuckDB connection."""
+
     conn = duckdb_adapter.create_connection()
     yield conn
     try:
@@ -66,14 +42,7 @@ def connection(duckdb_adapter):
         pass
 
 
-# ---------------------------------------------------------------------------
-# _collect_resource_utilization
-# ---------------------------------------------------------------------------
-
-
 class TestCollectResourceUtilization:
-    """Test _collect_resource_utilization with the real runtime environment."""
-
     def test_returns_dict_with_required_keys(self, duckdb_adapter):
         snapshot = duckdb_adapter._collect_resource_utilization()
         assert isinstance(snapshot, dict)
@@ -92,21 +61,21 @@ class TestCollectResourceUtilization:
         snapshot = duckdb_adapter._collect_resource_utilization()
         assert isinstance(snapshot["platform"], str)
         assert len(snapshot["platform"]) > 0
-        # Should match the stdlib platform.platform() format
+
         assert snapshot["platform"] == platform_module.platform()
 
     def test_timestamp_is_iso_format(self, duckdb_adapter):
         snapshot = duckdb_adapter._collect_resource_utilization()
         ts = snapshot["timestamp"]
         assert isinstance(ts, str)
-        assert "T" in ts  # ISO format includes a T separator
+        assert "T" in ts
 
     def test_psutil_available_flag_is_boolean(self, duckdb_adapter):
         snapshot = duckdb_adapter._collect_resource_utilization()
         assert isinstance(snapshot["available"], bool)
 
     def test_when_psutil_available_memory_is_populated(self, duckdb_adapter):
-        """If psutil is installed, memory metrics should be populated."""
+
         snapshot = duckdb_adapter._collect_resource_utilization()
         if snapshot["available"]:
             assert "memory" in snapshot
@@ -117,7 +86,7 @@ class TestCollectResourceUtilization:
             assert 0 <= mem["percent"] <= 100
 
     def test_when_psutil_available_disk_is_populated(self, duckdb_adapter):
-        """If psutil is installed, disk metrics should be populated."""
+
         snapshot = duckdb_adapter._collect_resource_utilization()
         if snapshot["available"]:
             assert "disk" in snapshot
@@ -127,16 +96,8 @@ class TestCollectResourceUtilization:
             assert disk["free_mb"] >= 0
 
 
-# ---------------------------------------------------------------------------
-# get_platform_info (base default + DuckDB override)
-# ---------------------------------------------------------------------------
-
-
 class TestGetPlatformInfoBase:
-    """Test the base PlatformAdapter.get_platform_info default implementation."""
-
     def test_base_get_platform_info_returns_expected_keys(self):
-        """The base implementation must return a dict with standard keys."""
 
         class MinimalAdapter(PlatformAdapter):
             @property
@@ -195,7 +156,6 @@ class TestGetPlatformInfoBase:
         assert info["platform_version"] == "unknown"
 
     def test_base_get_platform_info_includes_driver_metadata_when_set(self):
-        """Driver metadata should appear in platform_info when configured."""
 
         class DriverAdapter(PlatformAdapter):
             @property
@@ -250,8 +210,6 @@ class TestGetPlatformInfoBase:
 
 
 class TestGetPlatformInfoDuckDB:
-    """Test the DuckDB adapter's get_platform_info with real connection."""
-
     def test_returns_duckdb_platform_type(self, duckdb_adapter, connection):
         info = duckdb_adapter.get_platform_info(connection)
         assert info["platform_type"] == "duckdb"
@@ -261,7 +219,7 @@ class TestGetPlatformInfoDuckDB:
         info = duckdb_adapter.get_platform_info(connection)
         version = info["platform_version"]
         assert isinstance(version, str)
-        # DuckDB versions look like "1.2.0" (normalized from "v1.2.0")
+
         parts = version.split(".")
         assert len(parts) >= 2, f"Expected semver-like version, got: {version}"
         assert parts[0].isdigit()
@@ -282,11 +240,6 @@ class TestGetPlatformInfoDuckDB:
         assert len(info["client_library_version"]) > 0
 
 
-# ---------------------------------------------------------------------------
-# validate_platform_capabilities
-# ---------------------------------------------------------------------------
-
-
 class TestValidatePlatformCapabilities:
     def test_tpch_passes_validation(self, duckdb_adapter):
         result = duckdb_adapter.validate_platform_capabilities("tpch")
@@ -299,7 +252,7 @@ class TestValidatePlatformCapabilities:
         assert result.errors == []
 
     def test_unknown_benchmark_no_errors(self, duckdb_adapter):
-        """DuckDB override doesn't warn on unknown benchmarks but should still validate."""
+
         result = duckdb_adapter.validate_platform_capabilities("custom_bench")
         assert result.is_valid is True
         assert result.errors == []
@@ -311,11 +264,6 @@ class TestValidatePlatformCapabilities:
         assert result.details["dry_run_mode"] is False
 
 
-# ---------------------------------------------------------------------------
-# close_connection
-# ---------------------------------------------------------------------------
-
-
 class TestCloseConnection:
     def test_close_makes_connection_unusable(self, duckdb_adapter):
         conn = duckdb_adapter.create_connection()
@@ -325,17 +273,12 @@ class TestCloseConnection:
             conn.execute("SELECT 1")
 
     def test_close_none_does_not_raise(self, duckdb_adapter):
-        # Should not raise even when passed None
+
         duckdb_adapter.close_connection(None)
 
     def test_close_object_without_close_method(self, duckdb_adapter):
-        # Should not raise when object has no close method
+
         duckdb_adapter.close_connection(42)
-
-
-# ---------------------------------------------------------------------------
-# Table management via real DuckDB
-# ---------------------------------------------------------------------------
 
 
 class TestTableManagementDuckDB:
@@ -362,7 +305,7 @@ class TestTableManagementDuckDB:
 
     def test_drop_table_removes_from_catalog(self, duckdb_adapter, connection):
         connection.execute("CREATE TABLE drop_me (id INT)")
-        # Verify it exists
+
         before = connection.execute(
             "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'drop_me'"
         ).fetchone()
@@ -375,14 +318,14 @@ class TestTableManagementDuckDB:
         assert after[0] == 0
 
     def test_create_schema_namespace(self, duckdb_adapter, connection):
-        """Test creating a named schema within DuckDB."""
+
         connection.execute("CREATE SCHEMA test_schema")
         connection.execute("CREATE TABLE test_schema.my_table (id INT)")
         result = connection.execute("SELECT COUNT(*) FROM test_schema.my_table").fetchone()
         assert result[0] == 0
 
     def test_drop_schema_cascade(self, duckdb_adapter, connection):
-        """Test dropping a schema cascade removes tables."""
+
         connection.execute("CREATE SCHEMA drop_schema")
         connection.execute("CREATE TABLE drop_schema.t1 (id INT)")
         connection.execute("DROP SCHEMA drop_schema CASCADE")
@@ -390,21 +333,16 @@ class TestTableManagementDuckDB:
             connection.execute("SELECT * FROM drop_schema.t1")
 
 
-# ---------------------------------------------------------------------------
-# capture_query_plan via DuckDB (real EXPLAIN)
-# ---------------------------------------------------------------------------
-
-
 class TestCaptureQueryPlanDuckDB:
     def test_capture_plans_disabled_returns_none(self, duckdb_adapter, connection):
-        """When capture_plans is False, should return (None, 0.0)."""
+
         duckdb_adapter.capture_plans = False
         plan, capture_time = duckdb_adapter.capture_query_plan(connection, "SELECT 1", "q1")
         assert plan is None
         assert capture_time == 0.0
 
     def test_capture_plans_enabled_returns_plan_and_timing(self, duckdb_adapter, connection):
-        """When capture_plans is True, should return a parsed plan DAG and non-zero timing."""
+
         connection.execute("CREATE TABLE plan_test (id INT, name VARCHAR)")
         connection.execute("INSERT INTO plan_test VALUES (1, 'a'), (2, 'b')")
 
@@ -414,18 +352,17 @@ class TestCaptureQueryPlanDuckDB:
             connection, "SELECT * FROM plan_test WHERE id > 0", "q_plan"
         )
 
-        # plan should be a QueryPlanDAG or None depending on parser availability
         if plan is not None:
             assert capture_time > 0.0
             assert duckdb_adapter.query_plans_captured >= 1
-            # Plan should have a fingerprint
+
             assert plan.plan_fingerprint is not None
-        # If parser returns None, the failure should be recorded
+
         else:
             assert duckdb_adapter.plan_capture_failures >= 0
 
     def test_query_filter_excludes_non_matching_query(self, duckdb_adapter, connection):
-        """plan_query_filter should skip queries not in the filter set."""
+
         duckdb_adapter.capture_plans = True
         duckdb_adapter.plan_query_filter = {"q_special"}
 
@@ -433,19 +370,17 @@ class TestCaptureQueryPlanDuckDB:
         assert plan is None
 
     def test_query_filter_includes_matching_query(self, duckdb_adapter, connection):
-        """plan_query_filter should allow queries in the filter set."""
+
         connection.execute("CREATE TABLE filter_test (x INT)")
         duckdb_adapter.capture_plans = True
         duckdb_adapter.plan_query_filter = {"q_match"}
 
         plan, _ = duckdb_adapter.capture_query_plan(connection, "SELECT * FROM filter_test", "q_match")
-        # Should attempt capture (may succeed or fail depending on parser, but should not skip)
-        # Verify we didn't short-circuit due to filter
+
         assert duckdb_adapter.query_plans_captured + duckdb_adapter.plan_capture_failures >= 1
 
     def test_plan_query_filter_limits_capture(self, duckdb_adapter, connection):
-        """plan_query_filter restricts capture to the selected query ids; the
-        retired per-iteration sampling machinery no longer limits repeats."""
+
         duckdb_adapter.capture_plans = True
         duckdb_adapter.plan_query_filter = {"q_keep"}
 
@@ -457,10 +392,7 @@ class TestCaptureQueryPlanDuckDB:
         assert skipped_ms == 0.0
 
     def test_query_filter_matches_internal_capture_key(self, duckdb_adapter, connection):
-        """The isolated capture phase passes the internal capture key
-        (``<public>#<digest>``), not the user-facing id, as the capture query id.
-        The filter must recover the public id so ``--plan-queries q_keep`` still
-        selects the query instead of silently producing no plans."""
+
         from benchbox.platforms.base.result_capture import _plan_capture_key
 
         connection.execute("CREATE TABLE key_filter_test (x INT)")
@@ -469,31 +401,24 @@ class TestCaptureQueryPlanDuckDB:
 
         sql = "SELECT * FROM key_filter_test"
         capture_key = _plan_capture_key("q_keep", sql)
-        assert "#" in capture_key  # internal key carries the digest suffix
+        assert "#" in capture_key
 
-        # Phase-style call with the internal key must NOT be filtered out.
         before = duckdb_adapter.query_plans_captured + duckdb_adapter.plan_capture_failures
         duckdb_adapter.capture_query_plan(connection, sql, capture_key)
         assert duckdb_adapter.query_plans_captured + duckdb_adapter.plan_capture_failures > before
 
-        # A different public id keyed the same way is still excluded.
         other_key = _plan_capture_key("q_other", sql)
         skipped, skipped_ms = duckdb_adapter.capture_query_plan(connection, sql, other_key)
         assert skipped is None
         assert skipped_ms == 0.0
 
     def test_get_query_plan_returns_json(self, duckdb_adapter, connection):
-        """DuckDB's get_query_plan should return JSON-formatted EXPLAIN output."""
+
         connection.execute("CREATE TABLE gqp_test (val INT)")
         result = duckdb_adapter.get_query_plan(connection, "SELECT * FROM gqp_test")
         assert result is not None
         assert isinstance(result, str)
         assert len(result) > 0
-
-
-# ---------------------------------------------------------------------------
-# _record_plan_capture_failure
-# ---------------------------------------------------------------------------
 
 
 class TestRecordPlanCaptureFailure:
@@ -520,14 +445,9 @@ class TestRecordPlanCaptureFailure:
 
     def test_non_strict_mode_does_not_raise(self, duckdb_adapter):
         duckdb_adapter.strict_plan_capture = False
-        # Should not raise
+
         duckdb_adapter._record_plan_capture_failure("q4", reason="explain_failed")
         assert duckdb_adapter.plan_capture_failures == 1
-
-
-# ---------------------------------------------------------------------------
-# PlanCaptureError dataclass
-# ---------------------------------------------------------------------------
 
 
 class TestPlanCaptureError:
@@ -568,11 +488,6 @@ class TestSerializationError:
         err = SerializationError("too large")
         assert isinstance(err, Exception)
         assert str(err) == "too large"
-
-
-# ---------------------------------------------------------------------------
-# _build_query_result_with_validation
-# ---------------------------------------------------------------------------
 
 
 class TestBuildQueryResultWithValidation:
@@ -662,11 +577,6 @@ class TestBuildQueryResultWithValidation:
         assert "No expected" in result["row_count_validation"]["warning"]
 
 
-# ---------------------------------------------------------------------------
-# _build_query_failure_result
-# ---------------------------------------------------------------------------
-
-
 class TestBuildQueryFailureResult:
     def test_failure_result_structure(self, duckdb_adapter):
         from benchbox.utils.clock import mono_time
@@ -685,11 +595,6 @@ class TestBuildQueryFailureResult:
         assert result["rows_returned"] == 0
         assert "Connection lost" in result["error"]
         assert result["error_type"] == "RuntimeError"
-
-
-# ---------------------------------------------------------------------------
-# Dry-run mode lifecycle
-# ---------------------------------------------------------------------------
 
 
 class TestDryRunMode:
@@ -739,15 +644,9 @@ class TestDryRunMode:
         duckdb_adapter.capture_sql("SELECT 1", "query")
         assert len(duckdb_adapter.captured_sql) == 1
 
-        # Re-enabling should reset
         duckdb_adapter.enable_dry_run()
         assert len(duckdb_adapter.captured_sql) == 0
         assert duckdb_adapter.query_counter == 0
-
-
-# ---------------------------------------------------------------------------
-# _extract_table_names / _resolve_benchmark_table_names helpers
-# ---------------------------------------------------------------------------
 
 
 class TestExtractTableNames:
@@ -794,8 +693,7 @@ class TestResolveBenchmarkTableNames:
         assert sorted(result) == ["customer", "nation"]
 
     def test_returns_empty_when_tables_is_none(self):
-        # _resolve_benchmark_table_names no longer inspects _impl directly;
-        # BaseBenchmark.tables property handles _impl delegation transparently.
+
         impl = SimpleNamespace(tables=["region", "supplier"])
         benchmark = SimpleNamespace(tables=None, _impl=impl)
         result = _resolve_benchmark_table_names(benchmark)
@@ -805,11 +703,6 @@ class TestResolveBenchmarkTableNames:
         benchmark = SimpleNamespace(tables=None, _impl=None)
         result = _resolve_benchmark_table_names(benchmark)
         assert result == []
-
-
-# ---------------------------------------------------------------------------
-# validate_platform_dependencies
-# ---------------------------------------------------------------------------
 
 
 class TestValidatePlatformDependencies:
@@ -826,14 +719,9 @@ class TestValidatePlatformDependencies:
 
     def test_psutil_check_returns_boolean(self):
         deps = PlatformAdapter.validate_platform_dependencies()
-        # psutil may or may not be installed, but key should exist with boolean value
+
         assert "psutil" in deps
         assert isinstance(deps["psutil"], bool)
-
-
-# ---------------------------------------------------------------------------
-# DriverIsolationCapability and check_isolation_capability
-# ---------------------------------------------------------------------------
 
 
 class TestDriverIsolationCapability:
@@ -852,7 +740,7 @@ class TestDriverIsolationCapability:
 
 class TestCheckIsolationCapability:
     def test_supported_adapter_does_not_raise(self):
-        # DuckDB supports isolation, should not raise
+
         check_isolation_capability(DuckDBAdapter, "duckdb", "isolated_site_packages")
 
     def test_not_applicable_raises_for_isolation(self):
@@ -897,11 +785,6 @@ class TestCheckIsolationCapability:
 
         with pytest.raises(RuntimeError, match="not applicable"):
             check_isolation_capability(NoIsoAdapter, "NoIso", "isolated-site-packages")
-
-
-# ---------------------------------------------------------------------------
-# _summarize_performance_characteristics edge cases
-# ---------------------------------------------------------------------------
 
 
 class TestSummarizePerformanceEdgeCases:
@@ -962,7 +845,7 @@ class TestSummarizePerformanceEdgeCases:
         assert len(summary["error_breakdown"]) == 2
 
     def test_mixed_results_with_execution_time_ms(self, duckdb_adapter):
-        """Results may use execution_time_ms instead of seconds."""
+
         from benchbox.core.schemas import QueryResult
 
         results = [
@@ -982,11 +865,11 @@ class TestSummarizePerformanceEdgeCases:
         )
         assert summary["total_queries"] == 1
         assert summary["successful_queries"] == 1
-        # 500ms = 0.5s -> 500ms
+
         assert summary["average_query_time_ms"] == pytest.approx(500.0)
 
     def test_single_query_latency_stats(self, duckdb_adapter):
-        """With a single query, latency stats should still be computed."""
+
         results = [
             {"query_id": "Q1", "status": "SUCCESS", "execution_time_seconds": 0.42, "rows_returned": 7},
         ]
@@ -1005,15 +888,10 @@ class TestSummarizePerformanceEdgeCases:
         assert all_stats["seconds"]["stdev"] == pytest.approx(0.0)
 
 
-# ---------------------------------------------------------------------------
-# DuckDB execute_query dry-run
-# ---------------------------------------------------------------------------
-
-
 class TestDuckDBExecuteQueryDryRun:
     def test_dry_run_returns_synthetic_result(self, duckdb_adapter, connection):
         duckdb_adapter.enable_dry_run()
-        # Need a new connection in dry-run mode
+
         dry_conn = duckdb_adapter.create_connection()
         result = duckdb_adapter.execute_query(
             connection=dry_conn,
@@ -1027,28 +905,18 @@ class TestDuckDBExecuteQueryDryRun:
         duckdb_adapter.disable_dry_run()
 
 
-# ---------------------------------------------------------------------------
-# test_connection
-# ---------------------------------------------------------------------------
-
-
 class TestTestConnection:
     def test_duckdb_connection_succeeds(self, duckdb_adapter):
         assert duckdb_adapter.test_connection() is True
 
     def test_connection_failure_returns_false(self):
-        """An adapter that fails to connect should return False."""
+
         adapter = DuckDBAdapter(database_path=":memory:", memory_limit="256MB")
-        # Monkey-patch to force failure
+
         original = adapter.create_connection
         adapter.create_connection = Mock(side_effect=RuntimeError("Simulated failure"))
         assert adapter.test_connection() is False
         adapter.create_connection = original
-
-
-# ---------------------------------------------------------------------------
-# _reset_plan_capture_stats
-# ---------------------------------------------------------------------------
 
 
 class TestResetPlanCaptureStats:
@@ -1063,22 +931,12 @@ class TestResetPlanCaptureStats:
         assert duckdb_adapter.plan_capture_errors == []
 
 
-# ---------------------------------------------------------------------------
-# supports_external_tables capability flag
-# ---------------------------------------------------------------------------
-
-
 class TestExternalTableCapability:
     def test_duckdb_supports_external_tables(self):
         assert DuckDBAdapter.supports_external_tables is True
 
     def test_base_defaults_to_false(self):
         assert PlatformAdapter.supports_external_tables is False
-
-
-# ---------------------------------------------------------------------------
-# get_tpc_base_dialect
-# ---------------------------------------------------------------------------
 
 
 class TestGetTpcBaseDialect:
@@ -1095,11 +953,6 @@ class TestGetTpcBaseDialect:
         assert duckdb_adapter.get_tpc_base_dialect("ssb") == "netezza"
 
 
-# ---------------------------------------------------------------------------
-# _check_import
-# ---------------------------------------------------------------------------
-
-
 class TestCheckImport:
     def test_existing_module_returns_true(self):
         assert PlatformAdapter._check_import("os") is True
@@ -1111,18 +964,12 @@ class TestCheckImport:
         assert PlatformAdapter._check_import("duckdb") is True
 
 
-# ---------------------------------------------------------------------------
-# translate_sql
-# ---------------------------------------------------------------------------
-
-
 class TestTranslateSql:
     def test_no_dialect_returns_unchanged(self, duckdb_adapter):
-        # DuckDB adapter has get_target_dialect returning None-ish or "duckdb"
-        # When dialect matches source or is None, SQL passes through
+
         sql = "SELECT * FROM table1"
         result = duckdb_adapter.translate_sql(sql, source_dialect="duckdb")
-        # DuckDB dialect is None, so it should pass through
+
         assert result == sql
 
     def test_same_dialect_returns_unchanged(self, duckdb_adapter):
@@ -1132,38 +979,28 @@ class TestTranslateSql:
         assert result == sql
 
 
-# ---------------------------------------------------------------------------
-# DuckDB real EXPLAIN output
-# ---------------------------------------------------------------------------
-
-
 class TestDuckDBExplainOutput:
     def test_explain_simple_query(self, connection):
-        """EXPLAIN on a simple query returns output with plan keywords."""
+
         connection.execute("CREATE TABLE explain_tbl (id INT, val VARCHAR)")
         connection.execute("INSERT INTO explain_tbl VALUES (1, 'x'), (2, 'y')")
 
         rows = connection.execute("EXPLAIN SELECT * FROM explain_tbl WHERE id > 0").fetchall()
         assert len(rows) > 0
-        # Combine all output text
+
         full_plan = "\n".join(str(row) for row in rows)
-        # DuckDB EXPLAIN output should mention scan or filter operations
+
         plan_upper = full_plan.upper()
         assert "SCAN" in plan_upper or "SEQ_SCAN" in plan_upper or "FILTER" in plan_upper
 
     def test_explain_format_json(self, connection):
-        """EXPLAIN (FORMAT JSON) should return JSON-like output."""
+
         connection.execute("CREATE TABLE json_explain_tbl (x INT)")
         rows = connection.execute("EXPLAIN (FORMAT JSON) SELECT * FROM json_explain_tbl").fetchall()
         assert len(rows) > 0
-        # The output should contain JSON structure markers
+
         text = str(rows)
         assert "{" in text
-
-
-# ---------------------------------------------------------------------------
-# DuckDB adapter initialization
-# ---------------------------------------------------------------------------
 
 
 class TestDuckDBAdapterInit:
@@ -1192,24 +1029,19 @@ class TestDuckDBAdapterInit:
         assert adapter.show_query_plans is False
 
     def test_apply_run_plan_flags_applies_and_restores_show_query_plans(self):
-        """--show-plans applies for one run and never leaks into later runs."""
+
         adapter = DuckDBAdapter(database_path=":memory:")
         assert adapter.show_query_plans is False
 
         snapshot = adapter._apply_run_plan_flags({"show_query_plans": True})
         assert adapter.show_query_plans is True
         assert snapshot["show_query_plans"] is False
-        # Restore exactly as run_enhanced_benchmark's finally block does.
+
         adapter.show_query_plans = snapshot["show_query_plans"]
         assert adapter.show_query_plans is False
 
     def test_run_enhanced_benchmark_restores_plan_flags_on_failure(self):
-        """The finally block in run_enhanced_benchmark must restore every flag.
 
-        Fails the review's repro: delete the finally-block restore lines in
-        adapter.py and this test goes red. The sentinel raises inside the
-        try, so only the finally block can restore the flags.
-        """
         from unittest.mock import patch
 
         adapter = DuckDBAdapter(database_path=":memory:")
@@ -1239,11 +1071,7 @@ class TestDuckDBAdapterInit:
         assert adapter.capture_plans is False
 
     def test_apply_run_plan_flags_none_timeout_keeps_default_without_mutation(self):
-        """plan_capture_timeout_seconds=None means unset, not int(None).
 
-        Coercion happens before any assignment, so a bad value cannot leave
-        partial adapter mutation behind.
-        """
         adapter = DuckDBAdapter(database_path=":memory:")
         before = adapter.plan_capture_timeout_seconds
 
@@ -1253,13 +1081,7 @@ class TestDuckDBAdapterInit:
         assert snapshot["plan_capture_timeout_seconds"] == before
 
     def test_apply_run_plan_flags_none_show_query_plans_preserves_adapter_value(self):
-        """RunConfig show_query_plans=None leaves a preconfigured adapter value alone.
 
-        Covers the reported case: the caller sets show_query_plans=True via
-        platform_config (or a preconfigured adapter) without duplicating it
-        in DatabaseConfig, so the runner passes None and the adapter must
-        keep True instead of resetting to False.
-        """
         adapter = DuckDBAdapter(database_path=":memory:", show_query_plans=True)
         assert adapter.show_query_plans is True
 
@@ -1274,27 +1096,22 @@ class TestDuckDBAdapterInit:
         assert adapter.dry_run_mode is False
 
 
-# ---------------------------------------------------------------------------
-# get_database_path and check_database_exists
-# ---------------------------------------------------------------------------
-
-
 class TestDatabasePathAndExists:
     def test_memory_database_path(self):
         adapter = DuckDBAdapter(database_path=":memory:")
         assert adapter.get_database_path() == ":memory:"
 
     def test_memory_database_check_exists_returns_false(self):
-        """In-memory databases don't 'exist' as files."""
+
         adapter = DuckDBAdapter(database_path=":memory:")
-        # check_database_exists for :memory: should check server (returns False by default)
+
         result = adapter.check_database_exists()
         assert result is False
 
     def test_file_database_exists_when_created(self, tmp_path):
         db_path = str(tmp_path / "test.duckdb")
         adapter = DuckDBAdapter(database_path=db_path, memory_limit="128MB")
-        # Create the database
+
         conn = adapter.create_connection()
         conn.execute("CREATE TABLE t (id INT)")
         conn.close()

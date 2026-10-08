@@ -1,11 +1,3 @@
-"""Regression coverage for Q78's returns anti-join and ratio rounding on both DataFrame families.
-
-The SQL keeps a sale when ``sr_ticket_number IS NULL`` after a left join to the returns table, so a
-return whose ``sr_returned_date_sk`` is NULL still removes the sale. Testing the date instead keeps
-that sale. The SQL ``ROUND`` also rounds a half up (30 / 48 = 0.625 gives 0.63), where Polars and
-pandas round it to even (0.62).
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -17,7 +9,6 @@ FAMILIES = ["expression", "pandas"]
 
 def _tables():
     return {
-        # Item 1 sells 30 and is not returned; item 2 sells 5 and its ticket was returned with a NULL date.
         "store_sales": {
             "ss_ticket_number": [1, 2],
             "ss_item_sk": [1, 2],
@@ -81,7 +72,6 @@ def test_q78_drops_a_returned_sale_even_when_the_return_date_is_null_and_rounds_
 
     rows = materialize_rows(impl(_context(family, _tables())))
 
-    # (year, item, customer, ratio, store_qty, store_wholesale_cost, store_sales_price, other qty/cost/price)
     assert rows == [(2000, 1, 1, 0.63, 30, 10.0, 11.0, 48, 4.0, 6.0)]
 
 

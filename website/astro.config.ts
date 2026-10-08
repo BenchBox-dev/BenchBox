@@ -70,8 +70,8 @@ const publishStatic = (): AstroIntegration => ({
       writeFileSync(path.join(out, "robots.txt"), renderRobots());
       const pages = htmlFiles(out).filter((file) => file !== "404.html" && !Object.hasOwn(REDIRECT_PAGES, file));
       writeFileSync(path.join(out, "sitemap.xml"), renderSitemap(pages.map(sitemapPathForFile)));
-      for (const name of readdirSync(images)) cpSync(path.join(images, name), path.join(out, "_images", name));
       const legacy = JSON.parse(readFileSync(path.join(repoRoot, "website", ".generated", "manifest", "legacy-files.json"), "utf-8")) as LegacyFiles;
+      for (const name of legacy.images) cpSync(path.join(images, name), path.join(out, "_images", name));
       publishLegacyFiles(legacy, path.join(repoRoot, "docs"), out);
       const entries = JSON.parse(readFileSync(path.join(repoRoot, "website", ".generated", "manifest", "inventory-entries.json"), "utf-8")) as InventoryEntry[];
       const version = /^version = "([^"]+)"/m.exec(readFileSync(path.join(repoRoot, "pyproject.toml"), "utf-8"))?.[1] ?? "";

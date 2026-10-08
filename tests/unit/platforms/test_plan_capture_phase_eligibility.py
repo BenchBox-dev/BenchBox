@@ -1,5 +1,3 @@
-"""Plan-capture phase eligibility must be explicit on concrete adapters."""
-
 from __future__ import annotations
 
 import pytest
@@ -22,7 +20,7 @@ def _registered_adapter_classes() -> list[tuple[str, type[PlatformAdapter]]]:
 
 
 def test_registered_adapters_declare_plan_capture_phase_eligibility() -> None:
-    """Concrete registered adapters must not inherit the base default silently."""
+
     missing = [
         f"{platform_name}: {adapter_class.__module__}.{adapter_class.__name__}"
         for platform_name, adapter_class in _registered_adapter_classes()

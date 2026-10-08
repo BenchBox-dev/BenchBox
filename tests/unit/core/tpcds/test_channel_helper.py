@@ -39,7 +39,7 @@ class _ExpressionCtx:
     def col(self, name: str) -> _Expr:
         return _Expr(name)
 
-    def lit(self, value):  # noqa: ANN001
+    def lit(self, value):
         return _Expr(str(value))
 
     def get_table(self, name: str) -> _ExprTable:

@@ -1,20 +1,6 @@
-"""Regression tests for Polars window helpers and the UnifiedExpr.desc() sort marker.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These guard three shared-platform bugs surfaced during the read_primitives
-cross-surface burn-down:
-
-* ``window_lag``/``window_lead`` shifted in the frame's current order and then
-  re-sorted the shifted values (wrong); they must sort by the window ORDER BY
-  first, then shift.
-* ``window_ntile`` used ``ceil(rank*n/count)``, which does not match SQL NTILE's
-  even bucket distribution.
-* ``UnifiedExpr.desc()`` returned a value-reordering expression on Polars instead
-  of a descending sort marker, so ``.sort(a, b.desc())`` sorted ascending.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -36,7 +22,7 @@ def test_window_lag_sorts_before_shifting():
     df = pl.DataFrame({"g": [1, 1, 1], "o": [3, 1, 2], "v": [30, 10, 20]})
     expr = adapter.window_lag("v", 1, partition_by=["g"], order_by=[("o", True)])
     out = df.with_columns(expr.alias("lag")).sort(["g", "o"])
-    # Ordered by o: 10, 20, 30 -> lag is None, 10, 20.
+
     assert out["lag"].to_list() == [None, 10, 20]
 
 
@@ -50,7 +36,7 @@ def test_window_lead_sorts_before_shifting():
 
 def test_window_ntile_even_distribution():
     adapter = PolarsDataFrameAdapter()
-    # NTILE(3) over 5 rows -> bucket sizes [2, 2, 1].
+
     df = pl.DataFrame({"o": [10, 20, 30, 40, 50]})
     expr = adapter.window_ntile(3, order_by=[("o", True)])
     out = df.with_columns(expr.alias("nt")).sort("o")
@@ -59,7 +45,7 @@ def test_window_ntile_even_distribution():
 
 def test_window_ntile_partition_smaller_than_n():
     adapter = PolarsDataFrameAdapter()
-    # NTILE(4) over a 2-row partition -> [1, 2] (no divide-by-zero).
+
     df = pl.DataFrame({"o": [10, 20]})
     expr = adapter.window_ntile(4, order_by=[("o", True)])
     out = df.with_columns(expr.alias("nt")).sort("o")
@@ -70,13 +56,13 @@ def test_unified_sort_desc_marker_is_descending():
     adapter = PolarsDataFrameAdapter()
     lf = UnifiedLazyFrame(pl.DataFrame({"a": [1, 1, 2], "b": [1, 3, 2]}).lazy(), adapter)
     out = lf.sort(UnifiedExpr(pl.col("a")), UnifiedExpr(pl.col("b")).desc()).native.collect()
-    # a ascending, b DESCENDING within a.
+
     assert out.select("a", "b").rows() == [(1, 3), (1, 1), (2, 2)]
 
 
 def test_window_lag_honors_composite_order_by():
     adapter = PolarsDataFrameAdapter()
-    # Ties on o1 are broken by o2: order is (1,1)->v10, (1,2)->v20, (2,1)->v30.
+
     df = pl.DataFrame({"g": [1, 1, 1], "o1": [1, 2, 1], "o2": [2, 1, 1], "v": [20, 30, 10]})
     expr = adapter.window_lag("v", 1, partition_by=["g"], order_by=[("o1", True), ("o2", True)])
     out = df.with_columns(expr.alias("lag")).sort(["o1", "o2"])
@@ -93,7 +79,7 @@ def test_window_lead_honors_composite_order_by():
 
 def test_window_ntile_honors_composite_order_by():
     adapter = PolarsDataFrameAdapter()
-    # NTILE(2) over 4 rows ordered by (o1, o2) -> buckets [1, 1, 2, 2].
+
     df = pl.DataFrame({"o1": [1, 1, 2, 2], "o2": [2, 1, 2, 1]})
     expr = adapter.window_ntile(2, order_by=[("o1", True), ("o2", True)])
     out = df.with_columns(expr.alias("nt")).sort(["o1", "o2"])

@@ -1,5 +1,3 @@
-"""Canonical JoinOrder SQL query coverage tests."""
-
 from __future__ import annotations
 
 import re

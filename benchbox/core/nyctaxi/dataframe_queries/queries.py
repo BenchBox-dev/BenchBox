@@ -1,5 +1,3 @@
-"""NYC Taxi DataFrame query implementations."""
-
 from __future__ import annotations
 
 from csv import reader
@@ -135,8 +133,6 @@ def _expr_derive(ctx: DataFrameContext, frame: Any, names: str) -> Any:
         elif name == "month":
             frame = frame.with_columns(col("pickup_datetime").dt.truncate("1mo").alias("month"))
         elif name == "day_of_week":
-            # Postgres DOW: Sunday=0..Saturday=6. Unified weekday() is ISO
-            # 0=Monday..6=Sunday on every backend, so DOW = (iso + 1) mod 7.
             frame = frame.with_columns(
                 (
                     (col("pickup_datetime").dt.weekday() + lit(1))
@@ -214,7 +210,6 @@ def _pandas_derive(frame: Any, names: str) -> Any:
         elif name == "month":
             frame["month"] = frame["pickup_datetime"].dt.to_period("M").dt.to_timestamp()
         elif name == "day_of_week":
-            # Postgres DOW: Sunday=0..Saturday=6. Pandas dayofweek: Monday=0..Sunday=6.
             frame["day_of_week"] = (frame["pickup_datetime"].dt.dayofweek + 1) % 7
         elif name == "tip_pct_nonzero":
             frame["tip_pct"] = np.where(

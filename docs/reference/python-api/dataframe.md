@@ -5,7 +5,7 @@
 ```{tags} reference, python-api
 ```
 
-Constants that describe the DataFrame platforms and the DataFrame query sets that BenchBox ships. On 0.4.1 the TPC-H DataFrame query names do not import in a fresh process; see the sections below.
+Constants that describe the DataFrame platforms and the DataFrame query sets that BenchBox ships. The TPC-H DataFrame query names currently do not import in a fresh process; see the sections below.
 
 ## `benchbox.DATAFRAME_PLATFORMS`
 
@@ -103,9 +103,9 @@ The TPC-H DataFrame query registry exported at the top level of `benchbox`.
 
 **Import:** `from benchbox import TPCH_DATAFRAME_QUERIES` · **Extras:** none
 
-### Known issue on 0.4.1
+### Known issue
 
-This name does not import in a fresh process on 0.4.1. The import fails with an `ImportError` caused by a circular import between `benchbox.core.tpch.dataframe_queries` and `benchbox.core.dataframe.benchmark_suite`. Its type, contents and behaviour are not documented here because they could not be run.
+This name does not import in a fresh process. The import fails with an `ImportError` caused by a circular import between `benchbox.core.tpch.dataframe_queries` and `benchbox.core.dataframe.benchmark_suite`. Its type, contents and behaviour are not documented while the import fails.
 
 ```python
 from benchbox import TPCH_DATAFRAME_QUERIES
@@ -131,9 +131,9 @@ The TPC-H DataFrame query registry in its defining module.
 
 **Import:** `from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES` · **Extras:** none
 
-### Known issue on 0.4.1
+### Known issue
 
-This name does not import in a fresh process on 0.4.1, because of the circular import described for `benchbox.TPCH_DATAFRAME_QUERIES`. Its type, contents and behaviour are not documented here because they could not be run.
+This name does not import in a fresh process, because of the circular import described for `benchbox.TPCH_DATAFRAME_QUERIES`. Its type, contents and behaviour are not documented while the import fails.
 
 ```python
 from benchbox.core.tpch.dataframe_queries import TPCH_DATAFRAME_QUERIES
@@ -155,9 +155,9 @@ A function in the TPC-H DataFrame query module that returns a query.
 
 **Import:** `from benchbox.core.tpch.dataframe_queries import get_query` · **Extras:** none
 
-### Known issue on 0.4.1
+### Known issue
 
-This function does not import in a fresh process on 0.4.1, because of the same circular import. Its parameters, return value and exceptions are not documented here because they could not be run.
+This function does not import in a fresh process, because of the same circular import. Its parameters, return value and exceptions are not documented while the import fails.
 
 ```python
 from benchbox.core.tpch.dataframe_queries import get_query

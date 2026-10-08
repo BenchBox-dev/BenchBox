@@ -1,11 +1,6 @@
-"""Unit tests for adapter factory deployment mode support.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Tests the extended _normalize_platform_name() and get_adapter() with deployment modes.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import pytest
 
@@ -24,214 +19,163 @@ pytestmark = [
 
 
 class TestNormalizePlatformName:
-    """Tests for _normalize_platform_name with deployment mode support."""
-
     def test_simple_platform_name(self):
-        """Simple platform name returns base name, no df mode, no deployment."""
         result = _normalize_platform_name("duckdb")
         assert result == ("duckdb", False, None)
 
     def test_df_suffix_detection(self):
-        """Platform with -df suffix detects DataFrame mode."""
         result = _normalize_platform_name("polars-df")
         assert result == ("polars", True, None)
 
     def test_deployment_suffix_detection(self):
-        """Platform with :deployment suffix extracts deployment mode."""
         result = _normalize_platform_name("clickhouse:cloud")
         assert result == ("clickhouse", False, "cloud")
 
     def test_local_deployment(self):
-        """Local deployment mode is extracted correctly."""
         result = _normalize_platform_name("clickhouse:local")
         assert result == ("clickhouse", False, "local")
 
     def test_server_deployment(self):
-        """Server deployment mode is extracted correctly."""
         result = _normalize_platform_name("clickhouse:server")
         assert result == ("clickhouse", False, "server")
 
     def test_firebolt_core_deployment(self):
-        """Firebolt core deployment mode is extracted correctly."""
         result = _normalize_platform_name("firebolt:core")
         assert result == ("firebolt", False, "core")
 
     def test_combined_df_and_deployment(self):
-        """Combined -df and :deployment suffixes work together."""
         result = _normalize_platform_name("databricks-df:serverless")
         assert result == ("databricks", True, "serverless")
 
     def test_case_insensitive(self):
-        """Platform name parsing is case-insensitive."""
         result = _normalize_platform_name("ClickHouse:CLOUD")
         assert result == ("clickhouse", False, "cloud")
 
     def test_uppercase_df_suffix(self):
-        """DataFrame suffix is case-insensitive."""
         result = _normalize_platform_name("POLARS-DF")
         assert result == ("polars", True, None)
 
     def test_multiple_colons_uses_last(self):
-        """Multiple colons use the last one for deployment."""
-        # This is an edge case - rsplit with maxsplit=1
         result = _normalize_platform_name("some:thing:cloud")
         assert result == ("some:thing", False, "cloud")
 
 
 class TestGetAvailableDeployments:
-    """Tests for get_available_deployments function."""
-
     def test_clickhouse_deployments(self):
-        """ClickHouse has local and server deployments (cloud is now a separate platform)."""
         result = get_available_deployments("clickhouse")
         assert "local" in result
         assert "server" in result
-        # Cloud is now a first-class platform: clickhouse-cloud
         assert "cloud" not in result
 
     def test_firebolt_deployments(self):
-        """Firebolt has core and cloud deployments."""
         result = get_available_deployments("firebolt")
         assert "core" in result
         assert "cloud" in result
 
     def test_duckdb_single_deployment(self):
-        """DuckDB only has local deployment."""
         result = get_available_deployments("duckdb")
         assert result == ["local"]
 
     def test_timescaledb_deployments(self):
-        """TimescaleDB has self-hosted and cloud deployments."""
         result = get_available_deployments("timescaledb")
         assert "self-hosted" in result
         assert "cloud" in result
 
     def test_platform_without_deployments(self):
-        """Platform without deployment modes returns empty list."""
         result = get_available_deployments("polars")
         assert result == []
 
     def test_strips_df_suffix(self):
-        """Deployment lookup works with -df suffix."""
         result = get_available_deployments("polars-df")
         assert result == []
 
     def test_strips_deployment_suffix(self):
-        """Deployment lookup works with :deployment suffix."""
         result = get_available_deployments("clickhouse:server")
         assert "local" in result
         assert "server" in result
 
 
 class TestGetDefaultDeployment:
-    """Tests for get_default_deployment function."""
-
     def test_clickhouse_default_is_local(self):
-        """ClickHouse defaults to local (chDB - easiest onboarding)."""
         result = get_default_deployment("clickhouse")
         assert result == "local"
 
     def test_firebolt_default_is_core(self):
-        """Firebolt defaults to core (local Docker)."""
         result = get_default_deployment("firebolt")
         assert result == "core"
 
     def test_duckdb_default_is_local(self):
-        """DuckDB defaults to local."""
         result = get_default_deployment("duckdb")
         assert result == "local"
 
     def test_timescaledb_default_is_selfhosted(self):
-        """TimescaleDB defaults to self-hosted."""
         result = get_default_deployment("timescaledb")
         assert result == "self-hosted"
 
     def test_platform_without_deployments_returns_none(self):
-        """Platform without deployment modes returns None."""
         result = get_default_deployment("polars")
         assert result is None
 
 
 class TestIsDataframeModeWithDeployment:
-    """Tests that is_dataframe_mode works with deployment suffixes."""
-
     def test_df_suffix_still_works(self):
-        """DataFrame mode detection still works with -df suffix."""
-        # DuckDB supports both SQL and DataFrame modes - use it to test -df suffix
         assert is_dataframe_mode("duckdb-df") is True
-        assert is_dataframe_mode("duckdb") is False  # defaults to SQL mode
-        # Polars is now DataFrame-only (SQL mode removed) so always True
+        assert is_dataframe_mode("duckdb") is False
         assert is_dataframe_mode("polars-df") is True
-        assert is_dataframe_mode("polars") is True  # defaults to DataFrame mode
+        assert is_dataframe_mode("polars") is True
 
     def test_deployment_suffix_doesnt_affect_df_mode(self):
-        """Deployment suffix doesn't affect DataFrame mode detection."""
         assert is_dataframe_mode("clickhouse:cloud") is False
         assert is_dataframe_mode("clickhouse") is False
 
     def test_combined_suffixes(self):
-        """Combined -df and :deployment suffixes work."""
         assert is_dataframe_mode("pyspark-df:cluster") is True
 
 
 class TestGetAvailableModesWithDeployment:
-    """Tests that get_available_modes works with deployment suffixes."""
-
     def test_deployment_suffix_stripped_for_mode_check(self):
-        """Deployment suffix is stripped when checking available modes."""
         modes = get_available_modes("clickhouse:cloud")
         assert "sql" in modes
 
     def test_both_suffixes_stripped(self):
-        """Both -df and :deployment suffixes stripped for mode check."""
         modes = get_available_modes("pyspark-df:cluster")
         assert "dataframe" in modes
 
 
 class TestGetAdapterDeploymentValidation:
-    """Tests for get_adapter() deployment mode validation."""
-
     def test_invalid_deployment_for_platform_raises_error(self):
-        """Invalid deployment mode raises ValueError with helpful message."""
         from benchbox.platforms.adapter_factory import get_adapter
 
         with pytest.raises(ValueError) as exc_info:
             get_adapter("duckdb:cloud")
 
-        # Check error message contains helpful info
         assert "duckdb" in str(exc_info.value).lower()
         assert "cloud" in str(exc_info.value).lower()
-        assert "local" in str(exc_info.value).lower()  # Available mode
+        assert "local" in str(exc_info.value).lower()
 
     def test_unknown_deployment_for_platform_with_modes(self):
-        """Unknown deployment mode for platform with deployment modes raises error."""
         from benchbox.platforms.adapter_factory import get_adapter
 
         with pytest.raises(ValueError) as exc_info:
             get_adapter("clickhouse:nonexistent")
 
         assert "nonexistent" in str(exc_info.value)
-        # Should list available modes (cloud is now a separate platform)
         assert "local" in str(exc_info.value)
         assert "server" in str(exc_info.value)
 
     def test_deployment_on_platform_without_modes_raises_error(self):
-        """Deployment suffix on platform without modes raises clear error."""
         from benchbox.platforms.adapter_factory import get_adapter
 
         with pytest.raises(ValueError) as exc_info:
             get_adapter("polars:managed")
 
-        # Should suggest removing suffix
         assert "does not support deployment modes" in str(exc_info.value)
         assert ":managed" in str(exc_info.value)
 
     def test_explicit_deployment_overrides_name_suffix(self):
-        """Explicit deployment parameter takes priority over name suffix."""
         from benchbox.core.platform_registry import DeploymentCapability, PlatformCapability
         from benchbox.platforms.adapter_factory import _resolve_deployment_mode
 
-        # Create mock capabilities
         caps = PlatformCapability(
             supports_sql=True,
             deployment_modes={
@@ -242,7 +186,6 @@ class TestGetAdapterDeploymentValidation:
             default_deployment="local",
         )
 
-        # Explicit deployment should override name suffix
         result = _resolve_deployment_mode(
             platform="clickhouse",
             explicit_deployment="cloud",
@@ -252,7 +195,6 @@ class TestGetAdapterDeploymentValidation:
         assert result == "cloud"
 
     def test_name_suffix_overrides_default(self):
-        """Deployment from name suffix takes priority over platform default."""
         from benchbox.core.platform_registry import DeploymentCapability, PlatformCapability
         from benchbox.platforms.adapter_factory import _resolve_deployment_mode
 
@@ -266,7 +208,6 @@ class TestGetAdapterDeploymentValidation:
             default_deployment="local",
         )
 
-        # Name suffix should override default
         result = _resolve_deployment_mode(
             platform="clickhouse",
             explicit_deployment=None,
@@ -276,7 +217,6 @@ class TestGetAdapterDeploymentValidation:
         assert result == "server"
 
     def test_default_used_when_no_explicit_or_suffix(self):
-        """Platform default is used when no explicit deployment or suffix."""
         from benchbox.core.platform_registry import DeploymentCapability, PlatformCapability
         from benchbox.platforms.adapter_factory import _resolve_deployment_mode
 
@@ -298,14 +238,13 @@ class TestGetAdapterDeploymentValidation:
         assert result == "local"
 
     def test_platform_without_deployment_modes_returns_none(self):
-        """Platform without deployment modes returns None."""
         from benchbox.core.platform_registry import PlatformCapability
         from benchbox.platforms.adapter_factory import _resolve_deployment_mode
 
         caps = PlatformCapability(
             supports_sql=True,
             supports_dataframe=True,
-            deployment_modes={},  # No deployment modes
+            deployment_modes={},
         )
 
         result = _resolve_deployment_mode(
@@ -318,15 +257,7 @@ class TestGetAdapterDeploymentValidation:
 
 
 class TestClickHouseCloudAdapter:
-    """Tests for ClickHouse Cloud as a first-class platform.
-
-    ClickHouse Cloud was refactored from a deployment mode (clickhouse:cloud) to
-    a separate first-class platform (clickhouse-cloud) for better discoverability
-    and to follow the MotherDuck/Starburst pattern.
-    """
-
     def test_cloud_adapter_requires_host(self):
-        """ClickHouse Cloud adapter raises error without host."""
         import os
         from unittest.mock import patch
 
@@ -343,7 +274,6 @@ class TestClickHouseCloudAdapter:
             assert "CLICKHOUSE_CLOUD_HOST" in str(exc_info.value)
 
     def test_cloud_adapter_requires_password(self):
-        """ClickHouse Cloud adapter raises error without password."""
         import os
         from unittest.mock import patch
 
@@ -360,7 +290,6 @@ class TestClickHouseCloudAdapter:
             assert "CLICKHOUSE_CLOUD_PASSWORD" in str(exc_info.value)
 
     def test_cloud_adapter_uses_secure_connection(self):
-        """ClickHouse Cloud adapter always uses HTTPS."""
         from benchbox.platforms.clickhouse_cloud import ClickHouseCloudAdapter
 
         adapter = ClickHouseCloudAdapter(
@@ -372,7 +301,6 @@ class TestClickHouseCloudAdapter:
         assert adapter.port == 8443
 
     def test_cloud_adapter_accepts_env_vars(self):
-        """ClickHouse Cloud adapter reads credentials from environment variables."""
         import os
         from unittest.mock import patch
 
@@ -393,7 +321,6 @@ class TestClickHouseCloudAdapter:
             assert adapter.username == "env-user"
 
     def test_cloud_adapter_config_overrides_env(self):
-        """Config parameters override environment variables."""
         import os
         from unittest.mock import patch
 
@@ -415,7 +342,6 @@ class TestClickHouseCloudAdapter:
             assert adapter.password == "config-password"
 
     def test_cloud_adapter_default_username(self):
-        """ClickHouse Cloud adapter defaults to 'default' username."""
         from benchbox.platforms.clickhouse_cloud import ClickHouseCloudAdapter
 
         adapter = ClickHouseCloudAdapter(
@@ -426,7 +352,6 @@ class TestClickHouseCloudAdapter:
         assert adapter.username == "default"
 
     def test_base_clickhouse_adapter_rejects_cloud_mode(self):
-        """Base ClickHouse adapter raises helpful error for cloud deployment mode."""
         from benchbox.platforms.clickhouse.adapter import ClickHouseAdapter
 
         with pytest.raises(ValueError) as exc_info:
@@ -437,7 +362,6 @@ class TestClickHouseCloudAdapter:
         assert "clickhouse-cloud" in error_msg
 
     def test_cloud_adapter_platform_name(self):
-        """ClickHouse Cloud adapter returns correct platform name."""
         from benchbox.platforms.clickhouse_cloud import ClickHouseCloudAdapter
 
         adapter = ClickHouseCloudAdapter(
@@ -448,7 +372,6 @@ class TestClickHouseCloudAdapter:
         assert adapter.platform_name == "ClickHouse Cloud"
 
     def test_cloud_client_interface(self):
-        """ClickHouseCloudClient provides expected interface."""
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.clickhouse.client import ClickHouseCloudClient
@@ -464,14 +387,12 @@ class TestClickHouseCloudAdapter:
                 password="test-password",
             )
 
-            # Test interface methods exist
             assert hasattr(client, "execute")
             assert hasattr(client, "command")
             assert hasattr(client, "close")
             assert hasattr(client, "disconnect")
             assert hasattr(client, "commit")
 
-            # Test execute returns expected format
             result = client.execute("SELECT 1")
             assert result == [(1,)]
 

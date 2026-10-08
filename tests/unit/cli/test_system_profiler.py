@@ -1,9 +1,6 @@
-"""Tests for benchbox.cli.system.SystemProfiler display_profile method.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from unittest.mock import MagicMock, patch
 
@@ -16,7 +13,6 @@ pytestmark = [
 
 
 def _printed_strings(mock_console):
-    """Extract all string representations from a mock console's print calls."""
     result = []
     for call in mock_console.print.call_args_list:
         for arg in call.args:
@@ -26,7 +22,6 @@ def _printed_strings(mock_console):
 
 @pytest.fixture
 def mock_profile():
-    """A minimal SystemProfile-like object."""
     profile = MagicMock()
     profile.platform = "darwin"
     profile.cpu_count = 8
@@ -106,7 +101,6 @@ class TestSystemProfilerDisplayProfile:
             profiler.display_profile(mock_profile)
 
             printed = _printed_strings(profiler.console)
-            # "Install psutil" note should NOT appear
             assert not any("Install psutil" in arg for arg in printed)
 
     def test_instantiation_uses_quiet_console(self):

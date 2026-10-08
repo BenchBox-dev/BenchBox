@@ -1,5 +1,3 @@
-"""Unit tests for TPCDSBenchmark using hermetic fakes."""
-
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -18,7 +16,7 @@ RENDERED_SCALE_FACTORS: list[float] = []
 
 @pytest.fixture
 def fake_tpcds_components(monkeypatch, tmp_path):
-    """Provide lightweight test doubles for TPC-DS dependencies."""
+
     RENDERED_SCALE_FACTORS.clear()
 
     class FakeTPCDSDataGenerator:
@@ -103,7 +101,7 @@ def test_tpcds_benchmark_uses_fakes(fake_tpcds_components):
 
 @pytest.mark.parametrize("scale_factor", [0.01, 1.0, 10.0])
 def test_get_queries_renders_at_the_data_scale_factor(fake_tpcds_components, scale_factor):
-    """dsqgen derives some values from the scale, so SQL must be rendered at the data's scale."""
+
     bench = TPCDSBenchmark(scale_factor=scale_factor, output_dir=fake_tpcds_components)
 
     bench.get_queries(dialect="duckdb")

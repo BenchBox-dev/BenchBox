@@ -1,5 +1,3 @@
-"""Tests for BenchmarkHookRegistry and benchmark option parsers."""
-
 from __future__ import annotations
 
 import pytest
@@ -20,10 +18,6 @@ from benchbox.cli.benchmark_hooks import (
     parse_int_list,
     parse_str_list,
 )
-
-# ---------------------------------------------------------------------------
-# Parser unit tests
-# ---------------------------------------------------------------------------
 
 
 class TestParsers:
@@ -93,11 +87,6 @@ class TestParsers:
             parse_datetime("not-a-date")
 
 
-# ---------------------------------------------------------------------------
-# BenchmarkOptionSpec tests
-# ---------------------------------------------------------------------------
-
-
 class TestBenchmarkOptionSpec:
     def test_parse_identity(self):
         spec = BenchmarkOptionSpec(name="foo")
@@ -117,44 +106,22 @@ class TestBenchmarkOptionSpec:
             spec.parse("partial")
 
 
-# ---------------------------------------------------------------------------
-# BenchmarkHookRegistry tests
-# ---------------------------------------------------------------------------
-
-
 @pytest.fixture(autouse=True, scope="module")
 def _register_real_benchmark_specs():
-    """Import every benchmark module whose registry specs this file reads,
-    BEFORE the per-test `_clean_registry` snapshot below is first taken.
-
-    Module-level hook registration only runs once per interpreter (sys.modules
-    caching), while `_clean_registry` restores a pre-test registry snapshot
-    after every test. If a benchmark module is first imported INSIDE a test
-    body, its registration is wiped by that test's restore and can never
-    re-run - so any later test reading the same benchmark's specs fails
-    (e.g. TestRealBenchmarkSpecs::test_nyctaxi_taxi_types_parser, KeyError
-    'taxi_types'). Previously `import benchbox` eagerly imported some of
-    these modules (nyctaxi, tsbs_devops, tpch_skew), masking the problem;
-    NYCTaxi is now lazy (break-root-import-cycle w5), and joinorder/
-    vector_search were always lazy with the same latent hazard. Importing
-    them all here, module-scoped (runs before any function-scoped autouse
-    fixture), guarantees every snapshot/restore cycle includes their specs.
-    """
-    import benchbox.core.datavault.benchmark  # noqa: F401
-    import benchbox.core.flightdata.benchmark  # noqa: F401
-    import benchbox.core.joinorder.benchmark  # noqa: F401
-    import benchbox.core.joinorder_synthetic.benchmark  # noqa: F401
-    import benchbox.core.nyctaxi.benchmark  # noqa: F401
-    import benchbox.core.tpcdi.benchmark  # noqa: F401
-    import benchbox.core.tpcds_obt.benchmark  # noqa: F401
-    import benchbox.core.tpch_skew.benchmark  # noqa: F401
-    import benchbox.core.tsbs_devops.benchmark  # noqa: F401
-    import benchbox.core.vector_search.benchmark  # noqa: F401
+    import benchbox.core.datavault.benchmark
+    import benchbox.core.flightdata.benchmark
+    import benchbox.core.joinorder.benchmark
+    import benchbox.core.joinorder_synthetic.benchmark
+    import benchbox.core.nyctaxi.benchmark
+    import benchbox.core.tpcdi.benchmark
+    import benchbox.core.tpcds_obt.benchmark
+    import benchbox.core.tpch_skew.benchmark
+    import benchbox.core.tsbs_devops.benchmark
+    import benchbox.core.vector_search.benchmark
 
 
 @pytest.fixture(autouse=True)
 def _clean_registry():
-    """Save and restore registry state around each test."""
     import copy
 
     saved_specs = copy.deepcopy(BenchmarkHookRegistry._option_specs)
@@ -205,7 +172,6 @@ class TestBenchmarkHookRegistry:
             BenchmarkHookRegistry.parse_options("no_specs_bench", [("key", "val")])
 
     def test_parse_options_returns_only_provided(self):
-        """Ensure defaults are NOT merged - only explicitly provided options returned."""
         BenchmarkHookRegistry.register_option_specs(
             "test_bench",
             BenchmarkOptionSpec(name="a", default="default_a"),
@@ -237,10 +203,8 @@ class TestBenchmarkHookRegistry:
     def test_re_registration_is_idempotent(self):
         spec = BenchmarkOptionSpec(name="x", help="first")
         BenchmarkHookRegistry.register_option_specs("test_bench", spec)
-        # Re-register same name - should silently skip
         spec2 = BenchmarkOptionSpec(name="x", help="second")
         BenchmarkHookRegistry.register_option_specs("test_bench", spec2)
-        # First registration wins
         assert BenchmarkHookRegistry.list_option_specs("test_bench")["x"].help == "first"
 
     def test_duplicate_alias_rejected(self):
@@ -263,14 +227,8 @@ class TestBenchmarkHookRegistry:
         assert BenchmarkHookRegistry.has_specs("TESTBENCH")
 
 
-# ---------------------------------------------------------------------------
-# Registration-time constructor validation tests
-# ---------------------------------------------------------------------------
-
-
 class TestRegistrationTimeConstructorValidation:
     def test_omitted_class_skips_validation(self):
-        # "test_bench" doubles never pass a class, so registration must not fail.
         BenchmarkHookRegistry.register_option_specs(
             "test_bench",
             BenchmarkOptionSpec(name="anything_goes_here"),
@@ -355,7 +313,6 @@ class TestRegistrationTimeConstructorValidation:
             )
 
     def test_all_registered_specs_match_constructors(self):
-        """Tree-wide invariant: every registered spec names a keyword-passable ctor param."""
         import inspect
 
         from benchbox.core.benchmark_loader import get_core_benchmark_class
@@ -378,7 +335,6 @@ class TestRegistrationTimeConstructorValidation:
                 assert spec_name in explicit, f"{benchmark}.{spec_name}"
 
     def test_all_resolvable_benchmarks_validated_at_registration(self):
-        """Every resolvable registered benchmark passed its class at registration."""
         from benchbox.core.benchmark_loader import get_core_benchmark_class
 
         for benchmark in BenchmarkHookRegistry._option_specs:
@@ -387,11 +343,6 @@ class TestRegistrationTimeConstructorValidation:
             except Exception:
                 continue
             assert benchmark in BenchmarkHookRegistry._validated_benchmarks, benchmark
-
-
-# ---------------------------------------------------------------------------
-# Click param type test
-# ---------------------------------------------------------------------------
 
 
 class TestBenchmarkOptionParamType:
@@ -419,16 +370,9 @@ class TestBenchmarkOptionParamType:
             param_type.convert("noequals", None, None)
 
 
-# ---------------------------------------------------------------------------
-# Integration: real benchmark specs registered
-# ---------------------------------------------------------------------------
-
-
 class TestRealBenchmarkSpecs:
-    """Verify that importing benchmark modules registers option specs."""
-
     def test_nyctaxi_specs_registered(self):
-        from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark  # noqa: F401
+        from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
 
         specs = BenchmarkHookRegistry.list_option_specs("nyctaxi")
         assert "taxi_types" in specs
@@ -437,7 +381,7 @@ class TestRealBenchmarkSpecs:
         assert "seed" in specs
 
     def test_nyctaxi_taxi_types_parser(self):
-        from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark  # noqa: F401
+        from benchbox.core.nyctaxi.benchmark import NYCTaxiBenchmark
         from benchbox.core.nyctaxi.schema import TaxiType
 
         specs = BenchmarkHookRegistry.list_option_specs("nyctaxi")
@@ -445,7 +389,7 @@ class TestRealBenchmarkSpecs:
         assert result == [TaxiType.YELLOW, TaxiType.GREEN, TaxiType.HVFHV]
 
     def test_tsbs_devops_specs_registered(self):
-        from benchbox.core.tsbs_devops.benchmark import TSBSDevOpsBenchmark  # noqa: F401
+        from benchbox.core.tsbs_devops.benchmark import TSBSDevOpsBenchmark
 
         specs = BenchmarkHookRegistry.list_option_specs("tsbs_devops")
         assert "num_hosts" in specs
@@ -454,21 +398,21 @@ class TestRealBenchmarkSpecs:
         assert "start_time" in specs
 
     def test_tpch_skew_specs_registered(self):
-        from benchbox.core.tpch_skew.benchmark import TPCHSkewBenchmark  # noqa: F401
+        from benchbox.core.tpch_skew.benchmark import TPCHSkewBenchmark
 
         specs = BenchmarkHookRegistry.list_option_specs("tpch_skew")
         assert "skew_preset" in specs
         assert specs["skew_preset"].default == "moderate"
 
     def test_vector_search_specs_registered(self):
-        from benchbox.core.vector_search.benchmark import VectorSearchBenchmark  # noqa: F401
+        from benchbox.core.vector_search.benchmark import VectorSearchBenchmark
 
         specs = BenchmarkHookRegistry.list_option_specs("vector_search")
         assert "dimensions" in specs
         assert specs["dimensions"].default == 128
 
     def test_joinorder_force_regenerate_documents_download_cost(self):
-        from benchbox.core.joinorder.benchmark import JoinOrderBenchmark  # noqa: F401
+        from benchbox.core.joinorder.benchmark import JoinOrderBenchmark
 
         specs = BenchmarkHookRegistry.list_option_specs("joinorder")
         help_text = specs["force_regenerate"].help
@@ -476,14 +420,10 @@ class TestRealBenchmarkSpecs:
         assert "~1.2 GB" in help_text
 
     def test_benchmarks_without_specs_still_work(self):
-        """Benchmarks with no registered specs should not raise on empty parse."""
-        # tpch has no registered specs - parsing with no options should be fine
         assert not BenchmarkHookRegistry.has_specs("tpch")
 
 
 class TestBenchmarkOptionShellCompletion:
-    """--benchmark-option completes registered keys and declared choice values."""
-
     def _ctx(self, benchmark=None, pairs=()):
         from click import Context
         from click.core import Command
@@ -529,13 +469,12 @@ class TestBenchmarkOptionShellCompletion:
         assert "skew_preset=" not in [item.value for item in items]
 
     def test_completion_imports_lazy_benchmark(self, monkeypatch):
-        """A not-yet-imported benchmark resolves via lazy module import."""
         import sys
 
         from benchbox.core.hooks.benchmark_hooks import BenchmarkHookRegistry
 
         module_name = "benchbox.core.tpch_skew.benchmark"
-        assert module_name in sys.modules  # pre-imported by the module fixture
+        assert module_name in sys.modules
         monkeypatch.delitem(sys.modules, module_name)
         monkeypatch.delitem(BenchmarkHookRegistry._option_specs, "tpch_skew")
         monkeypatch.delitem(BenchmarkHookRegistry._alias_index, "tpch_skew", raising=False)

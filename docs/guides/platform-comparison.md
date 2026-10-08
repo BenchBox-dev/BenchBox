@@ -21,13 +21,13 @@ BenchBox provides a unified comparison interface supporting:
 
 A key BenchBox design principle: benchmark data is generated once as Parquet files and shared across all platforms. When you compare DuckDB, DataFusion, SQLite, and Polars at the same scale factor, every engine reads from the same Parquet dataset. This eliminates data variability and ensures performance differences reflect the engines themselves.
 
+All three run commands read the same generated Parquet files. The final command compares the results.
+
 ```bash
-# All three commands read the same generated Parquet files
 benchbox run --platform duckdb --benchmark tpch --scale 1 --output results/duckdb.json
 benchbox run --platform datafusion --benchmark tpch --scale 1 --output results/datafusion.json
 benchbox run --platform polars-df --benchmark tpch --scale 1 --output results/polars.json
 
-# Compare the results
 benchbox compare results/duckdb.json results/datafusion.json results/polars.json
 ```
 
@@ -37,11 +37,12 @@ Data is generated on the first run and cached in `benchmark_runs/<benchmark>/sf<
 
 Use `--table-mode external` when you want engines to query staged files directly instead of materializing into native tables:
 
+The first command uses the default native mode, which materializes data into platform-managed tables. The second uses
+external mode, which registers views or external tables over the staged files.
+
 ```bash
-# Native (default): materialize into platform-managed tables
 benchbox run --platform duckdb --benchmark tpch --scale 1 --table-mode native
 
-# External: register views/external tables over staged files
 benchbox run --platform duckdb --benchmark tpch --scale 1 --table-mode external
 ```
 
@@ -72,7 +73,6 @@ Unsupported: SQLite and PostgreSQL.
 ### List Available Platforms
 
 ```bash
-# List all available platforms
 benchbox compare --list-platforms
 ```
 
@@ -105,29 +105,29 @@ DataFrame Platforms:
 
 ### Compare SQL Platforms
 
+This compares DuckDB with SQLite on TPC-H at scale factor 0.01.
+
 ```bash
-# Compare DuckDB vs SQLite on TPC-H SF 0.01
 benchbox compare -p duckdb -p sqlite --scale 0.01
 ```
 
 ### Compare DataFrame Platforms
 
+This compares Polars with Pandas.
+
 ```bash
-# Compare Polars vs Pandas
 benchbox compare -p polars-df -p pandas-df --scale 0.01
 ```
 
 ### Compare Result Files
 
 ```bash
-# Compare previously saved results
 benchbox compare results/duckdb.json results/sqlite.json
 ```
 
 ### Interactive Mode
 
 ```bash
-# Launch interactive wizard
 benchbox compare
 ```
 
@@ -301,14 +301,13 @@ comparison_results/
 
 ### Compare Result Files
 
-Compare previously saved benchmark results:
+Compare previously saved benchmark results. The two `run` commands export results from individual runs, and the
+`compare` command compares the result files:
 
 ```bash
-# Export results from individual runs
 benchbox run --platform duckdb --benchmark tpch --scale 0.1 --output results/duckdb
 benchbox run --platform sqlite --benchmark tpch --scale 0.1 --output results/sqlite
 
-# Compare the result files
 benchbox compare results/duckdb/results.json results/sqlite/results.json
 ```
 
@@ -401,7 +400,6 @@ from benchbox.core.comparison import (
 ```python
 from benchbox.core.comparison import run_unified_comparison
 
-# Run quick comparison
 results = run_unified_comparison(
     platforms=["duckdb", "sqlite"],
     scale_factor=0.01,
@@ -420,7 +418,6 @@ from benchbox.core.comparison import (
     PlatformType,
 )
 
-# Configure benchmark
 config = UnifiedBenchmarkConfig(
     platform_type=PlatformType.SQL,
     scale_factor=0.1,
@@ -430,13 +427,10 @@ config = UnifiedBenchmarkConfig(
     benchmark_iterations=5,
 )
 
-# Create suite
 suite = UnifiedBenchmarkSuite(config=config)
 
-# Run comparison
 results = suite.run_comparison(platforms=["duckdb", "sqlite"])
 
-# Get summary
 summary = suite.get_summary(results)
 print(f"Fastest: {summary.fastest_platform}")
 print(f"Speedup ratio: {summary.speedup_ratio:.2f}x")
@@ -448,34 +442,29 @@ print(f"Speedup ratio: {summary.speedup_ratio:.2f}x")
 from benchbox.core.visualization import ResultPlotter, export_ascii
 from benchbox.core.visualization.ascii.base import ChartOptions
 
-# Load results from JSON files
 plotter = ResultPlotter.from_sources(["results/duckdb.json", "results/sqlite.json"])
 
-# Render individual chart types
 from benchbox.core.visualization.ascii import BarChart
 from benchbox.core.visualization.ascii.bar_chart import BarData
 
 bar_data = [BarData(label=r.platform, value=r.total_time_ms or 0) for r in plotter.results]
 chart = BarChart(data=bar_data, title="Performance Comparison")
 print(chart.render())
-
-# Or use the CLI for automatic chart generation
-# benchbox visualize results/duckdb.json results/sqlite.json
 ```
 
+You can also use the CLI for automatic chart generation: `benchbox visualize results/duckdb.json results/sqlite.json`.
+
 ### Platform Type Detection
+
+`detect_platform_type("polars-df")` returns `PlatformType.DATAFRAME`. For the list of three platforms,
+`detect_platform_types` returns `PlatformType.SQL` as `detected` (the majority) and `["polars-df"]` as `inconsistent`.
 
 ```python
 from benchbox.core.comparison import detect_platform_type, detect_platform_types
 
-# Single platform
 platform_type = detect_platform_type("polars-df")
-# Returns: PlatformType.DATAFRAME
 
-# Multiple platforms
 detected, inconsistent = detect_platform_types(["duckdb", "sqlite", "polars-df"])
-# detected: PlatformType.SQL (majority)
-# inconsistent: ["polars-df"]
 ```
 
 ## Platform Categories
@@ -620,11 +609,12 @@ When comparing result files, you can include query plan analysis to understand *
 
 ### Include Plan Analysis
 
+The first command compares files with plan analysis. The second shows only plans that changed significantly, meaning
+less than 90% similar (`--plan-threshold 0.9`).
+
 ```bash
-# Compare files with plan analysis
 benchbox compare baseline.json current.json --include-plans
 
-# Only show plans that changed significantly (< 90% similar)
 benchbox compare baseline.json current.json --include-plans --plan-threshold 0.9
 ```
 
@@ -650,14 +640,13 @@ These are highlighted specially because optimizer changes likely caused the regr
 
 ### Requirements
 
-Plan comparison requires benchmark results captured with `--capture-plans`:
+Plan comparison requires benchmark results captured with `--capture-plans`. The two `run` commands capture plans, and
+the `compare` command then compares with plan analysis:
 
 ```bash
-# Capture plans during benchmark runs
 benchbox run --platform duckdb --benchmark tpch --capture-plans --output baseline
 benchbox run --platform duckdb --benchmark tpch --capture-plans --output current
 
-# Compare with plan analysis
 benchbox compare baseline/results.json current/results.json --include-plans
 ```
 

@@ -42,7 +42,6 @@ on:
   push:
     branches: [main]
   schedule:
-    # Run daily at 2 AM UTC
     - cron: '0 2 * * *'
 
 jobs:
@@ -78,6 +77,8 @@ jobs:
           path: results/*.json
 ```
 
+The schedule trigger runs the workflow daily at 2 AM UTC.
+
 ### Regression Detection Workflow
 
 Create `.github/workflows/benchmark-regression.yml`:
@@ -96,7 +97,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Need history for baseline
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -159,8 +160,6 @@ jobs:
 Create `scripts/compare_benchmarks.py`:
 
 ```python
-#!/usr/bin/env python3
-"""Compare benchmark results and detect regressions."""
 
 import argparse
 import json
@@ -169,37 +168,24 @@ from pathlib import Path
 
 
 def compare_benchmarks(baseline_path: Path, current_path: Path, threshold: float = 10.0):
-    """Compare two benchmark results.
-
-    Args:
-        baseline_path: Path to baseline results
-        current_path: Path to current results
-        threshold: Regression threshold percentage
-
-    Returns:
-        True if regression detected
-    """
     with open(baseline_path) as f:
         baseline = json.load(f)
 
     with open(current_path) as f:
         current = json.load(f)
 
-    # Extract timing data
     baseline_timing = baseline.get("results", {}).get("timing", {})
     current_timing = current.get("results", {}).get("timing", {})
 
     baseline_avg = baseline_timing.get("avg_ms", 0) / 1000
     current_avg = current_timing.get("avg_ms", 0) / 1000
 
-    # Calculate change
     if baseline_avg == 0:
         print("⚠️  No baseline data available")
         return False
 
     change_pct = ((current_avg - baseline_avg) / baseline_avg) * 100
 
-    # Generate report
     report = f"""## Benchmark Comparison Report
 
 ### Overall Performance
@@ -210,7 +196,6 @@ def compare_benchmarks(baseline_path: Path, current_path: Path, threshold: float
 
 """
 
-    # Determine status
     is_regression = change_pct > threshold
 
     if is_regression:
@@ -223,10 +208,8 @@ def compare_benchmarks(baseline_path: Path, current_path: Path, threshold: float
         report += f"### ✓ No Significant Change\n\n"
         report += f"Performance change within acceptable range\n"
 
-    # Write report
     Path("comparison_report.md").write_text(report)
 
-    # Set GitHub Actions output
     with open(os.environ.get("GITHUB_OUTPUT", "/dev/null"), "a") as f:
         f.write(f"regression={'true' if is_regression else 'false'}\n")
 
@@ -316,7 +299,7 @@ report:
 
 ## Jenkins
 
-Create `Jenkinsfile`:
+Create `Jenkinsfile`. Benchmark parameter values are passed as individual arguments through environment variables; shell expressions in those values are treated as data:
 
 ```groovy
 pipeline {
@@ -345,15 +328,16 @@ pipeline {
 
         stage('Run Benchmark') {
             steps {
-                sh """
-                    benchbox run \
-                        --platform ${params.PLATFORM} \
-                        --benchmark ${params.BENCHMARK} \
-                        --scale ${params.SCALE_FACTOR} \
-                        --output results/
-
-                    benchbox export --last --format html --output-dir results/
-                """
+                withEnv([
+                    "BENCHBOX_PLATFORM=${params.PLATFORM}",
+                    "BENCHBOX_BENCHMARK=${params.BENCHMARK}",
+                    "BENCHBOX_SCALE_FACTOR=${params.SCALE_FACTOR}"
+                ]) {
+                    sh '''
+                        benchbox run --platform "$BENCHBOX_PLATFORM" --benchmark "$BENCHBOX_BENCHMARK" --scale "$BENCHBOX_SCALE_FACTOR" --output results/
+                        benchbox export --last --format html --output-dir results/
+                    '''
+                }
             }
         }
 
@@ -365,10 +349,7 @@ pipeline {
             }
             steps {
                 sh '''
-                    python scripts/compare_benchmarks.py \
-                        --baseline baseline/*.json \
-                        --current results/*.json \
-                        --threshold 10
+                    python scripts/compare_benchmarks.py --baseline baseline/*.json --current results/*.json --threshold 10
                 '''
             }
         }
@@ -553,9 +534,10 @@ stages:
 
 ### 1. Small Scale Factors
 
-Use small scale factors in CI/CD to keep execution times reasonable:
+Use small scale factors in CI/CD to keep execution times reasonable. These
+are command-option fragments:
 
-```yaml
+```text
 # Fast feedback in CI
 --scale 0.01  # ~10 MB data, ~30 seconds
 
@@ -568,26 +550,27 @@ Use small scale factors in CI/CD to keep execution times reasonable:
 Maintain stable baselines:
 
 ```bash
-# Store baseline in version control
 git add baseline/tpch_sf001_duckdb.json
 git commit -m "Update performance baseline"
 
-# Or use artifact storage
 aws s3 cp results/*.json s3://benchmarks/baselines/$(git rev-parse HEAD)/
 ```
+
+The first two commands store the baseline in version control. The ``aws s3 cp`` command is an alternative that stores baselines in artifact storage.
 
 ### 3. Conditional Execution
 
 Run benchmarks only when relevant:
 
 ```yaml
-# GitHub Actions - only on specific paths
 on:
   push:
     paths:
       - 'src/**'
       - 'benchmarks/**'
 ```
+
+This GitHub Actions trigger runs the workflow only when files under the listed paths change.
 
 ### 4. Parallel Execution
 
@@ -624,33 +607,33 @@ from benchbox.platforms.duckdb import DuckDBAdapter
 from benchbox.core.results.exporter import ResultExporter
 from pathlib import Path
 
-# Run benchmark
 benchmark = TPCH(scale_factor=0.01)
 adapter = DuckDBAdapter()
 results = adapter.run_benchmark(benchmark)
 
-# Export as baseline
 exporter = ResultExporter(output_dir="baseline")
 baseline_files = exporter.export_result(results, formats=["json"])
 
 print(f"Baseline created: {baseline_files['json']}")
 ```
 
+The script runs a benchmark and exports its result as the baseline.
+
 ### Updating Baselines
 
 Update baseline after verified improvements:
 
 ```bash
-# Run comparison
 python scripts/compare_benchmarks.py \
   --baseline baseline/tpch_sf001_duckdb.json \
   --current results/tpch_sf001_duckdb.json
 
-# If improvement is verified, update baseline
 cp results/tpch_sf001_duckdb.json baseline/tpch_sf001_duckdb.json
 git add baseline/tpch_sf001_duckdb.json
 git commit -m "Update baseline with verified improvements"
 ```
+
+Run the comparison first. Copy the new result over the baseline only if the improvement is verified.
 
 ## Regression Detection
 
@@ -659,8 +642,6 @@ git commit -m "Update baseline with verified improvements"
 Create `scripts/regression_detector.py`:
 
 ```python
-#!/usr/bin/env python3
-"""Advanced regression detection with query-level analysis."""
 
 import argparse
 import json
@@ -678,7 +659,6 @@ class RegressionDetector:
             return json.load(f)
 
     def extract_query_timings(self, results: dict) -> Dict[str, float]:
-        """Extract query-level timing data."""
         query_timings = {}
 
         queries = results.get("results", {}).get("queries", {}).get("details", [])
@@ -694,7 +674,6 @@ class RegressionDetector:
         baseline_timings: Dict[str, float],
         current_timings: Dict[str, float]
     ) -> List[dict]:
-        """Compare query-level performance."""
         comparisons = []
 
         for query_id in baseline_timings.keys():
@@ -726,8 +705,6 @@ class RegressionDetector:
         current: dict,
         comparisons: List[dict]
     ) -> str:
-        """Generate detailed regression report."""
-        # Overall metrics
         baseline_timing = baseline.get("results", {}).get("timing", {})
         current_timing = current.get("results", {}).get("timing", {})
 
@@ -735,12 +712,10 @@ class RegressionDetector:
         current_avg = current_timing.get("avg_ms", 0) / 1000
         overall_change = ((current_avg - baseline_avg) / baseline_avg) * 100 if baseline_avg else 0
 
-        # Categorize queries
         regressions = [c for c in comparisons if c["is_regression"]]
         improvements = [c for c in comparisons if c["is_improvement"]]
         unchanged = [c for c in comparisons if not c["is_regression"] and not c["is_improvement"]]
 
-        # Build report
         report = f"""# Benchmark Regression Report
 
 ## Overall Performance
@@ -751,7 +726,6 @@ class RegressionDetector:
 
 """
 
-        # Summary
         if overall_change > self.threshold:
             report += f"### ❌ Regression Detected\n\n"
             report += f"Overall performance degraded by {overall_change:.2f}%\n\n"
@@ -762,7 +736,6 @@ class RegressionDetector:
             report += f"### ✓ Performance Stable\n\n"
             report += f"No significant overall change ({overall_change:+.2f}%)\n\n"
 
-        # Query breakdown
         report += f"""## Query-Level Analysis
 
 - **Total Queries**: {len(comparisons)}
@@ -772,7 +745,6 @@ class RegressionDetector:
 
 """
 
-        # Regressions detail
         if regressions:
             report += "### Regressed Queries\n\n"
             report += "| Query | Baseline | Current | Change |\n"
@@ -781,7 +753,6 @@ class RegressionDetector:
                 report += f"| {r['query_id']} | {r['baseline_time']:.3f}s | {r['current_time']:.3f}s | {r['change_pct']:+.2f}% |\n"
             report += "\n"
 
-        # Improvements detail
         if improvements:
             report += "### Improved Queries\n\n"
             report += "| Query | Baseline | Current | Change |\n"
@@ -797,7 +768,6 @@ class RegressionDetector:
         baseline_path: Path,
         current_path: Path
     ) -> bool:
-        """Main regression detection logic."""
         baseline = self.load_results(baseline_path)
         current = self.load_results(current_path)
 
@@ -807,11 +777,9 @@ class RegressionDetector:
         comparisons = self.compare_queries(baseline_timings, current_timings)
         report = self.generate_report(baseline, current, comparisons)
 
-        # Write report
         Path("regression_report.md").write_text(report)
         print(report)
 
-        # Determine if there are regressions
         has_regressions = any(c["is_regression"] for c in comparisons)
 
         return has_regressions
@@ -842,10 +810,8 @@ from benchbox.core.results.exporter import ResultExporter
 
 exporter = ResultExporter(output_dir="reports")
 
-# Export with HTML format
 files = exporter.export_result(results, formats=["html"])
 
-# Export comparison report
 comparison = exporter.compare_results(baseline_path, current_path)
 report_path = exporter.export_comparison_report(comparison)
 
@@ -857,20 +823,16 @@ print(f"Report: {report_path}")
 Generate ASCII visualization charts for CI logs or text-based reports:
 
 ```bash
-# Generate ASCII charts from results (renders to stdout)
 benchbox visualize results/*.json --no-color > comparison_charts.txt
 
-# Specific chart type for CI summary
 benchbox visualize results/*.json --chart-type performance_bar --no-color
 ```
 
 ```python
 from benchbox.core.visualization import ResultPlotter
 
-# Load results and generate charts programmatically
 plotter = ResultPlotter.from_sources(["results/tpch_duckdb.json"])
 
-# Export ASCII charts to text files
 charts = plotter.generate_charts(output_dir="reports/charts")
 print(f"Charts exported: {charts}")
 ```
@@ -884,7 +846,6 @@ import requests
 import json
 
 def send_slack_notification(webhook_url: str, results: dict):
-    """Send benchmark results to Slack."""
     benchmark_name = results.get("benchmark", {}).get("name", "Unknown")
     execution_id = results.get("execution", {}).get("id", "")
     timing = results.get("results", {}).get("timing", {})
@@ -915,7 +876,6 @@ def send_slack_notification(webhook_url: str, results: dict):
     response = requests.post(webhook_url, json=message)
     response.raise_for_status()
 
-# Usage
 webhook = os.environ.get("SLACK_WEBHOOK_URL")
 if webhook:
     send_slack_notification(webhook, results)
@@ -933,17 +893,20 @@ if webhook:
 benchbox run \
   --platform duckdb \
   --benchmark tpch \
-  --scale 0.001 \  # Very small scale
-  --queries 1,6,12  # Subset of queries
+  --scale 0.001 \
+  --queries 1,6,12
 ```
+
+``--scale 0.001`` is a very small scale, and ``--queries 1,6,12`` runs a subset of queries.
 
 ### Resource Constraints
 
 **Problem**: CI runners run out of memory
 
-**Solution**: Use resource-appropriate configurations:
+**Solution**: Use resource-appropriate configurations. The fragments below
+show a runner setting (use a larger runner) and a command option (limit the benchmark scope), not a complete workflow:
 
-```yaml
+```text
 # GitHub Actions - use larger runners
 runs-on: ubuntu-latest-8-cores
 
@@ -958,15 +921,15 @@ runs-on: ubuntu-latest-8-cores
 **Solution**: Run multiple iterations and use median:
 
 ```python
-# Run multiple times
 results = []
 for i in range(3):
     result = adapter.run_benchmark(benchmark)
     results.append(result.average_query_time)
 
-# Use median for stability
 median_time = sorted(results)[len(results) // 2]
 ```
+
+The loop runs the benchmark several times. Using the median gives a stable result.
 
 ## See Also
 

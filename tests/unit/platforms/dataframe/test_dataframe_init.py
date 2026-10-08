@@ -1,5 +1,3 @@
-"""Coverage tests for platforms.dataframe package exports."""
-
 from __future__ import annotations
 
 import pytest

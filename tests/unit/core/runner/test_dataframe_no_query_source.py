@@ -1,29 +1,3 @@
-"""DataFrame query resolution must reach the registries every benchmark ships.
-
-Eleven benchmarks ship a `benchbox/core/<id>/dataframe_queries/` package that
-registers `DataFrameQuery` objects at import, and the cross-surface equivalence
-gates execute them. Query resolution reached none of them: it named only tpch,
-tpcds and clickbench, and the `get_dataframe_queries` instance hook is defined
-by almost no benchmark class.
-
-So seven families -- amplab, coffeeshop, h2odb, nyctaxi, ssb, tpch_skew,
-tsbs_devops -- resolved to zero queries. Both DataFrame builders then logged a
-warning, returned an empty list, marked power_test COMPLETED, and emitted a
-bundle reporting 0/0 queries with exit 0. Sixty such bundles are in the public
-corpus; the split by execution mode is absolute, 60 DataFrame and 0 SQL.
-
-Measured end to end after wiring the registries, `--platform polars-df --scale 0.01`:
-
-    amplab       24/24 pass, exit 0        nyctaxi       3/75 pass, exit 1
-    coffeeshop   33/33 pass, exit 0        tsbs_devops   0/54 pass, exit 1
-    h2odb        30/30 pass, exit 0
-    ssb          39/39 pass, exit 0
-    tpch_skew    66/66 pass, exit 0
-
-Five families now work. The two that do not fail loudly with a real Polars
-error instead of silently reporting a clean pass, which is the point.
-"""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -37,8 +11,7 @@ from benchbox.platforms.dataframe.benchmark_mixin import no_dataframe_queries_me
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
-#: Families that had no reachable DataFrame queries before the registry
-#: fallback, with the count each registry actually holds.
+
 PREVIOUSLY_UNREACHABLE = {
     "amplab": 8,
     "coffeeshop": 11,
@@ -52,7 +25,6 @@ PREVIOUSLY_UNREACHABLE = {
 
 @pytest.mark.parametrize(("benchmark_id", "expected_count"), sorted(PREVIOUSLY_UNREACHABLE.items()))
 def test_resolution_reaches_every_shipped_registry(benchmark_id: str, expected_count: int) -> None:
-    """The fix: these resolve through the production path, not just in the gates."""
     config = BenchmarkConfig(name=benchmark_id, display_name=benchmark_id, scale_factor=0.01)
 
     queries = get_dataframe_queries_for_benchmark(config, None, stream_id=0)
@@ -62,7 +34,6 @@ def test_resolution_reaches_every_shipped_registry(benchmark_id: str, expected_c
 
 
 def test_resolution_detects_a_nonstandard_registry_name() -> None:
-    """Registry discovery is type-based because valid constant names are not uniform."""
     queries = registry_dataframe_queries("tpcds_obt")
 
     ids = sorted((query.query_id for query in queries), key=lambda qid: int(qid[1:]))
@@ -70,12 +41,10 @@ def test_resolution_detects_a_nonstandard_registry_name() -> None:
 
 
 def test_the_registry_helper_is_quiet_about_a_benchmark_that_ships_none() -> None:
-    """A benchmark with no dataframe_queries package resolves to nothing, not an error."""
     assert registry_dataframe_queries("no_such_benchmark") == []
 
 
 def test_nested_module_import_error_is_not_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A broken dependency in an existing query module must fail closed."""
     from benchbox.core.dataframe import query_resolution
 
     error = ModuleNotFoundError("No module named 'broken_dependency'", name="broken_dependency")
@@ -90,7 +59,6 @@ def test_nested_module_import_error_is_not_hidden(monkeypatch: pytest.MonkeyPatc
 
 
 def test_multiple_registries_are_rejected_as_ambiguous(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A module cannot silently choose one of multiple independent registries."""
     from benchbox.core.dataframe import query_resolution
 
     module = SimpleNamespace(first=QueryRegistry("first"), second=QueryRegistry("second"))
@@ -101,7 +69,6 @@ def test_multiple_registries_are_rejected_as_ambiguous(monkeypatch: pytest.Monke
 
 
 def test_registry_aliases_do_not_create_false_ambiguity(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Two exported names for the same registry still resolve deterministically."""
     from benchbox.core.dataframe import query_resolution
 
     registry = QueryRegistry("aliased")
@@ -112,12 +79,6 @@ def test_registry_aliases_do_not_create_false_ambiguity(monkeypatch: pytest.Monk
 
 
 def test_the_message_distinguishes_a_narrow_filter_from_a_missing_source() -> None:
-    """The two causes need different advice.
-
-    An over-narrow `--queries` selection is the user's to correct; a benchmark
-    that genuinely ships no DataFrame surface is not, and telling them to check
-    their filter would send them in a circle.
-    """
     filtered = no_dataframe_queries_message("tpch", {"99"})
     missing = no_dataframe_queries_message("tpcds_obt", None)
 

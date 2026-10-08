@@ -12,8 +12,8 @@ Use unified tuning `platform_optimizations`:
 
 ```yaml
 platform_optimizations:
-  sorted_ingestion_mode: force   # off | auto | force
-  sorted_ingestion_method: ctas  # auto | ctas | z_order | liquid_clustering | vacuum_sort
+  sorted_ingestion_mode: force
+  sorted_ingestion_method: ctas
 ```
 
 `sorted_ingestion_mode`:

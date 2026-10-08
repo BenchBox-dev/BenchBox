@@ -1,9 +1,3 @@
-"""BenchBox visualization toolkit - ASCII-only charting.
-
-Keep visualization package imports lightweight so commands can register without
-eagerly importing ASCII renderer shims and their optional charting dependency.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -29,7 +23,6 @@ __all__ = list(_EXPORTS)
 
 
 def __getattr__(name: str) -> Any:
-    """Lazily expose visualization helpers and sibling submodules."""
     module_name = _EXPORTS.get(name)
     if module_name is not None:
         module = importlib.import_module(f"{__name__}.{module_name}")
@@ -47,5 +40,4 @@ def __getattr__(name: str) -> Any:
 
 
 def __dir__() -> list[str]:
-    """Return stable introspection output for lazy exports."""
     return sorted(set(globals()) | set(__all__))

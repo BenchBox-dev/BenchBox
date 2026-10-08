@@ -1,12 +1,6 @@
-"""Core tuning interface classes for BenchBox.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides the core tuning interface classes that define how database
-table tunings are configured, validated, and applied across different platforms.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from .ddl_generator import (
     BaseDDLGenerator,
@@ -46,29 +40,23 @@ from .workload_profiles import (
 )
 
 __all__ = [
-    # DDL Generator Protocol
     "DDLGenerator",
     "BaseDDLGenerator",
     "NoOpDDLGenerator",
     "TuningClauses",
     "ColumnDefinition",
     "ColumnNullability",
-    # Tuning Interface
     "TuningType",
     "TuningColumn",
     "TableTuning",
     "BenchmarkTunings",
-    # Advanced Tuning Configuration
     "PartitioningConfig",
     "SortKeyConfig",
     "ClusteringConfig",
-    # Metadata
     "TuningMetadata",
     "TuningMetadataManager",
     "MetadataValidationResult",
-    # Tuning-policy generation seam (ADR-3)
     "TUNING_POLICY_GENERATION",
-    # Workload tuning profiles
     "WorkloadTuningCandidate",
     "WorkloadTuningProfile",
     "load_workload_tuning_profile",

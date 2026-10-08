@@ -1,20 +1,3 @@
-"""CoffeeShop data generator aligned with the reference order line model.
-
-This implementation discards the legacy 6-table schema and now emits the exact
-three-table layout expected by the reference CoffeeShop generator:
-
-* ``dim_locations`` - static seed data describing each store and its region
-* ``dim_products`` - reference product catalog with seasonal pricing windows
-* ``order_lines`` - exploded fact table with 1-5 lines per order and realistic
-  temporal, regional, and product weighting
-
-The generator follows the approved mapping of scale factor → order count where
-``SF=1.0`` produces 8.5 million orders (≈13.3 million order lines). Smaller
-scale factors remain practical for development and unit tests while the
-weighting logic mirrors the seasonal, regional, and growth dynamics of the
-reference implementation.
-"""
-
 from __future__ import annotations
 
 import csv
@@ -41,8 +24,6 @@ from benchbox.utils.path_utils import get_benchmark_runs_datagen_path
 
 @dataclass(frozen=True)
 class _ProductWindow:
-    """Bucket of product seeds that share the same availability window."""
-
     start: date
     end: date
     seeds_by_subcategory: dict[str, list[ProductSeed]]
@@ -52,8 +33,6 @@ T = TypeVar("T")
 
 
 class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
-    """Generate CoffeeShop benchmark data that matches the reference schema."""
-
     SF1_ORDER_COUNT = 8_500_000
 
     MONTH_WEIGHTS: dict[int, float] = {
@@ -130,7 +109,7 @@ class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         output_dir: Path | None = None,
         **kwargs,
     ) -> None:
-        # Initialize compression mixin with all kwargs
+
         super().__init__(**kwargs)
 
         self.scale_factor = scale_factor
@@ -152,11 +131,8 @@ class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
 
         self._reset_generation_state()
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
     def generate_data(self, tables: list[str] | None = None) -> dict[str, str]:
-        """Generate CoffeeShop data for the requested tables."""
+
         self._reset_generation_state()
 
         def local_generator(output_path):
@@ -170,9 +146,6 @@ class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         self._write_manifest(table_paths)
         return {name: str(path) for name, path in table_paths.items()}
 
-    # ------------------------------------------------------------------
-    # Core generation helpers
-    # ------------------------------------------------------------------
     def _generate_data_local(self, output_dir: Path, tables: list[str] | None) -> dict[str, Path]:
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -321,7 +294,6 @@ class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         return path
 
     def _reset_generation_state(self) -> None:
-        """Reset mutable state so repeated runs remain deterministic."""
 
         self._product_indices = [defaultdict(int) for _ in self._product_windows]
         self._order_line_cycle = cycle(self._order_line_sequence)
@@ -331,12 +303,9 @@ class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
         self._time_cycle = cycle(self._time_sequence)
         self._table_row_counts: dict[str, int] = {}
 
-    # ------------------------------------------------------------------
-    # Helper utilities
-    # ------------------------------------------------------------------
     @staticmethod
     def calculate_order_count(scale_factor: float) -> int:
-        """Translate a scale factor into a number of orders."""
+
         base = CoffeeShopDataGenerator.SF1_ORDER_COUNT * scale_factor
         return max(1, int(round(base)))
 
@@ -367,7 +336,6 @@ class CoffeeShopDataGenerator(CompressionMixin, CloudStorageGeneratorMixin):
             if window.start <= order_date <= window.end:
                 seeds = window.seeds_by_subcategory.get(subcategory)
                 if not seeds:
-                    # Fallback: use whatever is available in this window
                     seeds = [seed for items in window.seeds_by_subcategory.values() for seed in items]
                 cursor = self._product_indices[window_index]
                 position = cursor[subcategory] % len(seeds)

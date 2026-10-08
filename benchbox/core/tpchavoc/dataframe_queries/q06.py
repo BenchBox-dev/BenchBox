@@ -1,10 +1,3 @@
-"""TPC-Havoc DataFrame variants for Q6.
-
-Q6 is a single-table predicate plus scalar aggregate. The variants keep the
-existing filter sequencing, column-pruning, precomputed-revenue, and formula
-differences explicit while sharing repeated predicate and scalar-result code.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable

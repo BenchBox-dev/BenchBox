@@ -1,9 +1,6 @@
-"""Utilities for loading the Write Primitives benchmark operation catalog.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -23,13 +20,11 @@ CATALOG_FILENAME = "operations.yaml"
 
 
 class WritePrimitivesCatalogError(RuntimeError):
-    """Raised when the Write Primitives operation catalog cannot be loaded or is invalid."""
+    pass
 
 
 @dataclass(frozen=True)
 class ValidationQuery:
-    """Representation of a validation query for a write operation."""
-
     id: str
     sql: str
     expected_rows: int | None = None
@@ -37,51 +32,24 @@ class ValidationQuery:
     expected_rows_max: int | None = None
     expected_values: dict[str, Any] | None = None
     check_expression: str | None = None
-    # Tolerance-based scalar validation for approximate sketch reads. The
-    # validator asserts that the first column of the first row falls in
-    # [expected_value_min, expected_value_max]. Both fields must be set
-    # together; combining them with expected_rows*/expected_values is rejected
-    # at load time because they describe a different validation kind.
     expected_value_min: float | None = None
     expected_value_max: float | None = None
-    # Per-platform override for the validation SQL body. Mirrors the
-    # operation-level platform_overrides semantics: a string replaces the
-    # default sql for that platform; an explicit `null` skips validation
-    # on that platform with a logged reason (the op result stays passed
-    # because skip means "not applicable on this engine", not "failed").
-    # Platforms with no key in this mapping fall through to the default sql.
     platform_overrides: dict[str, str | None] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class AggregateStateSpec:
-    """Catalog spec for an AGGREGATE_PERSIST/MERGE DataFrame op.
-
-    SQL ops carry their work in `write_sql`; aggregate-state DataFrame
-    ops instead declare a small spec the runtime uses to instantiate
-    the appropriate factory builder + merge-extract pair from
-    `dataframe_operations.py`. The benchmark dispatch fork inspects the
-    op for an `aggregate_state` block, calls the correct factory, then
-    runs `manager.execute_aggregate_persist` followed by
-    `manager.execute_aggregate_merge` and rolls the two
-    `DataFrameWriteResult`s into the operation envelope.
-    """
-
-    sketch_type: str  # "hll" | "topk"
-    source_table: str  # e.g. "lineitem"
-    target_subdir: str  # relative path under the run output dir
+    sketch_type: str
+    source_table: str
+    target_subdir: str
     group_cols: list[str] = field(default_factory=list)
     value_col: str = ""
     sketch_alias: str = "sketch"
-    # Platforms this op supports. Other platforms surface a structured
-    # "unsupported" failure via DataFrameWriteOperationsManager.
     supported_platforms: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class WriteOperation:
-    """Representation of a single write operation entry."""
-
     id: str
     category: str
     description: str
@@ -91,19 +59,12 @@ class WriteOperation:
     expected_rows_affected: int | None = None
     file_dependencies: list[str] = field(default_factory=list)
     platform_overrides: dict[str, str] = field(default_factory=dict)
-    requires_setup: bool = True  # Whether operation requires staging tables to be set up
-    # Optional aggregate-state spec. When present, this op is dispatched
-    # through `manager.execute_aggregate_persist` + `execute_aggregate_merge`
-    # rather than the SQL parity path; `write_sql` may be a placeholder
-    # string but is preserved so existing tooling that introspects ops
-    # by SQL body keeps working.
+    requires_setup: bool = True
     aggregate_state: AggregateStateSpec | None = None
 
 
 @dataclass(frozen=True)
 class WriteOperationsCatalog:
-    """Container for the write operations catalog."""
-
     version: int
     operations: dict[str, WriteOperation]
 
@@ -128,13 +89,6 @@ def _load_catalog_payload() -> dict:
 
 
 def _parse_validation_queries(operation_id: str, raw_validations: object) -> list[ValidationQuery]:
-    """Delegate to the shared loader so the field-forwarding contract stays unified.
-
-    See ``benchbox.core.primitives.catalog.loader._parse_validation_queries``
-    for the contract. The cross-loader parity test at
-    ``tests/unit/core/primitives/test_loader_parity.py`` enforces that this
-    wrapper and the shared one expose identical kwargs.
-    """
     return shared_parse_validation_queries(
         {"validation_queries": raw_validations},
         operation_id,
@@ -148,7 +102,6 @@ def _parse_validation_platform_overrides(
     val_id: str,
     val_entry: dict,
 ) -> dict[str, str | None]:
-    """Backwards-compatible re-export bound to ``WritePrimitivesCatalogError``."""
     return _shared_parse_validation_platform_overrides(operation_id, val_id, val_entry, WritePrimitivesCatalogError)
 
 
@@ -157,7 +110,6 @@ def _parse_expected_value_bounds(
     val_id: str,
     val_entry: dict,
 ) -> tuple[float | None, float | None]:
-    """Backwards-compatible re-export bound to ``WritePrimitivesCatalogError``."""
     return _shared_parse_expected_value_bounds(operation_id, val_id, val_entry, WritePrimitivesCatalogError)
 
 
@@ -178,13 +130,6 @@ def _parse_optional_scalars(operation_id: str, entry: dict) -> tuple[str | None,
 
 
 def _parse_aggregate_state(operation_id: str, raw: object) -> AggregateStateSpec | None:
-    """Parse the optional `aggregate_state` block on a catalog op.
-
-    Aggregate-state ops dispatch through the DataFrame manager's
-    `execute_aggregate_persist` / `execute_aggregate_merge` paths
-    instead of the SQL parity runner. Returning None means "this op is
-    a normal SQL op."
-    """
     if raw is None:
         return None
     if not isinstance(raw, dict):
@@ -264,9 +209,6 @@ def _parse_operation_entry(index: int, entry: object, existing_ids: set[str]) ->
         if not isinstance(write_sql, str) or not write_sql.strip():
             raise WritePrimitivesCatalogError(f"Catalog entry '{operation_id}' must include non-empty write_sql")
     else:
-        # Aggregate-state ops route through the DataFrame manager rather than
-        # SQL execution; tolerate a placeholder write_sql for tooling that
-        # introspects the catalog by SQL body.
         if write_sql is None:
             write_sql = ""
         if not isinstance(write_sql, str):
@@ -304,14 +246,6 @@ def _parse_operation_entry(index: int, entry: object, existing_ids: set[str]) ->
 
 
 def load_write_primitives_catalog() -> WriteOperationsCatalog:
-    """Load and validate the write primitives operation catalog from package resources.
-
-    Returns:
-        WriteOperationsCatalog containing all operations
-
-    Raises:
-        WritePrimitivesCatalogError: If catalog cannot be loaded or is invalid
-    """
     payload = _load_catalog_payload()
 
     raw_version = payload.get("version", 1)

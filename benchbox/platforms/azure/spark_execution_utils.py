@@ -1,5 +1,3 @@
-"""Shared Livy statement execution for Azure Spark adapters."""
-
 from __future__ import annotations
 
 import time
@@ -13,8 +11,6 @@ from benchbox.utils.clock import elapsed_seconds, mono_time
 
 
 class LivyStatementState:
-    """Livy statement state constants (shared across Fabric and Synapse)."""
-
     WAITING = "waiting"
     RUNNING = "running"
     AVAILABLE = "available"
@@ -30,18 +26,6 @@ def wait_for_livy_statement(
     get_headers: Callable[[], dict[str, str]],
     timeout_minutes: float,
 ) -> dict[str, Any]:
-    """Wait for a Livy statement to complete and return its output.
-
-    Args:
-        livy_endpoint: Base Livy REST endpoint URL.
-        session_id: Livy session ID.
-        statement_id: Livy statement ID.
-        get_headers: Callable returning auth headers.
-        timeout_minutes: Maximum wait time in minutes.
-
-    Returns:
-        The statement output dict.
-    """
     timeout_seconds = timeout_minutes * 60
     start_time = mono_time()
     statement_url = f"{livy_endpoint}/{session_id}/statements/{statement_id}"
@@ -81,19 +65,6 @@ def execute_livy_statement(
     get_headers: Callable[[], dict[str, str]],
     timeout_minutes: float,
 ) -> tuple[dict[str, Any], float]:
-    """Submit and wait for a Livy statement, returning result and elapsed time.
-
-    Args:
-        livy_endpoint: Base Livy REST endpoint URL.
-        session_id: Livy session ID.
-        code: Code to execute.
-        kind: Statement kind ('sql', 'spark', 'pyspark').
-        get_headers: Callable returning auth headers.
-        timeout_minutes: Maximum wait time in minutes.
-
-    Returns:
-        Tuple of (statement output dict, execution time in seconds).
-    """
     statements_url = f"{livy_endpoint}/{session_id}/statements"
 
     statement_data = {

@@ -1,9 +1,6 @@
-"""Tests for pg_extension_comparison pure functions.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import math
 
@@ -39,7 +36,6 @@ class TestGeometricMean:
         assert math.isclose(result, 1.0, rel_tol=1e-9)
 
     def test_mixed_with_zero(self):
-        # zeros are filtered out; only positive values contribute
         result = _geometric_mean([0.0, 4.0, 9.0])
         assert math.isclose(result, 6.0, rel_tol=1e-9)
 
@@ -80,7 +76,6 @@ class TestFormatQueryComparisonSection:
         baseline = {"Q1": {"execution_time": 2.0}, "Q2": {"execution_time": 0}}
         extension = {"Q1": {"execution_time": 1.0}, "Q2": {"execution_time": 0}}
         lines = _format_query_comparison_section(baseline, extension)
-        # Q1 should have a speedup line; Q2 has both zero so no row shown
         text = "\n".join(lines)
         assert "Q1" in text
 

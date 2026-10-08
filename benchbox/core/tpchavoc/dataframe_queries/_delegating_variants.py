@@ -1,5 +1,3 @@
-"""Shared helpers for TPC-Havoc DataFrame variant registration."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
@@ -35,7 +33,6 @@ _VARIANT_STRATEGIES: tuple[tuple[str, tuple[str, ...]], ...] = (
 
 
 def make_variant_delegate(impl: VariantImpl, *, name: str, module: str) -> VariantImpl:
-    """Return a named variant callable that delegates to an equivalent body."""
 
     def _variant(ctx: DataFrameContext) -> Any:
         return impl(ctx)
@@ -53,12 +50,6 @@ def build_result_replay_variants(
     sort_columns: Sequence[str] = (),
     descending: Sequence[bool] | None = None,
 ) -> list[DataFrameQuery]:
-    """Build safe TPC-Havoc variants that replay canonical result operations.
-
-    Q16-Q22 use complex correlated subquery and anti-join shapes. This helper
-    preserves semantic equivalence by delegating the core query to the existing
-    TPC-H implementation, then varying the final result operation sequence.
-    """
     base_query = get_tpch_query(f"Q{query_number}")
     sort_descending = tuple(descending or (False for _ in sort_columns))
     return [

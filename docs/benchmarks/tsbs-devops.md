@@ -189,34 +189,33 @@ Filtering by host metadata:
 ```python
 from benchbox import TSBSDevOps
 
-# Initialize TSBS DevOps benchmark (SF=1 = 100 hosts, 2 days)
 tsbs = TSBSDevOps(scale_factor=1.0, output_dir="tsbs_data")
 
-# Generate time-series data
 data_files = tsbs.generate_data()
 
-# Get all queries
 queries = tsbs.get_queries()
 print(f"Generated {len(queries)} TSBS queries")
 
-# Get specific query
 cpu_query = tsbs.get_query("cpu-max-all-1-hr")
 print(cpu_query)
 ```
 
+Scale factor 1 generates 100 hosts and 2 days of time-series data.
+
 ### Custom Configuration
 
 ```python
-# Configure specific hosts and duration
 tsbs_custom = TSBSDevOps(
     scale_factor=0.5,
     output_dir="tsbs_custom",
-    num_hosts=50,           # Override: 50 hosts
-    duration_days=7,        # Override: 7 days of data
-    interval_seconds=60,    # 1-minute intervals
+    num_hosts=50,
+    duration_days=7,
+    interval_seconds=60,
 )
 data_files = tsbs_custom.generate_data()
 ```
+
+These explicit options override the values derived from the scale factor: 50 hosts, 7 days of data and 1-minute (60-second) intervals.
 
 ### DuckDB Integration
 
@@ -224,11 +223,9 @@ data_files = tsbs_custom.generate_data()
 import duckdb
 from benchbox import TSBSDevOps
 
-# Initialize and generate data
 tsbs = TSBSDevOps(scale_factor=0.1, output_dir="tsbs_small")
 data_files = tsbs.generate_data()
 
-# Create DuckDB connection and schema
 conn = duckdb.connect("tsbs.duckdb")
 schema_sql = tsbs.get_create_tables_sql(dialect="duckdb")
 
@@ -236,14 +233,12 @@ for stmt in schema_sql.split(";"):
     if stmt.strip():
         conn.execute(stmt)
 
-# Load data
 for table_name, file_path in tsbs.tables.items():
     conn.execute(f"""
         INSERT INTO {table_name}
         SELECT * FROM read_csv('{file_path}', header=true, auto_detect=true)
     """)
 
-# Run queries
 for query_id in ["cpu-max-all-1-hr", "high-cpu-1-hr", "lastpoint"]:
     query_sql = tsbs.get_query(query_id)
     result = conn.execute(query_sql).fetchall()
@@ -259,14 +254,14 @@ from benchbox import TSBSDevOps
 
 tsbs = TSBSDevOps(scale_factor=1.0)
 
-# Get TimescaleDB-optimized schema with hypertables
 schema_sql = tsbs.get_create_tables_sql(
     dialect="timescale",
     time_partitioning=True,
 )
 print(schema_sql)
-# Includes: SELECT create_hypertable('cpu', 'time', ...)
 ```
+
+This returns the TimescaleDB-optimized schema with hypertables. The output includes statements such as `SELECT create_hypertable('cpu', 'time', ...)`.
 
 ### ClickHouse Integration
 
@@ -275,14 +270,14 @@ from benchbox import TSBSDevOps
 
 tsbs = TSBSDevOps(scale_factor=1.0)
 
-# Get ClickHouse-optimized schema
 schema_sql = tsbs.get_create_tables_sql(
     dialect="clickhouse",
     time_partitioning=True,
 )
 print(schema_sql)
-# Includes: ENGINE = MergeTree() ORDER BY (...) PARTITION BY toYYYYMMDD(time)
 ```
+
+This returns the ClickHouse-optimized schema. The output includes clauses such as `ENGINE = MergeTree() ORDER BY (...) PARTITION BY toYYYYMMDD(time)`.
 
 ### InfluxDB Integration
 
@@ -292,11 +287,9 @@ InfluxDB 3.x uses FlightSQL for SQL queries and Line Protocol for data ingestion
 from benchbox.platforms.influxdb import InfluxDBAdapter
 from benchbox import TSBSDevOps
 
-# Initialize TSBS DevOps benchmark
 tsbs = TSBSDevOps(scale_factor=0.1, output_dir="tsbs_influx")
 data_files = tsbs.generate_data()
 
-# Create InfluxDB adapter (Core/OSS mode)
 adapter = InfluxDBAdapter(
     mode="core",
     host="localhost",
@@ -306,15 +299,11 @@ adapter = InfluxDBAdapter(
     ssl=False,
 )
 
-# Create connection
 conn = adapter.create_connection()
 
-# InfluxDB auto-creates schema from Line Protocol writes
-# Load data (converts CSV to Line Protocol)
 row_counts, load_time, metadata = adapter.load_data(tsbs, conn, tsbs.output_dir)
 print(f"Loaded {metadata['total_rows']:,} rows in {load_time:.2f}s")
 
-# Get InfluxDB-compatible queries (uses DataFusion SQL)
 for query_id in ["cpu-max-all-1-hr", "high-cpu-1-hr", "lastpoint"]:
     query_sql = tsbs.get_query(query_id, dialect="influxdb")
     exec_time, row_count, _ = adapter.execute_query(conn, query_sql, query_id)
@@ -323,10 +312,13 @@ for query_id in ["cpu-max-all-1-hr", "high-cpu-1-hr", "lastpoint"]:
 adapter.close_connection(conn)
 ```
 
+The adapter uses Core/OSS mode. InfluxDB creates the schema automatically from Line Protocol writes, and `load_data` converts the CSV files to Line Protocol. The queries use the `influxdb` dialect, which runs as DataFusion SQL.
+
 **InfluxDB Cloud mode:**
 
+The following adapter targets InfluxDB Cloud (Serverless, Dedicated or Clustered).
+
 ```python
-# InfluxDB Cloud (Serverless/Dedicated/Clustered)
 adapter = InfluxDBAdapter(
     mode="cloud",
     host="us-east-1-1.aws.cloud2.influxdata.com",
@@ -360,12 +352,13 @@ Configure TSBS Devops data generation via `--benchmark-option KEY=VALUE`:
 Accepts hyphenated aliases (e.g. `num-hosts`, `duration-days`).
 
 ```bash
-# Custom host count and interval
 benchbox run --platform duckdb --benchmark tsbs_devops --scale 1 \
   --benchmark-option num_hosts=100 \
   --benchmark-option interval_seconds=30 \
   --benchmark-option start_time=2019-01-01T00:00:00
 ```
+
+This sets a custom host count, interval and start time.
 
 ## Scale Factor Guidelines
 

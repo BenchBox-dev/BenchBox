@@ -1,9 +1,3 @@
-"""Tests for TPC-DS benchmark runner: stream operations and orchestration.
-
-Covers query stream permutation, single stream execution, result aggregation,
-throughput test orchestration, power test execution, and parameter validation.
-"""
-
 from __future__ import annotations
 
 import time
@@ -27,7 +21,6 @@ pytestmark = [
 
 @pytest.fixture()
 def tpcds(tmp_path, monkeypatch):
-    """Create a TPCDSBenchmark with mocked dependencies."""
 
     class FakeQueryManager:
         def get_query(self, query_id, **kwargs):
@@ -56,8 +49,6 @@ def tpcds(tmp_path, monkeypatch):
 
 
 class _Conn:
-    """Minimal mock connection for benchmark tests."""
-
     def __init__(self, fail_on: str | None = None):
         self.fail_on = fail_on
         self.closed = False
@@ -80,17 +71,7 @@ class _Conn:
         pass
 
 
-# ---------------------------------------------------------------------------
-# _execute_single_stream (module-level function)
-# ---------------------------------------------------------------------------
 class TestExecuteSingleStream:
-    """_execute_single_stream used to "execute" a stream by counting `-- Query`
-    comment lines and reporting every query as successful, without running
-    any SQL (it doesn't even accept a database connection). That fake-success
-    stub is retired: it now raises NotImplementedError unconditionally,
-    regardless of whether the stream file exists or what it contains.
-    """
-
     def test_missing_stream_file_raises_not_implemented(self, tmp_path: Path):
         with pytest.raises(NotImplementedError, match="does not execute SQL"):
             _execute_single_stream(0, tmp_path / "nonexistent.sql")
@@ -108,9 +89,6 @@ class TestExecuteSingleStream:
             _execute_single_stream(0, stream_file)
 
 
-# ---------------------------------------------------------------------------
-# _aggregate_stream_results (module-level function)
-# ---------------------------------------------------------------------------
 class TestAggregateStreamResults:
     def test_aggregates_successful_streams(self):
         results = [
@@ -135,9 +113,6 @@ class TestAggregateStreamResults:
         assert agg["total_queries_failed"] == 10
 
 
-# ---------------------------------------------------------------------------
-# Initialization
-# ---------------------------------------------------------------------------
 class TestTPCDSInit:
     def test_type_error_scale_factor(self, tmp_path, monkeypatch):
         monkeypatch.setattr("benchbox.core.tpcds.benchmark.runner.TPCDSQueryManager", MagicMock)
@@ -154,7 +129,7 @@ class TestTPCDSInit:
             TPCDSBenchmark(scale_factor=0, output_dir=tmp_path)
 
     def test_fractional_sf_rounds_up(self, tpcds):
-        # Constructor rounds 0.5 → 1.0 with warning; our fixture already uses 1.0
+
         assert tpcds.scale_factor == 1.0
 
     def test_parallel_type_error(self, tmp_path, monkeypatch):
@@ -165,9 +140,6 @@ class TestTPCDSInit:
             TPCDSBenchmark(scale_factor=1, output_dir=tmp_path, parallel=1.5)
 
 
-# ---------------------------------------------------------------------------
-# get_query argument validation
-# ---------------------------------------------------------------------------
 class TestGetQueryValidation:
     def test_string_query_id_raises(self, tpcds):
         with pytest.raises(TypeError):
@@ -185,9 +157,6 @@ class TestGetQueryValidation:
         assert len(result) > 0
 
 
-# ---------------------------------------------------------------------------
-# Stream info
-# ---------------------------------------------------------------------------
 class TestStreamInfo:
     def test_get_stream_info_valid(self, tpcds):
         info = tpcds.get_stream_info(0)
@@ -195,14 +164,10 @@ class TestStreamInfo:
         assert "stream_id" in info
 
     def test_get_all_streams_info_skips_invalid(self, tpcds):
-        """get_all_streams_info should silently skip invalid streams."""
         results = tpcds.get_all_streams_info(num_streams=2)
         assert isinstance(results, list)
 
 
-# ---------------------------------------------------------------------------
-# Available queries and tables
-# ---------------------------------------------------------------------------
 class TestAvailableQueriesAndTables:
     def test_available_queries_returns_99(self, tpcds):
         queries = tpcds.get_available_queries()
@@ -221,9 +186,6 @@ class TestAvailableQueriesAndTables:
         assert isinstance(ordered, list)
 
 
-# ---------------------------------------------------------------------------
-# Power test
-# ---------------------------------------------------------------------------
 class TestPowerTest:
     def test_runs_all_99_queries(self, tpcds):
         conn = _Conn()
@@ -236,13 +198,10 @@ class TestPowerTest:
         conn = _Conn(fail_on="SELECT 42")
         result = tpcds.run_power_test(conn, warm_up=False, validation=False)
         assert len(result["errors"]) > 0
-        # Other queries should still succeed
+
         assert result["total_time"] >= 0
 
 
-# ---------------------------------------------------------------------------
-# Throughput test parameter validation
-# ---------------------------------------------------------------------------
 class TestThroughputTestValidation:
     def test_rejects_zero_streams(self, tpcds):
         with pytest.raises(ValueError):
@@ -257,9 +216,6 @@ class TestThroughputTestValidation:
             tpcds.run_throughput_test(lambda: _Conn(), max_retries=-1)
 
 
-# ---------------------------------------------------------------------------
-# Query text normalization
-# ---------------------------------------------------------------------------
 class TestQueryNormalization:
     def test_normalize_interval_syntax(self, tpcds):
         input_sql = "date + 30 days"
@@ -267,14 +223,11 @@ class TestQueryNormalization:
         assert "INTERVAL" in result or "days" in result.lower()
 
     def test_fix_query58_ambiguity(self, tpcds):
-        # Should handle query58-specific ORDER BY disambiguation
+
         result = tpcds._fix_query58_ambiguity("SELECT * FROM t ORDER BY 1")
         assert isinstance(result, str)
 
 
-# ---------------------------------------------------------------------------
-# Benchmark info
-# ---------------------------------------------------------------------------
 class TestBenchmarkInfo:
     def test_includes_required_keys(self, tpcds):
         info = tpcds.get_benchmark_info()
@@ -287,9 +240,6 @@ class TestBenchmarkInfo:
         assert "c_tools_info" in info
 
 
-# ---------------------------------------------------------------------------
-# Validation methods
-# ---------------------------------------------------------------------------
 class TestValidation:
     def test_validate_data_integrity_returns_result(self, tpcds):
         result = tpcds.validate_data_integrity()
@@ -304,9 +254,6 @@ class TestValidation:
         assert hasattr(result, "is_valid")
 
 
-# ---------------------------------------------------------------------------
-# Schema and SQL generation
-# ---------------------------------------------------------------------------
 class TestSchemaAndSQL:
     def test_get_schema_returns_dict(self, tpcds):
         schema = tpcds.get_schema()

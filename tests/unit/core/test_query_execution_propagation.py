@@ -1,5 +1,3 @@
-"""Unit tests for query execution metadata propagation."""
-
 from __future__ import annotations
 
 import pytest

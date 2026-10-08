@@ -10,9 +10,7 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     const tray = page.getByTestId("compare-tray");
     await expect(tray).toHaveAttribute("role", "region");
     await expect(tray).toHaveAttribute("aria-label", "Comparison selection");
-    // The tray must not be a dialog and must not trap focus.
     await expect(tray).not.toHaveAttribute("role", "dialog");
-    // Tab navigation should still reach the compare link.
     await expect(page.getByTestId("compare-tray-compare-link")).toBeVisible();
   });
 
@@ -30,7 +28,6 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     await duckdbCheckbox.scrollIntoViewIfNeeded();
     await duckdbCheckbox.focus();
     await duckdbCheckbox.check();
-    // Focus must not move to tray (tray not yet visible at 1 selection).
     await expect(duckdbCheckbox).toBeFocused();
 
     const datafusionCheckbox = page
@@ -50,7 +47,6 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openBenchmarkTray(page);
     const toggle = page.getByTestId("compare-tray-toggle");
-    // It is a native button element
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect(toggle).toHaveAttribute("aria-controls", "compare-tray-details");
     await toggle.click();
@@ -68,9 +64,7 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     await expect(toggle).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(page.getByTestId("compare-tray")).toHaveAttribute("data-collapsed", "true");
-    // Selection retained
     await expect(page.getByTestId("compare-tray-compare-link")).toBeVisible();
-    // Focus on live element
     const focused = await page.evaluate(() => document.activeElement?.getAttribute("data-testid") || document.activeElement?.tagName);
     expect(focused).toBeTruthy();
   });
@@ -80,10 +74,8 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     await openBenchmarkTray(page);
     await page.getByTestId("compare-tray-toggle").click();
     await expect(page.getByTestId("compare-tray")).toHaveAttribute("data-collapsed", "false");
-    // Focus body (outside tray) then Escape
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.keyboard.press("Escape");
-    // Should remain expanded since focus is outside tray
     await expect(page.getByTestId("compare-tray")).toHaveAttribute("data-collapsed", "false");
   });
 
@@ -98,10 +90,6 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     const n = await checkboxes.count();
     expect(n).toBeGreaterThanOrEqual(5);
 
-    // Select 4 *comparable* rows to hit cap. Partial-subset runs (e.g. the
-    // genuine Polars SF0.01 source with 3 queries) render disabled with an
-    // "insufficient valid queries" reason, so skip ineligible rows instead
-    // of assuming DOM order.
     const handles = await checkboxes.all();
     const comparable: typeof handles = [];
     for (const cb of handles) {
@@ -118,7 +106,6 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
       await expect(cb).toBeChecked();
     }
 
-    // Fifth comparable checkbox must be disabled at cap with aria-describedby pointing to reason.
     const fifth = comparable[4];
     if (!fifth) throw new Error("expected fifth comparable checkbox for cap assertion");
     await expect(fifth).toBeDisabled();
@@ -128,7 +115,6 @@ test.describe("tray accessibility: announcements, focus, escape", () => {
     await expect(reason).toBeVisible();
     expect(await reason.textContent()).toMatch(/Up to 4|compare|selection/i);
 
-    // Tray remains accessible region even when cap prevents further selection.
     await expect(page.getByTestId("compare-tray")).toHaveAttribute("role", "region");
     await expect(page.getByTestId("compare-tray-announcer")).toHaveAttribute("aria-live", "polite");
   });

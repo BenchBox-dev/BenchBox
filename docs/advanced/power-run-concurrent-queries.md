@@ -44,15 +44,22 @@ Power Run Iterations execute the same benchmark test multiple times, providing s
 ### Configuration Options
 
 ```yaml
-# benchbox.yaml
 execution:
   power_run:
-    iterations: 5                          # Number of test iterations to run
-    warm_up_iterations: 2                  # Warm-up runs (excluded from statistics)
-    timeout_per_iteration_minutes: 90      # Maximum time per iteration
-    fail_fast: false                       # Stop on first failure vs. continue
-    collect_metrics: true                  # Collect detailed performance metrics
+    iterations: 5
+    warm_up_iterations: 2
+    timeout_per_iteration_minutes: 90
+    fail_fast: false
+    collect_metrics: true
 ```
+
+- `iterations`: the number of test iterations to run.
+- `warm_up_iterations`: warm-up runs, which are excluded from statistics.
+- `timeout_per_iteration_minutes`: the maximum time for each iteration.
+- `fail_fast`: when true, stop on the first failure. When false, continue.
+- `collect_metrics`: collect detailed performance metrics.
+
+Put these settings in `benchbox.yaml`.
 
 ### Usage Examples
 
@@ -66,36 +73,31 @@ import duckdb
 from benchbox import TPCH
 from benchbox.core.tpch.power_test import TPCHPowerTest
 
-# Create benchmark
 tpch = TPCH(scale_factor=0.1)
 
-# This example requires test.db to contain a loaded TPC-H SF 0.1 dataset.
-# Generate and load it first, or replace this path with an initialized database.
-
-# Power iterations are a plain loop over stream IDs: each TPCHPowerTest
-# run executes the 22 queries in that stream's permutation against a real
-# connection and reports Power@Size. (The former PowerRunExecutor wrapper
-# is removed; see adr-concurrency-public-api-reconciliation.)
 connection = duckdb.connect("test.db")
 
 power_values = []
-for stream_id in range(5):  # 5 test iterations
+for stream_id in range(5):
     power_test = TPCHPowerTest(
         benchmark=tpch,
         connection=connection,
         scale_factor=0.1,
         stream_id=stream_id,
-        validation=False,  # answer sets exist for stream 0 only
+        validation=False,
     )
     result = power_test.run()
     assert result.success, result.errors
     power_values.append(result.power_at_size)
 
-# Statistical analysis
 print(f"Average Power@Size: {statistics.mean(power_values):.2f}")
 print(f"Std Deviation: {statistics.stdev(power_values):.2f}")
 print(f"Confidence: {len(power_values)}/5 iterations successful")
 ```
+
+This example requires `test.db` to contain a loaded TPC-H SF 0.1 dataset. Generate and load it first, or replace the path with an initialized database.
+
+Power iterations are a plain loop over stream IDs. Each `TPCHPowerTest` run executes the 22 queries in that stream's permutation against a real connection and reports Power@Size. Validation is off because answer sets exist for stream 0 only.
 
 #### Advanced-level Statistical Analysis
 
@@ -103,8 +105,6 @@ print(f"Confidence: {len(power_values)}/5 iterations successful")
 import numpy as np
 from scipy import stats
 
-# power_values comes from the loop above: one Power@Size per stream-ID run
-# Calculate confidence interval (95%)
 confidence_level = 0.95
 degrees_freedom = len(power_values) - 1
 sample_mean = np.mean(power_values)
@@ -120,6 +120,8 @@ confidence_interval = stats.t.interval(
 print(f"95% Confidence Interval: {confidence_interval[0]:.2f} - {confidence_interval[1]:.2f}")
 print(f"Coefficient of Variation: {(np.std(power_values) / sample_mean) * 100:.1f}%")
 ```
+
+`power_values` comes from the loop above: one Power@Size per stream-ID run. The interval is a 95% confidence interval.
 
 ### Sizing Power-Run Loops
 
@@ -209,17 +211,8 @@ import duckdb
 from benchbox import TPCH
 from benchbox.core.tpch.throughput_test import TPCHThroughputTest
 
-# Create benchmark
 tpch = TPCH(scale_factor=0.1)
 
-# This example requires throughput.db to contain a loaded TPC-H SF 0.1 dataset.
-# Generate and load it first, or replace this path with an initialized database.
-
-# One throughput test owns all of its streams: the connection factory
-# hands each stream its session (see the adapter session-capability
-# contract), and StreamRunner executes them concurrently with fail-closed
-# accounting. (The former ConcurrentQueryExecutor wrapper is removed; see
-# adr-concurrency-public-api-reconciliation.)
 connection = duckdb.connect("throughput.db")
 
 throughput_test = TPCHThroughputTest(
@@ -231,7 +224,6 @@ throughput_test = TPCHThroughputTest(
 )
 result = throughput_test.run()
 
-# Throughput analysis
 print(f"Streams: {result.streams_successful}/{result.streams_executed} successful")
 for stream in result.stream_results:
     print(f"Stream {stream.stream_id}: "
@@ -239,10 +231,13 @@ for stream in result.stream_results:
           f"{stream.duration:.2f}s")
 ```
 
+This example requires `throughput.db` to contain a loaded TPC-H SF 0.1 dataset. Generate and load it first, or replace the path with an initialized database.
+
+One throughput test owns all of its streams. The connection factory hands each stream its session, and `StreamRunner` executes the streams concurrently with fail-closed accounting.
+
 #### Scalability Analysis
 
 ```python
-# Test scalability across different concurrency levels
 concurrency_levels = [1, 2, 4, 8]
 throughput_results = {}
 
@@ -265,7 +260,6 @@ for level in concurrency_levels:
         'avg_duration': level_result.total_time / level if level else 0.0,
     }
 
-# Analyze scalability
 print(f"\n Scalability Analysis:")
 print(f"{'Streams':<8} {'Queries OK':<12} {'Success Rate':<12}")
 print("-" * 38)
@@ -273,6 +267,8 @@ print("-" * 38)
 for level, metrics in throughput_results.items():
     print(f"{level:<8} {metrics['successful']:<12} {metrics['success_rate']:<12.1%}")
 ```
+
+The loop tests scalability across the different concurrency levels.
 
 ## System Optimization
 
@@ -286,18 +282,18 @@ from benchbox.utils import ExecutionConfigHelper
 
 config_helper = ExecutionConfigHelper()
 
-# Auto-optimize based on system specs
 cpu_cores = psutil.cpu_count()
 memory_gb = psutil.virtual_memory().total / (1024**3)
 
 config_helper.optimize_for_system(cpu_cores=cpu_cores, memory_gb=memory_gb)
 
-# View configured settings
 summary = config_helper.get_execution_summary()
 print(f"Optimized for {cpu_cores} cores, {memory_gb:.1f}GB RAM:")
 print(f"- Max concurrent streams: {summary['concurrent_queries']['max_streams']}")
 print(f"- Power run timeout: {summary['power_run']['settings']['timeout_per_iteration_minutes']} min")
 ```
+
+`optimize_for_system` tunes settings automatically from the system specs, and `get_execution_summary` shows the configured settings.
 
 ### Optimization Rules
 
@@ -330,9 +326,8 @@ from benchbox.core.tpch.power_test import TPCHPowerTest
 from benchbox.core.tpch.throughput_test import TPCHThroughputTest
 from benchbox.utils import ExecutionConfigHelper
 
-# 1. System Analysis and Optimization
 config_helper = ExecutionConfigHelper()
-config_helper.apply_performance_profile('thorough')  # Comprehensive testing
+config_helper.apply_performance_profile('thorough')
 
 import psutil
 config_helper.optimize_for_system(
@@ -340,11 +335,9 @@ config_helper.optimize_for_system(
     memory_gb=psutil.virtual_memory().total / (1024**3)
 )
 
-# 2. Benchmark Setup
-tpch = TPCH(scale_factor=1.0)  # Production scale
+tpch = TPCH(scale_factor=1.0)
 connection = duckdb.connect("production_test.db")
 
-# 3. Power Run Testing (Statistical Confidence)
 print("Phase 1: Power Run Analysis")
 power_values = []
 for stream_id in range(5):
@@ -353,7 +346,7 @@ for stream_id in range(5):
         connection=connection,
         scale_factor=1.0,
         stream_id=stream_id,
-        validation=(stream_id == 0),  # answer sets exist for stream 0 only
+        validation=(stream_id == 0),
     )
     power_result = power_test.run()
     assert power_result.success, power_result.errors
@@ -364,7 +357,6 @@ print(f"  Average: {statistics.mean(power_values):.2f} Power@Size")
 print(f"  Std Dev: {statistics.stdev(power_values):.2f}")
 print(f"  Range: {min(power_values):.2f} - {max(power_values):.2f}")
 
-# 4. Concurrent Query Testing (Throughput Analysis)
 print("\nPhase 2: Concurrent Throughput Analysis")
 throughput_test = TPCHThroughputTest(
     benchmark=tpch,
@@ -382,11 +374,12 @@ print(f" Multi-Stream Performance:")
 print(f"  Streams: {concurrent_result.streams_successful}/{concurrent_result.streams_executed}")
 print(f"  Success Rate: {successful}/{executed}")
 
-# 5. Comprehensive Analysis
 print(f"\n Performance Analysis:")
 print(f"  Single-stream efficiency: {statistics.mean(power_values):.2f} Power@Size")
 print(f"  Performance consistency: ±{statistics.stdev(power_values):.1f} Power@Size")
 ```
+
+The workflow has four steps: system analysis and optimization (the `thorough` profile gives comprehensive testing), benchmark setup at production scale (SF 1.0), power run testing for statistical confidence, and concurrent throughput testing. Validation runs for stream 0 only because answer sets exist for stream 0 only.
 
 ## Best Practices
 
@@ -461,23 +454,17 @@ BenchBox ensures compliance with official TPC specifications for query ordering 
 Every TPC-H power run iteration, warm-up and measured, runs stream 00 of the TPC specification: the same query permutation and the same substitution parameters, so iterations are repeats of one workload and can be compared directly. Row-count validation applies to every measured iteration under the default validation mode. TPC-DS power iterations keep their existing stream ordering.
 
 ```python
-# Every iteration: TPC-H stream 0 permutation [14, 2, 9, 20, 6, 17, 18, 8, 21, 13, 3, 22, 16, 4, 11, 15, 1, 10, 19, 5, 7, 12]
-
 config = PowerRunSettings()
-config.iterations = 5  # Five repeats of stream 0
+config.iterations = 5
 ```
+
+All five iterations repeat stream 0. For TPC-H, its permutation is `[14, 2, 9, 20, 6, 17, 18, 8, 21, 13, 3, 22, 16, 4, 11, 15, 1, 10, 19, 5, 7, 12]`.
 
 ### Throughput Compliance
 
-Throughput streams are numbered 1 to S, as in the TPC specifications. Stream 0 is the power stream, so no throughput stream repeats the power ordering, and each throughput stream uses its own permutation and parameters:
+Throughput streams are numbered 1 to S, as in the TPC specifications. Stream 0 is the power stream, so no throughput stream repeats the power ordering, and each throughput stream uses its own permutation and parameters.
 
-```python
-# Stream 1: TPC-H permutation[1] or TPC-DS dsqgen stream 1
-# Stream 2: TPC-H permutation[2] or TPC-DS dsqgen stream 2
-# Stream S: TPC-H permutation[S] or TPC-DS dsqgen stream S
-
-# A 4-stream throughput test runs streams 1, 2, 3 and 4.
-```
+Stream N uses TPC-H permutation N, or TPC-DS dsqgen stream N. A 4-stream throughput test runs streams 1, 2, 3 and 4.
 
 Results record this under `phases.throughput_test.stream_numbering`.
 
@@ -492,11 +479,12 @@ Results record this under `phases.throughput_test.stream_numbering`.
 
 Check result compliance:
 ```python
-# Verify first query in TPC-H power test uses stream permutation
-assert result.query_results[0]['query_id'] == 14  # Stream 0 starts with query 14
-assert result.query_results[0]['stream_id'] == 0   # Stream ID recorded
-assert result.query_results[0]['position'] == 1    # Position in permutation
+assert result.query_results[0]['query_id'] == 14
+assert result.query_results[0]['stream_id'] == 0
+assert result.query_results[0]['position'] == 1
 ```
+
+These assertions verify that the first query in a TPC-H power test follows the stream permutation. Stream 0 starts with query 14, the stream ID is recorded, and the position is the query's place in the permutation.
 
 For detailed compliance documentation, see:
 [TPC-H Official Guide → Specification Compliance](../guides/tpc/tpc-h-official-guide.md#tpc-h-specification-compliance),

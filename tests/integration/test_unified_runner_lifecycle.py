@@ -15,11 +15,10 @@ pytestmark = [
 @pytest.mark.integration
 @pytest.mark.duckdb
 def test_primitives_lifecycle_end_to_end(tmp_path):
-    """Run the primitives benchmark through the lifecycle pipeline against DuckDB."""
 
     db_path = tmp_path / "primitives_lifecycle.duckdb"
     output_root = tmp_path / "bb_output"
-    data_dir = tmp_path / "data"  # Use temp directory for data generation
+    data_dir = tmp_path / "data"
     output_root.mkdir(parents=True, exist_ok=True)
     data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -28,7 +27,7 @@ def test_primitives_lifecycle_end_to_end(tmp_path):
         "benchmark": "read_primitives",
         "scale_factor": 0.01,
         "database_path": str(db_path),
-        "output_dir": str(data_dir),  # Use temp data directory
+        "output_dir": str(data_dir),
         "memory_limit": "512MB",
         "force": True,
     }
@@ -44,7 +43,7 @@ def test_primitives_lifecycle_end_to_end(tmp_path):
         options={
             "power_iterations": 1,
             "power_warmup_iterations": 0,
-            "force_regenerate": True,  # Clean up any existing chunked files
+            "force_regenerate": True,
         },
         test_execution_type="power",
     )
@@ -57,12 +56,11 @@ def test_primitives_lifecycle_end_to_end(tmp_path):
 
     system_profile = SystemProfiler().get_system_profile()
 
-    # Create benchmark instance with parallel=1 to prevent chunked file generation
     benchmark_instance = ReadPrimitivesBenchmark(
         scale_factor=0.01,
         output_dir=str(data_dir),
-        parallel=1,  # Prevent chunked files (.tbl.1, .tbl.2, etc.)
-        force_regenerate=True,  # Clean up any existing files
+        parallel=1,
+        force_regenerate=True,
     )
 
     result = run_benchmark_lifecycle(
@@ -76,10 +74,10 @@ def test_primitives_lifecycle_end_to_end(tmp_path):
             "scale_factor": 0.01,
         },
         platform_adapter=adapter,
-        benchmark_instance=benchmark_instance,  # Use pre-constructed benchmark
+        benchmark_instance=benchmark_instance,
         phases=LifecyclePhases(generate=True, load=True, execute=True),
         validation_opts=ValidationOptions(),
-        output_root=str(data_dir),  # Use temp data directory for generation
+        output_root=str(data_dir),
     )
 
     assert result.total_queries > 0

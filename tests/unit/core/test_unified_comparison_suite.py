@@ -1,12 +1,4 @@
-"""Fast-lane coverage tests for UnifiedBenchmarkSuite.
-
-Covers: __init__, get_available_platforms, run_comparison routing,
-_run_sql_comparison, _run_dataframe_comparison, _build_platform_result,
-get_summary, export_results, _generate_markdown_report,
-_generate_text_report, run_unified_comparison.
-
-Copyright 2026 Joe Harris / BenchBox Project
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
 
 from __future__ import annotations
 
@@ -27,11 +19,6 @@ from benchbox.core.comparison.types import (
 )
 
 pytestmark = [pytest.mark.unit, pytest.mark.fast]
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _qr(query_id: str, platform: str, mean_ms: float, status: str = "SUCCESS") -> UnifiedQueryResult:
@@ -60,11 +47,6 @@ def _pr_with_queries(platform: str, query_ids_ms: dict) -> UnifiedPlatformResult
     return suite._build_platform_result(platform, PlatformType.SQL, qrs)
 
 
-# ---------------------------------------------------------------------------
-# __init__ and config defaults
-# ---------------------------------------------------------------------------
-
-
 class TestUnifiedBenchmarkSuiteInit:
     def test_default_config_created(self):
         suite = UnifiedBenchmarkSuite()
@@ -79,21 +61,14 @@ class TestUnifiedBenchmarkSuiteInit:
         assert suite.config.scale_factor == 1.0
 
 
-# ---------------------------------------------------------------------------
-# get_available_platforms
-# ---------------------------------------------------------------------------
-
-
 class TestGetAvailablePlatforms:
     def test_returns_sql_platforms(self):
         suite = UnifiedBenchmarkSuite()
         with (
             patch("benchbox.core.comparison.suite.UnifiedBenchmarkSuite.get_available_platforms") as mock_method,
         ):
-            # Direct call, mock list_available_platforms inside
             mock_method.return_value = ["duckdb", "sqlite"]
             result = suite.get_available_platforms(PlatformType.SQL)
-            # Use the actual method but mock its imports
         with (
             patch("benchbox.platforms.list_available_platforms", return_value=["duckdb", "sqlite"]),
             patch("benchbox.platforms.list_available_dataframe_platforms", return_value={}),
@@ -126,11 +101,6 @@ class TestGetAvailablePlatforms:
             result = suite.get_available_platforms(None)
             assert "duckdb" in result
             assert "polars-df" in result
-
-
-# ---------------------------------------------------------------------------
-# run_comparison routing
-# ---------------------------------------------------------------------------
 
 
 class TestRunComparison:
@@ -174,11 +144,6 @@ class TestRunComparison:
             suite.run_comparison(["duckdb", "polars-df"])
 
 
-# ---------------------------------------------------------------------------
-# _run_sql_comparison error handling
-# ---------------------------------------------------------------------------
-
-
 class TestRunSqlComparison:
     def test_collects_results_for_each_platform(self):
         suite = UnifiedBenchmarkSuite()
@@ -195,11 +160,6 @@ class TestRunSqlComparison:
         assert len(results) == 1
         assert results[0].query_results[0].status == "ERROR"
         assert "boom" in results[0].query_results[0].error_message
-
-
-# ---------------------------------------------------------------------------
-# _build_platform_result
-# ---------------------------------------------------------------------------
 
 
 class TestBuildPlatformResult:
@@ -230,14 +190,9 @@ class TestBuildPlatformResult:
 
     def test_zero_mean_times_excluded_from_geomean(self):
         suite = UnifiedBenchmarkSuite()
-        qrs = [_qr("Q1", "duckdb", 0.0)]  # zero time → excluded from geomean
+        qrs = [_qr("Q1", "duckdb", 0.0)]
         result = suite._build_platform_result("duckdb", PlatformType.SQL, qrs)
         assert result.geometric_mean_ms == 0.0
-
-
-# ---------------------------------------------------------------------------
-# get_summary
-# ---------------------------------------------------------------------------
 
 
 class TestGetSummary:
@@ -255,7 +210,6 @@ class TestGetSummary:
         assert abs(summary.speedup_ratio - 5.0) < 0.01
 
     def test_handles_no_geomeans(self):
-        """No timings means no ranking, not a fabricated 1.00x self-comparison."""
         suite = UnifiedBenchmarkSuite()
         results = [_pr("duckdb", geomean=0.0), _pr("sqlite", geomean=0.0)]
         summary = suite.get_summary(results)
@@ -282,11 +236,6 @@ class TestGetSummary:
         pr2 = UnifiedPlatformResult("sqlite", PlatformType.SQL, qrs2, geometric_mean_ms=40.0)
         summary = suite.get_summary([pr1, pr2])
         assert summary.total_queries == 3
-
-
-# ---------------------------------------------------------------------------
-# export_results
-# ---------------------------------------------------------------------------
 
 
 class TestExportResults:
@@ -333,11 +282,6 @@ class TestExportResults:
         assert nested.exists()
 
 
-# ---------------------------------------------------------------------------
-# _generate_markdown_report
-# ---------------------------------------------------------------------------
-
-
 class TestGenerateMarkdownReport:
     def test_includes_platform_table(self):
         suite = UnifiedBenchmarkSuite()
@@ -357,11 +301,6 @@ class TestGenerateMarkdownReport:
         assert "Query Winners" in report
 
 
-# ---------------------------------------------------------------------------
-# _generate_text_report
-# ---------------------------------------------------------------------------
-
-
 class TestGenerateTextReport:
     def test_includes_headers(self):
         suite = UnifiedBenchmarkSuite()
@@ -373,16 +312,10 @@ class TestGenerateTextReport:
         assert "Fastest" in report
 
 
-# ---------------------------------------------------------------------------
-# _run_dataframe_comparison
-# ---------------------------------------------------------------------------
-
-
 class TestRunDataframeComparison:
     def test_delegates_to_dataframe_suite(self):
         suite = UnifiedBenchmarkSuite()
 
-        # Build a fake DataFrame platform result
         fake_qr = SimpleNamespace(
             query_id="Q1",
             platform="polars-df",
@@ -437,20 +370,7 @@ class TestRunDataframeComparison:
         assert "sf001" in str(call_kwargs.get("data_dir", ""))
 
 
-# ---------------------------------------------------------------------------
-# _benchmark_sql_platform (remote platform path)
-# ---------------------------------------------------------------------------
-
-
 class TestBenchmarkSqlPlatform:
-    """The SQL path routes through the canonical run service.
-
-    It used to be a private TPC-H-only runner that required pre-generated data
-    at a guessed directory and never reached the real benchmark path, so the
-    documented ``benchbox compare -p duckdb -p sqlite`` invocation could not
-    work. These tests pin the delegation and the result conversion instead.
-    """
-
     def test_delegates_to_the_canonical_run_path(self):
         config = UnifiedBenchmarkConfig(query_ids=["Q1"], benchmark="tpch", scale_factor=0.01)
         suite = UnifiedBenchmarkSuite(config=config)
@@ -518,25 +438,13 @@ class TestBenchmarkSqlPlatform:
         assert UnifiedBenchmarkSuite(config=UnifiedBenchmarkConfig())._normalized_query_ids() is None
 
 
-# ---------------------------------------------------------------------------
-# _generate_markdown_report - empty query_winners branch
-# ---------------------------------------------------------------------------
-
-
 class TestGenerateMarkdownReportBranches:
     def test_no_query_winners_when_all_errors(self):
         suite = UnifiedBenchmarkSuite()
-        # All queries errored, so no winners found
         qrs = [_qr("Q1", "duckdb", 0.0, status="ERROR")]
         pr = UnifiedPlatformResult("duckdb", PlatformType.SQL, qrs, geometric_mean_ms=0.0)
         report = suite._generate_markdown_report([pr])
-        # summary.query_winners is empty, section skipped
         assert "Query Winners" not in report
-
-
-# ---------------------------------------------------------------------------
-# get_summary - no best_platform branch (query has only error results)
-# ---------------------------------------------------------------------------
 
 
 class TestGetSummaryBranches:
@@ -545,13 +453,7 @@ class TestGetSummaryBranches:
         qrs = [_qr("Q1", "duckdb", 0.0, status="ERROR")]
         pr = UnifiedPlatformResult("duckdb", PlatformType.SQL, qrs, geometric_mean_ms=0.0)
         summary = suite.get_summary([pr])
-        # Q1 has no winner (all errors)
         assert "Q1" not in summary.query_winners
-
-
-# ---------------------------------------------------------------------------
-# run_unified_comparison convenience function
-# ---------------------------------------------------------------------------
 
 
 class TestRunUnifiedComparison:

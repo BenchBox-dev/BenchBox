@@ -1,5 +1,3 @@
-"""Benchmark gates for capabilities absent from embedded ClickHouse Local."""
-
 from __future__ import annotations
 
 from benchbox.sql_compat.actions import CompatAction

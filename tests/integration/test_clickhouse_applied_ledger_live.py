@@ -1,25 +1,6 @@
-"""Applied-ledger corroboration against a REAL ClickHouse engine.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-The unit suite (``tests/unit/platforms/test_clickhouse_introspection.py``)
-proves the corroboration logic against a fake ``system.tables`` connection. That
-cannot catch a wrong assumption about what ClickHouse actually PUTS in
-``system.tables`` -- and one of the #1331 fixes turns entirely on that: the
-clause regex must capture ``toYYYYMM(l_shipdate)`` including its closing paren,
-or every date-partitioned table mismatches its own catalog fact.
-
-That failure mode is invisible. It fails CLOSED: nothing errors, runs simply
-never reach ``applied_verified``. So it needs a live engine, which is what these
-tests use -- chDB is ClickHouse embedded in-process, and ``system.tables`` is
-the same catalog a server exposes.
-
-Scope: this exercises the schema/introspection/corroboration path, not data
-loading, and chDB is not a ClickHouse *server*. A full server run against a
-loaded corpus remains the wider check.
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -92,15 +73,12 @@ def connection():
 
 
 def _run(connection, *, apply_partition: bool) -> tuple[str, dict[str, str]]:
-    """Execute the tuned DDL for real, then corroborate the live catalog."""
     adapter = _tuned_adapter()
     tunings = _combined_tunings()
     optimized = adapter._optimize_table_definition(SOURCE_DDL, tunings, nullable_columns=set())
 
     executed = optimized if apply_partition else optimized.replace(TUNED_PARTITION_CLAUSE, "")
     connection.execute(executed)
-    # The ledger always records the tuned INTENT; corroboration decides whether
-    # the engine actually honoured it.
     adapter._record_tuned_sort_key_op(SOURCE_DDL, optimized, "lineitem", tunings)
 
     status, receipt = adapter._corroborate_applied_ledger(connection, APPLIED_UNVERIFIED)
@@ -142,10 +120,6 @@ class TestAppliedLedgerAgainstLiveClickHouse:
         assert partition.evidence == {"partition_key": "toStartOfInterval(ts, toIntervalDay(1))"}
 
     def test_catalog_reports_the_partition_expression_with_its_closing_paren(self, connection):
-        # Pins the assumption the clause regex depends on. If ClickHouse ever
-        # reported a bare column here, the regex fix would be over-built; if the
-        # regex regressed to stopping at the inner paren, expected and observed
-        # would disagree and nothing else would tell us.
         adapter = _tuned_adapter()
         optimized = adapter._optimize_table_definition(SOURCE_DDL, _combined_tunings(), nullable_columns=set())
         connection.execute(optimized)
@@ -159,15 +133,12 @@ class TestAppliedLedgerAgainstLiveClickHouse:
         assert sorting_key == "l_orderkey, l_linenumber"
 
     def test_date_partitioned_table_earns_verification(self, connection):
-        # The fail-closed case: an expression partition key must corroborate.
         status, verdicts = _run(connection, apply_partition=True)
         assert status == APPLIED_VERIFIED
         assert verdicts["sort_key"] == "corroborated"
         assert verdicts["partition_key"] == "corroborated"
 
     def test_unapplied_partition_key_blocks_verification(self, connection):
-        # The over-certification case: sort key corroborates, partition does
-        # not, and the run must NOT reach applied_verified on the sort key alone.
         status, verdicts = _run(connection, apply_partition=False)
         assert status == APPLIED_UNVERIFIED
         assert verdicts["sort_key"] == "corroborated"

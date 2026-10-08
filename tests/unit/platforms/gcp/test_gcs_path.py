@@ -1,13 +1,3 @@
-"""Unit tests for the GCS staging-path helper.
-
-Pins the contract the Dataproc and Dataproc Serverless adapters share:
-  * missing / wrongly-prefixed paths raise ConfigurationError with the
-    exact wording the adapters emitted before consolidation;
-  * ``gs://bucket`` (no prefix) yields empty prefix;
-  * ``gs://bucket/prefix/path/`` has the trailing slash stripped in
-    ``uri`` and the prefix is everything after the first ``/``.
-"""
-
 from __future__ import annotations
 
 import pytest

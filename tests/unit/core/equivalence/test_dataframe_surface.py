@@ -1,15 +1,6 @@
-"""Unit tests for the benchmark-agnostic cross-surface equivalence harness.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-These lock the control-flow contract of
-:func:`benchbox.core.equivalence.dataframe_surface.find_surface_divergences`
-and the value normalization that every gate built on the harness depends on,
-without needing DuckDB / Polars / Pandas (those are exercised by the
-integration-lane TPC-Havoc gates).
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 from __future__ import annotations
 
@@ -33,11 +24,10 @@ pytestmark = [
 
 
 class _Mismatch(Exception):
-    """Stand-in for a validator's mismatch exception type."""
+    pass
 
 
 def _equal_check(reference, candidate):
-    """A check closure that raises _Mismatch when rows differ."""
 
     def check(actual_reference):
         assert actual_reference == reference
@@ -88,8 +78,6 @@ def test_execution_error_is_prefixed_and_isolated_per_cell() -> None:
         ],
         validation_error=_Mismatch,
     )
-    # The bad cell is reported with an ``error:`` prefix; the good sibling cell
-    # in the same query is unaffected (per-cell isolation).
     assert [(d.cell, d.detail) for d in divergences] == [("expression", "error: kaboom")]
 
 
@@ -110,7 +98,7 @@ def test_reference_failure_records_one_divergence_and_skips_cells() -> None:
         validation_error=_Mismatch,
         reference_failure_cell="v0:canonical",
     )
-    assert calls == []  # candidate cells never enumerated without a reference
+    assert calls == []
     assert len(divergences) == 1
     assert divergences[0].cell == "v0:canonical"
     assert divergences[0].detail == "reference query failed: no data"

@@ -1,19 +1,6 @@
 #!/usr/bin/env python3
-"""Validate Example File References in Documentation
-
-This script validates that all file reference callouts (📁 pattern) in
-documentation actually point to existing files or directories.
-
-Usage:
-    python scripts/validate_example_references.py
-
-Exit codes:
-    0 - All references valid
-    1 - Broken references found
-
-Copyright 2026 Joe Harris / BenchBox Project
-Licensed under the MIT License.
-"""
+# Copyright 2026 Joe Harris / BenchBox Project
+# Licensed under the MIT License.
 
 import re
 import sys
@@ -22,20 +9,12 @@ from typing import List, Tuple
 
 
 def find_markdown_files(docs_dir: Path) -> List[Path]:
-    """Find all markdown files in documentation directory."""
     return list(docs_dir.rglob("*.md"))
 
 
 def extract_file_references(content: str, file_path: Path) -> List[Tuple[int, str, str]]:
-    """Extract file references from markdown content.
-
-    Returns:
-        List of (line_number, link_text, file_path) tuples
-    """
     references = []
 
-    # Pattern: **📁 Complete[,tested example:]** ... [`text`](path)
-    # Matches the 📁 callout pattern we use
     pattern = r"📁.*?\[`([^`]+)`\]\(([^)]+)\)"
 
     for line_num, line in enumerate(content.split("\n"), 1):
@@ -49,37 +28,19 @@ def extract_file_references(content: str, file_path: Path) -> List[Tuple[int, st
 
 
 def validate_reference(ref_path: str, doc_file: Path, repo_root: Path) -> Tuple[bool, str]:
-    """Validate a single reference path.
-
-    Args:
-        ref_path: The path from the markdown link
-        doc_file: The markdown file containing the reference
-        repo_root: Repository root directory
-
-    Returns:
-        (is_valid, resolved_path)
-    """
-    # Handle relative paths
-    if ref_path.startswith("../../"):
-        # Relative to doc file location
-        resolved = (doc_file.parent / ref_path).resolve()
-    elif ref_path.startswith("../"):
+    if ref_path.startswith("../../") or ref_path.startswith("../"):
         resolved = (doc_file.parent / ref_path).resolve()
     elif ref_path.startswith("/"):
-        # Absolute from repo root
         resolved = repo_root / ref_path.lstrip("/")
     else:
-        # Relative to doc file
         resolved = (doc_file.parent / ref_path).resolve()
 
-    # Check if file or directory exists
     exists = resolved.exists()
 
     return exists, str(resolved)
 
 
 def main():
-    """Main validation entry point."""
     repo_root = Path(__file__).parent.parent
     docs_dir = repo_root / "docs"
 
@@ -132,7 +93,6 @@ def main():
         except Exception as e:
             print(f"   ⚠️  Error reading {md_file.name}: {e}")
 
-    # Summary
     print("\n" + "=" * 60)
     print("Validation Summary")
     print("=" * 60)

@@ -1,14 +1,3 @@
-"""Unit tests for publication workflow step-output wiring.
-
-The promotion writer once read ``steps.upload_pages.outputs.artifact-id``
-(dash) while ``actions/upload-pages-artifact`` declares ``artifact_id``
-(underscore). The empty interpolation rendered
-``const deployedArtifactId = ;``, so the deploy step died at parse time
-before any provider write. These tests pin every step-output reference in
-the publication workflows against the referenced action's declared
-outputs for the upload actions in play.
-"""
-
 from __future__ import annotations
 
 import re
@@ -25,9 +14,6 @@ WORKFLOWS = [
     REPO_ROOT / ".github/workflows/publication-deploy.yml",
 ]
 
-# Declared outputs for the upload actions referenced by the publication
-# workflows. upload-pages-artifact uses underscores; upload-artifact uses
-# dashes. That asymmetry is exactly what this guard protects.
 KNOWN_ACTION_OUTPUTS = {
     "actions/upload-pages-artifact": {"artifact_id"},
     "actions/upload-artifact": {"artifact-id", "artifact-url"},
@@ -65,7 +51,6 @@ def _iter_step_strings(workflow: dict) -> tuple[str, str, str]:
 
 
 def find_unknown_step_outputs(workflow_path: Path) -> list[str]:
-    """Return step-output references naming an undeclared output."""
     with workflow_path.open(encoding="utf-8") as handle:
         workflow = yaml.safe_load(handle)
     steps: dict[str, str] = {}
@@ -176,10 +161,6 @@ def test_publication_workflow_step_outputs_resolve(workflow_path: Path) -> None:
 
 
 def test_deploy_script_sends_resolvable_build_version() -> None:
-    # The provider resolves pages_build_version as a commit. Sending the
-    # journal's dangling write-intent OID made it reject the create request
-    # with 404, so the wire value must be the run's pushed source SHA while
-    # intent correlation stays in the journal's write record.
     text = (REPO_ROOT / ".github/workflows/publication-transaction.yml").read_text(encoding="utf-8")
     assert "pages_build_version: '${{ github.sha }}'" in text
     assert "start_write.outputs.pages_build_version" not in text

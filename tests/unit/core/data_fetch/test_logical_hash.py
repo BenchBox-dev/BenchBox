@@ -1,11 +1,3 @@
-"""Tests for benchbox.core.data_fetch.logical_hash.
-
-Pins the canonical logical row-content hash algorithm
-(``joinorder-logical-content-v1``) with golden values from the committed tiny
-fixture, so any accidental change to the algorithm — which would silently
-desynchronise the build script and the runtime verifier — fails loudly.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -35,10 +27,7 @@ pytestmark = [
 REPO_ROOT = Path(__file__).resolve().parents[4]
 TINY_FIXTURE = REPO_ROOT / "tests" / "fixtures" / "joinorder_canonical_tiny"
 
-# Golden logical hashes of full-size lookup tables in the committed tiny fixture.
-# These lookup tables carry their complete production content even in the tiny
-# fixture, so the values double as an algorithm-drift tripwire. Recompute
-# deliberately (never blindly) if the algorithm version is intentionally bumped.
+
 _GOLDEN = {
     "kind_type": (7, "8fbf00d7899a61594d08ac49ec54842f8bad6d996e91ae4f1d17cbb1f9da9649"),
     "company_type": (4, "02fb1bd2ed8cc9e2bb3771e202f3323aedca306b7fbdf8129e383aba1b56f57e"),
@@ -46,7 +35,7 @@ _GOLDEN = {
     "role_type": (12, "60de7318954c4b7b8847e92bbd8882e051cdc208c052451863a000dc5f0093fe"),
 }
 
-# The lookup tables above are (id integer, <label> character varying).
+
 _LOOKUP_SCHEMAS = {
     "kind_type": {"id": "integer", "kind": "character varying"},
     "company_type": {"id": "integer", "kind": "character varying"},
@@ -81,9 +70,6 @@ def test_logical_hash_is_deterministic() -> None:
 
 
 def test_integer_column_normalises_across_encodings() -> None:
-    """An integer column hashes identically whether the value arrives as a
-    Python int (Parquet) or its decimal string (CSV) — the reproducibility
-    property the whole design rests on."""
     col = LogicalColumn(name="id", is_integer=True)
     assert canonical_logical_value(123, col) == canonical_logical_value("123", col)
     assert canonical_logical_value(0, col) == ("I", b"0")
@@ -106,7 +92,6 @@ def test_row_hash_detects_column_name_and_value_changes() -> None:
     update_logical_row_hash(changed_value, cols, [1, "series"])
     assert base.hexdigest() != changed_value.hexdigest()
 
-    # A NULL and an empty string must not collide.
     null_row = hashlib.sha256()
     update_logical_row_hash(null_row, cols, [1, None])
     empty_row = hashlib.sha256()
@@ -124,10 +109,10 @@ def test_aggregate_is_order_independent_but_content_sensitive() -> None:
     a = LogicalTableHash("aka_name", 10, "aa")
     b = LogicalTableHash("title", 20, "bb")
     assert aggregate_logical_content_hash([a, b]) == aggregate_logical_content_hash([b, a])
-    # A per-table hash change propagates.
+
     b2 = LogicalTableHash("title", 20, "cc")
     assert aggregate_logical_content_hash([a, b]) != aggregate_logical_content_hash([a, b2])
-    # A row-count change propagates even if the hash is unchanged.
+
     b3 = LogicalTableHash("title", 21, "bb")
     assert aggregate_logical_content_hash([a, b]) != aggregate_logical_content_hash([a, b3])
 

@@ -1,17 +1,4 @@
 #!/usr/bin/env python3
-"""Check all 7 Phase 1 launch criteria for the BenchBox results explorer.
-
-Verifies that the seed corpus, built explorer site, and supporting
-infrastructure meet the requirements defined in the strategy document
-before public launch.
-
-Usage:
-    uv run -- python scripts/check_launch_criteria.py [OPTIONS]
-
-Exit codes:
-    0 - All 7 criteria PASS (SKIP does not count as failure)
-    1 - One or more criteria FAIL, or an unexpected error occurred
-"""
 
 from __future__ import annotations
 
@@ -21,10 +8,6 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
-# Status constants
-# ---------------------------------------------------------------------------
-
 PASS = "PASS"
 FAIL = "FAIL"
 SKIP = "SKIP"
@@ -32,13 +15,7 @@ SKIP = "SKIP"
 _SYMBOLS = {PASS: "\u2713", FAIL: "\u2717", SKIP: "~"}
 
 
-# ---------------------------------------------------------------------------
-# Corpus cohort depth (inline - scripts do not import each other)
-# ---------------------------------------------------------------------------
-
-
 def _load_manifest_results(data_dir: Path) -> list[dict] | None:
-    """Return result entries from manifest.json, or None if the file is absent."""
     manifest_path = data_dir / "manifest.json"
     if not manifest_path.exists():
         return None
@@ -64,7 +41,6 @@ def _build_cohorts(results: list[dict]) -> dict[tuple[str, str], set[str]]:
 
 
 def _check_corpus_depth(data_dir: Path, min_platforms: int = 3) -> tuple[str, str]:
-    """Check cohort depth. Returns (status, detail_message)."""
     results = _load_manifest_results(data_dir)
     if results is None:
         return FAIL, f"{data_dir}/manifest.json not found - run the static build pipeline first"
@@ -84,11 +60,6 @@ def _check_corpus_depth(data_dir: Path, min_platforms: int = 3) -> tuple[str, st
         return FAIL, detail
 
     return PASS, f"{len(cohorts)} cohorts, all with \u2265{min_platforms} platforms"
-
-
-# ---------------------------------------------------------------------------
-# Individual criterion checks
-# ---------------------------------------------------------------------------
 
 
 def criterion_corpus_depth(data_dir: Path) -> tuple[str, str]:
@@ -143,17 +114,11 @@ def criterion_cname(repo_root: Path) -> tuple[str, str]:
     return PASS, f"{cname} exists"
 
 
-# ---------------------------------------------------------------------------
-# Reporting
-# ---------------------------------------------------------------------------
-
-
 def run_all_checks(
     data_dir: Path,
     site_dir: Path,
     repo_root: Path,
 ) -> list[tuple[str, str, str]]:
-    """Run all 7 criteria and return list of (name, status, detail)."""
     return [
         ("Corpus depth (\u22653 platforms per benchmark\u00d7scale cohort)", *criterion_corpus_depth(data_dir)),
         ("Explorer home page present", *criterion_explorer_home(site_dir)),
@@ -180,11 +145,6 @@ def print_report(results: list[tuple[str, str, str]]) -> None:
     print(f"Summary: {passed}/{total} criteria met")
     if any(s == FAIL for _, s, _ in results):
         print("To launch: fix FAIL items above, then verify manually with cross-browser testing")
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

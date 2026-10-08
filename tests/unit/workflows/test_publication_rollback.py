@@ -1,5 +1,3 @@
-"""Contract and simulation tests for publication deployment and legacy rollback fallback."""
-
 from __future__ import annotations
 
 import json
@@ -51,7 +49,6 @@ def test_workflow_permissions_follow_least_privilege() -> None:
     wf = _workflow()
     jobs = wf["jobs"]
 
-    # Top-level permissions should be read-only
     assert wf.get("permissions") == {"contents": "read"}
 
     assert jobs["build"]["permissions"] == {"actions": "read", "contents": "read"}
@@ -80,7 +77,6 @@ def test_workflow_uses_pages_deploy_actions_only_in_write_jobs() -> None:
     assert "group: pages-deploy" in text
     assert "cancel-in-progress: false" in text
 
-    # Concurrency is scoped to write jobs, never candidate build
     assert "concurrency" not in wf
     assert wf["jobs"]["deploy"]["concurrency"] == {"group": "pages-deploy", "cancel-in-progress": False}
     assert wf["jobs"]["rollback"]["concurrency"] == {"group": "pages-deploy", "cancel-in-progress": False}
@@ -361,12 +357,12 @@ def test_pre_write_cas_rejection_does_not_trigger_rollback() -> None:
 @pytest.mark.parametrize(
     ("pages_write_outcome", "verify_result", "force_rollback", "expected_rollback"),
     [
-        ("success", "success", False, False),  # Normal successful deployment -> no rollback
-        ("", "skipped", False, False),  # Pre-write CAS rejection -> no rollback
-        ("failure", "skipped", False, True),  # Pages write failed -> rollback
-        ("success", "failure", False, True),  # Healthcheck/checksum verification failed -> rollback
-        ("success", "success", True, True),  # Forced drill -> rollback
-        ("failure", "failure", True, True),  # Multiple failures + force -> rollback
+        ("success", "success", False, False),
+        ("", "skipped", False, False),
+        ("failure", "skipped", False, True),
+        ("success", "failure", False, True),
+        ("success", "success", True, True),
+        ("failure", "failure", True, True),
     ],
 )
 def test_simulated_rollback_trigger_logic(
@@ -375,7 +371,6 @@ def test_simulated_rollback_trigger_logic(
     force_rollback: bool,
     expected_rollback: bool,
 ) -> None:
-    """Simulate GitHub Actions expression evaluation for the rollback conditional."""
     deploy_failed = pages_write_outcome == "failure"
     verify_failed = verify_result == "failure"
     should_rollback = deploy_failed or verify_failed or force_rollback

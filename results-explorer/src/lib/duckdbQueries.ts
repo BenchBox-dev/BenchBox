@@ -1,13 +1,3 @@
-/**
- * Typed query helpers for the canonical browser DuckDB contract.
- *
- * Every user-visible explorer metric must originate from one of these helpers
- * (or a direct SQL query against the same attached `bench` schema). Pages must
- * not recompute display reductions, ranks, or aggregates in TypeScript -
- * canonical values live in the tables defined by
- * `docs/development/browser-duckdb-schema.sql`.
- */
-
 import { queryRows } from "@/db";
 import type { BuiltQuery } from "@/lib/queryFilters";
 import { canonicalPhaseSql, type FacetWhereClause } from "@/lib/facetModel";
@@ -38,11 +28,6 @@ const RESULT_SEARCH_SQL = ["platform", "platform_version", "result_id"]
   .map((column) => `CONTAINS(LOWER(COALESCE(CAST(${column} AS VARCHAR), '')), LOWER(?))`)
   .join(" OR ");
 
-/**
- * Turn the Query workbench's canonical filtered select into one SQL page and
- * a matching count. Keeping the transformation here makes the paging/search
- * contract testable without coupling it to component state.
- */
 export function buildQueryResultPageQueries(
   baseQuery: BuiltQuery,
   searchText: string,
@@ -73,7 +58,6 @@ export function buildQueryResultPageQueries(
   };
 }
 
-/** Return every filtered/search-matching row within the selected Query cap. */
 export function buildQueryResultExportQuery(baseQuery: BuiltQuery, searchText: string): BuiltQuery {
   const parsed = parseResultSelect(baseQuery);
   const search = normalizeResultSearch(searchText);
@@ -115,10 +99,6 @@ function normalizeResultSearch(searchText: string): string {
   return searchText.trim();
 }
 
-// ---------------------------------------------------------------------------
-// Row shapes - one-to-one with the DDL in browser-duckdb-schema.sql
-// ---------------------------------------------------------------------------
-
 export interface ResultRow extends CostDeploymentFields {
   result_id: string;
   benchmark: string;
@@ -141,50 +121,27 @@ export interface ResultRow extends CostDeploymentFields {
   comparison_exclusion_reason: string | null;
   ranking_exclusion_reason: string | null;
   trust_label: string;
-  /** Funding disclosure; "unspecified" when the bundle declares none. */
   funding: string;
   visibility: string;
   platform_version: string | null;
   execution_mode: string | null;
   tuning_mode: string | null;
   tuning_hash: string | null;
-  // Accepted plausibility-override rule ids (canonical JSON array string,
-  // see DetailResult in types.ts). List-only: the audit fields
-  // (evidence/approver/expires) stay detail-only. Optional so fixtures and
-  // SQL paths predating this column default to undefined. Display-only.
   override_rules?: string | null;
-  // ADR-1 bundle-emitted tuning identities (see DetailResult in types.ts):
-  // canonical requested-config hash and physical applied-ledger hash. Optional
-  // (like physical_rendering_id below) so fixtures/SQL paths predating these
-  // columns default to undefined. Display-only; never a join/dedup key.
   requested_config_hash?: string | null;
   applied_ledger_hash?: string | null;
-  // ADR-1 tuning verified-state (see DetailResult in types.ts). Optional so
-  // fixtures/SQL paths predating this column default to undefined. Display-only.
   tuning_validation_status?: string | null;
-  // ADR-3 seam: explicit tuning-policy generation marker (see DetailResult in
-  // types.ts). Optional so fixtures/SQL paths predating this column default to
-  // undefined. Display-only; never a join/dedup key.
   tuning_policy_generation?: string | null;
   test_type: string | null;
   validation_status: string | null;
   cost_usd: number | null;
   compliance_class: string | null;
-  // Registry-declared product support status (see benchmarkSupport.ts).
-  // Optional so fixtures and SQL paths predating this column default to
-  // undefined and render under "Other benchmarks" with no badge.
   benchmark_support_status?: string | null;
   is_ranking_eligible: boolean;
   has_plans: boolean;
   plans_published: boolean;
   has_tuning: boolean;
   bundle_download_url: string;
-  // ADR-2 §3 secondary facet: the physical rendering strategy id for
-  // platforms that expose one (currently TPC benchmarks on Databricks).
-  // Never invented; null/undefined when the bundle never recorded a logical
-  // tuning profile. Optional (like plans_published above) so fixtures and
-  // SQL paths predating this field default to undefined rather than needing
-  // updates everywhere a ResultRow is constructed.
   physical_rendering_id?: string | null;
   arch?: string | null;
   cpu_family?: string | null;
@@ -193,18 +150,12 @@ export interface ResultRow extends CostDeploymentFields {
 
 export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_eligible" | "visibility"> {
   visibility: string;
-  // NOT NULL in the snapshot schema; "unspecified" when the bundle declares
-  // no funding. Orthogonal to trust_label - a disclosure, not a rank signal.
   funding: string;
   os: string | null;
   arch: string | null;
   cpu_count: number | null;
   memory_gb: number | null;
   python: string | null;
-  // Required, not optional. An optional marker here is what previously let the
-  // projection omit both columns while `getDetailResult` still compiled: the
-  // reads were `undefined` forever and every receipt reported the CPU as not
-  // recorded. Required means the omission is a type error.
   cpu_model: string | null;
   cpu_family: string | null;
   cpu_identity_provenance: "measured" | "user_attested" | "inferred" | null;
@@ -213,23 +164,8 @@ export interface ResultDetailMetricsRow extends Omit<ResultRow, "is_ranking_elig
   statement_overhead_min_ms: number | null;
   statement_overhead_median_ms: number | null;
   link_status: string | null;
-  // ADR-2 §3: comma-joined, sorted physical tuning mechanisms (see
-  // physical_mechanisms in DetailResult). Tri-state, preserved from the
-  // pipeline: SQL NULL (-> null here) means no logical tuning profile was
-  // recorded at all (unknown); "" means a profile WAS recorded and it
-  // genuinely has zero mechanisms (recorded-empty, a real comparable
-  // value); a non-empty string is the comma-joined mechanism list.
   physical_mechanisms?: string | null;
-  // ADR-1 per-statement introspection receipt (see applied_receipt in
-  // DetailResult): an opaque JSON string carried verbatim from the pipeline.
-  // Detail-only - the list projection never selects it. Optional so fixtures
-  // and SQL paths predating this column default to undefined.
   applied_receipt?: string | null;
-  // Accepted plausibility-override badge data (see DetailResult): the covered
-  // rule ids as a canonical JSON array string plus the audit fields, carried
-  // verbatim from the pipeline. Detail-only - the list projection carries
-  // only override_rules. Optional so fixtures predating these columns default
-  // to undefined. Display-only; never a join/dedup key.
   override_rules?: string | null;
   override_evidence?: string | null;
   override_approver?: string | null;
@@ -255,16 +191,6 @@ export interface QueryExecutionRow {
   stream: number | null;
 }
 
-/**
- * One row of `bench.result_basis_availability`, the pipeline's precomputed
- * answer to "which measurement bases can this run serve?".
- *
- * `available_bases` is a comma-separated token list in the same vocabulary the
- * URL grammar uses (see measurementBasis.ts), so an availability check is a
- * token comparison rather than a translation. `varying_pass_queries` is a JSON
- * object mapping query_id to that query's usable pass count, present only when
- * a run's queries disagree; it is null for the common uniform case.
- */
 export interface ResultBasisAvailabilityRow {
   result_id: string;
   has_warmup: boolean;
@@ -295,12 +221,9 @@ export interface BenchmarkRankingRow extends CostDeploymentFields {
   platform: string;
   short_id: string;
   trust_label: string;
-  /** Funding disclosure; "unspecified" when the bundle declares none. */
   funding: string;
   platform_version?: string | null;
   validation_status?: string | null;
-  // Accepted plausibility-override rule ids (canonical JSON array string).
-  // Optional so fixtures predating this column default to undefined.
   override_rules?: string | null;
   tuning_mode: string | null;
   tuning_hash: string | null;
@@ -359,11 +282,8 @@ export interface PlatformIndexRowRow extends CostDeploymentFields {
   comparison_exclusion_reason: string | null;
   ranking_exclusion_reason: string | null;
   trust_label: string;
-  /** Funding disclosure; "unspecified" when the bundle declares none. */
   funding: string;
   validation_status?: string | null;
-  // Accepted plausibility-override rule ids (canonical JSON array string).
-  // Optional so fixtures predating this column default to undefined.
   override_rules?: string | null;
   tuning_mode: string | null;
   tuning_validation_status?: string | null;
@@ -383,7 +303,6 @@ export interface CohortMetadataRow {
   phase: string;
   cohort_label: string;
   cohort_href: string;
-  /** Count of ranking-eligible rows with non-null primary metrics. */
   platform_count: number;
   cohort_ranked_count: number;
   cohort_ranking_exclusion_reason: string | null;
@@ -414,10 +333,6 @@ export interface MetaLeaderboardRow {
   avg_rank: number | null;
   n_cohorts: number;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 const RESULTS_SNAPSHOT_PATH = "/results/data/results.duckdb";
 const snapshotQueryCache = new Map<string, Promise<unknown>>();
@@ -469,7 +384,6 @@ const RESULT_COLUMNS = [
   "tuning_policy_generation",
   "test_type",
   "validation_status",
-  // Accepted-override rule ids (list-safe: small JSON array, unlike applied_receipt).
   "override_rules",
   "cost_usd",
   "normalized_cost_usd",
@@ -532,11 +446,7 @@ const RESULT_DETAIL_METRICS_COLUMNS = [
   "requested_config_hash",
   "applied_ledger_hash",
   "tuning_validation_status",
-  // ADR-1 per-statement introspection receipt, detail-only (the list
-  // projection above deliberately omits this potentially large JSON blob).
   "applied_receipt",
-  // Accepted plausibility-override badge data, detail-only (the list
-  // projection carries only override_rules; the audit fields stay here).
   "override_rules",
   "override_evidence",
   "override_approver",
@@ -712,11 +622,6 @@ export async function listResults(
   where: FacetWhereClause = { sql: "", params: [] },
   options: { includeHardware?: boolean } = {},
 ): Promise<ResultRow[]> {
-  // Only pay for the result_detail_metrics join when a caller filters on
-  // hardware (arch/cpu_family/memory_gb appear in the facet WHERE clause) or explicitly
-  // asks to display those columns (includeHardware) -- unfiltered browse
-  // queries like Home and CorpusSectionIndex don't touch arch/cpu_family and
-  // shouldn't carry the join cost.
   const needsHardware = options.includeHardware === true || /\b(?:arch|cpu_family|memory_gb)\b/.test(where.sql);
   const columns = needsHardware ? RESULT_HARDWARE_COLUMNS : RESULT_COLUMNS;
   const source = needsHardware
@@ -726,13 +631,6 @@ export async function listResults(
   return memoizedSnapshotQueryRows<ResultRow>("list-results", { sql, params: where.params }, { cacheEmpty: false });
 }
 
-/**
- * Distinct benchmark slugs that have at least one public result bundle.
- *
- * Sourced from the same `bench.results` projection that powers the Home
- * corpus summary, so the benchmark detail switcher cannot drift from the
- * actual public corpus.
- */
 export async function listBenchmarksWithPublicResults(): Promise<string[]> {
   const rows = await memoizedSnapshotQueryRows<{ benchmark: string }>(
     "distinct-benchmarks-with-public-results",
@@ -807,17 +705,6 @@ export async function getQueryExecutions(
   );
 }
 
-/**
- * Bulk accessor for cohort basis resolution.
- *
- * Issues one query each against `bench.result_detail_metrics`,
- * `bench.query_display_timings`, and `bench.query_executions` for the entire
- * cohort result-id set, avoiding the N-query loop that previously blocked
- * interactive basis selection on the cohort index pages. Shares
- * `detailResultFromWideRow` with `getDetailResult` so exclusion reasons,
- * trust/visibility/compliance labels, and display timings can't silently
- * diverge between the single-id and bulk read paths.
- */
 export async function getCohortBasisDetails(
   resultIds: readonly string[],
 ): Promise<Map<string, DetailResult>> {
@@ -860,20 +747,6 @@ export async function getCohortBasisDetails(
   return byId;
 }
 
-/**
- * Read a run's precomputed basis availability.
- *
- * Surfaces use this rather than deriving availability from raw executions:
- * the pipeline has already made the determination, and pulling every
- * execution row for a 103-query run just to re-derive it would be a large
- * download to reach an answer the read model already holds. The pure
- * `basisAvailability` helper in measurementBasis.ts remains the authority for
- * per-query detail once those rows are in hand.
- *
- * Returns null for a result the table does not cover, which is the honest
- * answer for a snapshot built before the basis columns existed.
- */
-/** Fetch the small basis inventory in one query for a platform page. */
 export async function getResultsBasisAvailability(resultIds: readonly string[]): Promise<ResultBasisAvailabilityRow[]> {
   if (resultIds.length === 0) return [];
   return queryRows<ResultBasisAvailabilityRow>(
@@ -896,16 +769,6 @@ export async function getResultBasisAvailability(
   return rows[0] ?? null;
 }
 
-/**
- * Compose a DetailResult from a `result_detail_metrics` wide row plus its
- * query execution and display timing rows.
- *
- * Shared by the single-id (`getDetailResult`) and bulk (`getCohortBasisDetails`)
- * read paths so exclusion reasons, trust/visibility/compliance labels, and
- * timing data are always sourced from the same mapping -- a bulk accessor that
- * reimplements this shape independently is how those fields silently drift out
- * of sync with the per-row path.
- */
 function detailResultFromWideRow(
   wide: ResultDetailMetricsRow,
   executionRows: readonly QueryExecutionRow[],
@@ -1009,10 +872,6 @@ function detailResultFromWideRow(
     storage_format: wide.storage_format,
     storage_tier: wide.storage_tier,
     compliance_class: wide.compliance_class,
-    // Preserve the unknown (null/undefined -> undefined) vs recorded-empty
-    // ("" -> []) distinction from the DB row -- do not collapse both to [],
-    // or a legacy/unrecorded row would look identical to a genuine
-    // zero-mechanism row to ComparabilityReceipt's undefined-guard.
     physical_mechanisms:
       wide.physical_mechanisms === null || wide.physical_mechanisms === undefined
         ? undefined
@@ -1028,14 +887,6 @@ function detailResultFromWideRow(
   };
 }
 
-/**
- * Compose a DetailResult from the canonical DuckDB tables.
- *
- * Returns null when the result_id is not present in `result_detail_metrics`.
- * display_timings and queries are read verbatim from their canonical tables;
- * detailResultFromWideRow performs only shape pivoting (wide-row → nested
- * Environment object, row arrays with presentation-ready fields).
- */
 export async function getDetailResult(resultId: string): Promise<DetailResult | null> {
   const [wide, timingRows, executionRows] = await Promise.all([
     getResultDetailMetrics(resultId),
@@ -1082,13 +933,6 @@ export async function getBenchmarkRanking(
   );
 }
 
-/**
- * Fetch phase-duration rows and return them grouped by result_id.
- *
- * Each result_id maps to a `{ phase → duration_s }` record. result_ids with
- * no phase rows are omitted from the map - the caller is expected to treat
- * a missing entry as null `phase_durations`.
- */
 export async function getResultPhaseDurations(resultIds: string[]): Promise<Map<string, Record<string, number>>> {
   const result = new Map<string, Record<string, number>>();
   if (resultIds.length === 0) return result;
@@ -1108,15 +952,6 @@ export async function getResultPhaseDurations(resultIds: string[]): Promise<Map<
   return result;
 }
 
-/**
- * Compose a BenchmarkSummary from the canonical DuckDB tables.
- *
- * Returns null when the cohort has no rankings or no matrix cells - callers
- * should render an empty state. All numeric values (ranks, geomeans,
- * percentiles, per-query display_ms) are read verbatim from the pipeline-
- * pre-computed tables; this helper performs only shape pivoting (row-major
- * → `{platforms[], query_ids[]}`), not any reduction.
- */
 export async function getBenchmarkSummaryFromDuckDB(
   benchmark: string,
   scaleFactor: number,
@@ -1339,20 +1174,6 @@ export async function getMetaLeaderboard(): Promise<MetaLeaderboardRow[]> {
   );
 }
 
-/**
- * Load the full nested MetaLeaderboard shape used by the Home page.
- *
- * Combines `bench.meta_leaderboard` (per-platform avg_rank/n_cohorts) with
- * `bench.cohort_metadata` (every publishable variant row per cohort) and
- * pivots them into the TS render shape. Returns null when no cohorts exist
- * (fresh corpus with no ≥2-platform cohorts yet).
- *
- * The pipeline already enforces "best rank wins" when the same platform has
- * multiple variants in a cohort (see `_build_meta_leaderboard.platform_agg`),
- * but cohort_metadata keeps every variant. We replicate the best-rank pick
- * for the per-platform `ranks[cohort_key]` map so the Home summary row is
- * stable regardless of variant ordering on disk.
- */
 export async function getMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
   return memoizedSnapshotQuery("meta-leaderboard-data", loadMetaLeaderboardData);
 }
@@ -1364,10 +1185,6 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
         " FROM bench.meta_leaderboard" +
         " ORDER BY avg_rank NULLS LAST, platform_id",
     ),
-    // Filter to leaderboard-eligible cohorts (≥2 rankable platforms) to match the
-    // pipeline's `_build_meta_leaderboard` selection. Single-platform cohorts
-    // carry no ranks and would only bloat the pivot - excluding them here
-    // keeps the round-trip small on large corpora.
     queryRows<CohortMetadataRow>(
       `SELECT ${COHORT_METADATA_COLUMNS} FROM bench.cohort_metadata` +
         " WHERE platform_count >= 2" +
@@ -1378,7 +1195,6 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
   if (cohortRows.length === 0) return null;
 
   const cohortsByKey = new Map<string, MetaCohort>();
-  // (platform_id, cohort_key) → best (lowest-rank) variant row seen so far.
   const bestByPair = new Map<string, CohortMetadataRow>();
 
   for (const row of cohortRows) {
@@ -1459,24 +1275,12 @@ async function loadMetaLeaderboardData(): Promise<MetaLeaderboard | null> {
   });
 
   return {
-    // generated_at is not stored per-row in DuckDB; callers that need it can
-    // read the corpus generated_at from elsewhere. Home doesn't display it.
     generated_at: "",
     cohorts: [...cohortsByKey.values()],
     platforms,
   };
 }
 
-/**
- * Return the primary metric for a benchmark by reading the DuckDB-persisted
- * ranking rows. The canonical source is the pipeline-written
- * `bench.benchmark_rankings.primary_metric` column - there is deliberately no
- * TypeScript-side family mirror here so the registry cannot drift from
- * `RANKING_METRIC_BY_FAMILY` in `_project/scripts/explorer_pipeline/models.py`.
- *
- * Falls back to `"display_geomean_ms"` only when the benchmark has no rows
- * yet (empty corpus), matching Python's `_DEFAULT_RANKING`.
- */
 export async function getPrimaryMetricForBenchmark(benchmark: string): Promise<"power_score" | "display_geomean_ms"> {
   const rows = await queryRows<{ primary_metric: string }>(
     "SELECT DISTINCT primary_metric FROM bench.benchmark_rankings WHERE benchmark = ? LIMIT 1",
@@ -1500,12 +1304,6 @@ export async function getExistingResultIds(
   );
   const existing = new Set(batchRows.map((row) => row.result_id));
   onInitialExistingIds?.(existing);
-  // A non-empty batch is only a positive hint: one readable row can make
-  // `queryRows` return while another requested row group is still cold.
-  // Confirm omissions against a complete scan. An incomplete scan returns no
-  // rows and keeps the normal cold-read retries; a complete scan returns one
-  // nullable row so a genuinely absent ID does not consume that retry budget.
-  // Compare caps this fan-out at four candidate IDs.
   const confirmedRows = await Promise.all(
     resultIds.filter((resultId) => !existing.has(resultId)).map((resultId) =>
       queryRows<{ result_id: string | null }>(

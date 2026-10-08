@@ -1,32 +1,4 @@
 #!/usr/bin/env python3
-"""Use Case: CI/CD Regression Testing
-
-This example demonstrates how to integrate BenchBox into CI/CD pipelines
-for automated performance regression testing.
-
-Use this pattern when:
-- Running performance tests in GitHub Actions, GitLab CI, Jenkins, etc.
-- Detecting performance regressions before merging pull requests
-- Maintaining performance SLAs across releases
-- Automating performance validation
-
-Key requirements for CI/CD:
-- Fast execution (< 30 seconds preferred, < 5 minutes maximum)
-- Clear pass/fail criteria (exit codes)
-- Minimal console output (concise logs)
-- Stable results (low variance)
-- Baseline comparison
-
-Usage:
-    # Run in CI pipeline
-    python use_cases/ci_regression_test.py --baseline results/baseline.json
-
-    # Generate baseline (run once on main branch)
-    python use_cases/ci_regression_test.py --save-baseline results/baseline.json
-
-    # GitHub Actions example
-    # See ci_regression_test_github.yml for full workflow
-"""
 
 from __future__ import annotations
 
@@ -35,7 +7,6 @@ import json
 import sys
 from pathlib import Path
 
-# Add parent directory to path for imports
 _SCRIPT_DIR = Path(__file__).resolve().parent
 _EXAMPLES_DIR = _SCRIPT_DIR.parent
 sys.path.insert(0, str(_EXAMPLES_DIR))
@@ -45,14 +16,7 @@ from benchbox.tpch import TPCH
 
 
 class RegressionDetector:
-    """Detect performance regressions by comparing against baseline."""
-
     def __init__(self, threshold_percent: float = 15.0):
-        """Initialize regression detector.
-
-        Args:
-            threshold_percent: Percentage change threshold for regression (default 15%)
-        """
         self.threshold_percent = threshold_percent
 
     def detect_regression(
@@ -60,11 +24,6 @@ class RegressionDetector:
         baseline_results: dict,
         current_results: dict,
     ) -> tuple[bool, str]:
-        """Detect if current results show regression vs baseline.
-
-        Returns:
-            (has_regression, report_message)
-        """
         baseline_time = baseline_results.get("total_execution_time", 0)
         current_time = current_results.get("total_execution_time", 0)
 
@@ -95,37 +54,23 @@ class RegressionDetector:
 
 
 def run_ci_benchmark() -> dict:
-    """Run lightweight benchmark suitable for CI/CD.
-
-    Strategy for CI/CD benchmarks:
-    - Use smallest scale factor (0.01) for speed
-    - Run subset of queries (2-3 fast queries)
-    - Use in-memory database (no I/O overhead)
-    - Disable verbose output
-    - Cache data generation
-    """
     print("Running CI performance test...")
 
-    # Create benchmark with minimal scale
     benchmark = TPCH(
-        scale_factor=0.01,  # ~10MB, < 1 second to generate
+        scale_factor=0.01,
         output_dir=Path("./benchmark_runs/ci_test"),
-        force_regenerate=False,  # Reuse cached data
-        verbose=False,  # Minimal output
+        force_regenerate=False,
+        verbose=False,
     )
 
-    # Generate data (cached after first run)
     benchmark.generate_data()
 
-    # Create adapter
     adapter = DuckDBAdapter(database_path=":memory:")
 
-    # Run smoke test queries only (Q1 and Q6 are fastest)
-    # This provides quick validation without full benchmark overhead
     results = adapter.run_benchmark(
         benchmark,
         test_execution_type="power",
-        query_subset=["1", "6"],  # ~2-5 seconds total
+        query_subset=["1", "6"],
     )
 
     print(f"✓ Benchmark complete: {results.total_execution_time:.2f}s")
@@ -134,7 +79,6 @@ def run_ci_benchmark() -> dict:
 
 
 def save_baseline(results: dict, baseline_path: Path) -> None:
-    """Save results as baseline for future comparisons."""
     baseline_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(baseline_path, "w", encoding="utf-8") as f:
@@ -144,7 +88,6 @@ def save_baseline(results: dict, baseline_path: Path) -> None:
 
 
 def load_baseline(baseline_path: Path) -> dict:
-    """Load baseline results from file."""
     if not baseline_path.exists():
         raise FileNotFoundError(f"Baseline file not found: {baseline_path}")
 
@@ -153,12 +96,6 @@ def load_baseline(baseline_path: Path) -> dict:
 
 
 def main() -> int:
-    """Run CI regression test.
-
-    Returns:
-        0 if no regression detected
-        1 if regression detected
-    """
     parser = argparse.ArgumentParser(description="CI/CD performance regression test")
     parser.add_argument(
         "--baseline",
@@ -179,7 +116,6 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    # Mode 1: Save baseline (run on main/master branch)
     if args.save_baseline:
         print("=" * 70)
         print("GENERATING BASELINE")
@@ -193,7 +129,6 @@ def main() -> int:
         print(f"  python {Path(__file__).name} --baseline {args.save_baseline}")
         return 0
 
-    # Mode 2: Regression test (run on pull requests)
     if not args.baseline:
         print("Error: Must specify --baseline or --save-baseline")
         print()
@@ -207,7 +142,6 @@ def main() -> int:
     print("=" * 70)
     print()
 
-    # Load baseline
     try:
         baseline_results = load_baseline(args.baseline)
         print(f"✓ Loaded baseline from: {args.baseline}")
@@ -220,11 +154,9 @@ def main() -> int:
 
     print()
 
-    # Run current benchmark
     current_results = run_ci_benchmark()
     print()
 
-    # Detect regression
     detector = RegressionDetector(threshold_percent=args.threshold)
     has_regression, report = detector.detect_regression(baseline_results, current_results)
 

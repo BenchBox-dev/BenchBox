@@ -58,14 +58,6 @@ function formatCostScope(scope: string | null | undefined): string | null {
   return scope.split("_").join(" ");
 }
 
-/**
- * Convert a `billing_unit` / `pricing_region` raw value into user-facing copy.
- * The corpus stores sentinel values like `not_applicable` for local-no-cloud
- * runs; rendering those verbatim in the Run Receipt was finding #12 of the
- * 2026-05-09 post-completion review. Returns `null` when the field carries a
- * sentinel so callers can drop the fragment entirely; otherwise returns the
- * humanized form (trimmed, underscores replaced with spaces).
- */
 const BILLING_FRAGMENT_SENTINELS = new Set([
   "not_applicable",
   "not applicable",

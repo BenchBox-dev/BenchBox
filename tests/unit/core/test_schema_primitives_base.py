@@ -1,13 +1,3 @@
-"""Unit tests for BaseSchemaTable.
-
-Pins the contract:
-  * get_primary_key returns names of pk=True columns;
-  * get_foreign_keys returns {col: (ref_table, ref_col)} for FK columns;
-  * get_create_table_sql generates correct DDL including NOT NULL, PK, FK;
-  * enable_primary_keys=False suppresses PRIMARY KEY clause;
-  * enable_foreign_keys=False suppresses FOREIGN KEY clauses.
-"""
-
 from __future__ import annotations
 
 from typing import NamedTuple
@@ -23,8 +13,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.fast]
 
 
 class _Col(NamedTuple):
-    """Minimal column duck-type for testing."""
-
     name: str
     sql_type: str
     nullable: bool = True
@@ -163,11 +151,6 @@ class TestGetCreateTableSQL:
 
 
 class TestGetFkOrderedTableNamesFromColumnSpecs:
-    """Covers the dict/YAML-schema adapter (SSB, CoffeeShop schema_specs.yaml
-    shape: dotted "table.column" foreign_key strings) added for
-    tuning-fk-load-ordering-fix-20260716's SSB/CoffeeShop extension.
-    """
-
     def test_orders_star_schema_fact_table_last(self) -> None:
         tables = {
             "date": {"columns": [{"name": "d_datekey"}]},

@@ -1,5 +1,3 @@
-"""CLI application factory and command registration."""
-
 import json
 
 import click
@@ -32,7 +30,6 @@ For complete documentation: https://benchbox.dev/docs/
 
 
 def version_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
-    """Custom version callback with enhanced version information."""
     if not value or ctx.resilient_parsing:
         return
 
@@ -45,14 +42,12 @@ def version_callback(ctx: click.Context, param: click.Parameter, value: bool) ->
 
         click.echo(format_version_report())
     except ImportError:
-        # Fallback if version utilities not available
         click.echo(f"BenchBox Version: {benchbox.__version__}")
 
     ctx.exit()
 
 
 def version_json_callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
-    """Emit machine-readable version information."""
     if not value or ctx.resilient_parsing:
         return
 
@@ -86,7 +81,6 @@ def version_json_callback(ctx: click.Context, param: click.Parameter, value: boo
 )
 @click.pass_context
 def cli(ctx: click.Context) -> None:
-    """BenchBox CLI quick reference and command dispatcher."""
     ctx.ensure_object(dict)
     import importlib
 
@@ -94,8 +88,6 @@ def cli(ctx: click.Context) -> None:
     config_manager = _cli_main.get_config_manager()
     ctx.obj["config"] = config_manager
 
-    # Push the CLI's configuration down to the utils-level seam. utils must not
-    # reach up for it; see benchbox.utils.config_interface.
     from benchbox.cli.config import install_cli_config_provider
 
     install_cli_config_provider(config_manager)
@@ -105,7 +97,6 @@ register_commands(cli)
 
 
 def main() -> None:
-    """Entry point for the CLI."""
     cli()
 
 

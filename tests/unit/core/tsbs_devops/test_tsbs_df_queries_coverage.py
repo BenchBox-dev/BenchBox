@@ -1,5 +1,3 @@
-"""Coverage-focused execution tests for TSBS DevOps DataFrame queries."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -19,7 +17,7 @@ pytestmark = [
 class _Expr:
     value: object
 
-    def __eq__(self, other):  # noqa: PLR0124
+    def __eq__(self, other):
         return _Expr(("eq", self.value, getattr(other, "value", other)))
 
     def __gt__(self, other):

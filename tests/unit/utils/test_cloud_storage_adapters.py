@@ -1,9 +1,6 @@
-"""Tests for cloud storage adapters and mixins.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import os
 from pathlib import Path
@@ -33,34 +30,27 @@ pytestmark = [
 
 
 class TestCloudPathAdapter:
-    """Test CloudPathAdapter functionality."""
-
     def test_cloud_path_adapter_local(self):
-        """Test CloudPathAdapter with local paths."""
         adapter = CloudPathAdapter("/tmp/test")
         assert not adapter.is_cloud
         assert adapter.path_info["is_cloud"] is False
         assert adapter.path_info["provider"] == "local"
 
     def test_cloud_path_adapter_cloud_without_lib(self):
-        """Test CloudPathAdapter with cloud paths but no cloudpathlib."""
         with patch("benchbox.utils.cloud_storage.CloudPath", None), pytest.raises(ImportError):
             CloudPathAdapter("s3://bucket/path")
 
     def test_cloud_path_adapter_str_representation(self):
-        """Test string representation of CloudPathAdapter."""
         adapter = CloudPathAdapter("/tmp/test")
         assert str(Path("/tmp/test")) in str(adapter)
 
     def test_cloud_path_adapter_path_joining(self):
-        """Test path joining with CloudPathAdapter."""
         adapter = CloudPathAdapter("/tmp/test")
         new_adapter = adapter / "subpath"
         assert isinstance(new_adapter, CloudPathAdapter)
         assert "subpath" in str(new_adapter)
 
     def test_cloud_path_adapter_handles_exists_errors(self):
-        """Exists checks should degrade to False if the handler raises."""
         adapter = CloudPathAdapter("/tmp/path")
         adapter.path_handler = Mock()
         adapter.path_handler.exists.side_effect = OSError("boom")
@@ -68,7 +58,6 @@ class TestCloudPathAdapter:
         assert adapter.exists() is False
 
     def test_cloud_path_adapter_cloud_join_mkdir_name_and_parent(self):
-        """Cloud adapters should use cloud metadata and cloud-aware path joins."""
         path_handler = MagicMock()
         path_handler.__truediv__.return_value = "s3://bucket/base/child"
         path_handler.name = "base"
@@ -102,10 +91,7 @@ class TestCloudPathAdapter:
 
 
 class TestCloudStagingPath:
-    """Test CloudStagingPath for persistent local caching with cloud upload."""
-
     def test_initialization_with_str_paths(self):
-        """Test CloudStagingPath initialization with string paths."""
         local_path = "/tmp/data"
         cloud_target = "gs://my-bucket/data"
 
@@ -115,7 +101,6 @@ class TestCloudStagingPath:
         assert staging_path._cloud_target == cloud_target
 
     def test_initialization_with_path_objects(self):
-        """Test CloudStagingPath initialization with Path objects."""
         local_path = Path("/tmp/data")
         cloud_target = "s3://my-bucket/data"
 
@@ -125,22 +110,18 @@ class TestCloudStagingPath:
         assert staging_path._cloud_target == cloud_target
 
     def test_fspath_protocol(self):
-        """Test __fspath__() returns local path string for os.PathLike protocol."""
         local_path = "/tmp/benchmark_data"
         staging_path = CloudStagingPath(local_path, "gs://bucket/path")
 
-        # os.fspath() should work with CloudStagingPath
         assert os.fspath(staging_path) == str(Path(local_path))
 
     def test_str_returns_local_path(self):
-        """Test str() returns local path."""
         local_path = "/tmp/data"
         staging_path = CloudStagingPath(local_path, "gs://bucket/data")
 
         assert str(staging_path) == str(Path(local_path))
 
     def test_repr_shows_both_paths(self):
-        """Test repr() shows both local and cloud paths."""
         local_path = "/tmp/data"
         cloud_target = "gs://bucket/data"
         staging_path = CloudStagingPath(local_path, cloud_target)
@@ -151,14 +132,12 @@ class TestCloudStagingPath:
         assert "gs://bucket/data" in repr_str
 
     def test_cloud_target_property(self):
-        """Test cloud_target property returns the cloud URI."""
         cloud_target = "s3://my-bucket/benchmark-data"
         staging_path = CloudStagingPath("/local/path", cloud_target)
 
         assert staging_path.cloud_target == cloud_target
 
     def test_path_joining_with_truediv(self):
-        """Test path joining with / operator."""
         staging_path = CloudStagingPath("/tmp/data", "gs://bucket/data")
 
         joined = staging_path / "subdir" / "file.txt"
@@ -167,18 +146,16 @@ class TestCloudStagingPath:
         assert joined == Path("/tmp/data/subdir/file.txt")
 
     def test_equality_comparison(self):
-        """Test equality comparison between CloudStagingPath instances."""
         path1 = CloudStagingPath("/tmp/data", "gs://bucket/data")
         path2 = CloudStagingPath("/tmp/data", "gs://bucket/data")
         path3 = CloudStagingPath("/tmp/other", "gs://bucket/data")
         path4 = CloudStagingPath("/tmp/data", "gs://other-bucket/data")
 
         assert path1 == path2
-        assert path1 != path3  # Different local path
-        assert path1 != path4  # Different cloud target
+        assert path1 != path3
+        assert path1 != path4
 
     def test_equality_with_path_objects(self):
-        """Test equality comparison with Path objects."""
         staging_path = CloudStagingPath("/tmp/data", "gs://bucket/data")
 
         assert staging_path == Path("/tmp/data")
@@ -186,47 +163,36 @@ class TestCloudStagingPath:
         assert staging_path != Path("/tmp/other")
 
     def test_hash_based_on_local_path(self):
-        """Test hash() works for use in sets/dicts."""
         path1 = CloudStagingPath("/tmp/data", "gs://bucket/data")
-        path2 = CloudStagingPath("/tmp/data", "gs://bucket/data")  # Same everything
-        path3 = CloudStagingPath("/tmp/data", "gs://other-bucket/data")  # Different cloud target
+        path2 = CloudStagingPath("/tmp/data", "gs://bucket/data")
+        path3 = CloudStagingPath("/tmp/data", "gs://other-bucket/data")
 
-        # Same local path = same hash (for dict/set usage)
         assert hash(path1) == hash(path2) == hash(path3)
 
-        # Can be used in sets - but only truly equal instances deduplicate
         path_set = {path1, path2}
-        assert len(path_set) == 1  # path1 and path2 are equal, so deduplicated
+        assert len(path_set) == 1
 
-        # Different cloud targets are NOT equal, so no deduplication
         path_set2 = {path1, path3}
-        assert len(path_set2) == 2  # path1 and path3 have different cloud_targets
+        assert len(path_set2) == 2
 
     def test_path_operations_delegate_to_local(self, tmp_path):
-        """Test Path operations work through delegation."""
         staging_path = CloudStagingPath(str(tmp_path), "gs://bucket/data")
 
-        # mkdir
         staging_path.mkdir(parents=True, exist_ok=True)
         assert tmp_path.exists()
 
-        # is_dir
         assert staging_path.is_dir()
 
-        # Create a test file
         test_file = tmp_path / "test.txt"
         test_file.write_text("content")
 
-        # iterdir
         files = list(staging_path.iterdir())
         assert len(files) == 1
 
-        # glob
         matches = list(staging_path.glob("*.txt"))
         assert len(matches) == 1
 
     def test_path_properties(self, tmp_path):
-        """Test Path properties work correctly."""
         local_path = tmp_path / "subdir" / "file.txt"
         staging_path = CloudStagingPath(str(local_path), "s3://bucket/data")
 
@@ -235,20 +201,17 @@ class TestCloudStagingPath:
         assert staging_path.parts == local_path.parts
 
     def test_as_posix_returns_local_posix(self):
-        """Test as_posix() returns local path in POSIX format."""
         staging_path = CloudStagingPath("/tmp/data/file.txt", "gs://bucket/data")
 
         assert staging_path.as_posix() == "/tmp/data/file.txt"
 
     def test_resolve_returns_absolute_local_path(self):
-        """Test resolve() returns absolute local path."""
         staging_path = CloudStagingPath("relative/path", "s3://bucket/data")
 
         resolved = staging_path.resolve()
         assert resolved.is_absolute()
 
     def test_with_different_cloud_providers(self):
-        """Test CloudStagingPath works with different cloud providers."""
         gcs_path = CloudStagingPath("/tmp/data", "gs://gcs-bucket/path")
         s3_path = CloudStagingPath("/tmp/data", "s3://s3-bucket/path")
         azure_path = CloudStagingPath("/tmp/data", "abfss://container@account.dfs.core.windows.net/path")
@@ -257,19 +220,15 @@ class TestCloudStagingPath:
         assert s3_path.cloud_target.startswith("s3://")
         assert azure_path.cloud_target.startswith("abfss://")
 
-        # All expose the same local path
         assert os.fspath(gcs_path) == os.fspath(s3_path) == os.fspath(azure_path)
 
     def test_inequality_with_unrelated_objects(self):
-        """CloudStagingPath equality should reject unrelated object types."""
         staging_path = CloudStagingPath("/tmp/data", "gs://bucket/data")
 
         assert staging_path != object()
 
 
 class TestDatabricksVolumeAdapter:
-    """Test Databricks volume remote-file adapter behavior."""
-
     def _sdk_modules(self, workspace_client_cls):
         databricks_module = ModuleType("databricks")
         sdk_module = ModuleType("databricks.sdk")
@@ -278,7 +237,6 @@ class TestDatabricksVolumeAdapter:
         return {"databricks": databricks_module, "databricks.sdk": sdk_module}
 
     def test_uses_provided_workspace_client(self):
-        """Providing a workspace client should bypass client construction."""
         workspace_client_cls = Mock()
         workspace_client = Mock()
 
@@ -289,7 +247,6 @@ class TestDatabricksVolumeAdapter:
         workspace_client_cls.assert_not_called()
 
     def test_constructs_workspace_client_with_host_and_token(self):
-        """Host and token should be passed through to the SDK client."""
         workspace_client = Mock()
         workspace_client_cls = Mock(return_value=workspace_client)
 
@@ -300,7 +257,6 @@ class TestDatabricksVolumeAdapter:
         workspace_client_cls.assert_called_once_with(host="https://workspace.cloud.databricks.com", token="tok")
 
     def test_file_exists_returns_true_when_sdk_finds_file(self):
-        """File existence checks should translate dbfs paths to workspace paths."""
         workspace_client = Mock()
         workspace_client.files.get.return_value = {"path": "/Volumes/catalog/schema/volume/file.txt"}
         workspace_client_cls = Mock()
@@ -312,7 +268,6 @@ class TestDatabricksVolumeAdapter:
         workspace_client.files.get.assert_called_once_with("/Volumes/catalog/schema/volume/file.txt")
 
     def test_file_exists_returns_false_on_sdk_errors(self):
-        """File existence failures should be treated as a missing remote file."""
         workspace_client = Mock()
         workspace_client.files.get.side_effect = RuntimeError("missing")
         workspace_client_cls = Mock()
@@ -323,7 +278,6 @@ class TestDatabricksVolumeAdapter:
         assert adapter.file_exists("dbfs:/Volumes/catalog/schema/volume/file.txt") is False
 
     def test_read_file_supports_bytes_and_stream_results(self):
-        """Reads should work with both byte payloads and stream-like payloads."""
         workspace_client = Mock()
         workspace_client.files.download.side_effect = [b"raw", MagicMock(read=Mock(return_value=b"stream"))]
         workspace_client_cls = Mock()
@@ -335,7 +289,6 @@ class TestDatabricksVolumeAdapter:
         assert adapter.read_file("dbfs:/Volumes/catalog/schema/volume/stream.txt") == b"stream"
 
     def test_read_file_wraps_sdk_errors(self):
-        """Read failures should surface the remote path in the error message."""
         workspace_client = Mock()
         workspace_client.files.download.side_effect = RuntimeError("boom")
         workspace_client_cls = Mock()
@@ -347,7 +300,6 @@ class TestDatabricksVolumeAdapter:
             adapter.read_file("dbfs:/Volumes/catalog/schema/volume/file.txt")
 
     def test_write_file_uploads_bytes_and_wraps_errors(self):
-        """Writes should upload bytes content and wrap SDK failures."""
         workspace_client = Mock()
         workspace_client_cls = Mock()
 
@@ -366,7 +318,6 @@ class TestDatabricksVolumeAdapter:
             adapter.write_file("dbfs:/Volumes/catalog/schema/volume/file.txt", b"payload")
 
     def test_list_files_filters_names_and_returns_empty_on_errors(self):
-        """Listing should support mixed SDK item types and swallow provider failures."""
         workspace_client = Mock()
         workspace_client.files.list.return_value = [
             SimpleNamespace(path="/Volumes/catalog/schema/volume/part-000.tbl"),
@@ -389,8 +340,6 @@ class TestDatabricksVolumeAdapter:
 
 
 class TestCloudStorageEdgeCases:
-    """Additional edge cases for cloud storage helpers."""
-
     def _sdk_modules(self, workspace_client_cls):
         databricks_module = ModuleType("databricks")
         sdk_module = ModuleType("databricks.sdk")
@@ -399,7 +348,6 @@ class TestCloudStorageEdgeCases:
         return {"databricks": databricks_module, "databricks.sdk": sdk_module}
 
     def test_create_path_handler_passthroughs_existing_specialized_paths(self, tmp_path):
-        """Already-wrapped path handlers should be returned as-is."""
         databricks_path = DatabricksPath(tmp_path, "dbfs:/Volumes/catalog/schema/volume")
         assert create_path_handler(databricks_path) is databricks_path
 
@@ -411,7 +359,6 @@ class TestCloudStorageEdgeCases:
             assert create_path_handler(fake_cloud_path) is fake_cloud_path
 
     def test_get_remote_fs_adapter_returns_databricks_adapter(self):
-        """dbfs paths should build a Databricks volume adapter via WorkspaceClient."""
         workspace_client = Mock()
         workspace_client_cls = Mock(return_value=workspace_client)
 
@@ -426,7 +373,6 @@ class TestCloudStorageEdgeCases:
         adapter_cls.assert_called_once_with(workspace_client)
 
     def test_get_remote_fs_adapter_wraps_import_errors(self):
-        """Adapter import failures should surface as installation guidance."""
         workspace_client_cls = Mock(return_value=Mock())
 
         with (
@@ -437,7 +383,6 @@ class TestCloudStorageEdgeCases:
             get_remote_fs_adapter("dbfs:/Volumes/catalog/schema/volume")
 
     def test_get_remote_fs_adapter_wraps_runtime_errors(self):
-        """Unexpected adapter initialization failures should become runtime guidance."""
         workspace_client_cls = Mock(return_value=Mock())
 
         with (
@@ -448,13 +393,11 @@ class TestCloudStorageEdgeCases:
             get_remote_fs_adapter("dbfs:/Volumes/catalog/schema/volume")
 
     def test_get_remote_fs_adapter_rejects_unsupported_paths(self):
-        """Only dbfs remote adapters are supported today."""
         with pytest.raises(ValueError, match="No RemoteFileSystemAdapter available"):
             get_remote_fs_adapter("s3://bucket/path")
 
     @patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": "/tmp/key.json"}, clear=True)
     def test_validate_cloud_credentials_handles_missing_credentials_error(self):
-        """Provider auth errors should use the credential-specific message path."""
 
         class FakeMissingCredentialsError(Exception):
             pass
@@ -471,7 +414,6 @@ class TestCloudStorageEdgeCases:
 
     @patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": "/tmp/key.json"}, clear=True)
     def test_validate_cloud_credentials_handles_generic_cloudpath_errors(self):
-        """Unexpected cloudpathlib failures should return a generic validation error."""
         with patch("benchbox.utils.cloud_storage.CloudPath", side_effect=RuntimeError("network down")):
             result = validate_cloud_credentials("gs://bucket/path")
 
@@ -480,7 +422,6 @@ class TestCloudStorageEdgeCases:
         assert "Cloud path validation failed: network down" in result["error"]
 
     def test_ensure_cloud_directory_uses_exists_only_handlers(self):
-        """Handlers without mkdir should fall back to an exists-only check."""
         handler = Mock()
         del handler.mkdir
         handler.exists.return_value = False
@@ -493,7 +434,6 @@ class TestCloudStorageEdgeCases:
         info_log.assert_called_once()
 
     def test_ensure_cloud_directory_reraises_creation_errors(self):
-        """Directory creation errors should be logged and re-raised."""
         handler = Mock()
         handler.mkdir.side_effect = OSError("permission denied")
 
@@ -507,21 +447,17 @@ class TestCloudStorageEdgeCases:
 
 
 class DummyCloudGenerator(CloudStorageGeneratorMixin):
-    """Minimal concrete helper for CloudStorageGeneratorMixin tests."""
+    pass
 
 
 class TestCloudStorageGeneratorMixin:
-    """Test mixin helpers shared by data generators."""
-
     def test_is_cloud_output_distinguishes_uri_strings(self):
-        """Cloud output detection should treat URI strings as cloud locations."""
         generator = DummyCloudGenerator()
 
         assert generator._is_cloud_output("s3://bucket/path") is True
         assert generator._is_cloud_output("/tmp/local") is False
 
     def test_handle_cloud_or_local_generation_delegates_to_generator(self):
-        """Generation should call the provided function with the original path object."""
         generator = DummyCloudGenerator()
         output_dir = CloudStagingPath("/tmp/cache", "gs://bucket/path")
         generate = Mock(return_value={"orders": "/tmp/cache/orders.tbl"})

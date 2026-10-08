@@ -1,6 +1,3 @@
-# cuDF DataFrame Tuning - Default Configuration
-# GPU-accelerated processing with host memory fallback
-
 gpu:
   enabled: true
   device_id: 0

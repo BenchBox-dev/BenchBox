@@ -1,9 +1,6 @@
-"""Unit tests for MotherDuck platform adapter.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-Copyright 2026 Joe Harris / BenchBox Project
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 import os
@@ -21,33 +18,26 @@ pytestmark = [
 
 
 class TestMotherDuckRegistration:
-    """Test MotherDuck platform is properly registered."""
-
     def test_platform_registered_in_registry(self):
-        """MotherDuck should be registered in PlatformRegistry."""
         caps = PlatformRegistry.get_platform_capabilities("motherduck")
         assert caps is not None
         assert caps.supports_sql is True
 
     def test_inherits_from_duckdb(self):
-        """MotherDuck should inherit from DuckDB."""
         caps = PlatformRegistry.get_platform_capabilities("motherduck")
         assert caps.inherits_from == "duckdb"
         assert caps.platform_family == "duckdb"
 
     def test_dialect_resolves_to_duckdb(self):
-        """Query translation should use DuckDB dialect."""
         dialect = resolve_dialect_for_query_translation("motherduck")
         assert dialect == "duckdb"
 
     def test_deployment_mode_is_managed(self):
-        """MotherDuck should have managed deployment mode."""
         caps = PlatformRegistry.get_platform_capabilities("motherduck")
         assert "managed" in caps.deployment_modes
         assert caps.default_deployment == "managed"
 
     def test_requires_credentials(self):
-        """MotherDuck managed mode should require credentials."""
         caps = PlatformRegistry.get_platform_capabilities("motherduck")
         managed_cap = caps.deployment_modes["managed"]
         assert managed_cap.requires_credentials is True
@@ -56,15 +46,10 @@ class TestMotherDuckRegistration:
 
 
 class TestMotherDuckAdapter:
-    """Test MotherDuck adapter initialization and configuration."""
-
     def test_requires_token(self):
-        """Adapter should raise error when no token provided."""
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
-        # Clear environment variable if set
         with patch.dict(os.environ, {}, clear=True):
-            # Remove MOTHERDUCK_TOKEN if present
             os.environ.pop("MOTHERDUCK_TOKEN", None)
 
             with pytest.raises(ValueError) as exc_info:
@@ -74,19 +59,15 @@ class TestMotherDuckAdapter:
             assert "MOTHERDUCK_TOKEN" in str(exc_info.value)
 
     def test_token_from_config(self):
-        """Adapter should accept token from config."""
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
         with patch.dict(os.environ, {}, clear=True):
             os.environ.pop("MOTHERDUCK_TOKEN", None)
 
-            # Token provided via config - should not raise
-            # Note: We can't actually test connection without a real token
             adapter = MotherDuckAdapter(token="test-token-12345")
             assert adapter.token == "test-token-12345"
 
     def test_token_from_environment(self):
-        """Adapter should accept token from environment variable."""
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
         with patch.dict(os.environ, {"MOTHERDUCK_TOKEN": "env-token-67890"}):
@@ -94,44 +75,37 @@ class TestMotherDuckAdapter:
             assert adapter.token == "env-token-67890"
 
     def test_default_database(self):
-        """Default database should be 'benchbox'."""
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
         adapter = MotherDuckAdapter(token="test-token")
         assert adapter.database == "benchbox"
 
     def test_custom_database(self):
-        """Custom database should be configurable."""
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
         adapter = MotherDuckAdapter(token="test-token", database="my_custom_db")
         assert adapter.database == "my_custom_db"
 
     def test_platform_name(self):
-        """Platform name should be 'MotherDuck'."""
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
         adapter = MotherDuckAdapter(token="test-token")
         assert adapter.platform_name == "MotherDuck"
 
     def test_dialect_is_duckdb(self):
-        """Dialect should be 'duckdb'."""
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
         adapter = MotherDuckAdapter(token="test-token")
         assert adapter._dialect == "duckdb"
 
     def test_get_target_dialect(self):
-        """get_target_dialect should return duckdb via inheritance."""
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
         adapter = MotherDuckAdapter(token="test-token")
-        # get_target_dialect uses config inheritance
         dialect = adapter.get_target_dialect()
         assert dialect == "duckdb"
 
     def test_get_platform_metadata(self):
-        """Platform metadata should include MotherDuck-specific fields."""
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
         adapter = MotherDuckAdapter(token="test-token", database="test_db")
@@ -144,7 +118,6 @@ class TestMotherDuckAdapter:
         assert metadata["inherits_from"] == "duckdb"
 
     def test_create_external_tables_uses_duckdb_view_registration(self, tmp_path):
-        """MotherDuck should reuse DuckDB external-view registration logic."""
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
         adapter = MotherDuckAdapter(token="test-token")
@@ -178,10 +151,7 @@ class TestMotherDuckAdapter:
 
 
 class TestMotherDuckAdapterFactory:
-    """Test adapter factory integration with MotherDuck."""
-
     def test_factory_can_resolve_motherduck(self):
-        """Adapter factory should resolve motherduck platform."""
         from benchbox.platforms.adapter_factory import _normalize_platform_name, get_available_deployments
 
         name, df_mode, deployment = _normalize_platform_name("motherduck")
@@ -193,7 +163,6 @@ class TestMotherDuckAdapterFactory:
         assert "managed" in deployments
 
     def test_case_insensitive_name(self):
-        """Platform name should be case-insensitive."""
         from benchbox.platforms.adapter_factory import _normalize_platform_name
 
         name1, _, _ = _normalize_platform_name("MotherDuck")
@@ -204,8 +173,6 @@ class TestMotherDuckAdapterFactory:
 
 
 class TestMotherDuckFromConfig:
-    """Test from_config classmethod."""
-
     def test_from_config_sets_database(self):
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
@@ -231,17 +198,9 @@ class TestMotherDuckFromConfig:
 
 
 class TestMotherDuckConfigBuilder:
-    """w19 regression: the credential wizard saves a `database` field, but the
-    default registry builder did not call CredentialManager, so runtime always
-    fell back to the adapter's internal default (``benchbox``). Routing
-    MotherDuck through ``_build_motherduck_config`` (registered in
-    benchbox/platforms/__init__.py) pulls the wizard-saved database into
-    runtime config so adapters land on the configured database."""
-
     def test_config_builder_pulls_database_from_credential_manager(self, monkeypatch):
         from benchbox.platforms.motherduck import _build_motherduck_config
 
-        # Patch CredentialManager to return a wizard-saved database value.
         class _FakeCredentialManager:
             def get_platform_credentials(self, key: str):
                 assert key == "motherduck"
@@ -313,8 +272,6 @@ class TestMotherDuckConfigBuilder:
 
 
 class TestMotherDuckCreateConnection:
-    """Test create_connection with a mocked duckdb.connect."""
-
     def test_create_connection_uses_md_scheme(self):
         from unittest.mock import MagicMock, patch
 
@@ -336,7 +293,6 @@ class TestMotherDuckCreateConnection:
         assert adapter.connection is mock_conn
 
     def test_create_connection_cached(self):
-        """Second call should return the same connection without reconnecting."""
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.motherduck import MotherDuckAdapter
@@ -372,14 +328,6 @@ class TestMotherDuckCreateConnection:
         assert "motherduck_token=****" in caplog.text
 
     def test_create_connection_does_not_leak_token_through_chained_cause(self):
-        """Redacting the message is not enough on its own.
-
-        ``raise ... from e`` keeps the original driver exception as __cause__,
-        and Python prints its text in the "direct cause" section of any
-        traceback - so a token scrubbed from the message still reaches logs and
-        CI output through the chain. The raised error must expose the token
-        neither in its message nor anywhere in its cause/context chain.
-        """
         import traceback
 
         from benchbox.platforms.motherduck import MotherDuckAdapter
@@ -396,13 +344,8 @@ class TestMotherDuckCreateConnection:
             adapter.create_connection()
 
         assert exc_info.value.__cause__ is None
-        # __suppress_context__ is what stops the implicit "During handling of
-        # the above exception" section from printing the raw driver error;
-        # `from None` sets it, a plain `raise ConnectionError(...)` would not.
         assert exc_info.value.__suppress_context__ is True
 
-        # End-to-end: the rendered traceback - the form that actually reaches a
-        # log file or CI console - carries no token material at all.
         rendered = "".join(
             traceback.format_exception(type(exc_info.value), exc_info.value, exc_info.value.__traceback__)
         )
@@ -411,8 +354,6 @@ class TestMotherDuckCreateConnection:
 
 
 class TestMotherDuckAddCliArguments:
-    """Test add_cli_arguments registers expected flags."""
-
     def test_motherduck_database_arg_added(self):
         import argparse
 
@@ -435,8 +376,6 @@ class TestMotherDuckAddCliArguments:
 
 
 class TestMotherDuckGetPlatformInfo:
-    """Test get_platform_info returns expected keys."""
-
     def test_get_platform_info_has_name_and_version(self):
         from benchbox.platforms.motherduck import MotherDuckAdapter
 
@@ -445,7 +384,6 @@ class TestMotherDuckGetPlatformInfo:
         assert info["platform_name"] == "MotherDuck"
 
     def test_get_platform_info_with_active_connection(self):
-        """Platform version is probed when a connection is available."""
         from unittest.mock import MagicMock
 
         from benchbox.platforms.motherduck import MotherDuckAdapter
@@ -460,7 +398,6 @@ class TestMotherDuckGetPlatformInfo:
         assert info["engine_version"] == "v24.1.0"
 
     def test_get_platform_info_version_probe_exception_silenced(self):
-        """Version probe failure does not raise."""
         from unittest.mock import MagicMock
 
         from benchbox.platforms.motherduck import MotherDuckAdapter
@@ -474,8 +411,6 @@ class TestMotherDuckGetPlatformInfo:
 
 
 class TestMotherDuckExecuteQuery:
-    """Test execute_query method."""
-
     def test_execute_query_success(self):
         from unittest.mock import MagicMock
 
@@ -493,7 +428,6 @@ class TestMotherDuckExecuteQuery:
         assert result["execution_time_seconds"] >= 0.0
 
     def test_execute_query_creates_connection_when_none(self):
-        """execute_query falls back to self.connection then create_connection when both are None."""
         from unittest.mock import MagicMock, patch
 
         from benchbox.platforms.motherduck import MotherDuckAdapter
@@ -510,7 +444,6 @@ class TestMotherDuckExecuteQuery:
         assert result["rows_returned"] == 0
 
     def test_execute_query_returns_failed_dict_on_exception(self):
-        """execute_query returns a FAILED dict instead of propagating the exception."""
         from unittest.mock import MagicMock
 
         from benchbox.platforms.motherduck import MotherDuckAdapter
@@ -572,7 +505,6 @@ class TestMotherDuckConfigureForBenchmark:
         mock_conn = MagicMock()
         mock_conn.execute.side_effect = RuntimeError("read-only")
 
-        # Should not raise
         adapter.configure_for_benchmark(mock_conn, "olap")
 
 
@@ -590,7 +522,6 @@ class TestMotherDuckCloseConnection:
         adapter.close_connection(connection=external_conn)
 
         external_conn.close.assert_called_once()
-        # self.connection should NOT be cleared (we passed an external conn)
         assert adapter.connection is internal_conn
 
     def test_close_self_connection_clears_state(self):
@@ -609,8 +540,6 @@ class TestMotherDuckCloseConnection:
 
 
 class TestMotherDuckCoverageW15:
-    """Additional coverage for w15: connection errors, version probing, load_data."""
-
     def test_create_connection_failure_raises_connection_error(self):
         from unittest.mock import MagicMock, patch
 
@@ -632,7 +561,6 @@ class TestMotherDuckCoverageW15:
         mock_conn = MagicMock()
         mock_conn.close.side_effect = RuntimeError("already closed")
         adapter.connection = mock_conn
-        # Should not raise - logs warning and clears connection
         adapter.close_connection()
         assert adapter.connection is None
 
@@ -657,7 +585,6 @@ class TestMotherDuckCoverageW15:
         mock_conn = MagicMock()
         mock_conn.execute.side_effect = RuntimeError("no connection")
 
-        # Should not raise
         info = adapter.get_platform_info(connection=mock_conn)
         assert info["platform_type"] == "motherduck"
 
@@ -696,7 +623,6 @@ class TestMotherDuckCoverageW15:
         mock_conn = MagicMock()
         mock_conn.execute.return_value.fetchone.return_value = (42,)
 
-        # Create fake parquet files
         (tmp_path / "lineitem.parquet").write_bytes(b"fake")
         (tmp_path / "orders.parquet").write_bytes(b"fake")
 

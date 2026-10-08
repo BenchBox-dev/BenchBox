@@ -1,19 +1,3 @@
-/**
- * Regression coverage for shared retheme primitives.
- *
- * These primitives are introduced by
- * `results-explorer-retheme-theme-system-foundation` and consumed by every
- * downstream retheme TODO. We exercise:
- *
- *   - accessible names (aria-label / role / labelled headers)
- *   - selected / pressed state (aria-checked / aria-selected / aria-pressed)
- *   - disabled state (does not trigger callbacks; aria-disabled)
- *   - status-tone semantics for StatusBadge
- *   - keyboard-focus surface (the focus-visible CSS rule is asserted via
- *     surface attribute presence — actual paint is verified in browser
- *     screenshots)
- */
-
 import { fireEvent, render, screen } from "@testing-library/preact";
 import { describe, expect, it, vi } from "vitest";
 import { Button } from "@/components/Button";

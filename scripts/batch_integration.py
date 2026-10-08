@@ -1,25 +1,4 @@
 #!/usr/bin/env python3
-"""Feature-batch branch integration: one shared base, one integrator, bound receipts.
-
-A feature batch prepares members separately and lands them through a single
-shared integration branch. This helper makes that discipline mechanical:
-
-* ``start`` records one shared base (ref + OID + timestamp) for the whole
-  batch in per-worktree git config. Integration timestamps and ancestry are
-  always evaluated against that recorded base, never the current tip of a
-  moving ref. The helper never refreshes the base itself.
-* ``verify`` checks the three integration gates: the recorded base (moved or
-  not — reported, never auto-fixed), single-integrator authorship since the
-  base, and member-head ancestry in the integration head.
-* ``receipt`` binds per-item acceptance evidence (produced tracker-side) to
-  the exact integration head it was evaluated against, with branch-history
-  timestamps (first commit / first merge since the base, the observable
-  proxies for first-prepare / first-integration). A moved head or
-  base invalidates the binding instead of silently carrying it forward.
-
-Member preparation evidence never certifies the integrated tree: acceptance
-must name the integration head, and the receipt refuses any other head.
-"""
 
 from __future__ import annotations
 
@@ -30,12 +9,35 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+CLI_DESCRIPTION = (
+    "Feature-batch branch integration: one shared base, one integrator, bound receipts.\n"
+    "\n"
+    "A feature batch prepares members separately and lands them through a single\n"
+    "shared integration branch. This helper makes that discipline mechanical:\n"
+    "\n"
+    "* ``start`` records one shared base (ref + OID + timestamp) for the whole\n"
+    "  batch in per-worktree git config. Integration timestamps and ancestry are\n"
+    "  always evaluated against that recorded base, never the current tip of a\n"
+    "  moving ref. The helper never refreshes the base itself.\n"
+    "* ``verify`` checks the three integration gates: the recorded base (moved or\n"
+    "  not — reported, never auto-fixed), single-integrator authorship since the\n"
+    "  base, and member-head ancestry in the integration head.\n"
+    "* ``receipt`` binds per-item acceptance evidence (produced tracker-side) to\n"
+    "  the exact integration head it was evaluated against, with branch-history\n"
+    "  timestamps (first commit / first merge since the base, the observable\n"
+    "  proxies for first-prepare / first-integration). A moved head or\n"
+    "  base invalidates the binding instead of silently carrying it forward.\n"
+    "\n"
+    "Member preparation evidence never certifies the integrated tree: acceptance\n"
+    "must name the integration head, and the receipt refuses any other head.\n"
+)
+
 CONFIG_PREFIX = "benchbox.batch"
 DELIVERY_RECEIPT_SCHEMA = "batch_delivery_receipt_v1"
 
 
 class BatchError(RuntimeError):
-    """A refused or failed batch integration transition."""
+    pass
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -82,7 +84,6 @@ def record_start(
     members: list[str],
     base_ref: str = "origin/develop",
 ) -> dict:
-    """Record the shared integration base for the whole batch (w0/w2)."""
     if _config_get(repo, "id") is not None:
         raise BatchError("batch start already recorded for this worktree; refusing overwrite")
     base_oid = _git(repo, "rev-parse", f"{base_ref}^{{commit}}")
@@ -103,23 +104,12 @@ def record_start(
 
 
 def reset_batch(repo: Path) -> None:
-    """Clear a batch start record (audited recovery from a crashed start).
-
-    Deletes the seal FIRST so an interrupted reset can never leave a sealed
-    record with half-cleared fields: any crash past the first delete reads
-    as absent, never as valid.
-    """
     _config_delete(repo, "sealed")
     for key in ("id", "base-ref", "base-oid", "started-at", "members"):
         _config_delete(repo, key)
 
 
 def read_batch(repo: Path) -> dict | None:
-    """Read the recorded batch start, or None when absent or unsealed.
-
-    A crash between the individual config writes leaves no `sealed` marker;
-    such partial records fail closed instead of binding half a start.
-    """
     batch_id = _config_get(repo, "id")
     if batch_id is None or _config_get(repo, "sealed") != "1":
         return None
@@ -138,31 +128,20 @@ def read_batch(repo: Path) -> dict | None:
 
 
 def verify_base(repo: Path, record: dict) -> dict:
-    """Compare the recorded base against the current tip (reported, never fixed)."""
     current = _git(repo, "rev-parse", f"{record['base_ref']}^{{commit}}")
     return {"recorded_oid": record["base_oid"], "current_oid": current, "moved": current != record["base_oid"]}
 
 
 def committers_since_base(repo: Path, base_oid: str, head: str) -> list[str]:
-    """Distinct committer identities on the first-parent chain base..head.
-
-    Committer (who applied), not author (who wrote), and first-parent only:
-    legitimate member merges preserve member authorship/committer off-chain,
-    while any commit applied directly to the integration branch — member or
-    rogue — records its writer as a first-parent committer. The head is
-    passed in (never re-resolved) so all receipt gates evaluate one revision.
-    """
     out = _git(repo, "log", "--first-parent", f"{base_oid}..{head}", "--format=%cn <%ce>")
     return sorted(set(out.splitlines()) if out else [])
 
 
 def verify_single_integrator(repo: Path, base_oid: str, integrator: str, head: str) -> list[str]:
-    """Offending committers when anyone but the integrator applied work (w3)."""
     return [committer for committer in committers_since_base(repo, base_oid, head) if committer != integrator]
 
 
 def member_ancestry(repo: Path, members: object, integration_head: str) -> dict[str, bool]:
-    """Whether each member prepared head is an ancestor of the integration head."""
     if not isinstance(members, list):
         raise BatchError("members manifest must be a list")
     result: dict[str, bool] = {}
@@ -185,7 +164,6 @@ def member_ancestry(repo: Path, members: object, integration_head: str) -> dict[
 
 
 def normalize_members(members: object) -> list[dict[str, str]]:
-    """Validate and normalize a member manifest for a durable receipt."""
     if not isinstance(members, list):
         raise BatchError("members manifest must be a list")
     normalized: list[dict[str, str]] = []
@@ -205,7 +183,6 @@ def normalize_members(members: object) -> list[dict[str, str]]:
 
 
 def normalize_dependencies(value: object, member_ids: set[str]) -> list[dict[str, str]]:
-    """Validate tracker-side internal implementation dependency evidence."""
     if value is None:
         return []
     if not isinstance(value, list):
@@ -233,14 +210,6 @@ def normalize_dependencies(value: object, member_ids: set[str]) -> list[dict[str
 
 
 def branch_timestamps(repo: Path, base_oid: str, head: str) -> dict:
-    """Branch-history timestamps: first commit and first merge since the base.
-
-    These are the observable proxies for first-prepare / first-integration,
-    named as what they are: a first commit is not proof of preparation, and
-    a first merge is not proof of integration. Ranges are pinned to one
-    resolved *head* so a concurrent commit cannot mix an old integration
-    head with new history.
-    """
     first = _git(repo, "log", "--reverse", "--format=%H %cI", f"{base_oid}..{head}").splitlines()
     merges = _git(repo, "log", "--reverse", "--merges", "--format=%H %cI", f"{base_oid}..{head}").splitlines()
     return {
@@ -251,14 +220,6 @@ def branch_timestamps(repo: Path, base_oid: str, head: str) -> dict:
 
 
 def delivery_receipt(repo: Path, member_heads: list[dict], acceptance: dict) -> dict:
-    """Bind tracker-side per-item acceptance to the exact integration head.
-
-    Refuses when the acceptance head differs from HEAD, when the member set
-    differs from the recorded start (late or dropped members), when any
-    member lacks passing acceptance, when anyone but the named integrator
-    applied work, when a member head is missing from the integration head,
-    or when the base moved without a re-recorded start.
-    """
     if not isinstance(acceptance, dict):
         raise BatchError("acceptance must be a JSON object")
     record = read_batch(repo)
@@ -320,7 +281,7 @@ def delivery_receipt(repo: Path, member_heads: list[dict], acceptance: dict) -> 
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(description=CLI_DESCRIPTION, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--worktree", type=Path, default=Path.cwd())
     sub = parser.add_subparsers(dest="command", required=True)
 

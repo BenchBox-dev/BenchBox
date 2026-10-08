@@ -19,10 +19,6 @@ const BASELINE = process.env.PUBLIC_SITE_VISUAL_BASELINE
   ? path.resolve(process.env.PUBLIC_SITE_VISUAL_BASELINE)
   : undefined;
 const REQUIRE_BASELINE = process.env.PUBLIC_SITE_VISUAL_REQUIRE_BASELINE === "1";
-// "capture" writes the manifest only; "compare" reads a manifest written by an
-// earlier capture. The split lets a merge-queue follower capture its own tree
-// while the leader group is still publishing the follower's exact-base
-// baseline. Unset runs both in one pass.
 const PHASE = process.env.PUBLIC_SITE_VISUAL_PHASE ?? "";
 if (!["", "capture", "compare"].includes(PHASE)) {
   throw new Error(`PUBLIC_SITE_VISUAL_PHASE must be capture, compare, or unset; got ${PHASE}`);
@@ -37,8 +33,6 @@ if (!RENDERERS.includes(RENDERER)) {
 if (RENDERER === "astro" && PHASE !== "capture") {
   throw new Error("PUBLIC_SITE_VISUAL_RENDERER=astro supports only PUBLIC_SITE_VISUAL_PHASE=capture until the renderer cutover");
 }
-// Match the protected baseline's UTC capture day so relative run ages do not
-// make an otherwise unchanged screenshot expire every midnight.
 const VISUAL_REFERENCE_TIME = new Date("2026-09-08T19:35:00Z");
 const VIEWPORTS = [390, 768, 1280, 1600] as const;
 const ALL_ROUTES = [
@@ -75,12 +69,7 @@ const ROUTES =
   SELECTED_SLUGS.length > 0 ? ALL_ROUTES.filter((route) => SELECTED_SLUGS.includes(route.slug)) : ALL_ROUTES;
 const MANIFEST = path.join(OUTPUT, "manifest.json");
 
-// Each Results viewport can spend up to 46 seconds on bounded cold-snapshot
-// recovery. Give the four independent waits enough aggregate budget while
-// keeping the per-attempt limits in `waitForDataLoaded` unchanged.
 test.describe.configure({ mode: "serial", timeout: 240_000 });
-// The public-site suite requires the assembled Pages-shaped site. Keep it out
-// of the Explorer-only blocking command unless that site is explicitly mounted.
 test.skip(!process.env.E2E_PAGES_SHAPED || !process.env.E2E_SITE_DIR, "requires E2E_PAGES_SHAPED and E2E_SITE_DIR");
 
 type CapturedManifest = VisualManifest & {
@@ -124,8 +113,6 @@ async function captureManifest(browser: Browser): Promise<CapturedManifest> {
           }
         }
       }
-      // Disable timing only after production IntersectionObserver behavior has
-      // reached and proved the visible end state.
       await page.addStyleTag({
         content: `
           .feature-card, .benchmark-card, .install-step {
@@ -182,7 +169,6 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
     PHASE === "compare"
       ? (JSON.parse(await readFile(MANIFEST, "utf8")) as CapturedManifest)
       : await captureManifest(browser);
-  // A compare-only pass must judge the capture of this run's tree, not a stale file.
   expect(manifest.source_sha, "captured manifest source SHA").toBe(SOURCE_SHA);
   if (PHASE === "capture") return;
 
@@ -196,9 +182,6 @@ test("captures the public route and viewport matrix", async ({ browser }) => {
   }
   const baseline = JSON.parse(await readFile(path.join(BASELINE, "manifest.json"), "utf8")) as typeof manifest;
   expect(baseline.browser).toBe("chromium");
-  // When comparison is required, the baseline must be bound to a real SHA:
-  // an empty BASE_SHA skips this assertion and compares pixels only, which
-  // would let a stale or wrong-tree baseline pass unread.
   expect(process.env.PUBLIC_SITE_VISUAL_BASE_SHA, "PUBLIC_SITE_VISUAL_BASE_SHA binds the baseline").toMatch(
     /^[0-9a-f]{40}$/,
   );

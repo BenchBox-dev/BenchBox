@@ -1,17 +1,3 @@
-"""End-to-end round trip: `benchbox submit` → validate_submission.py.
-
-Reproduces the workflow that lives across two scripts and one CI
-pipeline: package a bundle into the submission directory, copy the
-bundle + manifest into a `results-data/bundles/` style directory that
-already contains other bundles, then run the validator that CI runs on
-each PR. The directory-already-has-other-bundles part is the load-bearing
-case — a hash algorithm that includes the directory contents will fail
-here even though the actual submission is valid.
-
-See `_project/DONE/main/planning/fix-submission-hash-mismatch-vs-validator-directory-scope.yaml`
-for context.
-"""
-
 from __future__ import annotations
 
 import json
@@ -44,9 +30,6 @@ _FAKE_BUNDLE = {
         "queries": {"total": 22, "passed": 22, "failed": 0},
         "validation": "passed",
     },
-    # Full canonical coverage with producer-shaped string ids: the
-    # round-trip fixtures must satisfy the query-set coverage gate, the
-    # same way a genuine complete submission does.
     "queries": [{"id": str(i), "ms": 1.0} for i in range(1, 23)],
 }
 
@@ -58,14 +41,14 @@ def _write_payload(path: Path, name: str, payload: dict) -> Path:
 
 
 def _write_bundle(path: Path, name: str, marker: str) -> Path:
-    """Write a deterministic dummy bundle whose contents differ by `marker`."""
+
     bundle = {**_FAKE_BUNDLE}
     bundle["run"] = {**_FAKE_BUNDLE["run"], "id": f"run-{marker}"}
     return _write_payload(path, name, bundle)
 
 
 def _run_validator(bundle_paths: list[Path]) -> subprocess.CompletedProcess[str]:
-    """Invoke scripts/validate_submission.py the way CI does."""
+
     repo_root = Path(__file__).resolve().parents[2]
     cmd = [
         sys.executable,
@@ -77,12 +60,10 @@ def _run_validator(bundle_paths: list[Path]) -> subprocess.CompletedProcess[str]
 
 @pytest.fixture
 def populated_corpus(tmp_path: Path) -> Path:
-    """results-data/bundles/-style directory with several pre-existing bundles."""
+
     bundles_dir = tmp_path / "results-data" / "bundles"
     bundles_dir.mkdir(parents=True)
-    # Three pre-existing bundles in the directory mimic the published-results
-    # state at PR time. Hash algorithms that include the directory contents
-    # will diverge here.
+
     _write_bundle(bundles_dir, "tpch_sf001_duckdb_existing", "existing-1")
     _write_bundle(bundles_dir, "ssb_sf01_clickhouse_existing", "existing-2")
     _write_bundle(bundles_dir, "tpch_sf01_polars_existing", "existing-3")
@@ -90,16 +71,13 @@ def populated_corpus(tmp_path: Path) -> Path:
 
 
 def _package_via_submit(bundle_path: Path, output_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Run `benchbox submit` to produce a manifest. Returns the manifest path."""
+
     repo_root = Path(__file__).resolve().parents[2]
-    # Invoke via the click command directly (not the console script) so the
-    # test does not depend on the entry point being on PATH.
+
     from click.testing import CliRunner
 
     from benchbox.cli.commands.submit import submit
 
-    # `benchbox submit` is community-facing end-to-end and hard-refuses
-    # without a deployment salt.
     monkeypatch.setenv("BENCHBOX_MACHINE_ID_SALT", "integration-test-community-publish-salt")
 
     runner = CliRunner()
@@ -111,7 +89,7 @@ def _package_via_submit(bundle_path: Path, output_dir: Path, monkeypatch: pytest
     assert result.exit_code == 0, f"benchbox submit failed: {result.output}"
     manifest = output_dir / f"{bundle_path.stem}.manifest.json"
     assert manifest.is_file(), f"manifest missing from {output_dir}"
-    # repo_root is referenced by _run_validator below; keep it accessible.
+
     _ = repo_root
     return manifest
 
@@ -119,24 +97,20 @@ def _package_via_submit(bundle_path: Path, output_dir: Path, monkeypatch: pytest
 def test_round_trip_validates_clean_submission(
     tmp_path: Path, populated_corpus: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Package a bundle, drop it next to existing bundles, validate: must pass."""
-    # 1. Generate a fresh bundle outside the corpus.
+
     source_dir = tmp_path / "fresh"
     source_dir.mkdir()
     bundle = _write_bundle(source_dir, "tpch_sf001_duckdb_new", "new-clean")
 
-    # 2. Package via `benchbox submit`.
     out_dir = tmp_path / "submission"
     manifest_src = _package_via_submit(bundle, out_dir, monkeypatch)
 
-    # 3. Copy bundle + manifest into the populated corpus.
     submitted_bundle = out_dir / "bundle" / bundle.name
     target_bundle = populated_corpus / bundle.name
     target_manifest = populated_corpus / manifest_src.name
     shutil.copy2(submitted_bundle, target_bundle)
     shutil.copy2(manifest_src, target_manifest)
 
-    # 4. Run the CI validator and confirm it passes.
     proc = _run_validator([target_bundle])
     assert proc.returncode == 0, (
         f"validator should accept an unmodified submission, "
@@ -148,7 +122,7 @@ def test_round_trip_validates_clean_submission(
 def test_round_trip_rejects_tampered_bundle(
     tmp_path: Path, populated_corpus: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Bundle mutated after the manifest hash is computed must be rejected."""
+
     source_dir = tmp_path / "fresh"
     source_dir.mkdir()
     bundle = _write_bundle(source_dir, "tpch_sf001_duckdb_tamper", "tamper")
@@ -162,7 +136,6 @@ def test_round_trip_rejects_tampered_bundle(
     shutil.copy2(submitted_bundle, target_bundle)
     shutil.copy2(manifest_src, target_manifest)
 
-    # Mutate the deposited bundle: flip a timing value.
     payload = json.loads(target_bundle.read_text(encoding="utf-8"))
     payload["queries"][0]["ms"] = 99.9
     target_bundle.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -171,13 +144,13 @@ def test_round_trip_rejects_tampered_bundle(
     assert proc.returncode != 0, (
         f"validator must reject a tampered bundle but exited 0.\nstdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
     )
-    # The error must name the offending file and indicate a hash mismatch.
+
     assert "hash mismatch" in proc.stdout.lower(), proc.stdout
     assert bundle.name in proc.stdout, proc.stdout
 
 
 def test_validator_accepts_forward_numeric_schema_v2_family(tmp_path: Path) -> None:
-    """Public submissions accept future numeric 2.x versions by policy."""
+
     source_dir = tmp_path / "fresh"
     source_dir.mkdir()
     bundle = _write_bundle(source_dir, "tpch_sf001_duckdb_future_v2", "future-v2")
@@ -192,7 +165,7 @@ def test_validator_accepts_forward_numeric_schema_v2_family(tmp_path: Path) -> N
 
 
 def test_validator_rejects_malformed_schema_v2_family(tmp_path: Path) -> None:
-    """Malformed versions should not pass just because they start with ``2.``."""
+
     source_dir = tmp_path / "fresh"
     source_dir.mkdir()
     bundle = _write_bundle(source_dir, "tpch_sf001_duckdb_malformed_v2", "malformed-v2")
@@ -215,7 +188,7 @@ def test_validator_rejects_malformed_schema_v2_family(tmp_path: Path) -> None:
 def test_validator_rejects_explicit_invalid_validation_phase(
     tmp_path: Path, phase_status: object, reported_status: str
 ) -> None:
-    """Explicit invalid validation-phase evidence contradicts a clean claim."""
+
     source_dir = tmp_path / "fresh"
     source_dir.mkdir()
     payload = {**_FAKE_BUNDLE, "phases": {"validation": {"status": phase_status}}}

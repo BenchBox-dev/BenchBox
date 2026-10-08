@@ -1,5 +1,3 @@
-"""Unit tests for platform information standardization."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -20,8 +18,6 @@ pytestmark = [
 
 
 class MockAdapter:
-    """Mock adapter for testing platform info extraction."""
-
     def __init__(
         self,
         platform_name: str = "MockPlatform",
@@ -34,7 +30,6 @@ class MockAdapter:
         self._platform_info = platform_info
 
     def get_platform_info(self) -> dict[str, Any]:
-        """Return mock platform info."""
         if self._platform_info is not None:
             return self._platform_info
         return {
@@ -46,10 +41,7 @@ class MockAdapter:
 
 
 class TestBuildPlatformInfo:
-    """Tests for build_platform_info function."""
-
     def test_build_basic_info(self) -> None:
-        """Test building basic platform info."""
         adapter = MockAdapter(platform_name="DuckDB")
         result = build_platform_info(adapter)
 
@@ -60,7 +52,6 @@ class TestBuildPlatformInfo:
         assert result.connection_mode == "in-memory"
 
     def test_build_with_dataframe_mode(self) -> None:
-        """Test building platform info with DataFrame mode."""
         adapter = MockAdapter(platform_name="Polars", family="expression")
         result = build_platform_info(adapter, execution_mode="dataframe")
 
@@ -69,7 +60,6 @@ class TestBuildPlatformInfo:
         assert result.family == "expression"
 
     def test_build_extracts_config(self) -> None:
-        """Test that configuration is extracted and flattened."""
         adapter = MockAdapter(
             platform_name="DuckDB",
             platform_info={
@@ -87,7 +77,6 @@ class TestBuildPlatformInfo:
         assert result.config["host"] == "localhost"
 
     def test_build_from_adapter_without_platform_info(self) -> None:
-        """Test building info from adapter without get_platform_info method."""
 
         class MinimalAdapter:
             platform_name = "MinimalDB"
@@ -100,8 +89,7 @@ class TestBuildPlatformInfo:
         assert result.config == {}
 
     def test_build_extracts_version_from_multiple_locations(self) -> None:
-        """Test version extraction from various locations."""
-        # Test platform_version
+
         adapter = MockAdapter(
             platform_name="DB1",
             platform_info={"platform": "DB1", "platform_version": "2.0.0"},
@@ -109,7 +97,6 @@ class TestBuildPlatformInfo:
         result = build_platform_info(adapter)
         assert result.platform_version == "2.0.0"
 
-        # Test client_library_version
         adapter = MockAdapter(
             platform_name="DB2",
             platform_info={"platform": "DB2", "client_library_version": "3.0.0"},
@@ -118,7 +105,6 @@ class TestBuildPlatformInfo:
         assert result.client_library_version == "3.0.0"
 
     def test_build_handles_get_platform_info_exception(self) -> None:
-        """Test handling of exceptions from get_platform_info."""
 
         class FailingAdapter:
             platform_name = "FailDB"
@@ -129,11 +115,9 @@ class TestBuildPlatformInfo:
         adapter = FailingAdapter()
         result = build_platform_info(adapter)
 
-        # Should still work, just with limited info
         assert result.name == "FailDB"
 
     def test_build_excludes_redundant_keys_from_config(self) -> None:
-        """Test that redundant keys are excluded from config."""
         adapter = MockAdapter(
             platform_name="TestDB",
             platform_info={
@@ -148,7 +132,6 @@ class TestBuildPlatformInfo:
         )
         result = build_platform_info(adapter)
 
-        # Redundant keys should not be in config
         assert "platform" not in result.config
         assert "platform_name" not in result.config
         assert "name" not in result.config
@@ -156,15 +139,11 @@ class TestBuildPlatformInfo:
         assert "platform_version" not in result.config
         assert "connection_mode" not in result.config
 
-        # Custom keys should be preserved
         assert result.config["custom_setting"] == "value"
 
 
 class TestPlatformInfoInput:
-    """Tests for PlatformInfoInput dataclass."""
-
     def test_create_basic(self) -> None:
-        """Test creating basic PlatformInfoInput."""
         info = PlatformInfoInput(name="DuckDB")
 
         assert info.name == "DuckDB"
@@ -176,7 +155,6 @@ class TestPlatformInfoInput:
         assert info.config == {}
 
     def test_create_with_all_fields(self) -> None:
-        """Test creating PlatformInfoInput with all fields."""
         info = PlatformInfoInput(
             name="Polars",
             platform_version="1.0.0",
@@ -197,29 +175,21 @@ class TestPlatformInfoInput:
 
 
 class TestFormatPlatformDisplayName:
-    """Tests for format_platform_display_name function."""
-
     def test_format_sql_mode(self) -> None:
-        """Test formatting for SQL mode."""
         result = format_platform_display_name("DuckDB", "sql")
         assert result == "DuckDB"
 
     def test_format_dataframe_mode(self) -> None:
-        """Test formatting for DataFrame mode."""
         result = format_platform_display_name("Polars", "dataframe")
         assert result == "Polars"
 
     def test_format_default_mode(self) -> None:
-        """Test formatting with default mode (sql)."""
         result = format_platform_display_name("DuckDB")
         assert result == "DuckDB"
 
 
 class TestMergePlatformInfo:
-    """Tests for merge_platform_info function."""
-
     def test_merge_with_additional_config(self) -> None:
-        """Test merging additional configuration."""
         base = PlatformInfoInput(
             name="DuckDB",
             platform_version="1.0.0",
@@ -236,7 +206,6 @@ class TestMergePlatformInfo:
         assert result.config["cache_size"] == "1GB"
 
     def test_merge_overwrites_existing_keys(self) -> None:
-        """Test that merge overwrites existing config keys."""
         base = PlatformInfoInput(
             name="DuckDB",
             config={"threads": 4, "memory": "4GB"},
@@ -249,7 +218,6 @@ class TestMergePlatformInfo:
         assert result.config["memory"] == "8GB"
 
     def test_merge_with_none(self) -> None:
-        """Test merging with None additional config."""
         base = PlatformInfoInput(
             name="DuckDB",
             config={"threads": 4},
@@ -257,10 +225,9 @@ class TestMergePlatformInfo:
 
         result = merge_platform_info(base, None)
 
-        assert result is base  # Should return the same object
+        assert result is base
 
     def test_merge_with_empty_dict(self) -> None:
-        """Test merging with empty additional config."""
         base = PlatformInfoInput(
             name="DuckDB",
             config={"threads": 4},
@@ -268,6 +235,5 @@ class TestMergePlatformInfo:
 
         result = merge_platform_info(base, {})
 
-        # Should return new object with same config
         assert result.name == "DuckDB"
         assert result.config == {"threads": 4}

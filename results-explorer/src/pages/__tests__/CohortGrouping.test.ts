@@ -1,13 +1,3 @@
-/**
- * Grouping the cohort index tables.
- *
- * The load-bearing claim is that grouping is PRESENTATION ONLY: it rearranges
- * rows and never changes how a rank is computed or which rows are eligible.
- * Ranking semantics have their own contract and release gate, so a grouping
- * control that quietly reordered or re-filtered would become a second, hidden
- * ranking policy.
- */
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -25,7 +15,6 @@ interface Row {
   eligible: boolean;
 }
 
-// Already rank-sorted, as the page hands them over.
 const rows: Row[] = [
   { id: "a", rank: 1, engine: "1.4.3", eligible: true },
   { id: "b", rank: 2, engine: "1.3.2", eligible: true },
@@ -42,9 +31,6 @@ describe("grouping is presentation only", () => {
   });
 
   it("leaves ranking order unchanged across the full set", () => {
-    // Flattening the groups must yield the same MULTISET, and within any
-    // group the relative rank order must be preserved. That is what makes
-    // "grouping does not change ranking" true in the rendered output.
     const groups = groupCohortRows(rows, "engine_version", byEngine);
     const flat = groups.flatMap((g) => g.rows);
     expect(flat.map((r) => r.id).sort()).toEqual(rows.map((r) => r.id).sort());
@@ -63,8 +49,6 @@ describe("grouping is presentation only", () => {
   });
 
   it("does not filter out ranking-ineligible rows", () => {
-    // Grouping narrows nothing. An ineligible row is still part of the cohort
-    // and still has to be visible in it.
     const groups = groupCohortRows(rows, "engine_version", byEngine);
     expect(groups.flatMap((g) => g.rows).some((r) => !r.eligible)).toBe(true);
   });
@@ -85,8 +69,6 @@ describe("group composition", () => {
   });
 
   it("collects rows with no recorded value rather than dropping them", () => {
-    // Dropping them would let grouping silently shrink the cohort, and the
-    // per-group counts would stop summing to the total the page states.
     const groups = groupCohortRows(rows, "engine_version", byEngine);
     expect(groups.find((g) => g.label === UNGROUPED_LABEL)!.rows).toHaveLength(1);
   });
@@ -111,8 +93,6 @@ describe("group composition", () => {
   });
 
   it("offers only the grouping modes the data can support", () => {
-    // w0's coverage gate cleared engine version alone; architecture and CPU
-    // are single-bucket and are not offered as grouping axes.
     expect(Object.keys(COHORT_GROUP_BY_LABELS).sort()).toEqual(["engine_version", "none"]);
   });
 });
@@ -170,9 +150,6 @@ describe("render-window limiting", () => {
   });
 
   it("remains stable when cohorts are cloned before rendering", () => {
-    // A caller that deep-copies the cohort (e.g. for immutability) keeps the
-    // same logical rows but loses object identity. The window must be keyed
-    // by id, not by reference.
     const many = Array.from({ length: 250 }, (_, index): Row => ({
       id: `row-${index}`,
       rank: index + 1,

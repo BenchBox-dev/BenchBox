@@ -1,34 +1,9 @@
-"""Error handling and recovery mechanisms for TPC-DI ETL operations.
+# Copyright 2026 Joe Harris / BenchBox Project
 
-This module provides comprehensive error handling and recovery capabilities including:
+# TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
+# This implementation is based on the TPC-DI specification.
 
-1. Error Classification and Handling:
-   - Automatic error categorization (transient, permanent, data quality)
-   - Configurable retry policies and backoff strategies
-   - Dead letter queue for unrecoverable errors
-
-2. Transaction Management:
-   - Savepoint and rollback mechanisms
-   - Distributed transaction coordination
-   - Partial batch recovery and restart
-
-3. Data Integrity Protection:
-   - Validation checkpoints and data consistency checks
-   - Recovery from corrupted data states
-   - Audit trail for error tracking and resolution
-
-4. Monitoring and Alerting:
-   - Real-time error monitoring and classification
-   - Automated alerting for critical errors
-   - Error pattern analysis and prevention
-
-Copyright 2026 Joe Harris / BenchBox Project
-
-TPC Benchmark™ DI (TPC-DI) - Copyright © Transaction Processing Performance Council
-This implementation is based on the TPC-DI specification.
-
-Licensed under the MIT License. See LICENSE file in the project root for details.
-"""
+# Licensed under the MIT License. See LICENSE file in the project root for details.
 
 import logging
 import threading
@@ -43,8 +18,6 @@ logger = logging.getLogger(__name__)
 
 
 class ErrorSeverity(Enum):
-    """Error severity levels."""
-
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
@@ -52,19 +25,15 @@ class ErrorSeverity(Enum):
 
 
 class ErrorCategory(Enum):
-    """Error category classifications."""
-
-    TRANSIENT = "TRANSIENT"  # Network timeouts, temporary resource unavailability
-    PERMANENT = "PERMANENT"  # Invalid data format, schema mismatch
-    DATA_QUALITY = "DATA_QUALITY"  # Business rule violations, data consistency issues
-    SYSTEM = "SYSTEM"  # Database errors, infrastructure issues
-    CONFIGURATION = "CONFIGURATION"  # Invalid configuration, missing parameters
-    BUSINESS_RULE = "BUSINESS_RULE"  # TPC-DI business logic violations
+    TRANSIENT = "TRANSIENT"
+    PERMANENT = "PERMANENT"
+    DATA_QUALITY = "DATA_QUALITY"
+    SYSTEM = "SYSTEM"
+    CONFIGURATION = "CONFIGURATION"
+    BUSINESS_RULE = "BUSINESS_RULE"
 
 
 class RetryStrategy(Enum):
-    """Retry strategy types."""
-
     IMMEDIATE = "IMMEDIATE"
     EXPONENTIAL_BACKOFF = "EXPONENTIAL_BACKOFF"
     LINEAR_BACKOFF = "LINEAR_BACKOFF"
@@ -74,8 +43,6 @@ class RetryStrategy(Enum):
 
 @dataclass
 class ErrorRecord:
-    """Record representing a single error occurrence."""
-
     error_id: str
     timestamp: datetime
     error_message: str
@@ -83,25 +50,21 @@ class ErrorRecord:
     severity: ErrorSeverity
     category: ErrorCategory
 
-    # Context information
     batch_id: Optional[int] = None
     table_name: Optional[str] = None
     operation_name: Optional[str] = None
     record_context: Optional[dict[str, Any]] = None
 
-    # Error details
     exception_type: Optional[str] = None
     stack_trace: Optional[str] = None
     error_code: Optional[str] = None
 
-    # Recovery information
     retry_count: int = 0
     max_retries: int = 3
     retry_strategy: RetryStrategy = RetryStrategy.EXPONENTIAL_BACKOFF
     can_retry: bool = True
     recovery_action: Optional[str] = None
 
-    # Resolution tracking
     is_resolved: bool = False
     resolution_timestamp: Optional[datetime] = None
     resolution_notes: Optional[str] = None
@@ -109,21 +72,17 @@ class ErrorRecord:
 
 @dataclass
 class RecoveryCheckpoint:
-    """Checkpoint for recovery operations."""
-
     checkpoint_id: str
     timestamp: datetime
     batch_id: int
     operation_name: str
-    checkpoint_type: str  # 'SAVEPOINT', 'COMMIT', 'ROLLBACK'
+    checkpoint_type: str
 
-    # State information
     records_processed: int = 0
     tables_completed: list[str] = field(default_factory=list)
     current_table: Optional[str] = None
     current_operation: Optional[str] = None
 
-    # Recovery metadata
     recovery_data: dict[str, Any] = field(default_factory=dict)
     can_resume_from: bool = True
     dependencies: list[str] = field(default_factory=list)
@@ -131,8 +90,6 @@ class RecoveryCheckpoint:
 
 @dataclass
 class RetryPolicy:
-    """Configuration for retry behavior."""
-
     max_attempts: int = 3
     strategy: RetryStrategy = RetryStrategy.EXPONENTIAL_BACKOFF
     base_delay_seconds: float = 1.0
@@ -140,7 +97,6 @@ class RetryPolicy:
     backoff_multiplier: float = 2.0
     jitter: bool = True
 
-    # Conditions for retry
     retryable_errors: list[str] = field(default_factory=list)
     non_retryable_errors: list[str] = field(default_factory=list)
     retry_on_timeout: bool = True
@@ -148,11 +104,7 @@ class RetryPolicy:
 
 
 class ErrorClassifier:
-    """Classifier for automatic error categorization."""
-
     def __init__(self):
-        """Initialize error classifier with predefined patterns."""
-        # Error patterns for classification
         self.transient_patterns = [
             "timeout",
             "connection reset",
@@ -189,36 +141,22 @@ class ErrorClassifier:
         ]
 
     def classify_error(self, error_message: str, exception_type: str = "") -> tuple[ErrorCategory, ErrorSeverity]:
-        """Classify an error based on message and exception type.
-
-        Args:
-            error_message: The error message to classify
-            exception_type: The exception type name
-
-        Returns:
-            Tuple of (ErrorCategory, ErrorSeverity)
-        """
 
         error_lower = error_message.lower()
         exception_lower = exception_type.lower()
 
-        # Check for transient errors
         if any(pattern in error_lower for pattern in self.transient_patterns):
             return ErrorCategory.TRANSIENT, ErrorSeverity.MEDIUM
 
-        # Check for permanent errors
         if any(pattern in error_lower for pattern in self.permanent_patterns):
             return ErrorCategory.PERMANENT, ErrorSeverity.HIGH
 
-        # Check for data quality errors
         if any(pattern in error_lower for pattern in self.data_quality_patterns):
             return ErrorCategory.DATA_QUALITY, ErrorSeverity.MEDIUM
 
-        # Check for system errors
         if any(pattern in error_lower for pattern in self.system_patterns):
             return ErrorCategory.SYSTEM, ErrorSeverity.CRITICAL
 
-        # Exception type-based classification
         if "timeout" in exception_lower:
             return ErrorCategory.TRANSIENT, ErrorSeverity.MEDIUM
         elif "connection" in exception_lower:
@@ -226,41 +164,22 @@ class ErrorClassifier:
         elif "sql" in exception_lower or "database" in exception_lower:
             return ErrorCategory.SYSTEM, ErrorSeverity.HIGH
 
-        # Default classification
         return ErrorCategory.SYSTEM, ErrorSeverity.MEDIUM
 
 
 class RetryManager:
-    """Manager for retry logic and backoff strategies."""
-
     def __init__(self, policy: Optional[RetryPolicy] = None):
-        """Initialize retry manager with policy.
-
-        Args:
-            policy: Retry policy configuration
-        """
         self.policy = policy or RetryPolicy()
         self.classifier = ErrorClassifier()
 
     def should_retry(self, error_record: ErrorRecord) -> bool:
-        """Determine if an error should be retried.
 
-        Args:
-            error_record: The error record to evaluate
-
-        Returns:
-            True if the error should be retried
-        """
-
-        # Check retry count
         if error_record.retry_count >= self.policy.max_attempts:
             return False
 
-        # Check if error is marked as non-retryable
         if not error_record.can_retry:
             return False
 
-        # Check error category
         if error_record.category == ErrorCategory.PERMANENT:
             return False
         elif error_record.category == ErrorCategory.TRANSIENT:
@@ -268,7 +187,6 @@ class RetryManager:
         elif error_record.category == ErrorCategory.CONFIGURATION:
             return False
 
-        # Check specific error patterns
         error_lower = error_record.error_message.lower()
 
         for non_retryable in self.policy.non_retryable_errors:
@@ -279,18 +197,9 @@ class RetryManager:
             if retryable.lower() in error_lower:
                 return True
 
-        # Default based on category
         return error_record.category in [ErrorCategory.TRANSIENT, ErrorCategory.SYSTEM]
 
     def calculate_delay(self, retry_count: int) -> float:
-        """Calculate delay before next retry attempt.
-
-        Args:
-            retry_count: Current retry count
-
-        Returns:
-            Delay in seconds
-        """
 
         if self.policy.strategy == RetryStrategy.IMMEDIATE:
             delay = 0.0
@@ -303,58 +212,35 @@ class RetryManager:
         else:
             delay = self.policy.base_delay_seconds
 
-        # Apply maximum delay limit
         delay = min(delay, self.policy.max_delay_seconds)
 
-        # Add jitter if enabled
         if self.policy.jitter:
             import random
 
-            jitter_amount = delay * 0.1  # 10% jitter
+            jitter_amount = delay * 0.1
             delay += random.uniform(-jitter_amount, jitter_amount)
 
         return max(0.0, delay)
 
 
 class ErrorRecoveryManager:
-    """Comprehensive error recovery management system for TPC-DI ETL."""
-
     def __init__(self, connection: Any, dialect: str = "duckdb"):
-        """Initialize the error recovery manager.
-
-        Args:
-            connection: Database connection object
-            dialect: SQL dialect for query generation
-        """
         self.connection = connection
         self.dialect = dialect
 
-        # Error tracking
         self.error_log: list[ErrorRecord] = []
         self.error_counts_by_category: dict[ErrorCategory, int] = {}
         self.error_lock = threading.RLock()
 
-        # Recovery tracking
         self.checkpoints: dict[str, RecoveryCheckpoint] = {}
         self.active_operations: dict[str, dict[str, Any]] = {}
 
-        # Management components
         self.classifier = ErrorClassifier()
         self.retry_manager = RetryManager()
 
-        # Dead letter queue for unrecoverable errors
         self.dead_letter_queue: list[ErrorRecord] = []
 
     def classify_error(self, error_message: str, exception_type: str = "") -> tuple[ErrorCategory, ErrorSeverity]:
-        """Classify an error based on message and exception type.
-
-        Args:
-            error_message: The error message to classify
-            exception_type: The exception type name
-
-        Returns:
-            Tuple of (ErrorCategory, ErrorSeverity)
-        """
         return self.classifier.classify_error(error_message, exception_type)
 
     def handle_error(
@@ -363,24 +249,11 @@ class ErrorRecoveryManager:
         operation_context: dict[str, Any],
         retry_policy: Optional[RetryPolicy] = None,
     ) -> tuple[bool, Optional[float]]:
-        """Handle an error with automatic classification and retry logic.
 
-        Args:
-            error: The exception that occurred
-            operation_context: Context information about the operation
-            retry_policy: Optional custom retry policy
-
-        Returns:
-            Tuple of (should_retry, delay_seconds)
-        """
-
-        # Create error record
         error_record = self._create_error_record(error, operation_context)
 
-        # Log error
         self._log_error(error_record)
 
-        # Determine retry action
         retry_manager = RetryManager(retry_policy) if retry_policy else self.retry_manager
 
         should_retry = retry_manager.should_retry(error_record)
@@ -392,7 +265,6 @@ class ErrorRecoveryManager:
             logger.warning(f"Error will be retried (attempt {error_record.retry_count}): {error_record.error_message}")
             return True, delay
         else:
-            # Move to dead letter queue
             self.dead_letter_queue.append(error_record)
             error_record.can_retry = False
 
@@ -400,7 +272,6 @@ class ErrorRecoveryManager:
             return False, None
 
     def _create_error_record(self, error: Exception, context: dict[str, Any]) -> ErrorRecord:
-        """Create an error record from an exception and context."""
 
         error_message = str(error)
         exception_type = type(error).__name__
@@ -425,16 +296,13 @@ class ErrorRecoveryManager:
         return error_record
 
     def _log_error(self, error_record: ErrorRecord) -> None:
-        """Log an error record to the error tracking system."""
 
         with self.error_lock:
             self.error_log.append(error_record)
 
-            # Configure category counts
             category = error_record.category
             self.error_counts_by_category[category] = self.error_counts_by_category.get(category, 0) + 1
 
-        # Log to standard logging
         log_message = (
             f"Error logged: {error_record.error_id} - "
             f"{error_record.category.value}/{error_record.severity.value} - "
@@ -457,17 +325,6 @@ class ErrorRecoveryManager:
         checkpoint_type: str = "SAVEPOINT",
         recovery_data: Optional[dict[str, Any]] = None,
     ) -> str:
-        """Create a recovery checkpoint.
-
-        Args:
-            operation_name: Name of the operation being checkpointed
-            batch_id: Batch identifier
-            checkpoint_type: Type of checkpoint ('SAVEPOINT', 'COMMIT', 'ROLLBACK')
-            recovery_data: Additional data needed for recovery
-
-        Returns:
-            Checkpoint ID
-        """
 
         checkpoint_id = f"CP_{batch_id}_{operation_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
@@ -486,14 +343,6 @@ class ErrorRecoveryManager:
         return checkpoint_id
 
     def restore_from_checkpoint(self, checkpoint_id: str) -> dict[str, Any]:
-        """Restore operation state from a checkpoint.
-
-        Args:
-            checkpoint_id: ID of the checkpoint to restore from
-
-        Returns:
-            Recovery data and state information
-        """
 
         if checkpoint_id not in self.checkpoints:
             raise ValueError(f"Checkpoint not found: {checkpoint_id}")
@@ -505,7 +354,6 @@ class ErrorRecoveryManager:
 
         logger.info(f"Restoring from checkpoint: {checkpoint_id}")
 
-        # Return recovery state
         recovery_state = {
             "batch_id": checkpoint.batch_id,
             "operation_name": checkpoint.operation_name,
@@ -526,22 +374,10 @@ class ErrorRecoveryManager:
         retry_policy: Optional[RetryPolicy] = None,
         max_attempts: Optional[int] = None,
     ) -> Any:
-        """Execute an operation with automatic error handling and recovery.
-
-        Args:
-            operation_func: Function to execute
-            operation_context: Context information for the operation
-            retry_policy: Optional custom retry policy
-            max_attempts: Maximum retry attempts (overrides policy)
-
-        Returns:
-            Result of the operation
-        """
 
         operation_name = operation_context.get("operation_name", "unknown_operation")
         batch_id = operation_context.get("batch_id", 0)
 
-        # Create initial checkpoint
         checkpoint_id = self.create_checkpoint(operation_name, batch_id, "SAVEPOINT")
 
         attempts = 0
@@ -551,10 +387,8 @@ class ErrorRecoveryManager:
             try:
                 logger.debug(f"Executing operation {operation_name} (attempt {attempts + 1})")
 
-                # Execute the operation
                 result = operation_func()
 
-                # Create success checkpoint
                 self.create_checkpoint(operation_name, batch_id, "COMMIT")
 
                 logger.debug(f"Operation {operation_name} completed successfully")
@@ -563,7 +397,6 @@ class ErrorRecoveryManager:
             except Exception as e:
                 attempts += 1
 
-                # Handle the error
                 should_retry, delay = self.handle_error(e, operation_context, retry_policy)
 
                 if should_retry and attempts < max_attempts:
@@ -571,7 +404,6 @@ class ErrorRecoveryManager:
                         logger.info(f"Waiting {delay:.1f}s before retry...")
                         time.sleep(delay)
 
-                    # Try to restore from checkpoint if possible
                     try:
                         recovery_state = self.restore_from_checkpoint(checkpoint_id)
                         operation_context.update(recovery_state)
@@ -580,7 +412,6 @@ class ErrorRecoveryManager:
 
                     continue
                 else:
-                    # Final failure - create rollback checkpoint
                     self.create_checkpoint(
                         operation_name,
                         batch_id,
@@ -591,18 +422,15 @@ class ErrorRecoveryManager:
                     logger.error(f"Operation {operation_name} failed after {attempts} attempts")
                     raise
 
-        # Should not reach here, but safety check
         raise RuntimeError(f"Operation {operation_name} exceeded maximum attempts")
 
     def get_error_statistics(self) -> dict[str, Any]:
-        """Get comprehensive error statistics."""
 
         with self.error_lock:
             total_errors = len(self.error_log)
             if total_errors == 0:
                 return {"message": "No errors recorded"}
 
-            # Calculate statistics
             stats = {
                 "total_errors": total_errors,
                 "errors_in_dead_letter_queue": len(self.dead_letter_queue),
@@ -613,25 +441,21 @@ class ErrorRecoveryManager:
                 "error_trend": "STABLE",
             }
 
-            # Count by severity
             for error in self.error_log:
                 severity = error.severity.value
                 stats["errors_by_severity"][severity] = stats["errors_by_severity"].get(severity, 0) + 1
 
-            # Recent error rate (last hour)
             recent_threshold = datetime.now() - timedelta(hours=1)
             recent_errors = len([e for e in self.error_log if e.timestamp > recent_threshold])
             stats["recent_error_rate"] = recent_errors
 
-            # Most common error messages (top 5)
             error_message_counts = {}
-            for error in self.error_log[-100:]:  # Last 100 errors
-                msg = error.error_message[:100]  # Truncate for grouping
+            for error in self.error_log[-100:]:
+                msg = error.error_message[:100]
                 error_message_counts[msg] = error_message_counts.get(msg, 0) + 1
 
             stats["most_common_errors"] = sorted(error_message_counts.items(), key=lambda x: x[1], reverse=True)[:5]
 
-            # Calculate error trend
             if len(self.error_log) >= 10:
                 recent_errors = self.error_log[-10:]
                 older_errors = self.error_log[-20:-10] if len(self.error_log) >= 20 else []
@@ -648,7 +472,6 @@ class ErrorRecoveryManager:
             return stats
 
     def get_recovery_statistics(self) -> dict[str, Any]:
-        """Get recovery and checkpoint statistics."""
 
         stats = {
             "total_checkpoints": len(self.checkpoints),
@@ -659,7 +482,6 @@ class ErrorRecoveryManager:
             "failed_recoveries": 0,
         }
 
-        # Count by type and operation
         for checkpoint in self.checkpoints.values():
             cp_type = checkpoint.checkpoint_type
             operation = checkpoint.operation_name
@@ -670,14 +492,6 @@ class ErrorRecoveryManager:
         return stats
 
     def cleanup_old_errors(self, retention_hours: int = 24) -> int:
-        """Clean up old error records beyond retention period.
-
-        Args:
-            retention_hours: Hours to retain error records
-
-        Returns:
-            Number of records cleaned up
-        """
 
         cutoff_time = datetime.now() - timedelta(hours=retention_hours)
 
@@ -685,7 +499,6 @@ class ErrorRecoveryManager:
             initial_count = len(self.error_log)
             self.error_log = [error for error in self.error_log if error.timestamp > cutoff_time]
 
-            # Also clean up dead letter queue
             self.dead_letter_queue = [error for error in self.dead_letter_queue if error.timestamp > cutoff_time]
 
             cleaned_count = initial_count - len(self.error_log)
@@ -696,21 +509,11 @@ class ErrorRecoveryManager:
         return cleaned_count
 
     def export_error_report(self, output_path: str, include_stack_traces: bool = False) -> bool:
-        """Export comprehensive error report for analysis.
-
-        Args:
-            output_path: Path to save the error report
-            include_stack_traces: Whether to include full stack traces
-
-        Returns:
-            True if export successful
-        """
 
         try:
             import json
 
             with self.error_lock:
-                # Prepare error data for export
                 error_data = []
                 for error in self.error_log:
                     error_dict = {
@@ -736,7 +539,6 @@ class ErrorRecoveryManager:
 
                     error_data.append(error_dict)
 
-                # Create comprehensive report
                 report = {
                     "export_timestamp": datetime.now().isoformat(),
                     "error_statistics": self.get_error_statistics(),
@@ -745,7 +547,6 @@ class ErrorRecoveryManager:
                     "dead_letter_queue_size": len(self.dead_letter_queue),
                 }
 
-                # Write to file
                 with open(output_path, "w", encoding="utf-8") as f:
                     json.dump(report, f, indent=2)
 

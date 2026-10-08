@@ -1,5 +1,3 @@
-"""The bundle validator rejects runs that measured without their query tables."""
-
 import pytest
 
 from benchbox.validation.bundle import ValidationResult, _validate_required_tables

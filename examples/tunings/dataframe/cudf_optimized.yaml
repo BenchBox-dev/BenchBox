@@ -1,6 +1,3 @@
-# cuDF DataFrame Tuning - Performance Optimized
-# Maximum GPU performance with memory pooling
-
 gpu:
   enabled: true
   device_id: 0

@@ -1,5 +1,3 @@
-"""Tests for cloud platform CTAS sort hook decisions."""
-
 from __future__ import annotations
 
 import logging

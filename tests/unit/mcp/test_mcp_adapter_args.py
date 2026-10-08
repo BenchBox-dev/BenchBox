@@ -1,10 +1,3 @@
-"""Tests for MCP tool argument forwarding to platform adapters.
-
-Ensures that MCP tool handlers pass the correct arguments (benchmark, scale_factor,
-etc.) to internal platform adapter factories, preventing KeyError and TypeError
-failures at runtime.
-"""
-
 import sys
 from unittest.mock import MagicMock, patch
 
@@ -17,10 +10,7 @@ pytestmark = [
 
 
 class TestGetPlatformAdapterArgs:
-    """Tests for _get_platform_adapter argument forwarding."""
-
     def test_sql_platform_receives_benchmark_and_scale_factor(self):
-        """SQL platforms with from_config() must receive benchmark and scale_factor."""
         from benchbox.mcp.tools.benchmark import _get_platform_adapter
 
         mock_adapter = MagicMock()
@@ -35,7 +25,6 @@ class TestGetPlatformAdapterArgs:
         mock_get.assert_called_once_with("duckdb", benchmark="tpch", scale_factor=0.01)
 
     def test_dataframe_platform_does_not_receive_benchmark_or_scale_factor(self):
-        """DataFrame adapters don't accept benchmark/scale_factor kwargs."""
         from benchbox.mcp.tools.benchmark import _get_platform_adapter
 
         mock_adapter = MagicMock()
@@ -49,7 +38,6 @@ class TestGetPlatformAdapterArgs:
         mock_get.assert_called_once_with("polars-df")
 
     def test_dataframe_platform_forwards_other_config(self):
-        """DataFrame adapters receive non-benchmark config kwargs."""
         from benchbox.mcp.tools.benchmark import _get_platform_adapter
 
         mock_adapter = MagicMock()
@@ -63,7 +51,6 @@ class TestGetPlatformAdapterArgs:
         mock_get.assert_called_once_with("polars-df", streaming=True)
 
     def test_sql_platform_forwards_all_config(self):
-        """SQL platforms receive all config including benchmark and scale_factor."""
         from benchbox.mcp.tools.benchmark import _get_platform_adapter
 
         mock_adapter = MagicMock()
@@ -79,10 +66,7 @@ class TestGetPlatformAdapterArgs:
 
 
 class TestRunBenchmarkAdapterCreation:
-    """Tests for run_benchmark tool's adapter creation path."""
-
     def test_run_benchmark_passes_benchmark_to_adapter_factory(self):
-        """run_benchmark must forward benchmark name to _get_platform_adapter."""
         from benchbox.mcp.tools.benchmark import _get_platform_adapter
 
         mock_adapter = MagicMock()
@@ -99,10 +83,8 @@ class TestRunBenchmarkAdapterCreation:
         assert call_kwargs["scale_factor"] == 10.0
 
     def test_sql_adapter_from_config_receives_required_keys(self):
-        """Platforms with from_config() receive config dict containing benchmark/scale_factor."""
         from benchbox.platforms import get_platform_adapter
 
-        # Mock the adapter class returned by registry
         mock_adapter_class = MagicMock()
         mock_adapter_class.from_config.return_value = MagicMock(
             driver_package=None,
@@ -133,11 +115,8 @@ class TestRunBenchmarkAdapterCreation:
 
 
 class TestDataFrameAdapterSafety:
-    """Tests that DataFrame adapter creation doesn't crash with extra kwargs."""
-
     @pytest.mark.parametrize("platform", ["polars-df", "pandas-df"])
     def test_dataframe_adapter_not_passed_benchmark_kwargs(self, platform):
-        """DataFrame adapters must not receive benchmark/scale_factor to avoid TypeError."""
         from benchbox.mcp.tools.benchmark import _get_platform_adapter
 
         mock_adapter = MagicMock()
@@ -153,29 +132,24 @@ class TestDataFrameAdapterSafety:
         assert "scale_factor" not in kwargs
 
     def test_real_polars_adapter_rejects_benchmark_kwarg(self):
-        """Prove that PolarsDataFrameAdapter crashes if given benchmark/scale_factor directly."""
         from benchbox.platforms.dataframe.polars_df import PolarsDataFrameAdapter
 
         with pytest.raises(TypeError, match="unexpected keyword argument"):
             PolarsDataFrameAdapter(benchmark="tpch", scale_factor=0.01)
 
     def test_real_pandas_adapter_rejects_benchmark_kwarg(self):
-        """Prove that PandasDataFrameAdapter crashes if given benchmark/scale_factor directly."""
         from benchbox.platforms.dataframe.pandas_df import PandasDataFrameAdapter
 
         with pytest.raises(TypeError, match="unexpected keyword argument"):
             PandasDataFrameAdapter(benchmark="tpch", scale_factor=0.01)
 
     def test_get_platform_adapter_succeeds_for_polars_with_benchmark_kwargs(self):
-        """_get_platform_adapter strips benchmark/scale_factor so real Polars adapter works."""
         from benchbox.mcp.tools.benchmark import _get_platform_adapter
 
-        # This would crash with TypeError if benchmark/scale_factor leaked through
         adapter = _get_platform_adapter("polars-df", benchmark="tpch", scale_factor=0.01)
         assert adapter is not None
 
     def test_get_platform_adapter_succeeds_for_pandas_with_benchmark_kwargs(self):
-        """_get_platform_adapter strips benchmark/scale_factor so real Pandas adapter works."""
         from benchbox.mcp.tools.benchmark import _get_platform_adapter
 
         adapter = _get_platform_adapter("pandas-df", benchmark="tpch", scale_factor=0.01)

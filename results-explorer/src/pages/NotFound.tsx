@@ -2,10 +2,6 @@ import type { RoutableProps } from "preact-router";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
 interface NotFoundProps extends RoutableProps {
-  /** Optional context-specific copy that replaces the default
-   *  "Page not found." sub-heading. Pass when the caller can give the user
-   *  a more informative reason than the generic 404 (e.g. "Benchmark
-   *  `foo` is not part of the published corpus."). */
   message?: string;
 }
 

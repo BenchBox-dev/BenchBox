@@ -1,10 +1,3 @@
-"""Core lifecycle runner package.
-
-Keep package imports lightweight so sibling submodules such as
-``benchbox.core.runner.conversion`` do not pull in the full lifecycle runner
-and its transitive monitoring/reporting stack as an import side effect.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -14,7 +7,6 @@ __all__ = ["run_benchmark_lifecycle", "LifecyclePhases", "ValidationOptions"]
 
 
 def __getattr__(name: str) -> Any:
-    """Lazily expose lifecycle APIs and sibling submodules."""
     if name in __all__:
         from .runner import LifecyclePhases, ValidationOptions, run_benchmark_lifecycle
 
@@ -37,5 +29,4 @@ def __getattr__(name: str) -> Any:
 
 
 def __dir__() -> list[str]:
-    """Return stable introspection output for lazy exports."""
     return sorted(set(globals()) | set(__all__))

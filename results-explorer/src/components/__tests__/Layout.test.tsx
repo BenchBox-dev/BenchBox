@@ -135,9 +135,6 @@ describe("Layout", () => {
   });
 
   it("updates the active explorer subnav after a client-side route() call", async () => {
-    // Regression: prior to this fix, Layout read `window.location.pathname`
-    // once at module render time, so navigating from Overview to Query
-    // via preact-router left "Overview" highlighted indefinitely.
     renderWithRouter("/results/");
 
     const explorerNav = screen.getByRole("navigation", { name: "Results Explorer" });
