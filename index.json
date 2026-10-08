@@ -23598,6 +23598,16 @@
       "status": "done",
       "title": "UAT: harden per-cell timeout enforcement for process trees"
     },
+    "uat-tuned-ratio-diagnostic-20261008": {
+      "claim": null,
+      "needs": [
+        "tuning-evidence-tuned-mode-promise-20261008",
+        "tuning-evidence-unmeasured-template-label-20261008"
+      ],
+      "priority": "low",
+      "status": "open",
+      "title": "Show the tuned-to-notuning ratio in UAT reports as a tuning diagnostic, never as a gate"
+    },
     "unattributed-update-branch-commits-block-merge-20261008": {
       "claim": null,
       "needs": [],

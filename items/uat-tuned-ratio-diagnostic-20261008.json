@@ -1,0 +1,22 @@
+{
+  "acceptance": [
+    "A UAT report test shows the ratio, the per-cell failure counts, the evidence state and the diagnostic label for a matrix with both cells.",
+    "A test shows a ratio above 1 is flagged and the UAT exit code is unchanged.",
+    "docs/operations/uat-framework.md describes the diagnostic and its limits."
+  ],
+  "context": "Source: tuning-evidence plan (2026-10-08), plan step 10. Covers muse F17 (diagnostic, not ranking) and the plan's non-goal: no hard benefit gate.",
+  "description": "## Problem\nUAT runs both `tuned` and `notuning` cells but never compares them. That is how the ClickHouse TPC-H regression (1.6× to 4.5× slower) went unnoticed until someone looked by hand.\n\n## Change\n- Where a UAT matrix has both cells for a platform and benchmark, report the geometric-mean ratio over the queries that pass in both, the failure count for each cell, and the template's evidence state.\n- Label it \"tuning diagnostic, not a platform comparison\", using the wording from the ADR-2 addendum (`tuning-evidence-tuned-mode-promise-20261008`).\n- Flag a ratio above 1, but do not fail the matrix.\n\n## Decision gate\n- If the ratio would need data UAT does not keep (for example, per-query timings), stop and ask before widening what UAT stores.\n\n## Guardrails (must preserve)\n- No pass/fail on the ratio, and no change to UAT exit codes.\n- Respect the UAT production-LOC ceiling gate.\n- Single UAT cells are not harness-grade evidence. Say so in the report, and never feed the ratio into template decisions.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`. Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
+  "links": [
+    "docs/operations/uat-framework.md"
+  ],
+  "sessions": [
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:33:47Z",
+      "client": "claude-code",
+      "op": "create",
+      "op_id": "defe781b0c9c400ba4fc27ae6b649425",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    }
+  ]
+}
