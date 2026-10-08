@@ -1,16 +1,6 @@
-"""Platform and benchmark selection resolution for ``benchbox run``.
-
-This module hosts the preamble steps that turn raw ``--platform`` /
-``--benchmark`` CLI values into resolved, validated run state: benchmark-name
-normalization, platform/benchmark option parsing, platform and execution-mode
-resolution with availability checks, the benchmark compatibility gate, and the
-interactive wizard's mode resolution. The helpers operate on the command's
-namespace state and are re-exported through
-:mod:`benchbox.cli.commands.run` so existing imports keep working.
-"""
-
 from __future__ import annotations
 
+import importlib.util
 import logging
 import types
 from collections.abc import Iterable
@@ -33,21 +23,16 @@ from benchbox.core.platform_registry import PlatformRegistry
 from benchbox.platforms import is_dataframe_platform, list_available_dataframe_platforms
 from benchbox.platforms.adapter_factory import _reject_removed_platform
 
-# Benchmark name aliases - maps common variations to canonical names
 BENCHMARK_ALIASES: dict[str, str] = {
-    # TPC-H variations
     "tpc-h": "tpch",
     "tpc_h": "tpch",
-    # TPC-DS variations
     "tpc-ds": "tpcds",
     "tpc_ds": "tpcds",
-    # TPC-DS OBT variations
     "tpcdsobt": "tpcds_obt",
     "tpcds-obt": "tpcds_obt",
     "tpc-ds-obt": "tpcds_obt",
     "tpc-ds_obt": "tpcds_obt",
     "tpc_ds_obt": "tpcds_obt",
-    # SSB (Star Schema Benchmark) variations
     "star-schema": "ssb",
     "starschema": "ssb",
     "star_schema": "ssb",
@@ -56,13 +41,11 @@ BENCHMARK_ALIASES: dict[str, str] = {
 
 
 def normalize_benchmark_name(name: str) -> str:
-    """Normalize benchmark name: lowercase and resolve aliases."""
     normalized = name.lower()
     return BENCHMARK_ALIASES.get(normalized, normalized)
 
 
 def _reject_external_tuned(console: Any, logger: logging.Logger | None, ctx: click.Context) -> None:
-    """Exit with error when --table-mode external is combined with a tuning-bearing --tuning value."""
     console.print("[red]❌ Error: --table-mode external is incompatible with tuning enabled[/red]")
     console.print("[yellow]Use --table-mode native, or --tuning notuning[/yellow]")
     if logger:
@@ -71,35 +54,17 @@ def _reject_external_tuned(console: Any, logger: logging.Logger | None, ctx: cli
 
 
 def _tuning_arg_is_tuning_bearing(tuning_arg: str | None) -> bool:
-    """Whether a raw `--tuning` argument selects a tuning-bearing resolution.
-
-    Mirrors the outcomes `TuningResolution` can produce without requiring
-    resolution to have already run: `notuning` is the only raw keyword that
-    resolves to a disabled configuration. `tuned` (which may still resolve to
-    either a curated template or `tuned-fallback` -- both tuning-bearing per
-    ADR-2), `auto` (smart defaults, always enabled), and any other value (a
-    custom tuning file path, recorded as `custom`) are all tuning-bearing.
-    """
     if not tuning_arg:
         return False
     return tuning_arg.strip().lower() != "notuning"
 
 
 def _apply_dataframe_suffix_mode(s: types.SimpleNamespace) -> None:
-    """Treat a trailing ``-df`` platform suffix as an explicit DataFrame-mode request.
-
-    Must run before PLATFORM_ALIASES normalization, which maps ``-df`` names to
-    their base platform. For dual-mode platforms whose registry default is SQL
-    (datafusion, lakesail) that erases the request and the run silently selects
-    the SQL adapter. An explicit --mode flag still wins, matching adapter-factory
-    precedence (explicit mode > -df suffix > platform default).
-    """
     if s.mode is None and s.platform:
         s.mode = get_platform_alias_mode(s.platform)
 
 
 def _apply_ducklake_deployment_suffix(s: types.SimpleNamespace) -> None:
-    """Turn ``ducklake:<mode>`` shorthand into an explicit platform option."""
     if not s.platform or not s.platform.lower().startswith("ducklake:"):
         return
     platform, mode = s.platform.split(":", 1)
@@ -113,7 +78,6 @@ def _apply_ducklake_deployment_suffix(s: types.SimpleNamespace) -> None:
 
 
 def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
-    """Parse --platform-option and --benchmark-option flags; set state fields."""
     s.logger, s.verbosity_settings = setup_verbose_logging(s.verbose, quiet=bool(s.quiet))
     set_quiet_output(s.verbosity_settings.quiet)
     s.ctx.obj["verbosity"] = s.verbosity_settings
@@ -178,7 +142,6 @@ def _parse_plat_bench_options(s: types.SimpleNamespace) -> None:
 
 
 def _apply_benchmark_default_scale(s: types.SimpleNamespace) -> None:
-    """Use the selected benchmark's registry default when --scale was omitted."""
     if not s.benchmark:
         return
 
@@ -196,7 +159,6 @@ def _apply_benchmark_default_scale(s: types.SimpleNamespace) -> None:
 
 
 def _platform_option_sources_for_state(s: types.SimpleNamespace) -> dict[str, str]:
-    """Return source provenance for parsed platform options in the current CLI state."""
     if not s.platform_key or not s.parsed_platform_options:
         return {}
 
@@ -234,7 +196,6 @@ def _platform_option_config_entries(s: types.SimpleNamespace) -> dict[str, Any]:
 
 
 def _check_platforms_status(s: types.SimpleNamespace) -> None:
-    """Implement the --check-platforms status check."""
     if not s.check_platforms:
         return
     console.print("\n[bold cyan]Checking Platform Status...[/bold cyan]")
@@ -262,7 +223,6 @@ def _check_platforms_status(s: types.SimpleNamespace) -> None:
 
 
 def _validate_not_removed_platform(s: types.SimpleNamespace) -> bool:
-    """Reject selectors for platforms removed from BenchBox."""
     raw_platform = getattr(s, "platform", None)
     for candidate in (raw_platform, getattr(s, "platform_key", None)):
         if not candidate:
@@ -281,7 +241,6 @@ def _validate_not_removed_platform(s: types.SimpleNamespace) -> bool:
 
 
 def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
-    """Validate platform, resolve execution mode, and check availability."""
     s.resolved_mode = None
     if not _validate_not_removed_platform(s):
         return
@@ -328,12 +287,7 @@ def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
 
         if s.resolved_mode == "sql":
             if platform_key == "polars":
-                try:
-                    import polars  # noqa: F401
-
-                    is_available = True
-                except ImportError:
-                    is_available = False
+                is_available = importlib.util.find_spec("polars") is not None
             else:
                 is_available = s.platform_manager.is_platform_available(platform_key)
         else:
@@ -356,7 +310,6 @@ def _resolve_platform_mode(s: types.SimpleNamespace) -> None:
 
 
 def _check_benchmark_platform_compatibility(s: types.SimpleNamespace) -> None:
-    """Reject benchmark+platform combinations that always fail before any execution begins."""
     if not s.platform_key or not s.benchmark:
         return
 
@@ -378,7 +331,6 @@ def _check_benchmark_platform_compatibility(s: types.SimpleNamespace) -> None:
 
 
 def _interactive_resolve_mode_for_selected_platform(s: types.SimpleNamespace) -> None:
-    """Resolve execution mode for the platform chosen in the interactive wizard."""
     ctx = s.ctx
     platform_type = s.database_config.type
     caps = PlatformRegistry.get_platform_capabilities(platform_type)

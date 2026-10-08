@@ -1,11 +1,3 @@
-"""Edge-case coverage for ClickHouse primary-key stripping.
-
-Pins `_strip_primary_key_constraints` on unusual DDL: quoted table names,
-named constraints, inline column constraints, string literals and comments
-mentioning primary keys, and nested type commas. Every byte outside a real
-primary-key constraint must survive unchanged.
-"""
-
 from __future__ import annotations
 
 import pytest
@@ -83,8 +75,9 @@ class TestLiteralsAndCommentsSurvive:
         assert strip(statement) == "CREATE TABLE t (a Int32, n String DEFAULT 'a PRIMARY KEY b')"
 
     def test_line_comment_with_comma_survives(self):
-        statement = "CREATE TABLE t (a Int32 /* pk, (x) */, PRIMARY KEY (a))"
-        assert strip(statement) == "CREATE TABLE t (a Int32 /* pk, (x) */)"
+        comment = "/" + "* pk, (x) *" + "/"
+        statement = f"CREATE TABLE t (a Int32 {comment}, PRIMARY KEY (a))"
+        assert strip(statement) == f"CREATE TABLE t (a Int32 {comment})"
 
     def test_nested_type_commas_do_not_split(self):
         statement = "CREATE TABLE t (d Decimal(10, 2), e Enum8('a', 'b'), PRIMARY KEY (d))"

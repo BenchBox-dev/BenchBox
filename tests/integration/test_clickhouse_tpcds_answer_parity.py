@@ -1,25 +1,3 @@
-"""ClickHouse TPC-DS tuned-vs-untuned answer parity on a real engine.
-
-No unit test can prove that tuned DDL returns the same answers as untuned
-DDL: the NULLs-as-0 hazard (a tuned key rendered non-Nullable while the data
-holds NULLs) only materializes when real CSVs load into a real engine. This
-test generates TPC-DS once at a small scale factor, loads the identical files
-into an untuned and then a tuned ClickHouse local database (curated
-``tpcds_tuned`` template), runs the full 99-query ClickHouse-dialect set
-against both, and requires identical answers.
-
-Comparison is exact on values and row multiplicity (sorted by repr), but
-order-insensitive: tuned and untuned plans legitimately emit rows in
-different physical orders, and row order across plans is not part of the
-answer. There is no tolerance and no per-query exemption list; a mismatch
-fails with the query id.
-
-Runs in the nightly slow lane (``integration`` + ``slow`` + ``tpcds``): even
-at scale factor 0.01, datagen plus two full loads plus 198 query executions
-do not fit the fast/medium lane budgets. Skips cleanly where chDB cannot
-load.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -41,8 +19,6 @@ pytestmark = [
     pytest.mark.tpcds,
 ]
 
-# Skip the whole module where chDB cannot load (e.g. macOS hosts whose
-# loader rejects the published wheels); the skip reason names the cause.
 chdb = require_chdb()
 
 SCALE_FACTOR = 0.01
@@ -50,7 +26,6 @@ EXPECTED_QUERY_COUNT = 99
 
 
 def _load_curated_tuning_config() -> UnifiedTuningConfiguration:
-    """Load the packaged ClickHouse TPC-DS template the way runs do."""
     template_path = packaged_template_path("clickhouse", "tpcds")
     assert template_path.exists(), f"missing curated template: {template_path}"
     payload = yaml.safe_load(template_path.read_text(encoding="utf-8")) or {}
@@ -70,7 +45,6 @@ def _parity_sql(sql: str) -> str:
 
 
 def _query_answers(client: Any, queries: dict[str, str]) -> dict[str, list[tuple[str, ...]]]:
-    """Run every query and return rows as sorted repr tuples (multiset)."""
     answers: dict[str, list[tuple[str, ...]]] = {}
     for query_id in sorted(queries, key=int):
         rows = client.execute(_parity_sql(queries[query_id]))
@@ -109,9 +83,6 @@ def test_tuned_tpcds_answers_match_untuned(tmp_path: Path) -> None:
     queries = benchmark.get_queries(dialect="clickhouse")
     assert len(queries) == EXPECTED_QUERY_COUNT, f"expected 99 TPC-DS queries, got {len(queries)}"
 
-    # chDB pins one EmbeddedServer path per worker process, so both phases
-    # share the default in-memory client sequentially: run untuned, drop
-    # every table, then run tuned on the same client.
     client = ClickHouseLocalClient()
     try:
         untuned = ClickHouseAdapter(deployment_mode="local")
