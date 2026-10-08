@@ -11396,10 +11396,15 @@
       "title": "service_account exports a raw IAM email verbatim in internal result metadata"
     },
     "internal-labels-in-code-and-rules": {
-      "claim": null,
+      "claim": {
+        "expires_at": "2026-10-09T23:46:49Z",
+        "generation": "57f91209f2b648f7b91f23fadcfe9f8e",
+        "renewals": 0,
+        "worker": "mcp:antigravity-client:joe@joe-mac-mini.local:a9f51c620a99fea6b166f0af"
+      },
       "needs": [],
       "priority": "low",
-      "status": "open",
+      "status": "active",
       "title": "Remove work-item labels and dated UAT evidence from code strings users can see"
     },
     "internal-result-metadata-exports-connection-usernames": {
