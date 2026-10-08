@@ -3009,7 +3009,7 @@
       ],
       "priority": "medium",
       "status": "open",
-      "title": "Measure SSB on ClickHouse with and without the tuned session pack, and record the pack's benchmark scope"
+      "title": "Measure each ClickHouse tuned session-pack setting on TPC-H, SSB and TPC-DS, and record the pack's benchmark scope"
     },
     "clickhouse-tpcdi-dialect-overrides": {
       "claim": null,

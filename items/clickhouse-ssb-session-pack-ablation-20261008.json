@@ -1,12 +1,12 @@
 {
   "acceptance": [
-    "Harness output for the three SSB arms is recorded with CIs (path in context).",
-    "The benefit-rule verdict for the pack on SSB is recorded, and the gate in tuning.py is changed only if the verdict is keep.",
-    "The ADR-3 addendum states the pack's benchmark scope and the reason, or 'unmeasured', for each excluded benchmark.",
-    "A unit test pins the gate's benchmark list."
+    "Harness output for every arm on TPC-H, SSB and TPC-DS is recorded with CIs and failures (paths in context).",
+    "The pack and each setting have a benefit-rule verdict. Settings are removed or kept as the verdicts direct, and a unit test pins the final pack contents.",
+    "The gate's benchmark list matches the verdicts and is pinned by a unit test.",
+    "The ADR-3 addendum states the pack's contents, its benchmark scope and the reason for each exclusion."
   ],
   "context": "Source: tuning-evidence plan (2026-10-08), plan step 7. Covers muse F8. The existing item ssb-tuned-merge-settle-retest-20261008 (created by another session from handoff decision D3) asks for a merge-settle retest of the SSB layout. ADR-3's SSB row already records that retest: three cells on a fresh server with settle, 109.8 ms notuning vs 61.2 ms tuned (0.56x). This item covers the pack question that retest left open.",
-  "description": "## Problem\nThe tuned ClickHouse session pack applies only when `benchmark_type` is `olap`, `analytics`, `tpch` or `tpcds` (`benchbox/platforms/clickhouse/tuning.py:103-108`). SSB is excluded, along with every other benchmark. So the SSB keep decision measured layout alone, while TPC-H measured layout plus pack, and the two cannot be compared. Nothing records why the pack covers those four benchmarks.\n\n## Change\n- With the harness, run SSB SF1 in three arms: `notuning`, tuned layout without the pack, and tuned layout with the pack.\n- Apply the benefit rule, and decide whether `ssb` joins the pack's benchmark gate.\n- Record the gate's scope and the reason for it in the ADR-3 ClickHouse addendum, including why the other benchmarks are excluded. Where the reason is \"never measured\", say so.\n\n## Decision gate\n- Change the gate only if the rule says the pack helps SSB. Otherwise just record the scope.\n\n## Guardrails (must preserve)\n- Leave the pack's settings as they are.\n- No other benchmark joins the gate without its own measurement.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`. Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
+  "description": "## Problem\n- The tuned ClickHouse session pack applies only when `benchmark_type` is `olap`, `analytics`, `tpch` or `tpcds` (`benchbox/platforms/clickhouse/tuning.py:103-108`). SSB and every other benchmark are excluded, and nothing records why.\n- The SSB keep decision therefore measured layout alone, while TPC-H measured layout plus pack, so the two are not comparable.\n- The settings that stayed in the pack have no measured benefit. The ADR-3 ClickHouse addendum records them as \"within noise (1.03× to 1.06×)\" on TPC-H, which is slightly worse, not better. The settings are `max_bytes_in_join`, the external group-by and sort thresholds, `optimize_aggregation_in_order=1` and `group_by_two_level_threshold=100000`.\n\n## Change\n- With the harness, run each benchmark at SF1 on ClickHouse server (5.25 GiB rung) in these arms:\n  - `notuning`;\n  - tuned layout without the pack;\n  - tuned layout with the full pack;\n  - tuned layout with the pack minus each setting, one at a time.\n- Do this for TPC-H, SSB and TPC-DS.\n- Apply the benefit rule to the pack as a whole and to each setting. A setting stays only if removing it makes things worse beyond noise, or if it is needed to keep a query passing (record which query).\n- Decide whether `ssb` joins the gate. Record the gate's scope and the reason for each excluded benchmark in the ADR-3 addendum. Where the reason is that it was never measured, say so.\n\n## Decision gate\n- Change the gate or the pack only as the rule's verdicts direct.\n\n## Guardrails (must preserve)\n- No other benchmark joins the gate without its own measurement.\n- Keep memory-safety settings (`max_bytes_in_join` and the external thresholds) if removing them makes any query fail at the 5.25 GiB rung, even when they cost time. Record the trade-off.\n\n## Process guardrails\n- One PR per item against `develop`, via the AGENTS.md worktree flow (`make worktree-claim BRANCH=...`, `make agent-write-preflight`).\n- Verification ladder: `uv run -- python -m pytest -m fast -q`, `uv run -- ruff check .`, `uv run -- ruff format --check .` and `uv run -- ty check`. Then `make pr-preflight` and `make pr-open`.\n- Stage explicit paths; never `git add -A`.\n- Re-read every file:line anchor before editing. Anchors are from develop 5ca12e6ca.",
   "links": [
     "benchbox/platforms/clickhouse/tuning.py",
     "benchbox/core/tuning/templates/clickhouse/ssb_tuned.yaml"
@@ -18,6 +18,14 @@
       "client": "claude-code",
       "op": "create",
       "op_id": "5547d013219740739e35670723a31059",
+      "session_id": "11344d8456c14298801d7c917bc4b4db"
+    },
+    {
+      "actor": "mcp:claude-code:joe@joe-mac-mini.local:29337c0a62a5bcd21e75d97d",
+      "at": "2026-10-08T23:39:56Z",
+      "client": "claude-code",
+      "op": "update",
+      "op_id": "853b11f6ec2c4edf9dedd2f28cdb3cdf",
       "session_id": "11344d8456c14298801d7c917bc4b4db"
     }
   ]
